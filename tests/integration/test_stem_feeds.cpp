@@ -137,24 +137,23 @@ TEST_CASE("feeds: hits from the drum stem are the drums' hits; levels from it fo
     const Trace m = play(mix, 19.9, fps);
     const Trace f = play(fed, 19.9, fps);
     // 8-10 s: the drum stem is silent and the bass plays a note at 8.0. The mix hears a low attack there; the drums
-    // feed none, and no kick.
+    // feed none.
     const auto mixLow = rises(m.at("response.lowEnv"), fps);
     const auto fedLow = rises(f.at("response.lowEnv"), fps);
-    const auto fedKick = rises(f.at("response.kickEnv"), fps);
-    // ADR-1620: the mix has no kick: with no feed there is none at all, the stem's kicks only with one. The mix's
-    // snare and hat still fire.
-    CHECK(rises(m.at("response.kickEnv"), fps).empty());
-    CHECK_FALSE(rises(m.at("response.hatEnv"), fps).empty());
     INFO("mix low in 7.9-9.9: " << within(mixLow, 7.9, 9.9) << ", fed low " << within(fedLow, 7.9, 9.9));
     CHECK(within(mixLow, 7.9, 9.9) >= 1);
     CHECK(within(fedLow, 8.05, 9.95) == 0);
-    CHECK(within(fedKick, 8.05, 9.95) == 0);
-    // Every fed kick is one of the stem's kicks.
+    // Every fed low attack is one of the drum stem's kicks.
     const auto kicks = fx.times("drums", "kicks");
-    CHECK(fedKick.size() >= kicks.size() * 3 / 4);
-    for (double t : fedKick) {
-        INFO("fed kick at " << t);
+    CHECK(fedLow.size() >= kicks.size() * 3 / 4);
+    for (double t : fedLow) {
+        INFO("fed low attack at " << t);
         CHECK(std::any_of(kicks.begin(), kicks.end(), [&](double k) { return t >= k - 0.04 && t <= k + 0.08; }));
+    }
+    // No response signal names an instrument, fed or not.
+    for (const char* retired : {"response.kickEnv", "response.snareEnv", "response.hatEnv"}) {
+        CHECK_FALSE(m.contains(retired));
+        CHECK_FALSE(f.contains(retired));
     }
     // The levels: from the drum stem they fall away in its silence (its own reference holds); the mix's do not.
     const auto most = [&](const Trace& tr, const char* name, double from, double to) {
@@ -175,12 +174,12 @@ TEST_CASE("feeds: a stem outside its span feeds nothing; a key that names nothin
           "[feeds][stems][engine]") {
     const auto& fx = testsupport::requireStemFixture();
     json stems = standardStems(fx);
-    stems.push_back(stem(fx, "late", "drums.wav", 12.0, 0.0f, "drums")); // ADR-1630: a kick needs a drums source
+    stems.push_back(stem(fx, "late", "drums.wav", 12.0, 0.0f, "drums"));
     app::Engine late(app::EngineMode::Offline);
-    REQUIRE(late.loadProject(writeProject(fx, "late", stems, {{"kick", "stem.late"}})).has_value());
-    const auto kicks = rises(play(late, 15.0, 60.0).at("response.kickEnv"), 60.0);
-    CHECK(within(kicks, 0.0, 11.95) == 0);
-    CHECK(within(kicks, 12.4, 15.0) >= 4);
+    REQUIRE(late.loadProject(writeProject(fx, "late", stems, {{"low", "stem.late"}})).has_value());
+    const auto lows = rises(play(late, 15.0, 60.0).at("response.lowEnv"), 60.0);
+    CHECK(within(lows, 0.0, 11.95) == 0);
+    CHECK(within(lows, 12.4, 15.0) >= 4);
 
     app::Engine typo(app::EngineMode::Offline);
     REQUIRE(typo.loadProject(writeProject(fx, "typo", standardStems(fx), {{"hits", "stem.drumz"}, {"beat", "stem.drumz"}}))
@@ -263,7 +262,7 @@ TEST_CASE("feeds: the block and the stem trim survive a save; a project without 
           "[feeds][stems][engine][project]") {
     const auto& fx = testsupport::requireStemFixture();
     json stems = json::array({stem(fx, "drums", "drums.wav", 0.0, -6.5f), stem(fx, "bass", "bass.wav")});
-    const json feeds = {{"beat", "stem.drums"}, {"hits", "stem.drums"}, {"low", "stem.bass"}, {"hat", "audio"}};
+    const json feeds = {{"beat", "stem.drums"}, {"hits", "stem.drums"}, {"low", "stem.bass"}, {"onset", "audio"}};
     app::Engine e(app::EngineMode::Offline);
     REQUIRE(e.loadProject(writeProject(fx, "save", stems, feeds)).has_value());
     const fs::path saved = testsupport::processTempDir() / "feeds-save" / "saved.json";
@@ -288,13 +287,13 @@ TEST_CASE("feeds: the block and the stem trim survive a save; a project without 
 }
 
 
-TEST_CASE("feeds: a route on the kick is dead with no drum source and live with one (ADR-1620)",
-          "[feeds][stems][engine][liveness][adr1620]") {
+TEST_CASE("feeds: routes on the response hits are live on the mix and from a drum stem",
+          "[feeds][stems][engine][liveness]") {
     const auto& fx = testsupport::requireStemFixture();
     const auto audit = [&](const char* name, const json& feeds) {
         app::Engine e(app::EngineMode::Offline);
         REQUIRE(e.loadProject(writeProject(fx, name, standardStems(fx), feeds)).has_value());
-        for (const char* source : {"response.kick", "response.kickEnv", "response.snare"}) {
+        for (const char* source : {"response.low", "response.lowEnv", "response.onset"}) {
             params::ModRoute r;
             r.source = source;
             r.target = "camera/height";
@@ -304,25 +303,12 @@ TEST_CASE("feeds: a route on the kick is dead with no drum source and live with 
         e.rebind();
         return e.auditRoutes();
     };
-    const auto rule = [](const scene::AuditEntry& entry) {
-        return entry.findings.empty() ? std::string() : entry.findings.front().rule;
-    };
-    // The mix: the kick cannot fire, so its routes are dead and say why; the mix's snare is live.
-    const scene::RouteAudit mix = audit("liveness-mix", json());
-    REQUIRE(mix.routes.size() == 3);
-    CHECK(mix.routes[0].verdict == params::liveness::Verdict::Dead);
-    CHECK(rule(mix.routes[0]) == "silent-source");
-    CHECK(mix.routes[0].findings.front().reason.find("ADR-1620") != std::string::npos);
-    CHECK(mix.routes[1].verdict == params::liveness::Verdict::Dead);
-    CHECK(mix.routes[2].verdict != params::liveness::Verdict::Dead);
-    // Hits from the drum stem: the same routes are live.
-    const scene::RouteAudit fed = audit("liveness-fed", {{"hits", "stem.drums"}});
-    REQUIRE(fed.routes.size() == 3);
-    for (const scene::AuditEntry& entry : fed.routes) {
-        INFO(entry.label << ": " << rule(entry));
-        CHECK(entry.verdict != params::liveness::Verdict::Dead);
+    for (const json& feeds : {json(), json{{"hits", "stem.drums"}}, json{{"low", "stem.drumz"}}}) {
+        const scene::RouteAudit a = audit("liveness-hits", feeds);
+        REQUIRE(a.routes.size() == 3);
+        for (const scene::AuditEntry& entry : a.routes) {
+            INFO(feeds.dump() << " " << entry.label);
+            CHECK(entry.verdict != params::liveness::Verdict::Dead);
+        }
     }
-    // A feed that names a stem the project lacks is no source: still dead.
-    const scene::RouteAudit typo = audit("liveness-typo", {{"kick", "stem.drumz"}});
-    CHECK(typo.routes[0].verdict == params::liveness::Verdict::Dead);
 }

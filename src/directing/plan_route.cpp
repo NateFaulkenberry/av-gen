@@ -285,10 +285,10 @@ json planRouteSchema() {
           {"level", "micro|meso|macro: small fast local things | clusters, heroes, waves | the world"},
           {"group", "the catalogue group of the target (director.inspect_scene's reactive catalogue)"},
           {"owner", "what answers: a hero, a scatter layer, a particle system, or world"},
-          {"layer", "the musical layer it answers, in words: kick, clap, hats, bar, section energy, ..."},
+          {"layer", "the musical layer it answers, in words: beat, onset, bar, section energy, ..."},
           {"reason", "why this answers that, in a sentence a person reads"},
           {"route",
-           {{"source", "a signal on the bus (beat.pulse = the beat a kick lands on, audio.onsetMid = clap, audio.onsetHigh = hats, "
+           {{"source", "a signal on the bus (beat.pulse = the beat, audio.onset = any attack, "
                        "music.downbeat, beat.bar, section.energy, audio.energy, ...) or a plan source's signal"},
             {"target", "a parameter path from the reactive catalogue"},
             {"component", "-1 = all"},

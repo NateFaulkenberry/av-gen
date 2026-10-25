@@ -32,13 +32,7 @@ SpanProfile profileSpan(const AnalysisTrack& track, double startSeconds, double 
     double centroid = 0.0;
     std::size_t audible = 0;
     std::size_t stereo = 0;
-    std::size_t hits = 0;
-    std::size_t kicks = 0;
-    std::size_t snares = 0;
-    std::size_t hats = 0;
-    std::size_t broadband = 0;
-    bool percussive = false;
-    double lastHit = -1e30;
+    std::size_t onsets = 0;
     std::array<double, kMaxBands> power{};
     for (auto it = first; it != last; ++it) {
         const AnalysisFrame& f = *it;
@@ -55,39 +49,25 @@ SpanProfile profileSpan(const AnalysisTrack& track, double startSeconds, double 
             width += f.width;
             ++stereo;
         }
-        percussive = percussive || f.onsetRateIsPercussive;
-        kicks += f.lowOnset ? 1u : 0u;
-        snares += f.midOnset ? 1u : 0u;
-        hats += f.highOnset ? 1u : 0u;
-        broadband += f.onset ? 1u : 0u;
-        if ((f.lowOnset || f.midOnset || f.highOnset) && f.timeSeconds - lastHit >= 0.03) {
-            ++hits;
-            lastHit = f.timeSeconds;
-        }
+        onsets += f.causal.valid && f.causal.hit[static_cast<std::size_t>(HitClass::Onset)] ? 1u : 0u;
     }
     const double n = static_cast<double>(out.frames);
     const double seconds = endSeconds - startSeconds;
-    out.onsetRate = static_cast<float>(static_cast<double>(percussive ? hits : broadband) / seconds);
-    // The span's energy is the composite of its frames' level-free terms with the span's OWN onset
-    // rate as the density term -- not the mean of the frames' smoothed `energy`, whose one-pole lags a
-    // short section (a 7 s riser climbs for most of its length) and whose leaky rate carries the
-    // previous section's density into this one.
+    out.onsetRate = static_cast<float>(static_cast<double>(onsets) / seconds);
+    // The span's energy is the mean composite of its frames' level-free terms -- not the mean of the
+    // frames' smoothed `energy`, whose one-pole lags a short section (a 7 s riser climbs for most of
+    // its length).
     for (auto it = first; it != last; ++it) {
         EnergyTerms terms;
         terms.highRatioDb = it->highRatioDb;
         terms.centroidHz = it->centroidHz;
         terms.relativeFlux = it->relativeFlux;
-        terms.onsetRate = out.onsetRate;
-        terms.hasOnsetRate = percussive;
         terms.width = it->width;
         terms.hasWidth = it->stereo;
         terms.silent = !(it->rms > 1e-7f);
         energy += energyComposite(terms);
     }
     out.energy = static_cast<float>(energy / n);
-    out.kickRate = static_cast<float>(static_cast<double>(kicks) / seconds);
-    out.snareRate = static_cast<float>(static_cast<double>(snares) / seconds);
-    out.hatRate = static_cast<float>(static_cast<double>(hats) / seconds);
     out.brightnessHz = audible > 0 ? static_cast<float>(centroid / static_cast<double>(audible)) : 0.0f;
     for (std::size_t b = 0; b < out.bandCount; ++b) {
         const double mean = power[b] / n / kHannEnergyGain; // sine-amplitude units, as the levels are
@@ -107,9 +87,9 @@ nlohmann::json spanProfileToJson(const SpanProfile& p) {
         bands[names[b]] = p.bandDb[b];
         levels[names[b]] = p.bandLevels[b];
     }
-    nlohmann::json j = {{"energy", p.energy},       {"onsetRate", p.onsetRate}, {"kickRate", p.kickRate},
-                        {"snareRate", p.snareRate}, {"hatRate", p.hatRate},     {"brightnessHz", p.brightnessHz},
-                        {"bandsDb", std::move(bands)}, {"bandLevels", std::move(levels)}, {"frames", p.frames}};
+    nlohmann::json j = {{"energy", p.energy},          {"onsetRate", p.onsetRate},
+                        {"brightnessHz", p.brightnessHz}, {"bandsDb", std::move(bands)},
+                        {"bandLevels", std::move(levels)}, {"frames", p.frames}};
     if (p.stereo) {
         j["width"] = p.width;
     }
@@ -123,9 +103,6 @@ SpanProfile spanProfileFromJson(const nlohmann::json& j) {
     }
     p.energy = j.value("energy", 0.0f);
     p.onsetRate = j.value("onsetRate", 0.0f);
-    p.kickRate = j.value("kickRate", 0.0f);
-    p.snareRate = j.value("snareRate", 0.0f);
-    p.hatRate = j.value("hatRate", 0.0f);
     p.brightnessHz = j.value("brightnessHz", 0.0f);
     p.frames = j.value("frames", std::size_t{0});
     const auto& names = defaultBandNames();

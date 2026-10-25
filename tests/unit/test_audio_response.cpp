@@ -151,7 +151,7 @@ TEST_CASE("Sustain curves the spectrogram the fields hear; Release lengthens an 
     CHECK(slowDecay > neutralDecay);
 }
 
-TEST_CASE("THE ASTRAL FORGE's song, heard: neutral is the song, Transients drop kicks, Release slows the envelopes",
+TEST_CASE("THE ASTRAL FORGE's song, heard: neutral is the song, Transients drop low onsets, Release slows the envelopes",
           "[astral][adr1361]") {
     astral::SongAnalysis s;
     s.hops = 400;
@@ -164,33 +164,33 @@ TEST_CASE("THE ASTRAL FORGE's song, heard: neutral is the song, Transients drop 
     }
     s.env1.resize(static_cast<std::size_t>(s.hops), glm::vec4(0.0f, 0.5f, 0.0f, 0.4f));
     astral::foldSongEnvelopes(s, 1.0f, 1.0f);
-    s.kickT = {0.5f, 1.0f, 2.0f};
-    s.kickS = {0.25f, 0.6f, 1.0f};
+    s.lowT = {0.5f, 1.0f, 2.0f};
+    s.lowS = {0.25f, 0.6f, 1.0f};
 
     const astral::SongAnalysis same = astral::conditionSong(s, spatial::AudioResponse{});
     CHECK(same.spec == s.spec);
     CHECK(same.env0 == s.env0);
     CHECK(same.env1 == s.env1);
-    CHECK(same.kickS == s.kickS);
+    CHECK(same.lowS == s.lowS);
     CHECK(same.release == 1.0f);
 
     sonic::ResponseControls few;
     few.transient = 0.2f;
     const astral::SongAnalysis fewer = astral::conditionSong(s, responseOf(few));
-    CHECK(fewer.kickT.size() == 2); // the 0.25 kick is under the floor
-    CHECK(fewer.kickS[0] < 0.6f);
+    CHECK(fewer.lowT.size() == 2); // the 0.25 onset is under the floor
+    CHECK(fewer.lowS[0] < 0.6f);
 
     sonic::ResponseControls longer;
     longer.release = 4.0f;
     const astral::SongAnalysis slow = astral::conditionSong(s, responseOf(longer));
-    // half a second after the burst the band envelope has fallen less, and so has the kick envelope
+    // half a second after the burst the band envelope has fallen less, and so has the low envelope
     CHECK(slow.env0[160].x > s.env0[160].x);
-    CHECK(astral::sampleSong(slow, 2.3).kickEnv > astral::sampleSong(s, 2.3).kickEnv);
+    CHECK(astral::sampleSong(slow, 2.3).lowEnv > astral::sampleSong(s, 2.3).lowEnv);
 }
 
-TEST_CASE("THE ASTRAL FORGE's live conductor hears its kicks through the Response", "[astral][adr1361]") {
-    // A live history: a second of rows, beats every half second, one kick of strength 0.45 at 1.0 s.
-    auto blastAfterKick = [](float transient) {
+TEST_CASE("THE ASTRAL FORGE's live conductor hears its low onsets through the Response", "[astral][adr1361]") {
+    // A live history: a second of rows, beats every half second, one low onset of strength 0.45 at 1.0 s.
+    auto blastAfterLow = [](float transient) {
         spatial::AudioHistory h = spatial::AudioHistory::livePlaceholder(100.0);
         std::array<float, spatial::kAudioBins> row{};
         row.fill(0.3f);
@@ -209,11 +209,11 @@ TEST_CASE("THE ASTRAL FORGE's live conductor hears its kicks through the Respons
         h.setResponse(responseOf(c));
         scene::AstralLiveConductor conductor;
         const astral::State s = conductor.update(h, 1.05, astral::Controls{}, false);
-        return s.blast; // 14 + 10 x the last kick's strength as heard
+        return s.blast; // 14 + 10 x the last low onset's strength as heard
     };
-    const float low = blastAfterKick(0.2f);
-    const float neutral = blastAfterKick(0.5f);
-    const float high = blastAfterKick(0.9f);
+    const float low = blastAfterLow(0.2f);
+    const float neutral = blastAfterLow(0.5f);
+    const float high = blastAfterLow(0.9f);
     CHECK(neutral == Approx(14.0f + 10.0f * 0.45f));
     CHECK(low < neutral);
     CHECK(high > neutral);

@@ -52,7 +52,7 @@ struct PlanRoute {
     ReactiveLevel level = ReactiveLevel::Meso;
     std::string group;                        // the catalogue group of the target: "hero-emission", "scatter-hue", ...
     std::string owner;                        // what answers: a hero, "<terrain>/<layer>", a particle system, "world"
-    std::string layer;                        // the musical layer it answers, in words: "kick", "section energy"
+    std::string layer;                        // the musical layer it answers, in words: "beat", "section energy"
     std::string reason;                       // one or two sentences: why this target answers this layer this way
     params::ModRoute route;                   // exactly a project route (runtime fields unused, `planItem` empty)
     friend bool operator==(const PlanRoute& a, const PlanRoute& b);

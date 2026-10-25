@@ -55,9 +55,6 @@ float energyComposite(const EnergyTerms& terms) {
     const float octaves = terms.centroidHz > 0.0f ? std::log2(terms.centroidHz / 250.0f) / std::log2(24.0f) : 0.0f;
     add(clamp01(octaves), 2.0);
     add(on(terms.relativeFlux, 0.08f, 0.24f), 1.0);
-    if (terms.hasOnsetRate) {
-        add(on(terms.onsetRate, 2.0f, 12.0f), 1.0);
-    }
     if (terms.hasWidth) {
         add(on(terms.width, 0.1f, 0.4f), 1.0);
     }
@@ -306,6 +303,11 @@ void Analyzer::computeFrame() {
         }
         frame.flux = std::min(1.0f, static_cast<float>(rawFlux));
     }
+    // ADR-1604: the register of this hop's gain, kept for the onset decided below.
+    const std::array<float, 3> gained =
+        havePrevious_ ? registerShares(frame.magnitude, previousMagnitude_,
+                                       static_cast<float>(config_.sampleRate) / static_cast<float>(config_.windowSize))
+                      : std::array<float, 3>{};
     std::copy(frame.magnitude.begin(), frame.magnitude.end(), previousMagnitude_.begin());
     havePrevious_ = true;
 
@@ -335,6 +337,7 @@ void Analyzer::computeFrame() {
         frame.onsetStrength >= 1.0f && frame.flux >= lastFlux_ && frame.flux > 0.0f && refractoryElapsed;
     if (frame.onset) {
         lastOnsetTime_ = frame.timeSeconds;
+        frame.onsetRegister = gained;
     }
 
     fluxHistory_.push_back(frame.flux);
@@ -380,10 +383,7 @@ void Analyzer::computeFrame() {
     onsetRate_ = static_cast<float>(impl.rateKeep * static_cast<double>(onsetRate_) +
                                     (frame.onset ? impl.rateImpulse : 0.0));
     frame.onsetRate = onsetRate_;
-    frame.onsetRateIsPercussive = false;
-    // The streaming composite has no percussive onset rate -- the band onsets are an offline pass --
-    // so it is the level-free spectral terms (and the width, when stereo). AnalysisTrack recomputes
-    // it with the density term once the band onsets exist.
+    // The composite of the level-free spectral terms (and the width, when stereo).
     EnergyTerms terms;
     terms.highRatioDb = frame.highRatioDb;
     terms.centroidHz = frame.centroidHz;
@@ -421,9 +421,6 @@ void LiveEventLatch::apply(AnalysisFrame& frame) {
     };
     latch(frame.onset, frame.onsetStamp, onset);
     latch(frame.beat, frame.beatStamp, beat);
-    latch(frame.lowOnset, frame.lowStamp, low);
-    latch(frame.midOnset, frame.midStamp, mid);
-    latch(frame.highOnset, frame.highStamp, high);
 }
 
 } // namespace avgen::analysis

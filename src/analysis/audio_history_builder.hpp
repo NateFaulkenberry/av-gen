@@ -6,8 +6,8 @@
 // track, folded once. Each analysis frame's 1,025-bin log spectrum becomes one 64-bin row on a
 // log-frequency axis (32 Hz-16 kHz), and then every bin is stretched over its own range across the
 // whole track: 0 at the bin's 20th percentile, 1 at its 98th. The stretch is what keeps a quiet
-// intro dark and makes the treble as legible as the bass. The onset lists are the track's band
-// onsets (ADR-898) and its beats.
+// intro dark and makes the treble as legible as the bass. The onset lists are the track's onsets,
+// each on the row of its register (`onsetRows`), and its beats.
 //
 // Live input: there is no track. Each render frame pushes the newest analysis frame; the stretch
 // uses running estimates of the same two percentiles (a slow floor follower and a decaying peak),
@@ -37,9 +37,16 @@ struct HistoryFrom {
     double offsetSeconds = 0.0; // where the source's first sample sits on the project timeline
     bool classes = false;       // a drums source (ADR-1630): its kick / snare / hat are the low / mid / high rows
 };
-// The onset rows (low, mid, high) a source's hop contributes, as strengths (0 = none). A drums source's are its
-// measured classes -- kick, snare, hat; any other source has no identity to offer, so its onset (activity) is on all
-// three rows and a field reading any of them hears it.
+// The onset rows (low, mid, high) one picked onset contributes, as strengths (0 = none): the onset lands on the row
+// of its register's largest share (ADR-1604: low 30-250 Hz, mid 250 Hz-4 kHz, high 4-16 kHz), at the strength the
+// bus gives it (`onsetStrength` x 0.5, floored at 0.05 and capped at 1); one whose register is unknown (no band
+// gained) is on all three. Where an attack is, never what made it: the rule for the mix and every source that is not
+// a drums source.
+[[nodiscard]] std::array<float, 3> onsetRows(bool onset, float onsetStrength, const std::array<float, 3>& reg);
+// The mix frame's (its `onset` and `onsetRegister`).
+[[nodiscard]] std::array<float, 3> onsetRows(const AnalysisFrame& frame);
+// A source's hop. A drums source's rows are its measured classes -- kick, snare, hat (ADR-1630); any other source's
+// are its onset by register (`onsetRows`).
 [[nodiscard]] std::array<float, 3> sourceOnsetRows(const StemFrame& frame, bool classes);
 // The whole track's history with the spectrogram and the low/mid/high onset rows taken from those sources. The beat
 // row is always the mix's (ADR-1630 recommendation 6: the mix's grid stays the default). A source's spectrogram is

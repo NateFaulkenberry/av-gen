@@ -1375,9 +1375,6 @@ scene::LivenessInputs Engine::livenessInputs() const {
     // ADR-916: the tear rule asks whether anything lifts a water's tear amount.
     in.modulator = &modulator_;
     in.timeline = &timeline_;
-    // ADR-1620: the kick is heard only through a feed whose source resolves.
-    in.judgeKick = true;
-    in.kickFed = feeds_.kickFed() && feedState(feeds_.hitSource(0)).resolved;
     return in;
 }
 
@@ -2937,12 +2934,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         ~LoudAgain() { quiet = false; }
     } loudAgain{feedsQuiet_};
     if (const auto block = doc.find("feeds"); block != doc.end()) {
-        std::vector<std::string> feedWarnings;
-        if (auto parsed = audio::Feeds::fromJson(*block, &feedWarnings)) {
+        if (auto parsed = audio::Feeds::fromJson(*block)) {
             feeds_ = std::move(*parsed);
-            for (const std::string& w : feedWarnings) {
-                warn(w);
-            }
         } else {
             warn(parsed.error().message + "; the mix feeds everything");
         }
@@ -4788,15 +4781,6 @@ void Engine::rebuildFeeds() {
                                            audio::feedValue(key)));
         }
     };
-    // ADR-1630: a class (kick, snare, hat) from a source that is not a drums source is refused, and said.
-    const auto notDrums = [&](const char* feed, const std::string& key, audio::SourceRole role) {
-        if (!feedsQuiet_) {
-            noteBindingProblem(fmt::format("feeds.{}: '{}' is a {} source; a {} comes only from a drums source "
-                                           "(ADR-1630), so it {}",
-                                           feed, audio::feedValue(key), audio::sourceRoleName(role), feed,
-                                           std::string_view(feed) == "kick" ? "does not fire" : "follows the mix"));
-        }
-    };
 
     // ---- the grid (ADR-1581) ----
     grid_ = analysis::TrackedGrid{};
@@ -4877,17 +4861,13 @@ void Engine::rebuildFeeds() {
     if (track_ && !track_->empty() && feeds_.anyResponse() && sonic_->timbre.size() == track_->frames().size()) {
         std::vector<const StemState*> sources;
         analysis::FeedRouting routing;
-        const auto route = [&](const char* feed, const std::string& key, bool needsClasses) -> int {
+        const auto route = [&](const char* feed, const std::string& key) -> int {
             if (key.empty()) {
                 return -1;
             }
             const StemState* stem = stemOf(key);
             if (stem == nullptr) {
                 unresolved(feed, key);
-                return -1;
-            }
-            if (needsClasses && !stem->source.hits()) {
-                notDrums(feed, key, stem->source.role);
                 return -1;
             }
             const auto it = std::find(sources.begin(), sources.end(), stem);
@@ -4898,9 +4878,9 @@ void Engine::rebuildFeeds() {
             return static_cast<int>(sources.size()) - 1;
         };
         for (std::size_t k = 0; k < routing.hit.size(); ++k) {
-            routing.hit[k] = route(audio::kFeedHitNames[k], feeds_.hitSource(k), audio::feedHitIsClass(k));
+            routing.hit[k] = route(audio::kFeedHitNames[k], feeds_.hitSource(k));
         }
-        routing.levels = route("levels", feeds_.levels, false);
+        routing.levels = route("levels", feeds_.levels);
         if (routing.any()) {
             const auto& frames = track_->frames();
             std::vector<analysis::FeedFolder> folders(sources.size());
@@ -4926,7 +4906,7 @@ void Engine::rebuildFeeds() {
                     now[s] = folders[s].fold(window, t, inSpan);
                 }
                 sonic_->feed.push_back(analysis::mergeFeeds(
-                    analysis::ResponseFeed::fromMix(sonic_->timbre[i].causal), now, routing));
+                    analysis::ResponseFeed::fromCausal(sonic_->timbre[i].causal), now, routing));
             }
             sonic_->feedKey = std::hash<std::string>{}(feeds_.toJson().dump()) ^ (stemsRevision_ * 0x9e3779b97f4a7c15ull);
             if (sonic_->feedKey == 0) {
@@ -5961,18 +5941,10 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
     if (feeds_.anyResponse()) {
         std::vector<std::size_t> slots;
         analysis::FeedRouting routing;
-        const auto route = [&](const std::string& key, bool needsClasses) -> int {
+        const auto route = [&](const std::string& key) -> int {
             const int i = liveSourceIndex(key);
             if (i < 0) {
                 return -1; // not a live source: the mix (the offline warning names it)
-            }
-            if (needsClasses && !inputSources_[static_cast<std::size_t>(i)].hits()) {
-                // ADR-1630: a class from a source that is not a drums source: refused, and said.
-                const audio::InputSource& refused = inputSources_[static_cast<std::size_t>(i)];
-                noteBindingProblem(fmt::format("feeds: input source '{}' is a {} source; a kick, snare or hat comes "
-                                               "only from a drums source (ADR-1630), so it is not fed from it",
-                                               refused.key, audio::sourceRoleName(refused.role)));
-                return -1;
             }
             const auto it = std::find(slots.begin(), slots.end(), static_cast<std::size_t>(i));
             if (it != slots.end()) {
@@ -5982,9 +5954,9 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
             return static_cast<int>(slots.size()) - 1;
         };
         for (std::size_t k = 0; k < routing.hit.size(); ++k) {
-            routing.hit[k] = route(feeds_.hitSource(k), audio::feedHitIsClass(k));
+            routing.hit[k] = route(feeds_.hitSource(k));
         }
-        routing.levels = route(feeds_.levels, false);
+        routing.levels = route(feeds_.levels);
         if (routing.any()) {
             liveFeeds_ = std::make_unique<analysis::LiveFeedMixer>(*channels_, std::move(slots), routing);
         }
@@ -6198,37 +6170,25 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         return false;
     }
     // Consume every analysis frame whose centre lies at or before renderTime so events that fall
-    // between two render frames are not lost at low frame rates: the broadband onset, the tracked
-    // beat, and the three band onsets (ADR-898) are each OR-ed across the batch with their
-    // strongest strength. Before ADR-898 only the onset was, and `audio.beat` lost about a third of
-    // its beats at 60 fps (a beat on any but the batch's last analysis frame).
+    // between two render frames are not lost at low frame rates: the broadband onset (with the
+    // register of the strongest) and the tracked beat are each OR-ed across the batch. Before that
+    // only the onset was, and `audio.beat` lost about a third of its beats at 60 fps (a beat on any
+    // but the batch's last analysis frame).
     const auto& frames = track_->frames();
     const analysis::Meter m = meter();
     bool onset = false;
     float onsetStrength = 0.0f;
+    std::array<float, 3> onsetRegister{};
     bool beat = false;
-    bool low = false, mid = false, high = false;
-    float lowStrength = 0.0f, midStrength = 0.0f, highStrength = 0.0f;
     std::size_t cursor = clock.analysisCursor;
     while (cursor < frames.size() && frames[cursor].timeSeconds <= renderTime) {
         const analysis::AnalysisFrame& f = frames[cursor];
-        if (f.onset) {
+        if (f.onset && (!onset || f.onsetStrength > onsetStrength)) {
             onset = true;
-            onsetStrength = std::max(onsetStrength, f.onsetStrength);
+            onsetStrength = f.onsetStrength;
+            onsetRegister = f.onsetRegister;
         }
         beat = beat || f.beat;
-        if (f.lowOnset) {
-            low = true;
-            lowStrength = std::max(lowStrength, f.lowOnsetStrength);
-        }
-        if (f.midOnset) {
-            mid = true;
-            midStrength = std::max(midStrength, f.midOnsetStrength);
-        }
-        if (f.highOnset) {
-            high = true;
-            highStrength = std::max(highStrength, f.highOnsetStrength);
-        }
         // The classifier is fed here rather than from publishFrame() below, which only ever
         // sees the last frame of the batch: at 30 fps that is one analysis frame in three, and
         // a detector that samples the music at the frame rate is a detector whose answers
@@ -6243,14 +6203,9 @@ bool Engine::consumeAnalysis(SignalClock& clock, signals::SignalBus& bus, double
         clock.latest.onset = onset;
         if (onset) {
             clock.latest.onsetStrength = onsetStrength;
+            clock.latest.onsetRegister = onsetRegister;
         }
         clock.latest.beat = beat;
-        clock.latest.lowOnset = low;
-        clock.latest.lowOnsetStrength = lowStrength;
-        clock.latest.midOnset = mid;
-        clock.latest.midOnsetStrength = midStrength;
-        clock.latest.highOnset = high;
-        clock.latest.highOnsetStrength = highStrength;
         clock.hasFrame = true;
         audioSignals_.publish(bus, clock.latest);
         clock.music.consume(clock.latest, m); // a repeat: ignored by index
@@ -7971,9 +7926,8 @@ void Engine::updateAudioHistory(bool newFrame) {
                 }
                 std::array<float, spatial::kOnsetSources> onsets{};
                 if (onsetsSource < 0) {
-                    onsets = {f.lowOnset ? std::max(f.lowOnsetStrength, 0.05f) : 0.0f,
-                              f.midOnset ? std::max(f.midOnsetStrength, 0.05f) : 0.0f,
-                              f.highOnset ? std::max(f.highOnsetStrength, 0.05f) : 0.0f, 0.0f};
+                    const std::array<float, 3> mix = analysis::onsetRows(f);
+                    onsets = {mix[0], mix[1], mix[2], 0.0f};
                 } else {
                     std::copy(liveHistoryPending_.begin(), liveHistoryPending_.end(), onsets.begin());
                     liveHistoryPending_ = {};

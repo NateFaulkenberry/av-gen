@@ -226,8 +226,7 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
                 changed |= roleCombo("##role", it->role); // ADR-1630
                 if (ImGui::IsItemHovered()) {
                     tooltip("What this input carries. Drums finds kicks, snares and hats on it (stem.%s.kick/snare/hat, "
-                            "and role.drums.*: what tools/drum_signals.py's signal.kick reads first); about six times "
-                            "the analysis cost of the rest. Every other role publishes its onsets, levels and register "
+                            "and role.drums.kick/snare/hat); about six times the analysis cost of the rest. Every other role publishes its onsets, levels and register "
                             "only -- never a kick, snare or hat -- and role.<role>.* follows the first active source "
                             "of each role.",
                             it->key.c_str());
@@ -241,7 +240,7 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
                 }
                 if (ImGui::IsItemHovered()) {
                     tooltip("Trim before this source's analysis, on top of Input gain. It lifts a quiet channel over the "
-                            "gate and into the kick/snare/hat and beat detectors; it does not make the picture bigger "
+                            "gate and into the onset, drum and beat detectors; it does not make the picture bigger "
                             "(the levels read against the source's own loudness). Ctrl-click to type; 0 is none.");
                 }
                 changed |= ImGui::IsItemDeactivatedAfterEdit();
@@ -781,8 +780,8 @@ void ControlPanel::drawLive(app::Engine& engine) {
                "How quickly a response appears (a multiplier on every attack time).");
         slider("sonic/response/release", "Release", 0.25f, 4.0f, "%.2fx", ImGuiSliderFlags_Logarithmic,
                "How long a response lingers: the feel. A multiplier on every release and decay time.");
-        // ADR-1530: no kick / snare / hat meters here. The hits are still detected and published (response.*,
-        // audio.onset*); which input is the drums is the Inputs table's per-source Role (ADR-1630), not a panel classifier.
+        // ADR-1530: no hit meters here. A drum source's kick / snare / hat are its own signals: which input is the drums is
+        // the Inputs table's per-source Role (ADR-1630).
         if (ImGui::Button("Reset response")) {
             for (const char* path : {"sonic/response/sensitivity", "sonic/response/transient", "sonic/response/sustain",
                                      "sonic/response/attack", "sonic/response/release"}) {

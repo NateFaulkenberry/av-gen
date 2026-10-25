@@ -279,7 +279,7 @@ void AstralLiveConductor::ingest(const spatial::AudioHistory& audio, double now)
         song_.centroid.push_back(centroid_);
         ++song_.hops;
     }
-    // Onsets: kicks (low), snares (mid), hats (high) and beats, appended as the live analysis reports them.
+    // Onsets by register (low, mid, high) and beats, appended as the live analysis reports them.
     auto take = [&](spatial::OnsetSource src, std::vector<float>* T, std::vector<float>* S, std::vector<double>* beats) {
         const auto& list = audio.onsets(src);
         const double last = T != nullptr ? (T->empty() ? -1e9 : static_cast<double>(T->back()))
@@ -287,8 +287,8 @@ void AstralLiveConductor::ingest(const spatial::AudioHistory& audio, double now)
         for (const spatial::AudioOnset& o : list) {
             if (o.time <= last + 1e-6 || o.time > now + 1e-6) continue;
             if (T != nullptr) {
-                // ADR-1361: a hit as heard -- one below the performer's floor is not a kick at all, and the curve
-                // moves the rest against the collapse's 0.5 (kickNear) and the blast.
+                // ADR-1361: a hit as heard -- one below the performer's floor is not an onset at all, and the curve
+                // moves the rest against the collapse's 0.5 (lowNear) and the blast.
                 const float strength = heard.hit(std::max(0.25f, o.strength)); // the song path's order (conditionSong)
                 if (strength <= 0.0f) continue;
                 T->push_back(static_cast<float>(o.time));
@@ -298,9 +298,9 @@ void AstralLiveConductor::ingest(const spatial::AudioHistory& audio, double now)
             }
         }
     };
-    take(spatial::OnsetSource::Low, &song_.kickT, &song_.kickS, nullptr);
-    take(spatial::OnsetSource::Mid, &song_.snareT, &song_.snareS, nullptr);
-    take(spatial::OnsetSource::High, &song_.hatT, &song_.hatS, nullptr);
+    take(spatial::OnsetSource::Low, &song_.lowT, &song_.lowS, nullptr);
+    take(spatial::OnsetSource::Mid, &song_.midT, &song_.midS, nullptr);
+    take(spatial::OnsetSource::High, &song_.highT, &song_.highS, nullptr);
     take(spatial::OnsetSource::Beat, nullptr, nullptr, &song_.beats);
 }
 
@@ -330,16 +330,16 @@ void AstralLiveConductor::advancePhrases(double now, bool collapse) {
     }
     score_.beatSeconds = beatSec;
     song_.tempoBpm = static_cast<float>(60.0 / beatSec);
-    auto kickNear = [&](double t) {
-        for (std::size_t k = song_.kickT.size(); k-- > 0;) {
-            if (song_.kickT[k] < t - 0.07) break;
-            if (std::abs(song_.kickT[k] - t) < 0.07 && song_.kickS[k] > 0.5f) return true;
+    auto lowNear = [&](double t) {
+        for (std::size_t k = song_.lowT.size(); k-- > 0;) {
+            if (song_.lowT[k] < t - 0.07) break;
+            if (std::abs(song_.lowT[k] - t) < 0.07 && song_.lowS[k] > 0.5f) return true;
         }
         return false;
     };
     // Virtual sections of eight phrases: each chooses the next god of the cycle (a performer's `astral/god` wins).
     constexpr int kGods[] = {astral::kSeraph, astral::kMachine, astral::kChoir, astral::kChimera, astral::kAbyss};
-    auto open = [&](double start, std::size_t beat, bool kick) {
+    auto open = [&](double start, std::size_t beat, bool low) {
         const int index = static_cast<int>(score_.phrases.size());
         if (index % 8 == 0) {
             if (!song_.sections.empty()) song_.sections.back().end = start;
@@ -354,7 +354,7 @@ void AstralLiveConductor::advancePhrases(double now, bool collapse) {
             score_.sectionArch.push_back(kGods[godCycle_++ % 5]);
             score_.sectionWithhold.push_back(false);
         }
-        score_.phrases.push_back(Phrase{start, start + 16.0 * beatSec, index, static_cast<int>(song_.sections.size()) - 1, kick});
+        score_.phrases.push_back(Phrase{start, start + 16.0 * beatSec, index, static_cast<int>(song_.sections.size()) - 1, low});
         phraseStartBeat_ = beat;
     };
     if (score_.phrases.empty()) {
@@ -371,11 +371,11 @@ void AstralLiveConductor::advancePhrases(double now, bool collapse) {
     while (beats.size() > phraseStartBeat_ + 16) {
         const double at = beats[phraseStartBeat_ + 16];
         score_.phrases.back().end = at;
-        open(at, phraseStartBeat_ + 16, kickNear(at));
+        open(at, phraseStartBeat_ + 16, lowNear(at));
     }
     Phrase& cur = score_.phrases.back();
     cur.end = std::max(cur.start + 16.0 * beatSec, now + beatSec);
-    if (!cur.kickOpens && now - cur.start < 0.2) cur.kickOpens = kickNear(cur.start);
+    if (!cur.lowOpens && now - cur.start < 0.2) cur.lowOpens = lowNear(cur.start);
 }
 
 astral::State AstralLiveConductor::update(const spatial::AudioHistory& audio, double now, const astral::Controls& controls,

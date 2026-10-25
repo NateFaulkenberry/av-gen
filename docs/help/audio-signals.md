@@ -52,30 +52,20 @@ reads full scale again within seconds. For levels that stay where the music puts
 | `audio.midLevel` | 0 – 1 | | 400 – 2000 Hz, likewise |
 | `audio.highMidLevel` | 0 – 1 | | 2000 – 6000 Hz, likewise |
 | `audio.trebleLevel` | 0 – 1 | | 6000 – 16000 Hz, likewise |
-| `audio.energy` | 0 – 1 | | how much is happening, independent of loudness: high-band share, brightness, flux, percussive density and stereo width, smoothed over 1 s |
-| `audio.onsetRate` | 0 – 20 | | density: percussive onsets per second over a 2 s window |
+| `audio.energy` | 0 – 1 | | how much is happening, independent of loudness: high-band share, brightness, flux and stereo width, smoothed over 1 s |
+| `audio.onsetRate` | 0 – 20 | | density: onsets (`audio.onset`) per second over a 2 s window |
 | `audio.width` | 0 – 2 | | stereo width, side over mid; 0 for mono |
 
 On these scales 6 dB is 0.1. A heavily limited master barely moves `audio.rms`, but its arrangement
 moves `audio.energy` and the band levels.
 
-## Kick, snare and hats
+## Attacks, not instruments
 
-| Signal | Range | Event | Meaning |
-|---|---|---|---|
-| `audio.onsetMid` | 0 – 1 | yes | snare or clap: an attack in 2 – 6 kHz |
-| `audio.onsetHigh` | 0 – 1 | yes | hats: an attack in 6 – 16 kHz |
-
-With a loaded file they come from the whole-track analysis, and each carries its strength against
-the strongest of its band in the surrounding second. With live input they come from the causal
-snare and hat detector (ADR-1060), the same one behind `response.snare` and `hat`.
-
-**A mix has no kick signal** (ADR-1620). On real music about half of what the mix's kick detector
-called a kick was a bass note or a hat's click, so `audio.onsetLow` is gone and `response.kick`
-fires only from a drums source (a stem or an input whose role is drums, through the Feeds row). On a
-mix, use `beat.pulse`, or the live scenes' `signal.kick`: the drums source's kick (`role.drums.kick`)
-when there is one, else the beat clock's pulse while the mix's hat or snare detector says the drums
-are playing.
+The mix is never asked what made an attack. `audio.onset` (above) and the Sonic response's `response.onset` fire on
+any attack, `response.low` on an attack in the low register (40 – 120 Hz: a kick and a bass note alike), and
+`response.onsetLow`, `.onsetMid` and `.onsetHigh` say how the latest onset's attack divides between the low
+(30 – 250 Hz), mid (250 Hz – 4 kHz) and high (4 – 16 kHz) registers. Kicks, snares and hats come from an isolated drum
+source: a stem or an input whose role is **drums** (below).
 
 The centroid in Hz exists inside an analysis frame but is not published as a signal.
 
@@ -105,16 +95,8 @@ last frame, so none is lost at 30 fps. A source with no audio reads 0 and fires 
 the same set for the first active source of that role (a live input first, then the stems), and reads 0 when none is
 active. It exists once a source has the role, and only `role.drums` has `.kick`, `.snare` and `.hat`.
 
-| Signal | Range | Event | Meaning |
-|---|---|---|---|
-| `signal.kick` `signal.kickEnv` | 0 – 1 | ✓ / | `role.drums.kick`, else the beat clock's pulse while the drums are playing (`tools/drum_signals.py`) |
-| `signal.bassLevel` | 0 – 1 | | `role.bass.level` while a bass source is active, else `response.bass` |
-| `signal.synthLevel` | 0 – 1 | | `role.synth.level` while a synth source is active, else `response.sustain` |
-
-These three are signal sources a project adds (the generators add the ones a scene reads); they need a `sonic` block.
-
-A project's **feeds** can make a source drive the beat clock, `response.*` (the kick from the drum stem, the levels
-from the bass) and the history fields hear, without changing any route. See [Audio Input](help://audio/input).
+A project's **feeds** can make a source drive the beat clock, `response.*` (the low attacks and onsets from the drum
+stem, the levels from the bass) and the history fields hear, without changing any route. See [Audio Input](help://audio/input).
 
 ## The beat clock
 

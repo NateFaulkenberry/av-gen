@@ -26,14 +26,13 @@ using Catch::Approx;
 namespace {
 
 struct Run {
-    std::vector<double> kicks, snares, hats, lows, onsets;
-    double meanSustain = 0.0, meanBass = 0.0, meanTransient = 0.0, meanLevel = 0.0, meanHatRate = 0.0;
+    std::vector<double> lows, onsets;
+    double meanSustain = 0.0, meanBass = 0.0, meanTransient = 0.0, meanLevel = 0.0;
 };
 
-// Steps a runtime over a track and publishes at every analysis frame, as the engine's walk does. `drumSource`: the track
-// is also the project's drum source (ADR-1580's feeds: `"hits": "stem.<it>"`), so the drum classes have a source;
-// without it the track is a mix and has none (ADR-1620).
-Run run(const analysis::AnalysisTrack& track, const sonic::ResponseControls& controls = {}, bool drumSource = false) {
+// Steps a runtime over a track and publishes at every analysis frame, as the engine's walk does. `fedSource`: the track
+// is also fed as a source (ADR-1580's feeds: `"hits": "stem.<it>"`).
+Run run(const analysis::AnalysisTrack& track, const sonic::ResponseControls& controls = {}, bool fedSource = false) {
     sonic::SonicSetup setup;
     setup.analyse(track);
     signals::SignalBus bus;
@@ -42,28 +41,23 @@ Run run(const analysis::AnalysisTrack& track, const sonic::ResponseControls& con
     rt.setControls(controls);
     const double hop = 512.0 / 48000.0;
     const auto find = [&](const char* n) { return *bus.find(n); };
-    const auto kick = find("response.kick"), snare = find("response.snare"), hat = find("response.hat"),
-               low = find("response.low"), sustain = find("response.sustain"), bass = find("response.bass"),
+    const auto low = find("response.low"), sustain = find("response.sustain"), bass = find("response.bass"),
                transient = find("response.transient"), level = find("response.level"),
-               hatRate = find("response.hatRate"), onset = find("response.onset");
+               onset = find("response.onset");
     Run r;
     std::size_t n = 0;
     for (std::size_t i = 0; i < track.frames().size(); ++i) {
         const double t = track.frames()[i].timeSeconds;
         const analysis::ResponseFeed fed = analysis::ResponseFeed::fromCausal(setup.timbre[i].causal);
-        rt.step(setup, setup.timbre[i], hop, drumSource ? &fed : nullptr);
+        rt.step(setup, setup.timbre[i], hop, fedSource ? &fed : nullptr);
         rt.publish(&setup, bus, t);
         if (bus.event(onset)) r.onsets.push_back(t);
-        if (bus.event(kick)) r.kicks.push_back(t);
-        if (bus.event(snare)) r.snares.push_back(t);
-        if (bus.event(hat)) r.hats.push_back(t);
         if (bus.event(low)) r.lows.push_back(t);
         if (t > 1.0) {
             r.meanSustain += bus.value(sustain);
             r.meanBass += bus.value(bass);
             r.meanTransient += bus.value(transient);
             r.meanLevel += bus.value(level);
-            r.meanHatRate += bus.value(hatRate);
             ++n;
         }
         bus.clearEvents();
@@ -73,13 +67,12 @@ Run run(const analysis::AnalysisTrack& track, const sonic::ResponseControls& con
         r.meanBass /= double(n);
         r.meanTransient /= double(n);
         r.meanLevel /= double(n);
-        r.meanHatRate /= double(n);
     }
     return r;
 }
 
-// The art agent's window (-30..+90 ms): a frame is centred on its window, and the kick is decided a hop after its
-// low band peaks, the snare four hops after its attack (ADR-1067).
+// The art agent's window (-30..+90 ms): a frame is centred on its window, so an attack is seen up to half a window
+// early.
 std::size_t near(const std::vector<double>& got, const std::vector<double>& want) {
     std::size_t hits = 0;
     for (const double w : want) {
@@ -105,49 +98,44 @@ sonic::NoteEvent note(double start, double duration, int key, float velocity) {
 
 } // namespace
 
-TEST_CASE("Response hits from a drum source are the kit's parts, and transient sensitivity decides how many fire",
-          "[sonic][adr1062][adr1620]") {
-    // The drums and the pad, fed as the drum source (a bright bass line reads as kicks: ADR-1067; test_drum_recall.cpp
-    // has the mixes).
+TEST_CASE("Response hits are attacks by register, and transient sensitivity decides how many fire",
+          "[sonic][adr1062]") {
     const testsupport::Kit kit = testsupport::makeKit(8, true, false, true);
     const auto track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
-    const Run neutral = run(track, {}, true);
-    INFO("kicks " << neutral.kicks.size() << "/" << kit.kicks.size() << " snares " << neutral.snares.size() << "/"
-                  << kit.snares.size() << " hats " << neutral.hats.size() << "/" << kit.hats.size());
-    CHECK(near(neutral.kicks, kit.kicks) >= kit.kicks.size() * 95 / 100);
-    CHECK(neutral.kicks.size() <= kit.kicks.size() + 1);
-    CHECK(near(neutral.snares, kit.snares) >= kit.snares.size() * 95 / 100);
-    CHECK(near(neutral.hats, kit.hats) >= kit.hats.size() * 85 / 100);
-    CHECK(neutral.meanHatRate > 0.1);
+    const Run neutral = run(track);
+    INFO("onsets " << neutral.onsets.size() << " lows " << neutral.lows.size() << " for " << kit.kicks.size()
+                   << " kicks");
+    CHECK(near(neutral.onsets, kit.kicks) >= kit.kicks.size() * 9 / 10);
+    CHECK(near(neutral.lows, kit.kicks) >= kit.kicks.size() * 8 / 10);
 
     sonic::ResponseControls off;
     off.transient = 0.0f;
     off.sensitivity = 0.5f;
-    const Run none = run(track, off, true);
-    CHECK(none.kicks.empty());
-    CHECK(none.hats.empty());
+    const Run none = run(track, off);
+    CHECK(none.onsets.empty());
+    CHECK(none.lows.empty());
     CHECK(none.meanTransient == 0.0);
     // The levels do not move with Transient: the sustain and bass channels are the same.
     CHECK(none.meanBass == Approx(neutral.meanBass).margin(1e-6));
     CHECK(none.meanSustain == Approx(neutral.meanSustain).margin(1e-6));
 }
 
-TEST_CASE("On a mix the kick never fires; the snare, hat, low and onset are the detector's as before", "[sonic][adr1620]") {
-    // ADR-1620 (option B): the same kit as a plain mix (no feeds). Only the kick comes from a drum source; the mix's
-    // snare and hat are the detector's own, exactly as when the kit is fed as a drum source.
+TEST_CASE("No response hit names an instrument; a fed source is read as the mix is", "[sonic][adr1062]") {
+    signals::SignalBus bus;
+    sonic::SonicRuntime rt;
+    rt.declare(bus);
+    for (const char* retired : {"response.kick", "response.kickEnv", "response.snare", "response.snareEnv",
+                                "response.hat", "response.hatEnv", "response.hatRate"}) {
+        INFO(retired);
+        CHECK_FALSE(bus.find(retired).has_value());
+    }
+    // The same onsets as the mix or as a fed source: the same hits.
     const testsupport::Kit kit = testsupport::makeKit(8, true, false, true);
     const auto track = analysis::AnalysisTrack::analyze(kit.file, analysis::AnalyzerConfig{});
     const Run mix = run(track);
     const Run fed = run(track, {}, true);
-    INFO("onsets " << mix.onsets.size() << " snares " << mix.snares.size() << " hats " << mix.hats.size());
-    CHECK(mix.kicks.empty());
-    CHECK_FALSE(fed.kicks.empty());
-    CHECK(mix.snares == fed.snares);
-    CHECK(mix.hats == fed.hats);
     CHECK(mix.onsets == fed.onsets);
     CHECK(mix.lows == fed.lows);
-    CHECK(near(mix.snares, kit.snares) >= kit.snares.size() * 95 / 100);
-    CHECK(mix.meanHatRate == Approx(fed.meanHatRate).margin(1e-9));
 }
 
 TEST_CASE("A pad reads sustained, drums read transient", "[sonic][adr1062]") {
@@ -162,8 +150,7 @@ TEST_CASE("A pad reads sustained, drums read transient", "[sonic][adr1062]") {
     CHECK(p.meanSustain > 0.2);
     CHECK(p.meanSustain > 2.0 * d.meanSustain);
     CHECK(d.meanTransient > 3.0 * p.meanTransient);
-    CHECK(p.kicks.empty());
-    CHECK(p.snares.empty());
+    CHECK(p.lows.size() <= 1);
 }
 
 TEST_CASE("Sensitivity moves the window, never multiplies the top", "[sonic][adr1062][adr1510]") {
@@ -199,8 +186,9 @@ TEST_CASE("A quieter take keeps its hits, and its levels read against its own lo
         testsupport::makeKit(6, true, true, true, 124.0, 0.2f).file, analysis::AnalyzerConfig{});
     const Run a = run(loud, {}, true);
     const Run b = run(quiet, {}, true);
-    INFO("kicks " << a.kicks.size() << " vs " << b.kicks.size() << "; level " << a.meanLevel << " vs " << b.meanLevel);
-    CHECK(std::abs(static_cast<int>(a.kicks.size()) - static_cast<int>(b.kicks.size())) <= 2);
+    INFO("onsets " << a.onsets.size() << " vs " << b.onsets.size() << "; level " << a.meanLevel << " vs "
+                   << b.meanLevel);
+    CHECK(std::abs(static_cast<int>(a.onsets.size()) - static_cast<int>(b.onsets.size())) <= 3);
     CHECK(b.meanLevel > 0.2);
     CHECK(std::abs(b.meanLevel - a.meanLevel) < 0.12);
 }
@@ -288,7 +276,7 @@ TEST_CASE("The response and per-note signals are appended after every older Soni
     REQUIRE(phrase);
     REQUIRE(first);
     CHECK(*first == *phrase + 1);
-    for (const char* n : {"response.kick", "response.kickEnv", "response.note", "response.sustain", "response.bass",
+    for (const char* n : {"response.low", "response.lowEnv", "response.note", "response.sustain", "response.bass",
                           "notes.voice.7.on", "notes.class.11", "notes.classOn.0", "notes.release", "notes.held"}) {
         INFO(n);
         CHECK(bus.find(n).has_value());

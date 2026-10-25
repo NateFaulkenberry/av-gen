@@ -63,20 +63,21 @@ TEST_CASE("SignalBus events carry strength for one frame and clear", "[signals]"
 TEST_CASE("AudioSignals declares the fixed vocabulary and publishes frames", "[signals][audio]") {
     SignalBus bus;
     const AudioSignals audio = AudioSignals::declare(bus);
-    // The original sixteen, plus ADR-897's five long-term band levels, energy, onset rate and width,
-    // and ADR-898's band onsets but the low one (ADR-1620: the mix has no kick).
-    CHECK(bus.size() == 26);
+    // The original sixteen, plus ADR-897's five long-term band levels, energy, onset rate and width.
+    CHECK(bus.size() == 24);
     for (const char* name : {"audio.rms", "audio.peak", "audio.bass", "audio.lowMid", "audio.mid",
                              "audio.highMid", "audio.treble", "audio.spectralCentroid", "audio.spectralFlux",
                              "audio.onsetStrength", "audio.onset", "audio.tempo", "audio.tempoConfidence",
                              "audio.beat", "audio.beatPhase", "audio.beatCount", "audio.bassLevel",
                              "audio.lowMidLevel", "audio.midLevel", "audio.highMidLevel", "audio.trebleLevel",
-                             "audio.energy", "audio.onsetRate", "audio.width", "audio.onsetMid",
-                             "audio.onsetHigh"}) {
+                             "audio.energy", "audio.onsetRate", "audio.width"}) {
         INFO(name);
         CHECK(bus.find(name).has_value());
     }
-    CHECK_FALSE(bus.find("audio.onsetLow").has_value());
+    // No audio signal names an instrument.
+    for (const char* name : {"audio.onsetLow", "audio.onsetMid", "audio.onsetHigh"}) {
+        CHECK_FALSE(bus.find(name).has_value());
+    }
     CHECK(bus.info(audio.onset).isEvent);
     CHECK(bus.info(audio.onsetStrength).maxValue == 4.0f);
     CHECK(bus.info(audio.beat).isEvent);

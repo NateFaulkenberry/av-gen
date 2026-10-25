@@ -125,7 +125,7 @@ TEST_CASE("Installing the proposal by editing the project's JSON gives a project
     // must then read as the person's.
     json p = readJson(project);
     for (json route : install["routes"]) {
-        if (route["planItem"] == "reactivity/kick.fungi") {
+        if (route["planItem"] == "reactivity/beat.fungi") {
             route["amount"] = 0.2;
         }
         p["routes"].push_back(route);
@@ -160,13 +160,13 @@ TEST_CASE("Installing the proposal by editing the project's JSON gives a project
     REQUIRE(rows.size() == install["routes"].size());
     for (const ui::ReactivityRow& row : rows) {
         INFO(row.key);
-        CHECK(row.state == (row.key == "kick.fungi" ? "edited by hand" : "as made"));
+        CHECK(row.state == (row.key == "beat.fungi" ? "edited by hand" : "as made"));
     }
     // And the Director, asked again, keeps the person's edit.
     const directing::SceneFacts facts = app::sceneFactsFor(engine);
     const directing::Compilation again =
         directing::compilePlan(engine.directingPlans().front(), facts); // the stored plan, re-proposed as is
     CHECK(std::any_of(again.validation.issues.begin(), again.validation.issues.end(), [](const directing::Issue& i) {
-        return i.code == directing::IssueCode::HandEdited && i.item == "kick.fungi";
+        return i.code == directing::IssueCode::HandEdited && i.item == "beat.fungi";
     }));
 }

@@ -261,10 +261,10 @@ inline State test07(float t) {
 
 // ---- TEST 06: AUDIO ----------------------------------------------------------------------------------------
 // Musical structure, not amplitude: sections choose the god (repetition groups summon the same one), 16-beat
-// phrases are coherence cycles (even phrases build from chaos, odd ones hold and fold), a kick on a phrase
-// downbeat collapses the form, snares flash the face (eyes and mouth over-bind for ~250 ms), the mid band sets
+// phrases are coherence cycles (even phrases build from chaos, odd ones hold and fold), a strong low onset on a
+// phrase downbeat collapses the form, mid onsets flash the face (eyes and mouth over-bind for ~250 ms), the mid band sets
 // filament flow, the highs shimmer, and a section's spectral brightness tempers the metal.
-struct Phrase { double start, end; int index; int section; bool kickOpens; };
+struct Phrase { double start, end; int index; int section; bool lowOpens; };
 
 struct Score {
     std::vector<Phrase> phrases;
@@ -299,8 +299,8 @@ inline Score buildScore(const SongAnalysis& song) {
         for (std::size_t i = 0; i < song.sections.size(); ++i) if (t < song.sections[i].end) return static_cast<int>(i);
         return static_cast<int>(song.sections.size()) - 1;
     };
-    auto kickNear = [&](double t) {
-        for (std::size_t k = 0; k < song.kickT.size(); ++k) if (std::abs(song.kickT[k] - t) < 0.07 && song.kickS[k] > 0.5f) return true;
+    auto lowNear = [&](double t) {
+        for (std::size_t k = 0; k < song.lowT.size(); ++k) if (std::abs(song.lowT[k] - t) < 0.07 && song.lowS[k] > 0.5f) return true;
         return false;
     };
     // phrases of 16 beats, restarted at every section boundary (a section always opens a phrase)
@@ -312,7 +312,7 @@ inline Score buildScore(const SongAnalysis& song) {
         const double secEnd = sec >= 0 ? song.sections[static_cast<std::size_t>(sec)].end : 1e9;
         std::size_t e = std::min(b + 16, B.size() - 1);
         while (e > b + 1 && B[e] > secEnd + 0.05) --e;
-        sc.phrases.push_back({B[b], B[e], idx++, sec, kickNear(B[b])});
+        sc.phrases.push_back({B[b], B[e], idx++, sec, lowNear(B[b])});
         b = e;
     }
     return sc;
@@ -335,11 +335,11 @@ inline float phraseCoherence(const Score& sc, const Phrase& ph, double t, const 
         return C;
     }
     const bool firstOfSection = ph.index == 0 || sc.phrases[static_cast<std::size_t>(ph.index - 1)].section != ph.section;
-    // a kick that destroys the form always starts a rebuild (otherwise the collapse is a 90 ms flinch)
-    const bool build = (ph.index % 2 == 0) || firstOfSection || ph.kickOpens;
-    // a phrase opened by a strong kick builds from near chaos (the previous form was destroyed); one that
+    // a low onset that destroys the form always starts a rebuild (otherwise the collapse is a 90 ms flinch)
+    const bool build = (ph.index % 2 == 0) || firstOfSection || ph.lowOpens;
+    // a phrase opened by a strong low onset builds from near chaos (the previous form was destroyed); one that
     // opens softly only half-dissolves and rebuilds from there
-    const float base = ph.kickOpens ? 0.08f : 0.45f;
+    const float base = ph.lowOpens ? 0.08f : 0.45f;
     // v2: the build reaches its peak by 60% of the phrase, so the face HOLDS at high coherence for ~4 s before any
     // collapse on the next downbeat (the owner: 'we never really get to make out that it's a face')
     if (build) return base + (0.98f - base) * std::pow(sstep(0.0f, 0.6f, u), 1.25f);
@@ -361,7 +361,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     const int sec = std::max(ph.section, 0);
     int arch = sc.sectionArch.empty() ? kSeraph : sc.sectionArch[static_cast<std::size_t>(sec) % sc.sectionArch.size()];
     const bool withhold = withholdAt(sc, ph);
-    // iteration 4: a long section (over 40 s) alternates its god every four phrases, on a kick-opened collapse where
+    // iteration 4: a long section (over 40 s) alternates its god every four phrases, on a low-opened collapse where
     // possible, so the full song is never one god for a minute
     if (!song.sections.empty() && !withhold) {
         const auto& se = song.sections[static_cast<std::size_t>(sec) % song.sections.size()];
@@ -383,7 +383,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     s.paletteStrength = 0.9f; s.keyLight = 1.0f; s.rimLight = 1.0f; s.eyeGlow = 1.0f; s.atmosphere = 1.0f; s.godRays = 1.0f;
 
     float C = phraseCoherence(sc, ph, t, &song);
-    const bool collapseOpen = ph.kickOpens && pi > 0;
+    const bool collapseOpen = ph.lowOpens && pi > 0;
     if (collapseOpen) {
         const Phrase& prev = sc.phrases[pi - 1];
         const float cPrevEnd = phraseCoherence(sc, prev, prev.end - 1e-3, &song);
@@ -396,7 +396,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     // iteration 4: heat lives on the release front of the MOST RECENT collapse; a soft phrase's half-dissolve releases
     // matter far from any front, so it flies cold (before, no collapse time meant 'heat everything': orange clouds)
     for (std::size_t j = pi + 1; j-- > 1;) {
-        if (sc.phrases[j].kickOpens && sc.phrases[j].start <= t) { s.collapseAt = static_cast<float>(sc.phrases[j].start - songT0); break; }
+        if (sc.phrases[j].lowOpens && sc.phrases[j].start <= t) { s.collapseAt = static_cast<float>(sc.phrases[j].start - songT0); break; }
     }
     if (s.collapseAt < -1e8f) s.collapseAt = static_cast<float>(-1000.0 - songT0);
     if (!withhold) C += 0.10f * (a.env0.z - 0.5f);
@@ -404,21 +404,21 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     defaults(s);
     s.legible = sstep(0.82f, 0.95f, s.C);
     s.absorb = sstep(0.7f, 0.95f, s.C); // loose dust is drawn into a formed face (thinner background)
-    const float sinceSnare = static_cast<float>(t - a.lastSnare);
-    // snares flash the face while it is forming; in a withhold the flash is the ONLY time the face appears
+    const float sinceMid = static_cast<float>(t - a.lastMid);
+    // mid onsets flash the face while it is forming; in a withhold the flash is the ONLY time the face appears
     const float flashGain = withhold ? 0.6f : 0.38f;
-    s.flash = (s.C > 0.1f && s.C < 0.85f) ? flashGain * a.lastSnareS * std::exp(-sinceSnare / 0.13f) : 0.0f;
-    s.mass = 1.0f + 0.3f * a.kickEnv;
-    s.breath = 2.0f * a.env0.y - 1.0f + 0.6f * a.kickEnv;
+    s.flash = (s.C > 0.1f && s.C < 0.85f) ? flashGain * a.lastMidS * std::exp(-sinceMid / 0.13f) : 0.0f;
+    s.mass = 1.0f + 0.3f * a.lowEnv;
+    s.breath = 2.0f * a.env0.y - 1.0f + 0.6f * a.lowEnv;
     s.flow = 0.4f + 1.8f * a.env0.z;
     s.tendonFlow = 0.6f + 1.4f * a.env0.z;
-    s.shimmer = std::clamp(0.2f + 0.9f * a.env0.w + 0.4f * a.hatEnv, 0.0f, 1.2f);
-    // iteration 2: no global flicker. Brightening every light band on the hats made the WHOLE frame pulse with the
-    // audio (Critic: 71% of regions brightening together); the hats now only shimmer the flakes (s.shimmer above)
+    s.shimmer = std::clamp(0.2f + 0.9f * a.env0.w + 0.4f * a.highEnv, 0.0f, 1.2f);
+    // iteration 2: no global flicker. Brightening every light band on the high onsets made the WHOLE frame pulse with
+    // the audio (Critic: 71% of regions brightening together); they now only shimmer the flakes (s.shimmer above)
     s.flicker = 0.0f;
     const float secEnergy = song.sections.empty() ? 0.5f : song.sections[static_cast<std::size_t>(sec) % song.sections.size()].energy;
     s.temper = std::clamp(0.15f + 0.9f * (a.centroid - 0.35f) + 0.25f * secEnergy + 0.25f * s.C, 0.05f, 0.95f);
-    s.blast = 14.0f + 10.0f * a.lastKickS;
+    s.blast = 14.0f + 10.0f * a.lastLowS;
     s.heatInject = 1.0f + 0.8f * secEnergy;
     const bool hold = !withhold && phraseCoherence(sc, ph, t, &song) > 0.9f;
     if (hold) {
@@ -432,8 +432,8 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     if (arch == kChoir) { s.fold1.z = sstep(0.3f, 0.7f, u); s.fold1.w = hold ? sstep(0.0f, 0.2f, u) : sstep(0.3f, 0.5f, u); } // v2: the choir merges into one face at every peak
     if (arch == kAbyss) s.fall = 1.5f;
     s.rigPhase = static_cast<float>(t) * 0.3f + static_cast<float>(ph.index) * 0.7f;
-    s.sweep = std::clamp(-1.0f + 2.0f * sinceSnare / 0.35f, -1.0f, 1.0f);
-    s.sweepStrength = std::exp(-sinceSnare / 0.3f) * a.lastSnareS;
+    s.sweep = std::clamp(-1.0f + 2.0f * sinceMid / 0.35f, -1.0f, 1.0f);
+    s.sweepStrength = std::exp(-sinceMid / 0.3f) * a.lastMidS;
     s.warmth = arch == kChoir ? 0.65f : (arch == kAbyss ? 0.45f : (arch == kMachine ? 0.1f : 0.25f));
     if (arch == kMachine) s.gratingUm = 1.2f; // the most regular grooves: the most holographic god
 
@@ -457,7 +457,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const float v = static_cast<float>((tc - p.start) / std::max(p.end - p.start, 1e-3));
         const bool first = p.index == 0 || sc.phrases[static_cast<std::size_t>(p.index - 1)].section != p.section;
         const bool wh = withholdAt(sc, p);
-        const bool build = p.index == 0 || first || p.kickOpens || p.index % 2 == 0;
+        const bool build = p.index == 0 || first || p.lowOpens || p.index % 2 == 0;
         const float side = (p.index % 2 == 0) ? 1.0f : -1.0f;
         const int choice = (p.index * 7 + std::max(p.section, 0) * 5) % 3;
         glm::vec3 focus{0.0f, 0.2f, 0.0f};
@@ -466,7 +466,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         int seg = 0;
         tgt = {0.0f, 0.0f, 0.0f};
         bool accentPhrase = false;
-        if (build && next && next->kickOpens && !wh) {
+        if (build && next && next->lowOpens && !wh) {
             accentPhrase = true;
         }
         // v2: also an accent at the peak of every third held phrase (the face fully formed, ~4 beats)
@@ -501,7 +501,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
             const float r = std::sin(glm::pi<float>() * std::min(since / 7.0f, 1.0f));
             d = glm::mix(d, fillD(0.12f), r); el += 8.0f * r; lab = "REVEAL";
         }
-        if (p.kickOpens && since < 1.4f) { d -= 4.0f * (1.0f - since / 1.4f); lab = "COLLISION"; thirdX = 0.0f; thirdY = 0.0f; }
+        if (p.lowOpens && since < 1.4f) { d -= 4.0f * (1.0f - since / 1.4f); lab = "COLLISION"; thirdX = 0.0f; thirdY = 0.0f; }
         d /= std::max(zoom, 0.1f);
         eye = orbit(d, az, el, focus);
         const glm::vec3 fwd = glm::normalize(tgt - eye);
@@ -516,7 +516,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     // ITERATION 2's vocabulary (production, ADR-1221): a behaviour per phrase from its family, the side alternating,
     // the god centred. Build phrases: OBSERVER, PROFILE, LOW. Held phrases: DESCENT, ORBIT, PORTRAIT (the face held,
     // close: the owner's 'longer face poses'), and every fourth held phrase MICRO on one eye. Withheld sections:
-    // HOVER on the eyes. A new section REVEALs (shorter and nearer than iteration 2's); a kick-opened phrase begins
+    // HOVER on the eyes. A new section REVEALs (shorter and nearer than iteration 2's); a low-opened phrase begins
     // in COLLISION.
     auto camAt2 = [&](double tc, glm::vec3& eye, glm::vec3& tgt, std::string& lab) -> int {
         std::size_t k = 0;
@@ -525,7 +525,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         const float v = static_cast<float>((tc - p.start) / std::max(p.end - p.start, 1e-3));
         const bool first = p.index == 0 || sc.phrases[static_cast<std::size_t>(p.index - 1)].section != p.section;
         const bool wh = withholdAt(sc, p);
-        const bool build = p.index == 0 || first || p.kickOpens || p.index % 2 == 0;
+        const bool build = p.index == 0 || first || p.lowOpens || p.index % 2 == 0;
         const float side = (p.index % 2 == 0) ? 1.0f : -1.0f;
         const int choice = (p.index * 7 + std::max(p.section, 0) * 5) % 3;
         glm::vec3 focus{0.0f, 0.2f, 0.0f};
@@ -551,7 +551,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
         }
         const float since = static_cast<float>(tc - p.start);
         if (first && since < 4.5f && !wh) { d += 12.0f * std::sin(glm::pi<float>() * since / 4.5f); el += 6.0f; lab = "REVEAL"; }
-        if (p.kickOpens && since < 1.4f) { d -= 5.0f * (1.0f - since / 1.4f); lab = "COLLISION"; }
+        if (p.lowOpens && since < 1.4f) { d -= 5.0f * (1.0f - since / 1.4f); lab = "COLLISION"; }
         d /= std::max(zoom, 0.1f);
         eye = orbit(d, az, el, focus);
         return p.index;
@@ -581,7 +581,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
 
 // ---- TEST 08 (iteration 4): the FULL SONG -----------------------------------------------------------------
 // TEST 06's conductor over the whole track, with an arc: the piece opens from black on the first phrase (pure dust
-// fading up over 3 s); sections choose the gods; breaks withhold; kick-opened phrases collapse; and the quiet outro,
+// fading up over 3 s); sections choose the gods; breaks withhold; low-opened phrases collapse; and the quiet outro,
 // a withheld section, lets the last god surge to full coherence on its final beats while the camera pulls back --
 // then the frame fades to black with the last note.
 inline State test08(float t, const SongAnalysis& song, const Score& sc) {
@@ -604,7 +604,7 @@ inline State test08(float t, const SongAnalysis& song, const Score& sc) {
 struct Controls {
     float summon = 0.0f;      // 0..1: coherence floor (a performer summons the god; 1 = fully formed)
     float hold = 0.0f;        // 0..1: hold the formed face (coherence pulled to its peak)
-    float intensity = 1.0f;   // 0..2: matter energy (flow, shimmer, snare flash, collapse blast)
+    float intensity = 1.0f;   // 0..2: matter energy (flow, shimmer, mid flash, collapse blast)
     float palette = 0.0f;     // 0..1: per-god palette strength (v2)
     float light = 0.0f;       // 0..1: raking key, rim and eye glow (v2)
     float atmosphere = 0.0f;  // 0..1: the tinted void glow (v2)

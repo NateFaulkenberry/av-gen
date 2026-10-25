@@ -79,14 +79,30 @@ void stretchColumns(std::vector<float>& rows, std::size_t count) {
 
 } // namespace
 
+std::array<float, 3> onsetRows(bool onset, float onsetStrength, const std::array<float, 3>& reg) {
+    if (!onset) {
+        return {};
+    }
+    const float s = std::clamp(onsetStrength * 0.5f, 0.05f, 1.0f); // as audio.onset / stem.<key>.onset
+    if (!(reg[0] + reg[1] + reg[2] > 0.0f)) {
+        return {s, s, s};
+    }
+    std::array<float, 3> out{};
+    out[static_cast<std::size_t>(std::max_element(reg.begin(), reg.end()) - reg.begin())] = s;
+    return out;
+}
+
+std::array<float, 3> onsetRows(const AnalysisFrame& frame) {
+    return onsetRows(frame.onset, frame.onsetStrength, frame.onsetRegister);
+}
+
 std::array<float, 3> sourceOnsetRows(const StemFrame& frame, bool classes) {
     if (classes) {
         return {frame.kick ? std::max(frame.kickStrength, 0.05f) : 0.0f,
                 frame.snare ? std::max(frame.snareStrength, 0.05f) : 0.0f,
                 frame.hat ? std::max(frame.hatStrength, 0.05f) : 0.0f};
     }
-    const float s = frame.onset ? std::clamp(frame.onsetStrength * 0.5f, 0.05f, 1.0f) : 0.0f; // as stem.<key>.onset
-    return {s, s, s};
+    return onsetRows(frame.onset, frame.onsetStrength, frame.onsetRegister);
 }
 
 spatial::AudioHistory buildAudioHistory(const AnalysisTrack& track) {
@@ -129,14 +145,11 @@ spatial::AudioHistory buildAudioHistory(const AnalysisTrack& track, const Histor
     std::array<std::vector<spatial::AudioOnset>, spatial::kOnsetSources> onsets{};
     if (onsetsFrom.track == nullptr) {
         for (const AnalysisFrame& f : frames) {
-            if (f.lowOnset) {
-                onsets[0].push_back({f.timeSeconds, std::max(f.lowOnsetStrength, 0.05f)});
-            }
-            if (f.midOnset) {
-                onsets[1].push_back({f.timeSeconds, std::max(f.midOnsetStrength, 0.05f)});
-            }
-            if (f.highOnset) {
-                onsets[2].push_back({f.timeSeconds, std::max(f.highOnsetStrength, 0.05f)});
+            const std::array<float, 3> s = onsetRows(f);
+            for (std::size_t k = 0; k < 3; ++k) {
+                if (s[k] > 0.0f) {
+                    onsets[k].push_back({f.timeSeconds, s[k]});
+                }
             }
         }
     } else {
@@ -166,10 +179,8 @@ void LiveAudioHistoryFeed::push(const AnalysisFrame& frame) {
     }
     std::array<float, kAudioBins> row{};
     foldSpectrum(frame, config_, row);
-    pushRaw(frame.timeSeconds, row,
-            {frame.lowOnset ? std::max(frame.lowOnsetStrength, 0.05f) : 0.0f,
-             frame.midOnset ? std::max(frame.midOnsetStrength, 0.05f) : 0.0f,
-             frame.highOnset ? std::max(frame.highOnsetStrength, 0.05f) : 0.0f, frame.beat ? 1.0f : 0.0f});
+    const std::array<float, 3> s = onsetRows(frame);
+    pushRaw(frame.timeSeconds, row, {s[0], s[1], s[2], frame.beat ? 1.0f : 0.0f});
 }
 
 void LiveAudioHistoryFeed::pushRaw(double time, std::span<const float> rawRow,

@@ -1,4 +1,4 @@
-// The ADR-897/898 features on the signal bus: declared under their own names beside the auto-gained
+// The ADR-897 features on the signal bus: declared under their own names beside the auto-gained
 // bands, published every frame, events merged across a render frame's analysis frames so none is lost
 // at a low frame rate, and a route on each moving a parameter.
 
@@ -35,9 +35,7 @@ std::filesystem::path grooveWav() {
 }
 
 struct Counts {
-    std::size_t low = 0;
-    std::size_t mid = 0;
-    std::size_t high = 0;
+    std::size_t onsets = 0;
     std::size_t beats = 0;
     double lastPublished = -1.0;
 };
@@ -58,9 +56,7 @@ Counts published(double fps, double seconds) {
             continue;
         }
         lastPublished = f.timeSeconds;
-        c.low += f.lowOnset ? 1u : 0u;
-        c.mid += f.midOnset ? 1u : 0u;
-        c.high += f.highOnset ? 1u : 0u;
+        c.onsets += f.onset ? 1u : 0u;
         c.beats += f.beat ? 1u : 0u;
     }
     c.lastPublished = lastPublished;
@@ -76,9 +72,7 @@ Counts inTrack(double until) {
         if (f.timeSeconds > until) {
             break;
         }
-        c.low += f.lowOnset ? 1u : 0u;
-        c.mid += f.midOnset ? 1u : 0u;
-        c.high += f.highOnset ? 1u : 0u;
+        c.onsets += f.onset ? 1u : 0u;
         c.beats += f.beat ? 1u : 0u;
     }
     return c;
@@ -86,22 +80,23 @@ Counts inTrack(double until) {
 
 } // namespace
 
-TEST_CASE("The flat-master features and band onsets are on the bus under their own names, but the low one",
+TEST_CASE("The flat-master features are on the bus under their own names; no audio signal names an instrument",
           "[integration][signals][flatmaster]") {
     app::Engine engine(app::EngineMode::Offline);
     for (const char* name : {"audio.bassLevel", "audio.lowMidLevel", "audio.midLevel", "audio.highMidLevel",
-                             "audio.trebleLevel", "audio.energy", "audio.onsetRate", "audio.width",
-                             "audio.onsetMid", "audio.onsetHigh"}) {
+                             "audio.trebleLevel", "audio.energy", "audio.onsetRate", "audio.width"}) {
         INFO(name);
         REQUIRE(engine.signals().find(name).has_value());
     }
-    CHECK_FALSE(engine.signals().find("audio.onsetLow").has_value()); // ADR-1620: the mix has no kick
+    // The mix is never asked what made an attack: no kick, snare or hat from it, under any name.
+    for (const char* name : {"audio.onsetLow", "audio.onsetMid", "audio.onsetHigh", "response.kick",
+                             "response.snare", "response.hat"}) {
+        INFO(name);
+        CHECK_FALSE(engine.signals().find(name).has_value());
+    }
     // The auto-gained bands are still there, unchanged in name.
     for (const char* name : {"audio.bass", "audio.lowMid", "audio.mid", "audio.highMid", "audio.treble"}) {
         CHECK(engine.signals().find(name).has_value());
-    }
-    for (const char* name : {"audio.onsetMid", "audio.onsetHigh"}) {
-        CHECK(engine.signals().info(*engine.signals().find(name)).isEvent);
     }
 
     REQUIRE(engine.loadAudio(grooveWav()).has_value());
@@ -119,25 +114,23 @@ TEST_CASE("The flat-master features and band onsets are on the bus under their o
     }
     CHECK(energy > 0.2f);
     CHECK(bassLevel > 0.5f);
-    CHECK(rate > 2.0f);   // kick, clap and hat: more than one hit a beat
+    CHECK(rate > 2.0f);   // kick, clap and hat: more than one onset a beat
     CHECK(width > 0.0f);  // the groove's hats and lead are panned
 }
 
-TEST_CASE("No band onset or beat is lost between two render frames, at 30 fps or at 120",
+TEST_CASE("No onset or beat is lost between two render frames, at 30 fps or at 120",
           "[integration][signals][onsets]") {
     constexpr double kSeconds = 20.0;
     for (const double fps : {30.0, 120.0}) {
         const Counts seen = published(fps, kSeconds);
         const Counts truth = inTrack(seen.lastPublished);
-        REQUIRE(truth.low > 30);
+        REQUIRE(truth.onsets > 30);
         REQUIRE(truth.beats > 30);
-        INFO(fps << " fps: low " << seen.low << "/" << truth.low << ", mid " << seen.mid << "/" << truth.mid
-                 << ", high " << seen.high << "/" << truth.high << ", beats " << seen.beats << "/" << truth.beats);
-        CHECK(seen.low == truth.low);
-        CHECK(seen.mid == truth.mid);
-        CHECK(seen.high == truth.high);
-        // Before ADR-898 only the broadband onset was merged, and `audio.beat` kept a beat only when
-        // it fell on the batch's last analysis frame -- about one in three at 30 fps.
+        INFO(fps << " fps: onsets " << seen.onsets << "/" << truth.onsets << ", beats " << seen.beats << "/"
+                 << truth.beats);
+        CHECK(seen.onsets == truth.onsets);
+        // When only the onset was merged, `audio.beat` kept a beat only when it fell on the batch's last
+        // analysis frame -- about one in three at 30 fps.
         CHECK(seen.beats == truth.beats);
     }
 }
@@ -161,7 +154,7 @@ TEST_CASE("audio.get_analysis reports musical time and the flat-master measures"
     CHECK(r.value["musical"]["beats"].get<double>() > 3.0); // 2.5 s past a downbeat at 0.5 s, 120 BPM
     CHECK(r.value["energy"].get<float>() > 0.0f);
     CHECK(r.value["bandLevels"].size() == 5);
-    CHECK(r.value["onsets"].contains("low"));
+    CHECK(r.value["onsetRegister"].contains("low"));
 }
 
 TEST_CASE("Every new signal is pickable as a route source under a readable name", "[integration][signals][ui]") {
@@ -171,8 +164,7 @@ TEST_CASE("Every new signal is pickable as a route source under a readable name"
     const std::vector<std::string> items = ui::routeSourceItems(engine.signals());
     REQUIRE(items.size() == engine.signals().size());
     const std::vector<std::pair<const char*, const char*>> expected{
-        {"audio.onsetMid", "snare"},
-        {"audio.onsetHigh", "hats"},         {"audio.onsetRate", "density"},
+        {"audio.onsetRate", "density"},
         {"audio.energy", "energy"},          {"audio.bassLevel", "bass level"},
         {"audio.trebleLevel", "treble level"}, {"audio.width", "stereo width"},
         {"section.index", "section number"}, {"section.progress", "progress"},
@@ -194,9 +186,9 @@ TEST_CASE("Every new signal is pickable as a route source under a readable name"
     ai::ToolRegistry registry;
     ai::registerEngineTools(registry);
     ai::ToolContext ctx(engine);
-    const ai::ToolResult r = registry.invoke("signal.list", nlohmann::json{{"query", "snare"}}, ctx);
+    const ai::ToolResult r = registry.invoke("signal.list", nlohmann::json{{"query", "onsets per second"}}, ctx);
     REQUIRE(r.success);
     REQUIRE(r.value["signals"].size() >= 1);
-    CHECK(r.value["signals"][0]["name"] == "audio.onsetMid");
-    CHECK(r.value["signals"][0]["label"] == "snare / clap (mid-band onset)");
+    CHECK(r.value["signals"][0]["name"] == "audio.onsetRate");
+    CHECK(r.value["signals"][0]["label"] == "density (onsets per second)");
 }

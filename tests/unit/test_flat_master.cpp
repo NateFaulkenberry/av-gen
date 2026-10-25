@@ -143,15 +143,13 @@ TEST_CASE("A span profile measures the level-free features over a stretch of the
     const testsupport::Groove g = testsupport::makeGroove(spec);
     const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(g.file, analysis::AnalyzerConfig{});
     const analysis::SpanProfile first = analysis::profileSpan(track, g.truth.downbeats[0], g.truth.downbeats[8]);
-    // The pull-back measured inside its bar lines: a kick's onset is stamped on its attack frame, which
-    // can sit a few milliseconds before the bar line the kick is on.
+    // The pull-back measured inside its bar lines: an onset is stamped on its attack frame, which can sit
+    // a few milliseconds before the bar line it is on.
     const analysis::SpanProfile second =
         analysis::profileSpan(track, g.truth.downbeats[8] + 0.05, g.truth.downbeats[10] - 0.05);
-    INFO("kicks/s " << first.kickRate << " -> " << second.kickRate << ", onsets/s " << first.onsetRate << " -> "
-                    << second.onsetRate);
+    INFO("onsets/s " << first.onsetRate << " -> " << second.onsetRate);
     CHECK(first.measured());
-    CHECK(std::fabs(first.kickRate - 2.0f) < 0.2f); // 120 BPM, a kick a beat
-    CHECK(second.kickRate == 0.0f);
+    CHECK(first.onsetRate >= 1.8f); // 120 BPM: at least a kick a beat
     CHECK(first.onsetRate > second.onsetRate);
     CHECK(first.brightnessHz > 0.0f);
     CHECK(first.bandCount == 5);
@@ -162,7 +160,7 @@ TEST_CASE("A span profile measures the level-free features over a stretch of the
     // And it survives JSON exactly as a plan writes it.
     const analysis::SpanProfile back = analysis::spanProfileFromJson(analysis::spanProfileToJson(first));
     CHECK(back.energy == first.energy);
-    CHECK(back.kickRate == first.kickRate);
+    CHECK(back.onsetRate == first.onsetRate);
     CHECK(back.bandDb == first.bandDb);
     CHECK(back.width == first.width);
 }

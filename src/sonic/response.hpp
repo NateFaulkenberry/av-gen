@@ -11,13 +11,10 @@
 // for as long as a breakdown lasts. Each level has its own window below the reference (its top above it and its span,
 // in dB); below the gate a level reads 0 and the reference does not move. Sensitivity MOVES THE WINDOW (by a share of
 // its span) and the curve (gamma = 2^((0.5 - s) 1.6)); it never multiplies the top, so a loud sound cannot be
-// pushed past 1. Hits (kick, snare, hat, low, onset) come from ADR-1060's causal ratios, which are level-free by
-// construction: sensitivity moves their firing threshold and curves their strength. Every hit is an EVENT and has
-// an envelope beside it.
-//
-// ADR-1620: the kick comes only from a source the project's feeds name for it (a drum stem offline, a drum input
-// live): on a mix it never fires, and a route on it is reported dead by the route audit. The snare and hat are the
-// mix's as before.
+// pushed past 1. Hits (low, onset) come from ADR-1060's causal ratios, which are level-free by construction:
+// sensitivity moves their firing threshold and curves their strength; the note hit is a MIDI note-on. Every hit is an
+// EVENT and has an envelope beside it. No hit names an instrument: a drum source's kick, snare and hat are its own
+// `stem.<key>.*` / `role.drums.*` signals.
 //
 // Transient sensitivity drives the hits, Sustain sensitivity the levels, and Sensitivity both: a quiet synth gets
 // its attacks back without its pad lifting the whole world. Attack and Release multiply every time constant.
@@ -50,7 +47,7 @@ struct ResponseControls {
     [[nodiscard]] bool operator==(const ResponseControls&) const = default;
 };
 
-enum class ResponseHit : std::uint8_t { Kick = 0, Low, Snare, Hat, Onset, Note, Count };
+enum class ResponseHit : std::uint8_t { Low = 0, Onset, Note, Count };
 inline constexpr std::size_t kResponseHitCount = static_cast<std::size_t>(ResponseHit::Count);
 
 // The project's detail (`sonic.response`, optional): what is not on the panel.
@@ -74,8 +71,8 @@ struct ResponseSettings {
     LevelWindow sustainWindow{4.0f, 9.0f};    // the instant level sustain is made of (less its percussive share)
     LevelWindow levelSlowWindow{1.5f, 6.0f};  // the level over levelSlowSeconds
     LevelWindow intensityWindow{1.5f, 6.0f};  // the level over intensitySeconds
-    // Envelope release per hit, seconds (Kick, Low, Snare, Hat, Onset, Note); attack is one hop (instant) x attack.
-    std::array<float, kResponseHitCount> hitRelease{0.16f, 0.18f, 0.12f, 0.06f, 0.09f, 0.22f};
+    // Envelope release per hit, seconds (Low, Onset, Note); attack is one hop (instant) x attack.
+    std::array<float, kResponseHitCount> hitRelease{0.18f, 0.09f, 0.22f};
     // Levels' followers, seconds: attack / release.
     // ADR-1510: the releases hold the body between two hits (read in a window ~12 dB wide, a 200 ms release turned
     // every gap between kicks into a full-scale dip: a second kick envelope).
@@ -85,10 +82,7 @@ struct ResponseSettings {
     float fluxAttack = 0.01f, fluxRelease = 0.15f;
     float intensitySeconds = 12.0f;
     float levelSlowSeconds = 3.0f; // ADR-1361: `response.levelSlow`, the level over a few seconds (attack/release x)
-    float hatRateSeconds = 1.5f; // the hat-rate's leaky window
-    float hatRateFull = 12.0f;   // hats a second that read 1
     float melodicFull = 6.0f;    // pitch moves a second that read 1
-    float midiDrumness = 0.9f;   // ADR-1068: a snare or hat on a MIDI note-on must be at least this percussive
 
     [[nodiscard]] Result<void> applyJson(const nlohmann::json& j);
     [[nodiscard]] nlohmann::json toJson() const;
@@ -107,8 +101,8 @@ struct ResponseSignals {
     std::array<signals::SignalId, kResponseHitCount> env{};
     signals::SignalId bass = signals::kInvalidSignal, level = signals::kInvalidSignal,
                       transient = signals::kInvalidSignal, sustain = signals::kInvalidSignal,
-                      flux = signals::kInvalidSignal, hatRate = signals::kInvalidSignal,
-                      melodic = signals::kInvalidSignal, pitch = signals::kInvalidSignal,
+                      flux = signals::kInvalidSignal, melodic = signals::kInvalidSignal,
+                      pitch = signals::kInvalidSignal,
                       intensity = signals::kInvalidSignal, levelSlow = signals::kInvalidSignal; // ADR-1361
     // ADR-1604: response.onsetLow/Mid/High, the register of the latest onset hit, held until the next
     std::array<signals::SignalId, 3> onsetRegister{signals::kInvalidSignal, signals::kInvalidSignal,
@@ -136,7 +130,6 @@ public:
     // Read-outs (tests).
     [[nodiscard]] float envelope(ResponseHit h) const { return env_[static_cast<std::size_t>(h)]; }
     [[nodiscard]] std::uint64_t hits(ResponseHit h) const { return count_[static_cast<std::size_t>(h)]; }
-    [[nodiscard]] std::uint64_t demoted(ResponseHit h) const { return demoted_[static_cast<std::size_t>(h)]; }
     // ADR-1510: the loudness reference the levels are read against, dBFS (the gate until a sound is heard).
     [[nodiscard]] float referenceDb() const { return referenceDb_; }
 
@@ -145,9 +138,6 @@ private:
     std::array<float, kResponseHitCount> env_{};
     std::array<bool, kResponseHitCount> pending_{};
     std::array<float, kResponseHitCount> pendingStrength_{};
-    std::array<float, kResponseHitCount> pendingDrumness_{}; // ADR-1068
-    std::array<float, kResponseHitCount> envBefore_{};
-    std::array<std::uint64_t, kResponseHitCount> demoted_{};
     std::array<std::uint64_t, kResponseHitCount> count_{};
     float bass_ = 0.0f, level_ = 0.0f, sustain_ = 0.0f, flux_ = 0.0f, intensity_ = 0.0f, levelSlow_ = 0.0f;
     float fastDb_ = -120.0f, slowDb_ = -120.0f, transient_ = 0.0f, percussive_ = 0.0f;
@@ -157,7 +147,7 @@ private:
     double levelSlowPower_ = 0.0, intensityPower_ = 0.0, referencePower_ = 0.0;
     double heardSeconds_ = 0.0, sinceHeard_ = 0.0; // gated sound heard; time since the first of it
     bool levelsPrimed_ = false;
-    float hatRate_ = 0.0f, melodic_ = 0.0f;
+    float melodic_ = 0.0f;
     std::array<float, 3> onsetRegister_{}; // ADR-1604
     float lastSemitone_ = -1.0f, audioPitch_ = -1.0f;
     bool primed_ = false;

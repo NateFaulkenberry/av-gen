@@ -137,14 +137,22 @@ TEST_CASE("The track builder folds spectra onto 64 log bands and lists kicks and
     CHECK(hi > 0.9f);
     // The silent lead-in is dark.
     CHECK(spatial::spectrumRange(h, 0.2, 0.0f, 0.0f, 1.0f) < 0.1f);
-    // Beats are the tracker's; band onsets are the track's (ADR-898).
+    // Beats are the tracker's; the onset rows are the track's onsets, each on the row of its register.
     CHECK(h.onsets(spatial::OnsetSource::Beat).size() == track.beats().beatTimes.size());
-    std::size_t lowOnsets = 0;
+    std::size_t onsets = 0;
+    std::array<std::size_t, 3> rows{};
     for (const auto& f : track.frames()) {
-        lowOnsets += f.lowOnset ? 1u : 0u;
+        onsets += f.onset ? 1u : 0u;
+        const std::array<float, 3> r = analysis::onsetRows(f);
+        for (std::size_t k = 0; k < 3; ++k) {
+            rows[k] += r[k] > 0.0f ? 1u : 0u;
+        }
     }
-    CHECK(h.onsets(spatial::OnsetSource::Low).size() == lowOnsets);
-    CHECK(lowOnsets > 0);
+    CHECK(onsets > 0);
+    CHECK(h.onsets(spatial::OnsetSource::Low).size() == rows[0]);
+    CHECK(h.onsets(spatial::OnsetSource::Mid).size() == rows[1]);
+    CHECK(h.onsets(spatial::OnsetSource::High).size() == rows[2]);
+    CHECK(rows[0] + rows[1] + rows[2] >= onsets);
 }
 
 TEST_CASE("Audio fields sample the history at their delay, band and distance on the CPU", "[unit][audio-fields]") {
@@ -287,8 +295,9 @@ TEST_CASE("The live feed folds each pushed frame into a stretched row and record
         for (std::size_t b = 2; b < 12; ++b) {
             frame.spectrum[b] = loud ? 0.9f : 0.1f;
         }
-        frame.lowOnset = k % 47 == 0;
-        frame.lowOnsetStrength = 0.8f;
+        frame.onset = k % 47 == 0;
+        frame.onsetStrength = 1.6f;
+        frame.onsetRegister = {0.7f, 0.2f, 0.1f}; // a low attack
         frame.beat = k % 94 == 0;
         feed.push(frame);
         feed.push(frame); // the same frame twice (a render frame with no new hop): ignored

@@ -485,7 +485,7 @@ void AstralRenderer::fillFrame(FrameU& f, const scene::AstralForge& a, const ast
     if (a.song) {
         const astral::AudioAtT au = astral::sampleSong(a.song->song, t);
         f.audio0 = au.env0;
-        f.audio1 = glm::vec4(au.env1.x, au.rms, au.kickEnv, au.snareEnv);
+        f.audio1 = glm::vec4(au.env1.x, au.rms, au.lowEnv, au.midEnv);
     }
     f.look = glm::vec4(s.exposure, 0.08f, s.haze, 0.013f);
     // density norm: ~40 bound particles per cell form the surface at 2M particles in a 20/192 cell; it scales with the

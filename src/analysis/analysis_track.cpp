@@ -1,6 +1,5 @@
 #include "analysis/analysis_track.hpp"
 
-#include "analysis/band_onsets.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -266,12 +265,9 @@ AnalysisTrack AnalysisTrack::analyze(const audio::AudioFile& file, AnalyzerConfi
     track.config_ = analyzer.config();
     stampBeats(track.frames_, track.beats_, track.config_, beatConfig);
 
-    // The passes that need the whole track (ADR-896/897/898).
+    // The passes that need the whole track (ADR-896/897).
     const float binHz = static_cast<float>(track.config_.sampleRate) / static_cast<float>(track.config_.windowSize);
     track.meter_ = estimateMeter(track.frames_, track.beats_.beatTimes, binHz);
-    const BandOnsets onsets =
-        detectBandOnsets(track.frames_, binHz, track.beats_.beatTimes, track.beatSeconds());
-    stampBandOnsets(track.frames_, onsets, track.config_);
     // ADR-1060: the causal detector the live runner runs, over the file in the same order (file == live).
     detectCausalOnsets(track.frames_, binHz,
                        static_cast<double>(track.config_.hopSize) / static_cast<double>(track.config_.sampleRate));
@@ -290,11 +286,8 @@ double overlayTrackFields(AnalysisFrame& live, const AnalysisTrack& track, doubl
     live.beatCount = here.beatCount;
     live.beatPhase = here.beatPhase;
     live.onsetRate = here.onsetRate;
-    live.onsetRateIsPercussive = here.onsetRateIsPercussive;
     live.energy = here.energy;
     live.beat = false;
-    live.lowOnset = live.midOnset = live.highOnset = false;
-    live.lowOnsetStrength = live.midOnsetStrength = live.highOnsetStrength = 0.0f;
     constexpr double kMaxStepSeconds = 0.25;
     const bool continuous = now > previousSeconds && now - previousSeconds <= kMaxStepSeconds;
     if (continuous) {
@@ -302,18 +295,6 @@ double overlayTrackFields(AnalysisFrame& live, const AnalysisTrack& track, doubl
                                            [](double t, const AnalysisFrame& f) { return t < f.timeSeconds; });
         for (auto it = from; it != frames.end() && it->timeSeconds <= now; ++it) {
             live.beat = live.beat || it->beat;
-            if (it->lowOnset) {
-                live.lowOnset = true;
-                live.lowOnsetStrength = std::max(live.lowOnsetStrength, it->lowOnsetStrength);
-            }
-            if (it->midOnset) {
-                live.midOnset = true;
-                live.midOnsetStrength = std::max(live.midOnsetStrength, it->midOnsetStrength);
-            }
-            if (it->highOnset) {
-                live.highOnset = true;
-                live.highOnsetStrength = std::max(live.highOnsetStrength, it->highOnsetStrength);
-            }
         }
     }
     return now;

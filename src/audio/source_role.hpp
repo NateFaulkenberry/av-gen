@@ -6,7 +6,7 @@
 // keyed `drums` with no role is `other`. Only a `drums` source runs the kick/snare/hat classifier and publishes the
 // class names (`stem.<key>.kick/snare/hat`, `role.drums.kick/...`); every other role publishes onsets, levels and the
 // onset register -- broad musical activity -- and never a class name. `role.<role>.*` publishes the first active
-// source of each role, so a scene (and `tools/drum_signals.py`) names "the drums" without knowing any key.
+// source of each role, so a scene (and `tools/role_signals.py`) names "the drums" without knowing any key.
 
 #include <array>
 #include <cstdint>

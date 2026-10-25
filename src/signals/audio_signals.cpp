@@ -29,7 +29,7 @@ AudioSignals AudioSignals::declare(SignalBus& bus) {
     s.beat = bus.declare("audio.beat", 0.0f, 1.0f, true);
     s.beatPhase = bus.declare("audio.beatPhase");
     s.beatCount = bus.declare("audio.beatCount", 0.0f, 100000.0f);
-    // ADR-897 / ADR-898, each with the words an artist picking a route source would look for.
+    // ADR-897, each with the words an artist picking a route source would look for.
     static constexpr std::array<const char*, 5> kLevelNames{"audio.bassLevel", "audio.lowMidLevel", "audio.midLevel",
                                                             "audio.highMidLevel", "audio.trebleLevel"};
     static constexpr std::array<const char*, 5> kLevelLabels{
@@ -43,15 +43,9 @@ AudioSignals AudioSignals::declare(SignalBus& bus) {
     s.energy = bus.declare("audio.energy");
     bus.setLabel(s.energy, "energy (how much is happening, loudness-independent)");
     s.onsetRate = bus.declare("audio.onsetRate", 0.0f, 20.0f);
-    bus.setLabel(s.onsetRate, "density (percussive hits per second)");
+    bus.setLabel(s.onsetRate, "density (onsets per second)");
     s.width = bus.declare("audio.width", 0.0f, 2.0f);
     bus.setLabel(s.width, "stereo width");
-    // ADR-1620: ADR-898's low band onset (audio.onsetLow, a file's kick, live the mix's causal kick) is off the bus:
-    // a mix has no kick. The frames keep it for the internal readers (the audio history, band-onset triggers).
-    s.onsetMid = bus.declare("audio.onsetMid", 0.0f, 1.0f, true);
-    bus.setLabel(s.onsetMid, "snare / clap (mid-band onset)");
-    s.onsetHigh = bus.declare("audio.onsetHigh", 0.0f, 1.0f, true);
-    bus.setLabel(s.onsetHigh, "hats (high-band onset)");
     return s;
 }
 
@@ -78,11 +72,6 @@ void AudioSignals::publish(SignalBus& bus, const analysis::AnalysisFrame& frame)
     bus.set(energy, frame.energy);
     bus.set(onsetRate, frame.onsetRate);
     bus.set(width, frame.stereo ? frame.width : 0.0f);
-    // A band onset fires with its strength, floored so a quiet one still moves an event route: the
-    // strength is how hard it hit against the band's strongest nearby, and a route that triggers on
-    // the flag must never see a fired event with value 0 (ADR-898).
-    bus.setEvent(onsetMid, frame.midOnset, std::max(0.05f, frame.midOnsetStrength));
-    bus.setEvent(onsetHigh, frame.highOnset, std::max(0.05f, frame.highOnsetStrength));
 }
 
 void AudioSignals::publishSilence(SignalBus& bus) const {
@@ -97,7 +86,7 @@ void AudioSignals::publishSilence(SignalBus& bus) const {
 }
 
 void AudioSignals::clearEvents(SignalBus& bus) const {
-    for (const SignalId id : {onset, beat, onsetMid, onsetHigh}) {
+    for (const SignalId id : {onset, beat}) {
         bus.setEvent(id, false);
     }
 }

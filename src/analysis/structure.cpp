@@ -598,7 +598,7 @@ Result<SongStructure> detectStructure(const AnalysisTrack& track, const Structur
     // rescaled. On a limited master that is noise: "Rebuild"'s sub-heavy break read 1.0 and its
     // thinned suspension 0.0, and a picked onset is one hop in thirty, so the median was 0 in every
     // segment and density was structurally zero. Now: the energy composite (high band, brightness,
-    // flux, percussive density, width) and the onset rate in onsets per second, each divided by the
+    // flux, width) and the onset rate in onsets per second, each divided by the
     // piece's largest -- a ratio, so the quietest section keeps its distance from silence instead of
     // being stretched to 0.
     {
