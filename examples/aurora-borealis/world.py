@@ -397,6 +397,54 @@ def bed_tris(variant="coarse"):
     return tris
 
 
+# ---- the fish (pass 4, "if possible add some low poly fish in the river which are illuminated by the beams of light
+# under water"): small schools of faceted fish a few metres under the surface, along the stretch the song's camera
+# flies (and the beams reach ahead of it). Static, heading upstream; their program is the bed's (near black), so a
+# fish shows only when a beam's under-water light passes over it. About 8 m long (stylised) and 2-4 m down, so it reads through
+# the water from 65 m up (3 m long and 3-6 m down did not).
+FISH_SCHOOLS = 24
+FISH_PER_SCHOOL = 9
+
+
+def _fish(cx, cy, cz, heading, size, seed):
+    """One low-poly fish: a six-point body (nose, tail root, back, belly, two flanks) and a two-triangle tail fin."""
+    c, s_ = math.cos(heading), math.sin(heading)
+
+    def P(f, u, r):   # forward, up, right in the fish's frame -> world
+        return (cx + (f * s_ + r * c) * size, cy + u * size, cz + (f * c - r * s_) * size)
+    nose, root = P(0.55, 0.0, 0.0), P(-0.35, 0.0, 0.0)
+    back, belly = P(0.05, 0.22, 0.0), P(0.0, -0.16, 0.0)
+    left, right = P(0.05, 0.02, -0.14), P(0.05, 0.02, 0.14)
+    tail_top, tail_bot = P(-0.62, 0.2, 0.0), P(-0.62, -0.16, 0.0)
+    body = [(nose, back, left), (nose, right, back), (nose, left, belly), (nose, belly, right),
+            (root, left, back), (root, back, right), (root, belly, left), (root, right, belly)]
+    tail = [(root, tail_top, tail_bot), (root, tail_bot, tail_top)]
+    return body + tail
+
+
+def fish_tris():
+    tris = []
+    for k in range(FISH_SCHOOLS):
+        th = 0.03 + 1.35 * (k + 0.5 * mx._hash(k, 700, 1)) / FISH_SCHOOLS
+        e = 1e-4
+        d0, d1 = centre(th), centre(th + e)
+        flow = math.atan2(d1[0] - d0[0], d1[2] - d0[2])        # downstream, as a heading from +z
+        lat0 = (mx._hash(k, 700, 2) - 0.5) * 160.0                  # within the beams' lanes (+-80 m)
+        for j in range(FISH_PER_SCHOOL):
+            a = mx._hash(k * 31 + j, 701, 3) * TAU
+            rr = 10.0 + 22.0 * mx._hash(k * 31 + j, 701, 4)
+            lat = lat0 + rr * math.cos(a)
+            along = rr * math.sin(a)
+            r = rc(th) + lat
+            th2 = th + along / max(r, 1.0)
+            x, z = r * math.sin(th2), r * math.cos(th2)
+            y = -1.8 - 2.2 * mx._hash(k * 31 + j, 701, 5)
+            heading = flow + math.pi + (mx._hash(k * 31 + j, 701, 6) - 0.5) * 0.5   # heading upstream, roughly
+            size = 7.0 + 2.0 * mx._hash(k * 31 + j, 701, 7)    # stylised: large enough to read from the camera
+            tris += _fish(x, y, z, heading, size, k * 31 + j)
+    return tris
+
+
 # ---- the outer ranges -------------------------------------------------------------------------------------------
 def _crest(t, peak, keep_outer):
     if t <= 0.0:
@@ -546,6 +594,9 @@ def generate(mesh_dir):
         t = range_tris(*spec)
         write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
         out[spec[0]] = len(t)
+    t = fish_tris()
+    write_faceted_uv(os.path.join(mesh_dir, "ab-fish.glb"), t, "fish")
+    out["fish"] = len(t)
     for variant in BED:
         t = bed_tris(variant)
         write_faceted_uv(os.path.join(mesh_dir, "ab-bed-%s.glb" % variant), t, "bed")

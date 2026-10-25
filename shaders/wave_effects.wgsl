@@ -256,9 +256,12 @@ fn wavePathDisturb(worldPos: vec3<f32>) -> vec2<f32> {
             let front = 25.0 + 170.0 * age;
             if (r < front + 40.0) {
                 let pp = worldPos.xz;
-                let wobble = 1.6 * sin(pp.x * 0.031 + pp.y * 0.027);
+                // broken and wandering, as the wake's crests are: never a ruled set of rings (brief s8)
+                let wobble = 2.6 * sin(pp.x * 0.019 + pp.y * 0.023) + 1.4 * sin(pp.y * 0.041 - pp.x * 0.013);
                 let rings = cos(kWaveTau / 22.0 * (r - 170.0 * age) + wobble);
-                let shape = smoothstep(front + 40.0, front, r) * exp(-age / 0.8);
+                let broken = smoothstep(0.15, 0.85, 0.5 + 0.5 * sin(pp.x * 0.047 + sin(pp.y * 0.021) * 2.6) *
+                                                             sin(pp.y * 0.039 + sin(pp.x * 0.017) * 2.2));
+                let shape = smoothstep(front + 40.0, front, r) * exp(-age / 0.8) * (0.35 + 0.65 * broken);
                 let away = (pp - e.extra.xy) / max(r, 1.0e-3);
                 g = g + away * (e.extra.z * shape * rings);
             }

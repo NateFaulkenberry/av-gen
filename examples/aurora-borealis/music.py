@@ -4,10 +4,11 @@ Pass 3 (docs/prototypes/aurora-borealis/20-brief-sabertooth.md, 21-research-pass
 instrument has its own place in the frame.
 
   sky     Cloud Diving   signal.cloudSwell (300/1200 ms) and signal.cloudHue (1500/4000 ms) -> the aurora
-          Crash          signal.crashStarEv -> a fast shooting star (starA / starB, a pool of two) + signal.crashGlow
-  left    Moog           signal.moogNote (rms rise x1.6, 150 ms latch) + signal.moogGlow -> the left bank's glints
-  river   Kick           signal.kickBeamEv -> the amber river beam (riverKick)
-          Snare          signal.snareBeamEv -> the cyan twin beam (riverSnare)
+          Crash          signal.crashStarEv -> a ball of light thrown into the canyon (ballA / ballB, a pool of two)
+  left    Moog           signal.moogNote (every onset, sized by level) + signal.moogGlow -> the left bank's glints
+  river   Kick           signal.kickBeamEv -> the magenta river beam (riverKick)
+          Snare          signal.snareBeamEv -> the lilac twin beam (riverSnare)
+          Toms           signal.tomHitEv -> the violet beam (riverToms), each hit in its own lane
   right   Toms           signal.tomHit (sized) + signal.tomBody -> plane flashes on the right ranges
           Tone block     signal.blockTick (sized) -> small sharp glints stepping through a one-bar sequence
 
@@ -151,34 +152,39 @@ def sources(song):
         # ---- sky: Cloud Diving. Intensity follows the swell (300/1200 ms, A s3.6); the hue blends slowly (1500/4000)
         cloud("cloudSwell", 300.0, 1200.0),
         cloud("cloudHue", 1500.0, 4000.0),
+        # pass 4: the colour on a faster envelope (the hue at 1500/4000 was too slow for the owner), and the churn: the
+        # swell's own level, accumulated nowhere (a phase, ADR-1664) -- folds turn as it rises and unwind as it falls
+        cloud("cloudColor", 400.0, 1500.0),
+        cloud("cloudChurn", 600.0, 2500.0),
     ]
+    # a swell's start (Cloud Diving's onsets fire at the swell starts, A s3.6) sends a front up the ribbons
+    out += [sig("cloudStart", [inp(s("cloud", "onset"), latch(2000.0, 1.6), part="cloud")] if src["cloud"] else [])]
     # ---- sky: Crash. 12 hits, re-hits 0.70 s apart (A s3.1): a 300 ms refractory; the glow falls over 0.4 s
     out += onset_event("crashStar", onset("crash"), 300.0, 0.4, "crash")
     out += [
         sig("crashGlow", [inp("signal.crashStar")]),
         # phrase starts peak 0.41-0.42, re-hits 0.17-0.28 (A s3.1)
         sig("crashSize", [inp(s("crash", "peak"), dict(**remap(0.15, 0.42), **size_hold()))] if src["crash"] else []),
-        # the pool of two stars (B s4): A takes a crash when it is free (a star lives 1.0 s; A is held 0.9 s), B one
-        # that lands while A is busy -- so the newest crash always gets a star and at most two are ever alive
-        sig("starA", [inp("signal.crashStarEv", latch(900.0, 0.9))]),
-        sig("starAFresh", [inp("signal.starA", binary(0.95))]),
-        sig("starABusy", [inp("signal.starA", binary(0.01)), inp("signal.starAFresh", amount=-1.0)], combine="sum",
+        # the pool of two light balls (pass 4; the stars' pool before): A takes a crash when it is free (a ball lives
+        # 2.0 s; A is held 1.3 s: the groups' re-hits come 1.40 and 0.70 s apart), B one that lands while A is busy
+        sig("ballA", [inp("signal.crashStarEv", latch(1300.0, 1.3))]),
+        sig("ballAFresh", [inp("signal.ballA", binary(0.97))]),
+        sig("ballABusy", [inp("signal.ballA", binary(0.01)), inp("signal.ballAFresh", amount=-1.0)], combine="sum",
             chain=binary(0.5)),
-        sig("starAEv", [inp("signal.crashStarEv", gate="signal.starAFresh")], event=True),
-        sig("starBEv", [inp("signal.crashStarEv", gate="signal.starABusy")], event=True),
+        sig("ballAEv", [inp("signal.crashStarEv", gate="signal.ballAFresh")], event=True),
+        sig("ballBEv", [inp("signal.crashStarEv", gate="signal.ballABusy")], event=True),
     ]
     # ---- river: Kick and Snare (A s3.2): the onset with a 100 ms refractory (the snare double-fires on 40 of 48)
     out += onset_event("kickBeam", onset("kick"), 100.0, 0.25, "kick")
     out += onset_event("snareBeam", onset("snare"), 100.0, 0.25, "snare")
-    # ---- left: Moog. The re-bounced part (19:42) is 23 long notes, each a hard attack and a slow decay, at least 1.04 s
-    # apart: the rms rise x1.6 (A s3.5) catches all 23 at -3.3 ms; a 300 ms refractory (A's was 150) drops the three
-    # re-steps 0.18-0.24 s after a note (PROGRESS, pass 3)
-    if S["moogRise"]:
-        out += [sig("moogRise", [inp(s("moog", "rms"), trend(0.25, 15.0, 0.003, 1.6))]),
-                sig("moogNote", [inp("signal.moogRise", latch(300.0, 0.45), part="moog")])]
-    else:
-        out += [sig("moogNote", [inp(s("moog", "onset"), latch(150.0, 0.45), part="moog")])]
-    out += [sig("moogGlow", [inp(s("moog", "level"), {"attackMs": 20.0, "decayMs": 600.0}, part="moog")])]
+    # ---- left: Moog. Pass 4 (owner: "really hitting all the little trills"): every onset of the Moog stem (346 on
+    # Sabertooth, none in its opening silence; trill notes about 0.1 s apart) lights a fresh subset (random.moogPick),
+    # sized by the stem's level at the hit, so a loud passage lights more facets, brighter; the level keeps a gentle
+    # glow between hits and is 0 in silence
+    out += [sig("moogSize", [inp(s("moog", "rms"), dict(**remap(0.04, 0.22, 0.25, 1.0), **size_hold()), part="moog")]
+                if src["moog"] else [])]
+    out += onset_event("moogNote", onset("moog"), 50.0, 0.18, "moog", size="signal.moogSize")
+    out += [sig("moogGlow", [inp(s("moog", "level"), {"attackMs": 10.0, "decayMs": 200.0}, part="moog")])]
     # ---- right: Toms (28 notes in six fills, peak 0.15-0.41 -> size 0.4-1.3) and tone block (176 accents, peak
     # 0.34-0.55 -> size 0.5-1.0); each size scales its hit, and the part's knob scales the size
     out += [sig("tomSize", [inp(s("toms", "peak"), dict(**remap(0.15, 0.41, 0.4, 1.3), **size_hold()), part="toms")]
@@ -193,11 +199,10 @@ def sources(song):
     out += [sig("auroraLight", [inp("signal.cloudSwell", amount=0.75)], chain=UNIT)]
     # ---- subsets
     out += [
+        # a new Moog subset on every trill note (the k-th onset's value is fixed by the seed: seek equals play)
+        {"kind": "random", "name": "moogPick", "settings": {"trigger": "signal.moogNoteEv", "seed": 23}},
         # a new tom subset per accepted tom note (the k-th note's value is fixed by the seed: seek equals play)
         {"kind": "random", "name": "tomPick", "settings": {"trigger": "signal.tomHitEv", "seed": 17}},
-        # the Moog's subset glides slowly: an rms rise has no event to pick on, and notes about 1.4 s apart sit a
-        # fifth of a cycle apart, so each lights a different scattering, held (nearly) still through its glint
-        {"kind": "lfo", "name": "moogDrift", "settings": {"shape": "saw"}},
         # the tone block steps through one bar: a repeated pattern lights the same sequence of facets
         {"kind": "lfo", "name": "barSaw", "settings": {"shape": "saw"}},
     ]
@@ -205,7 +210,7 @@ def sources(song):
 
 
 def lfo_parameters():
-    return {"sources/moogDrift/rate": 0.137, "sources/barSaw/beatSync": True, "sources/barSaw/beatsPerCycle": 4.0}
+    return {"sources/barSaw/beatSync": True, "sources/barSaw/beatsPerCycle": 4.0}
 
 
 def R(src, target, amount):
@@ -216,26 +221,31 @@ def routes():
     A = "fx/aurora/"
     W = "nodes/%s/water/" % look.WATER_NODE
     out = [
-        # ---- Cloud Diving -> the aurora (B s3): intensity, height, width, fold amplitude, inner detail, airglow
+        # ---- Cloud Diving -> the aurora. Pass 4 (owner: "act much more wildly ... twist and turn more chaotically, change
+        # colors faster"): the swell now churns the folds (ADR-1664, a phase: no jump), swirls them hard, lifts and
+        # ripples the rims, and moves the palette on the fast envelope; brightness, height and width as before
         R("signal.cloudSwell", A + "intensity", 1.6),
         R("signal.cloudSwell", A + "curtainHeight", 250.0),
         R("signal.cloudSwell", A + "ribbonWidth", 0.012),
-        R("signal.cloudSwell", A + "ribbonSwirl", 0.6),
+        R("signal.cloudChurn", A + "ribbonChurn", 9.0),
+        R("signal.cloudSwell", A + "ribbonSwirl", 2.4),
+        R("signal.cloudSwell", A + "ribbonEdge", 0.35),
+        R("signal.cloudSwell", A + "turbulence", 0.6),
         R("signal.cloudSwell", A + "filaments", 1.5),
         R("signal.cloudSwell", A + "edgeBrightness", 1.5),
         R("signal.cloudSwell", A + "horizonGlow", 0.3),
-        # ... and, slowly, the persistence of the bright regions and the colour
+        R("signal.cloudStart", A + "pulse", 1.0),
         R("signal.cloudHue", A + "ribbonCoverage", 0.25),
-        R("signal.cloudHue", "palette/position", float(len(look.LOOKS) - 1) - look.REST_POSITION),
+        R("signal.cloudColor", "palette/position", float(len(look.LOOKS) - 1) - look.REST_POSITION),
         R("signal.cloudSwell", "fx/stars/brightness", -0.4),
         # the light the river takes from the aurora
         R("signal.auroraLight", W + "glow", 0.5),
         # ---- Crash: the environment's response to a shooting star (B s4)
         R("signal.crashGlow", A + "intensity", 0.3),
         R("signal.crashGlow", W + "glow", 0.1),   # 0.3 on a kick + bed failed the flash gate at 23-25 s
-        # a phrase-start crash is a brighter star than a re-hit on its decay
-        R("signal.crashSize", "fx/starA/coreIntensity", 40.0),
-        R("signal.crashSize", "fx/starB/coreIntensity", 40.0),
+        # a phrase-start crash throws a brighter ball than a re-hit on its decay
+        R("signal.crashSize", "fx/ballA/intensity", 1.0),
+        R("signal.crashSize", "fx/ballB/intensity", 1.0),
     ]
     out += look.music_routes(R)
     return out

@@ -77,23 +77,11 @@ def camera_tracks():
     def track(target, keys):
         return {"target": target, "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
                 "loopLength": period, "keys": keys}
-    # the shooting stars cross from 24 degrees one side of the camera's heading to 16 the other (B s4); the heading
-    # changes round the loop, so each star's azimuths are keyed from the camera track (a step every few seconds)
-    tracks_star = []
-    for star in look.STARS:
-        ka, kb = [], []
-        for i in range(0, KEYS_PER_LOOP + 1, 2):
-            p0, p1 = kp[i]["value"], kt[i]["value"]
-            head = math.degrees(math.atan2(p1[0] - p0[0], p1[2] - p0[2]))
-            a0, a1 = look.STAR_AZIMUTHS[star]
-            ka.append({"time": kp[i]["time"], "value": round(head + a0, 2), "interp": "step"})
-            kb.append({"time": kp[i]["time"], "value": round(head + a1, 2), "interp": "step"})
-        tracks_star += [track("fx/%s/startAzimuth" % star, ka), track("fx/%s/endAzimuth" % star, kb)]
     # explicit clip planes: the automatic far plane is 50x the world's radius (about 1,000 km here), and at that ratio the
     # sky's direction, unprojected from the far plane, came out NaN on some frames and the bloom blacked the whole frame
     camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"], "fov": 50.0, "orbitSpeed": 0.0,
               "near": 1.0, "far": 45000.0}
-    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)] + tracks_star, \
+    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)], \
         camera, period
 
 
@@ -107,6 +95,7 @@ def scene_doc(camera):
             "source": {"kind": "mesh", "asset": "ab-%s.glb" % name}, "distribution": {"kind": "single"},
             "material": look.rock_material(prog), "castsShadow": False}})
     nodes.append(look.bed_node())
+    nodes.append(look.fish_node())
     return {"format": "avgen-scene", "version": 1, "name": "aurora-borealis", "camera": camera,
             "environment": look.environment(), "nodes": nodes, "lights": [look.unshadowed_key()],
             "materialPrograms": [look.rock_program(look.ROCK_L), look.rock_program(look.ROCK_R), look.bed_program()]}
@@ -120,7 +109,7 @@ def project_doc(tracks, period, song):
                                              "release": 1.0}},
         "parameters": look.parameters(),
         "live": {"overrides": {"lodBias": 1.0}},
-        "effects": [look.aurora_effect(), look.stars_effect()] + look.star_effects() + look.river_effects(),
+        "effects": [look.aurora_effect(), look.stars_effect()] + look.ball_effects() + look.river_effects(),
         "palette": look.palette(),
         "timeline": {"enabled": True, "cues": [], "tracks": tracks},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/aurora-borealis.mp4"},

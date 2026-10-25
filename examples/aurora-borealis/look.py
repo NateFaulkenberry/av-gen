@@ -254,44 +254,43 @@ def _timing(**kw):
     return t
 
 
-# ---- the shooting stars (pass 3, B s4): the ADR-230 comet made fast -- a 0.45 s crossing, a 900 m tail, no wisps
-# or sparkle -- one instance per slot of the pool of two (a trigger-activated comet shows only its newest event)
-STARS = ["starA", "starB"]
-# azimuths relative to the camera's heading (build.py keys them round the loop): a diagonal through the upper middle;
-# B's crossing is mirrored and a little lower, so two stars in quick succession do not retrace one line
-STAR_AZIMUTHS = {"starA": (24.0, -16.0), "starB": (-20.0, 14.0)}
-STAR_ELEVATIONS = {"starA": (21.0, 9.0), "starB": (18.0, 7.0)}
-STAR_TRAVEL = 0.45        # seconds for the head's crossing (brief s12: star travel)
-STAR_CORE = 60.0          # the head out-blooms the aurora (bloom threshold 1.1); crashSize adds to it
+# ---- the light balls (pass 4, ADR-1663): the owner replaced the shooting stars with "a dynamic ball of light - shoot
+# it across the canyon from the camera perspective ... it should be able to throw lots of light onto the geometry
+# below". Thrown from the near left bank at the water's edge up and away into the canyon (the owner's arrow), lighting
+# the facets, the water and the riverbed as it flies; one instance per slot of the pool of two (music.py).
+# (launch, target) in the camera's frame: right, up, forward (m); the camera is 65 m above the water
+BALLS = {"ballA": ((-110.0, -60.0, 330.0), (50.0, 260.0, 2700.0)),
+         "ballB": ((-70.0, -60.0, 380.0), (-140.0, 230.0, 2500.0))}
+BALL_COLOR = "#eadcff"       # the light it casts: lavender-white, inside the palette
+BALL_INTENSITY = 1.0         # crashSize adds up to 1.0 (a phrase-start crash throws a brighter ball)
 
 
-def star_effect(name):
-    e0, e1 = STAR_ELEVATIONS[name]
-    a0, a1 = STAR_AZIMUTHS[name]
-    return {"id": name, "name": name, "type": "comet", "owner": {"kind": "world"}, "enabled": True, "order": 0,
+def ball_effect(name):
+    (l0, l1) = BALLS[name]
+    return {"id": name, "name": name, "type": "groundPulse", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "trigger", "trigger": {"source": "signal", "name": "signal.%sEv" % name, "threshold": 0.0},
-            "style": "", "timing": _timing(fadeIn=0.03, fadeOut=0.55, lifetime=1.0),
-            # the comet's ground term reaches lit PBR and water only: the river's flash
-            "ground": {"color": hexrgb("#d8c8ff"), "falloff": 2.0, "intensity": 0.15, "mode": "subtle",
-                       "radius": 600.0},
+            # it ignites over 0.35 s as it leaves the bank (instant, it flooded the near bank: the flash gate)
+            "style": "", "timing": _timing(fadeIn=0.35, fadeOut=0.8, lifetime=2.0),
             "parameters": {
-                "appearance": {"coreColor": hexrgb("#f6f0ff"), "coreIntensity": STAR_CORE, "flowSpeed": 0.35,
-                               "haloColor": hexrgb("#b9a4ff"), "haloIntensity": 3.0, "haloSize": 45.0,
-                               "headSize": 5.0, "tailColor": hexrgb("#c99cff"), "tailFalloff": 1.4,
-                               "tailIntensity": 9.0, "tailLength": 900.0, "tailWidth": 7.0, "wispAmount": 0.0,
-                               "wispScale": 0.002},
-                "path": {"acceleration": 0.0, "anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0],
-                         "arcLift": 0.0, "curvature": 0.0, "distance": 6000.0, "endAzimuth": a1,
-                         "endElevation": e1, "speedScale": 1.0, "startAzimuth": a0, "startElevation": e0,
-                         "travelSeconds": STAR_TRAVEL},
-                "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
-                            "speed": 0.2},
-                "sparkle": {"density": 0.01, "enabled": False, "fadeDistance": 85.0, "intensity": 5.0, "seed": 1,
-                            "size": 0.13, "speed": 1.3}}}
+                "appearance": {"color": hexrgb(BALL_COLOR), "edgeColor": [1.0, 0.97, 1.0], "edgeIntensity": 18.0,
+                               "intensity": BALL_INTENSITY, "rainbow": False, "rainbowBrightness": 1.0,
+                               "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
+                "propagation": {"kind": "ball", "direction": "explicit", "beamRadius": 0.0, "startOffset": 0.0,
+                                "speed": 60.0, "range": 220.0, "frontWidth": 14.0, "trailLength": 46.0,
+                                "falloff": 1.6, "verticalExtent": 18.0, "verticalGrowth": 0.0, "ringCount": 0.0,
+                                "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
+                                "explicitDirection": [0.0, 0.0, -1.0],
+                                "path": {"ease": 0.35},
+                                "ball": {"launch": list(l0), "target": list(l1), "travel": 1.3, "arc": 160.0,
+                                         "lightRadius": 170.0, "range": 1100.0, "coreSize": 3.5, "haloSize": 22.0}},
+                "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
+                "source": {"kind": "camera", "groundOffset": 0.0},
+                "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
+                            "size": 0.3, "speed": 0.6}}}
 
 
-def star_effects():
-    return [star_effect(n) for n in STARS]
+def ball_effects():
+    return [ball_effect(n) for n in BALLS]
 
 
 # ---- the river light (pass 3, 20b-brief-river-light.md; ADR-1662's path wave on the water's own `river` feature) --
@@ -315,7 +314,8 @@ def _whiter(hexcol, k):
 
 
 def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifetime, fade_out, core, twin, halo,
-               wake, wake_growth, disturb, land, bed, reach, reach_height, front_width):
+               wake, wake_growth, disturb, land, bed, reach, reach_height, front_width, lane=0.0, lane_jitter=0.0,
+               splash=0.0, near_wake=0.0):
     return {"id": name, "name": name, "type": "groundPulse", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "trigger", "trigger": {"source": "signal", "name": signal, "threshold": 0.0},
             "style": "", "timing": _timing(fadeIn=0.0, fadeOut=fade_out, lifetime=lifetime),
@@ -333,7 +333,8 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                          "wakeGrowth": wake_growth, "coreWidth": core, "coreOffset": twin,
                                          "haloWidth": halo, "reach": reach, "reachHeight": reach_height,
                                          "land": land, "bed": bed, "embed": 0.625, "disturb": disturb,
-                                         "nearFade": 500.0}},
+                                         "nearFade": 500.0, "lane": lane, "laneJitter": lane_jitter,
+                                         "splash": splash, "nearWake": near_wake}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
                 "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
@@ -341,24 +342,41 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 
 
 # brief s12: kick and snare colour and travel; ripple strength (`disturb`)
+# Pass 4 (owner): three lanes across the river's width -- kick left of the centre, snare right, toms anywhere, each hit
+# jittered -- a splash where each launches and a heavier wake near the camera ("as if someone dropped a heavy ball into
+# the water"); the toms a third colour
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
             twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.35, bed=3.5, reach=700.0,
-            reach_height=250.0, front_width=14.0)
+            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.07, near_wake=1.6)
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=2.5,
              twin=10.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=2.8, reach=600.0,
-             reach_height=200.0, front_width=9.0)
+             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.05, near_wake=1.3)
+TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
+            twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.3, bed=3.0, reach=650.0,
+            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=0.06, near_wake=1.3)
+TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
 
 def river_effects(pair=None):
     k, sn = BEAM_PAIRS[pair or BEAM_PAIR]
     return [river_beam("riverKick", "signal.kickBeamEv", k, **KICK),
-            river_beam("riverSnare", "signal.snareBeamEv", sn, **SNARE)]
+            river_beam("riverSnare", "signal.snareBeamEv", sn, **SNARE),
+            river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)]
 
 
 def bed_program():
     """The riverbed: nearly black at rest (the river body's colour), so only the river light reveals its planes."""
     return {"name": "abBed", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb("#010106") + [1.0]}],
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
+
+
+def fish_node():
+    """Pass 4: the fish, in the bed's program -- near black, lit only by the beams' under-water light."""
+    return {"name": "fish", "kind": "procedural", "procedural": {
+        "source": {"kind": "mesh", "asset": "ab-fish.glb"}, "distribution": {"kind": "single"},
+        "material": {"baseColor": [0.0, 0.0, 0.0], "emissiveColor": [0.0, 0.0, 0.0], "emissiveIntensity": 0.0,
+                     "roughness": 1.0, "metallic": 0.0, "unlit": True, "program": "abBed"},
+        "castsShadow": False}}
 
 
 def bed_node():
@@ -378,12 +396,12 @@ def music_routes(R):
                 R("signal.crashGlow", prog.path("crashCrest"), 0.2)]
     L, Rt = ROCK_L, ROCK_R
     out += [
-        # LEFT, the Moog: its subset glides slowly (lfo.moogDrift); a note opens the gate and swells the line; the
-        # ring keeps the same subset gently lit
-        R("lfo.moogDrift", L.path("moog", "value"), 1.0),
-        R("signal.moogNote", L.path("moogGate"), -GATE_DROP),
+        # LEFT, the Moog (pass 4): a fresh subset on every trill note (random.moogPick); the note, sized by the
+        # stem's level, opens the gate (louder: more facets, brighter) and swells the line; the level a gentle glow
+        R("random.moogPick", L.path("moog", "value"), 1.0),
+        R("signal.moogNote", L.path("moogGate"), -0.24),
         R("signal.moogGlow", L.path("moogGate"), -0.05),
-        R("signal.moogNote", L.path("moogLine"), 2.0),
+        R("signal.moogNote", L.path("moogLine"), 2.5),
         # RIGHT, the tone block: the subset steps through the bar (lfo.barSaw), so a repeated pattern repeats its
         # sequence of facets; the hit's size (blockSize) is already in blockTick
         R("lfo.barSaw", Rt.path("tblock", "value"), 1.0),

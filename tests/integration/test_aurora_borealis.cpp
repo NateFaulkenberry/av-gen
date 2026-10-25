@@ -8,8 +8,8 @@
 //     1; the aurora's own mix response is off and only Cloud Diving (and a crash's glow) reaches it;
 //   * Feline Footwear (the second project) keeps its three role stems and drum feeds;
 //   * with the Sabertooth stems (skipped where they are absent): every transient detector reproduces research A's
-//     event list (12 crashes, 121 kicks, 48 snares, 28 tom notes, 176 tone-block accents) and the Moog's 23 notes;
-//     at most two shooting stars are alive; the kicks sit on the 85.49 BPM grid with no drift.
+//     event list (12 crashes, 121 kicks, 48 snares, 28 tom notes, 176 tone-block accents) and the Moog's onsets;
+//     at most two light balls are alive; the kicks sit on the 85.49 BPM grid with no drift.
 #include "app/sonic_trace_cli.hpp"
 #include "params/modulation.hpp"
 #include "params/serialization.hpp"
@@ -196,7 +196,7 @@ TEST_CASE("Aurora Borealis: every musical input is a conditioned signal; routes 
             CHECK((source.starts_with("signal.") || subsets.contains(source)));
             CHECK_FALSE(r.contains("chain"));
         }
-        for (const char* n : {"cloudSwell", "cloudHue", "crashStarEv", "starAEv", "starBEv", "kickBeamEv",
+        for (const char* n : {"cloudSwell", "cloudHue", "crashStarEv", "ballAEv", "ballBEv", "kickBeamEv",
                               "snareBeamEv", "moogNote", "moogGlow", "tomHit", "tomHitEv", "tomBody", "blockTick",
                               "auroraLight"}) {
             INFO(n);
@@ -249,7 +249,7 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
         // the brief s4: other stems do not take over the aurora
         if (target.starts_with("fx/aurora/") || target == "palette/position") {
             const std::string source = r.at("source");
-            CHECK((source == "signal.cloudSwell" || source == "signal.cloudHue" || source == "signal.crashGlow"));
+            CHECK((source.starts_with("signal.cloud") || source == "signal.crashGlow")); // Cloud Diving's, and a crash
         }
     }
     // Feline Footwear stays available: its three stems by role and the drum feeds
@@ -273,7 +273,8 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     CHECK_FALSE(fx.contains("riverPulseA"));
     CHECK_FALSE(fx.contains("comet"));
     for (const auto& [id, event] : std::map<std::string, std::string>{{"riverKick", "signal.kickBeamEv"},
-                                                                      {"riverSnare", "signal.snareBeamEv"}}) {
+                                                                      {"riverSnare", "signal.snareBeamEv"},
+                                                                      {"riverToms", "signal.tomHitEv"}}) {
         INFO(id);
         REQUIRE(fx.contains(id));
         const json& e = fx.at(id);
@@ -288,13 +289,18 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     }
     CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("coreOffset").get<double>() > 0.0);
     CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("coreOffset").get<double>() == 0.0);
-    for (const char* id : {"starA", "starB"}) {
+    // the lanes: kick left of the centre, snare right, toms jittered across the width (pass 4)
+    CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
+    CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
+    CHECK(fx.at("riverToms").at("parameters").at("propagation").at("path").at("laneJitter").get<double>() > 0.0);
+    // the light balls replace the stars (pass 4, ADR-1663)
+    CHECK_FALSE(fx.contains("starA"));
+    for (const char* id : {"ballA", "ballB"}) {
         INFO(id);
         REQUIRE(fx.contains(id));
-        CHECK(fx.at(id).at("type") == "comet");
+        CHECK(fx.at(id).at("parameters").at("propagation").at("kind") == "ball");
         CHECK(fx.at(id).at("trigger").at("name") == std::string("signal.") + id + "Ev");
-        CHECK(fx.at(id).at("parameters").at("path").at("travelSeconds").get<double>() <= 0.6);
-        CHECK(fx.at(id).at("parameters").at("appearance").at("wispAmount").get<double>() == 0.0);
+        CHECK(fx.at(id).at("timing").at("lifetime").get<double>() > 0.0);
     }
 }
 
@@ -310,16 +316,16 @@ TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce rese
     const std::vector<double> crashes{2.808,  23.158, 24.567, 25.262, 35.788, 36.504,
                                       45.625, 47.021, 47.725, 56.846, 58.254, 58.958};
     checkEvents(ev("crashStarEv"), crashes, 0.006);
-    // the pool of two: every crash gets a star, in slot A when A's last is over 0.9 s old, else in B
-    const std::vector<double> a = ev("starAEv");
-    const std::vector<double> b = ev("starBEv");
+    // the pool of two balls (pass 4): every crash gets one, in slot A when A's last is 1.3 s old, else in B
+    const std::vector<double> a = ev("ballAEv");
+    const std::vector<double> b = ev("ballBEv");
     CHECK(a.size() + b.size() == crashes.size());
     for (std::size_t i = 1; i < a.size(); ++i) {
-        CHECK(a[i] - a[i - 1] >= 0.9);
+        CHECK(a[i] - a[i - 1] >= 1.3);
     }
     for (double tb : b) {
-        INFO("star B at " << tb);
-        CHECK(std::any_of(a.begin(), a.end(), [&](double ta) { return tb - ta > 0.0 && tb - ta < 0.9; }));
+        INFO("ball B at " << tb);
+        CHECK(std::any_of(a.begin(), a.end(), [&](double ta) { return tb - ta > 0.0 && tb - ta < 1.3; }));
     }
     // 21 s3.2-3.4: counts with no extras (a 100 ms refractory on kick, snare and toms, 80 ms on the tone block)
     CHECK(ev("kickBeamEv").size() == 121);
@@ -329,10 +335,19 @@ TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce rese
                                    46.837, 47.362, 47.542, 68.950, 69.304, 69.475, 69.825, 70.008};
     checkEvents(ev("tomHitEv"), toms, 0.006);
     CHECK(ev("blockTickEv").size() == 176);
-    // the Moog (re-bounced 19:42): 23 notes, one fire each (the rms rise, a 300 ms refractory)
-    const std::vector<double> moog{3.54,  8.78,  14.43, 19.30, 20.38, 21.80, 23.88, 25.99, 28.78, 31.28, 32.66, 34.76,
-                                   36.91, 41.42, 42.81, 47.73, 51.23, 53.36, 55.10, 58.97, 60.38, 64.58, 66.03};
-    checkEvents(rises(t, t.col("signal.moogNote"), 0.9), moog, 0.02);
+    // the Moog (pass 4, the owner: every trill): every onset of its stem, none in its opening silence (it plays from
+    // 3.54 s), with the 50 ms refractory: 346 on Sabertooth; each its own subset
+    {
+        const std::vector<double> trills = ev("moogNoteEv");
+        INFO(trills.size() << " Moog onsets");
+        CHECK(trills.size() >= 330);
+        CHECK(trills.size() <= 360);
+        REQUIRE_FALSE(trills.empty());
+        CHECK(trills.front() > 3.5);
+        for (std::size_t i = 1; i < trills.size(); ++i) {
+            CHECK(trills[i] - trills[i - 1] >= 0.049);
+        }
+    }
     // the kicks on the Kick-fed grid (85.49 BPM, every kick on a 16th): a constant offset, no drift (21 s7 risk 2)
     {
         const double sixteenth = 60.0 / 85.49 / 4.0;
