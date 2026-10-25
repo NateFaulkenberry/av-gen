@@ -347,7 +347,14 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
         INFO(id);
         REQUIRE(fx.contains(id));
         CHECK(fx.at(id).at("parameters").at("propagation").at("kind") == "ball");
-        CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("launch").at(2).get<double>() < 0.0); // behind
+        // pass 9 (the owner: "go across the valley from left to right and right to left"): launched beside one range,
+        // aimed at the other, in front of the camera, high up -- A left to right, B right to left
+        const json& ball = fx.at(id).at("parameters").at("propagation").at("ball");
+        CHECK(ball.at("launch").at(2).get<double>() > 1000.0);
+        CHECK(ball.at("launch").at(1).get<double>() > 400.0);
+        CHECK(ball.at("target").at(1).get<double>() > 400.0);
+        CHECK(ball.at("launch").at(0).get<double>() * ball.at("target").at(0).get<double>() < 0.0); // across
+        CHECK((ball.at("launch").at(0).get<double>() < 0.0) == (std::string(id) == "ballA"));
         CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("coronaIntensity").get<double>() > 0.0);
         // pass 5 (ADR-1665): a realistic fireball, its look not ADR-1663's glow
         CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("look").get<double>() >= 1.0);

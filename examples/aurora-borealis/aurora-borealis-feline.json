@@ -226,9 +226,9 @@
    "style": "",
    "timing": {
     "delay": 0.0,
-    "fadeIn": 0.6,
-    "fadeOut": 0.8,
-    "lifetime": 2.2,
+    "fadeIn": 0.4,
+    "fadeOut": 0.6,
+    "lifetime": 2.4,
     "repeatSeconds": 0.0,
     "windowSeconds": 6.0,
     "windowStart": 0.0
@@ -280,17 +280,17 @@
      },
      "ball": {
       "launch": [
-       18.0,
-       22.0,
-       -35.0
+       -1750.0,
+       600.0,
+       1650.0
       ],
       "target": [
-       -150.0,
-       560.0,
-       2500.0
+       1750.0,
+       540.0,
+       1750.0
       ],
-      "travel": 1.4,
-      "arc": 120.0,
+      "travel": 2.0,
+      "arc": 90.0,
       "lightRadius": 150.0,
       "range": 1100.0,
       "coreSize": 9.0,
@@ -304,7 +304,7 @@
       "coronaSize": 85.0,
       "flicker": 0.8,
       "trail": 220.0,
-      "spread": 900.0,
+      "spread": 120.0,
       "look": 1,
       "smoke": 0.7,
       "embers": 0.8
@@ -349,9 +349,9 @@
    "style": "",
    "timing": {
     "delay": 0.0,
-    "fadeIn": 0.6,
-    "fadeOut": 0.8,
-    "lifetime": 2.2,
+    "fadeIn": 0.4,
+    "fadeOut": 0.6,
+    "lifetime": 2.4,
     "repeatSeconds": 0.0,
     "windowSeconds": 6.0,
     "windowStart": 0.0
@@ -403,17 +403,17 @@
      },
      "ball": {
       "launch": [
-       -18.0,
-       26.0,
-       -30.0
+       2150.0,
+       700.0,
+       2050.0
       ],
       "target": [
-       150.0,
-       600.0,
-       2400.0
+       -2150.0,
+       650.0,
+       2150.0
       ],
-      "travel": 1.4,
-      "arc": 120.0,
+      "travel": 2.0,
+      "arc": 90.0,
       "lightRadius": 150.0,
       "range": 1100.0,
       "coreSize": 9.0,
@@ -427,7 +427,7 @@
       "coronaSize": 85.0,
       "flicker": 0.8,
       "trail": 220.0,
-      "spread": 900.0,
+      "spread": 120.0,
       "look": 1,
       "smoke": 0.7,
       "embers": 0.8

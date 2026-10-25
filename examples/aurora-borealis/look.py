@@ -288,8 +288,14 @@ def _timing(**kw):
 # pass 6: aimed higher (was 230-250 m up at 2.5 km): in pass 5 each one flew into a ridge near the end of its flight.
 # Pass 7, on pass 3's valley: re-checked against its peaks in the renders of all twelve crashes (pass7/ media): each
 # flight stays in the sky above the ridges
-BALLS = {"ballA": ((18.0, 22.0, -35.0), (-150.0, 560.0, 2500.0)),
-         "ballB": ((-18.0, 26.0, -30.0), (150.0, 600.0, 2400.0))}
+# Pass 9 (the owner: "have sky fireballs go across the valley from left to right and right to left rather than down the
+# valley"): each one now crosses the valley sideways in front of the camera, from above one range to above the other --
+# slot A left to right, slot B right to left (the pool gives a crash group both: A takes a crash when free, B one that
+# lands while A is busy) -- at its own height and distance (A 1.7 km out, B 2.1 km), just outside the frame's edges at
+# launch and target, high enough to clear the ridges at both ends (checked on all twelve crashes)
+BALLS = {"ballA": ((-1750.0, 600.0, 1650.0), (1750.0, 540.0, 1750.0)),
+         "ballB": ((2150.0, 700.0, 2050.0), (-2150.0, 650.0, 2150.0))}
+BALL_TRAVEL, BALL_ARC, BALL_SPREAD = 2.0, 90.0, 120.0
 BALL_COLOR = "#ffa060"       # the light it casts: warm fire
 BALL_INTENSITY = 0.6         # crashSize adds up to 0.6 (a phrase-start crash throws a brighter fireball)
 
@@ -300,7 +306,7 @@ def ball_effect(name):
             "activation": "trigger", "trigger": {"source": "signal", "name": "signal.%sEv" % name, "threshold": 0.0},
             # it ignites over 0.6 s as it comes over the camera: large but dim while close, at full fire as it flies away
             # (brighter sooner, a ball passing overhead swung the frame by 0.1-0.18 in 267 ms: the flash gate)
-            "style": "", "timing": _timing(fadeIn=0.6, fadeOut=0.8, lifetime=2.2),
+            "style": "", "timing": _timing(fadeIn=0.4, fadeOut=0.6, lifetime=2.4),
             "parameters": {
                 "appearance": {"color": hexrgb(BALL_COLOR), "edgeColor": [1.0, 0.86, 0.55], "edgeIntensity": 5.0,
                                "intensity": BALL_INTENSITY, "rainbow": False, "rainbowBrightness": 1.0,
@@ -311,10 +317,10 @@ def ball_effect(name):
                                 "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
                                 "explicitDirection": [0.0, 0.0, -1.0],
                                 "path": {"ease": 0.35},
-                                "ball": {"launch": list(l0), "target": list(l1), "travel": 1.4, "arc": 120.0,
+                                "ball": {"launch": list(l0), "target": list(l1), "travel": BALL_TRAVEL, "arc": BALL_ARC,
                                          "lightRadius": 150.0, "range": 1100.0, "coreSize": 9.0, "haloSize": 30.0,
                                          "coronaColor": [1.0, 0.36, 0.06], "coronaIntensity": 2.0,
-                                         "coronaSize": 85.0, "flicker": 0.8, "trail": 220.0, "spread": 900.0,
+                                         "coronaSize": 85.0, "flicker": 0.8, "trail": 220.0, "spread": BALL_SPREAD,
                                          # ADR-1665 (pass 5): the flame billboard, sooty, shedding embers -- the
                                          # most convincing of the three looks compared (41-research-pass5-fireball.md)
                                          "look": 1, "smoke": 0.7, "embers": 0.8}},
