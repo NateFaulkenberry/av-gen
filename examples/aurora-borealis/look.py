@@ -216,55 +216,54 @@ def _timing(**kw):
     return t
 
 
-def river_pulse(slot, signal, speed=750.0, intensity=0.3, name=None):
-    """Gate D: a front of light that leaves the camera and runs down the river (research A s5.3): a directional
-    groundPulse from the camera at the water's height, a few metres tall, so it lights the water and the first metres
-    of the shore slope wherever the river goes. Triggered by its slot of the ring of two (music.py, signal.pulseAEv/BEv)."""
-    c = look_colors(REST_LOOK)
-    return {"id": name or ("riverPulse" + slot), "name": name or ("riverPulse" + slot), "type": "groundPulse",
-            "owner": {"kind": "world"}, "enabled": True, "order": 0, "activation": "trigger",
-            "trigger": {"source": "signal", "name": signal, "threshold": 0.5}, "style": "",
-            "timing": _timing(fadeOut=0.6, lifetime=4.0),
-            "parameters": {
-                "appearance": {"color": c["waterGlow"], "edgeColor": c["auroraLow"], "edgeIntensity": 0.9,
-                               "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
-                               "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
-                "propagation": {"kind": "directional", "direction": "cameraVelocity", "beamRadius": 350.0,
-                                "startOffset": 120.0, "speed": speed, "range": 3000.0, "frontWidth": 90.0,
-                                "trailLength": 500.0, "falloff": 1.6, "verticalExtent": 5.0, "verticalGrowth": 0.004,
-                                "ringCount": 0.0, "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 1.0,
-                                "explicitDirection": [0.0, 0.0, -1.0]},
-                "response": {"emissive": 1.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
-                "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
-                "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
-                            "size": 0.3, "speed": 0.6}}}
+# ---- the shooting stars (pass 3, B s4): the ADR-230 comet made fast -- a 0.45 s crossing, a 900 m tail, no wisps
+# or sparkle -- one instance per slot of the pool of two (a trigger-activated comet shows only its newest event)
+STARS = ["starA", "starB"]
+# azimuths relative to the camera's heading (build.py keys them round the loop): a diagonal through the upper middle;
+# B's crossing is mirrored and a little lower, so two stars in quick succession do not retrace one line
+STAR_AZIMUTHS = {"starA": (24.0, -16.0), "starB": (-20.0, 14.0)}
+STAR_ELEVATIONS = {"starA": (21.0, 9.0), "starB": (18.0, 7.0)}
+STAR_TRAVEL = 0.45        # seconds for the head's crossing (brief s12: star travel)
+STAR_CORE = 60.0          # the head out-blooms the aurora (bloom threshold 1.1); crashSize adds to it
 
 
-CAM_H_WATER = 65.0   # the camera's height above the water (build.CAM_H): the pulse's origin sits on the water
-
-
-def comet_effect(start_az=30.0, end_az=-35.0):
-    """Gate F: one comet, triggered by signal.cometEv (about five a song, never two alive), crossing above the aurora's
-    band in the palette's lavender, violet and magenta (research A s7.3)."""
-    return {"id": "comet", "name": "comet", "type": "comet", "owner": {"kind": "world"}, "enabled": True, "order": 0,
-            "activation": "trigger", "trigger": {"source": "signal", "name": "signal.cometEv", "threshold": 0.5},
-            "style": "", "timing": _timing(fadeIn=0.4, fadeOut=1.5, lifetime=9.0),
-            "ground": {"color": hexrgb("#b38cff"), "falloff": 2.0, "intensity": 0.4, "mode": "subtle",
+def star_effect(name):
+    e0, e1 = STAR_ELEVATIONS[name]
+    a0, a1 = STAR_AZIMUTHS[name]
+    return {"id": name, "name": name, "type": "comet", "owner": {"kind": "world"}, "enabled": True, "order": 0,
+            "activation": "trigger", "trigger": {"source": "signal", "name": "signal.%sEv" % name, "threshold": 0.0},
+            "style": "", "timing": _timing(fadeIn=0.03, fadeOut=0.55, lifetime=1.0),
+            # the comet's ground term reaches lit PBR and water only: the river's flash
+            "ground": {"color": hexrgb("#d8c8ff"), "falloff": 2.0, "intensity": 0.4, "mode": "subtle",
                        "radius": 600.0},
             "parameters": {
-                "appearance": {"coreColor": hexrgb("#f4e8ff"), "coreIntensity": 16.0, "flowSpeed": 0.35,
-                               "haloColor": hexrgb("#b38cff"), "haloIntensity": 2.0, "haloSize": 120.0,
-                               "headSize": 24.0, "tailColor": hexrgb("#d36cff"), "tailFalloff": 1.8,
-                               "tailIntensity": 4.5, "tailLength": 2600.0, "tailWidth": 60.0, "wispAmount": 50.0,
+                "appearance": {"coreColor": hexrgb("#f6f0ff"), "coreIntensity": STAR_CORE, "flowSpeed": 0.35,
+                               "haloColor": hexrgb("#b9a4ff"), "haloIntensity": 3.0, "haloSize": 45.0,
+                               "headSize": 5.0, "tailColor": hexrgb("#c99cff"), "tailFalloff": 1.4,
+                               "tailIntensity": 9.0, "tailLength": 900.0, "tailWidth": 7.0, "wispAmount": 0.0,
                                "wispScale": 0.002},
                 "path": {"acceleration": 0.0, "anchor": "camera", "anchorPosition": [0.0, 0.0, 0.0],
-                         "arcLift": 200.0, "curvature": 0.0, "distance": 5000.0, "endAzimuth": end_az,
-                         "endElevation": 8.0, "speedScale": 1.0, "startAzimuth": start_az, "startElevation": 21.0,
-                         "travelSeconds": 6.5},
+                         "arcLift": 0.0, "curvature": 0.0, "distance": 6000.0, "endAzimuth": a1,
+                         "endElevation": e1, "speedScale": 1.0, "startAzimuth": a0, "startElevation": e0,
+                         "travelSeconds": STAR_TRAVEL},
                 "rainbow": {"brightness": 1.0, "enabled": False, "hueOffset": 0.0, "saturation": 0.85, "scale": 1.1,
                             "speed": 0.2},
-                "sparkle": {"density": 0.01, "enabled": True, "fadeDistance": 85.0, "intensity": 5.0, "seed": 1,
+                "sparkle": {"density": 0.01, "enabled": False, "fadeDistance": 85.0, "intensity": 5.0, "seed": 1,
                             "size": 0.13, "speed": 1.3}}}
+
+
+def star_effects():
+    return [star_effect(n) for n in STARS]
+
+
+def river_effects():
+    """The Kick and Snare river light (E2 path waves on the water's river course); added in pass 3's beam stage."""
+    return []
+
+
+def music_routes(R):
+    """The routes that name this module's program ops (music.py adds them to its own)."""
+    return [R("signal.auroraLight", ROCK.path("auroraGlow"), 0.75)]
 
 
 def stars_effect():

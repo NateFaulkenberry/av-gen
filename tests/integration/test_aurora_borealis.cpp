@@ -1,13 +1,15 @@
-// Aurora Borealis (docs/prototypes/aurora-borealis/): the committed live project, checked as a file, and its signals
-// checked against the Feline Footwear stems (02-research-signals.md s4.4, S1-S6). The scene it names is generated and
-// gitignored (examples/aurora-borealis/build.py); nothing here needs it.
+// Aurora Borealis (docs/prototypes/aurora-borealis/): the committed live projects, checked as files, and their signals
+// checked against the songs' stems (pass 3: 21-research-pass3-audio.md, 23-plan-pass3.md). The scene they name is
+// generated and gitignored (examples/aurora-borealis/build.py); nothing here needs it.
 //
-//   * S1: every musical input is a conditioned signal (ADR-1602); no route reads a stem, a role, the mix's response,
-//     the raw analysis or a macro. Every route and signal parses.
-//   * the stems are declared by role (drums, bass, synth), the beat and the hits are fed from the drum role, the three
-//     part knobs rest at 1, and the aurora's own mix response is off (ADR-939: sensitivity and spectrum shape 0).
-//   * with the stems (skipped where they are absent): the kick wave against the drum class (S2), no stuck accents
-//     (S4), no over-triggering (S5), the context medians by section (S6).
+//   * every musical input is a conditioned signal (ADR-1602); routes read only signals and the two subset sources
+//     (lfo, random), never a stem, the mix's response or a macro;
+//   * Sabertooth (the default) reads its nine stems BY KEY, the beat from the Kick stem; the seven part knobs rest at
+//     1; the aurora's own mix response is off and only Cloud Diving (and a crash's glow) reaches it;
+//   * Feline Footwear (the second project) keeps its three role stems and drum feeds;
+//   * with the Sabertooth stems (skipped where they are absent): every transient detector reproduces research A's
+//     event list (12 crashes, 121 kicks, 48 snares, 28 tom notes, 176 tone-block accents) and the Moog's 23 notes;
+//     at most two shooting stars are alive; the kicks sit on the 85.49 BPM grid with no drift.
 #include "app/sonic_trace_cli.hpp"
 #include "params/modulation.hpp"
 #include "params/serialization.hpp"
@@ -33,15 +35,17 @@ namespace fs = std::filesystem;
 
 namespace {
 
-fs::path projectPath() {
-    return fs::path(AVGEN_SOURCE_DIR) / "examples" / "aurora-borealis" / "aurora-borealis.json";
+fs::path projectPath(const char* name = "aurora-borealis.json") {
+    return fs::path(AVGEN_SOURCE_DIR) / "examples" / "aurora-borealis" / name;
 }
 
-json loadProject() {
-    std::ifstream in(projectPath());
+json loadProject(const char* name = "aurora-borealis.json") {
+    std::ifstream in(projectPath(name));
     REQUIRE(in.good());
     return json::parse(in);
 }
+
+const char* const kFeline = "aurora-borealis-feline.json";
 
 struct Trace {
     std::vector<std::string> names;
@@ -94,71 +98,133 @@ double median(std::vector<double> v) {
     return v[v.size() / 2];
 }
 
-double sectionMedian(const Trace& t, const std::string& name, double from, double to) {
-    const std::size_t c = t.col(name);
-    const std::size_t time = t.col("time");
-    std::vector<double> v;
-    for (const auto& r : t.rows) {
-        if (r[time] >= from && r[time] < to) {
-            v.push_back(r[c]);
+// The project's instrument (sources, stems, feeds) on an orb, traced at `fps`: no generated scene needed. The trace
+// samples after a frame's events are cleared, so each event signal is also read through a one-frame latch,
+// `signal.probe_<name>`.
+Trace traceInstrument(json p, const fs::path& dir, double fps) {
+    const fs::path base = projectPath().parent_path();
+    p["assets"]["scene"] = {{"kind", "orb"}};
+    p["assets"]["audio"] = (base / p["assets"]["audio"].get<std::string>()).lexically_normal().string();
+    for (json& s : p["assets"]["stems"]) {
+        s["file"] = (base / s.at("file").get<std::string>()).lexically_normal().string();
+    }
+    p.erase("palette");
+    p.erase("effects");
+    p["routes"] = json::array();
+    p["timeline"]["tracks"] = json::array();
+    std::vector<std::string> events;
+    for (const json& s : p["sources"]) {
+        if (s.at("kind") == "signal" && s.at("settings").value("event", false)) {
+            events.push_back(s.at("name"));
         }
     }
-    return median(v);
+    for (const std::string& e : events) {
+        p["sources"].push_back({{"kind", "signal"},
+                                {"name", "probe_" + e},
+                                {"settings",
+                                 {{"inputs",
+                                   json::array({{{"source", "signal." + e},
+                                                 {"chain",
+                                                  {{"attackMs", 0.0},
+                                                   {"envelope", "linearfall"},
+                                                   {"envelopeFallPerSecond", 1000.0}}}}})}}}});
+    }
+    fs::create_directories(dir);
+    std::ofstream(dir / "project.json") << p.dump(1);
+    REQUIRE(avgen::app::runSonicTraceCommand(dir / "project.json", dir / "trace.csv", fps) == 0);
+    return readTrace(dir / "trace.csv");
+}
+
+bool stemsPresent(const json& p) {
+    const fs::path base = projectPath().parent_path();
+    if (!fs::exists(base / p["assets"]["audio"].get<std::string>())) {
+        return false;
+    }
+    return std::all_of(p["assets"]["stems"].begin(), p["assets"]["stems"].end(),
+                       [&](const json& s) { return fs::exists(base / s.at("file").get<std::string>()); });
+}
+
+// Each reference event matched by one fire within `tol` seconds, and no fire without a reference event.
+void checkEvents(const std::vector<double>& fires, const std::vector<double>& ref, double tol) {
+    INFO(fires.size() << " fires against " << ref.size() << " reference events");
+    CHECK(fires.size() == ref.size());
+    for (double r : ref) {
+        INFO("reference event at " << r);
+        CHECK(std::any_of(fires.begin(), fires.end(), [&](double f) { return std::abs(f - r) <= tol; }));
+    }
+    for (double f : fires) {
+        INFO("fire at " << f);
+        CHECK(std::any_of(ref.begin(), ref.end(), [&](double r) { return std::abs(f - r) <= tol; }));
+    }
 }
 
 } // namespace
 
-TEST_CASE("Aurora Borealis: every musical input is a role-driven signal with a mix fallback",
-          "[examples][aurora-borealis][adr1602][adr1630]") {
-    const json p = loadProject();
-    CHECK(p.at("sonic").at("live") == true);
-    // S1: the chains live in the signals; routes carry amounts
-    for (const json& r : p.at("routes")) {
-        REQUIRE(avgen::params::routeFromJson(r).has_value());
-        const std::string source = r.at("source");
-        INFO(source);
-        CHECK(source.starts_with("signal."));
-        CHECK_FALSE(r.contains("chain"));
-    }
-    std::set<std::string> names;
-    for (const json& src : p.at("sources")) {
-        REQUIRE(src.at("kind") == "signal");
-        avgen::signals::ConditionedSignalSource parsed(src.at("name"));
-        REQUIRE(parsed.settingsFromJson(src.at("settings")).has_value());
-        for (const auto& in : parsed.inputs()) {
-            INFO(src.at("name").get<std::string>() << " <- " << in.source);
-            CHECK_FALSE(in.source.starts_with("stem.")); // by role, never by key (ADR-1630)
-            CHECK_FALSE(in.source.starts_with("macro."));
-            if (in.source.starts_with("signal.")) {
-                CHECK(names.contains(in.source.substr(7))); // listed after what it reads (same frame)
+TEST_CASE("Aurora Borealis: every musical input is a conditioned signal; routes carry amounts",
+          "[examples][aurora-borealis][adr1602]") {
+    for (const char* name : {"aurora-borealis.json", kFeline}) {
+        INFO(name);
+        const json p = loadProject(name);
+        CHECK(p.at("sonic").at("live") == true);
+        std::set<std::string> names;
+        std::set<std::string> subsets;
+        for (const json& src : p.at("sources")) {
+            const std::string kind = src.at("kind");
+            if (kind == "lfo" || kind == "random") { // the glints' subset selectors (pure in time / per trigger)
+                subsets.insert(kind + "." + src.at("name").get<std::string>());
+                continue;
             }
+            REQUIRE(kind == "signal");
+            avgen::signals::ConditionedSignalSource parsed(src.at("name"));
+            REQUIRE(parsed.settingsFromJson(src.at("settings")).has_value());
+            for (const auto& in : parsed.inputs()) {
+                INFO(src.at("name").get<std::string>() << " <- " << in.source);
+                CHECK_FALSE(in.source.starts_with("macro.")); // a frame late
+                // Sabertooth: no drum class (late and wrong on single-instrument stems, 21 s2.4); each stem's own onset
+                const bool classOk = std::string(name) == kFeline || !in.source.starts_with("role.");
+                CHECK(classOk);
+                if (in.source.starts_with("signal.")) {
+                    CHECK(names.contains(in.source.substr(7))); // listed after what it reads (same frame)
+                }
+            }
+            names.insert(src.at("name").get<std::string>());
         }
-        names.insert(src.at("name").get<std::string>());
-    }
-    for (const char* n : {"arrangement", "synthBright", "synthBed", "hatDrive", "paletteAxis", "kickWave", "snareFold",
-                          "bassHit", "bassBody", "swell", "auroraLight"}) {
-        INFO(n);
-        CHECK(names.contains(n));
+        for (const json& r : p.at("routes")) {
+            REQUIRE(avgen::params::routeFromJson(r).has_value());
+            const std::string source = r.at("source");
+            INFO(source);
+            CHECK((source.starts_with("signal.") || subsets.contains(source)));
+            CHECK_FALSE(r.contains("chain"));
+        }
+        for (const char* n : {"cloudSwell", "cloudHue", "crashStarEv", "starAEv", "starBEv", "kickBeamEv",
+                              "snareBeamEv", "moogNote", "moogGlow", "tomHit", "tomHitEv", "tomBody", "blockTick",
+                              "auroraLight"}) {
+            INFO(n);
+            CHECK(names.contains(n));
+        }
     }
 }
 
-TEST_CASE("Aurora Borealis: the stems by role, drum feeds, part knobs at rest, no mix leak into the aurora",
+TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part knobs at rest, the aurora is Cloud "
+          "Diving's",
           "[examples][aurora-borealis][adr1630][adr1612][adr939]") {
     const json p = loadProject();
-    std::set<std::string> roles;
+    std::map<std::string, std::string> roles;
     for (const json& s : p.at("assets").at("stems")) {
-        roles.insert(s.at("role").get<std::string>());
-        CHECK(s.at("file").get<std::string>().find("feline-footwear (") != std::string::npos);
+        roles[s.at("key")] = s.at("role");
+        CHECK(s.at("file").get<std::string>().find("stems/sabertooth/") != std::string::npos);
     }
-    CHECK(roles == std::set<std::string>{"drums", "bass", "synth"});
-    CHECK(p.at("feeds").at("beat") == "role.drums");
-    CHECK(p.at("feeds").at("hits") == "role.drums");
+    CHECK(roles == std::map<std::string, std::string>{{"kick", "drums"}, {"snare", "other"}, {"toms", "other"},
+                                                      {"crash", "other"}, {"hh", "other"}, {"bass", "bass"},
+                                                      {"cloud", "synth"}, {"moog", "other"}, {"toneblock", "other"}});
+    CHECK(p.at("assets").at("audio").get<std::string>().ends_with("sabertooth/Sabertooth.wav"));
+    CHECK(p.at("feeds") == json{{"beat", "stem.kick"}});
     std::set<std::string> parts;
     for (const json& c : p.at("control").at("channels")) {
-        CHECK(c.at("rest") == 1.0);
+        CHECK(c.at("rest").get<double>() == 1.0);
         parts.insert(c.at("name").get<std::string>());
     }
-    CHECK(parts == std::set<std::string>{"drums", "bass", "synth"});
+    CHECK(parts == std::set<std::string>{"cloud", "crash", "moog", "kick", "snare", "toms", "toneblock"});
     bool found = false;
     for (const json& e : p.at("effects")) {
         if (e.at("type") != "aurora") {
@@ -172,154 +238,110 @@ TEST_CASE("Aurora Borealis: the stems by role, drum feeds, part knobs at rest, n
         CHECK(par.at("shape").at("ribbonSteps").get<double>() >= 40.0); // 40-48 planes at Ultra (grain below)
     }
     CHECK(found);
-    // E4: the aurora's speeds are never routed (the flow is elapsed x speed, so a routed speed jumps the pattern)
     for (const json& r : p.at("routes")) {
         const std::string target = r.at("target");
+        INFO(target);
+        // E4: the aurora's speeds are never routed (the flow is elapsed x speed, so a routed speed jumps the
+        // pattern); nor its quality (the live ladder owns ribbonSteps) or fold size (it swims far sheets)
         CHECK(target.find("Speed") == std::string::npos);
         CHECK(target.find("ribbonSteps") == std::string::npos);
+        CHECK(target.find("ribbonScale") == std::string::npos);
+        // the brief s4: other stems do not take over the aurora
+        if (target.starts_with("fx/aurora/") || target == "palette/position") {
+            const std::string source = r.at("source");
+            CHECK((source == "signal.cloudSwell" || source == "signal.cloudHue" || source == "signal.crashGlow"));
+        }
+    }
+    // Feline Footwear stays available: its three stems by role and the drum feeds
+    const json f = loadProject(kFeline);
+    std::set<std::string> fr;
+    for (const json& s : f.at("assets").at("stems")) {
+        fr.insert(s.at("role").get<std::string>());
+        CHECK(s.at("file").get<std::string>().find("feline-footwear (") != std::string::npos);
+    }
+    CHECK(fr == std::set<std::string>{"drums", "bass", "synth"});
+    CHECK(f.at("feeds").at("beat") == "role.drums");
+    CHECK(f.at("effects") == p.at("effects")); // one scene, two songs
+}
+
+TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce research A's event lists",
+          "[examples][aurora-borealis][stems][adr1602]") {
+    const json p = loadProject();
+    if (!stemsPresent(p)) {
+        SKIP("the Sabertooth stems are local and never committed (assets/audio/stems/sabertooth/)");
+    }
+    const Trace t = traceInstrument(p, avgen::testsupport::processTempDir() / "aurora-borealis-sabertooth", 240.0);
+    const auto ev = [&](const char* n) { return rises(t, t.col(std::string("signal.probe_") + n), 1e-6); };
+    // 21 s3.1: the 12 crashes (a 300 ms refractory; the raw onset double-fires at 25.325)
+    const std::vector<double> crashes{2.808,  23.158, 24.567, 25.262, 35.788, 36.504,
+                                      45.625, 47.021, 47.725, 56.846, 58.254, 58.958};
+    checkEvents(ev("crashStarEv"), crashes, 0.006);
+    // the pool of two: every crash gets a star, in slot A when A's last is over 0.9 s old, else in B
+    const std::vector<double> a = ev("starAEv");
+    const std::vector<double> b = ev("starBEv");
+    CHECK(a.size() + b.size() == crashes.size());
+    for (std::size_t i = 1; i < a.size(); ++i) {
+        CHECK(a[i] - a[i - 1] >= 0.9);
+    }
+    for (double tb : b) {
+        INFO("star B at " << tb);
+        CHECK(std::any_of(a.begin(), a.end(), [&](double ta) { return tb - ta > 0.0 && tb - ta < 0.9; }));
+    }
+    // 21 s3.2-3.4: counts with no extras (a 100 ms refractory on kick, snare and toms, 80 ms on the tone block)
+    CHECK(ev("kickBeamEv").size() == 121);
+    CHECK(ev("snareBeamEv").size() == 48);
+    const std::vector<double> toms{1.046, 1.229, 1.571, 1.921, 2.446, 2.625, 24.033, 24.387, 24.558, 24.908,
+                                   35.254, 35.608, 35.788, 36.142, 36.312, 41.750, 41.933, 45.967, 46.146, 46.500,
+                                   46.837, 47.362, 47.542, 68.950, 69.304, 69.475, 69.825, 70.008};
+    checkEvents(ev("tomHitEv"), toms, 0.006);
+    CHECK(ev("blockTickEv").size() == 176);
+    // the Moog (re-bounced 19:42): 23 notes, one fire each (the rms rise, a 300 ms refractory)
+    const std::vector<double> moog{3.54,  8.78,  14.43, 19.30, 20.38, 21.80, 23.88, 25.99, 28.78, 31.28, 32.66, 34.76,
+                                   36.91, 41.42, 42.81, 47.73, 51.23, 53.36, 55.10, 58.97, 60.38, 64.58, 66.03};
+    checkEvents(rises(t, t.col("signal.moogNote"), 0.9), moog, 0.02);
+    // the kicks on the Kick-fed grid (85.49 BPM, every kick on a 16th): a constant offset, no drift (21 s7 risk 2)
+    {
+        const double sixteenth = 60.0 / 85.49 / 4.0;
+        std::vector<double> first;
+        std::vector<double> second;
+        for (double k : ev("kickBeamEv")) {
+            const double r = k - std::round(k / sixteenth) * sixteenth;
+            (k < 35.0 ? first : second).push_back(r);
+        }
+        const double m1 = median(first);
+        const double m2 = median(second);
+        INFO("kick offset from the 16th grid: " << m1 * 1000.0 << " / " << m2 * 1000.0 << " ms");
+        CHECK(std::abs(m1) <= 0.012);
+        CHECK(std::abs(m1 - m2) <= 0.003);
+    }
+    // the swell is smooth (the brief s4: no jitter): frame-to-frame steps at 30 fps inside the swells, p99 < 0.06
+    // (A s3.6: 0.022 at 300/1200 ms), and the hue slower still
+    for (const auto& [n, lim] : std::map<std::string, double>{{"signal.cloudSwell", 0.06}, {"signal.cloudHue", 0.02}}) {
+        const std::size_t c = t.col(n);
+        std::vector<double> steps;
+        for (std::size_t i = 8; i < t.rows.size(); i += 8) { // 240 -> 30 fps
+            steps.push_back(std::abs(t.rows[i][c] - t.rows[i - 8][c]));
+        }
+        std::sort(steps.begin(), steps.end());
+        INFO(n);
+        CHECK(steps[steps.size() * 99 / 100] < lim);
     }
 }
 
-TEST_CASE("Aurora Borealis: the signals on the Feline Footwear stems (S2, S4-S6)",
+TEST_CASE("Aurora Borealis: the Feline Footwear version's beams follow the drum classes",
           "[examples][aurora-borealis][stems][adr1602]") {
-    const fs::path root = fs::path(AVGEN_SOURCE_DIR) / "assets" / "audio";
-    for (const char* f : {"feline-footwear.wav", "stems/feline-footwear (Drums).wav", "stems/feline-footwear (Bass).wav",
-                          "stems/feline-footwear (Synth).wav"}) {
-        if (!fs::exists(root / f)) {
-            SKIP("the Feline Footwear stems are local and never committed: " << f);
+    const json p = loadProject(kFeline);
+    if (!stemsPresent(p)) {
+        SKIP("the Feline Footwear stems are local and never committed");
+    }
+    const Trace t = traceInstrument(p, avgen::testsupport::processTempDir() / "aurora-borealis-feline", 60.0);
+    const std::vector<double> kicks = rises(t, t.col("signal.probe_kickBeamEv"), 1e-6);
+    const std::vector<double> snares = rises(t, t.col("signal.probe_snareBeamEv"), 1e-6);
+    CHECK(kicks.size() > 300);
+    CHECK(snares.size() > 100);
+    for (const auto* v : {&kicks, &snares}) {
+        for (std::size_t i = 1; i < v->size(); ++i) {
+            CHECK((*v)[i] - (*v)[i - 1] >= 0.099); // the 100 ms refractory
         }
     }
-    // The project's instrument (its sources, stems and feeds) on an orb: the trace needs no generated scene. The
-    // trace samples after a frame's events are cleared, so the drum class is read through an envelope (0 attack).
-    json p = loadProject();
-    p["assets"]["scene"] = {{"kind", "orb"}};
-    p["assets"]["audio"] = (root / "feline-footwear.wav").string();
-    for (json& s : p["assets"]["stems"]) {
-        s["file"] = (root / "stems" / fs::path(s.at("file").get<std::string>()).filename()).string();
-    }
-    p.erase("palette");
-    p.erase("effects");
-    p["routes"] = json::array();
-    p["timeline"]["tracks"] = json::array();
-    p["sources"].push_back({{"kind", "envelope"}, {"name", "eKick"}, {"settings", {{"trigger", "role.drums.kick"}}}});
-    for (const auto& [k, v] : std::map<std::string, double>{
-             {"attackMs", 0.0}, {"decayMs", 0.0}, {"sustain", 1.0}, {"holdMs", 0.0}, {"releaseMs", 60.0}}) {
-        p["parameters"]["sources/eKick/" + k] = v;
-    }
-    const fs::path dir = avgen::testsupport::processTempDir() / "aurora-borealis-trace";
-    fs::create_directories(dir);
-    std::ofstream(dir / "project.json") << p.dump(1);
-    REQUIRE(avgen::app::runSonicTraceCommand(dir / "project.json", dir / "trace.csv", 30.0) == 0);
-    const Trace t = readTrace(dir / "trace.csv");
-
-    // S2: the kick wave fires on the attack of the drum class's kicks: precise and nearly complete
-    const std::vector<double> waves = rises(t, t.col("signal.kickWave"), 0.5);
-    const std::vector<double> kicks = rises(t, t.col("env.eKick"), 0.5);
-    REQUIRE(kicks.size() > 300);
-    std::size_t matched = 0;
-    for (double w : waves) {
-        matched += std::any_of(kicks.begin(), kicks.end(), [w](double k) { return k - w >= -0.08 && k - w <= 0.1; })
-                       ? 1
-                       : 0;
-    }
-    std::size_t found = 0;
-    for (double k : kicks) {
-        found += std::any_of(waves.begin(), waves.end(), [k](double w) { return k - w >= -0.08 && k - w <= 0.1; })
-                     ? 1
-                     : 0;
-    }
-    const double precision = static_cast<double>(matched) / static_cast<double>(waves.size());
-    const double recall = static_cast<double>(found) / static_cast<double>(kicks.size());
-    INFO("kickWave: " << waves.size() << " fires, precision " << precision << ", recall " << recall);
-    CHECK(precision >= 0.95);
-    CHECK(recall >= 0.85);
-
-    // S5: no over-triggering
-    for (std::size_t i = 1; i < waves.size(); ++i) {
-        CHECK(waves[i] - waves[i - 1] >= 0.19);
-    }
-    const std::vector<double> swells = rises(t, t.col("signal.swell"), 0.5);
-    for (std::size_t i = 1; i < swells.size(); ++i) {
-        CHECK(swells[i] - swells[i - 1] >= 5.9);
-    }
-
-    // S4: nothing sticks -- after the drums stop (183.3 s) the kick wave is gone, and every accent is back below 0.05
-    // within a second of the song's end
-    const std::size_t time = t.col("time");
-    for (const auto& r : t.rows) {
-        if (r[time] > 184.5 && r[time] < 210.0) {
-            CHECK(r[t.col("signal.kickWave")] < 0.05);
-            CHECK(r[t.col("signal.snareFold")] < 0.05);
-        }
-        if (r[time] > 212.0 && r[time] < 230.0) {
-            for (const char* a : {"signal.bassHit", "signal.swell"}) {
-                CHECK(r[t.col(a)] < 0.05);
-            }
-        }
-    }
-
-    // S6: the context reads the arrangement (02 s2.2's sections)
-    CHECK(sectionMedian(t, "signal.arrangement", 47.9, 101.4) >= 0.85);   // groove A
-    CHECK(sectionMedian(t, "signal.arrangement", 111.3, 151.0) >= 0.85);  // groove B
-    CHECK(sectionMedian(t, "signal.arrangement", 0.2, 8.2) <= 0.45);      // intro
-    CHECK(sectionMedian(t, "signal.arrangement", 194.6, 210.0) <= 0.45);  // synth alone
-    CHECK(sectionMedian(t, "signal.synthBright", 151.0, 166.9) >= 0.8);   // the lift
-    CHECK(sectionMedian(t, "signal.synthBright", 20.1, 39.9) <= 0.1);     // the calls
-    // no flicker (12-research-pass2-signals.md s2.6): the brightness that moves the palette changes smoothly, frame
-    // to frame, through groove B (it was p99 0.36 a frame with the raw rms as its depth)
-    {
-        const std::size_t c = t.col("signal.synthBright");
-        std::vector<double> steps;
-        for (std::size_t i = 1; i < t.rows.size(); ++i) {
-            if (t.rows[i][time] >= 111.3 && t.rows[i][time] < 151.0) {
-                steps.push_back(std::abs(t.rows[i][c] - t.rows[i - 1][c]));
-            }
-        }
-        std::sort(steps.begin(), steps.end());
-        REQUIRE_FALSE(steps.empty());
-        CHECK(steps[steps.size() * 99 / 100] < 0.02);
-    }
-    // pass 2 (12 s6.2 point 7): the comet's five cues land on their frames, at most one alive
-    {
-        const std::vector<double> comets = rises(t, t.col("signal.comet"), 0.5);
-        const std::vector<double> expected{48.27, 87.53, 114.6, 151.0, 185.33};
-        std::vector<double> inSong;
-        for (double c : comets) {
-            if (c < 205.0) {
-                inSong.push_back(c);
-            }
-        }
-        REQUIRE(inSong.size() == expected.size());
-        for (std::size_t i = 0; i < expected.size(); ++i) {
-            CHECK(std::abs(inSong[i] - expected[i]) <= 1.0 / 30.0 + 1e-6);
-        }
-        for (std::size_t i = 1; i < comets.size(); ++i) {
-            CHECK(comets[i] - comets[i - 1] >= 8.0);
-        }
-    }
-    // the river pulses: a ring of two, so never more than two fronts alive, each slot latched for its life
-    {
-        const std::size_t a = t.col("signal.pulseA");
-        const std::size_t b = t.col("signal.pulseB");
-        const std::vector<double> la = rises(t, a, 0.5);
-        const std::vector<double> lb = rises(t, b, 0.5);
-        CHECK(la.size() > 60);
-        CHECK(lb.size() > 60);
-        for (std::size_t i = 1; i < la.size(); ++i) {
-            CHECK(la[i] - la[i - 1] >= 1.79);
-        }
-        for (std::size_t i = 1; i < lb.size(); ++i) {
-            CHECK(lb[i] - lb[i - 1] >= 1.79);
-        }
-    }
-    // the snare: attack 0 and a 150 ms refractory
-    {
-        const std::vector<double> sn = rises(t, t.col("signal.snareFold"), 0.3);
-        for (std::size_t i = 1; i < sn.size(); ++i) {
-            CHECK(sn[i] - sn[i - 1] >= 0.149);
-        }
-    }
-    // the palette moves through its looks: low in the intro, high in the lift
-    CHECK(sectionMedian(t, "signal.paletteAxis", 0.2, 8.2) < 0.3);
-    CHECK(sectionMedian(t, "signal.paletteAxis", 151.0, 166.9) > 0.85);
 }

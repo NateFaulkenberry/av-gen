@@ -29,7 +29,8 @@ import music  # noqa: E402
 import world  # noqa: E402
 
 SCENE_DIR = os.path.join(HERE, "scene")
-PROJECT = os.path.join(HERE, "aurora-borealis.json")
+PROJECT = os.path.join(HERE, "aurora-borealis.json")             # Sabertooth, the default
+PROJECTS = {"sabertooth": "aurora-borealis.json", "feline": "aurora-borealis-feline.json"}
 SCENE_FILE = "aurora-borealis.scene.json"
 
 CAM_H = 65.0              # metres above the water
@@ -76,20 +77,23 @@ def camera_tracks():
     def track(target, keys):
         return {"target": target, "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
                 "loopLength": period, "keys": keys}
-    # Gate F: the comet crosses from 30 degrees one side of the camera's heading to 35 the other; the heading changes
-    # round the loop, so the path's azimuths are keyed from the camera track (a step every few seconds)
-    ka, kb = [], []
-    for i in range(0, KEYS_PER_LOOP + 1, 2):
-        p0, p1 = kp[i]["value"], kt[i]["value"]
-        head = math.degrees(math.atan2(p1[0] - p0[0], p1[2] - p0[2]))
-        ka.append({"time": kp[i]["time"], "value": round(head + 30.0, 2), "interp": "step"})
-        kb.append({"time": kp[i]["time"], "value": round(head - 35.0, 2), "interp": "step"})
-    tracks_comet = [track("fx/comet/startAzimuth", ka), track("fx/comet/endAzimuth", kb)]
+    # the shooting stars cross from 24 degrees one side of the camera's heading to 16 the other (B s4); the heading
+    # changes round the loop, so each star's azimuths are keyed from the camera track (a step every few seconds)
+    tracks_star = []
+    for star in look.STARS:
+        ka, kb = [], []
+        for i in range(0, KEYS_PER_LOOP + 1, 2):
+            p0, p1 = kp[i]["value"], kt[i]["value"]
+            head = math.degrees(math.atan2(p1[0] - p0[0], p1[2] - p0[2]))
+            a0, a1 = look.STAR_AZIMUTHS[star]
+            ka.append({"time": kp[i]["time"], "value": round(head + a0, 2), "interp": "step"})
+            kb.append({"time": kp[i]["time"], "value": round(head + a1, 2), "interp": "step"})
+        tracks_star += [track("fx/%s/startAzimuth" % star, ka), track("fx/%s/endAzimuth" % star, kb)]
     # explicit clip planes: the automatic far plane is 50x the world's radius (about 1,000 km here), and at that ratio the
     # sky's direction, unprojected from the far plane, came out NaN on some frames and the bloom blacked the whole frame
     camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"], "fov": 50.0, "orbitSpeed": 0.0,
               "near": 1.0, "far": 45000.0}
-    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)] + tracks_comet, \
+    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)] + tracks_star, \
         camera, period
 
 
@@ -104,7 +108,7 @@ def scene_doc(camera):
             "materialPrograms": [look.rock_program()]}
 
 
-def project_doc(tracks, period):
+def project_doc(tracks, period, song):
     doc = {
         "format": "avgen-project", "version": 4, "app": {"name": "Aurora Borealis"},
         "assets": {"scene": {"kind": "composition", "path": "scene/" + SCENE_FILE}},
@@ -112,20 +116,19 @@ def project_doc(tracks, period):
                                              "release": 1.0}},
         "parameters": look.parameters(),
         "live": {"overrides": {"lodBias": 1.0}},
-        "effects": [look.aurora_effect(), look.stars_effect(), look.river_pulse("A", "signal.pulseAEv"),
-                    look.river_pulse("B", "signal.pulseBEv"), look.comet_effect()],
+        "effects": [look.aurora_effect(), look.stars_effect()] + look.star_effects() + look.river_effects(),
         "palette": look.palette(),
         "timeline": {"enabled": True, "cues": [], "tracks": tracks},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/aurora-borealis.mp4"},
     }
-    music.apply(doc)
+    music.apply(doc, song)
     return doc
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--scene-dir", default=SCENE_DIR)
-    ap.add_argument("--project", default=PROJECT)
+    ap.add_argument("--project-dir", default=HERE, help="where the two song projects are written")
     ap.add_argument("--skip-meshes", action="store_true", help="keep the GLBs already in the scene folder")
     a = ap.parse_args()
     os.makedirs(a.scene_dir, exist_ok=True)
@@ -136,10 +139,12 @@ def main():
     with open(os.path.join(a.scene_dir, SCENE_FILE), "w") as f:
         json.dump(scene_doc(camera), f, indent=1)
         f.write("\n")
-    with open(a.project, "w") as f:
-        json.dump(project_doc(tracks, period), f, indent=1)
-        f.write("\n")
-    print("camera loop %.1f s; wrote %s and %s" % (period, os.path.relpath(a.scene_dir), os.path.relpath(a.project)))
+    for song, name in PROJECTS.items():
+        with open(os.path.join(a.project_dir, name), "w") as f:
+            json.dump(project_doc(tracks, period, song), f, indent=1)
+            f.write("\n")
+    print("camera loop %.1f s; wrote %s and %s" % (period, os.path.relpath(a.scene_dir),
+                                                  ", ".join(PROJECTS.values())))
 
 
 if __name__ == "__main__":
