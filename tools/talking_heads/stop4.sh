@@ -19,7 +19,7 @@ PS --out "$OUT/mouth" --poses 0:0 --views front --no-rays --lids 0.5 --dist 0.32
 PS --out "$OUT/mouth" --poses 0:0 --views front --no-rays --lids 1 --dist 0.32 --tag lids-shut
 # the neck at its extremes: looking down (-14), up with the gate's snap (34), turned either way (+-30), both at once
 mkdir -p "$OUT/neck"
-PS --out "$OUT/neck" --poses -14:0,34:0,0:0:30,0:0:-30,34:1:30,-14:0:-30 --views front,three-quarter --no-rays \
+PS --out "$OUT/neck" --poses=-14:0,34:0,0:0:30,0:0:-30,34:1:30,-14:0:-30 --views front,three-quarter --no-rays \
     --dist 0.75 --tag neck
 MOUTH3Q="-0.29,0.38,0.75,0.0,0.35,0.28"   # three-quarter on the middle head's mouth
 EYES="-0.07,0.42,0.62,0.0,0.40,0.25"      # close on the middle head's eyes
