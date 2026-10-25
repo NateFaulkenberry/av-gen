@@ -482,3 +482,97 @@ Cut from one full-song render (01) by the final build, except the stop-1 referen
 
 ### Pass 3 suites on bd0a44ca (recorded by the coordinator)
 `run-suite.sh gpu` (bare): PASS, exit 0, 704 passed / 0 failed / 1 skipped, 47 min 41 s. `gpu-lock.sh run-suite.sh cpu-assets`: PASS, exit 0, 4,470 passed / 0 failed / 29 skipped / 1 expected failure, 18 min 19 s. The first cpu-assets run failed one case (the registry round-trip test expected path rows back from a non-path wave, which `EffectField::written` leaves out by design); fixed in bd0a44ca. Logs: `~/Desktop/av-gen-review/aurora-borealis/pass3-impl/suite-gpu/` and `suite-cpu-assets2/`.
+
+## Pass 4: the owner's notes (stop, 2026-10-25)
+
+Notes: `30-owner-notes-pass4.md`, plus later notes relayed by the coordinator: the snare as one beam; bigger,
+individual fish; the valley itself straight; the shoreline seam; a smoother aurora; fireballs; the Moog's trills
+running down the mountains; the right range on BASS.
+
+### What changed
+
+- **A straight valley.** The world is still generated round the loop, then unrolled (`world.unroll`): distance round
+  the loop becomes distance down a straight axis, and radius becomes the lateral offset. The loop's triangle term is
+  gone, and the bends are 12-26 m. The camera flies straight down -z for 4 km (182 s), then starts again. The seam is
+  5.4 km beyond the run's end, never in view. The left side gains far and distant ranges, on the left program.
+  - **Measured:** within 2 km ahead of the camera, the river's heading changes at most **5.7°** (pass 3: 46-66°). All
+    of it is within 3° of the axis; 80% within 2° and 63% within 1°.
+- **The shoreline seam.** Isolated in one frame from one build: hiding the bed changed nothing; hiding the left bank
+  removed it. Both banks still carried a row 30 m into the river, 4-8 m down, left over from the layout where the
+  mountains ran into the water. Its edge stood above the bed and showed through the water. The rows are gone. The bed's
+  edges are now the banks' waterline rows, at their height, so bed and bank share an edge.
+- **The river light.** Three lanes: kick 55 m left of centre, snare 55 m right, each ±25 m per hit; toms (a third
+  colour, violet #8a5cff) anywhere across ±90 m. All three are one core (the snare's twin read as two beams). Each has a
+  launch splash and a heavier wake near the camera (ADR-1663). After the first take left the near water permanently
+  churned, both were cut to about half.
+- **Fireballs** replace the stars (ADR-1663, a wave kind; the land is unlit, so an engine light would reach nothing).
+  - They are thrown from behind and above the camera, enter from the near edge large, and arc away over the valley,
+    each crash on its own heading (±900 m spread).
+  - Look: a white-gold core in a flickering fire-orange corona with a 150 m flaming trail. Fire orange is the
+    complement of the violet aurora, so it reads as the most vibrant thing in the frame.
+  - They light land, water and riverbed below them. They ignite over 0.6 s; at 0.3 s a ball passing overhead swung the
+    frame by 0.10-0.18 in 267 ms.
+  - Cost: not resolved from noise with one alive (12.88 vs 12.84 ms GPU p50, 1.5 s windows).
+- **The aurora.** The swell drives the sheets' shape on a slow envelope with a second smoothing stage: churn
+  (ADR-1664, a phase routable without E4's jump), swirl, fold depth, width and height. Brightness has its own faster
+  pair of stages. The swell-start pulse is gone.
+  - **Measured, inside the swells at 30 fps:** every routed aurora final now has a per-frame step p99 ≤ 3% of its range
+    and a jerk p99 (the frame-to-frame change of the step) ≤ 0.3%. Before: up to 4.7% step and 2.4% jerk; the pulse
+    jumped 100%. Shape parameters: 1.4% step, 0.09% jerk. File: `17-aurora-smoothness-before-after.txt`.
+  - **The ribbons stand at 1500 m.** With the stronger swirl a near sheet hung over the camera at 1000 m.
+- **The Moog (left) and the BASS (right) run down their ranges.**
+  - **Moog:** fires on every onset of its stem (346, none in its opening silence). Each note lights a fresh subset of
+    crease glints, sized by the stem's level.
+  - **Bass:** fires on its stem's onset with a 100 ms refractory: 215 fires, recall 0.55 / precision 0.91 against its
+    level rises. An rms rise did worse: x1.3 gave 0.50 / 0.87, x1.6 gave 0.27 / 0.83, and onset-or-rise added nothing.
+    It lights a fresh set of right-bank planes per note, blue-violet.
+  - **The sweep:** each program lights only inside a 450 m band of distance from the camera. The band runs from the
+    camera 3.6 km down the valley in 1 s after a note, and does not restart until it has run, so a trill reads as sweep
+    after sweep with its glints re-picked on every note. Programs: left 64 ops, right 60.
+  - **The first approach was dropped:** path-wave fronts in lanes among the mountains, too faint on the walls. Since
+    then the land term's light comes level from the path, raised toward each surface's height, so valley walls take the
+    river beams squarely too.
+- **The tone block is unassigned.** Its signals remain, unrouted. The toms keep only their river lane.
+- **Fish:** 64 individual faceted fish, 12-17 m (stylised, to read from 65 m up), 2-4 m down across the river's width.
+  A quarter swim downstream, a quarter upstream, the rest across or angled. They share the bed's near-black program.
+  Shallow bodies under a beam now take its light evenly, whatever their facing, so a fish lights as a whole instead of
+  showing as a silhouette.
+
+### Measurements
+
+- **Flash gate**, the whole song: worst 267 ms swing **0.044** at 24.4 s (gate 0.05); 0 WCAG-style general flashes.
+- **Headless Ultra, pass 3 (bd0a44ca, regenerated, untracked) vs pass 4, same build, GPU p50 medians:** 12.04 vs 12.67
+  ms at 12 s; 12.01 vs 12.77 at 36 s; 12.02 vs 12.98 at 47 s.
+  - **These were taken on BATTERY** (the Mac had come off AC). They are indicative only, and pass 4 is about 0.7-1 ms
+    above pass 3. Repeat on AC before acceptance.
+- **Live acceptance and the suites:** after the owner's approval, on a fresh reboot.
+
+### Pass-4 stop media: `~/Desktop/av-gen-review/aurora-borealis/pass4/`
+
+| File | What it shows |
+|---|---|
+| `00a-straight-valley-measurements.txt` | the river's heading change ahead of the camera, and the share within 1/2/3/5° of straight, before and after |
+| `00b-top-down-map-straight-valley.png` | top-down map of the straight valley: river, left/right peaks, the camera's run and the song's stretch |
+| `00c-top-down-map-before-pass3-loop.png` | the pass-3 loop, for comparison |
+| `00d-before-after-same-times-6-21-36-51-66s-top-pass3-bottom-pass4.png` | the same song times from the same build: pass 3 above, pass 4 below |
+| `00e-shoreline-before-left-after-right-top-left-bank-bottom-right-bank.png` | the shoreline before and after removing the under-water bank rows, both banks |
+| `00f-straight-valley-left-mountains-visible-6-21-36-51-66s.png` | five frames down the valley, the left mountains in view |
+| `01-straight-river-0-10s.mp4` | the straight river, with sound |
+| `02-moog-trills-sweeping-down-left-range-with-bass-right-18-25s.mp4` | the densest Moog passage: glint sweeps down the left range, bass planes on the right, with sound |
+| `03-moog-trills-left-closeup-18-25s.mp4` | the left range close up, the same passage |
+| `04-fireballs-crash-group-45-49s.mp4` | the 45.6 / 47.0 / 47.7 s crashes as fireballs, with sound |
+| `05-fireballs-crash-group-22-27s.mp4` | the 23.2 / 24.6 / 25.3 s crashes |
+| `06-near-camera-splashes-10-16s.mp4` | launch splashes and the heavier near wake, with sound |
+| `07-near-camera-splashes-closeup-quarter-speed-10-12s.mp4` | the near water at quarter speed |
+| `08-wild-aurora-swell-before-twitchy-left-after-smooth-right-25-31s.mp4` | a swell, the first pass-4 drive (left) against the smoothed one (right), same build |
+| `09-wild-aurora-swell-36-42s.mp4` | the smoothed aurora on another swell |
+| `10-three-lanes-test-events-kick-snare-toms-8-16s.mp4` | kick, snare and toms on deterministic events, each in its lane |
+| `11-three-lanes-on-sabertooth-tom-fill-23-28s.mp4` | the three lanes on the real stems, a tom fill |
+| `12-fish-lit-by-beams-closeup-quarter-speed.mp4` | fish lit as beams pass under the water |
+| `13-bass-right-moog-left-40-48s.mp4` | a bass-heavy passage with the Moog: right planes and left glints together, with sound |
+| `14-full-song-0-70s-1080p.mp4` | the whole song, with sound (98 MB) |
+| `15-full-song-0-70s-720p-small.mp4` | the same at 720p, 16 MB |
+| `16-flash-audit-full-song.txt` | the flash audit |
+| `17-aurora-smoothness-before-after.txt` | step and jerk p99 of every routed aurora final, before and after |
+| `18-bass-detector.txt` | the bass detector candidates' recall and precision |
+| `19-headless-ultra-ab-pass3-vs-pass4-and-fireball-cost-ON-BATTERY.txt` | every headless run (battery: indicative only) |
