@@ -944,6 +944,8 @@ const char* deformerKindName(DeformerKind kind) {
         return "path";
     case DeformerKind::Streamline:
         return "streamline";
+    case DeformerKind::Hinge:
+        return "hinge";
     }
     return "twist";
 }
@@ -951,7 +953,7 @@ const char* deformerKindName(DeformerKind kind) {
 std::optional<DeformerKind> deformerKindFromName(std::string_view name) {
     for (const auto kind : {DeformerKind::Bend, DeformerKind::Twist, DeformerKind::Sine, DeformerKind::Noise,
                             DeformerKind::Displacement, DeformerKind::Field, DeformerKind::Path,
-                            DeformerKind::Streamline}) {
+                            DeformerKind::Streamline, DeformerKind::Hinge}) {
         if (name == deformerKindName(kind)) {
             return kind;
         }
@@ -2404,6 +2406,40 @@ glm::vec3 applyDisplacement(const Deformer& d, const glm::vec3& p, float t) {
     return p + axis * (d.amount * falloffWeight(d, y) * n);
 }
 
+// ADR-1672. The CPU twin of procedural.wgsl `hingePoint`: same arithmetic, same order.
+float hingeSmoothstep(float e0, float e1, float x) {
+    const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+glm::vec3 applyHinge(const Deformer& d, const glm::vec3& p) {
+    if (d.amount == 0.0f) {
+        return p;
+    }
+    const glm::vec3 a = unitOr(d.axis, glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::vec3 fwd = d.displacementAxis - a * glm::dot(d.displacementAxis, a);
+    fwd = glm::length(fwd) > 1e-6f ? glm::normalize(fwd) : anyPerpendicular(a);
+    const glm::vec3 up = glm::normalize(glm::cross(fwd, a));
+    const float r = std::max(d.falloff, 1e-6f);
+    const float rx = std::max(d.frequency, 1e-6f);
+    const float e = 0.004f * r;
+    const float py = glm::dot(p - d.center, up);
+    const float slit = 1.0f - hingeSmoothstep(d.phase - e, d.phase + e, py);
+    const glm::vec3 m = d.center + fwd * d.speed + up * d.scale;
+    const glm::vec3 rel = p - m;
+    const glm::vec3 q(glm::dot(rel, a) / rx, glm::dot(rel, up) / r, glm::dot(rel, fwd) / r);
+    const float mask = 1.0f - hingeSmoothstep(0.5f, 1.0f, glm::length(q));
+    const float angle = d.amount * slit * mask;
+    if (angle == 0.0f) {
+        return p;
+    }
+    // Rodrigues about a through the pivot, as the shader's rotateAbout
+    const glm::vec3 v = p - d.center;
+    const float s = std::sin(angle);
+    const float co = std::cos(angle);
+    return d.center + v * co + glm::cross(a, v) * s + a * (glm::dot(a, v) * (1.0f - co));
+}
+
 } // namespace
 
 glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
@@ -2425,6 +2461,8 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return p; // needs the spline: see applyPathDeformer
     case DeformerKind::Streamline:
         return p; // a Fiber's centre line, not a point map: see fiberCentreLine
+    case DeformerKind::Hinge:
+        return applyHinge(d, p);
     }
     return p;
 }

@@ -130,7 +130,8 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
         u.axisKind = glm::vec4(0.0f, 1.0f, 0.0f, -1.0f);
         return u;
     }
-    const float code = static_cast<float>(d.kind) + (d.space == scene::DeformSpace::World ? 8.0f : 0.0f);
+    // ADR-1672: the world flag is 16 (it was 8, which the ninth kind, Hinge, would have collided with)
+    const float code = static_cast<float>(d.kind) + (d.space == scene::DeformSpace::World ? 16.0f : 0.0f);
     u.axisKind = glm::vec4(safeNormalize(d.axis, glm::vec3(0.0f, 1.0f, 0.0f)), code);
     u.centerAmount = glm::vec4(d.center, d.amount);
     const float freqOrScale = d.kind == scene::DeformerKind::Sine ? d.frequency : d.scale;
@@ -158,6 +159,12 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
     case scene::DeformerKind::Twist:
     case scene::DeformerKind::Displacement:
         break;
+    case scene::DeformerKind::Hinge:
+        // ADR-1672: x = the mask's half-width along the axis (frequency), w = its radius (falloff); extra.xyz =
+        // forward, extra.w = the mask centre's offset along up (scale) as a plain float, not seed bits
+        u.params = glm::vec4(d.frequency, d.speed, d.phase, std::max(d.falloff, 0.0f));
+        u.extra = glm::vec4(d.displacementAxis, d.scale);
+        return u;
     }
     u.extra = glm::vec4(extra, std::bit_cast<float>(d.seed));
     return u;

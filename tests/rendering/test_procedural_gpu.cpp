@@ -939,3 +939,43 @@ TEST_CASE("Procedural instancing throughput", "[.perf][procedural]") {
         }
     }
 }
+
+// ADR-1672: the Hinge deformer on the GPU -- amount 0 is the identity, an angle turns the masked part; and the world
+// flag's move from 8 to 16 leaves a world-space deformer drawing what it drew (the Twist case above covers it).
+TEST_CASE("Hinge deformer: amount 0 is the identity, an angle moves the masked part", "[gpu][procedural][adr1672]") {
+    auto ctx = makeContext();
+    const scene::Scene plain = columnScene(1);
+    const auto base = renderOnce(*ctx, plain, 0.0);
+    const Coverage baseCov = coverage(base);
+    REQUIRE(baseCov.pixels > 0);
+    scene::Deformer h;
+    h.kind = scene::DeformerKind::Hinge;
+    h.space = scene::DeformSpace::Local;
+    h.axis = {1.0f, 0.0f, 0.0f};
+    h.displacementAxis = {0.0f, 0.0f, 1.0f};
+    h.center = {0.0f, 0.0f, 0.0f};
+    h.phase = 0.0f;
+    h.falloff = 4.0f;
+    h.frequency = 4.0f;
+    h.speed = 0.0f;
+    h.scale = -1.0f;
+    h.amount = 0.0f;
+    scene::Scene zero = plain;
+    zero.procedurals[0].deformers.push_back(h);
+    const auto zeroImg = renderOnce(*ctx, zero, 0.0);
+    REQUIRE(zeroImg.rgba.size() == base.rgba.size());
+    int worst = 0;
+    for (std::size_t i = 0; i < base.rgba.size(); ++i) {
+        worst = std::max(worst, std::abs(static_cast<int>(zeroImg.rgba[i]) - static_cast<int>(base.rgba[i])));
+    }
+    CHECK(worst <= 1); // ADR-1591: the finite-difference normal against the analytic one, to rounding
+    scene::Scene turned = plain;
+    h.amount = 0.6f;
+    turned.procedurals[0].deformers.push_back(h);
+    const auto turnedImg = renderOnce(*ctx, turned, 0.0);
+    CHECK(gpu::hashImage(turnedImg) != gpu::hashImage(base));
+    const Coverage tc = coverage(turnedImg);
+    CHECK(tc.pixels > 0);
+    CHECK((tc.minX != baseCov.minX || tc.maxX != baseCov.maxX || tc.minY != baseCov.minY || tc.maxY != baseCov.maxY));
+    CHECK(ctx->errorCount() == 0);
+}

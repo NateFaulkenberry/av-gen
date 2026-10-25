@@ -7,7 +7,7 @@
 //   p = deformLocal(p)           local-space deformers (kind < 8)
 //   p = instance(p)              position + rotate(quaternion, p * scale)
 //   p = object.model * p         the object/parent matrix (identity in this phase)
-//   p = deformWorld(p)           world-space deformers (kind >= 8)
+//   p = deformWorld(p)           world-space deformers (kind >= 16)
 // The normal is cross(chain(p + eps t1) - chain(p), chain(p + eps t2) - chain(p)) for a tangent
 // basis (t1, t2) of the source normal, flipped into the hemisphere of the transformed source
 // normal; eps = timeInfo.z (1e-3 x source bounds radius, set by the renderer).
@@ -129,7 +129,8 @@ const DEFORM_DISPLACEMENT: i32 = 4;
 const DEFORM_FIELD: i32 = 5;
 const DEFORM_PATH: i32 = 6;
 const DEFORM_STREAMLINE: i32 = 7; // ADR-1181: only the fiber path reads it; the chain passes it through
-const DEFORM_WORLD: i32 = 8;
+const DEFORM_HINGE: i32 = 8;      // ADR-1672
+const DEFORM_WORLD: i32 = 16;     // ADR-1672: the world flag (it was 8)
 
 // ---- transforms ------------------------------------------------------------------------------
 
@@ -201,6 +202,37 @@ fn bendPoint(p: vec3<f32>, c: vec3<f32>, axis: vec3<f32>, k: f32, dirIn: vec3<f3
     return c + dir * xp + axis * yp + b * z;
 }
 
+// ADR-1672: a soft-masked rigid turn (scene/procedural.hpp, Hinge): a jaw that opens a mouth, a lid. The CPU twin is
+// procedural.cpp applyHinge -- same arithmetic, same order.
+fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn: vec3<f32>, params: vec4<f32>,
+              upOffset: f32) -> vec3<f32> {
+    if (amount == 0.0) {
+        return p;
+    }
+    let a = axisIn;
+    var fwd = fwdIn - a * dot(fwdIn, a);
+    if (dot(fwd, fwd) < 1e-12) {
+        fwd = perpendicularTo(a);
+    } else {
+        fwd = normalize(fwd);
+    }
+    let up = normalize(cross(fwd, a));
+    let r = max(params.w, 1e-6);
+    let rx = max(params.x, 1e-6);
+    let e = 0.004 * r;
+    let py = dot(p - c, up);
+    let slit = 1.0 - smoothstep(params.z - e, params.z + e, py);
+    let m = c + fwd * params.y + up * upOffset;
+    let rel = p - m;
+    let q = vec3<f32>(dot(rel, a) / rx, dot(rel, up) / r, dot(rel, fwd) / r);
+    let mask = 1.0 - smoothstep(0.5, 1.0, length(q));
+    let angle = amount * slit * mask;
+    if (angle == 0.0) {
+        return p;
+    }
+    return rotateAbout(p, c, a, angle);
+}
+
 fn falloffRamp(y: f32, falloff: f32) -> f32 {
     if (falloff > 0.0) {
         return clamp(abs(y) / falloff, 0.0, 1.0);
@@ -220,6 +252,9 @@ fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f
     let y = dot(p - c, axis);
     if (kind == DEFORM_BEND) {
         return bendPoint(p, c, axis, amount, d.extra.xyz, falloff);
+    }
+    if (kind == DEFORM_HINGE) {
+        return hingePoint(p, c, axis, amount, d.extra.xyz, d.params, d.extra.w);
     }
     let ramp = falloffRamp(y, falloff);
     if (kind == DEFORM_TWIST) {

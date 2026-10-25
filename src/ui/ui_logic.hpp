@@ -1532,6 +1532,16 @@ struct DeformerRow {
         {"tension", "tension", "%.2f /m", "A pull weaker than this does not bend the fiber at all: straight runs and\n"
                                           "sharp bends, like wire under load. 0 = none."},
     };
+    static constexpr DeformerRow kHinge[] = { // ADR-1672
+        {"amount", "angle", "%.3f rad", "How far the masked part turns about the pivot (a jaw's drop)."},
+        {"axis", "hinge", "%.2f", "The axis it turns about."},
+        {"center", "pivot", "%.3f m", "The pivot, in the deformer's space."},
+        {"phase", "slit", "%.3f m", "The slit's height above the pivot: only points below it turn (the lips)."},
+        {"falloff", "radius", "%.3f m", "The mask's radius along up and forward; it eases out over its outer half."},
+        {"frequency", "half-width", "%.3f m", "The mask's half-width along the hinge axis."},
+        {"speed", "forward", "%.3f m", "The mask centre's offset forward of the pivot."},
+        {"scale", "up", "%.3f m", "The mask centre's offset up from the pivot (negative is down)."},
+    };
     static constexpr DeformerRow kPath[] = {
         {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},
         {"axis", "along", "%.2f", "The object axis that maps to arc length."},
@@ -1552,6 +1562,7 @@ struct DeformerRow {
     case scene::DeformerKind::Field: return kField;
     case scene::DeformerKind::Path: return kPath;
     case scene::DeformerKind::Streamline: return kStreamline;
+    case scene::DeformerKind::Hinge: return kHinge;
     }
     return kAxisCenter; // unreachable for a declared enumerator
 }
@@ -1561,7 +1572,7 @@ struct DeformerRow {
 inline constexpr scene::DeformerKind kDeformerKinds[] = {
     scene::DeformerKind::Bend,  scene::DeformerKind::Twist,        scene::DeformerKind::Sine,
     scene::DeformerKind::Noise, scene::DeformerKind::Displacement, scene::DeformerKind::Field,
-    scene::DeformerKind::Path,  scene::DeformerKind::Streamline,
+    scene::DeformerKind::Path,  scene::DeformerKind::Streamline,   scene::DeformerKind::Hinge,
 };
 
 // The parameter path one row names, for the object `prefix` (`procedural/<name>/`) and a 0-based

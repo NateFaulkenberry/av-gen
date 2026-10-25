@@ -2217,3 +2217,52 @@ TEST_CASE("partOf survives a round trip and is absent when unset", "[procedural]
     REQUIRE(loneBack.has_value());
     CHECK(loneBack->partOf.empty());
 }
+
+// ADR-1672: the Hinge deformer -- a soft-masked rigid turn (a jaw that opens a mouth, a lid), no rig, no cut.
+TEST_CASE("Hinge deformer: turns what lies below the slit inside its mask, eases out, leaves the rest", "[scene][procedural][adr1672]") {
+    Deformer h;
+    h.kind = DeformerKind::Hinge;
+    h.axis = {1.0f, 0.0f, 0.0f};             // the hinge: +X
+    h.displacementAxis = {0.0f, 0.0f, 1.0f}; // forward: +Z, so up is +Y
+    h.center = {0.0f, 0.0f, 0.0f};           // the pivot
+    h.phase = 0.0f;                          // the slit at the pivot's height
+    h.falloff = 0.10f;                       // mask radius (up, forward)
+    h.frequency = 0.05f;                     // mask half-width (along the hinge)
+    h.speed = 0.06f;                         // mask centre 6 cm forward ...
+    h.scale = -0.03f;                        // ... and 3 cm down
+    h.amount = 0.3f;
+    REQUIRE(std::string(deformerKindName(DeformerKind::Hinge)) == "hinge");
+    REQUIRE(deformerKindFromName("hinge") == DeformerKind::Hinge);
+
+    const glm::vec3 chin{0.0f, -0.03f, 0.06f}; // the mask's centre: fully inside, below the slit
+    const glm::vec3 turned = applyDeformer(h, chin, 0.0);
+    // a rigid turn about +X by 0.3 rad: (y, z) -> (y cos - z sin, y sin + z cos)
+    checkVec(turned, {0.0f, -0.03f * std::cos(0.3f) - 0.06f * std::sin(0.3f),
+                      -0.03f * std::sin(0.3f) + 0.06f * std::cos(0.3f)});
+    SECTION("above the slit nothing moves, however close (the upper lip)") {
+        checkVec(applyDeformer(h, {0.0f, 0.001f, 0.06f}, 0.0), {0.0f, 0.001f, 0.06f});
+    }
+    SECTION("outside the mask nothing moves (the throat, the back of the head)") {
+        checkVec(applyDeformer(h, {0.0f, -0.2f, 0.06f}, 0.0), {0.0f, -0.2f, 0.06f});
+        checkVec(applyDeformer(h, {0.0f, -0.03f, -0.2f}, 0.0), {0.0f, -0.03f, -0.2f});
+    }
+    SECTION("it eases out across the mask's outer half: no step at the mouth's corners") {
+        float prev = 1e9f;
+        for (int i = 0; i <= 10; ++i) {
+            const float x = 0.025f + 0.025f * static_cast<float>(i) / 10.0f; // half to full half-width
+            const glm::vec3 p{x, -0.03f, 0.06f};
+            const float moved = glm::length(applyDeformer(h, p, 0.0) - p);
+            CHECK(moved <= prev + 1e-6f);
+            prev = moved;
+        }
+        CHECK(prev < 1e-5f);
+    }
+    SECTION("amount 0 is the identity, bit for bit") {
+        h.amount = 0.0f;
+        const glm::vec3 p{0.01f, -0.02f, 0.05f};
+        const glm::vec3 q = applyDeformer(h, p, 0.0);
+        CHECK(q.x == p.x);
+        CHECK(q.y == p.y);
+        CHECK(q.z == p.z);
+    }
+}

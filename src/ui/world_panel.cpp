@@ -1003,6 +1003,7 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
         case scene::DeformerKind::Bend:
         case scene::DeformerKind::Twist:
         case scene::DeformerKind::Displacement:
+        case scene::DeformerKind::Hinge:
             break;
         }
 
@@ -1042,6 +1043,7 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
             case scene::DeformerKind::Field: add.amount = 1.0f; break;
             case scene::DeformerKind::Path: add.amount = 1.0f; break;
             case scene::DeformerKind::Streamline: add.amount = 2.0f; add.space = scene::DeformSpace::World; break;
+            case scene::DeformerKind::Hinge: add.amount = 0.2f; add.falloff = 0.1f; add.frequency = 0.05f; break;
             }
             next.push_back(add);
             commit(std::move(next));

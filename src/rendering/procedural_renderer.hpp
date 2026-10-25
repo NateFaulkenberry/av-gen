@@ -190,7 +190,7 @@ struct CullCounts {
 // The deformer record as the shader sees it (64 bytes, std140-compatible). Mirrors
 // shaders/procedural.wgsl `DeformerUniform`.
 struct DeformerUniform {
-    glm::vec4 axisKind;      // xyz = unit axis, w = kind code: DeformerKind (0..6) + 8 for world space, -1 = disabled slot
+    glm::vec4 axisKind;      // xyz = unit axis, w = kind code: DeformerKind (0..8) + 16 for world space, -1 = disabled slot
     glm::vec4 centerAmount;  // xyz = center, w = amount
     glm::vec4 params;        // x = frequency (sine) | spatial scale (noise, displacement) | field slot (field) | spline slot (path), y = speed | alongNormal (field) | resolved pathScale (path), z = phase | pathOffset (path), w = falloff | pathRoll (path)
     glm::vec4 extra;         // xyz = displacementAxis (sine, bend direction) | axisMask (noise); w = seed as float bits
