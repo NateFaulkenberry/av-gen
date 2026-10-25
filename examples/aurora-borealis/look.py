@@ -285,7 +285,9 @@ def _timing(**kw):
 # far mountains, shrinking; each crash its own heading (`spread`), lighting land, water and riverbed as it flies. Fire
 # orange: the aurora's complement, so it reads as the most vibrant thing in the frame. One instance per slot of the
 # pool of two (music.py). (launch, target) in the camera's frame: right, up, forward (m)
-# pass 6: aimed higher (was 230-250 m up at 2.5 km): in pass 5 each one flew into a ridge near the end of its flight
+# pass 6: aimed higher (was 230-250 m up at 2.5 km): in pass 5 each one flew into a ridge near the end of its flight.
+# Pass 7, on pass 3's valley: re-checked against its peaks in the renders of all twelve crashes (pass7/ media): each
+# flight stays in the sky above the ridges
 BALLS = {"ballA": ((18.0, 22.0, -35.0), (-150.0, 560.0, 2500.0)),
          "ballB": ((-18.0, 26.0, -30.0), (150.0, 600.0, 2400.0))}
 BALL_COLOR = "#ffa060"       # the light it casts: warm fire
@@ -523,19 +525,17 @@ def river_feature():
     """The river's course for the water's flow (the streaks run along it): the centreline, with no cut (the land is
     the GLB banks) and its surface at the sea's level."""
     import world
-    pts = world.river_points(256)   # 256 points at most; pass 4: the straight valley's (world.unroll)
+    pts = [world.centre(world.TAU * i / 255) for i in range(256)]   # 256 points at most
     return {"name": "river", "kind": "river", "path": [[round(p[0], 2), 0.0, round(p[2], 2)] for p in pts],
             "width": 200.0, "amplitude": 0.0, "falloff": 1.0, "flatten": 0.0, "roughness": 0.0, "water": True,
             "waterDepth": 0.0, "smoothing": 0}
 
 
 def water_node():
-    """A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
+    """Pass 3's water node, restored in pass 7. A terrain node that is only water: a flat bed under a sea at y = 0 (the land's GLBs make the river's banks, so
     there is nothing to fit). Coarse chunks; the bed is unlit and nearly black."""
-    # pass 4: a long strip down the straight valley's channel (the land's GLBs make the banks), from 3 km behind the
-    # camera's start to the far end of the unrolled world
-    return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, -3200.0],
-            "world": {"name": "aurora-river", "seed": 1, "size": [1600.0, 12600.0], "baseHeight": -40.0,
+    return {"name": WATER_NODE, "kind": "terrain", "position": [0.0, 0.0, 0.0],
+            "world": {"name": "aurora-river", "seed": 1, "size": [8400.0, 8400.0], "baseHeight": -40.0,
                       "erosion": 0.0, "seaLevel": 0.0, "layers": [], "features": [river_feature()]},
             "terrain": {"chunkSize": 400.0, "resolution": 8, "lodLevels": 2, "lodDistance": 400.0,
                         "viewDistance": 6000.0, "shadowDistance": 0.0, "skirtDepth": 1.0, "groundMottle": False,

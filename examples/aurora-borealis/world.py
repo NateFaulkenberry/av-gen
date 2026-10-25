@@ -1,4 +1,10 @@
-"""Aurora Borealis: the land. A closed-loop river with S-bends, faceted valley walls, a handful of art-directed hero
+"""Aurora Borealis: the land. Pass 7 (the owner on pass 6: "just tell it to go back to the pass 3 geometry"): the
+pass-3 generator as it stood at bd0a44ca -- the river with its seven mild bends and straight reaches round the loop, the
+valley walls, hero peaks, spurs, layered ranges and rock shoulders, unchanged -- with only these additions: the bank
+rows 30 m under the water are gone (the shoreline seam the owner found in pass 4), so the deeper bed of passes 5-6 meets
+the banks at their waterline rows; and the fish (pass 5-6). Everything below this paragraph is pass 3's text.
+
+Aurora Borealis: the land. A closed-loop river with S-bends, faceted valley walls, a handful of art-directed hero
 peaks on alternate banks, and three receding outer ranges, written as flat-faceted GLBs (tools/sonic_vfx/meshes.py).
 
 Everything is a pure function of the constants below, so a rebuild writes the same bytes.
@@ -33,7 +39,7 @@ TAU = 2.0 * math.pi
 R0 = 3000.0
 # a rounded triangle: with A3 = 0.10 each side's midpoint has zero curvature, so the loop has three long, nearly
 # straight reaches the camera can look down (11-research-pass2-render.md s2.3); two small harmonics add the meanders
-A3 = 0.0   # pass 4: the loop's rounded triangle (was 0.10) is gone; with the world unrolled the axis is straight
+A3 = 0.10
 
 
 # the river's course on the valley axis: straight reaches of about 1-2 km between mild bends (owner, Gate A take 3:
@@ -47,13 +53,8 @@ def _bends(count=7):
     out = []
     for i in range(count):
         c = TAU * (i + 0.5 + 0.35 * (_h(i, 1) - 0.5)) / count
-        half = 0.13 + 0.07 * _h(i, 2)              # 0.13-0.20 rad: 390-600 m either side of the apex
-        # pass 4 (owner): "a mostly straight river with some very slight bends" -- the hard bends hid the left
-        # mountains, the Moog's stage. 12-26 m swings (were 95-180 m) over the same 330-510 m half-lengths: at most
-        # a few degrees off the axis
-        # pass 6 (the owner: "go back to a slightly curved river design"): 45-75 m swings, between pass 4's 12-26 m (a
-        # straight valley) and pass 3's 95-180 m round a winding loop -- gentle bends that keep both ranges in view
-        amp = (45.0 + 30.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
+        half = 0.11 + 0.06 * _h(i, 2)              # 0.11-0.17 rad: 330-510 m either side of the apex
+        amp = (95.0 + 85.0 * _h(i, 3)) * (1 if i % 2 == 0 else -1)
         out.append((c, half, amp))
     return out
 
@@ -107,34 +108,6 @@ def axis_centre(th):
 def periodic_noise(th, cycles, seed, octaves=3):
     """0..1 smooth noise along the loop, periodic in theta (`cycles` lattice cells round the loop)."""
     return mx.fbm_p(0.37 * seed, (th % TAU) / TAU * cycles, seed, octaves, py=cycles)
-
-
-# ---- pass 4: the world unrolled into a straight valley -------------------------------------------------------------
-# The owner: "terrain is still too curved, i asked for a mostly straight river + valley". Everything here is still
-# generated round the loop (theta, r), which keeps every recipe above and below unchanged; then every point written --
-# each mesh vertex, the river's course, the camera -- passes through `unroll`: distance round the loop becomes
-# distance along a straight axis (z = -R0 theta, so the camera, flying +theta, looks down -z) and radius becomes the
-# lateral offset (x = r - R0: the inner bank, on the camera's left, at -x). The seam is the far side of the loop
-# (theta = +-pi, z = -+9.4 km): triangles across it are dropped, and the camera crosses it only after about 7 minutes.
-def unroll(p):
-    th = math.atan2(p[0], p[2])
-    r = math.hypot(p[0], p[2])
-    return (r - R0, p[1], -R0 * th)
-
-
-def unroll_tris(tris):
-    out = []
-    for tri in tris:
-        ths = [math.atan2(v[0], v[2]) for v in tri]
-        if max(ths) - min(ths) > math.pi or min(math.hypot(v[0], v[2]) for v in tri) < 1.0:
-            continue   # across the seam, or touching the loop's centre (no place on a straight valley)
-        out.append(tuple(unroll(v) for v in tri))
-    return out
-
-
-def river_points(n=256):
-    """The river's centreline, unrolled: n points along the straight valley, inside the seam."""
-    return [unroll(centre(-math.pi + 1e-3 + (2.0 * math.pi - 2e-3) * i / (n - 1))) for i in range(n)]
 
 
 # ---- the valley's profile across its band -------------------------------------------------------------------------
@@ -204,7 +177,7 @@ def _peak_frames():
 # alternating banks with jittered size and set-back. Looking down the river they overlap as they recede -- near, middle
 # and far ridges stacked in depth -- which is the layered "river in a valley" read (the Living Prism aurora valley's
 # composition, in this scene's faceted language). Each is a long low pyramid whose ridge points at the water.
-def _spurs(count=80):   # pass 6: 80 (was 140), so the ridges stand apart
+def _spurs(count=140):
     out = []
     for i in range(count):
         side = 1 if i % 2 == 0 else -1
@@ -271,20 +244,24 @@ def peak_height(x, z, side=0):
         d = 0.55 * math.sqrt(ua * ua + vb * vb) + 0.45 * max(abs(ua), abs(vb))
         if d >= 1.0:
             continue
-        # pass 6: one broad ridged octave (was three at 140 m), so a peak's faces are few and its crest clean
-        n = mx.fbm(x / 320.0, z / 320.0, 40 + seed, 1, ridged=True)
-        best = max(best, h * (1.0 - d) ** 1.35 * (0.93 + 0.14 * n))
+        n = mx.fbm(x / 140.0, z / 140.0, 40 + seed, 3, ridged=True)
+        best = max(best, h * (1.0 - d) ** 1.35 * (0.86 + 0.28 * n))
     return best
 
 
 def detail(x, z, th, o, side):
-    """Relief, so the facets are large, planar and irregular. Pass 6 (the owner: "simplify the mountain geometry"): the
-    river's three layers of ridged noise at 95-260 m become two broad ones (260 m, 320 m) with less amplitude, so the
-    slopes are a few large planes and the ridgelines between them are long and clean -- a clean stage for the light."""
+    """Relief, so the facets are large, planar and irregular: a little on the flats, strong ridged spurs on the walls
+    (their crests and gullies are what give the facets their different orientations). Nothing at the water's edge,
+    so the bank meets it cleanly."""
     ww = wall_weight(th, o, side)
-    flat = (10.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
-        mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 1, ridged=True) - 0.3)
-    spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 320.0, z / 320.0, 23, 2, ridged=True) - 0.35)
+    flat = 2.5 * mx.smooth(15.0, 70.0, o) * (mx.fbm(x / 70.0, z / 70.0, 21, 2) - 0.5)
+    # rocky shoulders: large ridged facets from 30 m up the shore (the waterline itself stays a gentle slope)
+    flat += (22.0 + 0.07 * min(o, 600.0)) * mx.smooth(30.0, 110.0, o) * (
+        mx.fbm(x / 95.0, z / 95.0, 27 + (0 if side > 0 else 4), 3, ridged=True) - 0.25)
+    # and a coarser set of rock buttresses, so every stretch of the near slopes has large readable facets
+    flat += (12.0 + 0.04 * min(o, 600.0)) * mx.smooth(40.0, 160.0, o) * (
+        mx.fbm(x / 260.0 + 3.7, z / 260.0, 29, 2, ridged=True) - 0.3)
+    spur = (30.0 + 0.12 * min(o, 900.0)) * ww * (mx.fbm(x / 230.0, z / 230.0, 23, 4, ridged=True) - 0.35)
     return flat + spur
 
 
@@ -300,15 +277,12 @@ def land_height(x, z, th, o, side):
 # ---- the valley band ------------------------------------------------------------------------------------------------
 # (offset from the water's edge in m, columns round the loop). Near rows are dense (about 17 m facets along the bank),
 # the far ones coarse; the last outer row sinks so the band's edge tucks under the first range.
-# pass 4: the rows at -30 m are gone (both banks). They were the bank running on under the river from the layout where
-# the mountains went straight into the water; their edge stood as a step above the riverbed and showed through the
-# water as a line along the shore (the owner's screenshot). The riverbed now runs under the bank's first row instead.
-# pass 6: about 60% of pass 4's density each way -- facets about twice the area, still fine enough up the walls (where
-# the peaks rise, 200-900 m out) that every peak keeps its shape; a coarser first try (9 rows) flattened them into hills
-OUTER_ROWS = [(-8, 520), (20, 520), (70, 440), (130, 400), (200, 360), (280, 330), (370, 300), (470, 280), (580, 250),
-              (720, 220), (900, 190), (1100, 170), (1350, 150)]
-INNER_NEAR = [(-8, 520), (20, 520), (70, 440), (130, 400), (200, 360), (280, 330), (370, 300), (470, 280), (580, 250)]
-INNER_FAR = [(0.50, 120), (0.66, 90), (0.80, 70), (0.91, 50)]   # fractions of the way to the centre
+# pass 7: pass 3's rows, less the -30 m ones (the seam under the water; pass 4)
+OUTER_ROWS = [(-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+              (300, 450), (400, 450), (520, 360), (680, 300), (880, 250), (1100, 210), (1350, 180)]
+INNER_NEAR = [(-8, 900), (14, 900), (40, 800), (72, 800), (110, 680), (160, 560), (220, 560),
+              (300, 450), (400, 450), (520, 360)]
+INNER_FAR = [(0.50, 160), (0.66, 120), (0.80, 90), (0.91, 60)]   # fractions of the way to the centre
 
 
 def _row(offset_fn, n, seed, jitter=0.3, sink=0.0, ojit=0.0):
@@ -375,11 +349,18 @@ def valley_band():
         outer += _zip(a, b, True)
     for a, b in zip(rows_in, rows_in[1:]):
         inner += _zip(a, b, False)
-    # (pass 4: no fan to the loop's centre -- unrolled, the inner band ends in a long edge, and the left ranges stand
-    # beyond it)
+    # the centre: a fan from the innermost row to the middle of the loop
+    last = rows_in[-1]
+    mid = (0.0, land_height(0.0, 0.0, 0.0, rc(0.0), -1), 0.0)
+    for i in range(len(last)):
+        a, b = last[i], last[(i + 1) % len(last)]
+        tri = (a, b, mid)
+        if mx.cross(mx.sub(tri[1], tri[0]), mx.sub(tri[2], tri[0]))[1] < 0.0:
+            tri = (a, mid, b)
+        inner.append(tri)
     # pass 3 (22-research-pass3-scene.md s5.1): the camera flies the loop in +theta with its right vector pointing out
-    # of the loop, so the inner bank is always on the LEFT (the Moog's) and the outer bank on the RIGHT (the toms' and
-    # the tone block's), with the three outer ranges
+    # of the loop, so the inner bank is always on the LEFT and the outer bank on the RIGHT, with the three outer ranges
+    # (pass 6-7: the bass's on the left, the Moog's on the right)
     return outer, inner
 
 
@@ -472,7 +453,7 @@ def _fish(kind, cx, cy, cz, heading, size):
 
 
 def fish_list():
-    """(kind, x, y, z, heading, size) per fish in the loop's frame (write_faceted_uv unrolls them); y is the body's centre
+    """(kind, x, y, z, heading, size) per fish in the loop's frame; y is the body's centre
     line, already clamped below the surface."""
     out = []
     for k in range(FISH_COUNT):
@@ -521,9 +502,9 @@ def _crest(t, peak, keep_outer):
 
 # (name, r0, r1, rings, columns, base height, relief, wavelength, seed, crest position, keep the outer side up)
 RANGES = [
-    ("near", 4300.0, 7000.0, 6, 200, 120.0, 380.0, 1300.0, 3, 0.45, False),   # pass 6: fewer, larger facets
-    ("far", 6500.0, 11000.0, 6, 170, 200.0, 500.0, 1800.0, 7, 0.5, False),
-    ("distant", 10500.0, 19000.0, 5, 130, 600.0, 1300.0, 2600.0, 13, 0.55, True),
+    ("near", 4300.0, 7000.0, 9, 360, 120.0, 380.0, 900.0, 3, 0.45, False),
+    ("far", 6500.0, 11000.0, 9, 300, 200.0, 500.0, 1300.0, 7, 0.5, False),
+    ("distant", 10500.0, 19000.0, 7, 220, 600.0, 1300.0, 2100.0, 13, 0.55, True),
 ]
 
 
@@ -531,7 +512,7 @@ def range_tris(name, r0, r1, nr, nth, base, amp, wl, seed, peak, keep):
     def h(x, z, r, th):
         t = (r - r0) / (r1 - r0)
         c = _crest(t, peak, keep)
-        n = mx.fbm(x / wl, z / wl, seed, 2, ridged=True)
+        n = mx.fbm(x / wl, z / wl, seed, 4, ridged=True)
         return max(c * (base + amp * n) - 30.0 * (1.0 - c) ** 2 - 2.0, peak_height(x, z) * min(1.0, 4.0 * t))
     return mx.polar_range(r0, r1, nr, nth, h, seed=seed)
 
@@ -609,16 +590,7 @@ def _crease_hash(p, q):
     return (x & 0xFFFFFF) / float(1 << 24)
 
 
-def write_faceted_uv_unrolled(path, tris, name):
-    """write_faceted_uv for triangles already in the straight valley's frame."""
-    _write_faceted_uv(path, tris, name)
-
-
 def write_faceted_uv(path, tris, name):
-    _write_faceted_uv(path, unroll_tris(tris), name)   # pass 4: the straight valley
-
-
-def _write_faceted_uv(path, tris, name):
     pos, nrm = mx.faceted(tris)
     uvs = edge_uvs(tris)
     n = len(pos)
@@ -664,15 +636,6 @@ def generate(mesh_dir):
         t = range_tris(*spec)
         write_faceted_uv(os.path.join(mesh_dir, "ab-%s.glb" % spec[0]), t, spec[0])
         out[spec[0]] = len(t)
-    # pass 4: the left (inner) side had no outer ranges -- the loop's centre was there. Unrolled, it gets the far and
-    # distant ranges too, with their own seeds, mirrored across the river (and turned to face up), so left and right
-    # never repeat
-    for spec in RANGES[1:]:
-        name = "left" + spec[0]
-        t = range_tris(name, *spec[1:8], spec[8] + 50, *spec[9:])
-        t = [tuple((-v[0], v[1], v[2]) for v in (tri[0], tri[2], tri[1])) for tri in unroll_tris(t)]
-        write_faceted_uv_unrolled(os.path.join(mesh_dir, "ab-%s.glb" % name), t, name)
-        out[name] = len(t)
     check_fish()
     t = fish_tris()
     write_faceted_uv(os.path.join(mesh_dir, "ab-fish.glb"), t, "fish")
