@@ -37,8 +37,8 @@ SCENE_FILE = "aurora-borealis.scene.json"
 # pass 5 (the owner: "static camera"): one composition, held for the whole song. The camera stands just inside the lake's
 # near end, a little above the water: the lake fills the lower middle of the frame, the horseshoe's arms rise on the
 # left and right and its back closes the view, and the view is pitched up so the aurora takes the upper half.
-CAM_POS = (0.0, 48.0, 0.0)
-CAM_PITCH_DEG = 1.5
+CAM_POS = (0.0, look.CAM_H_WATER, 0.0)
+CAM_PITCH_DEG = float(os.environ.get("AB_PITCH", "-1.0"))
 CAM_FOV = 50.0
 
 

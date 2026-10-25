@@ -319,7 +319,11 @@ BEAM_PAIRS = {   # (kick, snare)
     "fuchsia-lavender": ("#ff3cd0", "#ab9bff"),
 }
 BEAM_PAIR = os.environ.get("AB_BEAM_PAIR", "magenta-lilac")
-CAM_H_WATER = 48.0   # the camera's height above the water (build.CAM_POS): the beams' source sits on the water
+CAM_H_WATER = float(os.environ.get("AB_CAM_H", "110"))   # the camera's height above the water (build.CAM_POS)
+# pass 5: the lake is 2 km deep, so the light must show from close in -- it launches 70 m out and fades in over 150 m
+# (the river's 160 m and 500 m left only the last strip by the far shore lit)
+START_OFFSET = float(os.environ.get("AB_START", "70"))
+NEAR_FADE = float(os.environ.get("AB_NEARFADE", "150"))
 BED_VARIANT = os.environ.get("AB_BED", "coarse")
 
 
@@ -339,7 +343,7 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                "intensity": intensity, "rainbow": False, "rainbowBrightness": 1.0,
                                "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
                 "propagation": {"kind": "path", "direction": "explicit", "beamRadius": 0.0,
-                                "startOffset": 160.0, "speed": round(rng / travel, 2), "range": rng,
+                                "startOffset": START_OFFSET, "speed": round(rng / travel, 2), "range": rng,
                                 "frontWidth": front_width, "trailLength": wake, "falloff": 1.6,
                                 "verticalExtent": 40.0, "verticalGrowth": 0.0, "ringCount": 0.0,
                                 "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
@@ -348,7 +352,7 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
                                          "wakeGrowth": wake_growth, "coreWidth": core, "coreOffset": twin,
                                          "haloWidth": halo, "reach": reach, "reachHeight": reach_height,
                                          "land": land, "bed": bed, "embed": 0.625, "disturb": disturb,
-                                         "nearFade": 500.0, "lane": lane, "laneJitter": lane_jitter,
+                                         "nearFade": NEAR_FADE, "lane": lane, "laneJitter": lane_jitter,
                                          "splash": splash, "nearWake": near_wake}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": CAM_H_WATER},
@@ -362,15 +366,16 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 # just in front of the camera straight out across the lake to the far shore (about 2 km), 150 m either side of its axis
 # for the kick and snare, the toms anywhere across it; and (the owner: "tone down the amount of light that gets throw
 # onto the mountains from the underwater snare / kick / tom lights") the light on the land (`land`) is a quarter of
-# pass 4's, a restrained accent, while the light in the water and on the bed is unchanged.
-KICK = dict(intensity=4.0, edge=7.0, travel=2.0, rng=1950.0, ease=0.6, lifetime=2.0, fade_out=0.8, core=6.0,
-            twin=0.0, halo=35.0, wake=260.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=3.5, reach=700.0,
+# pass 4's, a restrained accent, while the light in the water and on the bed is unchanged. The cores and halos are half
+# as wide again as the river's: the camera stands 110 m up and sees them across the lake at 0.3-2 km.
+KICK = dict(intensity=4.0, edge=7.0, travel=2.0, rng=1950.0, ease=0.6, lifetime=2.0, fade_out=0.8, core=9.0,
+            twin=0.0, halo=52.0, wake=260.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=3.5, reach=700.0,
             reach_height=250.0, front_width=14.0, lane=-150.0, lane_jitter=50.0, splash=0.035, near_wake=0.8)
-SNARE = dict(intensity=3.6, edge=7.0, travel=1.4, rng=1900.0, ease=0.6, lifetime=1.3, fade_out=0.6, core=4.0,
-             twin=0.0, halo=26.0, wake=160.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
+SNARE = dict(intensity=3.6, edge=7.0, travel=1.4, rng=1900.0, ease=0.6, lifetime=1.3, fade_out=0.6, core=6.0,
+             twin=0.0, halo=40.0, wake=160.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
              reach_height=200.0, front_width=9.0, lane=150.0, lane_jitter=50.0, splash=0.025, near_wake=0.6)
-TOMS = dict(intensity=3.8, edge=6.0, travel=1.7, rng=1920.0, ease=0.6, lifetime=1.6, fade_out=0.7, core=4.5,
-            twin=0.0, halo=30.0, wake=200.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.0, reach=650.0,
+TOMS = dict(intensity=3.8, edge=6.0, travel=1.7, rng=1920.0, ease=0.6, lifetime=1.6, fade_out=0.7, core=7.0,
+            twin=0.0, halo=45.0, wake=200.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.0, reach=650.0,
             reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=220.0, splash=0.03, near_wake=0.6)
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
