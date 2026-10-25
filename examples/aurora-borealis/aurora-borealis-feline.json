@@ -55,7 +55,8 @@
   "camera/lens/useExplicitFov": false,
   "camera/lens/focalLength": 24.0,
   "temporal/echo/enabled": false,
-  "temporal/mosh/enabled": false
+  "temporal/mosh/enabled": false,
+  "sources/rangeFlow/rate": 1.0
  },
  "live": {
   "overrides": {
@@ -13182,50 +13183,6 @@
   },
   {
    "kind": "signal",
-   "name": "moogTrail",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.synth.onset",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.01,
-       "attackMs": 0.0,
-       "envelope": "linearfall",
-       "envelopeFallPerSecond": 1.6666666666666667,
-       "envelopeRefractoryMs": 600.0
-      },
-      "depthSource": "control.moog",
-      "depthMin": 0.0,
-      "depthMax": 1.0
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "moogSweep",
-   "settings": {
-    "combine": "sum",
-    "inputs": [
-     {
-      "constant": 1.0
-     },
-     {
-      "source": "signal.moogTrail",
-      "amount": -1.0
-     }
-    ],
-    "chain": {
-     "clampEnabled": true,
-     "clampMin": 0.0,
-     "clampMax": 1.0
-    }
-   }
-  },
-  {
-   "kind": "signal",
    "name": "tomSize",
    "settings": {
     "combine": "firstActive",
@@ -13531,50 +13488,6 @@
   },
   {
    "kind": "signal",
-   "name": "bassTrail",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "stem.bass.onset",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.01,
-       "attackMs": 0.0,
-       "envelope": "linearfall",
-       "envelopeFallPerSecond": 1.25,
-       "envelopeRefractoryMs": 800.0
-      },
-      "depthSource": "control.bass",
-      "depthMin": 0.0,
-      "depthMax": 1.0
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "bassSweep",
-   "settings": {
-    "combine": "sum",
-    "inputs": [
-     {
-      "constant": 1.0
-     },
-     {
-      "source": "signal.bassTrail",
-      "amount": -1.0
-     }
-    ],
-    "chain": {
-     "clampEnabled": true,
-     "clampMin": 0.0,
-     "clampMax": 1.0
-    }
-   }
-  },
-  {
-   "kind": "signal",
    "name": "auroraLight",
    "settings": {
     "combine": "firstActive",
@@ -13605,6 +13518,13 @@
    "settings": {
     "trigger": "signal.bassNoteEv",
     "seed": 17
+   }
+  },
+  {
+   "kind": "lfo",
+   "name": "rangeFlow",
+   "settings": {
+    "shape": "saw"
    }
   }
  ],
@@ -13779,7 +13699,7 @@
   },
   {
    "source": "signal.bassStrike",
-   "target": "material/abRockL/op/53/smoothstep/constant",
+   "target": "material/abRockL/op/51/smoothstep/constant",
    "amount": 2.0,
    "op": "add",
    "polarity": "unipolar"
@@ -13792,9 +13712,9 @@
    "polarity": "unipolar"
   },
   {
-   "source": "signal.bassSweep",
-   "target": "material/abRockL/op/47/constant/constant",
-   "amount": 1.2,
+   "source": "lfo.rangeFlow",
+   "target": "material/abRockL/op/47/palette/value",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar"
   },
@@ -13821,7 +13741,7 @@
   },
   {
    "source": "signal.moogStrike",
-   "target": "material/abRockR/op/53/smoothstep/constant",
+   "target": "material/abRockR/op/51/smoothstep/constant",
    "amount": 3.0,
    "op": "add",
    "polarity": "unipolar"
@@ -13834,9 +13754,9 @@
    "polarity": "unipolar"
   },
   {
-   "source": "signal.moogSweep",
-   "target": "material/abRockR/op/47/constant/constant",
-   "amount": 1.2,
+   "source": "lfo.rangeFlow",
+   "target": "material/abRockR/op/47/palette/value",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar"
   }

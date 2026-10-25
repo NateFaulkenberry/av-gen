@@ -96,18 +96,21 @@ GATE_DROP = 0.16
 # `edgeGlow`); and the travelling band of pass 4 is gone -- every note lights its subset at once, everywhere on its bank.
 # Pass 6 (the owner: "swap left and right mountain sides so left is BASS right is MOOG, and have it use the same effect it
 # did for the lake but have it revert to sending the light down the mountain range"): the sides swapped, pass 5's look
-# kept, and each glint term now lights only a band of its bank (`<label>Sweep`, an op constant routed by a ramp that
-# restarts on a note): each note sends the band from 400 m out down the range, lit at the strike's and the sustain's
-# level, and while the note rings the band stays lit as it runs (the ridgelines glow with the sustain everywhere).
+# kept, and each glint term now lights only bands of its bank that run down the range, away from the camera, all the
+# time (`<label>Flow`: a comb over the lines' distance fade r4 whose phase a saw LFO advances): a note lights whichever
+# bands are running, and while it rings they stay lit as they run, so every note -- every trill note -- shows as light
+# travelling down the mountains. (A first take restarted one band per note: a band must run its length before the next
+# can start, so only one Moog note in five sent one -- 67 of 445 -- and the visibility per note fell to a third of
+# pass 5's.)
 GLINTS = {
     "L": [("bass", 2.0, 5.0, "#6a52ff", 2.2, 0.9)],     # deep blue-violet: the bass (planes first, lines on them)
     "R": [("moog", 3.0, 7.0, "#ff9fdc", 6.0, 0.24)],     # pale pink: the Moog
 }
-# The band, in the units of the lines' distance fade r4 (1 at LINE_FADE_NEAR = 400 m, 0 at LINE_FADE_FAR = 4.5 km, linear
-# in metres): lit where (r4 - centre)^2 < SWEEP_WIDTH^2; the centre starts at SWEEP_START (just past 400 m, so the near
-# slopes filling the frame's sides never flash on with a note) and runs SWEEP_RUN down, to where the lines fade. A first
-# take lit everything nearer than the front: each note blanked the bank and lit it again, 0.052 on the flash gate.
-SWEEP_START, SWEEP_RUN, SWEEP_WIDTH = 0.95, 1.2, 0.22
+# The bands: FLOW_TEETH across r4's range (1 at LINE_FADE_NEAR = 400 m, 0 at LINE_FADE_FAR = 4.5 km: about 1.4 km apart),
+# each lit where the comb is above FLOW_EDGE (about a third of the spacing); music.py's saw moves them one spacing per
+# cycle, down the range.
+FLOW_TEETH, FLOW_EDGE = 3.0, (0.35, 0.75)
+FLOW_HZ = 1.0          # the saw's rate: a band runs 1.4 km down the range a second
 
 
 def rock(side) -> Prog:
@@ -175,11 +178,10 @@ def rock(side) -> Prog:
               constant2=[0.5, 0.5, 0.5, 0.0], constant3=[teeth, teeth, teeth, 0.0], constant4=[0.0, 0.0, 0.0, 0.0])
           .op("smoothstep", 7, srcA=7, constant=list(GATE_REST), label=label + "Gate")
           .op("multiply", 7, srcA=7, srcB=4)                                                      # the distance fade
-          # pass 6: the band running down the range: 1 - smoothstep(0, w^2, (r4 - centre)^2)
-          .op("constant", 6, constant=[-SWEEP_START] * 4, label=label + "Sweep")
-          .op("add", 6, srcA=4, srcB=6)
-          .op("multiply", 6, srcA=6, srcB=6)
-          .op("smoothstep", 6, srcA=6, constant=[SWEEP_WIDTH ** 2, 0.0, 0.0, 0.0])
+          # pass 6: the bands running down the range: a comb over r4, its phase advanced by the saw (`<label>Flow`)
+          .op("palette", 6, srcA=4, value=0.0, label=label + "Flow", constant=[0.5, 0.5, 0.5, 0.0],
+              constant2=[0.5, 0.5, 0.5, 0.0], constant3=[FLOW_TEETH] * 3 + [0.0], constant4=[0.0, 0.0, 0.0, 0.0])
+          .op("smoothstep", 6, srcA=6, constant=[FLOW_EDGE[0], FLOW_EDGE[1], 0.0, 0.0])
           .op("multiply", 7, srcA=7, srcB=6))
         # a wide line on the picked creases (routing `<label>Line` swells it) plus the fill on their facets, r6
         (p.op("multiply", 6, srcA=0, srcB=1)
@@ -457,13 +459,13 @@ def music_routes(R):
         # onsets); every note it plays -- its onsets and the softer ones its onset strength shows (music.py bassStrike) --
         # opens the gate, sized by the stem's level, and swells the lines; the sustained level holds it open while a
         # note rings and lets it close as the note decays (bassHold), and lights every ridgeline on the bank; each note
-        # sends the lit stretch out down the range (bassSweep, the front)
+        # lights the bands running down the range (bassFlow)
         R("random.bassPick", L.path("bass", "value"), 1.0),
         R("signal.bassStrike", L.path("bassGate"), -0.2),
         R("signal.bassHold", L.path("bassGate"), -0.2),
         R("signal.bassStrike", L.path("bassLine"), 2.0),
         R("signal.bassHold", L.path("edgeGlow"), 1.3),
-        R("signal.bassSweep", L.path("bassSweep"), SWEEP_RUN),
+        R("lfo.rangeFlow", L.path("bassFlow", "value"), 1.0),
         # RIGHT, the Moog (pass 6; the bass's bank before): the same, its creases first. The tone block is unassigned;
         # the toms keep their river lane
         R("random.moogPick", Rt.path("moog", "value"), 1.0),
@@ -471,7 +473,7 @@ def music_routes(R):
         R("signal.moogHold", Rt.path("moogGate"), -0.24),
         R("signal.moogStrike", Rt.path("moogLine"), 3.0),
         R("signal.moogHold", Rt.path("edgeGlow"), 1.6),
-        R("signal.moogSweep", Rt.path("moogSweep"), SWEEP_RUN),
+        R("lfo.rangeFlow", Rt.path("moogFlow", "value"), 1.0),
     ]
     return out
 

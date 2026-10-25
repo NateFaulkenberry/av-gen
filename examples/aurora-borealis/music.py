@@ -5,13 +5,13 @@ instrument has its own place in the frame.
 
   sky     Cloud Diving   signal.cloudSwell (300/1200 ms) and signal.cloudHue (1500/4000 ms) -> the aurora
           Crash          signal.crashStarEv -> a fireball thrown over the valley (ballA / ballB, a pool of two)
-  left    Bass           signal.bassStrike + signal.bassHold -> plane flashes with lines, ridgelines glowing; each
-                         note sends the lit stretch down the range (signal.bassSweep) -- pass 6: the sides swapped
+  left    Bass           signal.bassStrike + signal.bassHold -> plane flashes with lines, ridgelines glowing; the
+                         bands running down the range (lfo.rangeFlow) -- pass 6: the sides swapped
   river   Kick           signal.kickBeamEv -> the magenta river beam (riverKick)
           Snare          signal.snareBeamEv -> the lilac twin beam (riverSnare)
           Toms           signal.tomHitEv -> the violet beam (riverToms), each hit in its own lane
   right   Moog           signal.moogStrike (every note, sized by level) + signal.moogHold (the sustain) -> picked
-                         creases as wide lines and filled planes, every ridgeline glowing; signal.moogSweep the front
+                         creases as wide lines and filled planes, every ridgeline glowing; the bands running down the range
           (pass 4: the toms keep only their river lane; the tone block is unassigned -- its signals stay, unrouted)
 
 Every transient is `stem.<key>.onset` (or the Moog's rms rise) into a latch with attack 0 and its own refractory: no
@@ -160,23 +160,6 @@ def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay
     ]
 
 
-def sweep_signals(name, onset, run_s):
-    """Pass 6, the band down the range: `<name>Trail`, a latch on the note onsets falling over `run_s` and deaf for
-    as long (so a trill sends band after band, each running its whole length), and `<name>Sweep` = 1 - trail: 0 just
-    past the near slopes on a note, 1 when the band has run out to where the lines fade, where it rests between notes
-    (look.py routes it onto `<label>Sweep`)."""
-    if not onset:
-        return [sig(name + "Trail", []), sig(name + "Sweep", [{"constant": 1.0}])]
-    restart = {"threshold": "binary", "thresholdLevel": 0.01, "attackMs": 0.0, "envelope": "linearfall",
-               "envelopeFallPerSecond": 1.0 / run_s, "envelopeRefractoryMs": 1000.0 * run_s}
-    return [sig(name + "Trail", [inp(onset, restart, part=name)]),
-            sig(name + "Sweep", [{"constant": 1.0}, inp("signal.%sTrail" % name, amount=-1.0)], combine="sum",
-                chain=UNIT)]
-
-
-SWEEP_RUN_S = {"moog": 0.6, "bass": 0.8}   # seconds a front takes to run down the range
-
-
 def sources(song):
     S = SONGS[song]
     src, ons = S["src"], S["onset"]
@@ -236,7 +219,6 @@ def sources(song):
     out += onset_event("moogNote", onset("moog"), 35.0, 0.2, "moog", size="signal.moogSize")
     out += note_signals("moog", src["moog"], onset("moog"), 35.0, 0.2, "signal.moogSize", (0.02, 0.2), 150.0,
                         SOFT["moog"])
-    out += sweep_signals("moog", onset("moog"), SWEEP_RUN_S["moog"])
     # ---- right: Toms (28 notes in six fills, peak 0.15-0.41 -> size 0.4-1.3) and tone block (176 accents, peak
     # 0.34-0.55 -> size 0.5-1.0); each size scales its hit, and the part's knob scales the size
     out += [sig("tomSize", [inp(s("toms", "peak"), dict(**remap(0.15, 0.41, 0.4, 1.3), **size_hold()), part="toms")]
@@ -255,7 +237,6 @@ def sources(song):
     out += onset_event("bassNote", onset("bass"), 60.0, 0.3, "bass", size="signal.bassSize")
     out += note_signals("bass", src["bass"], onset("bass"), 60.0, 0.3, "signal.bassSize", (0.04, 0.3), 220.0,
                         SOFT["bass"])
-    out += sweep_signals("bass", onset("bass"), SWEEP_RUN_S["bass"])
     # ---- the light the land and river take from the aurora: the swell alone (B s3), no drum or bass share
     out += [sig("auroraLight", [inp("signal.cloudSwell", amount=0.75)], chain=UNIT)]
     # ---- subsets
@@ -264,6 +245,9 @@ def sources(song):
         {"kind": "random", "name": "moogPick", "settings": {"trigger": "signal.moogNoteEv", "seed": 23}},
         # a new set of right-bank planes per bass note (the k-th note's value is fixed by the seed: seek equals play)
         {"kind": "random", "name": "bassPick", "settings": {"trigger": "signal.bassNoteEv", "seed": 17}},
+        # pass 6: the saw that runs the mountains' bands down the range (look.py FLOW_*), a function of time: seek
+        # equals play
+        {"kind": "lfo", "name": "rangeFlow", "settings": {"shape": "saw"}},
     ]
     return out
 
@@ -321,4 +305,5 @@ def apply(doc, song="sabertooth"):
     doc["sources"] = sources(song)
     doc["routes"] = routes()
     doc["control"] = control()
+    doc["parameters"]["sources/rangeFlow/rate"] = look.FLOW_HZ
     doc["palette"]["position"] = look.REST_POSITION   # silence: between dusk indigo and the violet veil

@@ -299,13 +299,19 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     // the mountains (pass 6): the bass on the LEFT bank and the Moog on the RIGHT (swapped from pass 4-5) -- every note
     // opens its subset's gate (`<part>Strike`), the sustain holds it and lights the bank's ridgelines (`<part>Hold`
     // onto edgeGlow), a fresh subset per note (random.<part>Pick), and each note sends the lit stretch down the range
-    // (`<part>Sweep`, the front)
+    // (lfo.rangeFlow: the bands running down the range, lit by the strike and the sustain)
     {
         std::set<std::string> wired;
         for (const json& r : p.at("routes")) {
             const std::string target = r.at("target");
             const std::string source = r.at("source");
             for (const auto& [part, prog] : std::map<std::string, std::string>{{"bass", "abRockL"}, {"moog", "abRockR"}}) {
+                if (source == "lfo.rangeFlow") { // one saw, both banks
+                    if (target.find(prog) != std::string::npos && target.find("/palette/value") != std::string::npos) {
+                        wired.insert(part + " front");
+                    }
+                    continue;
+                }
                 const std::string other = prog == "abRockL" ? "abRockR" : "abRockL";
                 if (source.find(part) != std::string::npos) {
                     CHECK(target.find(other) == std::string::npos); // never on the other bank
@@ -322,9 +328,8 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
                 if (source == "signal." + part + "Hold" && lowers) {
                     wired.insert(part + " hold");
                 }
-                // the band's centre (a constant subtracted from the distance) is routed up by the ramp
-                if (source == "signal." + part + "Sweep" && target.find("/constant/") != std::string::npos &&
-                    amount > 0.0) {
+                // the bands running down the range: the saw drives the phase of the comb over distance
+                if (source == "lfo.rangeFlow" && target.find("/palette/value") != std::string::npos) {
                     wired.insert(part + " front");
                 }
                 if (source == "signal." + part + "Hold" && target.find("/constant/") != std::string::npos &&
