@@ -90,10 +90,15 @@ GATE_REST = [1.05, 1.10, 0.0, 0.0]
 GATE_DROP = 0.16
 # (label, teeth, glint line width in px (None: a whole-facet plane flash), colour, intensity)
 GLINTS = {
-    "L": [("moog", 3.0, 3.0, "#ff9fdc", 3.2)],                       # pale pink edge glints: the Moog
-    "R": [("tblock", 5.0, 3.5, "#e9dcff", 4.0),                      # small sharp lavender-white glints: the tone block
-          ("toms", 2.0, None, "#6a52ff", 1.3)],                      # blue-violet plane flashes: the bass (pass 4)
+    "L": [("moog", 3.0, 4.0, "#ff9fdc", 6.0)],                       # pale pink edge glints: the Moog
+    "R": [("bass", 2.0, None, "#6a52ff", 1.6)],                      # blue-violet plane flashes: the bass (pass 4)
 }
+# Pass 4 (the owner: the Moog's trills should run "down the mountains away from the camera ... similar to the way the
+# river lights work", and the bass's on the right): each glint term lights only inside a band of distance from the
+# camera, SWEEP_WIDTH metres wide, whose position is `<label>Sweep` (an op constant at rest SWEEP_REST: the band behind
+# the camera, nothing lit); music.py routes a 0..1 ramp that restarts on each note onto it, so the band runs from the
+# camera out to SWEEP_REACH metres down the valley after every note
+SWEEP_WIDTH, SWEEP_REST, SWEEP_REACH = 450.0, 600.0, 3600.0
 
 
 def rock(side) -> Prog:
@@ -162,12 +167,24 @@ def rock(side) -> Prog:
           .op("palette", 7, srcA=7, value=0.0, label=label, constant=[0.5, 0.5, 0.5, 0.0],
               constant2=[0.5, 0.5, 0.5, 0.0], constant3=[teeth, teeth, teeth, 0.0], constant4=[0.0, 0.0, 0.0, 0.0])
           .op("smoothstep", 7, srcA=7, constant=list(GATE_REST), label=label + "Gate"))
+        # the sweep: band = 1 - smoothstep(0, w^2, (d - front)^2) in decametres (op constants are bounded to +-1000),
+        # d the camera distance (r2), front = -constant; `tmp` is a register free at that point
+        def sweep(dst, tmp):
+            (p.op("constant", 5, constant=[0.1] * 4)
+              .op("multiply", 5, srcA=2, srcB=5)
+              .op("constant", tmp, constant=[SWEEP_REST * 0.1] * 4, label=label + "Sweep")
+              .op("add", 5, srcA=5, srcB=tmp)
+              .op("multiply", 5, srcA=5, srcB=5)
+              .op("smoothstep", 5, srcA=5, constant=[(SWEEP_WIDTH * 0.1) ** 2, 0.0, 0.0, 0.0])
+              .op("multiply", dst, srcA=dst, srcB=5))
         if width is not None:
             p.op("multiply", 6, srcA=6, srcB=7).op("multiply", 6, srcA=6, srcB=4)
+            sweep(6, 7)
             p.op("constant", 7, constant=[round(v * gain, 4) for v in hexrgb(color)] + [1.0], label=label + "Color")
             p.op("multiply", 6, srcA=6, srcB=7).op("add", 3, srcA=3, srcB=6)
         else:
             p.op("multiply", 7, srcA=7, srcB=4)
+            sweep(7, 6)
             p.op("constant", 6, constant=[round(v * gain, 4) for v in hexrgb(color)] + [1.0], label=label + "Color")
             p.op("multiply", 7, srcA=7, srcB=6).op("add", 3, srcA=3, srcB=7)
     (p.op("constant", 6, constant=c4(HAZE), label="haze")
@@ -286,7 +303,7 @@ def ball_effect(name):
                                 "path": {"ease": 0.35},
                                 "ball": {"launch": list(l0), "target": list(l1), "travel": 1.4, "arc": 120.0,
                                          "lightRadius": 150.0, "range": 1100.0, "coreSize": 9.0, "haloSize": 30.0,
-                                         "coronaColor": [1.0, 0.36, 0.06], "coronaIntensity": 2.0,
+                                         "coronaColor": [1.0, 0.36, 0.06], "coronaIntensity": 1.5,
                                          "coronaSize": 55.0, "flicker": 0.8, "trail": 150.0, "spread": 900.0}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": 0.0},
@@ -367,18 +384,21 @@ def river_effects(pair=None):
     k, sn = BEAM_PAIRS[pair or BEAM_PAIR]
     return [river_beam("riverKick", "signal.kickBeamEv", k, **KICK),
             river_beam("riverSnare", "signal.snareBeamEv", sn, **SNARE),
-            river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)] + mountain_fronts()
+            river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)]
 
 
 # ---- the mountain fronts (pass 4, the owner: "make the trills feeling like they are running down the mountains away
 # from the camera, so that the trill progresses down the valley, similar to the way the river lights work"; and the
-# bass on the right). ADR-1662's path wave in a lane at the mountains' foot, 300 m off the river: its land light runs
+# bass on the right). ADR-1662's path wave in a lane among the mountains, 700 m off the river: its land light runs
 # down the range, facet by facet, away from the camera; nothing on the water (the lane is far from it). Each note its
 # own front fading on its own envelope (at most four alive, ADR-981): a fast trill is a cascade down the left range.
-FRONT = dict(edge=0.0, ease=0.4, core=2.0, twin=0.0, halo=4.0, wake=260.0, wake_growth=0.3, disturb=0.0, land=1.0,
-             bed=0.0, reach=1400.0, reach_height=1100.0, front_width=60.0, lane_jitter=0.0, splash=0.0, near_wake=0.0)
-MOOG_FRONT = dict(FRONT, intensity=1.1, travel=1.0, rng=2200.0, lifetime=0.6, fade_out=0.35, lane=-300.0)
-BASS_FRONT = dict(FRONT, intensity=1.0, travel=1.2, rng=2000.0, lifetime=0.7, fade_out=0.4, lane=300.0)
+FRONT = dict(edge=8.0, ease=0.0, core=2.0, twin=0.0, halo=4.0, wake=200.0, wake_growth=0.25, disturb=0.0, land=1.0,
+             bed=0.0, reach=1000.0, reach_height=1100.0, front_width=60.0, lane_jitter=0.0, splash=0.0, near_wake=0.0)
+# An instance keeps at most four fronts alive (ADR-981), so a front crosses the range within four notes' time: the
+# Moog's trills (about 10 a second) run as a cascade of four fronts some 440 m apart, each across 2.2 km in 0.5 s; the
+# bass's notes (4.4 a second) cross 2 km in 0.8 s
+MOOG_FRONT = dict(FRONT, intensity=3.0, travel=0.5, rng=2200.0, lifetime=0.55, fade_out=0.2, lane=-700.0)
+BASS_FRONT = dict(FRONT, intensity=2.4, travel=0.8, rng=2000.0, lifetime=0.85, fade_out=0.3, lane=700.0)
 MOOG_FRONT_COLOR = "#ff9fdc"   # the Moog's pale pink
 BASS_FRONT_COLOR = "#6a52ff"   # deep blue-violet: the bass's, apart from the Moog's
 
@@ -427,17 +447,22 @@ def music_routes(R):
     L, Rt = ROCK_L, ROCK_R
     out += [
         # LEFT, the Moog (pass 4): a fresh subset on every trill note (random.moogPick); the note, sized by the
-        # stem's level, opens the gate (louder: more facets, brighter) and swells the line; the level a gentle glow
+        # stem's level, opens the gate (louder: more facets, brighter) and swells the line; and its sweep runs the lit
+        # band away from the camera down the left range (signal.moogSweep, 0..1 over 1 s from a note)
         R("random.moogPick", L.path("moog", "value"), 1.0),
         R("signal.moogNote", L.path("moogGate"), -0.24),
+        R("signal.moogTrail", L.path("moogGate"), -0.12),
         R("signal.moogGlow", L.path("moogGate"), -0.05),
         R("signal.moogNote", L.path("moogLine"), 2.5),
+        R("signal.moogSweep", L.path("moogSweep"), -(SWEEP_REST + SWEEP_REACH) * 0.1),
         # RIGHT, the bass (pass 4; the toms and tone block before): a fresh set of planes per note, opened by the note
-        # (sized by the stem's level), held gently by the level while it rings. The tone block is unassigned (its crease
-        # term rests); the toms keep their river lane
-        R("random.bassPick", Rt.path("toms", "value"), 1.0),
-        R("signal.bassNote", Rt.path("tomsGate"), -0.12),
-        R("signal.bassGlow", Rt.path("tomsGate"), -0.04),
+        # (sized by the stem's level), its band running down the right range; the level holds a gentle glow. The tone
+        # block is unassigned; the toms keep their river lane
+        R("random.bassPick", Rt.path("bass", "value"), 1.0),
+        R("signal.bassNote", Rt.path("bassGate"), -0.12),
+        R("signal.bassTrail", Rt.path("bassGate"), -0.08),
+        R("signal.bassGlow", Rt.path("bassGate"), -0.03),
+        R("signal.bassSweep", Rt.path("bassSweep"), -(SWEEP_REST + SWEEP_REACH) * 0.1),
     ]
     return out
 

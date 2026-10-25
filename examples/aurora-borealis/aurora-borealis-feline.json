@@ -301,7 +301,7 @@
        0.36,
        0.06
       ],
-      "coronaIntensity": 2.0,
+      "coronaIntensity": 1.5,
       "coronaSize": 55.0,
       "flicker": 0.8,
       "trail": 150.0,
@@ -421,7 +421,7 @@
        0.36,
        0.06
       ],
-      "coronaIntensity": 2.0,
+      "coronaIntensity": 1.5,
       "coronaSize": 55.0,
       "flicker": 0.8,
       "trail": 150.0,
@@ -753,224 +753,6 @@
       "laneJitter": 90.0,
       "splash": 0.03,
       "nearWake": 0.6
-     }
-    },
-    "response": {
-     "emissive": 0.0,
-     "foliage": 1.0,
-     "ground": 1.0,
-     "surface": 1.0
-    },
-    "source": {
-     "kind": "camera",
-     "groundOffset": 65.0
-    },
-    "sparkle": {
-     "density": 0.9,
-     "enabled": false,
-     "fadeDistance": 85.0,
-     "intensity": 1.8,
-     "seed": 1,
-     "size": 0.3,
-     "speed": 0.6
-    }
-   }
-  },
-  {
-   "id": "moogFront",
-   "name": "moogFront",
-   "type": "groundPulse",
-   "owner": {
-    "kind": "world"
-   },
-   "enabled": true,
-   "order": 0,
-   "activation": "trigger",
-   "trigger": {
-    "source": "signal",
-    "name": "signal.moogNoteEv",
-    "threshold": 0.0
-   },
-   "style": "",
-   "timing": {
-    "delay": 0.0,
-    "fadeIn": 0.0,
-    "fadeOut": 0.35,
-    "lifetime": 0.6,
-    "repeatSeconds": 0.0,
-    "windowSeconds": 6.0,
-    "windowStart": 0.0
-   },
-   "parameters": {
-    "appearance": {
-     "color": [
-      1.0,
-      0.3467,
-      0.71569
-     ],
-     "edgeColor": [
-      1.0,
-      0.7387,
-      0.8863
-     ],
-     "edgeIntensity": 0.0,
-     "intensity": 1.1,
-     "rainbow": false,
-     "rainbowBrightness": 1.0,
-     "rainbowSaturation": 0.85,
-     "rainbowScale": 0.025,
-     "rainbowSpeed": 0.35,
-     "width": 1.0
-    },
-    "propagation": {
-     "kind": "path",
-     "direction": "explicit",
-     "beamRadius": 0.0,
-     "startOffset": 60.0,
-     "speed": 2200.0,
-     "range": 2200.0,
-     "frontWidth": 60.0,
-     "trailLength": 260.0,
-     "falloff": 1.6,
-     "verticalExtent": 40.0,
-     "verticalGrowth": 0.0,
-     "ringCount": 0.0,
-     "forwardWeight": 1.0,
-     "targetWeight": 0.0,
-     "velocityWeight": 0.0,
-     "explicitDirection": [
-      0.0,
-      0.0,
-      -1.0
-     ],
-     "path": {
-      "node": "river",
-      "feature": "river",
-      "ease": 0.4,
-      "wakeGrowth": 0.3,
-      "coreWidth": 2.0,
-      "coreOffset": 0.0,
-      "haloWidth": 4.0,
-      "reach": 1400.0,
-      "reachHeight": 1100.0,
-      "land": 1.0,
-      "bed": 0.0,
-      "embed": 0.625,
-      "disturb": 0.0,
-      "nearFade": 120.0,
-      "lane": -300.0,
-      "laneJitter": 0.0,
-      "splash": 0.0,
-      "nearWake": 0.0
-     }
-    },
-    "response": {
-     "emissive": 0.0,
-     "foliage": 1.0,
-     "ground": 1.0,
-     "surface": 1.0
-    },
-    "source": {
-     "kind": "camera",
-     "groundOffset": 65.0
-    },
-    "sparkle": {
-     "density": 0.9,
-     "enabled": false,
-     "fadeDistance": 85.0,
-     "intensity": 1.8,
-     "seed": 1,
-     "size": 0.3,
-     "speed": 0.6
-    }
-   }
-  },
-  {
-   "id": "bassFront",
-   "name": "bassFront",
-   "type": "groundPulse",
-   "owner": {
-    "kind": "world"
-   },
-   "enabled": true,
-   "order": 0,
-   "activation": "trigger",
-   "trigger": {
-    "source": "signal",
-    "name": "signal.bassNoteEv",
-    "threshold": 0.0
-   },
-   "style": "",
-   "timing": {
-    "delay": 0.0,
-    "fadeIn": 0.0,
-    "fadeOut": 0.4,
-    "lifetime": 0.7,
-    "repeatSeconds": 0.0,
-    "windowSeconds": 6.0,
-    "windowStart": 0.0
-   },
-   "parameters": {
-    "appearance": {
-     "color": [
-      0.14413,
-      0.08438,
-      1.0
-     ],
-     "edgeColor": [
-      0.6577,
-      0.6338,
-      1.0
-     ],
-     "edgeIntensity": 0.0,
-     "intensity": 1.0,
-     "rainbow": false,
-     "rainbowBrightness": 1.0,
-     "rainbowSaturation": 0.85,
-     "rainbowScale": 0.025,
-     "rainbowSpeed": 0.35,
-     "width": 1.0
-    },
-    "propagation": {
-     "kind": "path",
-     "direction": "explicit",
-     "beamRadius": 0.0,
-     "startOffset": 60.0,
-     "speed": 1666.67,
-     "range": 2000.0,
-     "frontWidth": 60.0,
-     "trailLength": 260.0,
-     "falloff": 1.6,
-     "verticalExtent": 40.0,
-     "verticalGrowth": 0.0,
-     "ringCount": 0.0,
-     "forwardWeight": 1.0,
-     "targetWeight": 0.0,
-     "velocityWeight": 0.0,
-     "explicitDirection": [
-      0.0,
-      0.0,
-      -1.0
-     ],
-     "path": {
-      "node": "river",
-      "feature": "river",
-      "ease": 0.4,
-      "wakeGrowth": 0.3,
-      "coreWidth": 2.0,
-      "coreOffset": 0.0,
-      "haloWidth": 4.0,
-      "reach": 1400.0,
-      "reachHeight": 1100.0,
-      "land": 1.0,
-      "bed": 0.0,
-      "embed": 0.625,
-      "disturb": 0.0,
-      "nearFade": 120.0,
-      "lane": 300.0,
-      "laneJitter": 0.0,
-      "splash": 0.0,
-      "nearWake": 0.0
      }
     },
     "response": {
@@ -13341,6 +13123,50 @@
   },
   {
    "kind": "signal",
+   "name": "moogTrail",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.synth.onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.01,
+       "attackMs": 0.0,
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 1.0,
+       "envelopeRefractoryMs": 1000.0
+      },
+      "depthSource": "control.moog",
+      "depthMin": 0.0,
+      "depthMax": 1.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "moogSweep",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "constant": 1.0
+     },
+     {
+      "source": "signal.moogTrail",
+      "amount": -1.0
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
+  },
+  {
+   "kind": "signal",
    "name": "tomSize",
    "settings": {
     "combine": "firstActive",
@@ -13591,6 +13417,50 @@
   },
   {
    "kind": "signal",
+   "name": "bassTrail",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "stem.bass.onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.01,
+       "attackMs": 0.0,
+       "envelope": "linearfall",
+       "envelopeFallPerSecond": 1.0,
+       "envelopeRefractoryMs": 1000.0
+      },
+      "depthSource": "control.bass",
+      "depthMin": 0.0,
+      "depthMax": 1.0
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "bassSweep",
+   "settings": {
+    "combine": "sum",
+    "inputs": [
+     {
+      "constant": 1.0
+     },
+     {
+      "source": "signal.bassTrail",
+      "amount": -1.0
+     }
+    ],
+    "chain": {
+     "clampEnabled": true,
+     "clampMin": 0.0,
+     "clampMax": 1.0
+    }
+   }
+  },
+  {
+   "kind": "signal",
    "name": "auroraLight",
    "settings": {
     "combine": "firstActive",
@@ -13752,20 +13622,6 @@
    "polarity": "unipolar"
   },
   {
-   "source": "signal.moogGlow",
-   "target": "fx/moogFront/intensity",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar"
-  },
-  {
-   "source": "signal.bassGlow",
-   "target": "fx/bassFront/intensity",
-   "amount": 1.0,
-   "op": "add",
-   "polarity": "unipolar"
-  },
-  {
    "source": "signal.auroraLight",
    "target": "material/abRockL/op/8/constant/constant",
    "amount": 0.75,
@@ -13808,6 +13664,13 @@
    "polarity": "unipolar"
   },
   {
+   "source": "signal.moogTrail",
+   "target": "material/abRockL/op/48/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
    "source": "signal.moogGlow",
    "target": "material/abRockL/op/48/smoothstep/constant",
    "amount": -0.05,
@@ -13822,23 +13685,44 @@
    "polarity": "unipolar"
   },
   {
+   "source": "signal.moogSweep",
+   "target": "material/abRockL/op/53/constant/constant",
+   "amount": -420.0,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
    "source": "random.bassPick",
-   "target": "material/abRockR/op/55/palette/value",
+   "target": "material/abRockR/op/44/palette/value",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "signal.bassNote",
-   "target": "material/abRockR/op/56/smoothstep/constant",
+   "target": "material/abRockR/op/45/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar"
   },
   {
+   "source": "signal.bassTrail",
+   "target": "material/abRockR/op/45/smoothstep/constant",
+   "amount": -0.08,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
    "source": "signal.bassGlow",
-   "target": "material/abRockR/op/56/smoothstep/constant",
-   "amount": -0.04,
+   "target": "material/abRockR/op/45/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar"
+  },
+  {
+   "source": "signal.bassSweep",
+   "target": "material/abRockR/op/49/constant/constant",
+   "amount": -420.0,
    "op": "add",
    "polarity": "unipolar"
   }

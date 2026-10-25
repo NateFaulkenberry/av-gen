@@ -133,6 +133,22 @@ def onset_event(name, onset, refr_ms, life_s, part, size=None):
     ]
 
 
+def sweep_signals(name, onset):
+    """A note's sweep down a range: `<name>Trail`, a latch restarting on an onset and falling over 1.0 s (it holds the
+    subset's gate open while the band runs), and `<name>Sweep` = 1 - trail, the band's position, 0 at the camera on the
+    note and 1 far down the valley -- where it rests between notes, its gate closed."""
+    if not onset:
+        return [sig(name + "Trail", []), sig(name + "Sweep", [{"constant": 1.0}])]
+    # a sweep runs its whole length before the next note can restart it (a trill, ten notes a second, would otherwise
+    # keep it at the camera): while the part keeps playing, sweep follows sweep down the valley, its glints re-picked
+    # on every note
+    restart = {"threshold": "binary", "thresholdLevel": 0.01, "attackMs": 0.0, "envelope": "linearfall",
+               "envelopeFallPerSecond": 1.0 / 1.0, "envelopeRefractoryMs": 1000.0}
+    return [sig(name + "Trail", [inp(onset, restart, part=name)]),
+            sig(name + "Sweep", [{"constant": 1.0}, inp("signal.%sTrail" % name, amount=-1.0)], combine="sum",
+                chain=UNIT)]
+
+
 def sources(song):
     S = SONGS[song]
     src, ons = S["src"], S["onset"]
@@ -192,6 +208,9 @@ def sources(song):
                 if src["moog"] else [])]
     out += onset_event("moogNote", onset("moog"), 50.0, 0.18, "moog", size="signal.moogSize")
     out += [sig("moogGlow", [inp(s("moog", "level"), {"attackMs": 10.0, "decayMs": 200.0}, part="moog")])]
+    # the sweep down the left range (pass 4): a 0.7 s latch restarting on each note (the trail keeps its subset's gate
+    # open while it runs), and the ramp 1 - latch the band's position follows
+    out += sweep_signals("moog", onset("moog"))
     # ---- right: Toms (28 notes in six fills, peak 0.15-0.41 -> size 0.4-1.3) and tone block (176 accents, peak
     # 0.34-0.55 -> size 0.5-1.0); each size scales its hit, and the part's knob scales the size
     out += [sig("tomSize", [inp(s("toms", "peak"), dict(**remap(0.15, 0.41, 0.4, 1.3), **size_hold()), part="toms")]
@@ -211,6 +230,7 @@ def sources(song):
     out += onset_event("bassNote", onset("bass"), 100.0, 0.3, "bass", size="signal.bassSize")
     out += [sig("bassGlow", [inp(s("bass", "level"), {"attackMs": 20.0, "decayMs": 300.0}, part="bass")]
                 if src["bass"] else [])]
+    out += sweep_signals("bass", onset("bass"))
     # ---- the light the land and river take from the aurora: the swell alone (B s3), no drum or bass share
     out += [sig("auroraLight", [inp("signal.cloudSwell", amount=0.75)], chain=UNIT)]
     # ---- subsets
@@ -260,9 +280,7 @@ def routes():
         # a phrase-start crash throws a brighter ball than a re-hit on its decay
         R("signal.crashSize", "fx/ballA/intensity", 0.6),
         R("signal.crashSize", "fx/ballB/intensity", 0.6),
-        # ---- the mountain fronts: louder playing brightens the fronts in flight
-        R("signal.moogGlow", "fx/moogFront/intensity", 1.0),
-        R("signal.bassGlow", "fx/bassFront/intensity", 1.0),
+
     ]
     out += look.music_routes(R)
     return out

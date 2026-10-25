@@ -172,7 +172,10 @@ fn wavePathLand(e: Wave, worldPos: vec3<f32>, normal: vec3<f32>, viewDistance: f
     let above = 1.0 - smoothstep(e.vertical.y * 0.35, max(e.vertical.y, 1.0e-3), dy);
     let below = 1.0 - smoothstep(20.0, 40.0, -dy); // ADR-1663: 40 m below the level (vertical.x is now the age)
     let vband = select(above, below, underneath);
-    let source = select(vec3<f32>(h.nearest.x, e.originKind.y + 2.0, h.nearest.y),
+    // Above the level the light comes from the path's nearest point raised most of the way to the surface's own height
+    // (pass 4): mostly level, so a valley wall facing the path takes it squarely; from the water's level it struck the
+    // high facets from steeply below and they caught almost none.
+    let source = select(vec3<f32>(h.nearest.x, mix(e.originKind.y + 2.0, worldPos.y, 0.75), h.nearest.y),
                         e.originKind.xyz + vec3<f32>(0.0, 2.0, 0.0), underneath);
     let toLight = source - worldPos;
     let facing = max(dot(normal, toLight / max(length(toLight), 1.0e-3)), 0.0);

@@ -295,18 +295,21 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
     CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
     CHECK(fx.at("riverToms").at("parameters").at("propagation").at("path").at("laneJitter").get<double>() > 0.0);
-    // the mountain fronts (pass 4): the Moog's down the left range, the bass's down the right, on their notes
-    for (const auto& [id, event] : std::map<std::string, std::string>{{"moogFront", "signal.moogNoteEv"},
-                                                                      {"bassFront", "signal.bassNoteEv"}}) {
-        INFO(id);
-        REQUIRE(fx.contains(id));
-        CHECK(fx.at(id).at("trigger").at("name") == event);
-        const json& path = fx.at(id).at("parameters").at("propagation").at("path");
-        CHECK(path.at("land").get<double>() > 0.0);
-        CHECK(path.at("disturb").get<double>() == 0.0); // nothing on the water
+    // the mountain sweeps (pass 4): the Moog's glints run down the left range and the bass's planes down the right, a
+    // band of camera distance whose position a ramp restarting on their notes drives (look.py SWEEP_*)
+    {
+        std::set<std::string> swept;
+        for (const json& r : p.at("routes")) {
+            const std::string target = r.at("target");
+            if (target.find("abRockL") != std::string::npos && r.at("source") == "signal.moogSweep") {
+                swept.insert("moog");
+            }
+            if (target.find("abRockR") != std::string::npos && r.at("source") == "signal.bassSweep") {
+                swept.insert("bass");
+            }
+        }
+        CHECK(swept == std::set<std::string>{"moog", "bass"});
     }
-    CHECK(fx.at("moogFront").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
-    CHECK(fx.at("bassFront").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
     // the fireballs replace the stars (pass 4, ADR-1663)
     CHECK_FALSE(fx.contains("starA"));
     for (const char* id : {"ballA", "ballB"}) {
