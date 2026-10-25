@@ -386,13 +386,13 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 # lights"): the light on the land (`land`) is a quarter of pass 4's, a restrained accent; the light in the water and on
 # the bed is unchanged. Pass 6: back on the river, with pass 4's lanes and travel and pass 5's reduced spill.
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
-            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=3.5, reach=700.0,
+            twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.09, bed=4.5, reach=700.0,
             reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.035, near_wake=0.8)
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
-             twin=0.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=2.8, reach=600.0,
+             twin=0.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.06, bed=3.6, reach=600.0,
              reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.025, near_wake=0.6)
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
-            twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.0, reach=650.0,
+            twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.075, bed=3.9, reach=650.0,
             reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=0.03, near_wake=0.6)
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
@@ -404,7 +404,7 @@ def river_effects(pair=None):
             river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)]
 
 
-BED_SHELF = "#1c1858"   # pass 5: the lakebed's own faint blue-violet where it is shallow
+BED_SHELF = "#241e70"   # pass 5: the bed's own faint blue-violet where it is shallow (pass 8: a little brighter)
 BED_SHELF_DEPTH = (-38.0, -3.0)   # metres: it fades to the body's black between these depths
 
 
@@ -420,14 +420,21 @@ def bed_program():
         {"kind": "power", "dst": 0, "srcA": 0, "value": 1.6},
         {"kind": "constant", "dst": 1, "constant": c4(BED_SHELF)},
         {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
-        {"kind": "constant", "dst": 1, "constant": c4("#010106")},
+        # pass 8: a gentle blue-violet base light everywhere in the water (was the body's near black), so the planes
+        # read between pulses at every depth
+        {"kind": "constant", "dst": 1, "constant": c4(UNDERWATER_AMBIENT)},
         {"kind": "add", "dst": 0, "srcA": 0, "srcB": 1}],
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
 
 
+UNDERWATER_AMBIENT = "#0b0928"   # pass 8: the base light on the bed and the fish (was #010106)
+FISH_AMBIENT = "#100d36"         # the fish a little brighter than the bed round them, so they stand off it
+
+
 def fish_program():
-    """The fish: near black, so a fish shows only when a pulse's light in the water passes over it."""
-    return {"name": "abFish", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb("#010106") + [1.0]}],
+    """The fish: the underwater base light (pass 8; near black before), so a fish reads faintly between pulses and
+    brightly when a pulse's light in the water passes over it."""
+    return {"name": "abFish", "ops": [{"kind": "constant", "dst": 0, "constant": hexrgb(FISH_AMBIENT) + [1.0]}],
             "baseColor": -1, "metallic": -1, "roughness": -1, "emission": 0, "emissionIntensity": 1.0, "opacity": -1}
 
 
@@ -513,7 +520,9 @@ def water():
         # pass 3: the bed is seen through the water (dimmed with depth, wobbled by the beam's ripples via the refraction)
         # pass 5 ("make the pond appear deeper"; kept in pass 6): twice pass 4's absorption, so the bed darkens with depth -- the shelf
         # shows near the shores and fades into a dark middle -- and the water reads as a volume
-        "reflectionRays": 1.0, "transmission": 0.7, "absorption": [0.075, 0.06, 0.042], "undulation": 0.03,
+        # pass 8 (the owner: "make the underwater slightly more illuminated its hard to see the geometry / fish"): two
+        # thirds of pass 5-7's absorption, so the light carries deeper
+        "reflectionRays": 1.0, "transmission": 0.7, "absorption": [0.05, 0.04, 0.028], "undulation": 0.03,
         "undulationScale": 0.012, "roughnessVariation": 0.0, "tintPatches": 0.0, "glints": 0.0,
         "flowStreaks": 1.2, "streakLines": 600.0, "streakLength": 50.0, "streakDensity": 0.45, "streakSpeed": 1.8,
         "streakHighlight": 1.0, "streakColor1": c["auroraLow"], "streakColor2": c["auroraMid"],

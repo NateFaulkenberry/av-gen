@@ -394,7 +394,9 @@ def bed_rows(variant="coarse"):
             rim = land_height(r * math.sin(th), r * math.cos(th), th, -8.0, side) if edge else \
                 valley_height(th, -8.0, side)
             # pass 5-6: deeper -- about 50 m mid-river (was 20), falling steeply off the banks
-            depth = rim - 52.0 * (1.0 - min(1.0, fj * fj)) ** 0.7
+            # pass 8 (the owner: "make the river bed deeper so theres more room for fish"): about 75 m mid-river (pass
+            # 5-7: 52), on the same profile, so it still slopes cleanly up to the banks' waterline rows
+            depth = rim - 75.0 * (1.0 - min(1.0, fj * fj)) ** 0.7
             if not edge:
                 depth += (mx._hash(j, 500 + idx, 79) - 0.5) * 14.0   # tilted planes, so a grazing light picks some out
             pts.append((r * math.sin(th), depth, r * math.cos(th)))
@@ -468,7 +470,8 @@ def fish_list():
         r = rc(th) + lat
         x, z = r * math.sin(th), r * math.cos(th)
         heading = TAU * mx._hash(k, 700, 6)          # every way round: along, across, toward, away
-        y = -3.0 - 6.0 * mx._hash(k, 700, 5)
+        # pass 8: spread through the deeper water, 2.5-30 m down (pass 5-7: 3-9 m); some deep, some near the surface
+        y = -2.5 - 27.5 * mx._hash(k, 700, 5) ** 1.3
         top = max(b["back"], b["tail_top"], b["dorsal"], 0.02)
         y = min(y, -FISH_CLEARANCE - top * size)     # the whole body below the surface
         out.append((kind, x, y, z, heading, size))
