@@ -38,3 +38,9 @@ second screenshot shows exampel of the restored "ball dropping in water" effect 
 since we're close just render full video clips for my review from here on out, may only need one or two more passes then we're ready to merge
 
 Screenshots: (1) from an earlier pass, a red box over the near water behind a passing pulse: a hard straight seam/edge across the ripple field trailing the light, red line beside it; the owner says it is still visible in pass 9. (2) the restored splash: concentric rings around a bright impact spot in the near water.
+
+## The owner on pass 10 (verbatim, 2026-10-25)
+
+"im still able to see a seam in the wake, screen shot provided, line to the right of what I see. also the "big ball drop" effect was supposed to be per light source, so the kick drum light pulse creates a "ball drop ripple behind the camera where it shot out from, same with snare and toms - right now it looks like its just one big ball drop - check this. also the timing of the kick / snare / tom light pulses looks mistimed - they feel late"
+
+Screenshots: (1) near water behind a passing pulse, a red box with a line beside a diagonal straight edge running through the wake's ripples and dotted ring highlights; (2) the near water with one large set of ring ripples spanning the river width.
