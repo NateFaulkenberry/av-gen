@@ -1,9 +1,22 @@
 # Aurora Borealis
 
 A live scene: a slow flight down a winding mirror river through a valley of faceted indigo mountains at dusk, under a
-sky of layered aurora ribbons. It follows the Feline Footwear drum, bass and synth stems (or, live, any input whose
-channels are given the roles `drums`, `bass` and `synth`), and the mix alone otherwise. Examples > Live > Sonic VFX > Aurora
-Borealis.
+sky of layered aurora ribbons. Pass 3 plays **Sabertooth**: each stem performs its own part of the frame. Examples >
+Live > Sonic VFX > Aurora Borealis.
+
+| Stem | Where | What |
+|---|---|---|
+| Cloud Diving | sky | the aurora's swells: brightness, height, width, folds, inner detail, and slowly its colour |
+| Crash | sky | a fast shooting star (a pool of two) and a brief response: the aurora lifts, the crests flare, the river reflects it |
+| Moog | left bank | pale pink glints on a scattering of creases per note; the ring keeps them gently lit |
+| Kick | river | a magenta-pink beam racing down the river's own course (ADR-1662), lighting a faceted riverbed and the banks, rippling the mirror |
+| Snare | river | the same in pale lilac twin filaments, faster and shorter |
+| Toms | right bank and ranges | blue-violet flashes on whole planes, a new subset per note, sized by the hit |
+| Tone block | right bank and ranges | small lavender-white crease glints stepping through the bar |
+| Bass, HH | none | left unassigned (tested; see docs/prototypes/aurora-borealis/PROGRESS.md) |
+
+The Feline Footwear version is the hidden entry "Sonic VFX - Aurora Borealis (Feline Footwear)"
+(`aurora-borealis-feline.json`): the same scene and signals driven from its drums, bass and synth stems.
 
 ## Build it
 
@@ -15,24 +28,25 @@ Pure Python 3 (no Blender, no downloads), a few seconds. It writes:
 
 | Output | Committed? |
 |---|---|
-| `examples/aurora-borealis/scene/aurora-borealis.scene.json` and its four faceted GLBs (about 2 MB) | no (gitignored) |
-| `examples/aurora-borealis/aurora-borealis.json`, the live project | yes: a pure function of the scripts |
+| `examples/aurora-borealis/scene/aurora-borealis.scene.json`, its faceted GLBs (both banks, three ranges, two riverbeds) | no (gitignored) |
+| `examples/aurora-borealis/aurora-borealis.json` (Sabertooth) and `aurora-borealis-feline.json` | yes: pure functions of the scripts |
 
-The project names `assets/audio/feline-footwear.wav` and the three stems in `assets/audio/stems/`. Those are local and
-never committed. Without them the scene still opens and plays live input.
+The audio is local and never committed: `assets/audio/stems/sabertooth/` (the ten Sabertooth files) and, for the
+Feline version, `assets/audio/feline-footwear.wav` and its three stems. Without them the scene still opens and plays
+live input; keyed live channels (`kick`, `snare`, `toms`, `crash`, `cloud`, `moog`, `toneblock`) drive the same signals.
 
 ## The scripts
 
 | File | What it holds |
 |---|---|
-| `build.py` | the camera loop (a constant-speed timeline down the river, pitched up so the sky takes the frame) and the scene and project documents |
-| `world.py` | the land: the river's closed S-bend centreline, the valley band whose rows follow the river, the hero peaks, the three outer ranges |
-| `look.py` | the art direction: palette states, the land's unlit painter's program, sky, aurora, water, post |
-| `music.py` | the instrument: the stems by role, the drum feeds, the conditioned signals and the routes |
+| `build.py` | the camera loop, the stars' azimuth tracks, and the scene and project documents |
+| `world.py` | the land: the river's centreline, the two valley banks, the riverbed, the hero peaks, the outer ranges |
+| `look.py` | the art direction: palette, the two banks' programs (with the glints), sky, aurora, stars, the river beams, water, post |
+| `music.py` | the instrument: the songs, the stems, the conditioned signals and the routes |
 
 ## Controls
 
-CC 21, 22 and 23 scale the drums', bass's and synth's contribution. Each rests at full when the project loads and picks
-up from there (ADR-1612).
+CC 21-27 scale Cloud Diving, Crash, Moog, Kick, Snare, Toms and tone block. Each rests at full when the project loads
+and picks up from there (ADR-1612).
 
-See `docs/prototypes/aurora-borealis/` for the brief, the research, the plan and the progress log.
+See `docs/prototypes/aurora-borealis/` for the briefs, the research, the plans and the progress log.

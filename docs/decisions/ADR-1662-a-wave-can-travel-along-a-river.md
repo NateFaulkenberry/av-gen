@@ -69,7 +69,9 @@ those it draws three things:
   near-horizontal plane alike, and the bed read as a glow.
 
 A near fade by distance from the camera keeps the first frames of a front out of the bottom of the frame without
-delaying its onset.
+delaying its onset. The land and bed light take 40% of that fade, because the bed shows through the water only near
+the camera. They also wait until the front has travelled the fade's distance: lit from a head just launched, the
+near bed and banks washed the bottom of the frame.
 
 A front lives as an ADR-981 front, so a trigger with a lifetime gives each hit its own beam fading on its own
 envelope, at most four per instance. Past its range the front holds while its fade takes it away.
