@@ -6,8 +6,9 @@
 - Code: `src/world/effects/kinds/light_beam_effect.cpp`, which adds the rows `local` and `pitch` and a branch in
   `resolveBeam`.
 - Tests: `tests/unit/test_shell2.cpp` "Light Beam follows its owner in local space (ADR-1670)" (`[adr1670]`). It
-  checks four things:
+  checks these things:
   - off is byte-identical to a beam without the row, including with `pitch` set;
+  - the row is a Bool that a project file sets (read from the store's flags);
   - the offset and the aim are carried by the node's rotation, scale and position;
   - the beam can point straight up;
   - turning the node turns the beam with it;
@@ -43,4 +44,9 @@ Off, or on a Light or World owner, nothing changes. The rows are ordinary effect
 
 - An emitter is now one effect: a fan is N beams on one entity, with no carrier lights.
 - The pool light a beam asks for (`castLight`) follows the beam's resolved apex and axis as before.
+- **Found on the way:** a Bool row is stored in the effect value store's *flags*, and `StoredRows::f()` reads only
+  its *floats*. So a Bool row read through `f()` always answers its default. That is why Light Beam's `castLight:
+  false` in a project file has never turned the pool light off; 8-Bit Ocean's beams write it. `local` reads through
+  the new `StoredRows::b()`. `castLight` is left as it is: fixing it changes 8-Bit Ocean's picture, so it is reported
+  for its own decision.
 - A node whose forward is +Z (glTF's facing) aims with heading 0. The rule does not consult `FxAnchor.forward`.

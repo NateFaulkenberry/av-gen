@@ -684,6 +684,35 @@ class Scene:
         p.update(more)
         return self.effect(fid, "lightBeam", ("world",), parameters=p)
 
+    def emitter_fan(self, prefix, entity, origin, rays, look=None):
+        """A fan of light rays leaving one point of an entity and riding it (ADR-1670: Light Beam `local`): a mouth,
+        an eye, a lamp on a turning head. `origin` is a point in the entity node's LOCAL space (its mesh units).
+        `rays` is a list of dicts, each with `yaw` (degrees about the node's +Y, 0 = its +Z) and `pitch` (up from its
+        horizontal plane), and any Light Beam row to override (`angle`, `length`, `aperture`, `intensity`, `color`,
+        `coreSharpness`...). `look` holds rows every ray shares. Returns the effect ids, in order, for routes
+        (`fx/<id>/intensity`, `fx/<id>/angle`, `fx/<id>/yaw`...). The beams start dark unless a ray says otherwise:
+        a scene drives them with routes."""
+        shared = {"intensity": 0.0, "dust": 0.15, "dustScale": 2.5, "drift": 0.1, "coreSharpness": 4.0,
+                  "edgeSoftness": 0.45, "falloff": 1.4, "endFade": 0.35, "depthFade": 0.02, "steps": 8.0,
+                  "castLight": False, "light": 0.0}
+        shared.update(look or {})
+        ids = []
+        for i, ray in enumerate(rays):
+            p = dict(shared)
+            p.update({k: v for k, v in ray.items() if k not in ("yaw", "pitch")})
+            p.update({"local": True, "offsetX": float(origin[0]), "offsetY": float(origin[1]),
+                      "offsetZ": float(origin[2]), "yaw": float(ray.get("yaw", 0.0)),
+                      "pitch": float(ray.get("pitch", 0.0)), "tilt": 0.0})
+            for k, v in list(p.items()):
+                if isinstance(v, (int, float)) and not isinstance(v, bool):
+                    p[k] = float(v)
+                elif isinstance(v, (list, tuple)):
+                    p[k] = [float(c) for c in v]
+            fid = "%s%d" % (prefix, i)
+            self.effect(fid, "lightBeam", ("entity", entity), parameters=p)
+            ids.append(fid)
+        return ids
+
     def fogbank(self, fid, centre, shape="Bank", density=0.5, radius=100.0, height=20.0, color=(0.6, 0.65, 0.7),
                 **more):
         """A placed fog medium (the Effect Library's fog): a bank, an ellipsoid, a box... lit by the scene's lights,

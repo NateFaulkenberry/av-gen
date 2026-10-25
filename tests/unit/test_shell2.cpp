@@ -683,7 +683,7 @@ TEST_CASE("Light Beam follows its owner in local space (ADR-1670)", "[shell2][ef
     SECTION("off is byte-identical to a beam that never had the row") {
         scene.world = turned(30.0f, 2.0f, glm::vec3(1.0f, 2.0f, 3.0f));
         world::EffectInstance off = beam;
-        off.values.setFloat("lightBeam/local", 0.0f);
+        off.values.setBool("lightBeam/local", false);
         off.values.setFloat("lightBeam/pitch", 45.0f); // ignored while off
         const Built a = build({beam}, ctx);
         const Built b = build({off}, ctx);
@@ -693,7 +693,7 @@ TEST_CASE("Light Beam follows its owner in local space (ADR-1670)", "[shell2][ef
         CHECK(a.frame.instances[0].model[1].y == Approx(2.0f)); // col1 = -axis * L / 2, axis = -Y
     }
 
-    beam.values.setFloat("lightBeam/local", 1.0f);
+    beam.values.setBool("lightBeam/local", true);
     const auto apexAxis = [&](const Built& b) {
         const world::ShellInstance& s = b.frame.instances.at(0);
         const glm::vec3 axis = -glm::normalize(glm::vec3(s.model[1]));
@@ -714,6 +714,17 @@ TEST_CASE("Light Beam follows its owner in local space (ADR-1670)", "[shell2][ef
         CHECK(axis.x == Approx(1.0f)); // heading 0 is the node's +Z, now world +X
         CHECK(axis.y == Approx(0.0f).margin(1e-5));
         CHECK(glm::length(glm::vec3(b.frame.instances[0].model[1])) == Approx(2.0f)); // length stays in metres
+    }
+    SECTION("the row is the one a project file sets: a Bool, read from the store's flags") {
+        world::EffectInstance loaded = world::makeEffect(EffectKind::LightBeam, "mouth");
+        const world::EffectSchema& schema = *world::effectSchema(EffectKind::LightBeam);
+        for (const world::EffectField& f : schema.fields) {
+            if (std::string_view(f.leaf) == "local") {
+                CHECK(f.type == world::FieldType::Bool);
+                world::setFieldBool(f, schema, loaded, true);
+            }
+        }
+        CHECK(loaded.values.getBool("lightBeam/local", false));
     }
     SECTION("it can point up, which the world rule cannot") {
         beam.values.setFloat("lightBeam/pitch", 90.0f);

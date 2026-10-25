@@ -192,7 +192,7 @@ bool resolveBeam(const E& e, const EffectContext& ctx, Beam& out) {
         out.tint = anchor.light.color;
         return true;
     }
-    if (anchor.entity && kRows.f(e, "local") > 0.5f) {
+    if (anchor.entity && kRows.b(e, "local")) {
         // ADR-1670: the owner's drawn transform (XFORM offsets included) carries the offset and the aim.
         NodeView view;
         if (!ctx.scene->nodeView(e.owner.name, view)) {
