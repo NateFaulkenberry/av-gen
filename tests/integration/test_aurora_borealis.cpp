@@ -287,8 +287,10 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
         CHECK(prop.at("path").at("feature") == "river");
         CHECK(prop.at("path").at("disturb").get<double>() > 0.0);    // the owner: the ripples are required
     }
-    CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("coreOffset").get<double>() > 0.0);
-    CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("coreOffset").get<double>() == 0.0);
+    // one core each (the owner, pass 4: the snare's twin "looks like two beams"), told apart by colour, lane and timing
+    for (const char* id : {"riverKick", "riverSnare", "riverToms"}) {
+        CHECK(fx.at(id).at("parameters").at("propagation").at("path").at("coreOffset").get<double>() == 0.0);
+    }
     // the lanes: kick left of the centre, snare right, toms jittered across the width (pass 4)
     CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
     CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
