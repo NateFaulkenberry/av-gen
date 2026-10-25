@@ -2,9 +2,12 @@
 
 Porcelain mannequin busts, suspended in a dark indigo ether, each SPEAKING ITS OWN CHANNEL like a noise gate (the owner,
 stops 1-2): a head listens to one source -- a stem or a live input, found by role -- and when it sounds the head's neck
-SNAPS back, its jaw drops and rays of light shoot from its mouth, as bright as the mouth is open; when it stops the neck
-snaps forward, the jaw shuts and the rays are gone. Between notes the heads scan the room, each on its own: mechanical
-pans, pauses and snaps of the whole bust, with eyes that dart ahead of the turn like real eyes (saccades and fixations).
+SNAPS back, its lips part and rays of light shoot from its mouth, as bright as the mouth is open; when it stops the neck
+snaps forward, the mouth seals and the rays are gone. Between notes the heads look round the room, each on its own:
+mechanical pans, pauses and snaps of the whole bust and of the neck (yaw and pitch), with eyes that dart ahead of each
+turn like real eyes (saccades and fixations) and lids that blink. Each head has its own palette, and its secondary
+effects -- shake, tear, ghosts, wash, its light on the mist -- are its own source's alone. The room has drifting mist,
+motes at three depths and a slowly shifting colour.
 
 One scene, N heads (`HEADS`): each head is one source spec, and everything a head owns -- its nodes, its gate, its
 routes, its scan and its eyes -- is named by its prefix. The shipped project has three heads on Feline Footwear's three
@@ -13,11 +16,13 @@ unchanged. With no stems or inputs every head falls back to the mix's own band t
 A single-head project is the same scene with one spec.
 
 The articulated bust (tools/talking_heads/make_bust.py; anchors in meshes/th-bust.anchors.json):
-  <p>-bust (body) > <p>-neck (bent by a Bend deformer)
-                  > <p>-head (turned and placed on the bent neck's top) > <p>-jaw (hinged) > the mouth rays
-                                                                         > <p>-eyeL / <p>-eyeR (darting)
-Every route is same-frame (no macro.*). The rays' brightness and the jaw's angle are ONE route chain apart only in their
-amounts (tools/talking_heads/ray_check.py proves they track on every frame).
+  <p>-bust (body) > <p>-neck (twisted, then bent back or forward)
+                  > <p>-pivot (pitch, on the bent neck's top) > <p>-head (yaw; its mouth a Hinge deformer, ADR-1672)
+                                                                  > the mouth rays, the cavity, the ghosts
+                                                                  > <p>-eyeL / <p>-eyeR (darting), their lids
+Every route is same-frame (no macro.*). The rays' brightness and the mouth's angle are ONE route chain apart only in
+their amounts (tools/talking_heads/ray_check.py proves they track on every frame); tools/talking_heads/isolation_check.py
+proves each head's effects move only with its own source.
 """
 import json
 import math
@@ -34,13 +39,14 @@ _A = json.load(open(os.path.join(kit.ABSTRACT_DIR, "meshes", "th-bust.anchors.js
 NECK_FOOT = _A["body"]["neckFoot"]
 HEAD_REST = _A["body"]["headRest"]
 BEND_LEN = _A["neck"]["bendLength"]
-JAW_HINGE = _A["head"]["jawHinge"]
+HINGE = _A["head"]["mouthHinge"]               # the mouth's Hinge deformer (ADR-1672), head frame
 EYE_L = _A["head"]["eyeLeft"]
 EYE_R = _A["head"]["eyeRight"]
 EYEBALL_L = _A["eyes"]["left"]
 EYEBALL_R = _A["eyes"]["right"]
-MOUTH = _A["jaw"]["mouth"]                       # in the JAW's frame: inside the opening
-MOUTH_IN_HEAD = [JAW_HINGE[i] + MOUTH[i] for i in range(3)]
+MOUTH = _A["head"]["mouth"]                      # the rays' origin, head frame: behind the lips
+LID_UPPER_CLOSED = _A["eyes"]["lidCloseUpperDeg"]  # the upper lid's turn about X to meet the lower (positive)
+LID_LOWER_CLOSED = _A["eyes"]["lidCloseLowerDeg"]  # the lower lid's (applied negative)
 
 # The palette (01-research-assets.md section 6).
 INK = "#07051a"
@@ -54,10 +60,11 @@ PINK = "#ff6fb5"
 PALE = "#f4f0ff"
 IVORY = (0.86, 0.82, 0.74)
 
-# The gate's pose when open (degrees): the neck's tilt back and the jaw's drop. The head is placed on the bent neck's
-# top exactly at this angle (neck_offset), and within a millimetre on the way there.
+# The gate's pose when open: the neck's tilt back (degrees) and the mouth's opening (the Hinge's angle, radians: the
+# lower lip and chin turn down about a pivot behind the mouth, the corners stay attached, the cheeks stretch). The head
+# is placed on the bent neck's top exactly at this angle (neck_offset), and within a millimetre on the way there.
 TILT_OPEN = 24.0
-JAW_OPEN = 10.0
+MOUTH_OPEN = 0.20
 # A step, then a short mechanical settle (the owner approved the snap at stop 2). The rays use the SAME chain.
 SNAP = {"attackMs": 0.0, "decayMs": 0.0, "springHz": 11.0, "springDamping": 0.62}
 
@@ -66,13 +73,27 @@ SNAP = {"attackMs": 0.0, "decayMs": 0.0, "springHz": 11.0, "springDamping": 0.62
 # by role, ADR-1630) with the band its gate reads, and the mix's fallback band. Thresholds were tuned on Feline
 # Footwear's stems (07: "use Feline footwear stems for starter"). The drums head reads the drum stem's LOW band: it
 # opens on the kick and shuts between kicks (a hat or snare does not hold it open).
+# Each head's PALETTE (the owner, stop 4: "lets vary color palettes for multiple heads"): its rays, its possession
+# wash (four OKLab ramp stops), its glow, its two spectral copies and the light it spills into the mist. And its
+# EMPHASIS (the owner: "the secondary effects on the entities should all be unique to the sound source"): every
+# effect a head shows is driven by its own gate only, and each instrument leans on its own -- the drums SHAKE and
+# TEAR, the bass GHOSTS, the synth WASHES. 1 is a feature's full weight.
+ICE = {"rays": ("#2b7bff", "#4fe3ff", "#e6f6ff"), "wash": ("#1b2cff", "#2b7bff", "#4fe3ff", "#c9f4ff"),
+       "glow": "#4fe3ff", "ghosts": ("#4fe3ff", "#3a5bff"), "spill": "#3f8cff"}
+ORCHID = {"rays": (MAGENTA, PINK, VIOLET), "wash": (VIOLET, MAGENTA, PINK, "#ffb0dc"),
+          "glow": MAGENTA, "ghosts": (MAGENTA, VIOLET), "spill": "#ff2bd6"}
+EMBER = {"rays": ("#ffb347", "#ff7a3d", "#ffe08a"), "wash": ("#ff4a2b", "#ff9a3d", "#ffd36b", "#fff1cf"),
+         "glow": "#ffb347", "ghosts": ("#ffb347", "#ff5a2b"), "spill": "#ff9a40"}
 HEADS = [
     {"prefix": "th1", "role": "drums", "band": "bass", "mix": "signal.kickEnv", "mixOpen": 0.45, "open": 0.60, "close": 0.45,
-     "at": [-0.92, 0.0, -0.25], "heading": 28.0, "scan": (0.55, 0.13, 3), "colours": (BLUE, PALE, VIOLET)},
+     "at": [-0.92, 0.0, -0.25], "heading": 28.0, "scan": (0.55, 0.13, 3), "palette": ICE,
+     "emphasis": {"shake": 1.0, "tear": 1.0, "ghost": 0.3, "wash": 0.45}},
     {"prefix": "th2", "role": "bass", "band": "bass", "mix": "audio.bass", "open": 0.55, "close": 0.42,
-     "at": [0.0, 0.0, 0.18], "heading": 0.0, "scan": (0.48, 0.11, 7), "colours": (MAGENTA, PINK, VIOLET)},
+     "at": [0.0, 0.0, 0.18], "heading": 0.0, "scan": (0.48, 0.11, 7), "palette": ORCHID,
+     "emphasis": {"shake": 0.3, "tear": 0.25, "ghost": 1.0, "wash": 0.45}},
     {"prefix": "th3", "role": "synth", "band": "mid", "mix": "audio.mid", "open": 0.80, "close": 0.65,
-     "at": [0.92, 0.0, -0.25], "heading": -28.0, "scan": (0.52, 0.17, 11), "colours": (VIOLET, PINK, PALE)},
+     "at": [0.92, 0.0, -0.25], "heading": -28.0, "scan": (0.52, 0.17, 11), "palette": EMBER,
+     "emphasis": {"shake": 0.25, "tear": 0.25, "ghost": 0.3, "wash": 1.0}},
 ]
 MIX_STRICT = 0.15        # the mix path's thresholds sit this much higher than the stem path's
 MIX_PULSE_MS = 200.0     # a mix opening is a fixed pulse ...
@@ -81,25 +102,26 @@ MIX_REFRACTORY_MS = 450.0  # ... at most once per this long (07: "on a full mix 
 DESIGN = {
     "category": "surreal entity",
     "thesis": "Talking Heads: pale porcelain mannequin busts, each speaking its own channel like a noise gate -- on a "
-              "note its neck snaps back, its jaw drops and rays of light shoot from its mouth; between notes they shut "
-              "and scan the room, eyes darting ahead of each turn.",
+              "note its neck snaps back, its lips part and rays of light shoot from its mouth; between notes they seal "
+              "and look round the room, eyes darting ahead of each turn.",
     "composition": {
         "background": "a near-black indigo to deep violet gradient with a faint blue-purple haze",
-        "midground": "three busts well apart in the dark, at different headings",
-        "foreground": "sparse slow motes",
+        "midground": "three busts well apart in the dark, at different headings, among drifting mist",
+        "foreground": "sparse slow motes at three depths",
         "focal": "whichever head is speaking",
-        "secondary": ["the mouth rays sweeping the room", "darting eyes", "spectral copies on the speaking head"],
-        "atmosphere": "dark, sparse, suspended; no floor, horizon or set",
-        "post": "a restrained bloom; glitch only in bursts on an opening",
+        "secondary": ["the mouth rays sweeping the room", "darting eyes and blinks",
+                      "each head's own shake, tear, ghosts and wash, in its own palette"],
+        "atmosphere": "dark, suspended; drifting mist lit by the speaking heads; no floor, horizon or set",
+        "post": "a restrained bloom; no screen-wide glitch (every tear is a head's own)",
         "camera": "a slow, restrained drift; never on the music",
     },
     "palette": {"dominant": INK, "secondary": HAZE, "accent": MAGENTA, "highlight": PALE,
                 "background_value": "near black", "saturation": "pale porcelain against saturated emitted light"},
     "motion": {
-        "very_slow": ["the camera's drift"],
-        "medium": ["the scans: pans, pauses, snaps"],
-        "fast": ["the gates: neck and jaw snap, the rays with the jaw", "saccades"],
-        "extremely_fast": ["signal tears on an opening"],
+        "very_slow": ["the camera's drift", "the room's colour", "the mist"],
+        "medium": ["the scans and the neck's looks: pans, pauses, snaps"],
+        "fast": ["the gates: the neck snaps, the lips part, the rays with the mouth", "saccades", "blinks"],
+        "extremely_fast": ["a head's own tear on an opening"],
     },
     "vocabulary": [
         ["drums", "role.drums.bass", "head 1 speaks the kick"],
@@ -115,8 +137,8 @@ INDEX_ENTRY = {
     "category": kit.ABSTRACT_CATEGORY,
     "description": "Play live audio by channel: inputs (or stems) with the roles drums, bass and synth, one per head; a "
                    "plain mix works too, more sparingly. Three porcelain mannequin busts each speak their own channel "
-                   "like a noise gate: on a note the neck snaps back, the jaw drops and rays of light shoot from the "
-                   "mouth; between notes they scan the room, eyes darting. MIDI: CC 1 master, CC 2 rays, CC 3 gate "
+                   "like a noise gate: on a note the neck snaps back, the lips part and rays of light shoot from the "
+                   "mouth; between notes they look round the room, eyes darting. MIDI: CC 1 master, CC 2 rays, CC 3 gate "
                    "sensitivity, CC 4 copies, CC 5 tearing, CC 6 colour, CC 7 gain, CC 8 palette, CC 9 head tilt (each "
                    "rests at its middle and picks up); pad 36 holds every gate shut, 37 holds them open, 39 bursts. "
                    "docs/prototypes/talking-heads/.",
@@ -154,7 +176,7 @@ FAR = [9.0, 9.0, 9.0]
 PROGRAM_OPS = {}   # program name -> its Ops (every piece's program has the same op list, so one index names an op)
 
 
-def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR):
+def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"]):
     """Porcelain, darkened sockets, the possession wash (concentrated at the mouth and eyes) and the signal bands. The
     masks are points in THIS piece's frame (FAR = the piece has none). Registers: r0 local position, r1 mouth mask, r2
     eye mask, r3 porcelain, r5 wash colour, r6 wash amount, r7 base colour out, r4 emission out."""
@@ -169,8 +191,8 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR):
     o.add("socketMul", "multiply", 3, srcA=3, srcB=5)
     o.add("washNoise", "noise", 4, srcA=0, value=7.0, constant=[0.0, 0.0, 0.0, 0.0], seed=5)
     o.add("washSpread", "remap", 4, srcA=4, value=1.0, constant=[0.32, 0.68, 0.0, 1.0])
-    o.add("washRamp", "oklabRamp", 5, srcA=4, value=1.0, constant=hexrgb(VIOLET) + [1.0],
-          constant2=hexrgb(MAGENTA) + [1.0], constant3=hexrgb(PINK) + [1.0], constant4=hexrgb(BLUE) + [1.0])
+    o.add("washRamp", "oklabRamp", 5, srcA=4, value=1.0, constant=hexrgb(wash[0]) + [1.0],
+          constant2=hexrgb(wash[1]) + [1.0], constant3=hexrgb(wash[2]) + [1.0], constant4=hexrgb(wash[3]) + [1.0])
     o.add("masks", "add", 6, srcA=1, srcB=2)
     o.add("washAmount", "remap", 6, srcA=6, value=1.0, constant=[0.0, 1.0, 0.0, 0.0])
     o.add("washBase", "mixBy", 7, srcA=3, srcB=5, srcC=6)
@@ -223,7 +245,7 @@ MOUTH_RAYS = [
     {"yaw": -2.0, "pitch": 7.0, "angle": 1.4, "length": 1.95, "aperture": 0.003},
 ]
 RAY_WEIGHT = [0.55, 0.35, 0.8, 0.45, 0.3, 0.65]
-RAY_BRIGHTNESS = 2.6     # a ray's intensity at a fully open jaw, times its weight
+RAY_BRIGHTNESS = 2.6     # a ray's intensity at a fully open mouth, times its weight
 
 
 def neck_offset(deg):
@@ -254,16 +276,8 @@ def build(heads=None):
             castsShadow=False, contactShadow=False)
     s.light("fill", "directional", direction=[-0.6, 0.2, -0.75], color=hexrgb("#5a50c8"), intensity=0.25,
             castsShadow=False, contactShadow=False)
-    s.program(ghost_program("th-ghostA", MAGENTA))
-    s.program(ghost_program("th-ghostB", BLUE))
-    s.particles("motes", capacity=500, seed=17, shape="box", position=[0.0, 0.45, 0.0], extent=[3.6, 1.6, 2.4],
-                direction=[0.0, 1.0, 0.0], spawnRate=8.0, lifetimeMin=12.0, lifetimeMax=20.0, spread=1.0,
-                speedMin=0.005, speedMax=0.02, gravity=[0, 0.002, 0], drag=0.3, turbulence=0.02,
-                turbulenceScale=0.5, sizeStart=0.0035, sizeEnd=0.002, colorStart=hexrgb(PALE) + [0.6],
-                colorEnd=hexrgb(VIOLET) + [0.0], emissive=1.4, blend="additive")
     s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.42, "post/bloom/threshold": 0.9,
-               "post/output/vignette": 0.45, "post/output/grain": 0.012, "post/glitch/tearShift": 0.0,
-               "post/glitch/rate": 18.0, "post/glitch/block": 40.0, "temporal/echo/enabled": False})
+               "post/output/vignette": 0.45, "post/output/grain": 0.012, "temporal/echo/enabled": False})
     s.camera["fov"] = 40.0
     if len(heads) == 1:   # one head: the stop-2 framing, three-quarter from its right
         s.drift_camera(centre=[-0.98, 0.50, 2.05], target=[0.0, 0.36, 0.0], period=78.0, amp=(0.06, 0.02, 0.04),
@@ -272,63 +286,174 @@ def build(heads=None):
         s.drift_camera(centre=[-0.55, 0.62, 3.25], target=[0.0, 0.34, 0.0], period=90.0, amp=(0.08, 0.02, 0.05),
                        tamp=(0.01, 0.006, 0.0), steps=8)
     control(s)
+    atmosphere(s)
     for spec in heads:
         head(s, spec)
     return s
 
 
+# ================================================================================================ the atmosphere
+# The owner, stop 4: "add more atmosphere to the talking heads background too, mist, particles, ambient tones - it
+# should be dynamic too". All of it is the room's, not a head's: it drifts on its own clocks, swells a little with the
+# whole mix's energy, and takes each head's colour only through that head's own light (`<p>-spill`, in head()).
+MIST = "#3a2f7a"
+MIST_DEEP = "#1a1240"
+
+
+def atmosphere(s):
+    # the mist: ONE placed medium (the scene's one fog slot), a deep slab behind and among the heads, its density
+    # thresholded into drifting banks and threads (detail + turbulence on their own slow clocks); lit by the scene's
+    # lights, so a head's spill light colours the mist round it when its gate opens
+    s.fogbank("mist", (0.0, 0.25, -1.1), shape="Box", density=0.55, radius=3.6, height=1.3,
+              color=hexrgb(MIST), deepColor=hexrgb(MIST_DEEP), bankLength=2.2, edgeSoftness=0.6,
+              densityThreshold=0.32, densitySoftness=0.35, contrast=1.3, detailAmount=0.55, detailScale=1.8,
+              detailDrift=0.05, driftSpeed=0.08, driftVertical=0.012, turbulence=0.35,
+              turbulenceScale=0.9, turbulenceSpeed=0.05, swirl=0.15, scattering=0.75, selfGlow=0.04,
+              glowColor=hexrgb(VIOLET), swell=0.12, swellSpeed=0.07)
+    # the motes, at three depths: far (fine and many, behind the heads), mid (among them), near (few, larger, slow,
+    # between the camera and the heads); each its own clock
+    for name, cap, seed, pos, ext, rate, size, alpha, emis in (
+            ("motesFar", 700, 31, [0.0, 0.6, -2.2], [6.0, 2.4, 1.6], 14.0, 0.0022, 0.45, 1.1),
+            ("motes", 500, 17, [0.0, 0.45, 0.0], [3.6, 1.6, 2.4], 8.0, 0.0035, 0.6, 1.4),
+            ("motesNear", 90, 43, [0.0, 0.5, 1.7], [2.6, 1.4, 1.0], 1.6, 0.0065, 0.35, 1.2)):
+        s.particles(name, capacity=cap, seed=seed, shape="box", position=pos, extent=ext,
+                    direction=[0.0, 1.0, 0.0], spawnRate=rate, lifetimeMin=12.0, lifetimeMax=22.0, spread=1.0,
+                    speedMin=0.004, speedMax=0.018, gravity=[0, 0.002, 0], drag=0.3, turbulence=0.025,
+                    turbulenceScale=0.5, sizeStart=size, sizeEnd=size * 0.6, colorStart=hexrgb(PALE) + [alpha],
+                    colorEnd=hexrgb(VIOLET) + [0.0], emissive=emis, blend="additive")
+    # the room's tone: slow colour gradients through the sky (zenith and horizon on their own smooth noises,
+    # minutes long; visual, not audio)
+    for name, rate, seed in (("toneA", 0.021, 71), ("toneB", 0.033, 73), ("toneC", 0.027, 79)):
+        s.sources.append({"kind": "noise", "name": name, "settings": {"seed": seed}})
+        s.params_({"sources/%s/rate" % name: rate, "sources/%s/smoothness" % name: 1.0})
+    s.route(R("noise.toneA", "env/sky/zenithColor", 0.035, comp=2, polarity="bipolar"),
+            R("noise.toneA", "env/sky/zenithColor", -0.015, comp=0, polarity="bipolar"),
+            R("noise.toneB", "env/sky/horizonColor", 0.03, comp=0, polarity="bipolar"),
+            R("noise.toneB", "env/sky/horizonColor", 0.012, comp=1, polarity="bipolar"),
+            R("noise.toneC", "env/sky/horizonColor", 0.03, comp=2, polarity="bipolar"),
+            R("noise.toneC", "fx/mist/fogDensity", 0.12, polarity="bipolar"))
+    # ... and the whole mix's energy swells the mist and the bloom a little (seconds, not beats)
+    s.route(R("response.intensity", "fx/mist/fogDensity", 0.25, attackMs=1500.0, decayMs=4000.0),
+            R("response.intensity", "fx/mist/selfGlow", 0.06, attackMs=1500.0, decayMs=4000.0),
+            R("response.intensity", "post/bloom/intensity", 0.08, attackMs=1500.0, decayMs=4000.0))
+
+
 def head(s, spec):
     P = spec["prefix"]
+    pal = spec.get("palette", ORCHID)
     shear = {"kind": "sine", "amount": 0.0, "frequency": 240.0, "speed": 0.0, "phase": 0.0,
              "axis": [0.0, 1.0, 0.0], "displacementAxis": [1.0, 0.0, 0.0], "space": "world"}
     # (world space: the pieces have different local origins, and a shear in each one's own frame split the seams)
-    bend = {"kind": "bend", "amount": 0.0, "axis": [0.0, 1.0, 0.0], "displacementAxis": [0.0, 0.0, -1.0],
-            "center": [0.0, 0.0, 0.0], "falloff": BEND_LEN, "space": "local"}
+    # The neck: a TWIST (the swivel's yaw, about the straight neck), then two one-sided BENDS -- back (the gate's snap and
+    # looking up) and forward (looking down). One side at a time, each cut to exactly 0 at rest: a Bend at a curvature
+    # near 0 loses its normals to the GPU sine's precision, and a bipolar pitch would pass through it.
+    twist = {"kind": "twist", "amount": 0.0, "axis": [0.0, 1.0, 0.0], "center": [0.0, 0.0, 0.0], "speed": 0.0,
+             "space": "local"}
+    bend_back = {"kind": "bend", "amount": 0.0, "axis": [0.0, 1.0, 0.0], "displacementAxis": [0.0, 0.0, -1.0],
+                 "center": [0.0, 0.0, 0.0], "falloff": BEND_LEN, "space": "local"}
+    bend_fwd = dict(bend_back, displacementAxis=[0.0, 0.0, 1.0])
+    hinge = {"kind": "hinge", "amount": 0.0, "space": "local", "axis": HINGE["axis"], "center": HINGE["center"],
+             "displacementAxis": HINGE["displacementAxis"], "phase": HINGE["phase"], "falloff": HINGE["falloff"],
+             "frequency": HINGE["frequency"], "speed": HINGE["speed"], "scale": HINGE["scale"]}
+    # The head hangs from a PIVOT at the neck's top: the pivot takes the pitch (and its place on the bent neck), the
+    # head the yaw, so the head turns Rx(pitch) Ry(yaw) -- the order the neck's twist-then-bend turns its top ring.
+    s.nodes.append({"name": P + "-pivot", "kind": "group", "position": [float(v) for v in HEAD_REST],
+                    "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": P + "-bust"})
     pieces = [  # node, mesh, program (its masks in its own frame), parent, position, rotation, deformers
         (P + "-bust", "th-body", P + "-body", None, spec.get("at", [0.0, 0.0, 0.0]),
          [0.0, spec.get("heading", 0.0), 0.0], [shear]),
-        (P + "-neck", "th-neck", P + "-body", P + "-bust", NECK_FOOT, [0.0, 0.0, 0.0], [bend, shear]),
-        (P + "-head", "th-head", P + "-head", P + "-bust", HEAD_REST, [0.0, 0.0, 0.0], [shear]),
-        (P + "-jaw", "th-jaw", P + "-jaw", P + "-head", JAW_HINGE, [0.0, 0.0, 0.0], [shear]),
+        (P + "-neck", "th-neck", P + "-body", P + "-bust", NECK_FOOT, [0.0, 0.0, 0.0],
+         [twist, bend_back, bend_fwd, shear]),
+        (P + "-head", "th-head", P + "-head", P + "-pivot", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [hinge, shear]),
     ]
-    s.program(bust_program(P + "-body"))
-    s.program(bust_program(P + "-head", mouth=MOUTH_IN_HEAD, eye_l=EYE_L, eye_r=EYE_R))
-    s.program(bust_program(P + "-jaw", mouth=MOUTH))
+    s.program(bust_program(P + "-body", wash=pal["wash"]))
+    s.program(bust_program(P + "-head", mouth=MOUTH, eye_l=EYE_L, eye_r=EYE_R, wash=pal["wash"]))
+    s.program(ghost_program(P + "-ghostA", pal["ghosts"][0]))
+    s.program(ghost_program(P + "-ghostB", pal["ghosts"][1]))
     for node, mesh, prog, parent, pos, rot, deformers in pieces:
         s.proc(node, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh},
                material={"baseColor": list(IVORY), "roughness": 0.36, "metallic": 0.0, "program": prog},
                deformers=[dict(d) for d in deformers], position=pos, rotation=rot, scale=[1.0, 1.0, 1.0],
                parent=parent, extra={"castsShadow": False})
         s.entity(node)
-    # the mouth's dark interior and the eyes (own materials, no program); the head and jaw's spectral copies, which
-    # rest at a scale of nothing and grow only while this head speaks (07: ghosts only on the speaking head)
+    # the bust's pivot node goes before its children in the list (it was appended before the pieces, but its parent,
+    # the bust, is a piece): move it to just after the bust
+    piv = next(n for n in s.nodes if n["name"] == P + "-pivot")
+    s.nodes.remove(piv)
+    s.nodes.insert(next(i for i, n in enumerate(s.nodes) if n["name"] == P + "-bust") + 1, piv)
+    # the mouth's dark interior (seen only through the parted lips), the eyes and their lids (own materials, no
+    # program); the head's spectral copies, which rest at a scale of nothing and grow only while this head speaks
     for name, mesh, parent, pos, prog, scale in (
             (P + "-cavity", "th-mouth-cavity", P + "-head", [0.0, 0.0, 0.0], None, 1.0),
-            (P + "-floor", "th-jaw-floor", P + "-jaw", [0.0, 0.0, 0.0], None, 1.0),
             (P + "-eyeL", "th-eye", P + "-head", EYEBALL_L, None, 1.0),
             (P + "-eyeR", "th-eye", P + "-head", EYEBALL_R, None, 1.0),
-            (P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], "th-ghostA", 0.001),
-            (P + "-ghostAj", "th-jaw-ghost", P + "-jaw", [0.0, 0.0, 0.0], "th-ghostA", 0.001),
-            (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], "th-ghostB", 0.001),
-            (P + "-ghostBj", "th-jaw-ghost", P + "-jaw", [0.0, 0.0, 0.0], "th-ghostB", 0.001)):
+            (P + "-lidUL", "th-lid-upper", P + "-head", EYEBALL_L, None, 1.0),
+            (P + "-lidLL", "th-lid-lower", P + "-head", EYEBALL_L, None, 1.0),
+            (P + "-lidUR", "th-lid-upper", P + "-head", EYEBALL_R, None, 1.0),
+            (P + "-lidLR", "th-lid-lower", P + "-head", EYEBALL_R, None, 1.0),
+            (P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostA", 0.001),
+            (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostB", 0.001)):
         n = {"name": name, "kind": "gltf", "asset": "meshes/%s.glb" % mesh, "position": [float(v) for v in pos],
              "rotation": [0.0, 0.0, 0.0], "scale": [scale] * 3, "parent": parent, "castsShadow": False}
         if prog:
             n["program"] = prog
         s.nodes.append(n)
-    cols = spec.get("colours", (MAGENTA, PINK, VIOLET))
-    rays = s.emitter_fan(P + "-mouth", P + "-jaw", MOUTH,
+    cols = pal["rays"]
+    rays = s.emitter_fan(P + "-mouth", P + "-head", MOUTH,
                          [dict(r, color=hexrgb(cols[i % len(cols)])) for i, r in enumerate(MOUTH_RAYS)])
     s.effect(P + "-shake", "shake", ("entity", P + "-bust"),
              parameters={"trauma": 0.0, "amplitude": 0.004, "rotation": 1.0, "frequency": 17.0, "decay": 0.0,
                          "seed": 7.0})
-    for gid, ent in ((P + "-glowH", P + "-head"), (P + "-glowJ", P + "-jaw")):
-        s.effect(gid, "glow", ("entity", ent),
-                 parameters={"gain": 1.0, "tint": hexrgb(cols[0]), "glow": 0.0, "rim": 0.05,
-                             "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
+    s.effect(P + "-glowH", "glow", ("entity", P + "-head"),
+             parameters={"gain": 1.0, "tint": hexrgb(pal["glow"]), "glow": 0.0, "rim": 0.05,
+                         "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
+    # the head's own light, in front of its face: dark until its gate opens, then its colour on the mist round it
+    # and on its neighbours' porcelain (world space: the heads stand still, they only turn)
+    at, hd = spec.get("at", [0.0, 0.0, 0.0]), math.radians(spec.get("heading", 0.0))
+    fwd = 0.22
+    s.light(P + "-spill", "point", position=[at[0] + fwd * math.sin(hd), at[1] + HEAD_REST[1] + 0.12,
+                                              at[2] + fwd * math.cos(hd)],
+            color=hexrgb(pal["spill"]), intensity=0.0, range=1.6, castsShadow=False, contactShadow=False)
     gate(s, spec)
     scan_and_eyes(s, spec)
+    blinks(s, spec)
     routes(s, spec, rays)
+
+
+BLINK_CLOSE_MS = 35.0    # a lid shuts in about this long ...
+BLINK_HOLD_MS = 25.0     # ... stays shut this long ...
+BLINK_OPEN_PER_S = 11.0  # ... and opens at this rate (about 90 ms): a blink of about 100-150 ms in all
+BLINK_MIN_MS = 2000.0    # never two blinks closer than this
+LID_FOLLOW = 0.32        # the upper lid follows a downward glance by this share of the closed angle per unit noise
+
+
+def blinks(s, spec):
+    """The lids (the owner: "add eyelids to busts too"): porcelain shells round each eye, turned about the eye's centre,
+    so they can never cut into the eyeball. Both eyes blink together, irregularly: two slow smooth noises at
+    incommensurate rates, each blink on a noise's upward crossing, at least BLINK_MIN_MS apart -- intervals of about
+    2-6 s, each head its own. The upper lid also follows the eyes' downward glances (the same saccade noise, the same
+    spring), so a look down half-lowers it. The upper lid's turn is clamped at closed, so a blink during a downward
+    glance seals and never overshoots."""
+    P = spec["prefix"]
+    seed = spec.get("scan", (0.4, 0.13, 1))[2]
+    for name, r, sd in (("%sBlinkA" % P, 0.31, seed + 601), ("%sBlinkB" % P, 0.47, seed + 709)):
+        s.sources.append({"kind": "noise", "name": name, "settings": {"seed": sd}})
+        s.params_({"sources/%s/rate" % name: r, "sources/%s/smoothness" % name: 1.0})
+    sac = {"springHz": 14.0, "springDamping": 0.78}
+    s.sources += [
+        sig("%sBlink" % P, [{"source": "noise.%sBlinkA" % P}, {"source": "noise.%sBlinkB" % P}], combine="max",
+            chain={"threshold": "binary", "thresholdLevel": 0.72, "envelope": "peakhold",
+                   "envelopeHoldMs": BLINK_HOLD_MS, "envelopeFallPerSecond": BLINK_OPEN_PER_S, "envelopeRearm": 0.5,
+                   "envelopeRefractoryMs": BLINK_MIN_MS}),
+        sig("%sLidU" % P, [{"source": "signal.%sBlink" % P, "chain": {"attackMs": BLINK_CLOSE_MS, "decayMs": 0.0}},
+                           {"source": "noise.%sSacP" % P, "amount": LID_FOLLOW, "chain": dict(sac)},
+                           {"constant": -0.2 * LID_FOLLOW}],
+            combine="sum", chain={"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}),
+        sig("%sLidL" % P, [{"source": "signal.%sBlink" % P, "chain": {"attackMs": BLINK_CLOSE_MS, "decayMs": 0.0}}]),
+    ]
+    for side in ("L", "R"):
+        s.route(R("signal.%sLidU" % P, "nodes/%s-lidU%s/rotation" % (P, side), LID_UPPER_CLOSED, comp=0),
+                R("signal.%sLidL" % P, "nodes/%s-lidL%s/rotation" % (P, side), -LID_LOWER_CLOSED, comp=0))
 
 
 # ================================================================================================ the instrument
@@ -427,35 +552,62 @@ def gate(s, spec):
     s.map(M(GT + "Keep", [("signal.%sKeep" % GT, 1.0), ("signal." + GT, 1.0)], "min"))
 
 
-SCAN_RANGE = 45.0       # degrees either side of a head's resting heading
-SCAN_SNAP = 12.0        # the occasional snap's size
-SCAN_PAN = {"springHz": 0.9, "springDamping": 1.0}     # a pan: about 0.6-1.2 s, mechanical, no overshoot
+SCAN_RANGE = 26.0       # degrees either side of a head's resting heading: the whole bust's turn ...
+SCAN_SNAP = 10.0        # ... its occasional snap ...
+SCAN_PAN = {"springHz": 0.9, "springDamping": 1.0}     # ... and a pan: about 0.6-1.2 s, mechanical, no overshoot
+# The neck's swivel (the owner, stop 4: "making their necks swivel so they can also look up down left right at the
+# neck too"): its own mechanical pans, pauses and snaps in two axes, clamped, layered on the gate's snap back.
+NECK_YAW = 30.0         # degrees either side
+NECK_UP = 10.0          # looking up (the neck bends back) ...
+NECK_DOWN = 14.0        # ... and down (it bends forward)
+NECK_FULL = 36.0        # the most the neck bends back: the gate's 24 plus looking up 10 (and margin)
+NECK_PAN = {"springHz": 1.3, "springDamping": 1.0}
+NECK_LAG_MS = 220.0     # the neck sets off this much behind the eyes (07: eyes lead, the neck follows a beat later)
 
 
 def scan_and_eyes(s, spec):
-    """The scan (07: "scanning the room", readable): the whole bust's yaw. Its target is a STEPPED noise (a new heading
-    every 1/rate seconds, held), followed through a critically damped spring -- a pan of about 0.6-1.2 s -- plus a
-    second stepped noise added with no follower: the occasional snap. Each head has its own rates and seed.
+    """Where a head looks, in three layers, each with its own clocks and seed:
 
-    The eyes (07: darting, then "make the movements look more realistic"): conjugate (both eyes one route set), in the
-    head's frame, through a spring with a slight overshoot (saccades accelerate and settle in about 40-70 ms):
-      - they LEAD the scan: (target - current) heading, so they arrive at a new heading before the head does;
+    THE SCAN (07: "scanning the room", readable): the whole bust's yaw. A STEPPED noise (a new heading every 1/rate
+      seconds, held) through a critically damped spring -- a pan -- plus a second stepped noise with no follower: the
+      occasional snap.
+    THE NECK (stop 4): yaw and pitch at the neck, the same mechanics: stepped targets, held, through a lag and a
+      critically damped spring. Yaw twists the neck (its base stays put on the body), pitch bends it -- one-sided bends,
+      back or forward, so the bend is exactly 0 at rest -- and the head rides the neck's top through its pivot.
+    THE EYES (07: darting, then "make the movements look more realistic"): conjugate, in the head's frame, through a
+      spring with a slight overshoot (saccades accelerate and settle in about 40-70 ms):
+      - they LEAD: (target - current) of the scan AND of the neck, so they arrive before the head does;
       - saccades: two stepped noises at incommensurate rates (fixations of about 0.3-1.2 s), mostly small moves;
       - downward glances: a stepped pitch biased down (07: "eyes can look down though");
       - micro-drift during a fixation: a slow smooth noise of under a degree.
-    Kept within +-27 degrees yaw and -4..+16 pitch so the iris never sinks into the socket."""
+    Kept within about +-27 degrees yaw and -4..+16 pitch so the iris never sinks into the socket."""
     P = spec["prefix"]
     rate, snap_rate, seed = spec.get("scan", (0.4, 0.13, 1))
     noises = [("%sScanT" % P, rate, 0.0, seed), ("%sScanSnap" % P, snap_rate, 0.0, seed + 101),
               ("%sSacA" % P, 1.35, 0.0, seed + 211), ("%sSacB" % P, 2.15, 0.0, seed + 307),
-              ("%sSacP" % P, 0.85, 0.0, seed + 401), ("%sDrift" % P, 0.6, 1.0, seed + 503)]
+              ("%sSacP" % P, 0.85, 0.0, seed + 401), ("%sDrift" % P, 0.6, 1.0, seed + 503),
+              ("%sNeckYT" % P, rate * 1.3, 0.0, seed + 809), ("%sNeckPT" % P, rate * 0.9, 0.0, seed + 907)]
     for name, r, smooth, sd in noises:
         s.sources.append({"kind": "noise", "name": name, "settings": {"seed": sd}})
         s.params_({"sources/%s/rate" % name: r, "sources/%s/smoothness" % name: smooth})
+    neck = dict(NECK_PAN, attackMs=NECK_LAG_MS, decayMs=NECK_LAG_MS)
+    # the neck's look, in units of NECK_FULL (pitch, up positive) and NECK_YAW (yaw): -1..1 targets, then the lag and
+    # the pan. The pitch's target spans -NECK_DOWN..+NECK_UP: bipolar x (UP + DOWN) / 2, shifted by (UP - DOWN) / 2.
+    half = 0.5 * (NECK_UP + NECK_DOWN) / NECK_FULL
+    shift = 0.5 * (NECK_UP - NECK_DOWN) / NECK_FULL
     s.sources += [
         sig("%sScanNow" % P, [{"source": "noise.%sScanT" % P, "chain": dict(SCAN_PAN)}]),
         sig("%sLead" % P, [{"source": "noise.%sScanT" % P}, {"source": "signal.%sScanNow" % P, "amount": -1.0}],
             combine="sum"),
+        sig("%sNeckYTarget" % P, [{"source": "noise.%sNeckYT" % P, "polarity": "bipolar"}]),
+        sig("%sNeckY" % P, [{"source": "signal.%sNeckYTarget" % P, "chain": dict(neck)}]),
+        sig("%sNeckPTarget" % P, [{"source": "noise.%sNeckPT" % P, "polarity": "bipolar", "amount": half},
+                                  {"constant": shift}], combine="sum"),
+        sig("%sNeckP" % P, [{"source": "signal.%sNeckPTarget" % P, "chain": dict(neck)}]),
+        sig("%sNeckLeadY" % P, [{"source": "signal.%sNeckYTarget" % P},
+                                {"source": "signal.%sNeckY" % P, "amount": -1.0}], combine="sum"),
+        sig("%sNeckLeadP" % P, [{"source": "signal.%sNeckPTarget" % P},
+                                {"source": "signal.%sNeckP" % P, "amount": -1.0}], combine="sum"),
     ]
     bust = "nodes/%s-bust/rotation" % P
     s.route(R("signal.%sScanNow" % P, bust, SCAN_RANGE, comp=1, polarity="bipolar"),
@@ -463,8 +615,10 @@ def scan_and_eyes(s, spec):
     sac = {"springHz": 14.0, "springDamping": 0.78}
     for eye in ("eyeL", "eyeR"):
         rot = "nodes/%s-%s/rotation" % (P, eye)
-        s.route(R("signal.%sLead" % P, rot, 14.0, comp=1, **sac),                       # lead the turn
-                R("noise.%sSacA" % P, rot, 9.0, comp=1, polarity="bipolar", **sac),  # saccades
+        s.route(R("signal.%sLead" % P, rot, 10.0, comp=1, **sac),                       # lead the scan
+                R("signal.%sNeckLeadY" % P, rot, 7.0, comp=1, **sac),                  # ... and the neck's turn
+                R("signal.%sNeckLeadP" % P, rot, -0.25 * NECK_FULL, comp=0, **sac),    # ... and its nod (up = -)
+                R("noise.%sSacA" % P, rot, 8.0, comp=1, polarity="bipolar", **sac),  # saccades
                 R("noise.%sSacB" % P, rot, 3.0, comp=1, polarity="bipolar", **sac),  # small ones
                 R("noise.%sSacP" % P, rot, 20.0, comp=0, offset=-0.2, **sac),           # down glances, -4..+16
                 R("noise.%sDrift" % P, rot, 1.4, comp=1, polarity="bipolar"),           # fixation drift
@@ -473,6 +627,7 @@ def scan_and_eyes(s, spec):
 
 def routes(s, spec, rays):
     P = spec["prefix"]
+    E = spec.get("emphasis", {"shake": 0.5, "tear": 0.5, "ghost": 0.5, "wash": 0.5})
     G = "signal.%sPose" % P                # the gate's pose, 0..1 through the snap (the shut pad applied)
     LIVE = "signal.%sLive" % P             # the gate itself, 0 or 1
     SNAP_CUT = {"threshold": "gate", "thresholdLevel": 0.002}   # exact 0 at rest (see gate())
@@ -480,60 +635,86 @@ def routes(s, spec, rays):
     K = lambda f: "visual.%sGate" % f      # a knob's gate
     fx = lambda i, leaf: "fx/%s/%s" % (i, leaf)
     clamp = lambda hi: {"clampEnabled": True, "clampMin": 0.0, "clampMax": hi}
-    # ---- the pose: the neck snaps back (bend + head placement), the jaw drops; a step with a short mechanical settle
-    dy, dz = neck_offset(TILT_OPEN)
-    k = math.radians(TILT_OPEN) / BEND_LEN
-    s.route(R(G, "procedural/%s-neck/deform/1/amount" % P, k, depth="visual.tiltGate", **SNAP_CUT),
-            R(G, "nodes/%s-head/rotation" % P, -TILT_OPEN, comp=0, depth="visual.tiltGate", **SNAP_CUT),
-            R(G, "nodes/%s-head/position" % P, dy, comp=1, depth="visual.tiltGate", **SNAP_CUT),
-            R(G, "nodes/%s-head/position" % P, dz, comp=2, depth="visual.tiltGate", **SNAP_CUT),
-            R(G, "nodes/%s-jaw/rotation" % P, JAW_OPEN, comp=0, **SNAP_CUT))
-    # ---- the rays: a direct function of the jaw's opening (the owner: "mouth fully closed = rays off / fully open =
-    # rays fully bright"). The SAME signal (the pose, settle included) and the same route chain as the jaw's route above,
-    # so ray = weight x RAY_BRIGHTNESS x (jaw angle / JAW_OPEN) on every frame. CC 2 scales it.
+    # ---- the neck: the gate's snap back plus the look's pitch, as ONE angle in units of NECK_FULL (back positive),
+    # split into its back and forward halves (each 0..1, one of them 0); the tilt knob (CC 9) scales the snap
+    s.sources += [
+        sig(P + "Theta", [{"source": G, "amount": TILT_OPEN / NECK_FULL, "depthSource": "visual.tiltGate",
+                           "depthMax": 2.0},
+                          {"source": "signal.%sNeckP" % P}], combine="sum"),
+        sig(P + "Back", [{"source": "signal.%sTheta" % P}], chain=clamp(1.0)),
+        sig(P + "Fwd", [{"source": "signal.%sTheta" % P, "amount": -1.0}], chain=clamp(1.0)),
+    ]
+    s.map(M(P + "Back2", [("signal.%sBack" % P, 1.0)], "max", curve=2.0),
+          M(P + "Fwd2", [("signal.%sFwd" % P, 1.0)], "max", curve=2.0))
+    dy, dz = neck_offset(NECK_FULL)
+    k = math.radians(NECK_FULL) / BEND_LEN
+    piv = "nodes/%s-pivot/" % P
+    for half, sgn in (("Back", 1.0), ("Fwd", -1.0)):
+        src = "signal.%s%s" % (P, half)
+        s.route(R(src, "procedural/%s-neck/deform/%d/amount" % (P, 2 if half == "Back" else 3), k, **SNAP_CUT),
+                R(src, piv + "rotation", -sgn * NECK_FULL, comp=0, **SNAP_CUT),
+                R(src, piv + "position", sgn * dz, comp=2, **SNAP_CUT),
+                R("visual.%s%s2" % (P, half), piv + "position", dy, comp=1))
+    # ... and its yaw: the twist (radians per metre up the neck, so its top turns by the angle) and the head with it
+    s.route(R("signal.%sNeckY" % P, "procedural/%s-neck/deform/1/amount" % P, math.radians(NECK_YAW) / BEND_LEN),
+            R("signal.%sNeckY" % P, "nodes/%s-head/rotation" % P, NECK_YAW, comp=1))
+    # ---- the mouth: the head's Hinge opens with the gate's pose
+    s.route(R(G, "procedural/%s-head/deform/1/amount" % P, MOUTH_OPEN, **SNAP_CUT))
+    # ---- the rays: a direct function of the mouth's opening (the owner: "mouth fully closed = rays off / fully open =
+    # rays fully bright"). The SAME signal (the pose, settle included) and the same route chain as the mouth's route
+    # above, so ray = weight x RAY_BRIGHTNESS x (hinge angle / MOUTH_OPEN) on every frame. CC 2 scales it.
     for i, r in enumerate(rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
-    # ---- the flash on each opening: colour, spectral copies (grown only on this head), a shake, a restrained tear
-    s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.5, depth=K("copies"), attackMs=0, decayMs=140, **clamp(1.0)))
+    # ---- its light on the mist: the same pose, in its own colour
+    s.route(R(G, "lights/%s-spill/intensity" % P, 2.4, depth=K("chroma"), **SNAP_CUT))
+    # ---- the secondary effects, every one on THIS head's gate, weighted by its instrument's emphasis
+    # shake (the drums)
+    s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75 * E["shake"], depth=K("copies"), attackMs=0, decayMs=140,
+              **clamp(1.0)))
+    # tear (the drums): the head and bust's own shear and signal bands, and its own colour split -- the two copies
+    # pulled apart for a moment (the per-entity form of the post tear and RGB split this scene no longer uses)
+    for node in ("bust", "neck", "head"):
+        d = {"bust": 1, "neck": 4, "head": 2}[node]   # the shear is each piece's last deformer
+        s.route(R(OPEN, "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.006 * E["tear"], depth=K("tear"),
+                  attackMs=0, decayMs=120),
+                R(OPEN, "procedural/%s-%s/deform/%d/phase" % (P, node, d), 20.0, integrate=True, attackMs=10,
+                  decayMs=140),
+                R("control.padBurst", "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.01, attackMs=0,
+                  decayMs=150))
+    # ghosts (the bass): the spectral copies, grown only while this head speaks; how far they part and how long they
+    # linger is the instrument's
     for colour, sgn in (("A", 1.0), ("B", -1.0)):
-        for part in ("h", "j"):
-            node = "%s-ghost%s%s" % (P, colour, part)
-            for c in range(3):
-                s.route(R(LIVE, "nodes/%s/scale" % node, 0.999, comp=c, attackMs=0, decayMs=250))
-            s.route(R(OPEN, "nodes/%s/position" % node, 0.014 * sgn, comp=0, depth=K("copies"), attackMs=0,
-                      decayMs=220),
-                    R(OPEN, "nodes/%s/position" % node, 0.006 * sgn, comp=1, depth=K("copies"), attackMs=0,
-                      decayMs=220))
-    for part in ("body", "head", "jaw"):
+        node = "%s-ghost%sh" % (P, colour)
+        for c in range(3):
+            s.route(R(LIVE, "nodes/%s/scale" % node, 0.999, comp=c, attackMs=0, decayMs=250 + 500 * E["ghost"]))
+        part = 0.006 + 0.022 * max(E["ghost"], E["tear"])
+        s.route(R(OPEN, "nodes/%s/position" % node, part * sgn, comp=0, depth=K("copies"), attackMs=0,
+                  decayMs=160 + 300 * E["ghost"]),
+                R(OPEN, "nodes/%s/position" % node, 0.4 * part * sgn, comp=1, depth=K("copies"), attackMs=0,
+                  decayMs=160 + 300 * E["ghost"]),
+                R("signal.%sLevelS" % P, "nodes/%s/position" % node, 0.012 * E["ghost"] * sgn, comp=2,
+                  depth=K("copies"), attackMs=40, decayMs=400))
+    # wash (the synth): the possession colour over the porcelain, its spread on this head's own level
+    for part in ("body", "head"):
         prog = "%s-%s" % (P, part)
         o = PROGRAM_OPS[prog]
         op = lambda label, kind: "material/%s/op/%d/%s/" % (prog, o.at[label], kind)
-        s.route(R(LIVE, op("washAmount", "remap") + "constant", 0.5, comp=3, depth=K("chroma"), attackMs=0,
-                  decayMs=0),
-                R(OPEN, op("washAmount", "remap") + "constant", 0.08, comp=2, depth=K("chroma"), attackMs=0,
-                  decayMs=300),
-                R(OPEN, op("washAmount", "remap") + "constant", 0.35, comp=3, depth=K("chroma"), attackMs=0,
-                  decayMs=300),
-                R("response.intensity", op("washSpread", "remap") + "constant", -0.25, comp=2, attackMs=2500,
-                  decayMs=5000),
+        s.route(R(LIVE, op("washAmount", "remap") + "constant", 0.9 * E["wash"], comp=3, depth=K("chroma"),
+                  attackMs=0, decayMs=0),
+                R(OPEN, op("washAmount", "remap") + "constant", 0.12 * E["wash"], comp=2, depth=K("chroma"),
+                  attackMs=0, decayMs=300),
+                R(OPEN, op("washAmount", "remap") + "constant", 0.5 * E["wash"], comp=3, depth=K("chroma"),
+                  attackMs=0, decayMs=300),
+                R("signal.%sLevelS" % P, op("washSpread", "remap") + "constant", -0.25 * E["wash"], comp=2,
+                  attackMs=600, decayMs=2500),
                 R("control.palette", op("washSpread", "remap") + "constant", -0.6, comp=2),
-                R(OPEN, op("bands", "threshold") + "value", -0.12, depth=K("tear"), attackMs=0, decayMs=120))
-    for gid in (P + "-glowH", P + "-glowJ"):
-        s.route(R(OPEN, "fx/%s/glow" % gid, 0.25, depth=K("chroma"), attackMs=0, decayMs=200))
-    s.route(R(OPEN, "post/glitch/tear", 0.06, depth=K("tear"), attackMs=0, decayMs=90, **clamp(0.3)),
-            R(OPEN, "post/glitch/tearShift", 12.0, depth=K("tear"), attackMs=0, decayMs=90),
-            R(OPEN, "post/split/amount", 1.5, depth=K("tear"), attackMs=0, decayMs=90))
-    for node in ("bust", "neck", "head", "jaw"):
-        d = 2 if node == "neck" else 1
-        s.route(R(OPEN, "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.003, depth=K("tear"), attackMs=0,
-                  decayMs=120),
-                R(OPEN, "procedural/%s-%s/deform/%d/phase" % (P, node, d), 20.0, integrate=True, attackMs=10,
-                  decayMs=140))
-    # ---- global gain (CC 7, bipolar about its rest) and the burst pad (once, on the first head)
+                R(OPEN, op("bands", "threshold") + "value", -0.18 * E["tear"], depth=K("tear"), attackMs=0,
+                  decayMs=120))
+    s.route(R(OPEN, "fx/%s-glowH/glow" % P, 0.5 * E["wash"], depth=K("chroma"), attackMs=0, decayMs=200))
+    # ---- global gain (CC 7, bipolar about its rest): once, on the first head
     if spec is HEADS[0] or P == "th1":
         s.route(R("control.gain", "camera/exposure/compensation", 1.5, polarity="bipolar"),
-                R("control.gain", "post/bloom/intensity", 0.2, polarity="bipolar"),
-                R("control.padBurst", "post/glitch/tear", 0.5, attackMs=0, decayMs=150))
+                R("control.gain", "post/bloom/intensity", 0.2, polarity="bipolar"))
     for r in s.routes:
         ds = r.get("depthSource", "")
         if ds.startswith("visual.") and ds.endswith("Gate") and "depthMax" not in r:

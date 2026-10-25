@@ -17,10 +17,11 @@ contour. Quad topology, no decimation: the ring and segment counts set the trian
         --out examples/sonic-abstract/meshes [--previews ~/Desktop/av-gen-review/talking-heads/bust] [--samples 48]
 
 Writes to --out:
-- th-body.glb, th-neck.glb, th-head.glb, th-jaw.glb: the four articulated pieces (see "the articulation" below);
-- th-mouth-cavity.glb (head frame), th-jaw-floor.glb (jaw frame): the mouth's near-black interior;
-- th-eye.glb: an eyeball (porcelain with a dark iris disc facing +Z), placed in both recesses by the scene;
-- th-head-ghost.glb, th-jaw-ghost.glb: the head and jaw, one alpha-BLEND material, for the spectral copies;
+- th-body.glb, th-neck.glb, th-head.glb: the three articulated pieces (see "the articulation" below); the head's
+  mouth is a slit between closed lips that the engine's Hinge deformer opens (ADR-1672, cut_mouth);
+- th-mouth-cavity.glb (head frame): the mouth's near-black interior, seen only through the parted lips;
+- th-eye.glb: an eyeball (porcelain with a dark iris disc facing +Z); th-lid-upper/lower.glb: its lids;
+- th-head-ghost.glb: the head, one alpha-BLEND material, for the spectral copies;
 - th-bust.anchors.json: the hierarchy, the joints, the emitter anchors in each piece's frame, mesh statistics.
 The head tilts back on a neck that BENDS (the owner, stop 1: "the neck to snap back"; no ridge at the joint) and the jaw
 hinges open; the mouth's dark interior shows when it does.
@@ -37,7 +38,7 @@ import sys
 
 import bmesh
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 ap = argparse.ArgumentParser()
@@ -56,10 +57,10 @@ if PREV:
 # Control points up the bust: z, half-width W, front depth DF, back depth DB, centre offset CY (+Y = back),
 # superellipse exponent N (2 = ellipse, larger = boxier: the squared jaw, the cut shoulders). Monotone cubic.
 #            z      W      DF     DB     CY      N
-PROFILE = [(0.000, 0.176, 0.072, 0.068, 0.012, 3.4),   # flat base: a cut classical bust, not a bell
-           (0.030, 0.184, 0.076, 0.072, 0.012, 3.4),
-           (0.072, 0.176, 0.073, 0.071, 0.012, 3.0),   # shoulder edge
-           (0.108, 0.126, 0.060, 0.062, 0.014, 2.4),   # trapezius slope
+PROFILE = [(0.000, 0.176, 0.100, 0.084, 0.012, 3.4),   # flat base: a cut classical bust with a real chest (stop 3:
+           (0.030, 0.184, 0.104, 0.086, 0.012, 3.4),   # the shallow chest read as a column in profile)
+           (0.072, 0.176, 0.098, 0.082, 0.012, 3.0),   # shoulder edge
+           (0.108, 0.126, 0.074, 0.070, 0.014, 2.4),   # trapezius slope
            (0.150, 0.068, 0.048, 0.052, 0.020, 2.0),
            (0.195, 0.046, 0.040, 0.046, 0.024, 2.0),   # the long neck, leaning forward
            (0.245, 0.044, 0.040, 0.046, 0.018, 2.0),
@@ -93,8 +94,8 @@ FEATURES = [("nose",        0.0, 0.437, 5.5, 0.026, +0.021, False),
             ("chin",        0.0, 0.347, 10.0, 0.009, +0.009, False),
             ("upperLip",    0.0, 0.3935, 14.0, 0.0035, +0.003, False),
             ("lowerLip",    0.0, 0.3725, 13.0, 0.0045, +0.004, False),
-            ("mouth",       0.0, 0.383, 0.0, 0.0058, -0.022, False)]   # the opening: its own shape
-MOUTH_HALF_DEG = 14.0      # the opening's half width, in degrees round the face
+            ("mouth",       0.0, 0.383, 0.0, 0.0058, -0.0015, False)]  # a faint parting line; the lips close
+MOUTH_HALF_DEG = 17.0      # the opening's half width, in degrees round the face
 EYE_Z = 0.463
 EYE_DEG = 24.0
 MOUTH_Z = 0.383
@@ -362,7 +363,7 @@ JAW_HINGE = (0.0, None, MOUTH_Z + 0.010)           # y filled in from the profil
 TILT_TEST_DEG = 32.0
 JAW_TEST_DEG = 10.0
 EYE_RADIUS = 0.0125            # the eyeballs: 25 mm across, seated in the 17 mm recesses
-EYE_SEAT = 0.0095              # how far behind the recess surface the eyeball's centre sits
+EYE_SEAT = 0.0050              # how far behind the recess surface the eyeball's centre sits
 JOINT_INSET = 0.004            # the junction domes sit 4 mm inside the walls: hidden, and never coincident
 
 
@@ -532,148 +533,220 @@ def eye_centre(surface, side):
     return surface - d * EYE_SEAT
 
 
+MOUTH_SLIT_DEG = 16.0      # the slit (the lips' parting) runs this far either side of the front
+LIP_GAP = 0.0006           # the closed lips sit this far apart: a fine dark line
+LIP_ROLL = 0.012           # how deep the lips' inner walls roll into the mouth
+IRIS_DEG = 36.9            # the iris's angular radius from the gaze (its edge lands on the sphere's 8th ring, 36 deg)
+LID_GAP = 0.0012           # the lids' shells sit this far outside the eyeball
+LID_UPPER = (24.0, 82.0)   # elevation range of the upper lid at rest (degrees above the eye's horizontal)
+LID_LOWER = (-82.0, -30.0)
+
+
+def cut_mouth(ob):
+    """The mouth (stop 3: "the mouth should completely close ... not this cut out thing"). The surface is SLIT along the
+    mouth's ring between its corners -- the corners stay joined -- the two lips are set LIP_GAP apart (a fine line), and
+    each lip's edge rolls LIP_ROLL into the head as a near-black wall. The engine's Hinge deformer (ADR-1672) turns
+    what lies below the slit inside a soft mask about a jaw pivot: the lower lip and chin drop, the corners and cheeks
+    stretch, and the walls and the dark cavity behind show through the parted lips."""
+    S = args.segments
+    zs = rings_z()
+    iz = min(range(len(zs)), key=lambda i: abs(zs[i] - MOUTH_Z))
+    me = ob.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    ks = [k for k in range(-S // 2, S // 2 + 1) if abs(360.0 * k / S) <= MOUTH_SLIT_DEG]
+    chain = [bm.verts[iz * S + (k % S)] for k in ks]
+    edges = [bm.edges.get((a, b)) for a, b in zip(chain, chain[1:])]
+    ends = {chain[0], chain[-1]}
+    corner = max(abs(chain[0].co.x), abs(chain[-1].co.x))   # the cut's half-width: the Hinge's `frequency`
+    res = bmesh.ops.split_edges(bm, edges=[e for e in edges if e is not None])
+    zm = zs[iz]
+    upper, lower = [], []
+    for e in bm.edges:
+        if not e.is_boundary:
+            continue
+        if not all(abs(v.co.z - zm) < 1e-6 for v in e.verts):
+            continue
+        f = e.link_faces[0]
+        (upper if f.calc_center_median().z > zm else lower).append(e)
+    for group, sgn in ((upper, 1.0), (lower, -1.0)):
+        for v in {v for e in group for v in e.verts} - ends:
+            v.co.z += sgn * 0.5 * LIP_GAP
+    mi = len(me.materials) - 1   # mouth_interior
+    for group, sgn in ((upper, 1.0), (lower, -1.0)):
+        ext = bmesh.ops.extrude_edge_only(bm, edges=group)
+        new_verts = [g for g in ext["geom"] if isinstance(g, bmesh.types.BMVert)]
+        cy = interp(zm)[3]
+        for v in new_verts:
+            d = Vector((v.co.x, v.co.y - cy, 0.0))
+            L = d.length or 1.0
+            v.co -= d / L * LIP_ROLL
+            v.co.z += sgn * 0.002
+        for g in ext["geom"]:
+            if isinstance(g, bmesh.types.BMFace):
+                g.material_index = mi
+                g.smooth = True
+    bm.normal_update()
+    bm.to_mesh(me)
+    bm.free()
+    return zm, corner
+
+
+def lid_mesh(name, elev):
+    """An eyelid: a thin spherical shell round the eyeball's centre (LID_GAP outside it), between two elevations and
+    within +-75 degrees of the gaze. Turned about the eye's horizontal axis it closes over the eyeball -- the upper lid
+    down, the lower up -- and it can never touch the ball, however the eye turns."""
+    o = bpy.data.objects.new(name, bpy.data.meshes.new(name))
+    bpy.context.scene.collection.objects.link(o)
+    o.data.materials.append(make_mat("porcelain", (0.86, 0.82, 0.74), 0.36, 0.5, 0.12))
+    bm = bmesh.new()
+    R_ = EYE_RADIUS + LID_GAP
+    rows, cols = 14, 28
+    grid = []
+    for i in range(rows + 1):
+        e = math.radians(elev[0] + (elev[1] - elev[0]) * i / rows)
+        row = []
+        for j in range(cols + 1):
+            az = math.radians(-75.0 + 150.0 * j / cols)
+            # forward is -Y in Blender
+            row.append(bm.verts.new((R_ * math.cos(e) * math.sin(az), -R_ * math.cos(e) * math.cos(az),
+                                     R_ * math.sin(e))))
+        grid.append(row)
+    for i in range(rows):
+        for j in range(cols):
+            f = bm.faces.new((grid[i][j], grid[i + 1][j], grid[i + 1][j + 1], grid[i][j + 1]))
+            f.smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    for f in bm.faces:   # outward
+        if f.normal.dot(f.calc_center_median()) < 0:
+            f.normal_flip()
+    bm.to_mesh(o.data)
+    bm.free()
+    m = o.modifiers.new("solid", "SOLIDIFY")
+    m.thickness = 0.0010
+    m.offset = 1.0
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=m.name)
+    return o
+
+
 def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     ob = build_mesh()
     assign_regions(ob)
-    mouth = surface_point(ob, 0.0, MOUTH_Z)
+    for poly in ob.data.polygons:   # the old recess region is gone: the lips close
+        poly.material_index = 0
     lip = surface_point(ob, 0.0, MOUTH_Z + 0.012)
+    mouth_front = surface_point(ob, 0.0, MOUTH_Z)
     eyes = [surface_point(ob, s * EYE_DEG, EYE_Z) for s in (1, -1)]   # +X first = the bust's LEFT eye
     centre = Vector((0.0, interp(0.465 - NECK_DROP)[3], 0.465 - NECK_DROP))
     neck_foot = Vector((0.0, interp(NECK_LOW)[3], NECK_LOW))
     head_origin = Vector((0.0, interp(NECK_LOW)[3], NECK_TOP))      # straight above the neck's foot: the bend's axis
-    hinge = Vector((0.0, interp(MOUTH_Z)[3] - 0.010, JAW_HINGE[2]))
+    whole = ob.copy()
+    whole.data = ob.data.copy()
+    zm, corner = cut_mouth(ob)
+    pivot = Vector((0.0, interp(MOUTH_Z)[3], MOUTH_Z + 0.010))       # the jaw's pivot, near the hinge of a real jaw
     body = piece(ob, "th-body", lambda c, f: c.z < NECK_LOW)
     neck = piece(ob, "th-neck", lambda c, f: NECK_LOW < c.z < NECK_TOP)
-    head = piece(ob, "th-head", lambda c, f: c.z > NECK_TOP and not in_jaw(c, f, JAW_CORE_DEG, JAW_SKIRT))
-    jaw = piece(ob, "th-jaw", lambda c, f: in_jaw(c, f))
-    for p_ in (body, neck, head, jaw):
-        copy_smooth_normals(ob, p_)
-    sink_jaw_edges(jaw)
-    # the ghosts' copies are taken BEFORE the junction domes: a spectral copy is offset sideways, and the head's dome
-    # (hidden inside the neck on the real head) would stick out of the neck as a dark band on the copy
+    head = piece(ob, "th-head", lambda c, f: c.z > NECK_TOP)
+    for p_ in (body, neck, head):
+        copy_smooth_normals(whole, p_)
     head_g = piece(head, "th-head-g", lambda c, f: True)
-    jaw_g = piece(jaw, "th-jaw-g", lambda c, f: True)
-    copy_smooth_normals(ob, head_g)
-    copy_smooth_normals(ob, jaw_g)
+    copy_smooth_normals(whole, head_g)
     add_cap_dome(neck, NECK_TOP, up=True, depth_scale=0.3)
     add_cap_dome(head, NECK_TOP, up=False, depth_scale=0.22)
-    # the mouth's dark interior, as SEPARATE meshes (the scene draws them as plain gltf children with their own near-black
-    # material: a procedural node's one program would paint them porcelain): a cavity in the head behind the jaw block,
-    # and a dark floor riding the jaw
-    def dark_piece(name, centre, radii):
+
+    def dark_piece(name, centre_, radii):
         o = bpy.data.objects.new(name, bpy.data.meshes.new(name))
         bpy.context.scene.collection.objects.link(o)
         o.data.materials.append(make_mat("mouth_interior", (0.012, 0.010, 0.012), 0.85, 0.1))
-        add_dark_ellipsoid(o, centre, radii, 0)
+        add_dark_ellipsoid(o, centre_, radii, 0)
         return o
-    # the eyeballs (the darting-eyes pass): one porcelain ball with a dark iris disc on its +Y (Blender's forward is -Y,
-    # so the disc faces -Y), exported once and placed in both sockets by the scene. Its origin is its centre.
     eyeball = bpy.data.objects.new("th-eye", bpy.data.meshes.new("th-eye"))
     bpy.context.scene.collection.objects.link(eyeball)
     eyeball.data.materials.append(make_mat("eye_white", (0.86, 0.84, 0.80), 0.25, 0.6, 0.3))
     eyeball.data.materials.append(make_mat("iris", (0.03, 0.025, 0.04), 0.3, 0.5, 0.3))
     ebm = bmesh.new()
-    res = bmesh.ops.create_uvsphere(ebm, u_segments=32, v_segments=20, radius=EYE_RADIUS)
+    res = bmesh.ops.create_uvsphere(ebm, u_segments=64, v_segments=40, radius=EYE_RADIUS)
+    # the sphere's pole turned onto the gaze (-Y), so the iris's edge is one of its rings: a true circle, not the
+    # stair-step a cap cut across the rings draws
+    bmesh.ops.rotate(ebm, verts=res["verts"], cent=(0.0, 0.0, 0.0), matrix=Matrix.Rotation(math.radians(90.0), 3, "X"))
     for fce in {f for v in res["verts"] for f in v.link_faces}:
         fce.smooth = True
         c = fce.calc_center_median()
-        fce.material_index = 1 if c.y < -EYE_RADIUS * 0.62 else 0
+        polar = math.degrees(math.acos(max(-1.0, min(1.0, -c.y / c.length))))
+        fce.material_index = 1 if polar < IRIS_DEG else 0
     ebm.to_mesh(eyeball.data)
     ebm.free()
-    cavity = dark_piece("th-mouth-cavity", (0.0, interp(MOUTH_Z)[3] - 0.040, MOUTH_Z - 0.006), (0.042, 0.046, 0.026))
-    floor = dark_piece("th-jaw-floor", (0.0, interp(MOUTH_Z)[3] - 0.046, MOUTH_Z - 0.014), (0.040, 0.040, 0.016))
+    lid_up = lid_mesh("th-lid-upper", LID_UPPER)
+    lid_lo = lid_mesh("th-lid-lower", LID_LOWER)
+    cy_m = interp(MOUTH_Z)[3]
+    # the cavity: the dark behind the lips, its front just inside their walls
+    cavity = dark_piece("th-mouth-cavity", (0.0, mouth_front.y + LIP_ROLL + 0.026, MOUTH_Z - 0.006),
+                        (0.030, 0.030, 0.020))
     shift(neck, neck_foot)
     shift(head, head_origin)
     shift(cavity, head_origin)
-    shift(jaw, hinge)
-    shift(floor, hinge)
     shift(head_g, head_origin)
-    shift(jaw_g, hinge)
-    # frames (glTF): neck at its foot, head at the bend axis above it, jaw at its hinge in the head's frame
     G = lambda v: to_gltf(v)
     F = NECK_TOP - NECK_LOW
+    mask_c = Vector((0.0, mouth_front.y + 0.008, MOUTH_Z - 0.030))   # the hinge mask's centre: the chin
     anchors = {
         "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). Hierarchy: "
                 "body (origin at the base's bottom centre) > neck at body.neckFoot (bent by a Bend deformer: local, "
-                "axis +Y, displacementAxis -Z, falloff neck.bendLength, centre 0) ; head (a child of the BODY, at "
-                "body.headRest, turned by the bend's angle and moved by neck.headOffset to the bent neck's top) > jaw "
-                "at head.jawHinge (a positive turn about X opens it). jaw.mouth is the mouth beams' origin, inside the "
-                "opening, in the jaw's frame. head.eyeLeft/eyeRight are the eye recesses (for the darting-eyes pass).",
+                "axis +Y, falloff neck.bendLength, centre 0) ; head (a child of the BODY, at body.headRest) carries "
+                "the mouth's Hinge deformer (head.mouthHinge: ADR-1672), the cavity, the eyes and lids. head.mouth is "
+                "the rays' origin, behind the lips. Lids: th-lid-upper/lower.glb at each eye's centre; a positive "
+                "turn about X closes the upper lid (to lidCloseUpperDeg), a negative turn the lower.",
         "body": {"neckFoot": G(neck_foot), "headRest": G(head_origin)},
-        "neck": {"bendLength": round(F, 4), "headOffsetNote": "for a tilt back of theta (rad): the head turns by "
-                 "-theta about X and moves by (0, (R sin(theta) - F), -R (1 - cos(theta))) with R = F / theta"},
+        "neck": {"bendLength": round(F, 4)},
         "eyes": {"radius": EYE_RADIUS, "left": G(eye_centre(eyes[0], 1) - head_origin),
                  "right": G(eye_centre(eyes[1], -1) - head_origin),
+                 "lidCloseUpperDeg": LID_UPPER[0] + 1.0, "lidCloseLowerDeg": -LID_LOWER[1] + 1.0,
                  "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and "
-                         "pitch within -18..+6 degrees so the iris never sinks into the socket."},
-        "head": {"jawHinge": G(hinge - head_origin), "eyeLeft": G(eyes[0] - head_origin),
-                 "eyeRight": G(eyes[1] - head_origin), "headCentre": G(centre - head_origin),
-                 "mouthLip": G(Vector((0.0, lip.y, MOUTH_Z)) - head_origin), "forward": [0.0, 0.0, 1.0],
-                 "up": [0.0, 1.0, 0.0]},
-        "jaw": {"mouth": G(Vector((0.0, mouth.y - 0.004, MOUTH_Z + 0.001)) - hinge)},
-        "test": {"tiltDeg": TILT_TEST_DEG, "jawDeg": JAW_TEST_DEG},
-        "mesh": {n.name: stats(n) for n in (body, neck, head, jaw)} | {"whole": stats(ob)},
+                         "pitch within -4..+16 degrees (down positive) so the iris never sinks into the socket."},
+        "head": {"eyeLeft": G(eyes[0] - head_origin), "eyeRight": G(eyes[1] - head_origin),
+                 "headCentre": G(centre - head_origin),
+                 "mouth": G(Vector((0.0, mouth_front.y + 0.010, MOUTH_Z)) - head_origin),
+                 "mouthLip": G(Vector((0.0, lip.y, MOUTH_Z)) - head_origin),
+                 "mouthHinge": {"center": G(pivot - head_origin), "axis": [1.0, 0.0, 0.0],
+                                "displacementAxis": [0.0, 0.0, 1.0], "phase": round(zm - pivot.z, 5),
+                                "falloff": 0.065, "frequency": round(corner, 5),
+                                "speed": round(-(mask_c.y - pivot.y), 5), "scale": round(mask_c.z - pivot.z, 5)},
+                 "forward": [0.0, 0.0, 1.0], "up": [0.0, 1.0, 0.0]},
+        "test": {"tiltDeg": TILT_TEST_DEG},
+        "mesh": {n.name: stats(n) for n in (body, neck, head)} | {"whole": stats(whole)},
     }
     with open(os.path.join(OUT, "th-bust.anchors.json"), "w") as f:
         json.dump(anchors, f, indent=1)
         f.write("\n")
-    for p_, name in ((body, "th-body"), (neck, "th-neck"), (head, "th-head"), (jaw, "th-jaw"),
-                     (cavity, "th-mouth-cavity"), (floor, "th-jaw-floor"), (eyeball, "th-eye")):
+    for p_, name in ((body, "th-body"), (neck, "th-neck"), (head, "th-head"), (cavity, "th-mouth-cavity"),
+                     (eyeball, "th-eye"), (lid_up, "th-lid-upper"), (lid_lo, "th-lid-lower")):
         export(p_, os.path.join(OUT, name + ".glb"))
     gm = ghost_material()
-    for p_, name in ((head_g, "th-head-ghost.glb"), (jaw_g, "th-jaw-ghost.glb")):
-        keep = list(p_.data.materials)
-        p_.data.materials.clear()
-        p_.data.materials.append(gm)
-        export(p_, os.path.join(OUT, name))
-        p_.data.materials.clear()
-        for m in keep:
-            p_.data.materials.append(m)
+    head_g.data.materials.clear()
+    head_g.data.materials.append(gm)
+    export(head_g, os.path.join(OUT, "th-head-ghost.glb"))
     print("BUST_STATS", json.dumps(anchors["mesh"]))
     if not PREV:
         return
-    for o in (ob, head_g, jaw_g):   # previews show the real pieces only
+    for o in (ob, whole, head_g):
         bpy.data.objects.remove(o)
-    for i, side in enumerate((1, -1)):   # the two eyes in the previews (the scene places them the same way)
-        e = eyeball if i == 0 else bpy.data.objects.new("th-eye-R", eyeball.data)
-        if i:
-            bpy.context.scene.collection.objects.link(e)
-        e.parent = head
-        e.location = eye_centre(eyes[i], side) - head_origin
-    neck_rest = neck.data.copy()
+    head.location = head_origin
+    cavity.location = head_origin
+    for i, side in enumerate((1, -1)):
+        for proto in (eyeball, lid_up, lid_lo):
+            e = proto if i == 0 else bpy.data.objects.new(proto.name + "-R", proto.data)
+            if i:
+                bpy.context.scene.collection.objects.link(e)
+            e.location = eye_centre(eyes[i], side)
     cam = setup_render()
-
-    def pose(tilt_deg, jaw_deg):
-        th = math.radians(tilt_deg)
-        neck.data = neck_rest.copy()
-        shift(neck, -neck_foot)
-        bend_mesh(neck, th, NECK_LOW, F)
-        dy, dz = neck_bend(th, F)
-        head.location = head_origin + Vector((0.0, dy, dz))
-        head.rotation_euler = (-th, 0.0, 0.0)
-        jaw.parent = head
-        jaw.location = hinge - head_origin
-        jaw.rotation_euler = (math.radians(jaw_deg), 0.0, 0.0)
-        cavity.parent = head
-        floor.parent = jaw
-
-    pose(0.0, 0.0)
     shoot(cam, 0, "bust-front.png")
     shoot(cam, 35, "bust-three-quarter.png")
     shoot(cam, -90, "bust-profile.png")
     shoot(cam, 20, "bust-face-close.png", dist=0.75, height=0.42, aim_z=0.38)
-    pz = NECK_TOP
-    for deg, jd in ((0, 0), (20, JAW_TEST_DEG), (int(TILT_TEST_DEG), JAW_TEST_DEG)):
-        pose(deg, jd)
-        shoot(cam, -90, "neck-%02ddeg-profile-close.png" % deg, dist=0.55, height=pz + 0.03, aim_z=pz)
-        shoot(cam, -8, "neck-%02ddeg-front-close.png" % deg, dist=0.55, height=pz + 0.03, aim_z=pz)
-        shoot(cam, -35, "bust-%02ddeg-three-quarter.png" % deg, dist=1.65, height=0.40, aim_z=0.29)
-        shoot(cam, -90, "bust-%02ddeg-profile.png" % deg, dist=1.65, height=0.40, aim_z=0.29)
-    pose(0.0, JAW_TEST_DEG)
-    shoot(cam, -25, "jaw-open-close.png", dist=0.6, height=MOUTH_Z + 0.03, aim_z=MOUTH_Z)
-    pose(0.0, 0.0)
-    shoot(cam, -25, "jaw-shut-close.png", dist=0.6, height=MOUTH_Z + 0.03, aim_z=MOUTH_Z)
+    bpy.context.scene.camera.data.lens = 85
 
 
 def export(ob, path):

@@ -2,7 +2,7 @@
 """Talking Heads: do the beams start where the anchors say? (the owner's stop-1 note: "they look like they come from
 below the eyes and mouth").
 
-For each pose (head tilt, jaw angle), renders the scene twice from a fixed close camera -- every Light Beam on, then
+For each pose (head tilt, mouth angle: the head's Hinge deformer, in degrees), renders the scene twice from a fixed close camera -- every Light Beam on, then
 every Light Beam off -- with routes, tracks and motion effects removed, and takes the difference: the pixels the beams
 add. Each beam's origin (its owner node's world transform, walked up the scene's parents, times its local offset) is
 projected through the same camera, and the check passes when, for every beam, beam pixels lie within `--tol` pixels of
@@ -104,8 +104,10 @@ def pose_docs(project, scene, tilt, jaw, cam_pos, cam_tgt, beams_on):
                 R_ = F / th
                 n["position"] = [n["position"][0], n["position"][1] + R_ * math.sin(th) - F,
                                  n["position"][2] - R_ * (1.0 - math.cos(th))]
-        if n["name"] == PFX + "-jaw":
-            n["rotation"] = [jaw, 0.0, 0.0]
+        if n["name"] == PFX + "-head":   # the mouth: the head's Hinge deformer (ADR-1672), `jaw` degrees
+            for d in n["procedural"].get("deformers", []):
+                if d["kind"] == "hinge":
+                    d["amount"] = math.radians(jaw)
         if n["name"] == PFX + "-neck" and tilt:
             for d in n["procedural"].get("deformers", []):
                 if d["kind"] == "bend":
@@ -132,7 +134,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--poses", default="0:0,20:0,32:18", help="tilt:jaw degrees, comma-separated")
+    ap.add_argument("--poses", default="0:0,20:0,32:18", help="tilt:mouth degrees, comma-separated")
     ap.add_argument("--tol", type=float, default=12.0, help="pixels (the origin sits inside the mouth, so the lip can hide its first few)")
     ap.add_argument("--view", default="three-quarter", choices=["front", "three-quarter"])
     ap.add_argument("--prefix", default="th", help="the head to pose and look at (th, th1, th2...)")
@@ -207,7 +209,7 @@ def main():
                 print(line)
                 if not ok:
                     failures.append(line)
-            img.save(os.path.join(a.out, "anchor-check-%s-tilt%02d-jaw%02d.png" % (a.view, int(tilt), int(jaw))))
+            img.save(os.path.join(a.out, "anchor-check-%s-tilt%02d-mouth%02d.png" % (a.view, int(tilt), int(jaw))))
     finally:
         shutil.rmtree(work, ignore_errors=True)
     if failures:
