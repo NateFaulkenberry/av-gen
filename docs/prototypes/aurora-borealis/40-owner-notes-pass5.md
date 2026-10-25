@@ -11,3 +11,8 @@ lets turn the river into a lake and make the mountains horse shoe around the lak
 "alright go back to a slightly curved river design simply the mountain geometry but keep the modulation idea for next pass"
 
 Coordinator reading: pass 6 returns to a river (slightly curved, between pass 3's bends and pass 4's straight valley), with simpler mountain geometry, and keeps pass 5's Moog/bass mountain modulation (sensitivity, sustain, wide edges + facet fills + ridgeline glow). The lake is retired.
+
+## Further owner notes for pass 6 (verbatim, 2026-10-25)
+
+- Confirmed: moving camera along the slightly curved river; fireball, fish and deeper water carry over ("thats correct").
+- "have aura agent swap left and right mountain sides so left is BASS right is MOOG, and ahve it use the same effect it did for the lake but have it revert to sending the light down the mountain range"
