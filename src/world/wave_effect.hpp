@@ -184,6 +184,15 @@ struct BallShape {
     float flicker = 0.0f;      // 0..1: how much the corona's edge flickers
     float trail = 0.0f;        // metres of flaming trail behind the ball
     float spread = 0.0f;       // metres: each hit's target moves up to +- this to the right
+    // ADR-1665 (pass 5, the owner: "make the fireball look more like a realistic fireball"): how the visible ball is
+    // drawn. 0: ADR-1663's glow (core, corona, trail; every value below ignored, byte-identical). 1: a flame billboard --
+    // domain-warped fbm tongues swept back from the flight, coloured by a blackbody ramp (white-yellow core, orange, deep
+    // red), with a sooty rim. 2: volumetric-lite -- a short emission-absorption march through a teardrop of 3D
+    // domain-warped noise, hot inside, cooling to soot at its edge. `smoke` darkens the rim and leaves a smoke trail (it
+    // dims the aurora behind it); `embers` sheds glowing sparks along the trail.
+    int look = 0;
+    float smoke = 0.0f;        // 0..1
+    float embers = 0.0f;       // 0..1
 };
 
 struct Propagation {
@@ -362,6 +371,7 @@ struct ResolvedWave {
     float frontSpeed = 0.0f;
     float meanSpeed = 0.0f;
     double seconds = 0.0;
+    double launchSecond = 0.0;  // ADR-1665: a light ball's launch (its window's start), its look's seed
 };
 
 // ADR-1662: a polyline's geometry for a PathWave, exposed for the tests. `arcOf` projects a point onto

@@ -413,3 +413,56 @@ TEST_CASE("ADR-1663: a light ball flies its camera-relative arc and packs its li
     CHECK(back->wave.propagation.ball.arc == 100.0f);
     CHECK_FALSE(pathWave().toJson().at("parameters").at("propagation").contains("ball"));
 }
+
+TEST_CASE("ADR-1665: a fireball's look packs its smoke, embers and seed; look 0 packs byte for byte as ADR-1663's",
+          "[world][effects][waves][adr1665]") {
+    const glm::vec3 cam{0.0f, 10.0f, 0.0f};
+    const glm::vec3 fwd{0.0f, 0.0f, -1.0f};
+    const PathScene scene;
+    world::EffectInstance ball = world::makeEffect(world::EffectKind::GroundPulse, "ball");
+    ball.activation = world::Activation::Always;
+    ball.timing = world::Timing{};
+    ball.timing.fadeIn = 0.0;
+    ball.timing.fadeOut = 0.0;
+    ball.wave.source.kind = world::SourceKind::Camera;
+    ball.wave.propagation.kind = world::PropagationKind::LightBall;
+    ball.wave.propagation.ball.coronaIntensity = 2.0f;
+    ball.wave.propagation.ball.trail = 150.0f;
+    REQUIRE(ball.wave.validate().has_value());
+    const auto plain = world::resolveWave(ball, at(0.5, scene, cam, fwd));
+    REQUIRE(plain.has_value());
+    const world::WaveGpu g0 = world::packWave(*plain);
+    CHECK(g0.extra == glm::vec4(0.0f));
+    // look 0 with smoke and embers set: they are ignored, every byte as before
+    world::EffectInstance off = ball;
+    off.wave.propagation.ball.smoke = 0.7f;
+    off.wave.propagation.ball.embers = 0.8f;
+    const world::WaveGpu g1 = world::packWave(*world::resolveWave(off, at(0.5, scene, cam, fwd)));
+    CHECK(std::memcmp(&g0, &g1, sizeof(world::WaveGpu)) == 0);
+    // and nothing new in its file
+    const nlohmann::json j = off.toJson();
+    const nlohmann::json& bj = j.at("parameters").at("propagation").at("ball");
+    CHECK_FALSE(bj.contains("look"));
+    // look 1: the look, the smoke (with the envelope), the embers and a seed from the launch second
+    world::EffectInstance fire = off;
+    fire.wave.propagation.ball.look = 1;
+    REQUIRE(fire.wave.validate().has_value());
+    const world::WaveGpu g2 = world::packWave(*world::resolveWave(fire, at(0.5, scene, cam, fwd)));
+    CHECK(g2.extra.x == 1.0f);
+    CHECK(g2.extra.y == 0.7f);
+    CHECK(g2.extra.z == 0.8f);
+    const nlohmann::json fj = fire.toJson();
+    const nlohmann::json& fb = fj.at("parameters").at("propagation").at("ball");
+    CHECK(fb.at("look") == 1.0);
+    const auto back = world::EffectInstance::fromJson(fj);
+    REQUIRE(back.has_value());
+    CHECK(back->wave.propagation.ball.look == 1);
+    CHECK(back->wave.propagation.ball.smoke == 0.7f);
+    CHECK(back->wave.propagation.ball.embers == 0.8f);
+    // out of range is refused
+    fire.wave.propagation.ball.look = 3;
+    CHECK_FALSE(fire.wave.validate().has_value());
+    fire.wave.propagation.ball.look = 2;
+    fire.wave.propagation.ball.smoke = 1.5f;
+    CHECK_FALSE(fire.wave.validate().has_value());
+}

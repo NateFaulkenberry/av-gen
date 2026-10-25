@@ -8,9 +8,10 @@ Pure Python (no Blender, no downloads), about a minute. It writes
   examples/aurora-borealis/scene/            the scene file and its faceted GLBs (generated, gitignored)
   examples/aurora-borealis/aurora-borealis.json   the committed live project (a pure function of these scripts)
 
-The scene: a closed-loop river winding through a valley of faceted mountains at dusk, under a sky of ribbon aurora,
-flown down slowly by a timeline camera (world.py builds the land and the path; look.py holds the art direction --
-palette, the land's program, sky, aurora, water; music.py the stem-driven signals and routes).
+The scene (pass 5): a still lake ringed by faceted mountains at dusk -- a horseshoe open toward a static camera --
+under a sky of ribbon aurora (world.py builds the land, the lakebed and the fish; look.py holds the art direction --
+palette, the land's program, sky, aurora, water, the light in the water, the fireballs; music.py the stem-driven
+signals and routes).
 See docs/prototypes/aurora-borealis/.
 """
 from __future__ import annotations
@@ -33,52 +34,27 @@ PROJECT = os.path.join(HERE, "aurora-borealis.json")             # Sabertooth, t
 PROJECTS = {"sabertooth": "aurora-borealis.json", "feline": "aurora-borealis-feline.json"}
 SCENE_FILE = "aurora-borealis.scene.json"
 
-CAM_H = 65.0              # metres above the water
-CAM_SPEED = 22.0          # metres a second along the river
-AHEAD = 1600.0            # the target this far ahead on the centreline
-PITCH_DEG = 1.5           # the view pitched up so the horizon sits low and the sky takes the frame
-SWAY = 0.22               # the camera drifts across the river by this fraction of its half-width
-KEYS_PER_LOOP = 500
+# pass 5 (the owner: "static camera"): one composition, held for the whole song. The camera stands just inside the lake's
+# near end, a little above the water: the lake fills the lower middle of the frame, the horseshoe's arms rise on the
+# left and right and its back closes the view, and the view is pitched up so the aurora takes the upper half.
+CAM_POS = (0.0, 48.0, 0.0)
+CAM_PITCH_DEG = 1.5
+CAM_FOV = 50.0
 
 
-LOOP_METRES = 4000.0      # pass 4: the camera's run down the straight valley before it starts again
-
-
-def camera_tracks():
-    """Pass 4: a straight flight down the unrolled valley (world.unroll) at a constant speed, along the valley's axis
-    (z = 0 at the start, heading -z), with a slow sideways drift across the river; the target AHEAD metres further and
-    pitched up; no roll (there are no turns). The run is LOOP_METRES (182 s at 22 m/s) and then starts again: a cut
-    back to the start, well inside the world (it ends 5.4 km past the run), so no end of the world is ever in view.
-    Deterministic (seek equals play)."""
-    period = round(LOOP_METRES / CAM_SPEED, 3)
-    kp, kt, kr = [], [], []
-    for i in range(KEYS_PER_LOOP + 1):
-        s = LOOP_METRES * i / KEYS_PER_LOOP
-        side = SWAY * 180.0 * math.sin(2.0 * world.TAU * i / KEYS_PER_LOOP + 0.4)
-        pos = (side, CAM_H, -s)
-        tgt = (0.0, CAM_H + AHEAD * math.tan(math.radians(PITCH_DEG)), -(s + AHEAD))
-        t = round(period * i / KEYS_PER_LOOP, 4)
-        kp.append({"time": t, "value": [round(v, 3) for v in pos], "interp": "smooth"})
-        kt.append({"time": t, "value": [round(v, 3) for v in tgt], "interp": "smooth"})
-        kr.append({"time": t, "value": 0.0, "interp": "smooth"})
-
-    def track(target, keys):
-        return {"target": target, "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
-                "loopLength": period, "keys": keys}
-    # explicit clip planes: the automatic far plane is 50x the world's radius (about 1,000 km here), and at that ratio the
-    # sky's direction, unprojected from the far plane, came out NaN on some frames and the bloom blacked the whole frame
-    camera = {"mode": 1, "position": kp[0]["value"], "target": kt[0]["value"], "fov": 50.0, "orbitSpeed": 0.0,
-              "near": 1.0, "far": 45000.0}
-    return [track("camera/position", kp), track("camera/target", kt), track("camera/roll", kr)], \
-        camera, period
+def camera_doc():
+    """The fixed camera (no timeline tracks: nothing moves it). Explicit clip planes: the automatic far plane is 50x the
+    world's radius, and at that ratio the sky's direction came out NaN on some frames (pass 1)."""
+    tgt = (CAM_POS[0], CAM_POS[1] + 1000.0 * math.tan(math.radians(CAM_PITCH_DEG)), CAM_POS[2] - 1000.0)
+    return {"mode": 1, "position": list(CAM_POS), "target": [round(v, 3) for v in tgt], "fov": CAM_FOV,
+            "orbitSpeed": 0.0, "near": 1.0, "far": 45000.0}
 
 
 def scene_doc(camera):
     nodes = [look.water_node()]
-    # pass 3: the inner bank (always on the camera's left) takes the left program, the outer bank and the ranges the
-    # right one (22-research-pass3-scene.md s5.1)
-    for name in ["valleyL", "valleyR"] + [r[0] for r in world.RANGES] + ["left" + r[0] for r in world.RANGES[1:]]:
-        prog = look.ROCK_L if name in ("valleyL", "leftfar", "leftdistant") else look.ROCK_R   # left: the Moog
+    # each land mesh in halves: the left (x < 0) takes the Moog's program, the right the bass's
+    for name in [n + side for n in world.LAND for side in "LR"]:
+        prog = look.ROCK_L if name.endswith("L") else look.ROCK_R
         nodes.append({"name": name, "kind": "procedural", "procedural": {
             "source": {"kind": "mesh", "asset": "ab-%s.glb" % name}, "distribution": {"kind": "single"},
             "material": look.rock_material(prog), "castsShadow": False}})
@@ -89,7 +65,7 @@ def scene_doc(camera):
             "materialPrograms": [look.rock_program(look.ROCK_L), look.rock_program(look.ROCK_R), look.bed_program()]}
 
 
-def project_doc(tracks, period, song):
+def project_doc(song):
     doc = {
         "format": "avgen-project", "version": 4, "app": {"name": "Aurora Borealis"},
         "assets": {"scene": {"kind": "composition", "path": "scene/" + SCENE_FILE}},
@@ -99,7 +75,7 @@ def project_doc(tracks, period, song):
         "live": {"overrides": {"lodBias": 1.0}},
         "effects": [look.aurora_effect(), look.stars_effect()] + look.ball_effects() + look.river_effects(),
         "palette": look.palette(),
-        "timeline": {"enabled": True, "cues": [], "tracks": tracks},
+        "timeline": {"enabled": True, "cues": [], "tracks": []},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/aurora-borealis.mp4"},
     }
     music.apply(doc, song)
@@ -116,15 +92,14 @@ def main():
     if not a.skip_meshes:
         counts = world.generate(a.scene_dir)
         print("meshes: %s (%d triangles)" % (", ".join("%s %d" % kv for kv in counts.items()), sum(counts.values())))
-    tracks, camera, period = camera_tracks()
     with open(os.path.join(a.scene_dir, SCENE_FILE), "w") as f:
-        json.dump(scene_doc(camera), f, indent=1)
+        json.dump(scene_doc(camera_doc()), f, indent=1)
         f.write("\n")
     for song, name in PROJECTS.items():
         with open(os.path.join(a.project_dir, name), "w") as f:
-            json.dump(project_doc(tracks, period, song), f, indent=1)
+            json.dump(project_doc(song), f, indent=1)
             f.write("\n")
-    print("camera loop %.1f s; wrote %s and %s" % (period, os.path.relpath(a.scene_dir),
+    print("static camera; wrote %s and %s" % (os.path.relpath(a.scene_dir),
                                                   ", ".join(PROJECTS.values())))
 
 

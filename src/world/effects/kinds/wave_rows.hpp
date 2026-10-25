@@ -254,6 +254,21 @@ inline constexpr EffectField kFields[] = {
                AVGEN_WAVE_SETF(e.wave.propagation.ball.spread)).json("propagation/ball/spread").fmt("%.0f m")
         .floorAt(0.0f).tooltip("Each hit's target moves up to +- this to the right: its own heading.")
         .writtenWhen(isLightBall),
+    // ADR-1665: the fireball's look (written only when not ADR-1663's plain glow)
+    floatField("ball/look", "Look", 0.0f, 2.0f, 0.0f, 2.0f,
+               +[](const E& e) { return static_cast<float>(e.wave.propagation.ball.look); },
+               +[](E& e, float v) { e.wave.propagation.ball.look = std::clamp(static_cast<int>(std::lround(v)), 0, 2); })
+        .json("propagation/ball/look").fmt("%.0f")
+        .tooltip("0: a glow (core, corona, trail). 1: a flame billboard, blackbody-coloured. 2: volumetric-lite fire.")
+        .writtenWhen(+[](const E& e) { return isLightBall(e) && e.wave.propagation.ball.look != 0; }),
+    floatField("ball/smoke", "Smoke", 0.0f, 1.0f, 0.0f, 1.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.smoke),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.smoke)).json("propagation/ball/smoke")
+        .tooltip("Looks 1 and 2: a sooty rim and a smoke trail that dim what is behind them.")
+        .writtenWhen(+[](const E& e) { return isLightBall(e) && e.wave.propagation.ball.smoke != 0.0f; }),
+    floatField("ball/embers", "Embers", 0.0f, 1.0f, 0.0f, 1.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.embers),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.embers)).json("propagation/ball/embers")
+        .tooltip("Looks 1 and 2: glowing sparks shed along the trail.")
+        .writtenWhen(+[](const E& e) { return isLightBall(e) && e.wave.propagation.ball.embers != 0.0f; }),
     floatField("response/ground", "Ground", 0.0f, 6.0f, 0.0f, 2.0f, AVGEN_WAVE_GET(e.wave.response.ground),
                AVGEN_WAVE_SETF(e.wave.response.ground)).json("response/ground").sec("Surface response")
         .floorAt(0.0f),

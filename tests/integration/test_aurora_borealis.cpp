@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -197,8 +198,8 @@ TEST_CASE("Aurora Borealis: every musical input is a conditioned signal; routes 
             CHECK_FALSE(r.contains("chain"));
         }
         for (const char* n : {"cloudSwell", "cloudHue", "cloudShape", "crashStarEv", "ballAEv", "ballBEv", "kickBeamEv",
-                              "snareBeamEv", "moogNote", "moogGlow", "tomHit", "tomHitEv", "bassNoteEv", "bassGlow",
-                              "auroraLight"}) {
+                              "snareBeamEv", "moogNote", "moogStrike", "moogHold", "tomHit", "tomHitEv", "bassNoteEv",
+                              "bassStrike", "bassHold", "auroraLight"}) {
             INFO(n);
             CHECK(names.contains(n));
         }
@@ -295,20 +296,40 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
     CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
     CHECK(fx.at("riverToms").at("parameters").at("propagation").at("path").at("laneJitter").get<double>() > 0.0);
-    // the mountain sweeps (pass 4): the Moog's glints run down the left range and the bass's planes down the right, a
-    // band of camera distance whose position a ramp restarting on their notes drives (look.py SWEEP_*)
+    // the mountains (pass 5): the Moog on the left bank and the bass on the right -- every note opens its subset's gate
+    // (`<part>Strike`), the sustain holds it and lights the bank's ridgelines (`<part>Hold` onto edgeGlow), and a
+    // fresh subset per note (random.<part>Pick); no travelling band any more
     {
-        std::set<std::string> swept;
+        std::set<std::string> wired;
         for (const json& r : p.at("routes")) {
             const std::string target = r.at("target");
-            if (target.find("abRockL") != std::string::npos && r.at("source") == "signal.moogSweep") {
-                swept.insert("moog");
-            }
-            if (target.find("abRockR") != std::string::npos && r.at("source") == "signal.bassSweep") {
-                swept.insert("bass");
+            const std::string source = r.at("source");
+            CHECK(source.find("Sweep") == std::string::npos);
+            for (const auto& [part, prog] : std::map<std::string, std::string>{{"moog", "abRockL"}, {"bass", "abRockR"}}) {
+                if (target.find(prog) == std::string::npos) {
+                    continue;
+                }
+                // the gate opens downward (its smoothstep's edges lowered), the ridgelines' glow rises
+                const double amount = r.at("amount").get<double>();
+                const bool gate = target.find("/smoothstep/") != std::string::npos && amount < 0.0;
+                if (source == "signal." + part + "Strike" && gate) {
+                    wired.insert(part + " strike");
+                }
+                if (source == "signal." + part + "Hold" && gate) {
+                    wired.insert(part + " hold");
+                }
+                if (source == "signal." + part + "Hold" && target.find("/constant/") != std::string::npos &&
+                    amount > 0.0) {
+                    wired.insert(part + " ridges");
+                }
             }
         }
-        CHECK(swept == std::set<std::string>{"moog", "bass"});
+        CHECK(wired == std::set<std::string>{"moog strike", "moog hold", "moog ridges", "bass strike", "bass hold",
+                                             "bass ridges"});
+    }
+    // the static camera (pass 5, the owner: "static camera"): no timeline track moves it
+    for (const json& tr : p.at("timeline").at("tracks")) {
+        CHECK(tr.at("target").get<std::string>().rfind("camera/", 0) != 0);
     }
     // the fireballs replace the stars (pass 4, ADR-1663)
     CHECK_FALSE(fx.contains("starA"));
@@ -318,6 +339,8 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
         CHECK(fx.at(id).at("parameters").at("propagation").at("kind") == "ball");
         CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("launch").at(2).get<double>() < 0.0); // behind
         CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("coronaIntensity").get<double>() > 0.0);
+        // pass 5 (ADR-1665): a realistic fireball, its look not ADR-1663's glow
+        CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("look").get<double>() >= 1.0);
         CHECK(fx.at(id).at("trigger").at("name") == std::string("signal.") + id + "Ev");
         CHECK(fx.at(id).at("timing").at("lifetime").get<double>() > 0.0);
     }
@@ -355,7 +378,8 @@ TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce rese
     checkEvents(ev("tomHitEv"), toms, 0.006);
     CHECK(ev("blockTickEv").size() == 176);
     // the Moog (pass 4, the owner: every trill): every onset of its stem, none in its opening silence (it plays from
-    // 3.54 s), with the 50 ms refractory: 346 on Sabertooth; each its own subset
+    // 3.54 s): 346 on Sabertooth (the detector's own 60 ms floor binds before the 35 ms refractory); each its own
+    // subset
     {
         const std::vector<double> trills = ev("moogNoteEv");
         INFO(trills.size() << " Moog onsets");
@@ -364,18 +388,17 @@ TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce rese
         REQUIRE_FALSE(trills.empty());
         CHECK(trills.front() > 3.5);
         for (std::size_t i = 1; i < trills.size(); ++i) {
-            CHECK(trills[i] - trills[i - 1] >= 0.049);
+            CHECK(trills[i] - trills[i - 1] >= 0.034);
         }
     }
-    // the bass (pass 4, the right range): its stem's onsets, a 100 ms refractory (215 on Sabertooth; precision 0.91
-    // against the stem's level rises)
+    // the bass (pass 4-5, the right bank): its stem's onsets, a 60 ms refractory (pass 5: 222 on Sabertooth)
     {
         const std::vector<double> bass = ev("bassNoteEv");
         INFO(bass.size() << " bass notes");
-        CHECK(bass.size() >= 200);
-        CHECK(bass.size() <= 230);
+        CHECK(bass.size() >= 205);
+        CHECK(bass.size() <= 240);
         for (std::size_t i = 1; i < bass.size(); ++i) {
-            CHECK(bass[i] - bass[i - 1] >= 0.099);
+            CHECK(bass[i] - bass[i - 1] >= 0.059);
         }
     }
     // the kicks on the Kick-fed grid (85.49 BPM, every kick on a 16th): a constant offset, no drift (21 s7 risk 2)
@@ -405,6 +428,18 @@ TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce rese
         INFO(n);
         CHECK(steps[steps.size() * 99 / 100] < lim);
     }
+}
+
+TEST_CASE("Aurora Borealis: no fish breaks the lake's surface", "[examples][aurora-borealis]") {
+    // pass 5 (the owner: "some of them stick out of the water make sure that doesnt happen"): world.py clamps every
+    // fish -- back, fins, tail -- at least 1.5 m under the surface (the fish are static: no swim motion moves them);
+    // its check recomputes them all from the generator and fails when any vertex is above that
+    if (std::system("python3 --version >/dev/null 2>&1") != 0) {
+        SKIP("python3 is not available");
+    }
+    const std::filesystem::path script = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples/aurora-borealis/world.py";
+    const std::string cmd = "python3 \"" + script.string() + "\" --check-fish >/dev/null 2>&1";
+    CHECK(std::system(cmd.c_str()) == 0);
 }
 
 TEST_CASE("Aurora Borealis: the Feline Footwear version's beams follow the drum classes",

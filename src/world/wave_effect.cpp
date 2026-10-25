@@ -175,10 +175,13 @@ Result<void> Propagation::validate() const {
     if (kind == PropagationKind::LightBall) {
         const BallShape& b = ball;
         for (const float v : {b.travel, b.arc, b.lightRadius, b.range, b.coreSize, b.haloSize, b.coronaIntensity,
-                              b.coronaSize, b.flicker, b.trail, b.spread}) {
+                              b.coronaSize, b.flicker, b.trail, b.spread, b.smoke, b.embers}) {
             if (!(v >= 0.0f) || !finite(v)) {
                 return fail("a light ball's flight and sizes must be finite and not negative");
             }
+        }
+        if (b.look < 0 || b.look > 2 || b.smoke > 1.0f || b.embers > 1.0f) {
+            return fail("a light ball's look is 0, 1 or 2, and its smoke and embers are 0..1");
         }
         if (!(b.travel > 0.0f) || !(b.lightRadius > 0.0f) || !(b.range > 0.0f)) {
             return fail("a light ball's travel, light radius and range must be positive");
@@ -806,6 +809,7 @@ std::optional<ResolvedWave> resolveBallFront(const EffectInstance& instance, con
     r.axis = safeNormalize(ahead - r.origin, safeNormalize(p1 - p0, fwd));
     r.frontDistance = glm::distance(p0, r.origin);
     r.color = e.appearance.color;
+    r.launchSecond = window.start;
     return r;
 }
 
@@ -1024,6 +1028,11 @@ WaveGpu packWave(const ResolvedWave& r) {
         g.edge = glm::vec4(e.appearance.edgeColor * e.appearance.edgeIntensity * r.envelope, b.coreSize * w);
         g.rainbow = glm::vec4(b.coronaColor * b.coronaIntensity * r.envelope, b.coronaSize * w);
         g.sparkle = glm::vec4(0.0f);
+        // ADR-1665: the look, its smoke and embers, and a per-hit seed (the launch second), all 0 for look 0
+        if (b.look != 0) {
+            g.extra = glm::vec4(static_cast<float>(b.look), b.smoke * r.envelope, b.embers,
+                                static_cast<float>(std::fmod(r.launchSecond, 97.0)));
+        }
     }
     return g;
 }

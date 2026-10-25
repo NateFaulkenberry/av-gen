@@ -4,13 +4,13 @@ Pass 3 (docs/prototypes/aurora-borealis/20-brief-sabertooth.md, 21-research-pass
 instrument has its own place in the frame.
 
   sky     Cloud Diving   signal.cloudSwell (300/1200 ms) and signal.cloudHue (1500/4000 ms) -> the aurora
-          Crash          signal.crashStarEv -> a ball of light thrown into the canyon (ballA / ballB, a pool of two)
-  left    Moog           signal.moogNote (every onset, sized by level) + signal.moogGlow -> fronts down the left range,
-                         crease glints
-  river   Kick           signal.kickBeamEv -> the magenta river beam (riverKick)
+          Crash          signal.crashStarEv -> a fireball thrown over the lake (ballA / ballB, a pool of two)
+  left    Moog           signal.moogStrike (every note, sized by level) + signal.moogHold (the sustain) -> picked
+                         creases as wide lines and filled planes, every ridgeline glowing with the level
+  lake    Kick           signal.kickBeamEv -> the magenta river beam (riverKick)
           Snare          signal.snareBeamEv -> the lilac twin beam (riverSnare)
           Toms           signal.tomHitEv -> the violet beam (riverToms), each hit in its own lane
-  right   Bass           signal.bassNote (onset, sized) + signal.bassGlow -> fronts down the right range, plane flashes
+  right   Bass           signal.bassStrike + signal.bassHold -> plane flashes with lines, ridgelines glowing
           (pass 4: the toms keep only their river lane; the tone block is unassigned -- its signals stay, unrouted)
 
 Every transient is `stem.<key>.onset` (or the Moog's rms rise) into a latch with attack 0 and its own refractory: no
@@ -133,20 +133,30 @@ def onset_event(name, onset, refr_ms, life_s, part, size=None):
     ]
 
 
-def sweep_signals(name, onset):
-    """A note's sweep down a range: `<name>Trail`, a latch restarting on an onset and falling over 1.0 s (it holds the
-    subset's gate open while the band runs), and `<name>Sweep` = 1 - trail, the band's position, 0 at the camera on the
-    note and 1 far down the valley -- where it rests between notes, its gate closed."""
+import os as _os
+SOFT = {"moog": float(_os.environ.get("AB_SOFT_MOOG", "0.9")), "bass": float(_os.environ.get("AB_SOFT_BASS", "0.9"))}
+
+
+def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay_ms, soft):
+    """Pass 5 (the owner: the Moog and bass "need to be more sensitive hit more notes and sustain if the moog sustains").
+    Three signals per instrument, besides its `<name>Note` (the stem's onsets, picking the subset):
+      `<name>Soft`    the softer notes the onset detector does not call: the stem's onset strength (its spectral flux
+                      over the detector's threshold) gated at `soft` (< 1: below the detector's own line), latched on
+                      each rise past it with the same refractory, sized by the stem's level
+      `<name>Strike`  every note: the larger of the two
+      `<name>Hold`    the sustain: the stem's level, following each note up in 5 ms and down as it decays, so while a
+                      note rings the light holds and as it fades the light fades with it; 0 in silence"""
     if not onset:
-        return [sig(name + "Trail", []), sig(name + "Sweep", [{"constant": 1.0}])]
-    # a sweep runs its whole length before the next note can restart it (a trill, ten notes a second, would otherwise
-    # keep it at the camera): while the part keeps playing, sweep follows sweep down the valley, its glints re-picked
-    # on every note
-    restart = {"threshold": "binary", "thresholdLevel": 0.01, "attackMs": 0.0, "envelope": "linearfall",
-               "envelopeFallPerSecond": 1.0 / 1.0, "envelopeRefractoryMs": 1000.0}
-    return [sig(name + "Trail", [inp(onset, restart, part=name)]),
-            sig(name + "Sweep", [{"constant": 1.0}, inp("signal.%sTrail" % name, amount=-1.0)], combine="sum",
-                chain=UNIT)]
+        return [sig(name + "Soft", []), sig(name + "Strike", []), sig(name + "Hold", [])]
+    strike_latch = {"threshold": "gate", "thresholdLevel": soft, "attackMs": 0.0, "envelope": "linearfall",
+                    "envelopeFallPerSecond": soft / life_s, "envelopeRefractoryMs": float(refr_ms),
+                    "envelopeRearm": 0.5 * soft, **remap(0.0, soft)}
+    lo, hi = hold_range
+    return [
+        sig(name + "Soft", [inp(src + ".onsetStrength", strike_latch, depthSource=size, depthMin=0.0, depthMax=1.0)]),
+        sig(name + "Strike", [inp("signal.%sNote" % name), inp("signal.%sSoft" % name)], combine="max"),
+        sig(name + "Hold", [inp(src + ".rms", dict(remap(lo, hi), attackMs=5.0, decayMs=hold_decay_ms), part=name)]),
+    ]
 
 
 def sources(song):
@@ -200,17 +210,14 @@ def sources(song):
     # ---- river: Kick and Snare (A s3.2): the onset with a 100 ms refractory (the snare double-fires on 40 of 48)
     out += onset_event("kickBeam", onset("kick"), 100.0, 0.25, "kick")
     out += onset_event("snareBeam", onset("snare"), 100.0, 0.25, "snare")
-    # ---- left: Moog. Pass 4 (owner: "really hitting all the little trills"): every onset of the Moog stem (346 on
-    # Sabertooth, none in its opening silence; trill notes about 0.1 s apart) lights a fresh subset (random.moogPick),
-    # sized by the stem's level at the hit, so a loud passage lights more facets, brighter; the level keeps a gentle
-    # glow between hits and is 0 in silence
-    out += [sig("moogSize", [inp(s("moog", "rms"), dict(**remap(0.04, 0.22, 0.25, 1.0), **size_hold()), part="moog")]
+    # ---- left: Moog. Every onset of the Moog stem (35 ms apart at most: trill notes come about 0.1 s apart) picks a
+    # fresh subset (random.moogPick), sized by the stem's level at the hit; pass 5 adds the softer notes, the strike
+    # (both) and the sustain (note_signals)
+    out += [sig("moogSize", [inp(s("moog", "rms"), dict(**remap(0.04, 0.22, 0.35, 1.0), **size_hold()), part="moog")]
                 if src["moog"] else [])]
-    out += onset_event("moogNote", onset("moog"), 50.0, 0.18, "moog", size="signal.moogSize")
-    out += [sig("moogGlow", [inp(s("moog", "level"), {"attackMs": 10.0, "decayMs": 200.0}, part="moog")])]
-    # the sweep down the left range (pass 4): a 0.7 s latch restarting on each note (the trail keeps its subset's gate
-    # open while it runs), and the ramp 1 - latch the band's position follows
-    out += sweep_signals("moog", onset("moog"))
+    out += onset_event("moogNote", onset("moog"), 35.0, 0.2, "moog", size="signal.moogSize")
+    out += note_signals("moog", src["moog"], onset("moog"), 35.0, 0.2, "signal.moogSize", (0.02, 0.2), 150.0,
+                        SOFT["moog"])
     # ---- right: Toms (28 notes in six fills, peak 0.15-0.41 -> size 0.4-1.3) and tone block (176 accents, peak
     # 0.34-0.55 -> size 0.5-1.0); each size scales its hit, and the part's knob scales the size
     out += [sig("tomSize", [inp(s("toms", "peak"), dict(**remap(0.15, 0.41, 0.4, 1.3), **size_hold()), part="toms")]
@@ -221,16 +228,14 @@ def sources(song):
             sig("blockSize", [inp(s("toneblock", "peak"), dict(**remap(0.34, 0.55, 0.5, 1.0), **size_hold()),
                                   part="toneblock")] if src["toneblock"] else [])]
     out += onset_event("blockTick", onset("toneblock"), 80.0, 0.16, "toneblock", size="signal.blockSize")
-    # ---- right: BASS (pass 4, the owner's final revision: "change the right side mountains response to BASS.wav"). Each
-    # note (the stem's onset, 100 ms refractory: 215 fires on Sabertooth, precision 0.91) launches a front down the
-    # right range and lights a fresh set of planes, sized by the stem's level; the level holds a restrained glow while
-    # a note rings
-    out += [sig("bassSize", [inp(s("bass", "rms"), dict(**remap(0.06, 0.3, 0.3, 1.0), **size_hold()), part="bass")]
+    # ---- right: BASS (pass 4, the owner's final revision: "change the right side mountains response to BASS.wav";
+    # pass 5: more sensitive, sustaining). Each note (the stem's onset, now 60 ms apart at most) lights a fresh set of
+    # planes, sized by the stem's level; the softer notes and the sustain as the Moog's (note_signals)
+    out += [sig("bassSize", [inp(s("bass", "rms"), dict(**remap(0.06, 0.3, 0.35, 1.0), **size_hold()), part="bass")]
                 if src["bass"] else [])]
-    out += onset_event("bassNote", onset("bass"), 100.0, 0.3, "bass", size="signal.bassSize")
-    out += [sig("bassGlow", [inp(s("bass", "level"), {"attackMs": 20.0, "decayMs": 300.0}, part="bass")]
-                if src["bass"] else [])]
-    out += sweep_signals("bass", onset("bass"))
+    out += onset_event("bassNote", onset("bass"), 60.0, 0.3, "bass", size="signal.bassSize")
+    out += note_signals("bass", src["bass"], onset("bass"), 60.0, 0.3, "signal.bassSize", (0.04, 0.3), 220.0,
+                        SOFT["bass"])
     # ---- the light the land and river take from the aurora: the swell alone (B s3), no drum or bass share
     out += [sig("auroraLight", [inp("signal.cloudSwell", amount=0.75)], chain=UNIT)]
     # ---- subsets
@@ -239,14 +244,8 @@ def sources(song):
         {"kind": "random", "name": "moogPick", "settings": {"trigger": "signal.moogNoteEv", "seed": 23}},
         # a new set of right-bank planes per bass note (the k-th note's value is fixed by the seed: seek equals play)
         {"kind": "random", "name": "bassPick", "settings": {"trigger": "signal.bassNoteEv", "seed": 17}},
-        # the tone block steps through one bar: a repeated pattern lights the same sequence of facets
-        {"kind": "lfo", "name": "barSaw", "settings": {"shape": "saw"}},
     ]
     return out
-
-
-def lfo_parameters():
-    return {"sources/barSaw/beatSync": True, "sources/barSaw/beatsPerCycle": 4.0}
 
 
 def R(src, target, amount):
@@ -302,5 +301,4 @@ def apply(doc, song="sabertooth"):
     doc["sources"] = sources(song)
     doc["routes"] = routes()
     doc["control"] = control()
-    doc["parameters"].update(lfo_parameters())
     doc["palette"]["position"] = look.REST_POSITION   # silence: between dusk indigo and the violet veil

@@ -262,11 +262,201 @@ struct EntityFx {
 // FXL's `fxA`/`fxB` (the struct is 448 of its 512-byte slot). Four remain, so ADR-135's `tiering`
 // lane still fits without growing the stride. (ADR-1071 then took the last three; ADR-1143 grew the
 // stride to 768 bytes, so a per-draw tier lane now fits again.)
+// ---- ADR-1665: a realistic fireball (looks 1 and 2 of a light ball; look 0 is ADR-1663's glow, untouched) ----------
+// Research: docs/prototypes/aurora-borealis/41-research-pass5-fireball.md. A fire's light is soot glowing by its
+// temperature, so the colour is a blackbody ramp keyed to a temperature field -- white-yellow at the core, orange,
+// deep red, then soot that no longer glows and only absorbs (the dark edge) -- and the shape is domain-warped fbm
+// (fbm(p + fbm(p))) advected backwards along the flight, so tongues of flame lick off the ball and stream behind it.
+fn fireHash3(p: vec3<f32>) -> f32 {
+    var q = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+    q = q + dot(q, q.yzx + 33.33);
+    return fract((q.x + q.y) * q.z);
+}
+
+fn fireNoise3(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(fireHash3(i), fireHash3(i + vec3<f32>(1.0, 0.0, 0.0)), u.x);
+    let b = mix(fireHash3(i + vec3<f32>(0.0, 1.0, 0.0)), fireHash3(i + vec3<f32>(1.0, 1.0, 0.0)), u.x);
+    let c = mix(fireHash3(i + vec3<f32>(0.0, 0.0, 1.0)), fireHash3(i + vec3<f32>(1.0, 0.0, 1.0)), u.x);
+    let d = mix(fireHash3(i + vec3<f32>(0.0, 1.0, 1.0)), fireHash3(i + vec3<f32>(1.0, 1.0, 1.0)), u.x);
+    return mix(mix(a, b, u.y), mix(c, d, u.y), u.z);
+}
+
+// 0..1, `octaves` of value noise
+fn fireFbm3(p: vec3<f32>, octaves: i32) -> f32 {
+    var q = p;
+    var amp = 0.5;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var i = 0; i < octaves; i = i + 1) {
+        sum = sum + amp * fireNoise3(q);
+        norm = norm + amp;
+        q = q * 2.03 + vec3<f32>(1.7, 9.2, 3.1);
+        amp = amp * 0.5;
+    }
+    return sum / norm;
+}
+
+// The blackbody ramp of a flame, by a 0..1 temperature: soot black, deep red, orange, yellow, white-yellow; its
+// radiance rises steeply with the temperature (Stefan-Boltzmann's T^4, softened), so the core outshines the rim.
+fn fireRamp(temperature: f32) -> vec3<f32> {
+    let t = clamp(temperature, 0.0, 1.0);
+    var c = mix(vec3<f32>(0.0), vec3<f32>(0.42, 0.025, 0.0), smoothstep(0.0, 0.22, t));
+    c = mix(c, vec3<f32>(1.0, 0.30, 0.02), smoothstep(0.2, 0.48, t));
+    c = mix(c, vec3<f32>(1.0, 0.70, 0.18), smoothstep(0.45, 0.75, t));
+    c = mix(c, vec3<f32>(1.0, 0.94, 0.80), smoothstep(0.72, 1.0, t));
+    return c * (0.08 + 1.6 * t * t * t);
+}
+
+// One fireball (look 1 or 2) along the ray: rgb its emitted radiance, a the transmittance of its soot (what is behind
+// it keeps this share of its light).
+fn waveBallFire(e: Wave, ro: vec3<f32>, rd: vec3<f32>, maxT: f32) -> vec4<f32> {
+    let c0 = e.originKind.xyz;
+    let t = dot(c0 - ro, rd);
+    let trail = e.vertical.x;
+    let corona = e.rainbow.w;
+    let reach = max(corona * 3.0, trail * 1.4 + corona * 2.0);
+    if (t <= -reach || t > maxT + reach) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    let look = e.extra.x;
+    let smoke = e.extra.y;
+    let embers = e.extra.z;
+    let seed = e.extra.w;
+    let tt = e.vertical.z;
+    let gain = max(e.rainbow.r, max(e.rainbow.g, e.rainbow.b));     // the corona's intensity x the envelope
+    let hot = max(e.edge.r, max(e.edge.g, e.edge.b));                // the core's
+    let back = -e.axisFront.xyz;
+    let tc = max(t, 1.0);
+    let core = clamp(e.edge.w, tc * 0.0012, max(tc * 0.08, tc * 0.0012));
+    let R = min(max(corona, core * 2.0), max(tc * 0.25, core * 2.0));
+    var emit = vec3<f32>(0.0);
+    var trans = 1.0;
+    if (look < 1.5) {
+        // look 1, the flame billboard: the plane through the ball across the ray, in the ball's radii
+        if (t > 0.0 && t <= maxT + R) {
+            let q = ro + rd * t;
+            var bx = cross(rd, vec3<f32>(0.0, 1.0, 0.0));
+            bx = select(vec3<f32>(1.0, 0.0, 0.0), normalize(bx), dot(bx, bx) > 1.0e-6);
+            let by = cross(bx, rd);
+            let v = (q - c0) / R;
+            let p2 = vec2<f32>(dot(v, bx), dot(v, by));
+            let bk = vec2<f32>(dot(back, bx), dot(back, by));
+            let bl = length(bk);
+            let b2 = select(vec2<f32>(0.0, -1.0), bk / max(bl, 1.0e-4), bl > 1.0e-3);
+            let along = dot(p2, b2);
+            // the flames stream back: the far side of the ball along the flight is drawn out
+            let ps = p2 - b2 * max(along, 0.0) * 0.55 * min(bl * 1.5, 1.0);
+            // flame tongues: domain-warped fbm (two warp fields, then the flame field), scrolling back along the flight
+            // and boiling with time; about two tongues across the ball's radius
+            // (in 3D, the ball's own frame: a scroll in the screen plane turned with the view and fanned into rays
+            // round the point where the flight heads straight away)
+            let P = v * 1.5 - back * tt * 1.6 + vec3<f32>(seed, tt * 0.9, 0.37 * seed);
+            let w = vec2<f32>(fireFbm3(P * 0.9, 2), fireFbm3(P * 0.9 + vec3<f32>(5.2, 1.3, 2.8), 2)) - 0.5;
+            let n = fireFbm3(P + vec3<f32>(w.x * 1.8, w.y * 1.8, (w.x - w.y) * 1.2), 3);
+            let r = length(ps);
+            // temperature: hot at the heart, cooling outward, the noise pushing tongues of heat out and pockets in
+            let temp = clamp(1.1 - r * 1.25 + 1.1 * (n - 0.5), 0.0, 1.0);
+            emit = fireRamp(temp) * gain;
+            // soot: the cool fringe of the flames, dark and billowing, mostly on the trailing side
+            let fringe = smoothstep(0.02, 0.12, temp) * (1.0 - smoothstep(0.12, 0.3, temp));
+            let soot = smoke * (0.25 + 0.75 * smoothstep(-0.2, 0.6, along)) * (0.5 * fringe +
+                       0.6 * smoothstep(1.5, 0.8, r) * (1.0 - smoothstep(0.0, 0.1, temp)) * n);
+            trans = 1.0 - clamp(soot, 0.0, 0.8);
+        }
+    } else if (look < 2.5) {
+        // look 2, volumetric-lite: ten steps through a sphere that holds a teardrop of 3D domain-warped noise
+        let Rb = R * 1.6;
+        let oc = ro - c0;
+        let b = dot(oc, rd);
+        let h = b * b - (dot(oc, oc) - Rb * Rb);
+        if (h > 0.0) {
+            let sh = sqrt(h);
+            let t0 = max(-b - sh, 0.0);
+            let t1 = min(-b + sh, maxT);
+            if (t1 > t0) {
+                let steps = 10;
+                let dt = (t1 - t0) / f32(steps);
+                for (var i = 0; i < steps; i = i + 1) {
+                    let p = (ro + rd * (t0 + (f32(i) + 0.5) * dt) - c0) / R;
+                    let along = dot(p, back);
+                    let ps = p - back * max(along, 0.0) * 0.45;
+                    let P = p * 1.3 - back * tt * 1.6 + vec3<f32>(seed, 0.37 * seed, tt * 0.45);
+                    let wv = fireFbm3(P * 0.7 + vec3<f32>(3.1, 7.7, 1.9), 2) - 0.5;
+                    let n = fireFbm3(P + vec3<f32>(wv * 2.2, -wv * 1.6, wv * 1.9), 3);
+                    let r = length(ps);
+                    // a billowing body, gone by 1.2 radii (the march's sphere is 1.6), so no edge shows
+                    let dens = smoothstep(1.15, 0.45, r + 0.6 * (n - 0.5));
+                    let temp = clamp(1.05 - r * 1.3 + 1.0 * (n - 0.5), 0.0, 1.0);
+                    let k = dens * dt / R;
+                    emit = emit + trans * fireRamp(temp) * k * 0.9;
+                    // the cool, sooty parts absorb (the dark edge), mostly on the trailing side
+                    let sooty = (1.0 - smoothstep(0.08, 0.3, temp)) * (0.3 + 0.7 * smoothstep(-0.3, 0.5, along));
+                    trans = trans * exp(-k * (0.25 + smoke * 2.2 * sooty));
+                }
+                emit = emit * gain;
+            }
+        }
+    }
+    // the white-hot heart, as the plain ball draws it
+    if (t > 0.0 && t <= maxT) {
+        let d = distance(c0, ro + rd * t);
+        let cc = d / core;
+        emit = emit + e.edge.rgb * (0.35 * exp(-cc * cc));
+    }
+    // the trail: a string of soft puffs behind the ball -- flame near it cooling down the ramp, then soot growing as it
+    // falls back -- each by how close the ray passes it (well-defined from every side, end-on included), then embers
+    if (trail > 0.0) {
+        let u = back;
+        for (var k = 1; k < 7; k = k + 1) {
+            let f = f32(k) / 6.0;
+            let hk = fireHash3(vec3<f32>(f32(k), seed, 7.0));
+            let wob = fireFbm3(vec3<f32>(f32(k) * 1.3 - tt * 2.0, seed, tt * 0.6), 2) - 0.5;
+            let side = normalize(cross(u, vec3<f32>(0.3, 1.0, 0.2)));
+            let p = c0 + u * (f * trail) + side * wob * R * 0.8 + vec3<f32>(0.0, f * f * R * 0.5, 0.0);
+            let tp = dot(p - ro, rd);
+            if (tp <= 0.0 || tp > maxT) {
+                continue;
+            }
+            let rad = min(R * (0.45 + 0.7 * f), max(tp * 0.15, 0.5));
+            let dk = distance(p, ro + rd * tp) / rad;
+            let body = exp(-dk * dk * (1.6 + hk));
+            let ft = clamp(1.0 - f * 1.6, 0.0, 1.0);
+            emit = emit * mix(1.0, 1.0 - 0.6 * smoke, body * smoothstep(0.3, 0.8, f)) +
+                   fireRamp(0.72 * ft) * gain * body * ft * ft * 0.8;
+            trans = trans * (1.0 - clamp(smoke * 0.45 * body * smoothstep(0.2, 0.6, f), 0.0, 0.6));
+        }
+        if (embers > 0.0) {
+            for (var k = 0; k < 10; k = k + 1) {
+                let fk = f32(k);
+                let h1 = fireHash3(vec3<f32>(fk, seed, 1.0));
+                let h2 = fireHash3(vec3<f32>(fk, seed, 2.0));
+                let h3 = fireHash3(vec3<f32>(fk, seed, 3.0));
+                let life = fract(h1 + tt * (0.5 + 0.5 * h2));
+                let side = normalize(cross(u, vec3<f32>(h2 - 0.5, 1.0, h3 - 0.5)));
+                let p = c0 + u * (life * trail * 1.2 + R * 0.6) + side * (h3 - 0.5) * R * (0.6 + 2.0 * life) +
+                        vec3<f32>(0.0, -life * life * R * 1.5, 0.0);
+                let tp = dot(p - ro, rd);
+                if (tp > 0.0 && tp < maxT) {
+                    let dp = distance(p, ro + rd * tp) / max(tp * 0.0016, 0.5);
+                    emit = emit + fireRamp(0.85 - 0.6 * life) * gain * embers * 1.5 * (1.0 - life) * exp(-dp * dp);
+                }
+            }
+        }
+    }
+    return vec4<f32>(emit, trans);
+}
+
 // ADR-1663: the visible ball of a light-ball wave, seen along the ray `ro + rd t` for t in (0, maxT): a tight core and a
 // soft glow by how close the ray passes the ball. Shared by the surfaces (wave_effects.wgsl, maxT = the surface's
 // distance, so the ball is hidden behind what it flies behind) and the sky (atmosphere_fx.wgsl, unbounded). The core
 // never shrinks under about a pixel and a half at 1080p, so a far ball does not vanish.
 fn waveBallGlow(e: Wave, ro: vec3<f32>, rd: vec3<f32>, maxT: f32) -> vec3<f32> {
+    if (e.extra.x > 0.5) { // ADR-1665: a fireball's look (its soot dims only the sky's aurora: wavesBallSkyFx)
+        return waveBallFire(e, ro, rd, maxT).rgb;
+    }
     let t = dot(e.originKind.xyz - ro, rd);
     let trail = e.vertical.x;
     let corona = e.rainbow.w;
@@ -318,13 +508,19 @@ fn waveBallGlow(e: Wave, ro: vec3<f32>, rd: vec3<f32>, maxT: f32) -> vec3<f32> {
     return out;
 }
 
-fn wavesBallSky(ro: vec3<f32>, rd: vec3<f32>) -> vec3<f32> {
-    var out = vec3<f32>(0.0);
+fn wavesBallSky(ro: vec3<f32>, rd: vec3<f32>) -> vec4<f32> {
+    // rgb the balls' radiance, a the share of the light behind them that comes through (ADR-1665's soot; 1 for look 0)
+    var out = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     let count = u32(frame.waveCount.x + 0.5);
     for (var i: u32 = 0u; i < count; i = i + 1u) {
         let e = frame.waves[i];
         if (e.originKind.w > 2.5) {
-            out = out + waveBallGlow(e, ro, rd, 1.0e9);
+            if (e.extra.x > 0.5) {
+                let f = waveBallFire(e, ro, rd, 1.0e9);
+                out = vec4<f32>(out.rgb * f.a + f.rgb, out.a * f.a);
+            } else {
+                out = vec4<f32>(out.rgb + waveBallGlow(e, ro, rd, 1.0e9), out.a);
+            }
         }
     }
     return out;

@@ -813,8 +813,10 @@ fn atmosphereSkyAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosResult
     out.bloom = max(comets.bloom, aurora.bloom);
     // ADR-1663: a light ball against the sky (its glow on surfaces is wave_effects.wgsl's)
     if (frame.waveCount.x > 0.5) {
-        let ball = wavesBallSky(ro, rd);
-        out.radiance = out.radiance + ball;
+        let balls = wavesBallSky(ro, rd);
+        let ball = balls.rgb;
+        // ADR-1665: a fireball's soot dims the aurora and comets behind it (a = 1 for ADR-1663's glow: unchanged)
+        out.radiance = out.radiance * balls.a + ball;
         out.bloom = max(out.bloom, clamp(dot(ball, vec3<f32>(0.2126, 0.7152, 0.0722)) * 0.6, 0.0, 1.0));
     }
     return out;

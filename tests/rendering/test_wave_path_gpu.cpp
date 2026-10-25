@@ -141,6 +141,24 @@ scene::Scene groundScene() {
 }
 
 // Mean luma of a 3x3 block round the pixel a ground point projects to.
+// ADR-1665: the mean colour round the pixel `p` projects to (0..255 per channel)
+glm::vec3 rgbAt(const gpu::Image8& img, const scene::Scene& s, glm::vec3 p) {
+    const glm::mat4 view = glm::lookAt(s.camera.position, s.camera.target, glm::vec3(0, 1, 0));
+    const glm::mat4 proj = glm::perspective(s.camera.effectiveFovY(), static_cast<float>(kW) / static_cast<float>(kH),
+                                            0.1f, 500.0f);
+    const glm::vec4 clip = proj * view * glm::vec4(p, 1.0f);
+    const int x = static_cast<int>((clip.x / clip.w * 0.5f + 0.5f) * static_cast<float>(kW));
+    const int y = static_cast<int>((0.5f - clip.y / clip.w * 0.5f) * static_cast<float>(kH));
+    glm::vec3 total{0.0f};
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            const std::size_t at = (static_cast<std::size_t>(y + dy) * kW + static_cast<std::size_t>(x + dx)) * 4;
+            total += glm::vec3(img.rgba[at], img.rgba[at + 1], img.rgba[at + 2]);
+        }
+    }
+    return total / 9.0f;
+}
+
 double lumaAt(const gpu::Image8& img, const scene::Scene& s, glm::vec3 p) {
     const glm::mat4 view = glm::lookAt(s.camera.position, s.camera.target, glm::vec3(0, 1, 0));
     const glm::mat4 proj = glm::perspective(s.camera.effectiveFovY(), static_cast<float>(kW) / static_cast<float>(kH),
@@ -310,6 +328,48 @@ TEST_CASE("ADR-1663: a light ball lights the ground below it and shows its core 
     CHECK(under > 4.0 * std::max(far, 1.0));
     // the core: the pixel the ball itself projects to is near white
     CHECK(lumaAt(lit, scene, glm::vec3(ball.originKind)) > 200.0);
+    scene.waves = world::WaveFrame{};
+    CHECK(gpu::hashImage(render(scene)) == gpu::hashImage(dark));
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("ADR-1665: a fireball's looks draw a warm, fire-coloured ball; with no ball the frame is as it was",
+          "[gpu][waves][adr1665]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    scene::Scene scene = groundScene();
+    const FrameTime time{.renderTime = 1.0, .deltaTime = 1.0 / 60.0, .frameIndex = 1};
+    const auto render = [&](const scene::Scene& s) {
+        auto image = renderer.renderToImage(s, time, kW, kH);
+        REQUIRE(image.has_value());
+        return std::move(*image);
+    };
+    const gpu::Image8 dark = render(scene);
+    for (const float look : {1.0f, 2.0f}) {
+        world::WaveGpu ball{};
+        ball.originKind = {-30.0f, 12.0f, 20.0f, 3.0f};
+        ball.axisFront = {0.0f, 0.0f, -1.0f, 0.0f};
+        ball.color = {0.0f, 0.0f, 0.0f, 30.0f};     // no light on the ground: the pixels are the ball's own
+        ball.edge = {4.0f, 3.5f, 2.5f, 2.0f};
+        ball.shape = {12.0f, 400.0f, 0.0f, 0.0f};
+        ball.rainbow = {1.5f, 0.55f, 0.1f, 10.0f};  // the fire's gain; its radius 10 m
+        ball.vertical = {40.0f, 0.8f, 3.0f, 0.0f};  // a 40 m trail
+        ball.response = {1.0f, 1.0f, 1.0f, 0.0f};
+        ball.extra = {look, 0.7f, 0.8f, 11.0f};
+        scene.waves.count = 1;
+        scene.waves.effects[0] = ball;
+        const gpu::Image8 lit = render(scene);
+        // the heart is white-hot; the body round it is fire: warm, not the plain ball's white glow
+        const glm::vec3 heart = rgbAt(lit, scene, glm::vec3(ball.originKind));
+        const glm::vec3 side = glm::vec3(ball.originKind) + glm::vec3(5.0f, 0.0f, 0.0f);
+        const glm::vec3 body = rgbAt(lit, scene, side) - rgbAt(dark, scene, side);   // what the fire adds there
+        INFO("look " << look << ": the heart " << heart.r << " " << heart.g << " " << heart.b << ", the body " << body.r
+                     << " " << body.g << " " << body.b);
+        CHECK(heart.r > 200.0f);
+        CHECK(body.r > body.b + 20.0f);
+    }
     scene.waves = world::WaveFrame{};
     CHECK(gpu::hashImage(render(scene)) == gpu::hashImage(dark));
     CHECK(ctx->errorCount() == 0);
