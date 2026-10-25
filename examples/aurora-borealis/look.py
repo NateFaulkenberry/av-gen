@@ -215,7 +215,7 @@ def environment():
 
 
 # ---- the aurora ----------------------------------------------------------------------------------------------------
-RIBBONS = {"ribbons": True, "ribbonAltitude": 1000.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
+RIBBONS = {"ribbons": True, "ribbonAltitude": 1500.0, "ribbonScale": 4500.0, "ribbonWidth": 0.045, "ribbonSwirl": 1.9,
            "ribbonEdge": 0.3, "ribbonSteps": 48.0, "ribbonDistance": 24000.0, "ribbonCoverage": 0.75,
            # E3's travelling kick front, gentler than its default 2x so the kick stays under the flash budget
            "pulseGain": 1.0, "pulseThicken": 0.3}

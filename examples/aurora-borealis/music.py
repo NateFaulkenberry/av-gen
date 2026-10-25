@@ -229,7 +229,6 @@ def routes():
         R("signal.cloudSwell", A + "ribbonWidth", 0.012),
         R("signal.cloudChurn", A + "ribbonChurn", 9.0),
         R("signal.cloudSwell", A + "ribbonSwirl", 2.4),
-        R("signal.cloudSwell", A + "ribbonEdge", 0.35),
         R("signal.cloudSwell", A + "turbulence", 0.6),
         R("signal.cloudSwell", A + "filaments", 1.5),
         R("signal.cloudSwell", A + "edgeBrightness", 1.5),

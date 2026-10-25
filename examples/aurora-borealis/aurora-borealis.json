@@ -184,7 +184,7 @@
      "waveAmplitude": 0.5,
      "waveScale": 4.0,
      "ribbons": true,
-     "ribbonAltitude": 1000.0,
+     "ribbonAltitude": 1500.0,
      "ribbonScale": 4500.0,
      "ribbonWidth": 0.045,
      "ribbonSwirl": 1.9,
@@ -13461,13 +13461,6 @@
    "source": "signal.cloudSwell",
    "target": "fx/aurora/ribbonSwirl",
    "amount": 2.4,
-   "op": "add",
-   "polarity": "unipolar"
-  },
-  {
-   "source": "signal.cloudSwell",
-   "target": "fx/aurora/ribbonEdge",
-   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar"
   },
