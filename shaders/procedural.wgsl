@@ -971,6 +971,17 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     return procShade(in, frontFacing);
 }
 
+// ADR-905: the emissive field's gain on everything a surface emits (1 with no field). One call site of the field
+// evaluator for the fragment stage (ADR-1561), shared by fs_proc's procShade and fs_proc_unlit.
+fn procEmissionField(worldPos: vec3<f32>, element: f32) -> f32 {
+    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
+    if (emissiveSlot < 0) {
+        return 1.0;
+    }
+    fieldElement = element; // ADR-1116
+    return 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, worldPos);
+}
+
 // ADR-1673: the unlit fast path. A draw the renderer has proved needs none of the lit shading -- an unlit, opaque,
 // untextured material with no effect lanes, no refraction, and a program (if any) that reads no screen-space input
 // and writes no normal, occlusion or height (scene::unlitFastEligible) -- is drawn by this entry instead of fs_proc.
@@ -980,12 +991,7 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
 // pays for whether or not a draw uses them (about 4.5 ms over a frame-filling sheet at 1080p, Talking Heads stop 5).
 @fragment
 fn fs_proc_unlit(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
-    var emissionField = 1.0;
-    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
-    if (emissiveSlot >= 0) {
-        fieldElement = in.instRandom.w; // ADR-1116
-        emissionField = 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos);
-    }
+    let emissionField = procEmissionField(in.worldPos, in.instRandom.w);
     let worldPos = in.worldPos;
     var n = normalize(in.normal);
     if (!frontFacing) {
@@ -1118,12 +1124,7 @@ fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
     var info: MaterialInstanceInfo;
     // ADR-905: the emissive field is a gain on everything the surface emits, after its program --
     // the lane, not the per-channel multiplier a program's emission drops.
-    info.emissionField = 1.0;
-    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
-    if (emissiveSlot >= 0) {
-        fieldElement = in.instRandom.w; // ADR-1116
-        info.emissionField = 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos);
-    }
+    info.emissionField = procEmissionField(in.worldPos, in.instRandom.w);
     info.variation = in.variation;
     info.localPosition = in.localPos;
     info.objectId = pickIndex(object.ids.x);
