@@ -104,9 +104,16 @@ Read `--trace-finals` and the route audit: no `silent-source`, and no `macro.*` 
 
 ## 5. Cost
 
-**Probe measurements** (throwaway arms, headless, 1920x1080, `--range 1.0: --frames 360 --bench-json`, tier
-default, 2 reps): see the table filled in at the end of this section. The probe is the closest stand-in for the
-stack: about 62 k tri of subject, 4 bars, 3 programs, 3 unshadowed lights and bloom.
+**Probe measurements: not yet taken.**
+- The headless bench (`--range 1.0: --frames 360 --bench-json`, 1920x1080, P1-P3 x2) waited more than 45 minutes on
+  `tools/gpu-lock.sh` behind other agents' suites and was cancelled. It never ran.
+- The only number so far is the offline clip renders at tier `high`, including h264 encoding: P1 21.6 fps, and
+  P2/P3/P4 16.1-16.8 fps (480 frames each). That is a wall-clock throughput, not a GPU frame time, and **not
+  evidence for the budget**.
+- Run the bench first thing after the go (`probe/optical_probe.py` arms; the command is in `HANDOFF.md`).
+- The probe stack is about 62 k tri of subject, 4 bars, 3 programs, 3 unshadowed lights and bloom. It is comparable
+  to the Talking Heads probe, which measured 4-5 ms GPU p50 for a heavier stack (02-research-engine.md on
+  `scene/talking-heads`).
 
 **Budget** (GPU, 1080p, live High; the limit is 33.3 ms at 30 fps and the house target is ≤ 29.3 ms):
 
