@@ -233,6 +233,27 @@ inline constexpr EffectField kFields[] = {
     floatField("ball/haloSize", "Ball glow", 0.0f, 1000.0f, 0.0f, 200.0f,
                AVGEN_WAVE_GET(e.wave.propagation.ball.haloSize), AVGEN_WAVE_SETF(e.wave.propagation.ball.haloSize))
         .json("propagation/ball/haloSize").fmt("%.0f m").floorAt(0.0f).writtenWhen(isLightBall),
+    colorField("ball/coronaColor", "Corona colour", AVGEN_WAVE_GET(e.wave.propagation.ball.coronaColor),
+               AVGEN_WAVE_SETC(e.wave.propagation.ball.coronaColor)).json("propagation/ball/coronaColor")
+        .writtenWhen(isLightBall),
+    floatField("ball/coronaIntensity", "Corona brightness", 0.0f, 100.0f, 0.0f, 30.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.coronaIntensity),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.coronaIntensity)).json("propagation/ball/coronaIntensity")
+        .floorAt(0.0f).writtenWhen(isLightBall),
+    floatField("ball/coronaSize", "Corona size", 0.0f, 1000.0f, 0.0f, 300.0f,
+               AVGEN_WAVE_GET(e.wave.propagation.ball.coronaSize),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.coronaSize)).json("propagation/ball/coronaSize").fmt("%.0f m")
+        .floorAt(0.0f).writtenWhen(isLightBall),
+    floatField("ball/flicker", "Flicker", 0.0f, 1.0f, 0.0f, 1.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.flicker),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.flicker)).json("propagation/ball/flicker")
+        .writtenWhen(isLightBall),
+    floatField("ball/trail", "Trail", 0.0f, 2000.0f, 0.0f, 600.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.trail),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.trail)).json("propagation/ball/trail").fmt("%.0f m")
+        .floorAt(0.0f).writtenWhen(isLightBall),
+    floatField("ball/spread", "Spread", 0.0f, 5000.0f, 0.0f, 2000.0f, AVGEN_WAVE_GET(e.wave.propagation.ball.spread),
+               AVGEN_WAVE_SETF(e.wave.propagation.ball.spread)).json("propagation/ball/spread").fmt("%.0f m")
+        .floorAt(0.0f).tooltip("Each hit's target moves up to +- this to the right: its own heading.")
+        .writtenWhen(isLightBall),
     floatField("response/ground", "Ground", 0.0f, 6.0f, 0.0f, 2.0f, AVGEN_WAVE_GET(e.wave.response.ground),
                AVGEN_WAVE_SETF(e.wave.response.ground)).json("response/ground").sec("Surface response")
         .floorAt(0.0f),

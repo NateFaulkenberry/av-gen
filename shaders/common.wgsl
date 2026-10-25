@@ -268,18 +268,54 @@ struct EntityFx {
 // never shrinks under about a pixel and a half at 1080p, so a far ball does not vanish.
 fn waveBallGlow(e: Wave, ro: vec3<f32>, rd: vec3<f32>, maxT: f32) -> vec3<f32> {
     let t = dot(e.originKind.xyz - ro, rd);
-    if (t <= 0.0 || t > maxT) {
+    let trail = e.vertical.x;
+    let corona = e.rainbow.w;
+    let reach = max(max(e.shape.x, corona) * 3.0, trail + corona);
+    if (t <= -reach || t > maxT + reach) {
         return vec3<f32>(0.0);
     }
-    let d = distance(e.originKind.xyz, ro + rd * t);
-    let core = max(e.edge.w, t * 0.0012);
-    let halo = max(e.shape.x, core * 3.0);
-    if (d > halo * 3.0) {
-        return vec3<f32>(0.0);
+    var out = vec3<f32>(0.0);
+    if (t > 0.0 && t <= maxT) {
+        let q = ro + rd * t;
+        let d = distance(e.originKind.xyz, q);
+        // never under about a pixel and a half far away; never wider than ~5 degrees (core) close by, so a ball thrown
+        // past the camera enters large without filling the frame
+        let core = clamp(e.edge.w, t * 0.0012, max(t * 0.08, t * 0.0012));
+        let halo = min(max(e.shape.x, core * 3.0), max(t * 0.25, core));
+        let c = d / core;
+        let h = d / halo;
+        out = e.edge.rgb * (exp(-c * c) + 0.12 * exp(-h * h));
+        // ADR-1663: the fireball's corona, its edge flickering with time and with the angle round the core
+        if (corona > 0.0) {
+            let n = (q - e.originKind.xyz) / max(d, 1.0e-3);
+            let tt = e.vertical.z;
+            let wob = 0.5 * sin(tt * 23.0 + n.x * 7.0 + n.y * 5.0) + 0.3 * sin(tt * 37.0 + n.z * 9.0 - n.x * 4.0) +
+                      0.2 * sin(tt * 61.0 + n.y * 11.0);
+            let radius = min(max(corona, core * 2.0), max(t * 0.25, core * 2.0)) * (1.0 + 0.35 * e.vertical.y * wob);
+            let k = d / radius;
+            out = out + e.rainbow.rgb * (exp(-k * k * 1.5) + 0.25 * exp(-k * k * 0.25));
+        }
     }
-    let c = d / core;
-    let h = d / halo;
-    return e.edge.rgb * (exp(-c * c) + 0.12 * exp(-h * h));
+    // the flaming trail: a tapering glow along the segment behind the ball, by how close the ray passes it
+    if (trail > 0.0) {
+        let a = e.originKind.xyz;
+        let u = -e.axisFront.xyz;                        // back along the flight
+        let w0 = ro - a;
+        let b = dot(rd, u);
+        let dd = dot(rd, w0);
+        let ee = dot(u, w0);
+        let den = max(1.0 - b * b, 1.0e-4);
+        let sRay = clamp((b * ee - dd) / den, 0.0, maxT);
+        let sSeg = clamp((ee - b * dd) / den, 0.0, trail);
+        let gap = distance(ro + rd * sRay, a + u * sSeg);
+        let f = sSeg / trail;
+        let width = min(max(corona, e.edge.w * 3.0), max(sRay * 0.2, 1.0)) * (0.55 - 0.4 * f);
+        let g = gap / max(width, 1.0e-3);
+        if (sRay > 0.0) {
+            out = out + e.rainbow.rgb * (0.8 * pow(1.0 - f, 1.5) * exp(-g * g));
+        }
+    }
+    return out;
 }
 
 fn wavesBallSky(ro: vec3<f32>, rd: vec3<f32>) -> vec3<f32> {

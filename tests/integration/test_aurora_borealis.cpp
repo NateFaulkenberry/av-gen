@@ -196,8 +196,8 @@ TEST_CASE("Aurora Borealis: every musical input is a conditioned signal; routes 
             CHECK((source.starts_with("signal.") || subsets.contains(source)));
             CHECK_FALSE(r.contains("chain"));
         }
-        for (const char* n : {"cloudSwell", "cloudHue", "crashStarEv", "ballAEv", "ballBEv", "kickBeamEv",
-                              "snareBeamEv", "moogNote", "moogGlow", "tomHit", "tomHitEv", "tomBody", "blockTick",
+        for (const char* n : {"cloudSwell", "cloudHue", "cloudShape", "crashStarEv", "ballAEv", "ballBEv", "kickBeamEv",
+                              "snareBeamEv", "moogNote", "moogGlow", "tomHit", "tomHitEv", "bassNoteEv", "bassGlow",
                               "auroraLight"}) {
             INFO(n);
             CHECK(names.contains(n));
@@ -224,7 +224,7 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
         CHECK(c.at("rest").get<double>() == 1.0);
         parts.insert(c.at("name").get<std::string>());
     }
-    CHECK(parts == std::set<std::string>{"cloud", "crash", "moog", "kick", "snare", "toms", "toneblock"});
+    CHECK(parts == std::set<std::string>{"cloud", "crash", "moog", "kick", "snare", "toms", "toneblock", "bass"});
     bool found = false;
     for (const json& e : p.at("effects")) {
         if (e.at("type") != "aurora") {
@@ -295,12 +295,26 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
     CHECK(fx.at("riverKick").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
     CHECK(fx.at("riverSnare").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
     CHECK(fx.at("riverToms").at("parameters").at("propagation").at("path").at("laneJitter").get<double>() > 0.0);
-    // the light balls replace the stars (pass 4, ADR-1663)
+    // the mountain fronts (pass 4): the Moog's down the left range, the bass's down the right, on their notes
+    for (const auto& [id, event] : std::map<std::string, std::string>{{"moogFront", "signal.moogNoteEv"},
+                                                                      {"bassFront", "signal.bassNoteEv"}}) {
+        INFO(id);
+        REQUIRE(fx.contains(id));
+        CHECK(fx.at(id).at("trigger").at("name") == event);
+        const json& path = fx.at(id).at("parameters").at("propagation").at("path");
+        CHECK(path.at("land").get<double>() > 0.0);
+        CHECK(path.at("disturb").get<double>() == 0.0); // nothing on the water
+    }
+    CHECK(fx.at("moogFront").at("parameters").at("propagation").at("path").at("lane").get<double>() < 0.0);
+    CHECK(fx.at("bassFront").at("parameters").at("propagation").at("path").at("lane").get<double>() > 0.0);
+    // the fireballs replace the stars (pass 4, ADR-1663)
     CHECK_FALSE(fx.contains("starA"));
     for (const char* id : {"ballA", "ballB"}) {
         INFO(id);
         REQUIRE(fx.contains(id));
         CHECK(fx.at(id).at("parameters").at("propagation").at("kind") == "ball");
+        CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("launch").at(2).get<double>() < 0.0); // behind
+        CHECK(fx.at(id).at("parameters").at("propagation").at("ball").at("coronaIntensity").get<double>() > 0.0);
         CHECK(fx.at(id).at("trigger").at("name") == std::string("signal.") + id + "Ev");
         CHECK(fx.at(id).at("timing").at("lifetime").get<double>() > 0.0);
     }
@@ -348,6 +362,17 @@ TEST_CASE("Aurora Borealis: the detectors on the Sabertooth stems reproduce rese
         CHECK(trills.front() > 3.5);
         for (std::size_t i = 1; i < trills.size(); ++i) {
             CHECK(trills[i] - trills[i - 1] >= 0.049);
+        }
+    }
+    // the bass (pass 4, the right range): its stem's onsets, a 100 ms refractory (215 on Sabertooth; precision 0.91
+    // against the stem's level rises)
+    {
+        const std::vector<double> bass = ev("bassNoteEv");
+        INFO(bass.size() << " bass notes");
+        CHECK(bass.size() >= 200);
+        CHECK(bass.size() <= 230);
+        for (std::size_t i = 1; i < bass.size(); ++i) {
+            CHECK(bass[i] - bass[i - 1] >= 0.099);
         }
     }
     // the kicks on the Kick-fed grid (85.49 BPM, every kick on a 16th): a constant offset, no drift (21 s7 risk 2)

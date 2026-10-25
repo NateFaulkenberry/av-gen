@@ -92,7 +92,7 @@ GATE_DROP = 0.16
 GLINTS = {
     "L": [("moog", 3.0, 3.0, "#ff9fdc", 3.2)],                       # pale pink edge glints: the Moog
     "R": [("tblock", 5.0, 3.5, "#e9dcff", 4.0),                      # small sharp lavender-white glints: the tone block
-          ("toms", 2.0, None, "#7d6cff", 1.3)],                      # blue-violet plane flashes: the toms
+          ("toms", 2.0, None, "#6a52ff", 1.3)],                      # blue-violet plane flashes: the bass (pass 4)
 }
 
 
@@ -254,25 +254,28 @@ def _timing(**kw):
     return t
 
 
-# ---- the light balls (pass 4, ADR-1663): the owner replaced the shooting stars with "a dynamic ball of light - shoot
-# it across the canyon from the camera perspective ... it should be able to throw lots of light onto the geometry
-# below". Thrown from the near left bank at the water's edge up and away into the canyon (the owner's arrow), lighting
-# the facets, the water and the riverbed as it flies; one instance per slot of the pool of two (music.py).
-# (launch, target) in the camera's frame: right, up, forward (m); the camera is 65 m above the water
-BALLS = {"ballA": ((-110.0, -60.0, 330.0), (50.0, 260.0, 2700.0)),
-         "ballB": ((-70.0, -60.0, 380.0), (-140.0, 230.0, 2500.0))}
-BALL_COLOR = "#eadcff"       # the light it casts: lavender-white, inside the palette
-BALL_INTENSITY = 1.0         # crashSize adds up to 1.0 (a phrase-start crash throws a brighter ball)
+# ---- the fireballs (pass 4, ADR-1663): the owner replaced the shooting stars with "a dynamic ball of light ... it should
+# be able to throw lots of light onto the geometry below", then: "make them appear as though they are shooting from
+# behind the camera over the valley and change them to big glowing vibrant fireballs". Launched from behind and a little
+# above the camera, each enters the frame from its near edge, close and large, and arcs away over the valley toward the
+# far mountains, shrinking; each crash its own heading (`spread`), lighting land, water and riverbed as it flies. Fire
+# orange: the aurora's complement, so it reads as the most vibrant thing in the frame. One instance per slot of the
+# pool of two (music.py). (launch, target) in the camera's frame: right, up, forward (m)
+BALLS = {"ballA": ((18.0, 22.0, -35.0), (-150.0, 230.0, 2600.0)),
+         "ballB": ((-18.0, 26.0, -30.0), (150.0, 250.0, 2500.0))}
+BALL_COLOR = "#ffa060"       # the light it casts: warm fire
+BALL_INTENSITY = 0.6         # crashSize adds up to 0.6 (a phrase-start crash throws a brighter fireball)
 
 
 def ball_effect(name):
     (l0, l1) = BALLS[name]
     return {"id": name, "name": name, "type": "groundPulse", "owner": {"kind": "world"}, "enabled": True, "order": 0,
             "activation": "trigger", "trigger": {"source": "signal", "name": "signal.%sEv" % name, "threshold": 0.0},
-            # it ignites over 0.35 s as it leaves the bank (instant, it flooded the near bank: the flash gate)
-            "style": "", "timing": _timing(fadeIn=0.35, fadeOut=0.8, lifetime=2.0),
+            # it ignites over 0.6 s as it comes over the camera: large but dim while close, at full fire as it flies away
+            # (brighter sooner, a ball passing overhead swung the frame by 0.1-0.18 in 267 ms: the flash gate)
+            "style": "", "timing": _timing(fadeIn=0.6, fadeOut=0.8, lifetime=2.2),
             "parameters": {
-                "appearance": {"color": hexrgb(BALL_COLOR), "edgeColor": [1.0, 0.97, 1.0], "edgeIntensity": 18.0,
+                "appearance": {"color": hexrgb(BALL_COLOR), "edgeColor": [1.0, 0.86, 0.55], "edgeIntensity": 14.0,
                                "intensity": BALL_INTENSITY, "rainbow": False, "rainbowBrightness": 1.0,
                                "rainbowSaturation": 0.85, "rainbowScale": 0.025, "rainbowSpeed": 0.35, "width": 1.0},
                 "propagation": {"kind": "ball", "direction": "explicit", "beamRadius": 0.0, "startOffset": 0.0,
@@ -281,8 +284,10 @@ def ball_effect(name):
                                 "forwardWeight": 1.0, "targetWeight": 0.0, "velocityWeight": 0.0,
                                 "explicitDirection": [0.0, 0.0, -1.0],
                                 "path": {"ease": 0.35},
-                                "ball": {"launch": list(l0), "target": list(l1), "travel": 1.3, "arc": 160.0,
-                                         "lightRadius": 170.0, "range": 1100.0, "coreSize": 3.5, "haloSize": 22.0}},
+                                "ball": {"launch": list(l0), "target": list(l1), "travel": 1.4, "arc": 120.0,
+                                         "lightRadius": 150.0, "range": 1100.0, "coreSize": 9.0, "haloSize": 30.0,
+                                         "coronaColor": [1.0, 0.36, 0.06], "coronaIntensity": 2.0,
+                                         "coronaSize": 55.0, "flicker": 0.8, "trail": 150.0, "spread": 900.0}},
                 "response": {"emissive": 0.0, "foliage": 1.0, "ground": 1.0, "surface": 1.0},
                 "source": {"kind": "camera", "groundOffset": 0.0},
                 "sparkle": {"density": 0.9, "enabled": False, "fadeDistance": 85.0, "intensity": 1.8, "seed": 1,
@@ -348,13 +353,13 @@ def river_beam(name, signal, color, *, intensity, edge, travel, rng, ease, lifet
 # the water"); the toms a third colour
 KICK = dict(intensity=4.0, edge=7.0, travel=1.6, rng=1600.0, ease=0.6, lifetime=1.4, fade_out=0.7, core=6.0,
             twin=0.0, halo=35.0, wake=220.0, wake_growth=0.35, disturb=0.045, land=0.35, bed=3.5, reach=700.0,
-            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.07, near_wake=1.6)
+            reach_height=250.0, front_width=14.0, lane=-55.0, lane_jitter=25.0, splash=0.035, near_wake=0.8)
 SNARE = dict(intensity=3.6, edge=7.0, travel=1.0, rng=1300.0, ease=0.6, lifetime=0.9, fade_out=0.5, core=4.0,
              twin=0.0, halo=26.0, wake=130.0, wake_growth=0.22, disturb=0.035, land=0.25, bed=2.8, reach=600.0,
-             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.05, near_wake=1.3)
+             reach_height=200.0, front_width=9.0, lane=55.0, lane_jitter=25.0, splash=0.025, near_wake=0.6)
 TOMS = dict(intensity=3.8, edge=6.0, travel=1.3, rng=1400.0, ease=0.6, lifetime=1.0, fade_out=0.55, core=4.5,
             twin=0.0, halo=30.0, wake=170.0, wake_growth=0.3, disturb=0.04, land=0.3, bed=3.0, reach=650.0,
-            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=0.06, near_wake=1.3)
+            reach_height=220.0, front_width=12.0, lane=0.0, lane_jitter=90.0, splash=0.03, near_wake=0.6)
 TOMS_COLOR = "#8a5cff"   # electric violet: the third colour, between the magenta kick and the lilac snare
 
 
@@ -362,7 +367,31 @@ def river_effects(pair=None):
     k, sn = BEAM_PAIRS[pair or BEAM_PAIR]
     return [river_beam("riverKick", "signal.kickBeamEv", k, **KICK),
             river_beam("riverSnare", "signal.snareBeamEv", sn, **SNARE),
-            river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)]
+            river_beam("riverToms", "signal.tomHitEv", TOMS_COLOR, **TOMS)] + mountain_fronts()
+
+
+# ---- the mountain fronts (pass 4, the owner: "make the trills feeling like they are running down the mountains away
+# from the camera, so that the trill progresses down the valley, similar to the way the river lights work"; and the
+# bass on the right). ADR-1662's path wave in a lane at the mountains' foot, 300 m off the river: its land light runs
+# down the range, facet by facet, away from the camera; nothing on the water (the lane is far from it). Each note its
+# own front fading on its own envelope (at most four alive, ADR-981): a fast trill is a cascade down the left range.
+FRONT = dict(edge=0.0, ease=0.4, core=2.0, twin=0.0, halo=4.0, wake=260.0, wake_growth=0.3, disturb=0.0, land=1.0,
+             bed=0.0, reach=1400.0, reach_height=1100.0, front_width=60.0, lane_jitter=0.0, splash=0.0, near_wake=0.0)
+MOOG_FRONT = dict(FRONT, intensity=1.1, travel=1.0, rng=2200.0, lifetime=0.6, fade_out=0.35, lane=-300.0)
+BASS_FRONT = dict(FRONT, intensity=1.0, travel=1.2, rng=2000.0, lifetime=0.7, fade_out=0.4, lane=300.0)
+MOOG_FRONT_COLOR = "#ff9fdc"   # the Moog's pale pink
+BASS_FRONT_COLOR = "#6a52ff"   # deep blue-violet: the bass's, apart from the Moog's
+
+
+def mountain_fronts():
+    out = []
+    for name, signal, color, kw in (("moogFront", "signal.moogNoteEv", MOOG_FRONT_COLOR, MOOG_FRONT),
+                                    ("bassFront", "signal.bassNoteEv", BASS_FRONT_COLOR, BASS_FRONT)):
+        e = river_beam(name, signal, color, **kw)
+        e["parameters"]["propagation"]["startOffset"] = 60.0
+        e["parameters"]["propagation"]["path"]["nearFade"] = 120.0
+        out.append(e)
+    return out
 
 
 def bed_program():
@@ -403,15 +432,12 @@ def music_routes(R):
         R("signal.moogNote", L.path("moogGate"), -0.24),
         R("signal.moogGlow", L.path("moogGate"), -0.05),
         R("signal.moogNote", L.path("moogLine"), 2.5),
-        # RIGHT, the tone block: the subset steps through the bar (lfo.barSaw), so a repeated pattern repeats its
-        # sequence of facets; the hit's size (blockSize) is already in blockTick
-        R("lfo.barSaw", Rt.path("tblock", "value"), 1.0),
-        R("signal.blockTick", Rt.path("tblockGate"), -GATE_DROP),
-        R("signal.blockTick", Rt.path("tblockLine"), 2.5),
-        # RIGHT, the toms: a new subset of planes per note (random.tomPick), sized; the fill's body a little more
-        R("random.tomPick", Rt.path("toms", "value"), 1.0),
-        R("signal.tomHit", Rt.path("tomsGate"), -0.11),
-        R("signal.tomBody", Rt.path("tomsGate"), -0.03),
+        # RIGHT, the bass (pass 4; the toms and tone block before): a fresh set of planes per note, opened by the note
+        # (sized by the stem's level), held gently by the level while it rings. The tone block is unassigned (its crease
+        # term rests); the toms keep their river lane
+        R("random.bassPick", Rt.path("toms", "value"), 1.0),
+        R("signal.bassNote", Rt.path("tomsGate"), -0.12),
+        R("signal.bassGlow", Rt.path("tomsGate"), -0.04),
     ]
     return out
 

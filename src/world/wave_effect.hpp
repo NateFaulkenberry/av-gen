@@ -175,6 +175,15 @@ struct BallShape {
     float range = 1200.0f;     // metres: past this the light is cut (faded from 70%)
     float coreSize = 7.0f;     // metres: the visible ball's radius
     float haloSize = 60.0f;    // metres: its glow
+    // ADR-1663 (pass 4, the owner: "big glowing vibrant fireballs"): a corona round the core whose edge flickers, a
+    // short flaming trail behind it, and a per-hit spread of the target to the right/left (a hash of the hit's launch
+    // second: seek equals play). All 0: the plain ball above.
+    glm::vec3 coronaColor{1.0f, 0.42f, 0.1f};
+    float coronaIntensity = 0.0f;
+    float coronaSize = 80.0f;  // metres
+    float flicker = 0.0f;      // 0..1: how much the corona's edge flickers
+    float trail = 0.0f;        // metres of flaming trail behind the ball
+    float spread = 0.0f;       // metres: each hit's target moves up to +- this to the right
 };
 
 struct Propagation {
@@ -306,6 +315,8 @@ enum class EffectStatus : std::uint8_t;
 //   color       rgb = the light it casts (intensity and envelope folded in), w = the light's half radius (m)
 //   edge        rgb = the visible core's radiance (edge colour x edge intensity x envelope), w = core radius (m)
 //   shape       x = halo radius (m), y = range (m);   response as every kind
+//   rainbow     rgb = the corona's radiance (envelope folded in), w = its radius (m)
+//   vertical    x = trail length (m), y = flicker 0..1, z = transport seconds (mod 4096) for the flicker, w = 0
 struct WaveGpu {
     glm::vec4 originKind{0.0f};   // xyz = origin (world), w = PropagationKind
     glm::vec4 axisFront{0.0f};    // xyz = unit axis (directional), w = how far the front has travelled

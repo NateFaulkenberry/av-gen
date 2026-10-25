@@ -385,6 +385,21 @@ TEST_CASE("ADR-1663: a light ball flies its camera-relative arc and packs its li
     CHECK(g.color == glm::vec4(6.0f, 3.0f, 4.8f, 250.0f));
     CHECK(g.edge == glm::vec4(30.0f, 30.0f, 30.0f, 8.0f));
     CHECK(g.shape == glm::vec4(50.0f, 1200.0f, 0.0f, 0.0f));
+    CHECK(g.rainbow == glm::vec4(0.0f, 0.0f, 0.0f, 80.0f)); // no corona: the plain ball
+    CHECK(g.vertical.x == 0.0f);
+    // the fireball's corona, flicker and trail (pass 4) pack in their lanes
+    world::EffectInstance fire = ball;
+    fire.wave.propagation.ball.coronaColor = {1.0f, 0.4f, 0.1f};
+    fire.wave.propagation.ball.coronaIntensity = 2.0f;
+    fire.wave.propagation.ball.coronaSize = 55.0f;
+    fire.wave.propagation.ball.flicker = 0.8f;
+    fire.wave.propagation.ball.trail = 150.0f;
+    const auto fm = world::resolveWave(fire, at(0.5, scene, cam, fwd));
+    REQUIRE(fm.has_value());
+    const world::WaveGpu fg = world::packWave(*fm);
+    CHECK(fg.rainbow == glm::vec4(2.0f, 0.8f, 0.2f, 55.0f));
+    CHECK(fg.vertical.x == 150.0f);
+    CHECK(fg.vertical.y == 0.8f);
     for (const glm::vec4& v : g.path) {
         CHECK(v == glm::vec4(0.0f));
     }
