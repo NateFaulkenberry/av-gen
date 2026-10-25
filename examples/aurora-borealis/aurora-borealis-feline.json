@@ -13559,14 +13559,14 @@
   {
    "source": "signal.cloudShape",
    "target": "fx/aurora/ribbonChurn",
-   "amount": 14.0,
+   "amount": 18.0,
    "op": "add",
    "polarity": "unipolar"
   },
   {
    "source": "signal.cloudShape",
    "target": "fx/aurora/ribbonSwirl",
-   "amount": 3.2,
+   "amount": 4.0,
    "op": "add",
    "polarity": "unipolar"
   },

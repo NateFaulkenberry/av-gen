@@ -266,8 +266,11 @@ def routes():
         R("signal.cloudSwell", A + "intensity", 1.6),
         R("signal.cloudShape", A + "curtainHeight", 250.0),
         R("signal.cloudShape", A + "ribbonWidth", 0.012),
-        R("signal.cloudShape", A + "ribbonChurn", 14.0),
-        R("signal.cloudShape", A + "ribbonSwirl", 3.2),
+        # pass 9: the churn and swirl a quarter stronger (were 14 and 3.2) -- on pass 3's curving river the camera's
+        # heading turns the ribbons across the frame, and the curling read a little weaker than on pass 4's straight
+        # run; the same slow, doubly smoothed envelope drives them, so the steps stay the same share of their range
+        R("signal.cloudShape", A + "ribbonChurn", 18.0),
+        R("signal.cloudShape", A + "ribbonSwirl", 4.0),
         R("signal.cloudShape", A + "turbulence", 0.7),
         R("signal.cloudShape", A + "filaments", 1.5),
         R("signal.cloudSwell", A + "edgeBrightness", 1.5),
