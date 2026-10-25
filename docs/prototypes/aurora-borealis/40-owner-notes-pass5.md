@@ -16,3 +16,9 @@ Coordinator reading: pass 6 returns to a river (slightly curved, between pass 3'
 
 - Confirmed: moving camera along the slightly curved river; fireball, fish and deeper water carry over ("thats correct").
 - "have aura agent swap left and right mountain sides so left is BASS right is MOOG, and ahve it use the same effect it did for the lake but have it revert to sending the light down the mountain range"
+
+## The owner on pass 6 (verbatim, 2026-10-25)
+
+"just tell it to go bakc to the pass 3 geometry"
+
+Coordinator reading: restore the pass-3 landscape (Gate A take 3, c61111e6 lineage: the river with straight reaches and mild bends, the pass-3 mountains, peaks and camera path) and keep everything pass 4-6 added on top.
