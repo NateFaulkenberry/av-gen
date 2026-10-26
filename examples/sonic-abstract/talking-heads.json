@@ -117,7 +117,7 @@
  "parameters": {
   "post/bloom/enabled": true,
   "post/bloom/intensity": 0.42,
-  "post/bloom/threshold": 0.9,
+  "post/bloom/threshold": 1.2,
   "post/bloom/emissionWeight": 0.7,
   "post/tonemap/chroma-retention": 0.6,
   "post/output/vignette": 0.45,
@@ -1542,6 +1542,27 @@
   },
   {
    "kind": "signal",
+   "name": "th1Sweep",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.th1Onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.7,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 0.0,
+       "envelopeFallPerSecond": 4.0,
+       "envelopeRearm": 0.5,
+       "envelopeRefractoryMs": 120.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
    "name": "th2Level",
    "settings": {
     "combine": "firstActive",
@@ -2165,6 +2186,27 @@
   },
   {
    "kind": "signal",
+   "name": "th2Sweep",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.th2Onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.7,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 0.0,
+       "envelopeFallPerSecond": 4.0,
+       "envelopeRearm": 0.5,
+       "envelopeRefractoryMs": 120.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
    "name": "th3Level",
    "settings": {
     "combine": "firstActive",
@@ -2760,6 +2802,27 @@
        "envelopeFallPerSecond": 3.0,
        "envelopeRearm": 0.5,
        "envelopeRefractoryMs": 150.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "th3Sweep",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.th3Onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.7,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 0.0,
+       "envelopeFallPerSecond": 4.0,
+       "envelopeRearm": 0.5,
+       "envelopeRefractoryMs": 120.0
       }
      }
     ]
@@ -3410,6 +3473,27 @@
        "envelopeFallPerSecond": 1.1,
        "envelopeRearm": 0.5,
        "envelopeRefractoryMs": 250.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "name": "th4Sweep",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.th4Onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.7,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 0.0,
+       "envelopeFallPerSecond": 4.0,
+       "envelopeRearm": 0.5,
+       "envelopeRefractoryMs": 120.0
       }
      }
     ]
@@ -4182,14 +4266,14 @@
   {
    "source": "noise.toneC",
    "target": "particles/mist/emissive",
-   "amount": 0.35,
+   "amount": 0.12249999999999998,
    "op": "add",
    "polarity": "bipolar"
   },
   {
    "source": "noise.toneA",
    "target": "env/sky/zenithColor",
-   "amount": 0.035,
+   "amount": 0.0175,
    "op": "add",
    "polarity": "bipolar",
    "component": 2
@@ -4197,7 +4281,7 @@
   {
    "source": "noise.toneA",
    "target": "env/sky/zenithColor",
-   "amount": -0.015,
+   "amount": -0.0075,
    "op": "add",
    "polarity": "bipolar",
    "component": 0
@@ -4205,7 +4289,7 @@
   {
    "source": "noise.toneB",
    "target": "env/sky/horizonColor",
-   "amount": 0.03,
+   "amount": 0.015,
    "op": "add",
    "polarity": "bipolar",
    "component": 0
@@ -4213,7 +4297,7 @@
   {
    "source": "noise.toneB",
    "target": "env/sky/horizonColor",
-   "amount": 0.012,
+   "amount": 0.006,
    "op": "add",
    "polarity": "bipolar",
    "component": 1
@@ -4221,7 +4305,7 @@
   {
    "source": "noise.toneC",
    "target": "env/sky/horizonColor",
-   "amount": 0.03,
+   "amount": 0.015,
    "op": "add",
    "polarity": "bipolar",
    "component": 2
@@ -4229,7 +4313,7 @@
   {
    "source": "noise.toneB",
    "target": "env/sky/groundColor",
-   "amount": 0.03,
+   "amount": 0.015,
    "op": "add",
    "polarity": "bipolar",
    "component": 0
@@ -4237,7 +4321,7 @@
   {
    "source": "noise.toneB",
    "target": "env/sky/groundColor",
-   "amount": 0.012,
+   "amount": 0.006,
    "op": "add",
    "polarity": "bipolar",
    "component": 1
@@ -4245,7 +4329,7 @@
   {
    "source": "noise.toneC",
    "target": "env/sky/groundColor",
-   "amount": 0.03,
+   "amount": 0.015,
    "op": "add",
    "polarity": "bipolar",
    "component": 2
@@ -4253,7 +4337,7 @@
   {
    "source": "response.intensity",
    "target": "particles/mist/emissive",
-   "amount": 0.8,
+   "amount": 0.27999999999999997,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -4417,7 +4501,7 @@
   {
    "source": "response.lowEnv",
    "target": "material/thbg-memA-lines/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4429,7 +4513,7 @@
   {
    "source": "response.lowEnv",
    "target": "material/thbg-memA-lines/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4441,7 +4525,7 @@
   {
    "source": "response.lowEnv",
    "target": "material/thbg-memA-lines/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -4489,7 +4573,7 @@
   {
    "source": "response.intensity",
    "target": "material/thbg-memA/op/6/constant/constant",
-   "amount": 0.14,
+   "amount": 0.035,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4501,7 +4585,7 @@
   {
    "source": "response.intensity",
    "target": "material/thbg-memA/op/6/constant/constant",
-   "amount": 0.14,
+   "amount": 0.035,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4513,7 +4597,7 @@
   {
    "source": "response.intensity",
    "target": "material/thbg-memA/op/6/constant/constant",
-   "amount": 0.14,
+   "amount": 0.035,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -4667,7 +4751,7 @@
   {
    "source": "response.lowEnv",
    "target": "material/thbg-memB-lines/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4679,7 +4763,7 @@
   {
    "source": "response.lowEnv",
    "target": "material/thbg-memB-lines/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4691,7 +4775,7 @@
   {
    "source": "response.lowEnv",
    "target": "material/thbg-memB-lines/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -4739,7 +4823,7 @@
   {
    "source": "response.intensity",
    "target": "material/thbg-memB/op/6/constant/constant",
-   "amount": 0.14,
+   "amount": 0.035,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4751,7 +4835,7 @@
   {
    "source": "response.intensity",
    "target": "material/thbg-memB/op/6/constant/constant",
-   "amount": 0.14,
+   "amount": 0.035,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4763,7 +4847,7 @@
   {
    "source": "response.intensity",
    "target": "material/thbg-memB/op/6/constant/constant",
-   "amount": 0.14,
+   "amount": 0.035,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -4823,7 +4907,7 @@
   {
    "source": "response.onsetEnv",
    "target": "material/thbg-arcs/op/2/constant/constant",
-   "amount": 1.2,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4837,7 +4921,7 @@
   {
    "source": "response.onsetEnv",
    "target": "material/thbg-arcs/op/2/constant/constant",
-   "amount": 1.2,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4851,7 +4935,7 @@
   {
    "source": "response.onsetEnv",
    "target": "material/thbg-arcs/op/2/constant/constant",
-   "amount": 1.2,
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -4865,7 +4949,7 @@
   {
    "source": "audio.mid",
    "target": "material/thbg-bands/op/2/constant/constant",
-   "amount": 0.25,
+   "amount": 0.0625,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4877,7 +4961,7 @@
   {
    "source": "audio.mid",
    "target": "material/thbg-bands/op/2/constant/constant",
-   "amount": 0.25,
+   "amount": 0.0625,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4889,7 +4973,7 @@
   {
    "source": "audio.mid",
    "target": "material/thbg-bands/op/2/constant/constant",
-   "amount": 0.25,
+   "amount": 0.0625,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -4901,7 +4985,7 @@
   {
    "source": "audio.treble",
    "target": "material/thbg-fil/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -4913,7 +4997,7 @@
   {
    "source": "audio.treble",
    "target": "material/thbg-fil/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -4925,7 +5009,7 @@
   {
    "source": "audio.treble",
    "target": "material/thbg-fil/op/2/constant/constant",
-   "amount": 1.4,
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -5286,7 +5370,7 @@
   {
    "source": "signal.th1Pose",
    "target": "fx/th1-mouth0/intensity",
-   "amount": 1.4300000000000002,
+   "amount": 2.3100000000000005,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -5299,7 +5383,7 @@
   {
    "source": "signal.th1Pose",
    "target": "fx/th1-mouth1/intensity",
-   "amount": 0.9099999999999999,
+   "amount": 1.47,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -5312,7 +5396,7 @@
   {
    "source": "signal.th1Pose",
    "target": "fx/th1-mouth2/intensity",
-   "amount": 2.08,
+   "amount": 3.3600000000000003,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -5325,7 +5409,7 @@
   {
    "source": "signal.th1Pose",
    "target": "fx/th1-mouth3/intensity",
-   "amount": 1.1700000000000002,
+   "amount": 1.8900000000000001,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -5338,7 +5422,7 @@
   {
    "source": "signal.th1Pose",
    "target": "fx/th1-mouth4/intensity",
-   "amount": 0.78,
+   "amount": 1.26,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -5351,7 +5435,7 @@
   {
    "source": "signal.th1Pose",
    "target": "fx/th1-mouth5/intensity",
-   "amount": 1.6900000000000002,
+   "amount": 2.7300000000000004,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -5364,7 +5448,7 @@
   {
    "source": "signal.th1Pose",
    "target": "particles/th1-mist/emissive",
-   "amount": 1.4,
+   "amount": 0.42,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.chromaGate",
@@ -6160,7 +6244,7 @@
   },
   {
    "source": "signal.th1Hit",
-   "target": "material/th1-body/op/37/threshold/value",
+   "target": "material/th1-body/op/50/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -6173,7 +6257,20 @@
   },
   {
    "source": "signal.th1Hit",
-   "target": "material/th1-head/op/37/threshold/value",
+   "target": "material/th1-neck/op/50/threshold/value",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "material/th1-head/op/50/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -6269,100 +6366,508 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Live",
-   "target": "material/th1-body/op/23/remap/constant",
-   "amount": 0.45,
+   "source": "signal.th1LevelS",
+   "target": "material/th1-body/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-body/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-body/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-body/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Open",
+   "target": "material/th1-body/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-body/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-body/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
-   "target": "material/th1-body/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th1Live",
+   "target": "material/th1-body/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-body/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th1-neck/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th1-body/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th1Sweep",
+   "target": "material/th1-neck/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-head/op/23/remap/constant",
-   "amount": 0.45,
+   "target": "material/th1-neck/op/30/smoothstep/constant",
+   "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-neck/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Open",
+   "target": "material/th1-neck/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-neck/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-neck/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
-   "target": "material/th1-head/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th1Live",
+   "target": "material/th1-neck/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-head/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th1-head/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th1-head/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th1Sweep",
+   "target": "material/th1-head/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-head/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-head/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Open",
+   "target": "material/th1-head/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-head/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-head/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-lid/op/27/constant/constant",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-lid/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-lid/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-lid/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th1Open",
+   "target": "material/th1-lid/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-lid/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-lid/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "material/th1-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
   },
   {
    "source": "signal.th1Open",
@@ -6758,7 +7263,7 @@
   {
    "source": "signal.th2Pose",
    "target": "fx/th2-mouth0/intensity",
-   "amount": 1.4300000000000002,
+   "amount": 2.3100000000000005,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -6771,7 +7276,7 @@
   {
    "source": "signal.th2Pose",
    "target": "fx/th2-mouth1/intensity",
-   "amount": 0.9099999999999999,
+   "amount": 1.47,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -6784,7 +7289,7 @@
   {
    "source": "signal.th2Pose",
    "target": "fx/th2-mouth2/intensity",
-   "amount": 2.08,
+   "amount": 3.3600000000000003,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -6797,7 +7302,7 @@
   {
    "source": "signal.th2Pose",
    "target": "fx/th2-mouth3/intensity",
-   "amount": 1.1700000000000002,
+   "amount": 1.8900000000000001,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -6810,7 +7315,7 @@
   {
    "source": "signal.th2Pose",
    "target": "fx/th2-mouth4/intensity",
-   "amount": 0.78,
+   "amount": 1.26,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -6823,7 +7328,7 @@
   {
    "source": "signal.th2Pose",
    "target": "fx/th2-mouth5/intensity",
-   "amount": 1.6900000000000002,
+   "amount": 2.7300000000000004,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -6836,7 +7341,7 @@
   {
    "source": "signal.th2Pose",
    "target": "particles/th2-mist/emissive",
-   "amount": 1.4,
+   "amount": 0.42,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.chromaGate",
@@ -7832,7 +8337,7 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-body/op/31/threshold/value",
+   "target": "material/th2-body/op/44/threshold/value",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -7845,7 +8350,7 @@
   },
   {
    "source": "signal.th2Crash",
-   "target": "material/th2-body/op/31/threshold/value",
+   "target": "material/th2-body/op/44/threshold/value",
    "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -7858,7 +8363,7 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-head/op/31/threshold/value",
+   "target": "material/th2-neck/op/44/threshold/value",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -7871,7 +8376,7 @@
   },
   {
    "source": "signal.th2Crash",
-   "target": "material/th2-head/op/31/threshold/value",
+   "target": "material/th2-neck/op/44/threshold/value",
    "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -7883,100 +8388,534 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2Live",
-   "target": "material/th2-body/op/23/remap/constant",
-   "amount": 0.45,
+   "source": "signal.th2LevelS",
+   "target": "material/th2-head/op/44/threshold/value",
+   "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "depthSource": "visual.copiesGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 0
+    "attackMs": 500,
+    "decayMs": 3000
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2Open",
-   "target": "material/th2-body/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th2Crash",
+   "target": "material/th2-head/op/44/threshold/value",
+   "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "depthSource": "visual.copiesGate",
    "chain": {
     "attackMs": 0,
-    "decayMs": 300
+    "decayMs": 2000
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-body/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th2-body/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th2-body/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th2Sweep",
+   "target": "material/th2-body/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-head/op/23/remap/constant",
-   "amount": 0.45,
+   "target": "material/th2-body/op/30/smoothstep/constant",
+   "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-body/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Open",
+   "target": "material/th2-body/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-body/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-body/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2Open",
-   "target": "material/th2-head/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th2Live",
+   "target": "material/th2-body/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-head/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th2-neck/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th2-head/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th2Sweep",
+   "target": "material/th2-neck/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-neck/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-neck/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Open",
+   "target": "material/th2-neck/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-neck/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-neck/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-head/op/27/constant/constant",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-head/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-head/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-head/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Open",
+   "target": "material/th2-head/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-head/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-head/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-lid/op/27/constant/constant",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-lid/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-lid/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-lid/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th2Open",
+   "target": "material/th2-lid/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-lid/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-lid/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Live",
+   "target": "material/th2-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
   },
   {
    "source": "signal.th2Open",
@@ -8358,7 +9297,7 @@
   {
    "source": "signal.th3Pose",
    "target": "fx/th3-mouth0/intensity",
-   "amount": 1.4300000000000002,
+   "amount": 2.3100000000000005,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -8371,7 +9310,7 @@
   {
    "source": "signal.th3Pose",
    "target": "fx/th3-mouth1/intensity",
-   "amount": 0.9099999999999999,
+   "amount": 1.47,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -8384,7 +9323,7 @@
   {
    "source": "signal.th3Pose",
    "target": "fx/th3-mouth2/intensity",
-   "amount": 2.08,
+   "amount": 3.3600000000000003,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -8397,7 +9336,7 @@
   {
    "source": "signal.th3Pose",
    "target": "fx/th3-mouth3/intensity",
-   "amount": 1.1700000000000002,
+   "amount": 1.8900000000000001,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -8410,7 +9349,7 @@
   {
    "source": "signal.th3Pose",
    "target": "fx/th3-mouth4/intensity",
-   "amount": 0.78,
+   "amount": 1.26,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -8423,7 +9362,7 @@
   {
    "source": "signal.th3Pose",
    "target": "fx/th3-mouth5/intensity",
-   "amount": 1.6900000000000002,
+   "amount": 2.7300000000000004,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -8436,7 +9375,7 @@
   {
    "source": "signal.th3Pose",
    "target": "particles/th3-mist/emissive",
-   "amount": 1.4,
+   "amount": 0.42,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.chromaGate",
@@ -8520,7 +9459,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/32/smoothstep/constant",
+   "target": "material/th3-body/op/45/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -8534,7 +9473,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/32/smoothstep/constant",
+   "target": "material/th3-body/op/45/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8548,7 +9487,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/31/smoothstep/constant",
+   "target": "material/th3-body/op/44/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -8562,7 +9501,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/31/smoothstep/constant",
+   "target": "material/th3-body/op/44/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8576,7 +9515,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/32/smoothstep/constant",
+   "target": "material/th3-body/op/45/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -8590,7 +9529,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/32/smoothstep/constant",
+   "target": "material/th3-body/op/45/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8604,7 +9543,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/31/smoothstep/constant",
+   "target": "material/th3-body/op/44/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -8618,7 +9557,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/31/smoothstep/constant",
+   "target": "material/th3-body/op/44/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8632,7 +9571,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/33/noise/constant",
+   "target": "material/th3-body/op/46/noise/constant",
    "amount": 36.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8643,7 +9582,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/33/noise/constant",
+   "target": "material/th3-body/op/46/noise/constant",
    "amount": 54.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8654,7 +9593,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/33/noise/constant",
+   "target": "material/th3-body/op/46/noise/constant",
    "amount": 68.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8665,7 +9604,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/33/noise/constant",
+   "target": "material/th3-body/op/46/noise/constant",
    "amount": 102.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8676,7 +9615,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/33/noise/constant",
+   "target": "material/th3-body/op/46/noise/constant",
    "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8687,7 +9626,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/33/noise/constant",
+   "target": "material/th3-body/op/46/noise/constant",
    "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8698,7 +9637,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/29/noise/constant",
+   "target": "material/th3-body/op/42/noise/constant",
    "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8711,7 +9650,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/29/noise/constant",
+   "target": "material/th3-body/op/42/noise/constant",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
@@ -8724,7 +9663,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/43/threshold/value",
+   "target": "material/th3-body/op/56/threshold/value",
    "amount": -0.55,
    "op": "add",
    "polarity": "unipolar",
@@ -8735,7 +9674,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/43/threshold/value",
+   "target": "material/th3-body/op/56/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8746,7 +9685,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/44/constant/constant",
+   "target": "material/th3-body/op/57/constant/constant",
    "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -8760,7 +9699,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/44/constant/constant",
+   "target": "material/th3-body/op/57/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8774,7 +9713,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/44/constant/constant",
+   "target": "material/th3-body/op/57/constant/constant",
    "amount": 0.49586900000000006,
    "op": "add",
    "polarity": "unipolar",
@@ -8788,7 +9727,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/44/constant/constant",
+   "target": "material/th3-body/op/57/constant/constant",
    "amount": 0.45079,
    "op": "add",
    "polarity": "unipolar",
@@ -8802,7 +9741,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/44/constant/constant",
+   "target": "material/th3-body/op/57/constant/constant",
    "amount": 0.069311,
    "op": "add",
    "polarity": "unipolar",
@@ -8816,7 +9755,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/44/constant/constant",
+   "target": "material/th3-body/op/57/constant/constant",
    "amount": 0.06301,
    "op": "add",
    "polarity": "unipolar",
@@ -8830,7 +9769,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/32/smoothstep/constant",
+   "target": "material/th3-neck/op/45/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -8844,7 +9783,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/32/smoothstep/constant",
+   "target": "material/th3-neck/op/45/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8858,7 +9797,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/31/smoothstep/constant",
+   "target": "material/th3-neck/op/44/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -8872,7 +9811,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/31/smoothstep/constant",
+   "target": "material/th3-neck/op/44/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8886,7 +9825,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/32/smoothstep/constant",
+   "target": "material/th3-neck/op/45/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -8900,7 +9839,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/32/smoothstep/constant",
+   "target": "material/th3-neck/op/45/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8914,7 +9853,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/31/smoothstep/constant",
+   "target": "material/th3-neck/op/44/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -8928,7 +9867,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/31/smoothstep/constant",
+   "target": "material/th3-neck/op/44/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -8942,7 +9881,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/33/noise/constant",
+   "target": "material/th3-neck/op/46/noise/constant",
    "amount": 36.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8953,7 +9892,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/33/noise/constant",
+   "target": "material/th3-neck/op/46/noise/constant",
    "amount": 54.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8964,7 +9903,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/33/noise/constant",
+   "target": "material/th3-neck/op/46/noise/constant",
    "amount": 68.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8975,7 +9914,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/33/noise/constant",
+   "target": "material/th3-neck/op/46/noise/constant",
    "amount": 102.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8986,7 +9925,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/33/noise/constant",
+   "target": "material/th3-neck/op/46/noise/constant",
    "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",
@@ -8997,7 +9936,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/33/noise/constant",
+   "target": "material/th3-neck/op/46/noise/constant",
    "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9008,7 +9947,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/29/noise/constant",
+   "target": "material/th3-neck/op/42/noise/constant",
    "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -9021,7 +9960,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/29/noise/constant",
+   "target": "material/th3-neck/op/42/noise/constant",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
@@ -9034,7 +9973,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/43/threshold/value",
+   "target": "material/th3-neck/op/56/threshold/value",
    "amount": -0.55,
    "op": "add",
    "polarity": "unipolar",
@@ -9045,7 +9984,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/43/threshold/value",
+   "target": "material/th3-neck/op/56/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9056,7 +9995,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/44/constant/constant",
+   "target": "material/th3-neck/op/57/constant/constant",
    "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -9070,7 +10009,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/44/constant/constant",
+   "target": "material/th3-neck/op/57/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9084,7 +10023,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/44/constant/constant",
+   "target": "material/th3-neck/op/57/constant/constant",
    "amount": 0.49586900000000006,
    "op": "add",
    "polarity": "unipolar",
@@ -9098,7 +10037,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/44/constant/constant",
+   "target": "material/th3-neck/op/57/constant/constant",
    "amount": 0.45079,
    "op": "add",
    "polarity": "unipolar",
@@ -9112,7 +10051,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/44/constant/constant",
+   "target": "material/th3-neck/op/57/constant/constant",
    "amount": 0.069311,
    "op": "add",
    "polarity": "unipolar",
@@ -9126,7 +10065,317 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/44/constant/constant",
+   "target": "material/th3-neck/op/57/constant/constant",
+   "amount": 0.06301,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/45/smoothstep/constant",
+   "amount": -0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/45/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/44/smoothstep/constant",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/44/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/45/smoothstep/constant",
+   "amount": -0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/45/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/44/smoothstep/constant",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/44/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/46/noise/constant",
+   "amount": 36.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/46/noise/constant",
+   "amount": 54.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/46/noise/constant",
+   "amount": 68.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/46/noise/constant",
+   "amount": 102.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/46/noise/constant",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/46/noise/constant",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/42/noise/constant",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/42/noise/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/56/threshold/value",
+   "amount": -0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 700,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/56/threshold/value",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/57/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/57/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/57/constant/constant",
+   "amount": 0.49586900000000006,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/57/constant/constant",
+   "amount": 0.45079,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/57/constant/constant",
+   "amount": 0.069311,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/57/constant/constant",
    "amount": 0.06301,
    "op": "add",
    "polarity": "unipolar",
@@ -9251,100 +10500,508 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3Live",
-   "target": "material/th3-body/op/23/remap/constant",
-   "amount": 0.45,
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-body/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-body/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-body/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Open",
+   "target": "material/th3-body/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-body/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3Open",
-   "target": "material/th3-body/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th3Live",
+   "target": "material/th3-body/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th3-neck/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th3-body/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th3Sweep",
+   "target": "material/th3-neck/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-head/op/23/remap/constant",
-   "amount": 0.45,
+   "target": "material/th3-neck/op/30/smoothstep/constant",
+   "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-neck/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Open",
+   "target": "material/th3-neck/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-neck/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-neck/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3Open",
-   "target": "material/th3-head/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th3Live",
+   "target": "material/th3-neck/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th3-head/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th3-head/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th3Sweep",
+   "target": "material/th3-head/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-head/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-head/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Open",
+   "target": "material/th3-head/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-head/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-lid/op/27/constant/constant",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-lid/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-lid/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-lid/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th3Open",
+   "target": "material/th3-lid/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-lid/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-lid/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "material/th3-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
   },
   {
    "source": "signal.th3Open",
@@ -9726,7 +11383,7 @@
   {
    "source": "signal.th4Pose",
    "target": "fx/th4-mouth0/intensity",
-   "amount": 1.4300000000000002,
+   "amount": 2.3100000000000005,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -9739,7 +11396,7 @@
   {
    "source": "signal.th4Pose",
    "target": "fx/th4-mouth1/intensity",
-   "amount": 0.9099999999999999,
+   "amount": 1.47,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -9752,7 +11409,7 @@
   {
    "source": "signal.th4Pose",
    "target": "fx/th4-mouth2/intensity",
-   "amount": 2.08,
+   "amount": 3.3600000000000003,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -9765,7 +11422,7 @@
   {
    "source": "signal.th4Pose",
    "target": "fx/th4-mouth3/intensity",
-   "amount": 1.1700000000000002,
+   "amount": 1.8900000000000001,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -9778,7 +11435,7 @@
   {
    "source": "signal.th4Pose",
    "target": "fx/th4-mouth4/intensity",
-   "amount": 0.78,
+   "amount": 1.26,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -9791,7 +11448,7 @@
   {
    "source": "signal.th4Pose",
    "target": "fx/th4-mouth5/intensity",
-   "amount": 1.6900000000000002,
+   "amount": 2.7300000000000004,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.beamsGate",
@@ -9804,7 +11461,7 @@
   {
    "source": "signal.th4Pose",
    "target": "particles/th4-mist/emissive",
-   "amount": 1.4,
+   "amount": 0.42,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.chromaGate",
@@ -10031,100 +11688,508 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th4Live",
-   "target": "material/th4-body/op/23/remap/constant",
-   "amount": 0.45,
+   "source": "signal.th4LevelS",
+   "target": "material/th4-body/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-body/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-body/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-body/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Open",
+   "target": "material/th4-body/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-body/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-body/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th4Open",
-   "target": "material/th4-body/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th4Live",
+   "target": "material/th4-body/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-body/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-body/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th4-neck/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th4-body/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th4Sweep",
+   "target": "material/th4-neck/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-head/op/23/remap/constant",
-   "amount": 0.45,
+   "target": "material/th4-neck/op/30/smoothstep/constant",
+   "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
-   "depthSource": "visual.chromaGate",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-neck/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Open",
+   "target": "material/th4-neck/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 0
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-neck/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-neck/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th4Open",
-   "target": "material/th4-head/op/23/remap/constant",
-   "amount": 0.3,
+   "source": "signal.th4Live",
+   "target": "material/th4-neck/op/35/constant/constant",
+   "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 3,
+   "component": 1,
    "depthSource": "visual.chromaGate",
    "chain": {
-    "attackMs": 0,
-    "decayMs": 300
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-neck/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-head/op/20/remap/constant",
-   "amount": -0.12,
+   "target": "material/th4-head/op/27/constant/constant",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
+   "component": 0,
    "chain": {
-    "attackMs": 600,
-    "decayMs": 2500
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
    }
   },
   {
-   "source": "control.palette",
-   "target": "material/th4-head/op/20/remap/constant",
-   "amount": -0.6,
+   "source": "signal.th4Sweep",
+   "target": "material/th4-head/op/27/constant/constant",
+   "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-head/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-head/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Open",
+   "target": "material/th4-head/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-head/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-head/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-head/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-lid/op/27/constant/constant",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-lid/op/27/constant/constant",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-lid/op/30/smoothstep/constant",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-lid/op/30/smoothstep/constant",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   }
+  },
+  {
+   "source": "signal.th4Open",
+   "target": "material/th4-lid/op/18/smoothstep/constant",
+   "amount": -0.0015,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 300
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-lid/op/15/constant/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 200,
+    "decayMs": 800
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-lid/op/15/constant/constant",
+   "amount": 0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "material/th4-lid/op/35/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 120,
+    "decayMs": 700
+   },
+   "depthMax": 2.0
   },
   {
    "source": "signal.th4Open",

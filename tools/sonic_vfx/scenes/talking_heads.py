@@ -166,10 +166,11 @@ DESIGN = {
 INDEX_ENTRY = {
     "category": kit.ABSTRACT_CATEGORY,
     "description": "Play live audio by channel: up to four sources with the roles drums, bass, synth and vocal "
-                   "(or any other), one porcelain mannequin bust each -- one to four busts, as many as there are "
-                   "sources, laid out for the count; a plain mix gives one. Each bust speaks its own channel like a "
-                   "noise gate: on a note the neck snaps back, the lips part and rays of light shoot from the mouth; "
-                   "between notes they look round the room, eyes darting. Each source is a different corrupted "
+                   "(or any other), one mannequin bust each in engraved silver security foil -- one to four busts, as "
+                   "many as there are sources, laid out for the count; a plain mix gives one. Each bust speaks its own "
+                   "channel like a noise gate: on a note the neck snaps back, the lips part and rays of light shoot "
+                   "from the mouth; between notes they look round the room, eyes darting. The foil's spectral bands "
+                   "drift with its source's level, sweep on its onsets and shine while it speaks. Each source is a different corrupted "
                    "transmission: the drums suffer tracking failure (torn bands, static, channels jumping), the bass "
                    "codec collapse (displaced macroblocks that persist), the synth broadcast interference (static, "
                    "scanlines, drifting colour channels), a vocal or other source temporal ghosting. MIDI: CC 1 master, "
