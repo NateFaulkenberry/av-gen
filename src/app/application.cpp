@@ -2258,6 +2258,12 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             settings_.live.midiInput = filter.empty() ? "*" : filter;
             saveSettings();
         };
+        // ADR-1704: MIDI devices switched off in the MIDI panel are this machine's choice, kept with its other settings.
+        engine_->control().setDisabledDevices(settings_.live.midiDisabled);
+        panel_->midi.onDisabledDevicesChanged = [this](const std::vector<std::string>& ids) {
+            settings_.live.midiDisabled = ids;
+            saveSettings();
+        };
         if (auto examples = loadExamples(exampleSearchDirs(executablePath)); examples) {
             // ADR-1063/1341: the scenes a performer steps through -- every live example, whatever is open.
             liveScenes_ = liveSceneList(*examples);

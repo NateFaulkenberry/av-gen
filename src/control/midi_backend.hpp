@@ -8,7 +8,7 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <deque>
+#include <array>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -17,29 +17,56 @@
 
 namespace avgen::control::detail {
 
-// Thread-safe queue of parsed messages shared by every transport (device backend, inject).
-// Producers may run on any thread (CoreMIDI's receive thread, tests); the consumer drains from
-// the UI/engine thread. Beyond the limit the oldest message is evicted and counted as dropped.
+// ADR-1701: the bounded queue every transport (device backend, inject) feeds, and the device table.
+// Producers may run on any thread (CoreMIDI's receive thread, tests); the consumer drains from the
+// engine thread. The ring is allocated once (setQueueLimit) and a push never allocates: a message is
+// plain data and the critical section is a copy.
+//
+// Full policy. Continuous messages (CC, pitch bend, pressure) stop entering the ring at 3/4 of its
+// capacity and go to a small table keyed by device, channel, kind and number instead, where the
+// latest value replaces the previous one: a stalled consumer then still receives every control's
+// final position, not a backlog of obsolete ones. Everything else (notes, program, transport, device
+// removals) may use the whole ring. A note that finds the ring full is dropped and counted, and the
+// next drain ends with a DeviceRemoved for kAllMidiDevices so the consumer releases every gate rather
+// than leave one held by a lost note-off.
 class MidiInbox {
 public:
     static constexpr std::size_t kDefaultQueueLimit = 4096;
+    static constexpr std::size_t kOverflowSlots = 64;
 
-    // Parses `bytes` with the caller-owned per-source parser state and queues the messages.
-    void receive(std::span<const std::uint8_t> bytes, MidiParserState& state,
-                 std::uint64_t timestampNs, const std::string& source);
-    // Queues already parsed messages (moved from `messages`).
-    void push(std::vector<MidiMessage>& messages);
-
+    MidiInbox();
+    void push(std::span<const MidiMessage> messages);
     std::size_t drain(std::vector<MidiMessage>& out);
     [[nodiscard]] MidiInput::Stats stats() const;
     void setQueueLimit(std::size_t limit);
     void clear();
 
+    // The device table. `connectDevice` returns the slot for `id` (an earlier slot of a device that
+    // reconnects, else a new one) and marks it connected; `disconnectDevice` marks it gone and queues
+    // a DeviceRemoved for it, behind its last messages.
+    std::uint16_t connectDevice(const std::string& id, const std::string& name, bool virtualSource);
+    void disconnectDevice(std::uint16_t slot);
+    [[nodiscard]] std::vector<MidiDeviceSlot> devices() const;
+    [[nodiscard]] std::uint64_t deviceGeneration() const;
+
 private:
+    void pushLocked(const MidiMessage& m);
+    struct Overflow {
+        bool used = false;
+        MidiMessage message;
+    };
+
     mutable std::mutex mutex_;
-    std::deque<MidiMessage> queue_;
-    std::size_t limit_ = kDefaultQueueLimit;
+    std::vector<MidiMessage> ring_;
+    std::size_t head_ = 0;
+    std::size_t size_ = 0;
+    std::array<Overflow, kOverflowSlots> overflow_{};
+    std::size_t overflowUsed_ = 0;
+    bool notesLost_ = false;
     MidiInput::Stats stats_;
+    mutable std::mutex devicesMutex_;
+    std::vector<MidiDeviceSlot> devices_;
+    std::uint64_t deviceGeneration_ = 0;
 };
 
 // Device side of MidiInput. Implementations deliver bytes to the inbox they were created with.

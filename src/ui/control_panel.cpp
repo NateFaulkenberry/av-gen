@@ -719,6 +719,7 @@ void ControlPanel::drawPanels(app::Engine& engine, const FrameStats& stats) {
     panel("Performance", ImVec2(560, 700), [&] { drawPerformanceDashboard(engine, stats); });
     panel("Analysis", ImVec2(520, 620), [&] { drawAnalysis(engine); });
     panel("Live", ImVec2(420, 460), [&] { drawLive(engine); });
+    panel("MIDI", ImVec2(900, 520), [&] { midi.draw(engine); }); // ADR-1704
     panel("Modulation", ImVec2(560, 420), [&] { drawModulation(engine); });
     panel("Graph", ImVec2(900, 560), [&] { drawGraphWindow(engine); });
     // Full item width: the label column the other panels reserve is for sliders, and an article
@@ -2228,6 +2229,14 @@ void ControlPanel::drawParameters(app::Engine& engine) {
             }
             if (ImGui::MenuItem("Key at current time")) {
                 engine.recordKey(param->path());
+            }
+            // ADR-1704: this parameter is the destination; Learn listens for the control that should drive it.
+            if (param->flags().modulatable && ImGui::MenuItem("MIDI Learn...")) {
+                midi.learnFor(engine, param->path());
+                if (bool* open = layout_.slot("MIDI"); open != nullptr) {
+                    *open = true;
+                    ImGui::SetWindowFocus("MIDI");
+                }
             }
             ImGui::EndPopup();
         }
@@ -4018,13 +4027,19 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     ImGui::Separator();
 
     // ---- learn ----
-    ImGui::TextUnformatted("Learn: last received");
-    if (const auto& m = hub.lastMidi()) {
-        ImGui::Text("MIDI %s ch %d #%d = %d (%s)", control::midiKindName(m->kind), m->channel + 1, m->data1, m->data2,
-                    m->source.c_str());
-    } else {
-        ImGui::TextDisabled("MIDI: nothing yet");
+    // ADR-1700: MIDI is learned, listed and edited in the MIDI panel, which keeps the scene's defaults apart from the
+    // performer's own mappings. This tab keeps OSC's.
+    ImGui::Text("MIDI: %zu default, %zu own mapping(s); applied %llu, unmatched %llu", map.midi.size(), map.midiUser.size(),
+                static_cast<unsigned long long>(status.applied), static_cast<unsigned long long>(status.unmatched));
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Open MIDI panel")) {
+        if (bool* open = layout_.slot("MIDI"); open != nullptr) {
+            *open = true;
+            ImGui::SetWindowFocus("MIDI");
+        }
     }
+    ImGui::Separator();
+    ImGui::TextUnformatted("OSC learn: last received");
     if (const auto& o = hub.lastOsc()) {
         ImGui::Text("OSC %s (%zu args)%s", o->address.c_str(), o->args.size(),
                     o->hasNumber(0) ? fmt::format(" = {:.3f}", static_cast<double>(o->number(0))).c_str() : "");
@@ -4047,12 +4062,6 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     ImGui::SameLine();
     ImGui::Checkbox("event", &learnAsEvent_);
     const std::string parameter = learnTarget_ > 0 ? targets[static_cast<std::size_t>(learnTarget_)] : "";
-    if (ImGui::Button("Bind last MIDI")) {
-        if (!hub.bindLastMidi(learnSignal_, parameter, learnAsEvent_)) {
-            status_ = "no MIDI message received yet";
-        }
-    }
-    ImGui::SameLine();
     if (ImGui::Button("Bind last OSC")) {
         if (!hub.bindLastOsc(learnSignal_, parameter, learnAsEvent_)) {
             status_ = "no OSC message received yet";
@@ -4061,9 +4070,7 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     ImGui::Separator();
 
     // ---- bindings ----
-    ImGui::Text("Bindings: %zu MIDI, %zu OSC (applied %llu, unmatched %llu)", map.midi.size(), map.osc.size(),
-                static_cast<unsigned long long>(status.applied), static_cast<unsigned long long>(status.unmatched));
-    static const char* bindKinds[] = {"cc", "note", "noteEvent", "pitchBend", "pressure", "program"};
+    ImGui::Text("OSC bindings: %zu", map.osc.size());
     auto targetEditor = [&](control::BindingTarget& t) {
         char sig[64];
         std::snprintf(sig, sizeof(sig), "%s", t.signal.c_str());
@@ -4096,39 +4103,6 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
             t.component = std::clamp(t.component, -1, 3);
         }
     };
-    int removeMidi = -1;
-    for (std::size_t i = 0; i < map.midi.size(); ++i) {
-        auto& b = map.midi[i];
-        ImGui::PushID(static_cast<int>(i));
-        int kind = static_cast<int>(b.kind);
-        ImGui::SetNextItemWidth(90);
-        if (ImGui::Combo("##kind", &kind, bindKinds, 6)) {
-            b.kind = static_cast<control::MidiBindKind>(kind);
-        }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(40);
-        ImGui::InputInt("ch", &b.channel, 0, 0);
-        b.channel = std::clamp(b.channel, -1, 15);
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(40);
-        ImGui::InputInt("#", &b.number, 0, 0);
-        b.number = std::clamp(b.number, -1, 127);
-        if (b.kind == control::MidiBindKind::Note) {
-            ImGui::SameLine();
-            ImGui::Checkbox("toggle", &b.toggle);
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("x")) {
-            removeMidi = static_cast<int>(i);
-        }
-        ImGui::Indent();
-        targetEditor(b.target);
-        ImGui::Unindent();
-        ImGui::PopID();
-    }
-    if (removeMidi >= 0) {
-        map.midi.erase(map.midi.begin() + removeMidi);
-    }
     int removeOsc = -1;
     for (std::size_t i = 0; i < map.osc.size(); ++i) {
         auto& b = map.osc[i];

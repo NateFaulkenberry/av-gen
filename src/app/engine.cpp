@@ -605,6 +605,16 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
 
 // ---- control source, tempo and the scene controller -------------------------------------------
 
+std::string Engine::midiSceneKey() const {
+    if (composition() != nullptr) {
+        return compositionPath_.empty() ? std::string("inline") : compositionPath_.filename().string();
+    }
+    if (const auto* gltf = dynamic_cast<const scene::GltfScene*>(controller_.get()); gltf != nullptr) {
+        return gltf->path().filename().string();
+    }
+    return "orb";
+}
+
 void Engine::ensureControlSource() {
     auto* existing = sources_.find("control", "control");
     if (existing == nullptr) {
@@ -3312,6 +3322,9 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         auto map = control::ControlMap::fromJson(doc["control"]);
         if (!map) {
             return std::unexpected(map.error());
+        }
+        for (const std::string& w : map->warnings) {
+            warn(w); // ADR-1700: a user mapping set aside, an unknown key -- said, not silently dropped
         }
         controlHub_.setMap(std::move(*map));
         const std::string tempo = doc["control"].value("tempoSource", std::string("analysis"));
@@ -7352,6 +7365,12 @@ void Engine::update(const FrameTime& time) {
 
     // Live control first: MIDI clock messages feed this frame's beat clock, transport commands
     // move the position the time signals read, parameter writes precede modulation.
+    if (sceneGeneration_ != midiKeySceneGeneration_ || projectGeneration_ != midiKeyProjectGeneration_) {
+        // ADR-1700: another scene or project, so another set of scene-scope MIDI mappings (asked only when one changed).
+        midiKeySceneGeneration_ = sceneGeneration_;
+        midiKeyProjectGeneration_ = projectGeneration_;
+        controlHub_.setSceneKey(midiSceneKey());
+    }
     controlHub_.update(*this, time);
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels: declare and rebind routes

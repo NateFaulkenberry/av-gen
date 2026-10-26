@@ -78,6 +78,9 @@ json AppSettings::toJson() const {
         {"toolbar", preview.toolbar},
     };
     doc["live"] = json{{"audioInput", live.audioInput}, {"midiInput", live.midiInput}, {"smoothing", live.smoothing}};
+    if (!live.midiDisabled.empty()) {
+        doc["live"]["midiDisabled"] = live.midiDisabled; // ADR-1704
+    }
     if (!live.inputSources.empty()) {
         json devices = json::object();
         for (const auto& [device, sources] : live.inputSources) {
@@ -179,6 +182,13 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
             out.live.midiInput = "*";
         }
         out.live.smoothing = std::clamp(lv->value("smoothing", out.live.smoothing), 0.25f, 4.0f);
+        if (const auto off = lv->find("midiDisabled"); off != lv->end() && off->is_array()) { // ADR-1704
+            for (const auto& id : *off) {
+                if (id.is_string()) {
+                    out.live.midiDisabled.push_back(id.get<std::string>());
+                }
+            }
+        }
         if (const auto devices = lv->find("inputSources"); devices != lv->end() && devices->is_object()) {
             for (const auto& [device, list] : devices->items()) {
                 if (!list.is_array()) {
