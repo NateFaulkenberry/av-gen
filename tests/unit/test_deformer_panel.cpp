@@ -129,7 +129,8 @@ TEST_CASE("no row names a leaf the kind's arithmetic does not read", "[ui][defor
         {scene::DeformerKind::Streamline, {"amount", "falloff", "tension"}}, // ADR-1181
         {scene::DeformerKind::Hinge,
          {"amount", "axis", "center", "phase", "falloff", "frequency", "speed", "scale", "tension"}}, // ADR-1672
-        {scene::DeformerKind::Blocks, {"amount", "frequency", "scale", "falloff", "phase"}},           // ADR-1674
+        {scene::DeformerKind::Blocks,
+         {"amount", "frequency", "scale", "falloff", "phase", "speed", "center", "axis"}},            // ADR-1674
     };
     REQUIRE(expected.size() == std::size(ui::kDeformerKinds));
 

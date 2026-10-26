@@ -8,7 +8,8 @@
   - `src/ui/ui_logic.hpp`, `src/ui/world_panel.cpp`: rows and add-defaults.
 - Tests:
   - `tests/unit/test_procedural.cpp` `[adr1674]`: a share of cells moves, along the axis only and by at most the amount;
-    a cell moves as one; a new epoch moves a different set; amount 0 and share 0 are bit-identical.
+    a cell moves as one; a new epoch moves a different set; the still band holds its centre and leaves the far field
+    as without it; amount 0 and share 0 are bit-identical.
   - `tests/rendering/test_procedural_gpu.cpp` `[adr1674]`: amount 0 is the identity on the GPU, and a displacement
     changes the image.
   - `tests/unit/test_deformer_panel.cpp`: the panel lists the kind, and its controls move the point.
@@ -33,7 +34,18 @@ Add `DeformerKind::Blocks`, appended as kind 9.
   each cell has its own distance and sign.
 - **The look.** Everything in a cell moves together. Triangles that cross a cell edge stretch, which reads as a smear.
   A whole step of the epoch reshuffles the set: a reconstruction failure.
-- **The GPU slots.** params = (frequency, scale, phase, falloff); extra = (displacement axis, seed bits).
+- **A still band (`speed` > 0).** The displacement ramps from 0 at `center`, along `axis`, to full at that distance.
+  A Light Beam rides its owner's node, not its surface, so Talking Heads centres the band on the mouth: the mouth and
+  its rays stay put while the forehead and chest break up.
+- **The GPU slots.**
+
+  | Slot | Holds |
+  |---|---|
+  | params | frequency, scale, phase + seed x 4096, falloff |
+  | extra | displacement axis; speed as a plain float |
+
+  The seed is folded into the epoch, because the uniform has no free slot. The CPU computes the same sum, so the hash
+  reads the same integer.
 
 ## Consequences
 

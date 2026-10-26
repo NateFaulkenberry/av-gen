@@ -2422,6 +2422,19 @@ TEST_CASE("Blocks deformer: whole cells move together, a share of them, reshuffl
         }
         CHECK(differ > 10);
     }
+    SECTION("a still band: nothing moves at its centre, full displacement past its ramp") {
+        Deformer r = b;
+        r.falloff = 1.0f;          // every cell moves ...
+        r.speed = 0.2f;            // ... except near y = 0.5
+        r.center = {0.0f, 0.5f, 0.0f};
+        r.axis = {0.0f, 1.0f, 0.0f};
+        const glm::vec3 still{0.1f, 0.5f, 0.1f};
+        CHECK(applyDeformer(r, still, 0.0) == still);
+        Deformer full = r;
+        full.speed = 0.0f;
+        const glm::vec3 far{0.1f, 0.95f, 0.1f};   // 0.45 m from the centre: past the ramp, as without one
+        CHECK(applyDeformer(r, far, 0.0) == applyDeformer(full, far, 0.0));
+    }
     SECTION("amount 0 and share 0 are the identity, bit for bit") {
         const glm::vec3 p{0.13f, 0.27f, -0.4f};
         Deformer z = b;

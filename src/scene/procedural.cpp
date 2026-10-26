@@ -2408,7 +2408,10 @@ glm::vec3 applyDisplacement(const Deformer& d, const glm::vec3& p, float t) {
     return p + axis * (d.amount * falloffWeight(d, y) * n);
 }
 
-// ADR-1672. The CPU twin of procedural.wgsl `hingePoint`: same arithmetic, same order.
+// ADR-1672. The CPU twin of procedural.wgsl `hingePoint`: same arithmetic, same order. The mask is rigid inside
+// HINGE_EASE of its radius and eases to nothing at its shell over the rest -- a wide ease, so the turned part meets the
+// still face without a crease (the owner's "seams under the chins", fx1).
+constexpr float HINGE_EASE = 0.25f;
 float hingeSmoothstep(float e0, float e1, float x) {
     const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
     return t * t * (3.0f - 2.0f * t);
@@ -2438,7 +2441,7 @@ glm::vec3 applyHinge(const Deformer& d, const glm::vec3& p) {
     const float taper = purse > 1e-4f ? (1.0f - u * u) + std::min(purse, 1.0f) * (std::sqrt(1.0f - u * u) - (1.0f - u * u))
                                       : 1.0f - u * u;
     const float lip = taper + (1.0f - taper) * hingeSmoothstep(0.0f, 0.25f * r, -dy);
-    const float mask = 1.0f - hingeSmoothstep(0.5f, 1.0f, glm::length(p - m) / r);
+    const float mask = 1.0f - hingeSmoothstep(HINGE_EASE, 1.0f, glm::length(p - m) / r);
     const float angle = d.amount * slit * lip * mask;
     glm::vec3 out = p;
     if (angle != 0.0f) {
@@ -2485,14 +2488,22 @@ glm::vec3 applyBlocks(const Deformer& d, const glm::vec3& p) {
     const float w = f / std::max(d.scale, 1e-4f);
     const glm::ivec3 cell(static_cast<int>(std::floor(p.x * w)), static_cast<int>(std::floor(p.y * f)),
                           static_cast<int>(std::floor(p.z * w)));
-    const std::uint32_t epoch = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::floor(d.phase)));
-    const std::uint32_t base = d.seed + epoch * 977u;
+    // the seed is folded into the epoch (as the renderer packs it: phase + seed x 4096), so the GPU needs no seed slot
+    const float epochF = d.phase + static_cast<float>(d.seed) * 4096.0f;
+    const std::uint32_t base = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::floor(epochF))) * 977u;
     const float pick = static_cast<float>(blockHash(cell, base) & 0xFFFFFFu) / 16777216.0f;
     if (pick >= d.falloff) {
         return p;
     }
     const float h = static_cast<float>(blockHash(cell, base + 7919u) & 0xFFFFFFu) / 16777216.0f;
-    return p + d.displacementAxis * (d.amount * (h * 2.0f - 1.0f));
+    // the optional still band: `speed` > 0 ramps the displacement from 0 at `center` (along `axis`) to full at that
+    // distance -- a mouth whose rays no deformer can move stays put while the rest breaks up
+    float ramp = 1.0f;
+    if (d.speed > 0.0f) {
+        const glm::vec3 axis = unitOr(d.axis, glm::vec3(0.0f, 1.0f, 0.0f));
+        ramp = std::clamp(std::abs(glm::dot(p - d.center, axis)) / d.speed, 0.0f, 1.0f);
+    }
+    return p + d.displacementAxis * (d.amount * ramp * (h * 2.0f - 1.0f));
 }
 
 } // namespace

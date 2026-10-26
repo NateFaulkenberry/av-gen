@@ -1549,6 +1549,9 @@ struct DeformerRow {
         {"scale", "width", "%.2f", "A block's width over its height."},
         {"falloff", "share", "%.2f", "The share of blocks that are displaced, 0..1."},
         {"phase", "epoch", "%.1f", "Which blocks: every whole step reshuffles them (a reconstruction failure)."},
+        {"speed", "still band", "%.3f m", "0: everywhere. Otherwise the displacement ramps from 0 at the centre to full this far along the axis."},
+        {"center", "band centre", "%.3f m", "The still band's centre."},
+        {"axis", "band axis", "%.2f", "The still band's direction (the ramp runs along it)."},
     };
     static constexpr DeformerRow kPath[] = {
         {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},

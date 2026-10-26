@@ -160,11 +160,13 @@ DeformerUniform packDeformer(const scene::Deformer& d, int fieldSlot, int spline
     case scene::DeformerKind::Displacement:
         break;
     case scene::DeformerKind::Blocks:
-        // ADR-1674: x = cells per metre (height), y = the width ratio, z = the epoch, w = the share; extra.xyz = the
-        // displacement axis, w = the seed's bits
-        u.params = glm::vec4(d.frequency, d.scale, d.phase, std::max(d.falloff, 0.0f));
-        extra = d.displacementAxis;
-        break;
+        // ADR-1674: x = cells per metre (height), y = the width ratio, z = the epoch with the seed folded in (phase +
+        // seed x 4096: its whole part is what the hash reads), w = the share; extra.xyz = the displacement axis, w = the
+        // still band's ramp distance (speed) as a plain float
+        u.params = glm::vec4(d.frequency, d.scale, d.phase + static_cast<float>(d.seed) * 4096.0f,
+                             std::max(d.falloff, 0.0f));
+        u.extra = glm::vec4(d.displacementAxis, std::max(d.speed, 0.0f));
+        return u;
     case scene::DeformerKind::Hinge:
         // ADR-1672: x = the mask's half-width along the axis (frequency), w = its radius (falloff); extra.xyz =
         // forward, extra.w = the mask centre's offset along up (scale) as a plain float, not seed bits

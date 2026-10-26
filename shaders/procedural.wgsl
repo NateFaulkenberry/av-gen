@@ -233,7 +233,7 @@ fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn:
         taper = taper + min(purse, 1.0) * (sqrt(1.0 - u * u) - taper);
     }
     let lip = taper + (1.0 - taper) * smoothstep(0.0, 0.25 * r, -dy);
-    let mask = 1.0 - smoothstep(0.5, 1.0, length(p - m) / r);
+    let mask = 1.0 - smoothstep(0.25, 1.0, length(p - m) / r); // as procedural.cpp HINGE_EASE
     let angle = amount * slit * lip * mask;
     var out = p;
     if (angle != 0.0) {
@@ -269,21 +269,25 @@ fn blockHash(c: vec3<i32>, seed: u32) -> u32 {
     return h;
 }
 
-fn blocksPoint(p: vec3<f32>, amount: f32, params: vec4<f32>, dir: vec3<f32>, seed: u32) -> vec3<f32> {
+fn blocksPoint(p: vec3<f32>, c: vec3<f32>, axis: vec3<f32>, amount: f32, params: vec4<f32>, dir: vec3<f32>,
+               ramp: f32) -> vec3<f32> {
     if (amount == 0.0 || !(params.w > 0.0)) {
         return p;
     }
     let f = max(params.x, 1e-4);
     let w = f / max(params.y, 1e-4);
     let cell = vec3<i32>(i32(floor(p.x * w)), i32(floor(p.y * f)), i32(floor(p.z * w)));
-    let epoch = bitcast<u32>(i32(floor(params.z)));
-    let base = seed + epoch * 977u;
+    let base = bitcast<u32>(i32(floor(params.z))) * 977u;   // the epoch, the seed folded in by the packer
     let pick = f32(blockHash(cell, base) & 0xFFFFFFu) / 16777216.0;
     if (pick >= params.w) {
         return p;
     }
     let h = f32(blockHash(cell, base + 7919u) & 0xFFFFFFu) / 16777216.0;
-    return p + dir * (amount * (h * 2.0 - 1.0));
+    var weight = 1.0;
+    if (ramp > 0.0) {
+        weight = clamp(abs(dot(p - c, axis)) / ramp, 0.0, 1.0);
+    }
+    return p + dir * (amount * weight * (h * 2.0 - 1.0));
 }
 
 fn falloffRamp(y: f32, falloff: f32) -> f32 {
@@ -321,7 +325,8 @@ fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f
     }
     let seed = bitcast<u32>(d.extra.w);
     if (kind == DEFORM_BLOCKS) {
-        return blocksPoint(p, amount, d.params, d.extra.xyz, seed);
+        // ADR-1674: extra.w is the still band's ramp distance (speed), not seed bits
+        return blocksPoint(p, c, axis, amount, d.params, d.extra.xyz, d.extra.w);
     }
     let q = p * d.params.x + vec3<f32>(t * speed);
     if (kind == DEFORM_NOISE) {

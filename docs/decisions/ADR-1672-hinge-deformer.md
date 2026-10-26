@@ -74,6 +74,13 @@ The GPU packing reuses the existing slots:
 The world-space flag moves from +8 to +16 in both the packer and `procedural.wgsl`, because kind 8 is now taken. It is
 the one place the code is decoded, and the CPU and GPU change together.
 
+**The mask's ease** (fx1, the owner: "I can still see visible seams under the chins").
+- The mask was rigid inside half its radius and eased over the outer half. In profile, the turned lower face met the
+  still cheek at a visible crease.
+- It now eases over everything past a quarter of the radius: `smoothstep(0.25, 1, |p - m| / r)`.
+- Talking Heads' mask is now smaller and higher (`make_bust.py` `HINGE_DOWN`, `HINGE_RADIUS`), so it ends above the
+  head piece's lower edge and never turns the head where the still neck meets it.
+
 ## Consequences
 
 - **Off is byte-identical.** Amount 0 returns the point untouched on the CPU (tested bit-equal) and on the GPU

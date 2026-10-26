@@ -424,7 +424,8 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //                   below the slit the turn tapers to nothing at the corners (a lens-shaped opening, and past
 //                   the corners, where the surface is whole, nothing at the slit's height moves); r/4 below it
 //                   the whole width turns (the chin), so the cheeks stretch rather than tear;
-//            mask = 1 - smoothstep(0.5, 1, |p - m| / r): rigid inside half the sphere, easing out at its shell.
+//            mask = 1 - smoothstep(0.25, 1, |p - m| / r): rigid inside a quarter of the sphere, easing out over
+//                   the rest (a wide ease, so the turned part meets the still face without a crease).
 //          Then the PURSE (`tension`, 0 = off and skipped). It rounds the lens toward an ellipse -- taper becomes
 //          mix(1 - u^2, sqrt(1 - u^2), min(purse, 1)), u = min(lat/cw, 1) -- and, with t = amount x purse, L = r/4, sa = dot(p - m, a),
 //          near = 1 - smoothstep(0, L, |dy|), latw = 1 - smoothstep(cw, 2cw, lat), the point moves by
@@ -438,7 +439,8 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          floor(`phase`), is moved by `amount` x (h * 2 - 1) along `displacementAxis` (h a second hash: each cell its
 //          own distance and sign). Everything in a cell moves together, so a surface breaks into displaced rectangles
 //          and the triangles that cross a cell edge stretch (a smear); raising the epoch reshuffles which cells move.
-//          amount 0 or share 0 is the identity.
+//          `speed` > 0 is a still band: the displacement ramps from 0 at `center` (along `axis`) to full at that
+//          distance. amount 0 or share 0 is the identity.
 //   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
 //          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of
 //          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds)
