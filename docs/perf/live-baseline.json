@@ -2,7 +2,7 @@
  "format": "avgen-live-baseline",
  "version": 1,
  "machine": "Apple M2 Max, macOS, 60 Hz display (the owner's)",
- "revision": "6eee3184",
+ "revision": "8b95a484",
  "conditions": "Release; 1920x1080; 30 fps target; Feline Footwear muted (--no-audio) from 60 s; live Auto --warmup 5 --measure 30 x 3 interleaved reps; headless Ultra --warmup-frames 150 --measure 15; AC power; tools/gpu-lock.sh",
  "thresholds": {
   "T1": "misses/900 median <= 5",
@@ -267,64 +267,62 @@
    "project": "examples/aurora-borealis/aurora-borealis.json",
    "reps": [
     {
-     "frames": 901,
-     "deadlineMisses": 12,
-     "missesPer900": 11.986681465038846,
-     "p50": 33.314875,
-     "p99": 41.80125,
-     "max": 44.279084,
+     "frames": 900,
+     "deadlineMisses": 0,
+     "missesPer900": 0.0,
+     "p50": 33.280875,
+     "p99": 37.382542,
+     "max": 38.619125,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "62573ac3a6eb"
+     "revision": "4a134080bec8"
     },
     {
      "frames": 901,
-     "deadlineMisses": 9,
-     "missesPer900": 8.990011098779135,
-     "p50": 33.274875,
-     "p99": 41.666041,
-     "max": 54.855834,
+     "deadlineMisses": 2,
+     "missesPer900": 1.997780244173141,
+     "p50": 33.267958,
+     "p99": 37.401625,
+     "max": 55.022834,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "62573ac3a6eb"
+     "revision": "4a134080bec8"
     },
     {
-     "frames": 901,
-     "deadlineMisses": 5,
-     "missesPer900": 4.994450610432852,
-     "p50": 33.305667,
-     "p99": 40.83525,
-     "max": 50.900458,
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.341625,
+     "p99": 37.36425,
+     "max": 55.250458,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "62573ac3a6eb"
+     "revision": "4a134080bec8"
     }
    ],
    "failedRuns": [],
-   "missesMedian": 8.990011098779135,
-   "missesWorst": 11.986681465038846,
-   "p99Median": 41.666041,
-   "p99Worst": 41.80125,
+   "missesMedian": 1.0,
+   "missesWorst": 1.997780244173141,
+   "p99Median": 37.382542,
+   "p99Worst": 37.401625,
    "mediumOrBetter": 1.0,
    "headless": {
-    "gpuP50": 15.311224999999999,
-    "gpuP95": 18.734047999999998,
-    "cpuWorkP50": 2.572666999999999
+    "gpuP50": 16.143296,
+    "gpuP95": 21.385382,
+    "cpuWorkP50": 4.6445409999999985
    },
    "thresholds": {
-    "T1": false,
-    "T2": false,
+    "T1": true,
+    "T2": true,
     "T3": true,
     "T4": true
-   },
-   "conditions": "pass 3: Sabertooth (its own song and nine stems) muted from 12 s, not Feline from 60 s (SCENE_AUDIO)",
-   "note": "replaced 2026-10-25 for Aurora Borealis pass 3 (scene/aurora-borealis 046d04fc), on the LG at 60 Hz. T1/T2 not met: misses 5-12 (median 9), p99 40.8-41.8. Same-day control: the pass-2 scene (b6e572c2) with its pass-2 arguments missed 6-9 with p99 41.4-41.6 and live GPU p50 19.5-19.8, against its committed 3 and 39.2: the machine has drifted, the scene has not (docs/prototypes/aurora-borealis/PROGRESS.md, pass 3 final)"
+   }
   }
  }
 }
