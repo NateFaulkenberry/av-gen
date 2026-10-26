@@ -24,13 +24,15 @@ bool ratio(std::size_t i) {
 
 std::vector<ExampleInfo> liveSceneList(const std::vector<ExampleInfo>& examples) {
     std::vector<ExampleInfo> out;
+    // ADR-1720: a diagnostic entry (the Audio Response Lab) is opened from the menu, never stepped onto mid-set.
+    const auto performable = [](const ExampleInfo& e) { return e.live && !e.hidden && !e.diagnostic; };
     for (const ExampleInfo& e : examples) {
-        if (e.live && !e.hidden && e.name == "Sonic Live") {
+        if (performable(e) && e.name == "Sonic Live") {
             out.push_back(e);
         }
     }
     for (const ExampleInfo& e : examples) {
-        if (e.live && !e.hidden && e.name != "Sonic Live") {
+        if (performable(e) && e.name != "Sonic Live") {
             out.push_back(e);
         }
     }

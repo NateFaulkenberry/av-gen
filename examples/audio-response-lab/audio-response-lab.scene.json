@@ -1,0 +1,7793 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "audio-response-lab",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.0,
+   34.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 27.0,
+  "orbitSpeed": 0.0
+ },
+ "environment": {
+  "intensity": 0.0,
+  "background": [
+   0.006,
+   0.0065,
+   0.007
+  ],
+  "fogColor": [
+   0,
+   0,
+   0
+  ],
+  "volumeDensity": 0.0,
+  "skyIntensity": 0.0,
+  "sky": {
+   "enabled": false,
+   "background": false
+  },
+  "ambientOcclusion": false,
+  "contactShadows": false
+ },
+ "nodes": [
+  {
+   "name": "hA",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "A  ENERGY",
+     "textSize": 0.4,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.6,
+      7.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.95,
+      0.95
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLevelFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.02,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.0,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLevelTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.0,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLevelTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.0,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLevelTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.0,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLevelFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.0,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLevelLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LEVEL",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.0,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLowFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.02,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.65,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLowTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.65,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLowTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.65,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLowTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.65,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLowFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.65,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45,
+      0.15
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mLowLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LOW",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -11.65,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mMidFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.02,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.3,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mMidTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.3,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mMidTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.3,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mMidTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.3,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mMidFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.3,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.85,
+      0.2
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mMidLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "MID",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.3,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.02,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.95,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.95,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.95,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.95,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.95,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.3,
+      0.85,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "HIGH",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.95,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSustFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.02,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.6,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSustTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.6,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSustTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.6,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSustTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.6,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSustFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.6,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.6,
+      0.5,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSustLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "SUST",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.6,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mEnvFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.02,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.25,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mEnvTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.25,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mEnvTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.25,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mEnvTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.2,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.25,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mEnvFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.9,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.25,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      0.55
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mEnvLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ENV",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.25,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "hB",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "B  EVENTS",
+     "textSize": 0.4,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.6,
+      7.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.95,
+      0.95
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lOnset",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.5,
+      1.5,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      5.2,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      0.6
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lOnsetLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ONSET",
+     "textSize": 0.26,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      4.13,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lLow",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.5,
+      1.5,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.6,
+      5.2,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45,
+      0.15
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lLowLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LOW HIT",
+     "textSize": 0.26,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.6,
+      4.13,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lBeat",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.5,
+      1.5,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.4,
+      5.2,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.3,
+      0.9
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lBeatLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "BEAT",
+     "textSize": 0.26,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      0.4,
+      4.13,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lNote",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.2,
+      5.2,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.4,
+      1.0,
+      0.5
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "lNoteLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "MIDI NOTE",
+     "textSize": 0.22,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.2,
+      4.38,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rLFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.82,
+      2.3200000000000003,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      2.7,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rLTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      2.1500000000000004,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rLTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      2.7,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rLTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      3.25,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rLFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45,
+      0.15
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rLLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "REG L",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -3.6,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rMFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.82,
+      2.3200000000000003,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.4000000000000004,
+      2.7,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rMTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.4000000000000004,
+      2.1500000000000004,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rMTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.4000000000000004,
+      2.7,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rMTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.4000000000000004,
+      3.25,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rMFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.4000000000000004,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.85,
+      0.2
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rMLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "REG M",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.4000000000000004,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rHFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.82,
+      2.3200000000000003,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.2000000000000002,
+      2.7,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rHTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.2000000000000002,
+      2.1500000000000004,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rHTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.2000000000000002,
+      2.7,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rHTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.2000000000000002,
+      3.25,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rHFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.7,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.2000000000000002,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.3,
+      0.85,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "rHLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "REG H",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -1.2000000000000002,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "hD",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "D  BEAT",
+     "textSize": 0.4,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.0,
+      7.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.95,
+      0.95
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialRing",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 2.3,
+     "minorRadius": 0.05,
+     "majorSegments": 64,
+     "minorSegments": 8
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.2,
+      3.9,
+      -0.1
+     ],
+     "rotation": [
+      90.0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialTick0",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.2,
+      6.199999999999999,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialTick1",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      10.5,
+      3.9,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialTick2",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.2,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialTick3",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.12,
+      0.12,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.8999999999999995,
+      3.8999999999999995,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialHub",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.25,
+      0.25,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.2,
+      3.9,
+      0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.9,
+      0.9,
+      0.9
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialNeedle",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.32,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 2.3,
+     "plane": "xy",
+     "startAngle": 1.5707963267948966,
+     "endAngle": 7.853981633974483,
+     "center": [
+      8.2,
+      3.9,
+      0.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.3,
+      0.9
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialBar",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 0.16,
+     "segments": 16,
+     "rings": 8
+    },
+    "distribution": {
+     "kind": "radial",
+     "count": 1,
+     "radius": 2.85,
+     "plane": "xy",
+     "startAngle": 1.5707963267948966,
+     "endAngle": 7.853981633974483,
+     "center": [
+      8.2,
+      3.9,
+      0.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.7,
+      0.7,
+      0.7
+     ],
+     "emissiveIntensity": 0.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "dialLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "PHASE (pink)  BAR (grey)",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.2,
+      0.8999999999999999,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bConfFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bConfTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8999999999999999,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bConfTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8999999999999999,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bConfTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8999999999999999,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bConfFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.6,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.3,
+      0.9
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bConfLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "CONF",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bBpmFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.72,
+      4.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      12.8,
+      3.9,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bBpmTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8999999999999999,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      12.8,
+      2.75,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bBpmTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8999999999999999,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      12.8,
+      3.9,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bBpmTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8999999999999999,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      12.8,
+      5.05,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bBpmFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.6,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      12.8,
+      1.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.7,
+      0.7,
+      0.7
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "bBpmLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "BPM/300",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      12.8,
+      1.1500000000000001,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "hC",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "C  SOURCES",
+     "textSize": 0.4,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.6,
+      -0.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.95,
+      0.95
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsName",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "DRUMS",
+     "textSize": 0.3,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.299999999999999,
+      -1.45,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.2
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsNoData",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.049999999999999,
+      -2.2,
+      -0.02
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.12,
+      0.1
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsActive",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.049999999999999,
+      -2.2,
+      0.03
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.2,
+      1.0,
+      0.3
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "visible": false,
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsLevelFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.67,
+      3.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.049999999999999,
+      -4.8,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsLevelTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.049999999999999,
+      -5.699999999999999,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsLevelTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.049999999999999,
+      -4.8,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsLevelTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.049999999999999,
+      -3.8999999999999995,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsLevelFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.049999999999999,
+      -6.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.2
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsLevelLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LVL",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -12.049999999999999,
+      -7.05,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsOnset",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.049999999999999,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.2
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sdrumsOnsetLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ON",
+     "textSize": 0.2,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.049999999999999,
+      -3.9949999999999997,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassName",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "BASS",
+     "textSize": 0.3,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.7,
+      -1.45,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.35,
+      0.6,
+      1.0
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassNoData",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.45,
+      -2.2,
+      -0.02
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.12,
+      0.1
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassActive",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.45,
+      -2.2,
+      0.03
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.2,
+      1.0,
+      0.3
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "visible": false,
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassLevelFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.67,
+      3.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.45,
+      -4.8,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassLevelTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.45,
+      -5.699999999999999,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassLevelTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.45,
+      -4.8,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassLevelTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.45,
+      -3.8999999999999995,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassLevelFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.45,
+      -6.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.35,
+      0.6,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassLevelLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LVL",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.45,
+      -7.05,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassOnset",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.45,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.35,
+      0.6,
+      1.0
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sbassOnsetLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ON",
+     "textSize": 0.2,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -10.45,
+      -3.9949999999999997,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthName",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "SYNTH",
+     "textSize": 0.3,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.1,
+      -1.45,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.4,
+      1.0,
+      0.5
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthNoData",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.85,
+      -2.2,
+      -0.02
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.12,
+      0.1
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthActive",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.85,
+      -2.2,
+      0.03
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.2,
+      1.0,
+      0.3
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "visible": false,
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthLevelFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.67,
+      3.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.85,
+      -4.8,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthLevelTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.85,
+      -5.699999999999999,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthLevelTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.85,
+      -4.8,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthLevelTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.85,
+      -3.8999999999999995,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthLevelFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.85,
+      -6.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.4,
+      1.0,
+      0.5
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthLevelLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LVL",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -6.85,
+      -7.05,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthOnset",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.85,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.4,
+      1.0,
+      0.5
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "ssynthOnsetLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ON",
+     "textSize": 0.2,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -7.85,
+      -3.9949999999999997,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadName",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "PAD",
+     "textSize": 0.3,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.499999999999999,
+      -1.45,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.5,
+      1.0
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadNoData",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.05
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -5.249999999999999,
+      -2.2,
+      -0.02
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.12,
+      0.1
+     ],
+     "emissiveIntensity": 0.6,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadActive",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -5.249999999999999,
+      -2.2,
+      0.03
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.2,
+      1.0,
+      0.3
+     ],
+     "emissiveIntensity": 0.0,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "visible": false,
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadLevelFrame",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.67,
+      3.72,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.249999999999999,
+      -4.8,
+      -0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.1,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadLevelTick25",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.249999999999999,
+      -5.699999999999999,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadLevelTick50",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.249999999999999,
+      -4.8,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadLevelTick75",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.8500000000000001,
+      0.025,
+      0.02
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.249999999999999,
+      -3.8999999999999995,
+      0.06
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.12,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadLevelFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.249999999999999,
+      -6.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.5,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadLevelLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LVL",
+     "textSize": 0.28,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -4.249999999999999,
+      -7.05,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadOnset",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.55,
+      0.55,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -5.249999999999999,
+      -3.4,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.5,
+      1.0
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "spadOnsetLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ON",
+     "textSize": 0.2,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -5.249999999999999,
+      -3.9949999999999997,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sDrumsKick",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.45,
+      0.45,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.05,
+      -4.5,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.2
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sDrumsKickLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "K",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 2,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.45,
+      -4.62,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sDrumsSnare",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.45,
+      0.45,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.05,
+      -5.35,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.2
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sDrumsSnareLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "S",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 2,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.45,
+      -5.47,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sDrumsHat",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.45,
+      0.45,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.05,
+      -6.2,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.55,
+      0.2
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "sDrumsHatLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "H",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 2,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -13.45,
+      -6.32,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "hE",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "E  PROBES (real route chains)",
+     "textSize": 0.4,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -2.2,
+      -0.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.95,
+      0.95,
+      0.95
+     ],
+     "emissiveIntensity": 0.95,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pBass",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "sphere",
+     "radius": 1.0,
+     "segments": 32,
+     "rings": 16
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -0.6,
+      -3.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.45,
+      0.15
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pBassLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "BASS SPHERE",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -0.6,
+      -5.6,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pFlash",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.0,
+      2.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.4,
+      -3.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "emissiveIntensity": 0.02,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pFlashLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "ONSET FLASH 120ms",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      2.4,
+      -5.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pColour",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      2.0,
+      2.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.4,
+      -3.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.1,
+      0.2,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pColourLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "BRIGHTNESS COLOUR",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.4,
+      -5.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pStem",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.0,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.4,
+      -3.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      0.2,
+      0.2,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.35,
+      0.6,
+      1.0
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pStemLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "BASS STEM CUBE",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      8.4,
+      -5.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pMidi",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      1.4,
+      1.4,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      -3.6,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.4,
+      1.0,
+      0.5
+     ],
+     "emissiveIntensity": 0.05,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "pMidiLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "MIDI CC1",
+     "textSize": 0.24,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.6,
+      -5.0,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "title",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "AUDIO RESPONSE LAB  diagnostic",
+     "textSize": 0.26,
+     "textDepth": 0.0,
+     "textAlign": 2,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      13.6,
+      -7.3,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.5,
+      0.5,
+      0.5
+     ],
+     "emissiveIntensity": 0.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  }
+ ]
+}

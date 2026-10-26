@@ -20,6 +20,9 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
     }
     Engine engine(EngineMode::Offline);
     engine.setLiveControl(false);
+    // ADR-1720: an event lives one frame and `Engine::update` clears it before returning, so the bus read after the
+    // update holds 0 for every event column. The frame's events are kept (ADR-1605's copy) and written instead.
+    engine.setKeepFrameEvents(true);
     if (auto r = engine.loadProject(project); !r) {
         log::error("--sonic-trace: {}", r.error().message);
         return 3;
@@ -68,7 +71,10 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
                     // against the music it follows without a render; ADR-1630 the role aliases
                     name.starts_with("stem.") || name.starts_with("role.") || name.starts_with("env.") ||
                     name.starts_with("macro.") ||
-                    name.starts_with("signal.")) { // ADR-1602: the conditioned signals beside the macros
+                    name.starts_with("signal.") || // ADR-1602: the conditioned signals beside the macros
+                    // ADR-1720: the mix analysis (band levels, tempo confidence) and the control channels (MIDI),
+                    // which the Audio Response Lab's indicators read
+                    name.starts_with("audio.") || name.starts_with("control.")) {
                     columns.push_back(static_cast<signals::SignalId>(i));
                     file << ',' << name;
                 }
@@ -91,8 +97,11 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
             header = true;
         }
         file << fmt::format("{:.4f}", t.renderTime);
+        const std::vector<float>& fired = engine.frameEvents();
         for (const signals::SignalId id : columns) {
-            file << fmt::format(",{:.4f}", bus.value(id));
+            // An event column is the strength it fired with this frame (a fired strength of 0 reads 0.001), else 0.
+            const float v = bus.info(id).isEvent ? (id < fired.size() ? fired[id] : 0.0f) : bus.value(id);
+            file << fmt::format(",{:.4f}", v);
         }
         for (const auto& [param, c] : finalColumns) {
             file << fmt::format(",{:.6g}", param->finalComponent(c));

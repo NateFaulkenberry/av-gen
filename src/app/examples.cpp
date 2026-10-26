@@ -145,6 +145,10 @@ Result<std::vector<ExampleInfo>> loadExampleIndex(const std::filesystem::path& i
             return fail("examples index: '{}': 'hidden' must be true or false", info.name);
         }
         info.hidden = e.value("hidden", false);
+        if (e.contains("diagnostic") && !e["diagnostic"].is_boolean()) {
+            return fail("examples index: '{}': 'diagnostic' must be true or false", info.name);
+        }
+        info.diagnostic = e.value("diagnostic", false); // ADR-1720
         // Three kinds of entry, opened the same way: `Application::openAny` sniffs a recipe from a
         // project by content, so the key is documentation rather than routing. A recipe says so
         // rather than calling itself a project, since what it opens is a world that gets generated.

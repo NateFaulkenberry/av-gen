@@ -1,0 +1,1431 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "Audio Response Lab"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "audio-response-lab.scene.json"
+  }
+ },
+ "sonic": {
+  "live": true
+ },
+ "parameters": {
+  "post/bloom/enabled": false,
+  "post/tonemap/operator": 4,
+  "post/output/vignette": 0.0,
+  "post/output/grain": 0.0,
+  "camera/exposure/mode": 0,
+  "camera/exposure/compensation": 0.0,
+  "temporal/echo/enabled": false,
+  "temporal/mosh/enabled": false,
+  "post/grade/contrast": 1.0,
+  "post/grade/saturation": 1.0,
+  "camera/position": [
+   0.0,
+   0.0,
+   34.0
+  ],
+  "camera/target": [
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "control": {
+  "midi": {
+   "enabled": true,
+   "filter": "*",
+   "bindings": [
+    {
+     "signal": "labCC1",
+     "source": "*",
+     "channel": -1,
+     "kind": "cc",
+     "number": 1
+    }
+   ]
+  }
+ },
+ "sources": [],
+ "routes": [
+  {
+   "source": "response.level",
+   "target": "procedural/mLevelFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "response.level",
+   "target": "procedural/mLevelFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/mLowFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/mLowFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "audio.midLevel",
+   "target": "procedural/mMidFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "audio.midLevel",
+   "target": "procedural/mMidFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "audio.trebleLevel",
+   "target": "procedural/mHighFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "audio.trebleLevel",
+   "target": "procedural/mHighFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "procedural/mSustFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "response.sustain",
+   "target": "procedural/mSustFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "response.onsetEnv",
+   "target": "procedural/mEnvFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "response.onsetEnv",
+   "target": "procedural/mEnvFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "response.onset",
+   "target": "procedural/lOnset/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {}
+  },
+  {
+   "source": "response.low",
+   "target": "procedural/lLow/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {}
+  },
+  {
+   "source": "beat.pulse",
+   "target": "procedural/lBeat/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {}
+  },
+  {
+   "source": "response.note",
+   "target": "procedural/lNote/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {}
+  },
+  {
+   "source": "response.onsetLow",
+   "target": "procedural/rLFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 2.2
+   }
+  },
+  {
+   "source": "response.onsetLow",
+   "target": "procedural/rLFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 2.7
+   }
+  },
+  {
+   "source": "response.onsetMid",
+   "target": "procedural/rMFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 2.2
+   }
+  },
+  {
+   "source": "response.onsetMid",
+   "target": "procedural/rMFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 2.7
+   }
+  },
+  {
+   "source": "response.onsetHigh",
+   "target": "procedural/rHFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 2.2
+   }
+  },
+  {
+   "source": "response.onsetHigh",
+   "target": "procedural/rHFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 2.7
+   }
+  },
+  {
+   "source": "beat.phase",
+   "target": "procedural/dialNeedle/distribution/startAngle",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.5707963267948966,
+    "remapOutMax": -4.71238898038469
+   }
+  },
+  {
+   "source": "beat.bar",
+   "target": "procedural/dialBar/distribution/startAngle",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.5707963267948966,
+    "remapOutMax": -4.71238898038469
+   }
+  },
+  {
+   "source": "audio.tempoConfidence",
+   "target": "procedural/bConfFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "audio.tempoConfidence",
+   "target": "procedural/bConfFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "beat.bpm",
+   "target": "procedural/bBpmFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 300.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 300.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "beat.bpm",
+   "target": "procedural/bBpmFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 300.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 300.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "stem.drums.active",
+   "target": "procedural/sdrumsActive/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.drums.active",
+   "target": "procedural/sdrumsActive/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.drums.level",
+   "target": "procedural/sdrumsLevelFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 3.6
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.drums.level",
+   "target": "procedural/sdrumsLevelFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": -6.6,
+    "remapOutMax": -4.8
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.drums.onset",
+   "target": "procedural/sdrumsOnset/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.bass.active",
+   "target": "procedural/sbassActive/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.bass.active",
+   "target": "procedural/sbassActive/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.bass.level",
+   "target": "procedural/sbassLevelFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 3.6
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.bass.level",
+   "target": "procedural/sbassLevelFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": -6.6,
+    "remapOutMax": -4.8
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.bass.onset",
+   "target": "procedural/sbassOnset/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.synth.active",
+   "target": "procedural/ssynthActive/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.synth.active",
+   "target": "procedural/ssynthActive/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.level",
+   "target": "procedural/ssynthLevelFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 3.6
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.level",
+   "target": "procedural/ssynthLevelFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": -6.6,
+    "remapOutMax": -4.8
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.synth.onset",
+   "target": "procedural/ssynthOnset/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.pad.active",
+   "target": "procedural/spadActive/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.pad.active",
+   "target": "procedural/spadActive/visible",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.pad.level",
+   "target": "procedural/spadLevelFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 3.6
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.pad.level",
+   "target": "procedural/spadLevelFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": -6.6,
+    "remapOutMax": -4.8
+   },
+   "optional": true
+  },
+  {
+   "source": "stem.pad.onset",
+   "target": "procedural/spadOnset/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.drums.kick",
+   "target": "procedural/sDrumsKick/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.drums.snare",
+   "target": "procedural/sDrumsSnare/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "stem.drums.hat",
+   "target": "procedural/sDrumsHat/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "response.bass",
+   "target": "procedural/pBass/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.25,
+    "remapOutMax": 1.4,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
+   }
+  },
+  {
+   "source": "response.onset",
+   "target": "procedural/pFlash/material/emissive",
+   "amount": 0.95,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "envelope": "peakhold",
+    "envelopeHoldMs": 0,
+    "envelopeFallPerSecond": 8.33
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "procedural/pColour/material/emissiveColor",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.05,
+    "remapOutMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
+   }
+  },
+  {
+   "source": "sonic.brightness",
+   "target": "procedural/pColour/material/emissiveColor",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 1.0,
+    "remapOutMax": 0.05,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
+   }
+  },
+  {
+   "source": "stem.bass.level",
+   "target": "procedural/pStem/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "attackMs": 30,
+    "decayMs": 300,
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.2,
+    "remapOutMax": 1.8,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0
+   },
+   "optional": true
+  },
+  {
+   "source": "control.labCC1",
+   "target": "procedural/pMidi/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {},
+   "optional": true
+  },
+  {
+   "source": "control.labCC1",
+   "target": "procedural/pMidi/transform/rotation",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "remapOutMin": 0.0,
+    "remapOutMax": -90.0
+   },
+   "optional": true
+  }
+ ],
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/audio-response-lab.mp4"
+ },
+ "audioLab": {
+  "camera": {
+   "position": [
+    0.0,
+    0.0,
+    34.0
+   ],
+   "target": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "fov": 27.0
+  },
+  "layout": {
+   "mLevel": {
+    "kind": "meter",
+    "signal": "response.level",
+    "rect": [
+     -13.45,
+     1.6,
+     -12.55,
+     6.199999999999999
+    ],
+    "param": "procedural/mLevelFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mLow": {
+    "kind": "meter",
+    "signal": "response.bass",
+    "rect": [
+     -12.1,
+     1.6,
+     -11.200000000000001,
+     6.199999999999999
+    ],
+    "param": "procedural/mLowFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mMid": {
+    "kind": "meter",
+    "signal": "audio.midLevel",
+    "rect": [
+     -10.75,
+     1.6,
+     -9.850000000000001,
+     6.199999999999999
+    ],
+    "param": "procedural/mMidFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mHigh": {
+    "kind": "meter",
+    "signal": "audio.trebleLevel",
+    "rect": [
+     -9.399999999999999,
+     1.6,
+     -8.5,
+     6.199999999999999
+    ],
+    "param": "procedural/mHighFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mSust": {
+    "kind": "meter",
+    "signal": "response.sustain",
+    "rect": [
+     -8.049999999999999,
+     1.6,
+     -7.1499999999999995,
+     6.199999999999999
+    ],
+    "param": "procedural/mSustFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mEnv": {
+    "kind": "meter",
+    "signal": "response.onsetEnv",
+    "rect": [
+     -6.7,
+     1.6,
+     -5.8,
+     6.199999999999999
+    ],
+    "param": "procedural/mEnvFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "lOnset": {
+    "kind": "lamp",
+    "signal": "response.onset",
+    "rect": [
+     -4.35,
+     4.45,
+     -2.85,
+     5.95
+    ],
+    "param": "procedural/lOnset/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "lLow": {
+    "kind": "lamp",
+    "signal": "response.low",
+    "rect": [
+     -2.35,
+     4.45,
+     -0.8500000000000001,
+     5.95
+    ],
+    "param": "procedural/lLow/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "lBeat": {
+    "kind": "lamp",
+    "signal": "beat.pulse",
+    "rect": [
+     -0.35,
+     4.45,
+     1.15,
+     5.95
+    ],
+    "param": "procedural/lBeat/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "lNote": {
+    "kind": "lamp",
+    "signal": "response.note",
+    "rect": [
+     1.7000000000000002,
+     4.7,
+     2.7,
+     5.7
+    ],
+    "param": "procedural/lNote/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "rL": {
+    "kind": "meter",
+    "signal": "response.onsetLow",
+    "rect": [
+     -3.95,
+     1.6,
+     -3.25,
+     3.8000000000000003
+    ],
+    "param": "procedural/rLFill/transform/scale",
+    "component": 1,
+    "scale": 2.2
+   },
+   "rM": {
+    "kind": "meter",
+    "signal": "response.onsetMid",
+    "rect": [
+     -2.7500000000000004,
+     1.6,
+     -2.0500000000000003,
+     3.8000000000000003
+    ],
+    "param": "procedural/rMFill/transform/scale",
+    "component": 1,
+    "scale": 2.2
+   },
+   "rH": {
+    "kind": "meter",
+    "signal": "response.onsetHigh",
+    "rect": [
+     -1.5500000000000003,
+     1.6,
+     -0.8500000000000002,
+     3.8000000000000003
+    ],
+    "param": "procedural/rHFill/transform/scale",
+    "component": 1,
+    "scale": 2.2
+   },
+   "dialNeedle": {
+    "kind": "dial",
+    "signal": "beat.phase",
+    "centre": [
+     8.2,
+     3.9
+    ],
+    "radius": 2.3,
+    "param": "procedural/dialNeedle/distribution/startAngle"
+   },
+   "bConf": {
+    "kind": "meter",
+    "signal": "audio.tempoConfidence",
+    "rect": [
+     11.299999999999999,
+     1.6,
+     11.9,
+     6.199999999999999
+    ],
+    "param": "procedural/bConfFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "bBpm": {
+    "kind": "meter",
+    "signal": "beat.bpm",
+    "rect": [
+     12.5,
+     1.6,
+     13.100000000000001,
+     6.199999999999999
+    ],
+    "param": "procedural/bBpmFill/transform/scale",
+    "component": 1,
+    "scale": 4.6,
+    "range": 300.0
+   },
+   "sdrumsActive": {
+    "kind": "lamp",
+    "signal": "stem.drums.active",
+    "rect": [
+     -13.325,
+     -2.475,
+     -12.774999999999999,
+     -1.9250000000000003
+    ],
+    "param": "procedural/sdrumsActive/material/emissive",
+    "base": 0.0,
+    "gain": 0.9
+   },
+   "sdrumsLevel": {
+    "kind": "meter",
+    "signal": "stem.drums.level",
+    "rect": [
+     -12.325,
+     -6.6,
+     -11.774999999999999,
+     -2.9999999999999996
+    ],
+    "param": "procedural/sdrumsLevelFill/transform/scale",
+    "component": 1,
+    "scale": 3.6
+   },
+   "sdrumsOnset": {
+    "kind": "lamp",
+    "signal": "stem.drums.onset",
+    "rect": [
+     -13.325,
+     -3.675,
+     -12.774999999999999,
+     -3.125
+    ],
+    "param": "procedural/sdrumsOnset/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "sbassActive": {
+    "kind": "lamp",
+    "signal": "stem.bass.active",
+    "rect": [
+     -10.725,
+     -2.475,
+     -10.174999999999999,
+     -1.9250000000000003
+    ],
+    "param": "procedural/sbassActive/material/emissive",
+    "base": 0.0,
+    "gain": 0.9
+   },
+   "sbassLevel": {
+    "kind": "meter",
+    "signal": "stem.bass.level",
+    "rect": [
+     -9.725,
+     -6.6,
+     -9.174999999999999,
+     -2.9999999999999996
+    ],
+    "param": "procedural/sbassLevelFill/transform/scale",
+    "component": 1,
+    "scale": 3.6
+   },
+   "sbassOnset": {
+    "kind": "lamp",
+    "signal": "stem.bass.onset",
+    "rect": [
+     -10.725,
+     -3.675,
+     -10.174999999999999,
+     -3.125
+    ],
+    "param": "procedural/sbassOnset/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "ssynthActive": {
+    "kind": "lamp",
+    "signal": "stem.synth.active",
+    "rect": [
+     -8.125,
+     -2.475,
+     -7.574999999999999,
+     -1.9250000000000003
+    ],
+    "param": "procedural/ssynthActive/material/emissive",
+    "base": 0.0,
+    "gain": 0.9
+   },
+   "ssynthLevel": {
+    "kind": "meter",
+    "signal": "stem.synth.level",
+    "rect": [
+     -7.125,
+     -6.6,
+     -6.574999999999999,
+     -2.9999999999999996
+    ],
+    "param": "procedural/ssynthLevelFill/transform/scale",
+    "component": 1,
+    "scale": 3.6
+   },
+   "ssynthOnset": {
+    "kind": "lamp",
+    "signal": "stem.synth.onset",
+    "rect": [
+     -8.125,
+     -3.675,
+     -7.574999999999999,
+     -3.125
+    ],
+    "param": "procedural/ssynthOnset/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "spadActive": {
+    "kind": "lamp",
+    "signal": "stem.pad.active",
+    "rect": [
+     -5.5249999999999995,
+     -2.475,
+     -4.974999999999999,
+     -1.9250000000000003
+    ],
+    "param": "procedural/spadActive/material/emissive",
+    "base": 0.0,
+    "gain": 0.9
+   },
+   "spadLevel": {
+    "kind": "meter",
+    "signal": "stem.pad.level",
+    "rect": [
+     -4.5249999999999995,
+     -6.6,
+     -3.974999999999999,
+     -2.9999999999999996
+    ],
+    "param": "procedural/spadLevelFill/transform/scale",
+    "component": 1,
+    "scale": 3.6
+   },
+   "spadOnset": {
+    "kind": "lamp",
+    "signal": "stem.pad.onset",
+    "rect": [
+     -5.5249999999999995,
+     -3.675,
+     -4.974999999999999,
+     -3.125
+    ],
+    "param": "procedural/spadOnset/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "sDrumsKick": {
+    "kind": "lamp",
+    "signal": "stem.drums.kick",
+    "rect": [
+     -13.275,
+     -4.725,
+     -12.825000000000001,
+     -4.275
+    ],
+    "param": "procedural/sDrumsKick/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "sDrumsSnare": {
+    "kind": "lamp",
+    "signal": "stem.drums.snare",
+    "rect": [
+     -13.275,
+     -5.574999999999999,
+     -12.825000000000001,
+     -5.125
+    ],
+    "param": "procedural/sDrumsSnare/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "sDrumsHat": {
+    "kind": "lamp",
+    "signal": "stem.drums.hat",
+    "rect": [
+     -13.275,
+     -6.425,
+     -12.825000000000001,
+     -5.9750000000000005
+    ],
+    "param": "procedural/sDrumsHat/material/emissive",
+    "base": 0.07,
+    "gain": 0.9
+   },
+   "pBass": {
+    "kind": "probe",
+    "signal": "response.bass",
+    "param": "procedural/pBass/transform/scale",
+    "component": 0,
+    "rect": [
+     -2.0,
+     -5.0,
+     0.8,
+     -2.2
+    ]
+   },
+   "pFlash": {
+    "kind": "probe",
+    "signal": "response.onset",
+    "param": "procedural/pFlash/material/emissive",
+    "rect": [
+     1.4,
+     -4.6,
+     3.4,
+     -2.6
+    ]
+   },
+   "pColour": {
+    "kind": "probe",
+    "signal": "sonic.brightness",
+    "param": "procedural/pColour/material/emissiveColor",
+    "component": 0,
+    "rect": [
+     4.4,
+     -4.6,
+     6.4,
+     -2.6
+    ]
+   },
+   "pStem": {
+    "kind": "probe",
+    "signal": "stem.bass.level",
+    "param": "procedural/pStem/transform/scale",
+    "component": 0,
+    "rect": [
+     7.4,
+     -4.6,
+     9.4,
+     -2.6
+    ]
+   },
+   "pMidi": {
+    "kind": "probe",
+    "signal": "control.labCC1",
+    "param": "procedural/pMidi/material/emissive",
+    "rect": [
+     10.9,
+     -4.3,
+     12.3,
+     -2.9
+    ]
+   }
+  }
+ }
+}

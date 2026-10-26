@@ -746,6 +746,14 @@
       "name": "Rainbow World (offline)",
       "project": "rainbow-world/rainbow-world-offline.json",
       "generate": "python3 examples/rainbow-world/build.py   (needs Blender 5.x and the six CC0 Poly Haven rocks in assets/terrain/rocks: tools/fetch_polyhaven.py)"
+    },
+    {
+      "category": "Diagnostics",
+      "name": "Audio Response Lab",
+      "description": "An engineering instrument, not a show: a fixed board of meters, lamps, a beat dial and probes, each a route from a real production signal (response.*, audio.*Level, beat.*, stem.<key>.* for sources keyed drums/bass/synth/pad, control.labCC1 on MIDI CC 1). Play live audio (and optionally map input sources with those keys) to see what the analysis publishes, when, and where. A red lamp under a source means it is not configured or not sending. Fixtures and the measured report: tools/audio_lab, docs/prototypes/audio-response-lab.",
+      "live": true,
+      "diagnostic": true,
+      "project": "audio-response-lab/audio-response-lab.json"
     }
   ]
 }

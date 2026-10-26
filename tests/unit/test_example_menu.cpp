@@ -82,6 +82,38 @@ TEST_CASE("The index's 'live' must be a boolean", "[examples][live]") {
     std::filesystem::remove_all(dir);
 }
 
+// ADR-1720: a diagnostic entry is in File > Examples > Live under its own heading, but the live scene switcher never
+// lists it, so a performer stepping through a set cannot land on an instrument.
+TEST_CASE("A diagnostic live entry is in the menu and not in the switcher", "[examples][live][adr1720]") {
+    const auto dir = std::filesystem::temp_directory_path() / "avgen_example_diagnostic_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "index.json") << R"({"examples":[
+        {"name":"Sonic Live","category":"Sonic Garden","description":"d","project":"a.json","live":true},
+        {"name":"Lab","category":"Diagnostics","description":"d","project":"b.json","live":true,"diagnostic":true},
+        {"name":"Lake","category":"Sonic VFX","description":"d","project":"c.json","live":true}]})";
+    const auto all = app::loadExampleIndex(dir / "index.json");
+    REQUIRE(all.has_value());
+    REQUIRE(all->size() == 3);
+    CHECK((*all)[1].diagnostic);
+    CHECK_FALSE((*all)[0].diagnostic);
+
+    const auto sections = app::exampleSections(*all, true);
+    REQUIRE(sections.size() == 3);
+    CHECK(sections[1].category == "Diagnostics");
+    CHECK(names(*all, sections[1]) == std::vector<std::string>{"Lab"});
+
+    const auto scenes = app::liveSceneList(*all);
+    REQUIRE(scenes.size() == 2);
+    CHECK(scenes[0].name == "Sonic Live");
+    CHECK(scenes[1].name == "Lake");
+
+    std::ofstream(dir / "index.json") << R"({"examples":[
+        {"name":"Lab","category":"Diagnostics","description":"d","project":"b.json","live":true,"diagnostic":"yes"}]})";
+    CHECK_FALSE(app::loadExampleIndex(dir / "index.json").has_value());
+    std::filesystem::remove_all(dir);
+}
+
 // The real index: Live Projects leads with the live families, Examples keeps everything else, and moving the live
 // projects into their own menu did not change what the live scene switcher (ADR-1063/1074) steps through, because the
 // switcher's sets are categories and the live projects kept theirs.
@@ -122,14 +154,25 @@ TEST_CASE("The real index: Live Projects and the switcher's sets", "[examples][l
     CHECK(liveCategories.contains("Worlds"));
     CHECK(liveNames.contains("Rainbow World"));
 
-    // The switcher (ADR-1341): every live entry, Sonic Live first -- exactly the Live submenu's entries.
+    // The switcher (ADR-1341): every live entry, Sonic Live first -- exactly the Live submenu's entries, less the
+    // diagnostic ones (ADR-1720), which the menu lists and the switcher never steps onto.
     const auto scenes = app::liveSceneList(*all);
     REQUIRE(!scenes.empty());
     CHECK(scenes.front().name == "Sonic Live");
-    CHECK(scenes.size() == liveNames.size());
+    std::set<std::string> diagnostic;
+    for (const auto& e : *all) {
+        if (e.live && e.diagnostic) {
+            diagnostic.insert(e.name);
+        }
+    }
+    CHECK(diagnostic.contains("Audio Response Lab"));
+    CHECK(liveNames.contains("Audio Response Lab"));
+    CHECK(liveCategories.contains("Diagnostics"));
+    CHECK(scenes.size() + diagnostic.size() == liveNames.size());
     for (const auto& e : scenes) {
         INFO(e.name);
         CHECK(e.live);
+        CHECK_FALSE(e.diagnostic);
         CHECK(liveNames.contains(e.name));
     }
 #endif

@@ -37,6 +37,10 @@ struct ExampleInfo {
     // in File > Examples, not in the Live panel's Scene list. For a scene the owner cut from the menu that still
     // carries test or engine coverage (e.g. the only authored use of an effect type).
     bool hidden = false;
+    // `"diagnostic": true` (ADR-1720): an engineering instrument, not a scene to perform with (the Audio Response Lab).
+    // Listed in File > Examples like any entry, under its own category, but not in the live scene switcher (the Live
+    // panel's Scene list, its arrows, PageUp/PageDown, MIDI program change), so a set never steps onto it.
+    bool diagnostic = false;
     // What the entry cannot open without, read from the project when the index loads: the project or scene file
     // itself and the scene file a project names. Absolute.
     std::vector<std::filesystem::path> required;

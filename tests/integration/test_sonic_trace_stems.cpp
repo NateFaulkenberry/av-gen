@@ -10,6 +10,8 @@
 #include <nlohmann/json.hpp>
 
 #include <filesystem>
+#include <map>
+#include <vector>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -66,4 +68,65 @@ TEST_CASE("sonic trace: the stems, the beat clock and envelope sources are colum
         }
     }
     CHECK(active);
+}
+
+// ADR-1720: an event lives one frame and Engine::update clears it before returning, so the trace read 0 in every event
+// column (response.onset, stem.<k>.onset, beat.pulse) on every row. It now writes the strength the event fired with.
+// It also carries the mix analysis (audio.*), which the Audio Response Lab's band meters read.
+TEST_CASE("sonic trace: event columns carry the frame's events; audio.* are columns", "[stems][sonic][adr1720]") {
+    const testsupport::StemFixture& fx = testsupport::requireStemFixture();
+    const fs::path dir = testsupport::processTempDir() / "sonic-trace-events";
+    fs::create_directories(dir);
+    const nlohmann::json p = {
+        {"format", "avgen-project"},
+        {"version", 4},
+        {"assets",
+         {{"scene", {{"kind", "orb"}}},
+          {"audio", fx.file("mix.wav").string()},
+          {"stems", nlohmann::json::array({{{"key", "drums"}, {"label", "Drums"}, {"role", "drums"},
+                                            {"file", fx.file("drums.wav").string()}}})}}},
+        {"sonic", nlohmann::json::object()},
+        {"parameters", nlohmann::json::object()},
+        {"routes", nlohmann::json::array()}};
+    std::ofstream(dir / "project.json") << p.dump(1);
+    REQUIRE(app::runSonicTraceCommand(dir / "project.json", dir / "trace.csv", 30.0) == 0);
+    std::ifstream in(dir / "trace.csv");
+    std::string header;
+    REQUIRE(std::getline(in, header));
+    std::map<std::string, std::size_t> col;
+    {
+        std::stringstream ss(header);
+        std::string name;
+        for (std::size_t i = 0; std::getline(ss, name, ','); ++i) {
+            col[name] = i;
+        }
+    }
+    for (const char* c : {"stem.drums.onset", "stem.drums.kick", "response.onset", "beat.pulse", "audio.midLevel",
+                          "audio.tempoConfidence", "audio.onset"}) {
+        INFO(c);
+        REQUIRE(col.contains(c));
+    }
+    std::map<std::string, int> fired;
+    for (std::string row; std::getline(in, row);) {
+        std::vector<double> cells;
+        std::stringstream ss(row);
+        for (std::string cell; std::getline(ss, cell, ',');) {
+            cells.push_back(std::stod(cell));
+        }
+        for (const char* c : {"stem.drums.onset", "stem.drums.kick", "response.onset", "beat.pulse"}) {
+            if (cells[col[c]] > 0.0) {
+                ++fired[c];
+            }
+        }
+    }
+    // The drum stem's kicks: one per beat at 120 BPM for 20 s, less the 2 s gap (36). Every class fires; the rows that
+    // fired are a share of the frames, not all of them (an event is one frame, not a held value).
+    const auto kicks = fx.times("drums", "kicks").size();
+    CHECK(fired["stem.drums.kick"] >= static_cast<int>(kicks * 9 / 10));
+    CHECK(fired["stem.drums.kick"] <= static_cast<int>(kicks + 2));
+    CHECK(fired["stem.drums.onset"] >= fired["stem.drums.kick"]);
+    CHECK(fired["response.onset"] > 0);
+    // The grid's tempo is not this case's question (it reads this fixture at half time: 20 pulses in 20 s at 120 BPM,
+    // a finding of the Audio Response Lab's report); that the pulse is a column with events in it is.
+    CHECK(fired["beat.pulse"] >= 10);
 }
