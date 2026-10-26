@@ -1343,52 +1343,6 @@
    "castsShadow": false
   },
   {
-   "name": "th1-ghostAh",
-   "kind": "gltf",
-   "asset": "meshes/th-head-ghost.glb",
-   "position": [
-    0.0,
-    0.0,
-    -0.03
-   ],
-   "rotation": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "scale": [
-    0.001,
-    0.001,
-    0.001
-   ],
-   "parent": "th1-head",
-   "castsShadow": false,
-   "program": "th1-ghostA"
-  },
-  {
-   "name": "th1-ghostBh",
-   "kind": "gltf",
-   "asset": "meshes/th-head-ghost.glb",
-   "position": [
-    0.0,
-    0.0,
-    -0.03
-   ],
-   "rotation": [
-    0.0,
-    0.0,
-    0.0
-   ],
-   "scale": [
-    0.001,
-    0.001,
-    0.001
-   ],
-   "parent": "th1-head",
-   "castsShadow": false,
-   "program": "th1-ghostB"
-  },
-  {
    "name": "th1-mist",
    "kind": "particles",
    "particles": {
@@ -1469,18 +1423,18 @@
      {
       "kind": "sine",
       "amount": 0.0,
-      "frequency": 240.0,
+      "frequency": 11.0,
       "speed": 0.0,
       "phase": 0.0,
       "axis": [
        0.0,
        1.0,
-       0.0
+       0.25
       ],
       "displacementAxis": [
        1.0,
        0.0,
-       0.0
+       0.35
       ],
       "space": "world"
      }
@@ -1606,18 +1560,18 @@
      {
       "kind": "sine",
       "amount": 0.0,
-      "frequency": 240.0,
+      "frequency": 11.0,
       "speed": 0.0,
       "phase": 0.0,
       "axis": [
        0.0,
        1.0,
-       0.0
+       0.25
       ],
       "displacementAxis": [
        1.0,
        0.0,
-       0.0
+       0.35
       ],
       "space": "world"
      }
@@ -1692,18 +1646,18 @@
      {
       "kind": "sine",
       "amount": 0.0,
-      "frequency": 240.0,
+      "frequency": 11.0,
       "speed": 0.0,
       "phase": 0.0,
       "axis": [
        0.0,
        1.0,
-       0.0
+       0.25
       ],
       "displacementAxis": [
        1.0,
        0.0,
-       0.0
+       0.35
       ],
       "space": "world"
      }
@@ -1882,50 +1836,110 @@
    "castsShadow": false
   },
   {
-   "name": "th2-ghostAh",
-   "kind": "gltf",
-   "asset": "meshes/th-head-ghost.glb",
+   "name": "th2-ringA",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.2,
+     "minorRadius": 0.0016,
+     "majorSegments": 160,
+     "minorSegments": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "program": "th2-ringA",
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.045,
+      "scale": 2.5,
+      "speed": 0.35,
+      "space": "local"
+     }
+    ],
+    "castsShadow": false
+   },
    "position": [
     0.0,
-    0.0,
-    -0.03
+    0.2,
+    0.0
    ],
    "rotation": [
+    4.0,
     0.0,
-    0.0,
-    0.0
+    -3.0
    ],
    "scale": [
     0.001,
     0.001,
     0.001
    ],
-   "parent": "th2-head",
-   "castsShadow": false,
-   "program": "th2-ghostA"
+   "parent": "th2-bust"
   },
   {
-   "name": "th2-ghostBh",
-   "kind": "gltf",
-   "asset": "meshes/th-head-ghost.glb",
+   "name": "th2-ringB",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "torus",
+     "majorRadius": 0.2,
+     "minorRadius": 0.0016,
+     "majorSegments": 160,
+     "minorSegments": 6
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "program": "th2-ringB",
+     "unlit": true
+    },
+    "deformers": [
+     {
+      "kind": "noise",
+      "amount": 0.045,
+      "scale": 2.5,
+      "speed": 0.35,
+      "space": "local"
+     }
+    ],
+    "castsShadow": false
+   },
    "position": [
     0.0,
-    0.0,
-    -0.03
+    0.08,
+    0.0
    ],
    "rotation": [
+    -6.0,
     0.0,
-    0.0,
-    0.0
+    5.0
    ],
    "scale": [
     0.001,
     0.001,
     0.001
    ],
-   "parent": "th2-head",
-   "castsShadow": false,
-   "program": "th2-ghostB"
+   "parent": "th2-bust"
   },
   {
    "name": "th2-mist",
@@ -2004,26 +2018,6 @@
      "metallic": 0.0,
      "program": "th3-body"
     },
-    "deformers": [
-     {
-      "kind": "sine",
-      "amount": 0.0,
-      "frequency": 240.0,
-      "speed": 0.0,
-      "phase": 0.0,
-      "axis": [
-       0.0,
-       1.0,
-       0.0
-      ],
-      "displacementAxis": [
-       1.0,
-       0.0,
-       0.0
-      ],
-      "space": "world"
-     }
-    ],
     "castsShadow": false
    },
    "position": [
@@ -2141,24 +2135,6 @@
       ],
       "falloff": 0.075,
       "space": "local"
-     },
-     {
-      "kind": "sine",
-      "amount": 0.0,
-      "frequency": 240.0,
-      "speed": 0.0,
-      "phase": 0.0,
-      "axis": [
-       0.0,
-       1.0,
-       0.0
-      ],
-      "displacementAxis": [
-       1.0,
-       0.0,
-       0.0
-      ],
-      "space": "world"
      }
     ],
     "castsShadow": false
@@ -2227,24 +2203,6 @@
       "speed": 0.08098,
       "scale": -0.04,
       "tension": 2.0
-     },
-     {
-      "kind": "sine",
-      "amount": 0.0,
-      "frequency": 240.0,
-      "speed": 0.0,
-      "phase": 0.0,
-      "axis": [
-       0.0,
-       1.0,
-       0.0
-      ],
-      "displacementAxis": [
-       1.0,
-       0.0,
-       0.0
-      ],
-      "space": "world"
      }
     ],
     "castsShadow": false
@@ -2427,7 +2385,7 @@
    "position": [
     0.0,
     0.0,
-    -0.03
+    0.0
    ],
    "rotation": [
     0.0,
@@ -2450,7 +2408,7 @@
    "position": [
     0.0,
     0.0,
-    -0.03
+    0.0
    ],
    "rotation": [
     0.0,
@@ -2520,6 +2478,499 @@
     "emissive": 0.0,
     "blend": "additive",
     "softness": 0.25
+   }
+  },
+  {
+   "name": "th4-bust",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/th-body.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.86,
+      0.82,
+      0.74
+     ],
+     "roughness": 0.36,
+     "metallic": 0.0,
+     "program": "th4-body"
+    },
+    "castsShadow": false
+   },
+   "position": [
+    0.86,
+    0.0,
+    -0.42
+   ],
+   "rotation": [
+    0.0,
+    -26.0,
+    0.0
+   ],
+   "scale": [
+    0.92,
+    0.92,
+    0.92
+   ]
+  },
+  {
+   "name": "th4-pivot",
+   "kind": "group",
+   "position": [
+    0.0,
+    0.237,
+    -0.0214
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-bust"
+  },
+  {
+   "name": "th4-neck",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/th-neck.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.86,
+      0.82,
+      0.74
+     ],
+     "roughness": 0.36,
+     "metallic": 0.0,
+     "program": "th4-body"
+    },
+    "deformers": [
+     {
+      "kind": "twist",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "speed": 0.0,
+      "space": "local"
+     },
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       -1.0
+      ],
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "falloff": 0.075,
+      "space": "local"
+     },
+     {
+      "kind": "bend",
+      "amount": 0.0,
+      "axis": [
+       0.0,
+       1.0,
+       0.0
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "center": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "falloff": 0.075,
+      "space": "local"
+     }
+    ],
+    "castsShadow": false
+   },
+   "position": [
+    0.0,
+    0.162,
+    -0.0214
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-bust"
+  },
+  {
+   "name": "th4-head",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "mesh",
+     "asset": "meshes/th-head.glb"
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "material": {
+     "baseColor": [
+      0.86,
+      0.82,
+      0.74
+     ],
+     "roughness": 0.36,
+     "metallic": 0.0,
+     "program": "th4-head"
+    },
+    "deformers": [
+     {
+      "kind": "hinge",
+      "amount": 0.0,
+      "space": "local",
+      "axis": [
+       1.0,
+       0.0,
+       0.0
+      ],
+      "center": [
+       0.0,
+       0.091,
+       0.0214
+      ],
+      "displacementAxis": [
+       0.0,
+       0.0,
+       1.0
+      ],
+      "phase": -0.0096,
+      "falloff": 0.065,
+      "frequency": 0.02019,
+      "speed": 0.08098,
+      "scale": -0.04,
+      "tension": 2.0
+     }
+    ],
+    "castsShadow": false
+   },
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-pivot"
+  },
+  {
+   "name": "th4-cavity",
+   "kind": "gltf",
+   "asset": "meshes/th-mouth-cavity.glb",
+   "position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-eyeL",
+   "kind": "gltf",
+   "asset": "meshes/th-eye.glb",
+   "position": [
+    0.0287,
+    0.161,
+    0.0775
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-eyeR",
+   "kind": "gltf",
+   "asset": "meshes/th-eye.glb",
+   "position": [
+    -0.0287,
+    0.161,
+    0.0775
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-lidUL",
+   "kind": "gltf",
+   "asset": "meshes/th-lid-upper.glb",
+   "position": [
+    0.0287,
+    0.161,
+    0.0775
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-lidLL",
+   "kind": "gltf",
+   "asset": "meshes/th-lid-lower.glb",
+   "position": [
+    0.0287,
+    0.161,
+    0.0775
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-lidUR",
+   "kind": "gltf",
+   "asset": "meshes/th-lid-upper.glb",
+   "position": [
+    -0.0287,
+    0.161,
+    0.0775
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-lidLR",
+   "kind": "gltf",
+   "asset": "meshes/th-lid-lower.glb",
+   "position": [
+    -0.0287,
+    0.161,
+    0.0775
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "parent": "th4-head",
+   "castsShadow": false
+  },
+  {
+   "name": "th4-mist",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 36,
+    "seed": 65,
+    "shape": "box",
+    "position": [
+     0.9915113440367233,
+     0.45,
+     -0.77
+    ],
+    "extent": [
+     0.5,
+     0.35,
+     0.2
+    ],
+    "direction": [
+     0.0,
+     1.0,
+     0.0
+    ],
+    "spawnRate": 1.8,
+    "lifetimeMin": 14.0,
+    "lifetimeMax": 22.0,
+    "spread": 1.0,
+    "speedMin": 0.005,
+    "speedMax": 0.02,
+    "gravity": [
+     0,
+     0.0,
+     0
+    ],
+    "drag": 0.1,
+    "turbulence": 0.01,
+    "turbulenceScale": 0.3,
+    "sizeStart": 0.45,
+    "sizeEnd": 0.8,
+    "colorStart": [
+     0.04667,
+     1.0,
+     0.52712,
+     0.07
+    ],
+    "colorEnd": [
+     0.04667,
+     1.0,
+     0.52712,
+     0.0
+    ],
+    "emissive": 0.0,
+    "blend": "additive",
+    "softness": 0.25
+   }
+  },
+  {
+   "name": "th4-grain",
+   "kind": "particles",
+   "particles": {
+    "enabled": true,
+    "capacity": 500,
+    "seed": 75,
+    "shape": "box",
+    "position": [
+     0.86,
+     0.4,
+     -0.39
+    ],
+    "extent": [
+     0.07,
+     0.1,
+     0.06
+    ],
+    "direction": [
+     0.35,
+     1.0,
+     0.15
+    ],
+    "spawnRate": 0.0,
+    "lifetimeMin": 1.2,
+    "lifetimeMax": 2.6,
+    "spread": 0.6,
+    "speedMin": 0.03,
+    "speedMax": 0.1,
+    "gravity": [
+     0.0,
+     0.015,
+     0.0
+    ],
+    "drag": 0.5,
+    "turbulence": 0.05,
+    "turbulenceScale": 0.6,
+    "sizeStart": 0.0045,
+    "sizeEnd": 0.0015,
+    "colorStart": [
+     0.90466,
+     0.87137,
+     1.0,
+     0.9
+    ],
+    "colorEnd": [
+     0.04667,
+     1.0,
+     0.52712,
+     0.0
+    ],
+    "emissive": 2.4,
+    "blend": "additive",
+    "softness": 0.02
    }
   }
  ],
@@ -3746,236 +4197,6 @@
    "opacity": -1
   },
   {
-   "name": "th1-ghostA",
-   "ops": [
-    {
-     "kind": "fresnel",
-     "dst": 0,
-     "value": 1.6
-    },
-    {
-     "kind": "constant",
-     "dst": 1,
-     "constant": [
-      0.1251,
-      1.22904,
-      1.6,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 0,
-     "srcB": 1
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 4,
-     "srcA": 0,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.35,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.07,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 6
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      1.0
-     ]
-    }
-   ],
-   "baseColor": 5,
-   "metallic": -1,
-   "roughness": -1,
-   "emission": 2,
-   "emissionIntensity": 1.0,
-   "opacity": 3
-  },
-  {
-   "name": "th1-ghostB",
-   "ops": [
-    {
-     "kind": "fresnel",
-     "dst": 0,
-     "value": 1.6
-    },
-    {
-     "kind": "constant",
-     "dst": 1,
-     "constant": [
-      0.0677,
-      0.16739,
-      1.6,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 0,
-     "srcB": 1
-    },
-    {
-     "kind": "constant",
-     "dst": 3,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 4,
-     "srcA": 0,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.35,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.07,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 6
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      1.0
-     ]
-    }
-   ],
-   "baseColor": 5,
-   "metallic": -1,
-   "roughness": -1,
-   "emission": 2,
-   "emissionIntensity": 1.0,
-   "opacity": 3
-  },
-  {
    "name": "th2-body",
    "ops": [
     {
@@ -4225,112 +4446,6 @@
      "dst": 4,
      "srcA": 4,
      "srcB": 6
-    },
-    {
-     "kind": "input",
-     "dst": 1,
-     "input": "time"
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.0,
-      0.0,
-      14.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "worldPosition"
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.0,
-      1.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 3,
-     "srcB": 2
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "quantize",
-     "dst": 1,
-     "srcA": 1,
-     "value": 70.0,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ],
-     "seed": 9
-    },
-    {
-     "kind": "swizzle",
-     "dst": 1,
-     "srcA": 1,
-     "constant": [
-      3.0,
-      3.0,
-      3.0,
-      3.0
-     ]
-    },
-    {
-     "kind": "threshold",
-     "dst": 1,
-     "srcA": 1,
-     "value": 1.01
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      2.2,
-      2.2,
-      2.2,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 1
     }
    ],
    "baseColor": 7,
@@ -4590,112 +4705,6 @@
      "dst": 4,
      "srcA": 4,
      "srcB": 6
-    },
-    {
-     "kind": "input",
-     "dst": 1,
-     "input": "time"
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.0,
-      0.0,
-      14.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "input",
-     "dst": 3,
-     "input": "worldPosition"
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.0,
-      1.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 3,
-     "srcB": 2
-    },
-    {
-     "kind": "add",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "quantize",
-     "dst": 1,
-     "srcA": 1,
-     "value": 70.0,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ],
-     "seed": 9
-    },
-    {
-     "kind": "swizzle",
-     "dst": 1,
-     "srcA": 1,
-     "constant": [
-      3.0,
-      3.0,
-      3.0,
-      3.0
-     ]
-    },
-    {
-     "kind": "threshold",
-     "dst": 1,
-     "srcA": 1,
-     "value": 1.01
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      2.2,
-      2.2,
-      2.2,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 5
-    },
-    {
-     "kind": "add",
-     "dst": 4,
-     "srcA": 4,
-     "srcB": 1
     }
    ],
    "baseColor": 7,
@@ -4706,21 +4715,26 @@
    "opacity": -1
   },
   {
-   "name": "th2-ghostA",
+   "name": "th2-ringA",
    "ops": [
     {
-     "kind": "fresnel",
+     "kind": "constant",
      "dst": 0,
-     "value": 1.6
+     "constant": [
+      1.0,
+      0.02416,
+      0.67244,
+      1.0
+     ]
     },
     {
      "kind": "constant",
      "dst": 1,
      "constant": [
-      1.6,
-      0.03865,
-      1.07591,
-      1.0
+      0.0,
+      0.0,
+      0.0,
+      0.0
      ]
     },
     {
@@ -4733,109 +4747,41 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 4,
-     "srcA": 0,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.35,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.07,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 6
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
+      0.01,
+      0.008,
+      0.02,
       1.0
      ]
     }
    ],
-   "baseColor": 5,
+   "baseColor": 3,
    "metallic": -1,
    "roughness": -1,
    "emission": 2,
    "emissionIntensity": 1.0,
-   "opacity": 3
+   "opacity": -1
   },
   {
-   "name": "th2-ghostB",
+   "name": "th2-ringB",
    "ops": [
     {
-     "kind": "fresnel",
+     "kind": "constant",
      "dst": 0,
-     "value": 1.6
+     "constant": [
+      1.0,
+      0.02416,
+      0.67244,
+      1.0
+     ]
     },
     {
      "kind": "constant",
      "dst": 1,
      "constant": [
-      0.40664,
-      0.06998,
-      1.6,
-      1.0
+      0.0,
+      0.0,
+      0.0,
+      0.0
      ]
     },
     {
@@ -4848,92 +4794,19 @@
      "kind": "constant",
      "dst": 3,
      "constant": [
-      0.0,
-      0.0,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "remap",
-     "dst": 4,
-     "srcA": 0,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.35,
-      1.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 4
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.07,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 6
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
-    },
-    {
-     "kind": "constant",
-     "dst": 5,
-     "constant": [
-      0.0,
-      0.0,
-      0.0,
+      0.01,
+      0.008,
+      0.02,
       1.0
      ]
     }
    ],
-   "baseColor": 5,
+   "baseColor": 3,
    "metallic": -1,
    "roughness": -1,
    "emission": 2,
    "emissionIntensity": 1.0,
-   "opacity": 3
+   "opacity": -1
   },
   {
    "name": "th3-body",
@@ -5189,44 +5062,28 @@
     {
      "kind": "input",
      "dst": 1,
-     "input": "time"
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.0,
-      0.0,
-      14.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "input",
-     "dst": 3,
      "input": "worldPosition"
     },
     {
-     "kind": "constant",
-     "dst": 2,
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 1,
      "constant": [
-      0.0,
       1.0,
-      0.0,
-      0.0
+      1.0,
+      1.0,
+      1.0
      ]
     },
     {
-     "kind": "multiply",
+     "kind": "constant",
      "dst": 2,
-     "srcA": 3,
-     "srcB": 2
+     "constant": [
+      -0.8,
+      -0.8,
+      -0.8,
+      0.0
+     ]
     },
     {
      "kind": "add",
@@ -5235,42 +5092,80 @@
      "srcB": 2
     },
     {
-     "kind": "quantize",
+     "kind": "multiply",
      "dst": 1,
      "srcA": 1,
-     "value": 70.0,
+     "srcB": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.0001,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.0025000000000000005,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
      "constant": [
       0.0,
       0.0,
       0.0,
       0.0
-     ],
-     "seed": 9
-    },
-    {
-     "kind": "swizzle",
-     "dst": 1,
-     "srcA": 1,
-     "constant": [
-      3.0,
-      3.0,
-      3.0,
-      3.0
      ]
     },
     {
-     "kind": "threshold",
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
      "dst": 1,
-     "srcA": 1,
-     "value": 1.01
+     "input": "time"
     },
     {
      "kind": "constant",
      "dst": 2,
      "constant": [
-      2.2,
-      2.2,
-      2.2,
+      0.011,
+      0.017,
+      0.007,
       0.0
      ]
     },
@@ -5281,10 +5176,51 @@
      "srcB": 2
     },
     {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 6,
+     "srcB": 1
+    },
+    {
+     "kind": "voronoiEdge",
+     "dst": 1,
+     "srcA": 1,
+     "value": 26.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 21
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.045,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
      "kind": "multiply",
      "dst": 1,
      "srcA": 1,
-     "srcB": 5
+     "srcB": 2
     },
     {
      "kind": "add",
@@ -5554,44 +5490,28 @@
     {
      "kind": "input",
      "dst": 1,
-     "input": "time"
-    },
-    {
-     "kind": "constant",
-     "dst": 2,
-     "constant": [
-      0.0,
-      0.0,
-      14.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 1,
-     "srcA": 1,
-     "srcB": 2
-    },
-    {
-     "kind": "input",
-     "dst": 3,
      "input": "worldPosition"
     },
     {
-     "kind": "constant",
-     "dst": 2,
+     "kind": "swizzle",
+     "dst": 1,
+     "srcA": 1,
      "constant": [
-      0.0,
       1.0,
-      0.0,
-      0.0
+      1.0,
+      1.0,
+      1.0
      ]
     },
     {
-     "kind": "multiply",
+     "kind": "constant",
      "dst": 2,
-     "srcA": 3,
-     "srcB": 2
+     "constant": [
+      -0.8,
+      -0.8,
+      -0.8,
+      0.0
+     ]
     },
     {
      "kind": "add",
@@ -5600,42 +5520,80 @@
      "srcB": 2
     },
     {
-     "kind": "quantize",
+     "kind": "multiply",
      "dst": 1,
      "srcA": 1,
-     "value": 70.0,
+     "srcB": 1
+    },
+    {
+     "kind": "remap",
+     "dst": 2,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.0001,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.0025000000000000005,
+      1.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
      "constant": [
       0.0,
       0.0,
       0.0,
       0.0
-     ],
-     "seed": 9
-    },
-    {
-     "kind": "swizzle",
-     "dst": 1,
-     "srcA": 1,
-     "constant": [
-      3.0,
-      3.0,
-      3.0,
-      3.0
      ]
     },
     {
-     "kind": "threshold",
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2
+    },
+    {
+     "kind": "input",
+     "dst": 6,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
      "dst": 1,
-     "srcA": 1,
-     "value": 1.01
+     "input": "time"
     },
     {
      "kind": "constant",
      "dst": 2,
      "constant": [
-      2.2,
-      2.2,
-      2.2,
+      0.011,
+      0.017,
+      0.007,
       0.0
      ]
     },
@@ -5646,10 +5604,51 @@
      "srcB": 2
     },
     {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 6,
+     "srcB": 1
+    },
+    {
+     "kind": "voronoiEdge",
+     "dst": 1,
+     "srcA": 1,
+     "value": 26.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 21
+    },
+    {
+     "kind": "remap",
+     "dst": 1,
+     "srcA": 1,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      0.045,
+      1.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
      "kind": "multiply",
      "dst": 1,
      "srcA": 1,
-     "srcB": 5
+     "srcB": 2
     },
     {
      "kind": "add",
@@ -5671,15 +5670,15 @@
     {
      "kind": "fresnel",
      "dst": 0,
-     "value": 1.6
+     "value": 4.0
     },
     {
      "kind": "constant",
      "dst": 1,
      "constant": [
-      1.6,
-      0.72126,
-      0.10082,
+      2.2,
+      0.22493,
+      0.05315,
       1.0
      ]
     },
@@ -5700,75 +5699,24 @@
      ]
     },
     {
-     "kind": "remap",
-     "dst": 4,
-     "srcA": 0,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.35,
-      1.0
-     ]
-    },
-    {
      "kind": "multiply",
      "dst": 3,
      "srcA": 3,
-     "srcB": 4
+     "srcB": 0
     },
     {
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.07,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 6
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
+     "srcB": 3
     },
     {
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.0,
-      0.0,
-      0.0,
+      0.6,
+      0.06135,
+      0.01449,
       1.0
      ]
     }
@@ -5786,15 +5734,15 @@
     {
      "kind": "fresnel",
      "dst": 0,
-     "value": 1.6
+     "value": 4.0
     },
     {
      "kind": "constant",
      "dst": 1,
      "constant": [
-      1.6,
-      0.16359,
-      0.03865,
+      0.22493,
+      0.57695,
+      2.2,
       1.0
      ]
     },
@@ -5815,75 +5763,24 @@
      ]
     },
     {
-     "kind": "remap",
-     "dst": 4,
-     "srcA": 0,
-     "value": 1.0,
-     "constant": [
-      0.0,
-      1.0,
-      0.35,
-      1.0
-     ]
-    },
-    {
      "kind": "multiply",
      "dst": 3,
      "srcA": 3,
-     "srcB": 4
+     "srcB": 0
     },
     {
      "kind": "multiply",
      "dst": 2,
      "srcA": 2,
-     "srcB": 4
-    },
-    {
-     "kind": "input",
-     "dst": 6,
-     "input": "localPosition"
-    },
-    {
-     "kind": "swizzle",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      1.0,
-      1.0,
-      1.0,
-      1.0
-     ]
-    },
-    {
-     "kind": "smoothstep",
-     "dst": 6,
-     "srcA": 6,
-     "constant": [
-      0.0,
-      0.07,
-      0.0,
-      0.0
-     ]
-    },
-    {
-     "kind": "multiply",
-     "dst": 3,
-     "srcA": 3,
-     "srcB": 6
-    },
-    {
-     "kind": "multiply",
-     "dst": 2,
-     "srcA": 2,
-     "srcB": 6
+     "srcB": 3
     },
     {
      "kind": "constant",
      "dst": 5,
      "constant": [
-      0.0,
-      0.0,
-      0.0,
+      0.06135,
+      0.15735,
+      0.6,
       1.0
      ]
     }
@@ -5894,6 +5791,716 @@
    "emission": 2,
    "emissionIntensity": 1.0,
    "opacity": 3
+  },
+  {
+   "name": "th4-body",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "localPosition"
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      -9.0,
+      -9.0,
+      -9.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 1
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 1,
+     "value": -1.0,
+     "constant": [
+      1111.111111111111,
+      3906.25,
+      1111.111111111111,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      -9.0,
+      -9.0,
+      -8.996,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 0,
+     "srcB": 2
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 2,
+     "value": -1.0,
+     "constant": [
+      2267.5736961451244,
+      6944.444444444444,
+      1111.111111111111,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      -9.0,
+      -9.0,
+      -8.996,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 0,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 3,
+     "value": -1.0,
+     "constant": [
+      2267.5736961451244,
+      6944.444444444444,
+      1111.111111111111,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.86,
+      0.82,
+      0.74,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 2,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.6
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 4,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "noise",
+     "dst": 4,
+     "srcA": 4,
+     "value": 7.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "value": 1.0,
+     "constant": [
+      0.32,
+      0.68,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "oklabRamp",
+     "dst": 5,
+     "srcA": 4,
+     "value": 1.0,
+     "constant": [
+      0.00478,
+      0.14703,
+      0.10224,
+      1.0
+     ],
+     "constant2": [
+      0.016,
+      0.55201,
+      0.32314,
+      1.0
+     ],
+     "constant3": [
+      0.20508,
+      1.0,
+      0.67244,
+      1.0
+     ],
+     "constant4": [
+      0.7454,
+      1.0,
+      0.90466,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 7,
+     "srcA": 3,
+     "srcB": 5,
+     "srcC": 6
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.35,
+      0.35,
+      0.35,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "time"
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.0,
+      -0.035,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "noise",
+     "dst": 1,
+     "srcA": 1,
+     "value": 16.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 33
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 1,
+     "constant": [
+      1.25,
+      1.3,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 2,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.06
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.01633,
+      0.35,
+      0.18449,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2
+    }
+   ],
+   "baseColor": 7,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 4,
+   "emissionIntensity": 1.0,
+   "opacity": -1
+  },
+  {
+   "name": "th4-head",
+   "ops": [
+    {
+     "kind": "input",
+     "dst": 0,
+     "input": "localPosition"
+    },
+    {
+     "kind": "constant",
+     "dst": 1,
+     "constant": [
+      -0.0,
+      -0.07100000000000001,
+      -0.0964,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 0,
+     "srcB": 1
+    },
+    {
+     "kind": "multiply",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 1
+    },
+    {
+     "kind": "gradient",
+     "dst": 1,
+     "srcA": 1,
+     "value": -1.0,
+     "constant": [
+      1111.111111111111,
+      3906.25,
+      1111.111111111111,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 2,
+     "constant": [
+      -0.0294,
+      -0.161,
+      -0.0784,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 0,
+     "srcB": 2
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 2
+    },
+    {
+     "kind": "gradient",
+     "dst": 2,
+     "srcA": 2,
+     "value": -1.0,
+     "constant": [
+      2267.5736961451244,
+      6944.444444444444,
+      1111.111111111111,
+      1.0
+     ]
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.0294,
+      -0.161,
+      -0.0784,
+      0.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 3,
+     "srcA": 0,
+     "srcB": 3
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 3
+    },
+    {
+     "kind": "gradient",
+     "dst": 3,
+     "srcA": 3,
+     "value": -1.0,
+     "constant": [
+      2267.5736961451244,
+      6944.444444444444,
+      1111.111111111111,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.86,
+      0.82,
+      0.74,
+      1.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 5,
+     "srcA": 2,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.6
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 3,
+     "srcA": 3,
+     "srcB": 5
+    },
+    {
+     "kind": "input",
+     "dst": 4,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "noise",
+     "dst": 4,
+     "srcA": 4,
+     "value": 7.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 5
+    },
+    {
+     "kind": "remap",
+     "dst": 4,
+     "srcA": 4,
+     "value": 1.0,
+     "constant": [
+      0.32,
+      0.68,
+      0.0,
+      1.0
+     ]
+    },
+    {
+     "kind": "oklabRamp",
+     "dst": 5,
+     "srcA": 4,
+     "value": 1.0,
+     "constant": [
+      0.00478,
+      0.14703,
+      0.10224,
+      1.0
+     ],
+     "constant2": [
+      0.016,
+      0.55201,
+      0.32314,
+      1.0
+     ],
+     "constant3": [
+      0.20508,
+      1.0,
+      0.67244,
+      1.0
+     ],
+     "constant4": [
+      0.7454,
+      1.0,
+      0.90466,
+      1.0
+     ]
+    },
+    {
+     "kind": "add",
+     "dst": 6,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "remap",
+     "dst": 6,
+     "srcA": 6,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "mixBy",
+     "dst": 7,
+     "srcA": 3,
+     "srcB": 5,
+     "srcC": 6
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 5,
+     "srcB": 6
+    },
+    {
+     "kind": "constant",
+     "dst": 6,
+     "constant": [
+      0.35,
+      0.35,
+      0.35,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 6
+    },
+    {
+     "kind": "input",
+     "dst": 1,
+     "input": "worldPosition"
+    },
+    {
+     "kind": "input",
+     "dst": 2,
+     "input": "time"
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.0,
+      -0.035,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 1,
+     "srcA": 1,
+     "srcB": 2
+    },
+    {
+     "kind": "noise",
+     "dst": 1,
+     "srcA": 1,
+     "value": 16.0,
+     "constant": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seed": 33
+    },
+    {
+     "kind": "smoothstep",
+     "dst": 2,
+     "srcA": 1,
+     "constant": [
+      1.25,
+      1.3,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "kind": "remap",
+     "dst": 3,
+     "srcA": 2,
+     "value": 1.0,
+     "constant": [
+      0.0,
+      1.0,
+      1.0,
+      0.06
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 7,
+     "srcA": 7,
+     "srcB": 3
+    },
+    {
+     "kind": "constant",
+     "dst": 3,
+     "constant": [
+      0.01633,
+      0.35,
+      0.18449,
+      0.0
+     ]
+    },
+    {
+     "kind": "multiply",
+     "dst": 2,
+     "srcA": 2,
+     "srcB": 3
+    },
+    {
+     "kind": "add",
+     "dst": 4,
+     "srcA": 4,
+     "srcB": 2
+    }
+   ],
+   "baseColor": 7,
+   "metallic": -1,
+   "roughness": -1,
+   "emission": 4,
+   "emissionIntensity": 1.0,
+   "opacity": -1
   }
  ],
  "entities": [
@@ -5941,6 +6548,21 @@
    "name": "th3-head",
    "node": "th3-head",
    "seed": 387383
+  },
+  {
+   "name": "th4-bust",
+   "node": "th4-bust",
+   "seed": 412652
+  },
+  {
+   "name": "th4-neck",
+   "node": "th4-neck",
+   "seed": 96640
+  },
+  {
+   "name": "th4-head",
+   "node": "th4-head",
+   "seed": 675343
   }
  ]
 }
