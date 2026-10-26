@@ -105,6 +105,21 @@ def meter(name, x, y0, height, signal, colour, label, optional=False, width=0.9)
                     "param": f"procedural/{name}Fill/transform/scale", "component": 1, "scale": height}
 
 
+def slow_bar(name, x, y0, height, signal, colour, width=0.16):
+    """A thin fill inside a meter, on its right edge: the same idea read slowly (ADR-1723's meters show the fast level
+    as the meter and the long-term `audio.*Level` beside it)."""
+    box(f"{name}Fill", (x, y0, 0.05), (width, 1.0, 0.1), colour, 0.9)
+    nodes[-1]["procedural"]["distributionTransform"]["scale"] = [1.0, 0.001, 1.0]
+    remap = {"remapEnabled": True, "remapInMin": 0.0, "remapInMax": 1.0, "clampEnabled": True, "clampMin": 0.0,
+             "clampMax": 1.0}
+    route(signal, f"procedural/{name}Fill/transform/scale", component=1,
+          chain=dict(remap, remapOutMin=0.001, remapOutMax=height))
+    route(signal, f"procedural/{name}Fill/transform/position", component=1,
+          chain=dict(remap, remapOutMin=y0, remapOutMax=y0 + height / 2))
+    layout[name] = {"kind": "meter", "signal": signal, "rect": [x - width / 2, y0, x + width / 2, y0 + height],
+                    "param": f"procedural/{name}Fill/transform/scale", "component": 1, "scale": height}
+
+
 def lamp(name, x, y, size, signal, colour, label, gain=0.9, optional=False, label_size=0.26):
     """A square that is dim at rest and bright on the frames its event (or value) is non-zero: added, no chain."""
     box(name, (x, y, 0.0), (size, size, 0.1), colour, LAMP_BASE)
@@ -124,9 +139,13 @@ def heading(name, x, y, words):
 heading("hA", -13.6, 7.0, "A  ENERGY")
 for i, (sig, col, lab) in enumerate([
         ("response.level", (0.9, 0.9, 0.9), "LEVEL"), ("response.bass", (1.0, 0.45, 0.15), "LOW"),
-        ("audio.midLevel", (0.95, 0.85, 0.2), "MID"), ("audio.trebleLevel", (0.3, 0.85, 1.0), "HIGH"),
+        ("response.mid", (0.95, 0.85, 0.2), "MID"), ("response.high", (0.3, 0.85, 1.0), "HIGH"),
         ("response.sustain", (0.6, 0.5, 1.0), "SUST"), ("response.onsetEnv", (1.0, 1.0, 0.55), "ENV")]):
     meter(f"m{lab.title()}", -13.0 + i * 1.35, 1.6, 4.6, sig, col, lab)
+# ADR-1723: beside the fast mid and high levels, the long-term band levels (decay 4.3 dB/s) as thin grey bars.
+slow_bar("mMidSlow", -13.0 + 2 * 1.35 + 0.37, 1.6, 4.6, "audio.midLevel", (0.55, 0.55, 0.55))
+slow_bar("mHighSlow", -13.0 + 3 * 1.35 + 0.37, 1.6, 4.6, "audio.trebleLevel", (0.55, 0.55, 0.55))
+text("mSlowNote", (-13.0 + 2.5 * 1.35, 0.75, 0.0), "thin grey: audio.*Level (slow)", 0.2, align=1)
 
 # B: EVENTS (top middle)
 heading("hB", -4.6, 7.0, "B  EVENTS")
@@ -167,6 +186,24 @@ orbiter("dialNeedle", 2.3, 0.32, (1.0, 0.3, 0.9), 0.95, "beat.phase")
 orbiter("dialBar", 2.85, 0.16, (0.7, 0.7, 0.7), 0.8, "beat.bar")
 layout["dialNeedle"] = {"kind": "dial", "signal": "beat.phase", "centre": list(DIAL), "radius": 2.3,
                         "param": "procedural/dialNeedle/distribution/startAngle"}
+def state_lamp(name, x, y, value, colour, label):
+    """Lit while beat.source == value (ADR-1724): binary(v > value - 0.5) minus binary(v > value + 0.5)."""
+    box(name, (x, y, 0.0), (0.42, 0.42, 0.1), colour, LAMP_BASE)
+    route("beat.source", f"procedural/{name}/material/emissive", op="add", amount=0.9,
+          chain={"threshold": "binary", "thresholdLevel": value - 0.5})
+    route("beat.source", f"procedural/{name}/material/emissive", op="add", amount=-0.9,
+          chain={"threshold": "binary", "thresholdLevel": value + 0.5})
+    text(f"{name}Label", (x + 0.35, y - 0.11, 0.0), label, 0.22, align=0)
+    layout[name] = {"kind": "state", "signal": "beat.source", "value": value,
+                    "rect": [x - 0.21, y - 0.21, x + 0.21, y + 0.21], "param": f"procedural/{name}/material/emissive"}
+
+
+# ADR-1724: which clock the dial shows. A file grid is one whole-file estimate: its CONF is a single number for the
+# whole file and nothing here can show acquisition, loss or reacquisition -- the lamp says so instead of the dial
+# pretending.
+state_lamp("cMidi", 5.3, 0.25, 1.0, (0.4, 1.0, 0.5), "MIDI CLOCK")
+state_lamp("cGrid", 7.6, 0.25, 2.0, (1.0, 0.6, 0.1), "FILE GRID: NO LOCK STATE")
+state_lamp("cTracker", 11.4, 0.25, 3.0, (0.3, 0.85, 1.0), "LIVE TRACKER")
 text("dialLabel", (DIAL[0], DIAL[1] - 3.0, 0.0), "PHASE (pink)  BAR (grey)", 0.24)
 meter("bConf", 11.6, 1.6, 4.6, "audio.tempoConfidence", (1.0, 0.3, 0.9), "CONF", width=0.6)
 meter("bBpm", 12.8, 1.6, 4.6, "beat.bpm", (0.7, 0.7, 0.7), "BPM/300", width=0.6)

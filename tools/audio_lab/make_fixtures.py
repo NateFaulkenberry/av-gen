@@ -309,19 +309,28 @@ def make_noisy():
     rng = fx.rng
     signal_peak = 0.6
     # A continuous broadband floor whose level steps per section (SNR against the hits' peak).
-    floor = np.zeros(fx.n)
+    # One continuous noise (no step between sections: a step in level is an attack), its gain gliding over 1 s from
+    # one section's level to the next, faded in over 2 s from silence and out over 2 s at 25 s.
     plan = [(0.0, 5.0, None, -40.0), (5.0, 10.0, 30.0, None), (10.0, 15.0, 20.0, None), (15.0, 20.0, 10.0, None),
             (20.0, 25.0, 0.0, None)]
+    noise = band_noise(rng, 25.0, 30.0, 16000.0, 1.0, attack=0.001)
+    noise /= max(float(np.sqrt(np.mean(noise ** 2))), 1e-12)
+    gain_db = np.full(fx.n, -120.0)
+    levels = []
     for s0, s1, snr, abs_db in plan:
-        i0, i1 = int(s0 * RATE), int(s1 * RATE)
-        noise = band_noise(rng, s1 - s0, 30.0, 16000.0, 1.0, attack=0.05)
-        rms = float(np.sqrt(np.mean(noise ** 2)))
         level_db = abs_db if abs_db is not None else 20 * np.log10(signal_peak) - snr
-        noise *= (10 ** (level_db / 20.0)) / max(rms, 1e-12)
-        floor[i0:i1] += noise[: i1 - i0]
+        levels.append(level_db)
+        gain_db[int(s0 * RATE):int(s1 * RATE)] = level_db
         fx.sections.append({"start": s0, "end": s1, "label": "noise only" if snr is None else f"hits at SNR {snr:g} dB",
                             "snrDb": snr, "noiseRmsDbfs": round(float(level_db), 2)})
-    fx.tracks["mix"] += floor
+    for k in range(1, len(plan)):  # 1 s glides centred on each boundary
+        b = plan[k][0]
+        i0, i1 = int((b - 0.5) * RATE), int((b + 0.5) * RATE)
+        gain_db[i0:i1] = np.linspace(levels[k - 1], levels[k], i1 - i0)
+    gain = 10 ** (gain_db / 20.0)
+    gain[: 2 * RATE] *= np.linspace(0.0, 1.0, 2 * RATE)
+    gain[int(23.0 * RATE):int(25.0 * RATE)] *= np.linspace(1.0, 0.0, int(25.0 * RATE) - int(23.0 * RATE))
+    fx.tracks["mix"][: len(noise)] += (noise * gain[: len(noise)])
     for s0 in (5.0, 10.0, 15.0, 20.0):
         for j, t in enumerate(np.arange(s0 + 0.5, s0 + 4.6, 0.75)):
             seg = kick(signal_peak) if j % 2 == 0 else snare(rng, signal_peak)

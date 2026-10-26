@@ -125,7 +125,7 @@
    }
   },
   {
-   "source": "audio.midLevel",
+   "source": "response.mid",
    "target": "procedural/mMidFill/transform/scale",
    "amount": 1.0,
    "op": "replace",
@@ -143,7 +143,7 @@
    }
   },
   {
-   "source": "audio.midLevel",
+   "source": "response.mid",
    "target": "procedural/mMidFill/transform/position",
    "amount": 1.0,
    "op": "replace",
@@ -161,7 +161,7 @@
    }
   },
   {
-   "source": "audio.trebleLevel",
+   "source": "response.high",
    "target": "procedural/mHighFill/transform/scale",
    "amount": 1.0,
    "op": "replace",
@@ -179,7 +179,7 @@
    }
   },
   {
-   "source": "audio.trebleLevel",
+   "source": "response.high",
    "target": "procedural/mHighFill/transform/position",
    "amount": 1.0,
    "op": "replace",
@@ -253,6 +253,78 @@
   {
    "source": "response.onsetEnv",
    "target": "procedural/mEnvFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "audio.midLevel",
+   "target": "procedural/mMidSlowFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "audio.midLevel",
+   "target": "procedural/mMidSlowFill/transform/position",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 1.6,
+    "remapOutMax": 3.9
+   }
+  },
+  {
+   "source": "audio.trebleLevel",
+   "target": "procedural/mHighSlowFill/transform/scale",
+   "amount": 1.0,
+   "op": "replace",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "remapEnabled": true,
+    "remapInMin": 0.0,
+    "remapInMax": 1.0,
+    "clampEnabled": true,
+    "clampMin": 0.0,
+    "clampMax": 1.0,
+    "remapOutMin": 0.001,
+    "remapOutMax": 4.6
+   }
+  },
+  {
+   "source": "audio.trebleLevel",
+   "target": "procedural/mHighSlowFill/transform/position",
    "amount": 1.0,
    "op": "replace",
    "polarity": "unipolar",
@@ -440,6 +512,78 @@
     "remapInMax": 1.0,
     "remapOutMin": 1.5707963267948966,
     "remapOutMax": -4.71238898038469
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cMidi/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 0.5
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cMidi/material/emissive",
+   "amount": -0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 1.5
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cGrid/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 1.5
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cGrid/material/emissive",
+   "amount": -0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 2.5
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cTracker/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 2.5
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cTracker/material/emissive",
+   "amount": -0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 3.5
    }
   },
   {
@@ -995,7 +1139,7 @@
    },
    "mMid": {
     "kind": "meter",
-    "signal": "audio.midLevel",
+    "signal": "response.mid",
     "rect": [
      -10.75,
      1.6,
@@ -1008,7 +1152,7 @@
    },
    "mHigh": {
     "kind": "meter",
-    "signal": "audio.trebleLevel",
+    "signal": "response.high",
     "rect": [
      -9.399999999999999,
      1.6,
@@ -1042,6 +1186,32 @@
      6.199999999999999
     ],
     "param": "procedural/mEnvFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mMidSlow": {
+    "kind": "meter",
+    "signal": "audio.midLevel",
+    "rect": [
+     -10.010000000000002,
+     1.6,
+     -9.850000000000001,
+     6.199999999999999
+    ],
+    "param": "procedural/mMidSlowFill/transform/scale",
+    "component": 1,
+    "scale": 4.6
+   },
+   "mHighSlow": {
+    "kind": "meter",
+    "signal": "audio.trebleLevel",
+    "rect": [
+     -8.66,
+     1.6,
+     -8.5,
+     6.199999999999999
+    ],
+    "param": "procedural/mHighSlowFill/transform/scale",
     "component": 1,
     "scale": 4.6
    },
@@ -1145,6 +1315,42 @@
     ],
     "radius": 2.3,
     "param": "procedural/dialNeedle/distribution/startAngle"
+   },
+   "cMidi": {
+    "kind": "state",
+    "signal": "beat.source",
+    "value": 1.0,
+    "rect": [
+     5.09,
+     0.04000000000000001,
+     5.51,
+     0.45999999999999996
+    ],
+    "param": "procedural/cMidi/material/emissive"
+   },
+   "cGrid": {
+    "kind": "state",
+    "signal": "beat.source",
+    "value": 2.0,
+    "rect": [
+     7.39,
+     0.04000000000000001,
+     7.81,
+     0.45999999999999996
+    ],
+    "param": "procedural/cGrid/material/emissive"
+   },
+   "cTracker": {
+    "kind": "state",
+    "signal": "beat.source",
+    "value": 3.0,
+    "rect": [
+     11.19,
+     0.04000000000000001,
+     11.610000000000001,
+     0.45999999999999996
+    ],
+    "param": "procedural/cTracker/material/emissive"
    },
    "bConf": {
     "kind": "meter",

@@ -102,17 +102,19 @@ TEST_CASE("sonic trace: event columns carry the frame's events; audio.* are colu
         }
     }
     for (const char* c : {"stem.drums.onset", "stem.drums.kick", "response.onset", "beat.pulse", "audio.midLevel",
-                          "audio.tempoConfidence", "audio.onset"}) {
+                          "audio.tempoConfidence", "audio.onset", "response.mid", "response.high", "beat.source"}) {
         INFO(c);
         REQUIRE(col.contains(c));
     }
     std::map<std::string, int> fired;
+    double source = -1.0;
     for (std::string row; std::getline(in, row);) {
         std::vector<double> cells;
         std::stringstream ss(row);
         for (std::string cell; std::getline(ss, cell, ',');) {
             cells.push_back(std::stod(cell));
         }
+        source = cells[col["beat.source"]];
         for (const char* c : {"stem.drums.onset", "stem.drums.kick", "response.onset", "beat.pulse"}) {
             if (cells[col[c]] > 0.0) {
                 ++fired[c];
@@ -129,4 +131,6 @@ TEST_CASE("sonic trace: event columns carry the frame's events; audio.* are colu
     // The grid's tempo is not this case's question (it reads this fixture at half time: 20 pulses in 20 s at 120 BPM,
     // a finding of the Audio Response Lab's report); that the pulse is a column with events in it is.
     CHECK(fired["beat.pulse"] >= 10);
+    // ADR-1724: a file with an analysed grid is clock source 2 (the whole-file grid, which has no lock state).
+    CHECK(source == 2.0);
 }

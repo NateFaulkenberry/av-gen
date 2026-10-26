@@ -14,6 +14,8 @@ ResponseFeed ResponseFeed::fromCausal(const CausalOnsets& c) {
     f.onsetRatio = c.ratio[static_cast<std::size_t>(HitClass::Onset)];
     f.levelDb = c.levelDb;
     f.bassDb = c.bassDb;
+    f.midDb = c.midDb;   // ADR-1723
+    f.highDb = c.highDb;
     f.onsetRegister = c.onsetRegister; // ADR-1604
     return f;
 }
@@ -55,6 +57,8 @@ ResponseFeed FeedFolder::fold(std::span<const TimedFeed> hops, double to, bool a
     out.onsetRatio = newest_.feed.onsetRatio;
     out.levelDb = newest_.feed.levelDb;
     out.bassDb = newest_.feed.bassDb;
+    out.midDb = newest_.feed.midDb;   // ADR-1723
+    out.highDb = newest_.feed.highDb;
     return out;
 }
 
@@ -68,6 +72,8 @@ ResponseFeed mergeFeeds(const ResponseFeed& mix, std::span<const ResponseFeed> s
         out.onsetRatio = s->onsetRatio;
         out.levelDb = s->levelDb;
         out.bassDb = s->bassDb;
+        out.midDb = s->midDb;   // ADR-1723
+        out.highDb = s->highDb;
     }
     for (std::size_t k = 0; k < kHitClassCount; ++k) {
         if (const ResponseFeed* s = source(routing.hit[k])) {

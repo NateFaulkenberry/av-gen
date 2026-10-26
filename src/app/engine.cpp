@@ -95,6 +95,10 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
     bus.setLabel(time.timelineChange, "section change (a new section begins)");
     // ADR-1020: sonic.*, timbre.*, notes.* -- last, so every id above is the one it always was.
     sonic.declare(bus);
+    // ADR-1724: after everything older, for the same reason.
+    time.clockSource = bus.declare("beat.source", 0.0f, 3.0f);
+    bus.setLabel(time.clockSource,
+                 "which clock the beat is (0 none, 1 MIDI clock, 2 analysed file grid: no lock state, 3 live tracker)");
 }
 
 } // namespace
@@ -6247,6 +6251,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     bool pulse = false;
     bool running = true;
     double clockBeats = 0.0;
+    float source = 0.0f; // ADR-1724
     // An analysed grid is the clock whenever there is one and nothing else owns the beat: a file is
     // loaded (not live input) and no MIDI clock is running. In both engine modes, so the editor's
     // bars are the render's bars.
@@ -6259,6 +6264,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
         clock.beatCount = in.midiCount;
         pulse = in.midiPulse;
         clockBeats = static_cast<double>(in.midiCount) + in.midiPhase;
+        source = 1.0f;
     } else if (grid != nullptr) {
         // ADR-896: a pure function of the second -- interpolated between tracked beats, extrapolated
         // at the track's tempo outside them -- so a seek lands on the beat a play reaches, at any
@@ -6266,7 +6272,9 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
         clockBeats = analysis::clockBeatsAt(*grid, grid_.beatSeconds(), time.renderTime);
         pulse = clock.haveClockBeats && std::floor(clockBeats) > std::floor(clock.clockBeats);
         clock.beatPhase = clockBeats - std::floor(clockBeats);
+        source = 2.0f;
     } else if (bpm > 0.0) {
+        source = 3.0f;
         // Live input: advance the per-frame beat clock; re-sync to the analyzer whenever it reports
         // a beat.
         clock.beatPhase += time.deltaTime * bpm / 60.0;
@@ -6304,6 +6312,9 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     bus.set(timeSignals_.playing, in.playing ? 1.0f : 0.0f);
     bus.set(timeSignals_.beatPhase, static_cast<float>(clock.beatPhase));
     bus.setEvent(timeSignals_.beatPulse, pulse, 1.0f);
+    if (timeSignals_.clockSource != signals::kInvalidSignal) {
+        bus.set(timeSignals_.clockSource, source); // ADR-1724
+    }
     bus.set(timeSignals_.beatCount, static_cast<float>(std::floor(musical)));
     bus.set(timeSignals_.bpm, static_cast<float>(bpm));
     bus.set(timeSignals_.barPhase, static_cast<float>(m.barPhase(musical)));

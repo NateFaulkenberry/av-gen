@@ -44,6 +44,9 @@ struct CausalOnsets {
     float flux = 0.0f;         // the broadband ODF
     float bassDb = -120.0f;    // 30-150 Hz power in dBFS (a full-scale sine in the band is 0 dB)
     float levelDb = -120.0f;   // 30 Hz-16 kHz power in dBFS
+    // ADR-1723: the mid (250 Hz-4 kHz) and high (4-16 kHz) band powers in dBFS, ADR-1604's register bands
+    float midDb = -120.0f;
+    float highDb = -120.0f;
     // ADR-1604: the register of this hop's attack -- how the power that arrived since the previous hop divides between
     // low (30-250 Hz), mid (250 Hz-4 kHz) and high (4-16 kHz), summing to 1 (all 0 when no band gained). Known on the
     // onset's own hop.
@@ -134,7 +137,7 @@ private:
     CausalOnsetConfig config_;
     std::size_t bins_ = 0;
     float binHz_ = 0.0f;
-    BinRange low_, broad_, bass_;
+    BinRange low_, broad_, bass_, mid_, high_; // ADR-1723: mid, high
     std::vector<float> previous_;   // the previous frame's magnitudes
     float reference_ = 0.0f;        // the causal spectral peak the compression is relative to
     std::vector<float> flux_;       // r(k)

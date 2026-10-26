@@ -102,7 +102,8 @@ Result<void> ResponseSettings::applyJson(const nlohmann::json& j) {
     if (const auto w = j.find("windows"); w != j.end() && w->is_object()) {
         for (auto [name, window] : {std::pair{"bass", &bassWindow}, std::pair{"level", &levelWindow},
                                     std::pair{"sustain", &sustainWindow}, std::pair{"levelSlow", &levelSlowWindow},
-                                    std::pair{"intensity", &intensityWindow}}) {
+                                    std::pair{"intensity", &intensityWindow}, std::pair{"mid", &midWindow},
+                                    std::pair{"high", &highWindow}}) {
             const auto it = w->find(name);
             if (it == w->end()) {
                 continue;
@@ -127,6 +128,10 @@ Result<void> ResponseSettings::applyJson(const nlohmann::json& j) {
     sustainRelease = j.value("sustainRelease", sustainRelease);
     fluxAttack = j.value("fluxAttack", fluxAttack);
     fluxRelease = j.value("fluxRelease", fluxRelease);
+    midAttack = std::max(0.0f, j.value("midAttack", midAttack));     // ADR-1723
+    midRelease = std::max(0.0f, j.value("midRelease", midRelease));
+    highAttack = std::max(0.0f, j.value("highAttack", highAttack));
+    highRelease = std::max(0.0f, j.value("highRelease", highRelease));
     intensitySeconds = j.value("intensitySeconds", intensitySeconds);
     levelSlowSeconds = std::max(0.05f, j.value("levelSlowSeconds", levelSlowSeconds));
     melodicFull = std::max(0.1f, j.value("melodicFull", melodicFull));
@@ -141,7 +146,8 @@ nlohmann::json ResponseSettings::toJson() const {
     nlohmann::json windows;
     for (auto [name, window] : {std::pair{"bass", &bassWindow}, std::pair{"level", &levelWindow},
                                 std::pair{"sustain", &sustainWindow}, std::pair{"levelSlow", &levelSlowWindow},
-                                std::pair{"intensity", &intensityWindow}}) {
+                                std::pair{"intensity", &intensityWindow}, std::pair{"mid", &midWindow},
+                                std::pair{"high", &highWindow}}) {
         windows[name] = {window->topDb, window->spanDb};
     }
     return {{"sensitivity", controls.sensitivity},
@@ -194,6 +200,11 @@ void ResponseModel::declare(signals::SignalBus& bus) {
         bus.setLabel(ids_.onsetRegister[b], std::string("onset register: the ") + kRegisterLabel[b] +
                                                 " share of the latest onset's attack (held until the next)");
     }
+    // ADR-1723: declared after every older id.
+    ids_.mid = bus.declare("response.mid");
+    bus.setLabel(ids_.mid, "mid level (250 Hz-4 kHz, against its own loudness; fast: 0 within ~0.3 s of silence)");
+    ids_.high = bus.declare("response.high");
+    bus.setLabel(ids_.high, "high level (4-16 kHz, against its own loudness; fast: glints, 0 within ~0.3 s of silence)");
 }
 
 void ResponseModel::step(const TimbreFeatures& f, double dt, const ResponseControls& c, const ResponseSettings& s) {
@@ -277,6 +288,31 @@ void ResponseModel::step(const TimbreFeatures& f, const analysis::ResponseFeed& 
     const float levelSlowDb = sinceHeard_ > 0.0 ? powerToDb(levelSlowPower_) : gate;
     const float intensityDb = sinceHeard_ > 0.0 ? powerToDb(intensityPower_) : gate;
     bass_ = conditionLevel(bassDb_, ref, s.bassWindow, levelS, s);
+    // ADR-1723: mid and high, each against its own reference.
+    const auto band = [&](BandLevel& b, float rawDb, const ResponseSettings::LevelWindow& window, float attack,
+                          float release) {
+        const float gated = std::max(rawDb, gate);
+        if (!b.primed) {
+            b.db = b.referenceDb = gate;
+            b.primed = true;
+        }
+        if (rawDb > gate) {
+            b.heardSeconds += dt;
+            const double a = std::max(alpha(dt, static_cast<double>(s.referenceSeconds)), dt / b.heardSeconds);
+            b.referencePower += a * (dbToPower(gated) - b.referencePower);
+            const float source = powerToDb(b.referencePower);
+            if (b.heardSeconds <= 2.0 * static_cast<double>(s.referenceSeconds)) {
+                b.referenceDb = source;
+            } else {
+                follow(b.referenceDb, source, dt, static_cast<double>(s.referenceRise),
+                       static_cast<double>(s.referenceFall));
+            }
+        }
+        follow(b.db, gated, dt, static_cast<double>(attack) * att, static_cast<double>(release) * rel);
+        b.value = conditionLevel(b.db, b.referenceDb, window, levelS, s);
+    };
+    band(mid_, o.midDb, s.midWindow, s.midAttack, s.midRelease);
+    band(high_, o.highDb, s.highWindow, s.highAttack, s.highRelease);
     level_ = conditionLevel(levelDb_, ref, s.levelWindow, levelS, s);
     levelSlow_ = conditionLevel(levelSlowDb, ref, s.levelSlowWindow, levelS, s);
     intensity_ = conditionLevel(intensityDb, ref, s.intensityWindow, levelS, s);
@@ -363,6 +399,10 @@ void ResponseModel::publish(signals::SignalBus& bus, const NoteTrack& notes, dou
     for (std::size_t b = 0; b < 3; ++b) {
         bus.set(ids_.onsetRegister[b], onsetRegister_[b]); // ADR-1604
     }
+    if (ids_.mid != signals::kInvalidSignal) { // ADR-1723 (a bus restored from before it has no id)
+        bus.set(ids_.mid, mid_.value);
+        bus.set(ids_.high, high_.value);
+    }
 }
 
 void ResponseModel::publishZeros(signals::SignalBus& bus) {
@@ -376,6 +416,11 @@ void ResponseModel::publishZeros(signals::SignalBus& bus) {
     for (const signals::SignalId id : {ids_.bass, ids_.level, ids_.transient, ids_.sustain, ids_.flux, ids_.melodic, ids_.pitch, ids_.intensity, ids_.levelSlow,
                                        ids_.onsetRegister[0], ids_.onsetRegister[1], ids_.onsetRegister[2]}) {
         bus.set(id, 0.0f);
+    }
+    for (const signals::SignalId id : {ids_.mid, ids_.high}) { // ADR-1723
+        if (id != signals::kInvalidSignal) {
+            bus.set(id, 0.0f);
+        }
     }
 }
 

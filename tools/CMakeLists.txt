@@ -134,6 +134,11 @@ target_link_libraries(avgen_motion_probe PRIVATE avgen_core)
 add_executable(avgen_seek_probe seek_probe.cpp)
 target_link_libraries(avgen_seek_probe PRIVATE avgen_core)
 
+# ADR-1725: the Audio Response Lab's causal replay -- a file through the live analysis path (Analyzer, BeatTracker,
+# CausalOnsetDetector, the runner's carry) without a device or a thread.
+add_executable(avgen_audio_lab_replay audio_lab_replay.cpp)
+target_link_libraries(avgen_audio_lab_replay PRIVATE avgen_core)
+
 # TEMPORARY (ADR-383, the audit's W6). The Metal ray-tracing DECISION, not a backend: does Metal
 # beat Embree on an M2, where there is no hardware RT unit? Delete it with the decision it informs.
 if(APPLE)

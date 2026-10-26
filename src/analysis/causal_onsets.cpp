@@ -110,6 +110,8 @@ void CausalOnsetDetector::layout(std::size_t bins, float binHz) {
     low_ = binRange(40.0f, 120.0f, bins, binHz);
     broad_ = binRange(30.0f, 16000.0f, bins, binHz);
     bass_ = binRange(30.0f, 150.0f, bins, binHz);
+    mid_ = binRange(250.0f, 4000.0f, bins, binHz);   // ADR-1723
+    high_ = binRange(4000.0f, 16000.0f, bins, binHz); // ADR-1723
     previous_.assign(bins, 0.0f);
     flux_.assign(bins, 0.0f);
     havePrevious_ = false;
@@ -186,6 +188,8 @@ void CausalOnsetDetector::process(AnalysisFrame& frame, float binHz, double hopS
     // ---- levels ----
     out.bassDb = bandPowerDb(m, bass_.from, bass_.to);
     out.levelDb = bandPowerDb(m, broad_.from, broad_.to);
+    out.midDb = bandPowerDb(m, mid_.from, mid_.to);   // ADR-1723
+    out.highDb = bandPowerDb(m, high_.from, high_.to); // ADR-1723
 
     // ---- the ODFs, their ratios and the decisions ----
     constexpr auto kLow = static_cast<std::size_t>(HitClass::Low);

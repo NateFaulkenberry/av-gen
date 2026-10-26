@@ -31,6 +31,8 @@ struct ResponseFeed {
     float onsetRatio = 0.0f; // the broadband (Onset) ratio
     float levelDb = -120.0f;
     float bassDb = -120.0f;
+    float midDb = -120.0f;  // ADR-1723: part of the level family (routed with it)
+    float highDb = -120.0f; // ADR-1723
     std::array<float, 3> onsetRegister{}; // ADR-1604: the register of the onset hit (when hit[Onset])
     [[nodiscard]] bool operator==(const ResponseFeed&) const = default;
 

@@ -71,6 +71,11 @@ struct ResponseSettings {
     LevelWindow sustainWindow{4.0f, 9.0f};    // the instant level sustain is made of (less its percussive share)
     LevelWindow levelSlowWindow{1.5f, 6.0f};  // the level over levelSlowSeconds
     LevelWindow intensityWindow{1.5f, 6.0f};  // the level over intensitySeconds
+    // ADR-1723: the mid (250 Hz-4 kHz) and high (4-16 kHz) levels, each read against ITS OWN adaptive reference (the
+    // band's power over a few seconds, with the broadband reference's dynamics), so a high band 20 dB under the mix
+    // still reads across the range; fast followers, so a silent band reads 0 within a few hundred ms.
+    LevelWindow midWindow{6.5f, 15.0f};
+    LevelWindow highWindow{6.5f, 15.0f};
     // Envelope release per hit, seconds (Low, Onset, Note); attack is one hop (instant) x attack.
     std::array<float, kResponseHitCount> hitRelease{0.18f, 0.09f, 0.22f};
     // Levels' followers, seconds: attack / release.
@@ -80,6 +85,8 @@ struct ResponseSettings {
     float levelAttack = 0.02f, levelRelease = 1.0f;
     float sustainAttack = 0.25f, sustainRelease = 0.9f;
     float fluxAttack = 0.01f, fluxRelease = 0.15f;
+    float midAttack = 0.01f, midRelease = 0.15f;   // ADR-1723
+    float highAttack = 0.005f, highRelease = 0.12f; // ADR-1723
     float intensitySeconds = 12.0f;
     float levelSlowSeconds = 3.0f; // ADR-1361: `response.levelSlow`, the level over a few seconds (attack/release x)
     float melodicFull = 6.0f;    // pitch moves a second that read 1
@@ -107,6 +114,8 @@ struct ResponseSignals {
     // ADR-1604: response.onsetLow/Mid/High, the register of the latest onset hit, held until the next
     std::array<signals::SignalId, 3> onsetRegister{signals::kInvalidSignal, signals::kInvalidSignal,
                                                    signals::kInvalidSignal};
+    // ADR-1723: response.mid, response.high
+    signals::SignalId mid = signals::kInvalidSignal, high = signals::kInvalidSignal;
 };
 
 class ResponseModel {
@@ -149,6 +158,13 @@ private:
     bool levelsPrimed_ = false;
     float melodic_ = 0.0f;
     std::array<float, 3> onsetRegister_{}; // ADR-1604
+    // ADR-1723: a band level with its own adaptive reference (the broadband reference's rules, on the band's power).
+    struct BandLevel {
+        float db = -120.0f, referenceDb = -120.0f, value = 0.0f;
+        double referencePower = 0.0, heardSeconds = 0.0;
+        bool primed = false;
+    };
+    BandLevel mid_, high_;
     float lastSemitone_ = -1.0f, audioPitch_ = -1.0f;
     bool primed_ = false;
 };

@@ -799,6 +799,9 @@ public:
         signals::SignalId timelineProgress = signals::kInvalidSignal; // section.progress, 0..1
         signals::SignalId timelineEnergy = signals::kInvalidSignal;   // section.energy, the section's own
         signals::SignalId timelineChange = signals::kInvalidSignal;   // section.change (event)
+        // ADR-1724: which clock `beat.*` is reading -- 0 none, 1 MIDI clock, 2 the analysed grid (a whole-file
+        // estimate: one tempo and one confidence, so it has no lock state to show), 3 the live tracker
+        signals::SignalId clockSource = signals::kInvalidSignal;      // beat.source
     };
     [[nodiscard]] const TimeSignals& timeSignals() const { return timeSignals_; }
 

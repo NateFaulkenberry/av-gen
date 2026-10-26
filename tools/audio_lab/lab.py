@@ -36,6 +36,7 @@ REPO = Path(__file__).resolve().parents[2]
 LAB_PROJECT = REPO / "examples" / "audio-response-lab" / "audio-response-lab.json"
 DEFAULT_AVGEN = REPO / "build" / "release" / "src" / "avgen"
 DEFAULT_FIXTURES = REPO / "build" / "release" / "test-fixtures" / "audio-lab"
+DEFAULT_REPLAY = REPO / "build" / "release" / "tools" / "avgen_audio_lab_replay"
 
 RATE = 48000
 HOP = 512
@@ -55,6 +56,12 @@ MATCH_LATE_S = 3 * HOP_S + 0.002           # +34.0 ms (one hop to land in a wind
 CLUSTER_S = 0.030                          # GT attacks closer than this are one attack (below the 60 ms refractory)
 REFRACTORY_S = 0.060
 BEAT_TOL_S = 0.070                         # MIREX beat F-measure tolerance
+# The live path (ADR-1725's replay): a frame exists once its last sample arrives (centre + half a window), so nothing
+# is early; the latest is half a window, the decision (two hops, one spare) and the wait for the next render frame.
+LIVE_EARLY_S = 0.002
+LIVE_LATE_S = HALF_WINDOW_S + 3 * HOP_S + 1.0 / 30.0 + 0.002     # 87.7 ms
+LOCK_PHASE = 0.10                          # |phase error| under this (of a beat) at a beat counts as locked
+LOCK_BEATS = 4                             # ... for this many consecutive intended beats
 SETTLE_S = 1.5                             # after this long in silence every level and envelope must be at rest
 SUSTAIN_GRACE_S = 0.15                     # a sustained note's first 150 ms may hold its own (one) onset
 LEVEL_REST = 0.02                          # "at rest": below this
@@ -71,6 +78,9 @@ DOCUMENTED_REST_S = {
     "response.sustain": 0.9 * LN_REST,     # sustainRelease 0.9 s
     "response.onsetEnv": 0.09 * LN_REST,   # hitRelease onset 0.09 s
     "response.lowEnv": 0.18 * LN_REST,     # hitRelease low 0.18 s
+    # ADR-1723: the fast mid and high levels, the same dB-follower rule as the bass, at their own releases
+    "response.mid": 0.15 * math.log((-40 + 6.5 + 60) / (-40 + 6.5 - 15.0 + 60)),
+    "response.high": 0.12 * math.log((-40 + 6.5 + 60) / (-40 + 6.5 - 15.0 + 60)),
     "audio.midLevel": 60.0 / 4.343,        # power smoothed over 1 s on a 0 = -60 dB scale: 4.34 dB/s, 13.8 s from 0 dB
     "audio.trebleLevel": 60.0 / 4.343,
 }
@@ -107,6 +117,17 @@ def trace(avgen, project, out_csv, fps, finals):
     (out_csv.parent / (out_csv.stem + ".log")).write_text(r.stdout + r.stderr)
     if r.returncode != 0:
         sys.exit(f"lab: {' '.join(cmd)} failed ({r.returncode}); see {out_csv.stem}.log")
+
+
+def replay(tool, wav, prefix):
+    """ADR-1725: the file through the live analysis path (tools/audio_lab_replay.cpp)."""
+    if not Path(tool).exists():
+        print(f"lab: no {tool}; the live path is not scored (build avgen_audio_lab_replay)")
+        return
+    cmd = [str(REPO / "tools" / "gpu-lock.sh"), str(tool), str(wav), str(prefix)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        sys.exit(f"lab: {' '.join(cmd)} failed ({r.returncode}): {r.stderr[-400:]}")
 
 
 def read_trace(path):
@@ -180,13 +201,14 @@ def match(gt, det, early=MATCH_EARLY_S, late=MATCH_LATE_S):
     return pairs, missed, [i for i, u in enumerate(used) if not u]
 
 
-def onset_metrics(m, gt_events, det_times, sustained, silent, duration, label):
+def onset_metrics(m, gt_events, det_times, sustained, silent, duration, label, early=MATCH_EARLY_S,
+                  late=MATCH_LATE_S):
     """Precision/recall/timing of one detector against a set of GT events (clustered into attacks)."""
     clusters = cluster([e["time"] for e in gt_events])
     gt_times = [c[0] for c in clusters]
     ambiguous = [all(gt_events[i]["ambiguous"] for i in c[1]) or not any(gt_events[i]["onset"] for i in c[1])
                  for c in clusters]
-    pairs, missed, extra = match(gt_times, det_times)
+    pairs, missed, extra = match(gt_times, det_times, early, late)
     matched = {gi for gi, _, _ in pairs}
     errs = [e for gi, _, e in pairs if not ambiguous[gi]]
     # An unmatched detection is a DUPLICATE when it follows a matched one by less than 150 ms; otherwise FALSE.
@@ -341,8 +363,8 @@ def release_metrics(m, tr, col):
 
 
 def band_matrix(m, tr):
-    cols = ["response.bass", "audio.bassLevel", "audio.lowMidLevel", "audio.midLevel", "audio.highMidLevel",
-            "audio.trebleLevel", "response.level"]
+    cols = ["response.bass", "response.mid", "response.high", "audio.bassLevel", "audio.lowMidLevel",
+            "audio.midLevel", "audio.highMidLevel", "audio.trebleLevel", "response.level"]
     t = tr["time"]
     out = []
     for s in m["sections"]:
@@ -455,7 +477,8 @@ def source_metrics(m, tr):
                     continue
                 # A hit stacked on another class within one hop is one attack with two names: kept apart.
                 stacked = sum(1 for x in stamps if abs(x - e["time"]) < HOP_S) > 1
-                row = confusion.setdefault(e["cls"] + (" (stacked)" if stacked else ""),
+                row = confusion.setdefault(e["cls"] + (f" [{e['kit']}]" if "kit" in e else "") +
+                                           (" (stacked)" if stacked else ""),
                                            {"kick": 0, "snare": 0, "hat": 0, "none": 0})
                 hit = None
                 for cls, times in classes.items():
@@ -541,15 +564,148 @@ def probe_metrics(m, tr):
         out["pFlash"] = {"declaredMs": 120.0, "measuredMs": durations[:200],
                          "median": r3(pct(durations, 0.5)) if durations else None, "max": max(durations) if durations else None,
                          "bounded": [round(min(flash), 4), round(max(flash), 4)]}
-    for name, col, lo, hi in (("pBass", "final:procedural/pBass/transform/scale[0]", 0.25, 1.4),
-                              ("pStem", "final:procedural/pStem/transform/scale[0]", 0.2, 1.8)):
+    for name, col, lo, hi, signal in (("pBass", "final:procedural/pBass/transform/scale[0]", 0.25, 1.4, "response.bass"),
+                                      ("pStem", "final:procedural/pStem/transform/scale[0]", 0.2, 1.8, "response.level")):
         f = tr.get(col)
         if f:
-            quiet = [(a + SETTLE_S, b) for a, b in m["silent"] if b - a > SETTLE_S]
+            # The probe's chain falls (one-pole, 300 ms) from its top to within 0.01 of rest AFTER its signal has
+            # reached rest (the signal's documented release): judged only once both have run out.
+            settle = DOCUMENTED_REST_S[signal] + 0.3 * math.log((hi - lo) / 0.01) + 0.05
+            quiet = [(a + settle, b - QUIET_GUARD_S) for a, b in m["silent"] if b - a > settle + QUIET_GUARD_S]
             rest = [f[i] for i, ti in enumerate(t) if in_any(ti, quiet)]
             out[name] = {"bounded": [round(min(f), 4), round(max(f), 4)], "declared": [lo, hi],
                          "withinDeclared": min(f) >= lo - 1e-4 and max(f) <= hi + 1e-4,
                          "maxInSettledSilence": round(max(rest), 4) if rest else None, "rest": lo}
+    return out
+
+
+def section_onsets(m, det_times, early=MATCH_EARLY_S, late=MATCH_LATE_S):
+    """Per manifest section: firm attacks, detections, matched, false (the noisy SNR steps, the adversarial cases)."""
+    out = []
+    for sec in m["sections"]:
+        a, b = sec["start"], sec["end"]
+        ev = [e for e in m["events"] if a <= e["time"] < b]
+        firm = cluster([e["time"] for e in ev if e["onset"] and not e["ambiguous"]])
+        allc = cluster([e["time"] for e in ev])
+        det = [t for t in det_times if a - early <= t < b]
+        pairs, missed, extra = match([c[0] for c in allc], det, early, late)
+        firm_times = {round(c[0], 6) for c in firm}
+        hit_firm = sum(1 for gi, _, _ in pairs if round(allc[gi][0], 6) in firm_times)
+        out.append({"section": sec["label"], "start": a, "end": b, "events": len(ev), "attacks": len(allc),
+                    "firmAttacks": len(firm), "detections": len(det), "matched": len(pairs),
+                    "recallFirm": r3(hit_firm / len(firm)) if firm else None, "unmatchedDetections": len(extra),
+                    **({k: sec[k] for k in ("snrDb", "noiseRmsDbfs", "register") if k in sec})})
+    return out
+
+
+def kind_recall(m, onset_times, low_times):
+    """Per section with an SNR, per event kind: how many response.onset and response.low caught."""
+    out = []
+    for sec in m["sections"]:
+        if sec.get("snrDb") is None:
+            continue
+        for kind in sorted({e["kind"] for e in m["events"] if sec["start"] <= e["time"] < sec["end"]}):
+            ts = [e["time"] for e in m["events"] if e["kind"] == kind and sec["start"] <= e["time"] < sec["end"]]
+            row = {"section": sec["label"], "snrDb": sec["snrDb"], "kind": kind, "events": len(ts)}
+            for name, det in (("response.onset", onset_times), ("response.low", low_times)):
+                pairs, _, _ = match(ts, det)
+                row[name] = len(pairs)
+            out.append(row)
+    return out
+
+
+def pair_separation(m, det_times):
+    """Events marked with `pair` (two attacks `pair` seconds apart): how many detections each pair produced."""
+    out = []
+    firsts = {}
+    for e in m["events"]:
+        if "pair" in e:
+            firsts.setdefault(round(e["time"] - (e["pair"] if "second" in e.get("note", "") else 0.0), 4), e["pair"])
+    for t0, gap in sorted(firsts.items()):
+        n = sum(1 for t in det_times if t0 - MATCH_EARLY_S <= t <= t0 + gap + MATCH_LATE_S)
+        out.append({"start": t0, "gapMs": round(1000 * gap), "detections": n, "separated": n >= 2})
+    return out
+
+
+def lock_timeline(m, tr):
+    """Beat lock against the intended grid, beat by beat: locked when |phase error| < LOCK_PHASE and the clock's tempo
+    is within 3% of the intended. Acquisition = the first of LOCK_BEATS locked beats in a row in a tempo segment; a loss
+    = the first unlocked beat after a lock; reacquisition after each silence. Confidence is sampled at each beat."""
+    beats = m.get("beats")
+    if not beats or "beat.phase" not in tr:
+        return None
+    t = tr["time"]
+    gt = beats["times"]
+    tempo_at = lambda x: next((s["bpm"] for s in beats["tempo"] if s["start"] <= x < s["end"]), None)
+    rows = []
+    for k in range(len(gt) - 1):
+        i = min(len(t) - 1, bisect.bisect_left(t, gt[k] + 0.25 * (gt[k + 1] - gt[k])))  # a quarter beat in
+        gp = (t[i] - gt[k]) / (gt[k + 1] - gt[k])
+        d = (tr["beat.phase"][i] - gp + 0.5) % 1.0 - 0.5
+        bpm = tr["beat.bpm"][i]
+        want = tempo_at(gt[k])
+        ok = abs(d) < LOCK_PHASE and want is not None and bpm > 0 and abs(bpm / want - 1.0) < 0.03
+        conf = tr["audio.tempoConfidence"][i] if "audio.tempoConfidence" in tr else None
+        rows.append({"beat": round(gt[k], 4), "locked": ok, "phaseError": round(d, 3), "bpm": round(bpm, 2),
+                     "confidence": None if conf is None else round(conf, 3)})
+    def acquire(after, until):
+        run = 0
+        for r in rows:
+            if r["beat"] < after or r["beat"] >= until:
+                continue
+            run = run + 1 if r["locked"] else 0
+            if run >= LOCK_BEATS:
+                return round(r["beat"] - (LOCK_BEATS - 1) * 60.0 / (tempo_at(r["beat"]) or 120) - after, 3)
+        return None
+    segs = [{"start": s["start"], "end": s["end"], "bpm": s["bpm"], "acquireSeconds": acquire(s["start"], s["end"])}
+            for s in beats["tempo"]]
+    losses = []
+    was = False
+    for r in rows:
+        if was and not r["locked"]:
+            losses.append(r["beat"])
+        was = r["locked"]
+    silences = []
+    for a, b in m["silent"]:
+        if b - a < 1.0 or a < 0.5:
+            continue
+        conf_in = [tr["audio.tempoConfidence"][i] for i, x in enumerate(t) if a + 0.5 <= x < b] \
+            if "audio.tempoConfidence" in tr else []
+        pulses_in = sum(1 for i, x in enumerate(t) if a + 0.5 <= x < b and tr["beat.pulse"][i] > 0)
+        nxt = next((s["end"] for s in beats["tempo"] if s["start"] <= b < s["end"]), m["durationSeconds"])
+        fall = None
+        if "audio.tempoConfidence" in tr:
+            for i, x in enumerate(t):
+                if a <= x < b and tr["audio.tempoConfidence"][i] < 0.1:
+                    fall = round(x - a, 3)
+                    break
+        silences.append({"start": a, "end": b, "pulsesInSilence": pulses_in, "confidenceFallsAfterSeconds": fall,
+                         "confidenceInSilence": [r3(min(conf_in)), r3(max(conf_in))] if conf_in else None,
+                         "reacquireSeconds": acquire(b, nxt)})
+    return {"segments": segs, "losses": losses, "silences": silences,
+            "lockedFraction": r3(sum(1 for r in rows if r["locked"]) / len(rows)) if rows else None, "beats": rows}
+
+
+def live_metrics(m, run_dir):
+    """The causal replay (ADR-1725): the live analysis path's onsets and its beat tracker, scored on their own."""
+    path = run_dir / "live.frame.csv"
+    if not path.exists():
+        return None
+    tr = read_trace(path)
+    sustained = [s for s in m["sections"] if s.get("sustained")]
+    out = {"matchWindowMs": [-1000 * LIVE_EARLY_S, round(1000 * LIVE_LATE_S, 1)], "onsets": {}}
+    low_gt = [e for e in m["events"] if "low" in e.get("registers", [e["register"]])]
+    for col, gt in (("response.onset", m["events"]), ("response.low", low_gt), ("audio.onset", m["events"])):
+        det = [x for x, _ in events_of(tr, col)]
+        # Matched on the live window: a live frame exists only after its window ends, so nothing is early.
+        o = onset_metrics(m, gt, det, sustained, m["silent"], m["durationSeconds"], col + " (live)", LIVE_EARLY_S,
+                          LIVE_LATE_S)
+        o["liveWindow"] = {"matched": o["matched"], "missed": len(o["missed"]), "unmatched": len(o["false"]) +
+                           len(o["duplicates"]), "precision": o["precision"], "recall": o["recall"],
+                           "timingMs": o["timingErrorMs"]}
+        out["onsets"][col] = o
+    out["beat"] = beat_metrics(m, tr)
+    out["lock"] = lock_timeline(m, tr)
     return out
 
 
@@ -578,19 +734,28 @@ def evaluate(fixture_dir, run_dir):
     ev = events_of(hop, "response.low")
     res["onsets"]["response.low@hop (vs low-register GT)"] = onset_metrics(
         m, low_gt, [x for x, _ in ev], sustained, m["silent"], m["durationSeconds"], "response.low")
-    res["rest"] = rest_metrics(hop, m["silent"], ["response.level", "response.bass", "response.sustain",
+    res["rest"] = rest_metrics(hop, m["silent"], ["response.level", "response.bass", "response.mid", "response.high",
+                                                  "response.sustain",
                                                   "response.onsetEnv", "response.lowEnv", "audio.midLevel",
-                                                  "audio.trebleLevel", "audio.tempoConfidence"])
+                                                  "audio.trebleLevel", "audio.tempoConfidence", "sonic.energy",
+                                                  "sonic.brightness"])
     res["envelope"] = envelope_metrics(fixture_dir, hop)
     res["release"] = {c: release_metrics(m, hop, c) for c in ("response.level", "response.bass", "response.onsetEnv")}
     res["bands"] = band_matrix(m, hop)
     res["beat"] = beat_metrics(m, frame)
+    res["lock"] = lock_timeline(m, frame)
+    det = [x for x, _ in events_of(hop, "response.onset")]
+    res["sections"] = section_onsets(m, det)
+    res["pairs"] = pair_separation(m, det)
+    res["live"] = live_metrics(m, run_dir)
     if m.get("stems"):
         res["sources"] = source_metrics(m, hop)
         res["mixAttribution"] = mix_attribution(m, hop)
     res["mapping"] = mapping_metrics(project, frame)
     res["probes"] = probe_metrics(m, frame)
+    res["_hop"] = hop
     res["checks"] = checks(m, res)
+    del res["_hop"]
     return res
 
 
@@ -598,16 +763,21 @@ def checks(m, res):
     """Pass/fail against the derived thresholds (01-plan.md §6). Each says what it compares and why that bound."""
     out = []
 
-    def check(name, ok, value, bound, why):
+    def check(name, ok, value, bound, why, gate=True):
+        """`gate` False: a measured FINDING the owner has chosen to treat as separate work (reported, never
+        silently passed: its pass/fail is still the measurement's)."""
         out.append({"check": name, "pass": bool(ok) if ok is not None else None, "value": value, "bound": bound,
-                    "why": why})
+                    "why": why, "gate": gate})
 
     o = res["onsets"]["response.onset@hop"]
+    # Whole-fixture onset quality gates where the material is clean; on the noisy and adversarial fixtures it is a
+    # finding (their per-section checks carry the gates), since this branch does not change a detector.
+    clean = m["category"] not in ("noisy", "adversarial")
     if o["firmAttacks"]:
         check("response.onset recall (firm attacks)", o["recall"] is not None and o["recall"] >= 0.9, o["recall"],
-              ">= 0.90", "every unambiguous attack is a separate event at least 60 ms from its neighbours")
+              ">= 0.90", "every unambiguous attack is a separate event at least 60 ms from its neighbours", gate=clean)
         check("response.onset precision", o["precision"] is not None and o["precision"] >= 0.9, o["precision"],
-              ">= 0.90", "a detection that matches no attack is a false trigger")
+              ">= 0.90", "a detection that matches no attack is a false trigger", gate=clean)
         p95 = o["timingErrorMs"]["p95"]
         check("response.onset timing p95 (hop clock)", p95 is not None and p95 <= 1000 * MATCH_LATE_S, p95,
               f"<= {1000 * MATCH_LATE_S:.1f} ms", "one hop to reach a window centre, one to decide, one spare")
@@ -640,12 +810,99 @@ def checks(m, res):
                       p["maxInSettledSilence"], f"<= {p['rest'] + 0.01}", "no stale probe after silence")
     b = res["beat"]
     if b.get("applicable"):
-        check("beat F-measure (+-70 ms)", b["fMeasure"] >= 0.8, b["fMeasure"], ">= 0.80",
-              "MIREX tolerance; a grid that follows the intended pulse")
+        # Findings, not gates: the owner takes the beat clock as separate work (2026-10-26).
+        check("file grid: beat F-measure (+-70 ms)", b["fMeasure"] >= 0.8, b["fMeasure"], ">= 0.80",
+              "MIREX tolerance; a grid that follows the intended pulse", gate=False)
         for s in b["segments"]:
-            check(f"beat clock tempo {s['bpm']:g} BPM ({s['start']:g}-{s['end']:g} s)",
+            check(f"file grid: tempo {s['bpm']:g} BPM ({s['start']:g}-{s['end']:g} s)",
                   s["octaveRatio"] is not None and abs(s["octaveRatio"] - 1.0) < 0.03, s["clockBpmMedian"],
-                  f"{s['bpm']:g} +- 3%", "the intended tempo, not an octave of it")
+                  f"{s['bpm']:g} +- 3%", "the intended tempo, not an octave of it", gate=False)
+    lv = res.get("live")
+    if lv:
+        lb = lv["beat"]
+        if lb.get("applicable"):
+            check("live tracker: beat F-measure (+-70 ms)", lb["fMeasure"] >= 0.8, lb["fMeasure"], ">= 0.80",
+                  "MIREX tolerance, on the causal BeatTracker", gate=False)
+            for sg in lv["lock"]["segments"]:
+                check(f"live tracker: locks within 4 s of {sg['start']:g} s ({sg['bpm']:g} BPM)",
+                      sg["acquireSeconds"] is not None and sg["acquireSeconds"] <= 4.0, sg["acquireSeconds"], "<= 4 s",
+                      "two bars at 120 BPM: a performer hears a beat-locked scene within two bars", gate=False)
+            for si in lv["lock"]["silences"]:
+                check(f"live tracker: confidence falls in the silence at {si['start']:g} s",
+                      si["confidenceInSilence"] is not None and si["confidenceInSilence"][1] < 0.1,
+                      si["confidenceInSilence"], "max < 0.1",
+                      "a tracker with nothing to track should say so (ADR-1724's honesty rule)", gate=False)
+        lo = lv["onsets"]["response.onset"]["liveWindow"]
+        if lo["recall"] is not None:
+            check("live path: response.onset recall within the live window", lo["recall"] >= 0.9, lo["recall"],
+                  ">= 0.90", f"half a window + three hops + one frame ({1000 * LIVE_LATE_S:.0f} ms)", gate=clean)
+            check("live path: response.onset timing p95", lo["timingMs"]["p95"] is not None and
+                  lo["timingMs"]["p95"] <= 1000 * LIVE_LATE_S, lo["timingMs"]["p95"], f"<= {1000 * LIVE_LATE_S:.0f} ms",
+                  "the live window's late edge")
+    cat = m["category"]
+    secs = {x["section"]: x for x in res.get("sections", [])}
+    if cat == "dense":
+        for row in res["bands"]:
+            reg = row["register"]
+            if reg in ("low", "mid", "high"):
+                own = {"low": "response.bass", "mid": "response.mid", "high": "response.high"}[reg]
+                others = [c for c in ("response.bass", "response.mid", "response.high") if c != own]
+                check(f"band selectivity, {row['section']}: {own} leads", row[own] >= 0.3 and
+                      all(row[c] <= 0.15 for c in others), {c: row[c] for c in (own, *others)},
+                      f"{own} >= 0.30, the others <= 0.15",
+                      "ADR-1723's levels are band powers: a section with one register lights only its own")
+        for pr in res["pairs"]:
+            check(f"pair {pr['gapMs']} ms apart at {pr['start']:g} s separated", pr["separated"] or pr["gapMs"] < 60,
+                  pr["detections"], ">= 2 when >= 60 ms apart",
+                  "two attacks at least one refractory (60 ms) apart are two events", gate=pr["gapMs"] >= 60)
+    if cat == "noisy":
+        nz = secs.get("noise only")
+        if nz:
+            det = [x for x, _ in events_of(res["_hop"], "response.onset")]
+            steady = [x for x in det if 0.5 <= x < nz["end"] - 0.5]
+            start = [x for x in det if x < 0.5]
+            check("noisy: no onset in the steady -40 dBFS noise floor (0.5 s on)", not steady, steady, "none",
+                  "a steady noise floor has no attack")
+            check("noisy: no onset on the floor's first samples (fade-in from digital silence at the file start)",
+                  not start, start, "none", "the first audible samples after a reset are not an attack; a level-free "
+                  "detector with no history fires on them", gate=False)
+        # Kicks and snares apart: the broadband onset loses kicks in broadband noise first.
+        kicks = {}
+        for x in res["sections"]:
+            if x.get("snrDb") is not None:
+                kicks[x["snrDb"]] = x
+        res["noisyByKind"] = kind_recall(m, [x for x, _ in events_of(res["_hop"], "response.onset")],
+                                         [x for x, _ in events_of(res["_hop"], "response.low")])
+        for x in res["sections"]:
+            if x.get("snrDb") is not None:
+                gate = False  # a detector's quality in noise: reported, this branch changes no detector
+                check(f"noisy: recall at SNR {x['snrDb']:g} dB", x["recallFirm"] is None or x["recallFirm"] >= 0.9,
+                      x["recallFirm"], ">= 0.90",
+                      "hits 30 dB over the floor are clear; lower SNRs are reported as findings", gate=gate)
+                check(f"noisy: unmatched detections at SNR {x['snrDb']:g} dB", x["unmatchedDetections"] <= 1,
+                      x["unmatchedDetections"], "<= 1", "the floor does not trigger between hits",
+                      gate=x["snrDb"] >= 10)
+    if cat == "adversarial":
+        for label, most, why in (("sustained pure tone", 1, "one attack, then a held tone"),
+                                 ("bass drone, no percussion", 1, "one attack, then a held note"),
+                                 ("low-level noise (-60 dBFS)", 0, "noise at the gate is not an event")):
+            x = secs.get(label)
+            if x:
+                check(f"adversarial: {label}: at most {most} onset", x["detections"] <= most, x["detections"],
+                      f"<= {most}", why)
+        x = secs.get("repeated transients (roll)")
+        if x:
+            check("adversarial: roll at 30 Hz is bounded by the refractory", x["detections"] <= 1.0 / REFRACTORY_S + 1,
+                  x["detections"], f"<= {1 / REFRACTORY_S + 1:.0f}", "a 60 ms refractory caps a buzz roll's events")
+        for pr in res["pairs"]:
+            check(f"adversarial: click pair {pr['gapMs']} ms apart separated",
+                  pr["separated"] or pr["gapMs"] < 60, pr["detections"], ">= 2 when >= 60 ms apart",
+                  "one refractory apart is two events; closer is one by design", gate=pr["gapMs"] >= 60)
+    if cat == "dynamic":
+        x = secs.get("quiet intro")
+        if x:
+            check("dynamic: hits at -30 dB are detected (level-free detectors)", x["recallFirm"] is not None and
+                  x["recallFirm"] >= 0.9, x["recallFirm"], ">= 0.90", "ADR-1060's ratios do not depend on the level")
     if "sources" in res:
         for key, s in res["sources"].items():
             if not s.get("available", True):
@@ -668,9 +925,10 @@ def checks(m, res):
 def summary_md(results):
     lines = ["# Audio Response Lab: results", "",
              "Generated by `tools/audio_lab/lab.py`. Every number has its raw measurements in `results.json`.", ""]
-    total = sum(1 for r in results for c in r["checks"])
-    passed = sum(1 for r in results for c in r["checks"] if c["pass"])
-    lines += [f"**{passed} of {total} checks pass** across {len(results)} fixtures.", ""]
+    gates = [c for r in results for c in r["checks"] if c.get("gate", True)]
+    finds = [c for r in results for c in r["checks"] if not c.get("gate", True)]
+    lines += [f"**Gates: {sum(1 for c in gates if c['pass'])} of {len(gates)} pass. Findings (reported, not gated): "
+              f"{sum(1 for c in finds if c['pass'])} of {len(finds)} pass** across {len(results)} fixtures.", ""]
     for r in results:
         lines += [f"## {r['fixture']} ({r['category']}): {r['purpose']}", ""]
         o = r["onsets"]["response.onset@hop"]
@@ -688,6 +946,31 @@ def summary_md(results):
             for s in b["segments"]:
                 lines.append(f"- {s['start']:g}-{s['end']:g} s at {s['bpm']:g} BPM: clock {s['clockBpmMedian']} BPM, "
                              f"median |phase error| {s['phaseErrorMedian']}, locked after {s['lockAfterSeconds']} s")
+            lines.append("")
+        lv = r.get("live")
+        if lv:
+            lo = lv["onsets"]["response.onset"]["liveWindow"]
+            lines.append(f"Live path (causal replay): response.onset P {lo['precision']} R {lo['recall']}, timing median "
+                         f"{lo['timingMs']['median']} / p95 {lo['timingMs']['p95']} ms after the onset sample.")
+            if lv["beat"].get("applicable"):
+                b = lv["beat"]
+                lines.append(f"Live tracker: F {b['fMeasure']}, tempo confidence {b['tempoConfidence']}; lock "
+                             f"{json.dumps(lv['lock']['segments'])}; losses at {lv['lock']['losses'][:12]}; silences "
+                             f"{json.dumps(lv['lock']['silences'])}")
+            lines.append("")
+        if r.get("sections") and r["category"] in ("noisy", "adversarial", "dynamic", "dense", "sparse"):
+            lines += ["| section | attacks (firm) | detections | matched | firm recall | unmatched |", "|---|---|---|---|---|---|"]
+            for x in r["sections"]:
+                lines.append(f"| {x['section']} | {x['attacks']} ({x['firmAttacks']}) | {x['detections']} | {x['matched']} | "
+                             f"{x['recallFirm']} | {x['unmatchedDetections']} |")
+            lines.append("")
+        if r.get("noisyByKind"):
+            lines += ["| section | kind | events | caught by response.onset | caught by response.low |", "|---|---|---|---|---|"]
+            for x in r["noisyByKind"]:
+                lines.append(f"| {x['section']} | {x['kind']} | {x['events']} | {x['response.onset']} | {x['response.low']} |")
+            lines.append("")
+        if r.get("bands"):
+            lines.append(f"Band levels per section (means): `{json.dumps(r['bands'])}`")
             lines.append("")
         if "sources" in r:
             lines += ["| source | role | onset P / R | timing median ms | leaked onsets | level in own silence | notes |",
@@ -708,7 +991,8 @@ def summary_md(results):
             lines.append("")
         lines += ["| check | pass | value | bound | why |", "|---|---|---|---|---|"]
         for c in r["checks"]:
-            lines.append(f"| {c['check']} | {'PASS' if c['pass'] else 'FAIL'} | {c['value']} | {c['bound']} | {c['why']} |")
+            verdict = ("PASS" if c["pass"] else "FAIL") + ("" if c.get("gate", True) else " (finding)")
+            lines.append(f"| {c['check']} | {verdict} | {c['value']} | {c['bound']} | {c['why']} |")
         lines.append("")
     return "\n".join(lines) + "\n"
 
@@ -722,10 +1006,31 @@ def main():
     run.add_argument("--only", default="")
     run.add_argument("--avgen", type=Path, default=DEFAULT_AVGEN)
     run.add_argument("--no-generate", action="store_true")
+    run.add_argument("--replay", type=Path, default=DEFAULT_REPLAY)
     ev = sub.add_parser("evaluate")
     ev.add_argument("run_dir", type=Path)
     ev.add_argument("--fixtures", type=Path, default=DEFAULT_FIXTURES)
+    # For tests/integration/test_audio_lab_e2e.cpp, which runs the traces in-process:
+    pr = sub.add_parser("prepare", help="write <run-dir>/project.json for a fixture")
+    pr.add_argument("fixture_dir", type=Path)
+    pr.add_argument("run_dir", type=Path)
+    sc = sub.add_parser("score", help="score <run-dir>'s traces; exit 1 if a gate fails")
+    sc.add_argument("fixture_dir", type=Path)
+    sc.add_argument("run_dir", type=Path)
     args = ap.parse_args()
+
+    if args.cmd == "prepare":
+        write_project(args.fixture_dir, args.run_dir)
+        return
+    if args.cmd == "score":
+        res = evaluate(args.fixture_dir, args.run_dir)
+        (args.run_dir / "results.json").write_text(json.dumps(res, indent=1) + "\n")
+        failed = [c for c in res["checks"] if c.get("gate", True) and not c["pass"]]
+        for c in failed:
+            print(f"GATE FAILED: {c['check']}: {c['value']} (bound {c['bound']})")
+        print(f"score: {res['fixture']}: {sum(1 for c in res['checks'] if c.get('gate', True)) - len(failed)} gates pass, "
+              f"{len(failed)} fail; {sum(1 for c in res['checks'] if not c.get('gate', True))} findings reported")
+        sys.exit(1 if failed else 0)
 
     if args.cmd == "evaluate":
         res = evaluate(args.fixtures / args.run_dir.name, args.run_dir)
@@ -737,21 +1042,30 @@ def main():
         if only:
             cmd += ["--only", ",".join(only)]
         subprocess.run(cmd, check=True)
+        if not only or "drums-real" in only:  # ADR-1726: real one-shots, when this machine has them
+            subprocess.run([sys.executable, str(REPO / "tools" / "audio_lab" / "make_drum_fixture.py"), "--out",
+                            str(args.fixtures)], check=True)
     index = json.loads((args.fixtures / "index.json").read_text())
     results = []
     for f in index["fixtures"]:
         if only and f["name"] not in only:
             continue
         fdir = args.fixtures / f["dir"]
+        if "unavailable" in json.loads((fdir / "manifest.json").read_text()):
+            print(f"lab: {f['name']}: unavailable on this machine; skipped")
+            continue
         rdir = args.out / f["name"]
         project = write_project(fdir, rdir)
         trace(args.avgen, project, rdir / "hop.csv", HOP_FPS, False)
         trace(args.avgen, project, rdir / "frame.csv", FRAME_FPS, True)
+        replay(args.replay, fdir / "mix.wav", rdir / "live")
         res = evaluate(fdir, rdir)
         (rdir / "results.json").write_text(json.dumps(res, indent=1) + "\n")
         results.append(res)
-        ok = sum(1 for c in res["checks"] if c["pass"])
-        print(f"lab: {f['name']}: {ok}/{len(res['checks'])} checks pass")
+        g = [c for c in res["checks"] if c.get("gate", True)]
+        fnd = [c for c in res["checks"] if not c.get("gate", True)]
+        print(f"lab: {f['name']}: gates {sum(1 for c in g if c['pass'])}/{len(g)}, findings "
+              f"{sum(1 for c in fnd if c['pass'])}/{len(fnd)} pass")
     (args.out / "results.json").write_text(json.dumps({"format": "avgen-audio-lab-results", "version": 1,
                                                        "fixtures": results}, indent=1) + "\n")
     (args.out / "summary.md").write_text(summary_md(results))

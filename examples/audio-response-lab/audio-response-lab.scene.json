@@ -1955,6 +1955,163 @@
    }
   },
   {
+   "name": "mMidSlowFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.16,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.930000000000001,
+      1.6,
+      0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.55,
+      0.55,
+      0.55
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mHighSlowFill",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.16,
+      1.0,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -8.58,
+      1.6,
+      0.05
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      0.001,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.55,
+      0.55,
+      0.55
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "mSlowNote",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "thin grey: audio.*Level (slow)",
+     "textSize": 0.2,
+     "textDepth": 0.0,
+     "textAlign": 1,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      -9.625,
+      0.75,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
    "name": "hB",
    "kind": "procedural",
    "procedural": {
@@ -3800,6 +3957,324 @@
       0.7
      ],
      "emissiveIntensity": 0.8,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "cMidi",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.42,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.3,
+      0.25,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.4,
+      1.0,
+      0.5
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "cMidiLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "MIDI CLOCK",
+     "textSize": 0.22,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      5.6499999999999995,
+      0.14,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "cGrid",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.42,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      7.6,
+      0.25,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      1.0,
+      0.6,
+      0.1
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "cGridLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "FILE GRID: NO LOCK STATE",
+     "textSize": 0.22,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      7.949999999999999,
+      0.14,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "cTracker",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "box",
+     "size": [
+      0.42,
+      0.42,
+      0.1
+     ]
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.4,
+      0.25,
+      0.0
+     ],
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.3,
+      0.85,
+      1.0
+     ],
+     "emissiveIntensity": 0.07,
+     "roughness": 1.0,
+     "metallic": 0.0,
+     "unlit": true
+    },
+    "castsShadow": false
+   }
+  },
+  {
+   "name": "cTrackerLabel",
+   "kind": "procedural",
+   "procedural": {
+    "source": {
+     "kind": "text",
+     "text": "LIVE TRACKER",
+     "textSize": 0.22,
+     "textDepth": 0.0,
+     "textAlign": 0,
+     "font": {
+      "family": "Helvetica Neue",
+      "weight": 0.5,
+      "italic": false
+     }
+    },
+    "distribution": {
+     "kind": "single"
+    },
+    "distributionTransform": {
+     "position": [
+      11.75,
+      0.14,
+      0.0
+     ],
+     "rotation": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.0,
+      1.0,
+      1.0
+     ]
+    },
+    "material": {
+     "baseColor": [
+      0,
+      0,
+      0
+     ],
+     "emissiveColor": [
+      0.75,
+      0.75,
+      0.75
+     ],
+     "emissiveIntensity": 0.9,
      "roughness": 1.0,
      "metallic": 0.0,
      "unlit": true

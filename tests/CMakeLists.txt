@@ -158,6 +158,26 @@ else()
     message(WARNING "No Python 3 interpreter: the stem fixture is not generated and the stem tests will SKIP")
 endif()
 target_compile_definitions(avgen_tests PRIVATE AVGEN_STEM_FIXTURE_DIR="${AVGEN_STEM_FIXTURE_DIR}")
+# ADR-1720: the Audio Response Lab's fixtures (seven categories, tools/audio_lab/make_fixtures.py), generated into the
+# build tree the same way, plus the real one-shot drum fixture when this machine has the owner's samples (ADR-1726;
+# without them its test SKIPs). The causal replay tool (ADR-1725) is a dependency so the live path is scored too.
+set(AVGEN_AUDIO_LAB_FIXTURE_DIR "${CMAKE_BINARY_DIR}/test-fixtures/audio-lab")
+if(Python3_Interpreter_FOUND)
+    add_custom_command(
+        OUTPUT "${AVGEN_AUDIO_LAB_FIXTURE_DIR}/index.json"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/audio_lab/make_fixtures.py" --out "${AVGEN_AUDIO_LAB_FIXTURE_DIR}"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/audio_lab/make_drum_fixture.py" --out "${AVGEN_AUDIO_LAB_FIXTURE_DIR}"
+        DEPENDS "${CMAKE_SOURCE_DIR}/tools/audio_lab/make_fixtures.py" "${CMAKE_SOURCE_DIR}/tools/audio_lab/make_drum_fixture.py"
+        COMMENT "Generating the Audio Response Lab fixtures"
+        VERBATIM)
+    add_custom_target(avgen_audio_lab_fixture DEPENDS "${AVGEN_AUDIO_LAB_FIXTURE_DIR}/index.json")
+    add_dependencies(avgen_tests avgen_audio_lab_fixture)
+endif()
+target_compile_definitions(avgen_tests PRIVATE AVGEN_AUDIO_LAB_FIXTURE_DIR="${AVGEN_AUDIO_LAB_FIXTURE_DIR}")
+if(TARGET avgen_audio_lab_replay)
+    add_dependencies(avgen_tests avgen_audio_lab_replay)
+    target_compile_definitions(avgen_tests PRIVATE AVGEN_AUDIO_LAB_REPLAY="$<TARGET_FILE:avgen_audio_lab_replay>")
+endif()
 catch_discover_tests(avgen_tests
     TEST_PREFIX "unit."
     PROPERTIES LABELS "unit"
