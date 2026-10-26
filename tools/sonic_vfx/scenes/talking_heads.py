@@ -94,6 +94,7 @@ JADE = {"rays": ("#3dffc0", "#9affe0", "#2bd8ff"), "wash": ("#0f6b5a", "#22c49a"
 GREY = {"rays": ("#d8d8d8", "#bcbcbc", "#f0f0f0"), "wash": ("#6a6a6a", "#9a9a9a", "#c8c8c8", "#eeeeee"),
         "glow": "#cfcfcf", "ghosts": ("#d0d0d0", "#a8a8a8"), "spill": "#bdbdbd"}
 PROFILES = ("tracking", "codec", "broadcast", "ghosting")
+DEFAULT_PROFILE = "tracking"   # a slot whose profile is missing or unknown (the brief: a configurable default)
 HEADS = [
     {"prefix": "th1", "roles": ["drums"], "band": "bass", "open": 0.60, "close": 0.45,
      "scan": (0.55, 0.13, 3), "palette": ICE, "profile": "tracking"},
@@ -377,6 +378,9 @@ def build(heads=None, neutral=False):
     """`heads`: the slots (default HEADS, all four). `neutral`: every slot's palette grey -- the brief's test that a
     source is recognisable from its secondary effects alone (with the rays knob at 0)."""
     heads = [dict(h) for h in (heads or HEADS)]
+    for h in heads:
+        if h.get("profile") not in PROFILES:
+            h["profile"] = DEFAULT_PROFILE
     if neutral:
         for h in heads:
             h["palette"] = GREY
