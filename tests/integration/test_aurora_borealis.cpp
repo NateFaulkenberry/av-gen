@@ -6,7 +6,6 @@
 //     (lfo, random), never a stem, the mix's response or a macro;
 //   * Sabertooth (the default) reads its nine stems BY KEY, the beat from the Kick stem; the seven part knobs rest at
 //     1; the aurora's own mix response is off and only Cloud Diving (and a crash's glow) reaches it;
-//   * Feline Footwear (the second project) keeps its three role stems and drum feeds;
 //   * with the Sabertooth stems (skipped where they are absent): every transient detector reproduces research A's
 //     event list (12 crashes, 121 kicks, 48 snares, 28 tom notes, 176 tone-block accents) and the Moog's onsets;
 //     at most two light balls are alive; the kicks sit on the 85.49 BPM grid with no drift.
@@ -45,8 +44,6 @@ json loadProject(const char* name = "aurora-borealis.json") {
     REQUIRE(in.good());
     return json::parse(in);
 }
-
-const char* const kFeline = "aurora-borealis-feline.json";
 
 struct Trace {
     std::vector<std::string> names;
@@ -163,9 +160,8 @@ void checkEvents(const std::vector<double>& fires, const std::vector<double>& re
 
 TEST_CASE("Aurora Borealis: every musical input is a conditioned signal; routes carry amounts",
           "[examples][aurora-borealis][adr1602]") {
-    for (const char* name : {"aurora-borealis.json", kFeline}) {
-        INFO(name);
-        const json p = loadProject(name);
+    {
+        const json p = loadProject();
         CHECK(p.at("sonic").at("live") == true);
         std::set<std::string> names;
         std::set<std::string> subsets;
@@ -181,9 +177,8 @@ TEST_CASE("Aurora Borealis: every musical input is a conditioned signal; routes 
             for (const auto& in : parsed.inputs()) {
                 INFO(src.at("name").get<std::string>() << " <- " << in.source);
                 CHECK_FALSE(in.source.starts_with("macro.")); // a frame late
-                // Sabertooth: no drum class (late and wrong on single-instrument stems, 21 s2.4); each stem's own onset
-                const bool classOk = std::string(name) == kFeline || !in.source.starts_with("role.");
-                CHECK(classOk);
+                // each stem's own onset, never a role's (21 s2.4)
+                CHECK_FALSE(in.source.starts_with("role."));
                 if (in.source.starts_with("signal.")) {
                     CHECK(names.contains(in.source.substr(7))); // listed after what it reads (same frame)
                 }
@@ -253,17 +248,6 @@ TEST_CASE("Aurora Borealis: Sabertooth's stems by key, the Kick beat feed, part 
             CHECK((source.starts_with("signal.cloud") || source == "signal.crashGlow")); // Cloud Diving's, and a crash
         }
     }
-    // Feline Footwear stays available: its three stems by role and the drum feeds
-    const json f = loadProject(kFeline);
-    std::set<std::string> fr;
-    for (const json& s : f.at("assets").at("stems")) {
-        fr.insert(s.at("role").get<std::string>());
-        CHECK(s.at("file").get<std::string>().find("feline-footwear (") != std::string::npos);
-    }
-    CHECK(fr == std::set<std::string>{"drums", "bass", "synth"});
-    CHECK(f.at("feeds").at("beat") == "role.drums");
-    CHECK(f.at("effects") == p.at("effects")); // one scene, two songs
-
     // pass 3's effects: the river beams are ADR-1662 path waves on the water's own course, each on its own refractory
     // event and fading on its own envelope; the stars are two fast comets (a pool of two); the pass-2 perpendicular
     // pulses and slow comet are gone
@@ -474,22 +458,4 @@ TEST_CASE("Aurora Borealis: no fish breaks the lake's surface", "[examples][auro
     const std::filesystem::path script = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples/aurora-borealis/world.py";
     const std::string cmd = "python3 \"" + script.string() + "\" --check-fish >/dev/null 2>&1";
     CHECK(std::system(cmd.c_str()) == 0);
-}
-
-TEST_CASE("Aurora Borealis: the Feline Footwear version's beams follow the drum classes",
-          "[examples][aurora-borealis][stems][adr1602]") {
-    const json p = loadProject(kFeline);
-    if (!stemsPresent(p)) {
-        SKIP("the Feline Footwear stems are local and never committed");
-    }
-    const Trace t = traceInstrument(p, avgen::testsupport::processTempDir() / "aurora-borealis-feline", 60.0);
-    const std::vector<double> kicks = rises(t, t.col("signal.probe_kickBeamEv"), 1e-6);
-    const std::vector<double> snares = rises(t, t.col("signal.probe_snareBeamEv"), 1e-6);
-    CHECK(kicks.size() > 300);
-    CHECK(snares.size() > 100);
-    for (const auto* v : {&kicks, &snares}) {
-        for (std::size_t i = 1; i < v->size(); ++i) {
-            CHECK((*v)[i] - (*v)[i - 1] >= 0.099); // the 100 ms refractory
-        }
-    }
 }

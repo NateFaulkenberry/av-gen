@@ -15,9 +15,6 @@ Live > Sonic VFX > Aurora Borealis.
 | Tone block | right bank and ranges | small lavender-white crease glints stepping through the bar |
 | Bass, HH | none | left unassigned (tested; see docs/prototypes/aurora-borealis/PROGRESS.md) |
 
-The Feline Footwear version is the hidden entry "Sonic VFX - Aurora Borealis (Feline Footwear)"
-(`aurora-borealis-feline.json`): the same scene and signals driven from its drums, bass and synth stems.
-
 ## Build it
 
 ```sh
@@ -29,10 +26,9 @@ Pure Python 3 (no Blender, no downloads), a few seconds. It writes:
 | Output | Committed? |
 |---|---|
 | `examples/aurora-borealis/scene/aurora-borealis.scene.json`, its faceted GLBs (both banks, three ranges, two riverbeds) | no (gitignored) |
-| `examples/aurora-borealis/aurora-borealis.json` (Sabertooth) and `aurora-borealis-feline.json` | yes: pure functions of the scripts |
+| `examples/aurora-borealis/aurora-borealis.json` (Sabertooth) | yes: a pure function of the scripts |
 
-The audio is local and never committed: `assets/audio/stems/sabertooth/` (the ten Sabertooth files) and, for the
-Feline version, `assets/audio/feline-footwear.wav` and its three stems. Without them the scene still opens and plays
+The audio is local and never committed: `assets/audio/stems/sabertooth/` (the ten Sabertooth files). Without them the scene still opens and plays
 live input; keyed live channels (`kick`, `snare`, `toms`, `crash`, `cloud`, `moog`, `toneblock`) drive the same signals.
 
 ## The scripts

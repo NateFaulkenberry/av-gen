@@ -208,19 +208,10 @@
     },
     {
       "category": "Sonic VFX",
-      "description": "Play Sabertooth: its stems each perform a part of the frame (or, live, input channels keyed the same way); optionally a MIDI controller, CC 21-28 for Cloud Diving, Crash, Moog, Kick, Snare, Toms, tone block and Bass (each part's contribution, resting at full). A flight down a winding mirror river through a valley of faceted indigo mountains at dusk, under an enormous sky of layered aurora ribbons. The Cloud Diving swells twist and recolour the aurora; each crash throws a fireball across the valley; each kick, snare and tom sends a pulse of light down its own lane of the river, lighting the riverbed and the fish under the water, with a splash behind the camera; the bass lights the left bank (from its MIDI file, BASS.mid beside the stems, when it is there) and the Moog the right, in bands running down the ranges. On a mix alone the aurora still follows the mix and the accents rest. The Feline Footwear version is the hidden entry 'Sonic VFX - Aurora Borealis (Feline Footwear)'. Run examples/aurora-borealis/build.py first (pure Python, about a minute). See docs/prototypes/aurora-borealis/.",
+      "description": "Play Sabertooth: its stems each perform a part of the frame (or, live, input channels keyed the same way); optionally a MIDI controller, CC 21-28 for Cloud Diving, Crash, Moog, Kick, Snare, Toms, tone block and Bass (each part's contribution, resting at full). A flight down a winding mirror river through a valley of faceted indigo mountains at dusk, under an enormous sky of layered aurora ribbons. The Cloud Diving swells twist and recolour the aurora; each crash throws a fireball across the valley; each kick, snare and tom sends a pulse of light down its own lane of the river, lighting the riverbed and the fish under the water, with a splash behind the camera; the bass lights the left bank (from its MIDI file, BASS.mid beside the stems, when it is there) and the Moog the right, in bands running down the ranges. On a mix alone the aurora still follows the mix and the accents rest. Run examples/aurora-borealis/build.py first (pure Python, about a minute). See docs/prototypes/aurora-borealis/.",
       "live": true,
       "name": "Sonic VFX - Aurora Borealis",
       "project": "aurora-borealis/aurora-borealis.json",
-      "generate": "python3 examples/aurora-borealis/build.py   (pure Python; writes examples/aurora-borealis/scene/)"
-    },
-    {
-      "category": "Sonic VFX",
-      "description": "Aurora Borealis on the Feline Footwear stems (drums, bass, synth): the synth drives the aurora and the right bank, the drum classes the river pulses, the bass the left bank; no crash, toms or tone block. The same scene as Sonic VFX - Aurora Borealis. Run examples/aurora-borealis/build.py first.",
-      "hidden": true,
-      "live": true,
-      "name": "Sonic VFX - Aurora Borealis (Feline Footwear)",
-      "project": "aurora-borealis/aurora-borealis-feline.json",
       "generate": "python3 examples/aurora-borealis/build.py   (pure Python; writes examples/aurora-borealis/scene/)"
     },
     {

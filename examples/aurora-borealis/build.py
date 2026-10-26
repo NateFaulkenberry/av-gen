@@ -30,7 +30,7 @@ import world  # noqa: E402
 
 SCENE_DIR = os.path.join(HERE, "scene")
 PROJECT = os.path.join(HERE, "aurora-borealis.json")             # Sabertooth, the default
-PROJECTS = {"sabertooth": "aurora-borealis.json", "feline": "aurora-borealis-feline.json"}
+PROJECTS = {"sabertooth": "aurora-borealis.json"}
 SCENE_FILE = "aurora-borealis.scene.json"
 
 CAM_H = 65.0              # metres above the water

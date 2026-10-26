@@ -20,9 +20,7 @@ raw event (conditioned_signal.cpp), so each refractory is applied by gating the 
 (`<name>On`): `<name>Ev` fires once per accepted hit. Transients are stem-only: a mix alone fires no stars, beams or
 glints; the aurora keeps a mix fallback.
 
-Songs: Sabertooth (the default, `aurora-borealis.json`) reads its nine stems by key; Feline Footwear
-(`aurora-borealis-feline.json`) drives the same signals from its three role stems where it has the instrument
-(synth -> the aurora, the drum classes -> the beams, bass notes -> the left glints) and leaves the rest at rest.
+Song: Sabertooth (`aurora-borealis.json`) reads its nine stems by key.
 
 Isolation: one control channel per instrument rests at 1 (ADR-1612) and scales every input of its part, CC 21-27.
 `--sonic-trace --trace-finals` verifies it; nothing is drawn.
@@ -51,7 +49,6 @@ SONGS = {
         # instrument -> the bus prefix of its stem; None: the song has no such part
         "src": {"cloud": "stem.cloud", "crash": "stem.crash", "moog": "stem.moog", "kick": "stem.kick",
                 "snare": "stem.snare", "toms": "stem.toms", "toneblock": "stem.toneblock", "bass": "stem.bass"},
-        "onset": {},
         "cloudGain": 4.0,      # A s3.6: rms p95 0.19, max 0.24
         "moogRise": True,
         # pass 10 (the owner: "I've bounced a BASS.mid ... use that to perfectly line up the visuals with the bass notes ...
@@ -61,19 +58,6 @@ SONGS = {
         # scale 0.970905 (1/1.03 to 0.003%: the varispeed), offset -75.7446 s, residual median 1.5 ms, no drift
         # (docs/prototypes/aurora-borealis/PROGRESS.md, pass 10). Optional: without the file the onsets drive the bass.
         "bassMidi": {"path": STEMS + "sabertooth/BASS.mid", "scale": 0.970905, "offset": -75.7446, "optional": True},
-    },
-    "feline": {
-        "mix": "../../assets/audio/feline-footwear.wav",
-        "stems": [(k, label, k, "feline-footwear (%s).wav" % label)
-                  for k, label in [("drums", "Drums"), ("bass", "Bass"), ("synth", "Synth")]],
-        "feeds": {"beat": "role.drums", "hits": "role.drums"},
-        "src": {"cloud": "stem.synth", "crash": None, "moog": "stem.synth", "kick": "stem.drums", "snare": "stem.drums",
-                "toms": None, "toneblock": None, "bass": "stem.bass"},
-        # one drum stem: its classes stand in for the separate kick and snare stems
-        "onset": {"kick": "role.drums.kick", "snare": "role.drums.snare"},
-        "cloudGain": 8.0,      # pass 1's synth gain (the Feline synth is quieter)
-        "bassMidi": None,
-        "moogRise": False,     # a bass line: its onsets are its notes
     },
 }
 
@@ -170,13 +154,13 @@ def note_signals(name, src, onset, refr_ms, life_s, size, hold_range, hold_decay
 
 def sources(song):
     S = SONGS[song]
-    src, ons = S["src"], S["onset"]
+    src = S["src"]
 
     def s(inst, field):
         return "%s.%s" % (src[inst], field) if src[inst] else None
 
     def onset(inst):
-        return ons.get(inst) or s(inst, "onset")
+        return s(inst, "onset")
 
     def cloud(name, a, d, a2=0.0, d2=0.0):
         ins = [inp(s("cloud", "rms"), dict(gain=S["cloudGain"], **UNIT, attackMs=a, decayMs=d), part="cloud")]
