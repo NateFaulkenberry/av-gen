@@ -198,7 +198,6 @@
   "sources/th3BlinkA/smoothness": 1.0,
   "sources/th3BlinkB/rate": 1.7,
   "sources/th3BlinkB/smoothness": 1.0,
-  "sources/th3Scan/rate": 0.16,
   "sources/th4ScanT/rate": 0.5,
   "sources/th4ScanT/smoothness": 0.0,
   "sources/th4ScanSnap/rate": 0.15,
@@ -1522,6 +1521,27 @@
   },
   {
    "kind": "signal",
+   "name": "th1Hit",
+   "settings": {
+    "combine": "firstActive",
+    "inputs": [
+     {
+      "source": "signal.th1Onset",
+      "chain": {
+       "threshold": "binary",
+       "thresholdLevel": 0.6,
+       "envelope": "peakhold",
+       "envelopeHoldMs": 0.0,
+       "envelopeFallPerSecond": 7.0,
+       "envelopeRearm": 0.5,
+       "envelopeRefractoryMs": 60.0
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "signal",
    "name": "th2Level",
    "settings": {
     "combine": "firstActive",
@@ -2103,7 +2123,7 @@
   },
   {
    "kind": "signal",
-   "name": "th2Surge",
+   "name": "th2Crash",
    "settings": {
     "combine": "firstActive",
     "inputs": [
@@ -2111,12 +2131,12 @@
       "source": "signal.th2Onset",
       "chain": {
        "threshold": "binary",
-       "thresholdLevel": 1.2,
+       "thresholdLevel": 1.3,
        "envelope": "peakhold",
        "envelopeHoldMs": 0.0,
-       "envelopeFallPerSecond": 0.8,
+       "envelopeFallPerSecond": 0.5,
        "envelopeRearm": 0.5,
-       "envelopeRefractoryMs": 350.0
+       "envelopeRefractoryMs": 500.0
       }
      }
     ]
@@ -2124,7 +2144,7 @@
   },
   {
    "kind": "signal",
-   "name": "th2WaveA",
+   "name": "th2Jump",
    "settings": {
     "combine": "firstActive",
     "inputs": [
@@ -2132,65 +2152,12 @@
       "source": "signal.th2Onset",
       "chain": {
        "threshold": "binary",
-       "thresholdLevel": 1.2,
+       "thresholdLevel": 1.3,
        "envelope": "peakhold",
        "envelopeHoldMs": 0.0,
-       "envelopeFallPerSecond": 0.9,
+       "envelopeFallPerSecond": 12.0,
        "envelopeRearm": 0.5,
-       "envelopeRefractoryMs": 550.0
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "th2WaveB",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "signal.th2Onset",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 2.0,
-       "envelope": "peakhold",
-       "envelopeHoldMs": 0.0,
-       "envelopeFallPerSecond": 0.7,
-       "envelopeRearm": 0.5,
-       "envelopeRefractoryMs": 900.0
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "th2AliveA",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "signal.th2WaveA",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.02
-      }
-     }
-    ]
-   }
-  },
-  {
-   "kind": "signal",
-   "name": "th2AliveB",
-   "settings": {
-    "combine": "firstActive",
-    "inputs": [
-     {
-      "source": "signal.th2WaveB",
-      "chain": {
-       "threshold": "binary",
-       "thresholdLevel": 0.02
+       "envelopeRefractoryMs": 500.0
       }
      }
     ]
@@ -2778,15 +2745,8 @@
    }
   },
   {
-   "kind": "lfo",
-   "name": "th3Scan",
-   "settings": {
-    "shape": "saw"
-   }
-  },
-  {
    "kind": "signal",
-   "name": "th3Split",
+   "name": "th3Burst",
    "settings": {
     "combine": "firstActive",
     "inputs": [
@@ -2794,12 +2754,12 @@
       "source": "signal.th3Onset",
       "chain": {
        "threshold": "binary",
-       "thresholdLevel": 0.9,
+       "thresholdLevel": 1.0,
        "envelope": "peakhold",
-       "envelopeHoldMs": 30.0,
-       "envelopeFallPerSecond": 7.0,
+       "envelopeHoldMs": 40.0,
+       "envelopeFallPerSecond": 3.0,
        "envelopeRearm": 0.5,
-       "envelopeRefractoryMs": 120.0
+       "envelopeRefractoryMs": 150.0
       }
      }
     ]
@@ -3436,7 +3396,7 @@
   },
   {
    "kind": "signal",
-   "name": "th4Burst",
+   "name": "th4Sep",
    "settings": {
     "combine": "firstActive",
     "inputs": [
@@ -3444,12 +3404,12 @@
       "source": "signal.th4Onset",
       "chain": {
        "threshold": "binary",
-       "thresholdLevel": 1.0,
+       "thresholdLevel": 0.8,
        "envelope": "peakhold",
        "envelopeHoldMs": 60.0,
-       "envelopeFallPerSecond": 4.0,
+       "envelopeFallPerSecond": 1.1,
        "envelopeRearm": 0.5,
-       "envelopeRefractoryMs": 150.0
+       "envelopeRefractoryMs": 250.0
       }
      }
     ]
@@ -4141,28 +4101,6 @@
        }
       ],
       "curve": 2.0
-     },
-     {
-      "name": "th2WaveA2",
-      "combine": "max",
-      "inputs": [
-       {
-        "signal": "signal.th2WaveA",
-        "weight": 1.0
-       }
-      ],
-      "curve": 2.5
-     },
-     {
-      "name": "th2WaveB2",
-      "combine": "max",
-      "inputs": [
-       {
-        "signal": "signal.th2WaveB",
-        "weight": 1.0
-       }
-      ],
-      "curve": 2.5
      },
      {
       "name": "th3GateKeep",
@@ -5437,9 +5375,81 @@
    "depthMax": 2.0
   },
   {
+   "source": "signal.th1Live",
+   "target": "nodes/th1-ghostAh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "nodes/th1-ghostAh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "nodes/th1-ghostAh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "nodes/th1-ghostBh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "nodes/th1-ghostBh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th1Live",
+   "target": "nodes/th1-ghostBh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
    "source": "signal.th1Open",
    "target": "fx/th1-shake/trauma",
-   "amount": 0.75,
+   "amount": 0.6,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.copiesGate",
@@ -5453,34 +5463,45 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
+   "source": "signal.th1Hit",
    "target": "procedural/th1-bust/deform/1/amount",
-   "amount": 0.006,
+   "amount": 0.045,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tearGate",
    "chain": {
     "attackMs": 0,
-    "decayMs": 120
+    "decayMs": 90
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-bust/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
    "target": "procedural/th1-bust/deform/1/phase",
-   "amount": 20.0,
+   "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "integrate": true,
-    "attackMs": 10,
-    "decayMs": 140
+    "attackMs": 0,
+    "decayMs": 150
    }
   },
   {
    "source": "control.padBurst",
    "target": "procedural/th1-bust/deform/1/amount",
-   "amount": 0.01,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5489,34 +5510,56 @@
    }
   },
   {
-   "source": "signal.th1Open",
+   "source": "control.padBurst",
+   "target": "procedural/th1-bust/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
    "target": "procedural/th1-neck/deform/4/amount",
-   "amount": 0.006,
+   "amount": 0.045,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tearGate",
    "chain": {
     "attackMs": 0,
-    "decayMs": 120
+    "decayMs": 90
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-neck/deform/4/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
    "target": "procedural/th1-neck/deform/4/phase",
-   "amount": 20.0,
+   "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "integrate": true,
-    "attackMs": 10,
-    "decayMs": 140
+    "attackMs": 0,
+    "decayMs": 150
    }
   },
   {
    "source": "control.padBurst",
    "target": "procedural/th1-neck/deform/4/amount",
-   "amount": 0.01,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5525,34 +5568,56 @@
    }
   },
   {
-   "source": "signal.th1Open",
+   "source": "control.padBurst",
+   "target": "procedural/th1-neck/deform/4/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
    "target": "procedural/th1-head/deform/2/amount",
-   "amount": 0.006,
+   "amount": 0.045,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tearGate",
    "chain": {
     "attackMs": 0,
-    "decayMs": 120
+    "decayMs": 90
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-head/deform/2/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
    "target": "procedural/th1-head/deform/2/phase",
-   "amount": 20.0,
+   "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "integrate": true,
-    "attackMs": 10,
-    "decayMs": 140
+    "attackMs": 0,
+    "decayMs": 150
    }
   },
   {
    "source": "control.padBurst",
    "target": "procedural/th1-head/deform/2/amount",
-   "amount": 0.01,
+   "amount": 0.06,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
@@ -5561,9 +5626,542 @@
    }
   },
   {
-   "source": "signal.th1Open",
+   "source": "control.padBurst",
+   "target": "procedural/th1-head/deform/2/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-cavity/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-cavity/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-cavity/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-cavity/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-cavity/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeLw/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeLw/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeLw/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeLw/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeLw/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeLi/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeLi/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeLi/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeLi/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeLi/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeRw/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeRw/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeRw/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeRw/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeRw/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeRi/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeRi/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-eyeRi/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeRi/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-eyeRi/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidUL/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidUL/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidUL/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidUL/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidUL/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidLL/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidLL/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidLL/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidLL/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidLL/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidUR/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidUR/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidUR/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidUR/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidUR/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidLR/deform/1/amount",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 90
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidLR/deform/1/falloff",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 120
+   }
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "procedural/th1-lidLR/deform/1/phase",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidLR/deform/1/amount",
+   "amount": 0.06,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th1-lidLR/deform/1/falloff",
+   "amount": 0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 150
+   }
+  },
+  {
+   "source": "signal.th1Hit",
    "target": "material/th1-body/op/37/threshold/value",
-   "amount": -0.18,
+   "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tearGate",
@@ -5574,15 +6172,99 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th1Open",
+   "source": "signal.th1Hit",
    "target": "material/th1-head/op/37/threshold/value",
-   "amount": -0.18,
+   "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
    "depthSource": "visual.tearGate",
    "chain": {
     "attackMs": 0,
     "decayMs": 120
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "material/th1-ghostA/op/4/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "nodes/th1-ghostAh/position",
+   "amount": 0.016,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 110
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "nodes/th1-ghostAh/position",
+   "amount": 0.003,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 110
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "material/th1-ghostB/op/4/constant/constant",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 160
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "nodes/th1-ghostBh/position",
+   "amount": -0.016,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 110
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th1Hit",
+   "target": "nodes/th1-ghostBh/position",
+   "amount": -0.003,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 110
    },
    "depthMax": 2.0
   },
@@ -6167,340 +6849,1037 @@
   {
    "source": "signal.th2LevelS",
    "target": "procedural/th2-bust/deform/1/amount",
-   "amount": 0.014,
+   "amount": 0.022,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.copiesGate",
+   "depthSource": "visual.tearGate",
    "chain": {
-    "attackMs": 250,
-    "decayMs": 1500
+    "attackMs": 350,
+    "decayMs": 2500
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2Surge",
+   "source": "signal.th2Crash",
    "target": "procedural/th2-bust/deform/1/amount",
-   "amount": 0.016,
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.copiesGate",
+   "depthSource": "visual.tearGate",
    "chain": {
-    "attackMs": 60,
-    "decayMs": 1200
+    "attackMs": 0,
+    "decayMs": 1800
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th2LevelS",
-   "target": "procedural/th2-bust/deform/1/phase",
-   "amount": 5.0,
+   "target": "procedural/th2-bust/deform/1/falloff",
+   "amount": 0.28,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "integrate": true,
-    "attackMs": 250,
-    "decayMs": 1500
+    "attackMs": 500,
+    "decayMs": 3000
    }
   },
   {
-   "source": "signal.th2Surge",
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-bust/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
    "target": "procedural/th2-bust/deform/1/phase",
-   "amount": 6.0,
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "integrate": true,
-    "attackMs": 60,
-    "decayMs": 1200
+    "attackMs": 0,
+    "decayMs": 0
    }
   },
   {
    "source": "control.padBurst",
    "target": "procedural/th2-bust/deform/1/amount",
-   "amount": 0.02,
+   "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 600
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-bust/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
    }
   },
   {
    "source": "signal.th2LevelS",
    "target": "procedural/th2-neck/deform/4/amount",
-   "amount": 0.014,
+   "amount": 0.022,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.copiesGate",
+   "depthSource": "visual.tearGate",
    "chain": {
-    "attackMs": 250,
-    "decayMs": 1500
+    "attackMs": 350,
+    "decayMs": 2500
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2Surge",
+   "source": "signal.th2Crash",
    "target": "procedural/th2-neck/deform/4/amount",
-   "amount": 0.016,
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.copiesGate",
+   "depthSource": "visual.tearGate",
    "chain": {
-    "attackMs": 60,
-    "decayMs": 1200
+    "attackMs": 0,
+    "decayMs": 1800
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th2LevelS",
-   "target": "procedural/th2-neck/deform/4/phase",
-   "amount": 5.0,
+   "target": "procedural/th2-neck/deform/4/falloff",
+   "amount": 0.28,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "integrate": true,
-    "attackMs": 250,
-    "decayMs": 1500
+    "attackMs": 500,
+    "decayMs": 3000
    }
   },
   {
-   "source": "signal.th2Surge",
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-neck/deform/4/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
    "target": "procedural/th2-neck/deform/4/phase",
-   "amount": 6.0,
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "integrate": true,
-    "attackMs": 60,
-    "decayMs": 1200
+    "attackMs": 0,
+    "decayMs": 0
    }
   },
   {
    "source": "control.padBurst",
    "target": "procedural/th2-neck/deform/4/amount",
-   "amount": 0.02,
+   "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 600
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-neck/deform/4/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
    }
   },
   {
    "source": "signal.th2LevelS",
    "target": "procedural/th2-head/deform/2/amount",
-   "amount": 0.014,
+   "amount": 0.022,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.copiesGate",
+   "depthSource": "visual.tearGate",
    "chain": {
-    "attackMs": 250,
-    "decayMs": 1500
+    "attackMs": 350,
+    "decayMs": 2500
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2Surge",
+   "source": "signal.th2Crash",
    "target": "procedural/th2-head/deform/2/amount",
-   "amount": 0.016,
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
-   "depthSource": "visual.copiesGate",
+   "depthSource": "visual.tearGate",
    "chain": {
-    "attackMs": 60,
-    "decayMs": 1200
+    "attackMs": 0,
+    "decayMs": 1800
    },
    "depthMax": 2.0
   },
   {
    "source": "signal.th2LevelS",
-   "target": "procedural/th2-head/deform/2/phase",
-   "amount": 5.0,
+   "target": "procedural/th2-head/deform/2/falloff",
+   "amount": 0.28,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
-    "integrate": true,
-    "attackMs": 250,
-    "decayMs": 1500
+    "attackMs": 500,
+    "decayMs": 3000
    }
   },
   {
-   "source": "signal.th2Surge",
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-head/deform/2/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
    "target": "procedural/th2-head/deform/2/phase",
-   "amount": 6.0,
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "integrate": true,
-    "attackMs": 60,
-    "decayMs": 1200
+    "attackMs": 0,
+    "decayMs": 0
    }
   },
   {
    "source": "control.padBurst",
    "target": "procedural/th2-head/deform/2/amount",
-   "amount": 0.02,
+   "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
    "chain": {
     "attackMs": 0,
-    "decayMs": 600
+    "decayMs": 900
    }
   },
   {
-   "source": "signal.th2AliveA",
-   "target": "nodes/th2-ringA/scale",
-   "amount": 2.8,
+   "source": "control.padBurst",
+   "target": "procedural/th2-head/deform/2/falloff",
+   "amount": 0.5,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
   },
   {
-   "source": "signal.th2WaveA",
-   "target": "nodes/th2-ringA/scale",
-   "amount": -1.7999999999999998,
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-cavity/deform/1/amount",
+   "amount": 0.022,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "visual.th2WaveA2",
-   "target": "material/th2-ringA/op/2/constant/constant",
-   "amount": 1.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2AliveA",
-   "target": "nodes/th2-ringA/scale",
-   "amount": 2.8,
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-cavity/deform/1/amount",
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "signal.th2WaveA",
-   "target": "nodes/th2-ringA/scale",
-   "amount": -1.7999999999999998,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "visual.th2WaveA2",
-   "target": "material/th2-ringA/op/2/constant/constant",
-   "amount": 1.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2AliveA",
-   "target": "nodes/th2-ringA/scale",
-   "amount": 2.8,
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-cavity/deform/1/falloff",
+   "amount": 0.28,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
   },
   {
-   "source": "signal.th2WaveA",
-   "target": "nodes/th2-ringA/scale",
-   "amount": -1.7999999999999998,
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-cavity/deform/1/falloff",
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
   },
   {
-   "source": "visual.th2WaveA2",
-   "target": "material/th2-ringA/op/2/constant/constant",
-   "amount": 1.8,
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-cavity/deform/1/phase",
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-cavity/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-cavity/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeLw/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2AliveB",
-   "target": "nodes/th2-ringB/scale",
-   "amount": 2.8,
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeLw/deform/1/amount",
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "signal.th2WaveB",
-   "target": "nodes/th2-ringB/scale",
-   "amount": -1.7999999999999998,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "visual.th2WaveB2",
-   "target": "material/th2-ringB/op/2/constant/constant",
-   "amount": 1.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2AliveB",
-   "target": "nodes/th2-ringB/scale",
-   "amount": 2.8,
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeLw/deform/1/falloff",
+   "amount": 0.28,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
   },
   {
-   "source": "signal.th2WaveB",
-   "target": "nodes/th2-ringB/scale",
-   "amount": -1.7999999999999998,
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeLw/deform/1/falloff",
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
   },
   {
-   "source": "visual.th2WaveB2",
-   "target": "material/th2-ringB/op/2/constant/constant",
-   "amount": 1.8,
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-eyeLw/deform/1/phase",
+   "amount": 14.0,
    "op": "add",
    "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeLw/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeLw/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeLi/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th2AliveB",
-   "target": "nodes/th2-ringB/scale",
-   "amount": 2.8,
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeLi/deform/1/amount",
+   "amount": 0.03,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
   },
   {
-   "source": "signal.th2WaveB",
-   "target": "nodes/th2-ringB/scale",
-   "amount": -1.7999999999999998,
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeLi/deform/1/falloff",
+   "amount": 0.28,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
   },
   {
-   "source": "visual.th2WaveB2",
-   "target": "material/th2-ringB/op/2/constant/constant",
-   "amount": 1.8,
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeLi/deform/1/falloff",
+   "amount": 0.3,
    "op": "add",
    "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-eyeLi/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeLi/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeLi/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeRw/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeRw/deform/1/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeRw/deform/1/falloff",
+   "amount": 0.28,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeRw/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-eyeRw/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeRw/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeRw/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeRi/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeRi/deform/1/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-eyeRi/deform/1/falloff",
+   "amount": 0.28,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-eyeRi/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-eyeRi/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeRi/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-eyeRi/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidUL/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidUL/deform/1/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidUL/deform/1/falloff",
+   "amount": 0.28,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidUL/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-lidUL/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidUL/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidUL/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidLL/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidLL/deform/1/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidLL/deform/1/falloff",
+   "amount": 0.28,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidLL/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-lidLL/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidLL/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidLL/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidUR/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidUR/deform/1/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidUR/deform/1/falloff",
+   "amount": 0.28,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidUR/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-lidUR/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidUR/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidUR/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidLR/deform/1/amount",
+   "amount": 0.022,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 350,
+    "decayMs": 2500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidLR/deform/1/amount",
+   "amount": 0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.tearGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "procedural/th2-lidLR/deform/1/falloff",
+   "amount": 0.28,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   }
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "procedural/th2-lidLR/deform/1/falloff",
+   "amount": 0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   }
+  },
+  {
+   "source": "signal.th2Jump",
+   "target": "procedural/th2-lidLR/deform/1/phase",
+   "amount": 14.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 0,
+    "decayMs": 0
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidLR/deform/1/amount",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "control.padBurst",
+   "target": "procedural/th2-lidLR/deform/1/falloff",
+   "amount": 0.5,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-body/op/31/threshold/value",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "material/th2-body/op/31/threshold/value",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-head/op/31/threshold/value",
+   "amount": -0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 500,
+    "decayMs": 3000
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th2Crash",
+   "target": "material/th2-head/op/31/threshold/value",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 2000
+   },
    "depthMax": 2.0
   },
   {
@@ -7068,378 +8447,699 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3LevelS",
-   "target": "sources/th3Scan/rate",
-   "amount": 0.45,
-   "op": "add",
-   "polarity": "unipolar",
-   "chain": {
-    "attackMs": 500,
-    "decayMs": 2000
-   }
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/34/remap/constant",
-   "amount": -0.75,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 1200
-   }
-  },
-  {
-   "source": "lfo.th3Scan",
-   "target": "material/th3-body/op/30/constant/constant",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/36/constant/constant",
-   "amount": 2.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 900
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Open",
-   "target": "material/th3-body/op/36/constant/constant",
-   "amount": 1.6,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/46/constant/constant",
-   "amount": 1.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "lfo.th3Scan",
-   "target": "material/th3-body/op/30/constant/constant",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/36/constant/constant",
-   "amount": 1.081896,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 900
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Open",
-   "target": "material/th3-body/op/36/constant/constant",
-   "amount": 0.7212640000000001,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/46/constant/constant",
-   "amount": 0.5860270000000001,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "lfo.th3Scan",
-   "target": "material/th3-body/op/30/constant/constant",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/36/constant/constant",
-   "amount": 0.151224,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 900
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Open",
-   "target": "material/th3-body/op/36/constant/constant",
-   "amount": 0.100816,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/46/constant/constant",
-   "amount": 0.081913,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/34/remap/constant",
-   "amount": -0.75,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 1200
-   }
-  },
-  {
-   "source": "lfo.th3Scan",
-   "target": "material/th3-head/op/30/constant/constant",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/36/constant/constant",
-   "amount": 2.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 900
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Open",
-   "target": "material/th3-head/op/36/constant/constant",
-   "amount": 1.6,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/46/constant/constant",
-   "amount": 1.3,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "lfo.th3Scan",
-   "target": "material/th3-head/op/30/constant/constant",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/36/constant/constant",
-   "amount": 1.081896,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 900
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Open",
-   "target": "material/th3-head/op/36/constant/constant",
-   "amount": 0.7212640000000001,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/46/constant/constant",
-   "amount": 0.5860270000000001,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "lfo.th3Scan",
-   "target": "material/th3-head/op/30/constant/constant",
-   "amount": 0.8,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/36/constant/constant",
-   "amount": 0.151224,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 150,
-    "decayMs": 900
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Open",
-   "target": "material/th3-head/op/36/constant/constant",
-   "amount": 0.100816,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/46/constant/constant",
-   "amount": 0.081913,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 900,
-    "decayMs": 2500
-   },
-   "depthMax": 2.0
-  },
-  {
    "source": "signal.th3Live",
    "target": "nodes/th3-ghostAh/scale",
-   "amount": 1.005,
+   "amount": 1.004,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "chain": {
     "attackMs": 0,
-    "decayMs": 500
+    "decayMs": 600
    }
   },
   {
    "source": "signal.th3Live",
    "target": "nodes/th3-ghostAh/scale",
-   "amount": 1.005,
+   "amount": 1.004,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
    "chain": {
     "attackMs": 0,
-    "decayMs": 500
+    "decayMs": 600
    }
   },
   {
    "source": "signal.th3Live",
    "target": "nodes/th3-ghostAh/scale",
-   "amount": 1.005,
+   "amount": 1.004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
    "chain": {
     "attackMs": 0,
-    "decayMs": 500
+    "decayMs": 600
    }
   },
   {
    "source": "signal.th3Live",
+   "target": "nodes/th3-ghostBh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "nodes/th3-ghostBh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th3Live",
+   "target": "nodes/th3-ghostBh/scale",
+   "amount": 1.004,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/32/smoothstep/constant",
+   "amount": -0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/32/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/31/smoothstep/constant",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/31/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/32/smoothstep/constant",
+   "amount": -0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/32/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/31/smoothstep/constant",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/31/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/33/noise/constant",
+   "amount": 36.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/33/noise/constant",
+   "amount": 54.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/33/noise/constant",
+   "amount": 68.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/33/noise/constant",
+   "amount": 102.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/33/noise/constant",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/33/noise/constant",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/29/noise/constant",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/29/noise/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/43/threshold/value",
+   "amount": -0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 700,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/43/threshold/value",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/44/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/44/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/44/constant/constant",
+   "amount": 0.49586900000000006,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/44/constant/constant",
+   "amount": 0.45079,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/44/constant/constant",
+   "amount": 0.069311,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-body/op/44/constant/constant",
+   "amount": 0.06301,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/32/smoothstep/constant",
+   "amount": -0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/32/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/31/smoothstep/constant",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/31/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/32/smoothstep/constant",
+   "amount": -0.6,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/32/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/31/smoothstep/constant",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 900,
+    "decayMs": 2200
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/31/smoothstep/constant",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/33/noise/constant",
+   "amount": 36.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/33/noise/constant",
+   "amount": 54.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/33/noise/constant",
+   "amount": 68.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/33/noise/constant",
+   "amount": 102.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/33/noise/constant",
+   "amount": 16.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/33/noise/constant",
+   "amount": 24.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/29/noise/constant",
+   "amount": 0.12,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "integrate": true,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/29/noise/constant",
+   "amount": 0.05,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "integrate": true,
+    "attackMs": 300,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/43/threshold/value",
+   "amount": -0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 700,
+    "decayMs": 1800
+   }
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/43/threshold/value",
+   "amount": -0.3,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/44/constant/constant",
+   "amount": 1.1,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/44/constant/constant",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/44/constant/constant",
+   "amount": 0.49586900000000006,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/44/constant/constant",
+   "amount": 0.45079,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/44/constant/constant",
+   "amount": 0.069311,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 600,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-head/op/44/constant/constant",
+   "amount": 0.06301,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "depthSource": "visual.chromaGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
    "target": "material/th3-ghostA/op/4/constant/constant",
    "amount": 0.55,
    "op": "add",
@@ -7447,93 +9147,55 @@
    "component": 0,
    "depthSource": "visual.copiesGate",
    "chain": {
-    "attackMs": 20,
+    "attackMs": 700,
+    "decayMs": 1800
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "material/th3-ghostA/op/4/constant/constant",
+   "amount": 0.45,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
     "decayMs": 400
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3Split",
-   "target": "nodes/th3-ghostAh/position",
-   "amount": 0.018,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.copiesGate",
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Split",
-   "target": "nodes/th3-ghostAh/position",
-   "amount": 0.007,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Split",
-   "target": "nodes/th3-ghostAh/rotation",
-   "amount": 4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
-   "depthMax": 2.0
-  },
-  {
    "source": "signal.th3LevelS",
    "target": "nodes/th3-ghostAh/position",
-   "amount": 0.005,
+   "amount": 0.008,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "depthSource": "visual.copiesGate",
    "chain": {
-    "attackMs": 800,
-    "decayMs": 1500
+    "attackMs": 1200,
+    "decayMs": 2000
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3Live",
-   "target": "nodes/th3-ghostBh/scale",
-   "amount": 1.005,
+   "source": "signal.th3Burst",
+   "target": "nodes/th3-ghostAh/position",
+   "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
+   "depthSource": "visual.copiesGate",
    "chain": {
     "attackMs": 0,
     "decayMs": 500
-   }
+   },
+   "depthMax": 2.0
   },
   {
-   "source": "signal.th3Live",
-   "target": "nodes/th3-ghostBh/scale",
-   "amount": 1.005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 500
-   }
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "nodes/th3-ghostBh/scale",
-   "amount": 1.005,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 500
-   }
-  },
-  {
-   "source": "signal.th3Live",
+   "source": "signal.th3LevelS",
    "target": "material/th3-ghostB/op/4/constant/constant",
    "amount": 0.55,
    "op": "add",
@@ -7541,52 +9203,50 @@
    "component": 0,
    "depthSource": "visual.copiesGate",
    "chain": {
-    "attackMs": 20,
-    "decayMs": 400
+    "attackMs": 700,
+    "decayMs": 1800
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th3Split",
-   "target": "nodes/th3-ghostBh/position",
-   "amount": -0.018,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.copiesGate",
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Split",
-   "target": "nodes/th3-ghostBh/position",
-   "amount": 0.007,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Split",
-   "target": "nodes/th3-ghostBh/rotation",
-   "amount": -4.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3LevelS",
-   "target": "nodes/th3-ghostBh/position",
-   "amount": -0.005,
+   "source": "signal.th3Burst",
+   "target": "material/th3-ghostB/op/4/constant/constant",
+   "amount": 0.45,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
    "depthSource": "visual.copiesGate",
    "chain": {
-    "attackMs": 800,
-    "decayMs": 1500
+    "attackMs": 0,
+    "decayMs": 400
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "nodes/th3-ghostBh/position",
+   "amount": -0.008,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 1200,
+    "decayMs": 2000
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th3Burst",
+   "target": "nodes/th3-ghostBh/position",
+   "amount": -0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 500
    },
    "depthMax": 2.0
   },
@@ -8155,136 +9815,218 @@
    "depthMax": 2.0
   },
   {
-   "source": "signal.th4LevelS",
-   "target": "material/th4-body/op/34/smoothstep/constant",
-   "amount": -0.62,
+   "source": "signal.th4Live",
+   "target": "nodes/th4-ghostAh/scale",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "visual.copiesGate",
    "chain": {
-    "attackMs": 300,
-    "decayMs": 1400
-   },
-   "depthMax": 2.0
+    "attackMs": 0,
+    "decayMs": 600
+   }
   },
   {
-   "source": "signal.th4Burst",
-   "target": "material/th4-body/op/34/smoothstep/constant",
-   "amount": -0.12,
+   "source": "signal.th4Live",
+   "target": "nodes/th4-ghostAh/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "nodes/th4-ghostAh/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "nodes/th4-ghostBh/scale",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "visual.copiesGate",
    "chain": {
     "attackMs": 0,
-    "decayMs": 500
-   },
-   "depthMax": 2.0
+    "decayMs": 600
+   }
   },
   {
-   "source": "signal.th4LevelS",
-   "target": "material/th4-body/op/34/smoothstep/constant",
-   "amount": -0.62,
+   "source": "signal.th4Live",
+   "target": "nodes/th4-ghostBh/scale",
+   "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
-   "depthSource": "visual.copiesGate",
-   "chain": {
-    "attackMs": 300,
-    "decayMs": 1400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Burst",
-   "target": "material/th4-body/op/34/smoothstep/constant",
-   "amount": -0.12,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
    "chain": {
     "attackMs": 0,
-    "decayMs": 500
-   },
-   "depthMax": 2.0
+    "decayMs": 600
+   }
+  },
+  {
+   "source": "signal.th4Live",
+   "target": "nodes/th4-ghostBh/scale",
+   "amount": 1.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 600
+   }
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-head/op/34/smoothstep/constant",
-   "amount": -0.62,
+   "target": "material/th4-ghostA/op/4/constant/constant",
+   "amount": 0.75,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
-   "depthSource": "visual.copiesGate",
-   "chain": {
-    "attackMs": 300,
-    "decayMs": 1400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Burst",
-   "target": "material/th4-head/op/34/smoothstep/constant",
-   "amount": -0.12,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.copiesGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4LevelS",
-   "target": "material/th4-head/op/34/smoothstep/constant",
-   "amount": -0.62,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
-   "chain": {
-    "attackMs": 300,
-    "decayMs": 1400
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Burst",
-   "target": "material/th4-head/op/34/smoothstep/constant",
-   "amount": -0.12,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.copiesGate",
-   "chain": {
-    "attackMs": 0,
-    "decayMs": 500
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4LevelS",
-   "target": "particles/th4-grain/spawnRate",
-   "amount": 70.0,
-   "op": "add",
-   "polarity": "unipolar",
    "depthSource": "visual.copiesGate",
    "chain": {
     "attackMs": 200,
-    "decayMs": 800
+    "decayMs": 1600
    },
    "depthMax": 2.0
   },
   {
-   "source": "signal.th4Burst",
-   "target": "particles/th4-grain/spawnRate",
-   "amount": 600.0,
+   "source": "signal.th4Sep",
+   "target": "material/th4-ghostA/op/4/constant/constant",
+   "amount": 0.35,
    "op": "add",
    "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "nodes/th4-ghostAh/position",
+   "amount": 0.01125,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 800,
+    "decayMs": 1600
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "nodes/th4-ghostAh/position",
+   "amount": 0.045,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "nodes/th4-ghostAh/position",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "nodes/th4-ghostAh/rotation",
+   "amount": 7.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-ghostB/op/4/constant/constant",
+   "amount": 0.55,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 200,
+    "decayMs": 1600
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "material/th4-ghostB/op/4/constant/constant",
+   "amount": 0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 0,
+    "decayMs": 900
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "nodes/th4-ghostBh/position",
+   "amount": -0.0075,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "chain": {
+    "attackMs": 800,
+    "decayMs": 1600
+   },
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "nodes/th4-ghostBh/position",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "depthSource": "visual.copiesGate",
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "nodes/th4-ghostBh/position",
+   "amount": -0.006,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "depthSource": "visual.copiesGate",
+   "depthMax": 2.0
+  },
+  {
+   "source": "signal.th4Sep",
+   "target": "nodes/th4-ghostBh/rotation",
+   "amount": -5.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
    "depthSource": "visual.copiesGate",
    "depthMax": 2.0
   },
@@ -8532,6 +10274,438 @@
    }
   },
   {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L10",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.44999999999999996,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
    "source": "visual.th1L20",
    "target": "nodes/th1-bust/position",
    "amount": 0.21999999999999997,
@@ -8640,6 +10814,438 @@
    }
   },
   {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.21999999999999997,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L20",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.37,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
    "source": "visual.th1L30",
    "target": "particles/th1-mist/position",
    "amount": 0.0,
@@ -8670,6 +11276,438 @@
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L30",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "chain": {
     "attackMs": 700.0,
     "decayMs": 700.0
@@ -8778,6 +11816,438 @@
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-bust/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-neck/deform/4/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-head/deform/2/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-cavity/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeLw/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeLi/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeRw/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-eyeRi/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidUL/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidLL/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidUR/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": -0.14,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th1L40",
+   "target": "procedural/th1-lidLR/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "chain": {
     "attackMs": 700.0,
     "decayMs": 700.0
@@ -8904,6 +12374,438 @@
    }
   },
   {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0682,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L10",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.04999999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
    "source": "visual.th2L20",
    "target": "nodes/th2-bust/position",
    "amount": -0.4,
@@ -9012,6 +12914,438 @@
    }
   },
   {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.024800000000000023,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L20",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.03,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
    "source": "visual.th2L21",
    "target": "nodes/th2-bust/position",
    "amount": 0.46,
@@ -9078,6 +13412,438 @@
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.46,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L21",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.35,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "chain": {
     "attackMs": 700.0,
     "decayMs": 700.0
@@ -9156,6 +13922,438 @@
    }
   },
   {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.62,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L30",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.4,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
    "source": "visual.th2L31",
    "target": "particles/th2-mist/position",
    "amount": 0.0,
@@ -9186,6 +14384,438 @@
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L31",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": 0.0,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "chain": {
     "attackMs": 700.0,
     "decayMs": 700.0
@@ -9300,6 +14930,438 @@
    }
   },
   {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.76,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.02479999999999999,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L40",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.65,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
    "source": "visual.th2L41",
    "target": "nodes/th2-bust/position",
    "amount": -0.25,
@@ -9402,6 +15464,438 @@
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-bust/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-neck/deform/4/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-head/deform/2/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-cavity/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeLw/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeLi/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeRw/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-eyeRi/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidUL/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidLL/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidUR/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.25,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 0,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.015500000000000014,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 1,
+   "chain": {
+    "attackMs": 700.0,
+    "decayMs": 700.0
+   }
+  },
+  {
+   "source": "visual.th2L41",
+   "target": "procedural/th2-lidLR/deform/1/center",
+   "amount": -0.07,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": 2,
    "chain": {
     "attackMs": 700.0,
     "decayMs": 700.0
@@ -10368,42 +16862,6 @@
    }
   },
   {
-   "source": "visual.th4L10",
-   "target": "particles/th4-grain/position",
-   "amount": -0.78,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L10",
-   "target": "particles/th4-grain/position",
-   "amount": 0.74,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L10",
-   "target": "particles/th4-grain/position",
-   "amount": 0.11999999999999998,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
    "source": "visual.th4L20",
    "target": "nodes/th4-bust/position",
    "amount": -1.1800000000000002,
@@ -10503,42 +16961,6 @@
    "source": "visual.th4L20",
    "target": "particles/th4-mist/position",
    "amount": 0.07200000000000002,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L20",
-   "target": "particles/th4-grain/position",
-   "amount": -1.1800000000000002,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L20",
-   "target": "particles/th4-grain/position",
-   "amount": 0.66,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L20",
-   "target": "particles/th4-grain/position",
-   "amount": 0.06400000000000002,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -10656,42 +17078,6 @@
    }
   },
   {
-   "source": "visual.th4L21",
-   "target": "particles/th4-grain/position",
-   "amount": -0.32,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L21",
-   "target": "particles/th4-grain/position",
-   "amount": 0.33999999999999997,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L21",
-   "target": "particles/th4-grain/position",
-   "amount": 0.03199999999999999,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
    "source": "visual.th4L30",
    "target": "nodes/th4-bust/position",
    "amount": -1.4,
@@ -10791,42 +17177,6 @@
    "source": "visual.th4L30",
    "target": "particles/th4-mist/position",
    "amount": 0.03599999999999998,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L30",
-   "target": "particles/th4-grain/position",
-   "amount": -1.4,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L30",
-   "target": "particles/th4-grain/position",
-   "amount": 0.29000000000000004,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L30",
-   "target": "particles/th4-grain/position",
-   "amount": 0.03199999999999999,
    "op": "add",
    "polarity": "unipolar",
    "component": 1,
@@ -10944,42 +17294,6 @@
    }
   },
   {
-   "source": "visual.th4L31",
-   "target": "particles/th4-grain/position",
-   "amount": -0.78,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L31",
-   "target": "particles/th4-grain/position",
-   "amount": 0.69,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L31",
-   "target": "particles/th4-grain/position",
-   "amount": 0.03199999999999999,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
    "source": "visual.th4L32",
    "target": "nodes/th4-bust/position",
    "amount": -0.16000000000000003,
@@ -11088,42 +17402,6 @@
    }
   },
   {
-   "source": "visual.th4L32",
-   "target": "particles/th4-grain/position",
-   "amount": -0.16000000000000003,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L32",
-   "target": "particles/th4-grain/position",
-   "amount": 0.29000000000000004,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L32",
-   "target": "particles/th4-grain/position",
-   "amount": 0.03199999999999999,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
    "source": "visual.th4L40",
    "target": "nodes/th4-bust/position",
    "amount": -1.54,
@@ -11186,42 +17464,6 @@
   {
    "source": "visual.th4L40",
    "target": "particles/th4-mist/position",
-   "amount": 0.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L40",
-   "target": "particles/th4-grain/position",
-   "amount": -1.54,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L40",
-   "target": "particles/th4-grain/position",
-   "amount": 0.03999999999999998,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L40",
-   "target": "particles/th4-grain/position",
    "amount": 0.0,
    "op": "add",
    "polarity": "unipolar",
@@ -11340,42 +17582,6 @@
    }
   },
   {
-   "source": "visual.th4L41",
-   "target": "particles/th4-grain/position",
-   "amount": -1.03,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L41",
-   "target": "particles/th4-grain/position",
-   "amount": 0.62,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L41",
-   "target": "particles/th4-grain/position",
-   "amount": 0.011999999999999967,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
    "source": "visual.th4L42",
    "target": "nodes/th4-bust/position",
    "amount": -0.51,
@@ -11484,42 +17690,6 @@
    }
   },
   {
-   "source": "visual.th4L42",
-   "target": "particles/th4-grain/position",
-   "amount": -0.51,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L42",
-   "target": "particles/th4-grain/position",
-   "amount": 0.48,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L42",
-   "target": "particles/th4-grain/position",
-   "amount": 0.011999999999999967,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
    "source": "visual.th4L43",
    "target": "particles/th4-mist/position",
    "amount": 0.0,
@@ -11546,42 +17716,6 @@
   {
    "source": "visual.th4L43",
    "target": "particles/th4-mist/position",
-   "amount": 0.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L43",
-   "target": "particles/th4-grain/position",
-   "amount": 0.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 0,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L43",
-   "target": "particles/th4-grain/position",
-   "amount": 0.0,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
-   "chain": {
-    "attackMs": 700.0,
-    "decayMs": 700.0
-   }
-  },
-  {
-   "source": "visual.th4L43",
-   "target": "particles/th4-grain/position",
    "amount": 0.0,
    "op": "add",
    "polarity": "unipolar",
