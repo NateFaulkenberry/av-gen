@@ -379,11 +379,16 @@ Numbers, method and the table are in [`world-performance.md`](world-performance.
 
 ## What is not here
 
-No planar or screen-space reflection: the sky comes from the environment cube and the scene does not
-reflect in the water. No copy of the frame, so the only refraction is a wobble in the depth the
-shoreline is read at. No underwater post-processing when the camera dips below the surface — the
-surface shades itself differently from beneath and that is all. No caustics. Each of those is another
-pass, and the brief asked for a beautiful stylized surface rather than an ocean simulator.
+The default surface has no screen-space reflection and no copy of the frame: its sky comes from the
+environment cube, and its only refraction is a wobble in the depth the shoreline is read at. The
+cinematic pipeline (ADR-1286) adds both. It copies the lit opaque frame just before the water is drawn,
+reflects the scene by a screen-space march against that copy (`ssr`), and sees the bed through it with
+absorption; the [sky mirror](#sky-mirror-adr-1650) and [flow streaks](#flow-streaks-adr-1643) ride on
+the same pipeline. There is no planar reflection.
+
+No underwater post-processing when the camera dips below the surface: the surface shades itself
+differently from beneath and that is all. No caustics. Each of those is another pass, and the brief
+asked for a beautiful stylized surface rather than an ocean simulator.
 
 And one more, which is a *defect* rather than a scope decision: **the cube the reflection samples is
 not the sky the camera sees.** Since ADR-345 a scene may light itself from a baked HDRI while

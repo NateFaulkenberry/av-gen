@@ -138,7 +138,8 @@ whole block is disabled when there is no audio.
 | `Left` | seek back five seconds |
 | `Right` | seek forward five seconds |
 
-There is no loop or play-range feature in the transport.
+To loop a section, turn the loop on with ⟳ or `L` and set its range; see
+[Transport](help://sequencer/transport).
 
 ## With no audio at all
 
