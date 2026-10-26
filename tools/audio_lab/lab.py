@@ -97,7 +97,10 @@ def write_project(fixture_dir, out_dir):
 
 
 def trace(avgen, project, out_csv, fps, finals):
-    cmd = [str(avgen), "--project", str(project), "--sonic-trace", str(out_csv), "--fps", repr(fps)]
+    # Every avgen goes through the GPU lock, even a GPU-free trace: an unlocked process beside another agent's perf
+    # run spoils its timing (tools/gpu-lock.sh).
+    cmd = [str(REPO / "tools" / "gpu-lock.sh"), str(avgen), "--project", str(project), "--sonic-trace", str(out_csv),
+           "--fps", repr(fps)]
     if finals:
         cmd.append("--trace-finals")
     r = subprocess.run(cmd, capture_output=True, text=True)
