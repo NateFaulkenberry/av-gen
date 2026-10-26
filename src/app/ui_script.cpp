@@ -1966,7 +1966,7 @@ void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t f
         panel.midi.learnFor(engine, midiLearnParam_); // the Parameters right-click's path: destination first, listening
     }
     if (f >= 300 && f < 320) {
-        send(midiKeys_, {0xB0, 21, static_cast<std::uint8_t>(60 + (f - 280) * 3)}); // collides with a shipped default
+        send(midiKeys_, {0xB0, 3, static_cast<std::uint8_t>(60 + (f - 300) * 3)}); // CC 3: a shipped default maps it
     }
     if (f == 360) {
         hub.learn().cancel();
