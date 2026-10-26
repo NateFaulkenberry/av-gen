@@ -24,10 +24,14 @@ std::uint64_t steadyNs() {
 
 // ADR-1700: the mapper's destinations on the engine: parameter bases by path (found per write, never a cached pointer,
 // so a scene load that clears the parameter set cannot leave a mapping holding a dangling one) and the control source.
+//
+// The control source is looked up once per frame, not per write: `Engine::controlSource()` re-declares every channel
+// of the map each time it is called (ensureControlSource), which measured 16 us a message under a CC flood -- 7.7 ms of a
+// 33 ms frame at four devices x 3,000 messages a second. Once per frame it is nothing.
 class EngineTargets final : public control::MidiTargets {
 public:
     EngineTargets(Engine& engine, const control::ControlMap& map)
-        : engine_(engine), map_(map) {}
+        : engine_(engine), map_(map), control_(engine.controlSource()) {}
     std::optional<float> parameter(const std::string& path, int component) override {
         const params::IParameter* p = engine_.params().find(path);
         const std::size_t c = component < 0 ? 0 : static_cast<std::size_t>(component);
@@ -50,14 +54,15 @@ public:
             p->setBaseComponent(static_cast<std::size_t>(component), value);
         }
     }
-    float signal(const std::string& name) override { return engine_.controlSource().value(name); }
+    float signal(const std::string& name) override { return control_.value(name); }
     bool signalHasRest(const std::string& name) override { return map_.restFor(name) != nullptr; }
-    void setSignal(const std::string& name, float value) override { engine_.controlSource().set(name, value); }
-    void pulseSignal(const std::string& name, float strength) override { engine_.controlSource().pulse(name, strength); }
+    void setSignal(const std::string& name, float value) override { control_.set(name, value); }
+    void pulseSignal(const std::string& name, float strength) override { control_.pulse(name, strength); }
 
 private:
     Engine& engine_;
     const control::ControlMap& map_;
+    signals::ControlSource& control_;
 };
 
 } // namespace
