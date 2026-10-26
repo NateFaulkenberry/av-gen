@@ -54,6 +54,7 @@ private:
 
     // Assignments.
     std::string selected_; // a mapping id, never a row index
+    bool editorBeside_ = false;
     char search_[96] = "";
     int scopeFilter_ = 0;  // 0 all, 1 default, 2 project, 3 scene
     bool showInactive_ = true;

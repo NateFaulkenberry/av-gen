@@ -25,6 +25,7 @@
 
 #include <fmt/format.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <array>
@@ -1798,6 +1799,15 @@ void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t f
             (void)source->send(bytes);
         }
     };
+    if (f == 5) {
+        // A capture of a table wants rows: the bottom dock grows to half the window for this run (a person drags the
+        // same divider). Only this scripted run's layout changes; the .ini is not the person's here.
+        if (const std::uint32_t node = panel.layout().regionNode(ui::DockRegion::Bottom); node != 0) {
+            if (ImGuiDockNode* bottom = ImGui::DockBuilderGetNode(node); bottom != nullptr) {
+                ImGui::DockBuilderSetNodeSize(node, ImVec2(bottom->Size.x, ImGui::GetMainViewport()->WorkSize.y * 0.55f));
+            }
+        }
+    }
     if (f == 0) {
         if (bool* open = panel.layout().slot("MIDI"); open != nullptr) {
             *open = true;
@@ -1918,7 +1928,7 @@ void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t f
         return;
     }
     // The performance, paused while Learn listens (so the capture shows it waiting).
-    const bool quiet = f >= 170 && f < 280;
+    const bool quiet = f >= 170 && f < 320;
     if (f >= 12 && !quiet) {
         const int tri = static_cast<int>(f % 120);
         send(midiKeys_, {0xB0, 74, static_cast<std::uint8_t>(tri < 60 ? tri * 2 : (119 - tri) * 2)});

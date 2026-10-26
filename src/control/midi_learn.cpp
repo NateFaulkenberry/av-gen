@@ -288,15 +288,27 @@ void MidiMonitor::push(const MidiMessage& m, double seconds, std::uint16_t match
     }
     ++total_;
     if (coalesce_ && size_ > 0 && m.continuous()) {
-        Row& last = rows_[(head_ + size_ - 1) % kCapacity];
-        const MidiMessage& p = last.message;
-        const bool same = p.kind == m.kind && p.device == m.device && p.channel == m.channel &&
-                          (m.kind == MidiKind::Nrpn || m.kind == MidiKind::Rpn ? p.param == m.param : p.data1 == m.data1);
-        if (same && seconds - last.seconds < 1.0) {
-            last.message = m;
-            last.seconds = seconds;
-            ++last.repeats;
-            last.matched = std::max(last.matched, matched);
+        // The same control among the last few rows (a knob and a bend wheel moved together interleave): its row is
+        // updated and becomes the newest, so two streams stay two rows instead of alternating rows for ever.
+        const std::size_t look = std::min<std::size_t>(size_, 8);
+        for (std::size_t back = 0; back < look; ++back) {
+            const std::size_t at = size_ - 1 - back;
+            Row& candidate = rows_[(head_ + at) % kCapacity];
+            const MidiMessage& p = candidate.message;
+            const bool same = p.kind == m.kind && p.device == m.device && p.channel == m.channel &&
+                              (m.kind == MidiKind::Nrpn || m.kind == MidiKind::Rpn ? p.param == m.param : p.data1 == m.data1);
+            if (!same || seconds - candidate.seconds >= 1.0) {
+                continue;
+            }
+            Row merged = candidate;
+            merged.message = m;
+            merged.seconds = seconds;
+            ++merged.repeats;
+            merged.matched = std::max(merged.matched, matched);
+            for (std::size_t i = at; i + 1 < size_; ++i) {
+                rows_[(head_ + i) % kCapacity] = rows_[(head_ + i + 1) % kCapacity];
+            }
+            rows_[(head_ + size_ - 1) % kCapacity] = merged;
             return;
         }
     }

@@ -46,17 +46,19 @@ std::string slotLabel(const std::vector<control::MidiDeviceSlot>& devices, std::
     if (slot >= devices.size()) {
         return "(no device)";
     }
+    // Numbered only among CONNECTED devices: a slot left behind by a device that came back under another id is not a
+    // second keyboard.
     int same = 0;
     int index = 0;
     for (std::size_t i = 0; i < devices.size(); ++i) {
-        if (devices[i].name == devices[slot].name) {
+        if (devices[i].name == devices[slot].name && devices[i].connected) {
             ++same;
             if (i <= slot) {
                 ++index;
             }
         }
     }
-    return same > 1 ? fmt::format("{} ({})", devices[slot].name, index) : devices[slot].name;
+    return same > 1 && devices[slot].connected ? fmt::format("{} ({})", devices[slot].name, index) : devices[slot].name;
 }
 
 std::string deviceLabel(const MidiBinding& b) {
@@ -655,6 +657,7 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
     const bool sideBySide = !selected_.empty() && ImGui::GetContentRegionAvail().x > 1100.0f;
     const float editorHeight =
         selected_.empty() || sideBySide ? 0.0f : std::min(300.0f, ImGui::GetContentRegionAvail().y * 0.5f);
+    editorBeside_ = sideBySide;
     if (sideBySide) {
         ImGui::BeginChild("##midi-table-side", ImVec2(ImGui::GetContentRegionAvail().x * 0.6f, 0.0f));
     }
@@ -831,7 +834,9 @@ void MidiPanel::drawEditor(app::Engine& engine) {
         selected_.clear();
         return;
     }
-    ImGui::Separator();
+    if (!editorBeside_) {
+        ImGui::Separator(); // a separator beside the table would start a new line under it
+    }
     ImGui::BeginChild("##midi-editor", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None);
     ImGui::PushTextWrapPos(0.0f);
     const control::MidiMappingStatus* status = hub.mapper().status(shown->id);

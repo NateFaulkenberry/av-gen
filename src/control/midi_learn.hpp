@@ -11,7 +11,8 @@
 //
 // Monitor. A fixed ring of the most recent messages, written by the hub whatever the panel is
 // doing (it costs a copy), so it never blocks or allocates. With coalescing on, a continuous
-// message from the same control as the newest row updates that row instead of adding one.
+// message from the same control as one of the last eight rows (within a second) updates that row and moves it to the
+// newest place, instead of adding one: a knob and a bend wheel moved together stay two rows.
 
 #include "control/control_map.hpp"
 #include "control/midi.hpp"

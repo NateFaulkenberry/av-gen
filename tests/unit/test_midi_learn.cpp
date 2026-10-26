@@ -396,13 +396,17 @@ TEST_CASE("the monitor is bounded, coalesces a knob's stream, and describes mess
     on.data2 = 108;
     monitor.push(on, 2.0, 0, false);
     monitor.push(cc(74, 3), 2.0, 0, false);
-    CHECK(monitor.size() == 3); // a note between breaks the run
+    REQUIRE(monitor.size() == 2); // the knob's row merges across the note, and becomes the newest
+    CHECK(monitor.row(0).message.kind == MidiKind::NoteOn);
+    CHECK(monitor.row(1).repeats == 301);
     MidiMessage clock;
     clock.kind = MidiKind::Clock;
     monitor.push(clock, 2.0, 0, false);
-    CHECK(monitor.size() == 3); // not shown by default
+    CHECK(monitor.size() == 2); // not shown by default
+    monitor.push(cc(74, 9), 3.5, 0, false);
+    CHECK(monitor.size() == 3); // more than a second later: a new row
     monitor.setCoalesce(false);
-    monitor.push(cc(74, 4), 2.1, 0, false);
+    monitor.push(cc(74, 4), 3.6, 0, false);
     CHECK(monitor.size() == 4);
 
     CHECK(midiMessageDescription(cc(74, 92)) == "CC 74  92/127");
