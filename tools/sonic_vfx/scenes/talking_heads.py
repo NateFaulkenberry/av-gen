@@ -537,7 +537,7 @@ def head(s, spec, slot):
     #   ghosting -- two VHS ghosts: faint whole copies (an opacity floor) with a coloured rim, offset and fading
     copies = {"tracking": [("A", "#ff2a3a", 0.0), ("B", "#2affe8", 0.0)],
               "broadcast": [("A", "#ff3060", 0.0), ("B", "#3a6bff", 0.0)],
-              "ghosting": [("A", pal["ghosts"][0], 0.38), ("B", pal["ghosts"][1], 0.26)]}.get(prof, [])
+              "ghosting": [("A", pal["ghosts"][0], 0.5), ("B", pal["ghosts"][1], 0.34)]}.get(prof, [])
     for cp, colour, floor in copies:
         s.program(ghost_program("%s-ghost%s" % (P, cp), colour, floor))
         s.nodes.append({"name": "%s-ghost%sh" % (P, cp), "kind": "gltf", "asset": "meshes/th-head-ghost.glb",
