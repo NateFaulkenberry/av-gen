@@ -26,7 +26,11 @@ Its weaknesses:
    surface, which this asset cannot give cheaply (see §4).
 3. **Cost.** D is the most expensive variant. Headless it is 22.1 ms GPU, against 12.9 ms for the bare scan. Live it
    is 19.9 ms at High (0.85 scale). It holds 30 fps, but the face alone uses 60% of the budget (§3).
-4. **Sparkle at grazing angles** is fine-grained. In motion it can read as dust on the far cheek rather than flake.
+4. **Sparkle at grazing angles flickers.**
+   - Checked frame by frame at the orbit's extremes: on the far cheek, at grazing view, the sparkle becomes a dense
+     field of specks that changes every frame. That is flicker, not flake (A as well).
+   - Cause: the sparkle is weighted by Fresnel, and at grazing many cells' angle gates pass quickly.
+   - Fix (not yet done): cap the Fresnel weight, and use larger cells near the silhouette.
 
 **B (intaglio)** has the cleanest engraving and the best black/silver read, but almost no holographic character.
 **C (chrome)** reads the face best and is cheapest, but it looks like an oil-slick sculpture, not a printed foil.
@@ -124,8 +128,8 @@ Reused from POC 1-3:
 |---|---|---|---|---|
 | Swimming | None (object space) | None | None | None |
 | Visible tiling | None (procedural) | None | None | None |
-| Aliasing | None seen at 1080p (fade guards below 6 px a period) | None | None | Faint shimmer in the crosshatch on the far cheek at the orbit's extremes |
-| Excess sparkle | Mild: fine specks read as dust in the shadows | n/a | n/a | Mild, at grazing angles only |
+| Aliasing (lines) | None seen at 1080p (the fade guards below 6 px a period) | None seen | n/a | None seen |
+| Excess sparkle | **Yes at grazing:** dense specks on the far cheek that change every frame (flicker); fine front-on | n/a | n/a | **Same, slightly less dense** |
 | Washout | No. Bloom threshold 1.4, intensity 0.2 | No | No | No |
 | Rainbow not following the face | Follows depth contours, but covers everything | n/a | Follows the face (Fresnel and depth); reads as oil slick | Follows the face, but concentrates in the sockets and muzzle |
 | Readability | Good front-on, busy in the close-up | Very good | Best | Very good |
