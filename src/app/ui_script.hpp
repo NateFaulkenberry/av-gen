@@ -213,6 +213,7 @@ private:
     void stepDirectorModify(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame);
     std::uint64_t midiStart_ = 0;
+    bool midiStarted_ = false;
     std::shared_ptr<control::MidiVirtualSource> midiKeys_;
     std::shared_ptr<control::MidiVirtualSource> midiPads_;
     std::string midiSelect_;

@@ -1788,7 +1788,8 @@ void UiScript::stepDirectorModify(Engine& engine, ui::ControlPanel& panel, platf
 // ---- ADR-1704: the MIDI panel, for captures -------------------------------------------------------------------------
 
 void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame) {
-    if (midiStart_ == 0) {
+    if (!midiStarted_) { // a flag, not "start == 0": the first frame may be frame 0
+        midiStarted_ = true;
         midiStart_ = frame;
     }
     const std::uint64_t f = frame - midiStart_;
