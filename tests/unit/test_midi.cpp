@@ -1,4 +1,5 @@
 #include "control/midi.hpp"
+#include "control/midi_backend.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -583,3 +584,27 @@ TEST_CASE("MidiInput survives open, drain and destroy while a source is streamin
     sender.reset();
     CHECK(received == 12);
 }
+
+// ADR-1701: the device table's identity rules, on the inbox itself (the seam the backends use).
+TEST_CASE("the device table: reconnection, duplicate ids, and a name fallback upgraded to a real id", "[control][midi][adr1701]") {
+    detail::MidiInbox inbox;
+    const auto keys = inbox.connectDevice("111", "Keys", false);
+    const auto twin = inbox.connectDevice("111", "Keys", false); // a second device reporting the same id
+    CHECK(twin != keys);
+    CHECK(inbox.devices()[twin].id == "111#2");
+    inbox.disconnectDevice(keys);
+    CHECK_FALSE(inbox.devices()[keys].connected);
+    std::vector<MidiMessage> out;
+    inbox.drain(out);
+    REQUIRE(out.size() == 1);
+    CHECK(out[0].kind == MidiKind::DeviceRemoved);
+    CHECK(out[0].device == keys);
+    CHECK(inbox.connectDevice("111", "Keys", false) == keys); // back under its id: its old slot
+    // First seen with no unique id (filed under its name), then with one: the same slot, now with the real id.
+    const auto pads = inbox.connectDevice("Pads", "Pads", true);
+    inbox.disconnectDevice(pads);
+    CHECK(inbox.connectDevice("222", "Pads", true) == pads);
+    CHECK(inbox.devices()[pads].id == "222");
+    CHECK(inbox.devices().size() == 3);
+}
+

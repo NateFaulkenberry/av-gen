@@ -331,6 +331,20 @@ std::uint16_t MidiInbox::connectDevice(const std::string& id, const std::string&
     // "id", then "id#2", "id#3"... : the first candidate with a parked slot is that device coming back (its old slot,
     // so everything that refers to it finds it again); a candidate already connected is a second device with the same
     // id (a backend without unique ids, two identical devices), which moves on to the next name.
+    // A device first seen without a unique id was filed under its name (the backend's fallback); when it is seen again
+    // with its real id, that parked slot is the same device and takes the id -- one row, not a stale one beside it.
+    if (id != name) {
+        const auto parked = std::find_if(devices_.begin(), devices_.end(), [&](const MidiDeviceSlot& d) {
+            return d.id == name && d.name == name && !d.connected;
+        });
+        const bool idKnown = std::any_of(devices_.begin(), devices_.end(), [&](const MidiDeviceSlot& d) { return d.id == id; });
+        if (parked != devices_.end() && !idKnown) {
+            parked->id = id;
+            parked->connected = true;
+            ++deviceGeneration_;
+            return static_cast<std::uint16_t>(parked - devices_.begin());
+        }
+    }
     for (int n = 1;; ++n) {
         const std::string candidate = n == 1 ? id : id + "#" + std::to_string(n);
         const auto it = std::find_if(devices_.begin(), devices_.end(),

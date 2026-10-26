@@ -1928,7 +1928,8 @@ void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t f
         return;
     }
     // The performance, paused while Learn listens (so the capture shows it waiting).
-    const bool quiet = f >= 170 && f < 320;
+    // (A message sent the frame before Learn arms arrives after it: the quiet starts ten frames early.)
+    const bool quiet = f >= 160 && f < 340;
     if (f >= 12 && !quiet) {
         const int tri = static_cast<int>(f % 120);
         send(midiKeys_, {0xB0, 74, static_cast<std::uint8_t>(tri < 60 ? tri * 2 : (119 - tri) * 2)});
@@ -1963,7 +1964,7 @@ void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t f
         panel.midi.showTab(Tab::Assignments);
         panel.midi.learnFor(engine, midiLearnParam_); // the Parameters right-click's path: destination first, listening
     }
-    if (f >= 280 && f < 300) {
+    if (f >= 300 && f < 320) {
         send(midiKeys_, {0xB0, 21, static_cast<std::uint8_t>(60 + (f - 280) * 3)}); // collides with a shipped default
     }
     if (f == 360) {
