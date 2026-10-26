@@ -1091,3 +1091,30 @@ more fish and more variety, and one review video per pass from now on.
   - `seam-isolation.txt`
   - `fish-check.txt`
   - `flash-audit.txt`
+
+## Final: merge-ready (2026-10-25)
+
+The owner approved pass 11 ("looks good - do the 30 fps check, merge to main when ready").
+
+- **Main merged** (44ecd403: Talking Heads, ADR-1670..1673) as 4a134080.
+  - Conflicts resolved by keeping both sides: `.gitignore`, `docs/decisions/README.md`, `tools/live_perf_baseline.py`
+    (Talking Heads' scene, and Aurora's own song and start), `docs/perf/live-baseline.json` (both rows).
+  - CMake reconfigured and rebuilt.
+- **Examples:** "Sonic VFX - Aurora Borealis" and the hidden "Sonic VFX - Aurora Borealis (Feline Footwear)" now describe
+  the finished scene. `[examples]` and the menu tests pass; `tools/check_project_integrity.py` reports 0 problems.
+- **The 30 fps live check**, on AC with the LG UltraFine the only display at 60 Hz, in the same session as the Event
+  Horizon control. A reboot was not possible.
+
+  | Scene | Misses / 900 (median) | p99 (median) | Medium or better | Headless Ultra GPU | Targets |
+  |---|---|---|---|---|---|
+  | Event Horizon (control) | 1 (baseline 3) | 37.5 ms (baseline 40.2) | 100% | p50 9.6 ms | T4 as its baseline: fails |
+  | Aurora Borealis | 1 (reps 0/2/1) | 37.4 ms | 100% | p50 16.1 / p95 21.4 ms | T1-T4 met |
+
+  - **One fix on the way:** the first run's Aurora T4 failed on headless Ultra p95 against p50, 24.5 against 15.2. The
+    cause was pass 11's soft minimum over all seven chain segments, which cost an exponential per segment per pixel.
+    Blending only the two nearest segments (8b95a484) keeps the seam fix: p95 21.4, 1.31 x p50.
+  - Aurora's row in `docs/perf/live-baseline.json` was written from that run with `write --add`; the other rows are
+    kept.
+- **Suites** on 189e0728, both exit 0:
+  - GPU (`AVGEN_GPU_LOCK_TIMEOUT=14400 tools/ci/run-suite.sh gpu`, bare): passed 710, failed 0, skipped 1, ran 711/711.
+  - cpu-assets (under `tools/gpu-lock.sh`): passed 4477, failed 0, skipped 29, expected failures 1, ran 4507/4507.
