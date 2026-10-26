@@ -47,7 +47,6 @@ EYEBALL_R = _A["eyes"]["right"]
 # the rays' origin, head frame: behind the lips, at the middle of the open "oh" (it opens downward from the slit, so
 # an origin at the slit's height read as rays leaving the upper lip -- the owner's stop-5 screenshot)
 MOUTH = [_A["head"]["mouth"][0], _A["head"]["mouth"][1] - 0.010, _A["head"]["mouth"][2] - 0.004]
-GHOST_BACK = 0.03   # the ghosts sit this far behind the head, so they echo round its silhouette and never on its face
 LID_UPPER_CLOSED = _A["eyes"]["lidCloseUpperDeg"]  # the upper lid's turn about X to meet the lower (positive)
 LID_LOWER_CLOSED = _A["eyes"]["lidCloseLowerDeg"]  # the lower lid's (applied negative)
 
@@ -74,33 +73,56 @@ MOUTH_PURSE = 2.0
 # A step, then a short mechanical settle (the owner approved the snap at stop 2). The rays use the SAME chain.
 SNAP = {"attackMs": 0.0, "decayMs": 0.0, "springHz": 11.0, "springDamping": 0.62}
 
-# The heads: where each stands (metres, the body's origin), its resting heading (degrees about +Y; 0 faces the camera's
-# side of the room), its scan's own timing (rates in Hz and a seed), its rays' colours, and its source: `role` (found
-# by role, ADR-1630) with the band its gate reads, and the mix's fallback band. Thresholds were tuned on Feline
-# Footwear's stems (07: "use Feline footwear stems for starter"). The drums head reads the drum stem's LOW band: it
-# opens on the kick and shuts between kicks (a hat or snare does not hold it open).
-# Each head's PALETTE (the owner, stop 4: "lets vary color palettes for multiple heads"): its rays, its possession
-# wash (four OKLab ramp stops), its glow, its two spectral copies and the light it spills into the mist. And its
-# EMPHASIS (the owner: "the secondary effects on the entities should all be unique to the sound source"): every
-# effect a head shows is driven by its own gate only, and each instrument leans on its own -- the drums SHAKE and
-# TEAR, the bass GHOSTS, the synth WASHES. 1 is a feature's full weight.
+# The busts are SLOTS, one per source role (ADR-1630: a source says what it is -- stems or live inputs, by key and
+# role): drums, bass, synth, and a fourth for a vocal or any other source. A slot is shown while its role is active
+# (`role.<role>.active`), so the scene has one to four busts, as many as there are assigned sources (fx1,
+# 14-brief-secondary-fx.md section 6); with none at all the fourth slot is a hero on the mix. Each slot has:
+#   its gate: `band` (the role band its level reads), `open`/`close`, `onsets` (open on the stem's own onsets too);
+#   its look: a PALETTE (rays, wash, glow, the optical copies, its mist) and a PROFILE -- the secondary effects that make
+#   it a different phenomenon (15-fx-plan.md): fragment, liquid, optical, grain. `profile` is configurable per slot;
+#   the defaults follow the role.
+#   its scan's timing (rates in Hz and a seed).
+# Thresholds were tuned on Feline Footwear's stems. The drums slot reads the drum stem's LOW band (the kick).
 ICE = {"rays": ("#2b7bff", "#4fe3ff", "#e6f6ff"), "wash": ("#1b2cff", "#2b7bff", "#4fe3ff", "#c9f4ff"),
        "glow": "#4fe3ff", "ghosts": ("#4fe3ff", "#3a5bff"), "spill": "#3f8cff"}
 ORCHID = {"rays": (MAGENTA, PINK, VIOLET), "wash": (VIOLET, MAGENTA, PINK, "#ffb0dc"),
           "glow": MAGENTA, "ghosts": (MAGENTA, VIOLET), "spill": "#ff2bd6"}
 EMBER = {"rays": ("#ffb347", "#ff7a3d", "#ffe08a"), "wash": ("#ff4a2b", "#ff9a3d", "#ffd36b", "#fff1cf"),
-         "glow": "#ffb347", "ghosts": ("#ffb347", "#ff5a2b"), "spill": "#ff9a40"}
+         "glow": "#ffb347", "ghosts": ("#ff5a2b", "#5a8cff"), "spill": "#ff9a40"}
+JADE = {"rays": ("#3dffc0", "#9affe0", "#2bd8ff"), "wash": ("#0f6b5a", "#22c49a", "#7dffd6", "#e0fff4"),
+        "glow": "#3dffc0", "ghosts": ("#3dffc0", "#2bd8ff"), "spill": "#3dffc0"}
+GREY = {"rays": ("#d8d8d8", "#bcbcbc", "#f0f0f0"), "wash": ("#6a6a6a", "#9a9a9a", "#c8c8c8", "#eeeeee"),
+        "glow": "#cfcfcf", "ghosts": ("#d0d0d0", "#a8a8a8"), "spill": "#bdbdbd"}
+PROFILES = ("fragment", "liquid", "optical", "grain")
 HEADS = [
-    {"prefix": "th1", "role": "drums", "band": "bass", "mix": "response.lowEnv", "mixOpen": 0.7, "open": 0.60, "close": 0.45,
-     "at": [-0.62, 0.0, -0.15], "heading": 22.0, "scan": (0.55, 0.13, 3), "palette": ICE,
-     "emphasis": {"shake": 1.0, "tear": 1.0, "ghost": 0.3, "wash": 0.45}},
-    {"prefix": "th2", "role": "bass", "band": "bass", "mix": "audio.bass", "open": 0.55, "close": 0.42, "onsets": True,
-     "at": [0.0, 0.0, 0.25], "heading": 0.0, "scan": (0.48, 0.11, 7), "palette": ORCHID,
-     "emphasis": {"shake": 0.3, "tear": 0.25, "ghost": 1.0, "wash": 0.45}},
-    {"prefix": "th3", "role": "synth", "band": "mid", "mix": "audio.mid", "open": 0.80, "close": 0.65, "onsets": True, "onsetLevel": 0.8,
-     "at": [0.62, 0.0, -0.15], "heading": -22.0, "scan": (0.52, 0.17, 11), "palette": EMBER,
-     "emphasis": {"shake": 0.25, "tear": 0.25, "ghost": 0.3, "wash": 1.0}},
+    {"prefix": "th1", "roles": ["drums"], "band": "bass", "open": 0.60, "close": 0.45,
+     "scan": (0.55, 0.13, 3), "palette": ICE, "profile": "fragment"},
+    {"prefix": "th2", "roles": ["bass"], "band": "bass", "open": 0.55, "close": 0.42, "onsets": True,
+     "scan": (0.48, 0.11, 7), "palette": ORCHID, "profile": "liquid"},
+    {"prefix": "th3", "roles": ["synth"], "band": "mid", "open": 0.80, "close": 0.65, "onsets": True, "onsetLevel": 0.8,
+     "scan": (0.52, 0.17, 11), "palette": EMBER, "profile": "optical"},
+    # the fourth: a vocal, else any other source; with NO source at all it is the hero on the mix (its rate-limited
+    # mix path, `mix`)
+    {"prefix": "th4", "roles": ["vocal", "other"], "band": "mid", "open": 0.70, "close": 0.55, "onsets": True,
+     "mix": "audio.mid", "mixOpen": 0.75, "scan": (0.5, 0.15, 13), "palette": JADE, "profile": "grain"},
 ]
+# The layout per bust count (15-fx-plan.md): LAYOUT[count][rank] = (x, z, heading, scale), the busts in slot order left
+# to right. One: a hero with room round it. Two: an asymmetric pair. Three: the stop-5 stagger. Four: two forward, two
+# back and turned in, a little smaller -- none hidden, none a thumbnail.
+LAYOUT = {
+    1: [(0.0, 0.30, 0.0, 1.22)],
+    2: [(-0.40, 0.22, 14.0, 1.08), (0.46, -0.10, -18.0, 1.0)],
+    3: [(-0.62, -0.15, 22.0, 1.0), (0.0, 0.25, 0.0, 1.0), (0.62, -0.15, -22.0, 1.0)],
+    4: [(-0.86, -0.38, 26.0, 0.92), (-0.28, 0.18, 8.0, 0.95), (0.30, 0.04, -8.0, 0.95), (0.86, -0.42, -26.0, 0.92)],
+}
+
+
+def base_layout(i):
+    """Slot i's resting place: its spot in the three-bust layout (the fourth slot: its four-bust spot). Routes move it
+    from here to its place for the live count."""
+    return LAYOUT[3][i] if i < 3 else LAYOUT[4][3]
+
+
 ONSET_REFRACTORY_MS = 90.0   # an onset-gated head re-opens at most this often (no 16th-note chatter)
 MIX_STRICT = 0.15        # the mix path's thresholds sit this much higher than the stem path's
 MIX_PULSE_MS = 200.0     # a mix opening is a fixed pulse ...
@@ -184,10 +206,16 @@ FAR = [9.0, 9.0, 9.0]
 PROGRAM_OPS = {}   # program name -> its Ops (every piece's program has the same op list, so one index names an op)
 
 
-def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"]):
-    """Porcelain, darkened sockets, the possession wash (concentrated at the mouth and eyes) and the signal bands. The
-    masks are points in THIS piece's frame (FAR = the piece has none). Registers: r0 local position, r1 mouth mask, r2
-    eye mask, r3 porcelain, r5 wash colour, r6 wash amount, r7 base colour out, r4 emission out."""
+def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], profile="fragment", accent="#ffffff"):
+    """Porcelain, darkened sockets and the possession wash (concentrated at the mouth and eyes), then the PROFILE's own
+    surface (15-fx-plan.md):
+      fragment  signal bands: hashed horizontal stripes on each opening (the drums' tear)
+      liquid    nothing more: the bass's identity is its shape and the space round it
+      optical   a scan band sweeping the bust with a darkened trail (surface inversion), and slowly evolving veins
+      grain     dark patches dissolving into the surface and drifting down, faintly lit inside
+    Every pattern reads WORLD position, so the pieces of a bust meet without a seam. The masks are points in THIS
+    piece's frame (FAR = the piece has none). Registers: r0 local position, r4 emission out, r5 wash colour, r7 base
+    colour out; r1-r3, r6 scratch."""
     o = Ops()
     o.add("local", "input", 0, input="localPosition")
     ellipsoid(o, "mouth", 1, mouth, [0.030, 0.016, 0.030])
@@ -210,47 +238,87 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"]):
     o.add("washGlowAmt", "multiply", 4, srcA=5, srcB=6)
     o.add("washGlow", "constant", 6, constant=[0.35, 0.35, 0.35, 0.0])
     o.add("washGlowMul", "multiply", 4, srcA=4, srcB=6)
-    o.add("bandTime", "input", 1, input="time")
-    o.add("bandRate", "constant", 2, constant=[0.0, 0.0, 14.0, 0.0])
-    o.add("bandEpoch", "multiply", 1, srcA=1, srcB=2)
-    o.add("bandWorld", "input", 3, input="worldPosition")
-    o.add("bandY", "constant", 2, constant=[0.0, 1.0, 0.0, 0.0])
-    o.add("bandYMul", "multiply", 2, srcA=3, srcB=2)
-    o.add("bandCoord", "add", 1, srcA=1, srcB=2)
-    o.add("bandCell", "quantize", 1, srcA=1, value=70.0, constant=[0.0, 0.0, 0.0, 0.0], seed=9)
-    o.add("bandHash", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
-    o.add("bands", "threshold", 1, srcA=1, value=1.01)  # 1.01 = no band; routes lower it
-    o.add("bandGain", "constant", 2, constant=[2.2, 2.2, 2.2, 0.0])
-    o.add("bandGainMul", "multiply", 1, srcA=1, srcB=2)
-    o.add("bandColour", "multiply", 1, srcA=1, srcB=5)
-    o.add("bandAdd", "add", 4, srcA=4, srcB=1)
-    assert len(o.ops) <= 48, len(o.ops)
+    if profile == "fragment":
+        o.add("bandTime", "input", 1, input="time")
+        o.add("bandRate", "constant", 2, constant=[0.0, 0.0, 14.0, 0.0])
+        o.add("bandEpoch", "multiply", 1, srcA=1, srcB=2)
+        o.add("bandWorld", "input", 3, input="worldPosition")
+        o.add("bandY", "constant", 2, constant=[0.0, 1.0, 0.0, 0.0])
+        o.add("bandYMul", "multiply", 2, srcA=3, srcB=2)
+        o.add("bandCoord", "add", 1, srcA=1, srcB=2)
+        o.add("bandCell", "quantize", 1, srcA=1, value=70.0, constant=[0.0, 0.0, 0.0, 0.0], seed=9)
+        o.add("bandHash", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
+        o.add("bands", "threshold", 1, srcA=1, value=1.01)  # 1.01 = no band; routes lower it
+        o.add("bandGain", "constant", 2, constant=[2.2, 2.2, 2.2, 0.0])
+        o.add("bandGainMul", "multiply", 1, srcA=1, srcB=2)
+        o.add("bandColour", "multiply", 1, srcA=1, srcB=5)
+        o.add("bandAdd", "add", 4, srcA=4, srcB=1)
+    elif profile == "optical":
+        # the scan: a band at height c (routed: a saw LFO sweeps it down the bust, its rate the synth's level) -- a
+        # bright line, and round it a wide trail where the porcelain darkens toward black and back
+        o.add("scanW", "input", 1, input="worldPosition")
+        o.add("scanY", "swizzle", 1, srcA=1, constant=[1.0, 1.0, 1.0, 1.0])
+        o.add("scanC", "constant", 2, constant=[-SCAN_TOP, -SCAN_TOP, -SCAN_TOP, 0.0])
+        o.add("scanD", "add", 1, srcA=1, srcB=2)
+        o.add("scanD2", "multiply", 1, srcA=1, srcB=1)
+        o.add("scanBand", "remap", 2, srcA=1, value=1.0, constant=[0.0, SCAN_HALF ** 2, 1.0, 0.0])
+        # the trail: 1 outside it, down to its routed floor (constant.z, lowered by the level) at the band
+        o.add("scanWide", "remap", 3, srcA=1, value=1.0, constant=[0.0, (SCAN_HALF * 5) ** 2, 1.0, 1.0])
+        o.add("scanDark", "multiply", 7, srcA=7, srcB=3)
+        o.add("scanCol", "constant", 3, constant=[0.0, 0.0, 0.0, 0.0])      # routed: the band's colour x gain
+        o.add("scanLit", "multiply", 2, srcA=2, srcB=3)
+        o.add("scanAdd", "add", 4, srcA=4, srcB=2)
+        # the veins: cell edges of a slowly drifting Worley pattern, lit by the synth's sustained level
+        o.add("veinW", "input", 6, input="worldPosition")
+        o.add("veinTime", "input", 1, input="time")
+        o.add("veinV", "constant", 2, constant=[0.011, 0.017, 0.007, 0.0])
+        o.add("veinT", "multiply", 1, srcA=1, srcB=2)
+        o.add("veinP", "add", 1, srcA=6, srcB=1)
+        o.add("veinEdge", "voronoiEdge", 1, srcA=1, value=26.0, constant=[0.0, 0.0, 0.0, 0.0], seed=21)
+        o.add("veinLine", "remap", 1, srcA=1, value=1.0, constant=[0.0, 0.045, 1.0, 0.0])
+        o.add("veinCol", "constant", 2, constant=[0.0, 0.0, 0.0, 0.0])      # routed: colour x the sustained level
+        o.add("veinLit", "multiply", 1, srcA=1, srcB=2)
+        o.add("veinAdd", "add", 4, srcA=4, srcB=1)
+    elif profile == "grain":
+        # dissolving patches: a drifting noise whose high ground (above a routed threshold) darkens toward black,
+        # faintly lit inside -- the surface eaten in places while the head stays whole
+        o.add("grW", "input", 1, input="worldPosition")
+        o.add("grT", "input", 2, input="time")
+        o.add("grV", "constant", 3, constant=[0.0, -0.035, 0.0, 0.0])
+        o.add("grTm", "multiply", 2, srcA=2, srcB=3)
+        o.add("grP", "add", 1, srcA=1, srcB=2)
+        o.add("grN", "noise", 1, srcA=1, value=16.0, constant=[0.0, 0.0, 0.0, 0.0], seed=33)
+        o.add("grHole", "smoothstep", 2, srcA=1, constant=[GRAIN_OFF, GRAIN_OFF + 0.05, 0.0, 0.0])
+        o.add("grDark", "remap", 3, srcA=2, value=1.0, constant=[0.0, 1.0, 1.0, 0.06])
+        o.add("grMul", "multiply", 7, srcA=7, srcB=3)
+        o.add("grCol", "constant", 3, constant=hexrgb(accent, 0.35) + [0.0])
+        o.add("grLit", "multiply", 2, srcA=2, srcB=3)
+        o.add("grAdd", "add", 4, srcA=4, srcB=2)
+    assert len(o.ops) <= 48, (name, len(o.ops))
     PROGRAM_OPS[name] = o
     return {"name": name, "ops": o.ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
             "emissionIntensity": 1.0, "opacity": -1}
 
 
-GHOST_FADE = (0.0, 0.07)   # the head ghost fades in over this height (its frame, metres) above its lower edge
+SCAN_TOP = 0.80     # the scan band starts this high (world metres) and sweeps down to 0
+SCAN_HALF = 0.010   # the band's half-width (metres)
+GRAIN_OFF = 1.25    # the dissolve threshold at rest: above any noise value (no patch); routes lower it
 
 
 def ghost_program(name, colour):
-    """A spectral copy: black, a fresnel edge in its colour, opacity (constant op 4) routed from zero. It is a copy of
-    the HEAD only, so it fades to nothing toward its lower edge (an object-space gradient) rather than ending in a
-    line across the neck."""
+    """The optical profile's copies (fx1): RIM ONLY. A fresnel edge in its colour and an opacity that is the fresnel
+    itself, so a copy is nothing face-on and a coloured edge at its silhouette -- an image detaching from the bust, never
+    a body over or behind it (stop 6's copies had a 0.35 floor of opacity: patches on the face, then a drop shadow).
+    The opacity's gain (constant op 4) is routed from zero."""
     return {"name": name, "ops": [
-        {"kind": "fresnel", "dst": 0, "value": 1.6},
-        {"kind": "constant", "dst": 1, "constant": hexrgb(colour, 1.6) + [1.0]},
+        {"kind": "fresnel", "dst": 0, "value": 4.0},
+        {"kind": "constant", "dst": 1, "constant": hexrgb(colour, 2.2) + [1.0]},
         {"kind": "multiply", "dst": 2, "srcA": 0, "srcB": 1},
         {"kind": "constant", "dst": 3, "constant": [0.0, 0.0, 0.0, 0.0]},
-        {"kind": "remap", "dst": 4, "srcA": 0, "value": 1.0, "constant": [0.0, 1.0, 0.35, 1.0]},
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
-        {"kind": "input", "dst": 6, "input": "localPosition"},
-        {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [1.0, 1.0, 1.0, 1.0]},
-        {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [GHOST_FADE[0], GHOST_FADE[1], 0.0, 0.0]},
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 6},
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 6},
-        {"kind": "constant", "dst": 5, "constant": [0.0, 0.0, 0.0, 1.0]},
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
+        # the base is the copy's own colour, never black: a dark rim over the background read as a shadow
+        {"kind": "constant", "dst": 5, "constant": hexrgb(colour, 0.6) + [1.0]},
     ], "baseColor": 5, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": 3}
 
 
@@ -281,8 +349,13 @@ def neck_offset(deg):
 
 
 # ================================================================================================ the scene
-def build(heads=None):
-    heads = heads or HEADS
+def build(heads=None, neutral=False):
+    """`heads`: the slots (default HEADS, all four). `neutral`: every slot's palette grey -- the brief's test that a
+    source is recognisable from its secondary effects alone (with the rays knob at 0)."""
+    heads = [dict(h) for h in (heads or HEADS)]
+    if neutral:
+        for h in heads:
+            h["palette"] = GREY
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
     s.environment = {
@@ -301,20 +374,16 @@ def build(heads=None):
     s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.42, "post/bloom/threshold": 0.9,
                "post/output/vignette": 0.45, "post/output/grain": 0.012, "temporal/echo/enabled": False})
     s.camera["fov"] = 40.0
-    if len(heads) == 1:   # one head: the stop-2 framing, three-quarter from its right
-        s.drift_camera(centre=[-0.98, 0.50, 2.05], target=[0.0, 0.36, 0.0], period=78.0, amp=(0.06, 0.02, 0.04),
-                       tamp=(0.01, 0.006, 0.0), steps=8)
-    else:
-        # stop 5 (the owner: "make the busts take up more space in the composition"): the middle head forward, the two
-        # others back and to the sides; the middle bust about 55% of the frame's height, the others about 45%, with
-        # the background showing between and round them
-        s.drift_camera(centre=[-0.28, 0.46, 2.2], target=[0.0, 0.33, -0.05], period=90.0, amp=(0.05, 0.015, 0.03),
-                       tamp=(0.008, 0.005, 0.0), steps=8)
+    # the camera frames every layout (one to four busts, LAYOUT); the busts move, it does not
+    s.drift_camera(centre=[-0.28, 0.46, 2.2], target=[0.0, 0.33, -0.05], period=90.0, amp=(0.05, 0.015, 0.03),
+                   tamp=(0.008, 0.005, 0.0), steps=8)
     control(s)
     atmosphere(s)
     background(s)
-    for spec in heads:
-        head(s, spec)
+    layout_signals(s, heads)
+    for i, spec in enumerate(heads):
+        head(s, spec, i)
+    layout_routes(s, heads)
     return s
 
 
@@ -366,12 +435,18 @@ def atmosphere(s):
             R("response.intensity", "post/bloom/intensity", 0.08, attackMs=1500.0, decayMs=4000.0))
 
 
-def head(s, spec):
+def head(s, spec, slot):
     P = spec["prefix"]
     pal = spec.get("palette", ORCHID)
+    prof = spec.get("profile", "fragment")
+    # the profile's world-space surface motion, applied with identical values to every piece (a seam otherwise):
+    # fragment -- a high-frequency sideways shear (the tear, on each opening); liquid -- a long wave travelling up the
+    # bust, sideways and toward the camera, on the smoothed level. Optical and grain have none: the silhouette stays.
     shear = {"kind": "sine", "amount": 0.0, "frequency": 240.0, "speed": 0.0, "phase": 0.0,
              "axis": [0.0, 1.0, 0.0], "displacementAxis": [1.0, 0.0, 0.0], "space": "world"}
-    # (world space: the pieces have different local origins, and a shear in each one's own frame split the seams)
+    flow = {"kind": "sine", "amount": 0.0, "frequency": LIQUID_K, "speed": 0.0, "phase": 0.0,
+            "axis": [0.0, 1.0, 0.25], "displacementAxis": [1.0, 0.0, 0.35], "space": "world"}
+    surface = {"fragment": [shear], "liquid": [flow]}.get(prof, [])
     # The neck: a TWIST (the swivel's yaw, about the straight neck), then two one-sided BENDS -- back (the gate's snap and
     # looking up) and forward (looking down). One side at a time, each cut to exactly 0 at rest: a Bend at a curvature
     # near 0 loses its normals to the GPU sine's precision, and a bipolar pitch would pass through it.
@@ -388,70 +463,100 @@ def head(s, spec):
     # head the yaw, so the head turns Rx(pitch) Ry(yaw) -- the order the neck's twist-then-bend turns its top ring.
     s.nodes.append({"name": P + "-pivot", "kind": "group", "position": [float(v) for v in HEAD_REST],
                     "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": P + "-bust"})
+    bx, bz, bh, bs = base_layout(slot)
     pieces = [  # node, mesh, program (its masks in its own frame), parent, position, rotation, deformers
-        (P + "-bust", "th-body", P + "-body", None, spec.get("at", [0.0, 0.0, 0.0]),
-         [0.0, spec.get("heading", 0.0), 0.0], [shear]),
+        (P + "-bust", "th-body", P + "-body", None, [bx, 0.0, bz], [0.0, bh, 0.0], surface),
         (P + "-neck", "th-neck", P + "-body", P + "-bust", NECK_FOOT, [0.0, 0.0, 0.0],
-         [twist, bend_back, bend_fwd, shear]),
-        (P + "-head", "th-head", P + "-head", P + "-pivot", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [hinge, shear]),
+         [twist, bend_back, bend_fwd] + surface),
+        (P + "-head", "th-head", P + "-head", P + "-pivot", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [hinge] + surface),
     ]
-    s.program(bust_program(P + "-body", wash=pal["wash"]))
-    s.program(bust_program(P + "-head", mouth=MOUTH, eye_l=EYE_L, eye_r=EYE_R, wash=pal["wash"]))
-    s.program(ghost_program(P + "-ghostA", pal["ghosts"][0]))
-    s.program(ghost_program(P + "-ghostB", pal["ghosts"][1]))
+    accent = pal["glow"]
+    s.program(bust_program(P + "-body", wash=pal["wash"], profile=prof, accent=accent))
+    s.program(bust_program(P + "-head", mouth=MOUTH, eye_l=EYE_L, eye_r=EYE_R, wash=pal["wash"], profile=prof,
+                           accent=accent))
     for node, mesh, prog, parent, pos, rot, deformers in pieces:
         s.proc(node, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh},
                material={"baseColor": list(IVORY), "roughness": 0.36, "metallic": 0.0, "program": prog},
-               deformers=[dict(d) for d in deformers], position=pos, rotation=rot, scale=[1.0, 1.0, 1.0],
-               parent=parent, extra={"castsShadow": False})
+               deformers=[dict(d) for d in deformers], position=pos, rotation=rot,
+               scale=[bs] * 3 if node == P + "-bust" else [1.0, 1.0, 1.0], parent=parent, extra={"castsShadow": False})
         s.entity(node)
     # the bust's pivot node goes before its children in the list (it was appended before the pieces, but its parent,
     # the bust, is a piece): move it to just after the bust
     piv = next(n for n in s.nodes if n["name"] == P + "-pivot")
     s.nodes.remove(piv)
     s.nodes.insert(next(i for i, n in enumerate(s.nodes) if n["name"] == P + "-bust") + 1, piv)
-    # the mouth's dark interior (seen only through the parted lips), the eyes and their lids (own materials, no
-    # program); the head's spectral copies, which rest at a scale of nothing and grow only while this head speaks
-    for name, mesh, parent, pos, prog, scale in (
-            (P + "-cavity", "th-mouth-cavity", P + "-head", [0.0, 0.0, 0.0], None, 1.0),
-            (P + "-eyeL", "th-eye", P + "-head", EYEBALL_L, None, 1.0),
-            (P + "-eyeR", "th-eye", P + "-head", EYEBALL_R, None, 1.0),
-            (P + "-lidUL", "th-lid-upper", P + "-head", EYEBALL_L, None, 1.0),
-            (P + "-lidLL", "th-lid-lower", P + "-head", EYEBALL_L, None, 1.0),
-            (P + "-lidUR", "th-lid-upper", P + "-head", EYEBALL_R, None, 1.0),
-            (P + "-lidLR", "th-lid-lower", P + "-head", EYEBALL_R, None, 1.0),
-            (P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, -GHOST_BACK], P + "-ghostA", 0.001),
-            (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, -GHOST_BACK], P + "-ghostB", 0.001)):
+    # the mouth's dark interior (seen only through the parted lips), the eyes and their lids (own materials, no program)
+    extras = [(P + "-cavity", "th-mouth-cavity", P + "-head", [0.0, 0.0, 0.0], None, 1.0),
+              (P + "-eyeL", "th-eye", P + "-head", EYEBALL_L, None, 1.0),
+              (P + "-eyeR", "th-eye", P + "-head", EYEBALL_R, None, 1.0),
+              (P + "-lidUL", "th-lid-upper", P + "-head", EYEBALL_L, None, 1.0),
+              (P + "-lidLL", "th-lid-lower", P + "-head", EYEBALL_L, None, 1.0),
+              (P + "-lidUR", "th-lid-upper", P + "-head", EYEBALL_R, None, 1.0),
+              (P + "-lidLR", "th-lid-lower", P + "-head", EYEBALL_R, None, 1.0)]
+    if prof == "optical":
+        # the optical copies: rim-only images of the head, grown while it speaks, split apart on its onsets
+        s.program(ghost_program(P + "-ghostA", pal["ghosts"][0]))
+        s.program(ghost_program(P + "-ghostB", pal["ghosts"][1]))
+        extras += [(P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostA", 0.001),
+                   (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostB", 0.001)]
+    for name, mesh, parent, pos, prog, scale in extras:
         n = {"name": name, "kind": "gltf", "asset": "meshes/%s.glb" % mesh, "position": [float(v) for v in pos],
              "rotation": [0.0, 0.0, 0.0], "scale": [scale] * 3, "parent": parent, "castsShadow": False}
         if prog:
             n["program"] = prog
         s.nodes.append(n)
+    if prof == "liquid":
+        # the pressure waves: two thin irregular rings round the neck and the chest, expanding outward from the bust on
+        # the bass's onsets (the second only on strong ones) and fading as they go; unlit (ADR-1673's fast path)
+        for ring, y, tilt in (("A", 0.20, (4.0, 0.0, -3.0)), ("B", 0.08, (-6.0, 0.0, 5.0))):
+            name = "%s-ring%s" % (P, ring)
+            s.program(glow_program(name, pal["glow"], 0.0))
+            s.proc(name, {"kind": "torus", "majorRadius": RING_RADIUS, "minorRadius": 0.0016, "majorSegments": 160,
+                          "minorSegments": 6},
+                   material={"baseColor": [0.0, 0.0, 0.0], "roughness": 1.0, "metallic": 0.0, "program": name,
+                             "unlit": True},
+                   deformers=[{"kind": "noise", "amount": 0.045, "scale": 2.5, "speed": 0.35, "space": "local"}],
+                   position=[0.0, y, 0.0], rotation=list(tilt), scale=[0.001] * 3, parent=P + "-bust",
+                   extra={"castsShadow": False})
     cols = pal["rays"]
     rays = s.emitter_fan(P + "-mouth", P + "-head", MOUTH,
                          [dict(r, color=hexrgb(cols[i % len(cols)])) for i, r in enumerate(MOUTH_RAYS)])
-    s.effect(P + "-shake", "shake", ("entity", P + "-bust"),
-             parameters={"trauma": 0.0, "amplitude": 0.004, "rotation": 1.0, "frequency": 17.0, "decay": 0.0,
-                         "seed": 7.0})
+    if prof == "fragment":
+        s.effect(P + "-shake", "shake", ("entity", P + "-bust"),
+                 parameters={"trauma": 0.0, "amplitude": 0.004, "rotation": 1.0, "frequency": 17.0, "decay": 0.0,
+                             "seed": 7.0})
     # the glow on EVERY piece, with identical values and routes: a glow on the head alone stopped in a line at the neck
     for part, piece in (("H", "head"), ("N", "neck"), ("B", "bust")):
         s.effect("%s-glow%s" % (P, part), "glow", ("entity", "%s-%s" % (P, piece)),
                  parameters={"gain": 1.0, "tint": hexrgb(pal["glow"]), "glow": 0.0, "rim": 0.05,
                              "rimColor": hexrgb("#7a6cff"), "rimPower": 3.5, "spill": False, "recolour": 0.0})
-    at, hd = spec.get("at", [0.0, 0.0, 0.0]), math.radians(spec.get("heading", 0.0))
-    # (stop 4 also had a point light per head; three clustered lights cost 1 ms a frame, and the head's own mist and
-    # glow carry its colour into the room, so it is gone)
-    # the mist round this head, in its own colour: dark until its gate opens, then lit (its light on the mist)
+    # the halo: the mist behind this head, in its own colour, dark until its gate opens (its place follows the layout)
+    hd = math.radians(bh)
     s.particles(P + "-mist", capacity=36, seed=61 + int(P[2:]), shape="box",
-                position=[at[0] - 0.3 * math.sin(hd), 0.45, at[2] - 0.35], extent=[0.5, 0.35, 0.2],
+                position=[bx - 0.3 * math.sin(hd), 0.45, bz - 0.35], extent=[0.5, 0.35, 0.2],
                 direction=[0.0, 1.0, 0.0], spawnRate=1.8, lifetimeMin=14.0, lifetimeMax=22.0, spread=1.0,
                 speedMin=0.005, speedMax=0.02, gravity=[0, 0.0, 0], drag=0.1, turbulence=0.01,
                 turbulenceScale=0.3, sizeStart=0.45, sizeEnd=0.8, colorStart=hexrgb(pal["spill"]) + [0.07],
                 colorEnd=hexrgb(pal["spill"]) + [0.0], emissive=0.0, blend="additive", softness=0.25)
+    if prof == "grain":
+        # the grains: points shed from the head and drifting up and away, at a rate set by the slot's level, in bursts
+        # on its onsets
+        s.particles(P + "-grain", capacity=500, seed=71 + int(P[2:]), shape="box",
+                    position=[bx, GRAIN_Y, bz + 0.03], extent=[0.07, 0.10, 0.06],
+                    direction=[0.35, 1.0, 0.15], spawnRate=0.0, lifetimeMin=1.2, lifetimeMax=2.6, spread=0.6,
+                    speedMin=0.03, speedMax=0.10, gravity=[0.0, 0.015, 0.0], drag=0.5, turbulence=0.05,
+                    turbulenceScale=0.6, sizeStart=0.0045, sizeEnd=0.0015, colorStart=hexrgb(PALE) + [0.9],
+                    colorEnd=hexrgb(pal["glow"]) + [0.0], emissive=2.4, blend="additive", softness=0.02)
     gate(s, spec)
     scan_and_eyes(s, spec)
     blinks(s, spec)
     routes(s, spec, rays)
+
+
+LIQUID_K = 11.0     # the liquid wave's spatial frequency (rad/m): about one wavelength over the bust
+RING_RADIUS = 0.2   # a pressure ring's radius at its start (metres, the bust's frame) ...
+RING_REST = 2.8     # ... and the scale it has expanded to as it fades (then it is gone: scale 0.001)
+GRAIN_Y = 0.40      # the grain emitter's height (the head), the bust's frame at scale 1
 
 
 BLINK_CLOSE_MS = 35.0    # a lid shuts in about this long ...
@@ -611,6 +716,90 @@ def background(s):
     s.route(R("audio.treble", "procedural/thbg-fil/deform/2/amount", 0.012, attackMs=20.0, decayMs=260.0))
 
 
+# ================================================================================================ 1-4 busts
+ALL_ROLES = ("drums", "bass", "synth", "vocal", "other")
+LAYOUT_GLIDE = {"attackMs": 700.0, "decayMs": 700.0}   # a bust glides to its new place when the count changes
+
+
+def layout_signals(s, heads):
+    """Which busts are shown, and where (fx1, 14-brief-secondary-fx.md sections 6-7). From the sources' own flags
+    (`role.<role>.active`, stems or live inputs):
+      thNoSources      1 while no source of any role is assigned (the fourth slot is then the hero on the mix)
+      <p>Active        the slot's role (or one of its roles) is assigned -- or, for the mix slot, no source is
+      thCount          how many slots are active (0..4; never more: one slot per role)
+      thEq<c>          thCount == c;  <p>R<r>  the slot's rank among the active slots == r (the slots in order)
+      visual.<p>L<c><r> the product: this slot is the rank-r bust of a c-bust layout
+    An inactive slot has every indicator 0: it shrinks to nothing and its gate reads silence (its role's signals are
+    inactive), so nothing of it is left on screen or on the bus."""
+    binary = lambda lv: {"threshold": "binary", "thresholdLevel": lv}
+    s.sources.append(sig("thNoSources", [{"constant": 1.0}] + [{"source": "role.%s.active" % r, "amount": -1.0}
+                                                               for r in ALL_ROLES],
+                         combine="sum", chain={"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}))
+    for spec in heads:
+        P = spec["prefix"]
+        ins = [{"source": "role.%s.active" % r} for r in spec["roles"]]
+        if spec.get("mix"):
+            ins.append({"source": "signal.thNoSources"})
+        s.sources += [sig(P + "Active", ins, combine="max"),
+                      sig(P + "Inactive", [{"constant": 1.0}, {"source": "signal.%sActive" % P, "amount": -1.0}],
+                          combine="sum")]
+    s.sources.append(sig("thCount", [{"source": "signal.%sActive" % h["prefix"]} for h in heads], combine="sum"))
+    for c in range(1, len(heads) + 2):
+        s.sources.append(sig("thGe%d" % c, [{"source": "signal.thCount", "chain": binary(c - 0.5)}]))
+    for c in range(1, len(heads) + 1):
+        s.sources.append(sig("thEq%d" % c, [{"source": "signal.thGe%d" % c},
+                                            {"source": "signal.thGe%d" % (c + 1), "amount": -1.0}], combine="sum"))
+    for i, spec in enumerate(heads):
+        P = spec["prefix"]
+        before = [{"source": "signal.%sActive" % heads[j]["prefix"]} for j in range(i)]
+        s.sources.append(sig(P + "Rank", before or [{"constant": 0.0}], combine="sum"))
+        for r in range(1, i + 2):
+            s.sources.append(sig("%sRge%d" % (P, r), [{"source": "signal.%sRank" % P, "chain": binary(r - 0.5)}]))
+        for r in range(0, i + 1):
+            lo = [{"constant": 1.0}] if r == 0 else [{"source": "signal.%sRge%d" % (P, r)}]
+            s.sources.append(sig("%sR%d" % (P, r), lo + [{"source": "signal.%sRge%d" % (P, r + 1), "amount": -1.0}],
+                                 combine="sum"))
+        for c in range(1, len(heads) + 1):
+            for r in range(0, min(i, c - 1) + 1):
+                s.map(M("%sL%d%d" % (P, c, r), [("signal.thEq%d" % c, 1.0), ("signal.%sR%d" % (P, r), 1.0),
+                                                 ("signal.%sActive" % P, 1.0)], "product"))
+
+
+def layout_routes(s, heads):
+    """Each bust to its place for the live count: position, heading and size as offsets from its resting place
+    (base_layout), and the halo (and the grains) with it; an inactive bust shrinks to nothing."""
+    for i, spec in enumerate(heads):
+        P = spec["prefix"]
+        bx, bz, bh, bs = base_layout(i)
+        node = "nodes/%s-bust/" % P
+        for c in range(1, len(heads) + 1):
+            for r in range(0, min(i, c - 1) + 1):
+                x, z, h, sc = LAYOUT[c][r]
+                ind = "visual.%sL%d%d" % (P, c, r)
+                hd, bhd = math.radians(h), math.radians(bh)
+                if abs(x - bx) > 1e-6:
+                    s.route(R(ind, node + "position", x - bx, comp=0, **LAYOUT_GLIDE))
+                if abs(z - bz) > 1e-6:
+                    s.route(R(ind, node + "position", z - bz, comp=2, **LAYOUT_GLIDE))
+                if abs(h - bh) > 1e-6:
+                    s.route(R(ind, node + "rotation", h - bh, comp=1, **LAYOUT_GLIDE))
+                if abs(sc - bs) > 1e-6:
+                    s.route(*[R(ind, node + "scale", sc - bs, comp=k, **LAYOUT_GLIDE) for k in range(3)])
+                # the halo behind the head, and the grains at it, follow
+                mx = (x - 0.3 * math.sin(hd)) - (bx - 0.3 * math.sin(bhd))
+                mz = (z - 0.35) - (bz - 0.35)
+                s.route(R(ind, "particles/%s-mist/position" % P, mx, comp=0, **LAYOUT_GLIDE),
+                        R(ind, "particles/%s-mist/position" % P, mz, comp=2, **LAYOUT_GLIDE),
+                        R(ind, "particles/%s-mist/position" % P, 0.45 * (sc - bs), comp=1, **LAYOUT_GLIDE))
+                if spec.get("profile") == "grain":
+                    s.route(R(ind, "particles/%s-grain/position" % P, x - bx, comp=0, **LAYOUT_GLIDE),
+                            R(ind, "particles/%s-grain/position" % P, z - bz, comp=2, **LAYOUT_GLIDE),
+                            R(ind, "particles/%s-grain/position" % P, GRAIN_Y * (sc - bs), comp=1, **LAYOUT_GLIDE))
+        # an inactive bust: shrunk to nothing (it grows back in when its source arrives)
+        s.route(*[R("signal.%sInactive" % P, node + "scale", -0.999 * bs, comp=k, attackMs=150.0, decayMs=500.0)
+                  for k in range(3)])
+
+
 # ================================================================================================ the instrument
 def sig(name, inputs, combine="firstActive", chain=None, event=False):
     st = {"combine": combine, "inputs": inputs}
@@ -657,46 +846,51 @@ def gate(s, spec):
       <p>Gate      the max of the two; visual.<p>GateLive = Gate x (1 - Chomp) x (1 - the shut pad): what the head does
       <p>Open      a one-shot on each rise of Live: each opening and each re-opening after a chomp (the flashes)
     Pad 37 forces every gate open, pad 36 shut."""
-    P, role, band = spec["prefix"], spec["role"], spec["band"]
+    P, roles, band = spec["prefix"], spec["roles"], spec["band"]
     L, LS, RS, TR, GR, GT, PV, CH, OP, OM, ML, MG = ("%s%s" % (P, n) for n in (
         "Level", "LevelS", "Rise", "Trig", "GateRaw", "Gate", "Prev", "Chomp", "Open", "OnMix", "MixLevel", "MixGate"))
+    ON = P + "Onset"   # the slot's onset strength: the first active of its roles
     sens = {"source": "control.sensitivity", "polarity": "bipolar", "amount": 0.16}   # up = more sensitive
     binary = lambda lv: {"threshold": "binary", "thresholdLevel": lv}
     s.sources += [
-        sig(L, [{"source": "role.%s.%s" % (role, band)}]),
+        sig(L, [{"source": "role.%s.%s" % (r, band)} for r in roles]),
+        sig(ON, [{"source": "role.%s.onsetStrength" % r} for r in roles]),
         sig(LS, [{"source": "signal." + L}, sens], combine="sum"),
         sig(RS, [{"source": "signal." + LS}, {"source": "signal." + LS, "amount": -1.0,
                                               "chain": {"attackMs": 150.0, "decayMs": 150.0}}], combine="sum"),
         sig(TR, [{"source": "signal." + RS, "chain": dict(binary(0.20), envelope="peakhold", envelopeHoldMs=0.0,
                                                           envelopeFallPerSecond=30.0, envelopeRearm=0.5,
                                                           envelopeRefractoryMs=33.0)}]
-            + ([{"source": "role.%s.onsetStrength" % role, "chain": dict(binary(spec.get("onsetLevel", 1.0)),
-                                                                         envelope="peakhold", envelopeHoldMs=0.0,
+            + ([{"source": "signal." + ON, "chain": dict(binary(spec.get("onsetLevel", 1.0)),
+                                                         envelope="peakhold", envelopeHoldMs=0.0,
                                                                  envelopeFallPerSecond=30.0, envelopeRearm=0.5,
                                                                  envelopeRefractoryMs=ONSET_REFRACTORY_MS)}]
                if spec.get("onsets") else []), combine="max"),
         sig(PV, [{"source": "visual.%sKeep" % GT}]),                      # one-frame memory
-        # the mix path: on only while the head's role has no active source
-        sig(OM, [{"constant": 1.0}, {"source": "role.%s.active" % role, "amount": -1.0}], combine="sum",
-            chain={"clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0}),
-        sig(ML, [{"source": spec["mix"]}, sens], combine="sum"),
-        sig(MG, [{"source": "signal." + ML, "gate": "signal." + OM,
-                  "chain": dict(binary(spec.get("mixOpen", spec["open"] + MIX_STRICT)), envelope="peakhold", envelopeHoldMs=MIX_PULSE_MS,
-                                envelopeFallPerSecond=1000.0, envelopeRearm=0.5,
-                                envelopeRefractoryMs=MIX_REFRACTORY_MS)}], combine="max"),
+    ]
+    if spec.get("mix"):
+        # the mix path (the hero with no sources): on only while NO source of any role is assigned (layout())
+        s.sources += [
+            sig(ML, [{"source": spec["mix"]}, sens], combine="sum"),
+            sig(MG, [{"source": "signal." + ML, "gate": "signal.thNoSources",
+                      "chain": dict(binary(spec.get("mixOpen", spec["open"] + MIX_STRICT)), envelope="peakhold",
+                                    envelopeHoldMs=MIX_PULSE_MS, envelopeFallPerSecond=1000.0, envelopeRearm=0.5,
+                                    envelopeRefractoryMs=MIX_REFRACTORY_MS)}], combine="max"),
+        ]
+    s.sources += [
         sig(GR, [{"source": "signal." + LS, "chain": binary(spec["open"])},
                  {"source": "signal." + PV}]
             # ONSETS (stop 5, the synth: "i think it needs to be more sensitive"): the stem's own note onsets open the
             # gate for a moment, the level keeps it open while the note rings, and an onset while open is a chomp --
             # so legato notes, which never fall below the level's threshold between them, each read as their own
-            + ([{"source": "role.%s.onsetStrength" % role, "chain": dict(binary(spec.get("onsetLevel", 1.0)),
-                                                                         envelope="peakhold",
-                                                                         envelopeHoldMs=spec.get("onsetHoldMs", 140.0),
+            + ([{"source": "signal." + ON, "chain": dict(binary(spec.get("onsetLevel", 1.0)),
+                                                         envelope="peakhold",
+                                                         envelopeHoldMs=spec.get("onsetHoldMs", 140.0),
                                                                          envelopeFallPerSecond=1000.0,
                                                                          envelopeRearm=0.5,
                                                                          envelopeRefractoryMs=ONSET_REFRACTORY_MS)}]
-               if spec.get("onsets") else []) + [
-                 {"source": "signal." + MG},
+               if spec.get("onsets") else [])
+            + ([{"source": "signal." + MG}] if spec.get("mix") else []) + [
                  {"source": "control.padOpen", "chain": {"envelope": "peakhold", "envelopeHoldMs": 600.0,
                                                          "envelopeFallPerSecond": 1000.0}}],
             combine="max", chain={"attackMs": 0.0, "decayMs": 36.0}),
@@ -797,7 +991,6 @@ def scan_and_eyes(s, spec):
 
 def routes(s, spec, rays):
     P = spec["prefix"]
-    E = spec.get("emphasis", {"shake": 0.5, "tear": 0.5, "ghost": 0.5, "wash": 0.5})
     G = "signal.%sPose" % P                # the gate's pose, 0..1 through the snap (the shut pad applied)
     LIVE = "signal.%sLive" % P             # the gate itself, 0 or 1
     SNAP_CUT = {"threshold": "gate", "thresholdLevel": 0.002}   # exact 0 at rest (see gate())
@@ -837,56 +1030,131 @@ def routes(s, spec, rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
     # ---- its light on the mist: the same pose, in its own colour
     s.route(R(G, "particles/%s-mist/emissive" % P, 1.4, depth=K("chroma"), attackMs=0, decayMs=350))
-    # ---- the secondary effects, every one on THIS head's gate, weighted by its instrument's emphasis
-    # shake (the drums)
-    s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75 * E["shake"], depth=K("copies"), attackMs=0, decayMs=140,
-              **clamp(1.0)))
-    # tear (the drums): the head and bust's own shear and signal bands, and its own colour split -- the two copies
-    # pulled apart for a moment (the per-entity form of the post tear and RGB split this scene no longer uses)
-    for node in ("bust", "neck", "head"):
-        d = {"bust": 1, "neck": 4, "head": 2}[node]   # the shear is each piece's last deformer
-        s.route(R(OPEN, "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.006 * E["tear"], depth=K("tear"),
-                  attackMs=0, decayMs=120),
-                R(OPEN, "procedural/%s-%s/deform/%d/phase" % (P, node, d), 20.0, integrate=True, attackMs=10,
-                  decayMs=140),
-                R("control.padBurst", "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.01, attackMs=0,
-                  decayMs=150))
-    # ghosts (the bass): the spectral copies, grown only while this head speaks; how far they part and how long they
-    # linger is the instrument's
-    for colour, sgn in (("A", 1.0), ("B", -1.0)):
-        node = "%s-ghost%sh" % (P, colour)
-        for c in range(3):
-            s.route(R(LIVE, "nodes/%s/scale" % node, 0.999, comp=c, attackMs=0, decayMs=250 + 500 * E["ghost"]))
-        part = 0.006 + 0.022 * max(E["ghost"], E["tear"])
-        s.route(R(OPEN, "nodes/%s/position" % node, part * sgn, comp=0, depth=K("copies"), attackMs=0,
-                  decayMs=160 + 300 * E["ghost"]),
-                R(OPEN, "nodes/%s/position" % node, 0.4 * part * sgn, comp=1, depth=K("copies"), attackMs=0,
-                  decayMs=160 + 300 * E["ghost"]),
-                # ... and back, never forward: a copy in front of the face lies across it in patches (the
-                # owner's "cut out look"); behind it, depth-tested against the head, only its rim shows
-                R("signal.%sLevelS" % P, "nodes/%s/position" % node, -0.02 * E["ghost"], comp=2,
-                  depth=K("copies"), attackMs=40, decayMs=400))
-    # wash (the synth): the possession colour over the porcelain, its spread on this head's own level
-    for part in ("body", "head"):
-        prog = "%s-%s" % (P, part)
-        o = PROGRAM_OPS[prog]
-        op = lambda label, kind: "material/%s/op/%d/%s/" % (prog, o.at[label], kind)
-        s.route(R(LIVE, op("washAmount", "remap") + "constant", 0.9 * E["wash"], comp=3, depth=K("chroma"),
-                  attackMs=0, decayMs=0),
-                R(OPEN, op("washAmount", "remap") + "constant", 0.12 * E["wash"], comp=2, depth=K("chroma"),
-                  attackMs=0, decayMs=300),
-                R(OPEN, op("washAmount", "remap") + "constant", 0.5 * E["wash"], comp=3, depth=K("chroma"),
-                  attackMs=0, decayMs=300),
-                R("signal.%sLevelS" % P, op("washSpread", "remap") + "constant", -0.25 * E["wash"], comp=2,
-                  attackMs=600, decayMs=2500),
-                R("control.palette", op("washSpread", "remap") + "constant", -0.6, comp=2),
-                R(OPEN, op("bands", "threshold") + "value", -0.18 * E["tear"], depth=K("tear"), attackMs=0,
-                  decayMs=120))
+    # ---- the secondary effects: this head's PROFILE (15-fx-plan.md), every one on this head's own signals only
+    prof = spec.get("profile", "fragment")
+    pal = spec.get("palette", ORCHID)
+    LEVEL = "signal.%sLevelS" % P          # the slot's level (its band, the sensitivity knob applied)
+    ONSET = "signal.%sOnset" % P           # its onset strength
+    surf = {"bust": 1, "neck": 4, "head": 2}   # the world-space surface deformer: each piece's last
+    progs = ("%s-body" % P, "%s-head" % P)
+    opath = lambda prog, label, kind, field="constant": "material/%s/op/%d/%s/%s" % (
+        prog, PROGRAM_OPS[prog].at[label], kind, field)
+    colour = hexrgb(pal["glow"])
+    if prof == "fragment":
+        # FRAGMENT (the drums, kept as stop 5 had it): abrupt, transient-only -- the bust shakes, slices sideways and
+        # stripes on each opening, and recovers in about 120 ms; nothing between hits
+        s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75, depth=K("copies"), attackMs=0, decayMs=140, **clamp(1.0)))
+        for node in ("bust", "neck", "head"):
+            d = surf[node]
+            s.route(R(OPEN, "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.006, depth=K("tear"),
+                      attackMs=0, decayMs=120),
+                    R(OPEN, "procedural/%s-%s/deform/%d/phase" % (P, node, d), 20.0, integrate=True, attackMs=10,
+                      decayMs=140),
+                    R("control.padBurst", "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.01, attackMs=0,
+                      decayMs=150))
+        for prog in progs:
+            s.route(R(OPEN, opath(prog, "bands", "threshold", "value"), -0.18, depth=K("tear"), attackMs=0,
+                      decayMs=120))
+    elif prof == "liquid":
+        # LIQUID (the bass): continuous and heavy -- a long wave travels up the bust while the bass sounds (its height
+        # on the smoothed level, its travel integrated from it), a strong low onset swells it and it takes over a
+        # second to settle; and each onset sends a pressure ring out from the neck (a strong one, a second from the
+        # chest), travelling on after the note
+        s.sources += [
+            sig(P + "Surge", [{"source": ONSET, "chain": {"threshold": "binary", "thresholdLevel": 1.2,
+                                                          "envelope": "peakhold", "envelopeHoldMs": 0.0,
+                                                          "envelopeFallPerSecond": 0.8, "envelopeRearm": 0.5,
+                                                          "envelopeRefractoryMs": 350.0}}]),
+            sig(P + "WaveA", [{"source": ONSET, "chain": {"threshold": "binary", "thresholdLevel": 1.2,
+                                                          "envelope": "peakhold", "envelopeHoldMs": 0.0,
+                                                          "envelopeFallPerSecond": 0.9, "envelopeRearm": 0.5,
+                                                          "envelopeRefractoryMs": 550.0}}]),
+            sig(P + "WaveB", [{"source": ONSET, "chain": {"threshold": "binary", "thresholdLevel": 2.0,
+                                                          "envelope": "peakhold", "envelopeHoldMs": 0.0,
+                                                          "envelopeFallPerSecond": 0.7, "envelopeRearm": 0.5,
+                                                          "envelopeRefractoryMs": 900.0}}]),
+        ]
+        # a ring exists only while its wave travels (an idle ring would be a dark line: its body is black)
+        s.sources += [sig(P + "Alive" + w, [{"source": "signal.%sWave%s" % (P, w),
+                                             "chain": {"threshold": "binary", "thresholdLevel": 0.02}}])
+                      for w in ("A", "B")]
+        # a ring's light fades faster than it grows (the square of its envelope): bright at the bust, gone by the time
+        # it is wide
+        s.map(M(P + "WaveA2", [("signal.%sWaveA" % P, 1.0)], "max", curve=2.5),
+              M(P + "WaveB2", [("signal.%sWaveB" % P, 1.0)], "max", curve=2.5))
+        for node in ("bust", "neck", "head"):
+            d = "procedural/%s-%s/deform/%d/" % (P, node, surf[node])
+            s.route(R(LEVEL, d + "amount", 0.014, depth=K("copies"), attackMs=250, decayMs=1500),
+                    R("signal.%sSurge" % P, d + "amount", 0.016, depth=K("copies"), attackMs=60, decayMs=1200),
+                    R(LEVEL, d + "phase", 5.0, integrate=True, attackMs=250, decayMs=1500),
+                    R("signal.%sSurge" % P, d + "phase", 6.0, integrate=True, attackMs=60, decayMs=1200),
+                    R("control.padBurst", d + "amount", 0.02, attackMs=0, decayMs=600))
+        for ring in ("A", "B"):
+            name = "%s-ring%s" % (P, ring)
+            env = "signal.%sWave%s" % (P, ring)
+            for c in range(3):
+                s.route(R("signal.%sAlive%s" % (P, ring), "nodes/%s/scale" % name, RING_REST, comp=c),
+                        R(env, "nodes/%s/scale" % name, 1.0 - RING_REST, comp=c),
+                        R("visual.%sWave%s2" % (P, ring),
+                          "material/%s/op/%d/constant/constant" % (name, BG_PROGRAM_OPS[name].at["gain"]),
+                          1.8, comp=c, depth=K("chroma")))
+    elif prof == "optical":
+        # OPTICAL (the synth): optical and phrase-scale -- a scan sweeps the bust (faster as the synth plays more),
+        # darkening a trail behind its bright line; veins of light grow over a held note; and on each onset the
+        # head's rim-only copies split apart and snap back, drifting a little apart while the note sustains
+        scan = P + "Scan"
+        s.sources.append({"kind": "lfo", "name": scan, "settings": {"shape": "saw"}})
+        s.params_({"sources/%s/rate" % scan: 0.16})
+        s.route(R(LEVEL, "sources/%s/rate" % scan, 0.45, attackMs=500, decayMs=2000))
+        s.sources.append(sig(P + "Split", [{"source": ONSET, "chain": {
+            "threshold": "binary", "thresholdLevel": 0.9, "envelope": "peakhold", "envelopeHoldMs": 30.0,
+            "envelopeFallPerSecond": 7.0, "envelopeRearm": 0.5, "envelopeRefractoryMs": 120.0}}]))
+        for prog in progs:
+            s.route(R(LEVEL, opath(prog, "scanWide", "remap"), -0.75, comp=2, attackMs=150, decayMs=1200))
+            for c in range(3):
+                s.route(R("lfo." + scan, opath(prog, "scanC", "constant"), SCAN_TOP, comp=c),
+                        R(LEVEL, opath(prog, "scanCol", "constant"), 2.4 * colour[c], comp=c, depth=K("chroma"),
+                          attackMs=150, decayMs=900),
+                        R(OPEN, opath(prog, "scanCol", "constant"), 1.6 * colour[c], comp=c, depth=K("chroma"),
+                          attackMs=0, decayMs=400),
+                        R(LEVEL, opath(prog, "veinCol", "constant"), 1.3 * colour[c], comp=c, depth=K("chroma"),
+                          attackMs=900, decayMs=2500))
+        for copy_, sgn in (("A", 1.0), ("B", -1.0)):
+            node = "%s-ghost%sh" % (P, copy_)
+            for c in range(3):
+                s.route(R(LIVE, "nodes/%s/scale" % node, 1.005, comp=c, attackMs=0, decayMs=500))
+            s.route(R(LIVE, "material/%s-ghost%s/op/4/constant/constant" % (P, copy_), 0.55, comp=0,
+                      depth=K("copies"), attackMs=20, decayMs=400),
+                    R("signal.%sSplit" % P, "nodes/%s/position" % node, 0.018 * sgn, comp=0, depth=K("copies")),
+                    R("signal.%sSplit" % P, "nodes/%s/position" % node, 0.007, comp=1, depth=K("copies")),
+                    R("signal.%sSplit" % P, "nodes/%s/rotation" % node, 4.0 * sgn, comp=1, depth=K("copies")),
+                    R(LEVEL, "nodes/%s/position" % node, 0.005 * sgn, comp=0, depth=K("copies"), attackMs=800,
+                      decayMs=1500))
+    elif prof == "grain":
+        # GRAIN (a vocal, another source, the hero on a mix): the surface dissolves in drifting patches as the level
+        # rises, and the head sheds grains that drift up and away, in bursts on its onsets
+        s.sources.append(sig(P + "Burst", [{"source": ONSET, "chain": {
+            "threshold": "binary", "thresholdLevel": 1.0, "envelope": "peakhold", "envelopeHoldMs": 60.0,
+            "envelopeFallPerSecond": 4.0, "envelopeRearm": 0.5, "envelopeRefractoryMs": 150.0}}]))
+        for prog in progs:
+            for c in (0, 1):
+                s.route(R(LEVEL, opath(prog, "grHole", "smoothstep"), -0.62, comp=c, depth=K("copies"),
+                          attackMs=300, decayMs=1400),
+                        R("signal.%sBurst" % P, opath(prog, "grHole", "smoothstep"), -0.12, comp=c,
+                          depth=K("copies"), attackMs=0, decayMs=500))
+        s.route(R(LEVEL, "particles/%s-grain/spawnRate" % P, 70.0, depth=K("copies"), attackMs=200, decayMs=800),
+                R("signal.%sBurst" % P, "particles/%s-grain/spawnRate" % P, 600.0, depth=K("copies")))
+    # every profile: its own wash over the mouth and eyes while it speaks, and a glow on each opening (all pieces)
+    for prog in progs:
+        s.route(R(LIVE, opath(prog, "washAmount", "remap"), 0.45, comp=3, depth=K("chroma"), attackMs=0, decayMs=0),
+                R(OPEN, opath(prog, "washAmount", "remap"), 0.3, comp=3, depth=K("chroma"), attackMs=0,
+                  decayMs=300),
+                R(LEVEL, opath(prog, "washSpread", "remap"), -0.12, comp=2, attackMs=600, decayMs=2500),
+                R("control.palette", opath(prog, "washSpread", "remap"), -0.6, comp=2))
     for part in ("H", "N", "B"):
-        s.route(R(OPEN, "fx/%s-glow%s/glow" % (P, part), 0.5 * E["wash"], depth=K("chroma"), attackMs=0,
-                  decayMs=200))
+        s.route(R(OPEN, "fx/%s-glow%s/glow" % (P, part), 0.22, depth=K("chroma"), attackMs=0, decayMs=200))
     # ---- global gain (CC 7, bipolar about its rest): once, on the first head
-    if spec is HEADS[0] or P == "th1":
+    if P == "th1":
         s.route(R("control.gain", "camera/exposure/compensation", 1.5, polarity="bipolar"),
                 R("control.gain", "post/bloom/intensity", 0.2, polarity="bipolar"))
     for r in s.routes:

@@ -2,8 +2,8 @@
 """Talking Heads: every head's effects are its own source's (the owner, stop 4: "the secondary effects on the
 entities should all be unique to the sound source").
 
-Runs the engine's sonic trace (no GPU) on Feline Footwear's stems, then again with ONE stem replaced by silence of the
-same length, and compares every column a head owns: its signals (`signal.<p>...`, `visual.<p>...`) and every route
+Runs the engine's sonic trace (no GPU) with all four slots assigned (Feline Footwear's three stems and its mix as the
+`other` source), then again with ONE source replaced by silence of the same length, and compares every column a head owns: its signals (`signal.<p>...`, `visual.<p>...`) and every route
 target's final value under its prefix (`nodes/<p>-`, `fx/<p>-`, `material/<p>-`, `lights/<p>-`, `procedural/<p>-`, `particles/<p>-`).
 The muted stem's head must change, and every other head must be bit-identical on every frame. Exits non-zero
 otherwise.
@@ -28,7 +28,8 @@ AVGEN = os.environ.get("AVGEN") or os.path.join(REPO, "build", "release", "src",
 
 
 def trace(project, work, tag, mute=None):
-    proj = rv.variant(project, "feline", True, work)
+    # all four slots assigned: the three stems and the mix as the `other` source (the fourth slot)
+    proj = rv.variant(project, "feline", True, work, sources="drums,bass,synth,other")
     import json
     doc = json.load(open(proj))
     if mute:
@@ -63,7 +64,8 @@ def main():
     a = ap.parse_args()
     work = tempfile.mkdtemp(prefix="th-iso-")
     base = trace(a.project, work, "base")
-    roles = {h["role"]: h["prefix"] for h in th.HEADS}
+    # each slot by the role its source has here (the fourth slot's source is `other`)
+    roles = {("other" if "other" in h["roles"] else h["roles"][0]): h["prefix"] for h in th.HEADS}
     fails = 0
     for mute in (list(roles) if a.mute == "all" else [a.mute]):
         rows = trace(a.project, work, "mute-" + mute, mute)

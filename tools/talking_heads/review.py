@@ -32,6 +32,8 @@ AUDIO = os.path.join(REPO, "assets", "audio")
 WAVS = {"feline": "feline-footwear.wav", "trench": "trench.wav", "night": "night-shift.wav",
         "hyperborea": "hyperborea.wav"}
 FELINE_STEMS = [("drums", "Drums", "drums"), ("bass", "Bass", "bass"), ("synth", "Synth", "synth")]
+# fx1: a fourth source for the four-bust layout -- Feline has three stems, so the full mix stands in, role `other`
+FELINE_OTHER = ("other", "Mix", "other")
 
 
 def wav_path(name):
@@ -43,7 +45,7 @@ CLOSE = ([-0.34, 0.37, 0.80], [0.0, 0.30, 0.22])   # three-quarter from the righ
 
 
 def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_mouth="", no_atmos=False,
-            no_heads=False, no_bg=False, drop=""):
+            no_heads=False, no_bg=False, drop="", sources="", no_beams=False, spans=""):
     out = os.path.join(work, "variant.json")
     make_variant(project, wav_path(wav), None, out)
     with open(out) as f:
@@ -138,10 +140,38 @@ def variant(project, wav, stems, work, only=None, close=None, shut=False, slow_m
             json.dump(sc, f)
         doc["assets"]["scene"] = {"kind": "composition", "path": csp}
         doc["timeline"]["tracks"] = [t for t in doc["timeline"]["tracks"] if not t["target"].startswith("camera/")]
-    if stems:
-        doc["assets"]["stems"] = [{"key": k, "label": lbl, "role": role,
-                                   "file": os.path.join(AUDIO, "stems", "feline-footwear (%s).wav" % lbl)}
-                                  for k, lbl, role in FELINE_STEMS]
+    if no_beams:
+        # the rays knob at rest 0: the mouth rays dark (the brief's test of the secondary effects alone)
+        for ch in doc.get("control", {}).get("channels", []):
+            if ch["name"] == "beams":
+                ch["rest"] = 0.0
+    if stems or sources:
+        # `sources`: which to assign (comma-separated keys among drums, bass, synth, other); default the three stems
+        keep = sources.split(",") if sources else ["drums", "bass", "synth"]
+        entries = []
+        for k, lbl, role in FELINE_STEMS + [FELINE_OTHER]:
+            if k not in keep:
+                continue
+            f = (os.path.join(AUDIO, WAVS["feline"]) if k == "other"
+                 else os.path.join(AUDIO, "stems", "feline-footwear (%s).wav" % lbl))
+            entries.append({"key": k, "label": lbl, "role": role, "file": f})
+        # `spans`: key:start:end (seconds; either may be empty) -- the source is assigned only over that span (its file
+        # cut to it and placed at its start, offsetSeconds): a source arriving and leaving mid-song, as a live input
+        # added and removed would, to prove the busts follow (fx1, 14-brief-secondary-fx.md section 6)
+        for span in [x for x in spans.split(",") if x]:
+            k, t0, t1 = (span.split(":") + ["", ""])[:3]
+            for e in entries:
+                if e["key"] != k:
+                    continue
+                t0 = float(t0 or 0.0)
+                cut = os.path.join(work, "span-%s.wav" % k)
+                cmd = ["ffmpeg", "-v", "error", "-y", "-ss", str(t0), "-i", e["file"]]
+                if t1:
+                    cmd += ["-t", str(float(t1) - t0)]
+                subprocess.run(cmd + [cut], check=True)
+                e["file"] = cut
+                e["offset"] = t0   # the project key for StemSource::offsetSeconds
+        doc["assets"]["stems"] = entries
     with open(out, "w") as f:
         json.dump(doc, f, indent=1)
     return out
@@ -176,6 +206,9 @@ def main():
     ap.add_argument("--cam", default="", help="a static camera: px,py,pz,tx,ty,tz (implies --close)")
     ap.add_argument("--only", default="", help="comma-separated features to keep (mouth, eyes, vibration, tear, "
                                                 "chroma); the others' knobs rest at 0")
+    ap.add_argument("--sources", default="", help="assign these stems (drums,bass,synth,other=the mix): 1-4 busts")
+    ap.add_argument("--spans", default="", help="key:start:end,... each source assigned only over its span")
+    ap.add_argument("--no-beams", action="store_true", help="the mouth rays dark (the rays knob at 0)")
     ap.add_argument("--drop", default="", help="comma-separated name parts: drop those nodes (e.g. ghost)")
     ap.add_argument("--no-heads", action="store_true", help="the background alone (the brief's test)")
     ap.add_argument("--no-bg", action="store_true", help="without the stop-5 background (for its cost)")
@@ -195,7 +228,7 @@ def main():
         if a.mode in ("still", "silent"):
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.mode == "silent"
                     else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos,
-                            a.no_heads, a.no_bg, a.drop))
+                            a.no_heads, a.no_bg, a.drop, a.sources, a.no_beams, a.spans))
             d = os.path.join(work, "frames")
             # a still lands on the instant after 2 s of the music before it, so the envelopes are warm
             run(["--headless", "--project", proj, "--render", d, "--format", "png", "--range",
@@ -206,13 +239,13 @@ def main():
         elif a.mode == "clip":
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
                     else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos,
-                            a.no_heads, a.no_bg, a.drop))
+                            a.no_heads, a.no_bg, a.drop, a.sources, a.no_beams, a.spans))
             run(["--headless", "--project", proj, "--render", a.out, "--range", a.range, "--size", a.size, "--fps",
                  a.fps, "--codec", "h264", "--quality", "85", "--particle-warmup", "240", "--tier", a.tier])
         else:
             proj = (make_silent(a.project, os.path.join(work, "silent.json")) if a.wav == "none"
                     else variant(a.project, a.wav, a.stems, work, a.only, cam(a), a.shut, a.slow_mouth, a.no_atmos,
-                            a.no_heads, a.no_bg, a.drop))
+                            a.no_heads, a.no_bg, a.drop, a.sources, a.no_beams, a.spans))
             run(["--headless", "--project", proj, "--range", a.range, "--frames", a.frames, "--bench-json", a.out,
                  "--size", a.size, "--tier", a.tier])
         print(a.out)
