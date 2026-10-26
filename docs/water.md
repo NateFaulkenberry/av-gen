@@ -414,3 +414,8 @@ sky, and the correct fix is a second prefiltered cube with a per-phase re-bake b
 measurement above re-runs as
 `tools/gpu-lock.sh ./build/release/tests/avgen_render_tests "[water][sky][.probe]"`; it is a
 before-table for whoever fixes it and deliberately asserts nothing about the gap.
+
+The [sky mirror](#sky-mirror-adr-1650) works around it on a cinematic surface: where a reflected ray
+points up and its vanishing point is on screen, the water shows the sky the frame drew, so a sunset
+sky gives a sunset reflection there. Everywhere else, and on every surface without `skyMirror`, the
+reflection is still the cube's.
