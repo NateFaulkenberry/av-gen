@@ -1160,10 +1160,10 @@
        1.0
       ],
       "phase": -0.0096,
-      "falloff": 0.1,
+      "falloff": 0.14,
       "frequency": 0.02019,
       "speed": 0.08098,
-      "scale": 0.013,
+      "scale": 0.053,
       "tension": 2.0
      },
      {
@@ -2212,10 +2212,10 @@
        1.0
       ],
       "phase": -0.0096,
-      "falloff": 0.1,
+      "falloff": 0.14,
       "frequency": 0.02019,
       "speed": 0.08098,
-      "scale": 0.013,
+      "scale": 0.053,
       "tension": 2.0
      },
      {
@@ -3164,10 +3164,10 @@
        1.0
       ],
       "phase": -0.0096,
-      "falloff": 0.1,
+      "falloff": 0.14,
       "frequency": 0.02019,
       "speed": 0.08098,
-      "scale": 0.013,
+      "scale": 0.053,
       "tension": 2.0
      }
     ],
@@ -3884,10 +3884,10 @@
        1.0
       ],
       "phase": -0.0096,
-      "falloff": 0.1,
+      "falloff": 0.14,
       "frequency": 0.02019,
       "speed": 0.08098,
-      "scale": 0.013,
+      "scale": 0.053,
       "tension": 2.0
      }
     ],

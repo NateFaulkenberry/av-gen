@@ -22,8 +22,9 @@ open, the neck bent back 32 degrees and the camera below the chin, looking up at
   step at the boundary that its surroundings do not have.
 - The chin (jaw views only; the regression check for fx1's "visible seams under the chins", which was a crease inside
   the head piece where the mouth's hinge mask ended): the colour along the under-chin, from a quarter of the way back from the chin's tip to
-  the neck seam (40 samples, 5x5 px each), and its largest step between neighbouring samples. The baseline is the same view with
-  the mouth CLOSED ("closed"); the open mouth, alone and under every effect, must not add a step larger than --tol.
+  the neck seam (40 samples, 5x5 px each), and its largest step between neighbouring samples. The baseline is the same view and
+  the same effect with the mouth CLOSED ("closed-<effect>": an effect's own pattern is a step by design); the open
+  mouth must not add a step larger than --tol.
 Passes when each excess is under --tol (0..255 per channel). Writes each close-up and exits non-zero on a failure.
 Every render goes through tools/gpu-lock.sh.
 
@@ -168,15 +169,15 @@ def main():
             vyaw, tilt, opening, below = VIEWS[view]
             jaw = view.startswith("jaw")
             closed_step = None
-            for effect in (["closed"] if jaw else []) + a.effects.split(","):
-                pp, ss = ps.posed(project, scene, P, tilt, 0.0 if effect == "closed" else opening, 0.0,
-                                  rays_on=False)
+            # on a jaw view each effect is rendered twice, mouth closed then open: an effect's own pattern is a step
+            # along the chin path by design, so the open mouth is scored against the same effect closed
+            runs = []
+            for e in a.effects.split(","):
+                runs += [("closed-" + e, e, 0.0), (e, e, opening)] if jaw else [(e, e, opening)]
+            for effect, effect_, open_ in runs:
+                pp, ss = ps.posed(project, scene, P, tilt, open_, 0.0, rays_on=False)
                 ss["nodes"] = [n for n in ss["nodes"] if not n["name"].startswith(others)]
                 pp["effects"] = [e for e in pp["effects"] if not e["id"].startswith(others)]
-                if effect == "closed":
-                    effect_ = "rest"
-                else:
-                    effect_ = effect
                 pp["routes"] = [r for r in pp["routes"] if not r["target"].startswith(
                     ("material/%s-" % P, "fx/%s-" % P, "lights/%s-" % P, "particles/%s-" % P))]
                 if not apply_effect(pp, ss, P, effect_):
@@ -204,7 +205,7 @@ def main():
                 near = step_metric(img, x0, x1, range(vy - 10, vy + 11))
                 around = step_metric(img, x0, x1, list(range(vy - 30, vy - 12)) + list(range(vy + 12, vy + 30)))
                 seam_step, around_step = max(near), max(around)
-                scored = effect not in UNSCORED
+                scored = effect_ not in UNSCORED
                 ok = seam_step - around_step < a.tol or not scored
                 chin_txt = ""
                 if jaw:
@@ -216,7 +217,7 @@ def main():
                                         [tip[k] + (front[k] - tip[k]) * (0.25 + 0.75 * i / 39.0) for k in range(3)])
                            for i in range(40)]
                     chin_step = path_metric(img, pts)
-                    if effect == "closed":
+                    if effect.startswith("closed-"):
                         closed_step = chin_step
                         chin_txt = ", chin path %5.1f (the baseline)" % chin_step
                     else:
