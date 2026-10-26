@@ -57,7 +57,7 @@ def apply_effect(p, s, P, effect):
     elif effect == "scan":
         if "scanC" not in ops:
             return False
-        c = th.SCAN_TOP - 0.22          # the band at neck height, across the seam
+        c = 0.245                       # the band at the head/neck seam's height (world metres, the 3-bust layout)
         setop("scanC", "constant", [-c, -c, -c, 0.0])
         setop("scanCol", "constant", [2.0, 1.2, 0.5, 0.0])
         setop("scanWide", "constant", [0.0, (th.SCAN_HALF * 5) ** 2, 0.25, 1.0])
@@ -75,7 +75,7 @@ def apply_effect(p, s, P, effect):
     found = effect not in ("tear", "ghosts")
     for n in s["nodes"]:
         if effect == "tear" and n["name"] in (P + "-bust", P + "-neck", P + "-head"):
-            for d in n["procedural"]["deformers"]:
+            for d in n["procedural"].get("deformers", []):
                 if d["kind"] == "sine":   # the fragment's shear or the liquid's wave, whichever the profile has
                     d["amount"] = 0.006 if d["frequency"] > 100 else 0.03
                     d["phase"] = 1.3
