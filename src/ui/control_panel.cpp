@@ -1713,6 +1713,15 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             routeLivenessCheckedAt_ = now;
         }
     }
+    // The depth combo's entries, built once per draw and shared by every route (the bus's names, sorted). Rebuilding
+    // and sorting them for each route cost Talking Heads' ~1,200 routes x ~200 signals some 30 ms of UI a frame and
+    // took its live run off its deadline; a route whose depth source the bus does not carry builds its own list.
+    const std::vector<std::string> sharedDepthChoices = depthSourceChoices(bus);
+    std::vector<const char*> sharedDepthLabels;
+    sharedDepthLabels.reserve(sharedDepthChoices.size());
+    for (const std::string& c : sharedDepthChoices) {
+        sharedDepthLabels.push_back(c.c_str());
+    }
     for (std::size_t i = 0; i < routes.size(); ++i) {
         auto& route = routes[i];
         ImGui::PushID(static_cast<int>(i));
@@ -1831,12 +1840,20 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             }
             ImGui::SameLine();
             {
-                const std::vector<std::string> choices = depthSourceChoices(bus, route.depthSource);
-                std::vector<const char*> labels;
-                labels.reserve(choices.size());
-                for (const std::string& c : choices) {
-                    labels.push_back(c.c_str());
+                const bool onBus = route.depthSource.empty() ||
+                                   std::binary_search(sharedDepthChoices.begin() + 1, sharedDepthChoices.end(),
+                                                      route.depthSource);
+                std::vector<std::string> ownChoices;
+                std::vector<const char*> ownLabels;
+                if (!onBus) {
+                    ownChoices = depthSourceChoices(bus, route.depthSource);
+                    ownLabels.reserve(ownChoices.size());
+                    for (const std::string& c : ownChoices) {
+                        ownLabels.push_back(c.c_str());
+                    }
                 }
+                const std::vector<std::string>& choices = onBus ? sharedDepthChoices : ownChoices;
+                const std::vector<const char*>& labels = onBus ? sharedDepthLabels : ownLabels;
                 int depth = depthSourceIndex(choices, route.depthSource);
                 ImGui::SetNextItemWidth(170);
                 if (ImGui::Combo("depth", &depth, labels.data(), static_cast<int>(labels.size()))) {
