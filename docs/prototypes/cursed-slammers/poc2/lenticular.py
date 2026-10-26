@@ -50,6 +50,16 @@ ap.add_argument("--ghost", type=float, default=0.06)
 ap.add_argument("--lens", type=int, default=1)
 ap.add_argument("--gloss", type=float, default=0.22)
 ap.add_argument("--print-only", action="store_true")
+ap.add_argument("--light", default="-0.9,0.7,1.6", help="the glint light, print widths (x, y up, distance)")
+ap.add_argument("--window", default="0.28,0.30", help="the glint window's half-widths (x, y), print widths")
+ap.add_argument("--glint-width", type=float, default=0.07, help="the glint's angular width inside a lens, radians")
+ap.add_argument("--curtain", type=float, default=1.0,
+                help="1 = interlaced for a viewer at infinity (the view changes sweep across the print at distance D);"
+                     " < 1 = interlacing corrected toward the design distance D (a printer's pitch correction), so"
+                     " the whole print shows nearly one view and only a residual curtain drifts")
+ap.add_argument("--sweep", type=float, default=0.0, help="viewer sweep half-amplitude, print widths (0 = D tan zone)")
+ap.add_argument("--anaglyph", type=float, default=0.0,
+                help="DIAGNOSTIC: > 0 renders each eye at X -+ sep/2 (print widths) and writes a red/cyan anaglyph")
 a = ap.parse_args()
 os.makedirs(a.out, exist_ok=True)
 name = a.name or a.prefix + ("-lens" if a.lens else "-nolens")
@@ -104,16 +114,18 @@ aspect = W / H
 xj = ((np.arange(L) + 0.5) / L - 0.5)                                 # lens centres, print widths (x), -0.5..0.5
 tz = math.tan(math.radians(a.zone))
 D = a.viewer_dist
-Xmax = D * tz                                                          # the centre lens sees all N views over the sweep
-u = (np.arange(P) + 0.5) / P                                           # position inside a lens, 0..1
+Xmax = a.sweep if a.sweep > 0 else D * tz                             # default: the centre lens sees all N views
+SS = 16                                                                # sub-samples per pixel column (a glint is narrower than a pixel)
+u = (np.arange(P * SS) + 0.5) / (P * SS)                               # position inside a lens, 0..1
 kcurv = 0.85                                                           # cap: normal angle asin((u - .5) 2 k)
-lens_phi = np.arcsin((u - 0.5) * 2 * kcurv)                            # P
+lens_phi = np.arcsin((u - 0.5) * 2 * kcurv)                            # P * SS
 yrow = (np.arange(H) + 0.5) / H - 0.5                                  # print heights (y up = negative row)
-light = np.array([-0.9, 0.7, 1.6])                                     # upper left, in front (print widths)
+light = np.array([float(c) for c in a.light.split(",")])               # print widths
+WX, WY = (float(c) for c in a.window.split(","))
 
 
 def frame(X):
-    theta = np.arctan((X - xj) / D)                                    # L
+    theta = np.arctan((X - a.curtain * xj) / D)                        # L
     s = N * (0.5 + np.tan(theta) / (2 * tz)) - 0.5
     s = np.mod(s, N)                                                   # repeating zones
     f0 = np.floor(s).astype(int) % N
@@ -140,12 +152,13 @@ def frame(X):
         hv = lv + ev
         hv /= np.linalg.norm(hv, axis=1, keepdims=True)
         phi_h = np.arctan2(hv[:, 0], hv[:, 2])                         # L
-        glint = np.exp(-((lens_phi[None, :] - phi_h[:, None]) / 0.07) ** 2)   # L x P
+        glint = np.exp(-((lens_phi[None, :] - phi_h[:, None]) / a.glint_width) ** 2)   # L x P*SS
+        glint = glint.reshape(L, P, SS).mean(axis=2)                   # each pixel column's coverage
         # the window: the light's mirror image on the sheet (where the eye sees the light reflected), soft and broad
         xm = X + (light[0] - X) * D / (D + light[2])
         ym = (light[1] * D / (D + light[2]))
-        win_x = np.exp(-((xj - xm) / 0.28) ** 2)                       # L
-        win_y = np.exp(-((-yrow * (1 / aspect) - ym / aspect) / 0.30) ** 2)   # H
+        win_x = np.exp(-((xj - xm) / WX) ** 2)                       # L
+        win_y = np.exp(-((-yrow / aspect - ym) / WY) ** 2)                # H
         hl = (glint * win_x[:, None]).reshape(Wp)                      # Wp
         img = img + a.gloss * win_y[:, None, None] * hl[None, :, None] * np.array([0.9, 0.92, 1.0])
     return img
@@ -160,6 +173,13 @@ t0 = time.time()
 for fi in range(n):
     t = fi / a.fps
     X = -Xmax * math.cos(2 * math.pi * t / a.period)                  # the same sweep as harness.py --mode sweep
+    if a.anaglyph > 0:
+        # each eye sees its own strip of the print: red = left eye, green and blue = right eye (luminance each)
+        lw = np.array([0.2126, 0.7152, 0.0722])
+        le = (frame(X - a.anaglyph / 2) @ lw)[..., None]
+        re = (frame(X + a.anaglyph / 2) @ lw)[..., None]
+        ff.stdin.write(to_srgb8(np.concatenate([le, re, re], axis=2)).tobytes())
+        continue
     ff.stdin.write(to_srgb8(frame(X)).tobytes())
     if fi == int(a.period * a.fps / 4):
         Image.fromarray(to_srgb8(frame(X))).save(os.path.join(a.out, name + "-centre.png"))
