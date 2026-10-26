@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Talking Heads: build a look-development variant of the scene into a directory (not the repository's examples).
 
-    python3 tools/talking_heads/build_variant.py --out DIR [--neutral]
+    python3 tools/talking_heads/build_variant.py --out DIR [--neutral] [--porcelain]
 
 `--neutral`: every slot's palette grey (fx1, 14-brief-secondary-fx.md section 10: a source must be recognisable from
 its secondary effects alone; pair it with review.py --no-beams). The directory gets a `meshes` link to the repository's.
@@ -21,9 +21,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--neutral", action="store_true")
+    ap.add_argument("--porcelain", action="store_true", help="fx2's porcelain bust instead of foil1's foil")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
-    sc = th.build(neutral=a.neutral)
+    sc = th.build(neutral=a.neutral, foil=not a.porcelain)
     pp, _ = sc.write(a.out)
     link = os.path.join(a.out, "meshes")
     if not os.path.exists(link):

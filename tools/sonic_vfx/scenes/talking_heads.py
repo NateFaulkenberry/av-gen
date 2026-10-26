@@ -243,6 +243,159 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], pro
     o.add("washGlowAmt", "multiply", 4, srcA=5, srcB=6)
     o.add("washGlow", "constant", 6, constant=[0.35, 0.35, 0.35, 0.0])
     o.add("washGlowMul", "multiply", 4, srcA=4, srcB=6)
+    profile_tail(o, profile, wash)
+    assert len(o.ops) <= 48, (name, len(o.ops))
+    PROGRAM_OPS[name] = o
+    return {"name": name, "ops": o.ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
+            "emissionIntensity": 1.0, "opacity": -1}
+
+
+# ================================================================================================ the foil (foil1)
+# Cursed Slammers POC 4's variant D, the "hybrid security foil" (scene/cursed-slammers, poc4/variants.py; on this bust
+# in POC 5), rebuilt for the bust as one program per piece. Its look:
+# - engraved relief lines that follow the form (phase from height plus depth), grooves widening away from the key light;
+# - a silver base;
+# - spectral colour only inside narrow bands whose index runs with the view (fresnel) and the depth, plus a fine
+#   grating phase;
+# - sparse angle-gated micro-sparkle.
+# The music moves the bands (here, not in POC 4).
+#
+# Fitting it on one head with an fx2 profile's tail (up to 20 ops) inside the 64-op ceiling (ADR-1661):
+# - `objectProject` does POC 5's rescale and the piece's offset in one op;
+# - an unsaturated `gradient` gives each phase in one op, scaled down and recovered by the palette's frequency;
+# - the colour index is carried as t/8 + 0.5;
+# - D's diagonal crosshatch in shadow is left out (12 ops).
+#
+# SEAMLESS: localPosition is the rest mesh's (procedural.wgsl, before the deformers). Each piece adds its rest offset
+# in the bust's frame (body 0, neck NECK_FOOT, head HEAD_REST, a lid HEAD_REST + its eyeball), so the pieces form one
+# continuous engraving at every joint. It stays glued to the material as the neck bends, the head turns, the jaw drops
+# and fx2's blocks displace the surface.
+#
+# The SPARKLE flicker (POC 4's D shimmered at grazing angles, and its glints read as white dashes), fixed three ways:
+# - WHICH cell flares no longer depends on the view. POC 4's flare phase was 7 x hash + 6 x fresnel, and the fresnel
+#   varies across every cell on a curved surface, so nearly every cell held a thin stripe where it crossed its peak:
+#   a dash, swimming as anything moved. Now the phase is hash + a twinkle phase the MUSIC advances (integrated level
+#   and onsets), so a whole cell flashes for a moment as the phase passes it, and nothing moves with the view;
+# - the angle only weights the flare's brightness, capped: clamp(fresnel, 0, FOIL_SPARK_CAP), then scaled;
+# - the cells are 1.5 times bigger, and a cell fades out as it drops below about four pixels (the `footprint`
+#   input). That is where cells crowd together at the silhouette, so near the silhouette the sparkle comes only
+#   from cells still big enough on screen.
+# Registers: r0 position then the groove mask (kept through the tail), r4 emission, r7 base colour; r1-r3, r5 and r6
+# are scratch.
+FOIL_UNIT = 0.45          # POC 5's bust rescale: about 100 engraved lines up the bust
+FOIL_LINES_M = (95.0, 65.0)         # line phase per METRE of height and of depth: about 55 lines up the bust, 9 px
+                                    # apart in the three-bust layout (POC 5's 100 per unit was ~120, under the
+                                    # anti-aliasing fade's 6 px in the full scene: the lines vanished)
+FOIL_METAL = 0.7                    # the ridges' metallic: all metal reflected only the dark violet room
+FOIL_PHASE_DIV = 400.0              # the phase is carried /400 (+0.1) so the gradient never saturates
+FOIL_SPARK_CELLS = 100.0            # sparkle cells per unit (POC 4: 150, sub-pixel at the silhouette)
+FOIL_SPARK_CAP = 0.45               # the sparkle's angle weight stops growing here (POC 4: up to 1 at grazing)
+FOIL_SPARK_EDGE = 0.9997            # cos peak a cell must pass to flare: about 1 % of cells at a time (POC 4's
+                                    # 0.998 let ~3 % flare); routed down to ~2.7 % on hits
+FOIL_TWINKLE = (0.05, 0.4)          # the twinkle phase's advance: per second at full level, and per onset push
+FOIL_BAND = (0.68, 0.92)            # the band mask's smoothstep at rest (routed wider when the gate opens)
+FOIL_SILVER = (0.86, 0.86, 0.88)
+FOIL_INK = (0.008, 0.008, 0.008)
+FOIL_SPECTRUM = dict(constant=[0.62, 0.61, 0.66, 0], constant2=[0.30, 0.30, 0.32, 0],
+                     constant3=[8.0, 8.0, 8.0, 0], constant4=[0.0, 0.33, 0.67, 0])
+_KEY_TO = [0.55, -0.55, -0.62]
+_kn = math.sqrt(sum(c * c for c in _KEY_TO))
+FOIL_LDIR = [-c / _kn for c in _KEY_TO]   # toward the key light
+FOIL_SHADOW = 0.35
+
+
+def foil_program(name, offset, profile=None, wash=None):
+    """D's foil on one piece whose rest frame sits at `offset` in the bust's frame, with `profile`'s fx2 tail (None:
+    a lid, no tail)."""
+    u = 1.0 / FOIL_UNIT
+    lines_per_m = FOIL_LINES_M[0] + 0.5 * FOIL_LINES_M[1]
+    spark_per_m = FOIL_SPARK_CELLS * u
+    g = FOIL_SHADOW
+    o = Ops()
+    o.add("fPos", "objectProject", 0, value=u, constant=[offset[0] * u, offset[1] * u, offset[2] * u, 0.0])
+    o.add("fPhase", "gradient", 1, srcA=0, value=1.0,
+          constant=[0.0, FOIL_LINES_M[0] * FOIL_UNIT / FOIL_PHASE_DIV, FOIL_LINES_M[1] * FOIL_UNIT / FOIL_PHASE_DIV,
+                    0.1])
+    o.add("fN", "input", 3, input="normal")
+    o.add("fShade", "gradient", 3, srcA=3, value=1.0,
+          constant=[-g * FOIL_LDIR[0], -g * FOIL_LDIR[1], -g * FOIL_LDIR[2], g])
+    o.add("fLine", "palette", 2, srcA=1, value=0.0, constant=[0.5, 0.5, 0.5, 0], constant2=[0.5, 0.5, 0.5, 0],
+          constant3=[FOIL_PHASE_DIV] * 3 + [0], constant4=[0, 0, 0, 0])
+    o.add("fWiden", "add", 2, srcA=2, srcB=3)
+    o.add("fGroove", "smoothstep", 2, srcA=2, constant=[0.72, 0.9, 0.0, 0.0])
+    o.add("fFoot", "input", 5, input="footprint")
+    o.add("fAA", "gradient", 3, srcA=5, value=1.0, constant=[-3.0 * lines_per_m, 0.0, 0.0, 1.5])
+    o.add("fGrooveAA", "multiply", 2, srcA=2, srcB=3)                       # r2 = groove mask g
+    o.add("fSparkAA", "gradient", 5, srcA=5, value=1.0, constant=[-4.0 * spark_per_m, 0.0, 0.0, 2.0])
+    o.add("fFres", "fresnel", 3, value=1.0)
+    o.add("fCell", "quantize", 1, srcA=0, value=FOIL_SPARK_CELLS, constant=[0.0, 0.0, 0.0, 0.0], seed=11)
+    o.add("fCellR", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
+    o.add("fTwinkle", "constant", 6, constant=[0.0, 0.0, 0.0, 0.0])        # routed: the music's twinkle phase
+    o.add("fCellA", "add", 1, srcA=1, srcB=6)
+    o.add("fFlare", "palette", 1, srcA=1, value=0.0, constant=[0.5, 0.5, 0.5, 0], constant2=[0.5, 0.5, 0.5, 0],
+          constant3=[7.0, 7.0, 7.0, 0], constant4=[0, 0, 0, 0])
+    o.add("fSpark", "smoothstep", 1, srcA=1, constant=[FOIL_SPARK_EDGE, 1.0, 0.0, 0.0])   # routed down on hits
+    o.add("fCap", "remap", 6, srcA=3, value=1.0, constant=[0.0, FOIL_SPARK_CAP, 0.0, 1.6])  # capped angle weight
+    o.add("fSparkW", "multiply", 1, srcA=1, srcB=6)
+    o.add("fSparkE", "multiply", 4, srcA=1, srcB=5)                         # r4 = sparkle (emission starts here)
+    # the colour index u = t/8 + 0.5, t = 2.4 fresnel + 1.2 z' + a fine grating + the music's drift
+    o.add("fDepth", "gradient", 1, srcA=0, value=1.0, constant=[0.0, 0.0, 1.2 / 8.0, 0.5])
+    o.add("fView", "remap", 6, srcA=3, value=0.0, constant=[0.0, 1.0, 0.0, 2.4 / 8.0])
+    o.add("fIdx", "add", 1, srcA=1, srcB=6)
+    o.add("fGrate", "palette", 6, srcA=0, value=0.0, constant=[0, 0, 0, 0], constant2=[0.0075, 0.0075, 0.0075, 0],
+          constant3=[320.0, 320.0, 320.0, 0], constant4=[0, 0, 0, 0])
+    o.add("fIdxG", "add", 1, srcA=1, srcB=6)
+    o.add("fDrift", "constant", 6, constant=[0.0, 0.0, 0.0, 0.0])           # routed: the music's drift and sweeps
+    o.add("fIdxM", "add", 1, srcA=1, srcB=6)
+    o.add("fBandC", "palette", 6, srcA=1, value=0.0, constant=[0.5, 0.5, 0.5, 0], constant2=[0.5, 0.5, 0.5, 0],
+          constant3=[4.8, 4.8, 4.8, 0], constant4=[0, 0, 0, 0])
+    o.add("fBand", "smoothstep", 6, srcA=6, constant=[FOIL_BAND[0], FOIL_BAND[1], 0.0, 0.0])  # routed wider
+    o.add("fSpec", "palette", 5, srcA=1, value=0.0, **FOIL_SPECTRUM)
+    o.add("fSilver", "constant", 7, constant=list(FOIL_SILVER) + [1.0])
+    o.add("fFoilC", "mixBy", 7, srcA=7, srcB=5, srcC=6)
+    o.add("fBandCol", "multiply", 5, srcA=5, srcB=6)
+    o.add("fGlow", "constant", 6, constant=[FOIL_GLOW[0]] * 3 + [0.0])      # routed: the bands' light with the gate
+    o.add("fBandL", "multiply", 5, srcA=5, srcB=6)
+    o.add("fEmit", "add", 4, srcA=4, srcB=5)
+    o.add("fInk", "constant", 5, constant=list(FOIL_INK) + [1.0])
+    o.add("fInked", "mixBy", 7, srcA=7, srcB=5, srcC=2)
+    o.add("fKeep", "swizzle", 0, srcA=2, constant=[0.0, 0.0, 0.0, 0.0])    # r0 = g, kept through the tail
+    if profile is not None:
+        profile_tail(o, profile, wash)
+    o.add("fMetal", "remap", 1, srcA=0, value=1.0, constant=[0.0, 1.0, FOIL_METAL, 0.0])
+    o.add("fRough", "remap", 2, srcA=0, value=1.0, constant=[0.0, 1.0, 0.34, 0.85])
+    o.add("fRoughAA", "roughnessFilter", 2, srcA=2, value=1.0)
+    o.add("fOcc", "remap", 3, srcA=0, value=1.0, constant=[0.0, 1.0, 1.0, 0.08])
+    assert len(o.ops) <= 64, (name, len(o.ops))
+    PROGRAM_OPS[name] = o
+    return {"name": name, "ops": o.ops, "baseColor": 7, "metallic": 1, "roughness": 2, "emission": 4,
+            "emissionIntensity": 1.0, "opacity": -1, "occlusion": 3}
+
+
+def foil_pieces(P):
+    """The pieces drawn in foil and their programs: (program, offset in the bust frame, takes the profile's tail)."""
+    return [(P + "-body", [0.0, 0.0, 0.0], True), (P + "-neck", list(NECK_FOOT), True),
+            (P + "-head", list(HEAD_REST), True)]
+
+
+def bust_progs(P):
+    """The programs carrying the profile's tail and the per-head looks (wash or foil bands) on head P."""
+    return ([P + "-body", P + "-neck", P + "-head"] if FOIL else [P + "-body", P + "-head"])
+
+
+def lid_progs(P):
+    """One foil program for all four lids of a head: the line phase reads only height and depth, and the two eyes
+    differ only in x, so one offset (the left eyeball's) serves both (a 33rd program would not be uploaded)."""
+    return [P + "-lid"] if FOIL else []
+
+
+FOIL = True   # the bust's material: D's foil (foil1) or fx2's porcelain (build(foil=False))
+
+
+def profile_tail(o, profile, wash):
+    """The fx2 profile's own surface, appended to a bust program (porcelain or foil). Reads nothing the base left but
+    r4 (emission, added to) and r7 (base colour, mixed into); r1, r2, r3 and r6 are its scratch. r0 and r5 are left
+    alone (the foil keeps its groove mask in r0)."""
     if profile == "tracking":
         # TRACKING FAILURE's static: hashed horizontal bands (a routed threshold opens them on each hit) filled with
         # animated monochrome noise -- the signal dropping out in strips, not lines drawn over the head
@@ -312,10 +465,6 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], pro
         o.add("slLit", "multiply", 1, srcA=1, srcB=2)
         o.add("slIn", "multiply", 1, srcA=1, srcB=6)         # only round the patches (never stripes over the whole bust)
         o.add("slAdd", "add", 4, srcA=4, srcB=1)
-    assert len(o.ops) <= 48, (name, len(o.ops))
-    PROGRAM_OPS[name] = o
-    return {"name": name, "ops": o.ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
-            "emissionIntensity": 1.0, "opacity": -1}
 
 
 CODEC_CELLS = 14.0  # the codec's macroblocks per metre (about 7 cm squares)
@@ -374,9 +523,11 @@ def neck_offset(deg):
 
 
 # ================================================================================================ the scene
-def build(heads=None, neutral=False):
+def build(heads=None, neutral=False, foil=True):
     """`heads`: the slots (default HEADS, all four). `neutral`: every slot's palette grey -- the brief's test that a
     source is recognisable from its secondary effects alone (with the rays knob at 0)."""
+    global FOIL
+    FOIL = foil   # the bust's material for this build (module state: head() and routes() read it)
     heads = [dict(h) for h in (heads or HEADS)]
     for h in heads:
         if h.get("profile") not in PROFILES:
@@ -503,14 +654,19 @@ def head(s, spec, slot):
                     "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": P + "-bust"})
     pieces = [  # node, mesh, program (its masks in its own frame), parent, position, rotation, deformers
         (P + "-bust", "th-body", P + "-body", None, [bx, 0.0, bz], [0.0, bh, 0.0], surface),
-        (P + "-neck", "th-neck", P + "-body", P + "-bust", NECK_FOOT, [0.0, 0.0, 0.0],
+        (P + "-neck", "th-neck", P + "-neck" if FOIL else P + "-body", P + "-bust", NECK_FOOT, [0.0, 0.0, 0.0],
          [twist, bend_back, bend_fwd] + surface),
         (P + "-head", "th-head", P + "-head", P + "-pivot", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [hinge] + surface),
     ]
     accent = pal["glow"]
-    s.program(bust_program(P + "-body", wash=pal["wash"], profile=prof, accent=accent))
-    s.program(bust_program(P + "-head", mouth=MOUTH, eye_l=EYE_L, eye_r=EYE_R, wash=pal["wash"], profile=prof,
-                           accent=accent))
+    if FOIL:
+        for prog, off, _ in foil_pieces(P):
+            s.program(foil_program(prog, off, prof, pal["wash"]))
+        s.program(foil_program(P + "-lid", [HEAD_REST[k] + EYEBALL_L[k] for k in range(3)]))
+    else:
+        s.program(bust_program(P + "-body", wash=pal["wash"], profile=prof, accent=accent))
+        s.program(bust_program(P + "-head", mouth=MOUTH, eye_l=EYE_L, eye_r=EYE_R, wash=pal["wash"], profile=prof,
+                               accent=accent))
     for node, mesh, prog, parent, pos, rot, deformers in pieces:
         s.proc(node, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh},
                material={"baseColor": list(IVORY), "roughness": 0.36, "metallic": 0.0, "program": prog},
@@ -530,7 +686,10 @@ def head(s, spec, slot):
         s.nodes.append({"name": "%s-eye%s" % (P, side), "kind": "group", "position": [float(v) for v in at],
                         "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": P + "-head"})
     for name, mesh, parent, pos, mat in face_pieces(P):
-        s.proc(name, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh}, material=dict(mat),
+        mat = dict(mat)
+        if FOIL and "-lid" in name:
+            mat["program"] = P + "-lid"
+        s.proc(name, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh}, material=mat,
                deformers=[dict(d) for d in surface], position=pos, rotation=[0.0, 0.0, 0.0], scale=[1.0, 1.0, 1.0],
                parent=parent, extra={"castsShadow": False})
     # the copies: images of the head that the profile pulls out of register (gltf, alpha-blended). They are whole
@@ -1028,6 +1187,36 @@ def scan_and_eyes(s, spec):
                 R("noise.%sDrift" % P, rot, 1.0, comp=0, polarity="bipolar"))
 
 
+FOIL_DRIFT = 0.012      # the bands' drift, in u (t/8) per second at full level: about a band every 17 s
+FOIL_SWEEP = 0.8        # an onset's push, integrated over its ~125 ms envelope: about half a band per hit
+FOIL_GLOW = (0.12, 0.9) # the bands' own light: at rest, and added while the gate is open
+
+
+def foil_routes(s, spec, progs, opath, LIVE, OPEN, LEVEL, ONSET, K):
+    """The music on the foil, head by head, from this head's own source only (the same signals as its gate):
+    - the bands DRIFT with the level (integrated: they keep the place they reached when the source stops);
+    - an onset SWEEPS them on (an event envelope, integrated: a push, never a jump);
+    - the gate WIDENS the bands and makes them shine while it is open (smoothed both ways: no flicker);
+    - a hit lifts the sparkle a little (more cells pass the flare threshold, for ~300 ms)."""
+    P = spec["prefix"]
+    sweep = "signal.%sSweep" % P
+    s.sources.append(sig(P + "Sweep", [{"source": ONSET, "chain": {
+        "threshold": "binary", "thresholdLevel": 0.7, "envelope": "peakhold", "envelopeHoldMs": 0.0,
+        "envelopeFallPerSecond": 4.0, "envelopeRearm": 0.5, "envelopeRefractoryMs": 120.0}}]))
+    for prog in progs:
+        s.route(R(LEVEL, opath(prog, "fDrift", "constant"), FOIL_DRIFT, comp=0, integrate=True, attackMs=400,
+                  decayMs=1500),
+                R(sweep, opath(prog, "fDrift", "constant"), FOIL_SWEEP, comp=0, integrate=True),
+                R(LIVE, opath(prog, "fBand", "smoothstep"), -0.12, comp=0, attackMs=120, decayMs=700),
+                R(LIVE, opath(prog, "fBand", "smoothstep"), -0.03, comp=1, attackMs=120, decayMs=700),
+                R(OPEN, opath(prog, "fSpark", "smoothstep"), -0.0015, comp=0, attackMs=0, decayMs=300),
+                R(LEVEL, opath(prog, "fTwinkle", "constant"), FOIL_TWINKLE[0], comp=0, integrate=True, attackMs=200,
+                  decayMs=800),
+                R(sweep, opath(prog, "fTwinkle", "constant"), FOIL_TWINKLE[1], comp=0, integrate=True))
+        for c in range(3):
+            s.route(R(LIVE, opath(prog, "fGlow", "constant"), FOIL_GLOW[1], comp=c, depth=K("chroma"), attackMs=120,
+                      decayMs=700))
+
 def routes(s, spec, rays):
     P = spec["prefix"]
     G = "signal.%sPose" % P                # the gate's pose, 0..1 through the snap (the shut pad applied)
@@ -1078,7 +1267,7 @@ def routes(s, spec, rays):
     face = [f[0][len(P) + 1:] for f in face_pieces(P)]   # the face's pieces carry it too (their only deformer)
     surf.update({f: 1 for f in face})
     blocks = ["procedural/%s-%s/deform/%d/" % (P, n, surf[n]) for n in surf]
-    progs = ("%s-body" % P, "%s-head" % P)
+    progs = bust_progs(P)
     opath = lambda prog, label, kind, field="constant": "material/%s/op/%d/%s/%s" % (
         prog, PROGRAM_OPS[prog].at[label], kind, field)
     colour = hexrgb(pal["glow"])
@@ -1180,13 +1369,17 @@ def routes(s, spec, rays):
                     R(sep, ghost(cp) + "position", dx, comp=0, depth=K("copies")),
                     R(sep, ghost(cp) + "position", dy, comp=1, depth=K("copies")),
                     R(sep, ghost(cp) + "rotation", yaw, comp=1, depth=K("copies")))
-    # every profile: its own wash over the mouth and eyes while it speaks, and a glow on each opening (all pieces)
-    for prog in progs:
-        s.route(R(LIVE, opath(prog, "washAmount", "remap"), 0.45, comp=3, depth=K("chroma"), attackMs=0, decayMs=0),
-                R(OPEN, opath(prog, "washAmount", "remap"), 0.3, comp=3, depth=K("chroma"), attackMs=0,
-                  decayMs=300),
-                R(LEVEL, opath(prog, "washSpread", "remap"), -0.12, comp=2, attackMs=600, decayMs=2500),
-                R("control.palette", opath(prog, "washSpread", "remap"), -0.6, comp=2))
+    if FOIL:
+        foil_routes(s, spec, progs + lid_progs(P), opath, LIVE, OPEN, LEVEL, ONSET, K)
+    else:
+        # every profile: its own wash over the mouth and eyes while it speaks, and a glow on each opening (all pieces)
+        for prog in progs:
+            s.route(R(LIVE, opath(prog, "washAmount", "remap"), 0.45, comp=3, depth=K("chroma"), attackMs=0,
+                      decayMs=0),
+                    R(OPEN, opath(prog, "washAmount", "remap"), 0.3, comp=3, depth=K("chroma"), attackMs=0,
+                      decayMs=300),
+                    R(LEVEL, opath(prog, "washSpread", "remap"), -0.12, comp=2, attackMs=600, decayMs=2500),
+                    R("control.palette", opath(prog, "washSpread", "remap"), -0.6, comp=2))
     for part in ("H", "N", "B"):
         s.route(R(OPEN, "fx/%s-glow%s/glow" % (P, part), 0.22, depth=K("chroma"), attackMs=0, decayMs=200))
     # ---- global gain (CC 7, bipolar about its rest): once, on the first head

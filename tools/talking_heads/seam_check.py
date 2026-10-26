@@ -62,15 +62,21 @@ VIEWS = {"front": (0.0, 0.0, 0.0, -0.02), "three-quarter": (-32.0, 0.0, 0.0, -0.
 def apply_effect(p, s, P, effect):
     """Set one effect to full strength on head P. Returns False when P's profile has no such effect."""
     progs = {g["name"]: g for g in s.get("materialPrograms", [])}
-    ops = th.PROGRAM_OPS[P + "-head"].at
+    ops = {k: v for prog in th.bust_progs(P) for k, v in th.PROGRAM_OPS[prog].at.items()}
 
     def setop(label, field, value):
-        for part in ("body", "head"):
-            o = th.PROGRAM_OPS[P + "-" + part]
-            progs[P + "-" + part]["ops"][o.at[label] - 1][field] = value
+        for prog in th.bust_progs(P) + th.lid_progs(P):
+            o = th.PROGRAM_OPS[prog]
+            if label in o.at:
+                progs[prog]["ops"][o.at[label] - 1][field] = value
 
     if effect == "wash":
-        setop("washAmount", "constant", [0.0, 1.0, 0.12, 0.9])
+        if th.FOIL:   # foil1: the music's bands at their widest and brightest, swept part way
+            setop("fBand", "constant", [0.5, 0.86, 0.0, 0.0])
+            setop("fGlow", "constant", [1.0, 1.0, 1.0, 0.0])
+            setop("fDrift", "constant", [0.07, 0.0, 0.0, 0.0])
+        else:
+            setop("washAmount", "constant", [0.0, 1.0, 0.12, 0.9])
     elif effect == "bands":
         if "bands" not in ops:
             return False
@@ -148,6 +154,7 @@ def main():
     ap.add_argument("--tol", type=float, default=6.0)
     ap.add_argument("--effects", default=",".join(EFFECTS))
     ap.add_argument("--views", default=",".join(VIEWS))
+    ap.add_argument("--porcelain", dest="foil", action="store_false", help="the project is fx2's porcelain")
     a = ap.parse_args()
     from PIL import Image, ImageDraw
     ac.W, ac.H = 1280, 720
@@ -162,7 +169,7 @@ def main():
         if "asset" in n and not os.path.isabs(n["asset"]):
             n["asset"] = os.path.join(base, n["asset"])
     P = a.prefix
-    th.build()   # fills PROGRAM_OPS (op labels -> indices)
+    th.build(foil=a.foil)   # fills PROGRAM_OPS (op labels -> indices) and sets th.FOIL
     # (the bust is shown at full size: the scene rests every slot at scale 1 and hides inactive ones by route)
     os.makedirs(a.out, exist_ok=True)
     work = tempfile.mkdtemp(prefix="th-seam-")
