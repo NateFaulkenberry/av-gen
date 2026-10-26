@@ -8678,7 +8678,7 @@
   {
    "source": "visual.th1L40",
    "target": "nodes/th1-bust/position",
-   "amount": -0.24,
+   "amount": -0.14,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -8690,7 +8690,7 @@
   {
    "source": "visual.th1L40",
    "target": "nodes/th1-bust/position",
-   "amount": -0.23,
+   "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -8750,7 +8750,7 @@
   {
    "source": "visual.th1L40",
    "target": "particles/th1-mist/position",
-   "amount": -0.2591293660119497,
+   "amount": -0.1591293660119497,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -8762,7 +8762,7 @@
   {
    "source": "visual.th1L40",
    "target": "particles/th1-mist/position",
-   "amount": -0.22999999999999998,
+   "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -9194,7 +9194,7 @@
   {
    "source": "visual.th2L40",
    "target": "nodes/th2-bust/position",
-   "amount": -0.86,
+   "amount": -0.76,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9206,7 +9206,7 @@
   {
    "source": "visual.th2L40",
    "target": "nodes/th2-bust/position",
-   "amount": -0.63,
+   "amount": -0.65,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -9266,7 +9266,7 @@
   {
    "source": "visual.th2L40",
    "target": "particles/th2-mist/position",
-   "amount": -0.9915113440367233,
+   "amount": -0.8915113440367233,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9278,7 +9278,7 @@
   {
    "source": "visual.th2L40",
    "target": "particles/th2-mist/position",
-   "amount": -0.63,
+   "amount": -0.65,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -9302,7 +9302,7 @@
   {
    "source": "visual.th2L41",
    "target": "nodes/th2-bust/position",
-   "amount": -0.28,
+   "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9374,7 +9374,7 @@
   {
    "source": "visual.th2L41",
    "target": "particles/th2-mist/position",
-   "amount": -0.3217519302880196,
+   "amount": -0.2917519302880196,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9902,7 +9902,7 @@
   {
    "source": "visual.th3L40",
    "target": "nodes/th3-bust/position",
-   "amount": -1.48,
+   "amount": -1.38,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9914,7 +9914,7 @@
   {
    "source": "visual.th3L40",
    "target": "nodes/th3-bust/position",
-   "amount": -0.23,
+   "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -9974,7 +9974,7 @@
   {
    "source": "visual.th3L40",
    "target": "particles/th3-mist/position",
-   "amount": -1.723893322061497,
+   "amount": -1.6238933220614968,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -9986,7 +9986,7 @@
   {
    "source": "visual.th3L40",
    "target": "particles/th3-mist/position",
-   "amount": -0.22999999999999998,
+   "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10010,7 +10010,7 @@
   {
    "source": "visual.th3L41",
    "target": "nodes/th3-bust/position",
-   "amount": -0.9,
+   "amount": -0.87,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10082,7 +10082,7 @@
   {
    "source": "visual.th3L41",
    "target": "particles/th3-mist/position",
-   "amount": -1.0541339083127932,
+   "amount": -1.0241339083127932,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10118,7 +10118,7 @@
   {
    "source": "visual.th3L42",
    "target": "nodes/th3-bust/position",
-   "amount": -0.32,
+   "amount": -0.35,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10190,7 +10190,7 @@
   {
    "source": "visual.th3L42",
    "target": "particles/th3-mist/position",
-   "amount": -0.3906300477367539,
+   "amount": -0.42063004773675394,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10262,7 +10262,7 @@
   {
    "source": "visual.th4L10",
    "target": "nodes/th4-bust/position",
-   "amount": -0.86,
+   "amount": -0.78,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10274,7 +10274,7 @@
   {
    "source": "visual.th4L10",
    "target": "nodes/th4-bust/position",
-   "amount": 0.72,
+   "amount": 0.74,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10334,7 +10334,7 @@
   {
    "source": "visual.th4L10",
    "target": "particles/th4-mist/position",
-   "amount": -0.9915113440367233,
+   "amount": -0.9115113440367233,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10346,7 +10346,7 @@
   {
    "source": "visual.th4L10",
    "target": "particles/th4-mist/position",
-   "amount": 0.72,
+   "amount": 0.74,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10370,7 +10370,7 @@
   {
    "source": "visual.th4L10",
    "target": "particles/th4-grain/position",
-   "amount": -0.86,
+   "amount": -0.78,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10382,7 +10382,7 @@
   {
    "source": "visual.th4L10",
    "target": "particles/th4-grain/position",
-   "amount": 0.72,
+   "amount": 0.74,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10406,7 +10406,7 @@
   {
    "source": "visual.th4L20",
    "target": "nodes/th4-bust/position",
-   "amount": -1.26,
+   "amount": -1.1800000000000002,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10418,7 +10418,7 @@
   {
    "source": "visual.th4L20",
    "target": "nodes/th4-bust/position",
-   "amount": 0.64,
+   "amount": 0.66,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10478,7 +10478,7 @@
   {
    "source": "visual.th4L20",
    "target": "particles/th4-mist/position",
-   "amount": -1.4640879127166235,
+   "amount": -1.3840879127166237,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10490,7 +10490,7 @@
   {
    "source": "visual.th4L20",
    "target": "particles/th4-mist/position",
-   "amount": 0.64,
+   "amount": 0.66,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10514,7 +10514,7 @@
   {
    "source": "visual.th4L20",
    "target": "particles/th4-grain/position",
-   "amount": -1.26,
+   "amount": -1.1800000000000002,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10526,7 +10526,7 @@
   {
    "source": "visual.th4L20",
    "target": "particles/th4-grain/position",
-   "amount": 0.64,
+   "amount": 0.66,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10550,7 +10550,7 @@
   {
    "source": "visual.th4L21",
    "target": "nodes/th4-bust/position",
-   "amount": -0.39999999999999997,
+   "amount": -0.32,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10562,7 +10562,7 @@
   {
    "source": "visual.th4L21",
    "target": "nodes/th4-bust/position",
-   "amount": 0.31999999999999995,
+   "amount": 0.33999999999999997,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10622,7 +10622,7 @@
   {
    "source": "visual.th4L21",
    "target": "particles/th4-mist/position",
-   "amount": -0.438806245724239,
+   "amount": -0.358806245724239,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10634,7 +10634,7 @@
   {
    "source": "visual.th4L21",
    "target": "particles/th4-mist/position",
-   "amount": 0.32000000000000006,
+   "amount": 0.3400000000000001,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10658,7 +10658,7 @@
   {
    "source": "visual.th4L21",
    "target": "particles/th4-grain/position",
-   "amount": -0.39999999999999997,
+   "amount": -0.32,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10670,7 +10670,7 @@
   {
    "source": "visual.th4L21",
    "target": "particles/th4-grain/position",
-   "amount": 0.31999999999999995,
+   "amount": 0.33999999999999997,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10694,7 +10694,7 @@
   {
    "source": "visual.th4L30",
    "target": "nodes/th4-bust/position",
-   "amount": -1.48,
+   "amount": -1.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10706,7 +10706,7 @@
   {
    "source": "visual.th4L30",
    "target": "nodes/th4-bust/position",
-   "amount": 0.27,
+   "amount": 0.29000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10766,7 +10766,7 @@
   {
    "source": "visual.th4L30",
    "target": "particles/th4-mist/position",
-   "amount": -1.723893322061497,
+   "amount": -1.6438933220614969,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10778,7 +10778,7 @@
   {
    "source": "visual.th4L30",
    "target": "particles/th4-mist/position",
-   "amount": 0.27,
+   "amount": 0.29000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10802,7 +10802,7 @@
   {
    "source": "visual.th4L30",
    "target": "particles/th4-grain/position",
-   "amount": -1.48,
+   "amount": -1.4,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10814,7 +10814,7 @@
   {
    "source": "visual.th4L30",
    "target": "particles/th4-grain/position",
-   "amount": 0.27,
+   "amount": 0.29000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10838,7 +10838,7 @@
   {
    "source": "visual.th4L31",
    "target": "nodes/th4-bust/position",
-   "amount": -0.86,
+   "amount": -0.78,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10850,7 +10850,7 @@
   {
    "source": "visual.th4L31",
    "target": "nodes/th4-bust/position",
-   "amount": 0.6699999999999999,
+   "amount": 0.69,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10910,7 +10910,7 @@
   {
    "source": "visual.th4L31",
    "target": "particles/th4-mist/position",
-   "amount": -0.9915113440367233,
+   "amount": -0.9115113440367233,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10922,7 +10922,7 @@
   {
    "source": "visual.th4L31",
    "target": "particles/th4-mist/position",
-   "amount": 0.67,
+   "amount": 0.6900000000000001,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10946,7 +10946,7 @@
   {
    "source": "visual.th4L31",
    "target": "particles/th4-grain/position",
-   "amount": -0.86,
+   "amount": -0.78,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10958,7 +10958,7 @@
   {
    "source": "visual.th4L31",
    "target": "particles/th4-grain/position",
-   "amount": 0.6699999999999999,
+   "amount": 0.69,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -10982,7 +10982,7 @@
   {
    "source": "visual.th4L32",
    "target": "nodes/th4-bust/position",
-   "amount": -0.24,
+   "amount": -0.16000000000000003,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -10994,7 +10994,7 @@
   {
    "source": "visual.th4L32",
    "target": "nodes/th4-bust/position",
-   "amount": 0.27,
+   "amount": 0.29000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11054,7 +11054,7 @@
   {
    "source": "visual.th4L32",
    "target": "particles/th4-mist/position",
-   "amount": -0.2591293660119497,
+   "amount": -0.17912936601194973,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11066,7 +11066,7 @@
   {
    "source": "visual.th4L32",
    "target": "particles/th4-mist/position",
-   "amount": 0.27,
+   "amount": 0.29000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11090,7 +11090,7 @@
   {
    "source": "visual.th4L32",
    "target": "particles/th4-grain/position",
-   "amount": -0.24,
+   "amount": -0.16000000000000003,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11102,7 +11102,7 @@
   {
    "source": "visual.th4L32",
    "target": "particles/th4-grain/position",
-   "amount": 0.27,
+   "amount": 0.29000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11126,7 +11126,7 @@
   {
    "source": "visual.th4L40",
    "target": "nodes/th4-bust/position",
-   "amount": -1.72,
+   "amount": -1.54,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11162,7 +11162,7 @@
   {
    "source": "visual.th4L40",
    "target": "particles/th4-mist/position",
-   "amount": -1.9830226880734465,
+   "amount": -1.8030226880734466,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11198,7 +11198,7 @@
   {
    "source": "visual.th4L40",
    "target": "particles/th4-grain/position",
-   "amount": -1.72,
+   "amount": -1.54,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11234,7 +11234,7 @@
   {
    "source": "visual.th4L41",
    "target": "nodes/th4-bust/position",
-   "amount": -1.1400000000000001,
+   "amount": -1.03,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11246,7 +11246,7 @@
   {
    "source": "visual.th4L41",
    "target": "nodes/th4-bust/position",
-   "amount": 0.6,
+   "amount": 0.62,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11306,7 +11306,7 @@
   {
    "source": "visual.th4L41",
    "target": "particles/th4-mist/position",
-   "amount": -1.313263274324743,
+   "amount": -1.203263274324743,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11318,7 +11318,7 @@
   {
    "source": "visual.th4L41",
    "target": "particles/th4-mist/position",
-   "amount": 0.6000000000000001,
+   "amount": 0.6200000000000001,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11342,7 +11342,7 @@
   {
    "source": "visual.th4L41",
    "target": "particles/th4-grain/position",
-   "amount": -1.1400000000000001,
+   "amount": -1.03,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11354,7 +11354,7 @@
   {
    "source": "visual.th4L41",
    "target": "particles/th4-grain/position",
-   "amount": 0.6,
+   "amount": 0.62,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11378,7 +11378,7 @@
   {
    "source": "visual.th4L42",
    "target": "nodes/th4-bust/position",
-   "amount": -0.56,
+   "amount": -0.51,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11390,7 +11390,7 @@
   {
    "source": "visual.th4L42",
    "target": "nodes/th4-bust/position",
-   "amount": 0.45999999999999996,
+   "amount": 0.48,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11450,7 +11450,7 @@
   {
    "source": "visual.th4L42",
    "target": "particles/th4-mist/position",
-   "amount": -0.6497594137487036,
+   "amount": -0.5997594137487037,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11462,7 +11462,7 @@
   {
    "source": "visual.th4L42",
    "target": "particles/th4-mist/position",
-   "amount": 0.46,
+   "amount": 0.48000000000000004,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
@@ -11486,7 +11486,7 @@
   {
    "source": "visual.th4L42",
    "target": "particles/th4-grain/position",
-   "amount": -0.56,
+   "amount": -0.51,
    "op": "add",
    "polarity": "unipolar",
    "component": 0,
@@ -11498,7 +11498,7 @@
   {
    "source": "visual.th4L42",
    "target": "particles/th4-grain/position",
-   "amount": 0.45999999999999996,
+   "amount": 0.48,
    "op": "add",
    "polarity": "unipolar",
    "component": 2,
