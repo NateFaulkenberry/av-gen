@@ -211,7 +211,7 @@ void MidiPanel::learnFor(app::Engine& engine, const std::string& parameterPath) 
 }
 
 void MidiPanel::draw(app::Engine& engine) {
-    helpHeader("performance/midi-mapping");
+    helpHeader("modulation/midi-mapping");
     drawLearnBar(engine);
     ImGui::Separator();
     if (ImGui::BeginTabBar("##midi-tabs")) {

@@ -143,8 +143,21 @@ Transport, audio response and performance, plus the Shaders and Control tabs.
 - Transport: play, stop, seek, volume, and the live input selector.
 - Audio response: **Master gain** and one amount slider per modulation route.
 - Shaders: every user shader layer, with its compile errors.
-- Control: MIDI and OSC, learn, and the binding list.
+- Control: MIDI and OSC settings, OSC learn and the OSC binding list, the MIDI tempo source. MIDI mappings are in
+  the MIDI panel.
 - Performance: frame times, per-subsystem GPU pass times, and **Canvas scale**.
+
+## MIDI — bottom
+
+MIDI Learn, the assignments, a live monitor and the devices. Closed by default. See
+[MIDI mapping and Learn](help://modulation/midi-mapping).
+
+- The Learn bar (always visible): a destination, Scene or Project, **Learn**, and what was detected.
+- Assignments: every default, project and scene mapping, with its status and live activity, and an editor for the
+  selected one.
+- Monitor: the most recent incoming messages, with pause, clear and filters.
+- Devices: every input, whether it is connected and whether it is receiving, by channel; switch one off on this
+  computer.
 
 ## Analysis — bottom
 
