@@ -944,6 +944,45 @@ void forEachRunLayer(const std::vector<MaterialLayer>& layers, Fn&& fn) {
 
 bool MaterialProgram::writesOpacity() const { return registerInRange(opacityRegister); }
 
+bool MaterialProgram::unlitFastEligible() const {
+    if (normalRegister >= 0 || occlusionRegister >= 0 || heightRegister >= 0 || !textures.empty()) {
+        return false;
+    }
+    for (const MaterialLayer& layer : layers) {
+        if (layer.enabled) {
+            return false;
+        }
+    }
+    for (const MaterialOp& op : ops) {
+        if (!op.enabled) {
+            continue;
+        }
+        switch (op.kind) {
+        case MaterialOpKind::Input:
+            switch (op.input) {
+            case MaterialInput::Curvature: case MaterialInput::Convexity: case MaterialInput::Concavity:
+            case MaterialInput::Cavity: case MaterialInput::Occlusion: case MaterialInput::Height:
+            case MaterialInput::NormalVariance: case MaterialInput::TriplanarWeights: case MaterialInput::Footprint:
+                return false;
+            default:
+                break;
+            }
+            break;
+        case MaterialOpKind::Constant: case MaterialOpKind::Gradient: case MaterialOpKind::Noise:
+        case MaterialOpKind::Voronoi: case MaterialOpKind::Fresnel: case MaterialOpKind::Ramp:
+        case MaterialOpKind::Remap: case MaterialOpKind::Multiply: case MaterialOpKind::Add: case MaterialOpKind::Mix:
+        case MaterialOpKind::MixBy: case MaterialOpKind::Power: case MaterialOpKind::Smoothstep:
+        case MaterialOpKind::Threshold: case MaterialOpKind::HueShift: case MaterialOpKind::Saturate:
+        case MaterialOpKind::Palette: case MaterialOpKind::Swizzle: case MaterialOpKind::VoronoiEdge:
+        case MaterialOpKind::Quantize: case MaterialOpKind::OklabRamp:
+            break;
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
 bool MaterialProgram::writesEmission() const {
     bool writes = registerInRange(emissionRegister);
     forEachRunLayer(layers, [&writes](const MaterialLayer& layer) {

@@ -245,3 +245,26 @@ TEST_CASE("A deformer's phase takes a value far beyond one turn and is wrapped t
     CHECK_THAT(std::sin(static_cast<double>(live.deformers[0].phase)),
                WithinAbs(std::sin(static_cast<double>(12345.678f)), 1e-5));
 }
+
+TEST_CASE("A Hinge deformer's signed mask offset survives its parameter (ADR-1672)",
+          "[scene][procedural][params][adr1672]") {
+    // The Hinge reads `scale` as the mask centre's offset up from the pivot, negative below it. The other kinds' scale
+    // is a positive size with a hard minimum of 0.001; that floor would move a mouth's mask from the chin to the pivot.
+    params::ParameterSet params;
+    ProceduralGeometry rest = makeRest();
+    rest.deformers[0].kind = DeformerKind::Hinge;
+    rest.deformers[0].scale = -0.04f;
+    CHECK(rest.validate().has_value());   // a scene file holding it loads
+    const ProceduralParameters p = registerProceduralParameters(params, rest, "procedural/columns/");
+    ProceduralGeometry live = rest;
+    params.resetFinals();
+    applyProceduralParameters(p, rest, live);
+    CHECK(live.deformers[0].scale == -0.04f);
+    // and the other kinds keep their floor
+    auto* noiseScale = params.findAs<float>("procedural/columns/deform/2/scale");
+    REQUIRE(noiseScale != nullptr);
+    noiseScale->setBase(-1.0f);
+    params.resetFinals();
+    applyProceduralParameters(p, rest, live);
+    CHECK(live.deformers[1].scale > 0.0f);
+}

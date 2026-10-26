@@ -944,6 +944,8 @@ const char* deformerKindName(DeformerKind kind) {
         return "path";
     case DeformerKind::Streamline:
         return "streamline";
+    case DeformerKind::Hinge:
+        return "hinge";
     }
     return "twist";
 }
@@ -951,7 +953,7 @@ const char* deformerKindName(DeformerKind kind) {
 std::optional<DeformerKind> deformerKindFromName(std::string_view name) {
     for (const auto kind : {DeformerKind::Bend, DeformerKind::Twist, DeformerKind::Sine, DeformerKind::Noise,
                             DeformerKind::Displacement, DeformerKind::Field, DeformerKind::Path,
-                            DeformerKind::Streamline}) {
+                            DeformerKind::Streamline, DeformerKind::Hinge}) {
         if (name == deformerKindName(kind)) {
             return kind;
         }
@@ -2404,6 +2406,63 @@ glm::vec3 applyDisplacement(const Deformer& d, const glm::vec3& p, float t) {
     return p + axis * (d.amount * falloffWeight(d, y) * n);
 }
 
+// ADR-1672. The CPU twin of procedural.wgsl `hingePoint`: same arithmetic, same order.
+float hingeSmoothstep(float e0, float e1, float x) {
+    const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+glm::vec3 applyHinge(const Deformer& d, const glm::vec3& p) {
+    if (d.amount == 0.0f) {
+        return p;
+    }
+    const glm::vec3 a = unitOr(d.axis, glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::vec3 fwd = d.displacementAxis - a * glm::dot(d.displacementAxis, a);
+    fwd = glm::length(fwd) > 1e-6f ? glm::normalize(fwd) : anyPerpendicular(a);
+    const glm::vec3 up = glm::normalize(glm::cross(fwd, a));
+    const float r = std::max(d.falloff, 1e-6f);
+    const float cw = std::max(d.frequency, 1e-6f);   // the cut's half-width (the mouth's corners)
+    const float dy = glm::dot(p - d.center, up) - d.phase; // height above the slit (negative below)
+    const float e = 0.004f * r;
+    const float slit = 1.0f - hingeSmoothstep(-e, e, dy);
+    const glm::vec3 m = d.center + fwd * d.speed + up * d.scale;
+    const float lat = std::abs(glm::dot(p - m, a));
+    // the lips: just below the slit the turn tapers to nothing at the corners (a lens-shaped opening; past the
+    // corners, where the surface is not cut, nothing at the slit's height moves); a lip height L below it, the
+    // whole width turns
+    const float u = std::min(lat / cw, 1.0f);
+    const float purse = std::max(d.tension, 0.0f);
+    // a purse rounds the lens toward an ellipse (steep sides, a round "oh" rather than a smile's shallow curve)
+    const float taper = purse > 1e-4f ? (1.0f - u * u) + std::min(purse, 1.0f) * (std::sqrt(1.0f - u * u) - (1.0f - u * u))
+                                      : 1.0f - u * u;
+    const float lip = taper + (1.0f - taper) * hingeSmoothstep(0.0f, 0.25f * r, -dy);
+    const float mask = 1.0f - hingeSmoothstep(0.5f, 1.0f, glm::length(p - m) / r);
+    const float angle = d.amount * slit * lip * mask;
+    glm::vec3 out = p;
+    if (angle != 0.0f) {
+        // Rodrigues about a through the pivot, as the shader's rotateAbout
+        const glm::vec3 v = p - d.center;
+        const float s = std::sin(angle);
+        const float co = std::cos(angle);
+        out = d.center + v * co + glm::cross(a, v) * s + a * (glm::dot(a, v) * (1.0f - co));
+    }
+    // the purse (`tension`): the lips round into an "oh" as the mouth opens -- drawn in toward the middle, the upper
+    // lip arched up, both pushed forward -- in proportion to the angle, so shut is still sealed. 0 skips it.
+    if (purse > 1e-4f) {
+        const float t = d.amount * purse;
+        const float L = 0.25f * r;
+        const float sa = glm::dot(p - m, a);
+        const float near = 1.0f - hingeSmoothstep(0.0f, L, std::abs(dy));
+        const float latw = 1.0f - hingeSmoothstep(cw, 2.0f * cw, lat);
+        const float sgn = sa > 0.0f ? 1.0f : (sa < 0.0f ? -1.0f : 0.0f);
+        const float inward = -sgn * std::min(lat, cw) * 0.5f * t * near * latw;
+        const float raise = dy > 0.0f ? 0.20f * t * r * taper * (1.0f - hingeSmoothstep(0.0f, L, dy)) : 0.0f;
+        const float push = 0.10f * t * r * near * (1.0f - hingeSmoothstep(0.0f, 2.0f * cw, lat));
+        out += a * inward + up * raise + fwd * push;
+    }
+    return out;
+}
+
 } // namespace
 
 glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
@@ -2425,6 +2484,8 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return p; // needs the spline: see applyPathDeformer
     case DeformerKind::Streamline:
         return p; // a Fiber's centre line, not a point map: see fiberCentreLine
+    case DeformerKind::Hinge:
+        return applyHinge(d, p);
     }
     return p;
 }
@@ -2638,7 +2699,11 @@ Result<void> ProceduralGeometry::validate() const {
         if (d.falloff < 0.0f) {
             return fail("procedural '{}': deformer {} falloff must be >= 0", name, i + 1);
         }
-        if (!(d.scale > 0.0f)) {
+        if (d.kind == DeformerKind::Hinge) { // ADR-1672: scale is the mask's signed up offset
+            if (!std::isfinite(d.scale)) {
+                return fail("procedural '{}': deformer {} (hinge) scale must be finite", name, i + 1);
+            }
+        } else if (!(d.scale > 0.0f)) {
             return fail("procedural '{}': deformer {} scale must be > 0", name, i + 1);
         }
         if (d.kind == DeformerKind::Field && d.field.empty()) {
@@ -3154,7 +3219,8 @@ json ProceduralGeometry::toJson() const {
             s["pathOffset"] = d.pathOffset;
             s["pathScale"] = d.pathScale;
             s["pathRoll"] = d.pathRoll;
-            if (d.kind == DeformerKind::Streamline) { // ADR-1181; only for the kind that reads it
+            // ADR-1181 (Streamline's dead zone) and ADR-1672 (Hinge's purse); only for the kinds that read it
+            if (d.kind == DeformerKind::Streamline || d.kind == DeformerKind::Hinge) {
                 s["tension"] = d.tension;
             }
             arr.push_back(std::move(s));
@@ -3992,12 +4058,16 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         p.deformerSpeed[slot] = addF("speed", def.speed, -100.0f, 100.0f, -5.0f, 5.0f);
         addF("phase", def.phase, -1.0e6f, 1.0e6f, -kTwoPi, kTwoPi); // ADR-1372: wide, so a clock can drive it
         addF("frequency", def.frequency, 0.0f, 100.0f, 0.0f, 10.0f);
-        addF("scale", def.scale, 0.001f, 100.0f, 0.05f, 5.0f);
+        if (def.kind == DeformerKind::Hinge) { // ADR-1672: the mask's up offset, signed (below the pivot is negative)
+            addF("scale", def.scale, -1e4f, 1e4f, -0.5f, 0.5f);
+        } else {
+            addF("scale", def.scale, 0.001f, 100.0f, 0.05f, 5.0f);
+        }
         addF("falloff", def.falloff, 0.0f, 1000.0f, 0.0f, 10.0f);
         addV3("center", def.center, -1e4f, 1e4f, -10.0f, 10.0f);
         addV3("axis", def.axis, -1.0f, 1.0f, -1.0f, 1.0f);
-        if (def.kind == DeformerKind::Streamline) { // ADR-1181
-            addF("tension", def.tension, 0.0f, 1000.0f, 0.0f, 20.0f);
+        if (def.kind == DeformerKind::Streamline || def.kind == DeformerKind::Hinge) { // ADR-1181, ADR-1672 purse
+            addF("tension", def.tension, 0.0f, 1000.0f, 0.0f, def.kind == DeformerKind::Hinge ? 4.0f : 20.0f);
         }
         if (def.kind == DeformerKind::Path) {
             addF("pathOffset", def.pathOffset, -1e4f, 1e4f, -20.0f, 20.0f);

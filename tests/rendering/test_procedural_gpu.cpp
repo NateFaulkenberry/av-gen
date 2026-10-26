@@ -939,3 +939,148 @@ TEST_CASE("Procedural instancing throughput", "[.perf][procedural]") {
         }
     }
 }
+
+// ADR-1672: the Hinge deformer on the GPU -- amount 0 is the identity, an angle turns the masked part; and the world
+// flag's move from 8 to 16 leaves a world-space deformer drawing what it drew (the Twist case above covers it).
+TEST_CASE("Hinge deformer: amount 0 is the identity, an angle moves the masked part", "[gpu][procedural][adr1672]") {
+    auto ctx = makeContext();
+    const scene::Scene plain = columnScene(1);
+    const auto base = renderOnce(*ctx, plain, 0.0);
+    const Coverage baseCov = coverage(base);
+    REQUIRE(baseCov.pixels > 0);
+    scene::Deformer h;
+    h.kind = scene::DeformerKind::Hinge;
+    h.space = scene::DeformSpace::Local;
+    h.axis = {1.0f, 0.0f, 0.0f};
+    h.displacementAxis = {0.0f, 0.0f, 1.0f};
+    h.center = {0.0f, 0.0f, 0.0f};
+    h.phase = 0.0f;
+    h.falloff = 4.0f;
+    h.frequency = 4.0f;
+    h.speed = 0.0f;
+    h.scale = -1.0f;
+    h.amount = 0.0f;
+    scene::Scene zero = plain;
+    zero.procedurals[0].deformers.push_back(h);
+    const auto zeroImg = renderOnce(*ctx, zero, 0.0);
+    REQUIRE(zeroImg.rgba.size() == base.rgba.size());
+    int worst = 0;
+    for (std::size_t i = 0; i < base.rgba.size(); ++i) {
+        worst = std::max(worst, std::abs(static_cast<int>(zeroImg.rgba[i]) - static_cast<int>(base.rgba[i])));
+    }
+    CHECK(worst <= 1); // ADR-1591: the finite-difference normal against the analytic one, to rounding
+    scene::Scene turned = plain;
+    h.amount = 0.6f;
+    turned.procedurals[0].deformers.push_back(h);
+    const auto turnedImg = renderOnce(*ctx, turned, 0.0);
+    CHECK(gpu::hashImage(turnedImg) != gpu::hashImage(base));
+    const Coverage tc = coverage(turnedImg);
+    CHECK(tc.pixels > 0);
+    CHECK((tc.minX != baseCov.minX || tc.maxX != baseCov.maxX || tc.minY != baseCov.minY || tc.maxY != baseCov.maxY));
+    // the purse (tension, packed as the forward vector's length past 1) reaches the shader and moves the surface
+    scene::Scene pursed = plain;
+    h.tension = 1.5f;
+    pursed.procedurals[0].deformers.push_back(h);
+    const auto pursedImg = renderOnce(*ctx, pursed, 0.0);
+    CHECK(gpu::hashImage(pursedImg) != gpu::hashImage(turnedImg));
+    CHECK(ctx->errorCount() == 0);
+}
+
+namespace {
+
+// ADR-1673: one render through a fresh renderer with the unlit fast path on or off, and that frame's count of draws
+// it took.
+struct FastPathFrame {
+    gpu::Image8 image;
+    std::uint32_t fastDraws = 0;
+};
+
+FastPathFrame renderFastPath(gpu::Context& ctx, const scene::Scene& s, bool fast) {
+    auto shaders = makeShaders(ctx);
+    rendering::SceneRenderer renderer(ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    renderer.procedurals().setUnlitFastPath(fast);
+    FrameTime t{};
+    t.renderTime = 0.5;
+    auto img = renderer.renderToImage(s, t, 192, 192);
+    REQUIRE(img.has_value());
+    return {*img, renderer.stats().procedural.unlitFastDraws};
+}
+
+int worstChannelDifference(const gpu::Image8& a, const gpu::Image8& b) {
+    REQUIRE(a.rgba.size() == b.rgba.size());
+    int worst = 0;
+    for (std::size_t i = 0; i < a.rgba.size(); ++i) {
+        worst = std::max(worst, std::abs(static_cast<int>(a.rgba[i]) - static_cast<int>(b.rgba[i])));
+    }
+    return worst;
+}
+
+// An unlit column scene whose surfaces glow with a program of the eligible kind: a world-space gradient through an
+// OKLab ramp, quantised -- what the Talking Heads background is made of.
+scene::Scene unlitProgramScene(bool unlit, scene::MaterialInput extraInput = scene::MaterialInput::WorldPosition) {
+    scene::Scene s = columnScene(6);
+    scene::MaterialProgram p;
+    p.name = "glow";
+    const auto op = [](scene::MaterialOpKind kind, int dst, int a = 0) {
+        scene::MaterialOp o;
+        o.kind = kind;
+        o.dst = dst;
+        o.srcA = a;
+        return o;
+    };
+    scene::MaterialOp world = op(scene::MaterialOpKind::Input, 0);
+    world.input = scene::MaterialInput::WorldPosition;
+    scene::MaterialOp grad = op(scene::MaterialOpKind::Gradient, 1, 0);
+    grad.value = 0.15f;
+    grad.constant = {0.6f, 0.8f, 0.0f, 0.5f};
+    scene::MaterialOp ramp = op(scene::MaterialOpKind::OklabRamp, 2, 1);
+    ramp.constant = {0.1f, 0.05f, 0.4f, 1.0f};
+    ramp.constant2 = {0.5f, 0.1f, 0.8f, 1.0f};
+    ramp.constant3 = {0.9f, 0.2f, 0.6f, 1.0f};
+    ramp.constant4 = {0.2f, 0.4f, 1.0f, 1.0f};
+    scene::MaterialOp extra = op(scene::MaterialOpKind::Input, 3);
+    extra.input = extraInput;
+    p.ops = {world, grad, ramp, extra};
+    p.emissionRegister = 2;
+    s.materialPrograms.push_back(p);
+    s.procedurals[0].material.program = "glow";
+    s.procedurals[0].material.unlit = unlit;
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("Unlit fast path: an eligible unlit surface draws through it and looks the same (ADR-1673)",
+          "[gpu][procedural][adr1673]") {
+    auto ctx = makeContext();
+    const scene::Scene s = unlitProgramScene(true);
+    const FastPathFrame fast = renderFastPath(*ctx, s, true);
+    const FastPathFrame full = renderFastPath(*ctx, s, false);
+    CHECK(fast.fastDraws > 0);   // the fast path is actually taken ...
+    CHECK(full.fastDraws == 0);  // ... and off means off
+    REQUIRE(coverage(fast.image).pixels > 0);
+    // the same colour: the same program, emission lane, waves and fog, minus the lighting it never used
+    CHECK(worstChannelDifference(fast.image, full.image) <= 1);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("Unlit fast path: a lit surface, and an unlit one whose program needs the full path, never take it "
+          "(ADR-1673)", "[gpu][procedural][adr1673]") {
+    auto ctx = makeContext();
+    SECTION("lit: on and off are the same image, bit for bit") {
+        const scene::Scene s = unlitProgramScene(false);
+        const FastPathFrame on = renderFastPath(*ctx, s, true);
+        const FastPathFrame off = renderFastPath(*ctx, s, false);
+        CHECK(on.fastDraws == 0);
+        CHECK(gpu::hashImage(on.image) == gpu::hashImage(off.image));
+    }
+    SECTION("unlit, but the program reads ambient occlusion: the full path, the same image") {
+        const scene::Scene s = unlitProgramScene(true, scene::MaterialInput::Occlusion);
+        const FastPathFrame on = renderFastPath(*ctx, s, true);
+        const FastPathFrame off = renderFastPath(*ctx, s, false);
+        CHECK(on.fastDraws == 0);
+        CHECK(gpu::hashImage(on.image) == gpu::hashImage(off.image));
+    }
+    CHECK(ctx->errorCount() == 0);
+}

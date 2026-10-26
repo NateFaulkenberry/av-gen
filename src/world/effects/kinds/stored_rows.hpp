@@ -42,6 +42,10 @@ public:
     [[nodiscard]] float f(const EffectInstance& e, std::string_view leaf) const {
         return e.values.getFloat(KeyBuf(key_, leaf).view(), field(leaf).storedDefault);
     }
+    // A Bool row lives in the store's flags, not its floats (`setFieldBool`): read it here, never through f().
+    [[nodiscard]] bool b(const EffectInstance& e, std::string_view leaf) const {
+        return e.values.getBool(KeyBuf(key_, leaf).view(), field(leaf).storedDefault >= 0.5f);
+    }
     [[nodiscard]] int choice(const EffectInstance& e, std::string_view leaf) const {
         const EffectField& fd = field(leaf);
         const int i = static_cast<int>(f(e, leaf) + 0.5f);

@@ -7,7 +7,7 @@
 //   p = deformLocal(p)           local-space deformers (kind < 8)
 //   p = instance(p)              position + rotate(quaternion, p * scale)
 //   p = object.model * p         the object/parent matrix (identity in this phase)
-//   p = deformWorld(p)           world-space deformers (kind >= 8)
+//   p = deformWorld(p)           world-space deformers (kind >= 16)
 // The normal is cross(chain(p + eps t1) - chain(p), chain(p + eps t2) - chain(p)) for a tangent
 // basis (t1, t2) of the source normal, flipped into the hemisphere of the transformed source
 // normal; eps = timeInfo.z (1e-3 x source bounds radius, set by the renderer).
@@ -129,7 +129,8 @@ const DEFORM_DISPLACEMENT: i32 = 4;
 const DEFORM_FIELD: i32 = 5;
 const DEFORM_PATH: i32 = 6;
 const DEFORM_STREAMLINE: i32 = 7; // ADR-1181: only the fiber path reads it; the chain passes it through
-const DEFORM_WORLD: i32 = 8;
+const DEFORM_HINGE: i32 = 8;      // ADR-1672
+const DEFORM_WORLD: i32 = 16;     // ADR-1672: the world flag (it was 8)
 
 // ---- transforms ------------------------------------------------------------------------------
 
@@ -201,6 +202,59 @@ fn bendPoint(p: vec3<f32>, c: vec3<f32>, axis: vec3<f32>, k: f32, dirIn: vec3<f3
     return c + dir * xp + axis * yp + b * z;
 }
 
+// ADR-1672: a soft-masked rigid turn (scene/procedural.hpp, Hinge): a jaw that opens a mouth, a lid. The CPU twin is
+// procedural.cpp applyHinge -- same arithmetic, same order.
+fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn: vec3<f32>, params: vec4<f32>,
+              upOffset: f32) -> vec3<f32> {
+    if (amount == 0.0) {
+        return p;
+    }
+    let a = axisIn;
+    // ADR-1672: the purse travels as the forward vector's length past 1 (procedural_renderer packs it)
+    let purse = max(length(fwdIn) - 1.0, 0.0);
+    var fwd = fwdIn - a * dot(fwdIn, a);
+    if (dot(fwd, fwd) < 1e-12) {
+        fwd = perpendicularTo(a);
+    } else {
+        fwd = normalize(fwd);
+    }
+    let up = normalize(cross(fwd, a));
+    let r = max(params.w, 1e-6);
+    let cw = max(params.x, 1e-6);
+    let dy = dot(p - c, up) - params.z;
+    let e = 0.004 * r;
+    let slit = 1.0 - smoothstep(-e, e, dy);
+    let m = c + fwd * params.y + up * upOffset;
+    let lat = abs(dot(p - m, a));
+    let u = min(lat / cw, 1.0);
+    var taper = 1.0 - u * u;
+    if (purse > 1e-4) {
+        taper = taper + min(purse, 1.0) * (sqrt(1.0 - u * u) - taper);
+    }
+    let lip = taper + (1.0 - taper) * smoothstep(0.0, 0.25 * r, -dy);
+    let mask = 1.0 - smoothstep(0.5, 1.0, length(p - m) / r);
+    let angle = amount * slit * lip * mask;
+    var out = p;
+    if (angle != 0.0) {
+        out = rotateAbout(p, c, a, angle);
+    }
+    if (purse > 1e-4) {
+        let t = amount * purse;
+        let L = 0.25 * r;
+        let sa = dot(p - m, a);
+        let near = 1.0 - smoothstep(0.0, L, abs(dy));
+        let latw = 1.0 - smoothstep(cw, 2.0 * cw, lat);
+        let inward = -sign(sa) * min(lat, cw) * 0.5 * t * near * latw;
+        var raise = 0.0;
+        if (dy > 0.0) {
+            raise = 0.20 * t * r * taper * (1.0 - smoothstep(0.0, L, dy));
+        }
+        let push = 0.10 * t * r * near * (1.0 - smoothstep(0.0, 2.0 * cw, lat));
+        out = out + a * inward + up * raise + fwd * push;
+    }
+    return out;
+}
+
 fn falloffRamp(y: f32, falloff: f32) -> f32 {
     if (falloff > 0.0) {
         return clamp(abs(y) / falloff, 0.0, 1.0);
@@ -220,6 +274,9 @@ fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f
     let y = dot(p - c, axis);
     if (kind == DEFORM_BEND) {
         return bendPoint(p, c, axis, amount, d.extra.xyz, falloff);
+    }
+    if (kind == DEFORM_HINGE) {
+        return hingePoint(p, c, axis, amount, d.extra.xyz, d.params, d.extra.w);
     }
     let ramp = falloffRamp(y, falloff);
     if (kind == DEFORM_TWIST) {
@@ -914,6 +971,92 @@ fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
     return procShade(in, frontFacing);
 }
 
+// ADR-905: the emissive field's gain on everything a surface emits (1 with no field). One call site of the field
+// evaluator for the fragment stage (ADR-1561), shared by fs_proc's procShade and fs_proc_unlit.
+fn procEmissionField(worldPos: vec3<f32>, element: f32) -> f32 {
+    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
+    if (emissiveSlot < 0) {
+        return 1.0;
+    }
+    fieldElement = element; // ADR-1116
+    return 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, worldPos);
+}
+
+// ADR-1673: the unlit fast path. A draw the renderer has proved needs none of the lit shading -- an unlit, opaque,
+// untextured material with no effect lanes, no refraction, and a program (if any) that reads no screen-space input
+// and writes no normal, occlusion or height (scene::unlitFastEligible) -- is drawn by this entry instead of fs_proc.
+// It is `shadeSurface`'s unlit branch with nothing else compiled in: the program, the emission lane, the waves, the
+// fog. Every value it produces is the one fs_proc produces for such a draw; what it does not do is set up the tangent
+// frame, the screen-space geometry, the ambient-occlusion read and the lit paths' registers, which the big entry
+// pays for whether or not a draw uses them (about 4.5 ms over a frame-filling sheet at 1080p, Talking Heads stop 5).
+@fragment
+fn fs_proc_unlit(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    let emissionField = procEmissionField(in.worldPos, in.instRandom.w);
+    let worldPos = in.worldPos;
+    var n = normalize(in.normal);
+    if (!frontFacing) {
+        n = -n;
+    }
+    var matColor = object.baseColor;
+    var matEmissive = object.emissive;
+    var ownEmissiveMul = in.instEmissive.rgb;
+    var ownHue = 0.0;
+    var ownGain = 1.0;
+    let programIndex = materialSelect.program;
+    let programRuns = programIndex >= 0 &&
+                      materialProgramAdmits(programIndex, in.instRandom, distance(frame.cameraPos.xyz, worldPos));
+    if (programRuns) {
+        var ctx = materialContextZero();
+        ctx.worldPosition = worldPos;
+        ctx.localPosition = in.localPos;
+        ctx.normal = n;
+        ctx.uv = in.uv;
+        ctx.objectId = pickIndex(object.ids.x);
+        ctx.instanceIndex = in.instIndex;
+        ctx.instanceId = in.instColor.a;
+        ctx.instanceRandom = in.instRandom;
+        ctx.instanceColor = in.instColor;
+        ctx.instanceEmissive = in.instEmissive;
+        ctx.time = frame.params.x;
+        ctx.audio = frame.audio;
+        ctx.audioBands = frame.audioBands;
+        ctx.beat = frame.beat;
+        ctx.viewDirection = normalize(frame.cameraPos.xyz - worldPos);
+        ctx.depth = distance(frame.cameraPos.xyz, worldPos);
+        ctx.occlusion = 1.0;
+        ctx.materialId = object.ids.y;
+        ctx.materialEmission = vec4<f32>(object.emissive.rgb * in.instEmissive.rgb * object.emissive.w, 1.0);
+        var base = materialResultZero();
+        base.baseColor = object.baseColor.rgb;
+        base.metallic = object.material.y;
+        base.roughness = object.material.x;
+        base.emission = object.emissive.rgb * object.emissive.w;
+        base.opacity = object.baseColor.a;
+        let program = evaluateMaterialProgramFast(programIndex, ctx, base);
+        matColor = vec4<f32>(program.baseColor, program.opacity);
+        matEmissive = vec4<f32>(program.emission, 1.0);
+        let programFlags = materialProgramFlags(programIndex);
+        if ((programFlags & MAT_FLAG_WRITES_EMISSION) != 0) {
+            ownEmissiveMul = vec3<f32>(1.0);
+            if ((programFlags & MAT_FLAG_EMISSION_READS_INSTANCE) == 0) {
+                ownHue = in.variation.x;
+                ownGain = in.variation.y;
+            }
+        }
+    }
+    let baseColor = matColor * vec4<f32>(in.instColor.rgb, 1.0);
+    var emissive = matEmissive.rgb * ownEmissiveMul * matEmissive.w;
+    emissive = emissionLane(emissive, ownHue + object.emission.y, ownGain * object.emission.x * emissionField);
+    let fx = wavesAt(worldPos, n, emissive);
+    var out: SceneOut;
+    out.color = vec4<f32>(applyFog(baseColor.rgb + emissive + fx.radiance, worldPos), 1.0);
+    out.normalRoughness = packNormalRoughness(n, 1.0, 2.0);
+    out.velocity = screenVelocityAt(in.clip, in.prevClip);
+    out.emission = vec4<f32>(baseColor.rgb + emissive + fx.radiance, max(max(object.ids.z, 0.0), fx.bloom));
+    out.ids = packIds(object.ids.x, object.ids.y);
+    return out;
+}
+
 // ADR-1603: the refraction phase. A refractive surface (object.refraction0.x > 0) drawn after the refraction copy
 // shows what is behind it: the copy read at the pixel offset along the surface's view-space normal, absorbed per
 // channel over the path to what is behind (the linear depth there minus the surface's own, at most refraction0.z
@@ -981,12 +1124,7 @@ fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
     var info: MaterialInstanceInfo;
     // ADR-905: the emissive field is a gain on everything the surface emits, after its program --
     // the lane, not the per-channel multiplier a program's emission drops.
-    info.emissionField = 1.0;
-    let emissiveSlot = i32(floor(proc.fieldInfo.x + 0.5));
-    if (emissiveSlot >= 0) {
-        fieldElement = in.instRandom.w; // ADR-1116
-        info.emissionField = 1.0 + proc.fieldInfo.y * fieldScalar(emissiveSlot, in.worldPos);
-    }
+    info.emissionField = procEmissionField(in.worldPos, in.instRandom.w);
     info.variation = in.variation;
     info.localPosition = in.localPos;
     info.objectId = pickIndex(object.ids.x);
