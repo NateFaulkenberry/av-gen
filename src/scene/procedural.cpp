@@ -946,6 +946,8 @@ const char* deformerKindName(DeformerKind kind) {
         return "streamline";
     case DeformerKind::Hinge:
         return "hinge";
+    case DeformerKind::Blocks:
+        return "blocks";
     }
     return "twist";
 }
@@ -953,7 +955,7 @@ const char* deformerKindName(DeformerKind kind) {
 std::optional<DeformerKind> deformerKindFromName(std::string_view name) {
     for (const auto kind : {DeformerKind::Bend, DeformerKind::Twist, DeformerKind::Sine, DeformerKind::Noise,
                             DeformerKind::Displacement, DeformerKind::Field, DeformerKind::Path,
-                            DeformerKind::Streamline, DeformerKind::Hinge}) {
+                            DeformerKind::Streamline, DeformerKind::Hinge, DeformerKind::Blocks}) {
         if (name == deformerKindName(kind)) {
             return kind;
         }
@@ -2463,6 +2465,36 @@ glm::vec3 applyHinge(const Deformer& d, const glm::vec3& p) {
     return out;
 }
 
+// ADR-1674. The CPU twin of procedural.wgsl `blockHash` / `blocksPoint`: the same integer hash, bit for bit.
+std::uint32_t blockHash(glm::ivec3 c, std::uint32_t seed) {
+    std::uint32_t h = static_cast<std::uint32_t>(c.x) * 73856093u ^ static_cast<std::uint32_t>(c.y) * 19349663u ^
+                      static_cast<std::uint32_t>(c.z) * 83492791u ^ seed * 2654435761u;
+    h ^= h >> 16;
+    h *= 0x7feb352du;
+    h ^= h >> 15;
+    h *= 0x846ca68bu;
+    h ^= h >> 16;
+    return h;
+}
+
+glm::vec3 applyBlocks(const Deformer& d, const glm::vec3& p) {
+    if (d.amount == 0.0f || !(d.falloff > 0.0f)) {
+        return p;
+    }
+    const float f = std::max(d.frequency, 1e-4f);
+    const float w = f / std::max(d.scale, 1e-4f);
+    const glm::ivec3 cell(static_cast<int>(std::floor(p.x * w)), static_cast<int>(std::floor(p.y * f)),
+                          static_cast<int>(std::floor(p.z * w)));
+    const std::uint32_t epoch = static_cast<std::uint32_t>(static_cast<std::int32_t>(std::floor(d.phase)));
+    const std::uint32_t base = d.seed + epoch * 977u;
+    const float pick = static_cast<float>(blockHash(cell, base) & 0xFFFFFFu) / 16777216.0f;
+    if (pick >= d.falloff) {
+        return p;
+    }
+    const float h = static_cast<float>(blockHash(cell, base + 7919u) & 0xFFFFFFu) / 16777216.0f;
+    return p + d.displacementAxis * (d.amount * (h * 2.0f - 1.0f));
+}
+
 } // namespace
 
 glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
@@ -2486,6 +2518,8 @@ glm::vec3 applyDeformer(const Deformer& d, glm::vec3 p, double time) {
         return p; // a Fiber's centre line, not a point map: see fiberCentreLine
     case DeformerKind::Hinge:
         return applyHinge(d, p);
+    case DeformerKind::Blocks:
+        return applyBlocks(d, p);
     }
     return p;
 }

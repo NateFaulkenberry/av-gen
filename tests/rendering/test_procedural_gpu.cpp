@@ -1084,3 +1084,31 @@ TEST_CASE("Unlit fast path: a lit surface, and an unlit one whose program needs 
     }
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("Blocks deformer: amount 0 is the identity, a share of displaced cells moves the surface (ADR-1674)",
+          "[gpu][procedural][adr1674]") {
+    auto ctx = makeContext();
+    const scene::Scene plain = columnScene(1);
+    const auto base = renderOnce(*ctx, plain, 0.0);
+    scene::Deformer b;
+    b.kind = scene::DeformerKind::Blocks;
+    b.space = scene::DeformSpace::World;
+    b.frequency = 2.0f;
+    b.scale = 1.0f;
+    b.falloff = 1.0f;
+    b.displacementAxis = {1.0f, 0.0f, 0.0f};
+    b.amount = 0.0f;
+    scene::Scene zero = plain;
+    zero.procedurals[0].deformers.push_back(b);
+    const auto zeroImg = renderOnce(*ctx, zero, 0.0);
+    int worst = 0;
+    for (std::size_t i = 0; i < base.rgba.size(); ++i) {
+        worst = std::max(worst, std::abs(static_cast<int>(zeroImg.rgba[i]) - static_cast<int>(base.rgba[i])));
+    }
+    CHECK(worst <= 1);
+    scene::Scene moved = plain;
+    b.amount = 0.6f;
+    moved.procedurals[0].deformers.push_back(b);
+    CHECK(gpu::hashImage(renderOnce(*ctx, moved, 0.0)) != gpu::hashImage(base));
+    CHECK(ctx->errorCount() == 0);
+}

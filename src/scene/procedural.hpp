@@ -381,7 +381,7 @@ struct Variation {
 
 // ---- deformers ----------------------------------------------------------------------------------
 
-enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path, Streamline, Hinge };
+enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path, Streamline, Hinge, Blocks };
 [[nodiscard]] const char* deformerKindName(DeformerKind kind);
 [[nodiscard]] std::optional<DeformerKind> deformerKindFromName(std::string_view name);
 enum class DeformSpace : std::uint8_t { Local, World };
@@ -433,6 +433,12 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          + d x (0.10 t r near (1 - smoothstep(0, 2cw, lat)))                       (both pushed forward),
 //          so the opening rounds into an "oh", in proportion to the angle (shut is still sealed).
 //          amount 0 is the identity.
+//   Blocks (ADR-1674): block corruption. Space is cut into cells -- `1/frequency` tall, `scale/frequency` wide and
+//          deep -- and a share `falloff` (0..1) of them, chosen by a hash of the cell, the `seed` and the epoch
+//          floor(`phase`), is moved by `amount` x (h * 2 - 1) along `displacementAxis` (h a second hash: each cell its
+//          own distance and sign). Everything in a cell moves together, so a surface breaks into displaced rectangles
+//          and the triangles that cross a cell edge stretch (a smear); raising the epoch reshuffles which cells move.
+//          amount 0 or share 0 is the identity.
 //   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
 //          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of
 //          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds)

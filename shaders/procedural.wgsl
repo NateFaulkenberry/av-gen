@@ -130,6 +130,7 @@ const DEFORM_FIELD: i32 = 5;
 const DEFORM_PATH: i32 = 6;
 const DEFORM_STREAMLINE: i32 = 7; // ADR-1181: only the fiber path reads it; the chain passes it through
 const DEFORM_HINGE: i32 = 8;      // ADR-1672
+const DEFORM_BLOCKS: i32 = 9;     // ADR-1674
 const DEFORM_WORLD: i32 = 16;     // ADR-1672: the world flag (it was 8)
 
 // ---- transforms ------------------------------------------------------------------------------
@@ -255,6 +256,36 @@ fn hingePoint(p: vec3<f32>, c: vec3<f32>, axisIn: vec3<f32>, amount: f32, fwdIn:
     return out;
 }
 
+// ADR-1674: block corruption (scene/procedural.hpp, Blocks). The CPU twin is procedural.cpp applyBlocks -- the same
+// integer hash, bit for bit. params = (frequency, scale, phase, falloff); extra.xyz = the displacement axis.
+fn blockHash(c: vec3<i32>, seed: u32) -> u32 {
+    var h = (bitcast<u32>(c.x) * 73856093u) ^ (bitcast<u32>(c.y) * 19349663u) ^ (bitcast<u32>(c.z) * 83492791u) ^
+            (seed * 2654435761u);
+    h = h ^ (h >> 16u);
+    h = h * 0x7feb352du;
+    h = h ^ (h >> 15u);
+    h = h * 0x846ca68bu;
+    h = h ^ (h >> 16u);
+    return h;
+}
+
+fn blocksPoint(p: vec3<f32>, amount: f32, params: vec4<f32>, dir: vec3<f32>, seed: u32) -> vec3<f32> {
+    if (amount == 0.0 || !(params.w > 0.0)) {
+        return p;
+    }
+    let f = max(params.x, 1e-4);
+    let w = f / max(params.y, 1e-4);
+    let cell = vec3<i32>(i32(floor(p.x * w)), i32(floor(p.y * f)), i32(floor(p.z * w)));
+    let epoch = bitcast<u32>(i32(floor(params.z)));
+    let base = seed + epoch * 977u;
+    let pick = f32(blockHash(cell, base) & 0xFFFFFFu) / 16777216.0;
+    if (pick >= params.w) {
+        return p;
+    }
+    let h = f32(blockHash(cell, base + 7919u) & 0xFFFFFFu) / 16777216.0;
+    return p + dir * (amount * (h * 2.0 - 1.0));
+}
+
 fn falloffRamp(y: f32, falloff: f32) -> f32 {
     if (falloff > 0.0) {
         return clamp(abs(y) / falloff, 0.0, 1.0);
@@ -289,6 +320,9 @@ fn applyDeformer(d: DeformerUniform, kind: i32, p: vec3<f32>, n: vec3<f32>, t: f
         return p + d.extra.xyz * (amount * ramp * sin(arg));
     }
     let seed = bitcast<u32>(d.extra.w);
+    if (kind == DEFORM_BLOCKS) {
+        return blocksPoint(p, amount, d.params, d.extra.xyz, seed);
+    }
     let q = p * d.params.x + vec3<f32>(t * speed);
     if (kind == DEFORM_NOISE) {
         // three decorrelated channels: the input offset per axis; the seed selects the hash lattice

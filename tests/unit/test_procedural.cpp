@@ -2378,3 +2378,57 @@ TEST_CASE("The unlit fast path takes only programs that need no lit-path inputs 
         CHECK(q.unlitFastEligible());
     }
 }
+
+TEST_CASE("Blocks deformer: whole cells move together, a share of them, reshuffled by the epoch (ADR-1674)",
+          "[scene][procedural][adr1674]") {
+    Deformer b;
+    b.kind = DeformerKind::Blocks;
+    b.amount = 0.05f;
+    b.frequency = 10.0f;     // 10 cm tall cells ...
+    b.scale = 2.0f;          // ... 20 cm wide and deep
+    b.falloff = 0.5f;        // half of them displaced
+    b.displacementAxis = {1.0f, 0.0f, 0.0f};
+    b.seed = 7;
+    REQUIRE(std::string(deformerKindName(DeformerKind::Blocks)) == "blocks");
+    REQUIRE(deformerKindFromName("blocks") == DeformerKind::Blocks);
+    // a grid of cell centres: about half move, each along x only, by at most `amount`
+    int moved = 0;
+    int total = 0;
+    for (int ix = 0; ix < 20; ++ix) {
+        for (int iy = 0; iy < 20; ++iy) {
+            const glm::vec3 p{0.2f * static_cast<float>(ix) + 0.1f, 0.1f * static_cast<float>(iy) + 0.05f, 0.1f};
+            const glm::vec3 q = applyDeformer(b, p, 0.0);
+            CHECK(q.y == p.y);
+            CHECK(q.z == p.z);
+            CHECK(std::abs(q.x - p.x) <= 0.05f + 1e-6f);
+            moved += q.x != p.x ? 1 : 0;
+            ++total;
+        }
+    }
+    CHECK(moved > total * 35 / 100);
+    CHECK(moved < total * 65 / 100);
+    SECTION("everything in one cell moves by the same vector") {
+        const glm::vec3 a = applyDeformer(b, {0.11f, 0.31f, 0.02f}, 0.0) - glm::vec3{0.11f, 0.31f, 0.02f};
+        const glm::vec3 c = applyDeformer(b, {0.18f, 0.39f, 0.17f}, 0.0) - glm::vec3{0.18f, 0.39f, 0.17f};
+        CHECK(a == c);
+    }
+    SECTION("a new epoch moves a different set") {
+        Deformer e = b;
+        e.phase = 1.0f;
+        int differ = 0;
+        for (int i = 0; i < 40; ++i) {
+            const glm::vec3 p{0.2f * static_cast<float>(i) + 0.1f, 0.05f, 0.1f};
+            differ += applyDeformer(b, p, 0.0) != applyDeformer(e, p, 0.0) ? 1 : 0;
+        }
+        CHECK(differ > 10);
+    }
+    SECTION("amount 0 and share 0 are the identity, bit for bit") {
+        const glm::vec3 p{0.13f, 0.27f, -0.4f};
+        Deformer z = b;
+        z.amount = 0.0f;
+        CHECK(applyDeformer(z, p, 0.0) == p);
+        z = b;
+        z.falloff = 0.0f;
+        CHECK(applyDeformer(z, p, 0.0) == p);
+    }
+}

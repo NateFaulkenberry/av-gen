@@ -129,6 +129,7 @@ TEST_CASE("no row names a leaf the kind's arithmetic does not read", "[ui][defor
         {scene::DeformerKind::Streamline, {"amount", "falloff", "tension"}}, // ADR-1181
         {scene::DeformerKind::Hinge,
          {"amount", "axis", "center", "phase", "falloff", "frequency", "speed", "scale", "tension"}}, // ADR-1672
+        {scene::DeformerKind::Blocks, {"amount", "frequency", "scale", "falloff", "phase"}},           // ADR-1674
     };
     REQUIRE(expected.size() == std::size(ui::kDeformerKinds));
 
@@ -301,6 +302,13 @@ TEST_CASE("a deformer the panel adds does something", "[ui][deformers][procedura
             break;
         case scene::DeformerKind::Noise: d.amount = 0.1f; d.scale = 0.5f; break;
         case scene::DeformerKind::Displacement: d.amount = 0.1f; d.scale = 0.5f; break;
+        case scene::DeformerKind::Blocks:
+            // ADR-1674: every block displaced (share 1), so the point's block moves
+            d.amount = 0.2f;
+            d.frequency = 4.0f;
+            d.falloff = 1.0f;
+            d.displacementAxis = glm::vec3(1.0f, 0.0f, 0.0f);
+            break;
         case scene::DeformerKind::Hinge:
             // ADR-1672: the pivot sits just above the point (along up = cross(forward, axis) = +z
             // for the default axis y and forward x) and the mask is centred on the point, so it

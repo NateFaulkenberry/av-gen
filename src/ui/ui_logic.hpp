@@ -1543,6 +1543,13 @@ struct DeformerRow {
         {"scale", "up", "%.3f m", "The mask centre's offset up from the pivot (negative is down)."},
         {"tension", "purse", "%.2f", "How far the lips round into an \"oh\" as it opens: drawn in, the upper lip arched, both pushed forward."},
     };
+    static constexpr DeformerRow kBlocks[] = { // ADR-1674
+        {"amount", "shift", "%.3f m", "How far a corrupted block moves (each block its own share of it, either way)."},
+        {"frequency", "rows", "%.1f /m", "Blocks per metre, top to bottom: the block height is its inverse."},
+        {"scale", "width", "%.2f", "A block's width over its height."},
+        {"falloff", "share", "%.2f", "The share of blocks that are displaced, 0..1."},
+        {"phase", "epoch", "%.1f", "Which blocks: every whole step reshuffles them (a reconstruction failure)."},
+    };
     static constexpr DeformerRow kPath[] = {
         {"amount", "blend", "%.2f", "0 leaves the shape alone, 1 places it fully on the curve."},
         {"axis", "along", "%.2f", "The object axis that maps to arc length."},
@@ -1564,6 +1571,7 @@ struct DeformerRow {
     case scene::DeformerKind::Path: return kPath;
     case scene::DeformerKind::Streamline: return kStreamline;
     case scene::DeformerKind::Hinge: return kHinge;
+    case scene::DeformerKind::Blocks: return kBlocks;
     }
     return kAxisCenter; // unreachable for a declared enumerator
 }
@@ -1574,6 +1582,7 @@ inline constexpr scene::DeformerKind kDeformerKinds[] = {
     scene::DeformerKind::Bend,  scene::DeformerKind::Twist,        scene::DeformerKind::Sine,
     scene::DeformerKind::Noise, scene::DeformerKind::Displacement, scene::DeformerKind::Field,
     scene::DeformerKind::Path,  scene::DeformerKind::Streamline,   scene::DeformerKind::Hinge,
+    scene::DeformerKind::Blocks,
 };
 
 // The parameter path one row names, for the object `prefix` (`procedural/<name>/`) and a 0-based
