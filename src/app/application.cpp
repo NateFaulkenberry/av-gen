@@ -7843,7 +7843,8 @@ void Application::writeLiveSonicLog(std::uint64_t presentNs, double gpuMs) {
                 // conditioned signals (ADR-1602), envelope sources (ADR-1601), the beat clock -- as --sonic-trace has
                 name.starts_with("stem.") || name.starts_with("role.") || name.starts_with("signal.") ||
                 name.starts_with("env.") ||
-                name.starts_with("beat.") || name.starts_with("audio.onset")) {
+                name.starts_with("beat.") ||
+                name.starts_with("audio.")) { // ADR-1721: the mix analysis whole (tempo confidence, band levels)
                 liveLogColumns_.emplace_back(name, id);
             }
         }

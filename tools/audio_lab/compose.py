@@ -210,7 +210,8 @@ def main():
     strip = Strip(m, tr)
     camera = project["audioLab"]["camera"]
     layout = project["audioLab"]["layout"]
-    probes = {n: ind for n, ind in layout.items() if ind["kind"] in ("lamp", "meter") and "rect" in ind}
+    probes = {n: ind for n, ind in layout.items()
+              if ind["kind"] in ("lamp", "meter") and "rect" in ind and ind.get("pixel", True)}
     pixels = {n: {"luma": [], "final": [], "rect": project_rect(camera, ind["rect"])} for n, ind in probes.items()}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s",

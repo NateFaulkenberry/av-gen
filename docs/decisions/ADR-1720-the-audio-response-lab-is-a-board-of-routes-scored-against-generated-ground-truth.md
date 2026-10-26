@@ -1,14 +1,18 @@
 # ADR-1720: The Audio Response Lab is a board of routes, scored against generated ground truth
 
-- Status: Accepted for Gate 1 (eng/audio-response-lab; owner's brief docs/prototypes/audio-response-lab/00-brief.md)
+- Status: Accepted (eng/audio-response-lab; the owner's brief, docs/prototypes/audio-response-lab/00-brief.md; Gate 1
+  reviewed 2026-10-26)
 - Code:
   - `examples/audio-response-lab/` (the project and scene), written by `tools/audio_lab/make_lab_scene.py`;
   - `tools/audio_lab/make_fixtures.py` (the generator), `lab.py` (run and score), `compose.py` (clip and pixel check).
-- Tests: `tests/integration/test_audio_response_lab.cpp` (`[audiolab]`, `[adr1720]`):
+- Tests: `tests/integration/test_audio_lab_e2e.cpp` (one case per category; every gate);
+  `tests/integration/test_audio_response_lab.cpp` (`[audiolab]`, `[adr1720]`):
   - every indicator in the layout is a route from its declared signal, and every non-optional route binds;
   - on the stem fixture, every meter and lamp equals its declared function of its signal on every frame;
   - with no stems, every source meter stays empty and every ACTIVE lamp hidden (the red no-data lamp shows).
-- Docs: `docs/prototypes/audio-response-lab/01-plan.md` (audit, clocks, thresholds), `02-gate1-report.md`.
+- Docs: `docs/audio-response-lab.md` (how to run, add a fixture and read a failure);
+  `docs/prototypes/audio-response-lab/01-plan.md` (audit, clocks, thresholds), `02-gate1-report.md`,
+  `03-final-report.md`.
 
 ## Problem
 
@@ -47,4 +51,9 @@ pixel that answered it.
   (02-gate1-report).
 - The scene's own GPU cost is dominated by text labels (about 7.5 ms of 11.7 ms at 1080p30 on the M2 Max). It meets the
   target, but text meshes are expensive everywhere.
-- The live path (the causal tracker, capture latency) is not yet measured by the lab. It is next.
+- The live path is measured by ADR-1725's replay and loopback. The fast mid and high levels (ADR-1723) and the clock
+  source (ADR-1724) came out of Gate 1.
+- **Gates and findings.** A check is a gate when it is a property the system promises (mapping, rest after silence,
+  bounds, band selectivity, silence is silent). It is a finding when it is a measured quality the owner has chosen to
+  treat as separate work (the beat clock, a detector in noise). The end-to-end tests fail on gates. Findings are always
+  reported with their numbers.

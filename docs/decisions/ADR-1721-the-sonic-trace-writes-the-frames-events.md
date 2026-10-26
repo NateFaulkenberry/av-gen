@@ -2,7 +2,7 @@
 
 - Status: Accepted (eng/audio-response-lab)
 - Amends ADR-1571 (the trace's stem and envelope columns) and ADR-1602 (`--trace-finals`).
-- Code: `src/app/sonic_trace_cli.cpp`.
+- Code: `src/app/sonic_trace_cli.cpp`; `src/app/application.cpp` (`writeLiveSonicLog`).
 - Tests: `tests/integration/test_sonic_trace_stems.cpp` `[adr1720]`:
   - `stem.drums.onset`, `stem.drums.kick`, `response.onset` and `beat.pulse` have rows that fired;
   - the kick column fires about once per fixture kick, not on every frame;
@@ -27,6 +27,8 @@ the peak. The trace also left out `audio.*`, so the mix's band levels and tempo 
   reads 0.001, as in ADR-1605.
 - Value columns are unchanged.
 - `audio.*` and `control.*` join the column set.
+- `--sonic-live-log` (ADR-1605) writes `audio.*` whole, where it wrote only `audio.onset*`, so the live log carries the
+  tempo confidence the lab scores.
 
 ## Consequences
 

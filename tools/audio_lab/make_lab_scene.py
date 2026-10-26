@@ -116,8 +116,10 @@ def slow_bar(name, x, y0, height, signal, colour, width=0.16):
           chain=dict(remap, remapOutMin=0.001, remapOutMax=height))
     route(signal, f"procedural/{name}Fill/transform/position", component=1,
           chain=dict(remap, remapOutMin=y0, remapOutMax=y0 + height / 2))
+    # Not pixel-checked: it sits inside its meter's rectangle, so its pixels mix with the fast fill's (the trace checks
+    # its mapping exactly).
     layout[name] = {"kind": "meter", "signal": signal, "rect": [x - width / 2, y0, x + width / 2, y0 + height],
-                    "param": f"procedural/{name}Fill/transform/scale", "component": 1, "scale": height}
+                    "param": f"procedural/{name}Fill/transform/scale", "component": 1, "scale": height, "pixel": False}
 
 
 def lamp(name, x, y, size, signal, colour, label, gain=0.9, optional=False, label_size=0.26):

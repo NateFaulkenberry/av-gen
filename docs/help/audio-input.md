@@ -108,8 +108,8 @@ the Inputs table and under the Stems section, lets a source drive them instead:
   MIDI clock still wins.
 - **Hits**: `response.low` and `response.onset` (their envelopes and the onset register) from this source. From a drum
   bus, the bass line in the mix no longer fires `response.low`.
-- **Levels**: `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient` and `flux` from this source,
-  read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
+- **Levels**: `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient`, `flux`, `mid` and `high`
+  from this source, read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
   with every hit. For one level per part, read that part's own `role.<role>.level` instead.
 - **History**: what spectrum and onset fields hear (Resonator, the generative fields): this source's spectrogram and
   onsets instead of the mix's. A drums source's kicks, snares and hats are the fields' low, mid and high onsets; the

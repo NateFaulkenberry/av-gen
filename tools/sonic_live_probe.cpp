@@ -39,6 +39,7 @@
 // low-pass or band-pass state-variable filter), so the checklist sounds like the brief's list (PART 22): pad,
 // pluck, lead, FM, distorted, filtered, resonant, noisy, sustained, percussive.
 
+#include "audio/audio_file.hpp"
 #include "audio/capture_coreaudio.hpp"
 #include "control/midi.hpp"
 #include "sonic/live.hpp"
@@ -683,7 +684,20 @@ void buildShots(Synth& s) {
 
 void scenario(const std::string& name, Player& p) {
     Synth& s = p.synth;
-    if (name == "transients") {
+    if (name == "file") {
+        // ADR-1725: an Audio Response Lab fixture, played once as one long "shot" (mono, the file's own samples at
+        // 48 kHz), so its first sample's host time is exact on the stream's clock like a transient's: the `file` row.
+        s.shotStartFrame.store(-1, std::memory_order_release);
+        p.waitUntil(1.0);
+        s.shotPending.store(0, std::memory_order_release);
+        while (s.shotStartFrame.load(std::memory_order_acquire) < 0) {
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
+        }
+        const auto frame = static_cast<double>(s.shotStartFrame.load());
+        const std::uint64_t ns = s.firstCallbackNs.load() + static_cast<std::uint64_t>(frame / 48000.0 * 1e9);
+        p.log.out << ns << ",file,0," << s.shots[0].size() << ",0,0\n";
+        p.waitUntil(1.0 + static_cast<double>(s.shots[0].size()) / 48000.0 + 1.0);
+    } else if (name == "transients") {
         buildShots(s);
         for (int i = 0; i < 80; ++i) {
             const double t = 1.0 + 0.6031 * i;
@@ -998,6 +1012,7 @@ int main(int argc, char** argv) {
     double leadIn = 0.0;
     ma_uint32 period = 128;
     double recordSeconds = 0.0; // 0 = long enough for the scenario (see below)
+    std::string filePath;       // ADR-1725: the `file` scenario's WAV (48 kHz)
     for (int i = 2; i + 1 < argc; i += 2) {
         const std::string a = argv[i];
         if (a == "--out") outPath = argv[i + 1];
@@ -1007,6 +1022,7 @@ int main(int argc, char** argv) {
         else if (a == "--period") period = static_cast<ma_uint32>(std::atoi(argv[i + 1]));
         else if (a == "--scenes") scenes = std::max(1, std::atoi(argv[i + 1]));
         else if (a == "--record-seconds") recordSeconds = std::max(1.0, std::atof(argv[i + 1]));
+        else if (a == "--file") filePath = argv[i + 1];
     }
     // The recording buffer (the --wav soundtrack). It was a fixed 180 s, shorter than a 17-scene tour (1 + 20 x 17
     // = 341 s), so the tour's WAV stopped two thirds of the way through. The default now covers the tour plus the
@@ -1054,6 +1070,17 @@ int main(int argc, char** argv) {
     }
     Synth synth;
     synth.sampleRate = 48000.0f;
+    if (name == "file") {
+        auto file = avgen::audio::AudioFile::load(filePath);
+        if (!file || file->sampleRate() != 48000) {
+            std::fprintf(stderr, "probe: --file needs a 48 kHz WAV (%s)\n",
+                         file ? "wrong rate" : file.error().message.c_str());
+            return 2;
+        }
+        synth.shots[0].assign(file->mono().begin(), file->mono().end());
+        synth.level.store(0.0f); // nothing but the file
+        recordSeconds = std::max(recordSeconds, leadIn + 4.0 + file->durationSeconds());
+    }
     synth.recording.assign(static_cast<std::size_t>(48000.0 * recordSeconds), 0.0f);
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format = ma_format_f32;

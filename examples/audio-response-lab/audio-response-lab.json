@@ -1200,7 +1200,8 @@
     ],
     "param": "procedural/mMidSlowFill/transform/scale",
     "component": 1,
-    "scale": 4.6
+    "scale": 4.6,
+    "pixel": false
    },
    "mHighSlow": {
     "kind": "meter",
@@ -1213,7 +1214,8 @@
     ],
     "param": "procedural/mHighSlowFill/transform/scale",
     "component": 1,
-    "scale": 4.6
+    "scale": 4.6,
+    "pixel": false
    },
    "lOnset": {
     "kind": "lamp",

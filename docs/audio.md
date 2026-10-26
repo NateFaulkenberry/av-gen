@@ -72,6 +72,19 @@ Two paths share the analyzer's onset strength at hop rate:
 Frames carry `tempoBpm`, `tempoConfidence`, `beat`, `beatPhase`, `beatCount`. Octave errors are
 only mitigated by the prior; tempo changes inside an offline track get one global tempo.
 
+`beat.source` (ADR-1724) says which clock `beat.*` reads: 0 none, 1 MIDI clock, 2 the analysed file grid, 3 the live
+tracker. On the file grid, `audio.tempoConfidence` is one number for the whole file: it cannot show acquisition, loss or
+reacquisition, and a scene that wants to say "the beat is locked" must not read it as if it could.
+
+Measured by the Audio Response Lab (docs/prototypes/audio-response-lab/03-final-report.md, 2026-10-26), against intended
+beats:
+- **Syncopated material (110 BPM son clave and displaced accents):** both the file grid and the live tracker read
+  144.6 BPM. The F-measure is 0.28 for the file grid and 0.15-0.19 for the live tracker, and neither ever locks.
+- **A 120 BPM four-on-the-floor intro at -30 dB:** the live tracker reads it at half tempo and takes 22-26 s to lock.
+- **A step from 120 to 96 BPM:** the live tracker relocks in 3.7 s.
+- **Through a silence of a few seconds:** the live tracker's confidence holds (0.6-0.8).
+These numbers are recorded for separate work on the tracker.
+
 ## Signals (`signals::AudioSignals`)
 
 `audio.rms`, `audio.peak`, `audio.bass`, `audio.lowMid`, `audio.mid`, `audio.highMid`,
@@ -80,6 +93,11 @@ only mitigated by the prior; tempo changes inside an offline track get one globa
 `audio.tempoConfidence`, `audio.beat` (event), `audio.beatPhase`, `audio.beatCount`. The engine
 derives a per-frame beat clock from these (`beat.*`, see `docs/architecture.md` §4). No smoothing
 is applied at this level; each modulation route smooths independently.
+
+The band levels `audio.<band>Level` are long-term levels (power over 1 s on a fixed 0 = -60 dB scale, ADR-897). They
+fall 4.3 dB/s, so they take up to 14 s to read 0 after the music stops. For a level that follows a band's attacks and
+returns to rest within about 0.3 s, read `response.mid` (250 Hz-4 kHz) and `response.high` (4-16 kHz) (ADR-1723).
+Each reads against its own adaptive reference, so a dull mix's hats still read across the range.
 
 ## Live input (milestone 1.1, `audio::AudioInput`)
 
@@ -160,7 +178,7 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 | `beat` | the beat clock: `beat.*`, the metre (bar 1, phrases), `music.*`, the timeline's beat markers and snap, the Director's and the camera director's grid, effect triggers | `"audio"` |
 | `hits` | every response hit class not named below: `response.low`, `response.onset`, their `*Env` and the onset register (`response.onsetLow/Mid/High`) | `"audio"` |
 | `low` `onset` | that one class, over `hits` (`"audio"` puts one class back on the mix) | `hits` |
-| `levels` | `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient`, `flux` (one source: they share one loudness reference, ADR-1510) | `"audio"` |
+| `levels` | `response.bass`, `level`, `levelSlow`, `intensity`, `sustain`, `transient`, `flux`, `mid`, `high` (one source: they share one loudness reference, ADR-1510; `mid` and `high` each keep their own, ADR-1723) | `"audio"` |
 | `history` | ADR-1631: the audio history spectrum and onset fields read (Resonator, the generative fields, THE ASTRAL FORGE's conductors): its spectrogram and its low/mid/high onset rows | `"audio"` |
 | `historySpectrum` `historyOnsets` | one half of the history, over `history` | `history` |
 
