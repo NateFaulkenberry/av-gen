@@ -73,8 +73,9 @@ def apply_effect(p, s, P, effect):
     if effect == "wash":
         if th.FOIL:   # foil1: the music's bands at their widest and brightest, swept part way
             setop("fBand", "constant", [0.5, 0.86, 0.0, 0.0])
-            setop("fGlow", "constant", [1.0, 1.0, 1.0, 0.0])
-            setop("fDrift", "constant", [0.07, 0.0, 0.0, 0.0])
+            setop("fGlow", "constant", [0.0, 1.0, 0.0, 1.0])
+            setop("fBandC", "value", 0.07)
+            setop("fSpec", "value", 0.07)
         else:
             setop("washAmount", "constant", [0.0, 1.0, 0.12, 0.9])
     elif effect == "bands":

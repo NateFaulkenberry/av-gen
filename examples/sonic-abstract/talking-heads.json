@@ -6244,7 +6244,7 @@
   },
   {
    "source": "signal.th1Hit",
-   "target": "material/th1-body/op/50/threshold/value",
+   "target": "material/th1-body/op/44/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -6257,7 +6257,7 @@
   },
   {
    "source": "signal.th1Hit",
-   "target": "material/th1-neck/op/50/threshold/value",
+   "target": "material/th1-neck/op/44/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -6270,7 +6270,7 @@
   },
   {
    "source": "signal.th1Hit",
-   "target": "material/th1-head/op/50/threshold/value",
+   "target": "material/th1-head/op/44/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -6367,11 +6367,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-body/op/27/constant/constant",
+   "target": "material/th1-body/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -6380,18 +6379,39 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-body/op/27/constant/constant",
+   "target": "material/th1-body/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-body/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-body/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-body/op/30/smoothstep/constant",
+   "target": "material/th1-body/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -6403,7 +6423,7 @@
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-body/op/30/smoothstep/constant",
+   "target": "material/th1-body/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -6415,7 +6435,7 @@
   },
   {
    "source": "signal.th1Open",
-   "target": "material/th1-body/op/18/smoothstep/constant",
+   "target": "material/th1-body/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -6427,11 +6447,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-body/op/15/constant/constant",
+   "target": "material/th1-body/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -6440,50 +6459,21 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-body/op/15/constant/constant",
+   "target": "material/th1-body/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-body/op/35/constant/constant",
+   "target": "material/th1-body/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -6493,11 +6483,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-neck/op/27/constant/constant",
+   "target": "material/th1-neck/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -6506,18 +6495,39 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-neck/op/27/constant/constant",
+   "target": "material/th1-neck/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-neck/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-neck/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-neck/op/30/smoothstep/constant",
+   "target": "material/th1-neck/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -6529,7 +6539,7 @@
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-neck/op/30/smoothstep/constant",
+   "target": "material/th1-neck/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -6541,7 +6551,7 @@
   },
   {
    "source": "signal.th1Open",
-   "target": "material/th1-neck/op/18/smoothstep/constant",
+   "target": "material/th1-neck/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -6553,11 +6563,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-neck/op/15/constant/constant",
+   "target": "material/th1-neck/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -6566,50 +6575,21 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-neck/op/15/constant/constant",
+   "target": "material/th1-neck/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-neck/op/35/constant/constant",
+   "target": "material/th1-neck/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -6619,11 +6599,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-head/op/27/constant/constant",
+   "target": "material/th1-head/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -6632,18 +6611,39 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-head/op/27/constant/constant",
+   "target": "material/th1-head/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-head/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-head/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-head/op/30/smoothstep/constant",
+   "target": "material/th1-head/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -6655,7 +6655,7 @@
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-head/op/30/smoothstep/constant",
+   "target": "material/th1-head/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -6667,7 +6667,7 @@
   },
   {
    "source": "signal.th1Open",
-   "target": "material/th1-head/op/18/smoothstep/constant",
+   "target": "material/th1-head/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -6679,11 +6679,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-head/op/15/constant/constant",
+   "target": "material/th1-head/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -6692,50 +6691,21 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-head/op/15/constant/constant",
+   "target": "material/th1-head/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-head/op/35/constant/constant",
+   "target": "material/th1-head/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -6745,11 +6715,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-lid/op/27/constant/constant",
+   "target": "material/th1-lid/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -6758,18 +6727,39 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-lid/op/27/constant/constant",
+   "target": "material/th1-lid/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th1LevelS",
+   "target": "material/th1-lid/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th1Sweep",
+   "target": "material/th1-lid/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-lid/op/30/smoothstep/constant",
+   "target": "material/th1-lid/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -6781,7 +6771,7 @@
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-lid/op/30/smoothstep/constant",
+   "target": "material/th1-lid/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -6793,7 +6783,7 @@
   },
   {
    "source": "signal.th1Open",
-   "target": "material/th1-lid/op/18/smoothstep/constant",
+   "target": "material/th1-lid/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -6805,11 +6795,10 @@
   },
   {
    "source": "signal.th1LevelS",
-   "target": "material/th1-lid/op/15/constant/constant",
+   "target": "material/th1-lid/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -6818,50 +6807,21 @@
   },
   {
    "source": "signal.th1Sweep",
-   "target": "material/th1-lid/op/15/constant/constant",
+   "target": "material/th1-lid/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th1Live",
-   "target": "material/th1-lid/op/35/constant/constant",
+   "target": "material/th1-lid/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th1Live",
-   "target": "material/th1-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -8337,7 +8297,7 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-body/op/44/threshold/value",
+   "target": "material/th2-body/op/38/threshold/value",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8350,7 +8310,7 @@
   },
   {
    "source": "signal.th2Crash",
-   "target": "material/th2-body/op/44/threshold/value",
+   "target": "material/th2-body/op/38/threshold/value",
    "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -8363,7 +8323,7 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-neck/op/44/threshold/value",
+   "target": "material/th2-neck/op/38/threshold/value",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8376,7 +8336,7 @@
   },
   {
    "source": "signal.th2Crash",
-   "target": "material/th2-neck/op/44/threshold/value",
+   "target": "material/th2-neck/op/38/threshold/value",
    "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -8389,7 +8349,7 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-head/op/44/threshold/value",
+   "target": "material/th2-head/op/38/threshold/value",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8402,7 +8362,7 @@
   },
   {
    "source": "signal.th2Crash",
-   "target": "material/th2-head/op/44/threshold/value",
+   "target": "material/th2-head/op/38/threshold/value",
    "amount": -0.25,
    "op": "add",
    "polarity": "unipolar",
@@ -8415,11 +8375,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-body/op/27/constant/constant",
+   "target": "material/th2-body/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -8428,18 +8387,39 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-body/op/27/constant/constant",
+   "target": "material/th2-body/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-body/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-body/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-body/op/30/smoothstep/constant",
+   "target": "material/th2-body/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8451,7 +8431,7 @@
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-body/op/30/smoothstep/constant",
+   "target": "material/th2-body/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -8463,7 +8443,7 @@
   },
   {
    "source": "signal.th2Open",
-   "target": "material/th2-body/op/18/smoothstep/constant",
+   "target": "material/th2-body/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -8475,11 +8455,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-body/op/15/constant/constant",
+   "target": "material/th2-body/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -8488,50 +8467,21 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-body/op/15/constant/constant",
+   "target": "material/th2-body/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-body/op/35/constant/constant",
+   "target": "material/th2-body/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -8541,11 +8491,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-neck/op/27/constant/constant",
+   "target": "material/th2-neck/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -8554,18 +8503,39 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-neck/op/27/constant/constant",
+   "target": "material/th2-neck/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-neck/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-neck/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-neck/op/30/smoothstep/constant",
+   "target": "material/th2-neck/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8577,7 +8547,7 @@
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-neck/op/30/smoothstep/constant",
+   "target": "material/th2-neck/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -8589,7 +8559,7 @@
   },
   {
    "source": "signal.th2Open",
-   "target": "material/th2-neck/op/18/smoothstep/constant",
+   "target": "material/th2-neck/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -8601,11 +8571,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-neck/op/15/constant/constant",
+   "target": "material/th2-neck/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -8614,50 +8583,21 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-neck/op/15/constant/constant",
+   "target": "material/th2-neck/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-neck/op/35/constant/constant",
+   "target": "material/th2-neck/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -8667,11 +8607,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-head/op/27/constant/constant",
+   "target": "material/th2-head/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -8680,18 +8619,39 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-head/op/27/constant/constant",
+   "target": "material/th2-head/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-head/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-head/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-head/op/30/smoothstep/constant",
+   "target": "material/th2-head/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8703,7 +8663,7 @@
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-head/op/30/smoothstep/constant",
+   "target": "material/th2-head/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -8715,7 +8675,7 @@
   },
   {
    "source": "signal.th2Open",
-   "target": "material/th2-head/op/18/smoothstep/constant",
+   "target": "material/th2-head/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -8727,11 +8687,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-head/op/15/constant/constant",
+   "target": "material/th2-head/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -8740,50 +8699,21 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-head/op/15/constant/constant",
+   "target": "material/th2-head/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-head/op/35/constant/constant",
+   "target": "material/th2-head/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -8793,11 +8723,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-lid/op/27/constant/constant",
+   "target": "material/th2-lid/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -8806,18 +8735,39 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-lid/op/27/constant/constant",
+   "target": "material/th2-lid/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th2LevelS",
+   "target": "material/th2-lid/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th2Sweep",
+   "target": "material/th2-lid/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-lid/op/30/smoothstep/constant",
+   "target": "material/th2-lid/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -8829,7 +8779,7 @@
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-lid/op/30/smoothstep/constant",
+   "target": "material/th2-lid/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -8841,7 +8791,7 @@
   },
   {
    "source": "signal.th2Open",
-   "target": "material/th2-lid/op/18/smoothstep/constant",
+   "target": "material/th2-lid/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -8853,11 +8803,10 @@
   },
   {
    "source": "signal.th2LevelS",
-   "target": "material/th2-lid/op/15/constant/constant",
+   "target": "material/th2-lid/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -8866,50 +8815,21 @@
   },
   {
    "source": "signal.th2Sweep",
-   "target": "material/th2-lid/op/15/constant/constant",
+   "target": "material/th2-lid/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th2Live",
-   "target": "material/th2-lid/op/35/constant/constant",
+   "target": "material/th2-lid/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th2Live",
-   "target": "material/th2-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -9459,7 +9379,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/45/smoothstep/constant",
+   "target": "material/th3-body/op/39/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -9473,7 +9393,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/45/smoothstep/constant",
+   "target": "material/th3-body/op/39/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9487,7 +9407,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/44/smoothstep/constant",
+   "target": "material/th3-body/op/38/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -9501,7 +9421,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/44/smoothstep/constant",
+   "target": "material/th3-body/op/38/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9515,7 +9435,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/45/smoothstep/constant",
+   "target": "material/th3-body/op/39/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -9529,7 +9449,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/45/smoothstep/constant",
+   "target": "material/th3-body/op/39/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9543,7 +9463,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/44/smoothstep/constant",
+   "target": "material/th3-body/op/38/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -9557,7 +9477,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/44/smoothstep/constant",
+   "target": "material/th3-body/op/38/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9571,7 +9491,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/46/noise/constant",
+   "target": "material/th3-body/op/40/noise/constant",
    "amount": 36.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9582,7 +9502,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/46/noise/constant",
+   "target": "material/th3-body/op/40/noise/constant",
    "amount": 54.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9593,7 +9513,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/46/noise/constant",
+   "target": "material/th3-body/op/40/noise/constant",
    "amount": 68.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9604,7 +9524,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/46/noise/constant",
+   "target": "material/th3-body/op/40/noise/constant",
    "amount": 102.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9615,7 +9535,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/46/noise/constant",
+   "target": "material/th3-body/op/40/noise/constant",
    "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9626,7 +9546,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/46/noise/constant",
+   "target": "material/th3-body/op/40/noise/constant",
    "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9637,7 +9557,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/42/noise/constant",
+   "target": "material/th3-body/op/36/noise/constant",
    "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -9650,7 +9570,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/42/noise/constant",
+   "target": "material/th3-body/op/36/noise/constant",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
@@ -9663,7 +9583,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/56/threshold/value",
+   "target": "material/th3-body/op/50/threshold/value",
    "amount": -0.55,
    "op": "add",
    "polarity": "unipolar",
@@ -9674,7 +9594,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/56/threshold/value",
+   "target": "material/th3-body/op/50/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9685,7 +9605,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/57/constant/constant",
+   "target": "material/th3-body/op/51/constant/constant",
    "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -9699,7 +9619,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/57/constant/constant",
+   "target": "material/th3-body/op/51/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9713,7 +9633,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/57/constant/constant",
+   "target": "material/th3-body/op/51/constant/constant",
    "amount": 0.49586900000000006,
    "op": "add",
    "polarity": "unipolar",
@@ -9727,7 +9647,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/57/constant/constant",
+   "target": "material/th3-body/op/51/constant/constant",
    "amount": 0.45079,
    "op": "add",
    "polarity": "unipolar",
@@ -9741,7 +9661,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/57/constant/constant",
+   "target": "material/th3-body/op/51/constant/constant",
    "amount": 0.069311,
    "op": "add",
    "polarity": "unipolar",
@@ -9755,7 +9675,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-body/op/57/constant/constant",
+   "target": "material/th3-body/op/51/constant/constant",
    "amount": 0.06301,
    "op": "add",
    "polarity": "unipolar",
@@ -9769,7 +9689,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/45/smoothstep/constant",
+   "target": "material/th3-neck/op/39/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -9783,7 +9703,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/45/smoothstep/constant",
+   "target": "material/th3-neck/op/39/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9797,7 +9717,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/44/smoothstep/constant",
+   "target": "material/th3-neck/op/38/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -9811,7 +9731,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/44/smoothstep/constant",
+   "target": "material/th3-neck/op/38/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9825,7 +9745,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/45/smoothstep/constant",
+   "target": "material/th3-neck/op/39/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -9839,7 +9759,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/45/smoothstep/constant",
+   "target": "material/th3-neck/op/39/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9853,7 +9773,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/44/smoothstep/constant",
+   "target": "material/th3-neck/op/38/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -9867,7 +9787,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/44/smoothstep/constant",
+   "target": "material/th3-neck/op/38/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9881,7 +9801,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/46/noise/constant",
+   "target": "material/th3-neck/op/40/noise/constant",
    "amount": 36.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9892,7 +9812,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/46/noise/constant",
+   "target": "material/th3-neck/op/40/noise/constant",
    "amount": 54.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9903,7 +9823,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/46/noise/constant",
+   "target": "material/th3-neck/op/40/noise/constant",
    "amount": 68.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9914,7 +9834,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/46/noise/constant",
+   "target": "material/th3-neck/op/40/noise/constant",
    "amount": 102.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9925,7 +9845,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/46/noise/constant",
+   "target": "material/th3-neck/op/40/noise/constant",
    "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9936,7 +9856,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/46/noise/constant",
+   "target": "material/th3-neck/op/40/noise/constant",
    "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
@@ -9947,7 +9867,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/42/noise/constant",
+   "target": "material/th3-neck/op/36/noise/constant",
    "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -9960,7 +9880,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/42/noise/constant",
+   "target": "material/th3-neck/op/36/noise/constant",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
@@ -9973,7 +9893,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/56/threshold/value",
+   "target": "material/th3-neck/op/50/threshold/value",
    "amount": -0.55,
    "op": "add",
    "polarity": "unipolar",
@@ -9984,7 +9904,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/56/threshold/value",
+   "target": "material/th3-neck/op/50/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -9995,7 +9915,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/57/constant/constant",
+   "target": "material/th3-neck/op/51/constant/constant",
    "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -10009,7 +9929,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/57/constant/constant",
+   "target": "material/th3-neck/op/51/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10023,7 +9943,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/57/constant/constant",
+   "target": "material/th3-neck/op/51/constant/constant",
    "amount": 0.49586900000000006,
    "op": "add",
    "polarity": "unipolar",
@@ -10037,7 +9957,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/57/constant/constant",
+   "target": "material/th3-neck/op/51/constant/constant",
    "amount": 0.45079,
    "op": "add",
    "polarity": "unipolar",
@@ -10051,7 +9971,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/57/constant/constant",
+   "target": "material/th3-neck/op/51/constant/constant",
    "amount": 0.069311,
    "op": "add",
    "polarity": "unipolar",
@@ -10065,7 +9985,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-neck/op/57/constant/constant",
+   "target": "material/th3-neck/op/51/constant/constant",
    "amount": 0.06301,
    "op": "add",
    "polarity": "unipolar",
@@ -10079,7 +9999,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/45/smoothstep/constant",
+   "target": "material/th3-head/op/39/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -10093,7 +10013,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/45/smoothstep/constant",
+   "target": "material/th3-head/op/39/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -10107,7 +10027,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/44/smoothstep/constant",
+   "target": "material/th3-head/op/38/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -10121,7 +10041,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/44/smoothstep/constant",
+   "target": "material/th3-head/op/38/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -10135,7 +10055,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/45/smoothstep/constant",
+   "target": "material/th3-head/op/39/smoothstep/constant",
    "amount": -0.6,
    "op": "add",
    "polarity": "unipolar",
@@ -10149,7 +10069,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/45/smoothstep/constant",
+   "target": "material/th3-head/op/39/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -10163,7 +10083,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/44/smoothstep/constant",
+   "target": "material/th3-head/op/38/smoothstep/constant",
    "amount": -0.62,
    "op": "add",
    "polarity": "unipolar",
@@ -10177,7 +10097,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/44/smoothstep/constant",
+   "target": "material/th3-head/op/38/smoothstep/constant",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -10191,7 +10111,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/46/noise/constant",
+   "target": "material/th3-head/op/40/noise/constant",
    "amount": 36.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10202,7 +10122,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/46/noise/constant",
+   "target": "material/th3-head/op/40/noise/constant",
    "amount": 54.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10213,7 +10133,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/46/noise/constant",
+   "target": "material/th3-head/op/40/noise/constant",
    "amount": 68.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10224,7 +10144,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/46/noise/constant",
+   "target": "material/th3-head/op/40/noise/constant",
    "amount": 102.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10235,7 +10155,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/46/noise/constant",
+   "target": "material/th3-head/op/40/noise/constant",
    "amount": 16.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10246,7 +10166,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/46/noise/constant",
+   "target": "material/th3-head/op/40/noise/constant",
    "amount": 24.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10257,7 +10177,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/42/noise/constant",
+   "target": "material/th3-head/op/36/noise/constant",
    "amount": 0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -10270,7 +10190,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/42/noise/constant",
+   "target": "material/th3-head/op/36/noise/constant",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
@@ -10283,7 +10203,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/56/threshold/value",
+   "target": "material/th3-head/op/50/threshold/value",
    "amount": -0.55,
    "op": "add",
    "polarity": "unipolar",
@@ -10294,7 +10214,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/56/threshold/value",
+   "target": "material/th3-head/op/50/threshold/value",
    "amount": -0.3,
    "op": "add",
    "polarity": "unipolar",
@@ -10305,7 +10225,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/57/constant/constant",
+   "target": "material/th3-head/op/51/constant/constant",
    "amount": 1.1,
    "op": "add",
    "polarity": "unipolar",
@@ -10319,7 +10239,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/57/constant/constant",
+   "target": "material/th3-head/op/51/constant/constant",
    "amount": 1.0,
    "op": "add",
    "polarity": "unipolar",
@@ -10333,7 +10253,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/57/constant/constant",
+   "target": "material/th3-head/op/51/constant/constant",
    "amount": 0.49586900000000006,
    "op": "add",
    "polarity": "unipolar",
@@ -10347,7 +10267,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/57/constant/constant",
+   "target": "material/th3-head/op/51/constant/constant",
    "amount": 0.45079,
    "op": "add",
    "polarity": "unipolar",
@@ -10361,7 +10281,7 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/57/constant/constant",
+   "target": "material/th3-head/op/51/constant/constant",
    "amount": 0.069311,
    "op": "add",
    "polarity": "unipolar",
@@ -10375,7 +10295,7 @@
   },
   {
    "source": "signal.th3Burst",
-   "target": "material/th3-head/op/57/constant/constant",
+   "target": "material/th3-head/op/51/constant/constant",
    "amount": 0.06301,
    "op": "add",
    "polarity": "unipolar",
@@ -10501,11 +10421,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/27/constant/constant",
+   "target": "material/th3-body/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -10514,18 +10433,39 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-body/op/27/constant/constant",
+   "target": "material/th3-body/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-body/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-body/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-body/op/30/smoothstep/constant",
+   "target": "material/th3-body/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -10537,7 +10477,7 @@
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-body/op/30/smoothstep/constant",
+   "target": "material/th3-body/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -10549,7 +10489,7 @@
   },
   {
    "source": "signal.th3Open",
-   "target": "material/th3-body/op/18/smoothstep/constant",
+   "target": "material/th3-body/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -10561,11 +10501,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-body/op/15/constant/constant",
+   "target": "material/th3-body/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -10574,50 +10513,21 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-body/op/15/constant/constant",
+   "target": "material/th3-body/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-body/op/35/constant/constant",
+   "target": "material/th3-body/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -10627,11 +10537,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/27/constant/constant",
+   "target": "material/th3-neck/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -10640,18 +10549,39 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-neck/op/27/constant/constant",
+   "target": "material/th3-neck/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-neck/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-neck/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-neck/op/30/smoothstep/constant",
+   "target": "material/th3-neck/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -10663,7 +10593,7 @@
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-neck/op/30/smoothstep/constant",
+   "target": "material/th3-neck/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -10675,7 +10605,7 @@
   },
   {
    "source": "signal.th3Open",
-   "target": "material/th3-neck/op/18/smoothstep/constant",
+   "target": "material/th3-neck/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -10687,11 +10617,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-neck/op/15/constant/constant",
+   "target": "material/th3-neck/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -10700,50 +10629,21 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-neck/op/15/constant/constant",
+   "target": "material/th3-neck/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-neck/op/35/constant/constant",
+   "target": "material/th3-neck/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -10753,11 +10653,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/27/constant/constant",
+   "target": "material/th3-head/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -10766,18 +10665,39 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-head/op/27/constant/constant",
+   "target": "material/th3-head/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-head/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-head/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-head/op/30/smoothstep/constant",
+   "target": "material/th3-head/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -10789,7 +10709,7 @@
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-head/op/30/smoothstep/constant",
+   "target": "material/th3-head/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -10801,7 +10721,7 @@
   },
   {
    "source": "signal.th3Open",
-   "target": "material/th3-head/op/18/smoothstep/constant",
+   "target": "material/th3-head/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -10813,11 +10733,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-head/op/15/constant/constant",
+   "target": "material/th3-head/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -10826,50 +10745,21 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-head/op/15/constant/constant",
+   "target": "material/th3-head/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-head/op/35/constant/constant",
+   "target": "material/th3-head/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -10879,11 +10769,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-lid/op/27/constant/constant",
+   "target": "material/th3-lid/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -10892,18 +10781,39 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-lid/op/27/constant/constant",
+   "target": "material/th3-lid/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th3LevelS",
+   "target": "material/th3-lid/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th3Sweep",
+   "target": "material/th3-lid/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-lid/op/30/smoothstep/constant",
+   "target": "material/th3-lid/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -10915,7 +10825,7 @@
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-lid/op/30/smoothstep/constant",
+   "target": "material/th3-lid/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -10927,7 +10837,7 @@
   },
   {
    "source": "signal.th3Open",
-   "target": "material/th3-lid/op/18/smoothstep/constant",
+   "target": "material/th3-lid/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -10939,11 +10849,10 @@
   },
   {
    "source": "signal.th3LevelS",
-   "target": "material/th3-lid/op/15/constant/constant",
+   "target": "material/th3-lid/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -10952,50 +10861,21 @@
   },
   {
    "source": "signal.th3Sweep",
-   "target": "material/th3-lid/op/15/constant/constant",
+   "target": "material/th3-lid/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th3Live",
-   "target": "material/th3-lid/op/35/constant/constant",
+   "target": "material/th3-lid/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th3Live",
-   "target": "material/th3-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -11689,11 +11569,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-body/op/27/constant/constant",
+   "target": "material/th4-body/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -11702,18 +11581,39 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-body/op/27/constant/constant",
+   "target": "material/th4-body/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-body/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-body/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-body/op/30/smoothstep/constant",
+   "target": "material/th4-body/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -11725,7 +11625,7 @@
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-body/op/30/smoothstep/constant",
+   "target": "material/th4-body/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -11737,7 +11637,7 @@
   },
   {
    "source": "signal.th4Open",
-   "target": "material/th4-body/op/18/smoothstep/constant",
+   "target": "material/th4-body/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -11749,11 +11649,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-body/op/15/constant/constant",
+   "target": "material/th4-body/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -11762,50 +11661,21 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-body/op/15/constant/constant",
+   "target": "material/th4-body/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-body/op/35/constant/constant",
+   "target": "material/th4-body/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-body/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -11815,11 +11685,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-neck/op/27/constant/constant",
+   "target": "material/th4-neck/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -11828,18 +11697,39 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-neck/op/27/constant/constant",
+   "target": "material/th4-neck/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-neck/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-neck/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-neck/op/30/smoothstep/constant",
+   "target": "material/th4-neck/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -11851,7 +11741,7 @@
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-neck/op/30/smoothstep/constant",
+   "target": "material/th4-neck/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -11863,7 +11753,7 @@
   },
   {
    "source": "signal.th4Open",
-   "target": "material/th4-neck/op/18/smoothstep/constant",
+   "target": "material/th4-neck/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -11875,11 +11765,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-neck/op/15/constant/constant",
+   "target": "material/th4-neck/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -11888,50 +11777,21 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-neck/op/15/constant/constant",
+   "target": "material/th4-neck/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-neck/op/35/constant/constant",
+   "target": "material/th4-neck/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-neck/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -11941,11 +11801,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-head/op/27/constant/constant",
+   "target": "material/th4-head/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -11954,18 +11813,39 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-head/op/27/constant/constant",
+   "target": "material/th4-head/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-head/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-head/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-head/op/30/smoothstep/constant",
+   "target": "material/th4-head/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -11977,7 +11857,7 @@
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-head/op/30/smoothstep/constant",
+   "target": "material/th4-head/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -11989,7 +11869,7 @@
   },
   {
    "source": "signal.th4Open",
-   "target": "material/th4-head/op/18/smoothstep/constant",
+   "target": "material/th4-head/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -12001,11 +11881,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-head/op/15/constant/constant",
+   "target": "material/th4-head/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -12014,50 +11893,21 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-head/op/15/constant/constant",
+   "target": "material/th4-head/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-head/op/35/constant/constant",
+   "target": "material/th4-head/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-head/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,
@@ -12067,11 +11917,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-lid/op/27/constant/constant",
+   "target": "material/th4-lid/op/24/palette/value",
    "amount": 0.012,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 400,
@@ -12080,18 +11929,39 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-lid/op/27/constant/constant",
+   "target": "material/th4-lid/op/24/palette/value",
    "amount": 0.8,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
+   "chain": {
+    "integrate": true
+   }
+  },
+  {
+   "source": "signal.th4LevelS",
+   "target": "material/th4-lid/op/26/palette/value",
+   "amount": 0.012,
+   "op": "add",
+   "polarity": "unipolar",
+   "chain": {
+    "integrate": true,
+    "attackMs": 400,
+    "decayMs": 1500
+   }
+  },
+  {
+   "source": "signal.th4Sweep",
+   "target": "material/th4-lid/op/26/palette/value",
+   "amount": 0.8,
+   "op": "add",
+   "polarity": "unipolar",
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-lid/op/30/smoothstep/constant",
+   "target": "material/th4-lid/op/25/smoothstep/constant",
    "amount": -0.12,
    "op": "add",
    "polarity": "unipolar",
@@ -12103,7 +11973,7 @@
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-lid/op/30/smoothstep/constant",
+   "target": "material/th4-lid/op/25/smoothstep/constant",
    "amount": -0.03,
    "op": "add",
    "polarity": "unipolar",
@@ -12115,7 +11985,7 @@
   },
   {
    "source": "signal.th4Open",
-   "target": "material/th4-lid/op/18/smoothstep/constant",
+   "target": "material/th4-lid/op/15/smoothstep/constant",
    "amount": -0.0015,
    "op": "add",
    "polarity": "unipolar",
@@ -12127,11 +11997,10 @@
   },
   {
    "source": "signal.th4LevelS",
-   "target": "material/th4-lid/op/15/constant/constant",
+   "target": "material/th4-lid/op/14/palette/value",
    "amount": 0.05,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true,
     "attackMs": 200,
@@ -12140,50 +12009,21 @@
   },
   {
    "source": "signal.th4Sweep",
-   "target": "material/th4-lid/op/15/constant/constant",
+   "target": "material/th4-lid/op/14/palette/value",
    "amount": 0.4,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
    "chain": {
     "integrate": true
    }
   },
   {
    "source": "signal.th4Live",
-   "target": "material/th4-lid/op/35/constant/constant",
+   "target": "material/th4-lid/op/29/remap/constant",
    "amount": 0.9,
    "op": "add",
    "polarity": "unipolar",
-   "component": 0,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 1,
-   "depthSource": "visual.chromaGate",
-   "chain": {
-    "attackMs": 120,
-    "decayMs": 700
-   },
-   "depthMax": 2.0
-  },
-  {
-   "source": "signal.th4Live",
-   "target": "material/th4-lid/op/35/constant/constant",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": 2,
+   "component": 3,
    "depthSource": "visual.chromaGate",
    "chain": {
     "attackMs": 120,

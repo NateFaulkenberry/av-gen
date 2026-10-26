@@ -265,7 +265,8 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], pro
 # - `objectProject` does POC 5's rescale and the piece's offset in one op;
 # - an unsaturated `gradient` gives each phase in one op, scaled down and recovered by the palette's frequency;
 # - the colour index is carried as t/8 + 0.5;
-# - D's diagonal crosshatch in shadow is left out (12 ops).
+# - D's diagonal crosshatch in shadow is left out (12 ops);
+# - the music's phases go into the palettes' own `value` (their index offset), and one fade serves lines and sparkle.
 #
 # SEAMLESS: localPosition is the rest mesh's (procedural.wgsl, before the deformers). Each piece adds its rest offset
 # in the bust's frame (body 0, neck NECK_FOOT, head HEAD_REST, a lid HEAD_REST + its eyeball), so the pieces form one
@@ -325,15 +326,13 @@ def foil_program(name, offset, profile=None, wash=None):
     o.add("fWiden", "add", 2, srcA=2, srcB=3)
     o.add("fGroove", "smoothstep", 2, srcA=2, constant=[0.72, 0.9, 0.0, 0.0])
     o.add("fFoot", "input", 5, input="footprint")
-    o.add("fAA", "gradient", 3, srcA=5, value=1.0, constant=[-3.0 * lines_per_m, 0.0, 0.0, 1.5])
-    o.add("fGrooveAA", "multiply", 2, srcA=2, srcB=3)                       # r2 = groove mask g
-    o.add("fSparkAA", "gradient", 5, srcA=5, value=1.0, constant=[-4.0 * spark_per_m, 0.0, 0.0, 2.0])
+    # one fade for the lines and the sparkle cells (the cells are the finer: it reaches 0 at ~2 px of a cell)
+    o.add("fAA", "gradient", 5, srcA=5, value=1.0, constant=[-3.0 * spark_per_m, 0.0, 0.0, 1.5])
+    o.add("fGrooveAA", "multiply", 2, srcA=2, srcB=5)                       # r2 = groove mask g
     o.add("fFres", "fresnel", 3, value=1.0)
     o.add("fCell", "quantize", 1, srcA=0, value=FOIL_SPARK_CELLS, constant=[0.0, 0.0, 0.0, 0.0], seed=11)
     o.add("fCellR", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
-    o.add("fTwinkle", "constant", 6, constant=[0.0, 0.0, 0.0, 0.0])        # routed: the music's twinkle phase
-    o.add("fCellA", "add", 1, srcA=1, srcB=6)
-    o.add("fFlare", "palette", 1, srcA=1, value=0.0, constant=[0.5, 0.5, 0.5, 0], constant2=[0.5, 0.5, 0.5, 0],
+    o.add("fFlare", "palette", 1, srcA=1, value=0.0,   # value: the music's twinkle phase (routed) constant=[0.5, 0.5, 0.5, 0], constant2=[0.5, 0.5, 0.5, 0],
           constant3=[7.0, 7.0, 7.0, 0], constant4=[0, 0, 0, 0])
     o.add("fSpark", "smoothstep", 1, srcA=1, constant=[FOIL_SPARK_EDGE, 1.0, 0.0, 0.0])   # routed down on hits
     o.add("fCap", "remap", 6, srcA=3, value=1.0, constant=[0.0, FOIL_SPARK_CAP, 0.0, 1.6])  # capped angle weight
@@ -346,17 +345,15 @@ def foil_program(name, offset, profile=None, wash=None):
     o.add("fGrate", "palette", 6, srcA=0, value=0.0, constant=[0, 0, 0, 0], constant2=[0.0075, 0.0075, 0.0075, 0],
           constant3=[320.0, 320.0, 320.0, 0], constant4=[0, 0, 0, 0])
     o.add("fIdxG", "add", 1, srcA=1, srcB=6)
-    o.add("fDrift", "constant", 6, constant=[0.0, 0.0, 0.0, 0.0])           # routed: the music's drift and sweeps
-    o.add("fIdxM", "add", 1, srcA=1, srcB=6)
+    # the music's drift and sweeps: routed into the two palettes' `value` (added to their index), not an op
     o.add("fBandC", "palette", 6, srcA=1, value=0.0, constant=[0.5, 0.5, 0.5, 0], constant2=[0.5, 0.5, 0.5, 0],
           constant3=[4.8, 4.8, 4.8, 0], constant4=[0, 0, 0, 0])
     o.add("fBand", "smoothstep", 6, srcA=6, constant=[FOIL_BAND[0], FOIL_BAND[1], 0.0, 0.0])  # routed wider
     o.add("fSpec", "palette", 5, srcA=1, value=0.0, **FOIL_SPECTRUM)
     o.add("fSilver", "constant", 7, constant=list(FOIL_SILVER) + [1.0])
     o.add("fFoilC", "mixBy", 7, srcA=7, srcB=5, srcC=6)
-    o.add("fBandCol", "multiply", 5, srcA=5, srcB=6)
-    o.add("fGlow", "constant", 6, constant=[FOIL_GLOW[0]] * 3 + [0.0])      # routed: the bands' light with the gate
-    o.add("fBandL", "multiply", 5, srcA=5, srcB=6)
+    o.add("fGlow", "remap", 6, srcA=6, value=0.0, constant=[0.0, 1.0, 0.0, FOIL_GLOW[0]])  # mask x the bands'
+    o.add("fBandL", "multiply", 5, srcA=5, srcB=6)                          # light (k.w routed with the gate)
     o.add("fEmit", "add", 4, srcA=4, srcB=5)
     o.add("fInk", "constant", 5, constant=list(FOIL_INK) + [1.0])
     o.add("fInked", "mixBy", 7, srcA=7, srcB=5, srcC=2)
@@ -1225,18 +1222,19 @@ def foil_routes(s, spec, progs, opath, LIVE, OPEN, LEVEL, ONSET, K):
         "threshold": "binary", "thresholdLevel": 0.7, "envelope": "peakhold", "envelopeHoldMs": 0.0,
         "envelopeFallPerSecond": 4.0, "envelopeRearm": 0.5, "envelopeRefractoryMs": 120.0}}]))
     for prog in progs:
-        s.route(R(LEVEL, opath(prog, "fDrift", "constant"), FOIL_DRIFT, comp=0, integrate=True, attackMs=400,
-                  decayMs=1500),
-                R(sweep, opath(prog, "fDrift", "constant"), FOIL_SWEEP, comp=0, integrate=True),
+        for lab in ("fBandC", "fSpec"):
+            s.route(R(LEVEL, opath(prog, lab, "palette", "value"), FOIL_DRIFT, integrate=True, attackMs=400,
+                      decayMs=1500),
+                    R(sweep, opath(prog, lab, "palette", "value"), FOIL_SWEEP, integrate=True))
+        s.route(
                 R(LIVE, opath(prog, "fBand", "smoothstep"), -0.12, comp=0, attackMs=120, decayMs=700),
                 R(LIVE, opath(prog, "fBand", "smoothstep"), -0.03, comp=1, attackMs=120, decayMs=700),
                 R(OPEN, opath(prog, "fSpark", "smoothstep"), -0.0015, comp=0, attackMs=0, decayMs=300),
-                R(LEVEL, opath(prog, "fTwinkle", "constant"), FOIL_TWINKLE[0], comp=0, integrate=True, attackMs=200,
+                R(LEVEL, opath(prog, "fFlare", "palette", "value"), FOIL_TWINKLE[0], integrate=True, attackMs=200,
                   decayMs=800),
-                R(sweep, opath(prog, "fTwinkle", "constant"), FOIL_TWINKLE[1], comp=0, integrate=True))
-        for c in range(3):
-            s.route(R(LIVE, opath(prog, "fGlow", "constant"), FOIL_GLOW[1], comp=c, depth=K("chroma"), attackMs=120,
-                      decayMs=700))
+                R(sweep, opath(prog, "fFlare", "palette", "value"), FOIL_TWINKLE[1], integrate=True))
+        s.route(R(LIVE, opath(prog, "fGlow", "remap"), FOIL_GLOW[1], comp=3, depth=K("chroma"), attackMs=120,
+                  decayMs=700))
 
 def routes(s, spec, rays):
     P = spec["prefix"]
