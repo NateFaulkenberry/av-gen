@@ -509,7 +509,8 @@ MOUTH_RAYS = [
     {"yaw": -2.0, "pitch": 7.0, "angle": 1.4, "length": 1.95, "aperture": 0.003},
 ]
 RAY_WEIGHT = [0.55, 0.35, 0.8, 0.45, 0.3, 0.65]
-RAY_BRIGHTNESS = 2.6     # a ray's intensity at a fully open mouth, times its weight
+RAY_BRIGHTNESS = 4.2     # a ray's intensity at a fully open mouth, times its weight (foil1, the owner: "strengthen
+                         # brightness of light beams from mouth"; it was 2.6)
 
 
 def neck_offset(deg):
@@ -538,10 +539,11 @@ def build(heads=None, neutral=False, foil=True):
     s = kit.Scene(ID, TITLE, DESIGN)
     s.response = {"sensitivity": 0.5, "transient": 0.5, "sustain": 0.5, "attack": 1.0, "release": 1.0}
     s.environment = {
-        "intensity": 0.04, "background": hexrgb(INK), "fogColor": hexrgb(HAZE, 0.25),
+        "intensity": 0.04, "background": hexrgb(INK), "fogColor": hexrgb(HAZE, 0.25 * SKY_DIM),
         "volumeDensity": 0.0, "volumeMaxDistance": 0.0, "skyIntensity": 1.0,
-        "sky": {"enabled": True, "zenithColor": hexrgb(VIOLET_DEEP, 0.5), "horizonColor": hexrgb(VIOLET_DEEP, 0.32),
-                "groundColor": hexrgb(VIOLET_DEEP, 0.3), "haze": 0.25, "sunIntensity": 0.0, "intensity": 1.0,
+        "sky": {"enabled": True, "zenithColor": hexrgb(VIOLET_DEEP, 0.5 * SKY_DIM),
+                "horizonColor": hexrgb(VIOLET_DEEP, 0.32 * SKY_DIM), "groundColor": hexrgb(VIOLET_DEEP, 0.3 * SKY_DIM),
+                "haze": 0.25, "sunIntensity": 0.0, "intensity": 1.0,
                 "background": True, "useKeyLight": False},
     }
     s.light("key", "directional", direction=[0.55, -0.55, -0.62], color=hexrgb("#ffe2c0"), intensity=3.4,
@@ -550,7 +552,8 @@ def build(heads=None, neutral=False, foil=True):
             castsShadow=False, contactShadow=False)
     s.light("fill", "directional", direction=[-0.6, 0.2, -0.75], color=hexrgb("#5a50c8"), intensity=0.25,
             castsShadow=False, contactShadow=False)
-    s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.42, "post/bloom/threshold": 0.9,
+    # bloom from 1.2 (was 0.9): the brighter rays bloom; the foil's specular ridges, bands and glints stay crisp
+    s.params_({"camera/lens/focalLength": 50.0, "post/bloom/intensity": 0.42, "post/bloom/threshold": 1.2,
                "post/output/vignette": 0.45, "post/output/grain": 0.012, "temporal/echo/enabled": False})
     s.camera["fov"] = 40.0
     # the camera frames every layout (one to four busts, LAYOUT); the busts move, it does not
@@ -582,7 +585,7 @@ def atmosphere(s):
                 direction=[1.0, 0.1, 0.0], spawnRate=3.0, lifetimeMin=18.0, lifetimeMax=30.0, spread=0.6,
                 speedMin=0.01, speedMax=0.035, gravity=[0, 0.0, 0], drag=0.05, turbulence=0.01,
                 turbulenceScale=0.3, sizeStart=0.55, sizeEnd=0.95, colorStart=hexrgb(MIST) + [0.16],
-                colorEnd=hexrgb(MIST_DEEP) + [0.0], emissive=1.3, blend="additive", softness=0.25)
+                colorEnd=hexrgb(MIST_DEEP) + [0.0], emissive=1.3 * MIST_DIM, blend="additive", softness=0.25)
     # the motes, at three depths: far (fine and many, behind the heads), mid (among them), near (few, larger, slow,
     # between the camera and the heads); each its own clock
     for name, cap, seed, pos, ext, rate, size, alpha, emis in (
@@ -598,19 +601,19 @@ def atmosphere(s):
     for name, rate, seed in (("toneA", 0.021, 71), ("toneB", 0.033, 73), ("toneC", 0.027, 79)):
         s.sources.append({"kind": "noise", "name": name, "settings": {"seed": seed}})
         s.params_({"sources/%s/rate" % name: rate, "sources/%s/smoothness" % name: 1.0})
-    s.route(R("noise.toneC", "particles/mist/emissive", 0.35, polarity="bipolar"),
-            R("noise.toneA", "env/sky/zenithColor", 0.035, comp=2, polarity="bipolar"),
-            R("noise.toneA", "env/sky/zenithColor", -0.015, comp=0, polarity="bipolar"),
-            R("noise.toneB", "env/sky/horizonColor", 0.03, comp=0, polarity="bipolar"),
-            R("noise.toneB", "env/sky/horizonColor", 0.012, comp=1, polarity="bipolar"),
-            R("noise.toneC", "env/sky/horizonColor", 0.03, comp=2, polarity="bipolar"),
+    s.route(R("noise.toneC", "particles/mist/emissive", 0.35 * MIST_DIM, polarity="bipolar"),
+            R("noise.toneA", "env/sky/zenithColor", 0.035 * SKY_DIM, comp=2, polarity="bipolar"),
+            R("noise.toneA", "env/sky/zenithColor", -0.015 * SKY_DIM, comp=0, polarity="bipolar"),
+            R("noise.toneB", "env/sky/horizonColor", 0.03 * SKY_DIM, comp=0, polarity="bipolar"),
+            R("noise.toneB", "env/sky/horizonColor", 0.012 * SKY_DIM, comp=1, polarity="bipolar"),
+            R("noise.toneC", "env/sky/horizonColor", 0.03 * SKY_DIM, comp=2, polarity="bipolar"),
             # the ground moves with the horizon, so no horizon line ever shows (the room has none)
-            R("noise.toneB", "env/sky/groundColor", 0.03, comp=0, polarity="bipolar"),
-            R("noise.toneB", "env/sky/groundColor", 0.012, comp=1, polarity="bipolar"),
-            R("noise.toneC", "env/sky/groundColor", 0.03, comp=2, polarity="bipolar"),
+            R("noise.toneB", "env/sky/groundColor", 0.03 * SKY_DIM, comp=0, polarity="bipolar"),
+            R("noise.toneB", "env/sky/groundColor", 0.012 * SKY_DIM, comp=1, polarity="bipolar"),
+            R("noise.toneC", "env/sky/groundColor", 0.03 * SKY_DIM, comp=2, polarity="bipolar"),
             )
     # ... and the whole mix's energy swells the mist and the bloom a little (seconds, not beats)
-    s.route(R("response.intensity", "particles/mist/emissive", 0.8, attackMs=1500.0, decayMs=4000.0),
+    s.route(R("response.intensity", "particles/mist/emissive", 0.8 * MIST_DIM, attackMs=1500.0, decayMs=4000.0),
             R("response.intensity", "post/bloom/intensity", 0.08, attackMs=1500.0, decayMs=4000.0))
 
 
@@ -805,6 +808,20 @@ BG_PROGRAM_OPS = {}
 BG_SCALE = {"thbg-memA": 0.72, "thbg-memB": 0.6}
 
 
+# foil1, the owner: "darken the background". One factor on every light of the background (the membranes' colour
+# fields, their contour lines, the arcs, the bands, the filaments) -- their constants AND the routes that light them,
+# and their dark bodies too (drawn unlit, a body shows its base colour as it is: that, not the glow, set most of a
+# membrane's brightness),
+# so the motion and the reactivity are unchanged, only dimmer; one on the sky (its colours, its slow tone routes and
+# the fog's colour, which hazes the far membranes);
+# one on the room's mist, and one on each head's halo (the faces are lit by the key light, not by these).
+BG_DIM = 0.25
+SKY_DIM = 0.5
+MIST_DIM = 0.35
+HALO_DIM = 0.3    # each head's halo (the mist behind it in its colour, lit while it speaks): with the room mist, most of
+                  # the frame's violet-pink wash
+
+
 def membrane_program(name, ramp, field_scale=0.16):
     """A membrane's light: a dark surface whose colour field -- an OKLab ramp over a slow diagonal gradient through
     world space, shifted by routes -- glows only in its bright bands. Eight ops: every op of a program costs about
@@ -817,9 +834,9 @@ def membrane_program(name, ramp, field_scale=0.16):
     o.add("fieldShifted", "add", 5, srcA=5, srcB=6)
     o.add("fieldColour", "oklabRamp", 6, srcA=5, value=1.0, constant=hexrgb(ramp[0]) + [1.0],
           constant2=hexrgb(ramp[1]) + [1.0], constant3=hexrgb(ramp[2]) + [1.0], constant4=hexrgb(ramp[3]) + [1.0])
-    o.add("fieldGlow", "constant", 7, constant=[0.05, 0.05, 0.05, 0.0])
+    o.add("fieldGlow", "constant", 7, constant=[0.05 * BG_DIM] * 3 + [0.0])
     o.add("fieldLit", "multiply", 7, srcA=6, srcB=7)
-    o.add("base", "constant", 0, constant=[0.012, 0.009, 0.022, 1.0])
+    o.add("base", "constant", 0, constant=[0.012 * BG_DIM, 0.009 * BG_DIM, 0.022 * BG_DIM, 1.0])
     BG_PROGRAM_OPS[name] = o
     return {"name": name, "ops": o.ops, "baseColor": 0, "metallic": -1, "roughness": -1, "emission": 7,
             "emissionIntensity": 1.0, "opacity": -1}
@@ -829,9 +846,9 @@ def glow_program(name, colour, gain):
     """A structure's or a filament's light: one colour at a routed gain, on a dark body."""
     o = Ops()
     o.add("colour", "constant", 0, constant=hexrgb(colour) + [1.0])
-    o.add("gain", "constant", 1, constant=[gain, gain, gain, 0.0])
+    o.add("gain", "constant", 1, constant=[gain * BG_DIM] * 3 + [0.0])
     o.add("lit", "multiply", 2, srcA=0, srcB=1)
-    o.add("base", "constant", 3, constant=[0.01, 0.008, 0.02, 1.0])
+    o.add("base", "constant", 3, constant=[0.01 * BG_DIM, 0.008 * BG_DIM, 0.02 * BG_DIM, 1.0])
     BG_PROGRAM_OPS[name] = o
     return {"name": name, "ops": o.ops, "baseColor": 3, "metallic": -1, "roughness": -1, "emission": 2,
             "emissionIntensity": 1.0, "opacity": -1}
@@ -870,7 +887,8 @@ def background(s):
     for node, mesh, pos, rot, deformers in pieces:
         s.proc(node, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh},
                # unlit: the background is all emission, and the shared PBR shading cost ~5 ms over a frame-filling sheet
-               material={"baseColor": [0.012, 0.009, 0.022], "roughness": 0.9, "metallic": 0.0, "program": node,
+               material={"baseColor": [0.012 * BG_DIM, 0.009 * BG_DIM, 0.022 * BG_DIM], "roughness": 0.9,
+                         "metallic": 0.0, "program": node,
                          "unlit": True},
                deformers=[dict(d) for d in deformers], position=pos, rotation=rot,
                scale=[BG_SCALE.get(node.replace("-lines", ""), 1.0)] * 3, extra={"castsShadow": False})
@@ -890,10 +908,11 @@ def background(s):
                     R("response.onsetEnv", d(4, "phase"), 30.0, integrate=True, attackMs=0.0, decayMs=140.0))
         node = base
         # a bass hit lights the contour lines
-        s.route(R("response.lowEnv", op(base + "-lines", "gain", "constant"), 1.4, comp=c, **HIT) for c in range(3))
+        s.route(R("response.lowEnv", op(base + "-lines", "gain", "constant"), 1.4 * BG_DIM, comp=c, **HIT)
+                for c in range(3))
         s.route(R("audio.mid", op(node, "fieldShift", "constant"), 0.45, comp=c, attackMs=900.0, decayMs=2600.0)
                 for c in range(3))
-        s.route(R("response.intensity", op(node, "fieldGlow", "constant"), 0.14, comp=c, attackMs=3000.0,
+        s.route(R("response.intensity", op(node, "fieldGlow", "constant"), 0.14 * BG_DIM, comp=c, attackMs=3000.0,
                   decayMs=6000.0) for c in range(3))
     # the slow, independent colour: the field's shift also wanders on its own minute-long noise
     s.sources.append({"kind": "noise", "name": "bgTone", "settings": {"seed": 83}})
@@ -902,11 +921,12 @@ def background(s):
         s.route(R("noise.bgTone", op(node, "fieldShift", "constant"), 0.3, comp=c, polarity="bipolar")
                 for c in range(3))
     # the structures flare on strong transients; the filaments on the highs (and quiver)
-    s.route(R("response.onsetEnv", op("thbg-arcs", "gain", "constant"), 1.2, comp=c, **STRONG) for c in range(3))
-    s.route(R("audio.mid", op("thbg-bands", "gain", "constant"), 0.25, comp=c, attackMs=900.0, decayMs=2600.0)
+    s.route(R("response.onsetEnv", op("thbg-arcs", "gain", "constant"), 1.2 * BG_DIM, comp=c, **STRONG)
             for c in range(3))
-    s.route(R("audio.treble", op("thbg-fil", "gain", "constant"), 1.4, comp=c, attackMs=20.0, decayMs=260.0)
-            for c in range(3))
+    s.route(R("audio.mid", op("thbg-bands", "gain", "constant"), 0.25 * BG_DIM, comp=c, attackMs=900.0,
+              decayMs=2600.0) for c in range(3))
+    s.route(R("audio.treble", op("thbg-fil", "gain", "constant"), 1.4 * BG_DIM, comp=c, attackMs=20.0,
+              decayMs=260.0) for c in range(3))
     s.route(R("audio.treble", "procedural/thbg-fil/deform/2/amount", 0.012, attackMs=20.0, decayMs=260.0))
 
 
@@ -1257,7 +1277,7 @@ def routes(s, spec, rays):
     for i, r in enumerate(rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
     # ---- its light on the mist: the same pose, in its own colour
-    s.route(R(G, "particles/%s-mist/emissive" % P, 1.4, depth=K("chroma"), attackMs=0, decayMs=350))
+    s.route(R(G, "particles/%s-mist/emissive" % P, 1.4 * HALO_DIM, depth=K("chroma"), attackMs=0, decayMs=350))
     # ---- the secondary effects: this head's PROFILE (17-brief-signal-corruption.md), every one on this head's own signals only
     prof = spec.get("profile", "tracking")
     pal = spec.get("palette", ORCHID)
