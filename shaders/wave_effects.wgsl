@@ -95,57 +95,43 @@ fn wavePathHit(e: Wave, q: vec2<f32>) -> WavePathHit {
     // Pass 11 (the owner's "seam in the wake"): the nearest point on the chain was taken from whichever segment was
     // nearest, so where two segments are equally near -- the line bisecting a bend in the chain, straight in the water
     // -- the arc length jumped from one segment's value to the other's, and everything keyed to it (the wake's decay,
-    // its ripples' phase, the light's tail) stepped along that line. Now the segments are blended by a soft minimum of
-    // their distances (a few metres wide), so the arc length, the lateral distance and the nearest point all vary
-    // smoothly across the bisector.
+    // its ripples' phase, the light's tail) stepped along that line. Now the nearest two segments are blended by how
+    // much nearer the first is (over a few metres), so the arc length, the lateral distance and the nearest point vary
+    // smoothly across the bisector. (Only the two nearest matter there; a soft minimum over all seven cost an
+    // exponential per segment per pixel.)
     var h: WavePathHit;
     var a = wavePathPoint(e, 0u);
     var arc = -distance(a, wavePathPoint(e, 1u));
-    var dMin = 1.0e9;
-    var ds: array<f32, 7>;
-    var us: array<f32, 7>;
-    var cs: array<vec2<f32>, 7>;
-    var valid: array<bool, 7>;
+    var d1 = 1.0e9;
+    var d2 = 1.0e9;
+    var u1 = 0.0;
+    var u2 = 0.0;
+    var c1 = q;
+    var c2 = q;
     for (var i: u32 = 1u; i < 8u; i = i + 1u) {
         let b = wavePathPoint(e, i);
         let ab = b - a;
         let len = length(ab);
-        let k = i - 1u;
-        valid[k] = len > 1.0e-3;
-        if (valid[k]) {
+        if (len > 1.0e-3) {
             let t = clamp(dot(q - a, ab) / (len * len), 0.0, 1.0);
             let c = a + ab * t;
-            ds[k] = distance(q, c);
-            us[k] = arc + t * len;
-            cs[k] = c;
-            dMin = min(dMin, ds[k]);
+            let d = distance(q, c);
+            let u = arc + t * len;
+            if (d < d1) {
+                d2 = d1; u2 = u1; c2 = c1;
+                d1 = d; u1 = u; c1 = c;
+            } else if (d < d2) {
+                d2 = d; u2 = u; c2 = c;
+            }
             arc = arc + len;
         }
         a = b;
     }
-    let soft = 6.0;
-    var wSum = 0.0;
-    var u = 0.0;
-    var lat = 0.0;
-    var nearest = vec2<f32>(0.0);
-    for (var k: u32 = 0u; k < 7u; k = k + 1u) {
-        if (valid[k]) {
-            let w = exp(-(ds[k] - dMin) / soft);
-            wSum = wSum + w;
-            u = u + w * us[k];
-            lat = lat + w * ds[k];
-            nearest = nearest + w * cs[k];
-        }
-    }
-    if (wSum <= 0.0) {
-        h.lateral = 1.0e9;
-        h.u = 0.0;
-        h.nearest = q;
-        return h;
-    }
-    h.u = u / wSum;
-    h.lateral = lat / wSum;
-    h.nearest = nearest / wSum;
+    // the second segment's share: 0.5 on the bisector, falling to nothing 15 m nearer the first
+    let w2 = select(0.0, 0.5 * exp(-(d2 - d1) / 5.0), d2 < 1.0e8);
+    h.u = mix(u1, u2, w2);
+    h.lateral = mix(d1, d2, w2);
+    h.nearest = mix(c1, c2, w2);
     return h;
 }
 
