@@ -11,6 +11,8 @@ One head is held still (pose_stills.posed), its routes removed, and each effect 
 - codec (codec): a large share of macroblocks lost to flat smeared colour;
 - static (broadcast): the static patches and the scanlines open wide;
 - ghosts (tracking, broadcast, ghosting): the copies, opaque and split as on an onset;
+- foil (foil1): the foil exactly as drawn, the lines crossing every joint; written for the eye, not scored (on a foil
+  build every scored effect is rendered with the foil's pattern flattened: see apply_effect);
 - blocks (tracking, codec): the block deformer at full share. It is world space and identical on every piece, so the
   pieces move as one by construction (tests/unit/test_procedural.cpp [adr1674]). Its own block edges are steps
   wherever they fall, so its close-ups are written for the eye and not scored.
@@ -47,8 +49,8 @@ import anchor_check as ac  # noqa: E402
 import pose_stills as ps  # noqa: E402
 from tools.sonic_vfx.scenes import talking_heads as th  # noqa: E402
 
-EFFECTS = ("rest", "wash", "glow", "bands", "codec", "static", "ghosts", "blocks")
-UNSCORED = ("blocks",)
+EFFECTS = ("rest", "wash", "glow", "bands", "codec", "static", "ghosts", "blocks", "foil")
+UNSCORED = ("blocks", "foil")
 # effects whose own pattern is world-space noise or hashed lines: the open jaw moves the surface under the pattern, so
 # the chin path samples different noise open and closed. The jaw's geometry is scored by `rest` (and wash, glow, ghosts)
 # on every head; these are scored at the piece seam only
@@ -70,6 +72,17 @@ def apply_effect(p, s, P, effect):
             if label in o.at:
                 progs[prog]["ops"][o.at[label] - 1][field] = value
 
+    if th.FOIL and effect != "foil":
+        # foil1: the engraving is high-contrast lines everywhere, so a line landing on the seam's rows is a step the
+        # metric cannot tell from a seam. The scored runs flatten the foil's pattern (no grooves, bands or sparkle):
+        # what is left -- the metal's shading, the normals, the profile tails -- must still be seamless. The lines'
+        # own continuity holds by construction (every piece maps its rest position into the bust's frame) and is
+        # shown by the unscored "foil" close-ups.
+        setop("fGroove", "constant", [5.0, 6.0, 0.0, 0.0])
+        setop("fBand", "constant", [5.0, 6.0, 0.0, 0.0])
+        setop("fSpark", "constant", [5.0, 6.0, 0.0, 0.0])
+    if effect == "foil" and not th.FOIL:
+        return False
     if effect == "wash":
         if th.FOIL:   # foil1: the music's bands at their widest and brightest, swept part way
             setop("fBand", "constant", [0.5, 0.86, 0.0, 0.0])
