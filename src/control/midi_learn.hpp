@@ -73,6 +73,8 @@ private:
 
 // Commits a learned mapping (candidate with target, scope and scene set) and returns its id. Replace switches the
 // colliding mappings off first -- a default by a tombstone, a user mapping by its enabled flag -- never deletes them.
+// ADR-1705: a Rig candidate goes to `midiRig`. A rig mapping a scene or project Learn replaces is switched off only
+// there, by a disabled mapping of that scope that overrides it; only a rig Learn switches a rig mapping off everywhere.
 enum class MidiLearnCommit : std::uint8_t { Add, Replace };
 std::string commitMidiLearn(ControlMap& map, std::string_view sceneKey, MidiBinding candidate, MidiLearnCommit how);
 

@@ -3,6 +3,7 @@
 #include "app/engine.hpp"
 #include "control/midi.hpp"
 #include "control/midi_mapper.hpp"
+#include "control/midi_rig.hpp"
 #include "params/parameter.hpp"
 #include "ui/help_panel.hpp"
 #include "ui/style.hpp"
@@ -77,6 +78,9 @@ std::string channelLabel(int channel) {
 
 std::string destinationLabel(const control::BindingTarget& t) {
     std::string out;
+    if (t.action != control::MidiAction::None) { // ADR-1705
+        return std::string("action: ") + control::midiActionLabel(t.action);
+    }
     if (!t.signal.empty()) {
         out = "control." + t.signal;
     }
@@ -94,6 +98,9 @@ std::string destinationLabel(const control::BindingTarget& t) {
 
 std::string behaviourLabel(const MidiBinding& b) {
     std::string out;
+    if (b.target.action != control::MidiAction::None) {
+        return "press"; // ADR-1705: a rising edge fires it
+    }
     const auto range = fmt::format("{:.3g}..{:.3g}", static_cast<double>(b.target.min), static_cast<double>(b.target.max));
     switch (b.kind) {
     case MidiBindKind::Note:
@@ -138,11 +145,18 @@ StatusText statusFor(const MidiBinding& b, const control::MidiMappingStatus* s, 
     switch (s->state) {
     case MidiMappingState::Disabled: return {"off", p.textDisabled};
     case MidiMappingState::DefaultOff: return {"default switched off", p.textDisabled};
-    case MidiMappingState::Overridden: return {"replaced by your edit", p.textMuted};
+    case MidiMappingState::Overridden:
+        // ADR-1705: a rig mapping is replaced (or switched off) in this scene or project, and still applies elsewhere.
+        return {b.scope == MidiScope::Rig ? "replaced here (" + byLabel(s->by) + ")" : std::string("replaced by your edit"),
+                p.textMuted};
     case MidiMappingState::Shadowed: return {"shadowed by " + byLabel(s->by), p.warning};
     case MidiMappingState::OtherScene: return {"for scene " + b.scene, p.textDisabled};
     case MidiMappingState::Invalid: return {"invalid", p.error};
     case MidiMappingState::Active: break;
+    }
+    if (s->inactiveForScene) {
+        // ADR-1705: not a warning -- the rig is for every scene, and this one does not have that destination.
+        return {"inactive for this scene", p.textDisabled};
     }
     if (s->destinationMissing) {
         return {"not in this scene", p.warning};
@@ -224,7 +238,8 @@ void MidiPanel::draw(app::Engine& engine) {
             return ImGuiTabItemFlags_None;
         };
         const auto& map = engine.control().map();
-        const std::string assignments = fmt::format("Assignments ({})###assignments", map.midi.size() + map.midiUser.size());
+        const std::string assignments = fmt::format("Assignments ({})###assignments",
+                                                    map.midi.size() + map.midiUser.size() + map.midiRig.size());
         if (ImGui::BeginTabItem(assignments.c_str(), nullptr, flagsFor(Tab::Assignments))) {
             drawAssignments(engine);
             ImGui::EndTabItem();
@@ -260,11 +275,13 @@ void MidiPanel::drawLearnBar(app::Engine& engine) {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Destination");
     ImGui::SameLine();
-    const float scopeWidth = ImGui::CalcTextSize("Project").x * 2.0f + ImGui::GetFrameHeight() * 3.0f;
+    const float scopeWidth = ImGui::CalcTextSize("Project").x * 3.0f + ImGui::GetFrameHeight() * 4.5f;
+    pickerForRig_ = learnScope_ == MidiScope::Rig;
     destinationPicker("##learn-destination", engine, learnTarget_,
                       std::clamp(ImGui::GetContentRegionAvail().x - scopeWidth - buttonWidth("Learn") - 24.0f, 160.0f, 460.0f));
+    pickerForRig_ = false;
     ImGui::SameLine();
-    int scope = learnScope_ == MidiScope::Project ? 1 : 0;
+    const int scope = learnScope_ == MidiScope::Project ? 1 : (learnScope_ == MidiScope::Rig ? 2 : 0);
     if (ImGui::RadioButton("Scene", scope == 0)) {
         learnScope_ = MidiScope::Scene;
     }
@@ -279,8 +296,17 @@ void MidiPanel::drawLearnBar(app::Engine& engine) {
         tooltip("Saved with this project and active whatever scene it shows.");
     }
     ImGui::SameLine();
+    if (ImGui::RadioButton("Rig", scope == 2)) {
+        learnScope_ = MidiScope::Rig;
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltip("Your controller setup, for every scene and project: kept on this computer (midi-rig.json beside the "
+                "settings), never in a project. A project's or a scene's own mapping wins over it.");
+    }
+    ImGui::SameLine();
 
-    const bool hasTarget = !learnTarget_.signal.empty() || !learnTarget_.parameter.empty();
+    const bool hasTarget = !learnTarget_.signal.empty() || !learnTarget_.parameter.empty() ||
+                           learnTarget_.action != control::MidiAction::None;
     if (learn.state() == State::Idle) {
         if (ImGui::Button("Learn")) {
             learn.arm();
@@ -373,7 +399,8 @@ void MidiPanel::drawLearnBar(app::Engine& engine) {
         candidate.target = learnTarget_;
         candidate.scope = learnScope_;
         std::string invalid;
-        if (candidate.kind == MidiBindKind::NoteEvent && learnTarget_.signal.empty() && hasTarget) {
+        if (candidate.kind == MidiBindKind::NoteEvent && learnTarget_.signal.empty() &&
+            learnTarget_.action == control::MidiAction::None && hasTarget) {
             invalid = "A trigger is a one-frame pulse: map it to a control channel (a route turns it into a flash), or "
                       "untick Notes trigger for a gate.";
         }
@@ -386,7 +413,8 @@ void MidiPanel::drawLearnBar(app::Engine& engine) {
             hub.mappingsChanged();
             selected_ = id;
             learn.cancel();
-            learnMessage_ = fmt::format("Assigned {} to {}.", control::midiSourceLabel(candidate), destinationLabel(learnTarget_));
+            learnMessage_ = fmt::format("Assigned {} to {}{}.", control::midiSourceLabel(candidate), destinationLabel(learnTarget_),
+                                        candidate.scope == MidiScope::Rig ? " in the rig (every scene)" : "");
         };
         if (collisions.empty()) {
             if (ImGui::Button("Assign")) {
@@ -425,8 +453,10 @@ void MidiPanel::drawLearnBar(app::Engine& engine) {
 
 bool MidiPanel::destinationPicker(const char* id, app::Engine& engine, control::BindingTarget& target, float width) {
     bool changed = false;
-    const std::string preview = (target.signal.empty() && target.parameter.empty()) ? std::string("Choose a destination...")
-                                                                                     : destinationLabel(target);
+    const std::string preview =
+        (target.signal.empty() && target.parameter.empty() && target.action == control::MidiAction::None)
+            ? std::string("Choose a destination...")
+            : destinationLabel(target);
     if (ImGui::Button(fmt::format("{}{}", preview, id).c_str(), ImVec2(width, 0.0f))) {
         ImGui::OpenPopup(id);
         pickerSearch_[0] = '\0';
@@ -489,6 +519,30 @@ bool MidiPanel::destinationPicker(const char* id, app::Engine& engine, control::
         ImGui::TreePop();
     }
 
+    // ADR-1705: the app actions a press can fire, the keyboard's own commands.
+    if (ImGui::TreeNodeEx("App actions", searching ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
+        ImGui::TextDisabled("Fired once per press, in every scene: map a pad or a button.");
+        for (const control::MidiAction a : control::kMidiActions) {
+            const std::string label = control::midiActionLabel(a);
+            if (!containsNoCase(label, query) && !containsNoCase(control::midiActionName(a), query)) {
+                continue;
+            }
+            if (ImGui::Selectable(fmt::format("{}##act-{}", label, control::midiActionName(a)).c_str(), target.action == a)) {
+                target = control::BindingTarget{};
+                target.action = a;
+                changed = true;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", control::midiActionName(a));
+        }
+        ImGui::TreePop();
+    }
+    if (pickerForRig_) {
+        ImGui::TextDisabled("For the rig: control channels, app actions and the engine's own parameters (post/, temporal/, "
+                            "camera lens/exposure/focus, sonic/response/, scene/brightness) exist in every scene. A parameter marked \"this scene\" is inactive in scenes without it.");
+    }
+
     // Then the parameter registry: every exposed, modulatable parameter, by group and sub-group (the Parameters panel's
     // own structure, read off the paths).
     std::vector<std::string> groups;
@@ -548,6 +602,10 @@ bool MidiPanel::destinationPicker(const char* id, app::Engine& engine, control::
             ImGui::SameLine();
             ImGui::TextDisabled("%s  %.3g  [%.3g..%.3g]", param->path().c_str(), static_cast<double>(param->baseComponent(0)),
                                 static_cast<double>(param->softMin(0)), static_cast<double>(param->softMax(0)));
+            if (pickerForRig_ && !control::midiRigCommonParameter(param->path())) {
+                ImGui::SameLine();
+                ImGui::TextColored(colour(palette().warning), "this scene");
+            }
         }
         if (currentSub != "\x01" && !currentSub.empty() && subOpen) {
             ImGui::TreePop();
@@ -576,9 +634,9 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
     ImGui::SetNextItemWidth(std::min(240.0f, ImGui::GetContentRegionAvail().x * 0.4f));
     ImGui::InputTextWithHint("##midi-search", "Search source, device, destination", search_, sizeof(search_));
     ImGui::SameLine();
-    const char* scopes[] = {"All scopes", "Defaults", "Project", "Scene"};
+    const char* scopes[] = {"All scopes", "Defaults", "Rig", "Project", "Scene"}; // MidiScope order, after "All"
     ImGui::SetNextItemWidth(110.0f);
-    ImGui::Combo("##midi-scope", &scopeFilter_, scopes, 4);
+    ImGui::Combo("##midi-scope", &scopeFilter_, scopes, 5);
     ImGui::SameLine();
     ImGui::Checkbox("Inactive", &showInactive_);
     if (ImGui::IsItemHovered()) {
@@ -590,7 +648,7 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
     }
     if (ImGui::BeginPopupModal("Reset this scene's MIDI mappings?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Removes your scene mappings for this scene and switches every default back on.");
-        ImGui::TextUnformatted("Project mappings stay. Undo by not saving.");
+        ImGui::TextUnformatted("Project mappings and the rig stay. Undo by not saving.");
         if (ImGui::Button("Reset")) {
             control::resetSceneMidiMappings(map, hub.sceneKey());
             hub.mappingsChanged();
@@ -649,7 +707,7 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
     }
 
     // Deferred actions: a row's buttons must not edit the vectors the rows point into mid-loop.
-    enum class Action { None, Toggle, Duplicate, Remove, Restore, Promote };
+    enum class Action { None, Toggle, Duplicate, Remove, Restore, Promote, ToRig, RigToScene, RigOverride };
     Action action = Action::None;
     std::string actionId;
 
@@ -732,10 +790,46 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
                         action = Action::Duplicate;
                         actionId = b.id;
                     }
+                    // ADR-1705: between the rig and this project.
+                    if (b.scope != MidiScope::Rig) {
+                        if (ImGui::MenuItem(b.scope == MidiScope::Default ? "Copy to the rig" : "Move to the rig", nullptr,
+                                            false, !b.invalid())) {
+                            action = Action::ToRig;
+                            actionId = b.id;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            tooltip("The rig is your controller setup for every scene, kept on this computer and never "
+                                    "in a project. A project's or a scene's own mapping still wins over it.");
+                        }
+                    } else {
+                        if (ImGui::MenuItem("Move into this scene", nullptr, false, !b.invalid())) {
+                            action = Action::RigToScene;
+                            actionId = b.id;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            tooltip("Takes it out of the rig (other scenes stop using it) and saves it with this project, "
+                                    "for scene %s.", hub.sceneKey().c_str());
+                        }
+                        if (ImGui::MenuItem("Override in this scene", nullptr, false, !b.invalid())) {
+                            action = Action::RigOverride;
+                            actionId = b.id;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            tooltip("Keeps it in the rig and makes a scene copy that replaces it here only.");
+                        }
+                    }
                     if (b.scope == MidiScope::Default) {
                         if (ImGui::MenuItem("Restore default")) {
                             action = Action::Restore;
                             actionId = b.id;
+                        }
+                    } else if (b.scope == MidiScope::Rig) {
+                        if (ImGui::MenuItem("Remove from the rig")) {
+                            action = Action::Remove;
+                            actionId = b.id;
+                        }
+                        if (ImGui::IsItemHovered()) {
+                            tooltip("Removes it for every scene.");
                         }
                     } else {
                         if (!b.overrides.empty() && ImGui::MenuItem("Restore the default it replaces")) {
@@ -775,7 +869,14 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
                 ImGui::TableNextColumn();
                 ImGui::TextUnformatted(b.invalid() ? "" : behaviourLabel(b).c_str());
                 ImGui::TableNextColumn();
-                ImGui::TextUnformatted(control::midiScopeName(b.scope));
+                if (b.scope == MidiScope::Rig && !inactive) {
+                    ImGui::TextColored(colour(p.accent), "rig"); // ADR-1705: every scene
+                } else {
+                    ImGui::TextUnformatted(control::midiScopeName(b.scope));
+                }
+                if (b.scope == MidiScope::Rig && ImGui::IsItemHovered()) {
+                    tooltip("Rig: your mapping for every scene, kept on this computer, not in the project.");
+                }
                 if (inactive) {
                     ImGui::PopStyleColor();
                 }
@@ -803,6 +904,9 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
         break;
     case Action::Restore: control::restoreMidiDefault(map, actionId); selected_ = actionId; break;
     case Action::Promote: control::promoteMidiMappingToDefault(map, actionId); break;
+    case Action::ToRig: selected_ = control::promoteMidiMappingToRig(map, actionId); break;
+    case Action::RigToScene: control::demoteMidiRigMappingToScene(map, hub.sceneKey(), actionId); break;
+    case Action::RigOverride: selected_ = control::overrideMidiRigMappingInScene(map, hub.sceneKey(), actionId); break;
     case Action::None: break;
     }
     if (action != Action::None) {
@@ -813,7 +917,7 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
         ImGui::SameLine();
     }
     if (rows.empty()) {
-        ImGui::TextDisabled(map.midi.empty() && map.midiUser.empty()
+        ImGui::TextDisabled(map.midi.empty() && map.midiUser.empty() && map.midiRig.empty()
                                 ? "No MIDI mappings yet. Pick a destination above and press Learn, or right-click a "
                                   "parameter in the Parameters panel."
                                 : "Nothing matches the filter.");
@@ -859,6 +963,13 @@ void MidiPanel::drawEditor(app::Engine& engine) {
         ImGui::TextColored(colour(p.textMuted),
                            "Shipped with the scene. A change is saved as your scene mapping that replaces it; the default "
                            "itself is never written.");
+    } else if (shown->scope == MidiScope::Rig) {
+        ImGui::TextColored(colour(p.accent), "Rig");
+        ImGui::SameLine();
+        ImGui::TextColored(colour(p.textMuted),
+                           "Your mapping for every scene, kept on this computer and never in a project. A change here "
+                           "changes it everywhere; to change it for this scene only, right-click it: Override in this "
+                           "scene.");
     }
     if (status != nullptr && status->lastSeconds >= 0.0) {
         ImGui::TextDisabled("last input %.3f  ->  output %.4g  ·  %.1f s ago%s", static_cast<double>(status->lastInput),
@@ -967,10 +1078,15 @@ void MidiPanel::drawEditor(app::Engine& engine) {
         ImGui::TableNextColumn();
         ImGui::PushItemWidth(std::min(220.0f, half * 0.6f));
         ImGui::SeparatorText("Destination");
+        pickerForRig_ = shown->scope == MidiScope::Rig;
         if (destinationPicker("##edit-destination", engine, edit.target, std::min(320.0f, half))) {
             changed = true;
         }
-        if (status != nullptr && status->destinationMissing) {
+        pickerForRig_ = false;
+        if (status != nullptr && status->inactiveForScene) {
+            ImGui::TextDisabled("Inactive for this scene: it has no %s. Kept, and applied in every scene that has it.",
+                                edit.target.parameter.c_str());
+        } else if (status != nullptr && status->destinationMissing) {
             ImGui::TextColored(colour(p.warning), "Not in this scene: kept, and applied when a scene has it.");
         }
         if (!edit.target.parameter.empty()) {
@@ -984,7 +1100,11 @@ void MidiPanel::drawEditor(app::Engine& engine) {
             }
         }
         const bool note = control::midiBindKindIsNote(edit.kind);
-        if (note) {
+        const bool isAction = edit.target.action != control::MidiAction::None; // ADR-1705
+        if (isAction) {
+            ImGui::TextDisabled("Fires once per press: a note-on, a program change, or the control crossing half-way up.");
+        }
+        if (note && !isAction) {
             int behaviour = edit.kind == MidiBindKind::NoteEvent ? 2 : (edit.toggle ? 1 : 0);
             const char* behaviours[] = {"Gate (held = on)", "Toggle (each press flips)", "Trigger (one-frame pulse)"};
             if (ImGui::Combo("Behaviour", &behaviour, behaviours, 3)) {
@@ -1002,7 +1122,7 @@ void MidiPanel::drawEditor(app::Engine& engine) {
             }
         }
         float range[2] = {edit.target.min, edit.target.max};
-        if (ImGui::DragFloat2(note ? "Off / on" : "Min / max", range, 0.01f)) {
+        if (!isAction && ImGui::DragFloat2(note ? "Off / on" : "Min / max", range, 0.01f)) {
             edit.target.min = range[0];
             edit.target.max = range[1];
             changed = true;
@@ -1097,13 +1217,36 @@ void MidiPanel::drawEditor(app::Engine& engine) {
             changed = false;
         }
         ImGui::SameLine();
-        int scope = shown->scope == MidiScope::Project ? 1 : 0;
-        const char* scopes[] = {"Scene", "Project"};
+        const int was = shown->scope == MidiScope::Project ? 1 : (shown->scope == MidiScope::Rig ? 2 : 0);
+        int scope = was;
+        const char* scopes[] = {"Scene", "Project", "Rig"};
         ImGui::SetNextItemWidth(100.0f);
-        if (ImGui::Combo("Scope", &scope, scopes, 2)) {
-            edit.scope = scope == 1 ? MidiScope::Project : MidiScope::Scene;
-            edit.scene = scope == 1 ? std::string() : hub.sceneKey();
-            changed = true;
+        if (ImGui::Combo("Scope", &scope, scopes, 3) && scope != was) {
+            const std::string id = shown->id;
+            if (scope == 2) {
+                // ADR-1705: into the rig, out of the project.
+                selected_ = control::promoteMidiMappingToRig(map, id);
+                hub.mappingsChanged();
+                changed = false;
+            } else if (was == 2) {
+                // Out of the rig into this project (this scene, or the whole project).
+                if (control::demoteMidiRigMappingToScene(map, hub.sceneKey(), id) && scope == 1) {
+                    if (MidiBinding* moved = map.findMidi(id)) {
+                        moved->scope = MidiScope::Project;
+                        moved->scene.clear();
+                    }
+                }
+                hub.mappingsChanged();
+                changed = false;
+            } else {
+                edit.scope = scope == 1 ? MidiScope::Project : MidiScope::Scene;
+                edit.scene = scope == 1 ? std::string() : hub.sceneKey();
+                changed = true;
+            }
+        }
+        if (ImGui::IsItemHovered()) {
+            tooltip("Scene: this project, this scene. Project: this project, every scene it shows. Rig: every scene and "
+                    "project, kept on this computer.");
         }
     }
     if (changed && !selected_.empty()) {

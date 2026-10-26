@@ -864,6 +864,10 @@ private:
     AppSettings settings_;
     std::filesystem::path settingsPath_;
     void saveSettings();
+    // ADR-1705: the MIDI rig's file (`<preferences>/midi-rig.json`; empty in a headless run: no rig) and the hub's rig
+    // revision it last saved. serviceLiveScenes saves the rig when the hub's revision moves on.
+    std::filesystem::path midiRigPath_;
+    std::uint64_t midiRigSaved_ = 0;
     // ADR-1521: opens a capture device with its remembered channel map (or --input-sources); `synthetic:<n>` is the
     // benchmark generator. And the id a device is remembered by, from an id, a name or a name substring.
     Result<void> openAudioInput(const std::string& selector);

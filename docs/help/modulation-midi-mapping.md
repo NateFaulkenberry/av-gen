@@ -2,10 +2,10 @@
 id: modulation/midi-mapping
 title: MIDI Mapping and Learn
 category: Modulation
-summary: Playing the scene from a keyboard, synth, pad or fader bank: MIDI Learn, the assignments, the monitor, and how defaults, scene and project mappings combine.
+summary: Playing the scene from a keyboard, synth, pad or fader bank: MIDI Learn, the assignments, the monitor, and how defaults, your rig, project and scene mappings combine.
 order: 36
 tags: midi, learn, mapping, assignments, monitor, controller, nrpn, pads, faders, synth
-keywords: how do i map a midi knob; midi learn; map a drum pad; my synth knob does nothing; midi monitor; which cc is this knob; restore default mapping; turn off a default midi mapping; save my midi mappings; nrpn
+keywords: how do i map a midi knob; midi learn; map a drum pad; my synth knob does nothing; midi monitor; which cc is this knob; restore default mapping; turn off a default midi mapping; save my midi mappings; nrpn; midi rig; same mappings in every live scene; map next scene to a pad; midi play pause
 related: modulation/external-control, modulation/routes, reference/panels
 features: panel.midi
 ---
@@ -15,13 +15,14 @@ features: panel.midi
 The **MIDI** panel turns any device that sends MIDI into controls for the scene. That includes a synth, a keyboard,
 a drum pad, a fader bank or a DAW. Open it from **View ▸ MIDI**. It docks along the bottom, beside Modulation.
 
-A mapping does what a MIDI binding always did. It writes one of two things:
+A mapping does one of three things:
 
-- a **control channel** (`control.<name>`). The scene's routes then decide what that channel moves, so the
+- it writes a **control channel** (`control.<name>`). The scene's routes then decide what that channel moves, so the
   modulation system stays in charge;
-- a **parameter's base value**, as if you had moved its slider.
+- it writes a **parameter's base value**, as if you had moved its slider;
+- it fires an **app action**: play/pause, return to start, or the next or previous live scene.
 
-Either way it lands in the same frame it arrives in. The engine reads MIDI before it evaluates any parameter.
+It lands in the same frame it arrives in. The engine reads MIDI before it evaluates any parameter.
 
 ## Connect and inspect a device
 
@@ -43,11 +44,13 @@ The Learn bar at the top of the panel is always visible.
 
 1. Choose a **Destination**. The button opens a searchable list:
    - the control channels;
+   - the **App actions** (see below);
    - every parameter you can modulate, grouped as the Parameters panel groups them, with its current value and range.
+     While you are choosing for the rig, a parameter that only this scene has is marked *this scene*.
 
    You can also right-click a slider in the **Parameters** panel and choose **MIDI Learn…**. That picks the
    destination and starts listening in one step.
-2. Choose **Scene** or **Project** (see below).
+2. Choose **Scene**, **Project** or **Rig** (see below).
 3. Press **Learn**. An amber **LISTENING** bar appears.
 4. Move a knob or fader, press a pad, or play a note.
 
@@ -112,8 +115,15 @@ A source that drives several destinations is marked **x2**, **x3** and so on. Yo
 destination or scope, and sort by any column. Rows are identified by a stable mapping id, so sorting and filtering
 never edit the wrong one.
 
-Right-click a row to **Enable / Disable**, **Duplicate**, **Remove**, **Restore default** or **Make it a scene
-default**.
+Right-click a row to:
+
+- **Enable / Disable** it;
+- **Duplicate** it;
+- **Remove** it (**Remove from the rig** for a rig mapping, which removes it for every scene);
+- **Restore default**;
+- **Make it a scene default**;
+- **Move to the rig** (a project or scene mapping), or **Copy to the rig** (a default, which stays the scene's);
+- **Move into this scene** or **Override in this scene** (a rig mapping; see *Your rig* below).
 
 ### The editor
 
@@ -162,13 +172,31 @@ mapping starts from the destination's current value, so the first detent moves i
 A trigger mapped to a parameter sets the parameter and leaves it there. For a flash, map the trigger to a control
 channel and let a route shape it. The editor says so when you set this up.
 
-## Defaults, scene mappings and project mappings
+**Scope** moves the mapping between **Scene**, **Project** and **Rig**.
 
-There are three kinds of mapping.
+### App actions
+
+A pad, button or key can fire one of the keyboard's commands:
+
+| Action | Same as |
+|---|---|
+| Play / pause | Space |
+| Return to start | Return |
+| Next live scene | Page Down |
+| Previous live scene | Page Up |
+
+An action fires once per press: on a note-on, on a program change, or when a knob or button crosses half-way upwards.
+A button that sends 127 and then 0 is one press. The live scene actions work as Page Up and Page Down do: while a live
+scene is open, or while live input is running.
+
+## Defaults, your rig, project and scene mappings
+
+There are four kinds of mapping, lowest precedence first.
 
 | Scope | Where it is saved | When it applies |
 |---|---|---|
 | **Default** | the project's `control.midi.bindings`, written by the scene's author | always, unless you switch it off |
+| **Rig** | `midi-rig.json` in AV Gen's preferences folder on this computer, never in a project | in every scene and every project |
 | **Project** | `control.midi.mappings`, scope `project` | whatever scene the project shows |
 | **Scene** | `control.midi.mappings`, scope `scene` | only while the project shows that scene (its file name, for example `aurora-borealis.scene.json`) |
 
@@ -177,30 +205,76 @@ The precedence is exact:
 1. **Switching a default off** records its id in `control.midi.disabledDefaults`. The default itself is untouched.
 2. **Editing a default** never writes the default. AV Gen creates a scene mapping that *overrides* it, and the
    default is shown as *replaced by your edit*.
-3. When a higher scope (scene over project over default) maps an **overlapping** source to the **same
+3. When a higher scope (scene over project over rig over default) maps an **overlapping** source to the **same
    destination**, the lower mapping is **shadowed**: it is shown, but not applied. Sources overlap when they are the
    same type with overlapping numbers, channels and devices; "any" overlaps everything. So one physical control
    never drives one destination twice by accident.
 4. Different destinations from one source all apply, whatever their scopes.
-5. On one message, mappings apply in the order default, project, scene. The higher scope writes last.
+5. On one message, mappings apply in the order default, rig, project, scene. The higher scope writes last.
 
 To undo:
 
 - **Restore default** removes the default's tombstone and any edit that overrides it.
-- **Reset scene mappings** removes this scene's mappings and switches every default back on. Project mappings stay.
+- **Reset scene mappings** removes this scene's mappings and switches every default back on. Project mappings and the
+  rig stay.
 
 A scene's author can also turn a mapping into one of the scene's own defaults with **Make it a scene default**. It is
 written to `control.midi.bindings` when the project is saved.
 
 > [!NOTE]
 > "Project" means the open project file. The live scene switcher opens a different project for each live scene, so
-> a project mapping does not follow you from one live scene to the next. A mapping layer for your whole rig, across
-> every project, does not exist yet.
+> a project mapping does not follow you from one live scene to the next. For that, use the rig.
+
+### Your rig
+
+The rig is your controller setup, mapped once for every scene. Choose **Rig** in the Learn bar, or right-click an
+existing mapping and choose **Move to the rig**. The rig:
+
+- applies in every live scene and every project you open;
+- survives switching scenes, opening other projects and restarting AV Gen;
+- is saved on this computer as soon as you change it, in `midi-rig.json` beside AV Gen's settings. It is never
+  written into a project, so a project you share or save is exactly what it would be without a rig;
+- is shown with a **rig** label in the Assignments table.
+
+A project's own mapping or a scene's own mapping wins over the rig on the same control and destination. To change a
+rig mapping for one scene only, right-click it and choose **Override in this scene**. That makes a scene copy which
+replaces it in this scene, and the rig keeps applying everywhere else. **Move into this scene** takes it out of the
+rig and saves it with this project instead.
+
+If you Learn at Scene or Project scope and choose **Replace existing** over a rig mapping, the rig mapping is switched
+off in that scene or project only.
+
+What a rig mapping can drive in every scene:
+
+- **control channels**. They exist in every scene; whether a scene's routes use one is up to that scene;
+- **app actions**;
+- **the parameters AV Gen itself gives every scene**. Every live scene has these:
+  - the post chain (`post/...`: bloom, colour, lens effects and the rest);
+  - the temporal effects (`temporal/...`: feedback, echo, mosh, slit-scan);
+  - the camera's lens, exposure and focus (`camera/lens/...`, `camera/exposure/...`, `camera/focus/...`) and its orbit
+    (`camera/distance`, `camera/height`, `camera/orbitSpeed`);
+  - the response (`sonic/response/...`);
+  - `scene/brightness`, `scene/gridIntensity` and the live input gain (`audio/inputGain`).
+
+  A scene that draws with its own renderer may ignore some of them, for example the camera's lens settings. The
+  parameter is still there, so the mapping stays active.
+
+A rig mapping to a parameter that the current scene does not have is listed as **inactive for this scene**. That is
+not an error: it is kept, and it applies again in every scene that has the parameter.
+
+After a scene switch, every held note is released, and a rig knob with **Pickup** waits until it reaches the new
+scene's value before it moves it.
+
+How several mappings combine on one destination (**Combine**) belongs to the open project. A rig mapping uses the
+project's setting for its destination, **Replace** unless the project says otherwise.
 
 ## Saving
 
-Mappings are part of the project. **Save** writes them, and the unsaved-changes prompt and the dot in the title bar
-cover them like any other edit. Nothing is written to disk when MIDI arrives.
+Default, project and scene mappings are part of the project. **Save** writes them, and the unsaved-changes prompt and
+the dot in the title bar cover them like any other edit. Nothing is written to disk when MIDI arrives.
+
+The rig is saved to its own file as soon as it changes. It does not mark the project as changed. A rig mapping to a
+parameter moves that parameter's value, as a slider does, and that value is saved with the project.
 
 A mapping refers to its device by the system's stable id and keeps the device's name:
 
@@ -208,7 +282,8 @@ A mapping refers to its device by the system's stable id and keeps the device's 
   device comes back.
 - On **another computer** the id is different. If a connected device has the saved name, that device is used and the
   mapping says *device matched by name*. Otherwise, pick the device again in the editor, or choose **Any device**.
-- A mapping whose **parameter is not in this scene** is kept and marked *not in this scene*.
+- A mapping whose **parameter is not in this scene** is kept and marked *not in this scene*. For a rig mapping, it
+  is *inactive for this scene*.
 - A saved mapping that this version **cannot read** is kept exactly as it was, reported when the project loads, and
   written back on save. It is never applied, and never deleted for you.
 
@@ -278,8 +353,8 @@ is changed. Open the Monitor and turn the knob:
   and check that MIDI out goes to the USB port or cable you are using. The synth's manual names the exact setting;
   AV Gen has no list of them.
 - **Rows appear, but greyed and marked *switched off***: tick the device in the Devices tab.
-- **A mapping is marked *shadowed*, *replaced*, *other scene* or *device not connected***: the status column says
-  why it does not apply.
+- **A mapping is marked *shadowed*, *replaced*, *other scene*, *inactive for this scene* or *device not
+  connected***: the status column says why it does not apply.
 
 ## How it works
 
@@ -288,7 +363,8 @@ is changed. Open the Monitor and turn the knob:
 - **When the queue is full.** This only happens when the engine stalls, for example while a project loads.
   Continuous controls then keep only their latest position, so every knob still ends where it was left. Notes keep
   the rest of the queue. If a note is ever lost, every gate is released rather than left held.
-- **Unplugging.** A device that disappears releases its held notes. So does disabling a mapping or changing scene.
+- **Unplugging.** A device that disappears releases its held notes. So does disabling a mapping, changing scene or
+  switching live scene.
 - **Processing.** Once a frame, before the routes run, the engine:
   1. reads the queue;
   2. decodes NRPN/RPN;
@@ -298,7 +374,7 @@ is changed. Open the Monitor and turn the knob:
   On an M2 Max, four devices at 3,000 messages a second each added about 0.2 ms to a frame. Looking up one message
   among a thousand mappings took about 0.1 µs.
 
-The decisions are recorded in ADR-1700 to ADR-1704.
+The decisions are recorded in ADR-1700 to ADR-1705.
 
 ## Device profiles
 

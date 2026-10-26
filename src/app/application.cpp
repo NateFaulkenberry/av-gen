@@ -1,6 +1,7 @@
 #include "app/live_audio_policy.hpp"
 #include "audio/synthetic_capture.hpp"
 #include "app/application.hpp"
+#include "control/midi_rig.hpp"
 
 #include "gpu/pipeline_compile.hpp"
 #include "rendering/procedural_renderer.hpp" // ADR-1493: compiledMaterialsActive
@@ -2260,6 +2261,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         };
         // ADR-1704: MIDI devices switched off in the MIDI panel are this machine's choice, kept with its other settings.
         engine_->control().setDisabledDevices(settings_.live.midiDisabled);
+        // ADR-1705: the MIDI rig, this performer's mappings for every scene, beside the settings and never in a project.
+        midiRigPath_ = control::MidiRig::pathIn(prefs);
+        if (auto rig = control::MidiRig::load(midiRigPath_); !rig) {
+            // Unreadable as a whole: left on disk untouched (nothing saves over it this session) and said.
+            log::warn("midi rig: {}", rig.error().message);
+            midiRigPath_.clear();
+        } else {
+            for (const std::string& w : rig->warnings) {
+                log::warn("{}", w);
+            }
+            engine_->control().setRig(std::move(rig->mappings));
+        }
+        midiRigSaved_ = engine_->control().rigRevision();
         panel_->midi.onDisabledDevicesChanged = [this](const std::vector<std::string>& ids) {
             settings_.live.midiDisabled = ids;
             saveSettings();
@@ -2699,6 +2713,26 @@ void Application::serviceLiveScenes() {
         const int index = liveSceneForProgram(*program, static_cast<int>(liveScenes_.size()));
         if (index >= 0) {
             switchLiveScene(index);
+        }
+    }
+    // ADR-1705: a mapped Next / Previous live scene, under Page Down / Page Up's rule (a live scene is open, or live
+    // input runs).
+    if (const int steps = engine_->control().takeLiveSceneSteps(); steps != 0) {
+        const int count = static_cast<int>(liveScenes_.size());
+        const int current = liveSceneIndex(liveScenes_, engine_->projectPath());
+        if (count > 0 && (current >= 0 || engine_->liveSonic())) {
+            switchLiveScene(steppedLiveScene(current, steps, count));
+        }
+    }
+    // ADR-1705: the rig changed (Learn, an edit, a promote): its own file, now. Never the project's.
+    if (const std::uint64_t revision = engine_->control().rigRevision(); revision != midiRigSaved_) {
+        midiRigSaved_ = revision;
+        if (!midiRigPath_.empty()) {
+            control::MidiRig rig;
+            rig.mappings = engine_->control().rig();
+            if (auto r = rig.save(midiRigPath_); !r) {
+                log::warn("midi rig: {}", r.error().message);
+            }
         }
     }
 }

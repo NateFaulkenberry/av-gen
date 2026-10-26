@@ -42,6 +42,8 @@ public:
     [[nodiscard]] virtual bool signalHasRest(const std::string& name) = 0;
     virtual void setSignal(const std::string& name, float value) = 0;
     virtual void pulseSignal(const std::string& name, float strength) = 0;
+    // ADR-1705: an app action fired (a rising edge). The app performs it after the frame's messages; tests count it.
+    virtual void action(MidiAction /*action*/) {}
 };
 
 enum class MidiDeviceState : std::uint8_t {
@@ -58,6 +60,8 @@ struct MidiMappingStatus {
     std::string by;
     MidiDeviceState device = MidiDeviceState::Any;
     bool destinationMissing = false; // no such parameter in this scene
+    // ADR-1705: a rig mapping whose destination this scene lacks: kept, listed, not applied here. Not a warning.
+    bool inactiveForScene = false;
     float lastInput = -1.0f;         // the last raw value (0..1) that matched, -1 none yet
     float lastOutput = -1.0f;        // the last value written, in the destination's units
     double lastSeconds = -1.0;       // when (the hub's clock)
@@ -105,6 +109,7 @@ private:
         float smoothValue = 0.0f;
         float smoothTarget = 0.0f;
         bool smoothing = false;
+        bool high = false;        // ADR-1705: an action's source is above half-way (its rising edge fires)
         bool contributed = false; // has a value for max/add combination
         float contribution = 0.0f; // its current output, 0..1 on its own scale
     };
@@ -125,6 +130,7 @@ private:
     [[nodiscard]] float current01(const Entry& e, MidiTargets& targets) const; // -1 unknown
     void write(Entry& e, float y, MidiTargets& targets, double nowSeconds);
     void pulse(Entry& e, float y, MidiTargets& targets, double nowSeconds);
+    void fireAction(Entry& e, bool high, MidiTargets& targets, double nowSeconds);
     void releaseGate(Entry& e, MidiTargets& targets);
     void collect(const MidiMessage& m);
 
@@ -137,7 +143,7 @@ private:
     std::array<std::vector<std::uint16_t>, 128> byCc_, byNote_, byPoly_, byProgram_;
     std::vector<std::uint16_t> anyCc_, anyNote_, anyPoly_, anyProgram_, pitchBend_, pressure_, anyNrpn_, anyRpn_;
     std::unordered_map<std::uint16_t, std::vector<std::uint16_t>> byNrpn_, byRpn_;
-    std::vector<std::uint16_t> scratch_; // candidates of one message (capacity kept)
+    std::vector<std::uint16_t> scratch_; // candidates of one message (capacity kept; merged in order, never sorted)
     std::uint64_t pickupHeld_ = 0;
 };
 

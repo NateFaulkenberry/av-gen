@@ -28,6 +28,9 @@ bool containsNoCase(std::string_view haystack, std::string_view needle) {
 
 nlohmann::json targetToJson(const BindingTarget& t) {
     nlohmann::json j = nlohmann::json::object();
+    if (t.action != MidiAction::None) { // ADR-1705
+        j["action"] = midiActionName(t.action);
+    }
     if (!t.signal.empty()) {
         j["signal"] = t.signal;
     }
@@ -79,11 +82,25 @@ Result<BindingTarget> targetFromJson(const nlohmann::json& j) {
         }
         t.max = j["max"].get<float>();
     }
+    if (j.contains("action")) { // ADR-1705
+        const auto action = j["action"].is_string() ? midiActionFromName(j["action"].get<std::string>()) : std::nullopt;
+        if (!action) {
+            return fail("binding 'action' must be one of transport.play, transport.return-to-start, live.next-scene, "
+                        "live.previous-scene");
+        }
+        if (!t.signal.empty() || !t.parameter.empty()) {
+            return fail("binding 'action' cannot be combined with a 'signal' or a 'parameter'");
+        }
+        t.action = *action;
+        return t;
+    }
     if (t.signal.empty() && t.parameter.empty()) {
         return fail("binding needs a 'signal' or a 'parameter'");
     }
     return t;
 }
+
+} // namespace
 
 // ---- ADR-1700: a MIDI binding in JSON --------------------------------------------------------------------------------
 
@@ -96,7 +113,7 @@ nlohmann::json midiBindingToJson(const MidiBinding& b) {
     nlohmann::json j = targetToJson(b.target);
     if (b.scope != MidiScope::Default) {
         j["id"] = b.id;
-        j["scope"] = midiScopeName(b.scope);
+        j["scope"] = midiScopeName(b.scope); // ADR-1705: "rig" only ever in the rig file
         if (b.scope == MidiScope::Scene) {
             j["scene"] = b.scene;
         }
@@ -226,11 +243,23 @@ Result<MidiBinding> midiBindingFromJson(const nlohmann::json& e, MidiScope defau
         }
         b.encoder = *enc;
     }
-    if (warnings != nullptr) {
+    if (warnings != nullptr && defaultScope == MidiScope::Rig) {
+        // ADR-1705: the rig file holds rig mappings only; a scene or a project scope there is not something it can mean.
+        if (!scopeName.empty() && scopeName != "rig") {
+            return fail("scope '{}' in the rig: the rig holds rig mappings only", scopeName);
+        }
+        b.scope = MidiScope::Rig;
+        b.scene.clear();
+        if (!b.overrides.empty()) {
+            return fail("a rig mapping cannot override another mapping");
+        }
+    } else if (warnings != nullptr) {
         if (scopeName == "scene") {
             b.scope = MidiScope::Scene;
         } else if (scopeName == "project" || scopeName.empty()) {
             b.scope = MidiScope::Project;
+        } else if (scopeName == "rig") {
+            return fail("a rig mapping belongs in the app's rig file, not in a project");
         } else {
             return fail("scope '{}' is not project or scene", scopeName);
         }
@@ -240,15 +269,19 @@ Result<MidiBinding> midiBindingFromJson(const nlohmann::json& e, MidiScope defau
         static const std::set<std::string> known = {
             "id", "scope", "scene", "overrides", "source", "device", "deviceName", "channel", "kind", "number",
             "numberHigh", "enabled", "toggle", "velocity", "pickup", "invert", "curve", "scale", "offset", "smoothMs",
-            "encoder", "signal", "parameter", "component", "min", "max"};
+            "encoder", "signal", "parameter", "component", "min", "max", "action"};
         for (const auto& [key, value] : e.items()) {
             if (!known.contains(key)) {
-                warnings->push_back(fmt::format("control.midi.mappings '{}': unknown key '{}' ignored", b.id, key));
+                warnings->push_back(fmt::format("{} '{}': unknown key '{}' ignored",
+                                                defaultScope == MidiScope::Rig ? "MIDI rig" : "control.midi.mappings",
+                                                b.id, key));
             }
         }
     }
     return b;
 }
+
+namespace {
 
 std::uint64_t fnv1a(std::string_view text) {
     std::uint64_t h = 1469598103934665603ull;
@@ -270,13 +303,19 @@ void assignMidiIds(ControlMap& m) {
     for (const auto& b : m.midiUser) {
         if (!b.id.empty()) taken.insert(b.id);
     }
+    for (const auto& b : m.midiRig) { // ADR-1705: a rig id is not reused by a default named after its content
+        if (!b.id.empty()) taken.insert(b.id);
+    }
     const auto name = [&](MidiBinding& b, const char* prefix) {
         if (!b.id.empty()) {
             return;
         }
-        const std::string canonical =
+        std::string canonical =
             fmt::format("{}|{}|{}|{}|{}|{}|{}|{}|{}", midiBindKindName(b.kind), b.number, b.numberHigh, b.channel,
                         b.source, b.device, b.target.signal, b.target.parameter, b.target.component);
+        if (b.target.action != MidiAction::None) { // ADR-1705; appended, so every existing default keeps its id
+            canonical += fmt::format("|{}", midiActionName(b.target.action));
+        }
         const std::string base = fmt::format("{}{:08x}", prefix, fnv1a(canonical) & 0xFFFFFFFFull);
         std::string id = base;
         for (int n = 2; taken.contains(id); ++n) {
@@ -406,6 +445,7 @@ int relativeEncoderDelta(MidiEncoder encoder, std::uint8_t value) {
 const char* midiScopeName(MidiScope scope) {
     switch (scope) {
     case MidiScope::Default: return "default";
+    case MidiScope::Rig: return "rig";
     case MidiScope::Project: return "project";
     case MidiScope::Scene: return "scene";
     }
@@ -441,8 +481,42 @@ const char* midiMappingStateName(MidiMappingState state) {
     return "active";
 }
 
+const char* midiActionName(MidiAction action) {
+    switch (action) {
+    case MidiAction::None: return "";
+    case MidiAction::TransportPlay: return "transport.play";
+    case MidiAction::TransportReturnToStart: return "transport.return-to-start";
+    case MidiAction::LiveNextScene: return "live.next-scene";
+    case MidiAction::LivePreviousScene: return "live.previous-scene";
+    }
+    return "";
+}
+
+const char* midiActionLabel(MidiAction action) {
+    switch (action) {
+    case MidiAction::None: return "None";
+    case MidiAction::TransportPlay: return "Play / pause";
+    case MidiAction::TransportReturnToStart: return "Return to start";
+    case MidiAction::LiveNextScene: return "Next live scene";
+    case MidiAction::LivePreviousScene: return "Previous live scene";
+    }
+    return "None";
+}
+
+std::optional<MidiAction> midiActionFromName(std::string_view name) {
+    for (const MidiAction a : kMidiActions) {
+        if (name == midiActionName(a)) {
+            return a;
+        }
+    }
+    return std::nullopt;
+}
+
 std::vector<std::string> midiDestinationKeys(const BindingTarget& target) {
     std::vector<std::string> keys;
+    if (target.action != MidiAction::None) {
+        keys.push_back(std::string("action.") + midiActionName(target.action));
+    }
     if (!target.signal.empty()) {
         keys.push_back("control." + target.signal);
     }
@@ -648,6 +722,9 @@ Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
                 if (!target) {
                     return fail("osc binding: {}", target.error().message);
                 }
+                if (target->action != MidiAction::None) {
+                    return fail("osc binding: 'action' is a MIDI destination; OSC uses the direct scheme's transport");
+                }
                 OscBinding b;
                 b.target = *target;
                 if (!e.contains("address") || !e["address"].is_string()) {
@@ -783,7 +860,7 @@ void ControlMap::setCombine(const std::string& destinationKey, MidiCombine polic
 }
 
 MidiBinding* ControlMap::findMidi(std::string_view id) {
-    for (auto* list : {&midi, &midiUser}) {
+    for (auto* list : {&midi, &midiUser, &midiRig}) {
         for (auto& b : *list) {
             if (b.id == id) {
                 return &b;
@@ -799,8 +876,11 @@ const MidiBinding* ControlMap::findMidi(std::string_view id) const {
 
 std::vector<ResolvedMapping> resolveMidiMappings(const ControlMap& map, std::string_view sceneKey) {
     std::vector<ResolvedMapping> out;
-    out.reserve(map.midi.size() + map.midiUser.size());
+    out.reserve(map.midi.size() + map.midiRig.size() + map.midiUser.size());
     for (const auto& b : map.midi) {
+        out.push_back({&b, MidiMappingState::Active, {}});
+    }
+    for (const auto& b : map.midiRig) { // ADR-1705
         out.push_back({&b, MidiMappingState::Active, {}});
     }
     for (const auto& b : map.midiUser) {
@@ -894,6 +974,9 @@ std::vector<ControlMap::Channel> ControlMap::channels() const {
         add(b.target.signal, b.kind == MidiBindKind::NoteEvent);
     }
     for (const auto& b : midiUser) { // ADR-1700
+        add(b.target.signal, b.kind == MidiBindKind::NoteEvent);
+    }
+    for (const auto& b : midiRig) { // ADR-1705: a rig channel exists in every scene
         add(b.target.signal, b.kind == MidiBindKind::NoteEvent);
     }
     for (const auto& b : osc) {

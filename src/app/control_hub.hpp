@@ -47,7 +47,8 @@ public:
     [[nodiscard]] control::ControlMap& map() { return map_; }
     [[nodiscard]] const control::ControlMap& map() const { return map_; }
     // Replaces the map and (re)opens OSC/MIDI to match it. Errors are reported, not fatal
-    // (a port in use leaves OSC closed; see status()).
+    // (a port in use leaves OSC closed; see status()). ADR-1705: the hub's rig is kept -- whatever `map.midiRig`
+    // holds is replaced by it -- so a project load, a live scene switch or a new document never drops the rig.
     void setMap(control::ControlMap map);
     // Opens/closes receivers (and the feedback sender) to match the current map (called by
     // setMap; call after editing the map's port/filter/feedback fields from the UI).
@@ -91,6 +92,23 @@ public:
     [[nodiscard]] const std::string& sceneKey() const { return sceneKey_; }
     // The UI changed map()'s MIDI mappings: rebuilt before the next message, keeping held gates and pickup latches.
     void mappingsChanged() { rebuildPending_ = true; }
+
+    // ---- ADR-1705: the rig ----
+    // Replaces the rig (the app's file, at start-up): applied on the next update, fresh (gates released).
+    void setRig(std::vector<control::MidiBinding> rig);
+    [[nodiscard]] const std::vector<control::MidiBinding>& rig() const { return map_.midiRig; }
+    // Bumped whenever the rig's content changes (setRig, or an edit seen on rebuild): the app saves the rig file when it
+    // differs from the revision it last saved. Never bumped by a project load.
+    [[nodiscard]] std::uint64_t rigRevision() const { return rigRevision_; }
+    // ADR-1705: the live scene steps mapped actions asked for since the last call (+1 next, -1 previous; summed), taken
+    // once. The app performs them (Application::serviceLiveScenes), as it does a program change.
+    [[nodiscard]] int takeLiveSceneSteps() {
+        const int steps = liveSceneSteps_;
+        liveSceneSteps_ = 0;
+        return steps;
+    }
+    // Actions fired through mappings since construction (tests and the panel).
+    [[nodiscard]] std::uint64_t actionsFired() const { return actionsFired_; }
     [[nodiscard]] control::MidiMapper& mapper() { return mapper_; }
     [[nodiscard]] const control::MidiMapper& mapper() const { return mapper_; }
     [[nodiscard]] control::MidiLearn& learn() { return learn_; }
@@ -145,6 +163,10 @@ private:
     void applyMidiWith(Engine& engine, const control::MidiMessage& message, control::MidiTargets& targets, double now);
     void syncDevices();
     void rebuildMappings(control::MidiTargets& targets);
+    void noteRigChange();
+    friend class HubTargets;
+    void queueAction(control::MidiAction action);
+    void performActions(Engine& engine);
     // Query replies and feedback.
     [[nodiscard]] control::OscSender* replySender(const control::OscMessage& request);
     [[nodiscard]] control::OscMessage parameterMessage(const params::IParameter& parameter) const;
@@ -186,6 +208,13 @@ private:
     std::uint64_t ignored_ = 0;
     std::uint64_t startNs_ = 0;
     std::optional<int> programChange_;
+    // ADR-1705
+    std::string rigFingerprint_;
+    std::uint64_t rigRevision_ = 0;
+    int liveSceneSteps_ = 0;
+    int pendingPlayToggles_ = 0;
+    bool pendingReturnToStart_ = false;
+    std::uint64_t actionsFired_ = 0;
     std::optional<control::OscMessage> lastOsc_;
     std::unordered_map<std::string, std::vector<float>> feedbackCache_; // path -> last seen base components
     std::unordered_set<std::string> oscWritten_; // paths written through OSC this frame (no echo)

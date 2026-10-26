@@ -28,6 +28,7 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -62,8 +63,10 @@ enum class MidiEncoder : std::uint8_t { Absolute, TwosComplement, BinaryOffset, 
 // 64 = none, 65 = +1, 63 = -1; sign-magnitude bit 6 = down, low six bits = size.
 [[nodiscard]] int relativeEncoderDelta(MidiEncoder encoder, std::uint8_t value);
 
-// ADR-1700: where a mapping comes from, lowest precedence first.
-enum class MidiScope : std::uint8_t { Default, Project, Scene };
+// ADR-1700: where a mapping comes from, lowest precedence first. ADR-1705: Rig is the performer's controller setup,
+// kept in the app's per-user files (control/midi_rig.hpp), never in a project, and resolved above the scene's
+// defaults and below the project's and the scene's own mappings.
+enum class MidiScope : std::uint8_t { Default, Rig, Project, Scene };
 [[nodiscard]] const char* midiScopeName(MidiScope scope);
 
 // ADR-1700: several mappings driving one destination. Replace: the latest message wins (and what a binding always
@@ -72,11 +75,27 @@ enum class MidiCombine : std::uint8_t { Replace, Max, Add };
 [[nodiscard]] const char* midiCombineName(MidiCombine combine);
 [[nodiscard]] std::optional<MidiCombine> midiCombineFromName(std::string_view name);
 
+// ADR-1705: the app actions a mapping can fire, named by the keyboard command ids they share (docs/help/features.json).
+// Fired on a rising edge: a note-on, a program change, a continuous control crossing half-way upwards.
+enum class MidiAction : std::uint8_t {
+    None,
+    TransportPlay,         // "transport.play": play / pause, as Space
+    TransportReturnToStart, // "transport.return-to-start", as Return
+    LiveNextScene,         // "live.next-scene", as Page Down
+    LivePreviousScene      // "live.previous-scene", as Page Up
+};
+[[nodiscard]] const char* midiActionName(MidiAction action);  // the command id ("" for None)
+[[nodiscard]] const char* midiActionLabel(MidiAction action); // "Next live scene"
+[[nodiscard]] std::optional<MidiAction> midiActionFromName(std::string_view name);
+inline constexpr std::array<MidiAction, 4> kMidiActions = {MidiAction::TransportPlay, MidiAction::TransportReturnToStart,
+                                                           MidiAction::LiveNextScene, MidiAction::LivePreviousScene};
+
 // Where a matched value goes: a control signal (channel name without "control."), a parameter
-// base value (path + component, mapped to min..max), or both.
+// base value (path + component, mapped to min..max), or both. ADR-1705: or an app action, alone.
 struct BindingTarget {
     std::string signal;          // "" = none
     std::string parameter;       // "" = none
+    MidiAction action = MidiAction::None; // ADR-1705: exclusive of the two above (MIDI only)
     int component = -1;          // -1 = every component
     float min = 0.0f;            // parameter range for value 0..1
     float max = 1.0f;
@@ -132,6 +151,7 @@ struct MidiBinding {
 };
 
 // ADR-1700: the destinations a binding writes, as stable keys: "control.<signal>" and "<path>" or "<path>[<c>]".
+// ADR-1705: an action is "action.<command id>".
 [[nodiscard]] std::vector<std::string> midiDestinationKeys(const BindingTarget& target);
 // Whether two bindings can be moved by the same message: same kind, overlapping numbers, channels and devices ("any"
 // overlaps everything).
@@ -179,6 +199,10 @@ struct ControlMap {
     bool midiPickup = false;     // ADR-1606: soft takeover for every continuous binding (CC, pitch bend, pressure)
     std::vector<MidiBinding> midi;      // the scene's authored defaults ("bindings")
     std::vector<MidiBinding> midiUser;  // ADR-1700: the performer's mappings, project and scene scope ("mappings")
+    // ADR-1705: the rig, the performer's mappings for every scene. Carried by the map so the resolver, the mapper and the
+    // editing helpers see one list, but owned by the app's per-user files: toJson never writes it, fromJson never reads
+    // it, and ControlHub::setMap keeps it across a project load.
+    std::vector<MidiBinding> midiRig;
     std::vector<std::string> disabledDefaults; // ADR-1700: tombstones: ids of defaults switched off
     std::vector<std::pair<std::string, MidiCombine>> combine; // ADR-1700: destination key -> policy (not Replace)
     std::vector<std::string> warnings; // ADR-1700: what fromJson set aside (unreadable user records, unknown keys)
@@ -189,11 +213,11 @@ struct ControlMap {
     // ADR-1612: the declared rest of a channel, or null.
     [[nodiscard]] const ChannelRest* restFor(std::string_view channel) const;
     static Result<ControlMap> fromJson(const nlohmann::json& j);
-    [[nodiscard]] bool empty() const { return midi.empty() && midiUser.empty() && osc.empty(); }
+    [[nodiscard]] bool empty() const { return midi.empty() && midiUser.empty() && midiRig.empty() && osc.empty(); }
     // ADR-1700
     [[nodiscard]] MidiCombine combineFor(std::string_view destinationKey) const;
     void setCombine(const std::string& destinationKey, MidiCombine policy);
-    [[nodiscard]] MidiBinding* findMidi(std::string_view id); // a default or a user mapping
+    [[nodiscard]] MidiBinding* findMidi(std::string_view id); // a default, a user mapping or a rig mapping
     [[nodiscard]] const MidiBinding* findMidi(std::string_view id) const;
     // Every signal channel named by a binding (deduplicated) with its event flag, so the control
     // source can declare them before messages arrive.
@@ -204,6 +228,13 @@ struct ControlMap {
     };
     [[nodiscard]] std::vector<Channel> channels() const;
 };
+
+// ADR-1700: one MIDI mapping as JSON. `defaultScope` Default reads an authored binding (no warnings); Project reads a
+// project's user record (project or scene scope); ADR-1705: Rig reads a record of the rig file (rig scope only). A
+// project record that says "rig" is refused: the rig is never written into a project.
+[[nodiscard]] nlohmann::json midiBindingToJson(const MidiBinding& binding);
+[[nodiscard]] Result<MidiBinding> midiBindingFromJson(const nlohmann::json& json, MidiScope defaultScope,
+                                                      std::vector<std::string>* warnings);
 
 // ADR-1700: the state of every mapping in a map for one scene, and the active ones in the order they apply.
 enum class MidiMappingState : std::uint8_t {
@@ -221,9 +252,9 @@ struct ResolvedMapping {
     MidiMappingState state = MidiMappingState::Active;
     std::string by; // the id that overrides or shadows it
 };
-// Every binding of `map` (defaults, then user mappings in their order) with its state for `sceneKey`. The precedence
-// is ADR-1700's: tombstones, then explicit overrides, then scene > project > default shadowing on an overlapping source
-// that drives the same destination.
+// Every binding of `map` (defaults, then rig mappings, then user mappings, each in their order) with its state for
+// `sceneKey`. The precedence is ADR-1700's, with ADR-1705's rig: tombstones, then explicit overrides, then
+// scene > project > rig > default shadowing on an overlapping source that drives the same destination.
 [[nodiscard]] std::vector<ResolvedMapping> resolveMidiMappings(const ControlMap& map, std::string_view sceneKey);
 
 // A matched binding: the normalised value (0..1) and whether it is an event pulse.

@@ -132,11 +132,27 @@ std::vector<const MidiBinding*> midiCollisions(const ControlMap& map, std::strin
 std::string commitMidiLearn(ControlMap& map, std::string_view sceneKey, MidiBinding candidate, MidiLearnCommit how) {
     if (how == MidiLearnCommit::Replace) {
         std::vector<std::string> ids;
+        std::vector<std::string> rigIds;
         for (const MidiBinding* b : midiCollisions(map, sceneKey, candidate)) {
-            ids.push_back(b->id);
+            // ADR-1705: a rig mapping is switched off for everything only by a rig Learn. A scene or project Learn
+            // switches it off where it is made: a disabled mapping of that scope that overrides it.
+            (b->scope == MidiScope::Rig && candidate.scope != MidiScope::Rig ? rigIds : ids).push_back(b->id);
         }
         for (const std::string& id : ids) {
             setMidiMappingEnabled(map, id, false);
+        }
+        for (const std::string& id : rigIds) {
+            const MidiBinding* rig = map.findMidi(id);
+            if (rig == nullptr) {
+                continue;
+            }
+            MidiBinding off = *rig;
+            off.id = newMidiMappingId();
+            off.scope = candidate.scope == MidiScope::Project ? MidiScope::Project : MidiScope::Scene;
+            off.scene = off.scope == MidiScope::Scene ? std::string(sceneKey) : std::string();
+            off.overrides = id;
+            off.enabled = false;
+            map.midiUser.push_back(std::move(off));
         }
     }
     if (candidate.scope == MidiScope::Default) {
@@ -150,8 +166,10 @@ std::string commitMidiLearn(ControlMap& map, std::string_view sceneKey, MidiBind
     candidate.id = newMidiMappingId();
     candidate.idAuthored = false;
     candidate.enabled = true;
+    candidate.overrides.clear();
     std::string id = candidate.id;
-    map.midiUser.push_back(std::move(candidate));
+    // ADR-1705: a rig Learn goes to the rig, which the app saves in its own file.
+    (candidate.scope == MidiScope::Rig ? map.midiRig : map.midiUser).push_back(std::move(candidate));
     return id;
 }
 
@@ -164,9 +182,11 @@ bool isDefault(const ControlMap& map, std::string_view id) {
 } // namespace
 
 MidiBinding* editableMidiMapping(ControlMap& map, std::string_view sceneKey, std::string_view id) {
-    for (auto& b : map.midiUser) {
-        if (b.id == id) {
-            return &b;
+    for (auto* list : {&map.midiUser, &map.midiRig}) { // ADR-1705: a rig mapping is the performer's own: edited as is
+        for (auto& b : *list) {
+            if (b.id == id) {
+                return &b;
+            }
         }
     }
     const auto def = std::find_if(map.midi.begin(), map.midi.end(), [&](const MidiBinding& b) { return b.id == id; });
@@ -205,14 +225,15 @@ std::string duplicateMidiMapping(ControlMap& map, std::string_view sceneKey, std
         copy.scene = std::string(sceneKey);
     }
     std::string newId = copy.id;
-    map.midiUser.push_back(std::move(copy));
+    (copy.scope == MidiScope::Rig ? map.midiRig : map.midiUser).push_back(std::move(copy));
     return newId;
 }
 
 bool removeMidiMapping(ControlMap& map, std::string_view id) {
-    const auto before = map.midiUser.size();
+    const auto before = map.midiUser.size() + map.midiRig.size();
     std::erase_if(map.midiUser, [&](const MidiBinding& b) { return b.id == id; });
-    return map.midiUser.size() != before;
+    std::erase_if(map.midiRig, [&](const MidiBinding& b) { return b.id == id; }); // ADR-1705
+    return map.midiUser.size() + map.midiRig.size() != before;
 }
 
 void setMidiMappingEnabled(ControlMap& map, std::string_view id, bool enabled) {
@@ -224,9 +245,11 @@ void setMidiMappingEnabled(ControlMap& map, std::string_view id, bool enabled) {
         }
         return;
     }
-    for (auto& b : map.midiUser) {
-        if (b.id == id && !b.invalid()) {
-            b.enabled = enabled;
+    for (auto* list : {&map.midiUser, &map.midiRig}) {
+        for (auto& b : *list) {
+            if (b.id == id && !b.invalid()) {
+                b.enabled = enabled;
+            }
         }
     }
 }

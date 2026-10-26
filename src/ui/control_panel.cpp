@@ -4046,7 +4046,8 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     // ---- learn ----
     // ADR-1700: MIDI is learned, listed and edited in the MIDI panel, which keeps the scene's defaults apart from the
     // performer's own mappings. This tab keeps OSC's.
-    ImGui::Text("MIDI: %zu default, %zu own mapping(s); applied %llu, unmatched %llu", map.midi.size(), map.midiUser.size(),
+    ImGui::Text("MIDI: %zu default, %zu own, %zu rig mapping(s); applied %llu, unmatched %llu", map.midi.size(),
+                map.midiUser.size(), map.midiRig.size(),
                 static_cast<unsigned long long>(status.applied), static_cast<unsigned long long>(status.unmatched));
     ImGui::SameLine();
     if (ImGui::SmallButton("Open MIDI panel")) {

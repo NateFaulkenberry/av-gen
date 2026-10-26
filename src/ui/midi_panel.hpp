@@ -56,7 +56,7 @@ private:
     std::string selected_; // a mapping id, never a row index
     bool editorBeside_ = false;
     char search_[96] = "";
-    int scopeFilter_ = 0;  // 0 all, 1 default, 2 project, 3 scene
+    int scopeFilter_ = 0;  // 0 all, 1 default, 2 rig, 3 project, 4 scene
     bool showInactive_ = true;
 
     // Monitor.
@@ -70,6 +70,7 @@ private:
     // Picker.
     char pickerSearch_[96] = "";
     char newChannel_[48] = "";
+    bool pickerForRig_ = false; // ADR-1705: the picker is choosing for a rig mapping (common parameters first)
 
     int requestedTab_ = -1;
 };

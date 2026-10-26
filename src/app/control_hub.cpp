@@ -1,6 +1,7 @@
 #include "app/control_hub.hpp"
 
 #include "app/engine.hpp"
+#include "control/midi_rig.hpp"
 #include "core/log.hpp"
 
 #include <algorithm>
@@ -30,8 +31,8 @@ std::uint64_t steadyNs() {
 // 33 ms frame at four devices x 3,000 messages a second. Once per frame it is nothing.
 class EngineTargets final : public control::MidiTargets {
 public:
-    EngineTargets(Engine& engine, const control::ControlMap& map)
-        : engine_(engine), map_(map), control_(engine.controlSource()) {}
+    EngineTargets(Engine& engine, const control::ControlMap& map, ControlHub& hub)
+        : engine_(engine), map_(map), control_(engine.controlSource()), hub_(hub) {}
     std::optional<float> parameter(const std::string& path, int component) override {
         const params::IParameter* p = engine_.params().find(path);
         const std::size_t c = component < 0 ? 0 : static_cast<std::size_t>(component);
@@ -58,13 +59,25 @@ public:
     bool signalHasRest(const std::string& name) override { return map_.restFor(name) != nullptr; }
     void setSignal(const std::string& name, float value) override { control_.set(name, value); }
     void pulseSignal(const std::string& name, float strength) override { control_.pulse(name, strength); }
+    void action(control::MidiAction a) override;
 
 private:
     Engine& engine_;
     const control::ControlMap& map_;
     signals::ControlSource& control_;
+    ControlHub& hub_;
 };
 
+} // namespace
+
+// ADR-1705: the hub's private queue, reached through a friend.
+class HubTargets {
+public:
+    static void queue(ControlHub& hub, control::MidiAction a) { hub.queueAction(a); }
+};
+
+namespace {
+void EngineTargets::action(control::MidiAction a) { HubTargets::queue(hub_, a); }
 } // namespace
 
 ControlHub::ControlHub()
@@ -113,7 +126,49 @@ void ControlHub::syncDevices() {
     mapper_.setDevices(devices_);
 }
 
+void ControlHub::noteRigChange() {
+    std::string fingerprint = control::midiRigFingerprint(map_.midiRig);
+    if (fingerprint != rigFingerprint_) {
+        rigFingerprint_ = std::move(fingerprint);
+        ++rigRevision_;
+    }
+}
+
+void ControlHub::setRig(std::vector<control::MidiBinding> rig) {
+    for (auto& b : rig) {
+        b.scope = control::MidiScope::Rig;
+    }
+    map_.midiRig = std::move(rig);
+    rigFingerprint_ = control::midiRigFingerprint(map_.midiRig); // what was loaded is what is saved: no revision
+    rebuildPending_ = true;
+    freshRebuild_ = true;
+}
+
+void ControlHub::queueAction(control::MidiAction a) {
+    ++actionsFired_;
+    switch (a) {
+    case control::MidiAction::None: break;
+    case control::MidiAction::TransportPlay: ++pendingPlayToggles_; break;
+    case control::MidiAction::TransportReturnToStart: pendingReturnToStart_ = true; break;
+    case control::MidiAction::LiveNextScene: ++liveSceneSteps_; break;
+    case control::MidiAction::LivePreviousScene: --liveSceneSteps_; break;
+    }
+}
+
+// After the frame's messages: the transport actions as the keyboard does them (Space, Return). Two presses in one
+// frame toggle twice.
+void ControlHub::performActions(Engine& engine) {
+    if (pendingReturnToStart_) {
+        pendingReturnToStart_ = false;
+        engine.seekSeconds(engine.transport().playStartSeconds());
+    }
+    for (; pendingPlayToggles_ > 0; --pendingPlayToggles_) {
+        engine.togglePlay();
+    }
+}
+
 void ControlHub::rebuildMappings(control::MidiTargets& targets) {
+    noteRigChange(); // an edit may have changed the rig, which the app then saves (on rebuild only, never per frame)
     mapper_.rebuild(map_, sceneKey_, targets, !freshRebuild_);
     mapper_.setDevices(devices_);
     rebuildPending_ = false;
@@ -122,6 +177,7 @@ void ControlHub::rebuildMappings(control::MidiTargets& targets) {
 ControlHub::~ControlHub() { closeAll(); }
 
 void ControlHub::setMap(control::ControlMap map) {
+    map.midiRig = std::move(map_.midiRig); // ADR-1705: the rig is the performer's, not the project's
     map_ = std::move(map);
     rebuildPending_ = true; // ADR-1700: a new map starts fresh (held gates released on the next update)
     freshRebuild_ = true;
@@ -216,7 +272,7 @@ void ControlHub::injectOsc(control::OscMessage message) {
 std::size_t ControlHub::update(Engine& engine, const FrameTime& time) {
     frameNs_ = frameNanoseconds(time);
     std::size_t count = 0;
-    EngineTargets targets(engine, map_);
+    EngineTargets targets(engine, map_, *this);
     syncDevices();
     if (rebuildPending_) {
         rebuildMappings(targets);
@@ -230,6 +286,7 @@ std::size_t ControlHub::update(Engine& engine, const FrameTime& time) {
         ++count;
     }
     mapper_.advance(time.deltaTime, targets); // smoothing, this frame
+    performActions(engine);                    // ADR-1705
     clock_.advance(frameNs_);
     oscScratch_.clear();
     osc_.drain(oscScratch_);
@@ -270,12 +327,13 @@ void ControlHub::applyTarget(Engine& engine, const control::BindingTarget& targe
 }
 
 void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) {
-    EngineTargets targets(engine, map_);
+    EngineTargets targets(engine, map_, *this);
     syncDevices();
     if (rebuildPending_) {
         rebuildMappings(targets);
     }
     applyMidiWith(engine, message, targets, clockSeconds());
+    performActions(engine);
 }
 
 void ControlHub::applyMidiWith(Engine& engine, const control::MidiMessage& message, control::MidiTargets& targets,

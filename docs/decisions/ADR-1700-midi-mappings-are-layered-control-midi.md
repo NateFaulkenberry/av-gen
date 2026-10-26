@@ -106,7 +106,7 @@ having to switch the default off by hand.
   one.
 - A parameter base write is saved with the project, as a slider move is. That was already true of bindings.
 - "Project" is the open project document. The live scene switcher opens one project per live scene, so a project
-  mapping does not cross live scenes.
+  mapping does not cross live scenes. ADR-1705 adds the rig, a scope kept outside every project, for that.
 - The Control tab's MIDI learn and MIDI binding list are removed: the MIDI panel (ADR-1704) replaces them. OSC's stay.
 
 ## Rejected alternatives

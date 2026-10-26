@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace avgen::control {
 
@@ -60,8 +61,8 @@ void MidiMapper::rebuild(const ControlMap& map, std::string_view sceneKey, MidiT
     statuses_.clear();
     statusIndex_.clear();
 
-    // Applied in precedence order -- default, project, scene -- so on one message the higher scope writes last.
-    for (const MidiScope scope : {MidiScope::Default, MidiScope::Project, MidiScope::Scene}) {
+    // Applied in precedence order -- default, rig, project, scene -- so on one message the higher scope writes last.
+    for (const MidiScope scope : {MidiScope::Default, MidiScope::Rig, MidiScope::Project, MidiScope::Scene}) {
         for (const ResolvedMapping& r : resolved) {
             const MidiBinding& b = *r.binding;
             if (b.scope != scope) {
@@ -73,12 +74,15 @@ void MidiMapper::rebuild(const ControlMap& map, std::string_view sceneKey, MidiT
             if (!b.target.parameter.empty()) {
                 status.destinationMissing = !targets.parameter(b.target.parameter, b.target.component).has_value();
             }
+            // ADR-1705: a rig mapping whose parameter this scene lacks is inactive here -- kept, shown, not applied.
+            status.inactiveForScene = b.scope == MidiScope::Rig && status.destinationMissing;
+            const bool inactive = status.inactiveForScene;
             const std::size_t statusAt = statuses_.size();
             statuses_.push_back(std::move(status));
             if (!b.id.empty()) {
                 statusIndex_[b.id] = statusAt;
             }
-            if (r.state != MidiMappingState::Active || entries_.size() >= 0xFFFF) {
+            if (r.state != MidiMappingState::Active || inactive || entries_.size() >= 0xFFFF) {
                 continue;
             }
             Entry e;
@@ -331,27 +335,44 @@ const MidiMappingStatus* MidiMapper::status(std::string_view id) const {
 
 void MidiMapper::collect(const MidiMessage& m) {
     scratch_.clear();
-    const auto add = [&](const std::vector<std::uint16_t>& list) { scratch_.insert(scratch_.end(), list.begin(), list.end()); };
-    const auto addMapped = [&](const std::unordered_map<std::uint16_t, std::vector<std::uint16_t>>& table) {
-        if (const auto it = table.find(m.param); it != table.end()) {
-            add(it->second);
-        }
+    // Every index list is built in entry order, and entries are in precedence order (default, rig, project, scene), so
+    // a message's candidates -- one numbered list and one "any" list, disjoint -- are merged in order: no sort, and no
+    // allocation (scratch_ holds every entry's index).
+    static const std::vector<std::uint16_t> kNone;
+    const auto merge = [&](const std::vector<std::uint16_t>& a, const std::vector<std::uint16_t>& b) {
+        std::merge(a.begin(), a.end(), b.begin(), b.end(), std::back_inserter(scratch_));
+    };
+    const auto mapped = [&](const std::unordered_map<std::uint16_t, std::vector<std::uint16_t>>& table)
+        -> const std::vector<std::uint16_t>& {
+        const auto it = table.find(m.param);
+        return it != table.end() ? it->second : kNone;
     };
     switch (m.kind) {
-    case MidiKind::ControlChange: add(byCc_[m.data1 & 0x7F]); add(anyCc_); break;
+    case MidiKind::ControlChange: merge(byCc_[m.data1 & 0x7F], anyCc_); break;
     case MidiKind::NoteOn:
-    case MidiKind::NoteOff: add(byNote_[m.data1 & 0x7F]); add(anyNote_); break;
-    case MidiKind::PolyPressure: add(byPoly_[m.data1 & 0x7F]); add(anyPoly_); break;
-    case MidiKind::ProgramChange: add(byProgram_[m.data1 & 0x7F]); add(anyProgram_); break;
-    case MidiKind::PitchBend: add(pitchBend_); break;
-    case MidiKind::ChannelPressure: add(pressure_); break;
-    case MidiKind::Nrpn: addMapped(byNrpn_); add(anyNrpn_); break;
-    case MidiKind::Rpn: addMapped(byRpn_); add(anyRpn_); break;
+    case MidiKind::NoteOff: merge(byNote_[m.data1 & 0x7F], anyNote_); break;
+    case MidiKind::PolyPressure: merge(byPoly_[m.data1 & 0x7F], anyPoly_); break;
+    case MidiKind::ProgramChange: merge(byProgram_[m.data1 & 0x7F], anyProgram_); break;
+    case MidiKind::PitchBend: merge(pitchBend_, kNone); break;
+    case MidiKind::ChannelPressure: merge(pressure_, kNone); break;
+    case MidiKind::Nrpn: merge(mapped(byNrpn_), anyNrpn_); break;
+    case MidiKind::Rpn: merge(mapped(byRpn_), anyRpn_); break;
     default: break;
     }
-    if (scratch_.size() > 1) {
-        std::sort(scratch_.begin(), scratch_.end()); // precedence order: default, project, scene
+}
+
+// ADR-1705: an action fires once on the source's rising edge: a note-on, a program change, a continuous control
+// crossing half-way upwards (a button sending 127 then 0 is one press).
+void MidiMapper::fireAction(Entry& e, bool high, MidiTargets& targets, double nowSeconds) {
+    const bool rising = high && !e.rt.high;
+    e.rt.high = high;
+    if (!rising) {
+        return;
     }
+    targets.action(e.binding.target.action);
+    MidiMappingStatus& s = statuses_[e.status];
+    s.lastOutput = 1.0f;
+    s.lastSeconds = nowSeconds;
 }
 
 int MidiMapper::apply(const MidiMessage& m, MidiTargets& targets, double nowSeconds) {
@@ -395,6 +416,20 @@ int MidiMapper::apply(const MidiMessage& m, MidiTargets& targets, double nowSeco
         MidiMappingStatus& s = statuses_[e.status];
         s.lastInput = *raw;
         s.lastSeconds = nowSeconds;
+        if (b.target.action != MidiAction::None) {
+            bool high = false;
+            if (b.kind == MidiBindKind::Note || b.kind == MidiBindKind::NoteEvent) {
+                high = m.kind == MidiKind::NoteOn;
+            } else if (b.kind == MidiBindKind::Program) {
+                e.rt.high = false; // every program change is a press
+                high = true;
+            } else {
+                high = shape(e, *raw) >= 0.5f;
+            }
+            fireAction(e, high, targets, nowSeconds);
+            ++moved;
+            continue;
+        }
         switch (b.kind) {
         case MidiBindKind::Note: {
             if (b.toggle) {
