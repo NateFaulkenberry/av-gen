@@ -868,6 +868,8 @@ private:
     // revision it last saved. serviceLiveScenes saves the rig when the hub's revision moves on.
     std::filesystem::path midiRigPath_;
     std::uint64_t midiRigSaved_ = 0;
+    std::chrono::steady_clock::time_point midiRigSavedAt_{};
+    void saveMidiRig(bool force);
     // ADR-1521: opens a capture device with its remembered channel map (or --input-sources); `synthetic:<n>` is the
     // benchmark generator. And the id a device is remembered by, from an id, a name or a name substring.
     Result<void> openAudioInput(const std::string& selector);

@@ -232,8 +232,9 @@ existing mapping and choose **Move to the rig**. The rig:
 
 - applies in every live scene and every project you open;
 - survives switching scenes, opening other projects and restarting AV Gen;
-- is saved on this computer as soon as you change it, in `midi-rig.json` beside AV Gen's settings. It is never
-  written into a project, so a project you share or save is exactly what it would be without a rig;
+- is saved on this computer within a second of a change, and when AV Gen quits, in `midi-rig.json` beside AV Gen's
+  settings. It is never written into a project, so a project you share or save is exactly what it would be without
+  a rig;
 - is shown with a **rig** label in the Assignments table.
 
 A project's own mapping or a scene's own mapping wins over the rig on the same control and destination. To change a
@@ -273,7 +274,7 @@ project's setting for its destination, **Replace** unless the project says other
 Default, project and scene mappings are part of the project. **Save** writes them, and the unsaved-changes prompt and
 the dot in the title bar cover them like any other edit. Nothing is written to disk when MIDI arrives.
 
-The rig is saved to its own file as soon as it changes. It does not mark the project as changed. A rig mapping to a
+The rig is saved to its own file within a second of a change. It does not mark the project as changed. A rig mapping to a
 parameter moves that parameter's value, as a slider does, and that value is saved with the project.
 
 A mapping refers to its device by the system's stable id and keeps the device's name:

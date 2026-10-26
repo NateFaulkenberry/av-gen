@@ -1275,6 +1275,7 @@ Application::~Application() {
     // Destruction order matters: UI before GPU context, renderer before context, window last.
     // The control plane goes first of all: it cancels the running task and waits for it, and both
     // the panel (a raw pointer) and the engine (a reference) outlive it only if it goes now.
+    saveMidiRig(true); // ADR-1705: an edit made in the last second
     ai_.reset();
     step("ai_");
     panel_.reset();
@@ -2724,16 +2725,32 @@ void Application::serviceLiveScenes() {
             switchLiveScene(steppedLiveScene(current, steps, count));
         }
     }
-    // ADR-1705: the rig changed (Learn, an edit, a promote): its own file, now. Never the project's.
-    if (const std::uint64_t revision = engine_->control().rigRevision(); revision != midiRigSaved_) {
-        midiRigSaved_ = revision;
-        if (!midiRigPath_.empty()) {
-            control::MidiRig rig;
-            rig.mappings = engine_->control().rig();
-            if (auto r = rig.save(midiRigPath_); !r) {
-                log::warn("midi rig: {}", r.error().message);
-            }
-        }
+    saveMidiRig(false);
+}
+
+// ADR-1705: the rig changed (Learn, an edit, a promote): its own file, never the project's. At most once a second, so a
+// slider dragged in the rig mapping's editor does not write the file every frame; the destructor writes what is left.
+void Application::saveMidiRig(bool force) {
+    if (engine_ == nullptr) {
+        return;
+    }
+    const std::uint64_t revision = engine_->control().rigRevision();
+    if (revision == midiRigSaved_) {
+        return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (!force && now - midiRigSavedAt_ < std::chrono::seconds(1)) {
+        return;
+    }
+    midiRigSaved_ = revision;
+    midiRigSavedAt_ = now;
+    if (midiRigPath_.empty()) {
+        return;
+    }
+    control::MidiRig rig;
+    rig.mappings = engine_->control().rig();
+    if (auto r = rig.save(midiRigPath_); !r) {
+        log::warn("midi rig: {}", r.error().message);
     }
 }
 

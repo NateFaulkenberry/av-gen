@@ -54,8 +54,9 @@ scenes, a performer would map the same controller 46 times. ADR-1700 named this 
   - a project record with `"scope": "rig"` is refused and set aside (kept, reported, never applied).
 
 - **Saving.** On every mapping rebuild (an edit or a scene change, never per frame) the hub compares the rig's
-  serialised form with the last one. A change bumps `rigRevision`, and the app writes the file in that frame's
-  `serviceLiveScenes`. A project load is not a change. A headless run has no rig file and never writes one.
+  serialised form with the last one. A change bumps `rigRevision`, and the app writes the file from `serviceLiveScenes`,
+  at most once a second (a slider dragged in a rig mapping's editor must not write a file every frame), and once more
+  as it quits. A project load is not a change. A headless run has no rig file and never writes one.
 
 **Precedence: default < rig < project < scene.** This is the proposal, kept. The reasons:
 
