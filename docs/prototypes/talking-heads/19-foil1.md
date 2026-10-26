@@ -80,7 +80,9 @@ static and scanlines, and the ghosting copies. None needed changing.
 
 ## Cost
 
-See section "Performance" in the coordinator report and `foil1/performance.txt`.
+Headless 1080p, foil and porcelain interleaved in one (busy) session: the foil adds +0.9 / +1.6 / +1.4 / +1.2 ms
+GPU p50 at one to four busts (it was about +3 ms at four before six ops were trimmed). Added to fx2's clean figures,
+four busts come to about 21.9 ms p50 and about 24-25 ms p95, inside 30 fps. Details: `foil1/performance.txt`.
 
 ## Not done
 
