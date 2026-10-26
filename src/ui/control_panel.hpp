@@ -30,6 +30,7 @@
 #include "ui/ai_panel.hpp"
 #include "ui/director_panel.hpp"
 #include "ui/sequence_panel.hpp"
+#include "ui/midi_panel.hpp"
 #include "ui/settings_panel.hpp"
 #include "ui/transport_bar.hpp"
 #include "ui/editor_layout.hpp"
@@ -459,6 +460,7 @@ public:
     AiPanel ai;
     DirectorPanel director; // spec §35: the AI's proposal as a plan (ADR-762)
     SettingsPanel settings;
+    MidiPanel midi; // ADR-1704
 
     // How much of the canvas's pixel count the world is actually rendered at, before being shown
     // stretched to fill it (ADR-084). One means every canvas pixel, which is what the editor has

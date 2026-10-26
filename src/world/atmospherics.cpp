@@ -226,6 +226,12 @@ Result<void> AuroraShape::validate() const {
         return fail("an aurora's ribbons march 8..128 planes; each one is a sample per sky pixel");
     }
     if (!(ribbonDistance > 0.0f) || !finite(ribbonDistance)) { return fail("aurora ribbon distance must be positive"); }
+    if (ribbonCoverage < 0.0f || ribbonCoverage > 1.0f || !finite(ribbonCoverage)) {
+        return fail("aurora ribbon coverage must be in [0, 1]");
+    }
+    if (!finite(ribbonChurn)) {
+        return fail("aurora ribbon churn must be finite"); // ADR-1664
+    }
     // ADR-1652
     if (!(pulse >= 0.0f && pulse <= 1.0f)) { return fail("aurora pulse must be in [0, 1]"); }
     if (!(pulseGain >= 0.0f && pulseGain <= 16.0f)) { return fail("aurora pulse gain must be in [0, 16]"); }
@@ -769,6 +775,8 @@ AuroraGpu packAurora(const ResolvedAtmospheric& r, std::span<const float> spectr
                               std::max(s.ribbonScale, 1.0f));
         g.ribbon1 = glm::vec4(std::clamp(s.ribbonWidth, 0.005f, 0.5f), std::max(s.ribbonSwirl, 0.0f),
                               std::max(s.ribbonEdge, 0.0f), std::max(s.ribbonDistance, 1.0f));
+        g.audio3.y = std::clamp(s.ribbonCoverage, 0.0f, 1.0f); // ADR-1660: a free lane, zero while ribbons are off
+        g.audio3.z = s.ribbonChurn;                            // ADR-1664: likewise
         // ADR-1652: the travelling pulse. All zero at pulse 0, so the march reads the bytes it read before.
         if (s.pulse > 0.0f) {
             g.ribbon2 = glm::vec4(std::clamp(s.pulse, 0.0f, 1.0f), std::clamp(s.pulseGain, 0.0f, 16.0f),

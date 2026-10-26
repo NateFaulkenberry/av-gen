@@ -62,6 +62,8 @@ const char* propagationKindName(PropagationKind k) {
     switch (k) {
     case PropagationKind::DirectionalWave: return "directional";
     case PropagationKind::RadialWave: return "radial";
+    case PropagationKind::PathWave: return "path";
+    case PropagationKind::LightBall: return "ball";
     }
     return "radial";
 }
@@ -71,6 +73,12 @@ std::optional<PropagationKind> propagationKindFromName(std::string_view name) {
     }
     if (name == "radial" || name == "radialWave" || name == "ripple" || name == "pulse") {
         return PropagationKind::RadialWave;
+    }
+    if (name == "path" || name == "pathWave") {
+        return PropagationKind::PathWave;
+    }
+    if (name == "ball" || name == "lightBall") {
+        return PropagationKind::LightBall;
     }
     return std::nullopt;
 }
@@ -144,7 +152,132 @@ Result<void> Propagation::validate() const {
     if (glm::length(explicitDirection) <= kEps) {
         return fail("the explicit direction is zero-length");
     }
+    if (kind == PropagationKind::PathWave) {
+        // A path wave that names no path (or one the scene lacks) is inactive, not invalid: `resolvePathFront`
+        // finds nothing to travel along, as a FocusHero source with nothing spotlit.
+        const PathShape& q = path;
+        for (const float v : {q.ease, q.wakeGrowth, q.coreWidth, q.coreOffset, q.haloWidth, q.reach, q.reachHeight,
+                              q.land, q.bed, q.embed, q.disturb, q.nearFade, q.laneJitter, q.splash, q.nearWake, q.splashGlow, q.bedReach, q.splashBack}) {
+            if (!(v >= 0.0f) || !finite(v)) {
+                return fail("a path wave's shape values must be finite and not negative");
+            }
+        }
+        if (q.ease > 1.0f || q.embed > 1.0f) {
+            return fail("a path wave's ease and embed are 0..1");
+        }
+        if (!(q.coreWidth > 0.0f)) {
+            return fail("a path wave's core width must be positive");
+        }
+        if (!finite(q.lane)) {
+            return fail("a path wave's lane must be finite");
+        }
+    }
+    if (kind == PropagationKind::LightBall) {
+        const BallShape& b = ball;
+        for (const float v : {b.travel, b.arc, b.lightRadius, b.range, b.coreSize, b.haloSize, b.coronaIntensity,
+                              b.coronaSize, b.flicker, b.trail, b.spread, b.smoke, b.embers}) {
+            if (!(v >= 0.0f) || !finite(v)) {
+                return fail("a light ball's flight and sizes must be finite and not negative");
+            }
+        }
+        if (b.look < 0 || b.look > 2 || b.smoke > 1.0f || b.embers > 1.0f) {
+            return fail("a light ball's look is 0, 1 or 2, and its smoke and embers are 0..1");
+        }
+        if (!(b.travel > 0.0f) || !(b.lightRadius > 0.0f) || !(b.range > 0.0f)) {
+            return fail("a light ball's travel, light radius and range must be positive");
+        }
+        for (const glm::vec3& v : {b.launch, b.target}) {
+            if (!finite(v.x) || !finite(v.y) || !finite(v.z)) {
+                return fail("a light ball's launch and target must be finite");
+            }
+        }
+    }
     return {};
+}
+
+// ---- ADR-1662: path geometry -------------------------------------------------------------------
+
+namespace {
+glm::vec2 xzOf(const glm::mat4& m, const glm::vec3& p) {
+    const glm::vec4 w = m * glm::vec4(p, 1.0f);
+    return {w.x, w.z};
+}
+} // namespace
+
+bool PathGeometry::closed() const {
+    return points.size() >= 3 && glm::distance(xzOf(transform, points.front()), xzOf(transform, points.back())) < 1.0f;
+}
+
+float PathGeometry::length() const {
+    float total = 0.0f;
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        total += glm::distance(xzOf(transform, points[i - 1]), xzOf(transform, points[i]));
+    }
+    return total;
+}
+
+float PathGeometry::arcOf(const glm::vec3& p, glm::vec2* tangent) const {
+    const glm::vec2 q{p.x, p.z};
+    float best = std::numeric_limits<float>::max();
+    float bestArc = 0.0f;
+    glm::vec2 bestTan{0.0f, 1.0f};
+    float arc = 0.0f;
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        const glm::vec2 a = xzOf(transform, points[i - 1]);
+        const glm::vec2 b = xzOf(transform, points[i]);
+        const glm::vec2 ab = b - a;
+        const float len = glm::length(ab);
+        if (len <= kEps) {
+            continue;
+        }
+        const float t = std::clamp(glm::dot(q - a, ab) / (len * len), 0.0f, 1.0f);
+        const float d = glm::distance(q, a + ab * t);
+        if (d < best) {
+            best = d;
+            bestArc = arc + t * len;
+            bestTan = ab / len;
+        }
+        arc += len;
+    }
+    if (tangent != nullptr) {
+        *tangent = bestTan;
+    }
+    return bestArc;
+}
+
+glm::vec2 PathGeometry::pointAt(float arc, glm::vec2* tangent) const {
+    const float total = length();
+    if (points.size() < 2 || total <= kEps) {
+        if (tangent != nullptr) {
+            *tangent = {0.0f, 1.0f};
+        }
+        return points.empty() ? glm::vec2(0.0f) : xzOf(transform, points.front());
+    }
+    if (closed()) {
+        arc = std::fmod(arc, total);
+        if (arc < 0.0f) {
+            arc += total;
+        }
+    } else {
+        arc = std::clamp(arc, 0.0f, total);
+    }
+    float walked = 0.0f;
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        const glm::vec2 a = xzOf(transform, points[i - 1]);
+        const glm::vec2 b = xzOf(transform, points[i]);
+        const float len = glm::distance(a, b);
+        if (len <= kEps) {
+            continue;
+        }
+        if (walked + len >= arc || i + 1 == points.size()) {
+            if (tangent != nullptr) {
+                *tangent = (b - a) / len;
+            }
+            return a + (b - a) * std::clamp((arc - walked) / len, 0.0f, 1.0f);
+        }
+        walked += len;
+    }
+    return xzOf(transform, points.back());
 }
 
 Result<void> Appearance::validate() const {
@@ -559,6 +692,128 @@ bool isWave(const EffectInstance& e) {
     return schema != nullptr && schema->resolve.bucket == EffectBucket::Surface;
 }
 
+// ADR-1662. A PathWave's front: `pass` seconds after its launch, `envelope` its fade. The source (normally the
+// camera) projects onto the path; the front leaves that point AWAY from the camera's view along the path and
+// covers `range` metres in range / speed seconds, eased out; past that it holds while the fade takes it. The
+// GPU gets an eight-point chain from just ahead of the front back along its wake, spaced closest at the head,
+// where the core is brightest, so the drawn light keeps to the polyline round a bend.
+std::optional<ResolvedWave> resolvePathFront(const EffectInstance& instance, const EffectContext& ctx,
+                                             const ActivationWindow& window, double pass, float envelope) {
+    const WaveEffect& e = instance.wave;
+    const PathShape& q = e.propagation.path;
+    PathGeometry geom;
+    if (ctx.scene == nullptr || !ctx.scene->featurePath(q.node, q.feature, geom.points, geom.transform)) {
+        return std::nullopt; // no such path: inactive, as a FocusHero source with nothing to stand on
+    }
+    ResolvedWave r;
+    r.effect = &instance;
+    r.envelope = envelope;
+    r.elapsed = pass;
+    r.seconds = ctx.seconds;
+    const glm::vec3* accent = nullptr;
+    if (!resolveEndpoint(instance, e.source, ctx, window.span, r.origin, &accent)) {
+        return std::nullopt;
+    }
+    r.color = e.appearance.color;
+    const float w = std::max(e.appearance.width, kEps);
+    const float range = e.propagation.range;
+    const float travel = range / std::max(e.propagation.speed, kEps);
+    const float a = std::clamp(static_cast<float>(pass) / travel, 0.0f, 1.0f);
+    const float ease = std::clamp(q.ease, 0.0f, 1.0f);
+    const float eased = (1.0f - ease) * a + ease * (1.0f - (1.0f - a) * (1.0f - a));
+    r.frontDistance = e.propagation.startOffset + range * eased;
+    r.meanSpeed = range / travel;
+    r.frontSpeed = a < 1.0f ? r.meanSpeed * ((1.0f - ease) + ease * 2.0f * (1.0f - a)) : 0.0f;
+    r.wake = (e.propagation.trailLength + q.wakeGrowth * std::max(r.frontDistance, 0.0f)) * w;
+
+    glm::vec2 tan0{0.0f, 1.0f};
+    const float s0 = geom.arcOf(r.origin, &tan0);
+    const glm::vec2 fwd{ctx.cameraForward.x, ctx.cameraForward.z};
+    const float dir = glm::dot(tan0, fwd) >= 0.0f ? 1.0f : -1.0f; // away from the camera
+    const float sFront = s0 + dir * r.frontDistance;
+    glm::vec2 tanF{0.0f, 1.0f};
+    const glm::vec2 frontXZ = geom.pointAt(sFront, &tanF);
+    r.axis = glm::vec3(tanF.x * dir, 0.0f, tanF.y * dir);
+    r.origin = glm::vec3(frontXZ.x, r.origin.y, frontXZ.y);
+    // ADR-1663: the hit's lane, metres across the path (+ = right looking downstream), with a per-hit jitter from a
+    // hash of its launch second, so each hit keeps its lane for its whole life and a seek finds the same one
+    float lane = q.lane;
+    if (q.laneJitter > 0.0f) {
+        std::uint32_t h = static_cast<std::uint32_t>(static_cast<std::int64_t>(std::llround(window.start * 1000.0)));
+        h = (h ^ 61u) ^ (h >> 16);
+        h *= 9u;
+        h ^= h >> 4;
+        h *= 0x27d4eb2du;
+        h ^= h >> 15;
+        lane += (static_cast<float>(h & 0xFFFFu) / 65535.0f * 2.0f - 1.0f) * q.laneJitter;
+    }
+    const auto onLane = [&](float arc) {
+        glm::vec2 t{0.0f, 1.0f};
+        const glm::vec2 p = geom.pointAt(arc, &t);
+        return p + glm::vec2(-t.y, t.x) * (lane * dir); // the right-hand normal of the downstream direction
+    };
+    // ahead of the front by the leading edge, at it, then back along the wake (fractions of it)
+    const float lead = 2.0f * e.propagation.frontWidth * w + 4.0f;
+    constexpr std::array<float, kPathChainPoints> kBack{0.0f, 0.0f, 0.05f, 0.13f, 0.26f, 0.45f, 0.7f, 1.0f};
+    for (std::size_t i = 0; i < kPathChainPoints; ++i) {
+        const float offset = i == 0 ? lead : -kBack[i] * r.wake;
+        r.path[i] = lane == 0.0f ? geom.pointAt(sFront + dir * offset) : onLane(sFront + dir * offset);
+    }
+    if (lane != 0.0f) {
+        const glm::vec2 f = onLane(sFront);
+        r.origin = glm::vec3(f.x, r.origin.y, f.y);
+    }
+    // the splash's centre: where the front launched, less `splashBack` metres back along the path (ADR-1666)
+    const float sLaunch = s0 + dir * (e.propagation.startOffset - q.splashBack);
+    r.launch = lane == 0.0f ? geom.pointAt(sLaunch) : onLane(sLaunch);
+    if (accent != nullptr && !e.appearance.rainbow && e.appearance.color == glm::vec3(1.0f)) {
+        r.color = *accent;
+    }
+    return r;
+}
+
+// ADR-1663. A LightBall: `pass` seconds after its launch. The launch and target are offsets in the current camera's
+// frame (right, up, forward); the ball flies the chord between them, eased, bowed up by `arc`, then holds while
+// the instance's fade takes it.
+std::optional<ResolvedWave> resolveBallFront(const EffectInstance& instance, const EffectContext& ctx,
+                                             const ActivationWindow& window, double pass, float envelope) {
+    const WaveEffect& e = instance.wave;
+    const BallShape& b = e.propagation.ball;
+    const glm::vec3 fwd = safeNormalize(ctx.cameraForward, glm::vec3(0.0f, 0.0f, -1.0f));
+    const glm::vec3 right = safeNormalize(glm::cross(fwd, glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec3(1.0f, 0.0f, 0.0f));
+    const glm::vec3 up = glm::cross(right, fwd);
+    const auto place = [&](const glm::vec3& o) { return ctx.cameraPosition + right * o.x + up * o.y + fwd * o.z; };
+    const glm::vec3 p0 = place(b.launch);
+    glm::vec3 target = b.target;
+    if (b.spread > 0.0f) { // each hit its own heading: a hash of its launch second (seek equals play)
+        std::uint32_t h = static_cast<std::uint32_t>(static_cast<std::int64_t>(std::llround(window.start * 1000.0)));
+        h = (h ^ 61u) ^ (h >> 16);
+        h *= 9u;
+        h ^= h >> 4;
+        h *= 0x27d4eb2du;
+        h ^= h >> 15;
+        target.x += (static_cast<float>(h & 0xFFFFu) / 65535.0f * 2.0f - 1.0f) * b.spread;
+    }
+    const glm::vec3 p1 = place(target);
+    const float a = std::clamp(static_cast<float>(pass) / std::max(b.travel, kEps), 0.0f, 1.0f);
+    const float ease = std::clamp(e.propagation.path.ease, 0.0f, 1.0f);
+    const float u = (1.0f - ease) * a + ease * (1.0f - (1.0f - a) * (1.0f - a));
+    ResolvedWave r;
+    r.effect = &instance;
+    r.envelope = envelope;
+    r.elapsed = pass;
+    r.seconds = ctx.seconds;
+    r.origin = glm::mix(p0, p1, u) + glm::vec3(0.0f, 4.0f * b.arc * u * (1.0f - u), 0.0f);
+    const float du = 1.0e-3f;
+    const float u2 = std::min(u + du, 1.0f);
+    const glm::vec3 ahead = glm::mix(p0, p1, u2) + glm::vec3(0.0f, 4.0f * b.arc * u2 * (1.0f - u2), 0.0f);
+    r.axis = safeNormalize(ahead - r.origin, safeNormalize(p1 - p0, fwd));
+    r.frontDistance = glm::distance(p0, r.origin);
+    r.color = e.appearance.color;
+    r.launchSecond = window.start;
+    return r;
+}
+
 // One front of `instance`, living in `window`: nothing when it is not alive at `ctx.seconds`. The
 // whole of what a wave is at an instant, given when its activation opened -- which is what lets
 // `resolveWaveFronts` ask it once per trigger event (ADR-981) with no second copy of the rules.
@@ -592,6 +847,12 @@ std::optional<ResolvedWave> resolveFront(const EffectInstance& instance, const E
     // Where the front is. A repeating effect restarts its front every `repeatSeconds`, which is
     // what makes a pulse a pulse; `fmod` rather than a counter, so scrubbing lands the same ring.
     const double pass = timing.repeatSeconds > 0.0 ? std::fmod(local, timing.repeatSeconds) : local;
+    if (e.propagation.kind == PropagationKind::PathWave) {
+        return resolvePathFront(instance, ctx, window, pass, envelope);
+    }
+    if (e.propagation.kind == PropagationKind::LightBall) {
+        return resolveBallFront(instance, ctx, window, pass, envelope);
+    }
     const float front = e.propagation.startOffset + e.propagation.speed * static_cast<float>(pass);
     if (front > e.propagation.range + e.propagation.trailLength * e.appearance.width) {
         return std::nullopt; // this pass is over the horizon and the next one has not started
@@ -741,6 +1002,40 @@ WaveGpu packWave(const ResolvedWave& r) {
     g.sparkle = glm::vec4(density, std::clamp(e.sparkle.size, 0.0f, 1.0f), e.sparkle.intensity * r.envelope,
                           static_cast<float>(r.elapsed) * e.sparkle.speed + static_cast<float>(e.sparkle.seed) * 0.6180339887f);
     g.response = glm::vec4(e.response.ground, e.response.foliage, e.response.surface, e.response.emissive);
+    if (e.propagation.kind == PropagationKind::PathWave) {
+        // ADR-1662: the lanes a path wave re-reads (the table on WaveGpu).
+        const PathShape& q = e.propagation.path;
+        g.shape = glm::vec4(e.propagation.frontWidth * w, r.wake, q.nearFade, e.propagation.falloff);
+        g.vertical = glm::vec4(e.propagation.verticalExtent, q.reachHeight, q.reach * w, q.haloWidth * w);
+        g.color.w = q.coreWidth * w;
+        g.edge.w = q.coreOffset * w;
+        g.rainbow = glm::vec4(std::clamp(q.embed, 0.0f, 1.0f), q.disturb * r.envelope, q.land, q.bed);
+        // ADR-1666: x the splash's light, w how far the light reaches under the water
+        g.sparkle = glm::vec4(q.splashGlow, r.frontSpeed, r.meanSpeed, q.bedReach);
+        for (std::size_t i = 0; i < 4; ++i) {
+            g.path[i] = glm::vec4(r.path[2 * i], r.path[2 * i + 1]);
+        }
+        // ADR-1663: seconds since launch (the light's depth below the level is fixed at 40 m), the splash and the
+        // near-wake gain
+        g.vertical.x = static_cast<float>(r.elapsed);
+        g.extra = glm::vec4(r.launch, q.splash * r.envelope, q.nearWake);
+    }
+    if (e.propagation.kind == PropagationKind::LightBall) {
+        const BallShape& b = e.propagation.ball;
+        g.axisFront = glm::vec4(r.axis, 0.0f);
+        g.shape = glm::vec4(b.haloSize * w, b.range, 0.0f, 0.0f);
+        g.vertical = glm::vec4(b.trail * w, std::clamp(b.flicker, 0.0f, 1.0f),
+                               static_cast<float>(std::fmod(r.seconds, 4096.0)), 0.0f);
+        g.color.w = b.lightRadius;
+        g.edge = glm::vec4(e.appearance.edgeColor * e.appearance.edgeIntensity * r.envelope, b.coreSize * w);
+        g.rainbow = glm::vec4(b.coronaColor * b.coronaIntensity * r.envelope, b.coronaSize * w);
+        g.sparkle = glm::vec4(0.0f);
+        // ADR-1665: the look, its smoke and embers, and a per-hit seed (the launch second), all 0 for look 0
+        if (b.look != 0) {
+            g.extra = glm::vec4(static_cast<float>(b.look), b.smoke * r.envelope, b.embers,
+                                static_cast<float>(std::fmod(r.launchSecond, 97.0)));
+        }
+    }
     return g;
 }
 

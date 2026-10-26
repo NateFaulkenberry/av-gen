@@ -26,6 +26,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -39,6 +40,9 @@ class ControlPanel;
 }
 namespace avgen::params {
 class IParameter;
+}
+namespace avgen::control {
+class MidiVirtualSource;
 }
 
 namespace avgen::app {
@@ -124,6 +128,14 @@ enum class UiScriptArm : std::uint32_t {
     // ADR-770: type a follow-up, press Modify, wait for the revision; then press Regenerate and wait
     // again. Checks the waiting task is superseded each time and the plan keeps its id.
     DirectorModify = 1u << 21,
+    // ADR-1704: the MIDI panel, for `--capture-ui`. Opens the panel, creates two CoreMIDI virtual sources in this
+    // process ("AV Gen Demo Keys", "AV Gen Demo Pads"), installs a handful of mappings in every scope against them,
+    // and plays a scripted performance through the OS (a knob sweep, pads, pitch bend, an NRPN knob, pressure), while
+    // the panel walks a fixed sequence of states, counted from the arm's first frame:
+    //   ~120 Assignments with a selected mapping; ~240 Learn listening; ~330 Learn captured with a collision;
+    //   ~460 Monitor; ~560 Devices; ~660 the editor on a note mapping.
+    // Not in "all": it opens MIDI devices, which a benchmark must not do.
+    Midi = 1u << 22,
 };
 
 [[nodiscard]] constexpr UiScriptArm operator|(UiScriptArm a, UiScriptArm b) {
@@ -199,6 +211,14 @@ private:
     float viewpointWorstDrift_ = 0.0f;
     void stepDirectorCancel(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
     void stepDirectorModify(Engine& engine, ui::ControlPanel& panel, platform::Window& window, std::uint64_t frame);
+    void stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame);
+    std::uint64_t midiStart_ = 0;
+    bool midiStarted_ = false;
+    std::shared_ptr<control::MidiVirtualSource> midiKeys_;
+    std::shared_ptr<control::MidiVirtualSource> midiPads_;
+    std::string midiSelect_;
+    std::string midiNoteMapping_;
+    std::string midiLearnParam_;
 
     std::vector<std::string> editLog_;
     std::size_t sliceShotsBefore_ = 0;

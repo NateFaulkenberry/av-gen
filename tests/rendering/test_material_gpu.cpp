@@ -1356,13 +1356,15 @@ TEST_CASE("Material program throughput", "[.perf][material]") {
     REQUIRE(light.ops.size() == 3);
     REQUIRE(light.validate().has_value());
 
-    // ADR-036: the same shape of program at the new 48-op budget, spent the way a shipped material
-    // spends it -- a 28-op base plus four layers of five ops, each masked and height-blended. This
-    // is the cost the ADR asked to be measured against the 16-op path above.
+    // ADR-036: the same shape of program at the full op budget (48 then, 64 since ADR-1661), spent the
+    // way a shipped material spends it -- the rest of the budget in the base plus four layers of five
+    // ops, each masked and height-blended. This is the cost the ADR asked to be measured against the
+    // 16-op path above.
+    constexpr std::size_t kBaseOps = static_cast<std::size_t>(scene::kMaxMaterialOps) - 20;
     MaterialProgram layered;
-    layered.name = "layered48";
+    layered.name = "layeredFull";
     layered.ops = heavy.ops;
-    while (layered.ops.size() < 28) {
+    while (layered.ops.size() < kBaseOps) {
         MaterialOp o = op(MaterialOpKind::Triplanar, 4, 0);
         o.value = 0.4f + 0.1f * static_cast<float>(layered.ops.size());
         o.seed = static_cast<std::uint32_t>(31 + layered.ops.size());
@@ -1373,7 +1375,7 @@ TEST_CASE("Material program throughput", "[.perf][material]") {
         micro.seed = static_cast<std::uint32_t>(71 + layered.ops.size());
         layered.ops.push_back(micro);
     }
-    layered.ops.resize(28);
+    layered.ops.resize(kBaseOps);
     layered.baseColorRegister = 5;
     layered.roughnessRegister = 6;
     layered.metallicRegister = 3;
@@ -1418,7 +1420,7 @@ TEST_CASE("Material program throughput", "[.perf][material]") {
 
     const MaterialProgram* configs[4] = {nullptr, &light, &heavy, &layered};
     const char* names[4] = {"no program", "3-op program (input, gradient, ramp)", "16-op program",
-                            "48-op layered program (28-op base + 4 layers x 5)"};
+                            "64-op layered program (44-op base + 4 layers x 5)"};
     double base = -1.0;
     for (int cfg = 0; cfg < 4; ++cfg) {
         scene::Scene s = baseScene();

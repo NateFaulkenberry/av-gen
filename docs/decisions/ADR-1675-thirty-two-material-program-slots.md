@@ -19,15 +19,15 @@ material with no other sign. Merging the copies into one program would tie the t
 
 ## Decision
 
-The table holds thirty-two programs. The block is a read-only storage buffer (ADR-036): 16 + 32 × 5,744 = 183,824
-bytes, well inside every backend's storage-binding limit. The select uniform buffer gains sixteen 256-byte regions.
+The table holds thirty-two programs. The block is a read-only storage buffer (ADR-036): 16 + 32 × 7,536 = 241,168
+bytes (with ADR-1661's 64-op programs), well inside every backend's storage-binding limit. The select uniform buffer gains sixteen 256-byte regions.
 
 The update used to write the whole block every time it ran. It now writes only the header and the `count` programs in
 use. The shader rejects any slot at or past `count` (`programIndex >= materialPrograms.count`), so the bytes past it are
-never read, and their staleness is unobservable. A scene of a few programs therefore uploads a few programs, not 184 KB.
+never read, and their staleness is unobservable. A scene of a few programs therefore uploads a few programs, not 241 KB.
 
 ## Consequences
 
 - Scenes with sixteen or fewer programs keep the same slots, indices and pixels.
 - `program-not-uploaded` now fires at the thirty-third program.
-- The per-update upload shrinks for every scene with fewer than sixteen programs (it was a fixed 92 KB).
+- The per-update upload shrinks for every scene that does not fill the table (it was the whole table every time).

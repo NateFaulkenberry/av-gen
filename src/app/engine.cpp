@@ -605,6 +605,16 @@ Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
 
 // ---- control source, tempo and the scene controller -------------------------------------------
 
+std::string Engine::midiSceneKey() const {
+    if (composition() != nullptr) {
+        return compositionPath_.empty() ? std::string("inline") : compositionPath_.filename().string();
+    }
+    if (const auto* gltf = dynamic_cast<const scene::GltfScene*>(controller_.get()); gltf != nullptr) {
+        return gltf->path().filename().string();
+    }
+    return "orb";
+}
+
 void Engine::ensureControlSource() {
     auto* existing = sources_.find("control", "control");
     if (existing == nullptr) {
@@ -2509,7 +2519,12 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     if (sonic_) {
         nlohmann::json block = sonic_->document;
         if (!sonic_->notesPath.empty()) {
-            block["notes"] = relativeTo(sonic_->notesPath, dir);
+            const std::string rel = relativeTo(sonic_->notesPath, dir);
+            if (block.contains("notes") && block["notes"].is_object()) { // ADR-1667: the object form, kept
+                block["notes"]["path"] = rel;
+            } else {
+                block["notes"] = rel;
+            }
         }
         doc["sonic"] = std::move(block);
     }
@@ -3307,6 +3322,9 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         auto map = control::ControlMap::fromJson(doc["control"]);
         if (!map) {
             return std::unexpected(map.error());
+        }
+        for (const std::string& w : map->warnings) {
+            warn(w); // ADR-1700: a user mapping set aside, an unknown key -- said, not silently dropped
         }
         controlHub_.setMap(std::move(*map));
         const std::string tempo = doc["control"].value("tempoSource", std::string("analysis"));
@@ -6584,6 +6602,27 @@ public:
         return true;
     }
 
+    // ADR-1662. A terrain node's feature polyline, for a PathWave: the points its terrain samples (the
+    // water's flow follows the same ones) and where the node stands.
+    [[nodiscard]] bool featurePath(std::string_view name, std::string_view feature, std::span<const glm::vec3>& points,
+                                   glm::mat4& transform) const override {
+        if (comp_ == nullptr) {
+            return false;
+        }
+        const scene::CompositionNode* node = comp_->findNode(std::string(name));
+        if (node == nullptr || node->kind != scene::NodeKind::Terrain) {
+            return false;
+        }
+        for (const world::Feature& f : node->worldMap.features) {
+            if (f.name == feature && f.samplePath().size() >= 2) {
+                points = f.samplePath();
+                transform = comp_->nodeWorldTransform(*node).matrix();
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ADR-983. Where the node's current placement begins in HIST: a wake reads its path no further back.
     [[nodiscard]] bool nodePlacedSince(std::string_view name, double& out) const override {
         return history_ != nullptr && history_->placementStart(name, out);
@@ -7326,6 +7365,12 @@ void Engine::update(const FrameTime& time) {
 
     // Live control first: MIDI clock messages feed this frame's beat clock, transport commands
     // move the position the time signals read, parameter writes precede modulation.
+    if (sceneGeneration_ != midiKeySceneGeneration_ || projectGeneration_ != midiKeyProjectGeneration_) {
+        // ADR-1700: another scene or project, so another set of scene-scope MIDI mappings (asked only when one changed).
+        midiKeySceneGeneration_ = sceneGeneration_;
+        midiKeyProjectGeneration_ = projectGeneration_;
+        controlHub_.setSceneKey(midiSceneKey());
+    }
     controlHub_.update(*this, time);
     if (controlSource().needsAttach()) {
         sources_.attach(bus_, params_); // new control channels: declare and rebind routes
@@ -7763,6 +7808,9 @@ Result<void> Engine::setSonic(const nlohmann::json& block, const std::filesystem
     sonicRevision_ = 0;
     log::info("sonic: {} notes{}", sonic_->notes.notes.size(),
               sonic_->notesPath.empty() ? std::string(" (no notes file)") : " from " + sonic_->notesPath.filename().string());
+    if (sonic_->notesMissing) { // ADR-1667: an optional notes file that is not here
+        log::warn("sonic: the optional notes file '{}' is not here: no notes", sonic_->notesPath.string());
+    }
     refreshSonicTimbre();
     rebuildFeeds(); // ADR-1580
     syncResponseControls(); // ADR-1062: the response parameters exist before the project's parameters are applied

@@ -53,6 +53,13 @@ struct SonicSetup {
     int splitKey = 60;                    // ADR-1062: notes.low / notes.high divide here (`sonic.response.splitKey`)
     NoteTrack notes;
     std::filesystem::path notesPath;      // as resolved; empty = no notes
+    // ADR-1667: `sonic.notes` as an object -- {path, scale, offset, optional} -- re-times the file's notes onto the
+    // audio (start x scale + offset seconds, duration x scale: a varispeed bounce, a session that starts mid-song) and
+    // lets it be absent (`optional`: a missing file is no notes, not an error). The string form is {path} alone.
+    double notesScale = 1.0;
+    double notesOffset = 0.0;
+    bool notesOptional = false;
+    bool notesMissing = false;            // optional and not found: notesPath kept so a save writes it back
     std::vector<TimbreFeatures> timbre;   // parallel to the analysis track's frames; empty until analysed
     std::uint64_t trackFrames = 0;        // the frame count `timbre` was computed for
     // ADR-1580: with the project's feeds set, the response model's input per analysis frame (parallel to `timbre`):

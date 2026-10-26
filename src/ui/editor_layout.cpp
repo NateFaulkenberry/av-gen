@@ -18,7 +18,7 @@ constexpr int kFormatVersion = 1;
 // The panels, grouped the way the View menu reads them: what you build with on the left, what you
 // inspect and tune on the right, what runs underneath along the bottom. Nothing is assigned to the
 // centre -- see DockRegion.
-constexpr std::array<EditorPanel, 22> kPanels{{
+constexpr std::array<EditorPanel, 23> kPanels{{
     {"World Builder", "World Builder", DockRegion::Left, true,
      "recipe, Generate World and the job monitor"},
     // ADR-092. One panel, not two: the brush and the selection are the same job seen from two
@@ -75,6 +75,10 @@ constexpr std::array<EditorPanel, 22> kPanels{{
     // smoothing. Closed by default: an editor that is not being played shows nothing new.
     {"Live", "Live", DockRegion::Right, false,
      "live Sonic input: pick the synth's audio input and the MIDI keyboard, and play"},
+    // ADR-1704: MIDI performance mapping. Along the bottom beside Modulation, because its assignments are a wide table
+    // and what they drive is the modulation; closed by default, like Live.
+    {"MIDI", "MIDI", DockRegion::Bottom, false,
+     "MIDI Learn, the assignments (defaults, scene and project), a live monitor and the devices"},
     {"Modulation", "Modulation", DockRegion::Bottom, true,
      "routes, sources, presets, shaders, scene, timeline, control and outputs"},
     {"Graph", "Graph", DockRegion::Bottom, false, "the procedural graph editor"},

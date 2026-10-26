@@ -439,6 +439,11 @@ public:
             gate_.reset();
         }
         const std::lock_guard lock(mutex_);
+        // ADR-1701: no note-off can arrive from a closed port, so each device is reported gone (in order, behind its
+        // last messages) and whatever it held is released downstream.
+        for (const auto& conn : connections_) {
+            inbox_.disconnectDevice(conn->device);
+        }
         connections_.clear();
         graveyard_.clear();
         open_ = false;
@@ -472,6 +477,7 @@ public:
         if (it != connections_.end()) {
             MIDIPortDisconnectSource(port_, endpoint);
             log::info("MIDI source removed: '{}'", (*it)->name);
+            inbox_.disconnectDevice((*it)->device); // ADR-1701: its held notes are released downstream
             // The Connection stays alive (moved to the graveyard) in case a packet for it is
             // still in flight on the receive thread.
             graveyard_.push_back(std::move(*it));
@@ -486,6 +492,7 @@ private:
     struct Connection {
         MIDIEndpointRef endpoint = 0;
         std::string name;
+        std::uint16_t device = kNoMidiDevice; // ADR-1701: its slot in the inbox's device table
         MidiParserState parser;
         std::vector<std::uint8_t> bytes;   // receive-thread scratch: capacity is kept
         std::vector<MidiMessage> parsed;   // receive-thread scratch: capacity is kept
@@ -508,11 +515,15 @@ private:
         conn->endpoint = endpoint;
         conn->name = name;
         conn->bytes.reserve(64);
-        conn->parsed.reserve(16);
+        conn->parsed.reserve(64);
+        // ADR-1701: the CoreMIDI unique id is the device's identity, so a device that is unplugged and comes back gets
+        // the slot it had (and two devices with one name stay two).
+        conn->device = inbox_.connectDevice(endpointId(endpoint, name), name, isVirtualEndpoint(endpoint));
         publishForReceive(); // the Connection is complete; only now may CoreMIDI see it
         const OSStatus st = MIDIPortConnectSource(port_, endpoint, conn.get());
         if (st != noErr) {
             log::warn("cannot connect MIDI source '{}': {}", name, statusText(st));
+            inbox_.disconnectDevice(conn->device);
             return false;
         }
         connections_.push_back(std::move(conn));
@@ -531,9 +542,10 @@ private:
             umpPacketToBytes(packet, conn->bytes);
             if (!conn->bytes.empty()) {
                 const std::uint64_t ts = packet->timeStamp != 0 ? hostTicksToNs(packet->timeStamp) : nowNs();
-                parseMidiBytes(conn->bytes, conn->parser, conn->parsed, ts, conn->name);
+                conn->parsed.clear(); // keeps its capacity: no allocation once warm
+                parseMidiBytes(conn->bytes, conn->parser, conn->parsed, ts, conn->device);
                 if (!conn->parsed.empty()) {
-                    inbox_.push(conn->parsed); // moves the messages out and clears `parsed`
+                    inbox_.push(conn->parsed);
                 }
             }
             packet = MIDIEventPacketNext(packet);

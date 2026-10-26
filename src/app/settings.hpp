@@ -130,6 +130,7 @@ struct AppSettings {
     struct LiveInput {
         std::string audioInput;     // capture device id (Core Audio UID), or a name substring; "" = none chosen yet
         std::string midiInput = "*"; // MIDI source filter: "*" every source, else a name substring
+        std::vector<std::string> midiDisabled; // ADR-1704: MIDI devices switched off on this machine, by stable id
         float smoothing = 1.0f;     // multiplier on the Sonic Character's time constants (0.25..4)
         // ADR-1521: the analysis sources on each device's channels, by device id: this rig's patching (a mixer's drum
         // bus on input 1) belongs to the machine, not the project. Channels are 0-based here, 1-based in the file.

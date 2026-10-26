@@ -106,6 +106,7 @@
           "pulseWidth": 0.15000000596046448,
           "radius": 5200.0,
           "ribbonAltitude": 1800.0,
+          "ribbonCoverage": 0.0,
           "ribbonDistance": 60000.0,
           "ribbonEdge": 0.3499999940395355,
           "ribbonScale": 9000.0,

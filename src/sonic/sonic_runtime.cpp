@@ -80,19 +80,43 @@ Result<SonicSetup> SonicSetup::fromJson(const nlohmann::json& j, const std::file
         s.splitKey = std::clamp(r->value("splitKey", s.splitKey), 0, 127);
     }
     if (const auto n = j.find("notes"); n != j.end()) {
-        if (!n->is_string()) {
-            return fail("'sonic.notes' must be a path to a MIDI file");
+        // ADR-1667: a path, or {path, scale, offset, optional}
+        std::string file;
+        if (n->is_string()) {
+            file = n->get<std::string>();
+        } else if (n->is_object() && n->contains("path") && n->at("path").is_string()) {
+            file = n->at("path").get<std::string>();
+            s.notesScale = n->value("scale", 1.0);
+            s.notesOffset = n->value("offset", 0.0);
+            s.notesOptional = n->value("optional", false);
+            if (!(s.notesScale > 0.0) || !std::isfinite(s.notesScale) || !std::isfinite(s.notesOffset)) {
+                return fail("'sonic.notes.scale' must be positive and 'offset' finite");
+            }
+        } else {
+            return fail("'sonic.notes' must be a path to a MIDI file or {path, scale, offset, optional}");
         }
-        std::filesystem::path path = n->get<std::string>();
+        std::filesystem::path path = file;
         if (path.is_relative()) {
             path = baseDir / path;
         }
-        auto track = NoteTrack::fromMidiFile(path);
-        if (!track) {
-            return std::unexpected(track.error());
+        if (s.notesOptional && !std::filesystem::exists(path)) {
+            s.notesPath = path.lexically_normal();
+            s.notesMissing = true;
+        } else {
+            auto track = NoteTrack::fromMidiFile(path);
+            if (!track) {
+                return std::unexpected(track.error());
+            }
+            if (s.notesScale != 1.0 || s.notesOffset != 0.0) {
+                for (NoteEvent& e : track->notes) {
+                    e.start = e.start * s.notesScale + s.notesOffset;
+                    e.duration *= s.notesScale;
+                }
+                track->finish();
+            }
+            s.notes = std::move(*track);
+            s.notesPath = path.lexically_normal();
         }
-        s.notes = std::move(*track);
-        s.notesPath = path.lexically_normal();
     }
     return s;
 }
