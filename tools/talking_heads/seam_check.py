@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
 """Talking Heads: no secondary effect may reveal where a bust's pieces meet (the owner, stop 4: "see if its possible to
-eliminate this seam that gets exposed by some of the secondary entity effects").
+eliminate this seam that gets exposed by some of the secondary entity effects"; fx1: "I can still see visible seams
+under the chins too").
 
-One head is held at rest (pose_stills.posed), its routes removed, and each effect is set by hand to full strength:
+One head is held still (pose_stills.posed), its routes removed, and each effect is set by hand to full strength:
 - rest: nothing;
 - wash: the possession wash at its open maximum, plus the flash;
 - glow: the entity glow at full on every piece;
-- bands: the signal bands;
-- tear: the profile's world-space surface motion (the fragment's shear, the liquid's wave);
-- ghosts: the optical copies, grown and split as on an onset;
-- scan, veins (optical), dissolve (grain): the profile's own surface at full strength.
-Each is rendered close on the neck, front and three-quarter. A strip down the neck's middle is averaged across, and the
-largest colour step between neighbouring rows within +-10 px of the head/neck seam is compared with the same image's
-largest step in the rows 12-30 px above and below it: a seam is a step at the boundary that its surroundings do not have.
-Passes when the seam step exceeds its surroundings by under --tol (0..255 per channel). Writes each close-up and
-exits non-zero on a failure. Every render goes through tools/gpu-lock.sh.
+- bands (tracking): the static bands open;
+- codec (codec): a large share of macroblocks lost to flat smeared colour;
+- static (broadcast): the static patches and the scanlines open wide;
+- ghosts (tracking, broadcast, ghosting): the copies, opaque and split as on an onset;
+- blocks (tracking, codec): the block deformer at full share. It is world space and identical on every piece, so the
+  pieces move as one by construction (tests/unit/test_procedural.cpp [adr1674]). Its own block edges are steps
+  wherever they fall, so its close-ups are written for the eye and not scored.
+Each is rendered close on the head/neck seam in four views: front and three-quarter at rest, and JAW-SIDE and
+JAW-THREE-QUARTER: the mouth fully open, the neck bent back 32 degrees and the camera below the chin, looking up at the
+jawline and the under-chin (the regression check for fx1's chin seam). A strip down the neck's middle is averaged
+across. The largest colour step between neighbouring rows within +-10 px of the seam is compared with the same image's
+largest step 12-30 px above and below it. A seam is a step at the boundary that its surroundings do not have. Passes
+when the seam step exceeds its surroundings by under --tol (0..255 per channel). Writes each close-up and exits
+non-zero on a failure. Every render goes through tools/gpu-lock.sh.
 
     python3 tools/talking_heads/seam_check.py --project <talking-heads.json> --out DIR [--prefix th2] [--tol 6]
 """
@@ -35,7 +41,11 @@ import anchor_check as ac  # noqa: E402
 import pose_stills as ps  # noqa: E402
 from tools.sonic_vfx.scenes import talking_heads as th  # noqa: E402
 
-EFFECTS = ("rest", "wash", "glow", "bands", "tear", "ghosts", "scan", "veins", "dissolve")
+EFFECTS = ("rest", "wash", "glow", "bands", "codec", "static", "ghosts", "blocks")
+UNSCORED = ("blocks",)
+# view: (camera yaw from the bust's heading, neck tilt, mouth opening, camera height below the aim)
+VIEWS = {"front": (0.0, 0.0, 0.0, -0.02), "three-quarter": (-32.0, 0.0, 0.0, -0.02),
+         "jaw-side": (-70.0, 32.0, 1.0, 0.10), "jaw-three-quarter": (-32.0, 32.0, 1.0, 0.10)}
 
 
 def apply_effect(p, s, P, effect):
@@ -53,41 +63,38 @@ def apply_effect(p, s, P, effect):
     elif effect == "bands":
         if "bands" not in ops:
             return False
-        setop("bands", "value", 0.82)
-    elif effect == "scan":
-        if "scanC" not in ops:
+        setop("bands", "value", 0.6)
+    elif effect == "codec":
+        if "cMask" not in ops:
             return False
-        c = 0.245                       # the band at the head/neck seam's height (world metres, the 3-bust layout)
-        setop("scanC", "constant", [-c, -c, -c, 0.0])
-        setop("scanCol", "constant", [2.0, 1.2, 0.5, 0.0])
-        setop("scanWide", "constant", [0.0, (th.SCAN_HALF * 5) ** 2, 0.25, 1.0])
-    elif effect == "veins":
-        if "veinCol" not in ops:
+        setop("cMask", "value", 0.55)
+    elif effect == "static":
+        if "patch" not in ops:
             return False
-        setop("veinCol", "constant", [1.3, 0.8, 0.3, 0.0])
-    elif effect == "dissolve":
-        if "grHole" not in ops:
-            return False
-        setop("grHole", "constant", [0.55, 0.60, 0.0, 0.0])
+        setop("patch", "constant", [0.45, 0.51, 0.0, 0.0])
+        setop("slArea", "constant", [0.2, 0.5, 0.0, 0.0])
+        setop("slOn", "value", 0.4)
+        setop("slCol", "constant", [1.2, 0.7, 0.3, 0.0])
     for e in p["effects"]:
         if effect == "glow" and e["type"] == "glow" and e["id"].startswith(P + "-glow"):
             e["parameters"]["glow"] = 1.0
-    found = effect not in ("tear", "ghosts")
+    found = effect not in ("blocks", "ghosts")
     for n in s["nodes"]:
-        if effect == "tear" and n["name"] in (P + "-bust", P + "-neck", P + "-head"):
+        if effect == "blocks" and n["name"].startswith(P + "-") and "procedural" in n:
             for d in n["procedural"].get("deformers", []):
-                if d["kind"] == "sine":   # the fragment's shear or the liquid's wave, whichever the profile has
-                    d["amount"] = 0.006 if d["frequency"] > 100 else 0.03
-                    d["phase"] = 1.3
+                if d["kind"] == "blocks":
+                    d["amount"] = 0.04
+                    d["falloff"] = 0.6
+                    d["phase"] = 3.0
                     found = True
         if effect == "ghosts" and n["name"] in (P + "-ghostAh", P + "-ghostBh"):
             sg = 1.0 if "ghostA" in n["name"] else -1.0
-            n["scale"] = [1.005] * 3
-            n["position"] = [0.018 * sg, 0.007, 0.0]
+            n["scale"] = [1.004] * 3
+            n["position"] = [0.016 * sg, 0.004, 0.0]
             found = True
             for prog in progs.values():
                 if prog["name"] == n.get("program"):
-                    prog["ops"][3]["constant"] = [0.55, 0.0, 0.0, 0.0]
+                    prog["ops"][3]["constant"] = [0.8, 0.0, 0.0, 0.0]
     return found
 
 
@@ -111,6 +118,7 @@ def main():
     ap.add_argument("--prefix", default="th2")
     ap.add_argument("--tol", type=float, default=6.0)
     ap.add_argument("--effects", default=",".join(EFFECTS))
+    ap.add_argument("--views", default=",".join(VIEWS))
     a = ap.parse_args()
     from PIL import Image, ImageDraw
     ac.W, ac.H = 1280, 720
@@ -131,9 +139,10 @@ def main():
     work = tempfile.mkdtemp(prefix="th-seam-")
     fails = []
     try:
-        for view in ("front", "three-quarter"):
+        for view in a.views.split(","):
+            vyaw, tilt, opening, below = VIEWS[view]
             for effect in a.effects.split(","):
-                pp, ss = ps.posed(project, scene, P, 0.0, 0.0, 0.0, rays_on=False)
+                pp, ss = ps.posed(project, scene, P, tilt, opening, 0.0, rays_on=False)
                 pp["routes"] = [r for r in pp["routes"] if not r["target"].startswith(
                     ("material/%s-" % P, "fx/%s-" % P, "lights/%s-" % P, "particles/%s-" % P))]
                 if not apply_effect(pp, ss, P, effect):
@@ -144,8 +153,8 @@ def main():
                 # the seam: the head piece's lowest ring, at the pivot (the neck's top), in world space
                 seam = ac.apply(ac.node_world(nodes, P + "-pivot"), [0.0, -0.004, 0.0])
                 aim = [seam[0], seam[1] + 0.02, seam[2]]
-                yaw = hd + (0.0 if view == "front" else -32.0)
-                cam = [aim[0] + 0.45 * math.sin(math.radians(yaw)), aim[1] + 0.02,
+                yaw = hd + vyaw
+                cam = [aim[0] + 0.45 * math.sin(math.radians(yaw)), aim[1] - below,
                        aim[2] + 0.45 * math.cos(math.radians(yaw))]
                 ss["camera"] = {"mode": 1, "position": cam, "target": aim, "fov": 40.0, "orbitSpeed": 0.0}
                 png = ac.render(pp, ss, work, "seam")
@@ -155,19 +164,20 @@ def main():
                 # the neck's middle: a strip a quarter of its width either side of the seam's centre line
                 front = ac.apply(ac.node_world(nodes, P + "-pivot"), [0.0, -0.004, 0.035])
                 fu, _ = ac.to_screen(cam, aim, focal, front)
-                cx = int(round(fu if view == "three-quarter" else u))
+                cx = int(round(u if view == "front" else fu))
                 x0, x1 = cx - 12, cx + 12
                 vy = int(round(v))
                 near = step_metric(img, x0, x1, range(vy - 10, vy + 11))
                 around = step_metric(img, x0, x1, list(range(vy - 30, vy - 12)) + list(range(vy + 12, vy + 30)))
                 seam_step, around_step = max(near), max(around)
-                ok = seam_step - around_step < a.tol
+                scored = effect not in UNSCORED
+                ok = seam_step - around_step < a.tol or not scored
                 dr = ImageDraw.Draw(img)
                 dr.rectangle([x0, vy - 10, x1, vy + 10], outline=(0, 255, 0) if ok else (255, 0, 0))
                 name = "seam-%s-%s-%s.png" % (P, effect, view)
                 img.save(os.path.join(a.out, name))
-                line = "%-13s %-6s seam step %5.1f, around it %5.1f -> %s" % (view, effect, seam_step, around_step,
-                                                                              "ok" if ok else "SEAM")
+                line = "%-17s %-6s seam step %5.1f, around it %5.1f -> %s" % (
+                    view, effect, seam_step, around_step, ("ok" if ok else "SEAM") if scored else "(not scored)")
                 print(line)
                 if not ok:
                     fails.append(line)

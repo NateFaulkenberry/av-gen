@@ -78,8 +78,8 @@ SNAP = {"attackMs": 0.0, "decayMs": 0.0, "springHz": 11.0, "springDamping": 0.62
 # (`role.<role>.active`), so the scene has one to four busts, as many as there are assigned sources (fx1,
 # 14-brief-secondary-fx.md section 6); with none at all the fourth slot is a hero on the mix. Each slot has:
 #   its gate: `band` (the role band its level reads), `open`/`close`, `onsets` (open on the stem's own onsets too);
-#   its look: a PALETTE (rays, wash, glow, the optical copies, its mist) and a PROFILE -- the secondary effects that make
-#   it a different phenomenon (15-fx-plan.md): fragment, liquid, optical, grain. `profile` is configurable per slot;
+#   its look: a PALETTE (rays, wash, glow, the copies, its mist) and a PROFILE -- the secondary effects that make
+#   a different kind of corrupted transmission (17-brief-signal-corruption.md): tracking, codec, broadcast, ghosting. `profile` is configurable per slot;
 #   the defaults follow the role.
 #   its scan's timing (rates in Hz and a seed).
 # Thresholds were tuned on Feline Footwear's stems. The drums slot reads the drum stem's LOW band (the kick).
@@ -93,18 +93,18 @@ JADE = {"rays": ("#3dffc0", "#9affe0", "#2bd8ff"), "wash": ("#0f6b5a", "#22c49a"
         "glow": "#3dffc0", "ghosts": ("#3dffc0", "#2bd8ff"), "spill": "#3dffc0"}
 GREY = {"rays": ("#d8d8d8", "#bcbcbc", "#f0f0f0"), "wash": ("#6a6a6a", "#9a9a9a", "#c8c8c8", "#eeeeee"),
         "glow": "#cfcfcf", "ghosts": ("#d0d0d0", "#a8a8a8"), "spill": "#bdbdbd"}
-PROFILES = ("fragment", "liquid", "optical", "grain")
+PROFILES = ("tracking", "codec", "broadcast", "ghosting")
 HEADS = [
     {"prefix": "th1", "roles": ["drums"], "band": "bass", "open": 0.60, "close": 0.45,
-     "scan": (0.55, 0.13, 3), "palette": ICE, "profile": "fragment"},
+     "scan": (0.55, 0.13, 3), "palette": ICE, "profile": "tracking"},
     {"prefix": "th2", "roles": ["bass"], "band": "bass", "open": 0.55, "close": 0.42, "onsets": True,
-     "scan": (0.48, 0.11, 7), "palette": ORCHID, "profile": "liquid"},
+     "scan": (0.48, 0.11, 7), "palette": ORCHID, "profile": "codec"},
     {"prefix": "th3", "roles": ["synth"], "band": "mid", "open": 0.80, "close": 0.65, "onsets": True, "onsetLevel": 0.8,
-     "scan": (0.52, 0.17, 11), "palette": EMBER, "profile": "optical"},
+     "scan": (0.52, 0.17, 11), "palette": EMBER, "profile": "broadcast"},
     # the fourth: a vocal, else any other source; with NO source at all it is the hero on the mix (its rate-limited
     # mix path, `mix`)
     {"prefix": "th4", "roles": ["vocal", "other"], "band": "mid", "open": 0.70, "close": 0.55, "onsets": True,
-     "mix": "audio.mid", "mixOpen": 0.75, "scan": (0.5, 0.15, 13), "palette": JADE, "profile": "grain"},
+     "mix": "audio.mid", "mixOpen": 0.75, "scan": (0.5, 0.15, 13), "palette": JADE, "profile": "ghosting"},
 ]
 # The layout per bust count (15-fx-plan.md): LAYOUT[count][rank] = (x, z, heading, scale), the busts in slot order left
 # to right. One: a hero with room round it. Two: an asymmetric pair. Three: the stop-5 stagger. Four: two forward, two
@@ -168,9 +168,10 @@ INDEX_ENTRY = {
                    "(or any other), one porcelain mannequin bust each -- one to four busts, as many as there are "
                    "sources, laid out for the count; a plain mix gives one. Each bust speaks its own channel like a "
                    "noise gate: on a note the neck snaps back, the lips part and rays of light shoot from the mouth; "
-                   "between notes they look round the room, eyes darting. Each source has its own secondary nature: "
-                   "the drums fragment and tear, the bass undulates and sends out pressure waves, the synth is scanned "
-                   "and splits into rim images, a vocal or other source dissolves and sheds grains. MIDI: CC 1 master, "
+                   "between notes they look round the room, eyes darting. Each source is a different corrupted "
+                   "transmission: the drums suffer tracking failure (torn bands, static, channels jumping), the bass "
+                   "codec collapse (displaced macroblocks that persist), the synth broadcast interference (static, "
+                   "scanlines, drifting colour channels), a vocal or other source temporal ghosting. MIDI: CC 1 master, "
                    "CC 2 rays, CC 3 gate sensitivity, CC 4 effects, CC 5 tearing, CC 6 colour, CC 7 gain, CC 8 "
                    "palette, CC 9 head tilt (each rests at its middle and picks up); pad 36 holds every gate shut, 37 "
                    "holds them open, 39 bursts. Opening it turns live input on (View > Live); PageUp/PageDown step "
@@ -209,13 +210,13 @@ FAR = [9.0, 9.0, 9.0]
 PROGRAM_OPS = {}   # program name -> its Ops (every piece's program has the same op list, so one index names an op)
 
 
-def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], profile="fragment", accent="#ffffff"):
+def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], profile="tracking", accent="#ffffff"):
     """Porcelain, darkened sockets and the possession wash (concentrated at the mouth and eyes), then the PROFILE's own
     surface (15-fx-plan.md):
-      fragment  signal bands: hashed horizontal stripes on each opening (the drums' tear)
-      liquid    nothing more: the bass's identity is its shape and the space round it
-      optical   a scan band sweeping the bust with a darkened trail (surface inversion), and slowly evolving veins
-      grain     dark patches dissolving into the surface and drifting down, faintly lit inside
+      tracking   hashed horizontal bands of animated static, opened on each hit (with the block tear)
+      codec      macroblocks losing their image: flat smeared colour in a routed share of squares
+      broadcast  animated static in drifting patches and line-by-line scanline shimmer in the palette's colour
+      ghosting   nothing more: the identity is the copies
     Every pattern reads WORLD position, so the pieces of a bust meet without a seam. The masks are points in THIS
     piece's frame (FAR = the piece has none). Registers: r0 local position, r4 emission out, r5 wash colour, r7 base
     colour out; r1-r3, r6 scratch."""
@@ -241,7 +242,9 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], pro
     o.add("washGlowAmt", "multiply", 4, srcA=5, srcB=6)
     o.add("washGlow", "constant", 6, constant=[0.35, 0.35, 0.35, 0.0])
     o.add("washGlowMul", "multiply", 4, srcA=4, srcB=6)
-    if profile == "fragment":
+    if profile == "tracking":
+        # TRACKING FAILURE's static: hashed horizontal bands (a routed threshold opens them on each hit) filled with
+        # animated monochrome noise -- the signal dropping out in strips, not lines drawn over the head
         o.add("bandTime", "input", 1, input="time")
         o.add("bandRate", "constant", 2, constant=[0.0, 0.0, 14.0, 0.0])
         o.add("bandEpoch", "multiply", 1, srcA=1, srcB=2)
@@ -252,77 +255,95 @@ def bust_program(name, mouth=FAR, eye_l=FAR, eye_r=FAR, wash=ORCHID["wash"], pro
         o.add("bandCell", "quantize", 1, srcA=1, value=70.0, constant=[0.0, 0.0, 0.0, 0.0], seed=9)
         o.add("bandHash", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
         o.add("bands", "threshold", 1, srcA=1, value=1.01)  # 1.01 = no band; routes lower it
-        o.add("bandGain", "constant", 2, constant=[2.2, 2.2, 2.2, 0.0])
+        o.add("staticT", "input", 2, input="time")
+        o.add("staticV", "constant", 6, constant=[17.0, 23.0, 41.0, 0.0])
+        o.add("staticTm", "multiply", 2, srcA=2, srcB=6)
+        o.add("staticP", "add", 2, srcA=3, srcB=2)
+        o.add("staticN", "noise", 2, srcA=2, value=900.0, constant=[0.0, 0.0, 0.0, 0.0], seed=19)
+        o.add("bandStatic", "multiply", 1, srcA=1, srcB=2)
+        o.add("bandGain", "constant", 2, constant=[2.4, 2.4, 2.4, 0.0])
         o.add("bandGainMul", "multiply", 1, srcA=1, srcB=2)
-        o.add("bandColour", "multiply", 1, srcA=1, srcB=5)
         o.add("bandAdd", "add", 4, srcA=4, srcB=1)
-    elif profile == "optical":
-        # the scan: a band at height c (routed: a saw LFO sweeps it down the bust, its rate the synth's level) -- a
-        # bright line, and round it a wide trail where the porcelain darkens toward black and back
-        o.add("scanW", "input", 1, input="worldPosition")
-        o.add("scanY", "swizzle", 1, srcA=1, constant=[1.0, 1.0, 1.0, 1.0])
-        o.add("scanC", "constant", 2, constant=[-SCAN_TOP, -SCAN_TOP, -SCAN_TOP, 0.0])
-        o.add("scanD", "add", 1, srcA=1, srcB=2)
-        o.add("scanD2", "multiply", 1, srcA=1, srcB=1)
-        o.add("scanBand", "remap", 2, srcA=1, value=1.0, constant=[0.0, SCAN_HALF ** 2, 1.0, 0.0])
-        # the trail: 1 outside it, down to its routed floor (constant.z, lowered by the level) at the band
-        o.add("scanWide", "remap", 3, srcA=1, value=1.0, constant=[0.0, (SCAN_HALF * 5) ** 2, 1.0, 1.0])
-        o.add("scanDark", "multiply", 7, srcA=7, srcB=3)
-        o.add("scanCol", "constant", 3, constant=[0.0, 0.0, 0.0, 0.0])      # routed: the band's colour x gain
-        o.add("scanLit", "multiply", 2, srcA=2, srcB=3)
-        o.add("scanAdd", "add", 4, srcA=4, srcB=2)
-        # the veins: cell edges of a slowly drifting Worley pattern, lit by the synth's sustained level
-        o.add("veinW", "input", 6, input="worldPosition")
-        o.add("veinTime", "input", 1, input="time")
-        o.add("veinV", "constant", 2, constant=[0.011, 0.017, 0.007, 0.0])
-        o.add("veinT", "multiply", 1, srcA=1, srcB=2)
-        o.add("veinP", "add", 1, srcA=6, srcB=1)
-        o.add("veinEdge", "voronoiEdge", 1, srcA=1, value=26.0, constant=[0.0, 0.0, 0.0, 0.0], seed=21)
-        o.add("veinLine", "remap", 1, srcA=1, value=1.0, constant=[0.0, 0.045, 1.0, 0.0])
-        o.add("veinCol", "constant", 2, constant=[0.0, 0.0, 0.0, 0.0])      # routed: colour x the sustained level
-        o.add("veinLit", "multiply", 1, srcA=1, srcB=2)
-        o.add("veinAdd", "add", 4, srcA=4, srcB=1)
-    elif profile == "grain":
-        # dissolving patches: a drifting noise whose high ground (above a routed threshold) darkens toward black,
-        # faintly lit inside -- the surface eaten in places while the head stays whole
-        o.add("grW", "input", 1, input="worldPosition")
-        o.add("grT", "input", 2, input="time")
-        o.add("grV", "constant", 3, constant=[0.0, -0.035, 0.0, 0.0])
-        o.add("grTm", "multiply", 2, srcA=2, srcB=3)
-        o.add("grP", "add", 1, srcA=1, srcB=2)
-        o.add("grN", "noise", 1, srcA=1, value=16.0, constant=[0.0, 0.0, 0.0, 0.0], seed=33)
-        o.add("grHole", "smoothstep", 2, srcA=1, constant=[GRAIN_OFF, GRAIN_OFF + 0.05, 0.0, 0.0])
-        o.add("grDark", "remap", 3, srcA=2, value=1.0, constant=[0.0, 1.0, 1.0, 0.06])
-        o.add("grMul", "multiply", 7, srcA=7, srcB=3)
-        o.add("grCol", "constant", 3, constant=hexrgb(accent, 0.35) + [0.0])
-        o.add("grLit", "multiply", 2, srcA=2, srcB=3)
-        o.add("grAdd", "add", 4, srcA=4, srcB=2)
+    elif profile == "codec":
+        # CODEC COLLAPSE's macroblocks: the surface quantised into squares; a routed share of them (rand >= threshold)
+        # lose their image -- flat colour from a per-block ramp, streaked by per-row hashes (a smear), faintly lit
+        o.add("cW", "input", 1, input="worldPosition")
+        o.add("cQ", "quantize", 2, srcA=1, value=CODEC_CELLS, constant=[0.0, 0.0, 0.0, 0.0], seed=27)
+        o.add("cRand", "swizzle", 3, srcA=2, constant=[3.0, 3.0, 3.0, 3.0])
+        o.add("cMask", "threshold", 3, srcA=3, value=1.01)  # routed: 1 - the share of corrupt blocks
+        o.add("cN", "noise", 6, srcA=2, value=3.1, constant=[0.0, 0.0, 0.0, 0.0], seed=29)
+        o.add("cCol", "oklabRamp", 6, srcA=6, value=1.0, constant=hexrgb(wash[0]) + [1.0],
+              constant2=hexrgb(wash[1]) + [1.0], constant3=hexrgb(wash[2]) + [1.0], constant4=hexrgb(wash[3]) + [1.0])
+        o.add("cRowY", "constant", 2, constant=[0.0, 1.0, 0.0, 0.0])
+        o.add("cRowP", "multiply", 1, srcA=1, srcB=2)
+        o.add("cRow", "quantize", 1, srcA=1, value=160.0, constant=[0.0, 0.0, 0.0, 0.0], seed=31)
+        o.add("cRowR", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
+        o.add("cStreak", "remap", 1, srcA=1, value=1.0, constant=[0.0, 1.0, 0.55, 1.3])
+        o.add("cBlock", "multiply", 6, srcA=6, srcB=1)
+        o.add("cMix", "mixBy", 7, srcA=7, srcB=6, srcC=3)
+        o.add("cGlow", "constant", 1, constant=[0.25, 0.25, 0.25, 0.0])
+        o.add("cGlowM", "multiply", 6, srcA=6, srcB=1)
+        o.add("cGlowMask", "multiply", 6, srcA=6, srcB=3)
+        o.add("cAdd", "add", 4, srcA=4, srcB=6)
+    elif profile == "broadcast":
+        # BROADCAST INTERFERENCE: animated static in slowly drifting patches (their threshold routed: density), and
+        # scanlines that flicker line by line (routed), over the porcelain; the colour separation is the rim copies'
+        o.add("bW", "input", 1, input="worldPosition")
+        # the patches drift with the held level: the noise's offset (k) is integrated from it by routes, not a time op
+        o.add("pN", "noise", 3, srcA=1, value=4.0, constant=[0.0, 0.0, 0.0, 0.0], seed=41)
+        o.add("pSpread", "remap", 3, srcA=3, value=1.0, constant=[0.36, 0.64, 0.0, 1.0])   # fbm sits near 0.5
+        o.add("slArea", "smoothstep", 6, srcA=3, constant=[PATCH_OFF, PATCH_OFF + 0.3, 0.0, 0.0])  # routed down
+        o.add("patch", "smoothstep", 3, srcA=3, constant=[PATCH_OFF, PATCH_OFF + 0.06, 0.0, 0.0])  # routed down
+        # the static: fine noise whose offset runs on (integrated by routes from the level and the bursts, far more
+        # than a grain a frame), so it boils wherever a patch shows
+        o.add("bN", "noise", 2, srcA=1, value=1100.0, constant=[0.0, 0.0, 0.0, 0.0], seed=37)
+        o.add("bOver", "mixBy", 7, srcA=7, srcB=2, srcC=3)   # the static OBSCURES the surface inside a patch ...
+        o.add("bStatic", "multiply", 2, srcA=2, srcB=3)
+        o.add("bGain", "constant", 3, constant=[0.7, 0.7, 0.7, 0.0])
+        o.add("bLit", "multiply", 2, srcA=2, srcB=3)
+        o.add("bAdd", "add", 4, srcA=4, srcB=2)              # ... and glows a little
+        o.add("slY", "constant", 2, constant=[0.0, 1.0, 0.0, 0.0])
+        o.add("slP", "multiply", 1, srcA=1, srcB=2)
+        o.add("sl", "quantize", 1, srcA=1, value=320.0, constant=[0.0, 0.0, 0.0, 0.0], seed=43)
+        o.add("slR", "swizzle", 1, srcA=1, constant=[3.0, 3.0, 3.0, 3.0])
+        o.add("slOn", "threshold", 1, srcA=1, value=1.01)    # routed: lines lit where the hash passes
+        o.add("slCol", "constant", 2, constant=[0.0, 0.0, 0.0, 0.0])    # routed: the lines' colour x gain
+        o.add("slLit", "multiply", 1, srcA=1, srcB=2)
+        o.add("slIn", "multiply", 1, srcA=1, srcB=6)         # only round the patches (never stripes over the whole bust)
+        o.add("slAdd", "add", 4, srcA=4, srcB=1)
     assert len(o.ops) <= 48, (name, len(o.ops))
     PROGRAM_OPS[name] = o
     return {"name": name, "ops": o.ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
             "emissionIntensity": 1.0, "opacity": -1}
 
 
-SCAN_TOP = 0.80     # the scan band starts this high (world metres) and sweeps down to 0
-SCAN_HALF = 0.010   # the band's half-width (metres)
-GRAIN_OFF = 1.25    # the dissolve threshold at rest: above any noise value (no patch); routes lower it
+CODEC_CELLS = 14.0  # the codec's macroblocks per metre (about 7 cm squares)
+PATCH_OFF = 1.1     # the static patches' threshold at rest: above the remapped noise (no patch); routes lower it
 
 
-def ghost_program(name, colour):
-    """The optical profile's copies (fx1): RIM ONLY. A fresnel edge in its colour and an opacity that is the fresnel
-    itself, so a copy is nothing face-on and a coloured edge at its silhouette -- an image detaching from the bust, never
-    a body over or behind it (stop 6's copies had a 0.35 floor of opacity: patches on the face, then a drop shadow).
-    The opacity's gain (constant op 4) is routed from zero."""
-    return {"name": name, "ops": [
-        {"kind": "fresnel", "dst": 0, "value": 4.0},
-        {"kind": "constant", "dst": 1, "constant": hexrgb(colour, 2.2) + [1.0]},
-        {"kind": "multiply", "dst": 2, "srcA": 0, "srcB": 1},
-        {"kind": "constant", "dst": 3, "constant": [0.0, 0.0, 0.0, 0.0]},
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 0},
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
-        # the base is the copy's own colour, never black: a dark rim over the background read as a shadow
-        {"kind": "constant", "dst": 5, "constant": hexrgb(colour, 0.6) + [1.0]},
-    ], "baseColor": 5, "metallic": -1, "roughness": -1, "emission": 2, "emissionIntensity": 1.0, "opacity": 3}
+def ghost_program(name, colour, floor=0.0):
+    """A copy of the head (fx2). `floor` 0: RIM ONLY -- the opacity is the fresnel itself (power 4), so the copy is
+    nothing face-on and a coloured edge at its silhouette (a colour channel out of register). `floor` > 0: a VHS ghost --
+    a faint whole copy (that much opacity face-on) with the same coloured rim. The body is the copy's own colour, never
+    black (a dark copy read as a drop shadow). The copy fades out round its mouth: it is the head at rest, its lips
+    closed, and the slit's grazing faces caught the rim light as a bright dash beside the real, open mouth. The
+    opacity's gain (constant op 4) is routed from zero."""
+    o = Ops()
+    o.add("fres", "fresnel", 0, value=4.0)
+    o.add("col", "constant", 1, constant=hexrgb(colour, 2.2) + [1.0])
+    o.add("rim", "multiply", 2, srcA=0, srcB=1)
+    o.add("gain", "constant", 3, constant=[0.0, 0.0, 0.0, 0.0])
+    assert o.at["gain"] == 4   # the routes name op 4
+    o.add("floor", "remap", 6, srcA=0, value=1.0, constant=[0.0, 1.0, floor, 1.0])
+    o.add("opac", "multiply", 3, srcA=3, srcB=6)
+    o.add("local", "input", 4, input="localPosition")
+    ellipsoid(o, "mouth", 6, MOUTH, [0.045, 0.026, 0.06], src=4)
+    o.add("noMouth", "remap", 6, srcA=6, value=1.0, constant=[0.0, 0.35, 1.0, 0.0])
+    o.add("opacM", "multiply", 3, srcA=3, srcB=6)
+    o.add("lit", "multiply", 2, srcA=2, srcB=3)
+    o.add("base", "constant", 5, constant=hexrgb(colour, 0.6) + [1.0])
+    return {"name": name, "ops": o.ops, "baseColor": 5, "metallic": -1, "roughness": -1, "emission": 2,
+            "emissionIntensity": 1.0, "opacity": 3}
 
 
 # ================================================================================================ the mouth rays
@@ -438,18 +459,28 @@ def atmosphere(s):
             R("response.intensity", "post/bloom/intensity", 0.08, attackMs=1500.0, decayMs=4000.0))
 
 
+def copy_names(spec):
+    """The copies a profile has (head(), routes()): tracking, broadcast and ghosting have two; codec none."""
+    return ("A", "B") if spec.get("profile", "tracking") in ("tracking", "broadcast", "ghosting") else ()
+
+
 def head(s, spec, slot):
     P = spec["prefix"]
     pal = spec.get("palette", ORCHID)
-    prof = spec.get("profile", "fragment")
-    # the profile's world-space surface motion, applied with identical values to every piece (a seam otherwise):
-    # fragment -- a high-frequency sideways shear (the tear, on each opening); liquid -- a long wave travelling up the
-    # bust, sideways and toward the camera, on the smoothed level. Optical and grain have none: the silhouette stays.
-    shear = {"kind": "sine", "amount": 0.0, "frequency": 240.0, "speed": 0.0, "phase": 0.0,
-             "axis": [0.0, 1.0, 0.0], "displacementAxis": [1.0, 0.0, 0.0], "space": "world"}
-    flow = {"kind": "sine", "amount": 0.0, "frequency": LIQUID_K, "speed": 0.0, "phase": 0.0,
-            "axis": [0.0, 1.0, 0.25], "displacementAxis": [1.0, 0.0, 0.35], "space": "world"}
-    surface = {"fragment": [shear], "liquid": [flow]}.get(prof, [])
+    prof = spec.get("profile", "tracking")
+    bx, bz, bh, bs = base_layout(slot)
+    # the profile's world-space block corruption (ADR-1674), applied with identical values to every piece of the bust
+    # and to the face's pieces (one cell grid, so no join steps and nothing on the face detaches):
+    #   tracking -- flat full-width bands, displaced sideways on each hit (the tracking tear);
+    #   codec    -- macroblocks, a share displaced, persisting, reshuffled on strong onsets (the codec collapse).
+    # Each has a still band at the mouth (`speed`): the rays ride the head's node, which no deformer moves, so the
+    # mouth barely moves while the forehead and chest break up. Its centre follows the bust's place (layout_routes).
+    still = {"speed": STILL_BAND, "center": [bx, MOUTH_HEIGHT * bs, bz], "axis": [0.0, 1.0, 0.0], "space": "world"}
+    tracking = dict(still, kind="blocks", amount=0.0, frequency=42.0, scale=60.0, falloff=0.0, phase=0.0,
+                    displacementAxis=[1.0, 0.0, 0.0], seed=slot + 1)
+    codec = dict(still, kind="blocks", amount=0.0, frequency=9.0, scale=0.85, falloff=0.0, phase=0.0,
+                 displacementAxis=[1.0, 0.0, 0.3], seed=slot + 11)
+    surface = {"tracking": [tracking], "codec": [codec]}.get(prof, [])
     # The neck: a TWIST (the swivel's yaw, about the straight neck), then two one-sided BENDS -- back (the gate's snap and
     # looking up) and forward (looking down). One side at a time, each cut to exactly 0 at rest: a Bend at a curvature
     # near 0 loses its normals to the GPU sine's precision, and a bipolar pitch would pass through it.
@@ -466,7 +497,6 @@ def head(s, spec, slot):
     # head the yaw, so the head turns Rx(pitch) Ry(yaw) -- the order the neck's twist-then-bend turns its top ring.
     s.nodes.append({"name": P + "-pivot", "kind": "group", "position": [float(v) for v in HEAD_REST],
                     "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": P + "-bust"})
-    bx, bz, bh, bs = base_layout(slot)
     pieces = [  # node, mesh, program (its masks in its own frame), parent, position, rotation, deformers
         (P + "-bust", "th-body", P + "-body", None, [bx, 0.0, bz], [0.0, bh, 0.0], surface),
         (P + "-neck", "th-neck", P + "-body", P + "-bust", NECK_FOOT, [0.0, 0.0, 0.0],
@@ -488,43 +518,35 @@ def head(s, spec, slot):
     piv = next(n for n in s.nodes if n["name"] == P + "-pivot")
     s.nodes.remove(piv)
     s.nodes.insert(next(i for i, n in enumerate(s.nodes) if n["name"] == P + "-bust") + 1, piv)
-    # the mouth's dark interior (seen only through the parted lips), the eyes and their lids (own materials, no program)
-    extras = [(P + "-cavity", "th-mouth-cavity", P + "-head", [0.0, 0.0, 0.0], None, 1.0),
-              (P + "-eyeL", "th-eye", P + "-head", EYEBALL_L, None, 1.0),
-              (P + "-eyeR", "th-eye", P + "-head", EYEBALL_R, None, 1.0),
-              (P + "-lidUL", "th-lid-upper", P + "-head", EYEBALL_L, None, 1.0),
-              (P + "-lidLL", "th-lid-lower", P + "-head", EYEBALL_L, None, 1.0),
-              (P + "-lidUR", "th-lid-upper", P + "-head", EYEBALL_R, None, 1.0),
-              (P + "-lidLR", "th-lid-lower", P + "-head", EYEBALL_R, None, 1.0)]
-    if prof == "optical":
-        # the optical copies: rim-only images of the head, grown while it speaks, split apart on its onsets
-        s.program(ghost_program(P + "-ghostA", pal["ghosts"][0]))
-        s.program(ghost_program(P + "-ghostB", pal["ghosts"][1]))
-        extras += [(P + "-ghostAh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostA", 0.001),
-                   (P + "-ghostBh", "th-head-ghost", P + "-head", [0.0, 0.0, 0.0], P + "-ghostB", 0.001)]
-    for name, mesh, parent, pos, prog, scale in extras:
-        n = {"name": name, "kind": "gltf", "asset": "meshes/%s.glb" % mesh, "position": [float(v) for v in pos],
-             "rotation": [0.0, 0.0, 0.0], "scale": [scale] * 3, "parent": parent, "castsShadow": False}
-        if prog:
-            n["program"] = prog
-        s.nodes.append(n)
-    if prof == "liquid":
-        # the pressure waves: two thin irregular rings round the neck and the chest, expanding outward from the bust on
-        # the bass's onsets (the second only on strong ones) and fading as they go; unlit (ADR-1673's fast path)
-        for ring, y, tilt in (("A", 0.20, (4.0, 0.0, -3.0)), ("B", 0.08, (-6.0, 0.0, 5.0))):
-            name = "%s-ring%s" % (P, ring)
-            s.program(glow_program(name, pal["glow"], 0.0))
-            s.proc(name, {"kind": "torus", "majorRadius": RING_RADIUS, "minorRadius": 0.0016, "majorSegments": 160,
-                          "minorSegments": 6},
-                   material={"baseColor": [0.0, 0.0, 0.0], "roughness": 1.0, "metallic": 0.0, "program": name,
-                             "unlit": True},
-                   deformers=[{"kind": "noise", "amount": 0.045, "scale": 2.5, "speed": 0.35, "space": "local"}],
-                   position=[0.0, y, 0.0], rotation=list(tilt), scale=[0.001] * 3, parent=P + "-bust",
-                   extra={"castsShadow": False})
+    # the mouth's dark interior (seen only through the parted lips), the eyes and their lids: procedural pieces with the
+    # head's own surface deformers, the same values and routes (face_pieces), so whatever moves the face carries them
+    # with it (fx1, the owner: "the eyes look like they are not apart of the head", "the mouth doesnt bend with it")
+    for side, at in (("L", EYEBALL_L), ("R", EYEBALL_R)):
+        # the eye's darting turn is its group's; the white and the iris ride it
+        s.nodes.append({"name": "%s-eye%s" % (P, side), "kind": "group", "position": [float(v) for v in at],
+                        "rotation": [0.0, 0.0, 0.0], "scale": [1.0, 1.0, 1.0], "parent": P + "-head"})
+    for name, mesh, parent, pos, mat in face_pieces(P):
+        s.proc(name, {"kind": "mesh", "asset": "meshes/%s.glb" % mesh}, material=dict(mat),
+               deformers=[dict(d) for d in surface], position=pos, rotation=[0.0, 0.0, 0.0], scale=[1.0, 1.0, 1.0],
+               parent=parent, extra={"castsShadow": False})
+    # the copies: images of the head that the profile pulls out of register (gltf, alpha-blended). They are whole
+    # frames of the head at rest -- they do not open their mouths or break into blocks (a procedural piece ignores a
+    # program's opacity and drew them solid) -- which is what a lingering or misregistered frame is.
+    #   tracking, broadcast -- two RIM copies (no body: nothing face-on), red and cyan or red and blue: the colour
+    #     channels separating at the silhouette -- a flash on a hit, a slow drift with a held note
+    #   ghosting -- two VHS ghosts: faint whole copies (an opacity floor) with a coloured rim, offset and fading
+    copies = {"tracking": [("A", "#ff2a3a", 0.0), ("B", "#2affe8", 0.0)],
+              "broadcast": [("A", "#ff3060", 0.0), ("B", "#3a6bff", 0.0)],
+              "ghosting": [("A", pal["ghosts"][0], 0.38), ("B", pal["ghosts"][1], 0.26)]}.get(prof, [])
+    for cp, colour, floor in copies:
+        s.program(ghost_program("%s-ghost%s" % (P, cp), colour, floor))
+        s.nodes.append({"name": "%s-ghost%sh" % (P, cp), "kind": "gltf", "asset": "meshes/th-head-ghost.glb",
+                        "position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [0.001] * 3,
+                        "parent": P + "-head", "castsShadow": False, "program": "%s-ghost%s" % (P, cp)})
     cols = pal["rays"]
     rays = s.emitter_fan(P + "-mouth", P + "-head", MOUTH,
                          [dict(r, color=hexrgb(cols[i % len(cols)])) for i, r in enumerate(MOUTH_RAYS)])
-    if prof == "fragment":
+    if prof == "tracking":
         s.effect(P + "-shake", "shake", ("entity", P + "-bust"),
                  parameters={"trauma": 0.0, "amplitude": 0.004, "rotation": 1.0, "frequency": 17.0, "decay": 0.0,
                              "seed": 7.0})
@@ -541,25 +563,31 @@ def head(s, spec, slot):
                 speedMin=0.005, speedMax=0.02, gravity=[0, 0.0, 0], drag=0.1, turbulence=0.01,
                 turbulenceScale=0.3, sizeStart=0.45, sizeEnd=0.8, colorStart=hexrgb(pal["spill"]) + [0.07],
                 colorEnd=hexrgb(pal["spill"]) + [0.0], emissive=0.0, blend="additive", softness=0.25)
-    if prof == "grain":
-        # the grains: points shed from the head and drifting up and away, at a rate set by the slot's level, in bursts
-        # on its onsets
-        s.particles(P + "-grain", capacity=500, seed=71 + int(P[2:]), shape="box",
-                    position=[bx, GRAIN_Y, bz + 0.03], extent=[0.07, 0.10, 0.06],
-                    direction=[0.35, 1.0, 0.15], spawnRate=0.0, lifetimeMin=1.2, lifetimeMax=2.6, spread=0.6,
-                    speedMin=0.03, speedMax=0.10, gravity=[0.0, 0.015, 0.0], drag=0.5, turbulence=0.05,
-                    turbulenceScale=0.6, sizeStart=0.0045, sizeEnd=0.0015, colorStart=hexrgb(PALE) + [0.9],
-                    colorEnd=hexrgb(pal["glow"]) + [0.0], emissive=2.4, blend="additive", softness=0.02)
     gate(s, spec)
     scan_and_eyes(s, spec)
     blinks(s, spec)
     routes(s, spec, rays)
 
 
-LIQUID_K = 11.0     # the liquid wave's spatial frequency (rad/m): about one wavelength over the bust
-RING_RADIUS = 0.2   # a pressure ring's radius at its start (metres, the bust's frame) ...
-RING_REST = 2.8     # ... and the scale it has expanded to as it fades (then it is gone: scale 0.001)
-GRAIN_Y = 0.40      # the grain emitter's height (the head), the bust's frame at scale 1
+STILL_BAND = 0.07   # the block corruption ramps from nothing at the mouth to full this far above and below it
+MOUTH_HEIGHT = 0.31 # the mouth's height in the bust's frame at scale 1 (the still band's centre)
+EYE_WHITE = {"baseColor": [0.86, 0.84, 0.80], "roughness": 0.25, "metallic": 0.0}
+EYE_IRIS = {"baseColor": [0.03, 0.025, 0.04], "roughness": 0.3, "metallic": 0.0}
+LID = {"baseColor": list(IVORY), "roughness": 0.36, "metallic": 0.0}
+CAVITY = {"baseColor": [0.012, 0.010, 0.012], "roughness": 0.85, "metallic": 0.0}
+
+
+def face_pieces(P):
+    """The pieces on the face that must move with it: (node, mesh, parent, position, material)."""
+    return [(P + "-cavity", "th-mouth-cavity", P + "-head", [0.0, 0.0, 0.0], CAVITY),
+            (P + "-eyeLw", "th-eye-white", P + "-eyeL", [0.0, 0.0, 0.0], EYE_WHITE),
+            (P + "-eyeLi", "th-eye-iris", P + "-eyeL", [0.0, 0.0, 0.0], EYE_IRIS),
+            (P + "-eyeRw", "th-eye-white", P + "-eyeR", [0.0, 0.0, 0.0], EYE_WHITE),
+            (P + "-eyeRi", "th-eye-iris", P + "-eyeR", [0.0, 0.0, 0.0], EYE_IRIS),
+            (P + "-lidUL", "th-lid-upper", P + "-head", EYEBALL_L, LID),
+            (P + "-lidLL", "th-lid-lower", P + "-head", EYEBALL_L, LID),
+            (P + "-lidUR", "th-lid-upper", P + "-head", EYEBALL_R, LID),
+            (P + "-lidLR", "th-lid-lower", P + "-head", EYEBALL_R, LID)]
 
 
 BLINK_CLOSE_MS = 35.0    # a lid shuts in about this long ...
@@ -794,10 +822,14 @@ def layout_routes(s, heads):
                 s.route(R(ind, "particles/%s-mist/position" % P, mx, comp=0, **LAYOUT_GLIDE),
                         R(ind, "particles/%s-mist/position" % P, mz, comp=2, **LAYOUT_GLIDE),
                         R(ind, "particles/%s-mist/position" % P, 0.45 * (sc - bs), comp=1, **LAYOUT_GLIDE))
-                if spec.get("profile") == "grain":
-                    s.route(R(ind, "particles/%s-grain/position" % P, x - bx, comp=0, **LAYOUT_GLIDE),
-                            R(ind, "particles/%s-grain/position" % P, z - bz, comp=2, **LAYOUT_GLIDE),
-                            R(ind, "particles/%s-grain/position" % P, GRAIN_Y * (sc - bs), comp=1, **LAYOUT_GLIDE))
+                if spec.get("profile") in ("tracking", "codec"):
+                    # the block deformer's still band (at the mouth) moves with the bust
+                    for pn in ["bust", "neck", "head"] + [f[0][len(P) + 1:] for f in face_pieces(P)]:
+                        d = {"bust": 1, "neck": 4, "head": 2}.get(pn, 1)
+                        cp = "procedural/%s-%s/deform/%d/center" % (P, pn, d)
+                        s.route(R(ind, cp, x - bx, comp=0, **LAYOUT_GLIDE),
+                                R(ind, cp, MOUTH_HEIGHT * (sc - bs), comp=1, **LAYOUT_GLIDE),
+                                R(ind, cp, z - bz, comp=2, **LAYOUT_GLIDE))
         # an inactive bust: shrunk to nothing (it grows back in when its source arrives)
         s.route(*[R("signal.%sInactive" % P, node + "scale", -0.999 * bs, comp=k, attackMs=150.0, decayMs=500.0)
                   for k in range(3)])
@@ -1033,120 +1065,117 @@ def routes(s, spec, rays):
         s.route(R(G, fx(r, "intensity"), RAY_BRIGHTNESS * RAY_WEIGHT[i], depth=K("beams"), **SNAP_CUT))
     # ---- its light on the mist: the same pose, in its own colour
     s.route(R(G, "particles/%s-mist/emissive" % P, 1.4, depth=K("chroma"), attackMs=0, decayMs=350))
-    # ---- the secondary effects: this head's PROFILE (15-fx-plan.md), every one on this head's own signals only
-    prof = spec.get("profile", "fragment")
+    # ---- the secondary effects: this head's PROFILE (17-brief-signal-corruption.md), every one on this head's own signals only
+    prof = spec.get("profile", "tracking")
     pal = spec.get("palette", ORCHID)
     LEVEL = "signal.%sLevelS" % P          # the slot's level (its band, the sensitivity knob applied)
     ONSET = "signal.%sOnset" % P           # its onset strength
-    surf = {"bust": 1, "neck": 4, "head": 2}   # the world-space surface deformer: each piece's last
+    surf = {"bust": 1, "neck": 4, "head": 2}   # the world-space block deformer: each piece's last
+    face = [f[0][len(P) + 1:] for f in face_pieces(P)]   # the face's pieces carry it too (their only deformer)
+    surf.update({f: 1 for f in face})
+    blocks = ["procedural/%s-%s/deform/%d/" % (P, n, surf[n]) for n in surf]
     progs = ("%s-body" % P, "%s-head" % P)
     opath = lambda prog, label, kind, field="constant": "material/%s/op/%d/%s/%s" % (
         prog, PROGRAM_OPS[prog].at[label], kind, field)
     colour = hexrgb(pal["glow"])
-    if prof == "fragment":
-        # FRAGMENT (the drums, kept as stop 5 had it): abrupt, transient-only -- the bust shakes, slices sideways and
-        # stripes on each opening, and recovers in about 120 ms; nothing between hits
-        s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.75, depth=K("copies"), attackMs=0, decayMs=140, **clamp(1.0)))
-        for node in ("bust", "neck", "head"):
-            d = surf[node]
-            s.route(R(OPEN, "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.006, depth=K("tear"),
-                      attackMs=0, decayMs=120),
-                    R(OPEN, "procedural/%s-%s/deform/%d/phase" % (P, node, d), 20.0, integrate=True, attackMs=10,
-                      decayMs=140),
-                    R("control.padBurst", "procedural/%s-%s/deform/%d/amount" % (P, node, d), 0.01, attackMs=0,
-                      decayMs=150))
+    ghost = lambda cp: "nodes/%s-ghost%sh/" % (P, cp)
+    gain = lambda cp: "material/%s-ghost%s/op/4/constant/constant" % (P, cp)
+
+    def event(name, level, fall, refractory, hold=0.0):
+        """A one-shot envelope on this slot's onsets: jumps to 1 when the onset strength passes `level`, falls at
+        `fall` per second; `refractory` ms before it can fire again."""
+        s.sources.append(sig(P + name, [{"source": ONSET, "chain": {
+            "threshold": "binary", "thresholdLevel": level, "envelope": "peakhold", "envelopeHoldMs": hold,
+            "envelopeFallPerSecond": fall, "envelopeRearm": 0.5, "envelopeRefractoryMs": refractory}}]))
+        return "signal." + P + name
+
+    for cp in ("A", "B"):
+        if prof in ("tracking", "broadcast", "ghosting"):
+            s.route(*[R(LIVE, ghost(cp) + "scale", 1.004 if prof != "ghosting" else 1.0, comp=c, attackMs=0,
+                        decayMs=600) for c in range(3)])
+    if prof == "tracking":
+        # TRACKING FAILURE (default: drums): violent and brief. Each hit tears the bust into full-width bands thrown
+        # sideways (a share of the bands, a fresh pattern every few frames while it lasts), strips of the surface drop
+        # out to static, the red and cyan channels jump out of register, and the bust shakes -- all gone in ~150 ms.
+        hit = event("Hit", 0.6, 7.0, 60.0)
+        s.route(R(OPEN, "fx/%s-shake/trauma" % P, 0.6, depth=K("copies"), attackMs=0, decayMs=140, **clamp(1.0)))
+        for d in blocks:
+            s.route(R(hit, d + "amount", 0.045, depth=K("tear"), attackMs=0, decayMs=90),
+                    R(hit, d + "falloff", 0.55, attackMs=0, decayMs=120),
+                    R(hit, d + "phase", 24.0, integrate=True, attackMs=0, decayMs=150),
+                    R("control.padBurst", d + "amount", 0.06, attackMs=0, decayMs=150),
+                    R("control.padBurst", d + "falloff", 0.6, attackMs=0, decayMs=150))
         for prog in progs:
-            s.route(R(OPEN, opath(prog, "bands", "threshold", "value"), -0.18, depth=K("tear"), attackMs=0,
+            s.route(R(hit, opath(prog, "bands", "threshold", "value"), -0.3, depth=K("tear"), attackMs=0,
                       decayMs=120))
-    elif prof == "liquid":
-        # LIQUID (the bass): continuous and heavy -- a long wave travels up the bust while the bass sounds (its height
-        # on the smoothed level, its travel integrated from it), a strong low onset swells it and it takes over a
-        # second to settle; and each onset sends a pressure ring out from the neck (a strong one, a second from the
-        # chest), travelling on after the note
-        s.sources += [
-            sig(P + "Surge", [{"source": ONSET, "chain": {"threshold": "binary", "thresholdLevel": 1.2,
-                                                          "envelope": "peakhold", "envelopeHoldMs": 0.0,
-                                                          "envelopeFallPerSecond": 0.8, "envelopeRearm": 0.5,
-                                                          "envelopeRefractoryMs": 350.0}}]),
-            sig(P + "WaveA", [{"source": ONSET, "chain": {"threshold": "binary", "thresholdLevel": 1.2,
-                                                          "envelope": "peakhold", "envelopeHoldMs": 0.0,
-                                                          "envelopeFallPerSecond": 0.9, "envelopeRearm": 0.5,
-                                                          "envelopeRefractoryMs": 550.0}}]),
-            sig(P + "WaveB", [{"source": ONSET, "chain": {"threshold": "binary", "thresholdLevel": 2.0,
-                                                          "envelope": "peakhold", "envelopeHoldMs": 0.0,
-                                                          "envelopeFallPerSecond": 0.7, "envelopeRearm": 0.5,
-                                                          "envelopeRefractoryMs": 900.0}}]),
-        ]
-        # a ring exists only while its wave travels (an idle ring would be a dark line: its body is black)
-        s.sources += [sig(P + "Alive" + w, [{"source": "signal.%sWave%s" % (P, w),
-                                             "chain": {"threshold": "binary", "thresholdLevel": 0.02}}])
-                      for w in ("A", "B")]
-        # a ring's light fades faster than it grows (the square of its envelope): bright at the bust, gone by the time
-        # it is wide
-        s.map(M(P + "WaveA2", [("signal.%sWaveA" % P, 1.0)], "max", curve=2.5),
-              M(P + "WaveB2", [("signal.%sWaveB" % P, 1.0)], "max", curve=2.5))
-        for node in ("bust", "neck", "head"):
-            d = "procedural/%s-%s/deform/%d/" % (P, node, surf[node])
-            s.route(R(LEVEL, d + "amount", 0.014, depth=K("copies"), attackMs=250, decayMs=1500),
-                    R("signal.%sSurge" % P, d + "amount", 0.016, depth=K("copies"), attackMs=60, decayMs=1200),
-                    R(LEVEL, d + "phase", 5.0, integrate=True, attackMs=250, decayMs=1500),
-                    R("signal.%sSurge" % P, d + "phase", 6.0, integrate=True, attackMs=60, decayMs=1200),
-                    R("control.padBurst", d + "amount", 0.02, attackMs=0, decayMs=600))
-        for ring in ("A", "B"):
-            name = "%s-ring%s" % (P, ring)
-            env = "signal.%sWave%s" % (P, ring)
-            for c in range(3):
-                s.route(R("signal.%sAlive%s" % (P, ring), "nodes/%s/scale" % name, RING_REST, comp=c),
-                        R(env, "nodes/%s/scale" % name, 1.0 - RING_REST, comp=c),
-                        R("visual.%sWave%s2" % (P, ring),
-                          "material/%s/op/%d/constant/constant" % (name, BG_PROGRAM_OPS[name].at["gain"]),
-                          1.8, comp=c, depth=K("chroma")))
-    elif prof == "optical":
-        # OPTICAL (the synth): optical and phrase-scale -- a scan sweeps the bust (faster as the synth plays more),
-        # darkening a trail behind its bright line; veins of light grow over a held note; and on each onset the
-        # head's rim-only copies split apart and snap back, drifting a little apart while the note sustains
-        scan = P + "Scan"
-        s.sources.append({"kind": "lfo", "name": scan, "settings": {"shape": "saw"}})
-        s.params_({"sources/%s/rate" % scan: 0.16})
-        s.route(R(LEVEL, "sources/%s/rate" % scan, 0.45, attackMs=500, decayMs=2000))
-        s.sources.append(sig(P + "Split", [{"source": ONSET, "chain": {
-            "threshold": "binary", "thresholdLevel": 0.9, "envelope": "peakhold", "envelopeHoldMs": 30.0,
-            "envelopeFallPerSecond": 7.0, "envelopeRearm": 0.5, "envelopeRefractoryMs": 120.0}}]))
+        for cp, sgn in (("A", 1.0), ("B", -1.0)):
+            s.route(R(hit, gain(cp), 0.9, comp=0, depth=K("copies"), attackMs=0, decayMs=160),
+                    R(hit, ghost(cp) + "position", 0.016 * sgn, comp=0, depth=K("copies"), attackMs=0, decayMs=110),
+                    R(hit, ghost(cp) + "position", 0.003 * sgn, comp=1, depth=K("copies"), attackMs=0, decayMs=110))
+    elif prof == "codec":
+        # CODEC COLLAPSE (default: bass): the image reconstructed wrongly. The slot's smoothed level (the bass band)
+        # sets how many macroblocks are displaced and how far, slow to rise and slower to clear; a strong onset is a
+        # reconstruction failure -- a burst of more and larger displacement, a new block pattern, and blocks that lose
+        # their image to flat smeared colour, decaying over ~2 s. Between notes the blocks settle back into the bust.
+        crash = event("Crash", 1.3, 0.5, 500.0)
+        jump = event("Jump", 1.3, 12.0, 500.0)       # ~80 ms: one reshuffle of the block pattern per crash
+        for d in blocks:
+            s.route(R(LEVEL, d + "amount", 0.022, depth=K("tear"), attackMs=350, decayMs=2500),
+                    R(crash, d + "amount", 0.03, depth=K("tear"), attackMs=0, decayMs=1800),
+                    R(LEVEL, d + "falloff", 0.28, attackMs=500, decayMs=3000),
+                    R(crash, d + "falloff", 0.3, attackMs=0, decayMs=2000),
+                    R(jump, d + "phase", 14.0, integrate=True, attackMs=0, decayMs=0),
+                    R("control.padBurst", d + "amount", 0.05, attackMs=0, decayMs=900),
+                    R("control.padBurst", d + "falloff", 0.5, attackMs=0, decayMs=900))
         for prog in progs:
-            s.route(R(LEVEL, opath(prog, "scanWide", "remap"), -0.75, comp=2, attackMs=150, decayMs=1200))
-            for c in range(3):
-                s.route(R("lfo." + scan, opath(prog, "scanC", "constant"), SCAN_TOP, comp=c),
-                        R(LEVEL, opath(prog, "scanCol", "constant"), 2.4 * colour[c], comp=c, depth=K("chroma"),
-                          attackMs=150, decayMs=900),
-                        R(OPEN, opath(prog, "scanCol", "constant"), 1.6 * colour[c], comp=c, depth=K("chroma"),
-                          attackMs=0, decayMs=400),
-                        R(LEVEL, opath(prog, "veinCol", "constant"), 1.3 * colour[c], comp=c, depth=K("chroma"),
-                          attackMs=900, decayMs=2500))
-        for copy_, sgn in (("A", 1.0), ("B", -1.0)):
-            node = "%s-ghost%sh" % (P, copy_)
-            for c in range(3):
-                s.route(R(LIVE, "nodes/%s/scale" % node, 1.005, comp=c, attackMs=0, decayMs=500))
-            s.route(R(LIVE, "material/%s-ghost%s/op/4/constant/constant" % (P, copy_), 0.55, comp=0,
-                      depth=K("copies"), attackMs=20, decayMs=400),
-                    R("signal.%sSplit" % P, "nodes/%s/position" % node, 0.018 * sgn, comp=0, depth=K("copies")),
-                    R("signal.%sSplit" % P, "nodes/%s/position" % node, 0.007, comp=1, depth=K("copies")),
-                    R("signal.%sSplit" % P, "nodes/%s/rotation" % node, 4.0 * sgn, comp=1, depth=K("copies")),
-                    R(LEVEL, "nodes/%s/position" % node, 0.005 * sgn, comp=0, depth=K("copies"), attackMs=800,
-                      decayMs=1500))
-    elif prof == "grain":
-        # GRAIN (a vocal, another source, the hero on a mix): the surface dissolves in drifting patches as the level
-        # rises, and the head sheds grains that drift up and away, in bursts on its onsets
-        s.sources.append(sig(P + "Burst", [{"source": ONSET, "chain": {
-            "threshold": "binary", "thresholdLevel": 1.0, "envelope": "peakhold", "envelopeHoldMs": 60.0,
-            "envelopeFallPerSecond": 4.0, "envelopeRearm": 0.5, "envelopeRefractoryMs": 150.0}}]))
+            s.route(R(LEVEL, opath(prog, "cMask", "threshold", "value"), -0.12, depth=K("copies"), attackMs=500,
+                      decayMs=3000),
+                    R(crash, opath(prog, "cMask", "threshold", "value"), -0.25, depth=K("copies"), attackMs=0,
+                      decayMs=2000))
+    elif prof == "broadcast":
+        # BROADCAST INTERFERENCE (default: synth): analog and slow. Patches of animated static open over the bust as
+        # the level holds (their threshold drifting down over about a second), scanlines in the palette's colour
+        # shimmer on, and the red and blue channels drift apart at the silhouette; an onset is a burst of all three.
+        burst = event("Burst", 1.0, 3.0, 150.0, hold=40.0)
         for prog in progs:
             for c in (0, 1):
-                s.route(R(LEVEL, opath(prog, "grHole", "smoothstep"), -0.62, comp=c, depth=K("copies"),
-                          attackMs=300, decayMs=1400),
-                        R("signal.%sBurst" % P, opath(prog, "grHole", "smoothstep"), -0.12, comp=c,
-                          depth=K("copies"), attackMs=0, decayMs=500))
-        s.route(R(LEVEL, "particles/%s-grain/spawnRate" % P, 70.0, depth=K("copies"), attackMs=200, decayMs=800),
-                R("signal.%sBurst" % P, "particles/%s-grain/spawnRate" % P, 600.0, depth=K("copies")))
+                for lab, lv, bu in (("patch", -0.6, -0.3), ("slArea", -0.62, -0.3)):
+                    s.route(R(LEVEL, opath(prog, lab, "smoothstep"), lv, comp=c, depth=K("copies"),
+                              attackMs=900, decayMs=2200),
+                            R(burst, opath(prog, lab, "smoothstep"), bu, comp=c, depth=K("copies"), attackMs=0,
+                              decayMs=500))
+            for c, k in enumerate((0.9, 1.7, 0.4)):
+                s.route(R(LEVEL, opath(prog, "bN", "noise"), 40.0 * k, comp=c, integrate=True),
+                        R(burst, opath(prog, "bN", "noise"), 60.0 * k, comp=c, integrate=True))
+            s.route(R(LEVEL, opath(prog, "pN", "noise"), 0.12, comp=1, integrate=True, attackMs=300, decayMs=1500),
+                    R(LEVEL, opath(prog, "pN", "noise"), 0.05, comp=0, integrate=True, attackMs=300, decayMs=1500))
+            s.route(R(LEVEL, opath(prog, "slOn", "threshold", "value"), -0.55, attackMs=700, decayMs=1800),
+                    R(burst, opath(prog, "slOn", "threshold", "value"), -0.3, attackMs=0, decayMs=400))
+            for c in range(3):
+                s.route(R(LEVEL, opath(prog, "slCol", "constant"), 1.1 * colour[c], comp=c, depth=K("chroma"),
+                          attackMs=600, decayMs=1800),
+                        R(burst, opath(prog, "slCol", "constant"), 1.0 * colour[c], comp=c, depth=K("chroma"),
+                          attackMs=0, decayMs=400))
+        for cp, sgn in (("A", 1.0), ("B", -1.0)):
+            s.route(R(LEVEL, gain(cp), 0.55, comp=0, depth=K("copies"), attackMs=700, decayMs=1800),
+                    R(burst, gain(cp), 0.45, comp=0, depth=K("copies"), attackMs=0, decayMs=400),
+                    R(LEVEL, ghost(cp) + "position", 0.008 * sgn, comp=0, depth=K("copies"), attackMs=1200,
+                      decayMs=2000),
+                    R(burst, ghost(cp) + "position", 0.012 * sgn, comp=0, depth=K("copies"), attackMs=0,
+                      decayMs=500))
+    elif prof == "ghosting":
+        # TEMPORAL GHOSTING (default: the fourth source): two lingering frames. Faint whole copies of the head sit a
+        # little out of place while the source sounds (each its own opacity and colour); an onset throws them apart and
+        # they drift back over about a second. The bust itself stays clean beneath them.
+        sep = event("Sep", 0.8, 1.1, 250.0, hold=60.0)
+        for cp, dx, dy, yaw, op_ in (("A", 0.045, 0.012, 7.0, 0.75), ("B", -0.03, -0.006, -5.0, 0.55)):
+            s.route(R(LEVEL, gain(cp), op_, comp=0, depth=K("copies"), attackMs=200, decayMs=1600),
+                    R(sep, gain(cp), 0.35, comp=0, depth=K("copies"), attackMs=0, decayMs=900),
+                    R(LEVEL, ghost(cp) + "position", 0.25 * dx, comp=0, depth=K("copies"), attackMs=800,
+                      decayMs=1600),
+                    R(sep, ghost(cp) + "position", dx, comp=0, depth=K("copies")),
+                    R(sep, ghost(cp) + "position", dy, comp=1, depth=K("copies")),
+                    R(sep, ghost(cp) + "rotation", yaw, comp=1, depth=K("copies")))
     # every profile: its own wash over the mouth and eyes while it speaks, and a glow on each opening (all pieces)
     for prog in progs:
         s.route(R(LIVE, opath(prog, "washAmount", "remap"), 0.45, comp=3, depth=K("chroma"), attackMs=0, decayMs=0),

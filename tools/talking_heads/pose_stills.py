@@ -11,7 +11,7 @@ The eyes look ahead and the lids are open unless --lids is given. Every render g
 
     python3 tools/talking_heads/pose_stills.py --project <talking-heads.json> --out DIR \
         [--poses 0:0,0:0.5,0:1,32:0,32:0.5,32:1] [--views front,three-quarter] [--prefix th2] [--size 1920x1080] \
-        [--no-rays] [--lids 0..1] [--tag mouth]
+        [--no-rays] [--lids 0..1] [--tag mouth] [--solo] (views: front, three-quarter, side)
 
 A pose is tilt (degrees, back +, forward -):opening (0 = shut, 1 = MOUTH_OPEN)[:yaw (degrees at the neck)].
 """
@@ -83,6 +83,7 @@ def main():
     ap.add_argument("--dist", type=float, default=0.55)
     ap.add_argument("--size", default="1920x1080")
     ap.add_argument("--tag", default="mouth")
+    ap.add_argument("--solo", action="store_true", help="the other busts removed (a side view sees past them)")
     ap.add_argument("--no-rays", action="store_true", help="the rays off: a close camera sits inside their cones")
     a = ap.parse_args()
     ac.W, ac.H = (int(v) for v in a.size.split("x"))
@@ -108,10 +109,14 @@ def main():
             for view in a.views.split(","):
                 # aim at the mouth of the posed head, in world space; look from the head's front (+ its heading)
                 pp, ss = posed(project, scene, P, tilt, opening, a.lids, not a.no_rays, nyaw)
+                if a.solo:
+                    others = tuple(h["prefix"] + "-" for h in th.HEADS if h["prefix"] != P)
+                    ss["nodes"] = [n for n in ss["nodes"] if not n["name"].startswith(others)]
+                    pp["effects"] = [e for e in pp["effects"] if not e["id"].startswith(others)]
                 nodes = {n["name"]: n for n in ss["nodes"]}
                 mouth = ac.apply(ac.node_world(nodes, P + "-head"), th.MOUTH)
                 aim = [mouth[0], mouth[1] + 0.03, mouth[2]]
-                yaw = hd + (0.0 if view == "front" else -32.0)
+                yaw = hd + {"front": 0.0, "three-quarter": -32.0, "side": -70.0}[view]
                 cam = [aim[0] + a.dist * math.sin(math.radians(yaw)), aim[1] + 0.03,
                        aim[2] + a.dist * math.cos(math.radians(yaw))]
                 ss["camera"] = {"mode": 1, "position": cam, "target": aim, "fov": 40.0, "orbitSpeed": 0.0}

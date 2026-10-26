@@ -20,7 +20,8 @@ Writes to --out:
 - th-body.glb, th-neck.glb, th-head.glb: the three articulated pieces (see "the articulation" below); the head's
   mouth is a slit between closed lips that the engine's Hinge deformer opens (ADR-1672, cut_mouth);
 - th-mouth-cavity.glb (head frame): the mouth's near-black interior, seen only through the parted lips;
-- th-eye.glb: an eyeball (porcelain with a dark iris disc facing +Z); th-lid-upper/lower.glb: its lids;
+- th-eye-white.glb, th-eye-iris.glb: an eyeball's white and its dark iris disc (facing +Z); th-lid-upper/lower.glb:
+  its lids;
 - th-head-ghost.glb: the head, one alpha-BLEND material, for the spectral copies;
 - th-bust.anchors.json: the hierarchy, the joints, the emitter anchors in each piece's frame, mesh statistics.
 The head tilts back on a neck that BENDS (the owner, stop 1: "the neck to snap back"; no ridge at the joint) and the jaw
@@ -534,6 +535,8 @@ def eye_centre(surface, side):
 
 
 MOUTH_SLIT_DEG = 16.0      # the slit (the lips' parting) runs this far either side of the front
+HINGE_DOWN = 0.022         # the hinge mask's centre sits this far below the slit ...
+HINGE_RADIUS = 0.055       # ... with this radius: its lowest point stays above the head piece's bottom (the neck join)
 LIP_GAP = 0.0006           # the closed lips sit this far apart: a fine dark line
 LIP_ROLL = 0.012           # how deep the lips' inner walls roll into the mouth
 IRIS_DEG = 29.0            # the iris's angular radius from the gaze (its edge lands on the sphere's 6th ring, 27 deg)
@@ -692,7 +695,9 @@ def main():
     shift(head_g, head_origin)
     G = lambda v: to_gltf(v)
     F = NECK_TOP - NECK_LOW
-    mask_c = Vector((0.0, mouth_front.y + 0.008, MOUTH_Z - 0.030))   # the hinge mask's centre: the chin
+    # the hinge mask's centre (the chin) and radius: it must end above the head piece's lower edge, or the head turns
+    # where the still neck meets it (the owner's "seams under the chins", fx1)
+    mask_c = Vector((0.0, mouth_front.y + 0.008, MOUTH_Z - HINGE_DOWN))
     anchors = {
         "note": "tools/talking_heads/make_bust.py. Frames are the exported GLBs' (+Y up, face +Z, metres). Hierarchy: "
                 "body (origin at the base's bottom centre) > neck at body.neckFoot (bent by a Bend deformer: local, "
@@ -705,7 +710,7 @@ def main():
         "eyes": {"radius": EYE_RADIUS, "left": G(eye_centre(eyes[0], 1) - head_origin),
                  "right": G(eye_centre(eyes[1], -1) - head_origin),
                  "lidCloseUpperDeg": LID_UPPER[0] + 3.0, "lidCloseLowerDeg": -LID_LOWER[1] + 1.0,
-                 "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and "
+                 "note": "th-eye-white/iris.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and "
                          "pitch within -4..+16 degrees (down positive) so the iris never sinks into the socket."},
         "head": {"eyeLeft": G(eyes[0] - head_origin), "eyeRight": G(eyes[1] - head_origin),
                  "headCentre": G(centre - head_origin),
@@ -713,7 +718,7 @@ def main():
                  "mouthLip": G(Vector((0.0, lip.y, MOUTH_Z)) - head_origin),
                  "mouthHinge": {"center": G(pivot - head_origin), "axis": [1.0, 0.0, 0.0],
                                 "displacementAxis": [0.0, 0.0, 1.0], "phase": round(zm - pivot.z, 5),
-                                "falloff": 0.065, "frequency": round(corner, 5),
+                                "falloff": HINGE_RADIUS, "frequency": round(corner, 5),
                                 "speed": round(-(mask_c.y - pivot.y), 5), "scale": round(mask_c.z - pivot.z, 5)},
                  "forward": [0.0, 0.0, 1.0], "up": [0.0, 1.0, 0.0]},
         "test": {"tiltDeg": TILT_TEST_DEG},
@@ -723,8 +728,22 @@ def main():
         json.dump(anchors, f, indent=1)
         f.write("\n")
     for p_, name in ((body, "th-body"), (neck, "th-neck"), (head, "th-head"), (cavity, "th-mouth-cavity"),
-                     (eyeball, "th-eye"), (lid_up, "th-lid-upper"), (lid_lo, "th-lid-lower")):
+                     (lid_up, "th-lid-upper"), (lid_lo, "th-lid-lower")):
         export(p_, os.path.join(OUT, name + ".glb"))
+    # the eyeball as two single-material meshes, the white and the iris: the scene draws them as procedural pieces
+    # carrying the head's own surface deformers, so a wave across the face carries the eyes with it (fx1: the owner,
+    # "the eyes look like they are not apart of the head"), and a procedural draws one material
+    for keep, name in ((0, "th-eye-white"), (1, "th-eye-iris")):
+        part = eyeball.copy()
+        part.data = eyeball.data.copy()
+        bpy.context.scene.collection.objects.link(part)
+        pbm = bmesh.new()
+        pbm.from_mesh(part.data)
+        bmesh.ops.delete(pbm, geom=[f for f in pbm.faces if f.material_index != keep], context="FACES")
+        pbm.to_mesh(part.data)
+        pbm.free()
+        export(part, os.path.join(OUT, name + ".glb"))
+        bpy.data.objects.remove(part)
     gm = ghost_material()
     head_g.data.materials.clear()
     head_g.data.materials.append(gm)

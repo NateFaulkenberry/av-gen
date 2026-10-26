@@ -29,7 +29,7 @@
   ],
   "lidCloseUpperDeg": 27.0,
   "lidCloseLowerDeg": 31.0,
-  "note": "th-eye.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and pitch within -4..+16 degrees (down positive) so the iris never sinks into the socket."
+  "note": "th-eye-white/iris.glb's centre goes here (head frame); its iris faces +Z. Keep yaw within +-28 and pitch within -4..+16 degrees (down positive) so the iris never sinks into the socket."
  },
  "head": {
   "eyeLeft": [
@@ -74,10 +74,10 @@
     1.0
    ],
    "phase": -0.0096,
-   "falloff": 0.065,
+   "falloff": 0.055,
    "frequency": 0.02019,
    "speed": 0.08098,
-   "scale": -0.04
+   "scale": -0.032
   },
   "forward": [
    0.0,
