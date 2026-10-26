@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
 
 namespace avgen::rendering {
@@ -23,7 +24,7 @@ MaterialPrograms::MaterialPrograms(gpu::Context& context) : context_(context) {
     sdesc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
     sdesc.size = kSelectBufferSize;
     select_ = context_.device().CreateBuffer(&sdesc);
-    // One region per slot value (-1 = no program, then slots 0..7); written once and never again.
+    // One region per slot value (-1 = no program, then each slot); written once and never again.
     std::array<std::uint8_t, kSelectBufferSize> staging{};
     for (int slot = -1; slot < kMaxGpuMaterialPrograms; ++slot) {
         MaterialSelect s{};
@@ -56,7 +57,10 @@ void MaterialPrograms::update(const std::vector<scene::MaterialProgram>& program
         slots_.emplace(program.name, static_cast<int>(i));
     }
     block_.count = static_cast<std::uint32_t>(count);
-    context_.queue().WriteBuffer(buffer_, 0, &block_, sizeof(block_));
+    // Only the header and the programs in use (ADR-1675): the shader reads no slot at or past `count`, so the rest of
+    // the buffer is never looked at, and a scene of a few programs uploads a few programs, not the whole table.
+    const std::size_t used = offsetof(MaterialProgramBlock, programs) + count * sizeof(scene::MaterialProgramGpu);
+    context_.queue().WriteBuffer(buffer_, 0, &block_, used);
 }
 
 int MaterialPrograms::slotOf(std::string_view name) const {

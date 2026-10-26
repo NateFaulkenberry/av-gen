@@ -35,7 +35,7 @@ class FieldUniforms;
 
 // ADR-1290: 16 (was 8). A world of eight surface programs plus a sky object (the moon's phase) ran out of slots, and
 // the ninth program was dropped with one log line -- its surfaces shading as though they had none.
-constexpr int kMaxGpuMaterialPrograms = 16;
+constexpr int kMaxGpuMaterialPrograms = 32; // ADR-1675 (was 16, ADR-1290)
 
 // Mirrors `MaterialProgramBlock` in shaders/material.wgsl (91,920 bytes since ADR-1642's texture-op lane; 91,664 since
 // ADR-1290; 45,840 since ADR-904's header flags; past the uniform limit since ADR-036, which is why it is a read-only storage buffer).
@@ -69,7 +69,7 @@ public:
     [[nodiscard]] int slotOf(std::string_view name) const;
     [[nodiscard]] std::uint32_t count() const { return block_.count; }
     [[nodiscard]] const wgpu::Buffer& buffer() const { return buffer_; }
-    // The select buffer and the byte offset of the 16-byte region holding `slot` (-1 .. 7).
+    // The select buffer and the byte offset of the 16-byte region holding `slot` (-1 .. kMaxGpuMaterialPrograms - 1).
     [[nodiscard]] const wgpu::Buffer& selectBuffer() const { return select_; }
     [[nodiscard]] static std::uint64_t selectOffset(int slot);
     [[nodiscard]] const MaterialProgramBlock& block() const { return block_; } // the last packed block (tests)

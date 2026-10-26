@@ -1500,10 +1500,11 @@ TEST_CASE("a material program's bar input is the engine's bar phase", "[material
     CHECK(late != quarter);
 }
 
-// ---- ADR-1290: sixteen program slots ------------------------------------------------------------------------------
+// ---- ADR-1290, ADR-1675: sixteen, then thirty-two program slots ---------------------------------------------------
 
-TEST_CASE("the ninth to sixteenth material programs render; the seventeenth falls back to the material (ADR-1290)",
-          "[material][gpu][adr1290]") {
+TEST_CASE("the ninth to thirty-second material programs render; the thirty-third falls back to the material "
+          "(ADR-1290, ADR-1675)",
+          "[material][gpu][adr1290][adr1675]") {
     auto ctx = makeContext();
     auto shaders = makeShaders(*ctx);
     rendering::SceneRenderer renderer(*ctx, shaders);
@@ -1511,8 +1512,8 @@ TEST_CASE("the ninth to sixteenth material programs render; the seventeenth fall
         FAIL(init.error().message);
     }
 
-    // Seventeen programs, each a flat base colour: the first eight grey (the old table, filled), the ninth to
-    // sixteenth red, and the seventeenth green. A wall drawn with program i must take its colour when i < 16.
+    // Thirty-three programs, each a flat base colour: the first eight grey (ADR-1290's old table, filled), the ninth to
+    // thirty-second red, and the thirty-third green. A wall drawn with program i must take its colour when i < 32.
     auto flat = [](const std::string& name, glm::vec3 c) {
         MaterialProgram p;
         p.name = name;
@@ -1524,35 +1525,42 @@ TEST_CASE("the ninth to sixteenth material programs render; the seventeenth fall
     };
     scene::Scene base = baseScene();
     base.camera.position = {0.0f, 0.0f, 12.0f};
-    for (int i = 0; i < 17; ++i) {
-        const glm::vec3 c = i < 8 ? glm::vec3(0.5f) : (i < 16 ? glm::vec3(0.9f, 0.05f, 0.05f) : glm::vec3(0.05f, 0.9f, 0.05f));
+    for (int i = 0; i < 33; ++i) {
+        const glm::vec3 c = i < 8 ? glm::vec3(0.5f) : (i < 32 ? glm::vec3(0.9f, 0.05f, 0.05f) : glm::vec3(0.05f, 0.9f, 0.05f));
         base.materialPrograms.push_back(flat("p" + std::to_string(i), c));
     }
-    auto wallWith = [&](const std::string& program) {
-        scene::Scene s = base;
+    auto wallWith = [&](const scene::Scene& from, const std::string& program) {
+        scene::Scene s = from;
         scene::ProceduralGeometry wall = boxWall();
         wall.material.program = program;
         s.procedurals.push_back(wall);
         return renderWith(renderer, s);
     };
-    const auto ninth = wallWith("p8");
-    const auto twelfth = wallWith("p11");
-    const auto sixteenth = wallWith("p15");
-    const auto seventeenth = wallWith("p16");
+    const auto ninth = wallWith(base, "p8");
+    const auto sixteenth = wallWith(base, "p15");
+    const auto seventeenth = wallWith(base, "p16");
+    const auto thirtySecond = wallWith(base, "p31");
+    const auto thirtyThird = wallWith(base, "p32");
+    // ... and the table shrinking: only the header and the programs in use are uploaded (ADR-1675), so after the
+    // full scene a scene of two programs, the second now red, must draw with the new second, not the old grey one
+    scene::Scene two = base;
+    two.materialPrograms.resize(2);
+    two.materialPrograms[1] = flat("p1", glm::vec3(0.9f, 0.05f, 0.05f));
+    const auto shrunk = wallWith(two, "p1");
     CHECK(ctx->errorCount() == 0);
     auto rgb = [](const gpu::Image8& img) {
         const std::uint8_t* p = img.pixel(80, 80);
         return std::array<int, 3>{p[0], p[1], p[2]};
     };
-    for (const auto* img : {&ninth, &twelfth, &sixteenth}) {
+    for (const auto* img : {&ninth, &sixteenth, &seventeenth, &thirtySecond, &shrunk}) {
         const auto c = rgb(*img);
-        INFO("program slot 9..16 pixel " << c[0] << "," << c[1] << "," << c[2]);
+        INFO("program slot pixel " << c[0] << "," << c[1] << "," << c[2]);
         CHECK(c[0] > c[1] + 30); // red: the program ran
         CHECK(c[0] > c[2] + 30);
     }
-    // the seventeenth is not uploaded: the wall shades with its own (grey) material, not green
-    const auto g = rgb(seventeenth);
-    INFO("seventeenth pixel " << g[0] << "," << g[1] << "," << g[2]);
+    // the thirty-third is not uploaded: the wall shades with its own (grey) material, not green
+    const auto g = rgb(thirtyThird);
+    INFO("thirty-third pixel " << g[0] << "," << g[1] << "," << g[2]);
     CHECK(std::abs(g[1] - g[0]) < 12);
     CHECK(std::abs(g[1] - g[2]) < 12);
 }

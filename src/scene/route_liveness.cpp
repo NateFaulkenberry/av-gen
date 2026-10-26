@@ -29,7 +29,7 @@ namespace {
 // The GPU's material program table (rendering::kMaxGpuMaterialPrograms, material_programs.hpp): a
 // program past this many is never uploaded, and its surfaces shade as though they had none. Mirrored
 // here because avgen_core does not see the renderer; a GPU test holds the two equal.
-constexpr std::size_t kGpuProgramSlots = 16; // ADR-1290
+constexpr std::size_t kGpuProgramSlots = 32; // ADR-1675 (16 since ADR-1290)
 
 std::vector<std::string_view> splitPath(std::string_view path) {
     std::vector<std::string_view> out;

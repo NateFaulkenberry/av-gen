@@ -335,6 +335,9 @@ A program is 5,728 bytes and the block of eight is 45,840, which is past the uni
 limit — hence the move to a **read-only storage buffer** (ADR-036). Nothing else about the binding
 changed.
 
+The table has held sixteen programs since ADR-1290 and thirty-two since ADR-1675. Only the header
+and the programs in use are uploaded, since the shader reads no slot at or past `count`.
+
 Per op: `kind` (u32, enum order of `MaterialOpKind`), `input` (u32, enum order of
 `MaterialInput`), `seed` (u32), `fieldSlot` (i32, -1 when unresolved or not a field op),
 `registers` (ivec4 `dst, srcA, srcB, srcC`), `value` (f32), `fieldOrdinal` (i32, which of

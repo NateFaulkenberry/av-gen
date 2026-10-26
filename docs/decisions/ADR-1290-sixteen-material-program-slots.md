@@ -1,6 +1,6 @@
 # ADR-1290: Sixteen material program slots
 
-- Status: Accepted (2026-10-09), proto/bio-valley (spec 07 Deliverable C)
+- Status: Accepted (2026-10-09), proto/bio-valley (spec 07 Deliverable C); the slot count is superseded by ADR-1675 (32)
 - Code: `src/rendering/material_programs.hpp` (`kMaxGpuMaterialPrograms`), `shaders/material.wgsl`
   (`MaterialProgramBlock`, `MAT_MAX_PROGRAMS`), `src/scene/route_liveness.cpp` (`kGpuProgramSlots`).
 - Tests: `tests/unit/test_route_liveness.cpp` (`program-not-uploaded` now fires at the seventeenth program),
