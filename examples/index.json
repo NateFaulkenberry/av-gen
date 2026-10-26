@@ -220,7 +220,8 @@
       "hidden": true,
       "live": true,
       "name": "Sonic VFX - Aurora Borealis (Feline Footwear)",
-      "project": "aurora-borealis/aurora-borealis-feline.json"
+      "project": "aurora-borealis/aurora-borealis-feline.json",
+      "generate": "python3 examples/aurora-borealis/build.py   (pure Python; writes examples/aurora-borealis/scene/)"
     },
     {
       "category": "Sonic Garden",
