@@ -27,10 +27,10 @@ has() { [[ " $SECTIONS " == *" $1 "* ]]; }
 declare -a PROF=("drums:tracking:0:12" "bass:codec:5:17" "synth:broadcast:20:32" "other:ghosting:0:12")
 
 if has baseline; then
-  # fx1's reviewed three-together clip (56-71 s) beside fx2's, the same seconds and stems
+  # fx1's reviewed three-together clip (56-71 s) on the LEFT, fx2's on the right: the same seconds and stems
   R clip --project "$C" --range 56:71 --stems --out "$W/after-56-71.mp4"
   ffmpeg -v error -y -i "$FX1/03-three-together.mp4" -i "$W/after-56-71.mp4" \
-    -filter_complex "[0]scale=960:540,drawtext=text='fx1 (before)':x=20:y=20:fontsize=28:fontcolor=white[a];[1]scale=960:540,drawtext=text='fx2 (after)':x=20:y=20:fontsize=28:fontcolor=white[b];[a][b]hstack" \
+    -filter_complex "[0]scale=960:540[a];[1]scale=960:540[b];[a][b]hstack" \
     -c:v libx264 -crf 20 -pix_fmt yuv420p -map 1:a? -c:a aac "$OUT/00-before-after-three-together.mp4"
   for t in 2 6 10; do
     ffmpeg -v error -y -ss $t -i "$OUT/00-before-after-three-together.mp4" -frames:v 1 "$OUT/00-before-after-$((56 + t))s.png"

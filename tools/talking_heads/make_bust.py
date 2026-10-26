@@ -535,8 +535,11 @@ def eye_centre(surface, side):
 
 
 MOUTH_SLIT_DEG = 16.0      # the slit (the lips' parting) runs this far either side of the front
-HINGE_DOWN = 0.022         # the hinge mask's centre sits this far below the slit ...
-HINGE_RADIUS = 0.055       # ... with this radius: its lowest point stays above the head piece's bottom (the neck join)
+HINGE_DOWN = -0.023        # the hinge mask's centre sits this far below the slit (here above it) ...
+HINGE_RADIUS = 0.100       # ... with this radius: its lowest point stays above the head piece's bottom (the neck join),
+                           # and its ease spans the whole under-chin (fx2: at 0.055 the ease ran over 3 cm while the
+                           # chin swung 2.5 cm, and the skin folded into a dark pocket under the open jaw; seam_check's
+                           # jaw views hold it)
 LIP_GAP = 0.0006           # the closed lips sit this far apart: a fine dark line
 LIP_ROLL = 0.012           # how deep the lips' inner walls roll into the mouth
 IRIS_DEG = 29.0            # the iris's angular radius from the gaze (its edge lands on the sphere's 6th ring, 27 deg)

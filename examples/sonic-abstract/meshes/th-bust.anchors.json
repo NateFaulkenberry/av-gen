@@ -74,10 +74,10 @@
     1.0
    ],
    "phase": -0.0096,
-   "falloff": 0.055,
+   "falloff": 0.1,
    "frequency": 0.02019,
    "speed": 0.08098,
-   "scale": -0.032
+   "scale": 0.013
   },
   "forward": [
    0.0,

@@ -14,13 +14,18 @@ One head is held still (pose_stills.posed), its routes removed, and each effect 
 - blocks (tracking, codec): the block deformer at full share. It is world space and identical on every piece, so the
   pieces move as one by construction (tests/unit/test_procedural.cpp [adr1674]). Its own block edges are steps
   wherever they fall, so its close-ups are written for the eye and not scored.
-Each is rendered close on the head/neck seam in four views: front and three-quarter at rest, and JAW-SIDE and
-JAW-THREE-QUARTER: the mouth fully open, the neck bent back 32 degrees and the camera below the chin, looking up at the
-jawline and the under-chin (the regression check for fx1's chin seam). A strip down the neck's middle is averaged
-across. The largest colour step between neighbouring rows within +-10 px of the seam is compared with the same image's
-largest step 12-30 px above and below it. A seam is a step at the boundary that its surroundings do not have. Passes
-when the seam step exceeds its surroundings by under --tol (0..255 per channel). Writes each close-up and exits
-non-zero on a failure. Every render goes through tools/gpu-lock.sh.
+The head is rendered alone (the other busts removed: a side camera would see their necks first), close on the
+head/neck seam, in four views: front and three-quarter at rest, and JAW-SIDE and JAW-THREE-QUARTER: the mouth fully
+open, the neck bent back 32 degrees and the camera below the chin, looking up at the jawline and the under-chin.
+- The piece seam: a strip down the neck's middle is averaged across. The largest colour step between neighbouring rows
+  within +-10 px of the seam is compared with the same image's largest step 12-30 px above and below it. A seam is a
+  step at the boundary that its surroundings do not have.
+- The chin (jaw views only; the regression check for fx1's "visible seams under the chins", which was a crease inside
+  the head piece where the mouth's hinge mask ended): the colour along the under-chin, from a quarter of the way back from the chin's tip to
+  the neck seam (40 samples, 5x5 px each), and its largest step between neighbouring samples. The baseline is the same view with
+  the mouth CLOSED ("closed"); the open mouth, alone and under every effect, must not add a step larger than --tol.
+Passes when each excess is under --tol (0..255 per channel). Writes each close-up and exits non-zero on a failure.
+Every render goes through tools/gpu-lock.sh.
 
     python3 tools/talking_heads/seam_check.py --project <talking-heads.json> --out DIR [--prefix th2] [--tol 6]
 """
@@ -43,6 +48,7 @@ from tools.sonic_vfx.scenes import talking_heads as th  # noqa: E402
 
 EFFECTS = ("rest", "wash", "glow", "bands", "codec", "static", "ghosts", "blocks")
 UNSCORED = ("blocks",)
+CHIN = [0.0, 0.032, 0.092]   # the chin's tip under the lower lip, in the head's frame (anchors: mouthLip y 0.081)
 # view: (camera yaw from the bust's heading, neck tilt, mouth opening, camera height below the aim)
 VIEWS = {"front": (0.0, 0.0, 0.0, -0.02), "three-quarter": (-32.0, 0.0, 0.0, -0.02),
          "jaw-side": (-70.0, 32.0, 1.0, 0.10), "jaw-three-quarter": (-32.0, 32.0, 1.0, 0.10)}
@@ -98,6 +104,24 @@ def apply_effect(p, s, P, effect):
     return found
 
 
+def path_metric(img, pts):
+    """The largest colour step between neighbouring samples along a screen path (each a 5x5 mean)."""
+    px = img.load()
+    vals = []
+    for u, v in pts:
+        acc, n = [0.0, 0.0, 0.0], 0
+        for dx in range(-2, 3):
+            for dy in range(-2, 3):
+                x, y = int(round(u)) + dx, int(round(v)) + dy
+                if 0 <= x < img.width and 0 <= y < img.height:
+                    c = px[x, y]
+                    for k in range(3):
+                        acc[k] += c[k]
+                    n += 1
+        vals.append([a / max(n, 1) for a in acc])
+    return max(max(abs(a[k] - b[k]) for k in range(3)) for a, b in zip(vals, vals[1:]))
+
+
 def step_metric(img, x0, x1, ys):
     px = img.load()
     rows = []
@@ -139,13 +163,23 @@ def main():
     work = tempfile.mkdtemp(prefix="th-seam-")
     fails = []
     try:
+        others = tuple(h["prefix"] + "-" for h in th.HEADS if h["prefix"] != P)
         for view in a.views.split(","):
             vyaw, tilt, opening, below = VIEWS[view]
-            for effect in a.effects.split(","):
-                pp, ss = ps.posed(project, scene, P, tilt, opening, 0.0, rays_on=False)
+            jaw = view.startswith("jaw")
+            closed_step = None
+            for effect in (["closed"] if jaw else []) + a.effects.split(","):
+                pp, ss = ps.posed(project, scene, P, tilt, 0.0 if effect == "closed" else opening, 0.0,
+                                  rays_on=False)
+                ss["nodes"] = [n for n in ss["nodes"] if not n["name"].startswith(others)]
+                pp["effects"] = [e for e in pp["effects"] if not e["id"].startswith(others)]
+                if effect == "closed":
+                    effect_ = "rest"
+                else:
+                    effect_ = effect
                 pp["routes"] = [r for r in pp["routes"] if not r["target"].startswith(
                     ("material/%s-" % P, "fx/%s-" % P, "lights/%s-" % P, "particles/%s-" % P))]
-                if not apply_effect(pp, ss, P, effect):
+                if not apply_effect(pp, ss, P, effect_):
                     continue   # not this head's profile
                 nodes = {n["name"]: n for n in ss["nodes"]}
                 bust = nodes[P + "-bust"]
@@ -172,12 +206,33 @@ def main():
                 seam_step, around_step = max(near), max(around)
                 scored = effect not in UNSCORED
                 ok = seam_step - around_step < a.tol or not scored
+                chin_txt = ""
+                if jaw:
+                    head_w = ac.node_world(nodes, P + "-head")
+                    tip = ac.apply(head_w, CHIN)
+                    # from a quarter of the way back under the jaw (the tip itself is the silhouette once the jaw
+                    # drops) to the neck seam
+                    pts = [ac.to_screen(cam, aim, focal,
+                                        [tip[k] + (front[k] - tip[k]) * (0.25 + 0.75 * i / 39.0) for k in range(3)])
+                           for i in range(40)]
+                    chin_step = path_metric(img, pts)
+                    if effect == "closed":
+                        closed_step = chin_step
+                        chin_txt = ", chin path %5.1f (the baseline)" % chin_step
+                    else:
+                        chin_ok = chin_step - closed_step < a.tol or not scored
+                        ok = ok and chin_ok
+                        chin_txt = ", chin path %5.1f vs closed %5.1f%s" % (chin_step, closed_step,
+                                                                            "" if chin_ok else " CHIN")
+                    dr0 = ImageDraw.Draw(img)
+                    dr0.line([tuple(map(round, q)) for q in pts], fill=(255, 255, 0), width=1)
                 dr = ImageDraw.Draw(img)
                 dr.rectangle([x0, vy - 10, x1, vy + 10], outline=(0, 255, 0) if ok else (255, 0, 0))
                 name = "seam-%s-%s-%s.png" % (P, effect, view)
                 img.save(os.path.join(a.out, name))
-                line = "%-17s %-6s seam step %5.1f, around it %5.1f -> %s" % (
-                    view, effect, seam_step, around_step, ("ok" if ok else "SEAM") if scored else "(not scored)")
+                line = "%-17s %-6s seam step %5.1f, around it %5.1f%s -> %s" % (
+                    view, effect, seam_step, around_step, chin_txt,
+                    ("ok" if ok else "SEAM") if scored else "(not scored)")
                 print(line)
                 if not ok:
                     fails.append(line)
