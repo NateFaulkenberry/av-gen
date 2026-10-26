@@ -260,7 +260,7 @@ void MidiPanel::drawLearnBar(app::Engine& engine) {
     ImGui::SameLine();
     const float scopeWidth = ImGui::CalcTextSize("Project").x * 2.0f + ImGui::GetFrameHeight() * 3.0f;
     destinationPicker("##learn-destination", engine, learnTarget_,
-                      std::max(160.0f, ImGui::GetContentRegionAvail().x - scopeWidth - buttonWidth("Learn") - 24.0f));
+                      std::clamp(ImGui::GetContentRegionAvail().x - scopeWidth - buttonWidth("Learn") - 24.0f, 160.0f, 460.0f));
     ImGui::SameLine();
     int scope = learnScope_ == MidiScope::Project ? 1 : 0;
     if (ImGui::RadioButton("Scene", scope == 0)) {
@@ -450,7 +450,7 @@ bool MidiPanel::destinationPicker(const char* id, app::Engine& engine, control::
     const std::string_view query = pickerSearch_;
     const bool searching = !query.empty();
     ImGui::BeginChild("##picker-tree", ImVec2(0.0f, 380.0f));
-    const WrapText wrap;
+    ImGui::PushTextWrapPos(0.0f);
 
     // Control channels first: the modulation path (routes read them), and what the shipped scenes map.
     ImGui::SetNextItemOpen(true, ImGuiCond_Appearing);
@@ -555,6 +555,7 @@ bool MidiPanel::destinationPicker(const char* id, app::Engine& engine, control::
     if (groups.empty() && searching) {
         ImGui::TextDisabled("No parameter matches \"%s\".", pickerSearch_);
     }
+    ImGui::PopTextWrapPos();
     ImGui::EndChild();
     ImGui::EndPopup();
     return changed;
@@ -650,7 +651,13 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
     Action action = Action::None;
     std::string actionId;
 
-    const float editorHeight = selected_.empty() ? 0.0f : std::min(300.0f, ImGui::GetContentRegionAvail().y * 0.5f);
+    // Wide (the bottom dock): the editor sits beside the table, which keeps its height. Narrow: below it.
+    const bool sideBySide = !selected_.empty() && ImGui::GetContentRegionAvail().x > 1100.0f;
+    const float editorHeight =
+        selected_.empty() || sideBySide ? 0.0f : std::min(300.0f, ImGui::GetContentRegionAvail().y * 0.5f);
+    if (sideBySide) {
+        ImGui::BeginChild("##midi-table-side", ImVec2(ImGui::GetContentRegionAvail().x * 0.6f, 0.0f));
+    }
     const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable |
                                   ImGuiTableFlags_ScrollY | ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingFixedFit |
                                   ImGuiTableFlags_Hideable;
@@ -798,6 +805,10 @@ void MidiPanel::drawAssignments(app::Engine& engine) {
     if (action != Action::None) {
         hub.mappingsChanged();
     }
+    if (sideBySide) {
+        ImGui::EndChild();
+        ImGui::SameLine();
+    }
     if (rows.empty()) {
         ImGui::TextDisabled(map.midi.empty() && map.midiUser.empty()
                                 ? "No MIDI mappings yet. Pick a destination above and press Learn, or right-click a "
@@ -822,7 +833,7 @@ void MidiPanel::drawEditor(app::Engine& engine) {
     }
     ImGui::Separator();
     ImGui::BeginChild("##midi-editor", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None);
-    const WrapText wrap;
+    ImGui::PushTextWrapPos(0.0f);
     const control::MidiMappingStatus* status = hub.mapper().status(shown->id);
     ImGui::Text("%s  ->  %s", control::midiSourceLabel(*shown).c_str(), destinationLabel(shown->target).c_str());
     ImGui::SameLine();
@@ -835,6 +846,7 @@ void MidiPanel::drawEditor(app::Engine& engine) {
             hub.mappingsChanged();
             selected_.clear();
         }
+        ImGui::PopTextWrapPos();
         ImGui::EndChild();
         return;
     }
@@ -1106,6 +1118,7 @@ void MidiPanel::drawEditor(app::Engine& engine) {
             hub.mappingsChanged();
         }
     }
+    ImGui::PopTextWrapPos();
     ImGui::EndChild();
 }
 

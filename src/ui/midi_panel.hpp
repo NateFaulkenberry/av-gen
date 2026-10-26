@@ -29,6 +29,8 @@ public:
     void learnFor(app::Engine& engine, const std::string& parameterPath);
     // Raises a tab on the next draw (the View menu, a capture).
     void showTab(Tab tab) { requestedTab_ = static_cast<int>(tab); }
+    // Selects a mapping by id (the scripted capture arm; a click does the same).
+    void select(const std::string& id) { selected_ = id; }
 
     // Installed by the host: the devices switched off on this machine changed (saved in the app settings).
     std::function<void(const std::vector<std::string>&)> onDisabledDevicesChanged;
