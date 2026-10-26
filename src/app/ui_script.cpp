@@ -1,6 +1,10 @@
 #include "core/interaction_latency.hpp"
 #include "app/ui_script.hpp"
 
+#include "control/midi.hpp"
+#include "control/midi_learn.hpp"
+#include "ui/midi_panel.hpp"
+
 #include "app/engine.hpp"
 #include "platform/window.hpp"
 #include "app/placement.hpp"
@@ -21,6 +25,7 @@
 
 #include <fmt/format.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 
 #include <algorithm>
 #include <array>
@@ -37,7 +42,7 @@ struct ArmName {
     std::string_view name;
     UiScriptArm arm;
 };
-constexpr std::array<ArmName, 22> kArms{{
+constexpr std::array<ArmName, 23> kArms{{
     {"hover", UiScriptArm::Hover},
     {"sliders", UiScriptArm::Sliders},
     {"panels", UiScriptArm::Panels},
@@ -60,6 +65,7 @@ constexpr std::array<ArmName, 22> kArms{{
     {"viewpoint", UiScriptArm::Viewpoint},
     {"director-cancel", UiScriptArm::DirectorCancel},
     {"director-modify", UiScriptArm::DirectorModify},
+    {"midi", UiScriptArm::Midi}, // ADR-1704: a capture arm; not in "all"
 }};
 
 // Pushes a motion event as though the device had produced it. SDL routes it to the window under
@@ -133,7 +139,9 @@ std::optional<UiScriptArm> parseUiScript(std::string_view spec) {
     if (spec == "all") {
         UiScriptArm all = UiScriptArm::None;
         for (const ArmName& a : kArms) {
-            all = all | a.arm;
+            if (a.arm != UiScriptArm::Midi) { // it opens MIDI devices: never part of a benchmark
+                all = all | a.arm;
+            }
         }
         return all;
     }
@@ -357,6 +365,10 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
 
     if (has(arms_, UiScriptArm::Star)) {
         stepStar(engine, *panel, frame);
+    }
+
+    if (has(arms_, UiScriptArm::Midi)) {
+        stepMidi(engine, *panel, frame);
     }
 
     if (has(arms_, UiScriptArm::Click)) {
@@ -1770,6 +1782,202 @@ void UiScript::stepDirectorModify(Engine& engine, ui::ControlPanel& panel, platf
         check(current != nullptr && current->prompt() == "Have Rook run past Umbra at 1:30, followed low.",
               "Regenerate asked the original request again, not the follow-up");
         check(engine.directingPlans().empty(), "still nothing applied");
+    }
+}
+
+// ---- ADR-1704: the MIDI panel, for captures -------------------------------------------------------------------------
+
+void UiScript::stepMidi(Engine& engine, ui::ControlPanel& panel, std::uint64_t frame) {
+    if (!midiStarted_) { // a flag, not "start == 0": the first frame may be frame 0
+        midiStarted_ = true;
+        midiStart_ = frame;
+    }
+    const std::uint64_t f = frame - midiStart_;
+    auto& hub = engine.control();
+    using Tab = ui::MidiPanel::Tab;
+    const auto send = [](const std::shared_ptr<control::MidiVirtualSource>& source, std::vector<std::uint8_t> bytes) {
+        if (source && source->isOpen()) {
+            (void)source->send(bytes);
+        }
+    };
+    if (f == 5) {
+        // A capture of a table wants rows: the bottom dock grows to half the window for this run (a person drags the
+        // same divider). Only this scripted run's layout changes; the .ini is not the person's here.
+        if (const std::uint32_t node = panel.layout().regionNode(ui::DockRegion::Bottom); node != 0) {
+            if (ImGuiDockNode* bottom = ImGui::DockBuilderGetNode(node); bottom != nullptr) {
+                ImGui::DockBuilderSetNodeSize(node, ImVec2(bottom->Size.x, ImGui::GetMainViewport()->WorkSize.y * 0.55f));
+            }
+        }
+    }
+    if (f == 0) {
+        if (bool* open = panel.layout().slot("MIDI"); open != nullptr) {
+            *open = true;
+        }
+        midiKeys_ = std::make_shared<control::MidiVirtualSource>();
+        midiPads_ = std::make_shared<control::MidiVirtualSource>();
+        if (auto r = midiKeys_->open("AV Gen Demo Keys"); !r) {
+            log::warn("ui-script midi: {}", r.error().message);
+        }
+        if (auto r = midiPads_->open("AV Gen Demo Pads"); !r) {
+            log::warn("ui-script midi: {}", r.error().message);
+        }
+        hub.map().midiEnabled = true;
+        hub.map().midiFilter = "*";
+        hub.applyIo();
+        return;
+    }
+    if (f == 10) {
+        // Mappings in every scope, against the two sources' real ids.
+        std::string keysId;
+        std::string padsId;
+        for (const auto& d : control::listMidiInputs()) {
+            if (d.name == "AV Gen Demo Keys") keysId = d.id;
+            if (d.name == "AV Gen Demo Pads") padsId = d.id;
+        }
+        std::string param;
+        std::string param2;
+        for (const params::IParameter* p : engine.params().ordered()) {
+            if (!p->flags().exposed || !p->flags().modulatable || p->kind() != params::ParamKind::Float) continue;
+            const std::string& path = p->path();
+            if (param.empty() && (path.find("palette") != std::string::npos || path.find("exposure") != std::string::npos)) {
+                param = path;
+            } else if (param2.empty() && path.find("bloom") != std::string::npos) {
+                param2 = path;
+            }
+        }
+        for (const params::IParameter* p : engine.params().ordered()) {
+            if (!p->flags().exposed || !p->flags().modulatable || p->kind() != params::ParamKind::Float) continue;
+            if (param.empty()) param = p->path();
+            else if (param2.empty() && p->path() != param) param2 = p->path();
+        }
+        midiLearnParam_ = param2;
+        auto& map = hub.map();
+        const std::string scene = hub.sceneKey();
+        const auto range = [&](control::MidiBinding& b, const std::string& path) {
+            b.target.parameter = path;
+            if (const params::IParameter* p = engine.params().find(path)) {
+                b.target.min = p->softMin(0);
+                b.target.max = p->softMax(0);
+            }
+        };
+        control::MidiBinding knob;
+        knob.kind = control::MidiBindKind::ControlChange;
+        knob.number = 74;
+        knob.channel = 0;
+        knob.device = keysId;
+        knob.deviceName = "AV Gen Demo Keys";
+        knob.curve = control::MidiCurve::SCurve;
+        knob.smoothMs = 60.0f;
+        knob.scope = control::MidiScope::Scene;
+        range(knob, param);
+        midiSelect_ = control::commitMidiLearn(map, scene, knob, control::MidiLearnCommit::Add);
+        control::MidiBinding glow = knob;
+        glow.target = control::BindingTarget{};
+        glow.target.signal = "glow";
+        glow.curve = control::MidiCurve::Linear;
+        glow.smoothMs = 0.0f;
+        control::commitMidiLearn(map, scene, glow, control::MidiLearnCommit::Add);
+        control::MidiBinding pads;
+        pads.kind = control::MidiBindKind::Note;
+        pads.number = 36;
+        pads.numberHigh = 39;
+        pads.channel = 9;
+        pads.device = padsId;
+        pads.deviceName = "AV Gen Demo Pads";
+        pads.target.signal = "drums";
+        pads.scope = control::MidiScope::Project;
+        midiNoteMapping_ = control::commitMidiLearn(map, scene, pads, control::MidiLearnCommit::Add);
+        control::MidiBinding flash = pads;
+        flash.kind = control::MidiBindKind::NoteEvent;
+        flash.number = 40;
+        flash.numberHigh = -1;
+        flash.target.signal = "flash";
+        control::commitMidiLearn(map, scene, flash, control::MidiLearnCommit::Add);
+        control::MidiBinding nrpn;
+        nrpn.kind = control::MidiBindKind::Nrpn;
+        nrpn.number = 1234;
+        nrpn.channel = 0;
+        nrpn.device = keysId;
+        nrpn.deviceName = "AV Gen Demo Keys";
+        nrpn.target.signal = "filter";
+        nrpn.scope = control::MidiScope::Project;
+        control::commitMidiLearn(map, scene, nrpn, control::MidiLearnCommit::Add);
+        control::MidiBinding bend;
+        bend.kind = control::MidiBindKind::PitchBend;
+        bend.channel = 0;
+        bend.device = keysId;
+        bend.deviceName = "AV Gen Demo Keys";
+        bend.scope = control::MidiScope::Scene;
+        range(bend, param2);
+        control::commitMidiLearn(map, scene, bend, control::MidiLearnCommit::Add);
+        // A default edited (overridden) and one switched off, when the project ships defaults.
+        if (!map.midi.empty()) {
+            const std::string first = map.midi[0].id;
+            if (control::MidiBinding* edit = control::editableMidiMapping(map, scene, first)) {
+                edit->target.max = 0.8f;
+                edit->pickup = true;
+            }
+        }
+        if (map.midi.size() > 1) {
+            control::setMidiMappingEnabled(map, map.midi[1].id, false);
+        }
+        hub.mappingsChanged();
+        panel.midi.showTab(Tab::Assignments);
+        panel.midi.select(midiSelect_);
+        editLog_.push_back(fmt::format("midi: mappings installed on '{}' and '{}' (param {}, {})", keysId, padsId, param,
+                                       param2));
+        return;
+    }
+    // The performance, paused while Learn listens (so the capture shows it waiting).
+    // (A message sent the frame before Learn arms arrives after it: the quiet starts ten frames early.)
+    const bool quiet = f >= 160 && f < 340;
+    if (f >= 12 && !quiet) {
+        const int tri = static_cast<int>(f % 120);
+        send(midiKeys_, {0xB0, 74, static_cast<std::uint8_t>(tri < 60 ? tri * 2 : (119 - tri) * 2)});
+        if (f % 4 == 0) {
+            const double bend = 8192.0 + 6000.0 * std::sin(static_cast<double>(f) * 0.07);
+            const int v = std::clamp(static_cast<int>(bend), 0, 16383);
+            send(midiKeys_, {0xE0, static_cast<std::uint8_t>(v & 0x7F), static_cast<std::uint8_t>(v >> 7)});
+        }
+        if (f % 15 == 0) {
+            send(midiPads_, {0x99, static_cast<std::uint8_t>(36 + (f / 15) % 5),
+                             static_cast<std::uint8_t>(90 + (f * 7) % 37)});
+        }
+        if (f % 15 == 7) {
+            send(midiPads_, {0x89, static_cast<std::uint8_t>(36 + (f / 15) % 5), 0});
+        }
+        if (f % 30 == 3) {
+            const int v = static_cast<int>((f * 97) % 16384);
+            send(midiKeys_, {0xB0, 99, 9, 0xB0, 98, 82, 0xB0, 6, static_cast<std::uint8_t>(v >> 7), 0xB0, 38,
+                             static_cast<std::uint8_t>(v & 0x7F)});
+        }
+        if (f % 45 == 20) {
+            send(midiKeys_, {0xD0, static_cast<std::uint8_t>((f * 3) % 128)});
+        }
+        if (f % 60 == 30) {
+            send(midiKeys_, {0x90, 60, 100});
+        }
+        if (f % 60 == 50) {
+            send(midiKeys_, {0x80, 60, 0});
+        }
+    }
+    if (f == 170) {
+        panel.midi.showTab(Tab::Assignments);
+        panel.midi.learnFor(engine, midiLearnParam_); // the Parameters right-click's path: destination first, listening
+    }
+    if (f >= 300 && f < 320) {
+        send(midiKeys_, {0xB0, 3, static_cast<std::uint8_t>(60 + (f - 300) * 3)}); // CC 3: a shipped default maps it
+    }
+    if (f == 360) {
+        hub.learn().cancel();
+        panel.midi.showTab(Tab::Monitor);
+    }
+    if (f == 480) {
+        panel.midi.showTab(Tab::Devices);
+    }
+    if (f == 580) {
+        panel.midi.showTab(Tab::Assignments);
+        panel.midi.select(midiNoteMapping_);
     }
 }
 

@@ -4,6 +4,7 @@
 #include "core/log.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace avgen::app {
@@ -16,13 +17,115 @@ std::uint64_t frameNanoseconds(const FrameTime& time) {
     return static_cast<std::uint64_t>(std::max(0.0, time.renderTime) * 1e9);
 }
 
+std::uint64_t steadyNs() {
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+// ADR-1700: the mapper's destinations on the engine: parameter bases by path (found per write, never a cached pointer,
+// so a scene load that clears the parameter set cannot leave a mapping holding a dangling one) and the control source.
+//
+// The control source is looked up once per frame, not per write: `Engine::controlSource()` re-declares every channel
+// of the map each time it is called (ensureControlSource), which measured 16 us a message under a CC flood -- 7.7 ms of a
+// 33 ms frame at four devices x 3,000 messages a second. Once per frame it is nothing.
+class EngineTargets final : public control::MidiTargets {
+public:
+    EngineTargets(Engine& engine, const control::ControlMap& map)
+        : engine_(engine), map_(map), control_(engine.controlSource()) {}
+    std::optional<float> parameter(const std::string& path, int component) override {
+        const params::IParameter* p = engine_.params().find(path);
+        const std::size_t c = component < 0 ? 0 : static_cast<std::size_t>(component);
+        if (p == nullptr || c >= p->componentCount()) {
+            return std::nullopt;
+        }
+        return p->baseComponent(c);
+    }
+    void setParameter(const std::string& path, int component, float value) override {
+        params::IParameter* p = engine_.params().find(path);
+        if (p == nullptr) {
+            return;
+        }
+        const std::size_t n = p->componentCount();
+        if (component < 0) {
+            for (std::size_t c = 0; c < n; ++c) {
+                p->setBaseComponent(c, value);
+            }
+        } else if (static_cast<std::size_t>(component) < n) {
+            p->setBaseComponent(static_cast<std::size_t>(component), value);
+        }
+    }
+    float signal(const std::string& name) override { return control_.value(name); }
+    bool signalHasRest(const std::string& name) override { return map_.restFor(name) != nullptr; }
+    void setSignal(const std::string& name, float value) override { control_.set(name, value); }
+    void pulseSignal(const std::string& name, float strength) override { control_.pulse(name, strength); }
+
+private:
+    Engine& engine_;
+    const control::ControlMap& map_;
+    signals::ControlSource& control_;
+};
+
 } // namespace
 
-ControlHub::ControlHub() = default;
+ControlHub::ControlHub()
+    : startNs_(steadyNs()) {}
+
+double ControlHub::clockSeconds() const {
+    return static_cast<double>(steadyNs() - startNs_) * 1e-9;
+}
+
+void ControlHub::setSceneKey(const std::string& key) {
+    if (key == sceneKey_) {
+        return;
+    }
+    sceneKey_ = key;
+    rebuildPending_ = true;
+    freshRebuild_ = true;
+}
+
+void ControlHub::setDisabledDevices(std::vector<std::string> ids) {
+    disabledDevices_ = std::move(ids);
+    deviceGeneration_ = ~0ull; // re-derive the per-slot flags
+    syncDevices();
+}
+
+bool ControlHub::deviceEnabled(std::uint16_t slot) const {
+    return slot >= deviceDisabled_.size() || !deviceDisabled_[slot];
+}
+
+void ControlHub::injectMidiRemoval(const std::string& source) {
+    midi_.injectRemoval(source);
+}
+
+void ControlHub::syncDevices() {
+    const std::uint64_t generation = midi_.deviceGeneration();
+    if (generation == deviceGeneration_) {
+        return;
+    }
+    deviceGeneration_ = generation;
+    devices_ = midi_.devices();
+    activity_.resize(devices_.size());
+    deviceDisabled_.assign(devices_.size(), false);
+    for (std::size_t i = 0; i < devices_.size(); ++i) {
+        deviceDisabled_[i] = std::find(disabledDevices_.begin(), disabledDevices_.end(), devices_[i].id) !=
+                             disabledDevices_.end();
+    }
+    mapper_.setDevices(devices_);
+}
+
+void ControlHub::rebuildMappings(control::MidiTargets& targets) {
+    mapper_.rebuild(map_, sceneKey_, targets, !freshRebuild_);
+    mapper_.setDevices(devices_);
+    rebuildPending_ = false;
+    freshRebuild_ = false;
+}
 ControlHub::~ControlHub() { closeAll(); }
 
 void ControlHub::setMap(control::ControlMap map) {
     map_ = std::move(map);
+    rebuildPending_ = true; // ADR-1700: a new map starts fresh (held gates released on the next update)
+    freshRebuild_ = true;
+    nrpn_.reset();
     applyIo();
 }
 
@@ -113,12 +216,20 @@ void ControlHub::injectOsc(control::OscMessage message) {
 std::size_t ControlHub::update(Engine& engine, const FrameTime& time) {
     frameNs_ = frameNanoseconds(time);
     std::size_t count = 0;
+    EngineTargets targets(engine, map_);
+    syncDevices();
+    if (rebuildPending_) {
+        rebuildMappings(targets);
+    }
     midiScratch_.clear();
     midi_.drain(midiScratch_);
+    syncDevices(); // a device that connected while those were queued (its slot is in them)
+    const double now = clockSeconds();
     for (const auto& m : midiScratch_) {
-        applyMidi(engine, m);
+        applyMidiWith(engine, m, targets, now);
         ++count;
     }
+    mapper_.advance(time.deltaTime, targets); // smoothing, this frame
     clock_.advance(frameNs_);
     oscScratch_.clear();
     osc_.drain(oscScratch_);
@@ -158,59 +269,82 @@ void ControlHub::applyTarget(Engine& engine, const control::BindingTarget& targe
     }
 }
 
-// ADR-1606: where a binding's target stands now, 0..1 on the binding's own scale (-1 when it has none to read).
-float ControlHub::currentNormalised(Engine& engine, const control::BindingTarget& target) const {
-    if (!target.parameter.empty()) {
-        if (const auto* p = engine.params().find(target.parameter); p != nullptr && p->componentCount() > 0) {
-            const std::size_t c = target.component < 0 ? 0 : static_cast<std::size_t>(target.component);
-            if (c < p->componentCount() && target.max != target.min) {
-                return std::clamp((p->baseComponent(c) - target.min) / (target.max - target.min), 0.0f, 1.0f);
-            }
-        }
+void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) {
+    EngineTargets targets(engine, map_);
+    syncDevices();
+    if (rebuildPending_) {
+        rebuildMappings(targets);
     }
-    // A control signal only moves with its knob (or OSC); with a declared rest (ADR-1612) there is a value to take over
-    // from -- the rest, until the knob reaches it.
-    if (!target.signal.empty() && map_.restFor(target.signal) != nullptr) {
-        return engine.controlSource().value(target.signal);
-    }
-    return -1.0f;
+    applyMidiWith(engine, message, targets, clockSeconds());
 }
 
-void ControlHub::applyMidi(Engine& engine, const control::MidiMessage& message) {
+void ControlHub::applyMidiWith(Engine& engine, const control::MidiMessage& message, control::MidiTargets& targets,
+                               double now) {
     using K = control::MidiKind;
+    const bool known = message.device < activity_.size();
     if (message.kind == K::Clock || message.kind == K::Start || message.kind == K::Continue ||
         message.kind == K::Stop) {
-        // Tempo sync: not learnable, not bound, never unmatched.
+        // Tempo sync: not learnable, not mapped, never unmatched (and its own counter, not the monitor's rows).
         clock_.feed(message, frameNs_);
         ++clockMessages_;
+        if (known) {
+            ++activity_[message.device].clock;
+            activity_[message.device].lastSeconds = now;
+        }
+        if (monitor_.showClock()) {
+            monitor_.push(message, now, 0, false);
+        }
         return;
     }
-    lastMidi_ = message;
-    // ADR-1025: live Sonic input takes the notes (and the sustain pedal) into its note model. Bindings still see
-    // every message, so a project can also map a key or a CC as it always could.
-    bool matched = engine.liveSonic() && engine.liveSonicMidi(message);
-    if (engine.liveSonic() && message.kind == K::ProgramChange) {
-        programChange_ = static_cast<int>(message.data1); // ADR-1063: the scene switcher
+    if (message.kind == K::DeviceRemoved) {
+        // ADR-1701: its note-offs will never come. Its held gates are released and its NRPN state forgotten.
+        if (message.device == control::kAllMidiDevices) {
+            nrpn_.reset();
+        } else {
+            nrpn_.resetDevice(message.device);
+        }
+        mapper_.apply(message, targets, now);
+        monitor_.push(message, now, 0, false);
+        return;
+    }
+    if (known) {
+        DeviceActivity& a = activity_[message.device];
+        ++a.messages;
+        a.lastSeconds = now;
+        if (message.channel < 16) {
+            a.channelSeconds[message.channel] = now;
+        }
+    }
+    control::MidiMessage raw = message;
+    const std::optional<control::MidiMessage> decoded = nrpn_.feed(raw); // marks raw as an NRPN part when it is one
+    if (!deviceEnabled(message.device)) {
+        // Switched off on this machine: seen (so the person can tell it is sending), never applied.
+        monitor_.push(raw, now, 0, true);
+        if (decoded) {
+            monitor_.push(*decoded, now, 0, true);
+        }
+        ++ignored_;
+        return;
+    }
+    lastMidi_ = raw;
+    learn_.feed(raw);
+    // ADR-1025: live Sonic input takes the notes (and the sustain pedal) into its note model. Mappings still see every
+    // message, so a project can also map a key or a CC as it always could.
+    bool matched = engine.liveSonic() && engine.liveSonicMidi(raw);
+    if (engine.liveSonic() && raw.kind == K::ProgramChange) {
+        programChange_ = static_cast<int>(raw.data1); // ADR-1063: the scene switcher
         matched = true;
     }
-    for (auto& binding : map_.midi) {
-        if (auto match = control::matchMidi(binding, message)) {
-            matched = true;
-            // ADR-1606: soft takeover -- a continuous binding waits for the knob to reach the target's value.
-            const bool continuous = binding.kind == control::MidiBindKind::ControlChange ||
-                                    binding.kind == control::MidiBindKind::PitchBend ||
-                                    binding.kind == control::MidiBindKind::ChannelPressure;
-            const control::ChannelRest* rest =
-                binding.target.signal.empty() ? nullptr : map_.restFor(binding.target.signal); // ADR-1612
-            if (continuous && !match->event && (binding.pickup || map_.midiPickup || (rest != nullptr && rest->pickup))) {
-                const float current = currentNormalised(engine, binding.target);
-                if (current >= 0.0f && !control::pickupAccepts(binding.pickupState, match->value, current)) {
-                    ++pickupHeld_;
-                    continue;
-                }
-            }
-            applyTarget(engine, binding.target, *match);
-        }
+    const int moved = mapper_.apply(raw, targets, now);
+    monitor_.push(raw, now, static_cast<std::uint16_t>(moved), false);
+    matched = matched || moved > 0;
+    if (decoded) {
+        learn_.feed(*decoded);
+        const int movedDecoded = mapper_.apply(*decoded, targets, now);
+        monitor_.push(*decoded, now, static_cast<std::uint16_t>(movedDecoded), false);
+        matched = matched || movedDecoded > 0;
+    } else if ((raw.flags & control::kMidiNrpnPart) != 0 && !matched) {
+        return; // a parameter select: half of a message, neither applied nor unmatched
     }
     ++(matched ? applied_ : unmatched_);
 }
@@ -426,29 +560,6 @@ void ControlHub::pushFeedback(Engine& engine) {
 
 // ---- learn -----------------------------------------------------------------------------------
 
-bool ControlHub::bindLastMidi(const std::string& signal, const std::string& parameter, bool asEvent) {
-    if (!lastMidi_) {
-        return false;
-    }
-    control::MidiBinding b;
-    b.source = "*";
-    b.channel = lastMidi_->channel;
-    b.number = lastMidi_->data1;
-    switch (lastMidi_->kind) {
-    case control::MidiKind::ControlChange: b.kind = control::MidiBindKind::ControlChange; break;
-    case control::MidiKind::NoteOn:
-    case control::MidiKind::NoteOff: b.kind = asEvent ? control::MidiBindKind::NoteEvent : control::MidiBindKind::Note; break;
-    case control::MidiKind::PitchBend: b.kind = control::MidiBindKind::PitchBend; b.number = -1; break;
-    case control::MidiKind::ChannelPressure: b.kind = control::MidiBindKind::ChannelPressure; b.number = -1; break;
-    case control::MidiKind::ProgramChange: b.kind = control::MidiBindKind::Program; break;
-    default: return false;
-    }
-    b.target.signal = signal;
-    b.target.parameter = parameter;
-    map_.midi.push_back(std::move(b));
-    return true;
-}
-
 bool ControlHub::bindLastOsc(const std::string& signal, const std::string& parameter, bool asEvent) {
     if (!lastOsc_) {
         return false;
@@ -473,8 +584,9 @@ ControlHub::Status ControlHub::status() const {
     s.midiSources = midi_.connectedSources();
     s.midi = midi_.stats();
     s.applied = applied_;
-    s.pickupHeld = pickupHeld_;
+    s.pickupHeld = mapper_.pickupHeld();
     s.unmatched = unmatched_;
+    s.ignored = ignored_;
     s.feedbackOpen = feedback_.isOpen();
     s.feedbackError = feedbackError_;
     s.feedbackSent = feedbackSent_;

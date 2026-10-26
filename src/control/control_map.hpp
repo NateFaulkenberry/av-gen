@@ -16,6 +16,11 @@
 //      base values that change (other than through OSC) are pushed as "<prefix>/param/<path>".
 // Saved in the project under "control". Pure functions here; sockets and devices live in the
 // osc/midi modules and the app's ControlHub.
+//
+// ADR-1700: MIDI performance mapping. `control.midi.bindings` are the scene's authored defaults and
+// are written back exactly as they were read; a performer's own mappings are `control.midi.mappings`
+// (project or scene scope), defaults they switched off are `disabledDefaults`, and a destination's
+// combination policy is `combine`. Which of them apply, and in what order, is `resolveMidiMappings`.
 
 #include "control/midi.hpp"
 #include "control/osc.hpp"
@@ -31,9 +36,41 @@
 
 namespace avgen::control {
 
-enum class MidiBindKind : std::uint8_t { ControlChange, Note, NoteEvent, PitchBend, ChannelPressure, Program };
+// `note` is a gate (level while held; with `toggle`, flips on each note-on), `noteEvent` a trigger (a one-frame pulse).
+// ADR-1700 adds polyPressure (note identity kept), nrpn and rpn (ADR-1702).
+enum class MidiBindKind : std::uint8_t {
+    ControlChange, Note, NoteEvent, PitchBend, ChannelPressure, Program, PolyPressure, Nrpn, Rpn
+};
 [[nodiscard]] const char* midiBindKindName(MidiBindKind kind);
 [[nodiscard]] std::optional<MidiBindKind> midiBindKindFromName(std::string_view name);
+[[nodiscard]] bool midiBindKindIsNote(MidiBindKind kind);       // note, noteEvent
+[[nodiscard]] bool midiBindKindHasNumber(MidiBindKind kind);    // cc, note kinds, program, polyPressure, nrpn, rpn
+[[nodiscard]] bool midiBindKindIsContinuous(MidiBindKind kind); // cc, pitchBend, pressure, polyPressure, nrpn, rpn
+
+// ADR-1700: the response of a continuous mapping, after invert and before scale/offset.
+enum class MidiCurve : std::uint8_t { Linear, Exponential, Logarithmic, SCurve };
+[[nodiscard]] const char* midiCurveName(MidiCurve curve);
+[[nodiscard]] std::optional<MidiCurve> midiCurveFromName(std::string_view name);
+[[nodiscard]] float applyMidiCurve(MidiCurve curve, float x); // 0..1 -> 0..1, monotonic, fixed ends
+
+// ADR-1700: how a CC's value is read. Relative encoders are chosen by the person, never inferred: the same bytes mean
+// different things on different devices.
+enum class MidiEncoder : std::uint8_t { Absolute, TwosComplement, BinaryOffset, SignMagnitude };
+[[nodiscard]] const char* midiEncoderName(MidiEncoder encoder);
+[[nodiscard]] std::optional<MidiEncoder> midiEncoderFromName(std::string_view name);
+// The step a relative encoder's value means (0 for Absolute): two's complement 1..63 up, 127.. down; binary offset
+// 64 = none, 65 = +1, 63 = -1; sign-magnitude bit 6 = down, low six bits = size.
+[[nodiscard]] int relativeEncoderDelta(MidiEncoder encoder, std::uint8_t value);
+
+// ADR-1700: where a mapping comes from, lowest precedence first.
+enum class MidiScope : std::uint8_t { Default, Project, Scene };
+[[nodiscard]] const char* midiScopeName(MidiScope scope);
+
+// ADR-1700: several mappings driving one destination. Replace: the latest message wins (and what a binding always
+// did). Max / Add: the largest / the sum of every contributing mapping's current output, clamped to the destination.
+enum class MidiCombine : std::uint8_t { Replace, Max, Add };
+[[nodiscard]] const char* midiCombineName(MidiCombine combine);
+[[nodiscard]] std::optional<MidiCombine> midiCombineFromName(std::string_view name);
 
 // Where a matched value goes: a control signal (channel name without "control."), a parameter
 // base value (path + component, mapped to min..max), or both.
@@ -58,17 +95,56 @@ struct PickupState {
 [[nodiscard]] bool pickupAccepts(PickupState& state, float incoming, float current, float tolerance = 0.02f);
 
 struct MidiBinding {
-    std::string source = "*";    // substring of the source name ("*" = any)
+    // ADR-1700: identity and layer. A user mapping's id is minted when it is made; an authored default without one gets
+    // "d-<hash of its source and target>" at load (idAuthored false, and it is then not written back).
+    std::string id;
+    bool idAuthored = false;
+    MidiScope scope = MidiScope::Default;
+    std::string scene;           // Scene scope: the scene key (Engine::midiSceneKey) it belongs to
+    std::string overrides;       // a user mapping that replaces the mapping with this id while it exists
+    bool enabled = true;
+
+    // The source.
+    std::string source = "*";    // substring of the device name ("*" = any); used when `device` is empty
+    std::string device;          // ADR-1700: the stable device id (CoreMIDI unique id) it was learned from
+    std::string deviceName;      // that device's name when learned: what is shown, and the fallback match elsewhere
     int channel = -1;            // 0..15, -1 = any
     MidiBindKind kind = MidiBindKind::ControlChange;
-    int number = -1;             // controller / note / program number (-1 = any for Note/NoteEvent)
-    bool toggle = false;         // Note: note-on flips 0/1 instead of following velocity
+    int number = -1;             // controller / note / program / NRPN-RPN number (-1 = any)
+    int numberHigh = -1;         // note kinds, polyPressure: the top of a note range number..numberHigh (-1 = one note)
+
+    // Behaviour.
+    bool toggle = false;         // Note: note-on flips between min and max instead of gating
+    bool velocity = true;        // Note / NoteEvent: the level follows velocity (false: full level)
     bool pickup = false;         // ADR-1606: soft takeover for this binding (continuous kinds)
+    bool invert = false;
+    MidiCurve curve = MidiCurve::Linear;
+    float scale = 1.0f;          // sensitivity: y = clamp(curve(x) * scale + offset, 0, 1); relative: the step size
+    float offset = 0.0f;
+    float smoothMs = 0.0f;       // one-pole smoothing time constant (0 = none)
+    MidiEncoder encoder = MidiEncoder::Absolute; // ControlChange only
     BindingTarget target;
-    // Runtime (not serialised): toggle state.
-    bool toggleState = false;
-    PickupState pickupState;     // ADR-1606
+
+    // A user record that could not be read: kept verbatim (and written back verbatim) and never applied.
+    std::string invalidRaw;
+    std::string invalidReason;
+    [[nodiscard]] bool invalid() const { return !invalidReason.empty(); }
 };
+
+// ADR-1700: the destinations a binding writes, as stable keys: "control.<signal>" and "<path>" or "<path>[<c>]".
+[[nodiscard]] std::vector<std::string> midiDestinationKeys(const BindingTarget& target);
+// Whether two bindings can be moved by the same message: same kind, overlapping numbers, channels and devices ("any"
+// overlaps everything).
+[[nodiscard]] bool midiSourcesOverlap(const MidiBinding& a, const MidiBinding& b);
+// Whether a source (device slot named `deviceName` with id `deviceId`, or none) passes the binding's device filter.
+[[nodiscard]] bool midiDeviceMatches(const MidiBinding& binding, std::string_view deviceId, std::string_view deviceName);
+// A human description of the source: "CC 74", "Note C3", "Notes C1-B1", "Pitch bend", "NRPN 1234".
+[[nodiscard]] std::string midiSourceLabel(const MidiBinding& binding);
+// Middle C is note 60 = "C4" (the Scientific Pitch convention, as Apple's and Ableton's monitors label it; some
+// devices and DAWs call 60 "C3").
+[[nodiscard]] std::string midiNoteName(int note);
+// A fresh user mapping id ("m-" + 12 hex digits).
+[[nodiscard]] std::string newMidiMappingId();
 
 struct OscBinding {
     std::string address;         // exact address or OSC pattern ("/fader/*")
@@ -101,7 +177,11 @@ struct ControlMap {
     bool midiEnabled = true;
     std::string midiFilter = "*";
     bool midiPickup = false;     // ADR-1606: soft takeover for every continuous binding (CC, pitch bend, pressure)
-    std::vector<MidiBinding> midi;
+    std::vector<MidiBinding> midi;      // the scene's authored defaults ("bindings")
+    std::vector<MidiBinding> midiUser;  // ADR-1700: the performer's mappings, project and scene scope ("mappings")
+    std::vector<std::string> disabledDefaults; // ADR-1700: tombstones: ids of defaults switched off
+    std::vector<std::pair<std::string, MidiCombine>> combine; // ADR-1700: destination key -> policy (not Replace)
+    std::vector<std::string> warnings; // ADR-1700: what fromJson set aside (unreadable user records, unknown keys)
     std::vector<OscBinding> osc;
     std::vector<ChannelRest> channelRests; // ADR-1612: "channels" in the project's control block; written when set
 
@@ -109,7 +189,12 @@ struct ControlMap {
     // ADR-1612: the declared rest of a channel, or null.
     [[nodiscard]] const ChannelRest* restFor(std::string_view channel) const;
     static Result<ControlMap> fromJson(const nlohmann::json& j);
-    [[nodiscard]] bool empty() const { return midi.empty() && osc.empty(); }
+    [[nodiscard]] bool empty() const { return midi.empty() && midiUser.empty() && osc.empty(); }
+    // ADR-1700
+    [[nodiscard]] MidiCombine combineFor(std::string_view destinationKey) const;
+    void setCombine(const std::string& destinationKey, MidiCombine policy);
+    [[nodiscard]] MidiBinding* findMidi(std::string_view id); // a default or a user mapping
+    [[nodiscard]] const MidiBinding* findMidi(std::string_view id) const;
     // Every signal channel named by a binding (deduplicated) with its event flag, so the control
     // source can declare them before messages arrive.
     struct Channel {
@@ -120,13 +205,36 @@ struct ControlMap {
     [[nodiscard]] std::vector<Channel> channels() const;
 };
 
+// ADR-1700: the state of every mapping in a map for one scene, and the active ones in the order they apply.
+enum class MidiMappingState : std::uint8_t {
+    Active,
+    Disabled,       // its own enabled flag is off
+    DefaultOff,     // a default the performer switched off (a tombstone)
+    Overridden,     // a user mapping replaces it (`by`)
+    Shadowed,       // a higher scope maps an overlapping source to the same destination (`by`)
+    OtherScene,     // a scene mapping for another scene
+    Invalid         // an unreadable user record
+};
+[[nodiscard]] const char* midiMappingStateName(MidiMappingState state);
+struct ResolvedMapping {
+    const MidiBinding* binding = nullptr;
+    MidiMappingState state = MidiMappingState::Active;
+    std::string by; // the id that overrides or shadows it
+};
+// Every binding of `map` (defaults, then user mappings in their order) with its state for `sceneKey`. The precedence
+// is ADR-1700's: tombstones, then explicit overrides, then scene > project > default shadowing on an overlapping source
+// that drives the same destination.
+[[nodiscard]] std::vector<ResolvedMapping> resolveMidiMappings(const ControlMap& map, std::string_view sceneKey);
+
 // A matched binding: the normalised value (0..1) and whether it is an event pulse.
 struct Match {
     float value = 0.0f;
     bool event = false;
 };
-// Returns the value when `message` matches `binding` (toggle state is updated in place).
-[[nodiscard]] std::optional<Match> matchMidi(MidiBinding& binding, const MidiMessage& message);
+// ADR-1700: whether `message` is one the binding's source describes -- kind, channel, number or note range -- and its
+// raw value (0..1 at the message's resolution). The device filter is not checked here (it needs the device table:
+// midiDeviceMatches), nor behaviour (gates, toggles, encoders: the mapper's state).
+[[nodiscard]] std::optional<float> midiSourceValue(const MidiBinding& binding, const MidiMessage& message);
 [[nodiscard]] std::optional<Match> matchOsc(const OscBinding& binding, const OscMessage& message);
 
 // Direct OSC commands.

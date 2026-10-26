@@ -20,6 +20,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -790,4 +791,43 @@ TEST_CASE("Response and per-note signals land where a play does after a seek", "
         CHECK(value(c, n) == Approx(value(a, n)).margin(1e-5));
     }
     CHECK(value(a, "notes.lastPitch") > 0.0f);
+}
+
+TEST_CASE("ADR-1667: a notes file can be re-timed onto the audio and can be optional", "[sonic][adr1667]") {
+    const auto dir = avgen::testsupport::processTempDir() / "adr1667";
+    std::filesystem::create_directories(dir);
+    // 120 bpm: a note at beat 2 (1.0 s) lasting half a beat, one at beat 4 (2.0 s)
+    const auto mid = midiFile({{0, {0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20}},
+                               {960, {0x90, 40, 100}},
+                               {1200, {0x80, 40, 0}},
+                               {1920, {0x90, 43, 64}},
+                               {2160, {0x80, 43, 0}}});
+    std::ofstream(dir / "bass.mid", std::ios::binary).write(reinterpret_cast<const char*>(mid.data()),
+                                                            static_cast<std::streamsize>(mid.size()));
+    // the string form: the file's own times
+    auto plain = sonic::SonicSetup::fromJson(nlohmann::json{{"notes", "bass.mid"}}, dir);
+    REQUIRE(plain.has_value());
+    REQUIRE(plain->notes.notes.size() == 2);
+    CHECK_THAT(plain->notes.notes[0].start, Catch::Matchers::WithinAbs(1.0, 1e-9));
+    CHECK_THAT(plain->notes.notes[0].duration, Catch::Matchers::WithinAbs(0.25, 1e-9));
+    // the object form: start x scale + offset, duration x scale
+    auto timed = sonic::SonicSetup::fromJson(
+        nlohmann::json{{"notes", {{"path", "bass.mid"}, {"scale", 0.5}, {"offset", -0.25}}}}, dir);
+    REQUIRE(timed.has_value());
+    REQUIRE(timed->notes.notes.size() == 2);
+    CHECK_THAT(timed->notes.notes[0].start, Catch::Matchers::WithinAbs(0.25, 1e-9));
+    CHECK_THAT(timed->notes.notes[0].duration, Catch::Matchers::WithinAbs(0.125, 1e-9));
+    CHECK_THAT(timed->notes.notes[1].start, Catch::Matchers::WithinAbs(0.75, 1e-9));
+    CHECK_FALSE(timed->notesMissing);
+    // a missing file: an error, unless it is optional
+    CHECK_FALSE(sonic::SonicSetup::fromJson(nlohmann::json{{"notes", "absent.mid"}}, dir).has_value());
+    auto optional =
+        sonic::SonicSetup::fromJson(nlohmann::json{{"notes", {{"path", "absent.mid"}, {"optional", true}}}}, dir);
+    REQUIRE(optional.has_value());
+    CHECK(optional->notes.empty());
+    CHECK(optional->notesMissing);
+    CHECK_FALSE(optional->notesPath.empty());
+    // a bad scale is refused
+    CHECK_FALSE(
+        sonic::SonicSetup::fromJson(nlohmann::json{{"notes", {{"path", "bass.mid"}, {"scale", 0.0}}}}, dir).has_value());
 }

@@ -1,0 +1,529 @@
+# Aurora Borealis 22: pass 3 research, scene implementation and performance (Research Agent B)
+
+- **Scope:** the Sabertooth brief's Subagent B (`20-brief-sabertooth.md` §1), the six effects it names, and the river
+  light addendum (`20b-brief-river-light.md`), which governs effect 5. Research only: no production code changed.
+  Signal names follow Agent A's `21-research-pass3-audio.md` §5.1.
+- **Build:** branch `scene/aurora-borealis`, the worktree's Release `build/release/src/avgen`, linked at 12:00 from
+  02d93bf6. That is the last commit to touch `src/` or `shaders/`; the commits after it are documents. One binary
+  served every comparison.
+- **Conditions:** M2 Max on AC power. Headless Ultra, 1920x1080, target 30, 90 warm-up frames, 4 s measured
+  (120 frames) per run. Runs are interleaved in one batch, and the median of 3 reps is reported. Every GPU use went
+  through `tools/gpu-lock.sh`.
+- **Audio:** the probes run on the project as it stands (Feline Footwear and its stems). None of the costs below
+  depends on the track. Event timing on Sabertooth is A's subject.
+- **Probes:** throwaway project variants were written beside the real project and deleted afterwards. The river
+  light probe is shader-only, through `AVGEN_SHADER_DIR` on the same binary (§6.3).
+- **Media:** `~/Desktop/av-gen-review/aurora-borealis/pass3-research-b/`:
+  - the clips (`probe-*.mp4` and `compare-*.mp4`);
+  - `frames/`: sheets and crops;
+  - `probe-src/`: the probe generator, the WGSL, the bench script and every bench log.
+
+## 0. Summary
+
+| # | Effect | Recommended technique | Engine change | Cost (headless Ultra 1080p GPU p50) |
+|---|---|---|---|---|
+| 1 | **Cloud Diving → aurora** | A coordinated route set from A's `cloudSwell` (300/1200 ms) and `cloudHue` (1500/4000 ms): intensity, height, sheet width, swirl, filaments, edge brightness, horizon glow, coverage, palette. The drum and bass routes into the aurora are removed (§3) | none | **≈0**: the whole set held at its peak measured 13.67 against 13.67 ms (t152) |
+| 2 | **Crash → shooting star** | The existing ADR-230 `comet`, made fast: `travelSeconds` 0.45, tail 900 m × 7 m, core 60, no wisps or sparkle, life 1.0 s. Two instances form a ring of two. The environment response comes from routes and the sky mirror (§4) | none | **not resolved from noise (≤0.3 ms)** with one or two alive. The pass-2 comet costs +1.2 ms on the same build |
+| 3 | **Moog → LEFT glints** | Split the valley GLB by bank (the inner bank is always on the camera's left). Each bank gets its own program. The bake writes v = the crease's own hash and puts importance into the line's width. A one-op cosine comb over v picks a deterministic subset, and the note's envelope lowers its threshold (§5) | none (the left program fits 48 ops with three trims) | **≈0**: 13.33 against 13.36 ms |
+| 4 | **Toms and tone block → RIGHT** | The same system on the right program. Tone block: small sharp edge glints, whose subset is set by the bar position, so repeated patterns repeat their sequence. Toms: whole-facet plane flashes on their own subset, sized by the hit | **E1 (S):** a 64-op ceiling, or drop the glass rim on the right to fit 48 | in the ≈0 above |
+| 5 | **Kick/Snare → river light** | One path-following wave kind on the water's own `river` feature: a narrow core, a halo and a distance-scaled wake. It sits embedded under the reflection, with a coarse Worley caustic net on the near water and shore facets and a V-shaped wake disturbance in the water's normal. Kick is a single amber core; snare is a cyan twin filament, faster and shorter (§6). Probe variant **v4** recommended | **E2 (M):** a `path` propagation kind. **E3 (M, optional):** upward rays on Beam shells | **+0.21** band only, **+0.31-0.42** with caustics and wake, with 2-3 beams alive on every frame |
+| 6 | **Budget** | Combined worst case: a peak swell held, a star alive on every frame, kick and snare beams alive on every frame (analytic, with caustics and wake), all three glint terms firing, at the lift (t152) | | **12.39-12.42 ms p50, p95 12.7, max 12.9** against 33.3. The current scene measures 13.67 there |
+
+**Two corrections to the pass-2 notes:**
+1. **The water's streak lanes do not carry along-river position.** `uv.y` is the across-channel coordinate (1 at the
+   centreline, 0 at the bank), and `uv.x` is bed depth. The streaks' along-flow noise is advected in world xz
+   (`water.wgsl` header and `waterFlowStreaks`). There is no arc coordinate on the water. A pulse keyed to distance
+   along the river needs E2, or a new vertex channel.
+2. **The pass-2 comet's cost is mostly its wisps and its huge bound,** not the comet technique itself. Each march
+   step evaluates a curl noise (8 hashes) over a 2.6 km tail. The fast star has no wisps and a 900 m tail, and its
+   cost is in the noise.
+
+## 1. What the scene and engine have (read, and verified where it mattered)
+
+- **Registration:** `examples/aurora-borealis/` is generated by `build.py`. Its parts:
+  - the index entry "Sonic VFX - Aurora Borealis";
+  - one composition scene, four GLB nodes plus a terrain node that is only water;
+  - the effects: `aurora`, `stars`, `riverPulseA/B` (groundPulse) and `comet`.
+- **The land:** unlit procedural nodes, coloured by one program `abRock`, which has 47 of the 48 ops. The edge mask is
+  baked into TEXCOORD_0. Programs are compiled to straight-line WGSL per scene (ADR-1493), so op count is a
+  validation ceiling, not a per-pixel cost. `kMaxMaterialOps` is 48 (`material_program.hpp:144`). The 16-program GPU
+  block is a storage buffer of 92 KB.
+- **The vertex:** position, normal, uv only (`scene::Vertex`, 32 bytes). The glTF loader reads `TEXCOORD_0` and no
+  other set. A second attribute would change every mesh's vertex: size L, not needed (§5).
+- **The water:** ADR-1286 cinematic water with the ADR-1650 sky mirror and ADR-1643 streaks. It takes the world-wave
+  term itself (`wavesAt`, `water.wgsl:1185`), after the reflection mix and additively.
+- **World waves** (`wave_effects.wgsl`, `wave_effect.hpp`):
+  - **Metrics:** directional and radial.
+  - **Masks:** a lateral beam radius and a vertical band.
+  - **Fronts:** up to 16 a frame. ADR-981 keeps up to 4 fronts per trigger-activated instance, one per event, each
+    for its own lifetime.
+  - **Camera source:** it resolves to the camera of the current frame, not the camera at launch.
+- **Comets** (`atmosphere_fx.wgsl`): a great-circle arc with a view-ray trail.
+  - `travelSeconds` goes down to 0.05 s.
+  - It costs only inside a bounding sphere of the trail.
+  - A trigger-activated comet shows its newest event only, so two concurrent stars need two instances.
+- **Effect triggers** read an **event** signal by name (`effect_trigger.hpp`). `sources[].settings.event: true` makes
+  a conditioned signal an event. The bus records live events and derives offline ones, so seek equals play.
+- **Routing:** a scalar route on an op's vec4 `constant` moved the probe's smoothstep thresholds as intended. An op's
+  `value` is a routable float.
+- **Signal sources:**
+  - an LFO is pure in time, including `samplehold` and `saw`, beat-synced or free;
+  - `random` samples a new value per trigger, the k-th trigger giving the k-th value of its seed.
+- **Tools used here:**
+  - `--live-profile --mode headless|live`, with JSON and a per-frame trace;
+  - `--render --range`;
+  - `AVGEN_SHADER_DIR`: the shaders are read from disk at run time, so WGSL probes need no rebuild while no uniform
+    struct changes.
+
+  For the scene agent: `tools/ci/live-perf.sh`, `tools/sound_to_light.sh`, `--sonic-trace --trace-finals` and
+  `--audit-routes`, all used in pass 2.
+
+### 1.1 Why the current river pulse is perpendicular (verified)
+
+`look.river_pulse` is a `groundPulse`:
+- `propagation.kind: directional`, `direction: cameraVelocity`, `beamRadius` 350;
+- `source: camera` dropped by `groundOffset` 65 to the water;
+- `frontWidth` 90, `trailLength` 500, `verticalExtent` 5.
+
+The shader's metric is `d = dot(p - origin, axis)`. So the lit set is a slab 90 m thick, perpendicular to the camera's
+heading and limited to ±350 m sideways. Intersected with the water (`verticalExtent` 5), it is a bar across the
+river. It does not change with the river's shape at all.
+
+Evidence: the pass-2 pulse is visible in `frames/star-v1-sheet.png`, frames 2-3: a broad wedge of light lying
+across the water.
+
+**The zero-engine alternative fails at the bends.** A narrow `beamRadius` with a long trail is a straight line from
+the camera along its heading. The bends (`world.BENDS`) are Gaussian swings of 109-179 m with half-lengths of
+330-510 m, so their curvature radius at the apex is about 300 m. Over a 1 km beam the river leaves a straight line
+by more than 100 m: "a straight world-space beam that merely intersects the river". Rejected.
+
+## 2. Measurements (all interleaved, same build, AC)
+
+| Comparison | t | GPU p50 by rep (ms) | Median | Delta |
+|---|---|---|---|---|
+| Current scene vs no comet (pass-2 comet alive in this window) vs no comet + no pulses | 60 | 12.91 / 12.92 / 12.91 · 11.71 / 11.69 / 11.76 · 11.49 / 11.48 / 11.49 | 12.91 · 11.71 · 11.49 | old comet **+1.20**, pass-2 pulses **+0.22** |
+| No comet vs fast star (1 alive every frame) vs 2 stars | 60 | 12.61 / 13.18 / 13.55 · 13.10 / 12.43 / 12.33 · 13.04 / 12.15 / 12.60 | 13.18 · 12.43 · 12.60 | **not resolved** (a noisy batch: ±0.6) |
+| Current scene vs glint probe (split banks, both programs, three test LFOs) | 60 | 13.27 / 13.65 / 13.36 · 13.38 / 13.33 / 13.29 | 13.36 · 13.33 | **≈0** |
+| River light: stock shaders vs probe off vs v1 band vs v4 band+caustic+wake (no pass-2 pulses) | 60 | 11.60 / 11.45 / 11.51 · 11.51 / 11.45 / 11.52 · 11.72 / 11.77 / 11.71 · 11.82 / 11.82 / 11.93 | 11.51 · 11.51 · 11.72 · 11.82 | band **+0.21**, full **+0.31** (p50), up to +0.42 |
+| Current scene vs peak swell held vs **combined worst case** at peak | 152 | 13.74 / 13.67 / 13.64 · 13.67 / 13.65 / 13.68 · 12.39 / 12.39 / 12.42 | 13.67 · 13.67 · **12.39** | peak aurora **≈0**; combined **−1.3** against today's scene |
+| Current scene vs combined (no peak swell) | 60 | 13.02 / 13.01 / 12.94 · 12.09 / 11.97 / 11.91 | 13.01 · 11.97 | −1.0 |
+
+- **CPU work** p50 is 1.8-2.3 ms in every variant. The combined worst case's CPU p99 is 2.4-6.3 ms.
+- **Live (one run each, 20 s from 140 s, `--quality auto`):**
+  - today's scene: frame p50/p99/max 33.4/40.2/42.7 ms, GPU p50 11.8, 60 deadline misses in 601 frames;
+  - the combined worst case: 33.3/40.5/51.9 ms, GPU p50 12.3, 47 misses.
+
+  **This live run is not acceptance evidence.** The profile reports `refreshMs` 8.33 (a 120 Hz output, not the
+  60 Hz LG), and today's scene missed as often as the probe. The pacing condition, not the effects, made the misses;
+  pass 2 measured 3 in 900 on the LG. The scene agent should repeat P1/P2 on the LG with the final build.
+- **The beam cost is an upper bound.** The probe evaluates the river analytically on every water and land pixel
+  near the river: a 7-term bend sum, an `atan2`, and a 3×3 Worley at two scales. E2's chain test (§6.4) does less,
+  with a bounding-sphere early-out per front.
+
+## 3. Effect 1: Cloud Diving drives the aurora
+
+**Signals:** A's `cloudSwell` and `cloudHue`. Both are `stem.cloud.rms` × 8, clamped: `cloudSwell` at 300/1200 ms,
+`cloudHue` at 1500/4000 ms. There are 15 swells, rising over 0.5-2.5 s and cut abruptly. The 1.2 s decay turns the
+cut into a relaxation.
+
+**The coordinated set** (each route adds to the existing rest value; amounts are starting points for the scene
+agent's eye):
+
+| Quality the brief names | Target | Source | Amount | Rate |
+|---|---|---|---|---|
+| luminance and energy | `fx/aurora/intensity` | `cloudSwell` | +1.6 on the 3.0 base | fast |
+| vertical extent | `fx/aurora/curtainHeight` | `cloudSwell` | +400 m | fast |
+| width and spread | `fx/aurora/ribbonWidth` (ADR-1641) | `cloudSwell` | +0.02 on 0.045 | fast |
+| amplitude of the broad folds | `fx/aurora/ribbonSwirl` | `cloudSwell` | +0.6 on 1.9 | fast |
+| internal luminous detail | `fx/aurora/filaments`, `fx/aurora/edgeBrightness` | `cloudSwell` | +1.5, +1.5 | fast |
+| airglow under the arcs | `fx/aurora/horizonGlow` | `cloudSwell` | +0.3 | fast |
+| persistence of the bright regions | `fx/aurora/ribbonCoverage` (ADR-1660) | `cloudHue` | +0.25 (base 1.0 → clamp; lower the base to 0.75 so it has room) | slow |
+| dominant colour and secondary balance | `palette/position` via `signal.paletteAxis` = 0.5 arrangement + 0.5 `cloudHue` | `cloudHue` | the existing 4-look axis | slow |
+| (optional) a front climbing the sheets at a swell's start | `fx/aurora/pulse` (ADR-1652) | a `cloudSwell` rise event | 1.0 | event |
+
+**Remove** the drum and bass routes into the aurora. Otherwise "other stems take over the aurora":
+- `kickWave` → `pulse`, `snareFold` → `edgeBrightness`, `hatDrive` → `filaments`/`sparkle`;
+- `bassHit` → `ribbonEdge`, `bassBody` → `ribbonSwirl`.
+
+Pass 2's `auroraLight` keeps the land and the river glow in step with the aurora. Redefine it as
+0.55 `cloudSwell` + 0.25 arrangement, so the facets brighten with the swell, and drop its kick and bass shares.
+
+**Never route:**
+- `flowSpeed`, `driftSpeed`, `verticalSpeed` (E4: the flow is elapsed × speed, so a routed speed jumps the pattern);
+- `ribbonSteps` (quality; the live ladder owns it, ADR-1651);
+- `layerSpacing`, `radius`, `anchor`;
+- `ribbonScale`. Fold size scales the noise domain about the origin, so a few percent swims sheets 5 km away by
+  hundreds of metres. Fold *amplitude* is `ribbonSwirl`. If a slow fold-size change is wanted, ±3% on `cloudHue`
+  at most, judged in motion.
+
+**Cost: ≈0.** The whole set held at its peak measured 13.67 ms against 13.67 at t152 (`basepeak` in
+`bench-peak.txt`).
+
+**Risk: the flash budget.** Pass 2 failed the audit (≤ 0.05 relative-luminance swing in 267 ms) with a swell that
+moved the sky in two frames. It passed only with a 0.6 s ramp. A 300 ms attack on +1.6 intensity across a
+wide-arc frame may fail it. If so, raise the intensity attack to 500-600 ms: about 70 ms more lag against rises of
+0.5-2.5 s. Width, height and swirl can keep 300 ms.
+
+## 4. Effect 2: Crash → a fast shooting star
+
+**Technique: the existing comet, made fast.** Proved in `probe-star-v2-58-64s.mp4` and `frames/star-v2-sheet.png`.
+
+| Row | Value | Why |
+|---|---|---|
+| `path/travelSeconds` | 0.45 (0.3-0.6) | the head crosses about 40° in half a second |
+| `path/distance` | 6000 m | |
+| elevations | start 21°, end 9° | inside the frame: vertical FOV 53°, pitch +1.5°, so the top edge is near 28° |
+| azimuths | camera heading +24° → heading −16°, keyed per loop (as `build.py` does today) | a diagonal through the upper middle |
+| `arcLift` | 0 | |
+| `appearance/coreIntensity` | 60 | the head out-blooms the aurora (bloom threshold 1.1) |
+| `headSize`, `haloSize`, `haloIntensity` | 5, 45, 3 | |
+| `tailLength`, `tailWidth`, `tailIntensity`, `tailFalloff` | 900 m, 7 m, 9, 1.4 | |
+| `wispAmount`, `sparkle.enabled` | 0, false | the cost (§0) and the slow-comet look |
+| `timing` | fadeIn 0.03, lifetime 1.0, fadeOut 0.55 | the trail outlives the crossing by about 0.5 s, then it is gone |
+
+**What it looks like:** a tight white-violet head with a tapered streak. It crosses in about 14 frames and is
+mirrored in the river through the sky mirror for free: the "brief reflected flash". It reads as a meteor, not a
+comet, and it passes behind the ranges where its path dips.
+
+**Can the comet go that fast and that bright?** Yes. The trail integrator samples along the arc behind the head, so
+there is no strobing at 0.45 s. The width floors at a pixel and at the sample spacing.
+
+**Pool and retrigger:** A measured 12 crashes, re-hits 0.70 s apart, and recommends `crashStar` with a 300 ms
+refractory.
+- **Two instances, `starA` and `starB`,** keyed by the pass-2 ring-of-two pattern, retimed:
+  - `starAOn` latches on `crashStar` for 900 ms;
+  - `starB` takes an event only while `starAOn` is high;
+  - each fires through an event signal (`beat.pulse`-free: `crashStar` is already an event, so gate it directly).
+
+  That holds at most two alive, and the newest crash always gets a star.
+- **Size:** `crashSize` → `coreIntensity` (A: phrase-start crashes peak at 0.42, re-hits at 0.18-0.28).
+- **Path variety:** `random.crashPath`, triggered by `crashStar` (the k-th value is fixed), routed to start and end
+  azimuth (±12°) and elevation (±4°). **Check:** that a route composes with the `replace`-mode azimuth tracks.
+  Otherwise move the per-hit variety into the keyed track generator.
+
+**Environmental response** (an envelope `crashGlow` = `crashStar` {attack 0, linearfall over 0.4 s}):
+
+| Where | How | Ops |
+|---|---|---|
+| the river | the star's own reflection (sky mirror, free); `nodes/river/water/glow` +0.3 | 0 |
+| selected facets | high, sky-facing facets flare: the program's crest mask × `crashGlow` × a star colour, added | 3 per program (needs E1 on the right) |
+| the aurora near the path | a global `fx/aurora/intensity` +0.3 for 0.4 s. A local brightening along the path needs a new aurora term (not proposed) | 0 |
+| the comet's `ground` term | reaches lit PBR and water only. Keep 0.4 | 0 |
+
+**Cost:** not resolved from noise with one or two stars alive on every frame. The batch spread was ±0.6 ms, so the
+star is at most about 0.3 ms. The pass-2 comet on the same build is +1.2 ms while alive.
+
+## 5. Effects 3 and 4: glints, LEFT for the Moog and RIGHT for toms and tone block
+
+### 5.1 Side, subset and op budget
+
+**The side is free.** The camera flies the loop in +θ, and its right vector is the loop's outward normal, the
+engine's azimuth convention. So the **inner bank is always LEFT** and the outer bank and the three range rings are
+always RIGHT. `world.valley_band()` already builds the two banks as separate row sets, so the generator writes two
+GLBs (`ab-valleyL`, `ab-valleyR`) and the ranges stay right. Each node names its own program. No per-facet side flag
+and no engine attribute are needed.
+
+**A deterministic subset per facet, in the existing two channels:**
+- **v = the chosen crease's own hash** (from its rounded endpoints). The two facets that share a crease agree, so a
+  selected ridge lights at full width on both sides.
+- A facet with no crease takes its own hash, not 0. The first probe gave them all v = 0, and every one of them
+  flashed together.
+- **u = metres to the crease ÷ its importance.** The line's pixel width then carries importance: a weak crease
+  draws below a pixel and fades out. That frees v, and it removes the program's importance multiply.
+
+**The selection, one op:** `palette` is `a + b cos(2π(c·t + d))` with `t = v + value`.
+- With a = b = 0.5 and c = K teeth, it is a soft comb over the facets' random values.
+- Its `value` (routable) shifts which facets sit on a tooth.
+- A `smoothstep` with rest edges above 1 (1.05-1.10) lights nothing.
+- The instrument's envelope, routed to the smoothstep's constant at about −0.25, lowers the threshold: a hit lights
+  a subset, and a louder hit lights more of it, more fully.
+
+**The left program fits 48 (the probe's 47 ops),** with three trims that change the look by a hair:
+1. no decametre multiply: the haze and the edge fade are `gradient` ops on metres
+   (`saturate(d · f + k.w)`, with f = 1/(far − near)) instead of `smoothstep` on decametres, which is −2 ops;
+2. no shadow add (#02020c), −2;
+3. no importance multiply (now in the bake), −2.
+
+The glint term is +5: palette, smoothstep, colour constant, multiply, add.
+
+**The right program has two terms.** The probe is at 48 with the glass rim dropped. The production answer is
+**E1**, a 64-op ceiling (§9). It keeps the rim and pays for the crash crest flare (3 ops) and a sustain term.
+
+### 5.2 The three instruments (A's detectors, §3.3-3.5 and §5.1)
+
+| Instrument | Look | Subset rule | Drive |
+|---|---|---|---|
+| **Moog (L)** | pale-pink edge glints on creases, 3 comb teeth | **a new subset per note:** `random.moogPick` triggered by `moogNote`, → the comb's `value` | `moogNote` (rms rise, 26 fires) → gate −0.25 over 300-500 ms; `moogGlow` (`stem.moog.level`, 20/600) → gate −0.08, so the same subset stays gently lit through the echo tail |
+| **Tone block (R)** | small, sharp, cyan edge glints, 5 teeth, a narrow gate | **a repeating sequence:** the comb's `value` follows a beat-synced `saw` LFO of one bar (`lfo.barSaw`, pure in time). Each accent lights the subset at its bar position, so a repeated pattern lights the same sequence of facets | `blockTick` (176 accents) → gate, 120-200 ms; `blockSize` depth 0.6-1.2 |
+| **Toms (R)** | whole facets either side of a selected crease flash: "briefly illuminated planes", 2 teeth, blue-violet | a new subset per note (`random.tomPick` on `tomHit`); the loud last note of a fill opens the gate furthest | `tomHit` with `tomSize` depth 0.4-1.3 → gate −0.3, 400-600 ms; `tomBody` → gate −0.05 |
+
+**Seen in `probe-glints-58-64s.mp4` and `frames/glints-left-crop.png`** (deterministic LFO test events: Moog
+1.4 Hz, toms 0.7 Hz, tone block 2.8 Hz):
+- on a Moog hit, a scattering of left creases lights pale pink while the right stays dark;
+- the tone block's cyan glints pepper the right ranges;
+- the toms flash selected right planes.
+
+The left/right split reads at once.
+
+**Issues the probe found:**
+1. The first toms pass was far too strong; it washed the whole right side blue. The plane flash wants about 0.3 of
+   a line's colour.
+2. 2-pixel lines are thin for a "glint". Route the envelope also to the line's smoothstep edge (1.6 px → 3 px at the
+   peak), so a glint swells as it fires.
+3. The distance fade (4.5 km) and the haze already favour the near and middle ground, as the brief asks.
+
+**Cost:** ≈0 (13.33 against 13.36 ms, §2). The split adds one draw and one compiled program variant.
+
+## 6. Effect 5: the Kick/Snare river light (the addendum)
+
+### 6.1 The technique
+
+**One new wave kind keyed to the water's own course** (E2, §6.4). The CPU knows the `river` feature's 256-point
+polyline, the same points the water's flow and streaks are built from, so the light cannot drift from the water.
+
+**Each frame, for each live front:**
+1. Find the camera's arc position on the polyline.
+2. The front is at `s_f = s_cam + start + range · (1 − (1 − age/travel)^2)`: an ease-out that is fast near the
+   camera, where perspective stretches distance, and slower far away, where it compresses it.
+3. Pack four points of the polyline spanning `[s_f − wake, s_f]`.
+
+**Per pixel,** the projection onto that three-segment chain gives `u` (metres behind the front, along the river) and
+the lateral distance. From those:
+
+- **Along the river:**
+  - a sharp leading edge, widened to the distance the front moves per frame, so a fast front does not strobe;
+  - a white-hot head band;
+  - a wake whose length grows with distance (`wake = base + k · s_f`), so it keeps a readable length on screen.
+- **Across:**
+  - a core a few metres wide, floored at about 1.5 px;
+  - a 35 m halo;
+  - a faint 140 m pool that reaches the shore facets.
+- **In the water: embedded.** The light is added *under* the reflection, plus a 0.35 surface share so it still reads
+  at grazing distance:
+
+  ```
+  color = mix(body + B, reflected, fresnel) + 0.35 B
+  ```
+
+  The mountain reflections stay readable over the near beam, and the beam is not "a flat coloured line over the
+  water".
+- **Caustics:** a Worley F2 − F1 net in the water plane, 16 m cells with a second octave at 2.3x, cells drifting
+  with time.
+  - It is masked by the wake envelope and faded beyond a 1-3 m pixel footprint.
+  - It is strong on the shore facets inside the pool and faint (0.5) on the water.
+  - So "irregular caustic-like patterns on the riverbed and nearby facets" light briefly as the light passes.
+- **Disturbance:** a V-shaped wake in the water's normal, applied before the reflection.
+  - Behind the front, rings spread out from the centreline at about 260 m/s and decay in 0.45 s.
+  - Their crests wander and break with noise.
+  - It distorts the aurora and mountain reflections across the river where the light has just passed, then the
+    mirror heals. It never makes concentric drop rings, and it never makes the river permanently turbulent.
+- **Kick and snare in one kind:**
+
+  | | Colour | Profile |
+  |---|---|---|
+  | **Kick** | hot amber-gold, about (1.0, 0.45, 0.08) | a single core about 6 m wide; 0.75-1.1 s travel; a long wake (base 220 m + 0.4 s_f) |
+  | **Snare** | electric cyan, about (0.1, 0.85, 1.0) | a twin filament 10 m either side of the centre (`coreOffset`); faster (0.5-0.8 s), a shorter, sharper wake (base 120 m + 0.25 s_f) |
+
+  The two colours are complementary to the violet aurora, apart from each other, and distinct under bloom.
+  **Probe v5:** launched on the same frame, as 47 of 48 snares are (A §0.6), the cyan twin leads and the amber core
+  follows. The two read as two instruments round the bend
+  (`frames/beam-v5-kick-snare-together.png`, `probe-beam-v5-kick-snare-together-10-16s.mp4`).
+- **Bounded:**
+  - **one instance per drum.** ADR-981 gives each event its own front for its own lifetime, so no ring-of-two latch
+    is needed;
+  - **kick:** at most 3 fronts. 1.71 kicks a second, the 16th pickups 0.175 s apart, life about 0.9 s;
+  - **snare:** at most 2;
+  - the sum is clamped (E2's `maxSum`), and everything sits within `kMaxGpuWaves` 16.
+
+### 6.2 The variants the owner asked for (rendered, compared)
+
+The probes are shader-only (`probe-src/shaders/probe_river.wgsl`, hooked into `wave_effects.wgsl` and `water.wgsl`).
+The river is evaluated analytically, as world.py's `rc(θ)` with its seven bends, and position along it is the polar
+angle at 3,087 m per radian. Test events fire every 0.75 s, alternately kick and snare. The window is t = 10-16 s at
+a left bend about 1.4 km ahead.
+
+| Variant | What | Read | Clip |
+|---|---|---|---|
+| v1 | the pure along-river emissive band, embedded | **the most legible.** An amber filament that bends round the left bank and disappears behind it; the cyan snare sweeps the near water as a curved lane | `probe-beam-v1-10-16s.mp4`, `frames/beam-follows-bend-kick-t10.70-11.13.png` |
+| v2 | v1 + a fine caustic (7 m cells, 2 octaves) | the caustic reads as **speckle**, not caustics; invisible beyond about 500 m | `probe-beam-v2-10-16s.mp4`, `frames/beam-near-v1-v2-v3.png` |
+| v3 | v2 + the wake disturbance at full strength | the reflection visibly breaks behind the light, but the rings are **too regular** (a zig-zag comb) and too strong | `probe-beam-v3-10-16s.mp4`, `frames/beam-crop-v1-v2-v3-t10.83.png` |
+| **v4** | v1 + a coarse caustic net (16 m), strong on the shore and faint on water + a gentle, broken wake (0.45x, wandering crests) | **recommended:** the band stays the read; the shore flickers with a caustic web as the light passes; the reflection wobbles and heals | `probe-beam-v4-10-16s.mp4`, `frames/beam-v4-t10.83-t11.30.png` |
+| v5 | v4, kick and snare launched together, snare as a twin filament | both readable together (above) | `probe-beam-v5-kick-snare-together-10-16s.mp4` |
+
+All four side by side: `compare-beam-variants-2x2-10-16s.mp4` (v1 v2 / v3 v4), with a quarter-speed copy.
+
+**What to fix in the build:**
+1. **The near launch is large and bright.** The first frames of a front fill the lower third of the frame, in v5
+   with the caustic web over the whole near river. That threatens the flash budget. Attenuate by distance, not by
+   time: a near-field fade from 140 m (the bottom of the frame on the water) to about 400 m, which a front at
+   5-7 km/s crosses in about one frame, so the onset is not delayed. Or start at 250-300 m. Keep the water caustic
+   faint near the camera.
+2. **The far wake is short at grazing angles,** hence the distance-scaled wake. Tune `wakeGrowth` against the clip,
+   not the stills.
+
+### 6.3 The caustic technique, against the four references
+
+- **GPU Gems ch. 2 (Guardado and Sánchez-Crespo).** Caustics come from refracting rays through a wave surface onto
+  the floor and accumulating; the real-time form is a texture of light focused by the waves. This water has no
+  animated height field to refract through (ripple ≤ 0.01 by design: the long-exposure mirror), so the physical
+  version has nothing to focus. Only its look is borrowed: a bright cellular net that crawls.
+- **Overlapping wave normal maps (salivity).** Caustic brightness approximates how much two scrolled normal layers
+  converge: their summed slope's divergence, or a sharpened luminance of the summed normals. It is cheap where
+  normal textures already exist. Here the program-side equivalent is noise gradients, which give a softer, mottled
+  look than the reference images. Not chosen, but it is the fallback if the Worley net looks too regular.
+- **Ray-guided caustics (NVIDIA, UE4).** Ray-traced photon splats. Out of scope (the addendum rules it out).
+- **GPU water interaction and ripples (zlz-studio).** A ripple height-field simulation in a render target, sampled
+  by the water for normals. It is the right tool for persistent interactive ripples, and it costs a simulation pass
+  and a target. The wake here is analytic, a pure function of the front's arc position and time. So it is
+  deterministic (seek equals play), needs no pass, and dies with the front.
+
+**Chosen: a procedural Worley F2 − F1 net masked by the light's along-river envelope** (v4).
+- **Where:** on the water (faint) and on land surfaces inside the pool and the vertical band (strong).
+- **How it reaches the land:** through `wavesAt`, which every surface already calls, so the facets need no op.
+- **Cost:** 9 cells × 2 octaves per pixel, only where a front's chain and halo are.
+
+### 6.4 E2: the `path` wave kind, sized
+
+| Part | What | Lines (estimate) |
+|---|---|---|
+| model | `PropagationKind::PathWave` (appended); `Propagation.path` = {terrain node, feature name}; rows `travel`, `ease`, `wakeGrowth`, `coreWidth`, `coreOffset` (0 = single, >0 = twin), `haloWidth`, `poolWidth`, `caustic`, `causticScale`, `embed` (the under-surface share), `disturb` (wake amplitude), `nearFade`, `maxSum` | 60 C++ |
+| resolve | an arc-length table per feature, cached by revision; the camera's arc by projecting onto the polyline (256 segments, once a frame per instance); `s_f` from age; four chain points packed | 70 C++ |
+| GPU record | `WaveGpu` 144 → 176 bytes (`path01`, `path23`: four xz points) and FrameUniforms +512 B. **Alternative with no growth:** reuse `rainbow`/`sparkle` for the path kind | 10 + asserts |
+| shader | `wavesAt` kind 2: a bounding-sphere early-out, 3-segment projection, the profiles above, the Worley net; `WaveResult.embedded` returned separately for water | 80 WGSL |
+| water | the embed mix (`mix(body + B, reflected, F) + surface·B`); `waveDisturbAt(p)` added to the normal before reflection | 35 WGSL |
+| tests | (a) **off = identical:** a frame with no path waves hashes the same as before on a pulse scene and a water scene, and `packWave` bytes for directional and radial records are unchanged; (b) CPU: on a known L-shaped polyline the front's chain points sit at the expected arcs, and seek equals play; (c) GPU: a pixel on the polyline round a bend, downstream of the front, is lit, while a pixel at the same distance along the old straight axis is not ("follows the bend"); (d) `disturb` 0 gives the water's pre-change hash; (e) at most 4 fronts per instance under a dense trigger | 150 |
+
+**Size: M.** No new pass, no new buffer (only the frame block grows), no new path data: the water's feature is the
+shared path, so the brief's "reusable path representation shared by the river and the effect" already exists.
+
+**E3, upward rays (optional, stage 3): size M.** The path kind requests up to 3 SHELL proxies per front, shaded by
+the existing Light Beam `fs_beam` (an analytic cone, depth-faded, about a quarter to bloom).
+- Each is a thin vertical cone 40-90 m tall at `s_f − j·Δ`, popping in and out over about 0.25 s, at a hash-chosen
+  lateral offset.
+- Estimated at 0.05-0.15 ms for 3-6 small shells.
+- The alternative is an effect-owned particle burst at path points. It needs the same path anchoring, so it is no
+  cheaper.
+- Defer until the band, the caustic and the wake are approved, as the owner's staged order says.
+
+### 6.5 The owner's staged order, mapped
+
+1. **Path-following beam with deterministic test events:** E2 with `caustic` 0 and `disturb` 0, triggered by a
+   `repeat` trigger or an LFO-built event signal. Validated by test (c) and a bend clip like v1.
+2. **Light wake and caustic:** `wakeGrowth`, `caustic`, `embed`, as v4.
+3. **Ripples and sparse rays:** `disturb`, then E3.
+4. **Kick and snare on Sabertooth:** `kickBeam` and `snareBeam` (A's names; onset, refractory 100 ms) as event
+   triggers of the two instances.
+5. **1080p profile:** headless and live (§7).
+
+## 7. Budget
+
+| | GPU p50, headless Ultra 1080p |
+|---|---|
+| Today's scene (pass 2), t60 / t152 | 12.91-13.01 / 13.67 (the pass-2 comet alive in both windows) |
+| Aurora swell held at peak (all of §3) | +0.0 |
+| Shooting star, 1-2 alive | ≤ +0.3 (not resolved); the old comet's −1.2 is removed |
+| Glints, both programs, three terms firing | +0.0 |
+| River light, 2-3 fronts on every frame, caustic + wake (analytic probe, an upper bound) | +0.31-0.42; the pass-2 pulses' −0.22 is removed |
+| E3 rays (estimate) | +0.05-0.15 |
+| **Combined worst case, measured, t152** | **12.39-12.42 p50, p95 12.7, max 12.9** (11.97 at t60), against 33.3 ms |
+
+- **Headroom:** about 20 ms of GPU. The frame is still the aurora's march (about 90% of the scene pass, pass 2).
+- **CPU work:** unchanged at about 2 ms p50.
+- **Live acceptance is owed on the LG at 60 Hz** (§2): P1 misses ≤ 5 in 900, frame p99 ≤ 40 ms, Ultra share.
+- **What is not in the combined figure:** E3, and Sabertooth's own signal chains (A §6: about 12 chains, ns each).
+
+## 8. Bass and HH: cheap candidates (the decision is later)
+
+| Stem | Candidate | Technique | Cost |
+|---|---|---|---|
+| **Bass** | river flow energy | A's `bassFlow` (150/800) → `nodes/river/water/streaks/amount` (+0.5) and `reflection` (+0.15). **Not** `streakSpeed` or `rippleSpeed`: speeds through the flow cycle jump, as E4 does | 0 ops, ≈0 |
+| | a restrained floor under the edge glints | `bassFlow` → `edgeGlow` on both programs (+0.25), the resting line brightness, never a flash | 0 ops |
+| **HH** | the once-a-bar open hat as a water micro-glint | an open-hat event (A: an HH onset with rms still up 100 ms later; not built) → `nodes/river/water/sparkle` (0 → 0.4 over 150 ms). Water-wide but tiny and fine-scaled | 0 ops |
+| | (not recommended) closed hats | 374 sixteenths at 5.3 a second is the "continuous stream of flashes" the brief forbids | |
+
+## 9. Engine changes, sized
+
+| # | Change | Size | Needed for | Off = byte-identical test |
+|---|---|---|---|---|
+| **E1** | `kMaxMaterialOps` 48 → 64 (`material_program.hpp:144`, `material.wgsl:51`); the layout guards are parametric | **S** (2 lines + guard updates; storage block 92 → 120 KB) | the right program's two terms with the rim, crash crest flares and a sustain term | every existing material GPU test and scene hash unchanged (programs pack the same; only the array is longer); `test_material_gpu`'s full-budget case moves to 64 |
+| **E2** | `path` wave kind on a terrain feature, with embed, caustic and wake disturbance | **M** (§6.4) | effect 5 | §6.4 (a) and (d) |
+| E3 | upward rays: Beam shells spawned along a path wave | M (optional) | effect 5, stage 3 | a path wave with `rays` 0 has the pre-change frame |
+| — | a per-facet side flag / `TEXCOORD_1` / `COLOR_0` | **not needed** | — | the banks are separate GLBs |
+| — | a fast comet / streak kind | **not needed** | — | the comet already goes to 0.05 s |
+
+## 10. Names
+
+- **Signals (A's §5.1):**
+  - `cloudSwell`, `cloudHue`;
+  - `crashStar`, `crashSize`;
+  - `moogNote`, `moogGlow`;
+  - `kickBeam`, `snareBeam`;
+  - `tomHit`, `tomSize`, `tomBody`;
+  - `blockTick`, `blockSize`;
+  - `bassFlow`.
+- **Signals and sources added here:**
+  - `starAOn` / `starAEv` / `starBEv` (the star ring of two), `crashGlow`;
+  - `random.moogPick`, `random.tomPick`, `random.crashPath`;
+  - `lfo.barSaw`.
+- **Effects:**
+  - `starA`, `starB` (comet);
+  - `riverKick`, `riverSnare` (path waves; they replace `riverPulseA/B`);
+  - the `comet` effect and its azimuth tracks become `starA/B`'s.
+- **Programs:** `abRockL`, `abRockR`.
+- **Op labels:**
+  - `moog`/`moogGate`/`moogColor` (L);
+  - `tblock`/`tblockGate`/`tblockColor` and `toms`/`tomsGate`/`tomsColor` (R);
+  - `crashCrest` (both, with E1);
+  - the existing `facetLit`, `auroraGlow`, `edgeColor`, `edgeGlow`, `rim`, `haze` kept.
+- **Meshes:** `ab-valleyL.glb`, `ab-valleyR.glb`.
+- **The brief's §12 controls:**
+
+  | Control | Parameter |
+  |---|---|
+  | aurora swell intensity | the `cloudSwell` route amounts |
+  | aurora colour response | the `cloudHue` share of `paletteAxis` |
+  | star brightness | `coreIntensity` |
+  | star travel | `travelSeconds` |
+  | glint intensity | the three `*Gate` route amounts |
+  | kick and snare colour and travel | `riverKick`/`riverSnare` `color` and `travel` |
+  | ripple strength | `disturb` |
+  | transient sensitivity | the stems' refractories and A's gates |
+
+## 11. Risks
+
+1. **The flash budget:** the swell's 300 ms intensity attack (§3) and the river light's near launch (§6.2). Both
+   have fixes that cost no visible onset.
+2. **The live run here was on a 120 Hz output,** not the LG: inconclusive (§2). The final acceptance must be re-run.
+3. **The beam probe is analytic.** E2's chain metric follows the real polyline and should look the same as the probe, but
+   its arc speed is in true metres where the probe's polar angle varied ±15%. Retune `travel` on the build.
+4. **Bend curvature with a long far wake:** E2's 3-segment chain follows any wake length. The single-plane
+   approximation (origin and tangent at the front only) would leave the centreline by 17 m over a 200 m wake at a
+   300 m radius. Do not take that shortcut.
+5. **The caustic net's regularity:** Worley cells read as cells if too large or too still. Keep them at 12-20 m,
+   drifting, two octaves, and on the wake only. The overlapping-normal fallback is in §6.3.
+6. **The right program needs E1** to keep the glass rim. Without E1 the right side loses the rim and cannot take the
+   crash crest flare.
+7. **The star's per-hit path variety** depends on routes composing with replace-mode tracks (unverified, §4).
+8. **The comb gives a statistical subset.** On a short visible stretch a hit can light few creases. Tune K and the
+   gate on the real camera, and add `blockSize`/`tomSize` depth for loud hits.
+
+## 12. Open questions
+
+1. **E1 (64 ops) or drop the rim on the right?** E1 is the cleaner answer and S-sized.
+2. **Colours:** amber-gold kick and cyan snare (probed), against the violet/pink aurora. Does the owner want both
+   warmer or cooler?
+3. **Rays (E3):** build at stage 3, or leave the light at band, caustic and wake if v4 already reads as "light energy
+   racing through reflective water"?
+4. **The crash response on the aurora:** a global 0.4 s lift is all that exists. Is it enough, or is a local glow
+   along the star's path worth an aurora shader term later?
+
+## 13. Reproduce
+
+```
+# probes: probe-src/bench/mk.py (star, beam, nocomet, old-cont, star-cont, star2-cont),
+#         probe-src/generator/build_probe.py (glints; combined = glints + star-cont - pulses, see bench logs)
+# river light: copy shaders/, append probe-src/shaders/probe_river.wgsl to wave_effects.wgsl with PR_MODE = 1..5,
+#         rename the original wavesAt to wavesAtOrig and add the wrapper; apply water.wgsl.diff; then
+AVGEN_SHADER_DIR=<copy> tools/gpu-lock.sh build/release/src/avgen --project <probe>.json --render out.mp4 --range 10:16
+# costs: probe-src/bench/bench.sh <t> <reps> <variant[@shaderdir]>...  (headless Ultra 1080p, 90 warm-up, 4 s)
+```

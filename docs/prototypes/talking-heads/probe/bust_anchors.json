@@ -1,0 +1,76 @@
+{
+ "note": "Emitter anchors for the node's LOCAL space. 'gltf' is the exported GLB's frame (+Y up, face +Z). eyeLeft is the bust's own left (+X).",
+ "blender": {
+  "mouth": [
+   0.0,
+   -0.081,
+   0.384
+  ],
+  "eyeLeft": [
+   0.0326,
+   -0.0729,
+   0.462
+  ],
+  "eyeRight": [
+   -0.0326,
+   -0.0729,
+   0.462
+  ],
+  "headCentre": [
+   0.0,
+   0.004,
+   0.465
+  ]
+ },
+ "gltf": {
+  "mouth": [
+   0.0,
+   0.384,
+   0.081
+  ],
+  "eyeLeft": [
+   0.0326,
+   0.462,
+   0.0729
+  ],
+  "eyeRight": [
+   -0.0326,
+   0.462,
+   0.0729
+  ],
+  "headCentre": [
+   0.0,
+   0.465,
+   -0.004
+  ],
+  "forward": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "up": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ "mesh": {
+  "triangles": 29758,
+  "vertices": 14881,
+  "nonManifoldEdges": 0,
+  "trianglesPerMaterial": {
+   "porcelain": 29682,
+   "mouth_interior": 76
+  },
+  "boundsMinBlender": [
+   -0.166,
+   -0.1103,
+   0.0
+  ],
+  "boundsMaxBlender": [
+   0.166,
+   0.102,
+   0.6
+  ]
+ }
+}

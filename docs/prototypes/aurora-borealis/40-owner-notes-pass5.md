@@ -1,0 +1,46 @@
+# Aurora Borealis pass 5: the owner's notes on pass 4 (verbatim, 2026-10-25)
+
+Reviewed from ~/Desktop/av-gen-review/aurora-borealis/pass4/. Not merged.
+
+---
+
+lets turn the river into a lake and make the mountains horse shoe around the lake - pretty much close to what we have now. static camera, same effects in the water - make the pond appear deeper, less fish, add some variety to their shapes and sizes - some of them stick out of the wter make sure that d oesnt happen. tone down the amount of light that gets throw onto the mountains from the underwater snare / kick / tom lights - make the fireball look more like a realistic fireball - deep reseaarch on how to do this. the Moog and Bass are not translating well enough onto the mountains - they need to be more sensitive hit more notes and sustain if the moog sustains - try to illuminate more of the mountains or find a way to make edges brighter thicker or more prominent you can shift away from the light always traveling away from camera mountain effect if it makes the signals more visible
+
+## The owner on the pass-5 result (verbatim, 2026-10-25)
+
+"alright go back to a slightly curved river design simply the mountain geometry but keep the modulation idea for next pass"
+
+Coordinator reading: pass 6 returns to a river (slightly curved, between pass 3's bends and pass 4's straight valley), with simpler mountain geometry, and keeps pass 5's Moog/bass mountain modulation (sensitivity, sustain, wide edges + facet fills + ridgeline glow). The lake is retired.
+
+## Further owner notes for pass 6 (verbatim, 2026-10-25)
+
+- Confirmed: moving camera along the slightly curved river; fireball, fish and deeper water carry over ("thats correct").
+- "have aura agent swap left and right mountain sides so left is BASS right is MOOG, and ahve it use the same effect it did for the lake but have it revert to sending the light down the mountain range"
+
+## The owner on pass 6 (verbatim, 2026-10-25)
+
+"just tell it to go bakc to the pass 3 geometry"
+
+Coordinator reading: restore the pass-3 landscape (Gate A take 3, c61111e6 lineage: the river with straight reaches and mild bends, the pass-3 mountains, peaks and camera path) and keep everything pass 4-6 added on top.
+
+## The owner on pass 7 (verbatim, 2026-10-25)
+
+"aurora if we could just make the underwater slightly more illuminated its hard to see the geometry / fish also make the river bed deeper so theres more room for fish etc"
+
+## The owner on pass 9 (verbatim, 2026-10-25)
+
+aurora is close, a few nit picky things:
+animate fish if possible, increase their density a bit - still bright underwater some if possible
+screen shot is from a prior version but this issue is still noticable in the latest pass - light balls under the water create a ripple seam behind them, I've highlited an example here (from prior version cause it was easier to show and placed a red line to the right of it, but again it still exists)
+have the underwater light balls/streaks throw some more light onto the mountain ranges - maybe this increased brightness will do for perceived underwater brightness 
+second screenshot shows exampel of the restored "ball dropping in water" effect I asekd to be returned - this looks good but make it apepar as thought its always dropped behind the camera so we see the ripples propage forward but not the source spot
+
+since we're close just render full video clips for my review from here on out, may only need one or two more passes then we're ready to merge
+
+Screenshots: (1) from an earlier pass, a red box over the near water behind a passing pulse: a hard straight seam/edge across the ripple field trailing the light, red line beside it; the owner says it is still visible in pass 9. (2) the restored splash: concentric rings around a bright impact spot in the near water.
+
+## The owner on pass 10 (verbatim, 2026-10-25)
+
+"im still able to see a seam in the wake, screen shot provided, line to the right of what I see. also the "big ball drop" effect was supposed to be per light source, so the kick drum light pulse creates a "ball drop ripple behind the camera where it shot out from, same with snare and toms - right now it looks like its just one big ball drop - check this. also the timing of the kick / snare / tom light pulses looks mistimed - they feel late"
+
+Screenshots: (1) near water behind a passing pulse, a red box with a line beside a diagonal straight edge running through the wake's ripples and dotted ring highlights; (2) the near water with one large set of ring ripples spanning the river width.

@@ -699,6 +699,10 @@ public:
     // editor holds about the open project outside this engine (its overlays, its selection, its renderer history) is
     // reset when this moves, in one place (`Application::resetProjectViewState`), however the load was asked for.
     [[nodiscard]] std::uint64_t projectGeneration() const { return projectGeneration_; }
+    // ADR-1700: the name scene-scope MIDI mappings are kept under: the file name of the project's scene (a composition or
+    // a glTF), "inline" for a composition saved inside the project, "orb" for the built-in scene. A file name rather than
+    // a path, so it is the same on another computer.
+    [[nodiscard]] std::string midiSceneKey() const;
     // ADR-1392: the decoded-asset cache, for the checks that its size follows the open project.
     [[nodiscard]] const assets::AssetRegistry& assetRegistry() const { return registry_; }
 
@@ -1327,6 +1331,8 @@ private:
     ParkedDirectorsCut parkedCut_;      // ADR-582: the steering half of a cut, kept while parked
     std::uint64_t sceneGeneration_ = 0; // ADR-582: see sceneGeneration()
     std::uint64_t projectGeneration_ = 0; // ADR-1390: see projectGeneration()
+    std::uint64_t midiKeySceneGeneration_ = ~0ull;   // ADR-1700: the generations the hub's scene key was taken at
+    std::uint64_t midiKeyProjectGeneration_ = ~0ull;
     AutoDirectorSettings autoDirector_; // ADR-225: saved with the project, read by the host
     std::vector<directing::Plan> directingPlans_;           // ADR-755
     std::vector<nlohmann::json> unreadableDirectingPlans_;  // ...kept verbatim, written back

@@ -817,6 +817,11 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                 instance.timing.windowStart = static_cast<double>(static_cast<float>(t));
                 instance.timing.windowSeconds = static_cast<double>(static_cast<float>(window));
                 world::adaptEffectToOwner(instance);
+                // `source` points into out.staged.effects, which the insert below may reallocate: take what the
+                // diff line needs from it first (it read a freed record, and printed "a copy of ''").
+                const std::string sourceText = source != nullptr ? fmt::format("(a copy of '{}')", source->id)
+                                                                 : std::string("(new, the type's defaults)");
+                source = nullptr;
                 auto inserted = world::insertEffect(out.staged.effects, std::move(instance));
                 if (!inserted) {
                     line('!', pc.key, fmt::format("{}: {}", issueCodeName(IssueCode::SchemaInvalid), inserted.error().message));
@@ -826,8 +831,7 @@ Compilation compilePlan(Plan plan, const SceneFacts& facts) {
                 line(removedLine(pc.key), pc.key,
                      fmt::format("Effect \"{}\" on {} {}: active {}-{}", display,
                                  effect.owner.isWorld() ? std::string("the world") : effect.owner.name,
-                                 source != nullptr ? fmt::format("(a copy of '{}')", source->id) : std::string("(new, the type's defaults)"),
-                                 clock(t), clock(t + window)));
+                                 sourceText, clock(t), clock(t + window)));
                 continue;
             }
             parameter = fmt::format("fx/{}/{}", effect.id, pc.field);

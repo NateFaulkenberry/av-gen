@@ -62,6 +62,12 @@
    "document": "reference/panels"
   },
   {
+   "id": "panel.midi",
+   "kind": "panel",
+   "category": "Modulation",
+   "document": "modulation/midi-mapping"
+  },
+  {
    "id": "panel.analysis",
    "kind": "panel",
    "category": "Audio",

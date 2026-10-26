@@ -127,6 +127,8 @@ TEST_CASE("no row names a leaf the kind's arithmetic does not read", "[ui][defor
         {scene::DeformerKind::Path,
          {"amount", "axis", "center", "pathOffset", "pathScale", "pathRoll"}},
         {scene::DeformerKind::Streamline, {"amount", "falloff", "tension"}}, // ADR-1181
+        {scene::DeformerKind::Hinge,
+         {"amount", "axis", "center", "phase", "falloff", "frequency", "speed", "scale", "tension"}}, // ADR-1672
     };
     REQUIRE(expected.size() == std::size(ui::kDeformerKinds));
 
@@ -299,6 +301,16 @@ TEST_CASE("a deformer the panel adds does something", "[ui][deformers][procedura
             break;
         case scene::DeformerKind::Noise: d.amount = 0.1f; d.scale = 0.5f; break;
         case scene::DeformerKind::Displacement: d.amount = 0.1f; d.scale = 0.5f; break;
+        case scene::DeformerKind::Hinge:
+            // ADR-1672: the pivot sits just above the point (along up = cross(forward, axis) = +z
+            // for the default axis y and forward x) and the mask is centred on the point, so it
+            // lies below the slit and inside the mask, and turns.
+            d.amount = 0.3f;
+            d.center = glm::vec3(0.8f, 1.4f, -0.25f);
+            d.scale = -0.05f;
+            d.falloff = 0.1f;
+            d.frequency = 0.1f;
+            break;
         default: break;
         }
 

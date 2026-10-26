@@ -425,7 +425,7 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
     var transmit = 1.0;
     let onset = max(0.015, 1.5 * dy / height);       // the rim's onset, in curtain heights
     let off = vec2<f32>(a.flow.x, a.flow.x * 0.37); // the whole pattern drifting
-    let churn = a.flow.y;                            // its folds churning
+    let churn = a.flow.y + a.audio3.z;               // its folds churning (ADR-1664: + a routable phase offset)
     let foldAmount = clamp(a.shape.z + a.audio.z * midBand, 0.0, 1.5);
     for (var k = 0; k < steps; k = k + 1) {
         let y = baseY + (f32(k) + jitter) * dy;
@@ -450,7 +450,10 @@ fn atmosAuroraRibbons(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter: f32,
         let w1 = atmosFbm2(q * 0.8 + vec2<f32>(churn * 0.2, 1.3), 2);
         let w2 = atmosFbm2(q * 0.8 + vec2<f32>(5.2, 7.1 - churn * 0.2), 2);
         let qw = q + swirl * (vec2<f32>(w1, w2) - 0.5);
-        let line = abs(2.0 * atmosFbm2(qw, 2) - 1.0) * 1.8;
+        // ADR-1660: the sheet stands on the footprint's level `0.5 - 0.125 x coverage`. A two-octave fbm averages
+        // 0.375, so at 0.5 (coverage 0, ADR-1641 exactly) its level line is a few closed loops round the peaks; towards
+        // the mean it is a long line that winds through the whole sky.
+        let line = abs(2.0 * (atmosFbm2(qw, 2) + 0.125 * a.audio3.y) - 1.0) * 1.8;
         let sheet = 1.0 - smoothstep(0.0, widthEff, line);
         if (sheet <= 1.0e-3) {
             continue;
@@ -537,7 +540,7 @@ fn atmosAuroraRibbonsPulsed(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter
     var transmit = 1.0;
     let onset = max(0.015, 1.5 * dy / height);       // the rim's onset, in curtain heights
     let off = vec2<f32>(a.flow.x, a.flow.x * 0.37); // the whole pattern drifting
-    let churn = a.flow.y;                            // its folds churning
+    let churn = a.flow.y + a.audio3.z;               // its folds churning (ADR-1664: + a routable phase offset)
     let foldAmount = clamp(a.shape.z + a.audio.z * midBand, 0.0, 1.5);
     for (var k = 0; k < steps; k = k + 1) {
         let y = baseY + (f32(k) + jitter) * dy;
@@ -562,7 +565,7 @@ fn atmosAuroraRibbonsPulsed(a: AtmosAurora, ro: vec3<f32>, rd: vec3<f32>, jitter
         let w1 = atmosFbm2(q * 0.8 + vec2<f32>(churn * 0.2, 1.3), 2);
         let w2 = atmosFbm2(q * 0.8 + vec2<f32>(5.2, 7.1 - churn * 0.2), 2);
         let qw = q + swirl * (vec2<f32>(w1, w2) - 0.5);
-        let line = abs(2.0 * atmosFbm2(qw, 2) - 1.0) * 1.8;
+        let line = abs(2.0 * (atmosFbm2(qw, 2) + 0.125 * a.audio3.y) - 1.0) * 1.8; // ADR-1660, as above
         // The front: at `pulse` 1 it stands on the lower rims; as the routed envelope decays it climbs a curtain
         // height and fades with it (front = 1 - pulse). The same height as the rim test below, so it follows each
         // rim's own curve. Where it passes the sheets are wider (here) and brighter (at the emission).
@@ -808,5 +811,13 @@ fn atmosphereSkyAt(ro: vec3<f32>, rd: vec3<f32>, pixelAngle: f32) -> AtmosResult
     var out: AtmosResult;
     out.radiance = comets.radiance + aurora.radiance;
     out.bloom = max(comets.bloom, aurora.bloom);
+    // ADR-1663: a light ball against the sky (its glow on surfaces is wave_effects.wgsl's)
+    if (frame.waveCount.x > 0.5) {
+        let balls = wavesBallSky(ro, rd);
+        let ball = balls.rgb;
+        // ADR-1665: a fireball's soot dims the aurora and comets behind it (a = 1 for ADR-1663's glow: unchanged)
+        out.radiance = out.radiance * balls.a + ball;
+        out.bloom = max(out.bloom, clamp(dot(ball, vec3<f32>(0.2126, 0.7152, 0.0722)) * 0.6, 0.0, 1.0));
+    }
     return out;
 }

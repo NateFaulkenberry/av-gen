@@ -235,8 +235,10 @@ TEST_CASE("A hidden example is in the index but in no menu", "[examples][live][a
     std::filesystem::remove_all(dir);
 }
 
-// The owner's cut (2026-10-14): the Sonic VFX family offers exactly these six; the other ten are hidden, not deleted.
-TEST_CASE("The real index offers six Sonic VFX scenes", "[examples][live][adr1343]") {
+// The owner's cut (2026-10-14): the Sonic VFX family offered exactly six; the other ten are hidden, not deleted.
+// Aurora Borealis joined it on 2026-10-24 (the owner: "put the aurora scene under Sonic VFX"); its Feline Footwear
+// version is the eleventh hidden one (pass 3: Sabertooth is the offered song).
+TEST_CASE("The real index offers seven Sonic VFX scenes", "[examples][live][adr1343]") {
 #ifndef AVGEN_SOURCE_DIR
     SKIP("AVGEN_SOURCE_DIR not defined");
 #else
@@ -256,7 +258,8 @@ TEST_CASE("The real index offers six Sonic VFX scenes", "[examples][live][adr134
     }
     CHECK(offered == std::set<std::string>{"Sonic VFX - Cymatic Plate", "Sonic VFX - Feedback Mirror",
                                            "Sonic VFX - Datascape", "Sonic VFX - Ember Forest",
-                                           "Sonic VFX - The Corrupted Cathedral", "Sonic VFX - Event Horizon"});
-    CHECK(hiddenVfx == 10);
+                                           "Sonic VFX - The Corrupted Cathedral", "Sonic VFX - Event Horizon",
+                                           "Sonic VFX - Aurora Borealis"});
+    CHECK(hiddenVfx == 11);
 #endif
 }

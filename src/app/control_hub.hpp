@@ -6,15 +6,26 @@
 // thread: the receivers only queue. Follow-ups: MIDI clock (Clock/Start/Continue/Stop feed a
 // MidiClockTracker the engine can use as its tempo source) and OSC query/feedback (replies to
 // "<prefix>/query", pushed "<prefix>/param/<path>" messages when parameters change).
+//
+// ADR-1700: MIDI performance mapping. The MIDI half of a frame is: drain the bounded inbox (ADR-1701),
+// then per message, in arrival order: transport to the clock; device removals release held notes;
+// NRPN/RPN decoding (ADR-1702); activity, the monitor and Learn; live Sonic input; then the mapper,
+// which writes control channels and parameter bases. All of it before the sources publish
+// `control.*` and before the routes run, so a message drained this frame is in this frame's
+// parameters. The UI edits `map()` on the same thread and calls `mappingsChanged()`.
 
 #include "control/control_map.hpp"
 #include "control/midi.hpp"
 #include "control/midi_clock.hpp"
+#include "control/midi_learn.hpp"
+#include "control/midi_mapper.hpp"
+#include "control/midi_nrpn.hpp"
 #include "control/osc.hpp"
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "params/parameter.hpp"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -70,10 +81,39 @@ public:
         return p;
     }
     [[nodiscard]] const std::optional<control::OscMessage>& lastOsc() const { return lastOsc_; }
-    // Creates a binding from the last MIDI / OSC message to `signal` (control channel) or a
-    // parameter path. Returns false when nothing has been received yet.
-    bool bindLastMidi(const std::string& signal, const std::string& parameter = {}, bool asEvent = false);
+    // Creates a binding from the last OSC message to `signal` (control channel) or a parameter path. Returns false when
+    // nothing has been received yet. (MIDI is learned through learn(), ADR-1700.)
     bool bindLastOsc(const std::string& signal, const std::string& parameter = {}, bool asEvent = false);
+
+    // ---- ADR-1700: MIDI performance mapping ----
+    // The scene the scene-scope mappings are for (Engine::midiSceneKey). A change releases every gate and rebuilds.
+    void setSceneKey(const std::string& key);
+    [[nodiscard]] const std::string& sceneKey() const { return sceneKey_; }
+    // The UI changed map()'s MIDI mappings: rebuilt before the next message, keeping held gates and pickup latches.
+    void mappingsChanged() { rebuildPending_ = true; }
+    [[nodiscard]] control::MidiMapper& mapper() { return mapper_; }
+    [[nodiscard]] const control::MidiMapper& mapper() const { return mapper_; }
+    [[nodiscard]] control::MidiLearn& learn() { return learn_; }
+    [[nodiscard]] control::MidiMonitor& monitor() { return monitor_; }
+    [[nodiscard]] const control::MidiMonitor& monitor() const { return monitor_; }
+    // The input's device table as of this frame (index = device slot), and what each has sent.
+    [[nodiscard]] const std::vector<control::MidiDeviceSlot>& midiDevices() const { return devices_; }
+    struct DeviceActivity {
+        double lastSeconds = -1.0;   // the hub clock when it last sent a channel or system message
+        std::uint64_t messages = 0;
+        std::uint64_t clock = 0;     // clock and transport messages (not shown in the monitor by default)
+        std::array<double, 16> channelSeconds{};
+        DeviceActivity() { channelSeconds.fill(-1.0); }
+    };
+    [[nodiscard]] const std::vector<DeviceActivity>& deviceActivity() const { return activity_; }
+    // Seconds on the hub's own clock (steady, from construction): what the activity times are measured on.
+    [[nodiscard]] double clockSeconds() const;
+    // Devices switched off on this machine (by stable id): their messages are shown, counted and otherwise ignored.
+    void setDisabledDevices(std::vector<std::string> ids);
+    [[nodiscard]] const std::vector<std::string>& disabledDevices() const { return disabledDevices_; }
+    [[nodiscard]] bool deviceEnabled(std::uint16_t slot) const;
+    // A test seam: the input's device removal for an injected source (as unplugging it).
+    void injectMidiRemoval(const std::string& source);
 
     struct Status {
         bool oscOpen = false;
@@ -87,6 +127,7 @@ public:
         std::uint64_t applied = 0;   // messages applied since start
         std::uint64_t pickupHeld = 0; // ADR-1606: knob moves held back by soft takeover
         std::uint64_t unmatched = 0; // messages no binding or direct command consumed
+        std::uint64_t ignored = 0;   // ADR-1700: messages from a device switched off
         bool feedbackOpen = false;   // a feedback sender is open on map().feedbackHost
         std::string feedbackError;
         std::uint64_t feedbackSent = 0;  // parameter/preset messages sent (feedback + query replies)
@@ -101,7 +142,9 @@ public:
 
 private:
     void applyTarget(Engine& engine, const control::BindingTarget& target, const control::Match& match);
-    float currentNormalised(Engine& engine, const control::BindingTarget& target) const; // ADR-1606, ADR-1612
+    void applyMidiWith(Engine& engine, const control::MidiMessage& message, control::MidiTargets& targets, double now);
+    void syncDevices();
+    void rebuildMappings(control::MidiTargets& targets);
     // Query replies and feedback.
     [[nodiscard]] control::OscSender* replySender(const control::OscMessage& request);
     [[nodiscard]] control::OscMessage parameterMessage(const params::IParameter& parameter) const;
@@ -127,12 +170,26 @@ private:
     std::vector<control::MidiMessage> midiScratch_;
     std::vector<control::OscMessage> injectedOsc_;
     std::optional<control::MidiMessage> lastMidi_;
+    // ADR-1700
+    control::MidiMapper mapper_;
+    control::NrpnDecoder nrpn_;
+    control::MidiLearn learn_;
+    control::MidiMonitor monitor_;
+    std::vector<control::MidiDeviceSlot> devices_;
+    std::uint64_t deviceGeneration_ = ~0ull;
+    std::vector<DeviceActivity> activity_;
+    std::vector<std::string> disabledDevices_;
+    std::vector<bool> deviceDisabled_; // by slot
+    std::string sceneKey_;
+    bool rebuildPending_ = true;
+    bool freshRebuild_ = true;  // a new map or scene: gates released, runtime state forgotten
+    std::uint64_t ignored_ = 0;
+    std::uint64_t startNs_ = 0;
     std::optional<int> programChange_;
     std::optional<control::OscMessage> lastOsc_;
     std::unordered_map<std::string, std::vector<float>> feedbackCache_; // path -> last seen base components
     std::unordered_set<std::string> oscWritten_; // paths written through OSC this frame (no echo)
     std::uint64_t applied_ = 0;
-    std::uint64_t pickupHeld_ = 0; // ADR-1606: knob moves ignored while waiting to pick up
     std::uint64_t unmatched_ = 0;
     std::uint64_t feedbackSent_ = 0;
     std::uint64_t clockMessages_ = 0;

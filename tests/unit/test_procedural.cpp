@@ -1,5 +1,7 @@
+#include "scene/material_program.hpp"
 #include "scene/procedural.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <glm/gtc/constants.hpp>
@@ -2216,4 +2218,163 @@ TEST_CASE("partOf survives a round trip and is absent when unset", "[procedural]
     auto loneBack = ProceduralGeometry::fromJson(lj);
     REQUIRE(loneBack.has_value());
     CHECK(loneBack->partOf.empty());
+}
+
+// ADR-1672: the Hinge deformer -- a soft-masked rigid turn (a jaw that opens a mouth, a lid), no rig, no cut.
+TEST_CASE("Hinge deformer: turns what lies below the slit inside its mask, eases out, leaves the rest", "[scene][procedural][adr1672]") {
+    Deformer h;
+    h.kind = DeformerKind::Hinge;
+    h.axis = {1.0f, 0.0f, 0.0f};             // the hinge: +X
+    h.displacementAxis = {0.0f, 0.0f, 1.0f}; // forward: +Z, so up is +Y
+    h.center = {0.0f, 0.0f, 0.0f};           // the pivot
+    h.phase = 0.0f;                          // the slit at the pivot's height
+    h.falloff = 0.10f;                       // mask radius
+    h.frequency = 0.02f;                     // the cut's half-width (the mouth's corners)
+    h.speed = 0.06f;                         // mask centre 6 cm forward ...
+    h.scale = -0.03f;                        // ... and 3 cm down
+    h.amount = 0.3f;
+    REQUIRE(std::string(deformerKindName(DeformerKind::Hinge)) == "hinge");
+    REQUIRE(deformerKindFromName("hinge") == DeformerKind::Hinge);
+
+    const glm::vec3 chin{0.0f, -0.03f, 0.06f}; // the mask's centre: fully inside, below the slit
+    const glm::vec3 turned = applyDeformer(h, chin, 0.0);
+    // a rigid turn about +X by 0.3 rad: (y, z) -> (y cos - z sin, y sin + z cos)
+    checkVec(turned, {0.0f, -0.03f * std::cos(0.3f) - 0.06f * std::sin(0.3f),
+                      -0.03f * std::sin(0.3f) + 0.06f * std::cos(0.3f)});
+    SECTION("above the slit nothing moves, however close (the upper lip)") {
+        checkVec(applyDeformer(h, {0.0f, 0.001f, 0.06f}, 0.0), {0.0f, 0.001f, 0.06f});
+    }
+    SECTION("outside the mask nothing moves (the throat, the back of the head)") {
+        checkVec(applyDeformer(h, {0.0f, -0.2f, 0.06f}, 0.0), {0.0f, -0.2f, 0.06f});
+        checkVec(applyDeformer(h, {0.0f, -0.03f, -0.2f}, 0.0), {0.0f, -0.03f, -0.2f});
+    }
+    SECTION("it eases out across the mask's outer half") {
+        float prev = 1e9f;
+        for (int i = 0; i <= 10; ++i) {
+            const float x = 0.05f + 0.05f * static_cast<float>(i) / 10.0f; // half to full radius
+            const glm::vec3 p{x, -0.03f, 0.06f};
+            const float moved = glm::length(applyDeformer(h, p, 0.0) - p);
+            CHECK(moved <= prev + 1e-6f);
+            prev = moved;
+        }
+        CHECK(prev < 1e-5f);
+    }
+    SECTION("the lips part in a lens: widest at the middle, nothing at or past the corners") {
+        const auto drop = [&](float x, float y) {
+            const glm::vec3 p{x, y, 0.06f};
+            return glm::length(applyDeformer(h, p, 0.0) - p);
+        };
+        const float lip = -0.001f;                  // just below the slit: the lower lip
+        CHECK(drop(0.0f, lip) > 0.015f);            // the middle opens (0.3 rad at ~6 cm from the pivot)
+        CHECK(drop(0.015f, lip) < 0.5f * drop(0.0f, lip));
+        // the corner stays attached and past it, where the surface is whole, a millimetre below the slit's height
+        // moves under 0.2 mm (the start of the cheek's smooth stretch)
+        CHECK(drop(0.02f, lip) < 2e-4f);
+        CHECK(drop(0.03f, lip) < 2e-4f);
+        CHECK(drop(0.03f, 0.001f) < 1e-6f);         // ... and nothing above it, so no tear
+        // past the corners the turn grows smoothly downward: the cheek stretches to the chin
+        float prev = -1.0f;
+        for (int i = 0; i <= 10; ++i) {
+            const float m = drop(0.03f, -0.025f * static_cast<float>(i) / 10.0f);
+            CHECK(m >= prev - 1e-7f);
+            prev = m;
+        }
+        CHECK(prev > 0.01f);
+    }
+    SECTION("the purse rounds the lips into an oh: drawn in, the upper lip arched, both forward (ADR-1672)") {
+        Deformer o = h;
+        o.tension = 2.0f;
+        const glm::vec3 corner{0.019f, -0.001f, 0.06f};     // inside the corner, the lower lip
+        const glm::vec3 upper{0.0f, 0.001f, 0.06f};         // the upper lip's middle
+        const glm::vec3 lower{0.0f, -0.001f, 0.06f};
+        CHECK(applyDeformer(o, corner, 0.0).x < applyDeformer(h, corner, 0.0).x - 1e-3f);   // drawn in
+        CHECK(applyDeformer(o, upper, 0.0).y > upper.y + 1e-3f);                           // arched up
+        CHECK(applyDeformer(h, upper, 0.0) == upper);                                      // (no purse: still)
+        CHECK(applyDeformer(o, lower, 0.0).z > applyDeformer(h, lower, 0.0).z + 1e-3f);    // pushed forward
+        // in proportion to the opening: half the angle moves the upper lip half as far, and shut is still sealed
+        Deformer half = o;
+        half.amount = 0.5f * o.amount;
+        CHECK(applyDeformer(half, upper, 0.0).y - upper.y ==
+              Catch::Approx(0.5f * (applyDeformer(o, upper, 0.0).y - upper.y)).epsilon(1e-4));
+        Deformer shut = o;
+        shut.amount = 0.0f;
+        CHECK(applyDeformer(shut, upper, 0.0) == upper);
+        // nothing far from the lips moves with it (the brow, the back of the head)
+        checkVec(applyDeformer(o, {0.0f, 0.06f, 0.06f}, 0.0), {0.0f, 0.06f, 0.06f});
+        checkVec(applyDeformer(o, {0.0f, -0.03f, -0.2f}, 0.0), {0.0f, -0.03f, -0.2f});
+    }
+    SECTION("a purse of 0 is exactly the deformer without one") {
+        Deformer z = h;
+        z.tension = 0.0f;
+        for (const glm::vec3 q : {glm::vec3{0.01f, -0.002f, 0.06f}, glm::vec3{0.0f, 0.001f, 0.06f}}) {
+            const glm::vec3 x = applyDeformer(z, q, 0.0);
+            const glm::vec3 y = applyDeformer(h, q, 0.0);
+            CHECK(x.x == y.x);
+            CHECK(x.y == y.y);
+            CHECK(x.z == y.z);
+        }
+    }
+    SECTION("amount 0 is the identity, bit for bit") {
+        h.amount = 0.0f;
+        const glm::vec3 p{0.01f, -0.02f, 0.05f};
+        const glm::vec3 q = applyDeformer(h, p, 0.0);
+        CHECK(q.x == p.x);
+        CHECK(q.y == p.y);
+        CHECK(q.z == p.z);
+    }
+}
+
+TEST_CASE("The unlit fast path takes only programs that need no lit-path inputs (ADR-1673)", "[scene][material][adr1673]") {
+    const auto op = [](MaterialOpKind kind, int dst, int a = 0) {
+        MaterialOp o;
+        o.kind = kind;
+        o.dst = dst;
+        o.srcA = a;
+        return o;
+    };
+    MaterialProgram p;
+    MaterialOp world = op(MaterialOpKind::Input, 0);
+    world.input = MaterialInput::WorldPosition;
+    p.ops = {world, op(MaterialOpKind::Gradient, 1, 0), op(MaterialOpKind::OklabRamp, 2, 1),
+             op(MaterialOpKind::Quantize, 3, 0), op(MaterialOpKind::Noise, 4, 0)};
+    p.emissionRegister = 2;
+    CHECK(p.unlitFastEligible());
+    SECTION("a screen-space input (here ambient occlusion) needs the full path") {
+        MaterialOp ao = op(MaterialOpKind::Input, 5);
+        ao.input = MaterialInput::Occlusion;
+        p.ops.push_back(ao);
+        CHECK_FALSE(p.unlitFastEligible());
+        p.ops.back().enabled = false;   // a disabled op asks for nothing
+        CHECK(p.unlitFastEligible());
+    }
+    SECTION("so do curvature, cavity and footprint") {
+        for (const MaterialInput in : {MaterialInput::Curvature, MaterialInput::Cavity, MaterialInput::Footprint}) {
+            MaterialProgram q = p;
+            MaterialOp o = op(MaterialOpKind::Input, 5);
+            o.input = in;
+            q.ops.push_back(o);
+            CHECK_FALSE(q.unlitFastEligible());
+        }
+    }
+    SECTION("ops that need the tangent frame, textures or fields are not on the list") {
+        for (const MaterialOpKind k : {MaterialOpKind::Triplanar, MaterialOpKind::DetailNormal,
+                                       MaterialOpKind::CurvatureMask, MaterialOpKind::Field}) {
+            MaterialProgram q = p;
+            q.ops.push_back(op(k, 5));
+            CHECK_FALSE(q.unlitFastEligible());
+        }
+    }
+    SECTION("a normal, occlusion or height output, or an enabled layer, needs the full path") {
+        MaterialProgram q = p;
+        q.normalRegister = 3;
+        CHECK_FALSE(q.unlitFastEligible());
+        q = p;
+        q.occlusionRegister = 3;
+        CHECK_FALSE(q.unlitFastEligible());
+        q = p;
+        q.layers.emplace_back();
+        CHECK_FALSE(q.unlitFastEligible());
+        q.layers.back().enabled = false;
+        CHECK(q.unlitFastEligible());
+    }
 }

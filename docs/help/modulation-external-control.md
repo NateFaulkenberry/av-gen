@@ -7,7 +7,7 @@ order: 35
 audience: expert
 tags: midi, osc, control, learn, cc, binding, clock
 keywords: how do i use a midi controller; midi learn; osc address; can i control it from touchosc; midi clock sync; no midi devices
-related: modulation/routes, audio/beats, troubleshooting/audio-and-control
+related: modulation/midi-mapping, modulation/routes, audio/beats, troubleshooting/audio-and-control
 features: panel.control, subsystem.control
 ---
 
@@ -27,27 +27,29 @@ The status line shows the number of sources and the message count, or the error,
 
 `--list-midi` prints the available inputs and exits.
 
-### Learn
+### Learn and mappings
 
-The **Learn: last received** section shows the last message in the form
-`MIDI <kind> ch <n> #<cc> = <value>`, with the channel displayed **1-based**. Fill in a `signal`
-name, or pick a parameter from the target combo, then press **Bind last MIDI**.
-
-Ticking **event** before binding makes a note produce a momentary pulse rather than a level.
+MIDI is learned, listed and edited in the **MIDI** panel: see
+[MIDI mapping and Learn](help://modulation/midi-mapping). That panel keeps a scene's shipped bindings
+apart from your own mappings, so editing one never rewrites the scene's defaults. The Control tab
+shows how many there are and opens the panel.
 
 ### Binding kinds
 
 | Kind | Matches | Value |
 |---|---|---|
-| `cc` | control change | 0 – 127 normalised |
-| `note` | note on and off | velocity, or a 0/1 toggle |
-| `noteEvent` | note on only | an event pulse carrying velocity |
-| `pitchBend` | pitch bend | 14-bit normalised, centre 0.5 |
+| `cc` | control change | 0 – 127 normalised, or relative steps (`encoder`) |
+| `note` | note on and off, one note or a range | a gate (velocity or full), or a toggle |
+| `noteEvent` | note on only | an event pulse, with or without velocity |
+| `pitchBend` | pitch bend | 14-bit normalised; the centre is exactly 0.5 |
 | `pressure` | channel pressure | normalised |
+| `polyPressure` | polyphonic key pressure, one note or a range | normalised |
+| `nrpn` / `rpn` | a decoded NRPN / RPN parameter | 7- or 14-bit normalised |
 | `program` | program change | an event, or a continuous value |
 
-A binding can specify a source substring, a channel (or any), and a number (or any). A binding to a
-parameter also carries a `range` mapping the incoming 0…1 onto the parameter's units.
+A binding can specify a device (a stable id, or a name substring), a channel (or any), and a
+number (or any). A binding to a parameter also carries a `range` mapping the incoming 0…1 onto the
+parameter's units.
 
 ### Clock
 

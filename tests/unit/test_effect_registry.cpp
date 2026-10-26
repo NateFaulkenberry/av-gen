@@ -209,6 +209,12 @@ TEST_CASE("a value set through a row survives the file, by name", "[world][atmos
 
         for (const world::EffectField& f : s.fields) {
             INFO(std::string(s.key) + "/" + f.leaf);
+            if (f.written != nullptr && !f.written(e)) {
+                // ADR-1662: a row this effect's mode does not write (a wave's path shape on a wave that is not a path
+                // wave) is not in the file, so it cannot come back (tests/unit/test_wave_path.cpp holds a path wave's)
+                CHECK_FALSE(doc.at("parameters").at("propagation").contains("path"));
+                continue;
+            }
             switch (f.type) {
             case world::FieldType::Float:
                 CHECK(world::fieldFloat(f, s, *back) == world::fieldFloat(f, s, e));

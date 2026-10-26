@@ -183,6 +183,12 @@ __pycache__/
 # Rainbow World (docs/prototypes/rainbow-world/04-production-plan.md section 3): downloads, milestone .blend files and
 # large generated meshes. assets/rainbow-world.manifest.json is the part the repository keeps.
 /assets/rainbow-world/
+# Aurora Borealis: the generated scene (examples/aurora-borealis/build.py writes it; about 2 MB of GLB)
+/examples/aurora-borealis/scene/
+/examples/aurora-borealis/__pycache__/
+# Talking Heads reference downloads (assets/talking-heads.manifest.json): third-party binaries, never committed. No
+# trailing slash: in a worktree the folder is a symlink to the main checkout's, and `dir/` matches directories only.
+/assets/talking-heads
 # Cursed Slammers (look-development study): the downloaded CC-BY face scan and everything derived from it stay out of
 # git (assets/cursed-slammers.manifest.json records the source and the attribution).
 /assets/cursed-slammers

@@ -4,7 +4,7 @@
     python3 tools/live_perf_baseline.py run   --out <dir> [--reps 3] [--bin build/release] [--scenes a,b]
                                               [--extra "<avgen args>"]
     python3 tools/live_perf_baseline.py check --out <dir> [--baseline docs/perf/live-baseline.json] [--scenes a,b]
-    python3 tools/live_perf_baseline.py write --out <dir> [--baseline docs/perf/live-baseline.json]
+    python3 tools/live_perf_baseline.py write --out <dir> [--baseline docs/perf/live-baseline.json] [--add]
 
 `run` measures the reference live scenes the way the Living Prism audit measured them (01 §4.1, §9): 1920x1080 at the
 live target of 30 fps, Feline Footwear driving the analysis muted, from 60 s (the audit's representative window); per
@@ -46,9 +46,26 @@ SCENES = {
     "rainbow-world": ("examples/rainbow-world/rainbow-world.json", "examples/rainbow-world/scene"),
     "rift-live": ("examples/bioluminescent/rift-live.json", "examples/bioluminescent/rift.scene.json"),
     "event-horizon": ("examples/sonic-vfx/event-horizon.json", "examples/sonic-vfx/event-horizon.scene.json"),
+    "aurora-borealis": ("examples/aurora-borealis/aurora-borealis.json",
+                        "examples/aurora-borealis/scene/aurora-borealis.scene.json"),
+    "talking-heads": ("examples/sonic-abstract/talking-heads.json", "examples/sonic-abstract/talking-heads.scene.json"),
+}
+# Scenes that play their own song (Aurora Borealis pass 3: Sabertooth, 70 s, with its stems) instead of Feline from
+# 60 s: their analysis track and start. Sabertooth from 12 s puts the 5 s warm-up and the 30 s measured window inside
+# the song, over its swells, crashes, tom fills and the busiest beam passages.
+SCENE_AUDIO = {
+    "aurora-borealis": ("assets/audio/stems/sabertooth/Sabertooth.wav", "12"),
 }
 AUDIO = "assets/audio/feline-footwear.wav"
 COMMON = ["--audio", AUDIO, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", "60"]
+
+
+def common(scene):
+    """COMMON, with the scene's own song and start where it has one (SCENE_AUDIO)."""
+    if scene not in SCENE_AUDIO:
+        return list(COMMON)
+    audio, start = SCENE_AUDIO[scene]
+    return ["--audio", audio, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", start]
 LEVELS = ["Ultra", "High", "Medium", "Low", "Emergency"]
 DEFAULT_BASELINE = os.path.join(ROOT, "docs", "perf", "live-baseline.json")
 MISS_MARGIN = 2.0
@@ -68,6 +85,8 @@ def available(scene):
         return "its project is not in this tree"
     if needs and not os.path.exists(os.path.join(ROOT, needs)):
         return "its generated scene is missing (%s)" % needs
+    if scene in SCENE_AUDIO and not os.path.exists(os.path.join(ROOT, SCENE_AUDIO[scene][0])):
+        return "its song is missing (%s; never committed)" % SCENE_AUDIO[scene][0]
     return None
 
 
@@ -110,7 +129,7 @@ def run(a):
             time.sleep(a.gap)  # leave the GPU lock to the other agents between runs
         rep += a.rep_offset
         name = "%s-%s-r%d" % (scene, mode, rep)
-        args = ["--live-profile", "--mode", mode, "--project", SCENES[scene][0]] + COMMON
+        args = ["--live-profile", "--mode", mode, "--project", SCENES[scene][0]] + common(scene)
         args += ["--quality", "auto", "--warmup", "5", "--measure", "30"] if mode == "live" else \
                 ["--quality", "ultra", "--warmup-frames", "150", "--measure", "15"]
         args += ["--json", os.path.join(a.out, name + ".json"), "--trace", os.path.join(a.out, name + ".csv")]
@@ -245,6 +264,13 @@ def write(a):
         sys.exit("refusing to write a baseline with failed runs: " + ", ".join(bad))
     for sc in now.values():
         sc["thresholds"] = thresholds(sc)
+    if getattr(a, "add", False) and os.path.exists(a.baseline):
+        # keep the baseline's other scenes: add (or replace) only the scenes this run measured
+        with open(a.baseline) as f:
+            old = json.load(f)
+        merged = dict(old.get("scenes", {}))
+        merged.update(now)
+        now = merged
     rev = subprocess.run(["git", "describe", "--always", "--dirty", "--abbrev=8"], cwd=ROOT, capture_output=True,
                          text=True).stdout.strip()
     os.makedirs(os.path.dirname(a.baseline), exist_ok=True)
@@ -277,6 +303,7 @@ def main():
     ap.add_argument("--extra", help="arguments appended to every avgen run (an injected regression, an A/B arm)")
     ap.add_argument("--gap", type=float, default=0.0, help="seconds between runs, so other GPU users get the lock")
     ap.add_argument("--live-only", action="store_true", help="skip the headless Ultra runs (T4 is then unjudged)")
+    ap.add_argument("--add", action="store_true", help="write: keep the baseline's other scenes, add or replace this run's")
     ap.add_argument("--rep-offset", type=int, default=0, help="number this run's reps from offset+1 (to interleave "
                     "two arms rep by rep into one directory each)")
     a = ap.parse_args()

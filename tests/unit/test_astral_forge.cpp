@@ -227,9 +227,9 @@ TEST_CASE("MIDI reaches the astral controls through the live project's control m
         m.kind = control::MidiKind::ControlChange;
         m.data1 = 1;
         m.data2 = 127;
-        const auto hit = control::matchMidi(b, m);
+        const auto hit = control::midiSourceValue(b, m);
         REQUIRE(hit.has_value());
-        c.params.find(b.target.parameter)->setBaseComponent(0, b.target.min + hit->value * (b.target.max - b.target.min));
+        c.params.find(b.target.parameter)->setBaseComponent(0, b.target.min + *hit * (b.target.max - b.target.min));
     }
     c.frame(3.0);
     CHECK(c.comp->scene().astral.live.summon == Approx(1.0f));

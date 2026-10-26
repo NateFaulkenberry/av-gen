@@ -815,6 +815,16 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         n = cascadeTurn(n, cascadeUp);
     }
     // ---- cascade (ADR-985) end ----
+    // ---- path waves (ADR-1662) begin ----
+    // The wake's ripples behind a path wave's front: a slope added before the reflection, so the mirror breaks
+    // where the light has just passed and heals behind it. Zero with no path wave live.
+    if (frame.waveCount.x > 0.5) {
+        let pathSlope = wavePathDisturb(in.worldPos);
+        if (any(pathSlope != vec2<f32>(0.0))) { // untouched otherwise: a renormalise would move bits
+            n = normalize(n - vec3<f32>(pathSlope.x, 0.0, pathSlope.y));
+        }
+    }
+    // ---- path waves (ADR-1662) end ----
     if (underwater) {
         n = vec3<f32>(-n.x, -n.y, -n.z);
     }
@@ -1163,6 +1173,17 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     }
     // ---- cinematic (ADR-1286) end ----
     var color = mix(body, reflected, fresnel) + glint + sparkle + water.foamColor.rgb * foam;
+    // ---- path waves (ADR-1662) begin ----
+    // A path wave's light sits UNDER the reflection -- mixed into the body, so (1 - fresnel) of it shows -- with
+    // a share on top so it reads at grazing distance: the mountains' reflections stay readable over the beam.
+    var pathLight: WavePathWater;
+    pathLight.under = vec3<f32>(0.0);
+    pathLight.surface = vec3<f32>(0.0);
+    if (frame.waveCount.x > 0.5 && !underwater) {
+        pathLight = wavePathWater(in.worldPos, footprint);
+        color = color + pathLight.under * (1.0 - fresnel) + pathLight.surface;
+    }
+    // ---- path waves (ADR-1662) end ----
     // ---- cinematic (ADR-1286) begin ----
     color = color + cineGlint;
     // ---- cinematic (ADR-1286) end ----
@@ -1182,7 +1203,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // ADR-207: additive and pre-fog, as on every other surface. The surface normal is the water's
     // own, so a ripple crossing a pool reads as ground-facing and takes the same response weight the
     // bank beside it does -- which is what makes the crossing invisible.
-    let fx = wavesAt(in.worldPos, n, glint + sparkle);
+    let fx = wavesAtSurface(in.worldPos, n, glint + sparkle, true); // ADR-1662: path waves are drawn above
     // ADR-230 §6. Water's albedo is its own shaded colour rather than a base-colour texture, so the
     // wash is scaled by a constant instead: a pool is a dark mirror, and multiplying the sky's light
     // by an already-lit surface would double-count it.
@@ -1199,6 +1220,9 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // The glint and the sparkle are what should bloom; the body colour should not, or a wide river
     // washes the whole frame. The alpha lane is the bloom weight.
     out.emission = vec4<f32>((glint + sparkle) * alpha + fx.radiance, 1.0);
+    // ---- path waves (ADR-1662) begin ----
+    out.emission = vec4<f32>(out.emission.rgb + (pathLight.under * (1.0 - fresnel) + pathLight.surface) * alpha, 1.0);
+    // ---- path waves (ADR-1662) end ----
     // ---- cinematic (ADR-1286) begin ----
     out.emission = vec4<f32>(out.emission.rgb + cineGlint * alpha, 1.0);
     // ---- cinematic (ADR-1286) end ----

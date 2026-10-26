@@ -381,7 +381,7 @@ struct Variation {
 
 // ---- deformers ----------------------------------------------------------------------------------
 
-enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path, Streamline };
+enum class DeformerKind : std::uint8_t { Bend, Twist, Sine, Noise, Displacement, Field, Path, Streamline, Hinge };
 [[nodiscard]] const char* deformerKindName(DeformerKind kind);
 [[nodiscard]] std::optional<DeformerKind> deformerKindFromName(std::string_view name);
 enum class DeformSpace : std::uint8_t { Local, World };
@@ -414,6 +414,25 @@ enum class DeformSpace : std::uint8_t { Local, World };
 //          deformer space is World, else at the instance's world position + local offset):
 //          vector fields: p += v * a; scalar fields: p += n * s * a (along the normal) when
 //          `alongNormal`, else p += axis * s * a.
+//   Hinge (ADR-1672): a soft-masked rigid turn -- a mouth that opens along a cut -- with no rig. Points turn by
+//          `amount` (radians) about `axis` through `center` (the pivot), weighted by w = slit x lip x mask. The frame
+//          is axis a, forward d = `displacementAxis` made perpendicular to a, up u = cross(d, a); m = c + d x
+//          `speed` + u x `scale` is the mask's centre; dy = dot(p - c, u) - `phase` (height above the slit);
+//          lat = |dot(p - m, a)|; r = `falloff`; cw = `frequency` (the cut's half-width: the mouth's corners).
+//            slit = 1 - smoothstep(-e, e, dy), e = 0.004 r: a step, hidden in the mesh's own cut (the lips);
+//            lip  = taper + (1 - taper) x smoothstep(0, r/4, -dy), taper = 1 - min(lat/cw, 1)^2: just
+//                   below the slit the turn tapers to nothing at the corners (a lens-shaped opening, and past
+//                   the corners, where the surface is whole, nothing at the slit's height moves); r/4 below it
+//                   the whole width turns (the chin), so the cheeks stretch rather than tear;
+//            mask = 1 - smoothstep(0.5, 1, |p - m| / r): rigid inside half the sphere, easing out at its shell.
+//          Then the PURSE (`tension`, 0 = off and skipped). It rounds the lens toward an ellipse -- taper becomes
+//          mix(1 - u^2, sqrt(1 - u^2), min(purse, 1)), u = min(lat/cw, 1) -- and, with t = amount x purse, L = r/4, sa = dot(p - m, a),
+//          near = 1 - smoothstep(0, L, |dy|), latw = 1 - smoothstep(cw, 2cw, lat), the point moves by
+//            a x (-sign(sa) min(lat, cw) 0.5 t near latw)                            (the lips drawn in)
+//          + u x (0.20 t r taper (1 - smoothstep(0, L, dy)))   above the slit only   (the upper lip arched)
+//          + d x (0.10 t r near (1 - smoothstep(0, 2cw, lat)))                       (both pushed forward),
+//          so the opening rounds into an "oh", in proportion to the angle (shut is still sealed).
+//          amount 0 is the identity.
 //   Streamline (ADR-1181): a Fiber source's centre line follows the vector field named `field`. From
 //          the instance's root r_0 and its axis d_0 (the instance rotation of +Y), each segment of
 //          length ds turns towards the field and steps: d_{k+1} = normalize(d_k + v(r_k) * a * ds)

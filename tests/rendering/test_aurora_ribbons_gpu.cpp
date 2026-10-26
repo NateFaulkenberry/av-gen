@@ -192,6 +192,43 @@ TEST_CASE("the aurora's ribbons draw sheets with dark sky between them, steadily
     CHECK(h.ctx->errorCount() == 0);
 }
 
+TEST_CASE("the aurora's ribbon coverage fills the gaps between the sheets (ADR-1660)",
+          "[gpu][atmospherics][aurora][adr1660]") {
+    Harness h;
+    const gpu::Image8 curtains = h.render(aurora(false));
+    const int background = luma(curtains.pixel(kWidth / 2, 2));
+    const gpu::Image8 gaps = h.render(aurora(true));
+    world::EffectInstance zero = aurora(true);
+    zero.aurora.shape.ribbonCoverage = 0.0f;
+    // 0 is ADR-1641's sky exactly
+    CHECK(gpu::hashImage(h.render(zero)) == gpu::hashImage(gaps));
+    world::EffectInstance full = aurora(true);
+    full.aurora.shape.ribbonCoverage = 1.0f;
+    const gpu::Image8 covered = h.render(full);
+    const SkyCover a = cover(gaps, background);
+    const SkyCover b = cover(covered, background);
+    INFO("coverage 0: " << a.lit << " lit, " << a.dark << " bare; coverage 1: " << b.lit << " lit, " << b.dark
+                        << " bare, of " << a.total);
+    CHECK(b.dark < a.dark - a.dark / 4); // the bare sky between the ribbons shrinks
+    CHECK(b.lit >= a.lit);               // and nothing that was lit goes out
+    CHECK(h.ctx->errorCount() == 0);
+}
+
+// ADR-1664: churn 0 is the ribbons hash for hash; a churn offset turns the folds (the sky changes) without changing how
+// much of it is lit by more than a fraction.
+TEST_CASE("aurora ribbons: the churn offset at 0 is the ribbons exactly, and turns the folds when set",
+          "[gpu][atmospherics][aurora][adr1664]") {
+    Harness h;
+    const gpu::Image8 base = h.render(aurora(true));
+    world::EffectInstance zero = aurora(true);
+    zero.aurora.shape.ribbonChurn = 0.0f;
+    CHECK(gpu::hashImage(h.render(zero)) == gpu::hashImage(base));
+    world::EffectInstance turned = aurora(true);
+    turned.aurora.shape.ribbonChurn = 12.0f;
+    CHECK(gpu::hashImage(h.render(turned)) != gpu::hashImage(base));
+    CHECK(h.ctx->errorCount() == 0);
+}
+
 // Hidden ([.]): the ribbons' cost at 1080p (honest timestamps, ADR-1600): no aurora, the curtains (three shells),
 // ribbons at 24 and at 48 planes, interleaved over 4 reps of 100 frames; the GPU frame's median.
 TEST_CASE("aurora ribbons: cost (measure)", "[.][gpu][atmospherics][aurora][measure][adr1641]") {

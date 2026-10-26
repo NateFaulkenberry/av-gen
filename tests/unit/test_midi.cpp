@@ -1,4 +1,5 @@
 #include "control/midi.hpp"
+#include "control/midi_backend.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
@@ -22,10 +23,16 @@ namespace {
 
 using Bytes = std::vector<std::uint8_t>;
 
-std::vector<MidiMessage> parse(const Bytes& bytes, MidiParserState& state, const std::string& source = "t") {
+std::vector<MidiMessage> parse(const Bytes& bytes, MidiParserState& state, std::uint16_t device = 7) {
     std::vector<MidiMessage> out;
-    parseMidiBytes(bytes, state, out, 42, source);
+    parseMidiBytes(bytes, state, out, 42, device);
     return out;
+}
+
+// ADR-1701: a message carries its device's slot; the name is in the input's device table.
+std::string nameOf(const MidiInput& input, const MidiMessage& m) {
+    const auto devices = input.devices();
+    return m.device < devices.size() ? devices[m.device].name : std::string("?");
 }
 
 std::vector<MidiMessage> parse(const Bytes& bytes) {
@@ -54,7 +61,7 @@ TEST_CASE("parseMidiBytes decodes every channel voice message", "[control][midi]
         CHECK(m[0].data1 == 60);
         CHECK(m[0].data2 == 100);
         CHECK(m[0].timestampNs == 42);
-        CHECK(m[0].source == "t");
+        CHECK(m[0].device == 7);
     }
     SECTION("note off") {
         auto m = parse({0x80, 60, 64});
@@ -216,7 +223,9 @@ TEST_CASE("MidiMessage::normalized and midiKindName", "[control][midi]") {
     auto bend = parse({0xE0, 0x7F, 0x7F});
     CHECK_THAT(bend[0].normalized(), Catch::Matchers::WithinAbs(1.0, 1e-6));
     auto centre = parse({0xE0, 0x00, 0x40});
-    CHECK_THAT(centre[0].normalized(), Catch::Matchers::WithinAbs(8192.0 / 16383.0, 1e-6));
+    CHECK(centre[0].normalized() == 0.5f); // ADR-1703: the centre is exactly the middle
+    auto bottom = parse({0xE0, 0x00, 0x00});
+    CHECK(bottom[0].normalized() == 0.0f);
     auto off = parse({0x90, 60, 0});
     CHECK(off[0].normalized() == 0.0f);
 
@@ -240,10 +249,9 @@ TEST_CASE("MidiInput inbox: inject, drain order, stats and queue limit", "[contr
     CHECK(out[0].data1 == 60);
     CHECK(out[1].data1 == 61);
     CHECK(out[2].data1 == 62);
-    CHECK(out[0].source == "unit");
+    CHECK(nameOf(input, out[0]) == "unit");
     CHECK(input.stats().messages == 3);
     CHECK(input.stats().dropped == 0);
-    CHECK(input.stats().lastSource == "unit");
     CHECK(input.drain(out) == 0);
 
     SECTION("running status is kept per source across inject calls") {
@@ -253,28 +261,44 @@ TEST_CASE("MidiInput inbox: inject, drain order, stats and queue limit", "[contr
         out.clear();
         REQUIRE(input.drain(out) == 2);
         CHECK(out[0].kind == MidiKind::ProgramChange);
-        CHECK(out[0].source == "b");
+        CHECK(nameOf(input, out[0]) == "b");
         CHECK(out[1].kind == MidiKind::ControlChange);
         CHECK(out[1].data2 == 2);
-        CHECK(out[1].source == "a");
-        CHECK(input.stats().lastSource == "a");
+        CHECK(nameOf(input, out[1]) == "a");
+        CHECK(out[0].device != out[1].device);
     }
-    SECTION("the queue limit drops the oldest messages") {
-        input.setQueueLimit(4);
-        Bytes many = {0xB0};
-        for (std::uint8_t i = 0; i < 6; ++i) {
-            many.push_back(i);
-            many.push_back(1);
+    SECTION("ADR-1701: past 3/4 of the queue a continuous control keeps only its latest value") {
+        input.setQueueLimit(8); // continuous messages queue up to 6
+        Bytes flood = {0xB0};
+        for (int i = 0; i < 100; ++i) {
+            flood.push_back(static_cast<std::uint8_t>(i % 2 == 0 ? 7 : 10)); // two knobs, interleaved
+            flood.push_back(static_cast<std::uint8_t>(i));
         }
-        input.inject(many, "flood");
+        input.inject(flood, "flood");
         out.clear();
-        REQUIRE(input.drain(out) == 4);
-        CHECK(out[0].data1 == 2);
-        CHECK(out[3].data1 == 5);
+        REQUIRE(input.drain(out) == 8); // 6 queued in order, then the two knobs' final positions
+        CHECK(out[5].data2 == 5);
+        CHECK(out[6].data1 == 7);
+        CHECK(out[6].data2 == 98);
+        CHECK(out[7].data1 == 10);
+        CHECK(out[7].data2 == 99);
         const auto stats = input.stats();
-        CHECK(stats.messages == 9);
-        CHECK(stats.dropped == 2);
-        CHECK(stats.lastSource == "flood");
+        CHECK(stats.messages == 103); // the three notes above, and these
+        CHECK(stats.coalesced == 94);
+        CHECK(stats.dropped == 0);
+    }
+    SECTION("ADR-1701: notes may use the whole queue; a lost note releases every gate") {
+        input.setQueueLimit(4);
+        input.inject(Bytes{0xB0, 1, 1, 2, 2, 3, 3}, "keys"); // three CCs fill the continuous share
+        input.inject(Bytes{0x90, 60, 100, 0x80, 60, 0, 0x90, 61, 100}, "keys"); // one fits, two do not
+        out.clear();
+        REQUIRE(input.drain(out) == 5);
+        CHECK(out[3].kind == MidiKind::NoteOn);
+        CHECK(out[4].kind == MidiKind::DeviceRemoved);
+        CHECK(out[4].device == kAllMidiDevices);
+        CHECK(input.stats().droppedNotes == 2);
+        out.clear();
+        CHECK(input.drain(out) == 0); // said once
     }
     SECTION("drain appends to the output vector") {
         out.assign(1, MidiMessage{});
@@ -354,17 +378,33 @@ TEST_CASE("MidiInput receives from a virtual source through the OS", "[control][
     CHECK(got[0].channel == 2);
     CHECK(got[0].data1 == 7);
     CHECK(got[0].data2 == 100);
-    CHECK(got[0].source == name);
+    CHECK(nameOf(input, got[0]) == name);
     CHECK(got[0].timestampNs > 0);
     CHECK(got[1].kind == MidiKind::NoteOn);
     CHECK(got[1].channel == 0);
     CHECK(got[1].data1 == 60);
     CHECK(got[1].data2 == 101);
-    CHECK(got[1].source == name);
+    CHECK(nameOf(input, got[1]) == name);
     CHECK(input.stats().messages == 2);
-    CHECK(input.stats().lastSource == name);
+    // ADR-1701: the device table names it with the system's stable id, connected.
+    {
+        const auto devices = input.devices();
+        REQUIRE(got[0].device < devices.size());
+        CHECK(devices[got[0].device].connected);
+        CHECK_FALSE(devices[got[0].device].id.empty());
+        CHECK(devices[got[0].device].virtualSource);
+    }
 
     input.close();
+    // Closing reports the device gone, in order, so whatever it held downstream is released.
+    {
+        std::vector<MidiMessage> after;
+        input.drain(after);
+        REQUIRE_FALSE(after.empty());
+        CHECK(after.back().kind == MidiKind::DeviceRemoved);
+        CHECK(after.back().device == got[0].device);
+        CHECK_FALSE(input.devices()[got[0].device].connected);
+    }
     CHECK_FALSE(input.isOpen());
     CHECK(input.connectedSources().empty());
     source.close();
@@ -404,12 +444,12 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     std::vector<MidiMessage> got;
     for (int i = 0; i < 400; ++i) {
         input.drain(got);
-        if (std::any_of(got.begin(), got.end(), [&](const MidiMessage& m) { return m.source == name; })) {
+        if (std::any_of(got.begin(), got.end(), [&](const MidiMessage& m) { return nameOf(input, m) == name; })) {
             break;
         }
         sleepMs(5);
     }
-    auto it = std::find_if(got.begin(), got.end(), [&](const MidiMessage& m) { return m.source == name; });
+    auto it = std::find_if(got.begin(), got.end(), [&](const MidiMessage& m) { return nameOf(input, m) == name; });
     REQUIRE(it != got.end());
     CHECK(it->kind == MidiKind::PitchBend);
     CHECK(it->channel == 1);
@@ -428,6 +468,55 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
         }
     }
     CHECK(gone);
+    // ADR-1701: the unplug is queued as a DeviceRemoved for its slot, and the slot is marked disconnected.
+    const std::uint16_t slot = it->device;
+    bool removed = false;
+    for (int i = 0; i < 400 && !removed; ++i) {
+        got.clear();
+        input.drain(got);
+        removed = std::any_of(got.begin(), got.end(),
+                              [&](const MidiMessage& m) { return m.kind == MidiKind::DeviceRemoved && m.device == slot; });
+        if (!removed) {
+            sleepMs(5);
+        }
+    }
+    CHECK(removed);
+    CHECK_FALSE(input.devices()[slot].connected);
+
+    // Plugged back in under the same identity: the same slot, so its mappings find it again.
+    MidiVirtualSource again;
+    REQUIRE(again.open(name).has_value());
+    bool reconnected = false;
+    for (int i = 0; i < 400 && !reconnected; ++i) {
+        for (const auto& connectedName : input.connectedSources()) {
+            reconnected = reconnected || connectedName == name;
+        }
+        if (!reconnected) {
+            sleepMs(5);
+        }
+    }
+    REQUIRE(reconnected);
+    REQUIRE(again.send(Bytes{0xB1, 7, 3}).has_value());
+    std::optional<MidiMessage> back;
+    for (int i = 0; i < 400 && !back; ++i) {
+        got.clear();
+        input.drain(got);
+        for (const auto& m : got) {
+            if (m.kind == MidiKind::ControlChange && nameOf(input, m) == name) {
+                back = m;
+            }
+        }
+        if (!back) {
+            sleepMs(5);
+        }
+    }
+    REQUIRE(back.has_value());
+    INFO("CoreMIDI may give a re-created virtual source a new unique id; then it is a new slot with the same name");
+    const auto devices = input.devices();
+    CHECK(devices[back->device].connected);
+    if (devices[back->device].id == devices[slot].id) {
+        CHECK(back->device == slot);
+    }
 }
 
 // ADR-880: the CoreMIDI receive thread and the thread that opens, drains and destroys the input
@@ -495,3 +584,27 @@ TEST_CASE("MidiInput survives open, drain and destroy while a source is streamin
     sender.reset();
     CHECK(received == 12);
 }
+
+// ADR-1701: the device table's identity rules, on the inbox itself (the seam the backends use).
+TEST_CASE("the device table: reconnection, duplicate ids, and a name fallback upgraded to a real id", "[control][midi][adr1701]") {
+    detail::MidiInbox inbox;
+    const auto keys = inbox.connectDevice("111", "Keys", false);
+    const auto twin = inbox.connectDevice("111", "Keys", false); // a second device reporting the same id
+    CHECK(twin != keys);
+    CHECK(inbox.devices()[twin].id == "111#2");
+    inbox.disconnectDevice(keys);
+    CHECK_FALSE(inbox.devices()[keys].connected);
+    std::vector<MidiMessage> out;
+    inbox.drain(out);
+    REQUIRE(out.size() == 1);
+    CHECK(out[0].kind == MidiKind::DeviceRemoved);
+    CHECK(out[0].device == keys);
+    CHECK(inbox.connectDevice("111", "Keys", false) == keys); // back under its id: its old slot
+    // First seen with no unique id (filed under its name), then with one: the same slot, now with the real id.
+    const auto pads = inbox.connectDevice("Pads", "Pads", true);
+    inbox.disconnectDevice(pads);
+    CHECK(inbox.connectDevice("222", "Pads", true) == pads);
+    CHECK(inbox.devices()[pads].id == "222");
+    CHECK(inbox.devices().size() == 3);
+}
+

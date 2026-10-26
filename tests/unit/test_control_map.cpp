@@ -10,13 +10,12 @@ using namespace avgen::control;
 using Catch::Matchers::WithinAbs;
 
 namespace {
-MidiMessage cc(std::uint8_t channel, std::uint8_t number, std::uint8_t value, std::string source = "pad") {
+MidiMessage cc(std::uint8_t channel, std::uint8_t number, std::uint8_t value) {
     MidiMessage m;
     m.kind = MidiKind::ControlChange;
     m.channel = channel;
     m.data1 = number;
     m.data2 = value;
-    m.source = std::move(source);
     return m;
 }
 MidiMessage note(MidiKind kind, std::uint8_t number, std::uint8_t velocity) {
@@ -24,7 +23,6 @@ MidiMessage note(MidiKind kind, std::uint8_t number, std::uint8_t velocity) {
     m.kind = kind;
     m.data1 = number;
     m.data2 = velocity;
-    m.source = "keys";
     return m;
 }
 OscMessage osc(std::string address, std::vector<OscArg> args = {}) {
@@ -35,59 +33,63 @@ OscMessage osc(std::string address, std::vector<OscArg> args = {}) {
 }
 } // namespace
 
-TEST_CASE("MIDI bindings match by source, channel, kind and number", "[control][map]") {
+TEST_CASE("MIDI bindings match by device, channel, kind and number", "[control][map]") {
     MidiBinding b;
     b.kind = MidiBindKind::ControlChange;
     b.number = 7;
     b.channel = 2;
     b.source = "PAD";
     b.target.signal = "fader";
-    auto m = matchMidi(b, cc(2, 7, 127));
-    REQUIRE(m.has_value());
-    CHECK_THAT(m->value, WithinAbs(1.0, 1e-6));
-    CHECK_FALSE(m->event);
-    CHECK_FALSE(matchMidi(b, cc(1, 7, 127)).has_value());          // wrong channel
-    CHECK_FALSE(matchMidi(b, cc(2, 8, 127)).has_value());          // wrong number
-    CHECK_FALSE(matchMidi(b, cc(2, 7, 127, "keys")).has_value());  // wrong source
+    auto v = midiSourceValue(b, cc(2, 7, 127));
+    REQUIRE(v.has_value());
+    CHECK_THAT(*v, WithinAbs(1.0, 1e-6));
+    CHECK_FALSE(midiSourceValue(b, cc(1, 7, 127)).has_value()); // wrong channel
+    CHECK_FALSE(midiSourceValue(b, cc(2, 8, 127)).has_value()); // wrong number
+    // The device filter: a name substring (case-insensitive), or a stable id that wins over the name.
+    CHECK(midiDeviceMatches(b, "123", "Drum pad"));
+    CHECK_FALSE(midiDeviceMatches(b, "123", "keys"));
+    b.device = "42";
+    b.deviceName = "Drum pad";
+    CHECK(midiDeviceMatches(b, "42", "renamed"));
+    CHECK_FALSE(midiDeviceMatches(b, "43", "Drum pad")); // same name, another device
+    b.device.clear();
     b.channel = -1;
     b.source = "*";
-    CHECK(matchMidi(b, cc(9, 7, 64, "anything")).has_value());
+    CHECK(midiSourceValue(b, cc(9, 7, 64)).has_value());
+    CHECK(midiDeviceMatches(b, "", ""));
     b.number = -1;
-    CHECK(matchMidi(b, cc(9, 99, 64)).has_value());
+    CHECK(midiSourceValue(b, cc(9, 99, 64)).has_value());
 
-    // Notes: value follows velocity, off = 0; toggle flips on note-on only; NoteEvent pulses.
+    // Notes: a gate reads velocity on, 0 off; a trigger matches note-on only.
     MidiBinding n;
     n.kind = MidiBindKind::Note;
     n.number = 36;
-    CHECK_THAT(matchMidi(n, note(MidiKind::NoteOn, 36, 127))->value, WithinAbs(1.0, 1e-6));
-    CHECK_THAT(matchMidi(n, note(MidiKind::NoteOff, 36, 0))->value, WithinAbs(0.0, 1e-6));
-    CHECK_FALSE(matchMidi(n, note(MidiKind::NoteOn, 37, 127)).has_value());
-    n.toggle = true;
-    CHECK_THAT(matchMidi(n, note(MidiKind::NoteOn, 36, 100))->value, WithinAbs(1.0, 1e-6));
-    CHECK_FALSE(matchMidi(n, note(MidiKind::NoteOff, 36, 0)).has_value());
-    CHECK_THAT(matchMidi(n, note(MidiKind::NoteOn, 36, 100))->value, WithinAbs(0.0, 1e-6));
+    CHECK_THAT(*midiSourceValue(n, note(MidiKind::NoteOn, 36, 127)), WithinAbs(1.0, 1e-6));
+    CHECK_THAT(*midiSourceValue(n, note(MidiKind::NoteOff, 36, 0)), WithinAbs(0.0, 1e-6));
+    CHECK_FALSE(midiSourceValue(n, note(MidiKind::NoteOn, 37, 127)).has_value());
+    n.numberHigh = 40; // a note range
+    CHECK(midiSourceValue(n, note(MidiKind::NoteOn, 38, 64)).has_value());
+    CHECK_FALSE(midiSourceValue(n, note(MidiKind::NoteOn, 41, 64)).has_value());
     MidiBinding e;
     e.kind = MidiBindKind::NoteEvent;
-    auto ev = matchMidi(e, note(MidiKind::NoteOn, 40, 64));
-    REQUIRE(ev.has_value());
-    CHECK(ev->event);
-    CHECK_FALSE(matchMidi(e, note(MidiKind::NoteOff, 40, 0)).has_value());
+    CHECK(midiSourceValue(e, note(MidiKind::NoteOn, 40, 64)).has_value());
+    CHECK_FALSE(midiSourceValue(e, note(MidiKind::NoteOff, 40, 0)).has_value());
 
     MidiBinding pb;
     pb.kind = MidiBindKind::PitchBend;
     MidiMessage bend;
     bend.kind = MidiKind::PitchBend;
     bend.value14 = 8192;
-    CHECK_THAT(matchMidi(pb, bend)->value, WithinAbs(0.5, 1e-3));
+    CHECK(*midiSourceValue(pb, bend) == 0.5f);
     MidiBinding pr;
     pr.kind = MidiBindKind::Program;
     pr.number = 3;
     MidiMessage prog;
     prog.kind = MidiKind::ProgramChange;
     prog.data1 = 3;
-    CHECK(matchMidi(pr, prog)->event);
+    CHECK(*midiSourceValue(pr, prog) == 1.0f);
     prog.data1 = 4;
-    CHECK_FALSE(matchMidi(pr, prog).has_value());
+    CHECK_FALSE(midiSourceValue(pr, prog).has_value());
 }
 
 TEST_CASE("OSC bindings match addresses and patterns and scale the argument", "[control][map]") {
