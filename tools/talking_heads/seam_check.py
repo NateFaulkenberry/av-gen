@@ -49,6 +49,10 @@ from tools.sonic_vfx.scenes import talking_heads as th  # noqa: E402
 
 EFFECTS = ("rest", "wash", "glow", "bands", "codec", "static", "ghosts", "blocks")
 UNSCORED = ("blocks",)
+# effects whose own pattern is world-space noise or hashed lines: the open jaw moves the surface under the pattern, so
+# the chin path samples different noise open and closed. The jaw's geometry is scored by `rest` (and wash, glow, ghosts)
+# on every head; these are scored at the piece seam only
+CHIN_UNSCORED = ("blocks", "bands", "codec", "static")
 CHIN = [0.0, 0.032, 0.092]   # the chin's tip under the lower lip, in the head's frame (anchors: mouthLip y 0.081)
 # view: (camera yaw from the bust's heading, neck tilt, mouth opening, camera height below the aim)
 VIEWS = {"front": (0.0, 0.0, 0.0, -0.02), "three-quarter": (-32.0, 0.0, 0.0, -0.02),
@@ -221,10 +225,12 @@ def main():
                         closed_step = chin_step
                         chin_txt = ", chin path %5.1f (the baseline)" % chin_step
                     else:
-                        chin_ok = chin_step - closed_step < a.tol or not scored
+                        chin_scored = scored and effect_ not in CHIN_UNSCORED
+                        chin_ok = chin_step - closed_step < a.tol or not chin_scored
                         ok = ok and chin_ok
-                        chin_txt = ", chin path %5.1f vs closed %5.1f%s" % (chin_step, closed_step,
-                                                                            "" if chin_ok else " CHIN")
+                        chin_txt = ", chin path %5.1f vs closed %5.1f%s" % (
+                            chin_step, closed_step, (" (pattern: not scored)" if not chin_scored
+                                                     else "" if chin_ok else " CHIN"))
                     dr0 = ImageDraw.Draw(img)
                     dr0.line([tuple(map(round, q)) for q in pts], fill=(255, 255, 0), width=1)
                 dr = ImageDraw.Draw(img)
