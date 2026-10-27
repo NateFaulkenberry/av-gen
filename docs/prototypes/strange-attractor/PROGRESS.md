@@ -8,7 +8,7 @@
 > - The brief (`00-brief.md`) is kept as written. Where it asks for recursive landmarks and an attractor structure,
 >   the owner's direction overrides it.
 
-Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850-1855).
+Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850-1856).
 Review media: `~/Desktop/av-gen-review/101-strange-attractor/gate<N>/`.
 
 The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`.
@@ -28,7 +28,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | 2 | 2 recursive landmarks, 3 branching and the attractor | done; the formations were then **removed by the owner** |
 | 2b | the canyon alone: the fixes, the river, the flythrough | done |
 | 2c | clean-up: camera jitter, geometry, a flowing river, one clean render | done (the jitter persisted: see 2d) |
-| 2d | the real jitter cause, glassy water, a 46 s flight | **done, awaiting the owner**: media in `gate2d/` |
+| 2d | the real jitter cause, glassy water, a 46 s flight | done |
+| 2e | cliff edge artifacts traced and fixed (ADR-1856) | **done, awaiting the owner**: media in `gate2e/`, catalogue `gate2e-artifact-catalogue.md` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -171,6 +172,7 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
+- 2026-10-27: Gate 2e: the cliff edge artifacts catalogued, traced and fixed at their causes (ADR-1856).
 - 2026-10-27: Gate 2d: the real jitter (ray reconstruction precision) fixed and proven on the video; glassy water;
   46 s.
 - 2026-10-27: Gate 2c: the jitter measured and fixed (scene-side), the river flows, geometry clean-up, a clean 2x
