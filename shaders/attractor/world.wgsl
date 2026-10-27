@@ -609,10 +609,11 @@ fn shadeWater(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     let e = 0.5;
     let f1 = vec2<f32>(u / 22.0, v / 9.0);
     let f2 = vec2<f32>(u / 9.0, v / 6.0) + vec2<f32>(3.7, 1.9);
-    let w2 = 0.35 * (1.0 - smoothstep(200.0, 900.0, t));
+    let w2 = 0.0; // no second octave: it drew moire contours in the reflection
     let hu = (vnoise(f1 + vec2<f32>(e, 0.0)) - vnoise(f1 - vec2<f32>(e, 0.0))) / 22.0 + w2 * (vnoise(f2 + vec2<f32>(e, 0.0)) - vnoise(f2 - vec2<f32>(e, 0.0))) / 9.0;
     let hv = (vnoise(f1 + vec2<f32>(0.0, e)) - vnoise(f1 - vec2<f32>(0.0, e))) / 9.0 + w2 * (vnoise(f2 + vec2<f32>(0.0, e)) - vnoise(f2 - vec2<f32>(0.0, e))) / 6.0;
-    let slope = (dir * hu + across * hv) * 1.4;
+    // low amplitude: the reflection stays a mirror that wobbles, not a broken surface
+    let slope = (dir * hu + across * hv) * 0.35;
     let n = normalize(vec3<f32>(-slope.x, 1.0, -slope.y));
     var r = reflect(rd, n);
     r.y = max(r.y, 0.002);
