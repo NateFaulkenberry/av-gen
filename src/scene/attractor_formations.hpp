@@ -52,7 +52,7 @@ struct AttractorTube {
 void bakeTubeVolume(AttractorTube& tube, int res);
 
 struct AttractorLandmark {
-    int kind = 0;                 // 0 butte tower, 1 nested-arch fin
+    int kind = 0;                 // 0 butte tower, 1 nested arches
     glm::vec3 base{0.0f};         // world position of the base's centre (on the ground)
     float scale = 300.0f;         // metres: the first tier's radius, or the fin's half length
     float angle = 0.0f;           // radians about +Y

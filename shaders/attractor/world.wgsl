@@ -225,12 +225,12 @@ fn detailAt(xz: vec2<f32>, dist: f32) -> f32 {
     var sum = 0.0;
     var amp = 1.0;
     for (var i = 0; i < 4; i = i + 1) {
-        let n = 1.0 - abs(vnoise(p) * 2.0 - 1.0);
-        sum = sum + n * n * amp;
+        let n = vnoise(p);
+        sum = sum + n * amp;
         amp = amp * 0.45;
         p = kOct * p * 2.2;
     }
-    return (sum - 0.45) * (0.6 + 2.6 * m.r) * fade * au.look.w;
+    return (sum - 0.9) * (0.5 + 1.6 * m.r) * fade * au.look.w;
 }
 
 // Fluting on the cliffs, in the cliff's own plane: vertical grooves along the face (a 2D mask can only smear them).
@@ -406,9 +406,9 @@ fn strataColour(s: f32, xz: vec2<f32>) -> vec3<f32> {
     let hard = bandHardness(bi);
     c = mix(mix(c, pal(P_DUST), 0.3) * 0.82, c * 1.06, smoothstep(0.35, 0.75, hard));
     c = c * (0.93 + 0.12 * hash01(i32(bi), 5, seed));
-    c = c * mix(0.62, 1.0, smoothstep(0.0, 0.07, bf)); // bedding plane
+    c = c * mix(0.82, 1.0, smoothstep(0.0, 0.05, bf)); // bedding plane (the band cut's ledges carry most of it)
     let lam = 0.5 + 0.5 * sin((bf * 5.0 + hash01(i32(bi), 4, seed) * 6.0) * 6.2831);
-    c = c * (0.95 + 0.05 * lam);
+    c = c * (0.97 + 0.03 * lam);
     return c;
 }
 

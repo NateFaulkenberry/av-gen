@@ -290,7 +290,7 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
         const glm::vec3 centre = lm.base + glm::vec3(0.0f, lm.kind == 0 ? lm.height * 1.3f : lm.height * 0.5f, 0.0f);
         u.landmarks[3 * i + 0] = glm::vec4(lm.base, static_cast<float>(lm.kind));
         u.landmarks[3 * i + 1] = glm::vec4(lm.scale, lm.height, lm.angle, static_cast<float>(lm.depth));
-        u.landmarks[3 * i + 2] = glm::vec4(centre, reach);
+        u.landmarks[3 * i + 2] = glm::vec4(centre, reach + 20.0f); // inflated: the shader's outside bound adds 20 m
     }
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 

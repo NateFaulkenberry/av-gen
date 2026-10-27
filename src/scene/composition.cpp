@@ -1276,8 +1276,9 @@ void Composition::applyAttractorCamera(float& fovDegrees) {
     if (!a.active() || a.cameraDrive < 0.5f) {
         return;
     }
-    scene_.camera.position = a.world->eye;
-    scene_.camera.target = a.world->target;
+    const AttractorCameraPose pose = attractorCamera(*a.world, a.live.drift, currentTime_);
+    scene_.camera.position = pose.eye;
+    scene_.camera.target = pose.target;
     scene_.camera.farPlane = std::max(scene_.camera.farPlane, a.world->extent * 2.0f);
     fovDegrees = a.world->fovDeg;
 }

@@ -27,7 +27,10 @@ fn tubeSegment(p: vec3<f32>, i: i32) -> f32 {
     let b = tubePts[i + 1];
     let ab = b.xyz - a.xyz;
     let t = clamp(dot(p - a.xyz, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
-    return length(p - (a.xyz + ab * t)) - mix(a.w, b.w, t) * (1.0 + au.formation.y);
+    let r = mix(a.w, b.w, t) * (1.0 + au.formation.y);
+    // a weathered surface: pocked and grooved, a fraction of the radius
+    let weather = (vnoise(p.xz / 9.0 + vec2<f32>(p.y / 11.0, 0.0)) - 0.5) * 0.22 * r;
+    return length(p - (a.xyz + ab * t)) - r + weather;
 }
 
 fn sdTube(p: vec3<f32>) -> f32 {
@@ -39,7 +42,9 @@ fn sdTube(p: vec3<f32>) -> f32 {
     let q = clamp(p, lo, hi);
     let outside = length(p - q);
     if (outside > 0.0) {
-        return outside + 1.0; // the surface lies inside the box (with a margin): stepping to the box is safe
+        // the surface lies at least the box's margin (2.5 voxels) inside it, so `outside + 10 m` is still a lower bound
+        // -- and, unlike `outside + 1`, larger than the march's hit epsilon at any range (which drew the box as dots)
+        return outside + 10.0;
     }
     let res = i32(au.tubeMin.w);
     let g = (p - lo) / (hi - lo) * f32(res - 1);
@@ -77,7 +82,7 @@ fn towerOutline(u: vec2<f32>) -> f32 {
 }
 
 fn sdTower(p: vec3<f32>, base: vec3<f32>, scale: f32, height: f32, angle: f32, depth: i32, seed: u32) -> f32 {
-    var q = p - base;
+    let q = p - base;
     let qxz = rot2(q.xz, -angle);
     var d = 1e5;
     var c = vec2<f32>(0.0);
@@ -86,57 +91,60 @@ fn sdTower(p: vec3<f32>, base: vec3<f32>, scale: f32, height: f32, angle: f32, d
     var h = height + 40.0;
     var a = 0.0;
     for (var k = 0; k <= depth; k = k + 1) {
-        let u = rot2(qxz - c, -a) / r;
-        let flare = 1.0 + 0.5 * smoothstep(y0 + 0.4 * h, y0, q.y);
-        let e = towerOutline(u / flare) - 1.0;
-        let d2 = e * r * 0.5;
-        d = min(d, max(d2, q.y - (y0 + h)));
+        // each tier: the plateau's own profile in miniature -- a talus foot, a cliff, a caprock that overhangs a little
+        let yl = (q.y - y0) / h;
+        let flare = 1.0 + 0.55 * smoothstep(0.42, 0.0, yl);
+        let cap = 1.0 + 0.12 * smoothstep(0.86, 0.95, yl);
+        let u = rot2(qxz - c, -a) / (r * flare * cap);
+        let e = towerOutline(u) - 1.0;
+        let d2 = e * r * 0.45;
+        let topY = y0 + h + 0.06 * h * fbm(u * 2.3, 2, 79u);
+        d = min(d, max(d2, q.y - topY));
+        // the next tier leans out over its edge: the stack is balanced as no stack of rock could be
         let j = vec2<f32>(hash01(k, 11, seed), hash01(k, 12, seed)) - 0.5;
-        c = c + rot2(j, a) * r * 0.5;
+        c = c + rot2(normalize(j + vec2<f32>(0.3, 0.0)), a) * r * 0.42;
         y0 = y0 + h;
         if (k == 0) {
             h = height;
         }
-        r = r * 0.55;
-        h = h * 0.8;
-        a = a + 1.1 + hash01(k, 13, seed) * 1.4;
+        r = r * 0.58;
+        h = h * (0.72 + 0.2 * hash01(k, 14, seed));
+        a = a + 0.9 + hash01(k, 13, seed) * 1.8;
     }
     return d;
 }
 
-// ---- the arch fin ----
+// ---- the nested arches ----
 
-// One fin with one arch, in its own frame: ground at y = 0, the fin along x, its arch opening through z.
-fn sdFinUnit(q: vec3<f32>, L: f32, H: f32) -> f32 {
-    let T = 0.17 * L;
-    let xn = q.x / L;
-    let top = H * (0.80 + 0.20 * (1.0 - xn * xn)) + 0.06 * H * fbm(vec2<f32>(q.x, q.z) / (0.35 * L), 2, 31u);
-    let side = 0.12 * T * fbm(vec2<f32>(q.x, q.y) / (0.18 * L), 2, 33u);
-    let body = max(max(abs(q.x) - L, abs(q.z) - T - side), q.y - top);
-    let a = 0.44 * L;
-    let b = 0.66 * H;
-    let arch = (length(vec2<f32>(q.x / a, q.y / b)) - 1.0) * min(a, b);
-    return max(body, -arch);
+// One free-standing natural arch in its own frame: ground at y = 0, the span across x, its thickness along z. Legs
+// thick at the foot, a thin lintel, a weathered surface; the legs run 30 m into the ground.
+fn sdArchUnit(q: vec3<f32>, A: f32, B: f32) -> f32 {
+    let yn = clamp(q.y / B, 0.0, 1.0);
+    let e = length(vec2<f32>(q.x / A, q.y / B));
+    let n1 = fbm(vec2<f32>(q.x + q.z, q.y) / (0.22 * A), 3, 41u);
+    let w = A * mix(0.27, 0.10, yn) * (1.0 + 0.25 * n1);
+    let ring = abs(e - 1.0) * min(A, B) - w;
+    let T = A * mix(0.21, 0.08, yn) * (1.0 + 0.2 * fbm(vec2<f32>(q.x, q.y) / (0.3 * A), 2, 43u));
+    let d2 = vec2<f32>(ring, abs(q.z) - T);
+    var d = min(max(d2.x, d2.y), 0.0) + length(max(d2, vec2<f32>(0.0)));
+    d = max(d, -q.y - 30.0);
+    return d * 0.8;
 }
 
-fn sdFin(p: vec3<f32>, base: vec3<f32>, scale: f32, height: f32, angle: f32, depth: i32, seed: u32) -> f32 {
-    var q = p - base;
-    let r = rot2(q.xz, -angle);
-    q = vec3<f32>(r.x, q.y + 30.0, r.y); // sunk 30 m, so the fin rises out of the ground rather than sitting on it
+// An arch, and inside its opening a smaller arch turned a little, and inside that one another, to `depth` levels:
+// the same shape repeated within itself.
+fn sdArches(p: vec3<f32>, base: vec3<f32>, scale: f32, height: f32, angle: f32, depth: i32, seed: u32) -> f32 {
+    let q0 = p - base;
     var d = 1e5;
     var s = 1.0;
-    var off = vec3<f32>(0.0);
-    var yaw = 0.0;
+    var yaw = angle;
+    var shift = vec2<f32>(0.0);
     for (var k = 0; k <= depth; k = k + 1) {
-        let lq = q - off;
-        let lr = rot2(lq.xz, -yaw);
-        let local = vec3<f32>(lr.x, lq.y, lr.y);
-        d = min(d, sdFinUnit(local / s, scale, height + 30.0) * s);
-        // the next fin stands inside this one's arch, on the same ground
-        off = off + vec3<f32>(rot2(vec2<f32>((hash01(k, 21, seed) - 0.5) * 0.25 * scale * s, 0.0), yaw).x, 0.0,
-                              rot2(vec2<f32>((hash01(k, 21, seed) - 0.5) * 0.25 * scale * s, 0.0), yaw).y);
-        yaw = yaw + (hash01(k, 22, seed) - 0.5) * 0.5;
-        s = s * 0.38;
+        let r = rot2(q0.xz - shift, -yaw);
+        d = min(d, sdArchUnit(vec3<f32>(r.x, q0.y, r.y), scale * s, height * s));
+        shift = shift + rot2(vec2<f32>(0.0, (hash01(k, 21, seed) - 0.5) * 0.3 * scale * s), yaw);
+        yaw = yaw + (hash01(k, 22, seed) - 0.5) * 0.9;
+        s = s * 0.56;
     }
     return d;
 }
@@ -151,7 +159,7 @@ fn strataRecess(p: vec3<f32>) -> f32 {
     let bi = floor(t);
     let bf = t - bi;
     let soft = 1.0 - smoothstep(0.35, 0.75, bandHardness(bi));
-    return soft * 2.2 * smoothstep(0.0, 0.12, bf) * smoothstep(1.0, 0.85, bf);
+    return soft * 3.5 * smoothstep(0.0, 0.12, bf) * smoothstep(1.0, 0.85, bf);
 }
 
 // x = distance (m), y = 1 for the formations (the caller compares it with the terrain)
@@ -162,7 +170,7 @@ fn sdFormations(p: vec3<f32>) -> f32 {
         let b = au.landmarks[3 * i + 2];
         let toBound = length(p - b.xyz) - b.w;
         if (toBound > 0.0) {
-            d = min(d, toBound + 1.0);
+            d = min(d, toBound + 20.0); // the sphere is inflated by 20 m on the CPU, so this stays a lower bound
             continue;
         }
         let a = au.landmarks[3 * i];
@@ -171,7 +179,7 @@ fn sdFormations(p: vec3<f32>) -> f32 {
         if (a.w < 0.5) {
             d = min(d, sdTower(p, a.xyz, k.x, k.y, k.z, i32(k.w), seed));
         } else {
-            d = min(d, sdFin(p, a.xyz, k.x, k.y, k.z, i32(k.w), seed));
+            d = min(d, sdArches(p, a.xyz, k.x, k.y, k.z, i32(k.w), seed));
         }
     }
     if (d < 6.0) {

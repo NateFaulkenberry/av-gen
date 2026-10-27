@@ -135,10 +135,11 @@ TEST_CASE("the block parses, round-trips and refuses what it does not know", "[a
 }
 
 TEST_CASE("a seed change regenerates the world in place; a look change never does", "[attractor-world][adr1850]") {
-    Comp c(sceneWith({{"seed", 4}, {"resolution", 384}}));
+    Comp c(sceneWith({{"seed", 4}, {"resolution", 384}, {"look", {{"drift", 0.0}}}}));
     for (const char* leaf : {"seed", "terrainScale", "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion",
                              "strataFold", "palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
-                             "atmosphere", "strata", "exposure", "detail", "camera"}) {
+                             "atmosphere", "strata", "exposure", "detail", "drift", "camera", "recursiveDepth",
+                             "formationScale", "attractorInfluence", "attractorSystem", "branchingDensity", "landmarks"}) {
         INFO(leaf);
         CHECK(c.params.find(std::string("attractorWorld/") + leaf) != nullptr);
     }
@@ -288,4 +289,42 @@ TEST_CASE("the formation knobs never move the terrain or the camera", "[attracto
     CHECK(wa->hash != wb->hash);
     CHECK(wa->height == wb->height);
     CHECK(wa->eye == wb->eye);
+}
+
+TEST_CASE("the camera drift is a bounded, smooth function of time that starts at the composed pose", "[attractor-world][adr1852]") {
+    const auto w = scene::generateAttractorWorld(smallGen(2));
+    const auto p0 = scene::attractorCamera(*w, 1.0f, 0.0);
+    CHECK(glm::length(p0.eye - w->eye) < 1e-3f);
+    CHECK(glm::length(scene::attractorCamera(*w, 0.0f, 40.0).eye - w->eye) < 1e-6f);
+    float maxStep = 0.0f, maxOff = 0.0f;
+    glm::vec3 prev = p0.eye;
+    for (int f = 1; f <= 30 * 300; ++f) { // five minutes at 30 fps
+        const auto p = scene::attractorCamera(*w, 1.0f, f / 30.0);
+        maxStep = std::max(maxStep, glm::length(p.eye - prev));
+        maxOff = std::max(maxOff, glm::length(p.eye - w->eye));
+        prev = p.eye;
+    }
+    CHECK(maxStep < 0.25f); // under 7.5 m/s: a drift, never a move
+    CHECK(maxOff < 200.0f);
+    CHECK(maxOff > 50.0f);
+}
+
+TEST_CASE("attractor world probe (hidden)", "[.attractor-probe]") {
+    for (unsigned s : {1u, 2u, 5u}) {
+        scene::AttractorGen g;
+        g.seed = s;
+        auto w = scene::generateAttractorWorld(g);
+        int net = 0;
+        for (float a : w->networkArc) net += a >= 0.0f ? 1 : 0;
+        std::printf("seed %u branches %zu networkTexels %d gorgeLine %zu gen %.2fs tube %zu landmarks %zu\n", s,
+                    w->branches.size(), net, w->gorgeLine.size(), w->generateSeconds, w->tube.points.size(), w->landmarks.size());
+        std::printf("  eye (%.0f %.0f %.0f) target (%.0f %.0f %.0f) fov %.1f tube box (%.0f %.0f %.0f)-(%.0f %.0f %.0f)\n", w->eye.x, w->eye.y, w->eye.z,
+                    w->target.x, w->target.y, w->target.z, w->fovDeg, w->tube.boundsMin.x, w->tube.boundsMin.y, w->tube.boundsMin.z,
+                    w->tube.boundsMax.x, w->tube.boundsMax.y, w->tube.boundsMax.z);
+        for (const auto& lm : w->landmarks) std::printf("  landmark kind %d base (%.0f %.0f %.0f)\n", lm.kind, lm.base.x, lm.base.y, lm.base.z);
+        for (const auto& b : w->branches) {
+            if (b.level > 0) continue;
+            std::printf("  level %d n %zu w0 %.1f d0 %.1f start (%.0f %.0f)\n", b.level, b.points.size(), b.widths[0], b.depths[0], b.points[0].x, b.points[0].y);
+        }
+    }
 }

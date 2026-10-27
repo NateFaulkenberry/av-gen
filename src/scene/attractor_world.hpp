@@ -62,6 +62,7 @@ struct AttractorLook {
     float strata = 1.0f;          // visibility of the strata bands
     float exposure = 1.0f;
     float detail = 1.0f;          // near-field displacement detail
+    float drift = 0.5f;           // the composed camera's slow drift (0 still .. 1 the widest, slowest arc)
 };
 
 struct AttractorMass {
@@ -133,6 +134,13 @@ struct AttractorWorldParameters {
 [[nodiscard]] AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& params,
                                                                         const AttractorWorldBlock& rest,
                                                                         const std::string& prefix);
+// The composed camera at `seconds`: the generated eye and target, drifting on a slow lateral arc with a little dolly
+// (`look.drift`). A pure function of time, so it is frame-rate independent and seekable.
+struct AttractorCameraPose {
+    glm::vec3 eye{0.0f};
+    glm::vec3 target{0.0f};
+};
+[[nodiscard]] AttractorCameraPose attractorCamera(const AttractorWorld& world, float drift, double seconds);
 // The finals into `live.liveGen`, `live.live` and `live.cameraDrive`.
 void applyAttractorWorldParameters(const AttractorWorldParameters& p, const AttractorWorldBlock& rest,
                                    AttractorWorldBlock& live);
