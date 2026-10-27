@@ -76,8 +76,8 @@ can follow the bass alone while the picture still plays the whole song. See the 
 
 On an interface with more than two inputs, the **Live** panel lists every input channel under **Audio input** with a
 meter. Tick a channel to analyse it on its own as `stem.<key>.*`, beside the main mix; label it (Drum bus, Bass DI);
-tick **Pair** to treat it and the next channel as one stereo source; set its **Role** (drums on the drum bus: only a
-drums source finds kicks, snares and hats). The map is remembered for that interface on this machine.
+tick **Pair** to treat it and the next channel as one stereo source; set its **Role** (drums on the drum bus: the role is what
+`role.drums.*` reads; no source names an instrument, so there is no kick, snare or hat signal). The map is remembered for that interface on this machine.
 
 AV Gen cannot know what is plugged in: the drum bus is only on input 1 if your mixer sends it there. Give each
 part its own physical output on the mixer (a group or aux bus, pre-fader if the main fader should not change it) and
@@ -111,8 +111,8 @@ the Inputs table and under the Stems section, lets a source drive them instead:
   from this source, read against its own loudness. Use a sustained source (a bass, a pad, the mix): a drum source makes the levels pulse
   with every hit. For one level per part, read that part's own `role.<role>.level` instead.
 - **History**: what spectrum and onset fields hear (Resonator, the generative fields): this source's spectrogram and
-  onsets instead of the mix's. A drums source's kicks, snares and hats are the fields' low, mid and high onsets; the
-  mix's and any other source's onsets land on the row of their register. The beat stays the mix's.
+  onsets instead of the mix's. Every source's onsets, a drums source's included, land on the row of their register
+  (low, mid, high). The beat stays the mix's.
 
 Each list offers the roles first (**role: drums**: the first source of that role, whatever its key), then every key.
 
