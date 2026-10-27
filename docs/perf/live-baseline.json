@@ -2,7 +2,7 @@
  "format": "avgen-live-baseline",
  "version": 1,
  "machine": "Apple M2 Max, macOS, 60 Hz display (the owner's)",
- "revision": "8b95a484",
+ "revision": "eda492a6",
  "conditions": "Release; 1920x1080; 30 fps target; Feline Footwear muted (--no-audio) from 60 s; live Auto --warmup 5 --measure 30 x 3 interleaved reps; headless Ultra --warmup-frames 150 --measure 15; AC power; tools/gpu-lock.sh",
  "thresholds": {
   "T1": "misses/900 median <= 5",
@@ -11,7 +11,7 @@
   "T4": "headless Ultra GPU p50 <= 29.3, p95 <= 1.5 x p50",
   "T9": "misses > worst rep + 2 or p99 > worst rep + 2 ms fails"
  },
- "written": "2026-10-25",
+ "written": "2026-10-27",
  "scenes": {
   "rainbow-world": {
    "project": "examples/rainbow-world/rainbow-world.json",
@@ -206,55 +206,58 @@
    "project": "examples/sonic-abstract/talking-heads.json",
    "reps": [
     {
-     "frames": 901,
+     "frames": 900,
      "deadlineMisses": 1,
-     "missesPer900": 0.9988901220865705,
-     "p50": 33.316458,
-     "p99": 37.345541,
-     "max": 52.4025,
+     "missesPer900": 1.0,
+     "p50": 33.355625,
+     "p99": 36.283542,
+     "max": 52.357083,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "b4152cb63e9d"
-    },
-    {
-     "frames": 901,
-     "deadlineMisses": 1,
-     "missesPer900": 0.9988901220865705,
-     "p50": 33.322,
-     "p99": 37.6525,
-     "max": 51.186667,
-     "mediumOrBetter": 1.0,
-     "levels": {
-      "Ultra": 1.0
-     },
-     "revision": "b4152cb63e9d"
+     "revision": "a5b6c0aaef9c",
+     "environment": ""
     },
     {
      "frames": 901,
      "deadlineMisses": 2,
      "missesPer900": 1.997780244173141,
-     "p50": 33.311417,
-     "p99": 37.946667,
-     "max": 50.183166,
+     "p50": 33.318458,
+     "p99": 35.661167,
+     "max": 54.758708,
      "mediumOrBetter": 1.0,
      "levels": {
       "Ultra": 1.0
      },
-     "revision": "b4152cb63e9d"
+     "revision": "a5b6c0aaef9c",
+     "environment": ""
+    },
+    {
+     "frames": 900,
+     "deadlineMisses": 1,
+     "missesPer900": 1.0,
+     "p50": 33.2825,
+     "p99": 36.069583,
+     "max": 49.638292,
+     "mediumOrBetter": 1.0,
+     "levels": {
+      "Ultra": 1.0
+     },
+     "revision": "a5b6c0aaef9c",
+     "environment": ""
     }
    ],
    "failedRuns": [],
-   "missesMedian": 0.9988901220865705,
+   "missesMedian": 1.0,
    "missesWorst": 1.997780244173141,
-   "p99Median": 37.6525,
-   "p99Worst": 37.946667,
+   "p99Median": 36.069583,
+   "p99Worst": 36.283542,
    "mediumOrBetter": 1.0,
    "headless": {
-    "gpuP50": 14.485195,
-    "gpuP95": 18.283096,
-    "cpuWorkP50": 4.223458000000001
+    "gpuP50": 11.102414,
+    "gpuP95": 14.839189999999999,
+    "cpuWorkP50": 6.767874000000001
    },
    "thresholds": {
     "T1": true,
