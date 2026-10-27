@@ -14,6 +14,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -150,13 +151,33 @@ TEST_CASE("A seek lands the scene states, the macros and an integrating camera r
     }
 }
 
-TEST_CASE("A project without scene states does not pay for the control replay", "[seek][states][adr1168]") {
+TEST_CASE("A project without scene states does not pay for the control replay", "[seek][states][adr1168][adr1801]") {
+    // Without its integrals: since ADR-1801 an integrating route is replayed by the control replay (on the play's own
+    // grid; the signal replay's 60 Hz grid integrates to a different total). What is left is a follower on a pure
+    // source, which the signal replay rebuilds and which forgets in a second and a half.
     const auto project = writeProject(false);
+    {
+        nlohmann::json p = nlohmann::json::parse(std::ifstream(project));
+        auto& routes = p["routes"];
+        routes.erase(std::remove_if(routes.begin(), routes.end(),
+                                    [](const nlohmann::json& r) { return r["chain"].value("integrate", false); }),
+                     routes.end());
+        REQUIRE(routes.size() == 1);
+        std::ofstream(project) << p.dump(1);
+    }
     app::Engine e(app::EngineMode::Offline);
     REQUIRE(e.loadProject(project).has_value());
+    CHECK_FALSE(e.controlReplayNeeded());
     e.seekSeconds(4.0);
     e.seekSeconds(2.0);
     CHECK(e.stats().controlReplays == 0);
+}
+
+TEST_CASE("A project whose routes integrate is replayed by the control replay", "[seek][adr1801]") {
+    const auto project = writeProject(false);
+    app::Engine e(app::EngineMode::Offline);
+    REQUIRE(e.loadProject(project).has_value());
+    CHECK(e.controlReplayNeeded());
 }
 
 // ADR-1168's cost: a seek late in a real song. `AVGEN_BENCH_PROJECT` names the project (DIGITAL MOSH by default).

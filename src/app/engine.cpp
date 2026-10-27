@@ -2961,15 +2961,30 @@ bool Engine::controlReplayNeeded() const {
     if (!states_.states.empty()) {
         return true;
     }
-    // ADR-1602: a conditioned signal holds a route's chain state of its own, which only this replay rebuilds
     for (const auto& source : sources_.sources()) {
+        // ADR-1602: a conditioned signal holds a route's chain state of its own, which only this replay rebuilds
         if (source->kind() == "signal") {
             return true;
         }
+        // ADR-1801: so do the sources that count their triggers -- the k-th value of a sample-and-hold, an envelope's
+        // stage -- which the signal replay does not rebuild (they are not pure in time)
+        if (source->kind() == "random" || source->kind() == "envelope") {
+            return true;
+        }
     }
-    // ADR-1573: a route that feeds a source -- the macro knobs and source settings are parameters the sources read
     for (const params::ModRoute& r : modulator_.routes()) {
-        if (r.enabled && (r.target.starts_with("macros/") || r.target.starts_with("sources/"))) {
+        if (!r.enabled) {
+            continue;
+        }
+        // ADR-1573: a route that feeds a source -- the macro knobs and source settings are parameters the sources read
+        if (r.target.starts_with("macros/") || r.target.starts_with("sources/")) {
+            return true;
+        }
+        // ADR-1801: an integrating route's running total remembers the whole film. The signal replay (ADR-901) steps
+        // on its own 60 Hz grid, and a chain integrates per step: a play at the render's 30 fps reaches a different
+        // total, and a route on a signal that replay does not rebuild restarts at 0. This replay steps on the play's
+        // own grid, so the seek lands where the play does.
+        if (r.chain.integrate) {
             return true;
         }
     }
