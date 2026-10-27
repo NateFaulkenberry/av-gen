@@ -674,14 +674,15 @@ private:
     char assetSearch_[96] = "";
     int newRouteSource_ = 0;
     int newRouteTarget_ = 0;
-    // ADR-902: each route row's liveness badge, re-checked when that route changed and once a second
-    // besides (a rule also reads the scene). The rules sample the route's chain, so not every frame.
+    // ADR-902: each route row's liveness badge, re-checked when that route changed and about once a second
+    // besides (a rule also reads the scene), a slice of rows per frame (ADR-1802).
     struct RouteLivenessRow {
         std::uint64_t signature = 0;
         RouteBadge badge;
     };
     std::vector<RouteLivenessRow> routeLiveness_;
-    double routeLivenessCheckedAt_ = -1.0;
+    params::liveness::Registry::SetFindings routeLivenessSet_; // ADR-1802: the set rules' findings, per route
+    LivenessSweep routeLivenessSweep_;                         // ADR-1802: which rows the periodic refresh visits next
     int newSourceKind_ = 0;
     char newSourceName_[64] = "wobble";
     char presetName_[64] = "preset";

@@ -1692,25 +1692,46 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     int removeIndex = -1;
     auto& routes = modulator.routes();
     // ADR-902: each route's liveness verdict, shown beside its header the way "[ignored]" is shown
-    // beside an inert parameter. Re-checked when a route changed, and once a second besides, because
-    // a rule also reads the scene; the rules sample the chain, so not every frame.
+    // beside an inert parameter. A route that changed is re-checked at once; every route is re-checked
+    // about once a second besides, because a rule also reads the scene. ADR-1802: that refresh is a
+    // slice of rows per frame (`LivenessSweep`), not every route in one frame.
     {
-        const double now = ImGui::GetTime();
-        bool stale = routeLiveness_.size() != routes.size() || now - routeLivenessCheckedAt_ > 1.0;
-        for (std::size_t i = 0; !stale && i < routes.size(); ++i) {
-            stale = routeLiveness_[i].signature != routeSignature(routes[i]);
-        }
-        if (stale) {
-            const scene::SceneLivenessFacts facts(engine.livenessInputs());
-            const auto& registry = liveness::Registry::standard();
-            const auto set = registry.checkSet(routes, engine.timeline().tracks());
+        const auto& registry = liveness::Registry::standard();
+        std::optional<scene::SceneLivenessFacts> facts; // built only on a frame that checks something
+        const auto check = [&](std::size_t i) {
+            if (!facts) {
+                facts.emplace(engine.livenessInputs());
+            }
+            auto findings = registry.checkRoute(routes[i], *facts);
+            findings.insert(findings.end(), routeLivenessSet_.routes[i].begin(), routeLivenessSet_.routes[i].end());
+            routeLiveness_[i] = RouteLivenessRow{routeSignature(routes[i]), routeBadge(findings)};
+        };
+        if (routeLiveness_.size() != routes.size()) { // a load, an add, a delete: everything, now
+            routeLivenessSet_ = registry.checkSet(routes, engine.timeline().tracks());
             routeLiveness_.assign(routes.size(), RouteLivenessRow{});
             for (std::size_t i = 0; i < routes.size(); ++i) {
-                auto findings = registry.checkRoute(routes[i], facts);
-                findings.insert(findings.end(), set.routes[i].begin(), set.routes[i].end());
-                routeLiveness_[i] = RouteLivenessRow{routeSignature(routes[i]), routeBadge(findings)};
+                check(i);
             }
-            routeLivenessCheckedAt_ = now;
+            routeLivenessSweep_ = LivenessSweep{};
+        } else {
+            std::vector<std::size_t> changed;
+            for (std::size_t i = 0; i < routes.size(); ++i) {
+                if (routeLiveness_[i].signature != routeSignature(routes[i])) {
+                    changed.push_back(i);
+                }
+            }
+            const LivenessSweep::Slice slice = routeLivenessSweep_.next(routes.size());
+            // The set rules (a later Replace on the same target) read every route and the tracks: re-judged when a
+            // route changed and once per sweep.
+            if (!changed.empty() || slice.completesSweep) {
+                routeLivenessSet_ = registry.checkSet(routes, engine.timeline().tracks());
+            }
+            for (const std::size_t i : changed) {
+                check(i);
+            }
+            for (std::size_t k = 0; k < slice.count; ++k) {
+                check((slice.first + k) % routes.size());
+            }
         }
     }
     // The depth combo's entries, built once per draw and shared by every route (the bus's names, sorted). Rebuilding

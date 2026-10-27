@@ -7,12 +7,14 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
+#include <algorithm>
 #include <vector>
 
 using namespace avgen;
 using namespace avgen::params;
 using namespace avgen::params::liveness;
 using Catch::Matchers::ContainsSubstring;
+using avgen::ui::LivenessSweep;
 
 TEST_CASE("A route row's badge names the worst finding and lists them all", "[ui][liveness][adr902]") {
     CHECK_FALSE(ui::routeBadge(std::vector<Finding>{}).show); // live: nothing beside the header
@@ -80,4 +82,45 @@ TEST_CASE("The depth-source combo lists (none) first and every signal, sorted", 
     CHECK(ui::depthSourceIndex(pending, "timeline.sectionEnergy") != 0);
     CHECK(pending[static_cast<std::size_t>(ui::depthSourceIndex(pending, "timeline.sectionEnergy"))] ==
           "timeline.sectionEnergy");
+}
+
+// ADR-1802: the periodic badge refresh visits every row once a sweep, a bounded slice per frame.
+TEST_CASE("The liveness sweep visits every row once per sweep, a slice per frame", "[ui][liveness][adr1802]") {
+    for (const std::size_t rows : {std::size_t{1}, std::size_t{7}, std::size_t{30}, std::size_t{241}, std::size_t{1306}}) {
+        INFO(rows << " rows");
+        LivenessSweep sweep;
+        std::vector<int> visits(rows, 0);
+        std::size_t frames = 0;
+        bool completed = false;
+        while (!completed) {
+            const LivenessSweep::Slice s = sweep.next(rows);
+            REQUIRE(s.count > 0);
+            // Talking Heads' 1,306 routes in one frame missed a 30 fps deadline: no frame takes more than its share
+            CHECK(s.count <= std::max<std::size_t>(LivenessSweep::kMinRowsPerFrame,
+                                                   (rows + LivenessSweep::kFramesPerSweep - 1) / LivenessSweep::kFramesPerSweep));
+            for (std::size_t k = 0; k < s.count; ++k) {
+                ++visits[(s.first + k) % rows];
+            }
+            completed = s.completesSweep;
+            ++frames;
+            REQUIRE(frames <= LivenessSweep::kFramesPerSweep);
+        }
+        // every row at least once; a slice that wraps may visit the first rows a second time
+        CHECK(std::all_of(visits.begin(), visits.end(), [](int v) { return v >= 1; }));
+        CHECK(std::all_of(visits.begin(), visits.end(), [](int v) { return v <= 2; }));
+        // and the next sweep starts where this one stopped, so over two sweeps every row is visited twice-ish
+        const LivenessSweep::Slice after = sweep.next(rows);
+        CHECK(after.first < rows);
+    }
+    LivenessSweep empty;
+    const LivenessSweep::Slice none = empty.next(0);
+    CHECK(none.count == 0);
+    CHECK_FALSE(none.completesSweep);
+    // a list that shrinks under the cursor (a route deleted) restarts inside it
+    LivenessSweep shrink;
+    for (int i = 0; i < 5; ++i) {
+        static_cast<void>(shrink.next(100));
+    }
+    const LivenessSweep::Slice s = shrink.next(10);
+    CHECK(s.first < 10);
 }

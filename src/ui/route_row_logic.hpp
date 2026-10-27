@@ -94,6 +94,42 @@ struct RouteBadge {
     return h;
 }
 
+// ADR-1802: the periodic re-check of every route's badge, spread over frames. It used to re-check all of them in one
+// frame once a second; on Talking Heads (1,306 routes) that frame missed its 30 fps deadline every second, live. Each
+// frame now re-checks a slice of rows in turn, so a whole sweep still takes about a second at 30 fps (half at 60) and
+// no frame pays for more than its share. A route that changed is still re-checked at once; this only paces the
+// "a rule also reads the scene" refresh.
+struct LivenessSweep {
+    static constexpr std::size_t kFramesPerSweep = 30;
+    static constexpr std::size_t kMinRowsPerFrame = 8;
+
+    struct Slice {
+        std::size_t first = 0; // rows first, first + 1, ... count of them, wrapping at the row count
+        std::size_t count = 0;
+        bool completesSweep = false; // the slice reaches the last row: anything judged on the whole set is due
+    };
+
+    std::size_t cursor = 0;
+
+    [[nodiscard]] static std::size_t rowsPerFrame(std::size_t rows) {
+        return std::min(rows, std::max(kMinRowsPerFrame, (rows + kFramesPerSweep - 1) / kFramesPerSweep));
+    }
+
+    [[nodiscard]] Slice next(std::size_t rows) {
+        Slice s;
+        if (rows == 0) {
+            cursor = 0;
+            return s;
+        }
+        cursor %= rows;
+        s.first = cursor;
+        s.count = rowsPerFrame(rows);
+        s.completesSweep = s.first + s.count >= rows;
+        cursor = (s.first + s.count) % rows;
+        return s;
+    }
+};
+
 // ADR-924: what a route row says about the Director plan item that made it, beside its header --
 // nothing for a route a person made; "[plan: <key>]" for one a plan made, with the plan, the item's
 // level, what it answers and why in the tooltip, so the person editing the route can see what it was
