@@ -4,43 +4,18 @@
 
 namespace avgen::analysis {
 
-namespace {
-
-// The four event kinds a StemFrame carries, by index.
-bool& flag(StemFrame& f, std::size_t k) {
-    switch (k) {
-    case 0: return f.onset;
-    case 1: return f.kick;
-    case 2: return f.snare;
-    default: return f.hat;
-    }
-}
-float& strength(StemFrame& f, std::size_t k) {
-    switch (k) {
-    case 0: return f.onsetStrength;
-    case 1: return f.kickStrength;
-    case 2: return f.snareStrength;
-    default: return f.hatStrength;
-    }
-}
-
-} // namespace
-
 void LiveStemLatch::apply(LiveStemFrame& f) {
     if (f.serial < serial) {
         *this = LiveStemLatch{}; // a new analysis (the input was reopened)
     }
     serial = f.serial;
-    for (std::size_t k = 0; k < 4; ++k) {
-        bool& on = flag(f.frame, k);
-        if (!on || f.stamps[k] == 0) {
-            continue;
-        }
-        if (f.stamps[k] <= fired[k]) {
-            on = false; // fired on an earlier render frame
-        } else {
-            fired[k] = f.stamps[k];
-        }
+    if (!f.frame.onset || f.stamp == 0) {
+        return;
+    }
+    if (f.stamp <= fired) {
+        f.frame.onset = false; // fired on an earlier render frame
+    } else {
+        fired = f.stamp;
     }
 }
 
@@ -72,7 +47,7 @@ ChannelAnalysis::ChannelAnalysis(std::vector<Source> sources, std::uint32_t samp
         if (previous && s.stream != nullptr) {
             const auto kept = std::find_if(previous->slots_.begin(), previous->slots_.end(), [&](const auto& slot) {
                 return slot && slot->source.stream == s.stream && slot->source.pair == s.pair &&
-                       slot->source.hits == s.hits && slot->source.classes == s.classes;
+                       slot->source.hits == s.hits;
             });
             if (kept != previous->slots_.end()) {
                 roles(**kept, s);
@@ -85,7 +60,6 @@ ChannelAnalysis::ChannelAnalysis(std::vector<Source> sources, std::uint32_t samp
         StemAnalysisConfig config;
         config.analyzer = base;
         config.hits = s.hits;
-        config.classes = s.classes;
         config.gainDb = s.gainDb;
         slot->analyzer = std::make_unique<StemAnalyzer>(config);
         slot->appliedGainDb = s.gainDb;
@@ -166,29 +140,26 @@ bool ChannelAnalysis::step(Slot& slot) {
         out.serial = ++slot.serial;
         out.tracked = false;
         if (slot.tracker) {
-            out.beat = slot.tracker->push(out.frame.beatOnsetStrength, out.frame.beatOnset); // ADR-1581
+            out.beat = slot.tracker->push(out.frame.beatOnsetStrength, out.frame.beatLowStrength, out.frame.beatOnset,
+                                           out.frame.rms); // ADR-1581
             out.tracked = true;
         }
         if (slot.source.feed && !slot.feeds.push({out.frame.timeSeconds, out.frame.feed})) {
             feedsDropped_.fetch_add(1, std::memory_order_relaxed); // ADR-1580: the render thread fell 5 s behind
         }
         const std::uint64_t consumed = slot.consumed.load(std::memory_order_acquire);
-        for (std::size_t k = 0; k < 4; ++k) {
-            bool& on = flag(out.frame, k);
-            float& s = strength(out.frame, k);
-            if (on) {
-                slot.pending[k] = true;
-                slot.pendingStrength[k] = s;
-                slot.pendingStamp[k] = out.serial;
-                out.stamps[k] = out.serial;
-            } else if (slot.pending[k] && slot.pendingStamp[k] > consumed) {
-                on = true; // not yet seen by the render thread: it rides on this frame too
-                s = std::max(s, slot.pendingStrength[k]);
-                out.stamps[k] = slot.pendingStamp[k];
-            } else {
-                slot.pending[k] = false;
-                out.stamps[k] = 0;
-            }
+        if (out.frame.onset) {
+            slot.pending = true;
+            slot.pendingStrength = out.frame.onsetStrength;
+            slot.pendingStamp = out.serial;
+            out.stamp = out.serial;
+        } else if (slot.pending && slot.pendingStamp > consumed) {
+            out.frame.onset = true; // not yet seen by the render thread: it rides on this frame too
+            out.frame.onsetStrength = std::max(out.frame.onsetStrength, slot.pendingStrength);
+            out.stamp = slot.pendingStamp;
+        } else {
+            slot.pending = false;
+            out.stamp = 0;
         }
         slot.frames.back() = out;
         slot.frames.publish();

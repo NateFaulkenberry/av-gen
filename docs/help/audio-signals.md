@@ -85,7 +85,6 @@ One analysis source -- an offline stem file, or a channel of a live input -- pub
 | `stem.<key>.bass` … `.treble` | 0 – 1 | | the five bands, auto-gained, as `audio.<band>` |
 | `stem.<key>.centroid` | 0 – 1 | | brightness |
 | `stem.<key>.width` | 0 – 2 | | stereo width of a stereo stem or a linked input pair; 0 for mono |
-| `stem.<key>.kick` `.snare` `.hat` | 0 – 1 | ✓ | a **drums** source only: kicks, snares and hats found in it (not on the bus for any other role) |
 | `stem.<key>.onsetLow` `.onsetMid` `.onsetHigh` | 0 – 1 | | the low, mid and high shares of the latest onset's attack |
 
 Values change once per analysis hop (about 11 ms); a render frame shows the newest, and carries every event since the
@@ -93,7 +92,7 @@ last frame, so none is lost at 30 fps. A source with no audio reads 0 and fires 
 
 **By role.** `role.<role>.*` -- `role.drums.*`, `role.bass.*`, `role.synth.*`, `role.vocal.*`, `role.other.*` -- is
 the same set for the first active source of that role (a live input first, then the stems), and reads 0 when none is
-active. It exists once a source has the role, and only `role.drums` has `.kick`, `.snare` and `.hat`.
+active. It exists once a source has the role. No source names an instrument: there is no kick, snare or hat signal.
 
 A project's **feeds** can make a source drive the beat clock, `response.*` (the low attacks and onsets from the drum
 stem, the levels from the bass) and the history fields hear, without changing any route. See [Audio Input](help://audio/input).

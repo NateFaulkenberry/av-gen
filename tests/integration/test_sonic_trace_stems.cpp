@@ -101,7 +101,7 @@ TEST_CASE("sonic trace: event columns carry the frame's events; audio.* are colu
             col[name] = i;
         }
     }
-    for (const char* c : {"stem.drums.onset", "stem.drums.kick", "response.onset", "beat.pulse", "audio.midLevel",
+    for (const char* c : {"stem.drums.onset", "response.onset", "beat.pulse", "audio.midLevel",
                           "audio.tempoConfidence", "audio.onset", "response.mid", "response.high", "beat.source"}) {
         INFO(c);
         REQUIRE(col.contains(c));
@@ -115,22 +115,20 @@ TEST_CASE("sonic trace: event columns carry the frame's events; audio.* are colu
             cells.push_back(std::stod(cell));
         }
         source = cells[col["beat.source"]];
-        for (const char* c : {"stem.drums.onset", "stem.drums.kick", "response.onset", "beat.pulse"}) {
+        for (const char* c : {"stem.drums.onset", "response.onset", "beat.pulse"}) {
             if (cells[col[c]] > 0.0) {
                 ++fired[c];
             }
         }
     }
-    // The drum stem's kicks: one per beat at 120 BPM for 20 s, less the 2 s gap (36). Every class fires; the rows that
-    // fired are a share of the frames, not all of them (an event is one frame, not a held value).
+    // The drum stem's kicks: one per beat at 120 BPM for 20 s, less the 2 s gap (36), and the snares and hats between;
+    // the rows that fired are a share of the frames, not all of them (an event is one frame, not a held value).
     const auto kicks = fx.times("drums", "kicks").size();
-    CHECK(fired["stem.drums.kick"] >= static_cast<int>(kicks * 9 / 10));
-    CHECK(fired["stem.drums.kick"] <= static_cast<int>(kicks + 2));
-    CHECK(fired["stem.drums.onset"] >= fired["stem.drums.kick"]);
+    CHECK(fired["stem.drums.onset"] >= static_cast<int>(kicks * 9 / 10));
     CHECK(fired["response.onset"] > 0);
-    // The grid's tempo is not this case's question (it reads this fixture at half time: 20 pulses in 20 s at 120 BPM,
-    // a finding of the Audio Response Lab's report); that the pulse is a column with events in it is.
-    CHECK(fired["beat.pulse"] >= 10);
+    // ADR-1780: the grid reads this fixture at its tempo now (it read half time before the beat clock pass): about one
+    // pulse a beat over 20 s at 120 BPM.
+    CHECK(fired["beat.pulse"] >= 36);
     // ADR-1724: a file with an analysed grid is clock source 2 (the whole-file grid, which has no lock state).
     CHECK(source == 2.0);
 }

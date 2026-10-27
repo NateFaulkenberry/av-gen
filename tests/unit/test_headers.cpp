@@ -3,7 +3,6 @@
 #include "analysis/analysis_track.hpp"
 #include "analysis/analyzer.hpp"
 #include "analysis/causal_onsets.hpp"
-#include "analysis/drum_classifier.hpp"
 #include "analysis/fft.hpp"
 #include "analysis/meter.hpp"
 #include "analysis/span_profile.hpp"

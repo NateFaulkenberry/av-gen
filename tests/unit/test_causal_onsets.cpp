@@ -1,5 +1,5 @@
 // Causal onsets (ADR-1060): a low-register attack and a broadband onset, with no look-ahead, the same from a file as
-// live. The detector names no instrument; a drums-role source's kick / snare / hat are test_drum_classifier.cpp's.
+// live. The detector names no instrument (ADR-1784: nor does any source).
 
 #include "analysis/analysis_runner.hpp"
 #include "analysis/analysis_track.hpp"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-scene response transfer (Audio Response Lab, brief §8; ADR-1720).
 
-    python3 tools/audio_lab/transfer.py [--scenes event-horizon,rainbow-world] [--fixtures DIR] [--out DIR]
+    python3 tools/audio_lab/transfer.py [--scenes event-horizon,rainbow-world,sacred-flight] [--fixtures DIR] [--out DIR]
                                         [--only sparse,dense,dynamic]
 
 Drives existing live scenes with the lab's fixtures and asks of every parameter an audio route moves: does the control
@@ -42,6 +42,8 @@ import lab  # noqa: E402
 SCENES = {
     "event-horizon": lab.REPO / "examples" / "sonic-vfx" / "event-horizon.json",
     "rainbow-world": lab.REPO / "examples" / "rainbow-world" / "rainbow-world.json",
+    # the beat clock pass: a live scene with a dozen beat.* routes
+    "sacred-flight": lab.REPO / "examples" / "sonic-abstract" / "sacred-flight.json",
 }
 TRANSIENT = ("response.low", "response.onset", "response.note")
 LEVEL = ("response.bass", "response.level", "response.sustain", "response.mid", "response.high",
@@ -150,7 +152,7 @@ def analyse(m, scene_json, tr, quiet):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--scenes", default="event-horizon,rainbow-world")
+    ap.add_argument("--scenes", default="event-horizon,rainbow-world,sacred-flight")
     ap.add_argument("--fixtures", type=Path, default=lab.DEFAULT_FIXTURES)
     ap.add_argument("--out", type=Path, default=lab.REPO / "build" / "audio-lab-transfer")
     ap.add_argument("--only", default="sparse,dense,dynamic")

@@ -34,7 +34,7 @@ json stem(const testsupport::StemFixture& fx, const std::string& key, const std:
     return e;
 }
 
-// The three stems with their roles (ADR-1630): the drum stem is a drums source, so it runs the classifier.
+// The three stems with their roles (ADR-1630).
 json standardStems(const testsupport::StemFixture& fx) {
     return json::array({stem(fx, "drums", "drums.wav", 0.0, 0.0f, "drums"), stem(fx, "bass", "bass.wav", 0.0, 0.0f, "bass"),
                         stem(fx, "synth", "synth.wav", 0.0, 0.0f, "synth")});
@@ -128,10 +128,11 @@ TEST_CASE("feeds: hits from the drum stem are the drums' hits; levels from it fo
                                          {{"hits", "stem.drums"}, {"levels", "stem.drums"}}))
                 .has_value());
     CHECK(fed.projectWarnings().empty());
-    // ADR-1630: a drums stem runs the hits tier by its role, fed or not; the bass stem, named by no feed, does not.
+    // ADR-1580: a stem a response feed names runs the hits tier; one no feed names does not, whatever its role
+    // (ADR-1784: the drums role no longer runs a classifier of its own).
     REQUIRE(fed.stems()[0].track != nullptr);
     CHECK(fed.stems()[0].track->hits());
-    CHECK(mix.stems()[0].track->hits());
+    CHECK_FALSE(mix.stems()[0].track->hits());
     CHECK_FALSE(mix.stems()[1].track->hits());
     constexpr double fps = 60.0;
     const Trace m = play(mix, 19.9, fps);
@@ -205,8 +206,8 @@ TEST_CASE("feeds: the beat clock follows the drum stem's grid, offset included",
     const analysis::TrackedGrid& g = e.beatGrid();
     INFO("mix tempo " << e.track()->beats().tempoBpm << ", drums " << g.beats.tempoBpm);
     CHECK(g.sourceKey == "drums");
-    // The fixture's backbeat (a snare on 2 and 4) reads as 60 bpm to the mix's tracker too: the same tracker, the
-    // same answer, on a clean drum stem.
+    // The mix's tracker and the drum stem's agree (120 BPM: ADR-1780's metrical score no longer reads the fixture's
+    // backbeat at half time).
     CHECK(g.beats.tempoBpm == Catch::Approx(e.track()->beats().tempoBpm).margin(1.0f));
     REQUIRE(g.beats.beatTimes.size() >= 15);
     const auto kicks = fx.times("drums", "kicks");
@@ -216,9 +217,10 @@ TEST_CASE("feeds: the beat clock follows the drum stem's grid, offset included",
     }
     CHECK(onKick >= g.beats.beatTimes.size() * 3 / 4);
     CHECK(e.tempo().bpm == Catch::Approx(static_cast<double>(g.beats.tempoBpm)));
-    // beat.bpm and the pulse follow it.
+    CHECK(g.beats.tempoBpm == Catch::Approx(120.0f).margin(1.0f));
+    // beat.bpm and the pulse follow it: beat.bpm is the grid's local tempo where the playhead is (ADR-1782).
     const Trace t = play(e, 19.9, 60.0);
-    CHECK(t.at("beat.bpm").back() == Catch::Approx(g.beats.tempoBpm));
+    CHECK(t.at("beat.bpm").back() == Catch::Approx(g.beats.tempoBpm).margin(1.0f));
     // The same stem 0.1 s later on the timeline: the grid moves with it.
     json shifted = json::array({stem(fx, "drums", "drums.wav", 0.1)});
     app::Engine s(app::EngineMode::Offline);

@@ -1,5 +1,6 @@
 # ADR-1726: A drum fixture from real one-shots, never committed
 
+- Superseded by ADR-1784 (2026-10-26): the drum classifier and this fixture are cut.
 - Status: Accepted (eng/audio-response-lab; the owner allowed the ~/Samples packs for the drum-class tests,
   2026-10-26)
 - Code:

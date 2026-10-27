@@ -38,7 +38,7 @@ except ImportError:  # the build must not fail for want of numpy: the lab's test
     np = None
 
 RATE = 48000
-GENERATOR_VERSION = 1
+GENERATOR_VERSION = 2
 
 # Registers, as the production code names them (ADR-1604: low 30-250 Hz, mid 250 Hz-4 kHz, high 4-16 kHz).
 LOW, MID, HIGH, BROAD = "low", "mid", "high", "broad"
@@ -265,11 +265,15 @@ def make_dense():
             fx.add("mix", t, kick(0.7), "kick", LOW)
         t += beat
     fx.add("mix", 4.0, tone(523.25, 3.9, 0.25, attack=0.3), "pad", MID, durationSeconds=3.9, attackSeconds=0.3)
-    t = 4.0 + 3 * beat / 4
+    # The beat clock pass (ADR-1782): every section's pattern starts on the fixture's own grid. They started at whole
+    # seconds, which are not on a 128 BPM grid, so from 12 s the kicks sat 0.6 of a beat off the manifest's beats and a
+    # tracker that followed the kicks scored F 0.
+    on_grid = lambda s: math.ceil(s / beat - 1e-9) * beat
+    t = on_grid(4.0) + 3 * beat / 4
     while t < 8.0 - 1e-9:
         fx.add("mix", t, pluck(1046.5 if int(t / beat) % 2 else 1568.0, 0.4), "pluck", MID)
         t += 3 * beat / 4
-    t = 8.0
+    t = on_grid(8.0)
     while t < 12.0 - 1e-9:
         fx.add("mix", t, hat(rng, 0.35), "hat", HIGH)
         t += beat / 4
@@ -277,7 +281,7 @@ def make_dense():
     fx.add("mix", 12.0, tone(261.63, 11.9, 0.15, attack=0.5, partials=(1.0, 0.5, 0.3)), "pad", MID,
            durationSeconds=11.9, attackSeconds=0.5)
     k = 0
-    t = 12.0
+    t = on_grid(12.0)
     while t < 24.0 - 1e-9:
         if k % 4 == 0:
             fx.add("mix", t, kick(0.65), "kick", LOW)
@@ -290,7 +294,7 @@ def make_dense():
         fx.add("mix", t + beat / 4, hat(rng, 0.15), "hat", HIGH)
         k += 2
         t += beat / 2
-    t = 12.0 + 3 * beat / 4
+    t = on_grid(12.0) + 3 * beat / 4
     while t < 24.0 - 1e-9:
         fx.add("mix", t, pluck(1318.5, 0.3), "pluck", MID)
         t += 3 * beat / 4
@@ -453,17 +457,17 @@ def make_isolation():
     for b in range(1, 48):  # from 0.5 s: sample 0 is not a musical case (no detector has a hop of history there)
         t = b * beat
         if t < 4.0:  # drums alone: kick every beat, a snare STACKED on the odd ones
-            fx.add("drums", t, kick(0.8), "kick", LOW, cls="kick")
+            fx.add("drums", t, kick(0.8), "kick", LOW)
             if b % 2 == 1:
-                fx.add("drums", t, snare(rng, 0.55), "snare", BROAD, cls="snare", ambiguous=True,
-                       note="snare on top of the kick (one attack, two classes)")
-            fx.add("drums", t + beat / 2, hat(rng, 0.35), "hat", HIGH, cls="hat")
+                fx.add("drums", t, snare(rng, 0.55), "snare", BROAD, ambiguous=True,
+                       note="snare on top of the kick (one attack)")
+            fx.add("drums", t + beat / 2, hat(rng, 0.35), "hat", HIGH)
         elif 12.0 <= t < 22.0:  # with everything: kick on even beats, the snare ALONE on odd ones
             if b % 2 == 0:
-                fx.add("drums", t, kick(0.8), "kick", LOW, cls="kick")
+                fx.add("drums", t, kick(0.8), "kick", LOW)
             else:
-                fx.add("drums", t, snare(rng, 0.55), "snare", BROAD, cls="snare")
-            fx.add("drums", t + beat / 2, hat(rng, 0.35), "hat", HIGH, cls="hat")
+                fx.add("drums", t, snare(rng, 0.55), "snare", BROAD)
+            fx.add("drums", t + beat / 2, hat(rng, 0.35), "hat", HIGH)
     for t, d, hz in ((4.0, 0.9, 55.0), (5.0, 0.4, 73.42), (5.75, 1.0, 49.0), (7.0, 0.5, 61.74),
                      (12.0, 0.45, 55.0), (13.0, 0.45, 55.0), (14.25, 0.7, 65.41), (16.0, 0.45, 49.0),
                      (17.0, 0.95, 61.74), (18.5, 0.45, 55.0), (20.0, 0.9, 73.42)):

@@ -51,14 +51,13 @@ beat tracking behaves differently. See [Beats and tempo](help://audio/beats).
 
 A project plays one mix. Beside it you can add **stems** -- the drum, bass or synth bounce of the same song -- which
 AV Gen analyses but never plays: open **Audio...** on the Sequence strip and use **Stems (analysis only)**. Each stem
-publishes `stem.<key>.*` (level, onset, the bands, and on a **drums** stem its kicks, snares and hats), so a route
+publishes `stem.<key>.*` (level, onset, the bands and the onset's register), so a route
 can follow the bass alone while the picture still plays the whole song. See the [Signal Reference](help://audio/signals).
 
-- **The role** says what the stem is: **drums**, **bass**, **synth**, **vocal** or **other** (the default). Only a
-  drums stem looks for kicks, snares and hats, always; a bass or synth stem publishes its onsets and levels, never a
-  "kick" a bass note could fake. `role.<role>.*` follows the first active source of each role, so a scene that reads
-  `role.drums.kick` works whatever the drum stem's key is. AV Gen never guesses
-  the role from the key or the audio.
+- **The role** says what the stem is: **drums**, **bass**, **synth**, **vocal** or **other** (the default). Every
+  role publishes the same onsets, levels and register; none names an instrument. `role.<role>.*` follows the first
+  active source of each role, so a scene that reads `role.drums.onset` works whatever the drum stem's key is. AV Gen
+  never guesses the role from the key or the audio.
 
 - **The key** (`drums`, `synth_lead`) is the signal name. It is made from the label once and kept: rename the label
   freely; change the key only if you mean to move every route on it.

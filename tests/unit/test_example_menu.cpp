@@ -303,6 +303,6 @@ TEST_CASE("The real index offers seven Sonic VFX scenes", "[examples][live][adr1
                                            "Sonic VFX - Datascape", "Sonic VFX - Ember Forest",
                                            "Sonic VFX - The Corrupted Cathedral", "Sonic VFX - Event Horizon",
                                            "Sonic VFX - Aurora Borealis"});
-    CHECK(hiddenVfx == 11);
+    CHECK(hiddenVfx == 10); // the Aurora Borealis Feline Footwear version is gone (2026-10-26)
 #endif
 }

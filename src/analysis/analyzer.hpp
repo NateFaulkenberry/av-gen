@@ -100,6 +100,14 @@ struct AnalysisFrame {
     float flux = 0.0f;              // half-wave-rectified spectral flux, 0..~1
     float onsetStrength = 0.0f;     // flux relative to adaptive threshold (>=1 means over)
     bool onset = false;             // peak-picked onset event in this hop
+    // ADR-1780: the beat trackers' input -- the half-wave-rectified rise of each band's log power (dB / 10, floored at
+    // -60 dB) weighted towards the low bands, where a kick or a bass note marks the beat that a syncopated hat does not.
+    // Level-free, so a quiet intro is tracked like a loud one.
+    float beatStrength = 0.0f;
+    // ADR-1780: the same rise from the bass and low-mid bands only (bass 1, low-mid 0.3). Where the low register is
+    // rhythmic at the tracked tempo, the trackers take the beat's PHASE from it: a kick or a bass note is on the beat
+    // more often than a hat is, and a syncopated pattern's hats on the "and"s otherwise pull the grid half a beat off.
+    float beatLowStrength = 0.0f;
     // ADR-1604: the register of `onset` -- the low (30-250 Hz), mid (250 Hz-4 kHz) and high (4-16 kHz)
     // shares of the power its hop gained (`registerShares`), summing to 1; all 0 with no onset.
     std::array<float, 3> onsetRegister{};
@@ -180,6 +188,7 @@ private:
     float lastFlux_ = 0.0f;
     float prevFlux_ = 0.0f;
     bool havePrevious_ = false;
+    std::array<float, kMaxBands> previousBandDb_{}; // ADR-1780
     // ADR-897 state: the smoothed band powers, the leaky onset count and the smoothed composite.
     std::array<double, kMaxBands> bandPower_{};
     float onsetRate_ = 0.0f;

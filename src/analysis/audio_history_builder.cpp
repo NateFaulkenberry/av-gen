@@ -96,12 +96,7 @@ std::array<float, 3> onsetRows(const AnalysisFrame& frame) {
     return onsetRows(frame.onset, frame.onsetStrength, frame.onsetRegister);
 }
 
-std::array<float, 3> sourceOnsetRows(const StemFrame& frame, bool classes) {
-    if (classes) {
-        return {frame.kick ? std::max(frame.kickStrength, 0.05f) : 0.0f,
-                frame.snare ? std::max(frame.snareStrength, 0.05f) : 0.0f,
-                frame.hat ? std::max(frame.hatStrength, 0.05f) : 0.0f};
-    }
+std::array<float, 3> sourceOnsetRows(const StemFrame& frame) {
     return onsetRows(frame.onset, frame.onsetStrength, frame.onsetRegister);
 }
 
@@ -154,7 +149,7 @@ spatial::AudioHistory buildAudioHistory(const AnalysisTrack& track, const Histor
         }
     } else {
         for (const StemFrame& f : onsetsFrom.track->frames()) {
-            const std::array<float, 3> s = sourceOnsetRows(f, onsetsFrom.classes);
+            const std::array<float, 3> s = sourceOnsetRows(f);
             for (std::size_t k = 0; k < 3; ++k) {
                 if (s[k] > 0.0f) {
                     onsets[k].push_back({f.timeSeconds + onsetsFrom.offsetSeconds, s[k]});

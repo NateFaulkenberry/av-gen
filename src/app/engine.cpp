@@ -96,9 +96,9 @@ void declareFrameSignals(signals::SignalBus& bus, signals::AudioSignals& audio, 
     // ADR-1020: sonic.*, timbre.*, notes.* -- last, so every id above is the one it always was.
     sonic.declare(bus);
     // ADR-1724: after everything older, for the same reason.
-    time.clockSource = bus.declare("beat.source", 0.0f, 3.0f);
-    bus.setLabel(time.clockSource,
-                 "which clock the beat is (0 none, 1 MIDI clock, 2 analysed file grid: no lock state, 3 live tracker)");
+    time.clockSource = bus.declare("beat.source", 0.0f, 4.0f);
+    bus.setLabel(time.clockSource, "which clock the beat is (0 none, 1 MIDI clock, 2 analysed file grid: no lock state, "
+                                   "3 live tracker, 4 manual: the tempo override and a marked beat)");
 }
 
 } // namespace
@@ -443,6 +443,7 @@ std::uint64_t Engine::replaySignalKey(bool playing) const {
     mix(track_ ? track_->frames().size() : 0u);
     mix(tempoOverride_.available ? 1u : 0u);
     mix(bits(tempoOverride_.available ? tempoOverride_.bpm : 0.0));
+    mix(bits(beatAnchor_.value_or(-1.0))); // ADR-1783
     mix(embeddedTempo_.available ? 1u : 0u);
     mix(bits(embeddedTempo_.available ? embeddedTempo_.bpm : 0.0));
     mix(bits(durationSeconds()));
@@ -2514,6 +2515,9 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     if (tempoOverride_.available) {
         doc["transport"]["tempo"] = {{"bpm", tempoOverride_.bpm},
                                      {"source", audio::tempoProvenanceToken(tempoOverride_.source)}};
+        if (beatAnchor_) {
+            doc["transport"]["tempo"]["anchor"] = *beatAnchor_; // ADR-1783: the marked beat
+        }
     }
     // ADR-1580/1581: the feeds, only when one is set.
     if (nlohmann::json feeds = feeds_.toJson(); !feeds.empty()) {
@@ -3040,7 +3044,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                     stem.label = item.value("label", std::string{});
                     stem.offsetSeconds = item.value("offset", 0.0);
                     // ADR-1630: what the stem is, explicit only (no role is `other`; nothing is inferred from the
-                    // key or the audio). `hits` is gone: a drums stem runs the classifier, no other does.
+                    // key or the audio). `hits` is gone: a response feed decides which stems run the causal onsets.
                     if (const auto role = item.find("role"); role != item.end()) {
                         const auto parsed = role->is_string() ? audio::sourceRoleFromName(role->get<std::string>())
                                                               : std::nullopt;
@@ -3053,8 +3057,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                         }
                     }
                     if (item.contains("hits")) {
-                        warn(fmt::format("assets.stems: stem '{}': \"hits\" is gone (ADR-1630); a stem with "
-                                         "\"role\": \"drums\" runs the kick/snare/hat classifier, and no other does",
+                        warn(fmt::format("assets.stems: stem '{}': \"hits\" is gone (ADR-1630); a response feed "
+                                         "(\"feeds\") decides which stems run the causal onsets",
                                          stem.key));
                     }
                     stem.gainDb = std::clamp(item.value("gainDb", 0.0f), analysis::kMinTrimDb, analysis::kMaxTrimDb);
@@ -3592,6 +3596,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // override from whatever was open before. A tempo from another piece quietly governing this
     // one is exactly the defect the reset exists to prevent.
     tempoOverride_ = {};
+    beatAnchor_.reset();
     if (doc.contains("transport") && doc["transport"].is_object()) {
         const auto& block = doc["transport"];
         if (block.contains("loop") && block["loop"].is_object()) {
@@ -3615,6 +3620,14 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
                                                    .bpm = bpm,
                                                    .source = audio::TempoProvenance::UserOverride,
                                                    .confidence = 1.0};
+                // ADR-1783: the marked beat, which makes the override the file's beat clock.
+                if (const auto a = tempo.find("anchor"); a != tempo.end() && a->is_number()) {
+                    if (const double anchor = a->get<double>(); std::isfinite(anchor) && anchor >= 0.0) {
+                        beatAnchor_ = anchor;
+                    } else {
+                        log::warn("project beat anchor {:g} ignored: not a time in the project", anchor);
+                    }
+                }
             } else if (bpm != 0.0) {
                 log::warn("project tempo {:g} ({}) ignored", bpm, tempo.value("source", "user"));
             }
@@ -4491,13 +4504,11 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
     std::vector<std::size_t> todo;
     for (std::size_t i = 0; i < wanted.size(); ++i) {
         next[i].source = wanted[i];
-        // ADR-1580: a stem a response feed names runs the hits tier whatever its role; ADR-1630: a drums stem always
-        // does, and only a drums stem publishes the classes.
+        // ADR-1580: a stem a response feed names runs the hits tier, whatever its role.
         const bool tier = stemHitsTier(wanted[i]);
         const auto same = std::find_if(stems_.begin(), stems_.end(), [&](const StemState& old) {
             const bool oldTier = old.track ? old.track->hits() : stemHitsTier(old.source);
-            return old.source.file == wanted[i].file && oldTier == tier && old.source.gainDb == wanted[i].gainDb &&
-                   old.source.hits() == wanted[i].hits();
+            return old.source.file == wanted[i].file && oldTier == tier && old.source.gainDb == wanted[i].gainDb;
         });
         if (same != stems_.end()) {
             next[i].report = same->report;
@@ -4516,7 +4527,6 @@ void Engine::setStems(std::vector<audio::StemSource> wanted) {
                 analysis::StemAnalysisConfig stemConfig;
                 stemConfig.analyzer = config;
                 stemConfig.hits = tier;
-                stemConfig.classes = state.source.hits(); // ADR-1630: a drums stem only
                 stemConfig.gainDb = state.source.gainDb; // ADR-1582
                 audio::StemFileFacts facts;
                 auto track = analysis::StemTrack::analyzeFile(state.source.file, stemConfig, facts);
@@ -4621,7 +4631,7 @@ bool Engine::fedForResponse(const audio::Feeds& feeds, const std::string& key, a
 }
 
 bool Engine::stemHitsTier(const audio::StemSource& stem) const {
-    return stem.hits() || fedForResponse(feeds_, stem.key, stem.role);
+    return fedForResponse(feeds_, stem.key, stem.role);
 }
 
 void Engine::declareRole(audio::SourceRole role) {
@@ -4819,12 +4829,15 @@ void Engine::rebuildFeeds() {
             const auto& frames = stem->track->frames();
             std::vector<double> times;
             std::vector<float> onsets;
+            std::vector<float> low;
             times.reserve(frames.size());
             onsets.reserve(frames.size());
+            low.reserve(frames.size());
             std::size_t picked = 0;
             for (const analysis::StemFrame& f : frames) {
                 times.push_back(f.timeSeconds);
                 onsets.push_back(f.beatOnsetStrength);
+                low.push_back(f.beatLowStrength);
                 picked += f.beatOnset ? 1 : 0;
             }
             analysis::BeatTrackerConfig beatConfig;
@@ -4833,7 +4846,7 @@ void Engine::rebuildFeeds() {
                 beatConfig.priorWidthOctaves = audio::kSeededPriorWidthOctaves;
             }
             analysis::OfflineBeats beats =
-                analysis::trackGrid(times, onsets, picked, stem->track->hopSeconds(), beatConfig);
+                analysis::trackGrid(times, onsets, low, picked, stem->track->hopSeconds(), beatConfig);
             if (beats.beatTimes.empty()) {
                 if (!feedsQuiet_) {
                     noteBindingProblem(fmt::format("feeds.beat: no beat was found in stem '{}'; the beat clock "
@@ -4861,6 +4874,37 @@ void Engine::rebuildFeeds() {
                 log::info("feeds: the beat clock follows stem '{}': {:.2f} bpm, {} beats", feeds_.beat,
                           grid_.beats.tempoBpm, grid_.beats.beatTimes.size());
             }
+        }
+    }
+
+    // ---- the manual beat clock (ADR-1783): over every analysed grid ----
+    if (manualBeatClock()) {
+        const double period = 60.0 / tempoOverride_.bpm;
+        const double anchor = *beatAnchor_;
+        const double first = anchor - std::floor(anchor / period) * period; // the first beat at or after 0
+        const double end = std::max(audioDurationSeconds(), anchor) + period;
+        analysis::OfflineBeats beats;
+        beats.tempoBpm = static_cast<float>(tempoOverride_.bpm);
+        beats.confidence = 1.0f;
+        for (double t = first; t <= end; t += period) {
+            beats.beatTimes.push_back(t);
+        }
+        grid_ = analysis::TrackedGrid{};
+        grid_.beats = std::move(beats);
+        grid_.manual = true;
+        // The marked beat is beat 1 of a bar.
+        const auto anchorIndex = static_cast<int>(std::llround((anchor - first) / period));
+        grid_.meter.valid = true;
+        grid_.meter.downbeat = anchorIndex % 4;
+        grid_.meter.downbeatConfidence = 1.0f;
+        gridBeatCount_.clear();
+        if (track_ && !track_->empty()) {
+            std::vector<double> mixTimes;
+            mixTimes.reserve(track_->frames().size());
+            for (const analysis::AnalysisFrame& f : track_->frames()) {
+                mixTimes.push_back(f.timeSeconds);
+            }
+            gridBeatCount_ = beatCountsAt(mixTimes, grid_.beats.beatTimes);
         }
     }
 
@@ -5515,6 +5559,39 @@ void Engine::setTempoOverride(double bpm) {
                                        .source = audio::TempoProvenance::UserOverride,
                                        .confidence = 1.0};
     log::info("tempo override set to {:g} bpm", bpm);
+    if (beatAnchor_) {
+        rebuildFeeds(); // ADR-1783: the manual grid at the new tempo
+    }
+    refreshTransport();
+}
+
+void Engine::setBeatAnchor(double seconds) {
+    if (!std::isfinite(seconds) || seconds < 0.0) {
+        log::warn("beat anchor {:g} ignored: not a time in the project", seconds);
+        return;
+    }
+    if (!tempoOverride_.available) {
+        const double bpm = resolvedTempo().second;
+        if (!(bpm >= audio::kMinPlausibleBpm && bpm <= audio::kMaxPlausibleBpm)) {
+            log::warn("beat anchor ignored: there is no tempo to mark a beat of (set one first)");
+            return;
+        }
+        tempoOverride_ = audio::AudioTempo{
+            .available = true, .bpm = bpm, .source = audio::TempoProvenance::UserOverride, .confidence = 1.0};
+    }
+    beatAnchor_ = seconds;
+    log::info("beat marked at {:.3f} s: the manual beat clock runs at {:g} bpm", seconds, tempoOverride_.bpm);
+    rebuildFeeds();
+    refreshTransport();
+}
+
+void Engine::clearBeatAnchor() {
+    if (!beatAnchor_) {
+        return;
+    }
+    beatAnchor_.reset();
+    log::info("beat mark cleared; the beat clock returns to the analysed grid");
+    rebuildFeeds();
     refreshTransport();
 }
 
@@ -5523,8 +5600,13 @@ void Engine::clearTempoOverride() {
         return;
     }
     tempoOverride_ = {};
+    const bool hadAnchor = beatAnchor_.has_value();
+    beatAnchor_.reset(); // ADR-1783: a mark is a beat of the override's tempo; it goes with it
     log::info("tempo override cleared; tempo returns to {}",
               audio::tempoProvenanceName(tempo().source));
+    if (hadAnchor) {
+        rebuildFeeds();
+    }
     refreshTransport();
 }
 
@@ -5951,8 +6033,7 @@ void Engine::rebuildChannelAnalysis(const std::vector<std::string>& previousKeys
         }
         sources.push_back({.stream = input_->sourceStream(i),
                            .pair = s.pair,
-                           .hits = s.hits() || fed,
-                           .classes = s.hits(), // ADR-1630: a drums source only
+                           .hits = fed,
                            .gainDb = s.gainDb,
                            .beat = beat,
                            .feed = fed});
@@ -6086,7 +6167,7 @@ void Engine::publishInputSources() {
                 liveHistoryRow_ = f.frame.spectrumRow; // ADR-1631
             }
             if (static_cast<int>(i) == historyOnsets) {
-                const std::array<float, 3> rows = analysis::sourceOnsetRows(f.frame, inputSources_[i].hits());
+                const std::array<float, 3> rows = analysis::sourceOnsetRows(f.frame);
                 for (std::size_t k = 0; k < rows.size(); ++k) {
                     liveHistoryPending_[k] = std::max(liveHistoryPending_[k], rows[k]); // until the next history row
                 }
@@ -6252,6 +6333,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
     bool running = true;
     double clockBeats = 0.0;
     float source = 0.0f; // ADR-1724
+    double publishedBpm = bpm;
     // An analysed grid is the clock whenever there is one and nothing else owns the beat: a file is
     // loaded (not live input) and no MIDI clock is running. In both engine modes, so the editor's
     // bars are the render's bars.
@@ -6272,7 +6354,11 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
         clockBeats = analysis::clockBeatsAt(*grid, grid_.beatSeconds(), time.renderTime);
         pulse = clock.haveClockBeats && std::floor(clockBeats) > std::floor(clock.clockBeats);
         clock.beatPhase = clockBeats - std::floor(clockBeats);
-        source = 2.0f;
+        source = grid_.manual ? 4.0f : 2.0f; // ADR-1783
+        // ADR-1782: the grid's own tempo here (it follows a tempo change), not the whole file's.
+        if (const double local = analysis::localBpmAt(*grid, time.renderTime); local > 0.0) {
+            publishedBpm = local;
+        }
     } else if (bpm > 0.0) {
         source = 3.0f;
         // Live input: advance the per-frame beat clock; re-sync to the analyzer whenever it reports
@@ -6316,7 +6402,7 @@ bool Engine::advanceClock(SignalClock& clock, signals::SignalBus& bus, const Fra
         bus.set(timeSignals_.clockSource, source); // ADR-1724
     }
     bus.set(timeSignals_.beatCount, static_cast<float>(std::floor(musical)));
-    bus.set(timeSignals_.bpm, static_cast<float>(bpm));
+    bus.set(timeSignals_.bpm, static_cast<float>(publishedBpm));
     bus.set(timeSignals_.barPhase, static_cast<float>(m.barPhase(musical)));
     {
         // Phrases and sections from the beat clock: continuous phases plus an event at each phrase
@@ -7935,7 +8021,6 @@ void Engine::updateAudioHistory(bool newFrame) {
                 if (const StemState* stem = key.empty() ? nullptr : feedStem(key); stem != nullptr && stem->track) {
                     h.track = stem->track.get();
                     h.offsetSeconds = stem->source.offsetSeconds;
-                    h.classes = stem->source.hits();
                 }
                 return h;
             };

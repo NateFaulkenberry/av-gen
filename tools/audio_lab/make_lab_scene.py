@@ -16,8 +16,8 @@ Panels (left to right, top then bottom):
               response.onsetLow/Mid/High (the latest onset's register, held).
   D  BEAT     a dial: the needle is beat.phase, the outer tick beat.bar; bars for audio.tempoConfidence and beat.bpm.
   C  SOURCES  one column per conventional source key (drums, bass, synth, pad): an ACTIVE lamp over a red
-              'no data' lamp (stem.<k>.active), a level bar (stem.<k>.level), an onset lamp (stem.<k>.onset); the
-              drums column adds kick/snare/hat lamps (stem.drums.kick/snare/hat: a drums-role source only).
+              'no data' lamp (stem.<k>.active), a level bar (stem.<k>.level), an onset lamp (stem.<k>.onset). No
+              source names an instrument (ADR-1784).
   E  PROBES   response-mapping probes with real chains: a sphere scaled by smoothed response.bass, a plate that
               flashes on response.onset (a 120 ms route envelope), a colour panel on sonic.brightness, a cube on
               stem.bass.level (smoothed), a cube on MIDI CC 1 (control.labCC1).
@@ -237,10 +237,6 @@ for i, (key, col) in enumerate(SOURCES):
     meter(f"s{key}Level", x + 0.55, -6.6, 3.6, f"stem.{key}.level", col, "LVL", optional=True, width=0.55)
     lamp(f"s{key}Onset", x - 0.45, -3.4, 0.55, f"stem.{key}.onset", col, "ON", gain=0.9, optional=True,
          label_size=0.2)
-for j, cls in enumerate(("kick", "snare", "hat")):
-    lamp(f"sDrums{cls.title()}", -13.05, -4.5 - j * 0.85, 0.45, f"stem.drums.{cls}", (1.0, 0.55, 0.2), "",
-         gain=0.9, optional=True)
-    text(f"sDrums{cls.title()}Label", (-13.45, -4.62 - j * 0.85, 0.0), cls[0].upper(), 0.24, align=2)
 
 # E: PROBES (bottom right)
 heading("hE", -2.2, -0.6, "E  PROBES (real route chains)")

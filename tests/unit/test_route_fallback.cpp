@@ -1,6 +1,6 @@
 // ADR-1570: a route can be optional (an unknown source is the expected state, not a binding problem), and a depth
 // signal can have a default that stands in while the bus does not carry it. Together they make a stem route and its
-// live fallback: `stem.drums.kick` (optional) and `response.onset` (depth `stem.drums.active`, 1 -> 0, default 0).
+// live fallback: `stem.drums.onset` (optional) and `response.onset` (depth `stem.drums.active`, 1 -> 0, default 0).
 
 #include "params/liveness.hpp"
 #include "params/modulation.hpp"
@@ -29,7 +29,7 @@ struct Fixture {
 
 ModRoute stemRoute() {
     ModRoute r;
-    r.source = "stem.drums.kick";
+    r.source = "stem.drums.onset";
     r.target = "ring/glow";
     r.amount = 2.0f;
     r.optional = true;
@@ -88,7 +88,7 @@ TEST_CASE("Once the stem is declared and active, the stem route drives and the f
     f.modulator.addRoute(fallbackRoute());
     REQUIRE(f.modulator.bind(f.bus, f.params).has_value());
     // The stem appears later (a project's stems analysed, a live input source mapped) and the engine rebinds.
-    const signals::SignalId kick = f.bus.declare("stem.drums.kick");
+    const signals::SignalId kick = f.bus.declare("stem.drums.onset");
     const signals::SignalId active = f.bus.declare("stem.drums.active");
     REQUIRE(f.modulator.bind(f.bus, f.params).has_value());
 

@@ -44,11 +44,11 @@ private:
 };
 
 // The offline (Ellis) tracker and ADR-896's refinement over one source's hops: `times` the hops' window centres,
-// `onsetStrength` the Analyzer's onset strength per hop, `picked` how many hops picked an onset (fewer than four: no
+// `onsetStrength` the Analyzer's beat strength per hop (ADR-1780) and `lowStrength` its low register's (or empty), `picked` how many hops picked an onset (fewer than four: no
 // beats). Beat times are on the `times` clock; `hops`, when given, gets the hop each beat is stamped on (strictly
 // increasing). What `AnalysisTrack::analyze` runs on the mix, and ADR-1581 on a stem.
 [[nodiscard]] OfflineBeats trackGrid(std::span<const double> times, std::span<const float> onsetStrength,
-                                     std::size_t picked, double hop, const BeatTrackerConfig& beatConfig = {},
+                                     std::span<const float> lowStrength, std::size_t picked, double hop, const BeatTrackerConfig& beatConfig = {},
                                      std::vector<std::size_t>* hops = nullptr);
 
 // ADR-1581: the beat grid the project's clock runs on -- the mix's (`AnalysisTrack::beats` and its metre estimate), or
@@ -58,6 +58,7 @@ struct TrackedGrid {
     OfflineBeats beats;
     MeterEstimate meter;
     std::string sourceKey; // "" = the mix
+    bool manual = false;   // ADR-1783: the project's manual beat clock (tempo override + one marked beat)
     [[nodiscard]] double beatSeconds() const {
         return beats.tempoBpm > 0.0f ? 60.0 / static_cast<double>(beats.tempoBpm) : 0.0;
     }

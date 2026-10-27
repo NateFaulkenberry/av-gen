@@ -122,7 +122,7 @@ void AnalysisRunner::threadMain(std::stop_token token) {
 
         std::size_t producedNow = 0;
         while (analyzer_.pop(frame)) {
-            const BeatState beat = beatTracker_.push(frame.onsetStrength, frame.onset);
+            const BeatState beat = beatTracker_.push(frame.beatStrength, frame.beatLowStrength, frame.onset, frame.rms);
             frame.tempoBpm = beat.tempoBpm;
             frame.tempoConfidence = beat.confidence;
             frame.beat = beat.beat;

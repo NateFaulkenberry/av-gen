@@ -18,8 +18,7 @@
 // model takes these decisions and shapes their strength with the performer's sensitivity; the detector itself has no
 // parameters a live control could change.
 //
-// A drums-role source's kick, snare and hat are not here: `DrumClassifier` (analysis/drum_classifier.hpp) runs on an
-// isolated drum source only, over the flux this detector computes.
+// It names no instrument, for any source (ADR-1784 cut the drums role's kick/snare/hat classifier).
 
 #include <array>
 #include <cstddef>
@@ -83,8 +82,7 @@ struct HitPicker {
 
 [[nodiscard]] HitPicker defaultHitPicker(HitClass c);
 
-// A detection function over its causal threshold: lambda x the median of the previous `frames` values + delta. Shared
-// with the drum classifier.
+// A detection function over its causal threshold: lambda x the median of the previous `frames` values + delta.
 class CausalThreshold {
 public:
     void reset(int frames);
@@ -97,8 +95,7 @@ private:
     std::size_t head_ = 0;
 };
 
-// The mean of `v` over bins [from, to) (0 for an empty band), and a band's power in dBFS (a full-scale sine 0 dB):
-// shared by the detector and the drum classifier.
+// The mean of `v` over bins [from, to) (0 for an empty band), and a band's power in dBFS (a full-scale sine 0 dB).
 [[nodiscard]] float bandMean(std::span<const float> v, std::size_t from, std::size_t to);
 [[nodiscard]] float bandPowerDb(std::span<const float> magnitude, std::size_t from, std::size_t to);
 // The bin range [from, to) of lo..hi Hz at `binHz`, clamped to `bins` and at least one bin wide.
@@ -122,12 +119,6 @@ public:
     // Frames must come in order; `reset` at a discontinuity.
     void process(AnalysisFrame& frame, float binHz, double hopSeconds);
     void reset();
-
-    // The last processed frame's compressed flux r(k), one per bin (all 0 on the first frame after a reset): what
-    // `DrumClassifier` reads.
-    [[nodiscard]] std::span<const float> binFlux() const { return flux_; }
-    // Whether the last processed frame was the first since a reset (its flux is all 0 and its ratios read 0).
-    [[nodiscard]] bool first() const { return first_; }
 
     [[nodiscard]] const CausalOnsetConfig& config() const { return config_; }
 

@@ -35,19 +35,16 @@ void foldSpectrum(const AnalysisFrame& frame, const AnalyzerConfig& config, std:
 struct HistoryFrom {
     const StemTrack* track = nullptr;
     double offsetSeconds = 0.0; // where the source's first sample sits on the project timeline
-    bool classes = false;       // a drums source (ADR-1630): its kick / snare / hat are the low / mid / high rows
 };
 // The onset rows (low, mid, high) one picked onset contributes, as strengths (0 = none): the onset lands on the row
 // of its register's largest share (ADR-1604: low 30-250 Hz, mid 250 Hz-4 kHz, high 4-16 kHz), at the strength the
 // bus gives it (`onsetStrength` x 0.5, floored at 0.05 and capped at 1); one whose register is unknown (no band
-// gained) is on all three. Where an attack is, never what made it: the rule for the mix and every source that is not
-// a drums source.
+// gained) is on all three. Where an attack is, never what made it: the rule for the mix and every source.
 [[nodiscard]] std::array<float, 3> onsetRows(bool onset, float onsetStrength, const std::array<float, 3>& reg);
 // The mix frame's (its `onset` and `onsetRegister`).
 [[nodiscard]] std::array<float, 3> onsetRows(const AnalysisFrame& frame);
-// A source's hop. A drums source's rows are its measured classes -- kick, snare, hat (ADR-1630); any other source's
-// are its onset by register (`onsetRows`).
-[[nodiscard]] std::array<float, 3> sourceOnsetRows(const StemFrame& frame, bool classes);
+// A source's hop: its onset by register (`onsetRows`), whatever its role (ADR-1784).
+[[nodiscard]] std::array<float, 3> sourceOnsetRows(const StemFrame& frame);
 // The whole track's history with the spectrogram and the low/mid/high onset rows taken from those sources. The beat
 // row is always the mix's (ADR-1630 recommendation 6: the mix's grid stays the default). A source's spectrogram is
 // stretched over its own percentiles like the mix's, sits at its offset, and reads 0 before and after its span. A pure

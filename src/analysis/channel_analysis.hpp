@@ -30,12 +30,11 @@
 
 namespace avgen::analysis {
 
-// A published frame: the newest StemFrame plus, per event kind (onset, kick, snare, hat), the serial of the frame
-// that raised the event it carries (0 = none).
+// A published frame: the newest StemFrame plus the serial of the frame that raised the onset it carries (0 = none).
 struct LiveStemFrame {
     StemFrame frame;
     std::uint64_t serial = 0;
-    std::array<std::uint64_t, 4> stamps{};
+    std::uint64_t stamp = 0;
     // ADR-1581: on the beat feed's source, its causal beat tracker after this hop (as the mix's runner stamps its
     // frames); `tracked` false on every other source.
     BeatState beat;
@@ -44,7 +43,7 @@ struct LiveStemFrame {
 
 // The render thread's half of the event carry for one source: fires a carried event once.
 struct LiveStemLatch {
-    std::array<std::uint64_t, 4> fired{};
+    std::uint64_t fired = 0;
     std::uint64_t serial = 0;
     void apply(LiveStemFrame& f);
 };
@@ -55,7 +54,6 @@ public:
         audio::AnalysisStream* stream = nullptr; // null: the source's channel is absent; it is never active
         bool pair = false;
         bool hits = false;
-        bool classes = true; // ADR-1630: with `hits`, publish kick/snare/hat (a drums-role source only)
         float gainDb = 0.0f; // ADR-1582: the trim, before analysis
         bool beat = false;   // ADR-1581: run the causal beat tracker (the beat feed's source)
         bool feed = false;   // ADR-1580: queue every hop's response feed (a response feed's source; needs `hits`)
@@ -99,9 +97,9 @@ private:
         std::unique_ptr<StemAnalyzer> analyzer;
         TripleBuffer<LiveStemFrame> frames;
         std::uint64_t serial = 0;
-        std::array<bool, 4> pending{};
-        std::array<float, 4> pendingStrength{};
-        std::array<std::uint64_t, 4> pendingStamp{};
+        bool pending = false;
+        float pendingStrength = 0.0f;
+        std::uint64_t pendingStamp = 0;
         std::atomic<std::uint64_t> consumed{0};
         std::vector<float> read, mono, side;
         std::atomic<float> gainDb{0.0f};      // ADR-1582: wanted; `appliedGainDb` is what the analyzer runs

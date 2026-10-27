@@ -54,7 +54,7 @@ fs::path requireFixture(const std::string& name) {
         root = testsupport::processTempDir() / "audio-lab-fixtures";
     }
     const fs::path manifest = root / name / "manifest.json";
-    if (!fs::exists(manifest) && name != "drums-real") {
+    if (!fs::exists(manifest)) {
         const std::string cmd = "python3 " + quoted(fs::path(AVGEN_SOURCE_DIR) / "tools/audio_lab/make_fixtures.py") +
                                 " --out " + quoted(root) + " > /dev/null 2>&1";
         if (std::system(cmd.c_str()) != 0 || !fs::exists(manifest)) {
@@ -153,9 +153,4 @@ TEST_CASE("Audio Response Lab e2e: isolation", "[audiolab][e2e][stems][adr1720]"
 
 TEST_CASE("Audio Response Lab e2e: adversarial", "[audiolab][e2e][adr1720]") {
     runAndScore("adversarial");
-}
-
-TEST_CASE("Audio Response Lab e2e: real drum one-shots (needs the owner's samples)", "[audiolab][e2e][adr1726]") {
-    const auto r = runAndScore("drums-real");
-    CHECK(r["sources"]["drums"].contains("drumClassConfusion"));
 }

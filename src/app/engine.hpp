@@ -582,6 +582,14 @@ public:
     void setTempoOverride(double bpm);
     void clearTempoOverride();
     [[nodiscard]] const audio::AudioTempo& tempoOverride() const { return tempoOverride_; }
+    // ADR-1783: the manual beat clock. One hand-marked beat (seconds on the project clock; it is beat 1 of a bar)
+    // with the tempo override IS the file's beat clock: beats at anchor + k x 60 / bpm, `beat.source` 4, over any
+    // analysed grid. Marking with no override first sets the override to the tempo in force. A MIDI clock still wins
+    // while it runs; live input keeps its tracker. Clearing the override clears the mark.
+    void setBeatAnchor(double seconds);
+    void clearBeatAnchor();
+    [[nodiscard]] std::optional<double> beatAnchor() const { return beatAnchor_; }
+    [[nodiscard]] bool manualBeatClock() const { return tempoOverride_.available && beatAnchor_.has_value(); }
 
     // ---- outputs (milestone 1.2): the application owns the windows; the engine only carries the
     // project's "outputs" block so it saves and loads with everything else ----
@@ -1529,6 +1537,7 @@ private:
     // The artist's tempo. Persisted; `available` false means "not overridden", which is not the
     // same as 0 bpm.
     audio::AudioTempo tempoOverride_;
+    std::optional<double> beatAnchor_; // ADR-1783
     Transport transport_;
     // The interactive seek's outstanding request. See `requestSeek`.
     double seekRequestSeconds_ = 0.0;

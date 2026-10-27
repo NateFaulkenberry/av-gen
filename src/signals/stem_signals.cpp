@@ -15,7 +15,7 @@ struct Field {
     bool event;
     const char* label;
 };
-constexpr std::array<Field, 19> kFields{{
+constexpr std::array<Field, 16> kFields{{
     {"active", 0.0f, 1.0f, false, "has audio now (0 = no data: outside the stem, absent or disconnected)"},
     {"rms", 0.0f, 1.0f, false, "loudness (RMS, unsmoothed)"},
     {"peak", 0.0f, 1.0f, false, "peak"},
@@ -29,34 +29,24 @@ constexpr std::array<Field, 19> kFields{{
     {"treble", 0.0f, 1.0f, false, "treble band"},
     {"centroid", 0.0f, 1.0f, false, "brightness (spectral centroid)"},
     {"width", 0.0f, 2.0f, false, "stereo width (0 for mono)"},
-    {"kick", 0.0f, 1.0f, true, "kick (a drums source's classifier)"},
-    {"snare", 0.0f, 1.0f, true, "snare / clap (a drums source's classifier)"},
-    {"hat", 0.0f, 1.0f, true, "hats (a drums source's classifier)"},
     // ADR-1604: the register of the latest onset (low/mid/high shares of its attack), held until the next
     {"onsetLow", 0.0f, 1.0f, false, "onset register: low share (30-250 Hz) of the latest attack"},
     {"onsetMid", 0.0f, 1.0f, false, "onset register: mid share (250 Hz-4 kHz) of the latest attack"},
     {"onsetHigh", 0.0f, 1.0f, false, "onset register: high share (4-16 kHz) of the latest attack"},
 }};
 
-std::array<SignalId*, 19> slots(StemSignals& s) {
-    return {&s.active, &s.rms,      &s.peak,     &s.level,    &s.onset,    &s.onsetStrength,
-            &s.bands[0], &s.bands[1], &s.bands[2], &s.bands[3], &s.bands[4], &s.centroid,
-            &s.width,    &s.kick,     &s.snare,    &s.hat,      &s.onsetRegister[0], &s.onsetRegister[1],
-            &s.onsetRegister[2]};
+std::array<SignalId*, 16> slots(StemSignals& s) {
+    return {&s.active,    &s.rms,       &s.peak,      &s.level,     &s.onset,    &s.onsetStrength,
+            &s.bands[0],  &s.bands[1],  &s.bands[2],  &s.bands[3],  &s.bands[4], &s.centroid,
+            &s.width,     &s.onsetRegister[0], &s.onsetRegister[1], &s.onsetRegister[2]};
 }
 
-bool isClass(std::size_t field) {
-    return field >= 13 && field <= 15; // kick, snare, hat
-}
-
-std::vector<std::string> namesWith(const std::string& prefix, audio::SourceRole role) {
+// ADR-1784: every role publishes the same names -- activity, never an instrument's identity.
+std::vector<std::string> namesWith(const std::string& prefix) {
     std::vector<std::string> out;
     out.reserve(kFields.size());
-    for (std::size_t i = 0; i < kFields.size(); ++i) {
-        if (isClass(i) && !audio::classifiesHits(role)) {
-            continue; // ADR-1630
-        }
-        out.push_back(prefix + "." + kFields[i].suffix);
+    for (const Field& f : kFields) {
+        out.push_back(prefix + "." + f.suffix);
     }
     return out;
 }
@@ -66,9 +56,6 @@ StemSignals declareWith(SignalBus& bus, const std::string& prefix, audio::Source
     s.role = role;
     const auto targets = slots(s);
     for (std::size_t i = 0; i < kFields.size(); ++i) {
-        if (isClass(i) && !audio::classifiesHits(role)) {
-            continue; // ADR-1630: a class name exists only on a drums source
-        }
         const Field& f = kFields[i];
         *targets[i] = bus.declare(prefix + "." + f.suffix, f.minValue, f.maxValue, f.event);
     }
@@ -84,11 +71,12 @@ std::string roleLabel(audio::SourceRole role) {
 } // namespace
 
 std::vector<std::string> StemSignals::names(const std::string& key, audio::SourceRole role) {
-    return namesWith("stem." + key, role);
+    static_cast<void>(role);
+    return namesWith("stem." + key);
 }
 
 std::vector<std::string> StemSignals::roleNames(audio::SourceRole role) {
-    return namesWith(std::string("role.") + audio::sourceRoleName(role), role);
+    return namesWith(std::string("role.") + audio::sourceRoleName(role));
 }
 
 StemSignals StemSignals::declare(SignalBus& bus, const std::string& key, const std::string& label,
@@ -165,9 +153,6 @@ void StemSignals::publish(SignalBus& bus, const analysis::StemFrame& f, bool eve
     }
     // An event fires with its strength, floored so a quiet one still moves an event route.
     bus.setEvent(onset, events && f.onset, std::clamp(f.onsetStrength * 0.5f, 0.05f, 1.0f));
-    bus.setEvent(kick, events && f.kick, std::max(0.05f, f.kickStrength));
-    bus.setEvent(snare, events && f.snare, std::max(0.05f, f.snareStrength));
-    bus.setEvent(hat, events && f.hat, std::max(0.05f, f.hatStrength));
 }
 
 void StemSignals::publishInactive(SignalBus& bus) const {
@@ -185,9 +170,7 @@ void StemSignals::publishInactive(SignalBus& bus) const {
 }
 
 void StemSignals::clearEvents(SignalBus& bus) const {
-    for (const SignalId id : {onset, kick, snare, hat}) {
-        bus.setEvent(id, false);
-    }
+    bus.setEvent(onset, false);
 }
 
 void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track, double offset, double from,
@@ -206,8 +189,7 @@ void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track,
                                         [](double t, const analysis::StemFrame& f) { return t < f.timeSeconds; });
     // Before the first window's centre (the stem's first 21 ms) the first frame stands: the stem has begun.
     analysis::StemFrame f = after == frames.begin() ? frames.front() : *std::prev(after);
-    f.onset = f.kick = f.snare = f.hat = false;
-    f.kickStrength = f.snareStrength = f.hatStrength = 0.0f;
+    f.onset = false;
     float batchStrength = 0.0f;
     if (from >= 0.0 && from < to) {
         const double localFrom = from - offset;
@@ -217,18 +199,6 @@ void StemSignals::publishTrack(SignalBus& bus, const analysis::StemTrack* track,
             if (it->onset) {
                 f.onset = true;
                 batchStrength = std::max(batchStrength, it->onsetStrength);
-            }
-            if (it->kick) {
-                f.kick = true;
-                f.kickStrength = std::max(f.kickStrength, it->kickStrength);
-            }
-            if (it->snare) {
-                f.snare = true;
-                f.snareStrength = std::max(f.snareStrength, it->snareStrength);
-            }
-            if (it->hat) {
-                f.hat = true;
-                f.hatStrength = std::max(f.hatStrength, it->hatStrength);
             }
         }
     }

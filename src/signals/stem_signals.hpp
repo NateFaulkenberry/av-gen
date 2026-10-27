@@ -15,9 +15,6 @@
 //   stem.<key>.bass .lowMid .mid .highMid .treble   0..1 auto-gained bands, like audio.<band>
 //   stem.<key>.centroid        0..1  log-normalised spectral centroid
 //   stem.<key>.width           0..2  side/mid RMS of a stereo stem or a linked pair; 0 for mono
-//   stem.<key>.kick .snare .hat event  the ADR-1060 causal classifier, on a `drums`-role source only (ADR-1630): the
-//                                    names are not declared for any other role -- a bass or synth source publishes
-//                                    activity, never an identity
 //   stem.<key>.onsetLow .onsetMid .onsetHigh  0..1  ADR-1604: the register of the latest onset -- the low (30-250 Hz),
 //                                    mid and high (4-16 kHz) shares of its attack, summing to 1 -- from its own hop on,
 //                                    held until the next onset
@@ -28,8 +25,9 @@
 //
 // ADR-1630, by role: `role.<role>.*` (drums, bass, synth, vocal, other) is the same vocabulary for the first ACTIVE
 // source of that role -- the live input sources first (while an input is open), then the stems, each in list order --
-// and inactive when none is. It is declared once a source of the role exists, and the class names only for
-// `role.drums`. A scene that names `role.drums.kick` follows a drum bus keyed `drums`, `kit` or `in3` alike.
+// and inactive when none is. It is declared once a source of the role exists. A scene that names `role.drums.onset`
+// follows a drum bus keyed `drums`, `kit` or `in3` alike. Every role publishes the same names: activity, never an
+// instrument's identity (ADR-1784 cut the drums role's kick/snare/hat classifier).
 
 #include "analysis/stem_analysis.hpp"
 #include "audio/source_role.hpp"
@@ -52,16 +50,12 @@ struct StemSignals {
     std::array<SignalId, 5> bands{kInvalidSignal, kInvalidSignal, kInvalidSignal, kInvalidSignal, kInvalidSignal};
     SignalId centroid = kInvalidSignal;
     SignalId width = kInvalidSignal;
-    SignalId kick = kInvalidSignal;  // ADR-1630: a drums-role source only; kInvalidSignal otherwise
-    SignalId snare = kInvalidSignal;
-    SignalId hat = kInvalidSignal;
     // ADR-1604: stem.<key>.onsetLow / onsetMid / onsetHigh
     std::array<SignalId, 3> onsetRegister{kInvalidSignal, kInvalidSignal, kInvalidSignal};
 
-    // Declares (idempotently) every signal of `key` -- the class names only for a drums `role` -- and labels them with
-    // `label` ("Drums: level (...)").
+    // Declares (idempotently) every signal of `key` and labels them with `label` ("Drums: level (...)").
     static StemSignals declare(SignalBus& bus, const std::string& key, const std::string& label, audio::SourceRole role);
-    // ADR-1630: declares `role.<role>.*` (the class names only for drums).
+    // ADR-1630: declares `role.<role>.*`.
     static StemSignals declareRole(SignalBus& bus, audio::SourceRole role);
     // Every name `declare` makes for `key` and `role`, in declaration order.
     [[nodiscard]] static std::vector<std::string> names(const std::string& key, audio::SourceRole role);

@@ -279,6 +279,28 @@ void Analyzer::computeFrame() {
         frame.bands[b] = bandPeak_[b] > 0.0f ? raw / bandPeak_[b] : 0.0f;
     }
 
+    // ---- the beat strength (ADR-1780): each band's log-power rise, weighted towards the low bands ----
+    {
+        // bass, low-mid, mid, high-mid, treble
+        constexpr std::array<float, 5> kBeatWeights{1.0f, 0.5f, 0.25f, 0.15f, 0.1f};
+        constexpr std::array<float, 5> kLowWeights{1.0f, 0.3f, 0.0f, 0.0f, 0.0f};
+        // -60 dB: a band rising out of near-silence (a file's first audible samples, a fade-in) is not an attack.
+        constexpr double kFloorPower = 1e-8;
+        float rise = 0.0f;
+        float lowRise = 0.0f;
+        for (std::size_t b = 0; b < impl.bandCount; ++b) {
+            const auto db = static_cast<float>(10.0 * std::log10(bandEnergy[b] + kFloorPower));
+            if (havePrevious_ && b < kBeatWeights.size()) {
+                const float up = std::max(0.0f, db - previousBandDb_[b]);
+                rise += kBeatWeights[b] * up;
+                lowRise += kLowWeights[b] * up;
+            }
+            previousBandDb_[b] = db;
+        }
+        frame.beatStrength = 0.1f * rise;
+        frame.beatLowStrength = 0.1f * lowRise;
+    }
+
     // ---- spectral centroid ----
     double weighted = 0.0;
     double total = 0.0;

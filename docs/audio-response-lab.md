@@ -22,13 +22,13 @@ Every indicator is a route from a production signal, so it shows what the bus pu
 - the phase marker (`beat.phase`) and the bar marker;
 - CONF (`audio.tempoConfidence`) and BPM;
 - three lamps for the clock source (`beat.source`, ADR-1724). **FILE GRID: NO LOCK STATE** means the dial is showing
-  a whole-file estimate, and its confidence cannot say whether it is locked.
+  a whole-file estimate, and its confidence cannot say whether it is locked. The manual clock (`beat.source` 4,
+  ADR-1783) has no lamp: the lab never sets a tempo override.
 
 **C Sources:** one column per key: `drums`, `bass`, `synth` and `pad`. Map live input sources or stems with those
 keys.
 - A red lamp means the source is not configured or not sending.
 - A green lamp means it is active.
-- The drums column adds kick/snare/hat lamps, for a drums-role source only.
 
 **E Probes:** real route chains: the bass sphere, the 120 ms onset flash, the brightness colour, the bass-stem cube
 and MIDI CC 1 (`control.labCC1`).
@@ -55,7 +55,9 @@ the real-drum fixture when the samples are present. Every gate must pass.
 - **offline (file):** `avgen --sonic-trace` at the hop clock (93.75 fps, `hop.csv`) and at 30 fps with every route
   final (`frame.csv`). This is the engine's own update sequence, so render frame N is row N.
 - **live analysis:** `avgen_audio_lab_replay` (ADR-1725) runs the same `Analyzer`, `BeatTracker` and causal onsets that
-  the live runner does, hop by hop, then the runner's carry at 30 fps (`live.frame.csv`).
+  the live runner does, hop by hop, then the runner's carry at 30 fps (`live.frame.csv`). It also writes the file grid's
+  beats (`live.grid.csv`: `AnalysisTrack::analyze`, one row per beat with its local tempo), for scoring a tracker change
+  without an engine trace.
 - **live device:** `loopback.sh`. The probe plays the fixture into BlackHole, AV Gen captures it at 1080p30, and the
   two logs are joined on the host clock.
 
@@ -77,8 +79,6 @@ the real-drum fixture when the samples are present. Every gate must pass.
    Give every check its bound and the reason for it, in the implementation's own terms (the window, the hop, a
    documented release).
 4. Add a `TEST_CASE` to `test_audio_lab_e2e.cpp`. **Never commit audio.** Generated audio goes in the build tree.
-   Commercial samples (the real-drum fixture) stay in the self-ignoring `assets/audio/drum-samples/`. The manifest
-   records their `~/Samples` paths and hashes.
 
 ## Reading a result
 
@@ -103,6 +103,7 @@ the real-drum fixture when the samples are present. Every gate must pass.
 | A stale value after silence | A follower's release grew, or a signal stopped being gated |
 | A band-selectivity failure | A band's edges moved (`causal_onsets.cpp` `layout`) or the reference rules changed |
 | A pixel check (`<clip>.pixels.json`) where lag 0 is not best | The render and the engine's update sequence disagree: frame N is not row N |
+| A beat gate (ADR-1785) | `beat_tracker.cpp`: the tempo score or path (a 4:3 or octave tempo), the low-register phase (half a beat off), the silence gate (confidence or pulses in a silence). Check the fixture's own grid first: the dense fixture once started its sections off its beat |
 
 **Timing:**
 - On the hop clock, an onset is about 11 ms early (the window centre).

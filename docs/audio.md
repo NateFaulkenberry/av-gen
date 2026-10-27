@@ -54,36 +54,59 @@ transient, so they lead the physical impulse by up to half a window (~10-20 ms) 
 early rather than late. Per-band running-max normalisation makes any steady tone tend towards 1
 in its band, which is intended for visual use (auto-gain); use `bandsRaw` for absolute levels.
 
-## Beat and tempo (milestone 0.3, `analysis::BeatTracker`)
+## Beat and tempo (`analysis::BeatTracker`; the beat clock pass, ADR-1780..1783)
 
-Two paths share the analyzer's onset strength at hop rate:
+**The input (ADR-1780).** Both trackers read `AnalysisFrame::beatStrength`: the half-wave-rectified rise of each band's
+log power (dB / 10, floored at -80 dB), weighted bass 1, low-mid 0.5, mid 0.25, high-mid 0.15, treble 0.1, so it is
+level-free and leans on the kick and the bass. `beatLowStrength` is the same from the bass and low-mid bands only
+(1, 0.3). Each is compressed (square root) and smoothed (one hop) before anything is correlated.
 
-- Live (`BeatTracker`, run by `AnalysisRunner`): an autocorrelation tempogram over a 6 s window
-  with the Ellis log-Gaussian prior (centre 120 BPM), re-evaluated every 0.5 s; a phase-locked
-  predictor that snaps predicted beats to nearby picked onsets. Requires at least four picked
-  onsets before trusting a tempo, free-runs through breaks and forgets the tempo after roughly
-  9 s without onsets. Measured: 120 BPM click track locks at 2 s, 119.97 BPM, beats within 20 ms
-  (mean 15 ms early, following the analyzer's early onset stamps); a 120→150 BPM jump is followed
-  within 3 s.
-- Offline (`trackBeatsOffline`, run by `AnalysisTrack`): Ellis 2007 dynamic programming with a
-  global tempo from the median of windowed estimates. Measured: 119.94 BPM, beats within 10 ms of
-  the clicks.
+**The tempo score (ADR-1780).** For each candidate period L (60-200 BPM, in quarter-hop steps): the mean of the
+unbiased autocorrelation at L, 2L, 3L and 4L (those that fit in three quarters of the window), times the Ellis
+log-Gaussian prior (centre 120 BPM, sigma 1 octave). A syncopated sub-period (three sixteenths, 4:3) or a backbeat's
+half time must win on the whole bar of evidence. Confidence is `1 - exp(-(best / mean - 1) / 3)`.
 
-Frames carry `tempoBpm`, `tempoConfidence`, `beat`, `beatPhase`, `beatCount`. Octave errors are
-only mitigated by the prior; tempo changes inside an offline track get one global tempo.
+**The file grid (`trackBeatsOffline`, ADR-1782).** The score over 8 s windows every 1 s; a Viterbi path through the
+windows (a window's evidence is its normalised score times its confidence; a change costs 1.5 windows of evidence per
+octave), so each section has its own tempo; then Ellis 2007 dynamic programming with the path's local period at each
+hop. Where the low register is itself confident of the path's period (confidence 0.3 to 0.5 fades it in), the DP's
+local score is the low envelope: the beats sit on the kick and the bass, not on a syncopated hat. ADR-896's refinement
+follows. `OfflineBeats::tempoBpm` is the median beat interval; `beat.bpm` on a file is `localBpmAt` (the median of the
+eight intervals around the playhead), so it follows a tempo change. `audio.tempo` and `audio.tempoConfidence` stay the
+whole file's.
 
-`beat.source` (ADR-1724) says which clock `beat.*` reads: 0 none, 1 MIDI clock, 2 the analysed file grid, 3 the live
-tracker. On the file grid, `audio.tempoConfidence` is one number for the whole file: it cannot show acquisition, loss or
-reacquisition, and a scene that wants to say "the beat is locked" must not read it as if it could.
+**The live tracker (`BeatTracker`, ADR-1781).**
+- A first estimate after 2 s of history with four picked onsets, re-estimated every 0.25 s while acquiring and every
+  0.5 s once locked, from all the history up to 8 s.
+- A lock is confirmed by an estimate over at least 4 s. A locked period is kept while its own peak (within 8%) scores
+  65% of the best; another tempo must win twice running. A tempo change is also read from the newest 5 s alone, when
+  they are confident (0.6) and the held period scores under half their best, unless the new tempo is a metrical
+  relative of the held one (x2, x1/2, x3/2, x2/3, x4/3, x3/4).
+- The phase: a comb over the history at the period (over the low register's history when it is confident of the
+  period), then a phase-locked loop that pulls each prediction half way to an onset within 20% of a period.
+- **The silence gate.** Input RMS under -60 dBFS for at least 0.15 s when a beat falls due, with no sound within 8% of
+  a period, or for a beat and a bit (at least 0.4 s) regardless: the beat that fell due is skipped, `tempoBpm` reads 0,
+  the confidence falls with a 40 ms time constant (under 0.1 within about 0.5 s of the silence), and the phase runs on
+  inside. Sound back within 2 s resumes the lock with its confidence; after a longer silence the first two onsets are
+  checked against the held phase (a miss restarts acquisition), and after 8 s the lock is forgotten.
 
-Measured by the Audio Response Lab (docs/prototypes/audio-response-lab/03-final-report.md, 2026-10-26), against intended
-beats:
-- **Syncopated material (110 BPM son clave and displaced accents):** both the file grid and the live tracker read
-  144.6 BPM. The F-measure is 0.28 for the file grid and 0.15-0.19 for the live tracker, and neither ever locks.
-- **A 120 BPM four-on-the-floor intro at -30 dB:** the live tracker reads it at half tempo and takes 22-26 s to lock.
-- **A step from 120 to 96 BPM:** the live tracker relocks in 3.7 s.
-- **Through a silence of a few seconds:** the live tracker's confidence holds (0.6-0.8).
-These numbers are recorded for separate work on the tracker.
+`beat.source` (ADR-1724, ADR-1783) says which clock `beat.*` reads. Highest first:
+
+| Value | Clock | When |
+|---|---|---|
+| 1 | MIDI clock | selected and running |
+| 4 | manual: the tempo override and one marked beat (ADR-1783) | a file is loaded and both are set |
+| 2 | the analysed file grid (the beat feed's stem, else the mix) | a file is loaded |
+| 3 | the live tracker | live input |
+| 0 | none | |
+
+**The manual beat clock (ADR-1783).** `transport.tempo` = `{"bpm": 112, "source": "user", "anchor": 3.42}`: beats at
+anchor + k x 60 / bpm, the anchor beat 1 of a bar. The transport bar's **Mark beat** sets the anchor at the playhead
+(with no override it first takes the tempo in force); right-click clears it; clearing the override clears it too. On a
+file grid, `audio.tempoConfidence` is one number for the whole file: it cannot show acquisition, loss or reacquisition.
+
+Measured by the Audio Response Lab against intended beats: `docs/prototypes/beat-clock/02-report.md` (before and after
+this pass). The lab gates the beat clock (`tools/audio_lab/lab.py` `checks()`).
 
 ## Signals (`signals::AudioSignals`)
 
@@ -123,13 +146,12 @@ log-spectral flux and `stem.<key>.level` is ADR-1510's law per source. The fixtu
 by the build into `build/<preset>/test-fixtures/stems` (or by the first test that needs it).
 
 **Roles (ADR-1630).** `role` is what the source is: `drums`, `bass`, `synth`, `vocal` or `other` (absent: `other`;
-never inferred from the key or the audio). Only `drums` runs the drum classifier (`analysis::DrumClassifier`) and has
-`stem.<key>.kick/snare/hat` on the bus, always. Every other role publishes onsets, levels and the onset register --
-activity, never an identity. The mix never runs the classifier: it publishes where an attack is (`response.low`,
-`response.onset`, `audio.onset` and the onset register), never what made it. A live input source has the same `role` (`live.inputSources`, the
+never inferred from the key or the audio). Every role publishes the same onsets, levels and the onset register --
+activity, never an identity (ADR-1784 cut the drums role's kick/snare/hat classifier). Like the mix, a source publishes
+where an attack is (`response.low`, `response.onset`, `audio.onset` and the onset register), never what made it. A live input source has the same `role` (`live.inputSources`, the
 Inputs table's Role column, `--input-sources <key>@<ch>:<role>`). `role.<role>.*` is the same vocabulary for the first
 ACTIVE source of each role (live inputs first while an input is open, then stems, each in list order), declared once a
-source has the role, the class names on `role.drums` only; seek-replayed like the stems.
+source has the role; seek-replayed like the stems.
 
 **The stem-set check (ADR-1632).** At load, and whenever the mix or a stem changes, `audio::checkStemSet` compares the
 stems with the mix from a 4 kHz probe of each (box-averaged mono, kept per stem: 3.4 MB for 210 s): channels (info),
@@ -191,12 +213,12 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 - Anything else is a load warning, and then the mix feeds everything.
 
 **Rules:**
-- **No instrument classes in the response:** the response hits are the low attack and the onset, from any role. A drum
-  source's kick, snare and hat are its own `stem.<key>.kick/snare/hat` and `role.drums.kick/snare/hat`, not part of
-  `response.*`; a key `kick`, `snare` or `hat` in `feeds` is not a feed (a load warning, and the mix feeds everything).
+- **No instrument classes:** the response hits are the low attack and the onset, from any role, and no source names an
+  instrument (ADR-1784); a key `kick`, `snare` or `hat` in `feeds` is not a feed (a load warning, and the mix feeds
+  everything).
 - **The history (ADR-1631):** offline, the whole-file history is built from the named stem (its folded spectrum rows,
-  stretched over its own percentiles, at its offset and zero outside its span; its onsets: a drums stem's kick / snare /
-  hat as the low / mid / high rows, any other stem's onsets on the row of their register), so a seek is exact as
+  stretched over its own percentiles, at its offset and zero outside its span; its onsets, each on the row of its
+  register, whatever the stem's role), so a seek is exact as
   before. The mix's onset rows are its picked onsets (`audio.onset`), each on the row of its register (low 30-250 Hz,
   mid 250 Hz-4 kHz, high 4-16 kHz). The beat row
   stays the mix's. Live, the named input source's newest row and onsets, on the mix's clock; an inactive source gives
@@ -204,8 +226,8 @@ By default the mix drives everything. A project's top-level `feeds` block lets a
 - **Not fed by a source:** `response.melodic`, `pitch` and `note` stay on the mix and MIDI. `audio.*` is always the
   mix's measurement, `audio.beat` and `audio.tempo` included.
 - **Needs a `sonic` block:** `response.*` runs only with a `sonic` block (or live Sonic input). `beat` needs none.
-- **The hits tier:** a drums source always runs it, with the drum classifier; a stem or input source of another role that
-  a response feed names runs it for the feed's onsets and levels, and publishes no class name.
+- **The hits tier:** a stem or input source that a response feed names runs it for the feed's onsets and levels, whatever
+  its role; no other does.
 - **Inactive sources:** an inactive source feeds nothing: no hits, and its levels read 0. That covers a stem outside
   `[offset, offset + duration)`, and an absent, disconnected or stalled input channel. Offline the beat clock keeps the
   stem's grid, extrapolated at its tempo. Live it free-runs at the last tempo.

@@ -200,7 +200,14 @@ TEST_CASE("Musical events land at the same times at 30 fps and at 120 fps", "[ap
     for (const auto& [kind, times] : slow) {
         INFO("event kind " << signals::musicalEventName(static_cast<signals::MusicalEvent>(kind)));
         REQUIRE(fast.count(kind) == 1);
-        const auto& other = fast.at(kind);
+        // The 120 fps run renders past the 30 fps run's last frame (6.992 s against 6.967 s): an event in between is
+        // one the slow run never reached, not a disagreement.
+        std::vector<double> other;
+        for (const double t : fast.at(kind)) {
+            if (t <= 7.0 - 1.0 / 30.0 + 1e-9) {
+                other.push_back(t);
+            }
+        }
         REQUIRE(times.size() == other.size());
         for (std::size_t i = 0; i < times.size(); ++i) {
             // Exactly equal, not merely close: both runs feed the classifier the same analysis

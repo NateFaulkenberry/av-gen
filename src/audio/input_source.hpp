@@ -22,9 +22,8 @@ struct InputSource {
     std::string label;
     std::uint32_t channel = 0;  // 0-based device channel; a pair is channel and channel + 1
     bool pair = false;
-    SourceRole role = SourceRole::Other; // ADR-1630: only `drums` runs the kick/snare/hat classifier
+    SourceRole role = SourceRole::Other; // ADR-1630: what the source is (`role.<role>.*`)
     float gainDb = 0.0f;        // ADR-1582: the source's trim before analysis, -24..+24 dB (on top of audio/inputGain)
-    [[nodiscard]] bool hits() const { return classifiesHits(role); }
     [[nodiscard]] bool operator==(const InputSource&) const = default;
 };
 

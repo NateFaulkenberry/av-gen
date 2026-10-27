@@ -1,5 +1,6 @@
 # ADR-1067: Drums under a mix: percussive flux, a snare that must last, and a kick with a period
 
+- Superseded in part by ADR-1784 (2026-10-26): the drums-role kick/snare/hat classifier is cut.
 - **Status:** Accepted (2026-10-02), proto/sonic-garden (VFX expansion; the art agent's measurement)
 - **Supersedes:** ADR-1060's class rules (its causal framework, live wiring and latch stand).
 - **Code:** `src/analysis/causal_onsets.*`; `ResponseModel::step` takes the detector's decisions.

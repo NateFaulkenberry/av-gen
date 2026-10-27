@@ -150,8 +150,8 @@ std::size_t nearestFrame(std::span<const double> times, double seconds) {
 
 } // namespace
 
-OfflineBeats trackGrid(std::span<const double> times, std::span<const float> onsetStrength, std::size_t picked,
-                       double hop, const BeatTrackerConfig& beatConfig, std::vector<std::size_t>* hops) {
+OfflineBeats trackGrid(std::span<const double> times, std::span<const float> onsetStrength,
+                       std::span<const float> lowStrength, std::size_t picked, double hop, const BeatTrackerConfig& beatConfig, std::vector<std::size_t>* hops) {
     OfflineBeats beats;
     std::vector<std::size_t> beatFrames;
     if (times.empty() || times.size() != onsetStrength.size() || !(hop > 0.0)) {
@@ -161,7 +161,7 @@ OfflineBeats trackGrid(std::span<const double> times, std::span<const float> ons
         return beats;
     }
     if (picked >= kMinOnsets) {
-        beats = trackBeatsOffline(onsetStrength, static_cast<float>(hop), beatConfig);
+        beats = trackBeatsOffline(onsetStrength, lowStrength, static_cast<float>(hop), beatConfig);
     }
 
     // The tracker's beat times are hop-relative (hopIndex * hop); move them onto the frames'
@@ -228,17 +228,20 @@ void stampBeats(std::vector<AnalysisFrame>& frames, OfflineBeats& beats, const A
     }
     const double hop = static_cast<double>(cfg.hopSize) / static_cast<double>(cfg.sampleRate);
     std::vector<float> onsets;
+    std::vector<float> low;
     std::vector<double> times;
     onsets.reserve(frames.size());
+    low.reserve(frames.size());
     times.reserve(frames.size());
     std::size_t picked = 0;
     for (const auto& f : frames) {
-        onsets.push_back(f.onsetStrength);
+        onsets.push_back(f.beatStrength); // ADR-1780: the beat strength, not the onset detector's ratio
+        low.push_back(f.beatLowStrength);
         times.push_back(f.timeSeconds);
         picked += f.onset ? 1 : 0;
     }
     std::vector<std::size_t> beatFrames;
-    beats = trackGrid(times, onsets, picked, hop, beatConfig, &beatFrames);
+    beats = trackGrid(times, onsets, low, picked, hop, beatConfig, &beatFrames);
     const double period = beats.tempoBpm > 0.0f ? 60.0 / static_cast<double>(beats.tempoBpm) : 0.0;
 
     std::size_t next = 0; // index of the first beat after the frame

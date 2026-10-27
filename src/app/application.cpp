@@ -199,9 +199,8 @@ std::string usageText() {
            "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit (audio: id, channels per\n"
            "                      Core Audio stream, rate)\n"
-           "  --input-sources <n>[h[k]]  analyse channels 1..n of the --input device as stem.in<c>.* (h: all\n"
-           "                      drums sources, with kick/snare/hat; hk: the first k); overrides the saved\n"
-           "                      channel map; or named: <key>@<channel>[:<role>],... (role drums, bass,\n"
+           "  --input-sources <n>  analyse channels 1..n of the --input device as stem.in<c>.*; overrides\n"
+           "                      the saved channel map; or named: <key>@<channel>[:<role>],... (role drums, bass,\n"
            "                      synth, vocal, other; e.g. drums@2:drums: channel 2 as stem.drums.*)\n"
            "  --input-meter <device> [s]  every input channel's peak once a second for s seconds (default\n"
            "                      20), through the multichannel capture path; device = id or name\n"
@@ -561,16 +560,14 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
         } else if (arg == "--list-audio-devices") {
             options.listAudioDevices = true;
         } else if (arg == "--input-sources") {
-            // ADR-1521: "<n>[h[<k>]]": n mono sources on channels 1..n; h: all drums sources (ADR-1630: the role that
-            // runs the hits tier), hk: the first k.
+            // ADR-1521: "<n>": n mono sources on channels 1..n.
             auto v = need(i, "--input-sources");
             if (!v) return std::unexpected(v.error());
             const std::string spec = *v;
             if (!spec.empty() && std::isdigit(static_cast<unsigned char>(spec[0])) == 0) {
                 // ADR-1605: named sources, "<key>@<channel>[:<role>],...", channel 1-based, so a loopback run can put a
                 // channel under the vocabulary a scene reads (stem.drums.*, role.drums.*) without touching the saved
-                // channel map. ADR-1630: the role (drums, bass, synth, vocal, other; default other) -- only drums runs
-                // the kick/snare/hat classifier.
+                // channel map. ADR-1630: the role (drums, bass, synth, vocal, other; default other).
                 std::vector<audio::InputSource> sources;
                 std::size_t start = 0;
                 while (start <= spec.size()) {
@@ -600,14 +597,13 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
                 continue;
             }
             const int n = std::atoi(spec.c_str());
-            if (n < 1 || n > 64) return fail("--input-sources: expected <n>[h[<k>]] with 1 <= n <= 64, got '{}'", spec);
-            const auto h = spec.find('h');
-            const int hits = h == std::string::npos ? 0 : (h + 1 < spec.size() ? std::atoi(spec.c_str() + h + 1) : n);
+            if (n < 1 || n > 64 || spec.find_first_not_of("0123456789") != std::string::npos) {
+                return fail("--input-sources: expected <n> with 1 <= n <= 64, got '{}'", spec);
+            }
             std::vector<audio::InputSource> sources;
             for (int c = 0; c < n; ++c) {
                 sources.push_back({.key = "in" + std::to_string(c + 1), .label = "Input " + std::to_string(c + 1),
-                                   .channel = static_cast<std::uint32_t>(c),
-                                   .role = c < hits ? audio::SourceRole::Drums : audio::SourceRole::Other});
+                                   .channel = static_cast<std::uint32_t>(c)});
             }
             options.inputSources = std::move(sources);
             ++i;

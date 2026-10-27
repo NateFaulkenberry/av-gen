@@ -2988,7 +2988,7 @@ void registerAudioTools(ToolRegistry& registry) {
     add(registry, "audio.get_analysis", "Audio analysis",
         "What the analyzer currently hears: loudness, the five frequency bands (auto-gained, and as "
         "long-term levels), spectral centroid, a loudness-independent energy, the onset rate, stereo "
-        "width, onset and the kick/snare/hat onsets, tempo and beat position in musical time (which "
+        "width, the onset and its register, tempo and beat position in musical time (which "
         "beat of which bar), plus when each musical event (beat, downbeat, build, break, drop, "
         "impact) last fired. This is the state audio-reactive work is built on.",
         noArgs(), readOnly(),

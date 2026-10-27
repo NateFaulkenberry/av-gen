@@ -59,9 +59,6 @@ PATHS = [
     ("route env (response.onset)", "final:post/grade/contrast[0]", None),
     ("route env (stem.drums.onset)", "final:post/tonemap/chroma-retention[0]", None),
     ("response.low", "response.low", ["kick"]),
-    ("stem.drums.kick", "stem.drums.kick", ["kick"]),
-    ("stem.drums.snare", "stem.drums.snare", ["snare"]),
-    ("stem.drums.hat", "stem.drums.hat", ["hat"]),
     # Rainbow World's own impact signals (ADR-1602) and its clap route's final
     ("RW signal.clap", "signal.clap", ["snare"]),
     ("RW signal.glint", "signal.glint", ["hat"]),

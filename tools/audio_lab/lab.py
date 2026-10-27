@@ -62,6 +62,12 @@ LIVE_EARLY_S = 0.002
 LIVE_LATE_S = HALF_WINDOW_S + 3 * HOP_S + 1.0 / 30.0 + 0.002     # 87.7 ms
 LOCK_PHASE = 0.10                          # |phase error| under this (of a beat) at a beat counts as locked
 LOCK_BEATS = 4                             # ... for this many consecutive intended beats
+# The beat clock gates (ADR-1785): measured after the beat clock pass with margin -- the file grid F 0.91-0.99, the
+# live tracker F 0.80-0.95, acquisition 1.5-4.4 s, confidence under 0.1 0.36-0.74 s into a silence (02-report.md).
+BEAT_F_FILE = 0.85
+BEAT_F_LIVE = 0.70
+LOCK_GATE_S = 8.0
+SILENCE_FALL_S = 0.8
 SETTLE_S = 1.5                             # after this long in silence every level and envelope must be at rest
 SUSTAIN_GRACE_S = 0.15                     # a sustained note's first 150 ms may hold its own (one) onset
 LEVEL_REST = 0.02                          # "at rest": below this
@@ -432,7 +438,7 @@ def beat_metrics(m, tr):
 
 def source_metrics(m, tr):
     """Per stem: onsets against that stem's GT; activity at times only OTHER stems play (leakage); a silent stem's
-    activity (false); drum classes against GT classes."""
+    activity (false)."""
     out = {}
     silent_all = m["silent"]
     for key, s in m["sources"].items():
@@ -465,36 +471,6 @@ def source_metrics(m, tr):
         if res["silentThroughout"]:
             res["falseActivity"] = {"onsets": len(det),
                                     "levelMax": round(max(lv), 4) if lv else None}
-        if s["role"] == "drums":
-            classes = {}
-            for cls in ("kick", "snare", "hat"):
-                ev = events_of(tr, f"stem.{key}.{cls}")
-                classes[cls] = [x for x, _ in ev] if ev is not None else None
-            confusion = {}
-            stamps = sorted(e["time"] for e in gt if "cls" in e)
-            for e in gt:
-                if "cls" not in e:
-                    continue
-                # A hit stacked on another class within one hop is one attack with two names: kept apart.
-                stacked = sum(1 for x in stamps if abs(x - e["time"]) < HOP_S) > 1
-                row = confusion.setdefault(e["cls"] + (f" [{e['kit']}]" if "kit" in e else "") +
-                                           (" (stacked)" if stacked else ""),
-                                           {"kick": 0, "snare": 0, "hat": 0, "none": 0})
-                hit = None
-                for cls, times in classes.items():
-                    if times and any(-MATCH_EARLY_S <= x - e["time"] <= 0.120 for x in times):
-                        row[cls] += 1
-                        hit = cls
-                if hit is None:
-                    row["none"] += 1
-            res["drumClassConfusion"] = confusion
-            res["drumClassLatencyMs"] = {}
-            for cls, times in classes.items():
-                gts = sorted(e["time"] for e in gt if e.get("cls") == cls)
-                pairs, _, _ = match(gts, times or [], MATCH_EARLY_S, 0.120)
-                errs = [e for _, _, e in pairs]
-                res["drumClassLatencyMs"][cls] = {"median": r3(1000 * pct(errs, 0.5)) if errs else None,
-                                                  "p95": r3(1000 * pct(errs, 0.95)) if errs else None}
         out[key] = res
     return out
 
@@ -810,28 +786,43 @@ def checks(m, res):
                       p["maxInSettledSilence"], f"<= {p['rest'] + 0.01}", "no stale probe after silence")
     b = res["beat"]
     if b.get("applicable"):
-        # Findings, not gates: the owner takes the beat clock as separate work (2026-10-26).
-        check("file grid: beat F-measure (+-70 ms)", b["fMeasure"] >= 0.8, b["fMeasure"], ">= 0.80",
-              "MIREX tolerance; a grid that follows the intended pulse", gate=False)
+        # The beat clock pass (ADR-1785): the beat findings are gates now, with bounds the trackers meet with margin.
+        check("file grid: beat F-measure (+-70 ms)", b["fMeasure"] >= BEAT_F_FILE, b["fMeasure"], f">= {BEAT_F_FILE}",
+              "MIREX tolerance; a grid that follows the intended pulse (ADR-1782)")
         for s in b["segments"]:
             check(f"file grid: tempo {s['bpm']:g} BPM ({s['start']:g}-{s['end']:g} s)",
                   s["octaveRatio"] is not None and abs(s["octaveRatio"] - 1.0) < 0.03, s["clockBpmMedian"],
-                  f"{s['bpm']:g} +- 3%", "the intended tempo, not an octave of it", gate=False)
+                  f"{s['bpm']:g} +- 3%", "the intended tempo in each section, not an octave or a 4:3 of it (ADR-1782)")
     lv = res.get("live")
     if lv:
         lb = lv["beat"]
         if lb.get("applicable"):
-            check("live tracker: beat F-measure (+-70 ms)", lb["fMeasure"] >= 0.8, lb["fMeasure"], ">= 0.80",
-                  "MIREX tolerance, on the causal BeatTracker", gate=False)
+            check("live tracker: beat F-measure (+-70 ms)", lb["fMeasure"] >= BEAT_F_LIVE, lb["fMeasure"],
+                  f">= {BEAT_F_LIVE}", "MIREX tolerance, on the causal BeatTracker; below the file grid's because it "
+                  "acquires (2-5 s with no beat) and follows changes late")
             for sg in lv["lock"]["segments"]:
+                check(f"live tracker: locks within {LOCK_GATE_S:g} s of {sg['start']:g} s ({sg['bpm']:g} BPM)",
+                      sg["acquireSeconds"] is not None and sg["acquireSeconds"] <= LOCK_GATE_S, sg["acquireSeconds"],
+                      f"<= {LOCK_GATE_S:g} s", "the owner's 4-8 s: a first estimate after 2 s, confirmed over 4 s "
+                      "(ADR-1781)")
                 check(f"live tracker: locks within 4 s of {sg['start']:g} s ({sg['bpm']:g} BPM)",
                       sg["acquireSeconds"] is not None and sg["acquireSeconds"] <= 4.0, sg["acquireSeconds"], "<= 4 s",
-                      "two bars at 120 BPM: a performer hears a beat-locked scene within two bars", gate=False)
+                      "two bars at 120 BPM", gate=False)
             for si in lv["lock"]["silences"]:
-                check(f"live tracker: confidence falls in the silence at {si['start']:g} s",
-                      si["confidenceInSilence"] is not None and si["confidenceInSilence"][1] < 0.1,
-                      si["confidenceInSilence"], "max < 0.1",
-                      "a tracker with nothing to track should say so (ADR-1724's honesty rule)", gate=False)
+                fall = si["confidenceFallsAfterSeconds"]
+                check(f"live tracker: confidence under 0.1 within {SILENCE_FALL_S:g} s of the silence at "
+                      f"{si['start']:g} s", fall is not None and fall <= SILENCE_FALL_S, fall,
+                      f"<= {SILENCE_FALL_S:g} s", "ADR-1781's gate: a beat falls due in silence (or a beat and a bit "
+                      "passes), then a 40 ms fall; about half a second at 120 BPM")
+                check(f"live tracker: no beat in the silence at {si['start']:g} s (from 0.5 s in)",
+                      si["pulsesInSilence"] <= 1, si["pulsesInSilence"], "<= 1",
+                      "the gate skips the beat that falls due in silence; one may land before the gate closes")
+                nxt = next((sg["end"] for sg in lv["lock"]["segments"] if sg["start"] <= si["end"] < sg["end"]),
+                           m["durationSeconds"])
+                if nxt - si["end"] >= 6.0:
+                    check(f"live tracker: the lock is back within 4 s of the silence at {si['start']:g} s",
+                          si["reacquireSeconds"] is not None and si["reacquireSeconds"] <= 4.0,
+                          si["reacquireSeconds"], "<= 4 s", "a break resumes the held phase (ADR-1781)")
         lo = lv["onsets"]["response.onset"]["liveWindow"]
         if lo["recall"] is not None:
             check("live path: response.onset recall within the live window", lo["recall"] >= 0.9, lo["recall"],
@@ -1041,8 +1032,6 @@ def summary_md(results):
                 note = ""
                 if s["silentThroughout"]:
                     note = f"silent source: {s['falseActivity']}"
-                if "drumClassConfusion" in s:
-                    note += f"classes {s['drumClassConfusion']}; latency {s['drumClassLatencyMs']}"
                 lines.append(f"| {k} | {s['role']} | {so['precision']} / {so['recall']} | {so['timingErrorMs']['median']} | "
                              f"{len(s['leakedOnsets'])} | {s['levelInOwnSilenceMax']} | {note} |")
             lines.append("")
@@ -1107,9 +1096,6 @@ def main():
         if only:
             cmd += ["--only", ",".join(only)]
         subprocess.run(cmd, check=True)
-        if not only or "drums-real" in only:  # ADR-1726: real one-shots, when this machine has them
-            subprocess.run([sys.executable, str(REPO / "tools" / "audio_lab" / "make_drum_fixture.py"), "--out",
-                            str(args.fixtures)], check=True)
     index = json.loads((args.fixtures / "index.json").read_text())
     results = []
     for f in index["fixtures"]:

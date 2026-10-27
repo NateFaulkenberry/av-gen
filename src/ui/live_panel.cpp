@@ -225,10 +225,9 @@ void ControlPanel::drawLiveInputs(app::Engine& engine) {
                 ImGui::SetNextItemWidth(-1.0f);
                 changed |= roleCombo("##role", it->role); // ADR-1630
                 if (ImGui::IsItemHovered()) {
-                    tooltip("What this input carries. Drums finds kicks, snares and hats on it (stem.%s.kick/snare/hat, "
-                            "and role.drums.kick/snare/hat); about six times the analysis cost of the rest. Every other role publishes its onsets, levels and register "
-                            "only -- never a kick, snare or hat -- and role.<role>.* follows the first active source "
-                            "of each role.",
+                    tooltip("What this input carries. Every role publishes the same onsets, levels and register "
+                            "(stem.%s.*); role.<role>.* follows the first active source of each role, so a scene can "
+                            "name the drums without knowing the key.",
                             it->key.c_str());
                 }
                 // ADR-1582: the source's trim. Applied while dragging (no reset), saved when released.

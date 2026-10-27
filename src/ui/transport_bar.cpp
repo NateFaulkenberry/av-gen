@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <optional>
 #include <string>
 
 namespace avgen::ui {
@@ -346,7 +347,7 @@ void TransportBar::drawTempo(app::Engine& engine, const app::TransportSnapshot& 
     }
     // What a BPM does not give you, said where somebody might assume otherwise.
     detail += "\n\nA tempo gives seconds per beat. The beat grid -- phase, downbeat, bars --\n"
-              "comes from analysis, not from the number.";
+              "comes from analysis, unless a beat is marked (Mark beat).";
     if (ImGui::IsItemHovered()) {
         // `tooltip` is `IM_FMTARGS(1)` -- printf-style -- and `detail` carries
         // `tempo.metadataFormat` and `tempo.metadataKey`, which are read out of the audio file's
@@ -377,7 +378,33 @@ void TransportBar::drawTempo(app::Engine& engine, const app::TransportSnapshot& 
     case audio::TempoProvenance::None:
         break;
     }
-    static_cast<void>(snapshot);
+
+    // ADR-1783: the manual beat clock. One marked beat plus the tempo above is the file's beat clock. The button marks
+    // the playhead as beat 1 of a bar; marked, it shows where, a click re-marks and a right-click clears.
+    ImGui::SameLine(0.0f, 8.0f);
+    const std::optional<double> anchor = engine.beatAnchor();
+    const std::string label = anchor ? fmt::format("beat 1 @ {:.2f} s##beatmark", *anchor) : std::string("Mark beat##beatmark");
+    if (anchor) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette().accent));
+    }
+    if (ImGui::SmallButton(label.c_str())) {
+        engine.setBeatAnchor(snapshot.positionSeconds);
+    }
+    if (anchor) {
+        ImGui::PopStyleColor();
+    }
+    if (ImGui::IsItemHovered()) {
+        tooltipUnformatted(anchor ? "The manual beat clock: beats every 60 / bpm seconds through this marked beat, which\n"
+                                    "is beat 1 of a bar. It is the file's beat clock (beat.source 4) over the analysed\n"
+                                    "grid; a running MIDI clock still wins, and live input keeps its tracker.\n\n"
+                                    "Click to mark the playhead instead. Right-click to clear the mark."
+                                  : "Mark the playhead as beat 1 of a bar. With the tempo, that makes a manual beat\n"
+                                    "clock that replaces the analysed grid (for a track the analysis gets wrong).\n"
+                                    "Pause on a downbeat, then click. With no tempo set, the one shown is kept.");
+    }
+    if (anchor && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+        engine.clearBeatAnchor();
+    }
 }
 
 } // namespace avgen::ui

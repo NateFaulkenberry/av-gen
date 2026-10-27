@@ -112,71 +112,65 @@ std::size_t rises(app::Engine& e, const std::string& env, double seconds, double
 
 // ---- ADR-1630: roles ------------------------------------------------------------------------------------------------
 
-TEST_CASE("roles: only a drums source has class names; every role has its role.<role>.* vocabulary",
-          "[stems][signals][adr1630]") {
+TEST_CASE("roles: every role publishes the same names and no instrument class; role.<role>.* follows a source",
+          "[stems][signals][adr1630][adr1784]") {
     signals::SignalBus bus;
     const auto drums = signals::StemSignals::declare(bus, "kit", "Kit", audio::SourceRole::Drums);
     const auto bass = signals::StemSignals::declare(bus, "bass", "Bass", audio::SourceRole::Bass);
-    CHECK(signals::StemSignals::names("kit", audio::SourceRole::Drums).size() == 19);
+    CHECK(signals::StemSignals::names("kit", audio::SourceRole::Drums).size() == 16);
     CHECK(signals::StemSignals::names("bass", audio::SourceRole::Bass).size() == 16);
     for (const char* cls : {"kick", "snare", "hat"}) {
-        CHECK(bus.find(std::string("stem.kit.") + cls).has_value());
+        // ADR-1784: the drums role's classifier is cut; no source names an instrument.
+        CHECK_FALSE(bus.find(std::string("stem.kit.") + cls).has_value());
         CHECK_FALSE(bus.find(std::string("stem.bass.") + cls).has_value());
     }
-    CHECK(bass.kick == signals::kInvalidSignal);
+    CHECK(drums.ids().size() == 16);
     CHECK(bass.ids().size() == 16);
     const auto alias = signals::StemSignals::declareRole(bus, audio::SourceRole::Drums);
     const auto bassAlias = signals::StemSignals::declareRole(bus, audio::SourceRole::Bass);
-    CHECK(bus.find("role.drums.kick").has_value());
+    CHECK(bus.find("role.drums.onset").has_value());
     CHECK(bus.find("role.bass.level").has_value());
-    CHECK_FALSE(bus.find("role.bass.kick").has_value());
+    CHECK_FALSE(bus.find("role.drums.kick").has_value());
     CHECK(signals::StemSignals::roleNames(audio::SourceRole::Synth).front() == "role.synth.active");
 
     analysis::StemFrame f;
     f.level = 0.7f;
     f.onset = true;
     f.onsetStrength = 2.0f;
-    f.kick = true;
-    f.kickStrength = 0.8f;
     drums.publish(bus, f);
     alias.copyFrom(bus, drums);
     CHECK(bus.value(alias.active) == 1.0f);
     CHECK(bus.value(alias.level) == 0.7f);
-    CHECK(bus.event(alias.kick));
-    CHECK(bus.value(alias.kick) == 0.8f);
     CHECK(bus.event(alias.onset));
-    // A bass frame that the classifier called a kick publishes no class anywhere.
     bass.publish(bus, f);
     bassAlias.copyFrom(bus, bass);
     CHECK(bus.value(bassAlias.level) == 0.7f);
     CHECK(bus.event(bassAlias.onset));
     alias.publishInactive(bus);
     CHECK(bus.value(alias.active) == 0.0f);
-    CHECK_FALSE(bus.event(alias.kick));
+    CHECK_FALSE(bus.event(alias.onset));
 }
 
-TEST_CASE("roles: a drums stem classifies with no flag; a bass stem never does; role.drums.* is the drum stem",
-          "[stems][engine][adr1630]") {
+TEST_CASE("roles: role.drums.* is the drum stem whatever its key; no stem runs a classifier",
+          "[stems][engine][adr1630][adr1784]") {
     const auto& fx = testsupport::requireStemFixture();
     // The drum stem keyed `kit`: nothing reads the key `drums`.
     app::Engine e(app::EngineMode::Offline);
     REQUIRE(e.loadProject(writeProject(fx, "classes", roleStems(fx, "kit"), json(),
-                                       {{"kit", "stem.kit.kick"}, {"alias", "role.drums.kick"}}))
+                                       {{"kit", "stem.kit.onset"}, {"alias", "role.drums.onset"}}))
                 .has_value());
     CHECK(e.projectWarnings().empty());
     REQUIRE(e.stems().size() == 3);
     CHECK(e.stems()[0].source.role == audio::SourceRole::Drums);
-    CHECK(e.stems()[0].track->hits()); // auto hits: no "hits" anywhere in the project
+    CHECK_FALSE(e.stems()[0].track->hits()); // ADR-1784: a role runs no tier of its own; only a feed does
     CHECK_FALSE(e.stems()[1].track->hits());
-    CHECK(has(e, "stem.kit.kick"));
-    CHECK_FALSE(has(e, "stem.bass.kick"));
-    CHECK_FALSE(has(e, "stem.synth.hat"));
-    CHECK(has(e, "role.drums.kick"));
+    CHECK_FALSE(has(e, "stem.kit.kick"));
+    CHECK_FALSE(has(e, "role.drums.kick"));
+    CHECK(has(e, "role.drums.onset"));
     CHECK(has(e, "role.bass.level"));
-    CHECK_FALSE(has(e, "role.bass.kick"));
     CHECK_FALSE(has(e, "role.vocal.active")); // no source of the role: not declared
-    // Frame for frame, role.drums.* is stem.kit.* and role.bass.* is stem.bass.*; the envelopes on the kit's kick
-    // and on the alias's are identical, and fire on the fixture's kicks.
+    // Frame for frame, role.drums.* is stem.kit.* and role.bass.* is stem.bass.*; the envelopes on the kit's onset
+    // and on the alias's are identical, and fire on the fixture's drum hits.
     constexpr double fps = 60.0;
     std::size_t kicks = 0;
     float previous = 0.0f;
@@ -192,9 +186,8 @@ TEST_CASE("roles: a drums stem classifies with no flag; a bass stem never does; 
         previous = v;
     }
     const std::size_t truth = fx.times("drums", "kicks").size();
-    INFO(kicks << " kicks through role.drums.kick against " << truth << " in the fixture");
-    CHECK(kicks >= truth - 2);
-    CHECK(kicks <= truth);
+    INFO(kicks << " onsets through role.drums.onset against " << truth << " kicks in the fixture");
+    CHECK(kicks >= truth - 2); // every kick, and the snares and hats between them
     // Past the stems' end the alias is inactive.
     frame(e, static_cast<long long>(25.0 * fps), fps);
     CHECK(value(e, "role.drums.active") == 0.0f);
@@ -210,10 +203,9 @@ TEST_CASE("roles: the role saves, \"hits\" is gone with a warning, and a stem wi
     REQUIRE(e.loadProject(writeProject(fx, "save", stems, json())).has_value());
     CHECK(warned(e, "\"hits\" is gone"));
     CHECK(warned(e, "is not drums, bass, synth, vocal or other"));
-    // No inference: the key `drums` with `hits` and no role is other, and classifies nothing.
+    // No inference: the key `drums` with `hits` and no role is other.
     CHECK(e.stems()[0].source.role == audio::SourceRole::Other);
     CHECK_FALSE(e.stems()[0].track->hits());
-    CHECK_FALSE(has(e, "stem.drums.kick"));
     CHECK(e.stems()[2].source.role == audio::SourceRole::Other);
     const fs::path saved = testsupport::processTempDir() / "roles-save" / "saved.json";
     REQUIRE(e.saveProject(saved).has_value());
@@ -275,8 +267,8 @@ TEST_CASE("roles: role.<role>.* is replayed by a seek exactly as a play publishe
 
 // ---- ADR-1631: the history from a source ----------------------------------------------------------------------------
 
-TEST_CASE("history: from a drums source its onset rows are its kicks, snares and hats; from another role its onsets",
-          "[stems][analysis][fields][adr1631]") {
+TEST_CASE("history: a source's onset rows are its onsets by register, whatever its role",
+          "[stems][analysis][fields][adr1631][adr1784]") {
     const auto& fx = testsupport::requireStemFixture();
     app::Engine e(app::EngineMode::Offline);
     REQUIRE(e.loadProject(writeProject(fx, "history-unit", roleStems(fx), json())).has_value());
@@ -295,15 +287,19 @@ TEST_CASE("history: from a drums source its onset rows are its kicks, snares and
         return out;
     };
     const auto mixHistory = analysis::buildAudioHistory(*e.track());
-    const auto fromDrums = analysis::buildAudioHistory(*e.track(), {&drums, 0.75, true}, {&drums, 0.75, true});
-    CHECK(listed(fromDrums, spatial::OnsetSource::Low) == times(drums, &analysis::StemFrame::kick, 0.75));
-    CHECK(listed(fromDrums, spatial::OnsetSource::Mid) == times(drums, &analysis::StemFrame::snare, 0.75));
-    CHECK(listed(fromDrums, spatial::OnsetSource::High) == times(drums, &analysis::StemFrame::hat, 0.75));
+    // A drums source: its onsets at its offset, each on one row, the beat row the mix's.
+    const auto fromDrums = analysis::buildAudioHistory(*e.track(), {&drums, 0.75}, {&drums, 0.75});
+    std::vector<double> drumRows;
+    for (const auto s : {spatial::OnsetSource::Low, spatial::OnsetSource::Mid, spatial::OnsetSource::High}) {
+        const auto l = listed(fromDrums, s);
+        drumRows.insert(drumRows.end(), l.begin(), l.end());
+    }
+    std::sort(drumRows.begin(), drumRows.end());
+    drumRows.erase(std::unique(drumRows.begin(), drumRows.end()), drumRows.end()); // an onset with no register is on all three
+    CHECK(drumRows == times(drums, &analysis::StemFrame::onset, 0.75));
     CHECK(listed(fromDrums, spatial::OnsetSource::Beat) == listed(mixHistory, spatial::OnsetSource::Beat));
-    CHECK_FALSE(times(drums, &analysis::StemFrame::kick, 0.0).empty());
-    // A bass source: no identity, so each onset is on the row of its register -- every onset once, and the bass's
-    // mostly low.
-    const auto fromBass = analysis::buildAudioHistory(*e.track(), {}, {&bass, 0.0, false});
+    // A bass source: each onset is on the row of its register -- every onset once, and the bass's mostly low.
+    const auto fromBass = analysis::buildAudioHistory(*e.track(), {}, {&bass, 0.0});
     const auto bassOnsets = times(bass, &analysis::StemFrame::onset, 0.0);
     CHECK_FALSE(bassOnsets.empty());
     std::vector<double> rows;
@@ -316,7 +312,7 @@ TEST_CASE("history: from a drums source its onset rows are its kicks, snares and
     CHECK(listed(fromBass, spatial::OnsetSource::Low).size() * 2 >= bassOnsets.size());
     // The spectrogram: the source's rows at its offset, 0 before it and after it, held to the mix's end.
     const double end = e.track()->frames().back().timeSeconds;
-    const auto spectrum = analysis::buildAudioHistory(*e.track(), {&bass, 2.0, false}, {});
+    const auto spectrum = analysis::buildAudioHistory(*e.track(), {&bass, 2.0}, {});
     CHECK(spectrum.newestRow(1.9) < 0);
     CHECK(spectrum.newestRow(2.5) >= 0);
     float during = 0.0f;
@@ -348,13 +344,17 @@ TEST_CASE("history: feeds.history names a source by role; a missing one is said 
     const auto h = fed.audioHistory();
     REQUIRE(h != nullptr);
     CHECK_FALSE(h->live()); // the whole-file history: a seek stays exact
-    std::vector<double> kicks;
+    std::vector<double> drumOnsets;
     for (const auto& f : fed.stems()[0].track->frames()) {
-        if (f.kick) kicks.push_back(f.timeSeconds);
+        if (f.onset) drumOnsets.push_back(f.timeSeconds);
     }
-    std::vector<double> low;
-    for (const auto& o : h->onsets(spatial::OnsetSource::Low)) low.push_back(o.time);
-    CHECK(low == kicks);
+    std::vector<double> rows;
+    for (const auto s : {spatial::OnsetSource::Low, spatial::OnsetSource::Mid, spatial::OnsetSource::High}) {
+        for (const auto& o : h->onsets(s)) rows.push_back(o.time);
+    }
+    std::sort(rows.begin(), rows.end());
+    rows.erase(std::unique(rows.begin(), rows.end()), rows.end()); // an onset with no register is on all three
+    CHECK(rows == drumOnsets); // the drum stem's onsets, by register (ADR-1784: no kick/snare/hat rows)
     CHECK(h->onsets(spatial::OnsetSource::Beat).size() == mix.audioHistory()->onsets(spatial::OnsetSource::Beat).size());
     CHECK(h->rowRate() == Catch::Approx(fed.stems()[1].track->sampleRate() / 512.0));
     // The bass's spectrogram is not the mix's: 9-10 s, where only the drums are silent, differs.
@@ -450,7 +450,7 @@ namespace {
 
 struct LiveRoles {
     bool drumsActive = false, bassActive = false;
-    bool drumsKickDeclared = false, bassKickDeclared = false, clickKickDeclared = false;
+    bool drumsKickDeclared = false, kitKickDeclared = false;
     std::array<std::size_t, 4> history{};  // the live history's low / mid / high / beat onsets
     bool historyLive = false;
 };
@@ -489,8 +489,7 @@ LiveRoles runLive(const audio::Feeds& feeds, double seconds) {
     out.drumsActive = value(engine, "role.drums.active") == 1.0f;
     out.bassActive = value(engine, "role.bass.active") == 1.0f;
     out.drumsKickDeclared = has(engine, "role.drums.kick");
-    out.bassKickDeclared = has(engine, "role.bass.kick");
-    out.clickKickDeclared = has(engine, "stem.click.kick");
+    out.kitKickDeclared = has(engine, "stem.kit.kick");
     if (const auto h = engine.audioHistory()) {
         out.historyLive = h->live();
         for (std::size_t k = 0; k < 4; ++k) {
@@ -514,9 +513,8 @@ TEST_CASE("roles live: role.<role>.* follows the input source of that role; the 
                         << b.history[0] << "/" << b.history[1] << "/" << b.history[2] << "/" << b.history[3]);
     CHECK(a.drumsActive);
     CHECK(a.bassActive);
-    CHECK(a.drumsKickDeclared);
-    CHECK_FALSE(a.bassKickDeclared);
-    CHECK_FALSE(a.clickKickDeclared); // a bass input has no class names
+    CHECK_FALSE(a.drumsKickDeclared); // ADR-1784: a drums input names no instrument either
+    CHECK_FALSE(a.kitKickDeclared);
     REQUIRE(a.historyLive);
     // A source with no identity: each onset on the row of its register -- one click every 0.5 s on the bass source,
     // about 16 in 8 s (the first while the detector warms up).

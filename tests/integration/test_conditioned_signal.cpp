@@ -317,11 +317,11 @@ TEST_CASE("signal: firstActive follows the stem while it is active and falls bac
 TEST_CASE("signal: an event signal fires with its selected input", "[signals][conditioned][adr1602]") {
     signals::SignalBus bus;
     params::ParameterSet params;
-    const signals::SignalId kick = bus.declare("stem.drums.kick", 0.0f, 1.0f, true);
+    const signals::SignalId kick = bus.declare("stem.drums.onset", 0.0f, 1.0f, true);
     const signals::SignalId active = bus.declare("stem.drums.active");
     const signals::SignalId onset = bus.declare("response.onset", 0.0f, 1.0f, true);
     ConditionedSignalSource sig("hit");
-    sig.inputs() = {ConditionedSignalSource::Input{.source = "stem.drums.kick"},
+    sig.inputs() = {ConditionedSignalSource::Input{.source = "stem.drums.onset"},
                     ConditionedSignalSource::Input{.source = "response.onset"}};
     sig.setEventMode(true);
     sig.attach(bus, params);

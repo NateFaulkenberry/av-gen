@@ -4312,7 +4312,7 @@ void SequencePanel::drawStems(app::Engine& engine) {
     ImGui::SeparatorText("Stems (analysis only)");
     if (ImGui::IsItemHovered()) {
         tooltip("Files analysed beside the mix -- a drum stem, a bass stem -- and published as stem.<key>.* for "
-                "routes: level, rms, peak, onset, the five bands, brightness, width, and kick/snare/hat on a drums stem. "
+                "routes: level, rms, peak, onset, the five bands, brightness, width and the onset's register. "
                 "Never played and never mixed: the clips above are what you hear. Line them up with the offset; "
                 "nothing is guessed.");
     }
@@ -4415,9 +4415,9 @@ void SequencePanel::drawStems(app::Engine& engine) {
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 4.5f);
             changed |= roleCombo("role", edit.role); // ADR-1630
             if (ImGui::IsItemHovered()) {
-                tooltip("What the stem is. Drums finds kicks, snares and hats in it (stem.<key>.kick/snare/hat, and "
-                        "role.drums.kick/snare/hat); about six times the analysis cost of the rest. Every other role publishes onsets, levels and register only -- "
-                        "never a kick, snare or hat. Never guessed from the key or the audio.");
+                tooltip("What the stem is. Every role publishes the same onsets, levels and register (stem.<key>.*); "
+                        "role.<role>.* follows the first stem of each role, so a scene can name the drums without "
+                        "knowing the key. Never guessed from the key or the audio.");
             }
             ImGui::SameLine();
             float gain = edit.gainDb;

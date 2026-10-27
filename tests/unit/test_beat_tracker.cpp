@@ -61,7 +61,7 @@ std::vector<float> onsetStrengths(const std::vector<AnalysisFrame>& frames) {
     std::vector<float> out;
     out.reserve(frames.size());
     for (const auto& f : frames) {
-        out.push_back(f.onsetStrength);
+        out.push_back(f.beatStrength); // ADR-1780: what the trackers read
     }
     return out;
 }
@@ -141,7 +141,7 @@ TEST_CASE("trackBeatsOffline follows a 120 BPM click track analyzed by the Analy
     const auto frames =
         analyze(testsupport::clickTrack(120.0f, kRate, static_cast<std::size_t>(kSeconds * kRate)));
     REQUIRE(frames.size() > 800);
-    const auto beats = trackBeatsOffline(onsetStrengths(frames), kHop);
+    const auto beats = trackBeatsOffline(onsetStrengths(frames), {}, kHop);
     WARN("offline tempo " << beats.tempoBpm << " (confidence " << beats.confidence << "), "
                           << beats.beatTimes.size() << " beats");
     CHECK_THAT(static_cast<double>(beats.tempoBpm), WithinAbs(120.0, 1.5));
@@ -181,20 +181,20 @@ TEST_CASE("trackBeatsOffline follows a 120 BPM click track analyzed by the Analy
 }
 
 TEST_CASE("trackBeatsOffline handles empty, silent and short input", "[analysis][beat]") {
-    CHECK(trackBeatsOffline(std::span<const float>{}, kHop).beatTimes.empty());
+    CHECK(trackBeatsOffline(std::span<const float>{}, {}, kHop).beatTimes.empty());
     const std::vector<float> zeros(1000, 0.0f);
-    const auto silent = trackBeatsOffline(zeros, kHop);
+    const auto silent = trackBeatsOffline(zeros, {}, kHop);
     CHECK(silent.tempoBpm == 0.0f);
     CHECK(silent.beatTimes.empty());
     const auto shortEnv = impulseEnvelope(120.0f, 0.3);
-    CHECK(trackBeatsOffline(shortEnv, kHop).beatTimes.empty());
-    CHECK(trackBeatsOffline(shortEnv, 0.0f).beatTimes.empty());
+    CHECK(trackBeatsOffline(shortEnv, {}, kHop).beatTimes.empty());
+    CHECK(trackBeatsOffline(shortEnv, {}, 0.0f).beatTimes.empty());
 }
 
 TEST_CASE("trackBeatsOffline is deterministic and ignores a tempo-consistent scale", "[analysis][beat]") {
     const auto env = impulseEnvelope(100.0f, 12.0, 0.05f);
-    const auto a = trackBeatsOffline(env, kHop);
-    const auto b = trackBeatsOffline(env, kHop);
+    const auto a = trackBeatsOffline(env, {}, kHop);
+    const auto b = trackBeatsOffline(env, {}, kHop);
     CHECK(a.tempoBpm == b.tempoBpm);
     CHECK(a.beatTimes == b.beatTimes);
     CHECK_THAT(static_cast<double>(a.tempoBpm), WithinAbs(100.0, 1.5));
@@ -220,7 +220,7 @@ TEST_CASE("BeatTracker locks to a 120 BPM click track hop by hop", "[analysis][b
     std::vector<BeatState> states;
     states.reserve(frames.size());
     for (const auto& f : frames) {
-        states.push_back(tracker.push(f.onsetStrength, f.onset));
+        states.push_back(tracker.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms));
     }
     REQUIRE(states.size() == frames.size());
 
@@ -301,7 +301,7 @@ TEST_CASE("BeatTracker follows a tempo change within 6 seconds", "[analysis][bea
     BeatTracker tracker(BeatTrackerConfig{}, kHop);
     double switched = -1.0;
     for (const auto& f : frames) {
-        const auto s = tracker.push(f.onsetStrength, f.onset);
+        const auto s = tracker.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
         if (f.timeSeconds >= kHalf && switched < 0.0 && std::fabs(s.tempoBpm - 150.0f) <= 2.0f) {
             switched = f.timeSeconds;
         }
@@ -323,7 +323,7 @@ TEST_CASE("BeatTracker follows a tempo change within 6 seconds", "[analysis][bea
     BeatTracker verify(BeatTrackerConfig{}, kHop);
     std::size_t lateBeats = 0;
     for (const auto& f : frames) {
-        const auto s = verify.push(f.onsetStrength, f.onset);
+        const auto s = verify.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
         if (s.beat && f.timeSeconds >= kHalf + 6.0) {
             const double error = signedNearestError(f.timeSeconds, clicks);
             INFO("beat at " << f.timeSeconds << " s, error " << error * 1000.0 << " ms");
@@ -339,8 +339,8 @@ TEST_CASE("BeatTracker is deterministic and reset clears its state", "[analysis]
     BeatTracker a(BeatTrackerConfig{}, kHop);
     BeatTracker b(BeatTrackerConfig{}, kHop);
     for (const auto& f : frames) {
-        const auto sa = a.push(f.onsetStrength, f.onset);
-        const auto sb = b.push(f.onsetStrength, f.onset);
+        const auto sa = a.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
+        const auto sb = b.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
         CHECK(sa.tempoBpm == sb.tempoBpm);
         CHECK(sa.confidence == sb.confidence);
         CHECK(sa.beat == sb.beat);
@@ -359,8 +359,8 @@ TEST_CASE("BeatTracker is deterministic and reset clears its state", "[analysis]
     // A reset tracker behaves exactly like a fresh one.
     BeatTracker fresh(BeatTrackerConfig{}, kHop);
     for (const auto& f : frames) {
-        const auto sa = a.push(f.onsetStrength, f.onset);
-        const auto sf = fresh.push(f.onsetStrength, f.onset);
+        const auto sa = a.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
+        const auto sf = fresh.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
         CHECK(sa.tempoBpm == sf.tempoBpm);
         CHECK(sa.beat == sf.beat);
         CHECK(sa.beatCount == sf.beatCount);
@@ -369,6 +369,7 @@ TEST_CASE("BeatTracker is deterministic and reset clears its state", "[analysis]
 
 TEST_CASE("BeatTracker free-runs through a gap and forgets the tempo after a silent window",
           "[analysis][beat]") {
+    // The gap is sound with no onsets (a held pad: RMS over the silence gate), so the tracker free-runs.
     auto env = impulseEnvelope(120.0f, 8.0);
     const auto silence = std::vector<float>(static_cast<std::size_t>(14.0 / kHopD), 0.0f);
     env.insert(env.end(), silence.begin(), silence.end());
@@ -377,7 +378,7 @@ TEST_CASE("BeatTracker free-runs through a gap and forgets the tempo after a sil
     std::uint32_t beatsDuringGap = 0;
     double forgotAt = -1.0;
     for (std::size_t i = 0; i < env.size(); ++i) {
-        const auto s = tracker.push(env[i], env[i] > 0.5f);
+        const auto s = tracker.push(env[i], 0.0f, env[i] > 0.5f, 0.1f);
         const double t = static_cast<double>(i) * kHopD;
         if (t > 8.0 && t < 10.0 && s.beat) {
             ++beatsDuringGap; // still predicting from the last period
@@ -394,10 +395,104 @@ TEST_CASE("BeatTracker free-runs through a gap and forgets the tempo after a sil
     CHECK_FALSE(tracker.state().beat);
 }
 
+TEST_CASE("BeatTracker gates digital silence and resumes the lock after a break (ADR-1781)",
+          "[analysis][beat][adr1781]") {
+    // 120 BPM clicks for 8 s, 3 s of digital silence, clicks again on the same grid. A click track is itself mostly
+    // silence (0.49 s between clicks): the gate must not close between clicks, only when a beat fails to come.
+    constexpr double kOn = 8.0;
+    constexpr double kOff = 3.0;
+    constexpr double kTotal = 15.0;
+    auto samples = testsupport::clickTrack(120.0f, kRate, static_cast<std::size_t>(kTotal * kRate));
+    std::fill(samples.begin() + static_cast<std::ptrdiff_t>(kOn * kRate),
+              samples.begin() + static_cast<std::ptrdiff_t>((kOn + kOff) * kRate), 0.0f);
+    const auto frames = analyze(samples);
+    const auto clicks = clickTimes(120.0f, kTotal);
+    BeatTracker tracker(BeatTrackerConfig{}, kHop);
+    double fellAt = -1.0;
+    std::size_t silentBeats = 0;
+    std::size_t lateBeats = 0;
+    for (const auto& f : frames) {
+        const auto s = tracker.push(f.beatStrength, f.beatLowStrength, f.onset, f.rms);
+        const double t = f.timeSeconds;
+        if (t >= 4.0 && t < kOn - 0.1) {
+            INFO("t = " << t);
+            CHECK(s.confidence >= tracker.config().confidenceFloor); // never gated between clicks
+            CHECK_FALSE(s.silent);
+        }
+        if (t >= kOn && fellAt < 0.0 && s.confidence < 0.1f) {
+            fellAt = t;
+        }
+        if (t >= kOn + 0.8 && t < kOn + kOff - 0.03) { // a frame's window reaches 21 ms past its centre
+            INFO("t = " << t);
+            CHECK(s.silent);
+            CHECK(s.tempoBpm == 0.0f);
+            silentBeats += s.beat ? 1 : 0;
+        }
+        if (s.beat && t >= kOn + kOff + 0.6) {
+            // The lock resumes on the held phase: the beats are back on the clicks at once.
+            INFO("beat at " << t);
+            CHECK(std::fabs(signedNearestError(t, clicks)) <= 0.040);
+            CHECK_THAT(static_cast<double>(s.tempoBpm), WithinAbs(120.0, 2.0));
+            ++lateBeats;
+        }
+    }
+    WARN("confidence under 0.1 " << fellAt - kOn << " s into the silence");
+    CHECK(fellAt > kOn);
+    CHECK(fellAt <= kOn + 0.8);
+    CHECK(silentBeats == 0);
+    CHECK(lateBeats >= 6);
+}
+
+TEST_CASE("estimateTempo reads a son clave at its beat, not at 4:3 (ADR-1780)", "[analysis][beat][adr1780]") {
+    // 110 BPM: a 3-2 son clave (16ths 0, 3, 6, 10, 12) at full strength and hats on the "and"s at a third. The
+    // clave's dotted-eighth spacing (146.7 BPM) is the strongest single autocorrelation peak; the comb's multiples
+    // see the bar.
+    const double sixteenth = 60.0 / 110.0 / 4.0;
+    const auto n = static_cast<std::size_t>(8.0 / kHopD);
+    std::vector<float> env(n, 0.0f);
+    for (int bar = 0; bar < 4; ++bar) {
+        for (const auto& [pos, a] : std::vector<std::pair<int, float>>{
+                 {0, 1.0f}, {3, 1.0f}, {6, 1.0f}, {10, 1.0f}, {12, 1.0f}, {2, 0.3f}, {6, 0.3f}, {10, 0.3f}, {14, 0.3f}}) {
+            const auto i = static_cast<std::size_t>(std::llround((bar * 16 + pos) * sixteenth / kHopD));
+            if (i < n) {
+                env[i] += a;
+            }
+        }
+    }
+    const auto [bpm, confidence] = estimateTempo(env, kHop, BeatTrackerConfig{});
+    WARN("son clave at 110 BPM -> " << bpm << " (confidence " << confidence << ")");
+    CHECK_THAT(static_cast<double>(bpm), WithinAbs(110.0, 2.0));
+}
+
+TEST_CASE("trackBeatsOffline follows a tempo change (ADR-1782)", "[analysis][beat][adr1782]") {
+    // 120 BPM clicks for 16 s, then 96 BPM for 16 s: the grid follows both, and its local tempo reads each.
+    auto samples = testsupport::clickTrack(120.0f, kRate, static_cast<std::size_t>(16.0 * kRate));
+    const auto second = testsupport::clickTrack(96.0f, kRate, static_cast<std::size_t>(16.0 * kRate));
+    samples.insert(samples.end(), second.begin(), second.end());
+    const auto file = audio::AudioFile::fromInterleaved(samples, 1, kRate);
+    const auto track = AnalysisTrack::analyze(file, AnalyzerConfig{});
+    auto clicks = clickTimes(120.0f, 16.0);
+    for (const double c : clickTimes(96.0f, 16.0, 16.0)) {
+        clicks.push_back(c);
+    }
+    const auto& beats = track.beats().beatTimes;
+    REQUIRE(beats.size() > 50);
+    std::size_t matched = 0;
+    for (const double t : beats) {
+        INFO("beat at " << t);
+        const double e = std::fabs(signedNearestError(t, clicks));
+        CHECK(e <= 0.040); // the refinement's local fit straddles the change for a few beats
+        matched += e <= 0.035 ? 1 : 0;
+    }
+    CHECK(matched >= 32 + 25 - 3);
+    CHECK_THAT(localBpmAt(beats, 8.0), WithinAbs(120.0, 1.5));
+    CHECK_THAT(localBpmAt(beats, 24.0), WithinAbs(96.0, 1.5));
+}
+
 TEST_CASE("BeatTracker reports nothing on silence", "[analysis][beat]") {
     BeatTracker tracker(BeatTrackerConfig{}, kHop);
     for (std::size_t i = 0; i < 2000; ++i) {
-        const auto s = tracker.push(0.0f, false);
+        const auto s = tracker.push(0.0f, 0.0f, false, 0.0f);
         CHECK(s.tempoBpm == 0.0f);
         CHECK_FALSE(s.beat);
         CHECK(s.beatCount == 0);

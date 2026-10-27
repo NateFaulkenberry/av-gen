@@ -2,11 +2,11 @@
 
 // What an analysis source is (ADR-1630): the artist's word for the part a stem or live input source carries.
 //
-// A role is measured identity's gate, not a measurement. AV Gen never infers it from the audio or the key: a source
-// keyed `drums` with no role is `other`. Only a `drums` source runs the kick/snare/hat classifier and publishes the
-// class names (`stem.<key>.kick/snare/hat`, `role.drums.kick/...`); every other role publishes onsets, levels and the
-// onset register -- broad musical activity -- and never a class name. `role.<role>.*` publishes the first active
-// source of each role, so a scene (and `tools/role_signals.py`) names "the drums" without knowing any key.
+// A role is the artist's statement, not a measurement. AV Gen never infers it from the audio or the key: a source
+// keyed `drums` with no role is `other`. Every role publishes the same onsets, levels and onset register -- broad
+// musical activity, never an instrument's identity (ADR-1784 cut the drums role's kick/snare/hat classifier).
+// `role.<role>.*` publishes the first active source of each role, so a scene (and `tools/role_signals.py`) names "the
+// drums" without knowing any key.
 
 #include <array>
 #include <cstdint>
@@ -31,11 +31,6 @@ inline constexpr std::array<const char*, kSourceRoleCount> kSourceRoleNames{"dru
         }
     }
     return std::nullopt;
-}
-
-// Whether a source of `role` runs the kick/snare/hat classifier and publishes the class names (only the drums).
-[[nodiscard]] constexpr bool classifiesHits(SourceRole role) {
-    return role == SourceRole::Drums;
 }
 
 } // namespace avgen::audio

@@ -30,11 +30,10 @@ struct StemSource {
     // Where the stem's first sample sits on the project timeline, seconds. Positive: the stem starts later. Explicit
     // only -- AV Gen never guesses an offset from the audio.
     double offsetSeconds = 0.0;
-    // ADR-1630: what the stem is. Only `drums` runs the kick/snare/hat classifier (ADR-1060) and publishes the class
-    // names; every role publishes onsets, levels and the onset register. Explicit only -- never inferred from the key.
+    // ADR-1630: what the stem is (`role.<role>.*` follows the first of each role). Every role publishes the same
+    // onsets, levels and onset register (ADR-1784). Explicit only -- never inferred from the key.
     SourceRole role = SourceRole::Other;
     float gainDb = 0.0f;            // ADR-1582: the stem's trim before analysis, -24..+24 dB (`gainDb`)
-    [[nodiscard]] bool hits() const { return classifiesHits(role); }
     [[nodiscard]] bool operator==(const StemSource&) const = default;
 };
 

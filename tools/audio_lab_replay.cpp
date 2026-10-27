@@ -17,8 +17,11 @@
 // hits at neutral controls are these causal hits, ADR-1062). The beat it reports is the tracker's own: the engine's
 // live clock re-syncs to every tracked beat (advanceClock, `bpm > 0`), so `beat.pulse` live is this beat.
 //
-// Writes <out-prefix>.hop.csv (one row per analysis frame) and <out-prefix>.frame.csv (one row per render frame).
+// Writes <out-prefix>.hop.csv (one row per analysis frame) and <out-prefix>.frame.csv (one row per render frame), and
+// <out-prefix>.grid.csv: the file grid's beats (`AnalysisTrack::analyze`, the offline tracker the engine's file clock
+// runs on), one row per beat with its local tempo -- so a tracker change can be scored without a full engine trace.
 
+#include "analysis/analysis_track.hpp"
 #include "analysis/analyzer.hpp"
 #include "analysis/beat_tracker.hpp"
 #include "analysis/causal_onsets.hpp"
@@ -76,7 +79,7 @@ int main(int argc, char** argv) {
         const std::size_t n = std::min<std::size_t>(config.hopSize, mono.size() - at);
         analyzer.push(std::span<const float>(mono.data() + at, n));
         while (analyzer.pop(frame)) {
-            const analysis::BeatState beat = tracker.push(frame.onsetStrength, frame.onset);
+            const analysis::BeatState beat = tracker.push(frame.beatStrength, frame.beatLowStrength, frame.onset, frame.rms);
             frame.tempoBpm = beat.tempoBpm;
             frame.tempoConfidence = beat.confidence;
             frame.beat = beat.beat;
@@ -140,6 +143,20 @@ int main(int argc, char** argv) {
                           newest != nullptr ? newest->centre : -1.0, onset, low, causalOnset, beat ? 1 : 0,
                           newest != nullptr ? newest->phase : 0.0f, newest != nullptr ? newest->tempo : 0.0f,
                           newest != nullptr ? newest->confidence : 0.0f);
+            out << line;
+        }
+    }
+    {
+        // The file grid (the offline tracker), for scoring it without an engine trace.
+        const analysis::AnalysisTrack track = analysis::AnalysisTrack::analyze(*file, analysis::AnalyzerConfig{});
+        const auto& beats = track.beats().beatTimes;
+        std::ofstream out(prefix + ".grid.csv");
+        out << "time,bpm\n";
+        char line[96];
+        std::snprintf(line, sizeof line, "# tempo %.3f confidence %.4f\n", track.beats().tempoBpm, track.beats().confidence);
+        out << line;
+        for (const double t : beats) {
+            std::snprintf(line, sizeof line, "%.6f,%.3f\n", t, analysis::localBpmAt(beats, t));
             out << line;
         }
     }

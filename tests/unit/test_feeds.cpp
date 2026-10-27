@@ -176,23 +176,24 @@ TEST_CASE("feeds: a stem's trim is exactly nothing at 0 dB and brings a quiet st
     const analysis::StemTrack plain = analysis::StemTrack::analyze(*drums, cfg);
     cfg.gainDb = 0.0f;
     CHECK(analysis::StemTrack::analyze(*drums, cfg).frames() == plain.frames());
-    // The same drums 42 dB down: under the kick detector's absolute floor (-45 dBFS in its band).
+    // The same drums 42 dB down: under the stem onset's floor (its log spectrum reads 0 below -60 dB per bin).
     std::vector<float> quiet(drums->interleaved().begin(), drums->interleaved().end());
     const float down = std::pow(10.0f, -42.0f / 20.0f);
     for (float& v : quiet) {
         v *= down;
     }
     const audio::AudioFile soft = audio::AudioFile::fromInterleaved(quiet, drums->channels(), drums->sampleRate());
-    const auto kicks = [](const analysis::StemTrack& t) {
-        return std::count_if(t.frames().begin(), t.frames().end(), [](const analysis::StemFrame& f) { return f.kick; });
+    const auto kicks = [](const analysis::StemTrack& t) { // stem.<key>.onset: the drum stem's hits
+        return std::count_if(t.frames().begin(), t.frames().end(), [](const analysis::StemFrame& f) { return f.onset; });
     };
     cfg.gainDb = 0.0f;
     const auto lost = kicks(analysis::StemTrack::analyze(soft, cfg));
     cfg.gainDb = 24.0f;
     const auto back = kicks(analysis::StemTrack::analyze(soft, cfg));
-    INFO("kicks: plain " << kicks(plain) << ", -42 dB " << lost << ", -42 dB with +24 dB trim " << back);
+    INFO("onsets: plain " << kicks(plain) << ", -42 dB " << lost << ", -42 dB with +24 dB trim " << back);
     CHECK(lost < kicks(plain) / 2);
-    CHECK(back >= kicks(plain) * 3 / 4);
+    // +24 dB of the 42 lost: the kicks come back (the quieter hats need the rest).
+    CHECK(back >= static_cast<long>(fx.times("drums", "kicks").size() * 3 / 4));
     // A trim never makes the level bigger once the reference has adapted: the levels are loudness-free (ADR-1510).
     cfg.gainDb = 0.0f;
     const analysis::StemTrack ref = analysis::StemTrack::analyze(*drums, cfg);

@@ -943,36 +943,6 @@
    "optional": true
   },
   {
-   "source": "stem.drums.kick",
-   "target": "procedural/sDrumsKick/material/emissive",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {},
-   "optional": true
-  },
-  {
-   "source": "stem.drums.snare",
-   "target": "procedural/sDrumsSnare/material/emissive",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {},
-   "optional": true
-  },
-  {
-   "source": "stem.drums.hat",
-   "target": "procedural/sDrumsHat/material/emissive",
-   "amount": 0.9,
-   "op": "add",
-   "polarity": "unipolar",
-   "component": -1,
-   "chain": {},
-   "optional": true
-  },
-  {
    "source": "response.bass",
    "target": "procedural/pBass/transform/scale",
    "amount": 1.0,
@@ -1534,45 +1504,6 @@
      -3.125
     ],
     "param": "procedural/spadOnset/material/emissive",
-    "base": 0.07,
-    "gain": 0.9
-   },
-   "sDrumsKick": {
-    "kind": "lamp",
-    "signal": "stem.drums.kick",
-    "rect": [
-     -13.275,
-     -4.725,
-     -12.825000000000001,
-     -4.275
-    ],
-    "param": "procedural/sDrumsKick/material/emissive",
-    "base": 0.07,
-    "gain": 0.9
-   },
-   "sDrumsSnare": {
-    "kind": "lamp",
-    "signal": "stem.drums.snare",
-    "rect": [
-     -13.275,
-     -5.574999999999999,
-     -12.825000000000001,
-     -5.125
-    ],
-    "param": "procedural/sDrumsSnare/material/emissive",
-    "base": 0.07,
-    "gain": 0.9
-   },
-   "sDrumsHat": {
-    "kind": "lamp",
-    "signal": "stem.drums.hat",
-    "rect": [
-     -13.275,
-     -6.425,
-     -12.825000000000001,
-     -5.9750000000000005
-    ],
-    "param": "procedural/sDrumsHat/material/emissive",
     "base": 0.07,
     "gain": 0.9
    },

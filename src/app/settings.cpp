@@ -201,7 +201,7 @@ Result<AppSettings> AppSettings::fromJson(const json& doc) {
                         continue; // lenient like the rest of `live`: a bad row is dropped, not the file
                     }
                     // ADR-1630: the role, explicit only (an unknown one or none is `other`; `hits` is gone and not
-                    // read: a drums source runs the classifier).
+                    // read).
                     const auto role = audio::sourceRoleFromName(item.value("role", std::string{}));
                     sources.push_back({.key = item.value("key", std::string{}),
                                        .label = item.value("label", std::string{}),

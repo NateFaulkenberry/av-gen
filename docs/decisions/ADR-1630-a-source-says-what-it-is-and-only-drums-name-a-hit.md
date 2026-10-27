@@ -1,5 +1,6 @@
 # ADR-1630: A source says what it is, and only a drums source names a hit
 
+- Superseded in part by ADR-1784 (2026-10-26): no role names a hit; the drums role runs no classifier.
 - Status: Accepted (eng/stem-roles; the stem-analysis milestone's recommendations 1, 2 and 4,
   `docs/prototypes/living-prism/17-stem-analysis-milestone.md` §4; merge after the owner's approval)
 - Extends: ADR-1520 (stems), ADR-1521 (live input sources), ADR-1580 (feeds), ADR-1602 (`signal.*`), ADR-1620 (a mix

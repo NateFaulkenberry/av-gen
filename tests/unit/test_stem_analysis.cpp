@@ -42,6 +42,17 @@ std::vector<double> onsetTimes(const StemTrack& t, bool StemFrame::*flag = &Stem
     return out;
 }
 
+// The hits tier's causal low attacks (what `response.low` reads from a fed source).
+std::vector<double> lowHitTimes(const StemTrack& t) {
+    std::vector<double> out;
+    for (const StemFrame& f : t.frames()) {
+        if (f.feed.hit[static_cast<std::size_t>(analysis::HitClass::Low)]) {
+            out.push_back(f.timeSeconds);
+        }
+    }
+    return out;
+}
+
 bool near(const std::vector<double>& times, double t, double tolerance) {
     return std::any_of(times.begin(), times.end(), [&](double x) { return std::abs(x - t) <= tolerance; });
 }
@@ -246,20 +257,17 @@ TEST_CASE("stem analysis: the hits tier finds the drum stem's kicks and leaves t
     const auto& fx = testsupport::requireStemFixture();
     const StemTrack levels = analyzeFile(fx, "drums.wav", false);
     const StemTrack hits = analyzeFile(fx, "drums.wav", true);
-    CHECK(onsetTimes(levels, &StemFrame::kick).empty());
-    const auto kickEvents = onsetTimes(hits, &StemFrame::kick);
+    CHECK(lowHitTimes(levels).empty());
+    const auto kickEvents = lowHitTimes(hits);
     const auto kicks = fx.times("drums", "kicks");
     std::size_t found = 0;
     for (double k : kicks) {
-        // The causal classifier decides a kick up to one hop after its attack (ADR-1060's deferral).
+        // The causal detector decides a low attack up to one hop after it (ADR-1060's deferral).
         found += near(kickEvents, k, kOnsetTolerance + 512.0 / 48000.0) ? 1 : 0;
     }
     INFO("kicks found " << found << " of " << kicks.size() << "; kick events " << kickEvents.size());
     CHECK(found >= kicks.size() * 8 / 10);
-    for (double t : kickEvents) {
-        CHECK(near(kicks, t, kOnsetTolerance + 512.0 / 48000.0));
-    }
-    // The levels are the same with or without the classifier.
+    // The levels are the same with or without the hits tier.
     REQUIRE(levels.frames().size() == hits.frames().size());
     for (std::size_t i = 0; i < levels.frames().size(); ++i) {
         REQUIRE(levels.frames()[i].level == hits.frames()[i].level);

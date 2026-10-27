@@ -72,7 +72,6 @@ void StemAnalyzer::setGainDb(float gainDb) {
 void StemAnalyzer::reset(std::uint64_t startFrame) {
     analyzer_.reset(startFrame);
     causal_.reset();
-    drums_.reset();
     levelDb_ = referenceDb_ = -120.0f;
     referencePower_ = 0.0;
     heardSeconds_ = 0.0;
@@ -170,22 +169,13 @@ bool StemAnalyzer::pop(StemFrame& out) {
         out.bands[b] = b < f.bandCount ? f.bands[b] : 0.0f;
     }
     out.level = followLevel(f.rms);
-    out.beatOnsetStrength = f.onsetStrength;
+    out.beatOnsetStrength = f.beatStrength; // ADR-1780
+    out.beatLowStrength = f.beatLowStrength;
     out.beatOnset = f.onset;
     foldSpectrum(f, analyzer_.config(), out.spectrumRow); // ADR-1631
     if (config_.hits) {
         causal_.process(scratch_, binHz_, hopSeconds_);
         out.feed = ResponseFeed::fromCausal(scratch_.causal);
-        if (!config_.classes) {
-            return true; // ADR-1630: not a drums source; no class name
-        }
-        const DrumHits d = drums_.process(scratch_.magnitude, causal_.binFlux(), causal_.first(), binHz_, hopSeconds_);
-        out.kick = d.hit[static_cast<std::size_t>(DrumClass::Kick)];
-        out.kickStrength = d.strength[static_cast<std::size_t>(DrumClass::Kick)];
-        out.snare = d.hit[static_cast<std::size_t>(DrumClass::Snare)];
-        out.snareStrength = d.strength[static_cast<std::size_t>(DrumClass::Snare)];
-        out.hat = d.hit[static_cast<std::size_t>(DrumClass::Hat)];
-        out.hatStrength = d.strength[static_cast<std::size_t>(DrumClass::Hat)];
     }
     return true;
 }

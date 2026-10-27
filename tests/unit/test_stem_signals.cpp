@@ -101,12 +101,12 @@ TEST_CASE("stem signals: one stable vocabulary per key; relabel moves no id; ina
     signals::SignalBus bus;
     const auto drums = signals::StemSignals::declare(bus, "drums", "Drums", audio::SourceRole::Drums);
     const auto names = signals::StemSignals::names("drums", audio::SourceRole::Drums);
-    REQUIRE(names.size() == 19); // ADR-1604 added onsetLow, onsetMid, onsetHigh
+    REQUIRE(names.size() == 16); // ADR-1604 added onsetLow, onsetMid, onsetHigh; ADR-1784 cut kick, snare, hat
     for (const auto& n : names) {
         CHECK(bus.find(n).has_value());
     }
     CHECK(bus.info(drums.onset).isEvent);
-    CHECK(bus.info(drums.kick).isEvent);
+    CHECK_FALSE(bus.find("stem.drums.kick").has_value()); // ADR-1784: no source names an instrument
     CHECK_FALSE(bus.info(drums.level).isEvent);
     CHECK(bus.info(drums.level).label == "Drums: level (against its own loudness)");
 
