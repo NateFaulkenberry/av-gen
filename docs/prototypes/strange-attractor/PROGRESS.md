@@ -1,6 +1,14 @@
 # The Strange Attractor: progress
 
-Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850, 1851, 1852).
+> **Change of direction (owner, after Gate 2, 2026-10-27):** "have it remove all that stuff and just go back to the
+> canyon - fix that up and make it look good and render a fly through of the canyon".
+> - The attractor ribbon, the butte tower and the nested arches are gone: code, parameters, tests and shaders
+>   (ADR-1853 supersedes ADR-1852's formation parts).
+> - The scene is now the canyon, with a river and a flythrough.
+> - The brief (`00-brief.md`) is kept as written. Where it asks for recursive landmarks and an attractor structure,
+>   the owner's direction overrides it.
+
+Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850, 1851, 1852, 1853).
 Review media: `~/Desktop/av-gen-review/101-strange-attractor/gate<N>/`.
 
 The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`.
@@ -17,9 +25,29 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | Gate | Stages | State |
 |---|---|---|
 | 1 | 0 research, 1 skeleton | **approved by the owner** ("solid start - looks fantastic") |
-| 2 | 2 recursive landmarks, 3 branching and the attractor | **done, awaiting the owner**: media in `gate2/` |
+| 2 | 2 recursive landmarks, 3 branching and the attractor | done; the formations were then **removed by the owner** |
+| 2b | the canyon alone: the fixes, the river, the flythrough | **done, awaiting the owner**: media in `gate2b/` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
+
+## Gate 2b (the canyon alone and its flythrough): ADR-1853
+
+- **The flythrough:** `avgen --headless --composition examples/strange-attractor/strange-attractor-flythrough.scene.json
+  --render out.mp4 --range 0:54 --fps 30 --size 1920x1080`. It is 54 s at offline quality (the 4096² field).
+- **The faults and their causes** (each found by A/B on the same frame; details in ADR-1853):
+  - the dashes (the shadow tested the uncut surface);
+  - the moiré (ledges cut along bilinear contours);
+  - the hatching (sub-pixel ledges);
+  - the vertical streaks (the flutes, and gullies cut in texels);
+  - the near blob (relief that could only vary along a face).
+- **The river:** a reflecting water plane in the gorge.
+- **Offline cost:** about 29 ms per frame end to end (54 s rendered in 47.2 s). Not a live measurement.
+- **Known weak spots:**
+  - speckled edges on some sunlit caprock rims;
+  - the dive (8-17 s) spends a while looking down at shadowed bench;
+  - faint broad shading of real gully geometry on bright faces;
+  - the river is a flat plane, so it has no flow;
+  - the side canyons are subtle.
 
 ## How to see it
 
@@ -113,5 +141,6 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
+- 2026-10-27: Gate 2b: the formations removed (owner); the canyon fixed; the river and the flythrough; tests 7 cases.
 - 2026-10-27: Gate 1 approved. Gate 2: the owner's fixes, the formations, the side canyons and the drift; ADR-1851
   and ADR-1852; tests 11 cases, 217 assertions, pass; Gate 2 media rendered.

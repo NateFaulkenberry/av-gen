@@ -1,6 +1,9 @@
 # ADR-1852: The Strange Attractor's formations, branching network and band cut
 
-- Status: Accepted, scene/strange-attractor (Gate 2, 2026-10-27).
+- Status: **Superseded in part by ADR-1853** (2026-10-27): the formations (the attractor ribbon, the butte tower,
+  the nested arches) were removed at the owner's request. The side canyons, the band cut, the streak-fix normals and
+  the knife-ridge smoothing stand. The text below records what was built and why.
+- Original status: Accepted, scene/strange-attractor (Gate 2, 2026-10-27).
 - Code:
   - `src/scene/attractor_formations.{hpp,cpp}`: the integrator, resampling and the tube volume.
   - `src/scene/attractor_world.cpp`: pass 1c (the network), `bandProfile`, `placeFormations` and `attractorCamera`.
