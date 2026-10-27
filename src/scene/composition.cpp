@@ -32,6 +32,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <future>
 #include <optional>
 #include <array>
 #include "world/camera_clearance.hpp"
@@ -1237,13 +1238,34 @@ void Composition::updateAttractorWorld() {
     }
     // A structural change regenerates (never a look change). The world is shared: the authored block keeps it so a
     // rebuild does not regenerate, and the scene copy points at the same one.
-    if (!attractorWorld_.world || attractorWorld_.world->hash != live.liveGen.hash()) {
-        if (live.liveGen.validate()) {
-            attractorWorld_.world = acquireAttractorWorld(live.liveGen);
-            log::info("attractorWorld: seed {} regenerated in {:.2f} s", live.liveGen.seed,
-                      attractorWorld_.world->generateSeconds);
-            cameraCutThisFrame_ = true; // a new world is a new picture: no temporal history across it
-            ++cameraCutSerial_;
+    const auto install = [&](std::shared_ptr<const AttractorWorld> world) {
+        attractorWorld_.world = std::move(world);
+        log::info("attractorWorld: seed {} regenerated in {:.2f} s", attractorWorld_.world->gen.seed,
+                  attractorWorld_.world->generateSeconds);
+        cameraCutThisFrame_ = true; // a new world is a new picture: no temporal history across it
+        ++cameraCutSerial_;
+    };
+    const std::uint64_t want = live.liveGen.hash();
+    // ADR-1851: collect a finished worker; install it if it is still what the knobs ask for.
+    if (attractorPending_.valid() &&
+        attractorPending_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        auto world = attractorPending_.get();
+        if (attractorPendingHash_ == want && (!attractorWorld_.world || attractorWorld_.world->hash != want)) {
+            install(std::move(world));
+        }
+    }
+    if ((!attractorWorld_.world || attractorWorld_.world->hash != want) && live.liveGen.validate()) {
+        if (interactiveRebuildBudgetMs_ > 0.0 && attractorWorld_.world) {
+            if (!attractorPending_.valid()) { // one at a time; a newer request starts when this one lands
+                attractorPendingHash_ = want;
+                attractorPending_ = std::async(std::launch::async, [gen = live.liveGen] { return acquireAttractorWorld(gen); });
+            }
+        } else {
+            if (attractorPending_.valid()) {
+                attractorPending_.wait(); // never leave a worker writing the cache under a synchronous generation
+                (void)attractorPending_.get();
+            }
+            install(acquireAttractorWorld(live.liveGen));
         }
     }
     live.world = attractorWorld_.world;

@@ -68,6 +68,7 @@
 #include <map>
 #include <memory>
 #include <functional>
+#include <future>
 #include <optional>
 #include <span>
 #include <string>
@@ -1457,6 +1458,8 @@ public:
     // Generates the world at once; its parameters (`attractorWorld/...`) are registered when attached, and a change
     // of a structural one regenerates the world on the next frame.
     void setAttractorWorld(AttractorWorldBlock block);
+    // ADR-1851: true while a regeneration is running on a worker (the editor can say so).
+    [[nodiscard]] bool attractorWorldGenerating() const { return attractorPending_.valid(); }
     [[nodiscard]] const AttractorWorldBlock& attractorWorld() const { return attractorWorld_; }
     [[nodiscard]] const Clouds& clouds() const { return clouds_; }
     // The song the conductor is reading (null in live mode or before the first frame with a track).
@@ -2369,6 +2372,10 @@ private:
     Clouds clouds_;                          // ADR-1289
     AttractorWorldBlock attractorWorld_;     // ADR-1850: the authored block (rest values) and the generated world
     std::optional<AttractorWorldParameters> attractorParams_; // its live knobs, while attached
+    // ADR-1851: a structural change in the live editor generates on a worker; the old world stays on screen until the
+    // new one is ready. Offline (no interactive budget) it generates synchronously, so a render is deterministic.
+    std::future<std::shared_ptr<const AttractorWorld>> attractorPending_;
+    std::uint64_t attractorPendingHash_ = 0;
     void updateAttractorWorld(); // the finals, and a regeneration when a structural one changed
     void applyAttractorCamera(float& fovDegrees); // the composed camera, when it drives
     std::optional<AstralParameters> astralParams_; // its live knobs, while attached

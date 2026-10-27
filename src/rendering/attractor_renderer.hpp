@@ -40,6 +40,8 @@ private:
     wgpu::Buffer uniforms_;
     wgpu::Texture height_;
     wgpu::Texture masks_;
+    wgpu::Texture tubeVolume_; // ADR-1852: RG32F distance to the ribbon + nearest segment (1^3 when there is none)
+    wgpu::Buffer tubePoints_;  // vec4 per point: xyz, radius
     wgpu::Sampler sampler_;
     std::uint64_t worldHash_ = 0;
     std::uint64_t uploads_ = 0;

@@ -14,6 +14,7 @@
 
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
+#include "scene/attractor_formations.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -37,7 +38,14 @@ struct AttractorGen {
     float domainWarp = 0.5f;     // spatial twisting of the masses and the strata (0..1)
     float terraces = 0.6f;       // the strata's steps cut into the masses (0..1)
     float erosion = 0.5f;        // gullies on the steep faces (0..1)
-    float strataFold = 0.0f;     // an impossible anticline wave through the strata and their terraces (0..1)
+    float strataFold = 0.7f;     // an impossible anticline wave through the strata and their terraces (0..1)
+    // Formations (ADR-1852)
+    int recursiveDepth = 3;      // landmark recursion levels after the first (0..kAttractorMaxRecursion)
+    float formationScale = 1.0f; // size of the landmarks and the attractor (0.5..1.5)
+    float attractorInfluence = 1.0f; // 0 none .. 1 the full ribbon (its size and presence)
+    int attractorSystem = 0;     // 0 Rossler, 1 Thomas
+    float branchingDensity = 0.6f; // tributary gorges (0 none .. 1 many)
+    int landmarks = 3;           // bitmask: 1 the butte tower, 2 the nested-arch fin
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;
@@ -72,11 +80,17 @@ struct AttractorWorld {
     float extent = 0.0f;
     glm::vec2 origin{0.0f};            // world xz of texel (0, 0)'s corner
     std::vector<float> height;         // res*res metres, row-major (z rows, x columns)
+    std::vector<float> strataOffset;   // res*res: the strata coordinate minus the height (tilt, warp, fold)
     std::vector<std::uint32_t> masks;  // res*res RGBA8: r rock, g playa (valley floor), b cavity, a ridge
     float minHeight = 0.0f;
     float maxHeight = 0.0f;
     std::vector<AttractorMass> masses;
+    std::vector<AttractorLandmark> landmarks; // the recursive formations (ADR-1852)
+    AttractorTube tube;                       // the attractor's stone ribbon (empty at influence 0)
+    std::vector<NetworkBranch> branches;      // the tributary gorges
+    std::vector<float> networkArc;            // res*res: network distance (m) along the gorges, or -1 off them
     std::vector<glm::vec2> valley;     // the valley's trunk, near to far (world xz)
+    std::vector<glm::vec2> gorgeLine;  // the inner gorge's centreline, near to far (world xz)
     std::array<glm::vec4, 4> strataSeed{}; // [0] x tilt angle, y tilt slope, z band (m); [1] fold: x angle, y wavelength, z amp
     glm::vec3 eye{0.0f};
     glm::vec3 target{0.0f};

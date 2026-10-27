@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace avgen::rendering {
 
@@ -31,7 +32,7 @@ constexpr std::array<std::array<std::uint32_t, kPaletteSlots>, 3> kPalettes{{
      0xa898b4, 0xc06272, 0x4a4260, 0x9a96bc, 0x262238},
     // Chromatic
     {0x24428c, 0xffb070, 0xff86ac, 0x4a5fc0, 0xffd890, 0xff9a50, 0xdca2bc, 0x6f8fff, 0xff8a50, 0xdc9a3a, 0xc23a30,
-     0xf0e0b8, 0x3a8a82, 0xa8788a, 0xf0d8d0, 0x6a2a4a},
+     0xf0e0b8, 0x8a3e62, 0xa8788a, 0xf0d8d0, 0x6a2a4a},
 }};
 
 glm::vec3 linearOf(std::uint32_t hex) {
@@ -52,8 +53,13 @@ struct AttractorUniformGpu {
     glm::vec4 look2;   // x ambient, y palette, z noise seed (u32 bits), w terraces
     glm::vec4 view;    // xy view direction (xz), z sun side, w domain warp
     std::array<glm::vec4, kPaletteSlots> pal;
+    // ADR-1852: the formations
+    glm::vec4 tubeMin;  // xyz the volume's min corner, w volume resolution (0 = no ribbon)
+    glm::vec4 tubeMax;  // xyz max corner, w segment count
+    glm::vec4 formation; // x landmark count, y swell (audio, 0 for now), zw 0
+    std::array<glm::vec4, 3 * scene::kAttractorMaxLandmarks> landmarks; // per landmark: base+kind, scale/height/angle/depth, bound
 };
-static_assert(sizeof(AttractorUniformGpu) == 8 * 16 + kPaletteSlots * 16);
+static_assert(sizeof(AttractorUniformGpu) == 8 * 16 + kPaletteSlots * 16 + 3 * 16 + 3 * scene::kAttractorMaxLandmarks * 16);
 
 } // namespace
 
@@ -67,7 +73,7 @@ Result<void> AttractorRenderer::init(gpu::Context& context, gpu::ShaderLibrary& 
     hdrFormat_ = hdrFormat;
     depthFormat_ = depthFormat;
     const wgpu::Device& device = context.device();
-    std::array<wgpu::BindGroupLayoutEntry, 5> e{};
+    std::array<wgpu::BindGroupLayoutEntry, 7> e{};
     e[0].binding = 0;
     e[0].visibility = wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex;
     e[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -85,6 +91,13 @@ Result<void> AttractorRenderer::init(gpu::Context& context, gpu::ShaderLibrary& 
     e[4].binding = 4;
     e[4].visibility = wgpu::ShaderStage::Fragment;
     e[4].sampler.type = wgpu::SamplerBindingType::Filtering;
+    e[5].binding = 5;
+    e[5].visibility = wgpu::ShaderStage::Fragment;
+    e[5].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
+    e[5].texture.viewDimension = wgpu::TextureViewDimension::e3D;
+    e[6].binding = 6;
+    e[6].visibility = wgpu::ShaderStage::Fragment;
+    e[6].buffer.type = wgpu::BufferBindingType::ReadOnlyStorage;
     wgpu::BindGroupLayoutDescriptor d{};
     d.label = "attractor-0";
     d.entryCount = e.size();
@@ -180,19 +193,52 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
             td.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
             return device.CreateTexture(&td);
         };
-        height_ = make(wgpu::TextureFormat::R32Float, "attractor-height");
+        height_ = make(wgpu::TextureFormat::RG32Float, "attractor-height"); // r height, g strata offset
         masks_ = make(wgpu::TextureFormat::RGBA8Unorm, "attractor-masks");
-        const auto upload = [&](const wgpu::Texture& tex, const void* data) {
+        const auto upload = [&](const wgpu::Texture& tex, const void* data, std::uint32_t texelBytes) {
             wgpu::TexelCopyTextureInfo dst{};
             dst.texture = tex;
             wgpu::TexelCopyBufferLayout layout{};
-            layout.bytesPerRow = n * 4;
+            layout.bytesPerRow = n * texelBytes;
             layout.rowsPerImage = n;
             const wgpu::Extent3D extent{n, n, 1};
-            context_->queue().WriteTexture(&dst, data, static_cast<std::size_t>(n) * n * 4, &layout, &extent);
+            context_->queue().WriteTexture(&dst, data, static_cast<std::size_t>(n) * n * texelBytes, &layout, &extent);
         };
-        upload(height_, w.height.data());
-        upload(masks_, w.masks.data());
+        std::vector<float> field(static_cast<std::size_t>(n) * n * 2);
+        for (std::size_t i = 0; i < w.height.size(); ++i) {
+            field[2 * i] = w.height[i];
+            field[2 * i + 1] = i < w.strataOffset.size() ? w.strataOffset[i] : 0.0f;
+        }
+        upload(height_, field.data(), 8);
+        upload(masks_, w.masks.data(), 4);
+        // the ribbon's volume and points (a 1-texel volume and one point when there is none)
+        const auto vr = static_cast<std::uint32_t>(w.tube.empty() ? 1 : w.tube.volumeRes);
+        wgpu::TextureDescriptor vd{};
+        vd.label = "attractor-tube-volume";
+        vd.dimension = wgpu::TextureDimension::e3D;
+        vd.size = {vr, vr, vr};
+        vd.format = wgpu::TextureFormat::RG32Float;
+        vd.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+        tubeVolume_ = device.CreateTexture(&vd);
+        {
+            const std::vector<glm::vec2> one{glm::vec2(1e4f, 0.0f)};
+            const void* data = w.tube.empty() ? static_cast<const void*>(one.data()) : static_cast<const void*>(w.tube.volume.data());
+            wgpu::TexelCopyTextureInfo dst{};
+            dst.texture = tubeVolume_;
+            wgpu::TexelCopyBufferLayout layout{};
+            layout.bytesPerRow = vr * 8;
+            layout.rowsPerImage = vr;
+            const wgpu::Extent3D extent{vr, vr, vr};
+            context_->queue().WriteTexture(&dst, data, static_cast<std::size_t>(vr) * vr * vr * 8, &layout, &extent);
+        }
+        const std::vector<glm::vec4> noPoints{glm::vec4(0.0f)};
+        const std::vector<glm::vec4>& pts = w.tube.empty() ? noPoints : w.tube.points;
+        wgpu::BufferDescriptor pd{};
+        pd.label = "attractor-tube-points";
+        pd.size = pts.size() * sizeof(glm::vec4);
+        pd.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
+        tubePoints_ = device.CreateBuffer(&pd);
+        context_->queue().WriteBuffer(tubePoints_, 0, pts.data(), pd.size);
         worldHash_ = w.hash;
         ++uploads_;
     }
@@ -224,9 +270,31 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
     for (int i = 0; i < kPaletteSlots; ++i) {
         u.pal[i] = glm::vec4(glm::mix(linearOf(kPalettes[p0][i]), linearOf(kPalettes[p0 + 1][i]), t), 0.0f);
     }
+    // ADR-1852: the formations
+    if (!w.tube.empty()) {
+        u.tubeMin = glm::vec4(w.tube.boundsMin, static_cast<float>(w.tube.volumeRes));
+        u.tubeMax = glm::vec4(w.tube.boundsMax, static_cast<float>(w.tube.points.size() - 1));
+    }
+    const std::size_t nl = std::min<std::size_t>(w.landmarks.size(), scene::kAttractorMaxLandmarks);
+    float formationTop = w.tube.empty() ? w.maxHeight : w.tube.boundsMax.y;
+    for (std::size_t i = 0; i < nl; ++i) {
+        const scene::AttractorLandmark& lm = w.landmarks[i];
+        // the tower's tiers sum to at most height * (1 + 0.8 + 0.8^2 + ...) = 5 * height above its base
+        formationTop = std::max(formationTop, lm.base.y + (lm.kind == 0 ? 5.0f * lm.height : 1.3f * lm.height));
+    }
+    u.formation = glm::vec4(static_cast<float>(nl), 0.0f, formationTop, 0.0f);
+    for (std::size_t i = 0; i < nl; ++i) {
+        const scene::AttractorLandmark& lm = w.landmarks[i];
+        // a bounding sphere generous enough for every tier or arch (the shader skips the landmark outside it)
+        const float reach = lm.kind == 0 ? std::max(lm.scale * 1.8f, lm.height * 2.2f) : std::max(lm.scale * 1.3f, lm.height * 1.2f);
+        const glm::vec3 centre = lm.base + glm::vec3(0.0f, lm.kind == 0 ? lm.height * 1.3f : lm.height * 0.5f, 0.0f);
+        u.landmarks[3 * i + 0] = glm::vec4(lm.base, static_cast<float>(lm.kind));
+        u.landmarks[3 * i + 1] = glm::vec4(lm.scale, lm.height, lm.angle, static_cast<float>(lm.depth));
+        u.landmarks[3 * i + 2] = glm::vec4(centre, reach);
+    }
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
-    std::array<wgpu::BindGroupEntry, 5> e{};
+    std::array<wgpu::BindGroupEntry, 7> e{};
     e[0].binding = 0;
     e[0].buffer = *f.frameUniforms;
     e[0].size = f.frameUniforms->GetSize();
@@ -239,6 +307,11 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
     e[3].textureView = masks_.CreateView();
     e[4].binding = 4;
     e[4].sampler = sampler_;
+    e[5].binding = 5;
+    e[5].textureView = tubeVolume_.CreateView();
+    e[6].binding = 6;
+    e[6].buffer = tubePoints_;
+    e[6].size = tubePoints_.GetSize();
     wgpu::BindGroupDescriptor bg{};
     bg.label = "attractor-0";
     bg.layout = layout_;

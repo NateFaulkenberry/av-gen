@@ -15,7 +15,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <cmath>
+#include <thread>
 
 using namespace avgen;
 using Catch::Approx;
@@ -178,4 +180,112 @@ TEST_CASE("a seed change regenerates the world in place; a look change never doe
     const nlohmann::json saved = c.comp->toJson();
     REQUIRE(saved.contains("attractorWorld"));
     CHECK(saved["attractorWorld"]["seed"].get<int>() == 4);
+}
+
+TEST_CASE("in the live editor a seed change generates on a worker and the old world stays until it lands",
+          "[attractor-world][adr1851]") {
+    Comp c(sceneWith({{"seed", 21}, {"resolution", 384}}));
+    c.comp->setInteractiveRebuildBudget(2.0); // what the live engine sets; offline never does
+    c.frame(0.0);
+    const auto first = c.comp->scene().attractorWorld.world;
+    REQUIRE(first != nullptr);
+    c.params.findAs<int>("attractorWorld/seed")->setBase(22);
+    c.frame(1.0 / 30.0);
+    // the frame that asked did not wait: the old world is still drawn (unless the worker was already done)
+    const auto during = c.comp->scene().attractorWorld.world;
+    CHECK((during == first || during->gen.seed == 22u));
+    std::shared_ptr<const scene::AttractorWorld> now = during;
+    for (int i = 0; i < 400 && now->gen.seed != 22u; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        c.frame((2.0 + i) / 30.0);
+        now = c.comp->scene().attractorWorld.world;
+    }
+    CHECK(now->gen.seed == 22u);
+    CHECK_FALSE(c.comp->attractorWorldGenerating());
+    // the same world as a synchronous generation would make
+    CHECK(now->height == scene::generateAttractorWorld(now->gen)->height);
+}
+
+// ---- formations (ADR-1852) --------------------------------------------------------------------------------------
+
+TEST_CASE("the attractors integrate finitely, and a diverging start stops instead of overflowing", "[attractor-world][adr1852]") {
+    for (auto sys : {scene::AttractorSystem::Rossler, scene::AttractorSystem::Thomas}) {
+        const scene::Trajectory t = scene::integrateAttractor(sys, glm::vec3(0.1f, 0.0f, 0.0f), 0.01f, 3000, 3000);
+        CHECK(t.finite);
+        REQUIRE(t.points.size() == 3000u);
+        glm::vec3 lo(1e30f), hi(-1e30f);
+        for (const glm::vec3& p : t.points) {
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+        }
+        CHECK(glm::length(hi - lo) > 2.0f);   // a strange attractor, not a fixed point
+        CHECK(glm::length(hi - lo) < 100.0f); // and bounded
+    }
+    // Rossler from a far-off state diverges: the integrator says so and keeps nothing non-finite
+    const scene::Trajectory bad = scene::integrateAttractor(scene::AttractorSystem::Rossler, glm::vec3(1e3f, 0, 1), 0.05f, 100, 100);
+    CHECK_FALSE(bad.finite);
+    for (const glm::vec3& p : bad.points) {
+        CHECK(std::isfinite(p.x + p.y + p.z));
+    }
+}
+
+TEST_CASE("arc-length resampling gives equal segments within the budget", "[attractor-world][adr1852]") {
+    const scene::Trajectory t = scene::integrateAttractor(scene::AttractorSystem::Rossler, glm::vec3(1, 1, 0), 0.01f, 2000, 2000);
+    const auto r = scene::resampleByArcLength(t.points, 200);
+    REQUIRE(r.size() == 201u);
+    float lo = 1e30f, hi = 0.0f;
+    for (std::size_t i = 0; i + 1 < r.size(); ++i) {
+        const float l = glm::length(r[i + 1] - r[i]);
+        lo = std::min(lo, l);
+        hi = std::max(hi, l);
+    }
+    CHECK(hi < 1.6f * lo + 1e-3f); // chords of equal arcs: equal up to the curvature
+    CHECK(scene::resampleByArcLength({}, 10).empty());
+    CHECK(scene::resampleByArcLength({glm::vec3(1), glm::vec3(1)}, 10).empty()); // a degenerate curve
+}
+
+TEST_CASE("the world's formations are placed, budgeted, and the ribbon's volume matches its exact distance",
+          "[attractor-world][adr1852]") {
+    scene::AttractorGen g = smallGen(1);
+    g.resolution = 512;
+    const auto w = scene::generateAttractorWorld(g);
+    REQUIRE_FALSE(w->tube.empty());
+    CHECK(w->tube.points.size() <= static_cast<std::size_t>(scene::kAttractorMaxSegments) + 1);
+    CHECK(w->tube.volumeRes == scene::kAttractorVolumeRes);
+    CHECK(w->landmarks.size() <= static_cast<std::size_t>(scene::kAttractorMaxLandmarks));
+    CHECK_FALSE(w->landmarks.empty());
+    for (const auto& lm : w->landmarks) {
+        CHECK(lm.depth <= scene::kAttractorMaxRecursion);
+        CHECK(std::isfinite(lm.base.x + lm.base.y + lm.base.z));
+    }
+    CHECK(w->branches.size() <= static_cast<std::size_t>(scene::kAttractorMaxBranches));
+    CHECK_FALSE(w->branches.empty());
+    // the volume against the exact distance at voxel centres, where trilinear filtering adds nothing
+    const int res = w->tube.volumeRes;
+    const glm::vec3 lo = w->tube.boundsMin, hi = w->tube.boundsMax;
+    std::size_t checked = 0;
+    for (int k = 0; k < 64; ++k) {
+        const glm::ivec3 v((k * 37) % res, (k * 53) % res, (k * 71) % res);
+        const glm::vec3 p = lo + (hi - lo) * glm::vec3(v) / static_cast<float>(res - 1);
+        const float baked = w->tube.volume[(static_cast<std::size_t>(v.z) * res + v.y) * res + v.x].x;
+        CHECK(baked == Approx(scene::tubeDistance(w->tube, p)).margin(1e-2));
+        ++checked;
+    }
+    CHECK(checked == 64u);
+    // zero influence: no ribbon at all
+    g.attractorInfluence = 0.0f;
+    CHECK(scene::generateAttractorWorld(g)->tube.empty());
+}
+
+TEST_CASE("the formation knobs never move the terrain or the camera", "[attractor-world][adr1852]") {
+    scene::AttractorGen a = smallGen(3);
+    scene::AttractorGen b = a;
+    b.recursiveDepth = 1;
+    b.formationScale = 1.3f;
+    b.landmarks = 1;
+    const auto wa = scene::generateAttractorWorld(a);
+    const auto wb = scene::generateAttractorWorld(b);
+    CHECK(wa->hash != wb->hash);
+    CHECK(wa->height == wb->height);
+    CHECK(wa->eye == wb->eye);
 }

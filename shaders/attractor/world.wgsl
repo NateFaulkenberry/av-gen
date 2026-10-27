@@ -20,12 +20,18 @@ struct AttractorUniforms {
     look2: vec4<f32>,   // x ambient, y palette, z noise seed (u32 bits), w terraces
     view: vec4<f32>,    // xy view direction (xz), z sun side, w domain warp
     pal: array<vec4<f32>, 16>,
+    tubeMin: vec4<f32>,   // ADR-1852: xyz min corner, w volume resolution (0 = no ribbon)
+    tubeMax: vec4<f32>,   // xyz max corner, w segment count
+    formation: vec4<f32>, // x landmark count, y ribbon swell, z the formations' top (y), w 0
+    landmarks: array<vec4<f32>, 12>,
 };
 
 @group(0) @binding(1) var<uniform> au: AttractorUniforms;
 @group(0) @binding(2) var heightTex: texture_2d<f32>;
 @group(0) @binding(3) var maskTex: texture_2d<f32>;
 @group(0) @binding(4) var maskSampler: sampler;
+
+#include "attractor/formations.wgsl"
 
 const P_ZENITH: u32 = 0u;
 const P_HORIZON: u32 = 1u;
@@ -122,19 +128,85 @@ fn texCoord(xz: vec2<f32>) -> vec2<f32> {
     return (xz - au.world.xy) / au.heights.z - 0.5;
 }
 
-fn heightBase(xz: vec2<f32>) -> f32 {
+// The baked field at `xz`: x height, y strata offset, zw the bilinear gradient (dh/dx, dh/dz).
+fn fieldAt(xz: vec2<f32>) -> vec4<f32> {
     let n = i32(au.world.w);
     let t = clamp(texCoord(xz), vec2<f32>(0.0), vec2<f32>(f32(n - 1)));
     let i0 = min(vec2<i32>(t), vec2<i32>(n - 2));
     let f = t - vec2<f32>(i0);
-    let a = textureLoad(heightTex, i0, 0).r;
-    let b = textureLoad(heightTex, i0 + vec2<i32>(1, 0), 0).r;
-    let c = textureLoad(heightTex, i0 + vec2<i32>(0, 1), 0).r;
-    let d = textureLoad(heightTex, i0 + vec2<i32>(1, 1), 0).r;
+    let a = textureLoad(heightTex, i0, 0).rg;
+    let b = textureLoad(heightTex, i0 + vec2<i32>(1, 0), 0).rg;
+    let c = textureLoad(heightTex, i0 + vec2<i32>(0, 1), 0).rg;
+    let d = textureLoad(heightTex, i0 + vec2<i32>(1, 1), 0).rg;
     // smoothstep-weighted bilinear: hides the texel grid on the faces without a 16-tap filter
     let s = f * f * (3.0 - 2.0 * f);
     let w = mix(f, s, 0.6);
-    return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+    let v = mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+    let gx = mix(b.x - a.x, d.x - c.x, f.y) / au.heights.z;
+    let gz = mix(c.x - a.x, d.x - b.x, f.x) / au.heights.z;
+    return vec4<f32>(v.x, v.y, gx, gz);
+}
+
+// The strata's band profile (scene/attractor_world.cpp `bandProfile`, line for line).
+fn bandProfile(s: f32) -> f32 {
+    let band = au.strata.z;
+    let t = s / band;
+    let i = floor(t);
+    let f = t - i;
+    let hard = smoothstep(0.35, 0.75, bandHardness(i));
+    let riser = 0.2;
+    let gg = clamp((f - (1.0 - riser)) / riser, 0.0, 1.0);
+    let st = gg * gg * (3.0 - 2.0 * gg);
+    return (i + f + (st - f) * hard) * band;
+}
+
+// The bands cut again on the steep faces, at sub-texel scale: a face spans less than a texel horizontally, so the
+// generator's terraces cannot show there, and the colour bands would read as a wash over smooth rock. Applying the
+// band profile to the bilinear surface steps the face into ledges and risers the march sees (silhouettes included).
+fn bandCut(fd: vec4<f32>, dist: f32) -> f32 {
+    let slope = length(fd.zw);
+    let amt = au.look2.w * smoothstep(0.8, 1.8, slope) * (1.0 - smoothstep(2500.0, 6000.0, dist));
+    if (amt <= 0.0) {
+        return 0.0;
+    }
+    let s0 = fd.x + fd.y;
+    return (bandProfile(s0) - s0) * amt;
+}
+
+fn heightBase(xz: vec2<f32>) -> f32 {
+    return fieldAt(xz).x;
+}
+
+// The height field's gradient from a uniform cubic B-spline over 4x4 texels (C2). The march uses the cheap bilinear
+// surface; the shading normal must not: a bilinear patch's contours turn at every texel edge, so on a steep face each
+// texel column faces a slightly different way and the cliff shades as vertical curtains one texel wide. The B-spline's
+// gradient is continuous across texels, so the face turns smoothly. Returns (dh/dx, dh/dz).
+fn bsplineW(f: f32) -> vec4<f32> {
+    let g = 1.0 - f;
+    return vec4<f32>(g * g * g, 3.0 * f * f * f - 6.0 * f * f + 4.0, -3.0 * f * f * f + 3.0 * f * f + 3.0 * f + 1.0, f * f * f) / 6.0;
+}
+fn bsplineD(f: f32) -> vec4<f32> {
+    let g = 1.0 - f;
+    return vec4<f32>(-g * g, 3.0 * f * f - 4.0 * f, -3.0 * f * f + 2.0 * f + 1.0, f * f) * 0.5;
+}
+fn gradientSmooth(xz: vec2<f32>) -> vec2<f32> {
+    let n = i32(au.world.w);
+    let t = texCoord(xz);
+    let i = vec2<i32>(floor(t));
+    let f = t - floor(t);
+    let wx = bsplineW(f.x);
+    let wy = bsplineW(f.y);
+    let dx = bsplineD(f.x);
+    let dy = bsplineD(f.y);
+    var g = vec2<f32>(0.0);
+    for (var y = 0; y < 4; y = y + 1) {
+        for (var x = 0; x < 4; x = x + 1) {
+            let c = clamp(i + vec2<i32>(x - 1, y - 1), vec2<i32>(0), vec2<i32>(n - 1));
+            let h = textureLoad(heightTex, c, 0).r;
+            g = g + h * vec2<f32>(dx[x] * wy[y], wx[x] * dy[y]);
+        }
+    }
+    return g / au.heights.z;
 }
 
 fn masksAt(xz: vec2<f32>) -> vec4<f32> {
@@ -164,21 +236,28 @@ fn detailAt(xz: vec2<f32>, dist: f32) -> f32 {
 // Fluting on the cliffs, in the cliff's own plane: vertical grooves along the face (a 2D mask can only smear them).
 // `tangent` runs along the face horizontally; the grooves are long in y.
 fn flutes(p: vec3<f32>, tangent: vec2<f32>) -> f32 {
-    let u = dot(p.xz, tangent);
+    // each band weathers on its own: the pattern restarts at every band, so no groove runs the whole face
+    let bi = floor(strataCoord(p) / au.strata.z);
+    let u = dot(p.xz, tangent) + hash01(i32(bi), 9, 5u) * 97.0;
     let a = vnoise(vec2<f32>(u / 7.0, p.y / 55.0));
     let b = vnoise(vec2<f32>(u / 2.3, p.y / 14.0));
     return 0.65 * a + 0.35 * b; // 0..1
 }
 
 fn heightAt(xz: vec2<f32>, dist: f32) -> f32 {
-    return heightBase(xz) + detailAt(xz, dist);
+    let fd = fieldAt(xz);
+    return fd.x + bandCut(fd, dist) + detailAt(xz, dist);
 }
 
 fn normalAt(xz: vec2<f32>, dist: f32) -> vec3<f32> {
-    let e = max(au.heights.z * 0.35, dist * 0.0012);
-    let hx = heightAt(xz + vec2<f32>(e, 0.0), dist) - heightAt(xz - vec2<f32>(e, 0.0), dist);
-    let hz = heightAt(xz + vec2<f32>(0.0, e), dist) - heightAt(xz - vec2<f32>(0.0, e), dist);
-    return normalize(vec3<f32>(-hx, 2.0 * e, -hz));
+    // the baked field's smooth gradient, plus the near-field detail's (finite differences of the detail alone)
+    let g = gradientSmooth(xz);
+    let e = max(0.5, dist * 0.0012);
+    let ex = vec2<f32>(e, 0.0);
+    let ez = vec2<f32>(0.0, e);
+    let dx = detailAt(xz + ex, dist) - detailAt(xz - ex, dist) + bandCut(fieldAt(xz + ex), dist) - bandCut(fieldAt(xz - ex), dist);
+    let dz = detailAt(xz + ez, dist) - detailAt(xz - ez, dist) + bandCut(fieldAt(xz + ez), dist) - bandCut(fieldAt(xz - ez), dist);
+    return normalize(vec3<f32>(-(g.x + dx / (2.0 * e)), 1.0, -(g.y + dz / (2.0 * e))));
 }
 
 fn insideWorld(xz: vec2<f32>) -> bool {
@@ -187,59 +266,74 @@ fn insideWorld(xz: vec2<f32>) -> bool {
     return all(xz >= lo) && all(xz <= hi);
 }
 
-// Returns the hit distance, or -1.
-fn march(ro: vec3<f32>, rd: vec3<f32>, tmax: f32) -> f32 {
-    let top = au.heights.y + 6.0;
+// The scene's distance at `p`: the terrain's vertical clearance, filleted (smooth-min) into the formations where they
+// meet it. y = 1 when the formations are the nearer surface.
+fn sceneDist(p: vec3<f32>, t: f32) -> vec2<f32> {
+    let dh = p.y - heightAt(p.xz, t);
+    let ds = sdFormations(p);
+    let isForm = select(0.0, 1.0, ds < dh);
+    if (ds < 80.0) {
+        return vec2<f32>(smin(dh, ds, 22.0), isForm);
+    }
+    return vec2<f32>(min(dh, ds), isForm);
+}
+
+fn sceneTop() -> f32 {
+    return max(au.heights.y, au.formation.z) + 6.0;
+}
+
+// Returns (hit distance or -1, 1 when the hit is on a formation).
+fn march(ro: vec3<f32>, rd: vec3<f32>, tmax: f32) -> vec2<f32> {
+    let top = sceneTop();
     var t = 0.5;
     if (ro.y > top) {
         if (rd.y >= 0.0) {
-            return -1.0;
+            return vec2<f32>(-1.0, 0.0);
         }
         t = (ro.y - top) / -rd.y;
     }
     var tPrev = t;
-    var dPrev = 1e9;
-    for (var i = 0; i < 400; i = i + 1) {
+    for (var i = 0; i < 420; i = i + 1) {
         let p = ro + rd * t;
         if (t > tmax || (p.y > top && rd.y > 0.0) || !insideWorld(p.xz)) {
-            return -1.0;
+            return vec2<f32>(-1.0, 0.0);
         }
-        let d = p.y - heightAt(p.xz, t);
-        if (d < 0.0) {
+        let d = sceneDist(p, t);
+        if (d.x < 0.0) {
             // overshot: bisect back to the surface
             var a = tPrev;
             var b = t;
-            for (var k = 0; k < 7; k = k + 1) {
+            for (var k = 0; k < 8; k = k + 1) {
                 let m = 0.5 * (a + b);
-                let pm = ro + rd * m;
-                if (pm.y - heightAt(pm.xz, m) < 0.0) {
+                if (sceneDist(ro + rd * m, m).x < 0.0) {
                     b = m;
                 } else {
                     a = m;
                 }
             }
-            return 0.5 * (a + b);
+            let tm = 0.5 * (a + b);
+            return vec2<f32>(tm, sceneDist(ro + rd * tm, tm).y);
         }
-        if (d < 0.0006 * t) {
-            return t;
+        if (d.x < 0.0006 * t) {
+            return vec2<f32>(t, d.y);
         }
         tPrev = t;
-        dPrev = d;
-        t = t + max(d * 0.38, 0.0015 * t + 0.05);
+        // the terrain's clearance is vertical, so it under-steps by a safety factor; a formation's is a true distance
+        t = t + max(d.x * select(0.38, 0.85, d.y > 0.5), 0.0015 * t + 0.05);
     }
-    return -1.0;
+    return vec2<f32>(-1.0, 0.0);
 }
 
 fn softShadow(p: vec3<f32>, l: vec3<f32>) -> f32 {
     var res = 1.0;
     var t = 3.0;
-    let top = au.heights.y + 6.0;
-    for (var i = 0; i < 56; i = i + 1) {
+    let top = sceneTop();
+    for (var i = 0; i < 64; i = i + 1) {
         let q = p + l * t;
         if (q.y > top || !insideWorld(q.xz)) {
             break;
         }
-        let d = q.y - heightBase(q.xz);
+        let d = min(q.y - heightBase(q.xz), sdFormations(q));
         res = min(res, 10.0 * d / t);
         if (res < 0.0) {
             break;
@@ -250,57 +344,70 @@ fn softShadow(p: vec3<f32>, l: vec3<f32>) -> f32 {
     return res * res * (3.0 - 2.0 * res);
 }
 
+// The normal of the full scene by central differences (the formations and their fillets).
+fn sceneNormal(p: vec3<f32>, t: f32) -> vec3<f32> {
+    let e = max(0.25, t * 0.0008);
+    let k = vec2<f32>(1.0, -1.0);
+    return normalize(k.xyy * sceneDist(p + k.xyy * e, t).x + k.yyx * sceneDist(p + k.yyx * e, t).x +
+                     k.yxy * sceneDist(p + k.yxy * e, t).x + k.xxx * sceneDist(p + k.xxx * e, t).x);
+}
+
+// Ambient occlusion from the formations' distance (the terrain's comes from the baked cavity).
+fn formationAO(p: vec3<f32>, n: vec3<f32>) -> f32 {
+    var occ = 0.0;
+    var w = 1.0;
+    for (var i = 1; i <= 4; i = i + 1) {
+        let h = 4.0 * f32(i);
+        occ = occ + w * max(0.0, h - sdFormations(p + n * h)) / h;
+        w = w * 0.6;
+    }
+    return clamp(1.0 - 0.45 * occ, 0.3, 1.0);
+}
+
 // ---- strata ------------------------------------------------------------------------------------------------------
 
 fn strataCoord(p: vec3<f32>) -> f32 {
-    let tilt = vec2<f32>(cos(au.strata.x), sin(au.strata.x));
-    let nseed = bitcast<u32>(au.look2.z);
-    let warp = (10.0 + 60.0 * au.view.w) * fbm(p.xz / 1300.0, 3, nseed + 3u);
-    let fd = vec2<f32>(cos(au.fold.x), sin(au.fold.x));
-    let fold = au.fold.z * sin(dot(p.xz, fd) * (6.28318530718 / max(au.fold.y, 1.0)));
-    return p.y + au.strata.y * dot(p.xz, tilt) + warp + fold;
+    return p.y + fieldAt(p.xz).y; // the generator's own tilt + warp + fold, baked
 }
 
 fn pal(i: u32) -> vec3<f32> {
     return au.pal[i].rgb;
 }
 
-// The colour of a stratum, in three scales (02-plan.md §strata):
-//   * a FORMATION, five or so terrace bands thick, picks one strata colour: rust and coral low in the stack,
-//     sandstone in the middle, a pale bone caprock high up, with the seed's hash shuffling neighbours;
-//   * each BAND (one terrace step) shifts that colour's value a little, with a soft darker bedding plane on top;
-//   * fine LAMINATIONS inside a band, barely there.
+// Band hardness: the generator's own per-band hash (attractor_world.cpp, pass 1b). Hard bands stand as cliffs with a
+// ledge on top; soft bands weather back to slopes.
+fn bandHardness(bi: f32) -> f32 {
+    return hash01(i32(bi), 7, bitcast<u32>(au.look2.z));
+}
+
+// The colour of a stratum. Everything is keyed to the terrace band the generator cut (`floor(s / band)`), so every
+// colour boundary sits on a step in the rock, not across it:
+//   * the band's colour comes from a slow noise over the band index (neighbours mostly agree, so formations several
+//     bands thick emerge), biased by depth in the stack: rust and coral low, sandstone, a bone caprock high;
+//   * hard bands are the cliff-formers: cleaner and lighter; soft bands are darker and weathered toward rubble;
+//   * a bedding plane at each band's base and faint laminations inside.
 fn strataColour(s: f32, xz: vec2<f32>) -> vec3<f32> {
     let seed = bitcast<u32>(au.look2.z);
     let band = au.strata.z;
-    // formations: irregular thickness from a slow wobble of the coordinate
-    let fs = (s + 0.6 * band * sin(s / (band * 3.1)) ) / (band * 4.5);
-    let fi = floor(fs);
-    let ff = fs - fi;
-    let h = hash01(i32(fi), 3, seed);
-    let level = clamp(fi * band * 4.5 / max(au.heights.y, 1.0), 0.0, 1.0); // 0 low in the stack .. 1 high
-    var idx = 0u;                                   // sandstone
-    let r = h + (0.5 - level) * 0.5;                // low formations lean rust/coral, high ones bone
-    if (r > 0.62) { idx = 1u; }                     // rust
-    if (r > 0.86) { idx = 3u; }                     // the accent (coral)
-    if (r < 0.22) { idx = 2u; }                     // bone
-    var c = pal(P_STRATA0 + idx);
-    // a soft blend into the next formation over its lowest tenth
-    let hn = hash01(i32(fi) - 1, 3, seed);
-    var idxN = 0u;
-    let rn = hn + (0.5 - level) * 0.5;
-    if (rn > 0.62) { idxN = 1u; }
-    if (rn > 0.86) { idxN = 3u; }
-    if (rn < 0.22) { idxN = 2u; }
-    c = mix(pal(P_STRATA0 + idxN), c, smoothstep(0.0, 0.12, ff));
-    // bands: a value shift per terrace step and a darker bedding plane
     let t = s / band;
     let bi = floor(t);
     let bf = t - bi;
-    c = c * (0.9 + 0.16 * hash01(i32(bi), 5, seed));
-    c = c * mix(0.78, 1.0, smoothstep(0.0, 0.05, bf));
-    // laminations
-    let lam = 0.5 + 0.5 * sin((bf * 6.0 + hash01(i32(bi), 4, seed) * 6.0) * 6.2831);
+    let q = bi * 0.23;
+    let q0 = floor(q);
+    let qf = q - q0;
+    let n = mix(hash01(i32(q0), 3, seed), hash01(i32(q0) + 1, 3, seed), qf * qf * (3.0 - 2.0 * qf));
+    let level = clamp(bi * band / max(au.heights.y, 1.0), 0.0, 1.0); // 0 low in the stack .. 1 high
+    let r = n + (0.5 - level) * 0.55;
+    var idx = 0u;                                   // sandstone
+    if (r > 0.60) { idx = 1u; }                     // rust
+    if (r > 0.88) { idx = 3u; }                     // the accent (coral)
+    if (r < 0.20) { idx = 2u; }                     // bone
+    var c = pal(P_STRATA0 + idx);
+    let hard = bandHardness(bi);
+    c = mix(mix(c, pal(P_DUST), 0.3) * 0.82, c * 1.06, smoothstep(0.35, 0.75, hard));
+    c = c * (0.93 + 0.12 * hash01(i32(bi), 5, seed));
+    c = c * mix(0.62, 1.0, smoothstep(0.0, 0.07, bf)); // bedding plane
+    let lam = 0.5 + 0.5 * sin((bf * 5.0 + hash01(i32(bi), 4, seed) * 6.0) * 6.2831);
     c = c * (0.95 + 0.05 * lam);
     return c;
 }
@@ -354,8 +461,10 @@ fn applyAir(col: vec3<f32>, ro: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
 
 // ---- shading ------------------------------------------------------------------------------------------------------
 
-fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
-    let n0 = normalAt(p.xz, t);
+fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32, onFormation: bool) -> vec3<f32> {
+    // a formation, or terrain within a fillet of one, takes the full scene's normal; open terrain the smooth one
+    let nearForm = onFormation || sdFormations(p) < 30.0;
+    let n0 = select(normalAt(p.xz, t), sceneNormal(p, t), nearForm);
     // bump the cliffs with flutes and the rest with grain, both fading with distance
     let near = 1.0 - smoothstep(300.0, 2500.0, t);
     let tangent = normalize(vec2<f32>(-n0.z, n0.x) + vec2<f32>(1e-4, 0.0));
@@ -368,7 +477,10 @@ fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     let gx = vnoise(p.xz / 1.7 + vec2<f32>(ge, 0.0)) - vnoise(p.xz / 1.7 - vec2<f32>(ge, 0.0));
     let gz = vnoise(p.xz / 1.7 + vec2<f32>(0.0, ge)) - vnoise(p.xz / 1.7 - vec2<f32>(0.0, ge));
     n = normalize(n - vec3<f32>(gx, 0.0, gz) * 0.35 * (1.0 - steepN) * near * au.look.w);
-    let m = masksAt(p.xz);
+    var m = masksAt(p.xz);
+    if (onFormation) {
+        m = vec4<f32>(1.0, 0.0, 0.5, 0.5); // all rock, no playa, neutral cavity
+    }
     let l = au.sun.xyz;
     let slope = 1.0 - n.y; // 0 flat .. 1 vertical
     // albedo: strata on the steep rock, dust on the flats, a pale playa on the valley floor
@@ -395,7 +507,11 @@ fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     // light
     let shadow = softShadow(p + n * 1.5, l);
     let dif = max(dot(n, l), 0.0) * shadow;
-    let cav = clamp(0.35 + 1.3 * (m.b - 0.5) + 0.55, 0.25, 1.0);
+    let cavRaw = clamp(0.35 + 1.3 * (m.b - 0.5) + 0.55, 0.25, 1.0);
+    var cav = mix(cavRaw, 0.85, smoothstep(0.25, 0.55, slope)); // a 2D mask means nothing on a face
+    if (nearForm) {
+        cav = cav * formationAO(p, n);
+    }
     let skyAmb = (0.55 + 0.45 * n.y) * cav;
     let back = clamp(dot(n, normalize(vec3<f32>(-l.x, 0.0, -l.z))), 0.0, 1.0) * cav;
     let bounce = clamp(0.5 - 0.5 * n.y + 0.2, 0.0, 1.0) * cav;
@@ -426,11 +542,12 @@ fn fs_world(in: VsOut) -> WorldOut {
 
     var out: WorldOut;
     let tmax = au.world.z * 1.6;
-    let t = march(ro, rd, tmax);
+    let hit = march(ro, rd, tmax);
+    let t = hit.x;
     var col: vec3<f32>;
     if (t > 0.0) {
         let p = ro + rd * t;
-        col = shade(p, rd, t);
+        col = shade(p, rd, t, hit.y > 0.5);
         col = applyAir(col, ro, rd, t);
         let clip = frame.viewProj * vec4<f32>(p, 1.0);
         out.depth = clamp(clip.z / clip.w, 0.0, 0.999999);

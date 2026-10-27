@@ -128,6 +128,20 @@ std::uint64_t mixHashF(std::uint64_t h, float v) {
     return mixHash(h, bits);
 }
 
+// The strata's band profile (shared, line for line, with world.wgsl's `bandProfile`): the coordinate `s` mapped to the
+// height the rock keeps. Each band is hard or soft by a per-band hash. A hard band (a cliff-former) rises in the last
+// fifth of its thickness and leaves a ledge; a soft band (a slope-former) keeps the slope it was given.
+float bandProfile(float s, float band, std::uint32_t seed) {
+    const float t = s / band;
+    const float i = std::floor(t);
+    const float f = t - i;
+    const float hard = smoothstepf(0.35f, 0.75f, hash01(static_cast<std::int32_t>(i), 7, seed));
+    const float riser = 0.2f;
+    const float gg = std::clamp((f - (1.0f - riser)) / riser, 0.0f, 1.0f);
+    const float step = gg * gg * (3.0f - 2.0f * gg);
+    return (i + f + (step - f) * hard) * band;
+}
+
 // ---- the layout ---------------------------------------------------------------------------------------------------
 
 struct Frame {
@@ -141,6 +155,188 @@ glm::vec2 catmull(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, float 
     const float t2 = t * t, t3 = t2 * t;
     return 0.5f * ((2.0f * p1) + (-p0 + p2) * t + (2.0f * p0 - 5.0f * p1 + 4.0f * p2 - p3) * t2 +
                    (-p0 + 3.0f * p1 - 3.0f * p2 + p3) * t3);
+}
+
+} // namespace
+
+// ---- formations (ADR-1852) -----------------------------------------------------------------------------------------
+
+namespace {
+
+struct ViewProjector {
+    glm::vec3 eye, f, r, u;
+    float tx, ty;
+    explicit ViewProjector(const AttractorWorld& w) : eye(w.eye) {
+        f = glm::normalize(w.target - w.eye);
+        r = glm::normalize(glm::cross(f, glm::vec3(0, 1, 0)));
+        u = glm::cross(r, f);
+        ty = std::tan(0.5f * w.fovDeg * kPi / 180.0f);
+        tx = ty * 16.0f / 9.0f;
+    }
+    // x, y in NDC (-1..1 across the 16:9 frame), z the depth along the view (m)
+    [[nodiscard]] glm::vec3 ndc(glm::vec3 p) const {
+        const glm::vec3 d = p - eye;
+        const float z = glm::dot(d, f);
+        return {glm::dot(d, r) / std::max(z, 1.0f) / tx, glm::dot(d, u) / std::max(z, 1.0f) / ty, z};
+    }
+};
+
+bool visibleFrom(const AttractorWorld& w, glm::vec3 eye, glm::vec3 p) {
+    for (int k = 1; k < 38; ++k) {
+        const glm::vec3 q = eye + (p - eye) * (static_cast<float>(k) / 40.0f);
+        if (w.sample(glm::vec2(q.x, q.z)) > q.y + 2.0f) return false;
+    }
+    return true;
+}
+
+// Puts the attractor over the gorge near the frame's middle, the butte tower out on the bench on one side and the
+// arch fin nearer on the other, each where the camera sees its base. Its own random stream: the formation knobs never
+// move the terrain or the camera.
+void placeFormations(AttractorWorld& w, const AttractorGen& g, float side, const std::vector<float>& rock) {
+    Rng frng(0xf0e7a710ull + g.seed, 0x1234567ull);
+    const ViewProjector view(w);
+    const float S = g.terrainScale;
+    const float fs = g.formationScale;
+    const int N = w.res;
+    const float texel = w.extent / static_cast<float>(N);
+    const auto rockAt = [&](glm::vec2 p) {
+        const glm::ivec2 t = glm::clamp(glm::ivec2(glm::floor((p - w.origin) / texel)), glm::ivec2(0), glm::ivec2(N - 1));
+        return rock[static_cast<std::size_t>(t.y) * N + t.x];
+    };
+    const auto netAt = [&](glm::vec2 p) {
+        const glm::ivec2 t = glm::clamp(glm::ivec2(glm::floor((p - w.origin) / texel)), glm::ivec2(0), glm::ivec2(N - 1));
+        return w.networkArc[static_cast<std::size_t>(t.y) * N + t.x];
+    };
+    const auto gorgeDist = [&](glm::vec2 p) {
+        float best = 1e9f, t = 0.0f;
+        for (std::size_t i = 0; i + 1 < w.gorgeLine.size(); i += 2) {
+            best = std::min(best, segDist(p, w.gorgeLine[i], w.gorgeLine[std::min(i + 2, w.gorgeLine.size() - 1)], t));
+        }
+        return best;
+    };
+    // a bench site: flat ground away from cliffs, gorges and tributaries
+    const auto benchSite = [&](glm::vec2 p, float clear) {
+        for (const glm::vec2 o : {glm::vec2(0), glm::vec2(clear, 0), glm::vec2(-clear, 0), glm::vec2(0, clear), glm::vec2(0, -clear)}) {
+            if (rockAt(p + o) > 0.2f || netAt(p + o) >= 0.0f) return false;
+        }
+        return gorgeDist(p) > clear + 120.0f * S;
+    };
+    // Searches the view for the best site of a formation of `height` whose top should sit near `targetX` in NDC.
+    const auto findSite = [&](float targetX, float zMin, float zMax, float clear, float height, bool onGorge,
+                              glm::vec3& out) {
+        float bestScore = -1e30f;
+        bool found = false;
+        const auto consider = [&](glm::vec2 xz) {
+            if (!onGorge && !benchSite(xz, clear)) return;
+            const glm::vec3 base(xz.x, w.sample(xz), xz.y);
+            const glm::vec3 top = base + glm::vec3(0, height, 0);
+            const glm::vec3 nb = view.ndc(base), nt = view.ndc(top);
+            if (nb.z < zMin || nb.z > zMax || std::abs(nt.x) > 0.85f || nt.y > 0.8f || nb.y < -0.95f) return;
+            if (!visibleFrom(w, w.eye, base + glm::vec3(0, height * 0.25f, 0))) return;
+            const float score = -std::abs(nt.x - targetX) - 0.15f * std::abs(nb.z - 0.5f * (zMin + zMax)) / (zMax - zMin) +
+                                0.02f * frng.nextFloat();
+            if (score > bestScore) {
+                bestScore = score;
+                out = base;
+                found = true;
+            }
+        };
+        if (onGorge) {
+            for (const glm::vec2 p : w.gorgeLine) consider(p);
+        } else {
+            for (float z = zMin; z <= zMax; z += 100.0f) {
+                for (float x = -1.0f; x <= 1.0f; x += 0.04f) {
+                    const glm::vec3 d = view.f + view.r * (x * view.tx);
+                    const glm::vec2 xz = glm::vec2(w.eye.x, w.eye.z) + glm::vec2(d.x, d.z) * z / std::max(glm::length(glm::vec2(view.f.x, view.f.z)), 1e-3f);
+                    consider(xz);
+                }
+            }
+        }
+        return found;
+    };
+
+    // The attractor: over the gorge, near the middle of the frame.
+    const float R = 380.0f * fs * S * (0.6f + 0.4f * g.attractorInfluence);
+    glm::vec3 attractorBase{0.0f};
+    const bool haveAttractor = g.attractorInfluence > 0.0f &&
+                               findSite(-side * 0.08f, 2200.0f * S, 4600.0f * S, 0.0f, 1.2f * R, true, attractorBase);
+    if (haveAttractor) {
+        const auto system = static_cast<AttractorSystem>(g.attractorSystem);
+        const bool thomas = system == AttractorSystem::Thomas;
+        const glm::vec3 start(0.1f + frng.range(0.0f, 1.0f), 0.0f + frng.range(-1.0f, 1.0f), frng.range(0.0f, 0.5f));
+        const float dt = thomas ? 0.05f : 0.01f;
+        const int transient = 4000 + static_cast<int>(frng.nextFloat() * 3000.0f);
+        const int keep = thomas ? 2600 : 2700; // about four turns of the Rossler spiral, with its fold
+        Trajectory tr = integrateAttractor(system, start, dt, transient, keep);
+        if (tr.finite && tr.points.size() > 16) {
+            glm::vec3 lo(1e30f), hi(-1e30f);
+            for (const glm::vec3& q : tr.points) {
+                lo = glm::min(lo, q);
+                hi = glm::max(hi, q);
+            }
+            // Rossler: the spiral lies in (x, y), the fold leaps along z. Stand the spiral up: its x across the
+            // view (turned 35-50 degrees so the loops are seen obliquely), its y vertical, the fold toward or away.
+            const float plane = side * frng.range(0.6f, 0.9f);
+            const glm::vec2 fwd = glm::normalize(glm::vec2(view.f.x, view.f.z));
+            const glm::vec2 rgt(-fwd.y, fwd.x);
+            const glm::vec2 ax = rgt * std::cos(plane) + fwd * std::sin(plane);
+            const glm::vec2 az = -rgt * std::sin(plane) + fwd * std::cos(plane);
+            const glm::vec3 ext = hi - lo;
+            const float scale = 2.0f * R / std::max(thomas ? std::max(ext.x, ext.z) : ext.x, 1e-3f);
+            const float buried = 0.32f;       // the fraction of the spiral below the ground: the loops become arches
+            const float yCut = lo.y + buried * ext.y;
+            const glm::vec3 c = 0.5f * (lo + hi);
+            std::vector<glm::vec3> world;
+            world.reserve(tr.points.size());
+            for (const glm::vec3& q : tr.points) {
+                const float wx = (q.x - c.x) * scale, wy = (q.y - yCut) * scale, wz = (q.z - (thomas ? c.z : lo.z)) * scale * (thomas ? 1.0f : 0.55f);
+                const glm::vec2 xz = glm::vec2(attractorBase.x, attractorBase.z) + ax * wx + az * wz;
+                world.emplace_back(xz.x, attractorBase.y + wy, xz.y);
+            }
+            const std::vector<glm::vec3> rs = resampleByArcLength(world, 640);
+            const float r0 = R * 0.06f;
+            glm::vec3 blo(1e30f), bhi(-1e30f);
+            for (const glm::vec3& q : rs) {
+                const float above = std::clamp((q.y - attractorBase.y) / std::max(R, 1.0f), 0.0f, 1.0f);
+                const float radius = r0 * (1.25f - 0.55f * above);
+                w.tube.points.emplace_back(q, radius);
+                blo = glm::min(blo, q - radius);
+                bhi = glm::max(bhi, q + radius);
+            }
+            const glm::vec3 margin(2.5f * glm::length(bhi - blo) / static_cast<float>(kAttractorVolumeRes));
+            w.tube.boundsMin = blo - margin;
+            w.tube.boundsMax = bhi + margin;
+            bakeTubeVolume(w.tube, kAttractorVolumeRes);
+        }
+    }
+
+    // The recursive landmarks.
+    if ((g.landmarks & 1) != 0) { // the butte tower, out on the bench opposite the escarpment, far
+        AttractorLandmark lm;
+        lm.kind = 0;
+        lm.scale = 150.0f * fs * S;
+        lm.height = 130.0f * fs * S;
+        lm.depth = g.recursiveDepth;
+        lm.angle = frng.range(0.0f, 2.0f * kPi);
+        lm.seed = frng.nextU32();
+        if (findSite(-side * 0.55f, 2600.0f * S, 6000.0f * S, lm.scale * 1.3f, lm.height * 2.8f, false, lm.base)) {
+            w.landmarks.push_back(lm);
+        }
+    }
+    if ((g.landmarks & 2) != 0) { // the nested-arch fin, nearer, on the escarpment's side
+        AttractorLandmark lm;
+        lm.kind = 1;
+        lm.scale = 230.0f * fs * S;
+        lm.height = 170.0f * fs * S;
+        lm.depth = g.recursiveDepth;
+        lm.seed = frng.nextU32();
+        if (findSite(side * 0.5f, 1300.0f * S, 2800.0f * S, lm.scale * 0.6f, lm.height, false, lm.base)) {
+            // the fin runs roughly across the view, so its arches face the camera
+            const glm::vec2 fwd = glm::normalize(glm::vec2(view.f.x, view.f.z));
+            lm.angle = std::atan2(fwd.x, -fwd.y) + frng.range(-0.35f, 0.35f);
+            w.landmarks.push_back(lm);
+        }
+    }
 }
 
 } // namespace
@@ -163,6 +359,15 @@ Result<void> AttractorGen::validate() const {
         return fail("attractorWorld: roughness, ridgeStrength, domainWarp, terraces, erosion and strataFold must be in [0, 1]");
     }
     if (!(terrainScale >= 0.5f && terrainScale <= 1.6f)) return fail("attractorWorld: terrainScale must be in [0.5, 1.6]");
+    if (recursiveDepth < 0 || recursiveDepth > kAttractorMaxRecursion) {
+        return fail("attractorWorld: recursiveDepth must be in [0, {}]", kAttractorMaxRecursion);
+    }
+    if (!(formationScale >= 0.5f && formationScale <= 1.5f)) return fail("attractorWorld: formationScale must be in [0.5, 1.5]");
+    if (!unit(attractorInfluence) || !unit(branchingDensity)) {
+        return fail("attractorWorld: attractorInfluence and branchingDensity must be in [0, 1]");
+    }
+    if (attractorSystem < 0 || attractorSystem > 1) return fail("attractorWorld: attractorSystem must be 0 (Rossler) or 1 (Thomas)");
+    if (landmarks < 0 || landmarks > 3) return fail("attractorWorld: landmarks is a mask in [0, 3]");
     return {};
 }
 
@@ -170,9 +375,13 @@ std::uint64_t AttractorGen::hash() const {
     std::uint64_t h = 1469598103934665603ull;
     h = mixHash(h, seed);
     h = mixHash(h, static_cast<std::uint64_t>(resolution));
-    for (float v : {extent, terrainScale, roughness, ridgeStrength, domainWarp, terraces, erosion, strataFold}) {
+    for (float v : {extent, terrainScale, roughness, ridgeStrength, domainWarp, terraces, erosion, strataFold,
+                    formationScale, attractorInfluence, branchingDensity}) {
         h = mixHashF(h, v);
     }
+    h = mixHash(h, static_cast<std::uint64_t>(recursiveDepth));
+    h = mixHash(h, static_cast<std::uint64_t>(attractorSystem));
+    h = mixHash(h, static_cast<std::uint64_t>(landmarks));
     return h;
 }
 
@@ -283,7 +492,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
 
     // Strata: a tilted, folded stack (shared with the shader, which colours by the same coordinate).
     for (auto& st : w.strataSeed) {
-        st = glm::vec4(rng.range(0.0f, 2.0f * kPi), rng.range(0.03f, 0.09f), rng.range(15.0f, 22.0f) * S,
+        st = glm::vec4(rng.range(0.0f, 2.0f * kPi), rng.range(0.03f, 0.09f), rng.range(19.0f, 27.0f) * S,
                        rng.range(0.0f, 100.0f));
     }
     // [1]: the fold -- x direction angle, y wavelength (m), z amplitude (m) at `strataFold` 1. A wave in the strata
@@ -299,6 +508,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     const float texel = g.extent / static_cast<float>(N);
     w.height.assign(static_cast<std::size_t>(N) * N, 0.0f);
     std::vector<float> rock(static_cast<std::size_t>(N) * N, 0.0f), playa(rock.size(), 0.0f);
+    std::vector<float> strataOffset(rock.size(), 0.0f);
     const float half = 0.5f * g.extent;
     // Pass 1a: the erosion front F and the valley distances, per texel.
     std::vector<float> fieldF(static_cast<std::size_t>(N) * N), trunkD(fieldF.size()), meanderD(fieldF.size());
@@ -365,7 +575,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             const float d1 = metres(0.0f), d2 = metres(tier2);
             const float tier3 = 1.0f + 0.25f * fbm(p / 700.0f, 3, nseed + 35u);
             const float d3 = metres(tier3);
-            const float Wc = 9.0f * S; // half the cliff's horizontal width
+            const float Wc = 20.0f * S; // half the cliff's horizontal width
             const float Wt = 150.0f * S; // the talus apron's reach
             // Height: a sharp cliff over a talus apron, a second tier, stranded buttes on top.
             const float cliff = smoothstepf(-Wc, Wc, d1);
@@ -393,18 +603,16 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             h -= (Lb + 2.0f) * gorge;
             const float wall = smoothstepf(chW * 1.9f, chW * 1.2f, best) * (1.0f - smoothstepf(chW * 1.0f, chW * 0.75f, best));
             r = std::max(r, wall * onBasin);
-            // Terraces: steps cut along the tilted, warped strata coordinate, on the cliffs only.
-            if (g.terraces > 0.0f) {
-                const float warp = (10.0f + 60.0f * g.domainWarp) * fbm(p / 1300.0f, 3, nseed + 3u);
-                const float sc = h + strata.y * glm::dot(p, tiltDir) + warp +
+            // Terraces: steps cut along the tilted, warped, folded strata coordinate, on the cliffs only. The offset
+            // (strata coordinate minus height) is baked for the shader, which cuts the same bands again at
+            // sub-texel scale on the steep faces (world.wgsl, `bandProfile`).
+            const float offset = strata.y * glm::dot(p, tiltDir) +
+                                 (10.0f + 60.0f * g.domainWarp) * fbm(p / 1300.0f, 3, nseed + 3u) +
                                  fold.z * std::sin(glm::dot(p, foldDir) * (2.0f * kPi / fold.y));
-                const float band = strata.z;
-                const float t = sc / band;
-                const float i = std::floor(t);
-                const float f = t - i;
-                const float riser = 0.18f + 0.30f * hash01(static_cast<std::int32_t>(i), 7, nseed);
-                const float gg = std::clamp((f - (1.0f - riser)) / riser, 0.0f, 1.0f);
-                const float T = (i + gg * gg * (3.0f - 2.0f * gg)) * band;
+            strataOffset[idx] = offset;
+            if (g.terraces > 0.0f) {
+                const float sc = h + offset;
+                const float T = bandProfile(sc, strata.z, nseed);
                 const float cliffBand = smoothstepf(-110.0f * S, -12.0f * S, d1) * (1.0f - 0.7f * top);
                 h += (T - sc) * g.terraces * std::max(cliffBand, wall * onBasin);
             }
@@ -414,6 +622,139 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         }
     });
     (void)camXZ;
+
+    // ---- pass 1c: the branching network (ADR-1852) ----
+    // Tributary gorges grown off the inner gorge across the bench: junctions at uneven spacing, mostly alternating
+    // sides, each branch a random walk with a slow turn, tapering, stopping at the cliffs' talus; a second level grows
+    // off the first. They are carved with the gorge's own profile, floors falling to meet the trunk's.
+    w.networkArc.assign(static_cast<std::size_t>(N) * N, -1.0f);
+    {
+        Rng brng(0xb7a9c400ull + g.seed, 0x77aa11ull);
+        const auto meanderWarp = [&](glm::vec2 p) {
+            return 260.0f * S * glm::vec2(fbm(p / 900.0f, 3, nseed + 41u), fbm(p / 900.0f, 3, nseed + 42u));
+        };
+        const auto texelOf = [&](glm::vec2 p) {
+            const glm::ivec2 t = glm::ivec2(glm::floor((p - w.origin) / texel));
+            return glm::clamp(t, glm::ivec2(0), glm::ivec2(N - 1));
+        };
+        const auto rockAt = [&](glm::vec2 p) {
+            const glm::ivec2 t = texelOf(p);
+            return rock[static_cast<std::size_t>(t.y) * N + t.x];
+        };
+        // the gorge's centreline: x with x + warp(x) = q for points q along the trunk (a fixed-point solve)
+        std::vector<glm::vec2> gorge;
+        std::vector<float> gorgeArc;
+        {
+            float arc = 0.0f;
+            for (std::size_t i = 0; i + 1 < w.valley.size(); ++i) {
+                const float len = glm::length(w.valley[i + 1] - w.valley[i]);
+                const int steps = std::max(1, static_cast<int>(len / 40.0f));
+                for (int k = 0; k < steps; ++k) {
+                    const glm::vec2 q = glm::mix(w.valley[i], w.valley[i + 1], static_cast<float>(k) / steps);
+                    glm::vec2 x = q;
+                    for (int it = 0; it < 4; ++it) x = q - meanderWarp(x);
+                    if (!gorge.empty()) arc += glm::length(x - gorge.back());
+                    gorge.push_back(x);
+                    gorgeArc.push_back(arc);
+                }
+            }
+        }
+        w.gorgeLine = gorge;
+        const float totalArc = gorgeArc.empty() ? 0.0f : gorgeArc.back();
+        const auto grow = [&](auto&& self, glm::vec2 start, glm::vec2 dir, float width, float depth, float length,
+                              float startArc, int level) -> void {
+            if (static_cast<int>(w.branches.size()) >= kAttractorMaxBranches) return;
+            NetworkBranch b;
+            b.level = level;
+            b.startArc = startArc;
+            float heading = std::atan2(dir.y, dir.x);
+            const float turn = brng.range(-0.012f, 0.012f); // a slow, steady curl
+            glm::vec2 p = start;
+            const float step = 25.0f * S;
+            const int count = std::max(2, static_cast<int>(length / step));
+            for (int k = 0; k <= count; ++k) {
+                const float frac = static_cast<float>(k) / count;
+                b.points.push_back(p);
+                b.widths.push_back(width * (1.0f - 0.7f * frac));
+                b.depths.push_back(depth * (1.0f - 0.75f * frac));
+                heading += turn + brng.range(-0.16f, 0.16f);
+                p += step * glm::vec2(std::cos(heading), std::sin(heading));
+                if (k > 3 && (rockAt(p) > 0.35f || std::max(std::abs(p.x), std::abs(p.y)) > 0.8f * half)) break;
+            }
+            if (b.points.size() < 4) return;
+            w.branches.push_back(b);
+            const NetworkBranch made = w.branches.back();
+            if (level == 1 && g.branchingDensity > 0.25f) {
+                const int kids = 1 + (brng.nextFloat() < g.branchingDensity ? 1 : 0);
+                for (int c = 0; c < kids; ++c) {
+                    const std::size_t at = static_cast<std::size_t>(made.points.size() * brng.range(0.25f, 0.7f));
+                    if (at + 1 >= made.points.size()) continue;
+                    const glm::vec2 t = glm::normalize(made.points[at + 1] - made.points[at]);
+                    const float a = (brng.nextFloat() < 0.5f ? -1.0f : 1.0f) * brng.range(0.5f, 1.05f);
+                    const glm::vec2 d(t.x * std::cos(a) - t.y * std::sin(a), t.x * std::sin(a) + t.y * std::cos(a));
+                    self(self, made.points[at], d, made.widths[at] * 0.6f, made.depths[at] * 0.7f,
+                         length * brng.range(0.35f, 0.6f), startArc + at * step, 2);
+                }
+            }
+        };
+        if (g.branchingDensity > 0.0f && gorge.size() > 8) {
+            float arc = brng.range(250.0f, 550.0f) * S;
+            float lastSide = brng.nextFloat() < 0.5f ? -1.0f : 1.0f;
+            std::size_t gi = 0;
+            while (arc < totalArc - 300.0f) {
+                while (gi + 1 < gorge.size() && gorgeArc[gi] < arc) ++gi;
+                if (gi + 1 >= gorge.size()) break;
+                const glm::vec2 tangent = glm::normalize(gorge[gi + 1] - gorge[gi]);
+                const float sideSign = brng.nextFloat() < 0.7f ? -lastSide : lastSide;
+                lastSide = sideSign;
+                // pointing back toward the near end: tributaries join downstream, so they lean upstream
+                const float a = sideSign * brng.range(0.65f, 1.25f);
+                const glm::vec2 back = -tangent;
+                const glm::vec2 d(back.x * std::cos(a) - back.y * std::sin(a), back.x * std::sin(a) + back.y * std::cos(a));
+                const float vpos = std::max(0.0f, glm::dot(gorge[gi] - fr.origin, fr.fwd));
+                const float chW = (55.0f + 0.010f * vpos) * S;
+                grow(grow, gorge[gi], d, chW * brng.range(0.45f, 0.7f), Lb + 2.0f, brng.range(500.0f, 1400.0f) * S, arc, 1);
+                arc += brng.range(380.0f, 900.0f) * S / (0.35f + g.branchingDensity);
+            }
+        }
+        // carve: splat each segment into a per-texel carve depth (the deepest wins) and the network distance
+        std::vector<float> carve(static_cast<std::size_t>(N) * N, 0.0f);
+        for (const NetworkBranch& b : w.branches) {
+            float along = b.startArc;
+            for (std::size_t k = 0; k + 1 < b.points.size(); ++k) {
+                const glm::vec2 a = b.points[k], c = b.points[k + 1];
+                const float wmax = std::max(b.widths[k], b.widths[k + 1]) * 1.6f;
+                const glm::ivec2 lo = texelOf(glm::min(a, c) - wmax), hi = texelOf(glm::max(a, c) + wmax);
+                const float segLen = glm::length(c - a);
+                for (int y = lo.y; y <= hi.y; ++y) {
+                    for (int x = lo.x; x <= hi.x; ++x) {
+                        const glm::vec2 p = w.origin + (glm::vec2(x, y) + 0.5f) * texel;
+                        float t = 0.0f;
+                        const float d = segDist(p, a, c, t);
+                        const float wd = glm::mix(b.widths[k], b.widths[k + 1], t);
+                        const float dp = glm::mix(b.depths[k], b.depths[k + 1], t);
+                        const std::size_t idx = static_cast<std::size_t>(y) * N + x;
+                        const float bench = 1.0f - smoothstepf(0.25f, 0.5f, rock[idx]);
+                        const float cut = dp * smoothstepf(wd * 1.4f, wd * 0.8f, d) * bench;
+                        if (cut > carve[idx]) carve[idx] = cut;
+                        if (d < wd * 0.7f && bench > 0.5f) {
+                            const float arcHere = along + t * segLen;
+                            float& na = w.networkArc[idx];
+                            na = na < 0.0f ? arcHere : std::min(na, arcHere);
+                            playa[idx] = std::max(playa[idx], smoothstepf(wd * 0.7f, wd * 0.4f, d));
+                        }
+                        const float wallMask = smoothstepf(wd * 1.8f, wd * 1.15f, d) * (1.0f - smoothstepf(wd * 0.95f, wd * 0.7f, d));
+                        rock[idx] = std::max(rock[idx], wallMask * bench * 0.8f);
+                    }
+                }
+                along += segLen;
+            }
+        }
+        for (std::size_t i = 0; i < carve.size(); ++i) {
+            // never below the gorge's own floor (-2 m), where a tributary meets the trunk it has already been cut
+            w.height[i] = std::max(w.height[i] - carve[i], std::min(w.height[i], -2.0f));
+        }
+    }
 
     // ---- pass 2: erosion gullies on the steep faces ----
     // A filter in the spirit of runevision's "Fast and Gorgeous Erosion Filter" (2026): stripes that run downhill,
@@ -442,7 +783,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                 float offset = 0.0f;
                 float period = 150.0f * S;
                 float amp = 9.0f * S;
-                for (int o = 0; o < 3; ++o) {
+                for (int o = 0; o < 3 && period >= 7.0f * texel; ++o) { // no gully narrower than 7 texels
                     const float cell = period * 1.6f;
                     const glm::vec2 cp = p / cell;
                     const int cx = static_cast<int>(std::floor(cp.x)), cy = static_cast<int>(std::floor(cp.y));
@@ -499,6 +840,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             }
         });
     }
+    w.strataOffset = std::move(strataOffset);
     w.masks.assign(w.height.size(), 0u);
     float lo = 1e30f, hi = -1e30f;
     for (std::size_t i = 0; i < w.height.size(); ++i) {
@@ -568,6 +910,9 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         w.viewAzimuth = std::atan2(dirXZ.x, dirXZ.y);
     }
 
+    // ---- formations (ADR-1852): placed in the composed view, after the camera ----
+    placeFormations(w, g, side, rock);
+
     w.generateSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     ++gGenerations;
     return world;
@@ -589,7 +934,9 @@ std::uint64_t attractorWorldGenerations() noexcept { return gGenerations.load();
 namespace {
 
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
-                                      "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold", "look"};
+                                      "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
+                                      "recursiveDepth", "formationScale", "attractorInfluence", "attractorSystem",
+                                      "branchingDensity", "landmarks", "look"};
 constexpr std::string_view kLookKeys[] = {"palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
                                           "atmosphere", "strata", "exposure", "detail"};
 
@@ -616,6 +963,12 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.terraces = j.value("terraces", g.terraces);
     g.erosion = j.value("erosion", g.erosion);
     g.strataFold = j.value("strataFold", g.strataFold);
+    g.recursiveDepth = j.value("recursiveDepth", g.recursiveDepth);
+    g.formationScale = j.value("formationScale", g.formationScale);
+    g.attractorInfluence = j.value("attractorInfluence", g.attractorInfluence);
+    g.attractorSystem = j.value("attractorSystem", g.attractorSystem);
+    g.branchingDensity = j.value("branchingDensity", g.branchingDensity);
+    g.landmarks = j.value("landmarks", g.landmarks);
     if (auto ok = g.validate(); !ok) return std::unexpected(ok.error());
     if (j.contains("look")) {
         const json& l = j.at("look");
@@ -659,6 +1012,12 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"terraces", g.terraces},
                 {"erosion", g.erosion},
                 {"strataFold", g.strataFold},
+                {"recursiveDepth", g.recursiveDepth},
+                {"formationScale", g.formationScale},
+                {"attractorInfluence", g.attractorInfluence},
+                {"attractorSystem", g.attractorSystem},
+                {"branchingDensity", g.branchingDensity},
+                {"landmarks", g.landmarks},
                 {"look",
                  {{"palette", k.palette}, {"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation},
                   {"sunIntensity", k.sunIntensity}, {"ambient", k.ambient}, {"atmosphere", k.atmosphere},
@@ -735,6 +1094,13 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("terraces", "strata terraces", "World Generation", g.terraces, 0.0f, 1.0f);
     r.f("erosion", "erosion gullies", "World Generation", g.erosion, 0.0f, 1.0f);
     r.f("strataFold", "strata fold", "World Generation", g.strataFold, 0.0f, 1.0f);
+    // Geometry (structural)
+    r.i("recursiveDepth", "recursive depth", "Geometry", g.recursiveDepth, 0, kAttractorMaxRecursion);
+    r.f("formationScale", "formation scale", "Geometry", g.formationScale, 0.5f, 1.5f);
+    r.f("attractorInfluence", "attractor influence", "Geometry", g.attractorInfluence, 0.0f, 1.0f);
+    r.i("attractorSystem", "attractor system (0 Rossler, 1 Thomas)", "Geometry", g.attractorSystem, 0, 1);
+    r.f("branchingDensity", "branching density", "Geometry", g.branchingDensity, 0.0f, 1.0f);
+    r.i("landmarks", "landmarks (1 tower, 2 arch fin, 3 both)", "Geometry", g.landmarks, 0, 3);
     // Materials and atmosphere (continuous).
     r.f("palette", "palette (0 Dusk Mineral, 1 Nocturne, 2 Chromatic)", "Materials and Atmosphere", k.palette, 0.0f,
         2.0f);
@@ -762,6 +1128,12 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     g.terraces = fval(p, "terraces", g.terraces);
     g.erosion = fval(p, "erosion", g.erosion);
     g.strataFold = fval(p, "strataFold", g.strataFold);
+    g.recursiveDepth = ival(p, "recursiveDepth", g.recursiveDepth);
+    g.formationScale = fval(p, "formationScale", g.formationScale);
+    g.attractorInfluence = fval(p, "attractorInfluence", g.attractorInfluence);
+    g.attractorSystem = ival(p, "attractorSystem", g.attractorSystem);
+    g.branchingDensity = fval(p, "branchingDensity", g.branchingDensity);
+    g.landmarks = ival(p, "landmarks", g.landmarks);
     live.liveGen = g;
     AttractorLook k = rest.look;
     k.palette = fval(p, "palette", k.palette);
