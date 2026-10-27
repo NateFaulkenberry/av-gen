@@ -289,7 +289,9 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     turn = smoothSamples(turn, 0.8f * rate);
     w.flight.resize(path.size());
     for (std::size_t i = 0; i < path.size(); ++i) {
-        const float roll = std::clamp(-1.6f * turn[i], -0.2f, 0.2f) * phase(static_cast<float>(i) / rate, 0.1f, 0.25f);
+        const float ti = static_cast<float>(i) / rate;
+        // banking on the river only: none in the vista, and none over the reveal, where a tilted horizon distracts
+        const float roll = std::clamp(-1.6f * turn[i], -0.2f, 0.2f) * phase(ti, 0.1f, 0.25f) * (1.0f - phase(ti, 0.66f, 0.78f));
         w.flight[i] = glm::vec4(path[i].x, ys[i], path[i].z, roll);
     }
 }
@@ -926,8 +928,8 @@ AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCamera
     if (mode != AttractorCameraMode::Flight || world.flight.size() < 2) {
         return pose;
     }
-    // Linear between the 30 Hz samples (the path itself is already smooth); the aim looks a second and a half ahead
-    // along the path, a little below it.
+    // Linear between the 30 Hz samples (the path itself is already smooth); the aim looks two and a half seconds ahead
+    // along the path, a little below it, its pitch held between -28 and +8 degrees (a dive looks out, not at the rock).
     const auto n = static_cast<int>(world.flight.size());
     const auto at = [&](double t) {
         const double f = std::clamp(t * AttractorWorld::kFlightRate, 0.0, static_cast<double>(n - 1));
@@ -936,14 +938,19 @@ AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCamera
         return glm::mix(world.flight[static_cast<std::size_t>(i)], world.flight[static_cast<std::size_t>(i) + 1], a);
     };
     const glm::vec4 e = at(seconds);
-    glm::vec3 ahead = glm::vec3(at(seconds + 1.5));
+    glm::vec3 ahead = glm::vec3(at(seconds + 2.5));
     const glm::vec3 eye(e);
-    if (glm::length(ahead - eye) < 1.0f) { // at the very end the path stops: keep looking the way it was going
-        const glm::vec3 back(at(seconds - 1.5));
+    if (glm::length(glm::vec2(ahead.x - eye.x, ahead.z - eye.z)) < 1.0f) { // the path has stopped: keep its heading
+        const glm::vec3 back(at(seconds - 2.5));
         ahead = eye + (eye - back);
     }
+    glm::vec3 d = ahead - eye;
+    d.y -= 0.12f * glm::length(d);
+    const float flat = std::max(glm::length(glm::vec2(d.x, d.z)), 1e-3f);
+    const float pitch = std::clamp(std::atan2(d.y, flat), glm::radians(-28.0f), glm::radians(8.0f));
+    const glm::vec2 h = glm::vec2(d.x, d.z) / flat;
     pose.eye = eye;
-    pose.target = ahead - glm::vec3(0.0f, 0.18f * glm::length(ahead - eye), 0.0f);
+    pose.target = eye + 500.0f * glm::vec3(h.x * std::cos(pitch), std::sin(pitch), h.y * std::cos(pitch));
     pose.rollDegrees = glm::degrees(e.w);
     return pose;
 }

@@ -1198,10 +1198,13 @@ void Composition::applyAstralCamera(float& fovDegrees) {
 void Composition::setAttractorWorld(AttractorWorldBlock block) {
     attractorWorld_ = std::move(block);
     if (attractorWorld_.enabled && (!attractorWorld_.world || attractorWorld_.world->hash != attractorWorld_.gen.hash())) {
+        const std::uint64_t before = attractorWorldGenerations();
         attractorWorld_.world = acquireAttractorWorld(attractorWorld_.gen);
-        log::info("attractorWorld: seed {} generated in {:.2f} s ({}^2, height {:.0f}..{:.0f} m)", attractorWorld_.gen.seed,
-                  attractorWorld_.world->generateSeconds, attractorWorld_.world->res, attractorWorld_.world->minHeight,
-                  attractorWorld_.world->maxHeight);
+        if (attractorWorldGenerations() != before) { // a cache hit generated nothing: say nothing
+            log::info("attractorWorld: seed {} generated in {:.2f} s ({}^2, height {:.0f}..{:.0f} m)", attractorWorld_.gen.seed,
+                      attractorWorld_.world->generateSeconds, attractorWorld_.world->res, attractorWorld_.world->minHeight,
+                      attractorWorld_.world->maxHeight);
+        }
     }
     if (params_ != nullptr) { // attached already: register its knobs now
         if (attractorParams_) {

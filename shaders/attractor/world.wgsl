@@ -235,7 +235,8 @@ fn masksAt(xz: vec2<f32>) -> vec4<f32> {
 //     sideways by only (height / slope), so the relief grows with the slope to keep its depth.
 // Faded out with distance.
 fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
-    let fade = 1.0 - smoothstep(500.0, 1800.0, dist);
+    // metre-scale relief is sub-pixel beyond a kilometre and only aliases (a woven grid on the faces): fade it out
+    let fade = 1.0 - smoothstep(300.0, 1100.0, dist);
     if (fade <= 0.0 || au.look.w <= 0.0) {
         return 0.0;
     }
@@ -244,9 +245,9 @@ fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
     let steep = smoothstep(0.6, 1.6, slope);
     // flats
     let b1 = vnoise(xz / 7.0);
-    let blocks = (floor(b1 * 5.0) + smoothstep(0.75, 1.0, fract(b1 * 5.0))) / 5.0;
+    let blocks = (floor(b1 * 5.0) + smoothstep(0.35, 1.0, fract(b1 * 5.0))) / 5.0; // soft risers: sharp ones self-shadow into specks
     let b2 = vnoise(kOct * xz / 2.6 + vec2<f32>(7.3, 1.1));
-    let chips = (floor(b2 * 4.0) + smoothstep(0.7, 1.0, fract(b2 * 4.0))) / 4.0;
+    let chips = (floor(b2 * 4.0) + smoothstep(0.3, 1.0, fract(b2 * 4.0))) / 4.0;
     let flat = 1.4 * blocks + 0.6 * chips - 1.0;
     // faces: (along, up) on the face
     var face = 0.0;
@@ -254,13 +255,15 @@ fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
         let dir = fd.zw / max(slope, 1e-4);
         let along = dot(xz, vec2<f32>(-dir.y, dir.x));
         let up = fd.x + fd.y; // the strata coordinate: height on the face
-        let bedH = 5.5;
-        let bed = fract(up / bedH);
-        let beds = smoothstep(0.0, 0.3, bed) * smoothstep(1.0, 0.7, bed);         // soft recessed bedding planes
-        let joint = vnoise(vec2<f32>(along / 14.0, floor(up / bedH) * 1.37));      // blocks: each bed jointed afresh
-        let blocky = smoothstep(0.3, 0.7, joint);
-        let skin = vnoise(vec2<f32>(along / 4.0, up / 2.5));                       // a weathered skin, broad not gritty
-        face = 0.45 * beds + 0.6 * blocky + 0.2 * skin - 0.6;
+        // beds of uneven thickness (the coordinate is wobbled before it is cut), recessed softly at their partings;
+        // sparse broad joints, so the face reads as rock rather than brickwork; a broad weathering skin
+        let bu = up / 6.0 + 0.45 * vnoise(vec2<f32>(along / 60.0, up / 19.0));
+        let bed = fract(bu);
+        let beds = smoothstep(0.0, 0.35, bed) * smoothstep(1.0, 0.75, bed);
+        let joint = vnoise(vec2<f32>(along / 32.0, floor(bu) * 1.37));
+        let blocky = smoothstep(0.55, 0.8, joint);
+        let skin = vnoise(vec2<f32>(along / 11.0, up / 7.0));
+        face = 0.5 * beds + 0.3 * blocky + 0.25 * skin - 0.55;
     }
     let relief = mix(flat, face, steep);
     let onRock = 0.25 + 0.75 * m.r;
@@ -530,7 +533,7 @@ fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     let skyAmb = (0.55 + 0.45 * n.y) * cav;
     let back = clamp(dot(n, normalize(vec3<f32>(-l.x, 0.0, -l.z))), 0.0, 1.0) * cav;
     let bounce = clamp(0.5 - 0.5 * n.y + 0.2, 0.0, 1.0) * cav;
-    var light = pal(P_SUN) * 5.0 * au.sun.w * dif;
+    var light = pal(P_SUN) * 4.6 * au.sun.w * dif;
     light = light + pal(P_AMBIENT) * 0.32 * au.look2.x * skyAmb;
     light = light + pal(P_BELT) * 0.18 * au.look2.x * back;
     light = light + pal(P_BOUNCE) * 0.22 * au.look2.x * bounce * (0.4 + 0.6 * shadow);
