@@ -14,7 +14,6 @@
 
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
-#include "scene/attractor_formations.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -39,13 +38,8 @@ struct AttractorGen {
     float terraces = 0.6f;       // the strata's steps cut into the masses (0..1)
     float erosion = 0.5f;        // gullies on the steep faces (0..1)
     float strataFold = 0.7f;     // an impossible anticline wave through the strata and their terraces (0..1)
-    // Formations (ADR-1852)
-    int recursiveDepth = 3;      // landmark recursion levels after the first (0..kAttractorMaxRecursion)
-    float formationScale = 1.0f; // size of the landmarks and the attractor (0.5..1.5)
-    float attractorInfluence = 1.0f; // 0 none .. 1 the full ribbon (its size and presence)
-    int attractorSystem = 0;     // 0 Rossler, 1 Thomas
-    float branchingDensity = 0.6f; // tributary gorges (0 none .. 1 many)
-    int landmarks = 3;           // bitmask: 1 the butte tower, 2 the nested-arch fin
+    float branchingDensity = 0.6f; // side canyons off the gorge (0 none .. 1 many)
+    float flightSeconds = 54.0f;   // the flythrough's length (20..120 s)
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;
@@ -62,8 +56,21 @@ struct AttractorLook {
     float strata = 1.0f;          // visibility of the strata bands
     float exposure = 1.0f;
     float detail = 1.0f;          // near-field displacement detail
-    float drift = 0.5f;           // the composed camera's slow drift (0 still .. 1 the widest, slowest arc)
 };
+
+inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines
+
+// One side canyon of the branching network (ADR-1852): a polyline grown off the gorge.
+struct NetworkBranch {
+    std::vector<glm::vec2> points; // world xz, from the junction outward
+    std::vector<float> widths;     // metres, per point (tapering)
+    std::vector<float> depths;     // the floor's height (m), per point: rising from the gorge's floor to the plateau
+    float startArc = 0.0f;         // network distance (m) from the trunk's near end to this branch's junction
+    int level = 1;                 // 1 a branch of the gorge, 2 a branch of a branch
+};
+
+// The camera the block drives (`attractorWorld/camera`).
+enum class AttractorCameraMode : int { Scene = 0, Composed = 1, Flight = 2 };
 
 struct AttractorMass {
     glm::vec2 centre{0.0f};
@@ -86,9 +93,7 @@ struct AttractorWorld {
     float minHeight = 0.0f;
     float maxHeight = 0.0f;
     std::vector<AttractorMass> masses;
-    std::vector<AttractorLandmark> landmarks; // the recursive formations (ADR-1852)
-    AttractorTube tube;                       // the attractor's stone ribbon (empty at influence 0)
-    std::vector<NetworkBranch> branches;      // the tributary gorges
+    std::vector<NetworkBranch> branches;      // the side canyons
     std::vector<float> networkArc;            // res*res: network distance (m) along the gorges, or -1 off them
     std::vector<glm::vec2> valley;     // the valley's trunk, near to far (world xz)
     std::vector<glm::vec2> gorgeLine;  // the inner gorge's centreline, near to far (world xz)
@@ -96,6 +101,10 @@ struct AttractorWorld {
     glm::vec3 eye{0.0f};
     glm::vec3 target{0.0f};
     float fovDeg = 40.0f;
+    // ADR-1853: the flythrough, sampled at kFlightRate: xyz the eye, w the bank (radians). Precomputed with the
+    // world, so a frame's pose is a pure function of its second.
+    std::vector<glm::vec4> flight;
+    static constexpr float kFlightRate = 30.0f;
     float viewAzimuth = 0.0f;          // radians: atan2 of the view direction's (x, z)
     std::uint32_t noiseSeed = 0;       // the noise seed (the shader's strata use the same one)
     float sunSide = 1.0f;              // +1 the sun stands to the view's right, -1 to its left
@@ -113,14 +122,14 @@ struct AttractorWorld {
 
 struct AttractorWorldBlock {
     bool enabled = false;
-    bool driveCamera = true; // the generated composition places the scene's camera
+    AttractorCameraMode camera = AttractorCameraMode::Composed; // which camera the block drives
     AttractorGen gen;        // rest values of the structural parameters
     AttractorLook look;      // rest values of the look parameters
     // ---- this frame (written by the Composition) ----
     std::shared_ptr<const AttractorWorld> world;
     AttractorGen liveGen;
     AttractorLook live;
-    float cameraDrive = 1.0f;
+    int cameraMode = 1;      // `attractorWorld/camera` final (an AttractorCameraMode)
     [[nodiscard]] bool active() const { return enabled && world != nullptr; }
 };
 
@@ -134,14 +143,15 @@ struct AttractorWorldParameters {
 [[nodiscard]] AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& params,
                                                                         const AttractorWorldBlock& rest,
                                                                         const std::string& prefix);
-// The composed camera at `seconds`: the generated eye and target, drifting on a slow lateral arc with a little dolly
-// (`look.drift`). A pure function of time, so it is frame-rate independent and seekable.
+// The camera at `seconds` for `mode`: the composed vista (still), or the flythrough (ADR-1853), held at its last pose
+// after its end. A pure function of time, so it is frame-rate independent and seekable.
 struct AttractorCameraPose {
     glm::vec3 eye{0.0f};
     glm::vec3 target{0.0f};
+    float rollDegrees = 0.0f;
 };
-[[nodiscard]] AttractorCameraPose attractorCamera(const AttractorWorld& world, float drift, double seconds);
-// The finals into `live.liveGen`, `live.live` and `live.cameraDrive`.
+[[nodiscard]] AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCameraMode mode, double seconds);
+// The finals into `live.liveGen`, `live.live` and `live.cameraMode`.
 void applyAttractorWorldParameters(const AttractorWorldParameters& p, const AttractorWorldBlock& rest,
                                    AttractorWorldBlock& live);
 

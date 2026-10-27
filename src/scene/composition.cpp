@@ -1227,12 +1227,12 @@ void Composition::updateAttractorWorld() {
         return;
     }
     live.enabled = true;
-    live.driveCamera = attractorWorld_.driveCamera;
+    live.camera = attractorWorld_.camera;
     live.gen = attractorWorld_.gen;
     live.look = attractorWorld_.look;
     live.liveGen = attractorWorld_.gen;
     live.live = attractorWorld_.look;
-    live.cameraDrive = attractorWorld_.driveCamera ? 1.0f : 0.0f;
+    live.cameraMode = static_cast<int>(attractorWorld_.camera);
     if (attractorParams_) {
         applyAttractorWorldParameters(*attractorParams_, attractorWorld_, live);
     }
@@ -1272,15 +1272,18 @@ void Composition::updateAttractorWorld() {
 }
 
 void Composition::applyAttractorCamera(float& fovDegrees) {
+    attractorRollDegrees_ = 0.0f;
     const AttractorWorldBlock& a = scene_.attractorWorld;
-    if (!a.active() || a.cameraDrive < 0.5f) {
+    const auto mode = static_cast<AttractorCameraMode>(a.cameraMode);
+    if (!a.active() || mode == AttractorCameraMode::Scene) {
         return;
     }
-    const AttractorCameraPose pose = attractorCamera(*a.world, a.live.drift, currentTime_);
+    const AttractorCameraPose pose = attractorCamera(*a.world, mode, currentTime_);
     scene_.camera.position = pose.eye;
     scene_.camera.target = pose.target;
     scene_.camera.farPlane = std::max(scene_.camera.farPlane, a.world->extent * 2.0f);
-    fovDegrees = a.world->fovDeg;
+    fovDegrees = mode == AttractorCameraMode::Flight ? 44.0f : a.world->fovDeg; // the flight wants a wider lens
+    attractorRollDegrees_ = pose.rollDegrees; // composed with camera/roll below
 }
 
 Result<void> Composition::addGrid(spatial::GridField grid) {
@@ -9369,6 +9372,7 @@ void Composition::applyParameters() {
     {
         float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
         roll += splineBankDegrees(); // ADR-1166
+        roll += attractorRollDegrees_; // ADR-1853: the flythrough banks through the bends
         glm::vec3 up = splineCameraUp(); // ADR-1541: the world's up unless the spline's frame is asked for
         const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
         if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {

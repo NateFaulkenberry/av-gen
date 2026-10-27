@@ -109,15 +109,17 @@ TEST_CASE("the generated world is finite, bounded and framed", "[attractor-world
         CHECK(w->fovDeg < 60.0f);
         CHECK(w->masses.size() == 3u);
         CHECK(w->valley.size() > 16u);
+        CHECK_FALSE(w->branches.empty());
+        CHECK(w->branches.size() <= static_cast<std::size_t>(scene::kAttractorMaxBranches));
     }
 }
 
 TEST_CASE("the block parses, round-trips and refuses what it does not know", "[attractor-world][adr1850]") {
     auto a = scene::attractorWorldFromJson(nlohmann::json::parse(
-        R"({"seed": 9, "resolution": 512, "strataFold": 0.3, "camera": false, "look": {"palette": 1.5, "exposure": 0.8}})"));
+        R"({"seed": 9, "resolution": 512, "strataFold": 0.3, "camera": "flight", "look": {"palette": 1.5, "exposure": 0.8}})"));
     REQUIRE(a.has_value());
     CHECK(a->enabled);
-    CHECK_FALSE(a->driveCamera);
+    CHECK(a->camera == scene::AttractorCameraMode::Flight);
     CHECK(a->gen.seed == 9u);
     CHECK(a->gen.resolution == 512);
     CHECK(a->gen.strataFold == Approx(0.3f));
@@ -132,14 +134,14 @@ TEST_CASE("the block parses, round-trips and refuses what it does not know", "[a
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"resolution": 100000})")).has_value());
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"erosion": 3})")).has_value());
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"terrainScale": "big"})")).has_value());
+    CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"camera": "drone"})")).has_value());
 }
 
 TEST_CASE("a seed change regenerates the world in place; a look change never does", "[attractor-world][adr1850]") {
-    Comp c(sceneWith({{"seed", 4}, {"resolution", 384}, {"look", {{"drift", 0.0}}}}));
+    Comp c(sceneWith({{"seed", 4}, {"resolution", 384}}));
     for (const char* leaf : {"seed", "terrainScale", "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion",
                              "strataFold", "palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
-                             "atmosphere", "strata", "exposure", "detail", "drift", "camera", "recursiveDepth",
-                             "formationScale", "attractorInfluence", "attractorSystem", "branchingDensity", "landmarks"}) {
+                             "atmosphere", "strata", "exposure", "detail", "camera", "branchingDensity", "flightSeconds"}) {
         INFO(leaf);
         CHECK(c.params.find(std::string("attractorWorld/") + leaf) != nullptr);
     }
@@ -173,7 +175,7 @@ TEST_CASE("a seed change regenerates the world in place; a look change never doe
     CHECK(glm::length(c.comp->scene().camera.position - second->eye) < 1e-3f);
 
     // the camera hands back to the scene's own
-    c.params.findAs<float>("attractorWorld/camera")->setBase(0.0f);
+    c.params.findAs<int>("attractorWorld/camera")->setBase(0);
     c.frame(4.0 / 30.0);
     CHECK(glm::length(c.comp->scene().camera.position - glm::vec3(0, 50, 300)) < 1e-3f);
 
@@ -207,104 +209,50 @@ TEST_CASE("in the live editor a seed change generates on a worker and the old wo
     CHECK(now->height == scene::generateAttractorWorld(now->gen)->height);
 }
 
-// ---- formations (ADR-1852) --------------------------------------------------------------------------------------
+// ---- the flythrough (ADR-1853) ------------------------------------------------------------------------------------
 
-TEST_CASE("the attractors integrate finitely, and a diverging start stops instead of overflowing", "[attractor-world][adr1852]") {
-    for (auto sys : {scene::AttractorSystem::Rossler, scene::AttractorSystem::Thomas}) {
-        const scene::Trajectory t = scene::integrateAttractor(sys, glm::vec3(0.1f, 0.0f, 0.0f), 0.01f, 3000, 3000);
-        CHECK(t.finite);
-        REQUIRE(t.points.size() == 3000u);
-        glm::vec3 lo(1e30f), hi(-1e30f);
-        for (const glm::vec3& p : t.points) {
-            lo = glm::min(lo, p);
-            hi = glm::max(hi, p);
+TEST_CASE("the flythrough is deterministic, smooth, inside the world and never touches the rock", "[attractor-world][adr1853]") {
+    for (std::uint32_t seed : {1u, 2u, 5u}) {
+        INFO("seed " << seed);
+        scene::AttractorGen g;
+        g.seed = seed;
+        g.resolution = 1024;
+        const auto w = scene::generateAttractorWorld(g);
+        REQUIRE(w->flight.size() == static_cast<std::size_t>(g.flightSeconds * scene::AttractorWorld::kFlightRate) + 1);
+        CHECK(w->flight == scene::generateAttractorWorld(g)->flight);
+        float maxStep = 0.0f, maxRoll = 0.0f, minClear = 1e9f, lowest = 1e9f;
+        for (std::size_t i = 0; i < w->flight.size(); ++i) {
+            const glm::vec4 f = w->flight[i];
+            REQUIRE(std::isfinite(f.x + f.y + f.z + f.w));
+            CHECK(std::abs(f.x) < 0.75f * w->extent * 0.5f); // deep inside the square: no edge to see
+            CHECK(std::abs(f.z) < 0.75f * w->extent * 0.5f);
+            // clear of everything within 20 m around it
+            float ground = w->sample(glm::vec2(f.x, f.z));
+            for (int a = 0; a < 8; ++a) {
+                const float ang = static_cast<float>(a) * 0.785398f;
+                ground = std::max(ground, w->sample(glm::vec2(f.x, f.z) + 20.0f * glm::vec2(std::cos(ang), std::sin(ang))));
+            }
+            minClear = std::min(minClear, f.y - ground);
+            lowest = std::min(lowest, f.y - w->sample(glm::vec2(f.x, f.z)));
+            maxRoll = std::max(maxRoll, std::abs(f.w));
+            if (i > 0) {
+                const float st = glm::length(glm::vec3(f) - glm::vec3(w->flight[i - 1]));
+                maxStep = std::max(maxStep, st);
+            }
         }
-        CHECK(glm::length(hi - lo) > 2.0f);   // a strange attractor, not a fixed point
-        CHECK(glm::length(hi - lo) < 100.0f); // and bounded
+        CHECK(minClear > 10.0f);
+        CHECK(lowest < 70.0f);      // it really goes down into the gorge
+        CHECK(maxStep < 120.0f / 30.0f); // under 120 m/s
+        CHECK(maxRoll <= 0.2f + 1e-4f);
+        // the pose: starts at the composed vista, looks ahead, and holds after the end
+        const auto p0 = scene::attractorCamera(*w, scene::AttractorCameraMode::Flight, 0.0);
+        CHECK(glm::length(p0.eye - w->eye) < 1.0f);
+        const auto pm = scene::attractorCamera(*w, scene::AttractorCameraMode::Flight, 25.0);
+        CHECK(glm::length(pm.target - pm.eye) > 20.0f);
+        const auto pe = scene::attractorCamera(*w, scene::AttractorCameraMode::Flight, 1000.0);
+        CHECK(glm::length(pe.eye - glm::vec3(w->flight.back())) < 1e-3f);
+        // the composed mode is the still vista
+        const auto pc = scene::attractorCamera(*w, scene::AttractorCameraMode::Composed, 25.0);
+        CHECK(pc.eye == w->eye);
     }
-    // Rossler from a far-off state diverges: the integrator says so and keeps nothing non-finite
-    const scene::Trajectory bad = scene::integrateAttractor(scene::AttractorSystem::Rossler, glm::vec3(1e3f, 0, 1), 0.05f, 100, 100);
-    CHECK_FALSE(bad.finite);
-    for (const glm::vec3& p : bad.points) {
-        CHECK(std::isfinite(p.x + p.y + p.z));
-    }
-}
-
-TEST_CASE("arc-length resampling gives equal segments within the budget", "[attractor-world][adr1852]") {
-    const scene::Trajectory t = scene::integrateAttractor(scene::AttractorSystem::Rossler, glm::vec3(1, 1, 0), 0.01f, 2000, 2000);
-    const auto r = scene::resampleByArcLength(t.points, 200);
-    REQUIRE(r.size() == 201u);
-    float lo = 1e30f, hi = 0.0f;
-    for (std::size_t i = 0; i + 1 < r.size(); ++i) {
-        const float l = glm::length(r[i + 1] - r[i]);
-        lo = std::min(lo, l);
-        hi = std::max(hi, l);
-    }
-    CHECK(hi < 1.6f * lo + 1e-3f); // chords of equal arcs: equal up to the curvature
-    CHECK(scene::resampleByArcLength({}, 10).empty());
-    CHECK(scene::resampleByArcLength({glm::vec3(1), glm::vec3(1)}, 10).empty()); // a degenerate curve
-}
-
-TEST_CASE("the world's formations are placed, budgeted, and the ribbon's volume matches its exact distance",
-          "[attractor-world][adr1852]") {
-    scene::AttractorGen g = smallGen(1);
-    g.resolution = 512;
-    const auto w = scene::generateAttractorWorld(g);
-    REQUIRE_FALSE(w->tube.empty());
-    CHECK(w->tube.points.size() <= static_cast<std::size_t>(scene::kAttractorMaxSegments) + 1);
-    CHECK(w->tube.volumeRes == scene::kAttractorVolumeRes);
-    CHECK(w->landmarks.size() <= static_cast<std::size_t>(scene::kAttractorMaxLandmarks));
-    CHECK_FALSE(w->landmarks.empty());
-    for (const auto& lm : w->landmarks) {
-        CHECK(lm.depth <= scene::kAttractorMaxRecursion);
-        CHECK(std::isfinite(lm.base.x + lm.base.y + lm.base.z));
-    }
-    CHECK(w->branches.size() <= static_cast<std::size_t>(scene::kAttractorMaxBranches));
-    CHECK_FALSE(w->branches.empty());
-    // the volume against the exact distance at voxel centres, where trilinear filtering adds nothing
-    const int res = w->tube.volumeRes;
-    const glm::vec3 lo = w->tube.boundsMin, hi = w->tube.boundsMax;
-    std::size_t checked = 0;
-    for (int k = 0; k < 64; ++k) {
-        const glm::ivec3 v((k * 37) % res, (k * 53) % res, (k * 71) % res);
-        const glm::vec3 p = lo + (hi - lo) * glm::vec3(v) / static_cast<float>(res - 1);
-        const float baked = w->tube.volume[(static_cast<std::size_t>(v.z) * res + v.y) * res + v.x].x;
-        CHECK(baked == Approx(scene::tubeDistance(w->tube, p)).margin(1e-2));
-        ++checked;
-    }
-    CHECK(checked == 64u);
-    // zero influence: no ribbon at all
-    g.attractorInfluence = 0.0f;
-    CHECK(scene::generateAttractorWorld(g)->tube.empty());
-}
-
-TEST_CASE("the formation knobs never move the terrain or the camera", "[attractor-world][adr1852]") {
-    scene::AttractorGen a = smallGen(3);
-    scene::AttractorGen b = a;
-    b.recursiveDepth = 1;
-    b.formationScale = 1.3f;
-    b.landmarks = 1;
-    const auto wa = scene::generateAttractorWorld(a);
-    const auto wb = scene::generateAttractorWorld(b);
-    CHECK(wa->hash != wb->hash);
-    CHECK(wa->height == wb->height);
-    CHECK(wa->eye == wb->eye);
-}
-
-TEST_CASE("the camera drift is a bounded, smooth function of time that starts at the composed pose", "[attractor-world][adr1852]") {
-    const auto w = scene::generateAttractorWorld(smallGen(2));
-    const auto p0 = scene::attractorCamera(*w, 1.0f, 0.0);
-    CHECK(glm::length(p0.eye - w->eye) < 1e-3f);
-    CHECK(glm::length(scene::attractorCamera(*w, 0.0f, 40.0).eye - w->eye) < 1e-6f);
-    float maxStep = 0.0f, maxOff = 0.0f;
-    glm::vec3 prev = p0.eye;
-    for (int f = 1; f <= 30 * 300; ++f) { // five minutes at 30 fps
-        const auto p = scene::attractorCamera(*w, 1.0f, f / 30.0);
-        maxStep = std::max(maxStep, glm::length(p.eye - prev));
-        maxOff = std::max(maxOff, glm::length(p.eye - w->eye));
-        prev = p.eye;
-    }
-    CHECK(maxStep < 0.25f); // under 7.5 m/s: a drift, never a move
-    CHECK(maxOff < 200.0f);
-    CHECK(maxOff > 50.0f);
 }

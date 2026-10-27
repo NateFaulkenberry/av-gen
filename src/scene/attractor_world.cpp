@@ -159,212 +159,138 @@ glm::vec2 catmull(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, float 
 
 } // namespace
 
-// ---- formations (ADR-1852) -----------------------------------------------------------------------------------------
+// ---- the flythrough (ADR-1853) ------------------------------------------------------------------------------------
 
 namespace {
 
-struct ViewProjector {
-    glm::vec3 eye, f, r, u;
-    float tx, ty;
-    explicit ViewProjector(const AttractorWorld& w) : eye(w.eye) {
-        f = glm::normalize(w.target - w.eye);
-        r = glm::normalize(glm::cross(f, glm::vec3(0, 1, 0)));
-        u = glm::cross(r, f);
-        ty = std::tan(0.5f * w.fovDeg * kPi / 180.0f);
-        tx = ty * 16.0f / 9.0f;
+// Gaussian smoothing of a sampled signal, clamped at its ends.
+template <class T>
+std::vector<T> smoothSamples(const std::vector<T>& in, float sigmaSamples) {
+    if (in.size() < 3 || !(sigmaSamples > 0.0f)) return in;
+    const int r = static_cast<int>(std::ceil(3.0f * sigmaSamples));
+    std::vector<float> k(static_cast<std::size_t>(2 * r + 1));
+    float sum = 0.0f;
+    for (int i = -r; i <= r; ++i) {
+        k[static_cast<std::size_t>(i + r)] = std::exp(-0.5f * (i * i) / (sigmaSamples * sigmaSamples));
+        sum += k[static_cast<std::size_t>(i + r)];
     }
-    // x, y in NDC (-1..1 across the 16:9 frame), z the depth along the view (m)
-    [[nodiscard]] glm::vec3 ndc(glm::vec3 p) const {
-        const glm::vec3 d = p - eye;
-        const float z = glm::dot(d, f);
-        return {glm::dot(d, r) / std::max(z, 1.0f) / tx, glm::dot(d, u) / std::max(z, 1.0f) / ty, z};
+    std::vector<T> out(in.size());
+    const int n = static_cast<int>(in.size());
+    for (int i = 0; i < n; ++i) {
+        T acc{};
+        for (int j = -r; j <= r; ++j) {
+            acc += in[static_cast<std::size_t>(std::clamp(i + j, 0, n - 1))] * (k[static_cast<std::size_t>(j + r)] / sum);
+        }
+        out[static_cast<std::size_t>(i)] = acc;
     }
-};
-
-bool visibleFrom(const AttractorWorld& w, glm::vec3 eye, glm::vec3 p) {
-    for (int k = 1; k < 38; ++k) {
-        const glm::vec3 q = eye + (p - eye) * (static_cast<float>(k) / 40.0f);
-        if (w.sample(glm::vec2(q.x, q.z)) > q.y + 2.0f) return false;
-    }
-    return true;
+    return out;
 }
 
-// Puts the attractor over the gorge near the frame's middle, the butte tower out on the bench on one side and the
-// arch fin nearer on the other, each where the camera sees its base. Its own random stream: the formation knobs never
-// move the terrain or the camera.
-void placeFormations(AttractorWorld& w, const AttractorGen& g, float side, const std::vector<float>& rock) {
-    Rng frng(0xf0e7a710ull + g.seed, 0x1234567ull);
-    const ViewProjector view(w);
+// The flight, in five movements over `flightSeconds`:
+//   * the vista: the composed view, pushing gently forward;
+//   * the dive: off the lip and down into the inner gorge;
+//   * the river: low along the gorge's centreline, 25-45 m above the floor, following every bend;
+//   * the climb: up the gorge's walls and the basin's cliffs to above the plateau;
+//   * the reveal: slow and level over the canyon country toward the far wall.
+// The path is smoothed, then lifted clear of the terrain (22 m around it, 14 m above it) and smoothed again until it
+// stays clear, so it never touches rock. Banking follows the turn rate.
+void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
+    w.flight.clear();
+    if (w.gorgeLine.size() < 8) return;
     const float S = g.terrainScale;
-    const float fs = g.formationScale;
-    const int N = w.res;
-    const float texel = w.extent / static_cast<float>(N);
-    const auto rockAt = [&](glm::vec2 p) {
-        const glm::ivec2 t = glm::clamp(glm::ivec2(glm::floor((p - w.origin) / texel)), glm::ivec2(0), glm::ivec2(N - 1));
-        return rock[static_cast<std::size_t>(t.y) * N + t.x];
+    const float D = g.flightSeconds;
+    const float rate = AttractorWorld::kFlightRate;
+    const int n = static_cast<int>(D * rate) + 1;
+    // the gorge by arc length
+    std::vector<float> arc(w.gorgeLine.size(), 0.0f);
+    for (std::size_t i = 1; i < w.gorgeLine.size(); ++i) arc[i] = arc[i - 1] + glm::length(w.gorgeLine[i] - w.gorgeLine[i - 1]);
+    const auto gorgeAt = [&](float sa) {
+        sa = std::clamp(sa, 0.0f, arc.back());
+        std::size_t i = 1;
+        while (i + 1 < arc.size() && arc[i] < sa) ++i;
+        const float t = arc[i] > arc[i - 1] ? (sa - arc[i - 1]) / (arc[i] - arc[i - 1]) : 0.0f;
+        return glm::mix(w.gorgeLine[i - 1], w.gorgeLine[i], std::clamp(t, 0.0f, 1.0f));
     };
-    const auto netAt = [&](glm::vec2 p) {
-        const glm::ivec2 t = glm::clamp(glm::ivec2(glm::floor((p - w.origin) / texel)), glm::ivec2(0), glm::ivec2(N - 1));
-        return w.networkArc[static_cast<std::size_t>(t.y) * N + t.x];
-    };
-    const auto gorgeDist = [&](glm::vec2 p) {
-        float best = 1e9f, t = 0.0f;
-        for (std::size_t i = 0; i + 1 < w.gorgeLine.size(); i += 2) {
-            best = std::min(best, segDist(p, w.gorgeLine[i], w.gorgeLine[std::min(i + 2, w.gorgeLine.size() - 1)], t));
-        }
-        return best;
-    };
-    // a bench site: flat ground away from cliffs, gorges and tributaries
-    const auto benchSite = [&](glm::vec2 p, float clear) {
-        for (const glm::vec2 o : {glm::vec2(0), glm::vec2(clear, 0), glm::vec2(-clear, 0), glm::vec2(0, clear), glm::vec2(0, -clear)}) {
-            if (rockAt(p + o) > 0.2f || netAt(p + o) >= 0.0f) return false;
-        }
-        return gorgeDist(p) > clear + 120.0f * S;
-    };
-    // Searches the view for the best site of a formation of `height` whose top should sit near `targetX` in NDC.
-    std::vector<glm::vec2> avoid; // screen intervals (NDC x centre, half width) formations already hold
-    bool strict = true;           // false: any visible site off the gorge network will do (a mesa top included)
-    const auto findSite = [&](float targetX, float zMin, float zMax, float clear, float height, bool onGorge,
-                              glm::vec3& out) {
-        float bestScore = -1e30f;
-        bool found = false;
-        const auto consider = [&](glm::vec2 xz) {
-            if (!onGorge && strict && !benchSite(xz, clear)) return;
-            if (!onGorge && !strict && (netAt(xz) >= 0.0f || gorgeDist(xz) < clear)) return;
-            const glm::vec3 base(xz.x, w.sample(xz), xz.y);
-            const glm::vec3 top = base + glm::vec3(0, height, 0);
-            const glm::vec3 nb = view.ndc(base), nt = view.ndc(top);
-            if (nb.z < zMin || nb.z > zMax || std::abs(nt.x) > 0.85f || nt.y > 0.8f || nb.y < -0.95f) return;
-            for (const glm::vec2 iv : avoid) {
-                if (std::abs(nt.x - iv.x) < iv.y || std::abs(nb.x - iv.x) < iv.y) return;
-            }
-            if (!visibleFrom(w, w.eye, base + glm::vec3(0, height * 0.25f, 0))) return;
-            const float score = -std::abs(nt.x - targetX) - 0.15f * std::abs(nb.z - 0.5f * (zMin + zMax)) / (zMax - zMin) +
-                                0.02f * frng.nextFloat();
-            if (score > bestScore) {
-                bestScore = score;
-                out = base;
-                found = true;
-            }
-        };
-        if (onGorge) {
-            for (const glm::vec2 p : w.gorgeLine) consider(p);
-        } else {
-            for (float z = zMin; z <= zMax; z += 100.0f) {
-                for (float x = -1.0f; x <= 1.0f; x += 0.04f) {
-                    const glm::vec3 d = view.f + view.r * (x * view.tx);
-                    const glm::vec2 xz = glm::vec2(w.eye.x, w.eye.z) + glm::vec2(d.x, d.z) * z / std::max(glm::length(glm::vec2(view.f.x, view.f.z)), 1e-3f);
-                    consider(xz);
-                }
-            }
-        }
-        return found;
-    };
-
-    // The attractor: over the gorge, near the middle of the frame.
-    const float R = 470.0f * fs * S * (0.6f + 0.4f * g.attractorInfluence);
-    glm::vec3 attractorBase{0.0f};
-    const bool haveAttractor = g.attractorInfluence > 0.0f &&
-                               findSite(-side * 0.08f, 1600.0f * S, 3200.0f * S, 0.0f, 1.2f * R, true, attractorBase);
-    if (haveAttractor) {
-        const auto system = static_cast<AttractorSystem>(g.attractorSystem);
-        const bool thomas = system == AttractorSystem::Thomas;
-        const glm::vec3 start(0.1f + frng.range(0.0f, 1.0f), 0.0f + frng.range(-1.0f, 1.0f), frng.range(0.0f, 0.5f));
-        const float dt = thomas ? 0.05f : 0.01f;
-        const int transient = 4000 + static_cast<int>(frng.nextFloat() * 3000.0f);
-        const int keep = thomas ? 2600 : 2700; // about four turns of the Rossler spiral, with its fold
-        Trajectory tr = integrateAttractor(system, start, dt, transient, keep);
-        if (tr.finite && tr.points.size() > 16) {
-            glm::vec3 lo(1e30f), hi(-1e30f);
-            for (const glm::vec3& q : tr.points) {
-                lo = glm::min(lo, q);
-                hi = glm::max(hi, q);
-            }
-            // Rossler: the spiral lies in (x, y), the fold leaps along z. Stand the spiral up: its x across the
-            // view (turned 35-50 degrees so the loops are seen obliquely), its y vertical, the fold toward or away.
-            const float plane = side * frng.range(0.6f, 0.9f);
-            const glm::vec2 fwd = glm::normalize(glm::vec2(view.f.x, view.f.z));
-            const glm::vec2 rgt(-fwd.y, fwd.x);
-            const glm::vec2 ax = rgt * std::cos(plane) + fwd * std::sin(plane);
-            const glm::vec2 az = -rgt * std::sin(plane) + fwd * std::cos(plane);
-            const glm::vec3 ext = hi - lo;
-            const float scale = 2.0f * R / std::max(thomas ? std::max(ext.x, ext.z) : ext.x, 1e-3f);
-            const float buried = 0.32f;       // the fraction of the spiral below the ground: the loops become arches
-            const float yCut = lo.y + buried * ext.y;
-            const glm::vec3 c = 0.5f * (lo + hi);
-            std::vector<glm::vec3> world;
-            world.reserve(tr.points.size());
-            for (const glm::vec3& q : tr.points) {
-                const float wx = (q.x - c.x) * scale, wy = (q.y - yCut) * scale, wz = (q.z - (thomas ? c.z : lo.z)) * scale * (thomas ? 1.0f : 0.55f);
-                const glm::vec2 xz = glm::vec2(attractorBase.x, attractorBase.z) + ax * wx + az * wz;
-                world.emplace_back(xz.x, attractorBase.y + wy, xz.y);
-            }
-            const std::vector<glm::vec3> rs = resampleByArcLength(world, 640);
-            const float r0 = R * 0.06f;
-            glm::vec3 blo(1e30f), bhi(-1e30f);
-            for (const glm::vec3& q : rs) {
-                const float above = std::clamp((q.y - attractorBase.y) / std::max(R, 1.0f), 0.0f, 1.0f);
-                const float along = static_cast<float>(w.tube.points.size()) / static_cast<float>(rs.size());
-                const float swell = 1.0f + 0.32f * fbm(glm::vec2(along * 9.0f, 0.5f), 3, 4242u); // thick and thin
-                const float radius = r0 * (1.25f - 0.55f * above) * swell;
-                w.tube.points.emplace_back(q, radius);
-                blo = glm::min(blo, q - radius);
-                bhi = glm::max(bhi, q + radius);
-            }
-            const glm::vec3 margin(2.5f * glm::length(bhi - blo) / static_cast<float>(kAttractorVolumeRes));
-            w.tube.boundsMin = blo - margin;
-            w.tube.boundsMax = bhi + margin;
-            bakeTubeVolume(w.tube, kAttractorVolumeRes);
-            // the ribbon's screen interval: the other formations keep out of it
-            const glm::vec3 nl = view.ndc(glm::vec3(blo.x, attractorBase.y, blo.z)), nh = view.ndc(glm::vec3(bhi.x, attractorBase.y, bhi.z));
-            const glm::vec3 nc = view.ndc(attractorBase + glm::vec3(0, 0.5f * R, 0));
-            avoid.emplace_back(nc.x, std::clamp(0.5f * std::abs(nh.x - nl.x) + 0.1f, 0.25f, 0.6f));
+    // where the gorge passes closest in front of the vista's eye
+    const glm::vec2 eyeXZ(w.eye.x, w.eye.z);
+    const glm::vec2 fwd = glm::normalize(glm::vec2(w.target.x - w.eye.x, w.target.z - w.eye.z));
+    float s0 = 0.0f, bestD = 1e30f;
+    for (std::size_t i = 0; i < w.gorgeLine.size(); ++i) {
+        const glm::vec2 d = w.gorgeLine[i] - eyeXZ;
+        const float along = glm::dot(d, fwd);
+        if (along < 150.0f * S) continue;
+        const float dist = glm::length(d) + 0.5f * std::abs(glm::dot(d, glm::vec2(-fwd.y, fwd.x)));
+        if (dist < bestD) {
+            bestD = dist;
+            s0 = arc[i];
         }
     }
-
-    // The recursive landmarks.
-    if ((g.landmarks & 1) != 0) { // the butte tower, out on the bench opposite the escarpment, far
-        AttractorLandmark lm;
-        lm.kind = 0;
-        lm.scale = 190.0f * fs * S;
-        lm.height = 165.0f * fs * S;
-        lm.depth = g.recursiveDepth;
-        lm.angle = frng.range(0.0f, 2.0f * kPi);
-        lm.seed = frng.nextU32();
-        strict = true;
-        bool placed = findSite(-side * 0.58f, 1800.0f * S, 3800.0f * S, lm.scale * 1.3f, lm.height * 2.8f, false, lm.base) ||
-                      findSite(side * 0.58f, 1800.0f * S, 4500.0f * S, lm.scale * 1.1f, lm.height * 2.8f, false, lm.base);
-        if (!placed) {
-            strict = false;
-            placed = findSite(-side * 0.58f, 1500.0f * S, 5000.0f * S, lm.scale, lm.height * 2.8f, false, lm.base);
-        }
-        if (placed) {
-            avoid.emplace_back(view.ndc(lm.base + glm::vec3(0, lm.height, 0)).x, 0.28f);
-            w.landmarks.push_back(lm);
-        }
+    const float plateau = L1 + Lb; // the plateau's height above the gorge floor (about)
+    const auto phase = [&](float t, float a, float b) { return smoothstepf(a * D, b * D, t); };
+    std::vector<glm::vec3> raw(static_cast<std::size_t>(n));
+    float sa = s0;
+    for (int k = 0; k < n; ++k) {
+        const float t = static_cast<float>(k) / rate;
+        // speed along the gorge: slow in the dive, fast on the river, slowing for the reveal
+        const float v = (45.0f + 35.0f * phase(t, 0.12f, 0.25f) - 10.0f * phase(t, 0.62f, 0.75f) -
+                         40.0f * phase(t, 0.82f, 1.0f)) * S;
+        if (t > 0.14f * D) sa += v / rate * phase(t, 0.14f, 0.24f);
+        const glm::vec2 gxz = gorgeAt(sa);
+        // height above the floor: low on the river with a slow swell, rising through the climb and the reveal
+        float alt = (34.0f + 9.0f * std::sin(t * 0.55f)) * S;
+        alt += (plateau + 70.0f * S - alt) * phase(t, 0.66f, 0.84f);
+        alt += 40.0f * S * phase(t, 0.84f, 1.0f);
+        const glm::vec3 river(gxz.x, w.sample(gxz) + alt, gxz.y);
+        // the vista: the composed eye, easing forward
+        const glm::vec3 vista = w.eye + glm::vec3(fwd.x, 0.0f, fwd.y) * (30.0f * t);
+        const float b = phase(t, 0.04f, 0.28f); // the dive: about thirteen seconds off the lip into the gorge
+        raw[static_cast<std::size_t>(k)] = glm::mix(vista, river, b);
     }
-    if ((g.landmarks & 2) != 0) { // the nested-arch fin, nearer, on the escarpment's side
-        AttractorLandmark lm;
-        lm.kind = 1;
-        lm.scale = 210.0f * fs * S;  // the outer arch's half span
-        lm.height = 260.0f * fs * S; // and its height
-        lm.depth = g.recursiveDepth;
-        lm.seed = frng.nextU32();
-        // the escarpment's side first; failing that, anywhere clear of the ribbon, then deeper into the view
-        strict = true;
-        bool placed = findSite(side * 0.5f, 1300.0f * S, 2800.0f * S, lm.scale * 0.6f, lm.height, false, lm.base) ||
-                      findSite(-side * 0.5f, 1300.0f * S, 3200.0f * S, lm.scale * 0.6f, lm.height, false, lm.base);
-        if (!placed) {
-            strict = false;
-            placed = findSite(side * 0.55f, 1000.0f * S, 4500.0f * S, lm.scale * 0.4f, lm.height, false, lm.base) ||
-                     findSite(-side * 0.55f, 1000.0f * S, 4500.0f * S, lm.scale * 0.4f, lm.height, false, lm.base);
+    // smooth, then keep clear of the land: lift above everything within 22 m, smooth again, until it holds
+    // smooth (faded in from the start, so the first frame is the composed vista exactly)
+    const std::vector<glm::vec3> smoothed = smoothSamples(raw, 0.6f * rate);
+    std::vector<glm::vec3> path(raw.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        path[i] = glm::mix(raw[i], smoothed[i], phase(static_cast<float>(i) / rate, 0.0f, 0.06f));
+    }
+    const auto clearance = [&](glm::vec3 p) {
+        float hmax = w.sample(glm::vec2(p.x, p.z));
+        for (int a = 0; a < 8; ++a) {
+            const float ang = static_cast<float>(a) * 0.7853982f;
+            hmax = std::max(hmax, w.sample(glm::vec2(p.x, p.z) + 22.0f * glm::vec2(std::cos(ang), std::sin(ang))));
         }
-        if (placed) {
-            // the fin runs roughly across the view, so its arches face the camera
-            const glm::vec2 fwd = glm::normalize(glm::vec2(view.f.x, view.f.z));
-            lm.angle = std::atan2(fwd.x, -fwd.y) + frng.range(-0.35f, 0.35f);
-            w.landmarks.push_back(lm);
-        }
+        return hmax + 14.0f;
+    };
+    // Height: the wanted height or the clearance, whichever is higher, lifted by a cone envelope --
+    // y_i = max_j (c_j - k |i - j|) -- which is above every c_j and climbs or falls at most k m/s; then a light
+    // smoothing, allowed to settle at most 5 m into the 14 m margin.
+    std::vector<float> c(path.size());
+    for (std::size_t i = 0; i < path.size(); ++i) c[i] = std::max(path[i].y, clearance(path[i]));
+    const float kRise = 28.0f * S / rate; // metres per sample
+    std::vector<float> ys(c);
+    for (std::size_t i = 1; i < ys.size(); ++i) ys[i] = std::max(ys[i], ys[i - 1] - kRise);
+    for (std::size_t i = ys.size() - 1; i-- > 0;) ys[i] = std::max(ys[i], ys[i + 1] - kRise);
+    ys = smoothSamples(ys, 0.35f * rate);
+    for (std::size_t i = 0; i < ys.size(); ++i) ys[i] = std::max(ys[i], c[i] - 5.0f);
+    ys[0] = path[0].y;
+    // bank: proportional to the turn rate, toward the turn
+    std::vector<float> heading(path.size(), 0.0f);
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        const std::size_t a = i == 0 ? 0 : i - 1, b2 = std::min(i + 1, path.size() - 1);
+        heading[i] = std::atan2(path[b2].z - path[a].z, path[b2].x - path[a].x);
+    }
+    std::vector<float> turn(path.size(), 0.0f);
+    for (std::size_t i = 1; i + 1 < path.size(); ++i) {
+        float dh = heading[i + 1] - heading[i - 1];
+        while (dh > kPi) dh -= 2.0f * kPi;
+        while (dh < -kPi) dh += 2.0f * kPi;
+        turn[i] = dh * rate * 0.5f; // radians per second
+    }
+    turn = smoothSamples(turn, 0.8f * rate);
+    w.flight.resize(path.size());
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        const float roll = std::clamp(-1.6f * turn[i], -0.2f, 0.2f) * phase(static_cast<float>(i) / rate, 0.1f, 0.25f);
+        w.flight[i] = glm::vec4(path[i].x, ys[i], path[i].z, roll);
     }
 }
 
@@ -388,15 +314,8 @@ Result<void> AttractorGen::validate() const {
         return fail("attractorWorld: roughness, ridgeStrength, domainWarp, terraces, erosion and strataFold must be in [0, 1]");
     }
     if (!(terrainScale >= 0.5f && terrainScale <= 1.6f)) return fail("attractorWorld: terrainScale must be in [0.5, 1.6]");
-    if (recursiveDepth < 0 || recursiveDepth > kAttractorMaxRecursion) {
-        return fail("attractorWorld: recursiveDepth must be in [0, {}]", kAttractorMaxRecursion);
-    }
-    if (!(formationScale >= 0.5f && formationScale <= 1.5f)) return fail("attractorWorld: formationScale must be in [0.5, 1.5]");
-    if (!unit(attractorInfluence) || !unit(branchingDensity)) {
-        return fail("attractorWorld: attractorInfluence and branchingDensity must be in [0, 1]");
-    }
-    if (attractorSystem < 0 || attractorSystem > 1) return fail("attractorWorld: attractorSystem must be 0 (Rossler) or 1 (Thomas)");
-    if (landmarks < 0 || landmarks > 3) return fail("attractorWorld: landmarks is a mask in [0, 3]");
+    if (!unit(branchingDensity)) return fail("attractorWorld: branchingDensity must be in [0, 1]");
+    if (!(flightSeconds >= 20.0f && flightSeconds <= 120.0f)) return fail("attractorWorld: flightSeconds must be in [20, 120]");
     return {};
 }
 
@@ -405,12 +324,9 @@ std::uint64_t AttractorGen::hash() const {
     h = mixHash(h, seed);
     h = mixHash(h, static_cast<std::uint64_t>(resolution));
     for (float v : {extent, terrainScale, roughness, ridgeStrength, domainWarp, terraces, erosion, strataFold,
-                    formationScale, attractorInfluence, branchingDensity}) {
+                    branchingDensity, flightSeconds}) {
         h = mixHashF(h, v);
     }
-    h = mixHash(h, static_cast<std::uint64_t>(recursiveDepth));
-    h = mixHash(h, static_cast<std::uint64_t>(attractorSystem));
-    h = mixHash(h, static_cast<std::uint64_t>(landmarks));
     return h;
 }
 
@@ -845,8 +761,8 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                 const glm::vec2 across(-dir.y, dir.x);
                 float offset = 0.0f;
                 float period = 150.0f * S;
-                float amp = 6.5f * S;
-                for (int o = 0; o < 3 && period >= 12.0f * texel; ++o) { // no gully narrower than 12 texels: finer ones notch the rims into teeth
+                float amp = 4.5f * S;
+                for (int o = 0; o < 3 && period >= std::max(90.0f * S, 6.0f * texel); ++o) { // in metres, the same at every resolution: finer grooves read as vertical streaks and notch the rims
                     const float cell = period * 1.6f;
                     const glm::vec2 cp = p / cell;
                     const int cx = static_cast<int>(std::floor(cp.x)), cy = static_cast<int>(std::floor(cp.y));
@@ -986,28 +902,8 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         w.viewAzimuth = std::atan2(dirXZ.x, dirXZ.y);
     }
 
-    // ---- formations (ADR-1852): placed in the composed view, after the camera ----
-    placeFormations(w, g, side, rock);
-    // Re-aim: turn the camera (at most 6 degrees) so the formations sit centred across the frame. The composition
-    // search framed the land; this frames what the land is about, and pans off whatever crowded an edge.
-    {
-        const ViewProjector view(w);
-        float sum = 0.0f, n = 0.0f;
-        if (!w.tube.empty()) {
-            sum += view.ndc(0.5f * (w.tube.boundsMin + w.tube.boundsMax)).x * 2.0f;
-            n += 2.0f;
-        }
-        for (const AttractorLandmark& lm : w.landmarks) {
-            sum += view.ndc(lm.base + glm::vec3(0, lm.height, 0)).x;
-            n += 1.0f;
-        }
-        if (n > 0.0f) {
-            const float yaw = std::clamp(-std::atan((sum / n) * view.tx), -0.105f, 0.105f);
-            const glm::vec3 d = w.target - w.eye;
-            const float c = std::cos(yaw), sn = std::sin(yaw);
-            w.target = w.eye + glm::vec3(c * d.x - sn * d.z, d.y, sn * d.x + c * d.z);
-        }
-    }
+    // ---- the flythrough (ADR-1853) ----
+    buildFlight(w, g, Lb, L1);
 
     w.generateSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     ++gGenerations;
@@ -1025,21 +921,30 @@ std::shared_ptr<const AttractorWorld> acquireAttractorWorld(const AttractorGen& 
 
 std::uint64_t attractorWorldGenerations() noexcept { return gGenerations.load(); }
 
-AttractorCameraPose attractorCamera(const AttractorWorld& world, float drift, double seconds) {
-    AttractorCameraPose pose{world.eye, world.target};
-    if (!(drift > 0.0f)) {
+AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCameraMode mode, double seconds) {
+    AttractorCameraPose pose{world.eye, world.target, 0.0f};
+    if (mode != AttractorCameraMode::Flight || world.flight.size() < 2) {
         return pose;
     }
-    const glm::vec3 f = glm::normalize(world.target - world.eye);
-    const glm::vec3 r = glm::normalize(glm::cross(f, glm::vec3(0, 1, 0)));
-    const double w = 2.0 * 3.14159265358979 / 150.0; // one slow arc every two and a half minutes
-    const auto t = static_cast<float>(std::fmod(seconds * w, 2.0 * 3.14159265358979));
-    const float lateral = drift * 140.0f * std::sin(t);
-    const float dolly = drift * 60.0f * (1.0f - std::cos(t));
-    const float lift = drift * 12.0f * std::sin(2.0f * t);
-    const glm::vec3 offset = r * lateral + glm::vec3(f.x, 0.0f, f.z) * dolly + glm::vec3(0, lift, 0);
-    pose.eye += offset;
-    pose.target += offset * 0.35f; // the aim moves less than the eye: parallax, not a pan
+    // Linear between the 30 Hz samples (the path itself is already smooth); the aim looks a second and a half ahead
+    // along the path, a little below it.
+    const auto n = static_cast<int>(world.flight.size());
+    const auto at = [&](double t) {
+        const double f = std::clamp(t * AttractorWorld::kFlightRate, 0.0, static_cast<double>(n - 1));
+        const int i = std::min(static_cast<int>(f), n - 2);
+        const auto a = static_cast<float>(f - i);
+        return glm::mix(world.flight[static_cast<std::size_t>(i)], world.flight[static_cast<std::size_t>(i) + 1], a);
+    };
+    const glm::vec4 e = at(seconds);
+    glm::vec3 ahead = glm::vec3(at(seconds + 1.5));
+    const glm::vec3 eye(e);
+    if (glm::length(ahead - eye) < 1.0f) { // at the very end the path stops: keep looking the way it was going
+        const glm::vec3 back(at(seconds - 1.5));
+        ahead = eye + (eye - back);
+    }
+    pose.eye = eye;
+    pose.target = ahead - glm::vec3(0.0f, 0.18f * glm::length(ahead - eye), 0.0f);
+    pose.rollDegrees = glm::degrees(e.w);
     return pose;
 }
 
@@ -1049,10 +954,9 @@ namespace {
 
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
-                                      "recursiveDepth", "formationScale", "attractorInfluence", "attractorSystem",
-                                      "branchingDensity", "landmarks", "look"};
+                                      "branchingDensity", "flightSeconds", "look"};
 constexpr std::string_view kLookKeys[] = {"palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
-                                          "atmosphere", "strata", "exposure", "detail", "drift"};
+                                          "atmosphere", "strata", "exposure", "detail"};
 
 } // namespace
 
@@ -1065,7 +969,13 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     }
     AttractorWorldBlock a;
     a.enabled = j.value("enabled", true);
-    a.driveCamera = j.value("camera", true);
+    if (j.contains("camera")) {
+        const std::string mode = j.at("camera").get<std::string>();
+        if (mode == "scene") a.camera = AttractorCameraMode::Scene;
+        else if (mode == "composed") a.camera = AttractorCameraMode::Composed;
+        else if (mode == "flight") a.camera = AttractorCameraMode::Flight;
+        else return fail("attractorWorld: 'camera' must be \"scene\", \"composed\" or \"flight\"");
+    }
     AttractorGen& g = a.gen;
     g.seed = j.value("seed", g.seed);
     g.resolution = j.value("resolution", g.resolution);
@@ -1077,12 +987,8 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.terraces = j.value("terraces", g.terraces);
     g.erosion = j.value("erosion", g.erosion);
     g.strataFold = j.value("strataFold", g.strataFold);
-    g.recursiveDepth = j.value("recursiveDepth", g.recursiveDepth);
-    g.formationScale = j.value("formationScale", g.formationScale);
-    g.attractorInfluence = j.value("attractorInfluence", g.attractorInfluence);
-    g.attractorSystem = j.value("attractorSystem", g.attractorSystem);
     g.branchingDensity = j.value("branchingDensity", g.branchingDensity);
-    g.landmarks = j.value("landmarks", g.landmarks);
+    g.flightSeconds = j.value("flightSeconds", g.flightSeconds);
     if (auto ok = g.validate(); !ok) return std::unexpected(ok.error());
     if (j.contains("look")) {
         const json& l = j.at("look");
@@ -1102,11 +1008,10 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         k.strata = l.value("strata", k.strata);
         k.exposure = l.value("exposure", k.exposure);
         k.detail = l.value("detail", k.detail);
-        k.drift = l.value("drift", k.drift);
     }
     a.liveGen = a.gen;
     a.live = a.look;
-    a.cameraDrive = a.driveCamera ? 1.0f : 0.0f;
+    a.cameraMode = static_cast<int>(a.camera);
     return a;
 } catch (const nlohmann::json::exception& e) {
     return fail("attractorWorld: {}", e.what()); // a key of the wrong type
@@ -1116,7 +1021,9 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
     const AttractorGen& g = a.gen;
     const AttractorLook& k = a.look;
     return json{{"enabled", a.enabled},
-                {"camera", a.driveCamera},
+                {"camera", a.camera == AttractorCameraMode::Scene      ? "scene"
+                           : a.camera == AttractorCameraMode::Flight ? "flight"
+                                                                     : "composed"},
                 {"seed", g.seed},
                 {"resolution", g.resolution},
                 {"extent", g.extent},
@@ -1127,16 +1034,12 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"terraces", g.terraces},
                 {"erosion", g.erosion},
                 {"strataFold", g.strataFold},
-                {"recursiveDepth", g.recursiveDepth},
-                {"formationScale", g.formationScale},
-                {"attractorInfluence", g.attractorInfluence},
-                {"attractorSystem", g.attractorSystem},
                 {"branchingDensity", g.branchingDensity},
-                {"landmarks", g.landmarks},
+                {"flightSeconds", g.flightSeconds},
                 {"look",
                  {{"palette", k.palette}, {"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation},
                   {"sunIntensity", k.sunIntensity}, {"ambient", k.ambient}, {"atmosphere", k.atmosphere},
-                  {"strata", k.strata}, {"exposure", k.exposure}, {"detail", k.detail}, {"drift", k.drift}}}};
+                  {"strata", k.strata}, {"exposure", k.exposure}, {"detail", k.detail}}}};
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------
@@ -1210,12 +1113,8 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("erosion", "erosion gullies", "World Generation", g.erosion, 0.0f, 1.0f);
     r.f("strataFold", "strata fold", "World Generation", g.strataFold, 0.0f, 1.0f);
     // Geometry (structural)
-    r.i("recursiveDepth", "recursive depth", "Geometry", g.recursiveDepth, 0, kAttractorMaxRecursion);
-    r.f("formationScale", "formation scale", "Geometry", g.formationScale, 0.5f, 1.5f);
-    r.f("attractorInfluence", "attractor influence", "Geometry", g.attractorInfluence, 0.0f, 1.0f);
-    r.i("attractorSystem", "attractor system (0 Rossler, 1 Thomas)", "Geometry", g.attractorSystem, 0, 1);
-    r.f("branchingDensity", "branching density", "Geometry", g.branchingDensity, 0.0f, 1.0f);
-    r.i("landmarks", "landmarks (1 tower, 2 arch fin, 3 both)", "Geometry", g.landmarks, 0, 3);
+    r.f("branchingDensity", "branching density (side canyons)", "Geometry", g.branchingDensity, 0.0f, 1.0f);
+    r.f("flightSeconds", "flythrough length (s)", "Animation and Camera", g.flightSeconds, 20.0f, 120.0f);
     // Materials and atmosphere (continuous).
     r.f("palette", "palette (0 Dusk Mineral, 1 Nocturne, 2 Chromatic)", "Materials and Atmosphere", k.palette, 0.0f,
         2.0f);
@@ -1227,9 +1126,8 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("strata", "strata bands", "Materials and Atmosphere", k.strata, 0.0f, 2.0f);
     r.f("exposure", "exposure", "Materials and Atmosphere", k.exposure, 0.1f, 4.0f);
     r.f("detail", "near detail", "Quality and Rendering", k.detail, 0.0f, 2.0f);
-    r.f("drift", "camera drift", "Animation and Camera", k.drift, 0.0f, 1.0f);
-    r.f("camera", "composed camera (0 = the scene's camera)", "Animation and Camera", rest.driveCamera ? 1.0f : 0.0f,
-        0.0f, 1.0f);
+    r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
+        static_cast<int>(rest.camera), 0, 2);
     return p;
 }
 
@@ -1244,12 +1142,8 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     g.terraces = fval(p, "terraces", g.terraces);
     g.erosion = fval(p, "erosion", g.erosion);
     g.strataFold = fval(p, "strataFold", g.strataFold);
-    g.recursiveDepth = ival(p, "recursiveDepth", g.recursiveDepth);
-    g.formationScale = fval(p, "formationScale", g.formationScale);
-    g.attractorInfluence = fval(p, "attractorInfluence", g.attractorInfluence);
-    g.attractorSystem = ival(p, "attractorSystem", g.attractorSystem);
     g.branchingDensity = fval(p, "branchingDensity", g.branchingDensity);
-    g.landmarks = ival(p, "landmarks", g.landmarks);
+    g.flightSeconds = fval(p, "flightSeconds", g.flightSeconds);
     live.liveGen = g;
     AttractorLook k = rest.look;
     k.palette = fval(p, "palette", k.palette);
@@ -1261,9 +1155,8 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     k.strata = fval(p, "strata", k.strata);
     k.exposure = fval(p, "exposure", k.exposure);
     k.detail = fval(p, "detail", k.detail);
-    k.drift = fval(p, "drift", k.drift);
     live.live = k;
-    live.cameraDrive = fval(p, "camera", rest.driveCamera ? 1.0f : 0.0f);
+    live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }
 
 } // namespace avgen::scene

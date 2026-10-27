@@ -2,7 +2,7 @@
   "format": "avgen-scene",
   "version": 1,
   "name": "the-strange-attractor",
-  "_note": "THE STRANGE ATTRACTOR (ADR-1850): a procedural surrealist landscape drawn by its own Environment renderer. The attractorWorld block is the whole world and its generated composition places the camera. docs/prototypes/strange-attractor/.",
+  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853): a procedural canyon drawn by its own Environment renderer. The attractorWorld block is the whole world; its composed camera, or with \"camera\": \"flight\" its flythrough, places the camera. docs/prototypes/strange-attractor/.",
   "camera": {
     "mode": 1,
     "position": [
