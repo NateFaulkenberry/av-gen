@@ -199,20 +199,53 @@ PunctualLight& Scene::addLight(PunctualLight light) {
     return lights.back();
 }
 
+namespace {
+bool fingerprintMatches(const MeshData& m, std::size_t vertexCount, std::size_t indexCount, const void* vertexData,
+                        const void* indexData) {
+    return m.vertices.size() == vertexCount && m.indices.size() == indexCount && m.vertices.data() == vertexData &&
+           m.indices.data() == indexData;
+}
+} // namespace
+
+const Scene::MeshCacheEntry& Scene::meshCacheEntry(MeshId mesh) const {
+    const auto fill = [](MeshCacheEntry& e, const MeshData& m) {
+        e.bounds = m.bounds();
+        e.valid = m.valid();
+        e.vertexCount = m.vertices.size();
+        e.indexCount = m.indices.size();
+        e.vertexData = m.vertices.data();
+        e.indexData = m.indices.data();
+    };
+    if (meshBoundsVersion_ != meshVersion || meshBoundsCache_.size() != meshes.size()) {
+        meshBoundsCache_.resize(meshes.size());
+        for (std::size_t i = 0; i < meshes.size(); ++i) {
+            fill(meshBoundsCache_[i], meshes[i]);
+        }
+        meshBoundsVersion_ = meshVersion;
+        ++meshBoundsRebuilds_;
+    }
+    MeshCacheEntry& e = meshBoundsCache_[mesh];
+    const MeshData& m = meshes[mesh];
+    if (!fingerprintMatches(m, e.vertexCount, e.indexCount, e.vertexData, e.indexData)) {
+        fill(e, m); // edited without a meshVersion bump: recompute this one mesh
+        ++meshBoundsRebuilds_;
+    }
+    return e;
+}
+
 const std::pair<glm::vec3, glm::vec3>& Scene::meshBounds(MeshId mesh) const {
     static const std::pair<glm::vec3, glm::vec3> empty{glm::vec3(0.0f), glm::vec3(0.0f)};
     if (mesh >= meshes.size()) {
         return empty;
     }
-    if (meshBoundsVersion_ != meshVersion || meshBoundsCache_.size() != meshes.size()) {
-        meshBoundsCache_.resize(meshes.size());
-        for (std::size_t i = 0; i < meshes.size(); ++i) {
-            meshBoundsCache_[i] = meshes[i].bounds();
-        }
-        meshBoundsVersion_ = meshVersion;
-        ++meshBoundsRebuilds_;
+    return meshCacheEntry(mesh).bounds;
+}
+
+bool Scene::meshValid(MeshId mesh) const {
+    if (mesh >= meshes.size()) {
+        return false;
     }
-    return meshBoundsCache_[mesh];
+    return meshCacheEntry(mesh).valid;
 }
 
 std::optional<Scene::PosedBox> Scene::posedMeshBounds(MeshId meshId, RigId rigId) const {
@@ -269,7 +302,7 @@ std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
     glm::vec3 hi(std::numeric_limits<float>::lowest());
     bool any = false;
     for (const auto& e : entities) {
-        if (!e.visible || e.style != MeshStyle::Lit || e.mesh >= meshes.size() || !meshes[e.mesh].valid()) {
+        if (!e.visible || e.style != MeshStyle::Lit || !meshValid(e.mesh)) { // ADR-1806: cached
             continue;
         }
         const auto& [mlo, mhi] = meshBounds(e.mesh);

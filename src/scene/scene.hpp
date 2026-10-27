@@ -162,6 +162,10 @@ struct Scene {
     // shadow cascades; before terrain that was a handful of meshes and now it is a world's worth,
     // so the answer is cached against the version that already says when meshes changed.
     [[nodiscard]] const std::pair<glm::vec3, glm::vec3>& meshBounds(MeshId mesh) const;
+    // ADR-1806: `MeshData::valid()` -- every index below the vertex count -- cached in the same table, because
+    // `bounds()` below asks it of every lit entity every frame and it walks every index (5 ms of CPU a frame at
+    // 8 M triangles). Out of range is false, exactly as `meshes[mesh].valid()` would refuse to be asked.
+    [[nodiscard]] bool meshValid(MeshId mesh) const;
     // How many times that table has been rebuilt. Exposed for the same reason
     // `MeshMetricsCache::rebuilds()` is -- so a test can assert that a cache asked the same question
     // a hundred times answers it once -- and added after a caller that had the Scene in hand called
@@ -197,7 +201,20 @@ struct Scene {
     void clear();
 
 private:
-    mutable std::vector<std::pair<glm::vec3, glm::vec3>> meshBoundsCache_;
+    // ADR-1806: one entry per mesh -- its bounds, its index validity, and the fingerprint they were computed from. The
+    // table is rebuilt when `meshVersion` moves (the contract every mesh edit already keeps for the renderer's
+    // upload); each lookup also re-checks the entry's fingerprint (counts and data pointers), so a mesh resized,
+    // reallocated or replaced without a version bump is recomputed rather than answered stale.
+    struct MeshCacheEntry {
+        std::pair<glm::vec3, glm::vec3> bounds{glm::vec3(0.0f), glm::vec3(0.0f)};
+        bool valid = false;
+        std::size_t vertexCount = 0;
+        std::size_t indexCount = 0;
+        const void* vertexData = nullptr;
+        const void* indexData = nullptr;
+    };
+    const MeshCacheEntry& meshCacheEntry(MeshId mesh) const; // mesh < meshes.size()
+    mutable std::vector<MeshCacheEntry> meshBoundsCache_;
     mutable std::uint64_t meshBoundsVersion_ = ~0ULL;
     mutable std::uint64_t meshBoundsRebuilds_ = 0;
     struct PosedBoundsEntry {
