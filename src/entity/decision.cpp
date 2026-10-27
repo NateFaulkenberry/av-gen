@@ -1161,15 +1161,15 @@ void InterestConsiderer::collectParameterPaths(std::vector<std::string>& out) co
     pace_.collectParameterPaths(out);
 }
 
-std::size_t InterestConsiderer::candidates(const DecisionContext& ctx, const GoalTaste& taste,
-                                           std::vector<GoalCandidate>& out) const {
+void InterestConsiderer::candidates(const DecisionContext& ctx, const GoalTaste& taste,
+                                    std::vector<GoalCandidate>& out) const {
     if (source_ == Source::Omniscient) {
-        if (ctx.world == nullptr) {
-            return 0;
+        if (ctx.world != nullptr) {
+            scoreGoals(ctx, taste, ctx.world->interestPoints(), out);
         }
-        return scoreGoals(ctx, taste, ctx.world->interestPoints(), out);
+        return;
     }
-    return scoreGoals(ctx, taste, ctx.percepts, out);
+    scoreGoals(ctx, taste, ctx.percepts, out);
 }
 
 void InterestConsiderer::consider(const DecisionContext& ctx, std::vector<Option>& out) const {

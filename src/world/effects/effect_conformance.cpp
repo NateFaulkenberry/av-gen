@@ -242,7 +242,8 @@ Report checkLeavesExist(EffectKind kind, std::span<const std::string_view> leave
     Report out;
     const EffectInstance probe = probeEffect(kind, std::string(kProbeName));
     params::ParameterSet params;
-    registerEffectParameters(params, std::span(&probe, 1));
+    // The set owns the parameters; the registration record is only needed to unregister, and `params` dies here.
+    [[maybe_unused]] const EffectParameters registered = registerEffectParameters(params, std::span(&probe, 1));
     const std::string prefix = effectParameterPrefix(probe.id);
     for (const std::string_view leaf : leaves) {
         const std::string path = prefix + std::string(leaf);

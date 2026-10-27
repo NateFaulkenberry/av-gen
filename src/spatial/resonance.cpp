@@ -1236,6 +1236,7 @@ float scalarChannel(const ResonanceSums& s, const ResonanceSpec& r) {
     }
     case ResonanceChannel::Force:
     case ResonanceChannel::Gradient:
+    case ResonanceChannel::Shading: // vector and colour channels: their readers never ask for a scalar here
         break;
     }
     return 0.0f;

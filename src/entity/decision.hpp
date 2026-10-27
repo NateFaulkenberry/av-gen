@@ -508,8 +508,8 @@ public:
     // draws from `Entity::rng_` and moving it would have re-cast every later choice the stream
     // makes -- which is exactly the drift the byte-identical control exists to catch. Wrapping 140
     // candidates into `ActionDesc`s every selection would also be work done for nothing there.
-    [[nodiscard]] std::size_t candidates(const DecisionContext& ctx, const GoalTaste& taste,
-                                         std::vector<GoalCandidate>& out) const;
+    // Appends to `out`; every caller reads the vector, not a count.
+    void candidates(const DecisionContext& ctx, const GoalTaste& taste, std::vector<GoalCandidate>& out) const;
 
     [[nodiscard]] Source source() const { return source_; }
     void setSource(Source source) { source_ = source; }

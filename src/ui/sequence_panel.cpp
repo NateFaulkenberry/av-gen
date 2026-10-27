@@ -1407,6 +1407,7 @@ void SequencePanel::drawStrip(app::Engine& engine) {
     case Drag::MoveOverlay:
         wantCursor = ImGuiMouseCursor_ResizeAll;
         break;
+    case Drag::Marquee: // a rubber band keeps the arrow
     case Drag::None:
         break;
     }

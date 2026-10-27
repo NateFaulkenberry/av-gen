@@ -294,13 +294,13 @@ inline Score buildScore(const SongAnalysis& song) {
         for (const char* q : kQuiet) w = w || se.label == q;
         sc.sectionWithhold.push_back(w || (se.density < 0.3f && se.energy < 0.6f));
     }
-    if (song.tempoBpm > 1.0f) sc.beatSeconds = 60.0 / song.tempoBpm;
+    if (song.tempoBpm > 1.0f) sc.beatSeconds = 60.0 / static_cast<double>(song.tempoBpm);
     auto sectionAt = [&](double t) {
         for (std::size_t i = 0; i < song.sections.size(); ++i) if (t < song.sections[i].end) return static_cast<int>(i);
         return static_cast<int>(song.sections.size()) - 1;
     };
     auto lowNear = [&](double t) {
-        for (std::size_t k = 0; k < song.lowT.size(); ++k) if (std::abs(song.lowT[k] - t) < 0.07 && song.lowS[k] > 0.5f) return true;
+        for (std::size_t k = 0; k < song.lowT.size(); ++k) if (std::abs(static_cast<double>(song.lowT[k]) - t) < 0.07 && song.lowS[k] > 0.5f) return true;
         return false;
     };
     // phrases of 16 beats, restarted at every section boundary (a section always opens a phrase)
@@ -352,7 +352,7 @@ inline float phraseCoherence(const Score& sc, const Phrase& ph, double t, const 
 inline State test06(float tl, double songT0, const SongAnalysis& song, const Score& sc, int godOverride = -1, int camera = 1,
                     float zoom = 1.0f) {
     State s;
-    const double t = songT0 + tl;
+    const double t = songT0 + static_cast<double>(tl);
     const AudioAtT a = sampleSong(song, t);
     std::size_t pi = 0;
     while (pi + 1 < sc.phrases.size() && t >= sc.phrases[pi + 1].start) ++pi;
@@ -404,7 +404,7 @@ inline State test06(float tl, double songT0, const SongAnalysis& song, const Sco
     defaults(s);
     s.legible = sstep(0.82f, 0.95f, s.C);
     s.absorb = sstep(0.7f, 0.95f, s.C); // loose dust is drawn into a formed face (thinner background)
-    const float sinceMid = static_cast<float>(t - a.lastMid);
+    const float sinceMid = static_cast<float>(t - static_cast<double>(a.lastMid));
     // mid onsets flash the face while it is forming; in a withhold the flash is the ONLY time the face appears
     const float flashGain = withhold ? 0.6f : 0.38f;
     s.flash = (s.C > 0.1f && s.C < 0.85f) ? flashGain * a.lastMidS * std::exp(-sinceMid / 0.13f) : 0.0f;

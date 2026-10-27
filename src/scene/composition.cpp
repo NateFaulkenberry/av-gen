@@ -4561,6 +4561,7 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
     case NodeKind::Orb:
     case NodeKind::Grid:
     case NodeKind::Group:
+    case NodeKind::City: // its blocks are generated at rebuild; nothing to validate here
         break;
     }
 

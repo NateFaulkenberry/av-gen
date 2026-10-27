@@ -27,27 +27,6 @@ constexpr float kEps = 1e-5f;
 
 bool finite(float v) { return std::isfinite(v); }
 
-glm::vec3 vec3FromJson(const json& j, glm::vec3 fallback) {
-    if (!j.is_array() || j.size() != 3) {
-        return fallback;
-    }
-    return glm::vec3(j[0].get<float>(), j[1].get<float>(), j[2].get<float>());
-}
-
-json vec3ToJson(const glm::vec3& v) { return json::array({v.x, v.y, v.z}); }
-
-float readFloat(const json& j, const char* key, float fallback) {
-    return j.contains(key) && j.at(key).is_number() ? j.at(key).get<float>() : fallback;
-}
-double readDouble(const json& j, const char* key, double fallback) {
-    return j.contains(key) && j.at(key).is_number() ? j.at(key).get<double>() : fallback;
-}
-bool readBool(const json& j, const char* key, bool fallback) {
-    return j.contains(key) && j.at(key).is_boolean() ? j.at(key).get<bool>() : fallback;
-}
-std::string readString(const json& j, const char* key, std::string fallback = {}) {
-    return j.contains(key) && j.at(key).is_string() ? j.at(key).get<std::string>() : std::move(fallback);
-}
 
 glm::vec3 safeNormalize(const glm::vec3& v, const glm::vec3& fallback) {
     const float len = glm::length(v);

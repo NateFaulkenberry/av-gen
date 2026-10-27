@@ -225,19 +225,6 @@ Result<void> SceneRenderer::init() {
     gpu::PipelineBatch pipelineBatch(device);
 
     // ---- bind group layouts ----
-    auto uniformLayout = [&](const char* label, std::uint64_t minSize, bool dynamic) {
-        wgpu::BindGroupLayoutEntry entry{};
-        entry.binding = 0;
-        entry.visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
-        entry.buffer.type = wgpu::BufferBindingType::Uniform;
-        entry.buffer.hasDynamicOffset = dynamic;
-        entry.buffer.minBindingSize = minSize;
-        wgpu::BindGroupLayoutDescriptor desc{};
-        desc.label = label;
-        desc.entryCount = 1;
-        desc.entries = &entry;
-        return device.CreateBindGroupLayout(&desc);
-    };
     {
         // Group 0 of every scene pass. 0 = FrameUniforms and 15 = the simulated-grid table declared
         // by shaders/fields.wgsl (ADR-032; read-only storage, inert when the scene has no grids).
