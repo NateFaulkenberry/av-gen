@@ -1743,16 +1743,27 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
     for (const std::string& c : sharedDepthChoices) {
         sharedDepthLabels.push_back(c.c_str());
     }
+    // ADR-1802: a row scrolled out of view is a spacer of the height it had when last drawn. Every row is an open
+    // tree of ten-odd widgets, and drawing all of Talking Heads' 1,306 of them was about 4 ms of every live frame.
+    if (routeRowHeights_.size() != routes.size()) {
+        routeRowHeights_.assign(routes.size(), 0.0f);
+    }
+    const float rowSpacing = ImGui::GetStyle().ItemSpacing.y;
     for (std::size_t i = 0; i < routes.size(); ++i) {
         auto& route = routes[i];
-        ImGui::PushID(static_cast<int>(i));
-        const std::string header = route.source + " -> " + route.target;
         // A click on a route in the World panel's Influences list lands here (ADR-211): open it,
         // scroll it into view and mark it, then clear the request so it fires once. Matched on
         // (source, target) rather than an index, because both panels redraw from the same live list
         // and an index is stale the moment a route above it is deleted.
         const bool focused = world.wantsRouteFocus() && route.source == world.focusRouteSource &&
                              route.target == world.focusRouteTarget;
+        if (const float h = routeRowHeights_[i]; !focused && h > 0.0f && !ImGui::IsRectVisible(ImVec2(1.0f, h))) {
+            ImGui::Dummy(ImVec2(1.0f, h));
+            continue;
+        }
+        const float rowTop = ImGui::GetCursorPosY();
+        ImGui::PushID(static_cast<int>(i));
+        const std::string header = route.source + " -> " + route.target;
         if (focused) {
             ImGui::SetNextItemOpen(true);
             world.focusRouteSource.clear();
@@ -1914,9 +1925,11 @@ void ControlPanel::drawRoutesTab(app::Engine& engine) {
             ImGui::TreePop();
         }
         ImGui::PopID();
+        routeRowHeights_[i] = std::max(1.0f, ImGui::GetCursorPosY() - rowTop - rowSpacing);
     }
     if (removeIndex >= 0) {
         routes.erase(routes.begin() + removeIndex);
+        routeRowHeights_.clear(); // the rows below moved up: measure them again
         engine.rebind();
     }
 }

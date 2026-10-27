@@ -683,6 +683,7 @@ private:
     std::vector<RouteLivenessRow> routeLiveness_;
     params::liveness::Registry::SetFindings routeLivenessSet_; // ADR-1802: the set rules' findings, per route
     LivenessSweep routeLivenessSweep_;                         // ADR-1802: which rows the periodic refresh visits next
+    std::vector<float> routeRowHeights_; // ADR-1802: each route row's height when last drawn (0 = not yet)
     int newSourceKind_ = 0;
     char newSourceName_[64] = "wobble";
     char presetName_[64] = "preset";

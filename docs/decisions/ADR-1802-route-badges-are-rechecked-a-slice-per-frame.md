@@ -23,6 +23,10 @@ frame (`LivenessSweep`: `max(8, ceil(rows / 30))`), so a whole sweep takes about
 no frame pays more than its share. The set rules (a later Replace on the same target) are re-judged when a route
 changed and once per sweep. What a badge says is unchanged; it can lag the scene by up to one sweep, as before.
 
+**And the rows themselves.** Every route row is an open tree of ten-odd widgets, all 1,306 drawn every frame: the
+live profile's "UI build and record" was 4.8-5.3 ms. A row scrolled out of view is now a spacer of the height it had
+when last drawn (a focused row, ADR-211, is always drawn; a delete re-measures). UI build and record: 3.4 ms.
+
 ## Consequences
 
 Talking Heads live, LG UltraFine 60 Hz, AC power, `live_perf_baseline.py --scenes talking-heads` (3 reps):
@@ -32,4 +36,6 @@ Talking Heads live, LG UltraFine 60 Hz, AC power, `live_perf_baseline.py --scene
 | before (`3ea9b678`) | 32 | 47.3 ms | 38-44, every 24-30 frames |
 | after | 4 | 36.5 ms | 6-17, no period |
 
-T1-T3 pass again. Event Horizon was already clean (2 misses against a baseline of 3).
+T1-T3 pass again on a quiet machine. With the row clipping too, during a run with another agent compiling (load
+average 40-86), UI build and record fell from 4.8-5.3 to 3.4 ms. The list was checked by eye at its top (a UI capture);
+scrolling through it was not. Event Horizon was already clean (2 misses against a baseline of 3).
