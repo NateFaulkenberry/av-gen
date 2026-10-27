@@ -48,3 +48,16 @@ Scratch: `$SCRATCH/qa2/` (= `/private/tmp/claude-501/-Users-natefaulkenberry-Doc
 - Desktop Feline project: current .json files carry no retired signal; only *.bak files and a stale ADR-1630 comment in
   make_project.py (line 401). Read-only, not edited.
 - Rainbow World's generated scene is absent from worktrees too; I symlinked the owner's (gitignored, excluded locally).
+
+## Later (10:00-11:30)
+
+- 6e5817b0 lab MANUAL CLOCK lamp; e7e06be9 architecture doc.
+- 6cdfb542 ADR-1805: the 17 s scene-switch freeze was the unlit fast-path pipeline built synchronously (mislabelled
+  procedural-refract); deferred to the background in the live editor.
+- 0b3c81a1 stale timeline across project switches (found by the e2e run); a5b6c0aa tools/ci/e2e.py (14/14 pass).
+- eda492a6 live projects' audio routes no longer "dead" at load.
+- 3d84918e TH baseline written (1 miss, p99 36.1, T1-T4). EH 24-30 misses late in the session with BOTH binaries
+  interleaved: machine state; EH baseline untouched.
+- EXR determinism case: 24 parallel runs under contention all pass; not reproduced (ADR-1563's open item).
+- Final CPU suite on 3d84918e: exit 0, 4554 pass / 0 fail / 29 skip / 1 shouldfail (4584 cases), 17m30s.
+- Final GPU suite: running. Report: FINAL-REPORT.md (fill B's final rows when it lands).
