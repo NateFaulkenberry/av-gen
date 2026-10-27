@@ -1252,6 +1252,25 @@ a wound.
      `--gain -24`). It traces the three real test tracks and exits 1 when a response level misses its
      range target. It skips cleanly where the tracks are absent, so it is a local check, not CI's.
 
+## End to end (`tools/ci/e2e.py`)
+
+`python3 tools/ci/e2e.py [--bin build/release] [--out dir]` drives the real application, each run under
+`tools/gpu-lock.sh`. It needs the Mac's GPU and a window, so it is not a hosted-CI job; run it before a merge that
+touches the app, the project load, MIDI or the renderer's lifecycle. About a minute.
+
+- **live:** the editor plays a deterministic 120 BPM track (`tools/make_test_audio.py`), the `midi` ui-script arm
+  creates two CoreMIDI virtual sources and plays a scripted performance through Learn into mappings, and
+  `--open-sequence` switches Hyperspace and Glitch Signal four times (both procedural: no private asset). Judged on:
+  exit 0, `GPU errors: 0`, no `[error]` line, no "unknown targets" (a switch binding the last project's timeline),
+  every switch done, resident memory after the last switch within 25% of after the second, the MIDI mappings
+  installed, an orderly shutdown, and a non-black capture.
+- **headless:** an offline render of 60 frames from 4 s (a seek) to PNGs: exit 0, 60 frames, `GPU errors: 0`, a
+  non-black last frame, an orderly shutdown.
+
+**Not covered:** a physical MIDI device (the sources are virtual), a physical audio input (the track plays from a
+file), window resizing, device loss, and whether any picture is right (non-black is not correct). Its first run found
+the stale-timeline warning on a project switch (fixed in the same pass).
+
 ## The scratchpad is shared by every agent in a session
 
 **"Session-specific" does not mean "yours alone."** Every agent spawned by a session inherits the
