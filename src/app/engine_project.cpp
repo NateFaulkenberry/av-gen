@@ -1131,6 +1131,10 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         bool& ready;
         ~LivenessReady() { ready = true; }
     } livenessGuard{livenessReady_};
+    // The last project's timeline goes now, not at stage 7 where this one's is read: every rebind on the way (the
+    // audio, the stems, the scene) bound the old tracks against the new parameters, and a project switch logged and
+    // recorded "timeline: unknown targets" naming the previous project's targets as this one's warning.
+    timeline_.clear();
     // Back to factory before anything of this project's is applied.
     //
     // Opening a project is a *replacement*, not a merge: a parameter the document does not mention

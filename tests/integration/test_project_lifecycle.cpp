@@ -32,6 +32,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 using namespace avgen;
 namespace fs = std::filesystem;
@@ -319,5 +320,32 @@ TEST_CASE("a close during playback, with no periodic sample, still answers corre
         engine.sampleProjectDirty(false);
         CHECK(engine.projectDirtyCached());
     }
+#endif
+}
+
+// QA pass 2: opening Hyperspace over Glitch Signal logged "timeline: unknown targets: procedural/wallL/..." -- Glitch
+// Signal's tracks, bound against Hyperspace's parameters by the rebinds in the middle of the load -- and the warning
+// was counted against Hyperspace. The last project's timeline is cleared before anything of the new one binds.
+TEST_CASE("opening B over A never binds A's timeline against B", "[project][lifecycle][timeline][regression]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const fs::path a = examples() / "sonic-abstract" / "glitch-signal.json";
+    const fs::path b = examples() / "hyperspace" / "hyperspace.json";
+    REQUIRE(fs::exists(a));
+    REQUIRE(fs::exists(b));
+    app::Engine fresh(app::EngineMode::Offline);
+    REQUIRE(fresh.loadProject(b).has_value());
+    const std::vector<std::string> alone = fresh.projectWarnings();
+
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadProject(a).has_value());
+    REQUIRE(!engine.timeline().empty());
+    REQUIRE(engine.loadProject(b).has_value());
+    for (const std::string& w : engine.projectWarnings()) {
+        INFO(w);
+        CHECK(w.find("unknown targets") == std::string::npos);
+    }
+    CHECK(engine.projectWarnings() == alone); // B's warnings are B's, whatever was open before
 #endif
 }
