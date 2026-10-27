@@ -1,6 +1,9 @@
 # ADR-1854: The flythrough camera is smooth by construction; the river flows
 
 - Status: Accepted, scene/strange-attractor (Gate 2c, 2026-10-27). Refines ADR-1853.
+- Note: the jitter the owner saw survived this fix. Its real cause was the ray reconstruction (ADR-1855), not the
+  path. The path work here stands, but it was not what made the picture shake. The Gate 2c water is superseded by
+  ADR-1855's.
 - Scope: scene-local. No engine code changed.
 - Code:
   - `src/scene/attractor_world.cpp`: `buildFlight`, `smoothSamples`, `attractorCamera`, the flow bake, `bandWarp`

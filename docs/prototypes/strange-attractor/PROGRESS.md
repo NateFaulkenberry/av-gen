@@ -8,7 +8,7 @@
 > - The brief (`00-brief.md`) is kept as written. Where it asks for recursive landmarks and an attractor structure,
 >   the owner's direction overrides it.
 
-Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850-1854).
+Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850-1855).
 Review media: `~/Desktop/av-gen-review/101-strange-attractor/gate<N>/`.
 
 The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`.
@@ -27,9 +27,25 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | 1 | 0 research, 1 skeleton | **approved by the owner** ("solid start - looks fantastic") |
 | 2 | 2 recursive landmarks, 3 branching and the attractor | done; the formations were then **removed by the owner** |
 | 2b | the canyon alone: the fixes, the river, the flythrough | done |
-| 2c | clean-up: camera jitter, geometry, a flowing river, one clean render | **done, awaiting the owner**: media in `gate2c/` |
+| 2c | clean-up: camera jitter, geometry, a flowing river, one clean render | done (the jitter persisted: see 2d) |
+| 2d | the real jitter cause, glassy water, a 46 s flight | **done, awaiting the owner**: media in `gate2d/` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
+
+## Gate 2d (the jitter in the picture): ADR-1855
+
+- **The cause.** The shader reconstructed view rays from `invViewProj` at ndc z = 0 and 1. With a 0.1 m near plane and
+  a 32 km far plane that is ill-conditioned in float32, so the ray direction wandered by up to 0.35 degrees,
+  differently every frame. The whole picture jumped by about 8 px.
+  - The camera itself was smooth; the Gate 2c trace was right about that.
+  - **Fix:** a double-precision camera basis computed on the CPU.
+- **Measured on the videos with a feature tracker:** 8.3 px per-feature jitter became 0.1-0.2 px. The frame-difference
+  irregularity went from 22-31% median to 0%.
+- **Frozen camera:** 0.006/255 per frame with the river on, 0 with it off.
+- **Water:** back to glassy, with one slow, broad, low swell octave along the flow and a sparse bank line. The fine
+  chop and flecks are gone.
+- **The flight is now 46 s.** The reveal is shorter.
+- Scene-local. `shaders/clouds.wgsl` uses the same reconstruction, but its scenes have ordinary far planes.
 
 ## Gate 2c (clean-up): ADR-1854
 
@@ -155,6 +171,8 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
+- 2026-10-27: Gate 2d: the real jitter (ray reconstruction precision) fixed and proven on the video; glassy water;
+  46 s.
 - 2026-10-27: Gate 2c: the jitter measured and fixed (scene-side), the river flows, geometry clean-up, a clean 2x
   supersampled render.
 - 2026-10-27: Gate 2b: the formations removed (owner); the canyon fixed; the river and the flythrough; tests 7 cases.
