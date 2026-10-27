@@ -8,7 +8,7 @@
 > - The brief (`00-brief.md`) is kept as written. Where it asks for recursive landmarks and an attractor structure,
 >   the owner's direction overrides it.
 
-Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850, 1851, 1852, 1853).
+Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850-1854).
 Review media: `~/Desktop/av-gen-review/101-strange-attractor/gate<N>/`.
 
 The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`.
@@ -26,9 +26,23 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 |---|---|---|
 | 1 | 0 research, 1 skeleton | **approved by the owner** ("solid start - looks fantastic") |
 | 2 | 2 recursive landmarks, 3 branching and the attractor | done; the formations were then **removed by the owner** |
-| 2b | the canyon alone: the fixes, the river, the flythrough | **done, awaiting the owner**: media in `gate2b/` |
+| 2b | the canyon alone: the fixes, the river, the flythrough | done |
+| 2c | clean-up: camera jitter, geometry, a flowing river, one clean render | **done, awaiting the owner**: media in `gate2c/` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
+
+## Gate 2c (clean-up): ADR-1854
+
+- **The jitter was scene-side, in the flight builder.** The height was re-clamped to a per-frame terrain clearance
+  after smoothing, and the 2.5 s look-ahead amplified that into the view.
+  - Hard pitch and bank clamps and an end-of-path aim switch made it worse.
+  - Measured with the hidden `[.attractor-camera-trace]` case through the real `Composition::update`:
+    - before: view noise 1.17 px rms, 19 px peaks, 3,566 deg/s² angular acceleration;
+    - after: 0.52 px rms, 1.7 px max, 59 deg/s².
+  - No engine code changed.
+- **The river flows** (a baked flow field, advected streaks, bank foam). The gorge floor is flat at -2 m (no shoals).
+- **Bands are of uneven thickness** (`bandWarp`).
+- **Rendering.** The final render is `--supersample 2`: 182.7 s for 1,620 frames, about 113 ms per frame.
 
 ## Gate 2b (the canyon alone and its flythrough): ADR-1853
 
@@ -141,6 +155,8 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
+- 2026-10-27: Gate 2c: the jitter measured and fixed (scene-side), the river flows, geometry clean-up, a clean 2x
+  supersampled render.
 - 2026-10-27: Gate 2b: the formations removed (owner); the canyon fixed; the river and the flythrough; tests 7 cases.
 - 2026-10-27: Gate 1 approved. Gate 2: the owner's fixes, the formations, the side canyons and the drift; ADR-1851
   and ADR-1852; tests 11 cases, 217 assertions, pass; Gate 2 media rendered.
