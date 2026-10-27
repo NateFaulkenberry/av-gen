@@ -200,9 +200,10 @@ def state_lamp(name, x, y, value, colour, label):
                     "rect": [x - 0.21, y - 0.21, x + 0.21, y + 0.21], "param": f"procedural/{name}/material/emissive"}
 
 
-# ADR-1724: which clock the dial shows. A file grid is one whole-file estimate: its CONF is a single number for the
+# ADR-1724: which clock the dial shows (ADR-1783 added the manual clock, 4: Mark beat on the transport bar). A file grid is one whole-file estimate: its CONF is a single number for the
 # whole file and nothing here can show acquisition, loss or reacquisition -- the lamp says so instead of the dial
 # pretending.
+state_lamp("cManual", 2.3, 0.25, 4.0, (0.9, 0.9, 0.9), "MANUAL CLOCK")  # ADR-1783: a tempo and a marked beat
 state_lamp("cMidi", 5.3, 0.25, 1.0, (0.4, 1.0, 0.5), "MIDI CLOCK")
 state_lamp("cGrid", 7.6, 0.25, 2.0, (1.0, 0.6, 0.1), "FILE GRID: NO LOCK STATE")
 state_lamp("cTracker", 11.4, 0.25, 3.0, (0.3, 0.85, 1.0), "LIVE TRACKER")

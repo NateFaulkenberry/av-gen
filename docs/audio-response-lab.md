@@ -21,9 +21,9 @@ Every indicator is a route from a production signal, so it shows what the bus pu
 **D Beat:**
 - the phase marker (`beat.phase`) and the bar marker;
 - CONF (`audio.tempoConfidence`) and BPM;
-- three lamps for the clock source (`beat.source`, ADR-1724). **FILE GRID: NO LOCK STATE** means the dial is showing
-  a whole-file estimate, and its confidence cannot say whether it is locked. The manual clock (`beat.source` 4,
-  ADR-1783) has no lamp: the lab never sets a tempo override.
+- four lamps for the clock source (`beat.source`, ADR-1724): **MANUAL CLOCK** (4, ADR-1783: a tempo override and a
+  marked beat, Mark beat on the transport bar), **MIDI CLOCK** (1), **FILE GRID: NO LOCK STATE** (2: the dial is
+  showing a whole-file estimate, and its confidence cannot say whether it is locked) and **LIVE TRACKER** (3).
 
 **C Sources:** one column per key: `drums`, `bass`, `synth` and `pad`. Map live input sources or stems with those
 keys.

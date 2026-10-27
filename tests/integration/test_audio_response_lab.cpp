@@ -25,6 +25,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -172,6 +173,33 @@ TEST_CASE("Audio Response Lab: every indicator shows the published value on its 
     }
     CHECK(meters > 0);
     CHECK(lamps > 0);
+    // The clock lamps (`beat.source` == 1 MIDI, 2 file grid, 3 live tracker, 4 manual): lit exactly while the source
+    // is theirs, 0.9 over their rest. Until 2026-10-27 the manual clock (ADR-1783) had no lamp.
+    std::set<int> values;
+    std::set<double> rests;
+    for (const auto& [name, ind] : layout.items()) {
+        if (ind["kind"].get<std::string>() != "state") {
+            continue;
+        }
+        INFO(name);
+        const int value = static_cast<int>(ind["value"].get<double>());
+        values.insert(value);
+        const std::string final = "final:" + ind["param"].get<std::string>() + "[0]";
+        REQUIRE(t.col.contains("beat.source"));
+        REQUIRE(t.col.contains(final));
+        const auto& v = t.col.at("beat.source");
+        const auto& f = t.col.at(final);
+        // Every lamp rests at the same glow, so a lamp lit through the whole fixture is judged by the others' rest.
+        REQUIRE(!v.empty());
+        const double rest = f[0] - (std::abs(v[0] - value) < 0.5 ? 0.9 : 0.0);
+        rests.insert(std::round(rest * 1000.0));
+        for (std::size_t i = 0; i < v.size(); ++i) {
+            const bool lit = std::abs(v[i] - value) < 0.5;
+            CHECK(std::abs(f[i] - (rest + (lit ? 0.9 : 0.0))) < 1e-3);
+        }
+    }
+    CHECK(values == std::set<int>{1, 2, 3, 4});
+    CHECK(rests.size() == 1);
 }
 
 TEST_CASE("Audio Response Lab: an absent source reads as absent, never as a level", "[audiolab][stems][adr1720]") {

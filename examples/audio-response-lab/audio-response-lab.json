@@ -516,6 +516,30 @@
   },
   {
    "source": "beat.source",
+   "target": "procedural/cManual/material/emissive",
+   "amount": 0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 3.5
+   }
+  },
+  {
+   "source": "beat.source",
+   "target": "procedural/cManual/material/emissive",
+   "amount": -0.9,
+   "op": "add",
+   "polarity": "unipolar",
+   "component": -1,
+   "chain": {
+    "threshold": "binary",
+    "thresholdLevel": 4.5
+   }
+  },
+  {
+   "source": "beat.source",
    "target": "procedural/cMidi/material/emissive",
    "amount": 0.9,
    "op": "add",
@@ -1287,6 +1311,18 @@
     ],
     "radius": 2.3,
     "param": "procedural/dialNeedle/distribution/startAngle"
+   },
+   "cManual": {
+    "kind": "state",
+    "signal": "beat.source",
+    "value": 4.0,
+    "rect": [
+     2.09,
+     0.04000000000000001,
+     2.51,
+     0.45999999999999996
+    ],
+    "param": "procedural/cManual/material/emissive"
    },
    "cMidi": {
     "kind": "state",
