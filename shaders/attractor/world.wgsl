@@ -138,10 +138,10 @@ fn fieldAt(xz: vec2<f32>) -> vec4<f32> {
     let b = textureLoad(heightTex, i0 + vec2<i32>(1, 0), 0).rg;
     let c = textureLoad(heightTex, i0 + vec2<i32>(0, 1), 0).rg;
     let d = textureLoad(heightTex, i0 + vec2<i32>(1, 1), 0).rg;
-    // smoothstep-weighted bilinear: hides the texel grid on the faces without a 16-tap filter
-    let s = f * f * (3.0 - 2.0 * f);
-    let w = mix(f, s, 0.6);
-    let v = mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
+    // Plain bilinear. (Gate 1 weighted it toward smoothstep to hide the texel grid in the shading; that flattened the
+    // surface at every texel centre, so on a face the strata contours -- and the ledges `bandCut` cuts along them --
+    // zigzagged at texel spacing. The shading normal now comes from `gradientSmooth`, which hides the grid itself.)
+    let v = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
     let gx = mix(b.x - a.x, d.x - c.x, f.y) / au.heights.z;
     let gz = mix(c.x - a.x, d.x - b.x, f.x) / au.heights.z;
     return vec4<f32>(v.x, v.y, gx, gz);
