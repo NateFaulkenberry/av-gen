@@ -284,8 +284,7 @@ void Analyzer::computeFrame() {
         // bass, low-mid, mid, high-mid, treble
         constexpr std::array<float, 5> kBeatWeights{1.0f, 0.5f, 0.25f, 0.15f, 0.1f};
         constexpr std::array<float, 5> kLowWeights{1.0f, 0.3f, 0.0f, 0.0f, 0.0f};
-        // -60 dB: a band rising out of near-silence (a file's first audible samples, a fade-in) is not an attack.
-        constexpr double kFloorPower = 1e-8;
+        constexpr double kFloorPower = 1e-8; // -80 dB: digital silence rises by nothing
         float rise = 0.0f;
         float lowRise = 0.0f;
         for (std::size_t b = 0; b < impl.bandCount; ++b) {

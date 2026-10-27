@@ -79,6 +79,12 @@ std::optional<std::filesystem::path> scoreWav() {
 void directedWithEffects(app::Engine& engine) {
     engine.newComposition();
     REQUIRE(engine.loadAudio(*scoreWav()).has_value());
+    // The score's own clock, set by hand (ADR-1783): tools/make_glowmere_score.py writes it at 72 BPM from 0 s, with
+    // the pulse on beats 1 and 3 only, which a tracker can read at more than one metrical level (it has read 122.6 and
+    // 144). The cut is this test's subject, not that reading.
+    engine.setTempoOverride(72.0);
+    engine.setBeatAnchor(0.0);
+    REQUIRE(engine.manualBeatClock());
     REQUIRE(engine.composition()->setHeroes(threeHeroes()).has_value());
     // ADR-702: both on the World, where a Ground Pulse's source is "whoever the cut holds".
     REQUIRE(engine
