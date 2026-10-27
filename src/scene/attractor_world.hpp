@@ -90,6 +90,7 @@ struct AttractorWorld {
     std::vector<float> height;         // res*res metres, row-major (z rows, x columns)
     std::vector<float> strataOffset;   // res*res: the strata coordinate minus the height (tilt, warp, fold)
     std::vector<std::uint32_t> masks;  // res*res RGBA8: r rock, g playa (valley floor), b cavity, a ridge
+    std::vector<std::uint32_t> flow;   // res*res RGBA8: rg the river's downstream direction, b distance from the channel (m), a in a channel
     float minHeight = 0.0f;
     float maxHeight = 0.0f;
     std::vector<AttractorMass> masses;
@@ -104,6 +105,7 @@ struct AttractorWorld {
     // ADR-1853: the flythrough, sampled at kFlightRate: xyz the eye, w the bank (radians). Precomputed with the
     // world, so a frame's pose is a pure function of its second.
     std::vector<glm::vec4> flight;
+    std::vector<glm::vec4> flightAim;  // per sample: xyz the unit view direction (smoothed; ADR-1854)
     static constexpr float kFlightRate = 30.0f;
     float viewAzimuth = 0.0f;          // radians: atan2 of the view direction's (x, z)
     std::uint32_t noiseSeed = 0;       // the noise seed (the shader's strata use the same one)

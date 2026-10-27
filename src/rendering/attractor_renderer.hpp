@@ -40,6 +40,7 @@ private:
     wgpu::Buffer uniforms_;
     wgpu::Texture height_;
     wgpu::Texture masks_;
+    wgpu::Texture flow_; // ADR-1854: the river's downstream direction
     wgpu::Sampler sampler_;
     std::uint64_t worldHash_ = 0;
     std::uint64_t uploads_ = 0;

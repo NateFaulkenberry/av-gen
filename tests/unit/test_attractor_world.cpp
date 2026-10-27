@@ -17,6 +17,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <thread>
 
 using namespace avgen;
@@ -246,7 +248,7 @@ TEST_CASE("the flythrough is deterministic, smooth, inside the world and never t
         CHECK(maxRoll <= 0.2f + 1e-4f);
         // the pose: starts at the composed vista, looks ahead, and holds after the end
         const auto p0 = scene::attractorCamera(*w, scene::AttractorCameraMode::Flight, 0.0);
-        CHECK(glm::length(p0.eye - w->eye) < 1.0f);
+        CHECK(glm::length(p0.eye - w->eye) < 5.0f); // the flight opens on the vista (smoothing may settle a few metres)
         const auto pm = scene::attractorCamera(*w, scene::AttractorCameraMode::Flight, 25.0);
         CHECK(glm::length(pm.target - pm.eye) > 20.0f);
         const auto pe = scene::attractorCamera(*w, scene::AttractorCameraMode::Flight, 1000.0);
@@ -255,4 +257,35 @@ TEST_CASE("the flythrough is deterministic, smooth, inside the world and never t
         const auto pc = scene::attractorCamera(*w, scene::AttractorCameraMode::Composed, 25.0);
         CHECK(pc.eye == w->eye);
     }
+}
+
+// A measurement, not a check: the scene camera of the flythrough frame by frame, stepped as an offline render steps it,
+// written to $AVGEN_CAMERA_TRACE (CSV). Hidden; run by hand.
+TEST_CASE("attractor flythrough camera trace (hidden)", "[.attractor-camera-trace]") {
+    const char* out = std::getenv("AVGEN_CAMERA_TRACE");
+    const char* scenePath = std::getenv("AVGEN_CAMERA_TRACE_SCENE");
+    REQUIRE(out != nullptr);
+    REQUIRE(scenePath != nullptr);
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::loadFile(scenePath, registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    std::FILE* f = std::fopen(out, "w");
+    REQUIRE(f != nullptr);
+    std::fprintf(f, "frame,t,px,py,pz,fx,fy,fz,ux,uy,uz\n");
+    for (int i = 0; i < 54 * 30 + 1; ++i) {
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = i / 30.0;
+        ft.deltaTime = 1.0 / 30.0;
+        ft.frameIndex = static_cast<std::uint64_t>(i);
+        (*c)->update(ft);
+        const scene::Camera& cam = (*c)->scene().camera;
+        const glm::vec3 fw = glm::normalize(cam.target - cam.position);
+        std::fprintf(f, "%d,%.6f,%.4f,%.4f,%.4f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n", i, i / 30.0, cam.position.x, cam.position.y,
+                     cam.position.z, fw.x, fw.y, fw.z, cam.up.x, cam.up.y, cam.up.z);
+    }
+    std::fclose(f);
 }

@@ -26,6 +26,7 @@ struct AttractorUniforms {
 @group(0) @binding(2) var heightTex: texture_2d<f32>;
 @group(0) @binding(3) var maskTex: texture_2d<f32>;
 @group(0) @binding(4) var maskSampler: sampler;
+@group(0) @binding(5) var flowTex: texture_2d<f32>; // ADR-1854: rg the river's downstream direction, b distance, a channel
 
 const P_ZENITH: u32 = 0u;
 const P_HORIZON: u32 = 1u;
@@ -143,15 +144,26 @@ fn fieldAt(xz: vec2<f32>) -> vec4<f32> {
 
 // The strata's band profile (scene/attractor_world.cpp `bandProfile`; the generator's riser is 0.2). Here the riser
 // widens with distance: a ledge the size of a pixel aliases into hatching, a softened one does not.
+// The band coordinate: the strata coordinate under a monotone wobble, so bands are of uneven thickness
+// (scene/attractor_world.cpp `bandWarp`, line for line). x the warped coordinate, y its derivative.
+fn bandWarp(s: f32) -> vec2<f32> {
+    let band = au.strata.z;
+    let a = s / (band * 2.3) + 0.7;
+    let b = s / (band * 0.93) + 1.7;
+    return vec2<f32>(s + band * (0.32 * sin(a) + 0.18 * sin(b)), 1.0 + 0.32 / 2.3 * cos(a) + 0.18 / 0.93 * cos(b));
+}
+
 fn bandProfile(s: f32, riser: f32) -> f32 {
     let band = au.strata.z;
-    let t = s / band;
+    let u = bandWarp(s);
+    let t = u.x / band;
     let i = floor(t);
     let f = t - i;
     let hard = smoothstep(0.35, 0.75, bandHardness(i));
     let gg = clamp((f - (1.0 - riser)) / riser, 0.0, 1.0);
     let st = gg * gg * (3.0 - 2.0 * gg);
-    return (i + f + (st - f) * hard) * band;
+    let tu = (i + f + (st - f) * hard) * band;
+    return s + (tu - u.x) / u.y;
 }
 
 // The bands cut again on the steep faces, at sub-texel scale: a face spans less than a texel horizontally, so the
@@ -236,7 +248,7 @@ fn masksAt(xz: vec2<f32>) -> vec4<f32> {
 // Faded out with distance.
 fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
     // metre-scale relief is sub-pixel beyond a kilometre and only aliases (a woven grid on the faces): fade it out
-    let fade = 1.0 - smoothstep(300.0, 1100.0, dist);
+    let fade = 1.0 - smoothstep(250.0, 900.0, dist);
     if (fade <= 0.0 || au.look.w <= 0.0) {
         return 0.0;
     }
@@ -244,11 +256,10 @@ fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
     let slope = length(fd.zw);
     let steep = smoothstep(0.6, 1.6, slope);
     // flats
+    // flats: rounded weathered relief (stepped plates drew stair-stepped silhouettes and specks on rims)
     let b1 = vnoise(xz / 7.0);
-    let blocks = (floor(b1 * 5.0) + smoothstep(0.35, 1.0, fract(b1 * 5.0))) / 5.0; // soft risers: sharp ones self-shadow into specks
     let b2 = vnoise(kOct * xz / 2.6 + vec2<f32>(7.3, 1.1));
-    let chips = (floor(b2 * 4.0) + smoothstep(0.3, 1.0, fract(b2 * 4.0))) / 4.0;
-    let flat = 1.4 * blocks + 0.6 * chips - 1.0;
+    let flat = 1.2 * b1 + 0.5 * b2 - 0.85;
     // faces: (along, up) on the face
     var face = 0.0;
     if (steep > 0.0) {
@@ -257,18 +268,21 @@ fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
         let up = fd.x + fd.y; // the strata coordinate: height on the face
         // beds of uneven thickness (the coordinate is wobbled before it is cut), recessed softly at their partings;
         // sparse broad joints, so the face reads as rock rather than brickwork; a broad weathering skin
-        let bu = up / 6.0 + 0.45 * vnoise(vec2<f32>(along / 60.0, up / 19.0));
+        // beds of strongly uneven thickness (two incommensurate periods, warped along the face), each bed's
+        // parting expressed only in some places, so the face never shows evenly spaced lines
+        let bu = up / 7.3 + 0.9 * vnoise(vec2<f32>(along / 45.0, up / 13.0)) + 0.35 * sin(up / 3.1);
         let bed = fract(bu);
-        let beds = smoothstep(0.0, 0.35, bed) * smoothstep(1.0, 0.75, bed);
-        let joint = vnoise(vec2<f32>(along / 32.0, floor(bu) * 1.37));
-        let blocky = smoothstep(0.55, 0.8, joint);
+        let showing = smoothstep(0.35, 0.7, vnoise(vec2<f32>(along / 25.0, floor(bu) * 2.1)));
+        let beds = 1.0 - (1.0 - smoothstep(0.0, 0.3, bed) * smoothstep(1.0, 0.8, bed)) * showing;
         let skin = vnoise(vec2<f32>(along / 11.0, up / 7.0));
-        face = 0.5 * beds + 0.3 * blocky + 0.25 * skin - 0.55;
+        face = 0.35 * beds + 0.3 * skin - 0.5;
     }
     let relief = mix(flat, face, steep);
     let onRock = 0.25 + 0.75 * m.r;
     // on a face, `relief` metres of height move the face `relief / slope` sideways: about a metre and a half of depth
-    let gain = mix(1.0, 1.5 * clamp(slope, 1.0, 6.0), steep);
+    // On a steep face the pattern's `up` changes by `slope` metres per horizontal metre, so the march samples it
+    // coarsely across the face: the gain is capped (a high one turned that undersampling into a vertical comb).
+    let gain = mix(1.0, 1.1 * clamp(slope, 1.0, 2.5), steep);
     return relief * onRock * gain * fade * au.look.w;
 }
 
@@ -417,7 +431,7 @@ fn bandHardness(bi: f32) -> f32 {
 fn strataColour(s: f32, xz: vec2<f32>) -> vec3<f32> {
     let seed = bitcast<u32>(au.look2.z);
     let band = au.strata.z;
-    let t = s / band;
+    let t = bandWarp(s).x / band; // the bands' own (uneven) coordinate
     let bi = floor(t);
     let bf = t - bi;
     let q = bi * 0.23;
@@ -568,18 +582,42 @@ fn shadeReflected(p: vec3<f32>, t: f32) -> vec3<f32> {
 
 // The river's surface at `p` seen along `rd`: the sky and the canyon reflected (Schlick's Fresnel on a still surface
 // stirred by fine ripples), over a dark body of water.
+// The river (ADR-1854): moving water, not a mirror.
+//   * Ripples and long flow streaks advected downstream along the baked flow direction, stretched along it, at about
+//     3 m/s; they bend the reflection and break up its edges.
+//   * Foam where the water is shallow against the banks, drawn out downstream; a few drifting flecks in the current.
+//   * The reflection itself (the canyon and the sky, Schlick's Fresnel) over a dark body that warms in the shallows.
+fn flowAt(xz: vec2<f32>) -> vec4<f32> {
+    let uv = (xz - au.world.xy) / au.world.z;
+    return textureSampleLevel(flowTex, maskSampler, uv, 0.0);
+}
+
 fn shadeWater(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
-    let near = 1.0 - smoothstep(200.0, 2500.0, t);
-    let q = p.xz / 6.0 + vec2<f32>(0.0, au.heights.w * 0.1);
-    let e = 0.15;
-    let rx = vnoise(q + vec2<f32>(e, 0.0)) - vnoise(q - vec2<f32>(e, 0.0)) + 0.5 * (vnoise(q * 2.7 + vec2<f32>(e, 3.0)) - vnoise(q * 2.7 - vec2<f32>(e, -3.0)));
-    let rz = vnoise(q + vec2<f32>(0.0, e)) - vnoise(q - vec2<f32>(0.0, e)) + 0.5 * (vnoise(q * 2.7 + vec2<f32>(3.0, e)) - vnoise(q * 2.7 - vec2<f32>(-3.0, e)));
-    let n = normalize(vec3<f32>(-rx * 0.035 * near, 1.0, -rz * 0.035 * near));
+    let near = 1.0 - smoothstep(150.0, 2500.0, t);
+    let fl = flowAt(p.xz);
+    var dir = fl.xy * 2.0 - 1.0;
+    dir = select(vec2<f32>(1.0, 0.0), normalize(dir), dot(dir, dir) > 0.01);
+    let across = vec2<f32>(-dir.y, dir.x);
+    let time = au.heights.w;
+    let speed = 3.2;
+    let u = dot(p.xz, dir) - speed * time; // along the current, moving downstream
+    let v = dot(p.xz, across);
+    // ripples stretched along the flow (long streaks) plus a finer cross-chop
+    let e = 0.2;
+    let f1 = vec2<f32>(u / 7.0, v / 1.6);
+    let f2 = vec2<f32>(u / 2.2, v / 0.9) + vec2<f32>(5.1, 2.3);
+    // each octave fades out before it is smaller than a pixel (a sub-pixel chop is glitter and speckled edges)
+    let w1 = 1.0 - smoothstep(350.0, 1400.0, t);
+    let w2 = 0.4 * (1.0 - smoothstep(60.0, 260.0, t));
+    let hu = w1 * (vnoise(f1 + vec2<f32>(e, 0.0)) - vnoise(f1 - vec2<f32>(e, 0.0))) / 7.0 + w2 * (vnoise(f2 + vec2<f32>(e, 0.0)) - vnoise(f2 - vec2<f32>(e, 0.0))) / 2.2;
+    let hv = w1 * (vnoise(f1 + vec2<f32>(0.0, e)) - vnoise(f1 - vec2<f32>(0.0, e))) / 1.6 + w2 * (vnoise(f2 + vec2<f32>(0.0, e)) - vnoise(f2 - vec2<f32>(0.0, e))) / 0.9;
+    // gentle: the reflection must survive (and a strong chop aliases into glitter at a distance)
+    let slope = (dir * hu + across * hv) * 0.3;
+    let n = normalize(vec3<f32>(-slope.x, 1.0, -slope.y));
     var r = reflect(rd, n);
     r.y = max(r.y, 0.002);
     let cosT = clamp(-dot(rd, n), 0.0, 1.0);
     let fres = 0.02 + 0.98 * pow(1.0 - cosT, 5.0);
-    // what the river reflects: the canyon, or the sky
     let ro2 = p + vec3<f32>(0.0, 0.05, 0.0);
     let t2 = march(ro2, r, 6000.0);
     var refl: vec3<f32>;
@@ -589,8 +627,18 @@ fn shadeWater(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     } else {
         refl = skyColour(r);
     }
+    // the body: dark, warming over the shallow edges where the bed shows through
+    let depth = kWaterY - heightBase(p.xz);
     let body = mix(pal(P_ROCK), pal(P_AMBIENT), 0.35) * 0.18 * au.look2.x;
-    return mix(body, refl, fres);
+    var col = mix(body, refl, fres);
+    // foam: along the banks where it is shallow, drawn out downstream; flecks drifting in the current
+    let streak = vnoise(vec2<f32>(u / 11.0, v / 0.7));
+    let bankFoam = (1.0 - smoothstep(0.05, 0.55, depth)) * smoothstep(0.45, 0.8, streak);
+    let fleck = smoothstep(0.86, 0.95, vnoise(vec2<f32>(u / 3.0, v / 0.6) + vec2<f32>(17.0, 3.0))) * 0.35 * near;
+    let foam = clamp(bankFoam + fleck, 0.0, 1.0) * fl.a;
+    let lit = pal(P_AMBIENT) * 0.5 * au.look2.x + pal(P_SUN) * 1.2 * au.sun.w * max(au.sun.y, 0.0);
+    col = mix(col, pal(P_PLAYA) * lit, foam * 0.55);
+    return col;
 }
 
 struct WorldOut {

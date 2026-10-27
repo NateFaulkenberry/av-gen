@@ -131,15 +131,25 @@ std::uint64_t mixHashF(std::uint64_t h, float v) {
 // The strata's band profile (shared, line for line, with world.wgsl's `bandProfile`): the coordinate `s` mapped to the
 // height the rock keeps. Each band is hard or soft by a per-band hash. A hard band (a cliff-former) rises in the last
 // fifth of its thickness and leaves a ledge; a soft band (a slope-former) keeps the slope it was given.
+// The strata's band coordinate (ADR-1854): the strata coordinate under a monotone wobble, so the bands are of uneven
+// thickness (about 0.7 to 1.35 of `band`) -- evenly spaced bands read as synthetic. Shared with world.wgsl
+// `bandWarp`, line for line. Returns (the warped coordinate, its derivative).
+glm::vec2 bandWarp(float s, float band) {
+    const float a = s / (band * 2.3f) + 0.7f, b = s / (band * 0.93f) + 1.7f;
+    return {s + band * (0.32f * std::sin(a) + 0.18f * std::sin(b)), 1.0f + 0.32f / 2.3f * std::cos(a) + 0.18f / 0.93f * std::cos(b)};
+}
+
 float bandProfile(float s, float band, std::uint32_t seed) {
-    const float t = s / band;
+    const glm::vec2 u = bandWarp(s, band);
+    const float t = u.x / band;
     const float i = std::floor(t);
     const float f = t - i;
     const float hard = smoothstepf(0.35f, 0.75f, hash01(static_cast<std::int32_t>(i), 7, seed));
     const float riser = 0.2f;
     const float gg = std::clamp((f - (1.0f - riser)) / riser, 0.0f, 1.0f);
     const float step = gg * gg * (3.0f - 2.0f * gg);
-    return (i + f + (step - f) * hard) * band;
+    const float Tu = (i + f + (step - f) * hard) * band;
+    return s + (Tu - u.x) / u.y; // back to the strata coordinate, to first order
 }
 
 // ---- the layout ---------------------------------------------------------------------------------------------------
@@ -163,7 +173,8 @@ glm::vec2 catmull(glm::vec2 p0, glm::vec2 p1, glm::vec2 p2, glm::vec2 p3, float 
 
 namespace {
 
-// Gaussian smoothing of a sampled signal, clamped at its ends.
+// Gaussian smoothing of a sampled signal. The ends are extended by odd reflection (x_{-k} = 2 x_0 - x_k), so a signal
+// moving linearly at an end is left exactly as it is there (a clamped extension would bend it).
 template <class T>
 std::vector<T> smoothSamples(const std::vector<T>& in, float sigmaSamples) {
     if (in.size() < 3 || !(sigmaSamples > 0.0f)) return in;
@@ -179,7 +190,16 @@ std::vector<T> smoothSamples(const std::vector<T>& in, float sigmaSamples) {
     for (int i = 0; i < n; ++i) {
         T acc{};
         for (int j = -r; j <= r; ++j) {
-            acc += in[static_cast<std::size_t>(std::clamp(i + j, 0, n - 1))] * (k[static_cast<std::size_t>(j + r)] / sum);
+            const int q = i + j;
+            T v;
+            if (q < 0) {
+                v = in[0] * 2.0f - in[static_cast<std::size_t>(std::min(-q, n - 1))];
+            } else if (q >= n) {
+                v = in[static_cast<std::size_t>(n - 1)] * 2.0f - in[static_cast<std::size_t>(std::max(2 * (n - 1) - q, 0))];
+            } else {
+                v = in[static_cast<std::size_t>(q)];
+            }
+            acc += v * (k[static_cast<std::size_t>(j + r)] / sum);
         }
         out[static_cast<std::size_t>(i)] = acc;
     }
@@ -231,68 +251,100 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     float sa = s0;
     for (int k = 0; k < n; ++k) {
         const float t = static_cast<float>(k) / rate;
-        // speed along the gorge: slow in the dive, fast on the river, slowing for the reveal
-        const float v = (45.0f + 35.0f * phase(t, 0.12f, 0.25f) - 10.0f * phase(t, 0.62f, 0.75f) -
-                         40.0f * phase(t, 0.82f, 1.0f)) * S;
-        if (t > 0.14f * D) sa += v / rate * phase(t, 0.14f, 0.24f);
+        // speed along the gorge: easing in through the dive, fast on the river, slowing for the climb and the reveal
+        const float v = (45.0f + 35.0f * phase(t, 0.10f, 0.22f) - 10.0f * phase(t, 0.66f, 0.76f) -
+                         40.0f * phase(t, 0.84f, 1.0f)) * S;
+        sa += v / rate * phase(t, 0.06f, 0.16f);
         const glm::vec2 gxz = gorgeAt(sa);
         // height above the floor: low on the river with a slow swell, rising through the climb and the reveal
         float alt = (34.0f + 9.0f * std::sin(t * 0.55f)) * S;
-        alt += (plateau + 70.0f * S - alt) * phase(t, 0.66f, 0.84f);
-        alt += 40.0f * S * phase(t, 0.84f, 1.0f);
-        const glm::vec3 river(gxz.x, w.sample(gxz) + alt, gxz.y);
+        alt += (plateau + 70.0f * S - alt) * phase(t, 0.70f, 0.85f);
+        alt += 40.0f * S * phase(t, 0.85f, 1.0f);
+        const glm::vec3 river(gxz.x, -2.0f + alt, gxz.y); // the gorge floor's height, not a sample of it: no noise
         // the vista: the composed eye, easing forward
         const glm::vec3 vista = w.eye + glm::vec3(fwd.x, 0.0f, fwd.y) * (30.0f * t);
-        const float b = phase(t, 0.04f, 0.28f); // the dive: about thirteen seconds off the lip into the gorge
+        const float b = phase(t, 0.03f, 0.19f); // the dive: about nine seconds off the lip into the gorge
         raw[static_cast<std::size_t>(k)] = glm::mix(vista, river, b);
     }
-    // smooth, then keep clear of the land: lift above everything within 22 m, smooth again, until it holds
-    // smooth (faded in from the start, so the first frame is the composed vista exactly)
-    const std::vector<glm::vec3> smoothed = smoothSamples(raw, 0.6f * rate);
-    std::vector<glm::vec3> path(raw.size());
-    for (std::size_t i = 0; i < raw.size(); ++i) {
-        path[i] = glm::mix(raw[i], smoothed[i], phase(static_cast<float>(i) / rate, 0.0f, 0.06f));
-    }
+    // smooth (the odd-reflected ends keep the vista's linear push exact at frame 0)
+    const std::vector<glm::vec3> path = smoothSamples(raw, 0.6f * rate);
+    // Height (ADR-1854). The clearance is the highest ground within 22 m, plus a margin; it moves by metres from one
+    // sample to the next as the path crosses metre-scale relief, so it must never reach the camera directly (Gate 2b
+    // re-clamped to it after smoothing, and that noise -- magnified by the look-ahead -- was the jitter). So: lift by a
+    // cone envelope, y_i = max_j (c_j - k |i - j|), which is above every c_j and climbs or falls at most k m/s; then
+    // smooth. The margin (22 m) is larger than anything the smoothing can take off a peak.
     const auto clearance = [&](glm::vec3 p) {
         float hmax = w.sample(glm::vec2(p.x, p.z));
-        for (int a = 0; a < 8; ++a) {
-            const float ang = static_cast<float>(a) * 0.7853982f;
+        for (int a = 0; a < 12; ++a) {
+            const float ang = static_cast<float>(a) * 0.5235988f;
             hmax = std::max(hmax, w.sample(glm::vec2(p.x, p.z) + 22.0f * glm::vec2(std::cos(ang), std::sin(ang))));
         }
-        return hmax + 14.0f;
+        return hmax + 24.0f;
     };
-    // Height: the wanted height or the clearance, whichever is higher, lifted by a cone envelope --
-    // y_i = max_j (c_j - k |i - j|) -- which is above every c_j and climbs or falls at most k m/s; then a light
-    // smoothing, allowed to settle at most 5 m into the 14 m margin.
     std::vector<float> c(path.size());
     for (std::size_t i = 0; i < path.size(); ++i) c[i] = std::max(path[i].y, clearance(path[i]));
-    const float kRise = 28.0f * S / rate; // metres per sample
+    // falling is limited by the forward pass, climbing by the backward one: a dive may drop at 45 m/s, a climb rises at
+    // 24 m/s
+    const float kFall = 45.0f * S / rate, kClimb = 24.0f * S / rate; // metres per sample
+    // two rounds: envelope, smooth; the second envelope is taken over max(smoothed, clearance), so whatever the first
+    // smoothing shaved off a peak is put back before the second, smaller smoothing
     std::vector<float> ys(c);
-    for (std::size_t i = 1; i < ys.size(); ++i) ys[i] = std::max(ys[i], ys[i - 1] - kRise);
-    for (std::size_t i = ys.size() - 1; i-- > 0;) ys[i] = std::max(ys[i], ys[i + 1] - kRise);
-    ys = smoothSamples(ys, 0.35f * rate);
-    for (std::size_t i = 0; i < ys.size(); ++i) ys[i] = std::max(ys[i], c[i] - 5.0f);
-    ys[0] = path[0].y;
-    // bank: proportional to the turn rate, toward the turn
-    std::vector<float> heading(path.size(), 0.0f);
-    for (std::size_t i = 0; i < path.size(); ++i) {
-        const std::size_t a = i == 0 ? 0 : i - 1, b2 = std::min(i + 1, path.size() - 1);
-        heading[i] = std::atan2(path[b2].z - path[a].z, path[b2].x - path[a].x);
+    for (int round = 0; round < 2; ++round) {
+        for (std::size_t i = 1; i < ys.size(); ++i) ys[i] = std::max(ys[i], ys[i - 1] - kFall);
+        for (std::size_t i = ys.size() - 1; i-- > 0;) ys[i] = std::max(ys[i], ys[i + 1] - kClimb);
+        ys = smoothSamples(ys, (round == 0 ? 0.9f : 0.5f) * rate);
+        if (round == 0) {
+            for (std::size_t i = 0; i < ys.size(); ++i) ys[i] = std::max(ys[i], c[i]);
+        }
     }
-    std::vector<float> turn(path.size(), 0.0f);
-    for (std::size_t i = 1; i + 1 < path.size(); ++i) {
+    std::vector<glm::vec3> eyes(path.size());
+    for (std::size_t i = 0; i < path.size(); ++i) eyes[i] = glm::vec3(path[i].x, ys[i], path[i].z);
+    // Aim (ADR-1854): from the smooth eye path 2.5 s ahead (the tangent extended past the end), a little below it, the
+    // pitch held softly between -28 and +8 degrees; then smoothed itself, so no clamp or sample can kink it.
+    const int ahead = static_cast<int>(2.5f * rate);
+    const int last = static_cast<int>(eyes.size()) - 1;
+    std::vector<glm::vec3> aim(eyes.size());
+    for (int i = 0; i <= last; ++i) {
+        glm::vec3 target;
+        if (i + ahead <= last) {
+            target = eyes[static_cast<std::size_t>(i + ahead)];
+        } else {
+            const glm::vec3 tangent = eyes[static_cast<std::size_t>(last)] - eyes[static_cast<std::size_t>(std::max(0, last - 15))];
+            target = eyes[static_cast<std::size_t>(last)] + tangent * (static_cast<float>(i + ahead - last) / 15.0f);
+        }
+        glm::vec3 d = target - eyes[static_cast<std::size_t>(i)];
+        d.y -= 0.12f * glm::length(d);
+        const float flat = std::max(glm::length(glm::vec2(d.x, d.z)), 1e-3f);
+        const float raw = std::atan2(d.y, flat);
+        // a soft clamp: -28..+8 degrees through tanh, so the limit is approached smoothly
+        const float mid = glm::radians(-10.0f), half = glm::radians(18.0f);
+        const float pitch = mid + half * std::tanh((raw - mid) / half);
+        const glm::vec2 h = glm::vec2(d.x, d.z) / flat;
+        aim[static_cast<std::size_t>(i)] = glm::vec3(h.x * std::cos(pitch), std::sin(pitch), h.y * std::cos(pitch));
+    }
+    {
+        const std::vector<glm::vec3> sm = smoothSamples(aim, 0.5f * rate);
+        for (std::size_t i = 0; i < aim.size(); ++i) aim[i] = glm::normalize(sm[i]);
+    }
+    // bank: toward the turn, proportional to the turn rate through a soft (tanh) limit of 11.5 degrees
+    std::vector<float> heading(eyes.size(), 0.0f);
+    for (std::size_t i = 0; i < eyes.size(); ++i) heading[i] = std::atan2(aim[i].z, aim[i].x);
+    std::vector<float> turn(eyes.size(), 0.0f);
+    for (std::size_t i = 1; i + 1 < eyes.size(); ++i) {
         float dh = heading[i + 1] - heading[i - 1];
         while (dh > kPi) dh -= 2.0f * kPi;
         while (dh < -kPi) dh += 2.0f * kPi;
         turn[i] = dh * rate * 0.5f; // radians per second
     }
     turn = smoothSamples(turn, 0.8f * rate);
-    w.flight.resize(path.size());
-    for (std::size_t i = 0; i < path.size(); ++i) {
+    w.flight.resize(eyes.size());
+    w.flightAim.resize(eyes.size());
+    for (std::size_t i = 0; i < eyes.size(); ++i) {
         const float ti = static_cast<float>(i) / rate;
         // banking on the river only: none in the vista, and none over the reveal, where a tilted horizon distracts
-        const float roll = std::clamp(-1.6f * turn[i], -0.2f, 0.2f) * phase(ti, 0.1f, 0.25f) * (1.0f - phase(ti, 0.66f, 0.78f));
-        w.flight[i] = glm::vec4(path[i].x, ys[i], path[i].z, roll);
+        const float roll = 0.2f * std::tanh(-1.6f * turn[i] / 0.2f) * phase(ti, 0.1f, 0.25f) * (1.0f - phase(ti, 0.68f, 0.80f));
+        w.flight[i] = glm::vec4(eyes[i], roll);
+        w.flightAim[i] = glm::vec4(aim[i], 0.0f);
     }
 }
 
@@ -459,6 +511,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     const float half = 0.5f * g.extent;
     // Pass 1a: the erosion front F and the valley distances, per texel.
     std::vector<float> fieldF(static_cast<std::size_t>(N) * N), trunkD(fieldF.size()), meanderD(fieldF.size());
+    std::vector<std::uint16_t> meanderSeg(fieldF.size(), 0); // the trunk segment nearest in the meander's warped space
     parallelRows(N, [&](int y) {
         for (int x = 0; x < N; ++x) {
             const std::size_t idx = static_cast<std::size_t>(y) * N + x;
@@ -493,10 +546,16 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             trunkD[idx] = best;
             const glm::vec2 mp = p + 260.0f * S * glm::vec2(fbm(p / 900.0f, 3, nseed + 41u), fbm(p / 900.0f, 3, nseed + 42u));
             float bestM = 1e9f;
+            std::size_t bestSeg = 0;
             for (std::size_t i = 0; i + 1 < w.valley.size(); ++i) {
-                bestM = std::min(bestM, segDist(mp, w.valley[i], w.valley[i + 1], along));
+                const float d = segDist(mp, w.valley[i], w.valley[i + 1], along);
+                if (d < bestM) {
+                    bestM = d;
+                    bestSeg = i;
+                }
             }
             meanderD[idx] = bestM;
+            meanderSeg[idx] = static_cast<std::uint16_t>(bestSeg);
         }
     });
 
@@ -547,7 +606,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             const float onBasin = 1.0f - smoothstepf(-40.0f * S, 40.0f * S, d1);
             h += Lb;
             const float gorge = smoothstepf(chW * 1.35f, chW * 0.85f, best) * onBasin;
-            h -= (Lb + 2.0f) * gorge;
+            h += (-2.0f - h) * gorge; // the gorge's floor is flat at -2 m, so the river is the same depth all along (no shoals)
             const float wall = smoothstepf(chW * 1.9f, chW * 1.2f, best) * (1.0f - smoothstepf(chW * 1.0f, chW * 0.75f, best));
             r = std::max(r, wall * onBasin);
             // Terraces: steps cut along the tilted, warped, folded strata coordinate, on the cliffs only. The offset
@@ -822,6 +881,32 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         });
     }
     w.strataOffset = std::move(strataOffset);
+    // ---- the river's flow (ADR-1854): along the gorge, downstream (the trunk's direction, near to far) ----
+    // The direction runs along the meander distance's contours (perpendicular to its gradient), its sign taken from the
+    // nearest trunk segment. Packed RGBA8: rg the direction, b the distance from the channel's centre (0..255 m), a 1
+    // where there is a channel to flow in.
+    w.flow.assign(w.height.size(), 0u);
+    parallelRows(N, [&](int y) {
+        for (int x = 0; x < N; ++x) {
+            const std::size_t idx = static_cast<std::size_t>(y) * N + x;
+            const float d = meanderD[idx];
+            if (d > 260.0f * S) continue;
+            const auto at = [&](int xx, int yy) {
+                return meanderD[static_cast<std::size_t>(std::clamp(yy, 0, N - 1)) * N + std::clamp(xx, 0, N - 1)];
+            };
+            const int k = std::max(1, static_cast<int>(std::lround(12.0f / texel)));
+            const glm::vec2 g(at(x + k, y) - at(x - k, y), at(x, y + k) - at(x, y - k));
+            glm::vec2 dir(-g.y, g.x);
+            const float len = glm::length(dir);
+            if (len < 1e-6f) continue;
+            dir /= len;
+            const std::size_t sg = meanderSeg[idx];
+            const glm::vec2 trunk = w.valley[std::min(sg + 1, w.valley.size() - 1)] - w.valley[sg];
+            if (glm::dot(dir, trunk) < 0.0f) dir = -dir;
+            const auto q = [](float v) { return static_cast<std::uint32_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
+            w.flow[idx] = q(0.5f + 0.5f * dir.x) | (q(0.5f + 0.5f * dir.y) << 8) | (q(d / 255.0f) << 16) | (255u << 24);
+        }
+    });
     w.masks.assign(w.height.size(), 0u);
     float lo = 1e30f, hi = -1e30f;
     for (std::size_t i = 0; i < w.height.size(); ++i) {
@@ -925,32 +1010,19 @@ std::uint64_t attractorWorldGenerations() noexcept { return gGenerations.load();
 
 AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCameraMode mode, double seconds) {
     AttractorCameraPose pose{world.eye, world.target, 0.0f};
-    if (mode != AttractorCameraMode::Flight || world.flight.size() < 2) {
+    if (mode != AttractorCameraMode::Flight || world.flight.size() < 2 || world.flightAim.size() != world.flight.size()) {
         return pose;
     }
-    // Linear between the 30 Hz samples (the path itself is already smooth); the aim looks two and a half seconds ahead
-    // along the path, a little below it, its pitch held between -28 and +8 degrees (a dive looks out, not at the rock).
+    // Linear between the 30 Hz samples (the eye, the aim and the bank are each smooth already; ADR-1854).
     const auto n = static_cast<int>(world.flight.size());
-    const auto at = [&](double t) {
-        const double f = std::clamp(t * AttractorWorld::kFlightRate, 0.0, static_cast<double>(n - 1));
-        const int i = std::min(static_cast<int>(f), n - 2);
-        const auto a = static_cast<float>(f - i);
-        return glm::mix(world.flight[static_cast<std::size_t>(i)], world.flight[static_cast<std::size_t>(i) + 1], a);
-    };
-    const glm::vec4 e = at(seconds);
-    glm::vec3 ahead = glm::vec3(at(seconds + 2.5));
-    const glm::vec3 eye(e);
-    if (glm::length(glm::vec2(ahead.x - eye.x, ahead.z - eye.z)) < 1.0f) { // the path has stopped: keep its heading
-        const glm::vec3 back(at(seconds - 2.5));
-        ahead = eye + (eye - back);
-    }
-    glm::vec3 d = ahead - eye;
-    d.y -= 0.12f * glm::length(d);
-    const float flat = std::max(glm::length(glm::vec2(d.x, d.z)), 1e-3f);
-    const float pitch = std::clamp(std::atan2(d.y, flat), glm::radians(-28.0f), glm::radians(8.0f));
-    const glm::vec2 h = glm::vec2(d.x, d.z) / flat;
-    pose.eye = eye;
-    pose.target = eye + 500.0f * glm::vec3(h.x * std::cos(pitch), std::sin(pitch), h.y * std::cos(pitch));
+    const double f = std::clamp(seconds * AttractorWorld::kFlightRate, 0.0, static_cast<double>(n - 1));
+    const int i = std::min(static_cast<int>(f), n - 2);
+    const auto a = static_cast<float>(f - i);
+    const glm::vec4 e = glm::mix(world.flight[static_cast<std::size_t>(i)], world.flight[static_cast<std::size_t>(i) + 1], a);
+    const glm::vec3 d = glm::normalize(glm::mix(glm::vec3(world.flightAim[static_cast<std::size_t>(i)]),
+                                                glm::vec3(world.flightAim[static_cast<std::size_t>(i) + 1]), a));
+    pose.eye = glm::vec3(e);
+    pose.target = pose.eye + 500.0f * d;
     pose.rollDegrees = glm::degrees(e.w);
     return pose;
 }

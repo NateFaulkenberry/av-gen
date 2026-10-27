@@ -68,7 +68,7 @@ Result<void> AttractorRenderer::init(gpu::Context& context, gpu::ShaderLibrary& 
     hdrFormat_ = hdrFormat;
     depthFormat_ = depthFormat;
     const wgpu::Device& device = context.device();
-    std::array<wgpu::BindGroupLayoutEntry, 5> e{};
+    std::array<wgpu::BindGroupLayoutEntry, 6> e{};
     e[0].binding = 0;
     e[0].visibility = wgpu::ShaderStage::Fragment | wgpu::ShaderStage::Vertex;
     e[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -86,6 +86,10 @@ Result<void> AttractorRenderer::init(gpu::Context& context, gpu::ShaderLibrary& 
     e[4].binding = 4;
     e[4].visibility = wgpu::ShaderStage::Fragment;
     e[4].sampler.type = wgpu::SamplerBindingType::Filtering;
+    e[5].binding = 5; // ADR-1854: the river's flow
+    e[5].visibility = wgpu::ShaderStage::Fragment;
+    e[5].texture.sampleType = wgpu::TextureSampleType::Float;
+    e[5].texture.viewDimension = wgpu::TextureViewDimension::e2D;
     wgpu::BindGroupLayoutDescriptor d{};
     d.label = "attractor-0";
     d.entryCount = e.size();
@@ -183,6 +187,7 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
         };
         height_ = make(wgpu::TextureFormat::RG32Float, "attractor-height"); // r height, g strata offset
         masks_ = make(wgpu::TextureFormat::RGBA8Unorm, "attractor-masks");
+        flow_ = make(wgpu::TextureFormat::RGBA8Unorm, "attractor-flow");
         const auto upload = [&](const wgpu::Texture& tex, const void* data, std::uint32_t texelBytes) {
             wgpu::TexelCopyTextureInfo dst{};
             dst.texture = tex;
@@ -199,6 +204,12 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
         }
         upload(height_, field.data(), 8);
         upload(masks_, w.masks.data(), 4);
+        if (w.flow.size() == w.masks.size()) {
+            upload(flow_, w.flow.data(), 4);
+        } else {
+            const std::vector<std::uint32_t> none(w.masks.size(), 0u);
+            upload(flow_, none.data(), 4);
+        }
         worldHash_ = w.hash;
         ++uploads_;
     }
@@ -232,7 +243,7 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
     }
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
-    std::array<wgpu::BindGroupEntry, 5> e{};
+    std::array<wgpu::BindGroupEntry, 6> e{};
     e[0].binding = 0;
     e[0].buffer = *f.frameUniforms;
     e[0].size = f.frameUniforms->GetSize();
@@ -245,6 +256,8 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
     e[3].textureView = masks_.CreateView();
     e[4].binding = 4;
     e[4].sampler = sampler_;
+    e[5].binding = 5;
+    e[5].textureView = flow_.CreateView();
     wgpu::BindGroupDescriptor bg{};
     bg.label = "attractor-0";
     bg.layout = layout_;
