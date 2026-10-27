@@ -1,7 +1,8 @@
 # Architecture
 
 This document describes the system as built for milestone 0.1 and the seams through which it
-grows. Decisions are recorded in `docs/decisions/`; the research behind them in `docs/research/`.
+grows. The module table (§2) and the directory layout (§8) were brought up to date on 2026-10-27; the data-flow
+diagram (§1) is still milestone 0.1's outline. Decisions are recorded in `docs/decisions/`; the research behind them in `docs/research/`.
 
 ## 1. Data flow
 
@@ -46,6 +47,18 @@ with `FixedStepClock`. Everything from `SignalBus` downwards is identical.
 | `comp` | avgen_core | the 2D composition above the render (ADR-083): `LayerStack` (ordered layers, cached geometry, per-frame items), `Layer` with `TextLayer`/`ShapeLayer`, `FontBackend` (CoreText shaping and outline rasterisation), `GlyphAtlas` (one shared signed-distance atlas keyed by face and glyph, not by size) | glm, params, CoreText (macOS) |
 | `ai` | avgen_core | AI: `InferenceBackend`/`InferenceService` (image models; ADR-065) and, beside it, the **control plane** (ADR-094) — `ToolRegistry` (the engine's semantic interface: named, schema-validated operations over real engine systems), `engine_tools` (34 tools over `ParameterSet`, `Timeline`, `Modulator`, `SignalBus`, `Scene`), `SnapshotStore`/`TransactionSink`, `Provider` + the vendor adapters, `MainThreadQueue`, `Orchestrator` (the agent loop) and `ControlPlane`. No render, audio or GPU dependency; the AI is one client of the tool registry and an MCP server or script API could be another | params, scene, signals, app::Engine (header), Security + Foundation (macOS) |
 | `control` | avgen_core | OSC 1.0 (messages, bundles, patterns, UDP receiver/sender), MIDI input (CoreMIDI on macOS, byte parser, virtual source), `ControlMap` (bindings + direct OSC scheme; ADR-021) | POSIX sockets, CoreMIDI |
+| `entity` | avgen_core | entities and characters: behaviours, the decision layer (considerers, goals, attention), actions, navigation and the nav grid, motion providers and the checkpointed seek re-simulation (ADR-700) | scene, world, spatial |
+| `world` | avgen_core | the procedural world: world maps and terrain generation, biomes, ecology scatter, cities, atmospherics and fog fields, art direction, and the effect registry (`world/effects/`: the `fx/<id>/` effects, ADR-702) | spatial, scene, params |
+| `stage` | avgen_core | staging: scenarios and set pieces that drive bodies and parameters on cue (ADR-210/241) | entity, params |
+| `graph` | avgen_core | the procedural node graph and its built-in nodes (the graph editor's model) | spatial |
+| `organism` | avgen_core | the organism generators (the procedural mushroom) | scene, search |
+| `search` | avgen_core | candidate search: generate many procedural individuals, reject, score and curate a diverse set (ADR-172/173; the hero mushrooms, the Tree of Life) | scene |
+| `directing` | avgen_core | the Director: plans, reactivity proposals and their compiler/resolver, set pieces, the validator (ADR-924/927) | params, scene, signals |
+| `sonic` | avgen_core | the Sonic Character and response model: `response.*` levels and hits, timbre, notes, interpret sources, the live analysis hook (ADR-1020/1062/1510/1723) | analysis, signals |
+| `seq`, `song` | avgen_core | the Sequence (shots, layers, events, retiming, song structure) and the song model it is built from (sections, cues, shot language) | params, scene |
+| `labs`, `help` | avgen_core | the Engineering Lab Suite's registry and cases; the Help system's documents, search and validation | core |
+| `pathtrace` | avgen_core | the CPU path tracer (Embree; `--pathtrace`, docs/pathtrace/) | scene, Embree |
+| `share` | avgen_gpu | texture sharing out of the app: Syphon and NDI | gpu |
 | `gpu` | avgen_gpu | `Context` (Dawn instance/adapter/device/surface), `ShaderLibrary` (WGSL files + includes + diagnostics), `RenderTarget`, `FrameTimeline` (per-pass GPU timing), readback (synchronous helpers and `ReadbackRing`) | Dawn |
 | `rendering` | avgen_gpu | `SceneRenderer` (pass list, PBR/grid/skybox/tonemap pipelines, material bind groups, lights, background/post user layers, engine shader reload), `EnvironmentProcessor` (IBL), `ShaderStack`/`ShaderLayerGpu` (user layers), `ParticleRenderer` (compute pools, indirect draw), `ProceduralRenderer` (one instanced draw per procedural object, deformer stack in the vertex shader; ADR-023), `VolumeRenderer` (half-res raymarched atmosphere + depth-aware composite; ADR-032), `Simulation` (grid-field compute passes into the shared grid table; ADR-032), `PostProcessor` (built-in effect chain over `gpu::TransientPool`), `CompositionRenderer` (the one `FrameOverlay`: 2D layers over the tone-mapped frame in a single pass; ADR-083) | gpu, scene, shaders, comp |
 | `platform` | avgen_platform | `Window` (SDL3, Metal layer, events, file dialog) | SDL3 |
@@ -267,9 +280,11 @@ audio callback never logs.
 ## 8. Directory layout
 
 ```
-src/{core,audio,analysis,signals,params,spatial,scene,control,assets,shaders,share,gpu,rendering,platform,ui,app}
+src/{core,audio,analysis,signals,sonic,params,spatial,scene,world,entity,stage,graph,organism,search,directing,
+     seq,song,comp,control,ai,labs,help,pathtrace,assets,shaders,share,gpu,rendering,platform,ui,app}
 shaders/           WGSL, loaded at runtime (AVGEN_SHADER_DIR overrides the search path)
 tests/{unit,integration,rendering,support}
-tools/             make_test_audio.py
-docs/{research,decisions}
+tools/             scripts and probes (tools/ci/: CI's build and suite runners; tools/gpu-lock.sh)
+examples/          shipped projects and scenes; examples/index.json is the File > Examples menu
+docs/{decisions,help,development,prototypes,...}   docs/decisions/README.md is the ADR index
 ```
