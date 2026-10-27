@@ -93,7 +93,17 @@ The live device path (`tools/audio_lab/loopback.sh`: the fixture played into Bla
 
 Latency is unchanged by this pass: sound to bus 39-40 ms median, 49-57 ms p95.
 
-## 6. Not verified by eye
+## 6. Real tracks
+
+- **Rebuild** (GV3's song, 130 BPM, hand-measured grid): 130.06 BPM; beats +5 ms median from the true grid (p5 -11, p95
+  +13 ms); every bar line within 30 ms and the downbeat right (ADR-896's tests pass). Without the attack snap the grid sat
+  +27 ms; with three beats left in the reverb tail the bar estimate turned two beats (fixed by the edge trims).
+- **The Glowmere score** (`assets/audio/glowmere-valley.wav`, synthetic, 72 BPM with the pulse on beats 1 and 3 only and
+  bells on random eighths): read at 144 BPM (confidence 0.17). Before this pass it read 122.6 (0.24). Neither is 72; 144
+  is at least a metrical level of it. The parked-cut director test depended on that reading; it now sets the score's
+  clock by hand (ADR-1783).
+
+## 7. Not verified by eye
 
 - The transport bar's **Mark beat** button (ADR-1783): built, its engine side tested (`[adr1783]`), the ImGui control
   never seen.
