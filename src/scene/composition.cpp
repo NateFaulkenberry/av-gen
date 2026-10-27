@@ -64,7 +64,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1192,6 +1192,72 @@ void Composition::applyAstralCamera(float& fovDegrees) {
         }
         astralShot_ = a.state.shot;
     }
+}
+
+void Composition::setAttractorWorld(AttractorWorldBlock block) {
+    attractorWorld_ = std::move(block);
+    if (attractorWorld_.enabled && (!attractorWorld_.world || attractorWorld_.world->hash != attractorWorld_.gen.hash())) {
+        attractorWorld_.world = acquireAttractorWorld(attractorWorld_.gen);
+        log::info("attractorWorld: seed {} generated in {:.2f} s ({}^2, height {:.0f}..{:.0f} m)", attractorWorld_.gen.seed,
+                  attractorWorld_.world->generateSeconds, attractorWorld_.world->res, attractorWorld_.world->minHeight,
+                  attractorWorld_.world->maxHeight);
+    }
+    if (params_ != nullptr) { // attached already: register its knobs now
+        if (attractorParams_) {
+            for (const params::IParameter* q : attractorParams_->all) {
+                params_->remove(q->path());
+            }
+            attractorParams_.reset();
+        }
+        if (attractorWorld_.enabled) {
+            attractorParams_ = registerAttractorWorldParameters(*params_, attractorWorld_, "attractorWorld/" + sanitise(prefix_));
+            for (const params::IParameter* q : attractorParams_->all) {
+                registeredPaths_.push_back(q->path());
+            }
+        }
+    }
+    dirty_ = true;
+}
+
+void Composition::updateAttractorWorld() {
+    AttractorWorldBlock& live = scene_.attractorWorld;
+    if (!attractorWorld_.enabled) {
+        live = AttractorWorldBlock{};
+        return;
+    }
+    live.enabled = true;
+    live.driveCamera = attractorWorld_.driveCamera;
+    live.gen = attractorWorld_.gen;
+    live.look = attractorWorld_.look;
+    live.liveGen = attractorWorld_.gen;
+    live.live = attractorWorld_.look;
+    live.cameraDrive = attractorWorld_.driveCamera ? 1.0f : 0.0f;
+    if (attractorParams_) {
+        applyAttractorWorldParameters(*attractorParams_, attractorWorld_, live);
+    }
+    // A structural change regenerates (never a look change). The world is shared: the authored block keeps it so a
+    // rebuild does not regenerate, and the scene copy points at the same one.
+    if (!attractorWorld_.world || attractorWorld_.world->hash != live.liveGen.hash()) {
+        if (live.liveGen.validate()) {
+            attractorWorld_.world = acquireAttractorWorld(live.liveGen);
+            log::info("attractorWorld: seed {} regenerated in {:.2f} s", live.liveGen.seed,
+                      attractorWorld_.world->generateSeconds);
+            cameraCutThisFrame_ = true; // a new world is a new picture: no temporal history across it
+            ++cameraCutSerial_;
+        }
+    }
+    live.world = attractorWorld_.world;
+}
+
+void Composition::applyAttractorCamera(float& fovDegrees) {
+    const AttractorWorldBlock& a = scene_.attractorWorld;
+    if (!a.active() || a.cameraDrive < 0.5f) {
+        return;
+    }
+    scene_.camera.position = a.world->eye;
+    scene_.camera.target = a.world->target;
+    scene_.camera.farPlane = std::max(scene_.camera.farPlane, a.world->extent * 2.0f);
+    fovDegrees = a.world->fovDeg;
 }
 
 Result<void> Composition::addGrid(spatial::GridField grid) {
@@ -5114,6 +5180,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     if (astral_.enabled) {
         astralParams_ = registerAstralParameters(params, astral_, "astral/" + sanitise(prefix_));
     }
+    // ADR-1850: the Strange Attractor's controls.
+    attractorParams_.reset();
+    if (attractorWorld_.enabled) {
+        attractorParams_ = registerAttractorWorldParameters(params, attractorWorld_, "attractorWorld/" + sanitise(prefix_));
+    }
     if (root) {
         addDefaultRoutes(modulator);
     } else {
@@ -6131,6 +6202,7 @@ void Composition::detach() {
     }
     gridParams_.clear(); // ADR-1122 (the parameters themselves go with `registeredPaths_`)
     astralParams_.reset(); // ADR-1221, likewise
+    attractorParams_.reset(); // ADR-1850, likewise
     cameraDistance_ = nullptr;
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
@@ -9028,6 +9100,7 @@ void Composition::applyParameters() {
     scene_.clouds = clouds_; // ADR-1289
     applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
     updateAstral(); // ADR-1221: before the camera, which it may place
+    updateAttractorWorld(); // ADR-1850: likewise
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -9242,6 +9315,7 @@ void Composition::applyParameters() {
         activeCamera_.focalLength = pose.focalLength;
     }
     applyAstralCamera(fov); // ADR-1221: the conductor places the camera, and shake and breath still compose with it
+    applyAttractorCamera(fov); // ADR-1850: the generated composition places it, likewise
     // Shake last, and in every mode: it is an offset applied to whatever placed the camera, which
     // is what makes it compose with an orbit, a spline ride and a baked cinematic move alike
     // instead of being a fourth way to position a camera (ADR-098, brief section 14).
@@ -11216,6 +11290,9 @@ nlohmann::json Composition::toJson() const {
     if (!clouds_.lobes.empty()) {
         j["clouds"] = clouds_.toJson(); // ADR-1289
     }
+    if (attractorWorld_.enabled) {
+        j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
+    }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
         for (const MaterialProgram& mp : materialPrograms_) {
@@ -12093,6 +12170,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (auto ok = comp->setGraph(std::move(*g)); !ok) {
             return fail("scene file '{}': graph: {}", scenePath.string(), ok.error().message);
         }
+    }
+    if (j.contains("attractorWorld")) { // ADR-1850
+        auto a = attractorWorldFromJson(j.at("attractorWorld"));
+        if (!a) {
+            return fail("scene file '{}': {}", scenePath.string(), a.error().message);
+        }
+        comp->setAttractorWorld(std::move(*a));
     }
     if (j.contains("astral")) { // ADR-1221
         auto a = astralFromJson(j.at("astral"));
