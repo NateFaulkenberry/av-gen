@@ -89,6 +89,7 @@ struct AttractorWorld {
     glm::vec2 origin{0.0f};            // world xz of texel (0, 0)'s corner
     std::vector<float> height;         // res*res metres, row-major (z rows, x columns)
     std::vector<float> strataOffset;   // res*res: the strata coordinate minus the height (tilt, warp, fold)
+    std::vector<float> slopeMax;       // res*res: the steepest slope within 5 texels (the march's step bound)
     std::vector<std::uint32_t> masks;  // res*res RGBA8: r rock, g playa (valley floor), b cavity, a ridge
     std::vector<std::uint32_t> flow;   // res*res RGBA8: rg the river's downstream direction, b distance from the channel (m), a in a channel
     float minHeight = 0.0f;

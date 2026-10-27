@@ -139,13 +139,12 @@ glm::vec2 bandWarp(float s, float band) {
     return {s + band * (0.32f * std::sin(a) + 0.18f * std::sin(b)), 1.0f + 0.32f / 2.3f * std::cos(a) + 0.18f / 0.93f * std::cos(b)};
 }
 
-float bandProfile(float s, float band, std::uint32_t seed) {
+float bandProfile(float s, float band, std::uint32_t seed, float riser = 0.2f) {
     const glm::vec2 u = bandWarp(s, band);
     const float t = u.x / band;
     const float i = std::floor(t);
     const float f = t - i;
     const float hard = smoothstepf(0.35f, 0.75f, hash01(static_cast<std::int32_t>(i), 7, seed));
-    const float riser = 0.2f;
     const float gg = std::clamp((f - (1.0f - riser)) / riser, 0.0f, 1.0f);
     const float step = gg * gg * (3.0f - 2.0f * gg);
     const float Tu = (i + f + (step - f) * hard) * band;
@@ -508,6 +507,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     w.height.assign(static_cast<std::size_t>(N) * N, 0.0f);
     std::vector<float> rock(static_cast<std::size_t>(N) * N, 0.0f), playa(rock.size(), 0.0f);
     std::vector<float> strataOffset(rock.size(), 0.0f);
+    std::vector<float> terraceW(rock.size(), 0.0f);
     const float half = 0.5f * g.extent;
     // Pass 1a: the erosion front F and the valley distances, per texel.
     std::vector<float> fieldF(static_cast<std::size_t>(N) * N), trunkD(fieldF.size()), meanderD(fieldF.size());
@@ -617,10 +617,8 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                                  fold.z * std::sin(glm::dot(p, foldDir) * (2.0f * kPi / fold.y));
             strataOffset[idx] = offset;
             if (g.terraces > 0.0f) {
-                const float sc = h + offset;
-                const float T = bandProfile(sc, strata.z, nseed);
                 const float cliffBand = smoothstepf(-110.0f * S, -12.0f * S, d1) * (1.0f - 0.7f * top);
-                h += (T - sc) * g.terraces * std::max(cliffBand, wall * onBasin);
+                terraceW[idx] = g.terraces * std::max(cliffBand, wall * onBasin); // applied in pass 1b' (antialiased)
             }
             playa[idx] = smoothstepf(chW * 0.85f, chW * 0.55f, best) * (1.0f - r);
             w.height[idx] = h;
@@ -628,6 +626,35 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         }
     });
     (void)camXZ;
+
+    // ---- pass 1b': the terraces, antialiased (ADR-1856) ----
+    // A terrace is a step function of height. Where a face climbs more than about a band within one texel, the steps
+    // fall between the samples: sampled, they alias into bumps whose phase drifts along the face, and the smooth
+    // surface built from those samples shades them as vertical stripes and combs (the Gate 2d cliff streaks). So the
+    // terraces fade out where |grad h| * texel exceeds a band: there the shader cuts the same bands analytically, at
+    // sub-texel scale (`bandCut`).
+    if (g.terraces > 0.0f) {
+        const std::vector<float> src = w.height;
+        const auto H = [&](int x, int y) {
+            return src[static_cast<std::size_t>(std::clamp(y, 0, N - 1)) * N + std::clamp(x, 0, N - 1)];
+        };
+        const float band = strata.z;
+        parallelRows(N, [&](int y) {
+            for (int x = 0; x < N; ++x) {
+                const std::size_t idx = static_cast<std::size_t>(y) * N + x;
+                if (terraceW[idx] <= 0.0f) continue;
+                const float climb = 0.5f * std::max(std::abs(H(x + 1, y) - H(x - 1, y)), std::abs(H(x, y + 1) - H(x, y - 1)));
+                // every riser at least 3 texels wide: a riser narrower than that is sampled as a staircase, and the
+                // treads' light and shadow come out as jagged stripes (Gate 2d's comb at the terminators)
+                const float riser = std::clamp(3.0f * climb / band, 0.2f, 1.0f);
+                const float keep = 1.0f - smoothstepf(0.6f, 0.95f, riser);
+                if (keep <= 0.0f) continue;
+                const float sc = src[idx] + strataOffset[idx];
+                const float T = bandProfile(sc, band, nseed, riser);
+                w.height[idx] = src[idx] + (T - sc) * terraceW[idx] * keep;
+            }
+        });
+    }
 
     // ---- pass 1c: the branching network (ADR-1852) ----
     // Tributary gorges grown off the inner gorge across the bench: junctions at uneven spacing, mostly alternating
@@ -881,6 +908,38 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         });
     }
     w.strataOffset = std::move(strataOffset);
+    // ADR-1856: the march's step bound. The largest slope within 5 texels of each texel (a separable max dilation),
+    // so a ray beside a cliff or spike steps by its clearance over (1 + the steepest nearby slope), not straight
+    // into the rock.
+    {
+        std::vector<float> slope(w.height.size()), tmp2(w.height.size());
+        const auto Hh = [&](int x, int y) {
+            return w.height[static_cast<std::size_t>(std::clamp(y, 0, N - 1)) * N + std::clamp(x, 0, N - 1)];
+        };
+        parallelRows(N, [&](int y) {
+            for (int x = 0; x < N; ++x) {
+                const float gx = (Hh(x + 1, y) - Hh(x - 1, y)) / (2.0f * texel);
+                const float gz = (Hh(x, y + 1) - Hh(x, y - 1)) / (2.0f * texel);
+                slope[static_cast<std::size_t>(y) * N + x] = std::sqrt(gx * gx + gz * gz);
+            }
+        });
+        const int R = 5;
+        parallelRows(N, [&](int y) {
+            for (int x = 0; x < N; ++x) {
+                float m = 0.0f;
+                for (int k = -R; k <= R; ++k) m = std::max(m, slope[static_cast<std::size_t>(y) * N + std::clamp(x + k, 0, N - 1)]);
+                tmp2[static_cast<std::size_t>(y) * N + x] = m;
+            }
+        });
+        w.slopeMax.assign(w.height.size(), 0.0f);
+        parallelRows(N, [&](int y) {
+            for (int x = 0; x < N; ++x) {
+                float m = 0.0f;
+                for (int k = -R; k <= R; ++k) m = std::max(m, tmp2[static_cast<std::size_t>(std::clamp(y + k, 0, N - 1)) * N + x]);
+                w.slopeMax[static_cast<std::size_t>(y) * N + x] = m;
+            }
+        });
+    }
     // ---- the river's flow (ADR-1854): along the gorge, downstream (the trunk's direction, near to far) ----
     // The direction runs along the meander distance's contours (perpendicular to its gradient), its sign taken from the
     // nearest trunk segment. Packed RGBA8: rg the direction, b the distance from the channel's centre (0..255 m), a 1

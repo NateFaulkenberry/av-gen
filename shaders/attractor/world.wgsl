@@ -180,8 +180,15 @@ fn bandCut(fd: vec4<f32>, dist: f32) -> f32 {
         return 0.0;
     }
     let s0 = fd.x + fd.y;
-    let riser = 0.16 + 0.4 * smoothstep(1800.0, 4500.0, dist);
-    return (bandProfile(s0, riser) - s0) * amt;
+    // ADR-1856: soft, shallow and centred. The Gate 2 cut was a sharp step a whole band deep, always below the baked
+    // surface: its tips drew serrated silhouettes and speckled ledge lines (thinner than the march's step), its
+    // risers cast comb-toothed shadows, and the shadow rays started inside it. Now a gentle ledge profile, a third
+    // of the depth, centred on the surface (it raises as much as it lowers), so every ledge spans several pixels.
+    let riser = 0.45 + 0.2 * smoothstep(1800.0, 4500.0, dist);
+    let band = au.strata.z;
+    let hard = smoothstep(0.35, 0.75, bandHardness(floor(bandWarp(s0).x / band)));
+    let centre = 0.5 * band * hard * (1.0 - riser);
+    return (bandProfile(s0, riser) - s0 + centre) * amt * 0.35;
 }
 
 fn heightBase(xz: vec2<f32>) -> f32 {
@@ -262,7 +269,7 @@ fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
     // flats: rounded weathered relief (stepped plates drew stair-stepped silhouettes and specks on rims)
     let b1 = vnoise(xz / 7.0);
     let b2 = vnoise(kOct * xz / 2.6 + vec2<f32>(7.3, 1.1));
-    let flat = 1.2 * b1 + 0.5 * b2 - 0.85;
+    let flat = 0.6 * b1 + 0.25 * b2 - 0.42; // gentler: the plateau's lumps read as blobs from 30 m
     // faces: (along, up) on the face
     var face = 0.0;
     if (steep > 0.0) {
@@ -278,7 +285,7 @@ fn detailAt(xz: vec2<f32>, dist: f32, fd: vec4<f32>) -> f32 {
         let showing = smoothstep(0.35, 0.7, vnoise(vec2<f32>(along / 25.0, floor(bu) * 2.1)));
         let beds = 1.0 - (1.0 - smoothstep(0.0, 0.3, bed) * smoothstep(1.0, 0.8, bed)) * showing;
         let skin = vnoise(vec2<f32>(along / 11.0, up / 7.0));
-        face = 0.35 * beds + 0.3 * skin - 0.5;
+        face = 0.2 * beds + 0.25 * skin - 0.35; // ADR-1856: low, so it never makes sub-pixel scratches
     }
     let relief = mix(flat, face, steep);
     let onRock = 0.25 + 0.75 * m.r;
@@ -306,7 +313,9 @@ fn normalAt(xz: vec2<f32>, dist: f32) -> vec3<f32> {
     let fzm = surfaceField(xz - ez, dist);
     let dx = bandCut(fxp, dist) - bandCut(fxm, dist) + detailAt(xz + ex, dist, fxp) - detailAt(xz - ex, dist, fxm);
     let dz = bandCut(fzp, dist) - bandCut(fzm, dist) + detailAt(xz + ez, dist, fzp) - detailAt(xz - ez, dist, fzm);
-    let g = select(c.zw, (vec2<f32>(fxp.x - fxm.x, fzp.x - fzm.x)) / (2.0 * e), dist > kSmoothNear);
+    // ADR-1856: always the B-spline gradient. Beyond kSmoothNear this used finite differences of the bilinear surface,
+    // whose facets turn at every texel: distant faces shaded as vertical combs and hard light/dark blocks.
+    let g = c.zw;
     return normalize(vec3<f32>(-(g.x + dx / (2.0 * e)), 1.0, -(g.y + dz / (2.0 * e))));
 }
 
@@ -331,14 +340,14 @@ fn march(ro: vec3<f32>, rd: vec3<f32>, tmax: f32) -> f32 {
         t = (ro.y - top) / -rd.y;
     }
     var tPrev = t;
-    for (var i = 0; i < 480; i = i + 1) {
+    for (var i = 0; i < 900; i = i + 1) {
         let p = ro + rd * t;
         if (t > tmax || (p.y > top && rd.y > 0.0) || !insideWorld(p.xz)) {
             return -1.0;
         }
         let d = p.y - heightAt(p.xz, t);
         if (d < 0.0) {
-            // overshot: bisect back to the surface
+            // overshot: bisect back to the surface (now rare: the step is slope-bounded)
             var a = tPrev;
             var b = t;
             for (var k = 0; k < 8; k = k + 1) {
@@ -356,8 +365,11 @@ fn march(ro: vec3<f32>, rd: vec3<f32>, tmax: f32) -> f32 {
             return t;
         }
         tPrev = t;
-        // the clearance is vertical, so it under-steps by a safety factor
-        t = t + max(d * 0.38, 0.0012 * t + 0.03);
+        // ADR-1856: a Lipschitz step. The clearance is vertical; beside a cliff the rock is d / slope away horizontally,
+        // so step by d over (1 + the steepest slope near here, baked). The old fixed 0.38 d stepped into the flanks of
+        // spikes and cliffs and drew their silhouettes as hair.
+        let sm = textureLoad(heightTex, clamp(vec2<i32>(texCoord(p.xz) + 0.5), vec2<i32>(0), vec2<i32>(i32(au.world.w) - 1)), 0).b;
+        t = t + max(d * 0.9 / (1.0 + sm * abs(sqrt(max(1.0 - rd.y * rd.y, 0.0)))), 0.0006 * t + 0.02);
     }
     return -1.0;
 }
@@ -367,17 +379,26 @@ fn march(ro: vec3<f32>, rd: vec3<f32>, tmax: f32) -> f32 {
 // against the baked one started inside rock: those treads came out black (ADR-1853, the dashes). Farther along, the
 // baked surface is enough.
 fn softShadow(p: vec3<f32>, l: vec3<f32>, dist: f32) -> f32 {
+    // ADR-1856: the march starts 25 m out. At grazing sun a ray starting at the surface skims the surface's own
+    // curvature and turns every gentle undulation into a hard shadow sliver (the comb at the terminators); within
+    // 25 m the diffuse term n.l already says whether the surface faces the sun.
     var res = 1.0;
-    var t = 1.5;
+    var t = 25.0;
     let top = sceneTop();
     for (var i = 0; i < 72; i = i + 1) {
         let q = p + l * t;
         if (q.y > top || !insideWorld(q.xz)) {
             break;
         }
+        // ADR-1856: the shadow tests the surface the eye sees. Near the start that is the cut, detailed surface; out to
+        // 1.5 km the B-spline surface (testing the bilinear one drew the terminator as a texel-stepped comb); beyond,
+        // where a texel is under a pixel, the bilinear one is enough.
+        // ADR-1856: the B-spline surface out to 1.5 km, the bilinear beyond. The ledges and the detail (a few metres
+        // either side of it, cleared by the start offset) cast no shadow of their own: testing them drew the
+        // terminator as a comb of sub-pixel teeth.
         var h: f32;
-        if (t < 120.0) {
-            h = heightAt(q.xz, dist);
+        if (t < 1500.0) {
+            h = fieldSmooth(q.xz).x;
         } else {
             h = heightBase(q.xz);
         }
@@ -508,13 +529,10 @@ fn applyAir(col: vec3<f32>, ro: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
 
 fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     let n0 = normalAt(p.xz, t);
-    // a fine grain on the flats, fading with distance (no grooves on the faces: those read as streaks)
+    // ADR-1856: no normal-map grain. A 1.7 m bump pattern is sub-pixel past a few hundred metres and, at the grazing
+    // rims of steep rock, flipped normals pixel by pixel into a hair-like fringe. Relief comes from geometry only.
+    let n = n0;
     let near = 1.0 - smoothstep(300.0, 2500.0, t);
-    let steepN = smoothstep(0.3, 0.7, 1.0 - n0.y);
-    let ge = 0.4;
-    let gx = vnoise(p.xz / 1.7 + vec2<f32>(ge, 0.0)) - vnoise(p.xz / 1.7 - vec2<f32>(ge, 0.0));
-    let gz = vnoise(p.xz / 1.7 + vec2<f32>(0.0, ge)) - vnoise(p.xz / 1.7 - vec2<f32>(0.0, ge));
-    let n = normalize(n0 - vec3<f32>(gx, 0.0, gz) * 0.35 * (1.0 - steepN) * near * au.look.w);
     let m = masksAt(p.xz);
     let l = au.sun.xyz;
     let slope = 1.0 - n.y; // 0 flat .. 1 vertical
@@ -525,11 +543,14 @@ fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     // cliffs show the strata; talus is their rubble; flats are dust, with desert-varnish patches
     let cliffAmt = smoothstep(0.32, 0.6, slope) * (0.4 + 0.6 * m.r);
     let talusAmt = smoothstep(0.06, 0.3, slope) * m.r;
+    let faceAmt = smoothstep(0.38, 0.62, slope); // the bands show where the rock is a face
     let varnish = 0.72 + 0.5 * fbm(p.xz / 380.0, 3, 61u) + 0.12 * vnoise(p.xz / 23.0);
     let dust = mix(pal(P_DUST), strata, 0.22 * m.r) * varnish;
-    let rubble = mix(strata, pal(P_DUST), 0.45) * (0.8 + 0.3 * vnoise(p.xz / 4.0));
+    // ADR-1856: talus is rubble from the bands above, not the bands themselves: painting the bands across sloping
+    // ground read as a translucent overlay (they are only cut into the rock on the faces)
+    let rubble = mix(strata, pal(P_DUST), 0.75) * (0.8 + 0.3 * vnoise(p.xz / 4.0));
     var albedo = mix(dust, rubble, talusAmt);
-    albedo = mix(albedo, strata, cliffAmt);
+    albedo = mix(albedo, strata, cliffAmt * faceAmt);
     let rockAmt = max(cliffAmt, talusAmt);
     // weathering on the faces: patchy staining across, not down (no vertical streaks)
     let stain = vnoise(vec2<f32>(dot(p.xz, vec2<f32>(0.7, 0.7)) / 23.0, p.y / 9.0));
@@ -542,8 +563,12 @@ fn shade(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
 
     // light
     // start the shadow ray off the surface by more than the relief's pixel-scale wrinkles (they self-shadowed as specks)
-    let shadow = softShadow(p + n * (1.2 + 0.002 * t) + l * 0.8, l, t);
-    let dif = max(dot(n, l), 0.0) * shadow;
+    let shadow = softShadow(p + n * (3.5 + 0.002 * t) + l * 2.0, l, t);
+    // ADR-1856: a rough-rock terminator. Sandstone is matte and rough at every scale below the geometry here, which
+    // softens the falloff into shadow; a hard max(n.l, 0) over metre-scale ledges at grazing sun aliased into slivers
+    // of light (the comb at every terminator).
+    let ndl = dot(n, l);
+    let dif = pow(clamp((ndl + 0.18) / 1.18, 0.0, 1.0), 1.7) * shadow;
     let cavRaw = clamp(0.35 + 1.3 * (m.b - 0.5) + 0.55, 0.25, 1.0);
     var cav = mix(cavRaw, 0.85, smoothstep(0.25, 0.55, slope)); // a 2D mask means nothing on a face
     cav = cav * nearAO(p, n, t);

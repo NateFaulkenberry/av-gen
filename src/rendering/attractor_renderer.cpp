@@ -191,7 +191,7 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
             td.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
             return device.CreateTexture(&td);
         };
-        height_ = make(wgpu::TextureFormat::RG32Float, "attractor-height"); // r height, g strata offset
+        height_ = make(wgpu::TextureFormat::RGBA32Float, "attractor-height"); // r height, g strata offset, b max slope
         masks_ = make(wgpu::TextureFormat::RGBA8Unorm, "attractor-masks");
         flow_ = make(wgpu::TextureFormat::RGBA8Unorm, "attractor-flow");
         const auto upload = [&](const wgpu::Texture& tex, const void* data, std::uint32_t texelBytes) {
@@ -203,12 +203,13 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
             const wgpu::Extent3D extent{n, n, 1};
             context_->queue().WriteTexture(&dst, data, static_cast<std::size_t>(n) * n * texelBytes, &layout, &extent);
         };
-        std::vector<float> field(static_cast<std::size_t>(n) * n * 2);
+        std::vector<float> field(static_cast<std::size_t>(n) * n * 4, 0.0f);
         for (std::size_t i = 0; i < w.height.size(); ++i) {
-            field[2 * i] = w.height[i];
-            field[2 * i + 1] = i < w.strataOffset.size() ? w.strataOffset[i] : 0.0f;
+            field[4 * i] = w.height[i];
+            field[4 * i + 1] = i < w.strataOffset.size() ? w.strataOffset[i] : 0.0f;
+            field[4 * i + 2] = i < w.slopeMax.size() ? w.slopeMax[i] : 8.0f;
         }
-        upload(height_, field.data(), 8);
+        upload(height_, field.data(), 16);
         upload(masks_, w.masks.data(), 4);
         if (w.flow.size() == w.masks.size()) {
             upload(flow_, w.flow.data(), 4);
