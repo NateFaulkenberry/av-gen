@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 
 namespace avgen::gpu {
@@ -61,6 +62,19 @@ void startRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineD
 void startComputePipeline(const wgpu::Device& device, const wgpu::ComputePipelineDescriptor* desc,
                           wgpu::ComputePipeline* out);
 [[nodiscard]] std::size_t pipelinesInFlight();
+
+// ADR-1805: a pipeline compiled in the background with no one waiting for it. The live editor's renderers use it for
+// a pipeline first needed mid-performance (the refraction pipelines took 17 s to compile cold, on the main thread,
+// when a set first switched to a scene with glass): the surface draws its defined fallback until `done`. The callback
+// runs inside the frame loop's ProcessEvents, on the main thread; the shared state outlives a renderer that is gone.
+struct BackgroundPipeline {
+    wgpu::RenderPipeline pipeline;
+    bool done = false;
+    bool failed = false;
+    std::string error;
+};
+void startBackgroundRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineDescriptor* desc,
+                                   std::shared_ptr<BackgroundPipeline> into);
 
 // The synchronous creations' implementation (resource_stats.cpp's wrappers count, then call these).
 [[nodiscard]] wgpu::RenderPipeline compileRenderPipeline(const wgpu::Device& device,

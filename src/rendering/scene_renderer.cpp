@@ -1165,6 +1165,12 @@ Result<void> SceneRenderer::createAuxTargets(std::uint32_t width, std::uint32_t 
     return {};
 }
 
+void SceneRenderer::setInteractivePipelineDeferral(bool on) {
+    if (procedurals_) {
+        procedurals_->setDeferredPipelines(on);
+    }
+}
+
 void SceneRenderer::setQuality(QualityTier tier) {
     tier_ = tier;
     // Through the setter, not by assignment, so a tier that ever sets `renderScale` below 1 is
@@ -4261,7 +4267,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         stats_.procedural = procedurals_->stats();
         // ADR-1603: the refraction phase runs when the ladder allows it and a refractive surface is in view. Set before
         // the prepass, which leaves those surfaces out (the depth behind them is what their absorption reads).
-        procedurals_->setRefractionPhase(refractionWanted && procedurals_->hasRefractive());
+        procedurals_->setRefractionPhase(refractionWanted && procedurals_->hasRefractive() &&
+                                         procedurals_->refractionReady()); // ADR-1805: deferred in the live editor
         if (procedurals_->refractionPhase() != refractionLogged_) {
             refractionLogged_ = procedurals_->refractionPhase();
             log::info("refraction phase {} ({} refractive surface(s) in view; ADR-1603)", refractionLogged_ ? "on" : "off",

@@ -372,6 +372,14 @@ public:
     void setRefractionPhase(bool on) { refractionPhase_ = on; }
     // ADR-1673: the unlit fast path (on by default). Off draws every unlit surface through the full fs_proc, as before.
     void setUnlitFastPath(bool on);
+    // ADR-1805: live editor only. The pipelines built on first need (the unlit fast path, refraction) compile in the
+    // background instead of on the frame that first needs them, which on a cold shader cache held the main thread for
+    // 14-17 s when a set switched scenes. Until they land the surfaces draw their fallback: the full lit path (the
+    // same colour within a level) and opaque (the ladder's Low look). Off -- the default, every offline render and
+    // test -- they are created where first needed, as before.
+    void setDeferredPipelines(bool on);
+    // ADR-1603/1805: whether the refraction pipelines exist; creates them (or, deferred, starts or polls them).
+    [[nodiscard]] bool refractionReady();
     [[nodiscard]] bool refractionPhase() const { return refractionPhase_; }
     // ADR-1640: whether a material's dispersion reaches the shader (QualitySettings::refractionDispersion). Read by
     // `update` when it packs the object slots, so set it before. Off, a dispersive material packs dispersion 0 and

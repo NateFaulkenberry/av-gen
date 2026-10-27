@@ -26,6 +26,7 @@
 #include <vector>
 #include <limits>
 #include <array>
+#include <string_view>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -398,7 +399,17 @@ struct ProceduralRenderer::Impl {
     // pipeline is returned.
     Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull,
                                                 bool depthOnly = false, wgpu::RenderPipeline* startInto = nullptr,
-                                                const char* fragmentEntry = nullptr);
+                                                const char* fragmentEntry = nullptr,
+                                                std::shared_ptr<gpu::BackgroundPipeline> background = nullptr);
+    // ADR-1805: the live editor compiles the on-demand pipelines (unlit fast path, refraction) in the background; the
+    // surfaces draw their fallback until they land. Off (offline renders, tests): created where first needed.
+    bool deferPipelines = false;
+    std::array<std::shared_ptr<gpu::BackgroundPipeline>, 2> unlitBackground;
+    std::array<std::shared_ptr<gpu::BackgroundPipeline>, 3> refractBackground;
+    bool backgroundFailed = false;
+    // Starts `slots` the first time, then reports whether all landed; on a failure, warns and gives up for this module.
+    template <std::size_t N>
+    bool landed(std::array<std::shared_ptr<gpu::BackgroundPipeline>, N>& slots, const char* what);
     // ADR-1603: the refraction pipelines, built the first time a frame needs them (no cost to a scene without one).
     wgpu::ShaderModule litModule;
     wgpu::RenderPipeline pipelineRefractCull;
@@ -1191,12 +1202,48 @@ void ProceduralRenderer::setShadowViews(std::span<const FrustumPlanes> views) {
                                                        std::min<std::size_t>(views.size(), kMaxShadowCullViews)));
 }
 
+template <std::size_t N>
+bool ProceduralRenderer::Impl::landed(std::array<std::shared_ptr<gpu::BackgroundPipeline>, N>& slots, const char* what) {
+    for (const auto& slot : slots) {
+        if (!slot->done) {
+            return false;
+        }
+    }
+    for (const auto& slot : slots) {
+        if (slot->failed) {
+            if (!backgroundFailed) {
+                log::warn("procedural: the {} pipelines failed in the background ({}); those surfaces keep their fallback",
+                          what, slot->error);
+            }
+            backgroundFailed = true;
+            return false;
+        }
+    }
+    return true;
+}
+
 bool ProceduralRenderer::Impl::ensureUnlitPipelines() {
     if (pipelineUnlitCull && pipelineUnlitNoCull) {
         return true;
     }
     if (!litModule) {
         return false;
+    }
+    if (deferPipelines) { // ADR-1805: the surfaces take the full path (the same colour within a level) meanwhile
+        if (!unlitBackground[0]) {
+            for (auto& slot : unlitBackground) {
+                slot = std::make_shared<gpu::BackgroundPipeline>();
+            }
+            static_cast<void>(createPipeline(litModule, true, false, nullptr, "fs_proc_unlit", unlitBackground[0]));
+            static_cast<void>(createPipeline(litModule, false, false, nullptr, "fs_proc_unlit", unlitBackground[1]));
+            return false;
+        }
+        if (!landed(unlitBackground, "unlit fast-path")) {
+            return false;
+        }
+        pipelineUnlitCull = unlitBackground[0]->pipeline;
+        pipelineUnlitNoCull = unlitBackground[1]->pipeline;
+        return true;
     }
     auto cull = createPipeline(litModule, true, false, nullptr, "fs_proc_unlit");
     auto noCull = createPipeline(litModule, false, false, nullptr, "fs_proc_unlit");
@@ -1218,15 +1265,6 @@ bool ProceduralRenderer::Impl::ensureRefractPipelines() {
     if (!litModule) {
         return false;
     }
-    auto cull = createPipeline(litModule, true, false, nullptr, "fs_proc_refract");
-    auto noCull = createPipeline(litModule, false, false, nullptr, "fs_proc_refract");
-    if (!cull || !noCull) {
-        log::warn("procedural: the refraction pipelines failed ({}); refractive surfaces draw opaque",
-                  !cull ? cull.error().message : noCull.error().message);
-        return false;
-    }
-    pipelineRefractCull = *cull;
-    pipelineRefractNoCull = *noCull;
     // The depth lay-down: the depth prepass's stages, inside a pass with the scene's colour targets, writing none.
     VertexLayoutStorage vertex;
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
@@ -1254,6 +1292,33 @@ bool ProceduralRenderer::Impl::ensureRefractPipelines() {
     desc.multisample.count = sampleCount;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
+    if (deferPipelines) { // ADR-1805: the refraction phase stays off (the surfaces draw opaque, as at Low) meanwhile
+        if (!refractBackground[0]) {
+            for (auto& slot : refractBackground) {
+                slot = std::make_shared<gpu::BackgroundPipeline>();
+            }
+            static_cast<void>(createPipeline(litModule, true, false, nullptr, "fs_proc_refract", refractBackground[0]));
+            static_cast<void>(createPipeline(litModule, false, false, nullptr, "fs_proc_refract", refractBackground[1]));
+            gpu::startBackgroundRenderPipeline(context.device(), &desc, refractBackground[2]);
+            return false;
+        }
+        if (!landed(refractBackground, "refraction")) {
+            return false;
+        }
+        pipelineRefractCull = refractBackground[0]->pipeline;
+        pipelineRefractNoCull = refractBackground[1]->pipeline;
+        pipelineRefractDepth = refractBackground[2]->pipeline;
+        return true;
+    }
+    auto cull = createPipeline(litModule, true, false, nullptr, "fs_proc_refract");
+    auto noCull = createPipeline(litModule, false, false, nullptr, "fs_proc_refract");
+    if (!cull || !noCull) {
+        log::warn("procedural: the refraction pipelines failed ({}); refractive surfaces draw opaque",
+                  !cull ? cull.error().message : noCull.error().message);
+        return false;
+    }
+    pipelineRefractCull = *cull;
+    pipelineRefractNoCull = *noCull;
     context.device().PushErrorScope(wgpu::ErrorFilter::Validation);
     pipelineRefractDepth = gpu::createRenderPipeline(context.device(), &desc);
     std::string error;
@@ -1274,6 +1339,9 @@ bool ProceduralRenderer::Impl::ensureRefractPipelines() {
 
 Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule& module, bool start) {
     litModule = module; // ADR-1603: the refraction pipelines are built from it on demand
+    unlitBackground = {}; // ADR-1805: a background build for the old module lands in its own slots, unread
+    refractBackground = {};
+    backgroundFailed = false;
     pipelineUnlitCull = nullptr; // ADR-1673: likewise
     pipelineUnlitNoCull = nullptr;
     pipelineRefractCull = nullptr;
@@ -1450,7 +1518,8 @@ Result<void> ProceduralRenderer::Impl::createCullPipelines(const wgpu::ShaderMod
 Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu::ShaderModule& module, bool cull,
                                                                       bool depthOnly,
                                                                       wgpu::RenderPipeline* startInto,
-                                                                      const char* fragmentEntry) {
+                                                                      const char* fragmentEntry,
+                                                                      std::shared_ptr<gpu::BackgroundPipeline> background) {
     VertexLayoutStorage vertex;
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, colorFormat, nullptr);
@@ -1464,7 +1533,9 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     depth.depthWriteEnabled = wgpu::OptionalBool::True;
     depth.depthCompare = depthOnly ? wgpu::CompareFunction::Less : wgpu::CompareFunction::LessEqual;
 
-    const char* label = fragmentEntry != nullptr ? (cull ? "procedural-refract" : "procedural-refract-twosided")
+    const bool unlitEntry = fragmentEntry != nullptr && std::string_view(fragmentEntry) == "fs_proc_unlit";
+    const char* label = unlitEntry ? (cull ? "procedural-unlit" : "procedural-unlit-twosided")
+                        : fragmentEntry != nullptr ? (cull ? "procedural-refract" : "procedural-refract-twosided")
                         : depthOnly                ? "procedural-depth"
                         : (cull ? "procedural-opaque" : "procedural-opaque-twosided");
     wgpu::RenderPipelineDescriptor desc{};
@@ -1486,6 +1557,10 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     const auto& device = context.device();
     if (startInto != nullptr) {
         gpu::startRenderPipeline(device, &desc, startInto);
+        return wgpu::RenderPipeline{};
+    }
+    if (background != nullptr) {
+        gpu::startBackgroundRenderPipeline(device, &desc, std::move(background));
         return wgpu::RenderPipeline{};
     }
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
@@ -3082,6 +3157,14 @@ void ProceduralRenderer::drawShadow(wgpu::RenderPassEncoder& pass, const scene::
 void ProceduralRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene,
                               const std::function<wgpu::BindGroup(const scene::Material&)>& materialBindGroup) {
     drawImpl(pass, scene, materialBindGroup, false, false);
+}
+
+void ProceduralRenderer::setDeferredPipelines(bool on) {
+    impl_->deferPipelines = on;
+}
+
+bool ProceduralRenderer::refractionReady() {
+    return impl_->ensureRefractPipelines();
 }
 
 void ProceduralRenderer::setUnlitFastPath(bool on) {

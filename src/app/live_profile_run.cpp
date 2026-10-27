@@ -414,6 +414,7 @@ int Application::runLiveProfileHeadless() {
     // hash moved -- 697 of about 1,060 frames and 6.2 ms of CPU a frame in Rainbow World, against 0.03 ms live -- so
     // it measured a frame nobody performs.
     renderer_->setInteractiveEnvironmentBudget(2.0);
+    renderer_->setInteractivePipelineDeferral(true); // ADR-1805
     renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
 
     if (const auto profile = liveQualityProfile()) {

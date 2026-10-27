@@ -173,6 +173,28 @@ wgpu::ComputePipeline compileComputePipeline(const wgpu::Device& device,
     return result;
 }
 
+void startBackgroundRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineDescriptor* desc,
+                                   std::shared_ptr<BackgroundPipeline> into) {
+    const std::string label = labelOf(desc->label);
+    const auto start = std::chrono::steady_clock::now();
+    gStarted.fetch_add(1, std::memory_order_relaxed);
+    static_cast<void>(pipelineCountersNoteAsync());
+    device.CreateRenderPipelineAsync(
+        desc, wgpu::CallbackMode::AllowProcessEvents,
+        [into = std::move(into), label, start](wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline,
+                                               wgpu::StringView message) {
+            gLanded.fetch_add(1, std::memory_order_relaxed);
+            into->done = true;
+            if (status == wgpu::CreatePipelineAsyncStatus::Success && pipeline) {
+                into->pipeline = std::move(pipeline);
+            } else {
+                into->failed = true;
+                into->error = labelOf(message);
+            }
+            notePipelineTime("render (background)", label, msSince(start));
+        });
+}
+
 void startRenderPipeline(const wgpu::Device& device, const wgpu::RenderPipelineDescriptor* desc,
                          wgpu::RenderPipeline* out) {
     if (gBatchDepth == 0 || forceSync()) {

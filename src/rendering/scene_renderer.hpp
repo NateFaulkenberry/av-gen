@@ -845,6 +845,10 @@ public:
     // clock has no business deciding what a deterministic render contains. Only the live editor
     // sets it, in `Application::runLive`.
     void setInteractiveEnvironmentBudget(double budgetMs) { interactiveEnvBudgetMs_ = budgetMs; }
+    // ADR-1805: live editor only, like the budget above: pipelines first needed mid-performance compile in the
+    // background and their surfaces draw a fallback until they land (ProceduralRenderer::setDeferredPipelines).
+    // Off by default and in every offline render.
+    void setInteractivePipelineDeferral(bool on);
     // ADR-1070, live only. A sky whose colours a performance routes (a chord painting the dusk)
     // moves on every frame, and each move past ADR-1022's tolerance used to cost the whole blocking
     // IBL chain inside a frame -- 7-17 ms, several times a second, each one a dropped frame. With
