@@ -73,6 +73,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1580-1589 | eng/stems-feed (stems and live channels feed the beat clock and response.*; per-source trims) |
 | 1590-1599 | perf/rainbow-world-live (Rainbow World's late song holding High live: depth programs, rigid normals) |
 | 1700-1719 | eng/midi-mapping (MIDI performance mapping: Learn, scopes and defaults, the monitor, the MIDI panel) |
+| 1800-1849 | eng/qa-pass-2 (the second QA, debugging, refactoring and cleanup pass) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -908,3 +909,6 @@ confirm the citation you are about to change is your own.
 | [1783](ADR-1783-the-manual-beat-clock-is-a-tempo-and-one-marked-beat.md) | The manual beat clock: the tempo override plus one marked beat (`transport.tempo.anchor`, beat 1 of a bar) is the file's beat clock, `beat.source` 4; Mark beat on the transport bar. Precedence MIDI clock > manual > file grid > live tracker. eng/beat-clock | Accepted |
 | [1784](ADR-1784-no-source-names-an-instrument-the-drum-classifier-is-cut.md) | The drums-role kick/snare/hat classifier is cut (no shims): no `stem.<key>.kick/snare/hat` or `role.drums.*` classes; the hits tier runs only for a response feed; history rows by register for every role; the real-drum fixture is gone. Supersedes parts of ADR-1060, 1067, 1630 and ADR-1726. eng/beat-clock | Accepted |
 | [1785](ADR-1785-the-beat-clock-is-gated-by-the-audio-response-lab.md) | The lab's beat findings are gates: file grid F >= 0.85 and tempo per section, live F >= 0.70, lock <= 8 s, confidence under 0.1 within 0.8 s of a silence, no beat in it, the lock back within 4 s. eng/beat-clock | Accepted |
+| [1801](ADR-1801-a-seek-replays-the-control-layer-for-an-integrating-route.md) | A seek replays the control layer (on the play's grid) for an enabled integrating route or a `random`/`envelope` source: the signal replay's 60 Hz grid sums a different total, and a stateful source restarted at 0. Seek output changes for 13 shipped projects (listed); +20-30% seek cost for them. eng/qa-pass-2 | Accepted |
+| [1803](ADR-1803-every-avgen-override-is-logged-and-recorded.md) | Every `AVGEN_*` variable set for a run is logged at startup and recorded in a live profile's conditions; `live_perf_baseline.py write` refuses runs with overrides or off AC power; the CLI reference lists all of them (hygiene test). eng/qa-pass-2 | Accepted |
+| [1804](ADR-1804-the-rig-common-set-is-measured-over-scenes-that-really-loaded.md) | The MIDI rig's common set is measured over live scenes that really loaded (a missing generated scene opened on the default scene and was counted): 287 parameters, adding the camera, environment, fog, volume, wind and root ones. Amends ADR-1705. eng/qa-pass-2 | Accepted |

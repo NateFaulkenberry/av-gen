@@ -164,6 +164,7 @@ struct LiveProfileConditions {
     std::string buildType;
     std::string gitRevision;
     bool gitDirty = false;
+    std::string environment; // ADR-1803: every AVGEN_* variable set for the run ("" = none)
     double displayRefreshHz = 0.0; // 0 = unknown / no display (headless)
     std::string window;            // "offscreen" | "windowed" | "fullscreen"
     std::uint32_t outputWidth = 0, outputHeight = 0;

@@ -898,6 +898,7 @@ json liveProfileJson(const LiveProfileRecord& r) {
         {"buildType", c.buildType},
         {"gitRevision", c.gitRevision},
         {"gitDirty", c.gitDirty},
+        {"environment", c.environment},
         {"displayRefreshHz", c.displayRefreshHz > 0.0 ? json(c.displayRefreshHz) : json(nullptr)},
         {"window", c.window},
         {"output", {{"width", c.outputWidth}, {"height", c.outputHeight}}},
@@ -1088,6 +1089,9 @@ std::string liveProfileText(const LiveProfileRecord& r) {
     line("OS:           {}", c.os.empty() ? "unknown" : c.os);
     line("Renderer:     {} ({})", c.backend, c.gpu);
     line("Build:        {} {}{}", c.buildType, c.gitRevision, c.gitDirty ? " (dirty)" : "");
+    if (!c.environment.empty()) {
+        line("Environment:  {}", c.environment);
+    }
     line("Output:       {} x {} {}{}", c.outputWidth, c.outputHeight, c.window,
          c.displayRefreshHz > 0.0 ? fmt::format(", display {:.0f} Hz", c.displayRefreshHz) : std::string());
     line("Internal:     {} x {} (scale {:.2f})", c.internalWidth, c.internalHeight, c.renderScale);

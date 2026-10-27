@@ -2,7 +2,7 @@
 id: reference/command-line
 title: Command Line
 category: Reference
-summary: The common flags, the common AVGEN environment variables, and the exit codes. avgen --help lists the rest.
+summary: The common flags, every AVGEN environment variable, and the exit codes. avgen --help lists the rest of the flags.
 order: 92
 audience: expert
 tags: cli, command line, flags, headless, environment, arguments
@@ -13,8 +13,8 @@ features: subsystem.cli
 
 # Command Line
 
-This page covers the flags and `AVGEN_*` variables most work needs; it is not complete. `avgen --help` prints the
-full flag list.
+This page covers the flags most work needs; it is not complete. `avgen --help` prints the full flag list. The
+`AVGEN_*` environment variables are all listed below (a test keeps the list complete).
 
 ## Loading
 
@@ -101,6 +101,39 @@ full flag list.
 | `AVGEN_NO_WARMUP` | skip the two warm-up frames before an offline render |
 | `AVGEN_FFMPEG` | path to an ffmpeg executable |
 | `AVGEN_NDI_LIB` | path to libndi |
+| `AVGEN_QUALITY` | path to the Quality Lab CLI (`avgen_quality`) the live optimizer runs |
+| `AVGEN_DAWN_TOGGLES` | `a,b`: enable Dawn device toggles (investigation only; `dump_shaders` with `--log debug` dumps MSL) |
+| `AVGEN_PIPELINE_TIMING` | log every pipeline's creation time |
+| `AVGEN_SHADOW_STATS` | log the shadow views every thirtieth frame |
+| `AVGEN_EDITOR_TRACE` | print the editor's per-frame inputs and what it made of them |
+| `AVGEN_DIRTY_TRACE` | log each unsaved-changes sample |
+| `AVGEN_HEIGHT_CENSUS` | count terrain height queries and print the census at exit |
+| `AVGEN_TRACE_DEBUG` | print each river course's trace while a world generates |
+| `AVGEN_ASTRAL_TRACE` | log the Astral renderer's steps each frame |
+| `AVGEN_HELP_SELFTEST` | step through every Help page once (a self-test) |
+| `AVGEN_CAPTURE_WORLD_INSPECTOR` | `environment`, `camera` or `node:<name>`: pin the World panel's Inspector for a capture |
+
+### Measurement arms
+
+Each of these turns a later optimisation or fix off, so its before and after can be measured in one binary. **They
+change what a frame costs or shows.** Since ADR-1803 every `AVGEN_*` variable that is set is logged as a warning when
+`avgen` starts and recorded in a live profile's conditions (`environment`); `tools/live_perf_baseline.py write` refuses
+a run that had any.
+
+| Variable | Restores |
+|---|---|
+| `AVGEN_LEGACY_PROCGEN=1` | the pre-ADR-233 double procedural generation |
+| `AVGEN_SYNC_PIPELINES=1` | pipeline creation on the calling thread (before ADR-1562) |
+| `AVGEN_NO_CONTROL_REPLAY` | a seek without the control replay (before ADR-1168; the seek lands where a play does not) |
+| `AVGEN_NO_SEEK_DEFERRAL` | an interactive seek that is never deferred |
+| `AVGEN_SEEK_BODY_STEPS=<n>` | the seek's body-step ceiling (0 = none; default ADR-700's) |
+| `AVGEN_SEEK_MODE=window` | the entity seek's re-simulation window instead of checkpoints |
+| `AVGEN_SCATTER_WORKERS=<n>` | the scatter's worker count |
+| `AVGEN_NO_TERRAIN_CACHE` | a terrain rebuilt for every node placement |
+| `AVGEN_KEEP_ASSET_CACHE=1` | every asset cache entry kept (before ADR-1392) |
+| `AVGEN_HEIGHT_CACHE=0`, `AVGEN_PATH_CUTOFF=0`, `AVGEN_LEVEL_BLEND=0` | the terrain height query without its cache, path cut-off or level blend |
+| `AVGEN_NAV_FORCE_TRUST=1` | the navigation grid's terrain trust forced on |
+| `AVGEN_DIAG_NO_SIGHTLINE` | a character's visibility signal without its sightline march |
 
 ## Exit codes
 

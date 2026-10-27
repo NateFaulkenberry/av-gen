@@ -10,6 +10,7 @@
 #include "app/live_profile.hpp"
 #include "app/live_profile_session.hpp"
 #include "assets/image.hpp"
+#include "core/env_overrides.hpp"
 #include "core/log.hpp"
 #include "core/phase2_probe.hpp"
 #include "core/time.hpp"
@@ -138,6 +139,7 @@ void Application::fillLiveProfileConditions(LiveProfileRecord& record, bool live
     c.buildType = AVGEN_BUILD_TYPE;
     c.gitRevision = AVGEN_GIT_REVISION;
     c.gitDirty = AVGEN_GIT_DIRTY != 0;
+    c.environment = core::avgenEnvironmentLine();
     c.targetFps = o.targetFps;
     c.budgetMs = 1000.0 / o.targetFps;
     c.qualityBudgetMs = liveBudget(o.targetFps).qualityBudgetMs;

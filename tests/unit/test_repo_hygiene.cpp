@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <regex>
 #include <set>
 #include <string>
@@ -219,4 +220,28 @@ TEST_CASE("the credits a published work must carry are still there", "[hygiene]"
     const std::string depsText((std::istreambuf_iterator<char>(depsIn)),
                                std::istreambuf_iterator<char>());
     REQUIRE(depsText.find("The 100STYLE Dataset - Ian Mason") != std::string::npos);
+}
+
+// ADR-1803: every `AVGEN_*` variable the source reads is in the command-line reference. On 2026-10-14 the page named 14
+// of 36 and eight were in no document at all, several of them A/B arms that change what a frame shows; a variable
+// nobody can find is one somebody leaves exported and then measures a different program with.
+TEST_CASE("every AVGEN environment variable the source reads is documented", "[hygiene]") {
+    const std::filesystem::path root(AVGEN_SOURCE_DIR);
+    const std::regex read(R"re(getenv\("(AVGEN_[A-Z0-9_]+)"\))re");
+    std::set<std::string> names;
+    for (const auto& file : filesUnder(root / "src", {".cpp", ".hpp", ".mm"})) {
+        std::ifstream in(file);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        for (auto it = std::sregex_iterator(text.begin(), text.end(), read); it != std::sregex_iterator(); ++it) {
+            names.insert((*it)[1].str());
+        }
+    }
+    // The premise: if the pattern stops matching, the check below passes by finding nothing.
+    REQUIRE(names.size() >= 30);
+    std::ifstream in(root / "docs" / "help" / "reference-command-line.md");
+    const std::string doc((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    for (const std::string& name : names) {
+        INFO(name << " is read in src/ and missing from docs/help/reference-command-line.md");
+        CHECK(doc.find("`" + name) != std::string::npos);
+    }
 }

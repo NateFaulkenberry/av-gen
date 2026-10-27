@@ -56,6 +56,11 @@ SCENES = {
 SCENE_AUDIO = {
     "aurora-borealis": ("assets/audio/stems/sabertooth/Sabertooth.wav", "12"),
 }
+# The command that writes a scene's generated (gitignored) files, for a skipped scene's message.
+GENERATORS = {
+    "aurora-borealis": "python3 examples/aurora-borealis/build.py",
+    "rainbow-world": "python3 examples/rainbow-world/build.py (Blender 5, about 20 minutes)",
+}
 AUDIO = "assets/audio/feline-footwear.wav"
 COMMON = ["--audio", AUDIO, "--no-audio", "--target-fps", "30", "--size", "1920x1080", "--start", "60"]
 
@@ -110,10 +115,12 @@ def run(a):
     if not os.path.exists(os.path.join(ROOT, AUDIO)):
         sys.exit("%s is missing (the analysis track; never committed)" % AUDIO)
     scenes = []
+    skipped = []
     for scene in chosen(a):
         why = available(scene)
         if why:
-            say("-- %s skipped: %s" % (scene, why))
+            say("-- %s SKIPPED: %s" % (scene, why))
+            skipped.append(scene)
         else:
             scenes.append(scene)
     avgen = os.path.join(a.bin, "src", "avgen")
@@ -143,6 +150,14 @@ def run(a):
         say("   exit %d %s %s" % (rc, datetime.now().strftime("%H:%M:%S"), power()))
     with open(os.path.join(a.out, "exits.json"), "w") as f:
         json.dump(exits, f, indent=1)
+    if skipped:
+        # A run that measured less than it was asked to is not a pass (Aurora Borealis's generated scene is absent from
+        # a fresh checkout, and the old summary line was easy to miss): say how to make each one, and fail.
+        say("FAILED: %d scene(s) not measured: %s" % (len(skipped), ", ".join(skipped)))
+        for scene in skipped:
+            if scene in GENERATORS:
+                say("   make %s with: %s" % (scene, GENERATORS[scene]))
+        return 1
     return 0 if all(rc == 0 for rc in exits.values()) else 1
 
 
@@ -178,7 +193,8 @@ def summarise(out):
                          "max": r["frame"]["frameMs"]["max"],
                          "mediumOrBetter": sum(share.get(lv, 0.0) for lv in LEVELS[:3]),
                          "levels": {k: round(v, 4) for k, v in sorted(share.items())},
-                         "revision": r.get("conditions", {}).get("gitRevision")})
+                         "revision": r.get("conditions", {}).get("gitRevision"),
+                         "environment": r.get("conditions", {}).get("environment", "")})
             rep += 1
         head = None
         hp = os.path.join(out, "%s-headless-r1.json" % scene)
@@ -262,6 +278,17 @@ def write(a):
     bad = [s for s, sc in now.items() if sc["failedRuns"] or not sc["reps"]]
     if bad:
         sys.exit("refusing to write a baseline with failed runs: " + ", ".join(bad))
+    # ADR-1803: a run under an A/B arm or any other AVGEN_* override measured a different program
+    overridden = sorted({"%s (%s)" % (s, r["environment"]) for s, sc in now.items() for r in sc["reps"]
+                         if r.get("environment")})
+    if overridden:
+        sys.exit("refusing to write a baseline from runs with AVGEN_* overrides: " + "; ".join(overridden))
+    # the owner's rule: a profile is evidence only on AC power
+    conditions = os.path.join(a.out, "conditions.log")
+    if os.path.exists(conditions):
+        off_ac = [line.strip() for line in open(conditions) if "drawing from" in line and "AC Power" not in line]
+        if off_ac:
+            sys.exit("refusing to write a baseline from a run not on AC power: " + off_ac[0])
     for sc in now.values():
         sc["thresholds"] = thresholds(sc)
     if getattr(a, "add", False) and os.path.exists(a.baseline):

@@ -7,6 +7,7 @@
 #include "app/jump_trace_cli.hpp"
 #include "audio/audio_input.hpp"
 #include "control/midi.hpp"
+#include "core/env_overrides.hpp"
 #include "core/log.hpp"
 #include "labs/lab.hpp"
 
@@ -105,6 +106,10 @@ int main(int argc, char** argv) {
                                                 options->fpsGiven ? options->offlineFps : 0.0, options->traceFinals);
     }
     avgen::log::info("avgen 0.1.0 starting ({} mode)", options->headless ? "headless" : "live");
+    // ADR-1803: an exported A/B arm changes the program; say so where every run's log starts.
+    if (const std::string env = avgen::core::avgenEnvironmentLine(); !env.empty()) {
+        avgen::log::warn("environment overrides: {}", env);
+    }
 
     // ADR-1392: the application is on the heap so the time its teardown takes can be measured and logged. "Quitting
     // is slow after opening several projects" was a report nothing could put a number on.
