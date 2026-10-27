@@ -39,6 +39,7 @@ target_link_libraries(avgen_sonic_probe PRIVATE avgen_core miniaudio::miniaudio)
 # goes with `render_settings.cpp` (ADR-383), as it does in `avgen_render_tests`.
 set(AVGEN_TOOL_ENGINE_APP_SOURCES
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/engine_project.cpp" # QA pass 2: engine.cpp's project persistence
     "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp" # ADR-1100: the engine's live block
     "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"

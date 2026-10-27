@@ -10,6 +10,7 @@ target_link_libraries(avgen_tests PRIVATE tinyexr::tinyexr PRIVATE avgen_quality
 target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/app/settings.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+    "${CMAKE_SOURCE_DIR}/src/app/engine_project.cpp" # QA pass 2: engine.cpp's project persistence
     # ADR-902: `avgen --audit-routes` -- an offline engine and a report, no GPU, so it is checked here.
     "${CMAKE_SOURCE_DIR}/src/app/route_audit_cli.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/sonic_trace_cli.cpp"
@@ -191,6 +192,7 @@ endif()
 if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
     add_executable(avgen_render_tests ${AVGEN_RENDER_TEST_SOURCES}
         "${CMAKE_SOURCE_DIR}/src/app/engine.cpp"
+        "${CMAKE_SOURCE_DIR}/src/app/engine_project.cpp" # QA pass 2: engine.cpp's project persistence
         "${CMAKE_SOURCE_DIR}/src/app/transport.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/recent_files.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_settings.cpp"
