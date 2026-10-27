@@ -349,3 +349,28 @@ TEST_CASE("opening B over A never binds A's timeline against B", "[project][life
     CHECK(engine.projectWarnings() == alone); // B's warnings are B's, whatever was open before
 #endif
 }
+
+// QA pass 2: a project made to be played live has no analysed track until its input opens, after the load, so the
+// load's liveness report called every audio route dead ("the project has no analysed audio, so 'audio.treble' never
+// moves"): a hundred-odd log lines on Talking Heads in every live run. A live project's audio is its input.
+TEST_CASE("a live project's audio routes are not reported dead before its input opens",
+          "[project][liveness][regression]") {
+#ifndef AVGEN_SOURCE_DIR
+    SKIP("AVGEN_SOURCE_DIR not defined");
+#else
+    const fs::path live = examples() / "sonic-abstract" / "talking-heads.json";
+    REQUIRE(fs::exists(live));
+    for (const app::EngineMode mode : {app::EngineMode::Offline, app::EngineMode::Live}) {
+        app::Engine engine(mode);
+        REQUIRE(engine.loadProject(live).has_value());
+        REQUIRE(engine.projectIsLive());
+        int silent = 0;
+        for (const scene::AuditEntry& entry : engine.auditRoutes().routes) {
+            for (const auto& f : entry.findings) {
+                silent += f.rule == "silent-source" ? 1 : 0;
+            }
+        }
+        CHECK(silent == 0);
+    }
+#endif
+}

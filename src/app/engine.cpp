@@ -1383,8 +1383,11 @@ scene::LivenessInputs Engine::livenessInputs() const {
     in.meter = meter();
     in.durationSeconds = durationSeconds();
     in.frameRate = render_.fps > 0.0 ? render_.fps : 60.0;
-    // An analysed track, or a live input whose analysis runs as it plays: either moves audio.*.
-    in.hasAudio = (track_ != nullptr && !track_->empty()) || input_ != nullptr;
+    // An analysed track, or a live input whose analysis runs as it plays: either moves audio.*. So does a project made
+    // to be played live (`sonic.live`, ADR-1025) or any project in the live editor: its audio is the input that opens
+    // after the load. Without this, loading Talking Heads live warned that 128 of its routes were dead.
+    in.hasAudio = (track_ != nullptr && !track_->empty()) || input_ != nullptr || mode_ == EngineMode::Live ||
+                  projectIsLive();
     in.hasTempo = in.hasAudio || tempoOverride_.available || embeddedTempo_.available;
     in.offline = mode_ == EngineMode::Offline;
     // ADR-916: the tear rule asks whether anything lifts a water's tear amount.
