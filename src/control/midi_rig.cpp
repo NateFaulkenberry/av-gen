@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iterator>
 
 namespace avgen::control {
 
@@ -131,20 +132,38 @@ std::string midiRigFingerprint(const std::vector<MidiBinding>& mappings) {
 }
 
 bool midiRigCommonParameter(std::string_view path) {
-    // The engine's own registrations, made for every project whatever it renders (measured over the live set).
-    for (const std::string_view prefix : {"post/", "temporal/", "sonic/response/", "camera/lens/", "camera/exposure/",
-                                          "camera/focus/"}) {
+    // The engine's own registrations, made for every project whatever it renders, and the scene's camera, environment,
+    // fog, volume and wind, which every live scene's composition registers (measured over the live set with every
+    // scene's generated files present, 287 parameters: test_midi_rig_engine.cpp; ADR-1804).
+    for (const std::string_view prefix :
+         {"post/", "temporal/", "sonic/response/", "camera/lens/", "camera/exposure/", "camera/focus/", "camera/breath/",
+          "camera/shake/", "env/dayNight/", "env/sky/", "scene/wind/", "scene/glow-pools/"}) {
         if (path.starts_with(prefix)) {
             return true;
         }
     }
-    for (const std::string_view exact : {"audio/inputGain", "scene/brightness", "scene/gridIntensity", "camera/distance",
-                                         "camera/height", "camera/orbitSpeed"}) {
-        if (path == exact) {
-            return true;
-        }
-    }
-    return false;
+    static constexpr std::string_view kExact[] = {
+        "audio/inputGain", "scene/brightness", "scene/gridIntensity", "camera/distance", "camera/height",
+        "camera/orbitSpeed",
+        // the camera
+        "camera/far", "camera/fov", "camera/lookAhead", "camera/mode", "camera/near", "camera/orbitPivot",
+        "camera/orbitPivotWeight", "camera/position", "camera/roll", "camera/splineBank", "camera/splineOffset",
+        "camera/splineT", "camera/splineUp", "camera/target",
+        // the environment
+        "env/intensity", "env/lightFromEnvironment", "env/proceduralSkyBackground", "env/rotation", "env/skyBloom",
+        "env/skybox",
+        // the root transform
+        "root/impulse", "root/rotationSpeed", "root/scale",
+        // the scene's fog, volume, light and wind
+        "scene/ecologyLight", "scene/fogColor", "scene/fogGroundFollow", "scene/fogHeight", "scene/fogHeightAmount",
+        "scene/fogHeightCurve", "scene/fogHeightFalloff", "scene/fogPooling", "scene/fogSky", "scene/fogSkyDistance",
+        "scene/fogUpperDensity", "scene/horizonDensity", "scene/keyLight", "scene/shadowRange",
+        "scene/styledGroundAmbient", "scene/styledSkyAmbient", "scene/stylized", "scene/volumeAbsorption",
+        "scene/volumeAnisotropy", "scene/volumeDensity", "scene/volumeEmission", "scene/volumeJitter",
+        "scene/volumeLocalLights", "scene/volumeMaxDistance", "scene/volumeNoise", "scene/volumeNoiseScale",
+        "scene/volumeNoiseSpeed", "scene/volumeScattering", "scene/volumeShadowSteps", "scene/volumeShadowStrength",
+        "scene/volumeSteps", "scene/windDirection", "scene/windSpeed"};
+    return std::find(std::begin(kExact), std::end(kExact), path) != std::end(kExact);
 }
 
 std::string promoteMidiMappingToRig(ControlMap& map, std::string_view id) {

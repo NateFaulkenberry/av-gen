@@ -296,15 +296,25 @@ TEST_CASE("every live scene has the rig's common parameters", "[integration][mid
     std::set<std::string> calledCommon; // every path any scene has that the rig calls common
     bool first = true;
     int loaded = 0;
+    std::vector<std::string> notHere;
     for (const app::ExampleInfo& scene : live) {
-        app::Engine engine(app::EngineMode::Offline);
-        auto r = engine.loadProject(scene.file);
         INFO(scene.file.string());
-        if (!r) {
-            // A scene whose private assets are absent on this machine is not a verdict on the parameter set.
-            WARN("not loaded: " << scene.file.filename().string() << ": " << r.error().message);
+        // A scene whose generated files are not on this machine is not a verdict on the parameter set. It must be
+        // skipped, not loaded: its project "loads" onto the default scene (ADR-1288), whose parameters are not the
+        // scene's. Until 2026-10-27 Aurora Borealis and Rainbow World were counted that way wherever their generated
+        // scenes were missing, and the measured common set (179) was the default scene's, not the live set's (287).
+        if (app::exampleStatus(scene).readiness == app::ExampleReadiness::Unavailable) {
+            CHECK(!scene.generate.empty()); // only generated files may be absent
+            notHere.push_back(scene.name);
             continue;
         }
+        app::Engine engine(app::EngineMode::Offline);
+        auto r = engine.loadProject(scene.file);
+        INFO((r ? std::string() : r.error().message));
+        REQUIRE(r.has_value());
+        const auto sceneLoaded = engine.requireProjectScene();
+        INFO((sceneLoaded ? std::string() : sceneLoaded.error().message));
+        REQUIRE(sceneLoaded.has_value());
         ++loaded;
         std::set<std::string> paths;
         for (params::IParameter* p : engine.params().ordered()) {
@@ -349,10 +359,18 @@ TEST_CASE("every live scene has the rig's common parameters", "[integration][mid
             ++notShared;
         }
     }
+    for (const std::string& name : notHere) {
+        WARN("not loaded here (its generated files are missing): " << name);
+    }
     INFO("shared but not called common: " << list.str());
     INFO("called common but missing from some live scene: " << missing.str());
     WARN(loaded << " live scenes loaded; " << shared.size() << " modulatable parameters shared by all");
-    CHECK(notCommon == 0);
+    // The rig's promise (a common destination exists in every live scene) holds over whatever loaded.
     CHECK(notShared == 0);
-    CHECK(loaded == static_cast<int>(live.size()));
+    CHECK(loaded + static_cast<int>(notHere.size()) == static_cast<int>(live.size()));
+    // Completeness (every shared parameter is called common) is a measurement of the whole live set: a subset shares
+    // more, so it is judged only when every live scene is here.
+    if (notHere.empty()) {
+        CHECK(notCommon == 0);
+    }
 }
