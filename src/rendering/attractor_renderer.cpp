@@ -65,7 +65,8 @@ static_assert(sizeof(AttractorUniformGpu) == 8 * 16 + kPaletteSlots * 16 + 3 * 1
 } // namespace
 
 bool AttractorRenderer::wants(const scene::Scene& scene) const {
-    return scene.attractorWorld.active();
+    // ADR-1857: the ray-march draws only a world built without its engine mesh (the Phase 1 comparison)
+    return scene.attractorWorld.active() && !scene.attractorWorld.world->terrainMesh;
 }
 
 Result<void> AttractorRenderer::init(gpu::Context& context, gpu::ShaderLibrary& shaders, wgpu::TextureFormat hdrFormat,

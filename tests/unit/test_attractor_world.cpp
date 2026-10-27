@@ -30,6 +30,7 @@ scene::AttractorGen smallGen(std::uint32_t seed) {
     scene::AttractorGen g;
     g.seed = seed;
     g.resolution = 384; // small: the generator's cost is per texel, and these tests only need its shape
+    g.meshSpacing = 16.0f; // a 1025^2 triangulation grid, so the engine mesh is built in a fraction of a second
     return g;
 }
 
@@ -288,4 +289,82 @@ TEST_CASE("attractor flythrough camera trace (hidden)", "[.attractor-camera-trac
                      cam.position.z, fw.x, fw.y, fw.z, cam.up.x, cam.up.y, cam.up.z);
     }
     std::fclose(f);
+}
+
+// ---- the engine-native terrain mesh (ADR-1857) ------------------------------------------------------------------
+
+TEST_CASE("the terrain mesh is valid, wound up, finite, bounded, deterministic and follows the surface",
+          "[attractor-world][adr1857]") {
+    const auto w = scene::generateAttractorWorld(smallGen(3));
+    REQUIRE(w->terrainMesh != nullptr);
+    const scene::AttractorTerrainMesh& tm = *w->terrainMesh;
+    CHECK(tm.triangles > 1000u);
+    CHECK(tm.chunks.size() == 256u);
+    std::size_t tris = 0, verts = 0, degenerate = 0, downward = 0;
+    float maxErr = 0.0f;
+    for (const auto& ch : tm.chunks) {
+        REQUIRE(ch.positions.size() == ch.normals.size());
+        REQUIRE(ch.positions.size() == ch.uvs.size());
+        REQUIRE(ch.indices.size() % 3 == 0);
+        verts += ch.positions.size();
+        tris += ch.indices.size() / 3;
+        for (std::uint32_t i : ch.indices) REQUIRE(i < ch.positions.size());
+        for (std::size_t i = 0; i < ch.positions.size(); ++i) {
+            const glm::vec3 p = ch.positions[i], n = ch.normals[i];
+            REQUIRE(std::isfinite(p.x + p.y + p.z + n.x + n.y + n.z + ch.uvs[i].x + ch.uvs[i].y));
+            CHECK(std::abs(glm::length(n) - 1.0f) < 1e-3f);
+            CHECK(n.y > 0.0f); // a height field's normal points up
+            CHECK(glm::all(glm::greaterThanEqual(p, ch.boundsMin - 1e-3f)));
+            CHECK(glm::all(glm::lessThanEqual(p, ch.boundsMax + 1e-3f)));
+            maxErr = std::max(maxErr, std::max(w->minHeight - p.y, p.y - w->maxHeight));
+        }
+        for (std::size_t i = 0; i + 2 < ch.indices.size(); i += 3) {
+            const glm::vec3 a = ch.positions[ch.indices[i]], b = ch.positions[ch.indices[i + 1]], c = ch.positions[ch.indices[i + 2]];
+            const glm::vec3 cr = glm::cross(b - a, c - a);
+            if (glm::length(cr) < 1e-6f) ++degenerate;
+            if (cr.y < 0.0f) ++downward; // every face is wound counter-clockwise seen from above
+        }
+    }
+    CHECK(tris == tm.triangles);
+    CHECK(verts == tm.vertices);
+    CHECK(degenerate == 0u);
+    CHECK(downward == 0u);
+    // the vertices are samples of the rendered surface (the B-spline of the bake), which stays inside the bake's range
+    CHECK(maxErr < 1.0f);
+    // deterministic
+    const auto again = scene::generateAttractorWorld(smallGen(3));
+    CHECK(again->terrainMesh->chunks[100].positions == tm.chunks[100].positions);
+    CHECK(again->terrainMesh->chunks[100].indices == tm.chunks[100].indices);
+    // the river sits at the water line, over ground that dips below it
+    CHECK_FALSE(tm.riverIndices.empty());
+    for (const glm::vec3& p : tm.riverPositions) CHECK(p.y == Approx(-0.8f));
+    // off: no mesh
+    scene::AttractorGen g = smallGen(3);
+    g.mesh = false;
+    CHECK(scene::generateAttractorWorld(g)->terrainMesh == nullptr);
+}
+
+TEST_CASE("the composition draws the terrain mesh as scene entities with the block's program, the river as water",
+          "[attractor-world][adr1857]") {
+    Comp c(sceneWith({{"seed", 4}, {"resolution", 384}, {"meshSpacing", 16.0}, {"terrainProgram", "rock"}}));
+    c.frame(0.0);
+    const scene::Scene& s = c.comp->scene();
+    std::size_t terrain = 0, water = 0;
+    for (const auto& e : s.entities) {
+        if (e.name.rfind("attractor.terrain", 0) == 0) {
+            ++terrain;
+            CHECK(e.material.program == "rock");
+            CHECK(e.style == scene::MeshStyle::Lit);
+        }
+        if (e.name == "attractor.river") {
+            ++water;
+            CHECK(e.style == scene::MeshStyle::Water);
+        }
+    }
+    CHECK(terrain > 100u);
+    CHECK(water == 1u);
+    CHECK(s.waters.size() == 1u);
+    bool sun = false;
+    for (const auto& l : s.lights) sun = sun || l.name == "attractor.sun";
+    CHECK(sun);
 }

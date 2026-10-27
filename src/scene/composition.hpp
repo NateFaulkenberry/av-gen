@@ -2379,6 +2379,7 @@ private:
     void updateAttractorWorld(); // the finals, and a regeneration when a structural one changed
     void applyAttractorCamera(float& fovDegrees); // the composed camera, when it drives
     float attractorRollDegrees_ = 0.0f; // ADR-1853: the flythrough's bank this frame
+    int attractorSunLight_ = -1;        // ADR-1857: the key light's index in scene_.lights, or -1
     std::optional<AstralParameters> astralParams_; // its live knobs, while attached
     AstralLiveConductor astralLive_;          // live mode: the song as heard so far
     std::shared_ptr<const AstralSong> astralSong_; // song mode: built once per track

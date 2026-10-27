@@ -12,6 +12,7 @@
 #include <mutex>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 
 namespace avgen::scene {
 
@@ -69,23 +70,6 @@ float fbm(glm::vec2 p, int octaves, std::uint32_t seed, float gain = 0.5f) {
         p = kOct * p * 2.03f;
     }
     return sum / norm; // about [-0.7, 0.7]
-}
-
-// Musgrave's ridged multifractal (Texturing & Modeling, ch. 16): each octave is weighted by the previous one's
-// signal, so detail gathers on the ridges and the valleys between them stay smooth. Returns about [0, 1].
-float ridged(glm::vec2 p, int octaves, std::uint32_t seed, float gain = 2.0f, float offset = 1.0f) {
-    float sum = 0.0f, weight = 1.0f, amp = 1.0f, norm = 0.0f;
-    for (int i = 0; i < octaves; ++i) {
-        float s = offset - std::abs(gnoise(p, seed + static_cast<std::uint32_t>(i) * 131u) * 1.4f);
-        s *= s;
-        s *= weight;
-        weight = std::clamp(s * gain, 0.0f, 1.0f);
-        sum += s * amp;
-        norm += amp;
-        amp *= 0.5f;
-        p = kOct * p * 2.1f;
-    }
-    return sum / norm;
 }
 
 float smoothstepf(float e0, float e1, float x) {
@@ -349,6 +333,229 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
 
 } // namespace
 
+// ---- the engine-native terrain mesh (ADR-1857) --------------------------------------------------------------------
+
+namespace {
+
+// The surface the ray-march drew, on the CPU: the C2 cubic B-spline of the baked field (height and strata offset),
+// line for line with world.wgsl's `fieldSmooth`.
+struct SurfaceSampler {
+    const AttractorWorld& w;
+    int n;
+    float texel;
+    float band;
+    std::uint32_t seed;
+    explicit SurfaceSampler(const AttractorWorld& world)
+        : w(world), n(world.res), texel(world.extent / static_cast<float>(world.res)), band(world.strataSeed[0].z),
+          seed(world.noiseSeed) {}
+    static glm::vec4 bw(float f) {
+        const float g = 1.0f - f;
+        return glm::vec4(g * g * g, 3.0f * f * f * f - 6.0f * f * f + 4.0f, -3.0f * f * f * f + 3.0f * f * f + 3.0f * f + 1.0f,
+                         f * f * f) / 6.0f;
+    }
+    static glm::vec4 bd(float f) {
+        const float g = 1.0f - f;
+        return glm::vec4(-g * g, 3.0f * f * f - 4.0f * f, -3.0f * f * f + 2.0f * f + 1.0f, f * f) * 0.5f;
+    }
+    // x height, y strata offset, zw gradient
+    [[nodiscard]] glm::vec4 smooth(glm::vec2 xz) const {
+        const glm::vec2 t = (xz - w.origin) / texel - 0.5f;
+        const glm::vec2 fl = glm::floor(t);
+        const glm::ivec2 i(fl);
+        const glm::vec2 f = t - fl;
+        const glm::vec4 wx = bw(f.x), wy = bw(f.y), dx = bd(f.x), dy = bd(f.y);
+        glm::vec2 v(0.0f), g(0.0f);
+        for (int y = 0; y < 4; ++y) {
+            for (int x = 0; x < 4; ++x) {
+                const int cx = std::clamp(i.x + x - 1, 0, n - 1), cy = std::clamp(i.y + y - 1, 0, n - 1);
+                const std::size_t k = static_cast<std::size_t>(cy) * n + cx;
+                const float h = w.height[k], o = w.strataOffset[k];
+                v += glm::vec2(h, o) * (wx[x] * wy[y]);
+                g += h * glm::vec2(dx[x] * wy[y], wx[x] * dy[y]);
+            }
+        }
+        return {v.x, v.y, g.x / texel, g.y / texel};
+    }
+    // The mesh is the smooth surface alone. The ledge cut (`cut`) is metre-scale on near-vertical walls: no height grid
+    // resolves it there (it aliased into zigzags at 2 m, as it had into combs in the ray-march), so the strata are left
+    // to the material, which draws them from the same band coordinate.
+    [[nodiscard]] float height(glm::vec2 xz, float /*terraces*/) const { return smooth(xz).x; }
+};
+
+// Error-bounded right-triangulated irregular network (Evans, Kirkpatrick & Townsend 2001; the "Martini" formulation):
+// the grid's triangle bintree is refined wherever a hypotenuse's midpoint differs from its linear interpolation by more
+// than the tolerance there. Errors propagate up the tree (a vertex's error is at least its descendants'), which is
+// what makes the result crack-free: the two triangles sharing a hypotenuse decide on the same midpoint. The tolerance
+// varies in space -- it grows with distance from the flight path -- so the error is stored normalised by it and the
+// threshold is 1 everywhere; the propagation then keeps the guarantee.
+std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorld& w) {
+    const auto t0 = std::chrono::steady_clock::now();
+    auto out = std::make_shared<AttractorTerrainMesh>();
+    const AttractorGen& g = w.gen;
+    const SurfaceSampler sampler(w);
+    // the grid: 2^k + 1 samples per side over the square
+    int k = 1;
+    while (static_cast<float>(1 << k) * g.meshSpacing < w.extent && k < 14) ++k;
+    const int size = 1 << k;
+    const int gn = size + 1;
+    const float spacing = w.extent / static_cast<float>(size);
+    out->sampleSpacing = spacing;
+    std::vector<float> H(static_cast<std::size_t>(gn) * gn), T(H.size());
+    parallelRows(gn, [&](int y) {
+        for (int x = 0; x < gn; ++x) {
+            const glm::vec2 p = w.origin + glm::vec2(x, y) * spacing;
+            const glm::vec4 fd = sampler.smooth(p);
+            H[static_cast<std::size_t>(y) * gn + x] = fd.x;
+            T[static_cast<std::size_t>(y) * gn + x] = bandWarp(fd.x + fd.y, sampler.band).x / sampler.band; // in bands
+        }
+    });
+    // the tolerance: from a coarse distance-to-the-flight field
+    constexpr int D = 192;
+    std::vector<float> dist(static_cast<std::size_t>(D) * D, 1e9f);
+    {
+        std::vector<glm::vec3> path;
+        for (std::size_t i = 0; i < w.flight.size(); i += 6) path.emplace_back(w.flight[i]);
+        path.push_back(w.eye);
+        parallelRows(D, [&](int y) {
+            for (int x = 0; x < D; ++x) {
+                const glm::vec2 p = w.origin + (glm::vec2(x, y) + 0.5f) * (w.extent / D);
+                float best = 1e9f;
+                for (const glm::vec3& q : path) best = std::min(best, glm::length(p - glm::vec2(q.x, q.z)));
+                dist[static_cast<std::size_t>(y) * D + x] = best;
+            }
+        });
+    }
+    const auto tolAt = [&](int gx, int gy) {
+        const glm::vec2 u = glm::vec2(gx, gy) / static_cast<float>(size) * static_cast<float>(D) - 0.5f;
+        const glm::ivec2 i0 = glm::clamp(glm::ivec2(glm::floor(u)), glm::ivec2(0), glm::ivec2(D - 2));
+        const glm::vec2 f = glm::clamp(u - glm::vec2(i0), 0.0f, 1.0f);
+        const auto at = [&](int x, int y) { return dist[static_cast<std::size_t>(y) * D + x]; };
+        const float d = glm::mix(glm::mix(at(i0.x, i0.y), at(i0.x + 1, i0.y), f.x), glm::mix(at(i0.x, i0.y + 1), at(i0.x + 1, i0.y + 1), f.x), f.y);
+        return std::max(g.meshMinError, g.meshError * d);
+    };
+    // normalised errors, propagated (post-order over the bintree)
+    std::vector<float> E(H.size(), 0.0f);
+    const auto idx = [gn](int x, int y) { return static_cast<std::size_t>(y) * gn + x; };
+    const auto errorOf = [&](auto&& self, int ax, int ay, int bx, int by, int cx, int cy) -> void {
+        const int mx = (ax + bx) / 2, my = (ay + by) / 2;
+        const bool leaf = std::abs(ax - cx) + std::abs(ay - cy) <= 1;
+        if (!leaf) {
+            self(self, cx, cy, ax, ay, mx, my);
+            self(self, bx, by, cx, cy, mx, my);
+        }
+        const float interp = 0.5f * (H[idx(ax, ay)] + H[idx(bx, by)]);
+        const float tol = tolAt(mx, my);
+        float e = std::abs(interp - H[idx(mx, my)]) / tol;
+        // the band coordinate is interpolated linearly across each triangle by the rasteriser, so it is an attribute
+        // the triangulation must carry too (attribute-aware simplification): on a tall wall a long triangle bends
+        // the strata into a sawtooth. Tolerance in bands, growing with distance like the height's.
+        const float bandInterp = 0.5f * (T[idx(ax, ay)] + T[idx(bx, by)]);
+        e = std::max(e, std::abs(bandInterp - T[idx(mx, my)]) / (0.25f * tol / g.meshMinError));
+        if (!leaf) {
+            e = std::max({e, E[idx((ax + cx) / 2, (ay + cy) / 2)], E[idx((bx + cx) / 2, (by + cy) / 2)]});
+        }
+        E[idx(mx, my)] = std::max(E[idx(mx, my)], e);
+    };
+    // the two root triangles, each in its own thread (they share only the diagonal's midpoints, written by max)
+    errorOf(errorOf, 0, 0, size, size, size, 0);
+    errorOf(errorOf, size, size, 0, 0, 0, size);
+    // extract the triangles
+    std::vector<glm::ivec3> tris;
+    const auto emit = [&](auto&& self, int ax, int ay, int bx, int by, int cx, int cy) -> void {
+        const int mx = (ax + bx) / 2, my = (ay + by) / 2;
+        if (std::abs(ax - cx) + std::abs(ay - cy) > 1 && E[idx(mx, my)] > 1.0f) {
+            self(self, cx, cy, ax, ay, mx, my);
+            self(self, bx, by, cx, cy, mx, my);
+        } else {
+            tris.emplace_back(static_cast<int>(idx(ax, ay)), static_cast<int>(idx(bx, by)), static_cast<int>(idx(cx, cy)));
+        }
+    };
+    emit(emit, 0, 0, size, size, size, 0);
+    emit(emit, size, size, 0, 0, 0, size);
+    // chunks: 16 x 16 over the square, a triangle by its centroid
+    constexpr int C = 16;
+    std::vector<std::vector<int>> byChunk(C * C);
+    for (int t = 0; t < static_cast<int>(tris.size()); ++t) {
+        const glm::ivec3 tr = tris[static_cast<std::size_t>(t)];
+        const int cx = ((tr.x % gn) + (tr.y % gn) + (tr.z % gn)) / 3, cy = ((tr.x / gn) + (tr.y / gn) + (tr.z / gn)) / 3;
+        const int ix = std::min(C - 1, cx * C / gn), iy = std::min(C - 1, cy * C / gn);
+        byChunk[static_cast<std::size_t>(iy) * C + ix].push_back(t);
+    }
+    out->chunks.resize(byChunk.size());
+    parallelRows(C * C, [&](int c) {
+        AttractorTerrainChunk& ch = out->chunks[static_cast<std::size_t>(c)];
+        std::unordered_map<int, std::uint32_t> remap;
+        remap.reserve(byChunk[static_cast<std::size_t>(c)].size());
+        glm::vec3 lo(1e30f), hi(-1e30f);
+        const float texel = w.extent / static_cast<float>(w.res);
+        for (int t : byChunk[static_cast<std::size_t>(c)]) {
+            const glm::ivec3 tr = tris[static_cast<std::size_t>(t)];
+            for (int v : {tr.x, tr.y, tr.z}) {
+                auto it = remap.find(v);
+                if (it == remap.end()) {
+                    const int gx = v % gn, gy = v / gn;
+                    const glm::vec2 xz = w.origin + glm::vec2(gx, gy) * spacing;
+                    const float h = H[static_cast<std::size_t>(v)];
+                    // the normal from the continuous surface (B-spline + ledge cut), not from the triangles: shading
+                    // is independent of the triangulation, so decimation never shows as facets
+                    const float e = std::max(0.5f, 0.5f * spacing);
+                    const float hx = sampler.height(xz + glm::vec2(e, 0), g.terraces) - sampler.height(xz - glm::vec2(e, 0), g.terraces);
+                    const float hz = sampler.height(xz + glm::vec2(0, e), g.terraces) - sampler.height(xz - glm::vec2(0, e), g.terraces);
+                    const glm::vec3 nrm = glm::normalize(glm::vec3(-hx / (2.0f * e), 1.0f, -hz / (2.0f * e)));
+                    const glm::ivec2 mt = glm::clamp(glm::ivec2(glm::floor((xz - w.origin) / texel)), glm::ivec2(0), glm::ivec2(w.res - 1));
+                    const std::uint32_t m = w.masks[static_cast<std::size_t>(mt.y) * w.res + mt.x];
+                    const float rock = static_cast<float>(m & 0xffu) / 255.0f, playa = static_cast<float>((m >> 8) & 0xffu) / 255.0f;
+                    const auto ni = static_cast<std::uint32_t>(ch.positions.size());
+                    ch.positions.emplace_back(xz.x, h, xz.y);
+                    ch.normals.push_back(nrm);
+                    // uv.x: the band coordinate (the strata coordinate under the band warp, in bands), so the material
+                    // program's bands are the very bands the ledges are cut along
+                    ch.uvs.emplace_back(T[static_cast<std::size_t>(v)], rock + 2.0f * playa);
+                    lo = glm::min(lo, ch.positions.back());
+                    hi = glm::max(hi, ch.positions.back());
+                    it = remap.emplace(v, ni).first;
+                }
+                ch.indices.push_back(it->second);
+            }
+        }
+        ch.boundsMin = lo;
+        ch.boundsMax = hi;
+    });
+    // winding: the bintree emits (a, b, c) with a consistent handedness; make it counter-clockwise seen from above
+    for (AttractorTerrainChunk& ch : out->chunks) {
+        for (std::size_t i = 0; i + 2 < ch.indices.size(); i += 3) {
+            const glm::vec3 a = ch.positions[ch.indices[i]], b = ch.positions[ch.indices[i + 1]], c = ch.positions[ch.indices[i + 2]];
+            if (glm::cross(b - a, c - a).y < 0.0f) std::swap(ch.indices[i + 1], ch.indices[i + 2]);
+        }
+        out->vertices += ch.positions.size();
+        out->triangles += ch.indices.size() / 3;
+    }
+    // the river: one flat sheet at the water line over every grid cell whose ground dips below it (coarsened 4x)
+    {
+        constexpr float kWaterY = -0.8f;
+        const int step = 4;
+        const float cs = spacing * step;
+        for (int y = 0; y + step <= size; y += step) {
+            for (int x = 0; x + step <= size; x += step) {
+                float lowest = 1e9f;
+                for (int yy = y; yy <= y + step; ++yy) for (int xx = x; xx <= x + step; ++xx) lowest = std::min(lowest, H[idx(xx, yy)]);
+                if (lowest >= kWaterY) continue;
+                const glm::vec2 p = w.origin + glm::vec2(x, y) * spacing;
+                const auto b = static_cast<std::uint32_t>(out->riverPositions.size());
+                out->riverPositions.emplace_back(p.x, kWaterY, p.y);
+                out->riverPositions.emplace_back(p.x + cs, kWaterY, p.y);
+                out->riverPositions.emplace_back(p.x + cs, kWaterY, p.y + cs);
+                out->riverPositions.emplace_back(p.x, kWaterY, p.y + cs);
+                for (std::uint32_t q : {0u, 2u, 1u, 0u, 3u, 2u}) out->riverIndices.push_back(b + q);
+            }
+        }
+    }
+    out->buildSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    return out;
+}
+
+} // namespace
+
 // The last world generated, and the count (acquireAttractorWorld, attractorWorldGenerations).
 namespace {
 std::mutex gWorldCacheMutex;
@@ -369,6 +576,10 @@ Result<void> AttractorGen::validate() const {
     if (!(terrainScale >= 0.5f && terrainScale <= 1.6f)) return fail("attractorWorld: terrainScale must be in [0.5, 1.6]");
     if (!unit(branchingDensity)) return fail("attractorWorld: branchingDensity must be in [0, 1]");
     if (!(flightSeconds >= 20.0f && flightSeconds <= 120.0f)) return fail("attractorWorld: flightSeconds must be in [20, 120]");
+    if (!(meshSpacing >= 0.5f && meshSpacing <= 16.0f)) return fail("attractorWorld: meshSpacing must be in [0.5, 16] m");
+    if (!(meshError > 0.0f && meshError <= 0.05f) || !(meshMinError > 0.0f && meshMinError <= 10.0f)) {
+        return fail("attractorWorld: meshError must be in (0, 0.05] and meshMinError in (0, 10] m");
+    }
     return {};
 }
 
@@ -377,9 +588,10 @@ std::uint64_t AttractorGen::hash() const {
     h = mixHash(h, seed);
     h = mixHash(h, static_cast<std::uint64_t>(resolution));
     for (float v : {extent, terrainScale, roughness, ridgeStrength, domainWarp, terraces, erosion, strataFold,
-                    branchingDensity, flightSeconds}) {
+                    branchingDensity, flightSeconds, meshSpacing, meshError, meshMinError}) {
         h = mixHashF(h, v);
     }
+    h = mixHash(h, mesh ? 1u : 0u);
     return h;
 }
 
@@ -670,10 +882,6 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             const glm::ivec2 t = glm::ivec2(glm::floor((p - w.origin) / texel));
             return glm::clamp(t, glm::ivec2(0), glm::ivec2(N - 1));
         };
-        const auto rockAt = [&](glm::vec2 p) {
-            const glm::ivec2 t = texelOf(p);
-            return rock[static_cast<std::size_t>(t.y) * N + t.x];
-        };
         // the gorge's centreline: x with x + warp(x) = q for points q along the trunk (a fixed-point solve)
         std::vector<glm::vec2> gorge;
         std::vector<float> gorgeArc;
@@ -923,11 +1131,11 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                 slope[static_cast<std::size_t>(y) * N + x] = std::sqrt(gx * gx + gz * gz);
             }
         });
-        const int R = 5;
+        const int RS = 5;
         parallelRows(N, [&](int y) {
             for (int x = 0; x < N; ++x) {
                 float m = 0.0f;
-                for (int k = -R; k <= R; ++k) m = std::max(m, slope[static_cast<std::size_t>(y) * N + std::clamp(x + k, 0, N - 1)]);
+                for (int k = -RS; k <= RS; ++k) m = std::max(m, slope[static_cast<std::size_t>(y) * N + std::clamp(x + k, 0, N - 1)]);
                 tmp2[static_cast<std::size_t>(y) * N + x] = m;
             }
         });
@@ -935,7 +1143,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         parallelRows(N, [&](int y) {
             for (int x = 0; x < N; ++x) {
                 float m = 0.0f;
-                for (int k = -R; k <= R; ++k) m = std::max(m, tmp2[static_cast<std::size_t>(std::clamp(y + k, 0, N - 1)) * N + x]);
+                for (int k = -RS; k <= RS; ++k) m = std::max(m, tmp2[static_cast<std::size_t>(std::clamp(y + k, 0, N - 1)) * N + x]);
                 w.slopeMax[static_cast<std::size_t>(y) * N + x] = m;
             }
         });
@@ -1051,6 +1259,10 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     // ---- the flythrough (ADR-1853) ----
     buildFlight(w, g, Lb, L1);
 
+    if (g.mesh) {
+        w.terrainMesh = buildTerrainMesh(w);
+    }
+
     w.generateSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     ++gGenerations;
     return world;
@@ -1086,13 +1298,23 @@ AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCamera
     return pose;
 }
 
+glm::vec3 attractorSunDirection(const AttractorWorld& w, const AttractorLook& k) {
+    const glm::vec2 fwd(std::sin(w.viewAzimuth), std::cos(w.viewAzimuth));
+    const glm::vec2 right(-fwd.y, fwd.x);
+    const float az = k.sunAzimuth * kPi / 180.0f * w.sunSide;
+    const float el = k.sunElevation * kPi / 180.0f;
+    const glm::vec2 sxz = fwd * std::cos(az) + right * std::sin(az);
+    return glm::normalize(glm::vec3(sxz.x * std::cos(el), std::sin(el), sxz.y * std::cos(el)));
+}
+
 // ---- JSON ---------------------------------------------------------------------------------------------------------
 
 namespace {
 
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
-                                      "branchingDensity", "flightSeconds", "look"};
+                                      "branchingDensity", "flightSeconds", "mesh", "meshSpacing", "meshError",
+                                      "meshMinError", "water", "terrainProgram", "sunLux", "sunShadowBias", "look"};
 constexpr std::string_view kLookKeys[] = {"palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
                                           "atmosphere", "strata", "exposure", "detail"};
 
@@ -1127,7 +1349,35 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.strataFold = j.value("strataFold", g.strataFold);
     g.branchingDensity = j.value("branchingDensity", g.branchingDensity);
     g.flightSeconds = j.value("flightSeconds", g.flightSeconds);
+    g.mesh = j.value("mesh", g.mesh);
+    g.meshSpacing = j.value("meshSpacing", g.meshSpacing);
+    g.meshError = j.value("meshError", g.meshError);
+    g.meshMinError = j.value("meshMinError", g.meshMinError);
     if (auto ok = g.validate(); !ok) return std::unexpected(ok.error());
+    a.terrainProgram = j.value("terrainProgram", a.terrainProgram);
+    a.sunLux = j.value("sunLux", a.sunLux);
+    a.sunShadowBias = j.value("sunShadowBias", a.sunShadowBias);
+    if (j.contains("water")) {
+        const json& wj = j.at("water");
+        if (!wj.is_object()) return fail("attractorWorld: 'water' must be an object");
+        WaterSettings& ws = a.water;
+        const auto v3 = [&](const char* key, glm::vec3& t) {
+            if (wj.contains(key)) t = glm::vec3(wj.at(key)[0].get<float>(), wj.at(key)[1].get<float>(), wj.at(key)[2].get<float>());
+        };
+        v3("shallowColor", ws.shallowColor);
+        v3("deepColor", ws.deepColor);
+        v3("reflectionTint", ws.reflectionTint);
+        for (auto [key, t] : {std::pair{"shallow", &ws.shallow}, std::pair{"roughness", &ws.roughness},
+                              std::pair{"clarity", &ws.clarity}, std::pair{"maxOpacity", &ws.maxOpacity},
+                              std::pair{"edgeFade", &ws.edgeFade}, std::pair{"fresnel", &ws.fresnel},
+                              std::pair{"reflection", &ws.reflection}, std::pair{"specular", &ws.specular},
+                              std::pair{"ripple", &ws.ripple}, std::pair{"rippleScale", &ws.rippleScale},
+                              std::pair{"ssr", &ws.ssr}, std::pair{"ssrDistance", &ws.ssrDistance},
+                              std::pair{"ssrSteps", &ws.ssrSteps}, std::pair{"ssrGain", &ws.ssrGain},
+                              std::pair{"skyMirror", &ws.skyMirror}}) {
+            if (wj.contains(key)) *t = wj.at(key).get<float>();
+        }
+    }
     if (j.contains("look")) {
         const json& l = j.at("look");
         if (!l.is_object()) return fail("attractorWorld: 'look' must be an object");
@@ -1174,6 +1424,13 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"strataFold", g.strataFold},
                 {"branchingDensity", g.branchingDensity},
                 {"flightSeconds", g.flightSeconds},
+                {"mesh", g.mesh},
+                {"meshSpacing", g.meshSpacing},
+                {"meshError", g.meshError},
+                {"meshMinError", g.meshMinError},
+                {"terrainProgram", a.terrainProgram},
+                {"sunLux", a.sunLux},
+                {"sunShadowBias", a.sunShadowBias},
                 {"look",
                  {{"palette", k.palette}, {"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation},
                   {"sunIntensity", k.sunIntensity}, {"ambient", k.ambient}, {"atmosphere", k.atmosphere},

@@ -1204,6 +1204,13 @@ void Composition::setAttractorWorld(AttractorWorldBlock block) {
             log::info("attractorWorld: seed {} generated in {:.2f} s ({}^2, height {:.0f}..{:.0f} m)", attractorWorld_.gen.seed,
                       attractorWorld_.world->generateSeconds, attractorWorld_.world->res, attractorWorld_.world->minHeight,
                       attractorWorld_.world->maxHeight);
+            if (const auto& tm = attractorWorld_.world->terrainMesh) {
+                const double mib = static_cast<double>(tm->vertices * sizeof(Vertex) + tm->triangles * 3 * sizeof(std::uint32_t)) / (1024.0 * 1024.0);
+                log::info("attractorWorld: terrain mesh {} vertices, {} triangles in {} chunks ({:.1f} MiB vertex+index), "
+                          "{:.2f} m sampling, built in {:.2f} s; river {} triangles",
+                          tm->vertices, tm->triangles, tm->chunks.size(), mib, tm->sampleSpacing, tm->buildSeconds,
+                          tm->riverIndices.size() / 3);
+            }
         }
     }
     if (params_ != nullptr) { // attached already: register its knobs now
@@ -1247,6 +1254,7 @@ void Composition::updateAttractorWorld() {
                   attractorWorld_.world->generateSeconds);
         cameraCutThisFrame_ = true; // a new world is a new picture: no temporal history across it
         ++cameraCutSerial_;
+        dirty_ = true; // ADR-1857: its terrain meshes are part of the flattened scene
     };
     const std::uint64_t want = live.liveGen.hash();
     // ADR-1851: collect a finished worker; install it if it is still what the knobs ask for.
@@ -1272,6 +1280,12 @@ void Composition::updateAttractorWorld() {
         }
     }
     live.world = attractorWorld_.world;
+    // ADR-1857: the key light follows the look parameters every frame (no rebuild)
+    if (live.world && attractorSunLight_ >= 0 && static_cast<std::size_t>(attractorSunLight_) < scene_.lights.size()) {
+        PunctualLight& sun = scene_.lights[static_cast<std::size_t>(attractorSunLight_)];
+        sun.direction = -attractorSunDirection(*live.world, live.live);
+        sun.intensity = attractorWorld_.sunLux * live.live.sunIntensity;
+    }
 }
 
 void Composition::applyAttractorCamera(float& fovDegrees) {
@@ -7898,6 +7912,70 @@ void Composition::rebuild() {
             }
         }
         scene_.addLight(std::move(light));
+    }
+
+    // ADR-1857: the Strange Attractor's canyon as engine geometry -- its terrain chunks through the scene pass with
+    // the block's material program, its river through the water pipeline, and its sun as the key light.
+    attractorSunLight_ = -1;
+    if (attractorWorld_.enabled && attractorWorld_.world && attractorWorld_.world->terrainMesh) {
+        const AttractorTerrainMesh& tm = *attractorWorld_.world->terrainMesh;
+        const std::string program = sanitise(prefix_) + attractorWorld_.terrainProgram;
+        for (std::size_t c = 0; c < tm.chunks.size(); ++c) {
+            const AttractorTerrainChunk& ch = tm.chunks[c];
+            if (ch.indices.empty()) {
+                continue;
+            }
+            MeshData mesh;
+            mesh.name = fmt::format("attractor.terrain{}", c);
+            mesh.vertices.resize(ch.positions.size());
+            for (std::size_t v = 0; v < ch.positions.size(); ++v) {
+                mesh.vertices[v] = Vertex{ch.positions[v], ch.normals[v], ch.uvs[v]};
+            }
+            mesh.indices = ch.indices;
+            const auto id = static_cast<MeshId>(scene_.meshes.size());
+            scene_.meshes.push_back(std::move(mesh));
+            Entity& e = scene_.addEntity(fmt::format("attractor.terrain{}", c), id);
+            e.material.baseColor = glm::vec4(0.55f, 0.38f, 0.30f, 1.0f);
+            e.material.roughness = 0.92f;
+            e.material.metallic = 0.0f;
+            e.material.program = program;
+            e.castsShadow = true;
+        }
+        if (!tm.riverIndices.empty()) {
+            MeshData river;
+            river.name = "attractor.river";
+            river.vertices.resize(tm.riverPositions.size());
+            for (std::size_t v = 0; v < tm.riverPositions.size(); ++v) {
+                river.vertices[v] = Vertex{tm.riverPositions[v], glm::vec3(0, 1, 0), glm::vec2(0.0f)};
+            }
+            river.indices = tm.riverIndices;
+            const auto id = static_cast<MeshId>(scene_.meshes.size());
+            scene_.meshes.push_back(std::move(river));
+            Entity& e = scene_.addEntity("attractor.river", id);
+            e.style = MeshStyle::Water;
+            e.material.baseColor = glm::vec4(attractorWorld_.water.shallowColor, 1.0f);
+            e.material.roughness = attractorWorld_.water.roughness;
+            e.material.metallic = 0.0f;
+            e.material.doubleSided = true;
+            e.material.program = sanitise(prefix_) + "attractor.river";
+            e.material.surfaceClass = SurfaceClass::Water;
+            e.castsShadow = false;
+            WaterSurface surface;
+            surface.program = e.material.program;
+            surface.settings = attractorWorld_.water;
+            surface.fastestFlow = 1.0f;
+            scene_.waters.push_back(std::move(surface));
+        }
+        PunctualLight sun;
+        sun.name = "attractor.sun";
+        sun.type = PunctualLight::Type::Directional;
+        sun.direction = -attractorSunDirection(*attractorWorld_.world, attractorWorld_.look);
+        sun.color = glm::vec3(1.0f, 0.82f, 0.62f);
+        sun.intensity = attractorWorld_.sunLux * attractorWorld_.look.sunIntensity;
+        sun.castsShadow = true;
+        sun.shadowBias = attractorWorld_.sunShadowBias; // a low sun over kilometres of rock: the default acnes
+        attractorSunLight_ = static_cast<int>(scene_.lights.size());
+        scene_.addLight(std::move(sun));
     }
 
     // A rig supplies the lighting; without one, a world with no authored lights still gets a key

@@ -14,6 +14,7 @@
 
 #include "core/error.hpp"
 #include "params/parameter_set.hpp"
+#include "scene/water_surface.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -40,6 +41,13 @@ struct AttractorGen {
     float strataFold = 0.7f;     // an impossible anticline wave through the strata and their terraces (0..1)
     float branchingDensity = 0.6f; // side canyons off the gorge (0 none .. 1 many)
     float flightSeconds = 46.0f;   // the flythrough's length (20..120 s)
+    // ADR-1857: the engine-native triangle mesh. `mesh` builds it with the world; `meshSpacing` is the sampling grid
+    // (metres) the error-bounded triangulation starts from; `meshError` the tolerated vertical error per metre of
+    // distance from the flight path (about a pixel at 1080p); `meshMinError` its floor near the path.
+    bool mesh = true;
+    float meshSpacing = 2.0f;
+    float meshError = 0.004f;    // ~6 px at 1080p from the path; measured indistinguishable from 0.002 (Phase 1)
+    float meshMinError = 0.3f;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;
@@ -72,6 +80,26 @@ struct NetworkBranch {
 // The camera the block drives (`attractorWorld/camera`).
 enum class AttractorCameraMode : int { Scene = 0, Composed = 1, Flight = 2 };
 
+// ADR-1857: the canyon as engine geometry. One crack-free error-bounded triangulation of the rendered surface,
+// partitioned into chunks for culling (shared border vertices are duplicated with identical positions and normals).
+struct AttractorTerrainChunk {
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> uvs;          // x the band coordinate (bands; the strata), y rock (0..1) + 2 x playa
+    std::vector<std::uint32_t> indices;
+    glm::vec3 boundsMin{0.0f};
+    glm::vec3 boundsMax{0.0f};
+};
+struct AttractorTerrainMesh {
+    std::vector<AttractorTerrainChunk> chunks;
+    std::vector<glm::vec3> riverPositions; // the river's water surface (a flat sheet over the gorge's channels)
+    std::vector<std::uint32_t> riverIndices;
+    std::size_t vertices = 0;
+    std::size_t triangles = 0;
+    float sampleSpacing = 0.0f;
+    double buildSeconds = 0.0;
+};
+
 struct AttractorMass {
     glm::vec2 centre{0.0f};
     glm::vec2 axes{500.0f, 300.0f}; // half extents (along, across)
@@ -96,6 +124,7 @@ struct AttractorWorld {
     float maxHeight = 0.0f;
     std::vector<AttractorMass> masses;
     std::vector<NetworkBranch> branches;      // the side canyons
+    std::shared_ptr<const AttractorTerrainMesh> terrainMesh; // ADR-1857: null when `gen.mesh` is off
     std::vector<float> networkArc;            // res*res: network distance (m) along the gorges, or -1 off them
     std::vector<glm::vec2> valley;     // the valley's trunk, near to far (world xz)
     std::vector<glm::vec2> gorgeLine;  // the inner gorge's centreline, near to far (world xz)
@@ -128,6 +157,13 @@ struct AttractorWorldBlock {
     AttractorCameraMode camera = AttractorCameraMode::Composed; // which camera the block drives
     AttractorGen gen;        // rest values of the structural parameters
     AttractorLook look;      // rest values of the look parameters
+    // ADR-1857: the engine-native path. The terrain chunks are drawn by the scene pass with this material program
+    // (authored in the scene file's `materialPrograms`), the river through the engine's water pipeline, and the sun
+    // is a directional key light the look parameters steer.
+    std::string terrainProgram = "canyonRock";
+    WaterSettings water;
+    float sunLux = 6.0f;     // the key light's intensity at `sunIntensity` 1
+    float sunShadowBias = 0.6f; // the key light's normal-offset shadow bias (world units)
     // ---- this frame (written by the Composition) ----
     std::shared_ptr<const AttractorWorld> world;
     AttractorGen liveGen;
@@ -135,6 +171,9 @@ struct AttractorWorldBlock {
     int cameraMode = 1;      // `attractorWorld/camera` final (an AttractorCameraMode)
     [[nodiscard]] bool active() const { return enabled && world != nullptr; }
 };
+
+// Toward the sun, for a world and a look: `sunAzimuth` degrees from the composed view, toward the escarpment's lit side.
+[[nodiscard]] glm::vec3 attractorSunDirection(const AttractorWorld& world, const AttractorLook& look);
 
 [[nodiscard]] Result<AttractorWorldBlock> attractorWorldFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json attractorWorldToJson(const AttractorWorldBlock& a);

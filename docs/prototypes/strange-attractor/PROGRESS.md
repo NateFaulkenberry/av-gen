@@ -8,7 +8,7 @@
 > - The brief (`00-brief.md`) is kept as written. Where it asks for recursive landmarks and an attractor structure,
 >   the owner's direction overrides it.
 
-Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850-1856).
+Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1879 (used: 1850-1857).
 Review media: `~/Desktop/av-gen-review/101-strange-attractor/gate<N>/`.
 
 The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`.
@@ -29,7 +29,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | 2b | the canyon alone: the fixes, the river, the flythrough | done |
 | 2c | clean-up: camera jitter, geometry, a flowing river, one clean render | done (the jitter persisted: see 2d) |
 | 2d | the real jitter cause, glassy water, a 46 s flight | done |
-| 2e | cliff edge artifacts traced and fixed (ADR-1856) | **done, awaiting the owner**: media in `gate2e/`, catalogue `gate2e-artifact-catalogue.md` |
+| 2e | cliff edge artifacts traced and fixed (ADR-1856) | done; owner then chose engine-native geometry (`03-canyon-brief.md`) |
+| canyon P1 | the canyon as engine triangle geometry (ADR-1857), `04-canyon-phase1.md` | **done, awaiting the owner**: media in `canyon-p1/` |
+| canyon P2-P6 | revelation, birds, glyphs, (campsite), QA | not started: gated on P1 acceptance |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -172,6 +174,8 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
+- 2026-10-27: Canyon Phase 1: rebased on main 2bc26a7a; RTIN mesh conversion (8.27M triangles), engine sun, sky,
+  water and material program; comparison, flythrough and perf; ray-march path kept only behind `"mesh": false`.
 - 2026-10-27: Gate 2e: the cliff edge artifacts catalogued, traced and fixed at their causes (ADR-1856).
 - 2026-10-27: Gate 2d: the real jitter (ray reconstruction precision) fixed and proven on the video; glassy water;
   46 s.
