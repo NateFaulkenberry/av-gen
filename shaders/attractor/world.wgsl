@@ -221,7 +221,7 @@ fn detailAt(xz: vec2<f32>, dist: f32) -> f32 {
         return 0.0;
     }
     let m = masksAt(xz);
-    var p = xz / 9.0;
+    var p = xz / 4.5;
     var sum = 0.0;
     var amp = 1.0;
     for (var i = 0; i < 4; i = i + 1) {
@@ -230,7 +230,7 @@ fn detailAt(xz: vec2<f32>, dist: f32) -> f32 {
         amp = amp * 0.45;
         p = kOct * p * 2.2;
     }
-    return (sum - 0.9) * (0.5 + 1.6 * m.r) * fade * au.look.w;
+    return (sum - 0.9) * (0.25 + 0.7 * m.r) * fade * au.look.w;
 }
 
 // Fluting on the cliffs, in the cliff's own plane: vertical grooves along the face (a 2D mask can only smear them).

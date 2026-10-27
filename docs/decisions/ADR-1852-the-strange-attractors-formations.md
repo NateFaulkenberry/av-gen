@@ -26,11 +26,20 @@
   - A 160³ RG32F volume holds the distance and the nearest segment, computed with per-block candidate culling.
   - The shader samples it trilinearly, then refines exactly over ±6 segments within three voxels of the surface.
 
-**The recursive landmarks.** Both are analytic signed distances, evaluated only inside a bounding sphere.
-- **The butte tower.** Each tier repeats one outline (the same noise in the tier's normalised frame) at 0.55 the
-  radius and 0.8 the height, rotated and offset, with a talus flare at its foot.
-- **The arch fin.** A fin pierced by an arch, and inside that arch a 0.38-scale fin pierced by its own arch, to
-  `recursiveDepth` levels.
+**The recursive landmarks.** Both are analytic signed distances, evaluated only inside a bounding sphere. The sphere
+is inflated by 20 m, and outside it the shader returns `distance + 20`. A bare `+1` fell under the hit epsilon at
+range and drew the bounds as dotted shells. The ribbon's box has the same issue, handled with `+10`.
+- **The butte tower.** Each tier repeats the plateau's own profile in miniature: a talus flare, a cliff and a
+  slightly overhanging caprock.
+  - Every tier uses one outline (the same noise in its own normalised frame) at 0.58 the radius and 0.72-0.92 the
+    height.
+  - Each tier turns and leans out over the one below, so the stack is balanced as no stack of rock could be.
+- **The nested arches.** A free-standing natural arch (thick legs, a thin lintel, a weathered surface). Inside its
+  opening stands a 0.56-scale arch turned a little, inside that another, to `recursiveDepth` levels. It is the same
+  shape repeated within itself.
+- **Rejected first strategy: a fin pierced by an arch, with smaller fins inside.** Rendered, it read as masonry: a
+  loaf or an aqueduct block with a door. Both the slab and a weathered rework of it failed. (Gate 2 media
+  `history-rejected-fin.png`.)
 
 **Composition and filleting.**
 - The landmarks and the ribbon are placed in the composed view by a search: attractor centre, tower one third, fin
@@ -41,14 +50,19 @@
   Formations cast shadows through the same soft-shadow march.
 
 **The branching network (pass 1c).**
-- Tributary gorges grow off the inner gorge's centreline, which is solved from the meander warp by fixed-point
+- Side canyons grow off the inner gorge's centreline, which is solved from the meander warp by fixed-point
   iteration. Junctions sit at uneven spacing and mostly alternate sides.
-- Each branch is a random walk with a slow curl. It tapers and stops at the talus.
-- A second level grows off the first. At most 48 branches.
-- Branches are carved by splatting segments, never below the gorge floor. A network-distance field is kept for the
-  audio stage's travelling light.
+- Each branch is a random walk with a slow curl, and a second level grows off the first. At most 48 branches.
+- Each branch has a floor that rises from the gorge floor (-2 m) to 92% of the plateau's height at its head.
+- The land is cut down to `floor + 2.6 (d - width)` through anything, so the canyons notch back into the
+  escarpments.
+  - A first version stopped at the talus. Its branches were 150-900 m long and invisible.
+- Two 3×3 passes over the carved texels remove knife ridges narrower than a texel, which bilinear sampling drew as
+  rows of pinnacles. This was found by A/B: terraces off, detail off and erosion off all kept the teeth; branching
+  off removed them.
+- A network-distance field is kept for the audio stage's travelling light.
 
-**The streak fix, which is part of this pass.** Cause, from the code:
+**The streak fix, which is part of this pass.** Cause, found in the code and confirmed in the A/B renders:
 - the shading normal came from finite differences of the bilinear surface;
 - a bilinear patch's contours turn at every texel edge;
 - so each texel column of a steep face faced a different way, which drew curtains one texel wide.
@@ -62,6 +76,10 @@ The bands read as paint because a face spans less than a texel, so the generator
 generator now bakes the strata offset (tilt, warp and fold) beside the height. The shader cuts the same band profile
 again on steep faces, at sub-texel scale: hard bands become cliffs with a ledge, soft bands keep their slope. The
 colour bands are keyed to the same band index.
+
+The surface itself is now plain bilinear. Gate 1's smoothstep weighting flattened it at every texel centre, so the
+contours, and the ledges cut along them, zigzagged at texel spacing. That drew rows of black notches, found in the
+same-frame A/B.
 
 **Camera drift.** `attractorCamera(world, drift, seconds)` is a pure function of time, with a 150 s period, up to
 140 m lateral and 60 m of dolly. The aim moves 35% as far as the eye.

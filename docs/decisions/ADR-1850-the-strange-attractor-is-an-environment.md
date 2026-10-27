@@ -30,7 +30,8 @@ The scene is a fourth Environment on ADR-1200's seam. It adds nothing to the int
   - It is a pure function of the structural knobs. Rows run in parallel and each texel is independent.
 - **Rendering (one fullscreen pass).**
   - It marches the height field: bilinear with a smoothstep blend, plus near-field displacement, and bisects on
-    overshoot.
+    overshoot. ADR-1852 replaced the blend with plain bilinear, with B-spline shading normals and a sub-texel band
+    cut.
   - Shading:
     - the strata coordinate, whose hash is bit-identical to the generator's;
     - a low sun with a soft height-field shadow, sky ambient, back light and bounce;

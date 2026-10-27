@@ -309,6 +309,24 @@ TEST_CASE("the camera drift is a bounded, smooth function of time that starts at
     CHECK(maxOff > 50.0f);
 }
 
+TEST_CASE("the camera drift is a bounded, smooth function of time that starts at the composed pose", "[attractor-world][adr1852]") {
+    const auto w = scene::generateAttractorWorld(smallGen(2));
+    const auto p0 = scene::attractorCamera(*w, 1.0f, 0.0);
+    CHECK(glm::length(p0.eye - w->eye) < 1e-3f);
+    CHECK(glm::length(scene::attractorCamera(*w, 0.0f, 40.0).eye - w->eye) < 1e-6f);
+    float maxStep = 0.0f, maxOff = 0.0f;
+    glm::vec3 prev = p0.eye;
+    for (int f = 1; f <= 30 * 300; ++f) { // five minutes at 30 fps
+        const auto p = scene::attractorCamera(*w, 1.0f, f / 30.0);
+        maxStep = std::max(maxStep, glm::length(p.eye - prev));
+        maxOff = std::max(maxOff, glm::length(p.eye - w->eye));
+        prev = p.eye;
+    }
+    CHECK(maxStep < 0.25f); // under 7.5 m/s: a drift, never a move
+    CHECK(maxOff < 200.0f);
+    CHECK(maxOff > 50.0f);
+}
+
 TEST_CASE("attractor world probe (hidden)", "[.attractor-probe]") {
     for (unsigned s : {1u, 2u, 5u}) {
         scene::AttractorGen g;

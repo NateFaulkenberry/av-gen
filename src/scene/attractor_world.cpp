@@ -956,7 +956,20 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                         sideBlock += std::max(0.0f, w.sample(c + sd * d) - (eyeY - 10.0f));
                     }
                 }
-                const float score = drop - 4.0f * block - 1.5f * sideBlock - 0.25f * lipDist - 0.05f * std::abs(u);
+                // the lower corners: no mound rising above the ground the camera stands on, close by (it fills a
+                // corner with a shapeless mass -- Gate 1's lower-left lump)
+                float cornerMass = 0.0f;
+                for (float sgn : {-1.0f, 1.0f}) {
+                    for (float a = 0.25f; a <= 0.65f; a += 0.2f) {
+                        const float ang = sgn * a;
+                        const glm::vec2 sd(dir.x * std::cos(ang) - dir.y * std::sin(ang), dir.x * std::sin(ang) + dir.y * std::cos(ang));
+                        for (float d = 30.0f; d <= 450.0f; d += 30.0f) {
+                            cornerMass += std::max(0.0f, w.sample(c + sd * d) - (h0 + 8.0f));
+                        }
+                    }
+                }
+                const float score = drop - 4.0f * block - 1.5f * sideBlock - 0.8f * cornerMass - 0.25f * lipDist -
+                                    0.05f * std::abs(u);
                 if (score > bestScore) {
                     bestScore = score;
                     bestXZ = c;
