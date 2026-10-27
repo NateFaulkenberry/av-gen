@@ -982,12 +982,32 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         const glm::vec3 dir(dirXZ.x * std::cos(pitch), std::sin(pitch), dirXZ.y * std::cos(pitch));
         w.eye = glm::vec3(bestXZ.x, bestY, bestXZ.y);
         w.target = w.eye + dir * 2500.0f;
-        w.fovDeg = rng.range(36.0f, 40.0f);
+        w.fovDeg = rng.range(32.0f, 34.0f); // a longer lens: the layers compress and the corners crop
         w.viewAzimuth = std::atan2(dirXZ.x, dirXZ.y);
     }
 
     // ---- formations (ADR-1852): placed in the composed view, after the camera ----
     placeFormations(w, g, side, rock);
+    // Re-aim: turn the camera (at most 6 degrees) so the formations sit centred across the frame. The composition
+    // search framed the land; this frames what the land is about, and pans off whatever crowded an edge.
+    {
+        const ViewProjector view(w);
+        float sum = 0.0f, n = 0.0f;
+        if (!w.tube.empty()) {
+            sum += view.ndc(0.5f * (w.tube.boundsMin + w.tube.boundsMax)).x * 2.0f;
+            n += 2.0f;
+        }
+        for (const AttractorLandmark& lm : w.landmarks) {
+            sum += view.ndc(lm.base + glm::vec3(0, lm.height, 0)).x;
+            n += 1.0f;
+        }
+        if (n > 0.0f) {
+            const float yaw = std::clamp(-std::atan((sum / n) * view.tx), -0.105f, 0.105f);
+            const glm::vec3 d = w.target - w.eye;
+            const float c = std::cos(yaw), sn = std::sin(yaw);
+            w.target = w.eye + glm::vec3(c * d.x - sn * d.z, d.y, sn * d.x + c * d.z);
+        }
+    }
 
     w.generateSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     ++gGenerations;

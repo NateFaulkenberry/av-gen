@@ -1,6 +1,6 @@
 # The Strange Attractor: progress
 
-Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850).
+Branch `scene/strange-attractor` in `../av-gen-attractor`, cut from main 3ea9b678. ADRs 1850-1869 (used: 1850, 1851, 1852).
 Review media: `~/Desktop/av-gen-review/101-strange-attractor/gate<N>/`.
 
 The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`.
@@ -16,8 +16,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 
 | Gate | Stages | State |
 |---|---|---|
-| 1 | 0 research, 1 skeleton | **done, awaiting the owner**: commit (see git log), media in `gate1/` |
-| 2 | 2 recursive landmarks, 3 branching and the attractor | not started |
+| 1 | 0 research, 1 skeleton | **approved by the owner** ("solid start - looks fantastic") |
+| 2 | 2 recursive landmarks, 3 branching and the attractor | **done, awaiting the owner**: media in `gate2/` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -52,7 +52,46 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 - Metric cliffs (`F / |grad F|`), with a wide stencil and a gradient floor.
 - Strata at three scales; ACES rather than AgX; strataFold 0.45 by default.
 
-## Known weaknesses at Gate 1 (honest)
+## Gate 2 (owner notes on Gate 1, and what was done)
+
+| Owner note | Done | Evidence |
+|---|---|---|
+| The curtain streaks on the cliffs | **Cause fixed** (ADR-1852): B-spline shading normals, the cavity mask off the faces, no gullies under 12 texels | the same-frame A/B: shaders restored to Gate 1 against the current shaders, same binary, same world |
+| The bands read as an overlay | the strata offset is baked; the shader cuts the band profile on faces at sub-texel scale (hard bands: ledge and riser) | the same A/B; the ribbon and tower close-ups |
+| A stronger fold | `strataFold` 0.7 by default | the primary and Nocturne |
+| The comb highlights on the gorge walls | the plain bilinear surface (the smoothstep weighting zigzagged the band ledges) and the B-spline normals | the A/B |
+| The lumpy foreground mound | the camera search penalises mounds above its own ground in the lower corners; the near detail is finer and lower | the primary |
+| Regeneration off the main thread | ADR-1851: a worker in the live editor; synchronous offline (deterministic) | test `[adr1851]` |
+| Tone Chromatic down | its accent slot is a restrained plum; no teal | `chromatic` still |
+| Rössler first, Thomas fallback | Rössler kept (a legible nested spiral); Thomas rendered and rejected (a tangle) | `attractor-thomas-rejected` |
+
+**Stages 2 and 3 as built (ADR-1852):**
+- **The attractor ribbon (Rössler).** Stood up as weathered stone loops arching out of the gorge; its radius swells
+  and thins along it, and its soft bands are recessed.
+- **Recursive landmarks: two strategies kept, one rejected.**
+  - The leaning butte tower: each tier is the plateau's own profile at 0.58 scale.
+  - The nested arches: arch inside arch inside arch.
+  - The fin with arches read as masonry and was rejected.
+- **Branching.** Side canyons off the gorge, cut back through the cliffs to a rising floor.
+- **Camera.** A slow time-based drift (`drift`, 150 s period).
+
+**Bugs found and fixed on the way, each by A/B render:**
+- the bounds drawn as dotted shells (outside distance under the hit epsilon);
+- knife-ridge pinnacles between side canyons;
+- landmarks placed on top of each other, or not at all;
+- black notch rows along the ledges (the smoothstep-weighted bilinear).
+
+## Known weaknesses at Gate 2 (honest)
+
+- The near right cliff in the primary shows a fine wood-grain moiré: bedding lines across the fluted face.
+- The tower's tiers are regular enough to read a little like a pagoda or chess piece.
+- The outer arch's strata ribs make it read partly as a sliced shell.
+- Nocturne crushes the lower half to near black, so the formations' detail is lost there.
+- The strata do not yet bend around the ribbon (a planned refinement for Stage 4).
+- The march now evaluates the formations at every step inside their bounds. The cost is unmeasured (Stage 6).
+- Generation is about 2.5 s at 2048² and 10-14 s at 4096².
+
+## Known weaknesses at Gate 1 (honest; status at Gate 2 in the table above)
 
 - The image is a convincing canyon, not yet surreal. The impossible geology (nested arches, the attractor ribbon,
   strata bending around it) is Gate 2's job.
@@ -66,3 +105,5 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
+- 2026-10-27: Gate 1 approved. Gate 2: the owner's fixes, the formations, the side canyons and the drift; ADR-1851
+  and ADR-1852; tests 11 cases, 217 assertions, pass; Gate 2 media rendered.
