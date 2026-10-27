@@ -32,7 +32,7 @@ fi
 
 t0=$(date +%s)
 echo "::group::configure ($PRESET)"
-cmake --preset "$PRESET" "${LAUNCHER[@]}" "$@" 2>&1 | tee "$OUT/configure.log"
+cmake --preset "$PRESET" ${LAUNCHER[@]+"${LAUNCHER[@]}"} "$@" 2>&1 | tee "$OUT/configure.log"
 configure_rc=${PIPESTATUS[0]}
 echo "::endgroup::"
 t1=$(date +%s)
