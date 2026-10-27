@@ -323,7 +323,6 @@ struct Transition {
 // A span of the piece with one visual setup. A shot is not a scene: several shots may name the same
 // slot and differ only in camera, lighting or which of the scene's parameters they animate, which
 // is what makes reusing an expensive environment cheap.
-// A span of the piece with one visual setup.
 //
 // **Every shot here is a person's.** A shot briefly carried an `Origin` so that re-running Song Mode
 // could replace the shots it had made; Song Mode no longer makes any, so nothing writes `Directed`

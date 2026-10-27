@@ -975,6 +975,11 @@ Result<void> RenderJob::finish() {
                     unstable["reason"] = "the scene's object set changed during the render";
                     std::ofstream file(aovDir_ / "materials.json");
                     file << unstable.dump(2) << "\n";
+                    file.close();
+                    if (!file) {
+                        // CA-017: the stable manifest would stay beside frames it does not describe
+                        fail("cannot rewrite '" + (aovDir_ / "materials.json").string() + "' as UNSTABLE");
+                    }
                 }
             }
         }
