@@ -83,7 +83,15 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Known weaknesses at Gate 2 (honest)
 
+- **Live cost is now a real problem.** A 15 s 1080p drift rendered at 7.6 fps end to end, encoding included. Gate 1's
+  bare terrain rendered at 61 fps. The formations are evaluated at every march step inside their bounds, plus in
+  the shadow march and AO. This is not a measurement, but it means Stage 6 needs real work: bounds-first stepping,
+  a cheaper tube near-field, fewer shadow steps, and render scale.
 - The near right cliff in the primary shows a fine wood-grain moiré: bedding lines across the fluted face.
+- Faint vertical streaks survive on brightly lit caprock faces. They are shading of real gully geometry, not the
+  texel curtains, but similar enough to note.
+- A hatched texture on the left mid mesa in the 4096 primary: the band cut where tilted bands cross a face
+  obliquely.
 - The tower's tiers are regular enough to read a little like a pagoda or chess piece.
 - The outer arch's strata ribs make it read partly as a sliced shell.
 - Nocturne crushes the lower half to near black, so the formations' detail is lost there.
