@@ -275,7 +275,7 @@ TEST_CASE("attractor flythrough camera trace (hidden)", "[.attractor-camera-trac
     std::FILE* f = std::fopen(out, "w");
     REQUIRE(f != nullptr);
     std::fprintf(f, "frame,t,px,py,pz,fx,fy,fz,ux,uy,uz\n");
-    for (int i = 0; i < 54 * 30 + 1; ++i) {
+    for (int i = 0; i < 46 * 30 + 1; ++i) {
         params.resetFinals();
         FrameTime ft{};
         ft.renderTime = i / 30.0;

@@ -252,14 +252,14 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     for (int k = 0; k < n; ++k) {
         const float t = static_cast<float>(k) / rate;
         // speed along the gorge: easing in through the dive, fast on the river, slowing for the climb and the reveal
-        const float v = (45.0f + 35.0f * phase(t, 0.10f, 0.22f) - 10.0f * phase(t, 0.66f, 0.76f) -
-                         40.0f * phase(t, 0.84f, 1.0f)) * S;
+        const float v = (45.0f + 35.0f * phase(t, 0.10f, 0.22f) - 10.0f * phase(t, 0.72f, 0.80f) -
+                         40.0f * phase(t, 0.88f, 1.0f)) * S;
         sa += v / rate * phase(t, 0.06f, 0.16f);
         const glm::vec2 gxz = gorgeAt(sa);
         // height above the floor: low on the river with a slow swell, rising through the climb and the reveal
         float alt = (34.0f + 9.0f * std::sin(t * 0.55f)) * S;
-        alt += (plateau + 70.0f * S - alt) * phase(t, 0.70f, 0.85f);
-        alt += 40.0f * S * phase(t, 0.85f, 1.0f);
+        alt += (plateau + 70.0f * S - alt) * phase(t, 0.74f, 0.87f);
+        alt += 40.0f * S * phase(t, 0.87f, 1.0f);
         const glm::vec3 river(gxz.x, -2.0f + alt, gxz.y); // the gorge floor's height, not a sample of it: no noise
         // the vista: the composed eye, easing forward
         const glm::vec3 vista = w.eye + glm::vec3(fwd.x, 0.0f, fwd.y) * (30.0f * t);
@@ -342,7 +342,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     for (std::size_t i = 0; i < eyes.size(); ++i) {
         const float ti = static_cast<float>(i) / rate;
         // banking on the river only: none in the vista, and none over the reveal, where a tilted horizon distracts
-        const float roll = 0.2f * std::tanh(-1.6f * turn[i] / 0.2f) * phase(ti, 0.1f, 0.25f) * (1.0f - phase(ti, 0.68f, 0.80f));
+        const float roll = 0.2f * std::tanh(-1.6f * turn[i] / 0.2f) * phase(ti, 0.1f, 0.25f) * (1.0f - phase(ti, 0.72f, 0.84f));
         w.flight[i] = glm::vec4(eyes[i], roll);
         w.flightAim[i] = glm::vec4(aim[i], 0.0f);
     }

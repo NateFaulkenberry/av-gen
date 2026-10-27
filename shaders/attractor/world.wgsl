@@ -20,6 +20,9 @@ struct AttractorUniforms {
     look2: vec4<f32>,   // x ambient, y palette, z noise seed (u32 bits), w terraces
     view: vec4<f32>,    // xy view direction (xz), z sun side, w domain warp
     pal: array<vec4<f32>, 16>,
+    rayForward: vec4<f32>, // ADR-1855: the view ray basis (double precision on the CPU)
+    rayRight: vec4<f32>,   // right * tan(half fov x)
+    rayUp: vec4<f32>,      // up * tan(half fov y)
 };
 
 @group(0) @binding(1) var<uniform> au: AttractorUniforms;
@@ -593,26 +596,23 @@ fn flowAt(xz: vec2<f32>) -> vec4<f32> {
 }
 
 fn shadeWater(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
-    let near = 1.0 - smoothstep(150.0, 2500.0, t);
+    // ADR-1855: glassy, deep water. The motion is a few broad, slow, low swells drifting downstream along the baked flow
+    // direction, so the reflected cliffs wobble gently and stay readable; no fine chop, no flecks (they smeared the
+    // reflection and shimmered).
     let fl = flowAt(p.xz);
     var dir = fl.xy * 2.0 - 1.0;
     dir = select(vec2<f32>(1.0, 0.0), normalize(dir), dot(dir, dir) > 0.01);
     let across = vec2<f32>(-dir.y, dir.x);
     let time = au.heights.w;
-    let speed = 3.2;
-    let u = dot(p.xz, dir) - speed * time; // along the current, moving downstream
+    let u = dot(p.xz, dir) - 1.6 * time; // drifting downstream
     let v = dot(p.xz, across);
-    // ripples stretched along the flow (long streaks) plus a finer cross-chop
-    let e = 0.2;
-    let f1 = vec2<f32>(u / 7.0, v / 1.6);
-    let f2 = vec2<f32>(u / 2.2, v / 0.9) + vec2<f32>(5.1, 2.3);
-    // each octave fades out before it is smaller than a pixel (a sub-pixel chop is glitter and speckled edges)
-    let w1 = 1.0 - smoothstep(350.0, 1400.0, t);
-    let w2 = 0.4 * (1.0 - smoothstep(60.0, 260.0, t));
-    let hu = w1 * (vnoise(f1 + vec2<f32>(e, 0.0)) - vnoise(f1 - vec2<f32>(e, 0.0))) / 7.0 + w2 * (vnoise(f2 + vec2<f32>(e, 0.0)) - vnoise(f2 - vec2<f32>(e, 0.0))) / 2.2;
-    let hv = w1 * (vnoise(f1 + vec2<f32>(0.0, e)) - vnoise(f1 - vec2<f32>(0.0, e))) / 1.6 + w2 * (vnoise(f2 + vec2<f32>(0.0, e)) - vnoise(f2 - vec2<f32>(0.0, e))) / 0.9;
-    // gentle: the reflection must survive (and a strong chop aliases into glitter at a distance)
-    let slope = (dir * hu + across * hv) * 0.3;
+    let e = 0.5;
+    let f1 = vec2<f32>(u / 22.0, v / 9.0);
+    let f2 = vec2<f32>(u / 9.0, v / 6.0) + vec2<f32>(3.7, 1.9);
+    let w2 = 0.35 * (1.0 - smoothstep(200.0, 900.0, t));
+    let hu = (vnoise(f1 + vec2<f32>(e, 0.0)) - vnoise(f1 - vec2<f32>(e, 0.0))) / 22.0 + w2 * (vnoise(f2 + vec2<f32>(e, 0.0)) - vnoise(f2 - vec2<f32>(e, 0.0))) / 9.0;
+    let hv = (vnoise(f1 + vec2<f32>(0.0, e)) - vnoise(f1 - vec2<f32>(0.0, e))) / 9.0 + w2 * (vnoise(f2 + vec2<f32>(0.0, e)) - vnoise(f2 - vec2<f32>(0.0, e))) / 6.0;
+    let slope = (dir * hu + across * hv) * 1.4;
     let n = normalize(vec3<f32>(-slope.x, 1.0, -slope.y));
     var r = reflect(rd, n);
     r.y = max(r.y, 0.002);
@@ -627,17 +627,13 @@ fn shadeWater(p: vec3<f32>, rd: vec3<f32>, t: f32) -> vec3<f32> {
     } else {
         refl = skyColour(r);
     }
-    // the body: dark, warming over the shallow edges where the bed shows through
-    let depth = kWaterY - heightBase(p.xz);
     let body = mix(pal(P_ROCK), pal(P_AMBIENT), 0.35) * 0.18 * au.look2.x;
     var col = mix(body, refl, fres);
-    // foam: along the banks where it is shallow, drawn out downstream; flecks drifting in the current
-    let streak = vnoise(vec2<f32>(u / 11.0, v / 0.7));
-    let bankFoam = (1.0 - smoothstep(0.05, 0.55, depth)) * smoothstep(0.45, 0.8, streak);
-    let fleck = smoothstep(0.86, 0.95, vnoise(vec2<f32>(u / 3.0, v / 0.6) + vec2<f32>(17.0, 3.0))) * 0.35 * near;
-    let foam = clamp(bankFoam + fleck, 0.0, 1.0) * fl.a;
+    // a light, sparse touch at the banks: a thin pale line where the water meets the rock, broken along the current
+    let depth = kWaterY - heightBase(p.xz);
+    let edge = (1.0 - smoothstep(0.03, 0.35, depth)) * smoothstep(0.55, 0.8, vnoise(vec2<f32>(u / 14.0, v / 3.0)));
     let lit = pal(P_AMBIENT) * 0.5 * au.look2.x + pal(P_SUN) * 1.2 * au.sun.w * max(au.sun.y, 0.0);
-    col = mix(col, pal(P_PLAYA) * lit, foam * 0.55);
+    col = mix(col, pal(P_PLAYA) * lit, edge * 0.3 * fl.a);
     return col;
 }
 
@@ -650,10 +646,9 @@ struct WorldOut {
 fn fs_world(in: VsOut) -> WorldOut {
     let uv = in.clip.xy * frame.targetSize.zw;
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    let farP = frame.invViewProj * vec4<f32>(ndc, 1.0, 1.0);
-    let nearP = frame.invViewProj * vec4<f32>(ndc, 0.0, 1.0);
     let ro = frame.cameraPos.xyz;
-    let rd = normalize(farP.xyz / farP.w - nearP.xyz / nearP.w);
+    // ADR-1855: the ray from the camera basis, not from invViewProj (float32-ill-conditioned at this near/far ratio)
+    let rd = normalize(au.rayForward.xyz + ndc.x * au.rayRight.xyz + ndc.y * au.rayUp.xyz);
 
     var out: WorldOut;
     let tmax = au.world.z * 1.6;

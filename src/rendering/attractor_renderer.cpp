@@ -53,8 +53,14 @@ struct AttractorUniformGpu {
     glm::vec4 look2;   // x ambient, y palette, z noise seed (u32 bits), w terraces
     glm::vec4 view;    // xy view direction (xz), z sun side, w domain warp
     std::array<glm::vec4, kPaletteSlots> pal;
+    // ADR-1855: the view ray basis, built in double precision from the frame's camera. Reconstructing rays from
+    // invViewProj at ndc z = 0 and 1 is ill-conditioned in float32 with this scene's near/far ratio (0.1 m to 32 km):
+    // the reconstructed direction wandered by up to 0.35 degrees, differently every frame -- the whole picture jumped.
+    glm::vec4 rayForward; // xyz the camera's forward
+    glm::vec4 rayRight;   // xyz right * tan(half fov x)
+    glm::vec4 rayUp;      // xyz up * tan(half fov y)
 };
-static_assert(sizeof(AttractorUniformGpu) == 8 * 16 + kPaletteSlots * 16);
+static_assert(sizeof(AttractorUniformGpu) == 8 * 16 + kPaletteSlots * 16 + 3 * 16);
 
 } // namespace
 
@@ -240,6 +246,20 @@ void AttractorRenderer::encode(const EnvironmentFrame& f) {
     const float t = pf - static_cast<float>(p0);
     for (int i = 0; i < kPaletteSlots; ++i) {
         u.pal[i] = glm::vec4(glm::mix(linearOf(kPalettes[p0][i]), linearOf(kPalettes[p0 + 1][i]), t), 0.0f);
+    }
+    {
+        const scene::Camera& cam = f.scene->camera;
+        const glm::dvec3 pos(cam.position), tgt(cam.target), upHint(cam.up);
+        const glm::dvec3 fw = glm::normalize(tgt - pos);
+        glm::dvec3 rt = glm::cross(fw, upHint);
+        if (glm::dot(rt, rt) < 1e-18) rt = glm::cross(fw, glm::dvec3(0, 0, 1));
+        rt = glm::normalize(rt);
+        const glm::dvec3 up = glm::cross(rt, fw);
+        const double ty = std::tan(0.5 * static_cast<double>(cam.effectiveFovY()));
+        const double tx = ty * static_cast<double>(f.width) / static_cast<double>(f.height);
+        u.rayForward = glm::vec4(glm::vec3(fw), 0.0f);
+        u.rayRight = glm::vec4(glm::vec3(rt * tx), 0.0f);
+        u.rayUp = glm::vec4(glm::vec3(up * ty), 0.0f);
     }
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 

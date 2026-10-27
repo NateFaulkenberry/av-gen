@@ -39,7 +39,7 @@ struct AttractorGen {
     float erosion = 0.5f;        // gullies on the steep faces (0..1)
     float strataFold = 0.7f;     // an impossible anticline wave through the strata and their terraces (0..1)
     float branchingDensity = 0.6f; // side canyons off the gorge (0 none .. 1 many)
-    float flightSeconds = 54.0f;   // the flythrough's length (20..120 s)
+    float flightSeconds = 46.0f;   // the flythrough's length (20..120 s)
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;
