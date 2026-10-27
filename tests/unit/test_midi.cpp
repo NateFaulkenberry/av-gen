@@ -46,6 +46,10 @@ std::string testSourceName(const char* base) {
     return std::string(base) + "-" + std::to_string(::getpid());
 }
 
+// How many 5 ms polls a CoreMIDI round trip may take: 10 s. Notifications arrive in milliseconds on an idle machine
+// and in seconds under a parallel suite; every wait exits as soon as it is satisfied.
+constexpr int kMidiWaitSteps = 2000;
+
 void sleepMs(int ms) {
     std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
@@ -420,7 +424,6 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     MidiInput input;
     REQUIRE(input.open("*").has_value());
     CHECK(input.isOpen());
-    const auto before = input.connectedSources().size();
 
     const std::string name = testSourceName("avgen-test-hotplug");
     MidiVirtualSource source;
@@ -429,7 +432,7 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
         SKIP("cannot create a virtual MIDI source here: " << created.error().message);
     }
     bool connected = false;
-    for (int i = 0; i < 400 && !connected; ++i) {
+    for (int i = 0; i < kMidiWaitSteps && !connected; ++i) {
         for (const auto& connectedName : input.connectedSources()) {
             connected = connected || connectedName == name;
         }
@@ -438,11 +441,15 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
         }
     }
     REQUIRE(connected);
-    CHECK(input.connectedSources().size() == before + 1);
+    // Exactly one connection for this source. Not `before + 1`: CoreMIDI is system-wide, and the wildcard also picks
+    // up a virtual source another test process creates meanwhile (the suite runs shards in parallel), which made this
+    // check fail about once a day under load and pass alone.
+    const auto sources = input.connectedSources();
+    CHECK(std::count(sources.begin(), sources.end(), name) == 1);
 
     REQUIRE(source.send(Bytes{0xE1, 0x00, 0x40}).has_value());
     std::vector<MidiMessage> got;
-    for (int i = 0; i < 400; ++i) {
+    for (int i = 0; i < kMidiWaitSteps; ++i) {
         input.drain(got);
         if (std::any_of(got.begin(), got.end(), [&](const MidiMessage& m) { return nameOf(input, m) == name; })) {
             break;
@@ -458,7 +465,7 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     // Removing the source disconnects it.
     source.close();
     bool gone = false;
-    for (int i = 0; i < 400 && !gone; ++i) {
+    for (int i = 0; i < kMidiWaitSteps && !gone; ++i) {
         gone = true;
         for (const auto& connectedName : input.connectedSources()) {
             gone = gone && connectedName != name;
@@ -471,7 +478,7 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     // ADR-1701: the unplug is queued as a DeviceRemoved for its slot, and the slot is marked disconnected.
     const std::uint16_t slot = it->device;
     bool removed = false;
-    for (int i = 0; i < 400 && !removed; ++i) {
+    for (int i = 0; i < kMidiWaitSteps && !removed; ++i) {
         got.clear();
         input.drain(got);
         removed = std::any_of(got.begin(), got.end(),
@@ -487,7 +494,7 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     MidiVirtualSource again;
     REQUIRE(again.open(name).has_value());
     bool reconnected = false;
-    for (int i = 0; i < 400 && !reconnected; ++i) {
+    for (int i = 0; i < kMidiWaitSteps && !reconnected; ++i) {
         for (const auto& connectedName : input.connectedSources()) {
             reconnected = reconnected || connectedName == name;
         }
@@ -498,7 +505,7 @@ TEST_CASE("MidiInput with a wildcard filter auto-connects sources that appear la
     REQUIRE(reconnected);
     REQUIRE(again.send(Bytes{0xB1, 7, 3}).has_value());
     std::optional<MidiMessage> back;
-    for (int i = 0; i < 400 && !back; ++i) {
+    for (int i = 0; i < kMidiWaitSteps && !back; ++i) {
         got.clear();
         input.drain(got);
         for (const auto& m : got) {
