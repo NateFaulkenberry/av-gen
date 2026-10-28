@@ -19,6 +19,7 @@
 // The scene is const here: the engine side calls SdfObject::rebuild() before rendering; a Mesh
 // object with an empty mesh is skipped. Per-object GPU state is keyed by the object's name.
 
+#include "rendering/compiled_materials.hpp"
 #include "core/error.hpp"
 #include "core/time.hpp"
 #include "scene/scene.hpp"
@@ -143,6 +144,13 @@ public:
     // profile turn it on; offline renders and tests keep the synchronous compile so no frame draws a stand-in).
     [[nodiscard]] std::size_t pendingCompiles() const;
     void setAsyncCompile(bool async);
+    // ADR-1812: material programs compiled into the compiled-tree variants (ADR-1003) as well. A raymarched object with
+    // `compile` gets the scene's programs spliced into its variant, keyed by their structure too; an interpreted tree
+    // and the meshed objects (which draw through the entity pipelines, see SceneRenderer) are not affected here.
+    void setCompiledMaterials(CompiledMaterialsMode mode);
+    void noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs);
+    [[nodiscard]] std::size_t compiledMaterialsPending() const;
+    void waitForCompiledMaterials();
     // ADR-1150: density-mode objects skip empty 8^3 blocks through the volume's coarse occupancy grid. On
     // by default; off draws the same surface by stepping every block (tests and the cost measurement).
     void setDensityOccupancySkipping(bool on);

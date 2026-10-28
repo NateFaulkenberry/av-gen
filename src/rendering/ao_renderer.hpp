@@ -58,9 +58,11 @@ public:
     [[nodiscard]] Result<void> init(const wgpu::BindGroupLayout& frameLayout);
     [[nodiscard]] Result<void> reload(); // hot reload of gtao.wgsl (keeps the old pipelines on failure)
 
-    // Sizes the targets and writes the uniforms. `linearDepth` is the R32Float scene depth.
+    // Sizes the targets and writes the uniforms. `linearDepth` is the R32Float scene depth; `prepassNormal` (ADR-1813)
+    // the depth prepass's RGBA16Float surface normals (null: none, GTAO rebuilds normals from depth everywhere).
     // Does nothing (and reports zero) when the tier has AO off or the size is degenerate.
     void update(std::uint32_t width, std::uint32_t height, const wgpu::TextureView& linearDepth,
+                const wgpu::TextureView& prepassNormal,
                 const QualitySettings& quality, std::uint64_t frameIndex, std::uint32_t frameNonce,
                 float fovYRadians, float aspect,
                 float nearPlane, float farPlane, float worldRadius, float strength);

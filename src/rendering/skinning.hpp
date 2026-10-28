@@ -15,6 +15,11 @@
 // ObjectUniforms::ids.w. The slice size is the largest rig in the scene, not kMaxPaletteJoints, so
 // a 49-joint character costs 6 KB and not 32.
 
+#include "rendering/compiled_materials.hpp"
+
+#include <functional>
+#include <memory>
+#include <span>
 #include "core/error.hpp"
 #include "scene/scene.hpp"
 
@@ -85,8 +90,17 @@ public:
     [[nodiscard]] Slice slice(scene::RigId rig) const;
     [[nodiscard]] bool ready() const { return ready_; }
 
-    [[nodiscard]] const wgpu::RenderPipeline& litPipeline(bool blend, bool doubleSided) const;
+    // ADR-1812: the compiled-materials variant's pipeline when one is ready for this frame's programs.
+    [[nodiscard]] wgpu::RenderPipeline litPipeline(bool blend, bool doubleSided) const;
+    // ADR-1812: material programs compiled into the skinned lit pipelines (see SceneRenderer::setCompiledMaterials).
+    void setCompiledMaterials(CompiledMaterialsMode mode);
+    void noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs);
+    [[nodiscard]] std::size_t compiledMaterialsPending() const;
+    void waitForCompiledMaterials();
+    void setCompiledMaterialsSuppressed(bool suppressed); // the `interpreted` arm
     [[nodiscard]] const wgpu::RenderPipeline& depthPipeline() const { return depthOnly_; }
+    // ADR-1813: the prepass variant that also writes the surface normal for GTAO (RGBA16Float, fs_depth_normal).
+    [[nodiscard]] const wgpu::RenderPipeline& depthNormalPipeline() const { return depthNormal_; }
     [[nodiscard]] const wgpu::BindGroup& objectBindGroup() const { return objectGroup_; }
 
     [[nodiscard]] const SkinningStats& stats() const { return stats_; }
@@ -99,6 +113,11 @@ public:
 
 private:
     Result<void> createPipelines(const wgpu::ShaderModule& module);
+    // The descriptor of one skinned pipeline, handed to `use` (which creates or starts it).
+    void describePipeline(const wgpu::ShaderModule& module, const char* label, bool isBlend, bool doubleSided,
+                          bool depthOnly, const std::function<void(const wgpu::RenderPipelineDescriptor&)>& use,
+                          bool writeNormal = false);
+    std::unique_ptr<CompiledMaterialVariants> compiled_; // ADR-1812: opaque cull, opaque two-sided, blend
     void ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigCount);
     void rebuildObjectGroup();
 
@@ -107,6 +126,7 @@ private:
     wgpu::BindGroupLayout objectLayout_;
     wgpu::PipelineLayout pipelineLayout_;
     wgpu::ShaderModule module_;
+    wgpu::RenderPipeline depthNormal_; // ADR-1813
     wgpu::RenderPipeline opaqueCull_;
     wgpu::RenderPipeline opaqueNoCull_;
     wgpu::RenderPipeline blend_;

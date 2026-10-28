@@ -205,6 +205,15 @@ Result<void> RenderJob::start() {
     // ADR-521: ADR-360's warm-up, on the renderer that actually produces the output. Clamped by
     // the renderer itself (kMaxWarmUpFrames); asking for more cannot buy anything.
     renderer_->setParticleWarmUpFrames(settings_.particleWarmUpFrames);
+    // ADR-1812: material programs compiled before the frame that first needs them -- Blocking, so every frame of the
+    // render is drawn compiled and the sequence stays a pure function of the timeline. AVGEN_RENDER_INTERPRETED=1 is
+    // the measurement arm that keeps the interpreter (the picture before ADR-1812).
+    {
+        const char* interpreted = std::getenv("AVGEN_RENDER_INTERPRETED");
+        renderer_->setCompiledMaterials(interpreted != nullptr && std::string(interpreted) == "1"
+                                            ? rendering::CompiledMaterialsMode::Off
+                                            : rendering::CompiledMaterialsMode::Blocking);
+    }
     renderer_->simulation().setCheckpointBudget(settings_.simCheckpointMb * 1024ull * 1024ull); // ADR-1119
     {
         rendering::QualityTier tier = rendering::QualityTier::Offline;

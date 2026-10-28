@@ -127,6 +127,7 @@ a run that had any.
 |---|---|
 | `AVGEN_LEGACY_PROCGEN=1` | the pre-ADR-233 double procedural generation |
 | `AVGEN_SYNC_PIPELINES=1` | pipeline creation on the calling thread (before ADR-1562) |
+| `AVGEN_RENDER_INTERPRETED=1` | an offline render (`--render`, a render job) draws its material programs through the interpreter (before ADR-1812). In the headless benchmark the same comparison is the `--ab interpreted` arm |
 | `AVGEN_NO_CONTROL_REPLAY` | a seek without the control replay (before ADR-1168; the seek lands where a play does not) |
 | `AVGEN_NO_SEEK_DEFERRAL` | an interactive seek that is never deferred |
 | `AVGEN_SEEK_BODY_STEPS=<n>` | the seek's body-step ceiling (0 = none; default ADR-700's) |

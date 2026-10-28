@@ -6065,7 +6065,7 @@ int Application::runLive() {
             autoResolution_.setPacing(pacePeriodMs, paceRefreshHz);
             // ADR-1493: the compiled-materials variant just replaced the interpreter -- forget the backoff the
             // interpreter's misses earned, so the controller climbs to what the compiled scene holds.
-            if (const bool compiled = renderer_->procedurals().compiledMaterialsActive();
+            if (const bool compiled = renderer_->compiledMaterialsActive();
                 compiled != compiledMaterialsSeen_) {
                 compiledMaterialsSeen_ = compiled;
                 if (compiled) {
@@ -6737,8 +6737,8 @@ void Application::installLiveRenderModes() {
     // ADR-1492, live only as well: the velocity target is computed only on frames something reads it (motion blur
     // open on the live level, an aux debug view). A render job has its own renderer and keeps it whatever.
     renderer_->setVelocityOnDemand(true);
-    // ADR-1493: material programs compiled into the procedural lit pass, built on Dawn's workers when they change.
-    renderer_->setCompiledMaterials(true);
+    // ADR-1493 / ADR-1812: material programs compiled into every lit path, built on Dawn's workers when they change.
+    renderer_->setCompiledMaterials(rendering::CompiledMaterialsMode::Async);
     // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
     // and rebuilds its lighting at a capped rate, spread across frames.
     renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
@@ -6815,9 +6815,14 @@ int Application::runHeadless() {
         log::info("headless: --live-frame: measuring the LIVE frame (live sky schedule, velocity on demand, compiled "
                   "materials, pipeline deferral, live antialiasing); the live sky schedule reads a wall clock, so "
                   "frames are not bit-reproducible");
-    } else if (!options_.abArm.empty()) {
-        log::info("headless: measuring the OFFLINE frame (the sky rebuilds whenever its hash moves); pass --live-frame "
-                  "for a live decision (ADR-1809)");
+    } else {
+        // ADR-1812: the offline frame draws its material programs compiled, as a render job does -- each frame waits
+        // for its variant, so no block measures the interpreter by accident. `--ab interpreted` measures without.
+        renderer_->setCompiledMaterials(rendering::CompiledMaterialsMode::Blocking);
+        if (!options_.abArm.empty()) {
+            log::info("headless: measuring the OFFLINE frame (the sky rebuilds whenever its hash moves); pass "
+                      "--live-frame for a live decision (ADR-1809)");
+        }
     }
 
     // ---- the run's schedule (ADR-113) ----------------------------------------------------------
@@ -6980,6 +6985,20 @@ int Application::runHeadless() {
         std::vector<rendering::RenderStats> frameStats;
         frameStats.reserve(static_cast<std::size_t>(frames));
         for (int i = 0; i < frames; ++i) {
+            if (options_.liveFrame && blockIndex == 0 && i == 1) {
+                // ADR-1812: the live frame builds its compiled material programs on Dawn's workers; the first frame
+                // asked for them. Wait here, as the live profile's pre-warm does, so no block measures the
+                // interpreter while a variant is in flight (the frames before this one are inside the warm-up trim).
+                const auto waitStart = std::chrono::steady_clock::now();
+                while (renderer_->compiledMaterialsPending() > 0 &&
+                       std::chrono::steady_clock::now() - waitStart < std::chrono::minutes(10)) {
+                    context_->processEvents();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                log::info("headless: --live-frame: compiled material programs {} after {:.1f} s",
+                          renderer_->compiledMaterialsActive() ? "ready" : "not active",
+                          std::chrono::duration<double>(std::chrono::steady_clock::now() - waitStart).count());
+            }
             const auto frameStart = std::chrono::steady_clock::now();
             // ADR-1090: cleared per frame as the live loop does. Without it the `cpu(update)` line below printed the
             // stages' running totals since the process started, not the frame's.

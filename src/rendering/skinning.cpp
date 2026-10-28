@@ -154,10 +154,16 @@ Result<void> SkinningRenderer::reload() {
         return r;
     }
     module_ = *module;
+    if (compiled_) {
+        compiled_->reset(); // ADR-1812: rebuilt from the reloaded source on the next frame
+    }
     return {};
 }
 
-Result<void> SkinningRenderer::createPipelines(const wgpu::ShaderModule& module) {
+void SkinningRenderer::describePipeline(const wgpu::ShaderModule& module, const char* label, bool isBlend,
+                                        bool doubleSided, bool depthOnly,
+                                        const std::function<void(const wgpu::RenderPipelineDescriptor&)>& use,
+                                        bool writeNormal) {
     SkinnedVertexLayout vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -166,50 +172,56 @@ Result<void> SkinningRenderer::createPipelines(const wgpu::ShaderModule& module)
     blend.alpha.operation = wgpu::BlendOperation::Add;
     blend.alpha.srcFactor = wgpu::BlendFactor::One;
     blend.alpha.dstFactor = wgpu::BlendFactor::OneMinusSrcAlpha;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, colorFormat_, isBlend ? &blend : nullptr,
+                     isBlend ? wgpu::ColorWriteMask::None : wgpu::ColorWriteMask::All);
+    wgpu::FragmentState fragment{};
+    fragment.module = module;
+    fragment.entryPoint = writeNormal ? "fs_depth_normal" : depthOnly ? "fs_depth" : "fs_main";
+    wgpu::ColorTargetState normalTarget{}; // ADR-1813
+    normalTarget.format = wgpu::TextureFormat::RGBA16Float;
+    normalTarget.writeMask = wgpu::ColorWriteMask::All;
+    fragment.targetCount = writeNormal ? 1 : depthOnly ? 0 : kSceneTargetCount;
+    fragment.targets = writeNormal ? &normalTarget : depthOnly ? nullptr : colorTargets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = depthFormat_;
+    depth.depthWriteEnabled = isBlend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
+    depth.depthCompare = (isBlend || depthOnly) ? wgpu::CompareFunction::Less : wgpu::CompareFunction::LessEqual;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = label;
+    desc.layout = pipelineLayout_;
+    desc.vertex.module = module;
+    desc.vertex.entryPoint = "vs_skinned";
+    desc.vertex.bufferCount = vertex.layouts.size();
+    desc.vertex.buffers = vertex.layouts.data();
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = (!depthOnly && !isBlend && !doubleSided) ? wgpu::CullMode::Back : wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    // Apple TBDR: every pass in this renderer is single-sampled.
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    use(desc);
+}
 
-    const auto make = [&](const char* label, bool isBlend, bool doubleSided,
-                          bool depthOnly) -> Result<wgpu::RenderPipeline> {
-        std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
-        fillSceneTargets(colorTargets, colorFormat_, isBlend ? &blend : nullptr,
-                         isBlend ? wgpu::ColorWriteMask::None : wgpu::ColorWriteMask::All);
-        wgpu::FragmentState fragment{};
-        fragment.module = module;
-        fragment.entryPoint = depthOnly ? "fs_depth" : "fs_main";
-        fragment.targetCount = depthOnly ? 0 : kSceneTargetCount;
-        fragment.targets = depthOnly ? nullptr : colorTargets.data();
-        wgpu::DepthStencilState depth{};
-        depth.format = depthFormat_;
-        depth.depthWriteEnabled = isBlend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
-        depth.depthCompare = (isBlend || depthOnly) ? wgpu::CompareFunction::Less
-                                                    : wgpu::CompareFunction::LessEqual;
-        wgpu::RenderPipelineDescriptor desc{};
-        desc.label = label;
-        desc.layout = pipelineLayout_;
-        desc.vertex.module = module;
-        desc.vertex.entryPoint = "vs_skinned";
-        desc.vertex.bufferCount = vertex.layouts.size();
-        desc.vertex.buffers = vertex.layouts.data();
-        desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
-        desc.primitive.frontFace = wgpu::FrontFace::CCW;
-        desc.primitive.cullMode =
-            (!depthOnly && !isBlend && !doubleSided) ? wgpu::CullMode::Back : wgpu::CullMode::None;
-        desc.depthStencil = &depth;
-        // Apple TBDR: every pass in this renderer is single-sampled.
-        desc.multisample.count = 1;
-        desc.multisample.mask = 0xFFFFFFFFu;
-        desc.fragment = &fragment;
-
-        context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
-        wgpu::RenderPipeline pipeline = gpu::createRenderPipeline(context_.device(), &desc);
+Result<void> SkinningRenderer::createPipelines(const wgpu::ShaderModule& module) {
+    const auto make = [&](const char* label, bool isBlend, bool doubleSided, bool depthOnly,
+                          bool writeNormal = false) -> Result<wgpu::RenderPipeline> {
+        wgpu::RenderPipeline pipeline;
         std::string error;
-        auto future = context_.device().PopErrorScope(
-            wgpu::CallbackMode::WaitAnyOnly,
-            [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
-                if (type != wgpu::ErrorType::NoError) {
-                    error = gpu::Context::toString(msg);
-                }
-            });
-        context_.waitFor(future);
+        describePipeline(module, label, isBlend, doubleSided, depthOnly, [&](const wgpu::RenderPipelineDescriptor& desc) {
+            context_.device().PushErrorScope(wgpu::ErrorFilter::Validation);
+            pipeline = gpu::createRenderPipeline(context_.device(), &desc);
+            auto future = context_.device().PopErrorScope(
+                wgpu::CallbackMode::WaitAnyOnly,
+                [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                    if (type != wgpu::ErrorType::NoError) {
+                        error = gpu::Context::toString(msg);
+                    }
+                });
+            context_.waitFor(future);
+        }, writeNormal);
         if (!error.empty() || !pipeline) {
             return fail("pipeline '{}' creation failed: {}", label, error);
         }
@@ -224,6 +236,9 @@ Result<void> SkinningRenderer::createPipelines(const wgpu::ShaderModule& module)
     if (!c) return std::unexpected(c.error());
     auto d = make("pbr-skinned-depth", false, false, true);
     if (!d) return std::unexpected(d.error());
+    auto e = make("pbr-skinned-depth-normal", false, false, true, true); // ADR-1813
+    if (!e) return std::unexpected(e.error());
+    depthNormal_ = *e;
     opaqueCull_ = *a;
     opaqueNoCull_ = *b;
     blend_ = *c;
@@ -231,11 +246,55 @@ Result<void> SkinningRenderer::createPipelines(const wgpu::ShaderModule& module)
     return {};
 }
 
-const wgpu::RenderPipeline& SkinningRenderer::litPipeline(bool blend, bool doubleSided) const {
+wgpu::RenderPipeline SkinningRenderer::litPipeline(bool blend, bool doubleSided) const {
+    const std::size_t which = blend ? 2u : doubleSided ? 1u : 0u;
+    if (compiled_) {
+        if (wgpu::RenderPipeline p = compiled_->pipeline(which)) {
+            return p; // ADR-1812
+        }
+    }
     if (blend) {
         return blend_;
     }
     return doubleSided ? opaqueNoCull_ : opaqueCull_;
+}
+
+void SkinningRenderer::setCompiledMaterials(CompiledMaterialsMode mode) {
+    if (!compiled_) {
+        compiled_ = std::make_unique<CompiledMaterialVariants>(
+            context_, shaders_, "pbr_skinned.wgsl", "skinned",
+            [this](const wgpu::ShaderModule& module, std::span<const scene::MaterialProgramGpu>,
+                   const CompiledMaterialVariants::Start& start) {
+                describePipeline(module, "pbr-skinned-opaque-compiled", false, false, false, start);
+                describePipeline(module, "pbr-skinned-opaque-twosided-compiled", false, true, false, start);
+                describePipeline(module, "pbr-skinned-blend-compiled", true, false, false, start);
+                return true;
+            });
+    }
+    compiled_->setMode(mode);
+}
+
+void SkinningRenderer::noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs) {
+    // Only a scene with a rig pays for the skinned variant's compile.
+    if (compiled_ && ready_ && stats_.rigs > 0) {
+        compiled_->note(programs);
+    }
+}
+
+std::size_t SkinningRenderer::compiledMaterialsPending() const {
+    return compiled_ ? compiled_->pendingCompiles() : 0;
+}
+
+void SkinningRenderer::setCompiledMaterialsSuppressed(bool suppressed) {
+    if (compiled_) {
+        compiled_->setSuppressed(suppressed);
+    }
+}
+
+void SkinningRenderer::waitForCompiledMaterials() {
+    if (compiled_) {
+        compiled_->waitUntilReady();
+    }
 }
 
 void SkinningRenderer::rebuildObjectGroup() {

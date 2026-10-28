@@ -478,6 +478,7 @@ struct ProceduralRenderer::Impl {
         std::chrono::steady_clock::time_point started{};
     };
     bool compiledMaterials = false;
+    bool compiledSuppressed = false; // ADR-1812: the `interpreted` diagnostic arm
     std::string procSource;                          // procedural.wgsl, includes resolved (the variants' base)
     std::shared_ptr<MaterialVariant> materialVariant; // the variant for this frame's key (null: none requested)
     // Every variant built this session, by structure key, so a scene visited again draws compiled from its first
@@ -488,7 +489,9 @@ struct ProceduralRenderer::Impl {
     std::uint64_t materialKey = 0;                    // this frame's programs
     [[nodiscard]] const MaterialVariant* activeVariant() const {
         const MaterialVariant* v = materialVariant.get();
-        return compiledMaterials && v != nullptr && v->key == materialKey && v->pending == 0 && !v->failed ? v
+        return compiledMaterials && !compiledSuppressed && v != nullptr && v->key == materialKey && v->pending == 0 &&
+                       !v->failed
+                   ? v
                                                                                                           : nullptr;
     }
     void buildMaterialVariant(std::span<const scene::MaterialProgramGpu> programs, std::uint64_t key);
@@ -915,6 +918,10 @@ void ProceduralRenderer::setCompiledMaterials(bool on) {
     impl_->compiledMaterials = on;
 }
 
+void ProceduralRenderer::setCompiledMaterialsSuppressed(bool suppressed) {
+    impl_->compiledSuppressed = suppressed;
+}
+
 void ProceduralRenderer::noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs) {
     Impl& im = *impl_;
     if (!im.compiledMaterials || !im.initialised) {
@@ -957,7 +964,10 @@ void ProceduralRenderer::Impl::buildMaterialVariant(std::span<const scene::Mater
         log::warn("procedural: material.wgsl has no compiled-materials markers; programs stay interpreted");
         return;
     }
+    const auto moduleStart = std::chrono::steady_clock::now();
     auto module = shaders.compile(source, "procedural-compiled-materials");
+    log::info("procedural: compiled-materials module created in {:.1f} ms on the calling thread (ADR-1812)",
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - moduleStart).count());
     if (!module) {
         slot->failed = true;
         log::warn("procedural: compiling the material programs failed, they stay interpreted: {}",

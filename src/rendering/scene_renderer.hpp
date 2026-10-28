@@ -39,6 +39,7 @@
 #include "rendering/frame_overlay.hpp"
 #include "rendering/light_data.hpp"
 #include "rendering/material_programs.hpp"
+#include "rendering/compiled_materials.hpp"
 #include "rendering/particle_renderer.hpp"
 #include "rendering/post_processor.hpp"
 #include "rendering/temporal_effects.hpp"
@@ -784,9 +785,17 @@ public:
     // deformer chain (a quarter of their vertex work) and write zero motion. Off (the default) for every other
     // renderer: an offline render, a render job's AOVs and the tests read the target whatever post does.
     void setVelocityOnDemand(bool on) { velocityOnDemand_ = on; }
-    // ADR-1493: procedural material programs compiled to straight-line WGSL in the lit pass (the live editor and the
-    // live profile; see ProceduralRenderer::setCompiledMaterials).
-    void setCompiledMaterials(bool on);
+    // ADR-1493 / ADR-1812: material programs compiled to straight-line WGSL in every lit path that runs them -- the
+    // procedural pass, entity meshes, skinned meshes and SDF surfaces. Async in the live editor and the live profile
+    // (the interpreter draws until a variant lands); Blocking in offline renders (each frame waits for its variant,
+    // so a render never switches mid-sequence); Off (the default) everywhere else, the tests included.
+    void setCompiledMaterials(CompiledMaterialsMode mode);
+    [[nodiscard]] CompiledMaterialsMode compiledMaterialsMode() const { return compiledMode_; }
+    // Variants still building, over every lit path (0 when none was asked for).
+    [[nodiscard]] std::size_t compiledMaterialsPending() const;
+    // True when every lit path that has a variant for this frame's programs is drawing it (ADR-1493's
+    // `compiledMaterialsActive`, over all paths).
+    [[nodiscard]] bool compiledMaterialsActive() const;
     [[nodiscard]] bool velocityOnDemand() const { return velocityOnDemand_; }
     // True when the last frame's velocity target was left unwritten (zero motion), for the tests and the profile.
     [[nodiscard]] bool velocitySkipped() const { return velocitySkipped_; }
@@ -920,6 +929,9 @@ public:
     static constexpr wgpu::TextureFormat kEmissionFormat = wgpu::TextureFormat::RGBA16Float;
     static constexpr wgpu::TextureFormat kIdFormat = wgpu::TextureFormat::R32Uint;
     static constexpr wgpu::TextureFormat kLinearDepthFormat = wgpu::TextureFormat::R32Float;
+    // ADR-1813: the depth prepass's surface normals for GTAO -- rg = octahedral world normal (the interpolated vertex
+    // normal, facing the camera), b = the axial view depth it was written at, a = 1 where written.
+    static constexpr wgpu::TextureFormat kPrepassNormalFormat = wgpu::TextureFormat::RGBA16Float;
     static constexpr std::uint32_t kAuxTargetCount = 4;
 
 private:
@@ -958,7 +970,8 @@ private:
     Result<void> createPipelines();
     Result<void> createAuxTargets(std::uint32_t width, std::uint32_t height);
     Result<void> createLightResources();
-    Result<wgpu::RenderPipeline> createDepthOnlyPipeline(const wgpu::ShaderModule& module);
+    // ADR-1813: `withNormal` builds the prepass variant that also writes `prepassNormal_` (fs_depth_normal).
+    Result<wgpu::RenderPipeline> createDepthOnlyPipeline(const wgpu::ShaderModule& module, bool withNormal = false);
     Result<wgpu::RenderPipeline> createLinearDepthPipeline(const wgpu::ShaderModule& module);
     Result<void> createAuxDebugResources(const wgpu::ShaderModule& module);
     [[nodiscard]] Result<wgpu::RenderPipeline> auxDebugPipelineFor(wgpu::TextureFormat format);
@@ -973,9 +986,12 @@ private:
                       float aspect, FrameUniforms& frame);
     // ADR-1562: with `startInto`, the compile is started into it (init waits for it) and an empty pipeline returned.
     // ADR-1642: `programTextures` builds the variant that samples material programs' textures (MAT_PROGRAM_TEXTURES).
+    // ADR-1812: with `sink`, the finished descriptor is handed to it (a compiled-materials variant starts it) and an
+    // empty pipeline returned.
     Result<wgpu::RenderPipeline> createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
                                                    wgpu::RenderPipeline* startInto = nullptr,
-                                                   bool programTextures = false);
+                                                   bool programTextures = false,
+                                                   const CompiledMaterialVariants::Start* sink = nullptr);
     // ADR-1642: the three textured lit variants, built the first time a frame draws an entity whose program has a
     // texture op (none for a scene without one). False when they failed (those entities draw untextured).
     bool ensureTexturedLitPipelines();
@@ -1030,6 +1046,10 @@ private:
     std::unique_ptr<Simulation> simulation_;
     std::unique_ptr<ShadowRenderer> shadows_; // ADR-034
     std::unique_ptr<SkinningRenderer> skinning_; // ADR-086
+    // ADR-1812: the entity lit pass's compiled-materials variants (pbr.wgsl): pipelines 0-2 are LitVariant
+    // OpaqueCull, OpaqueNoCull, Blend; 3-5 the same with program textures, present only when a program samples one.
+    std::unique_ptr<CompiledMaterialVariants> entityMaterials_;
+    CompiledMaterialsMode compiledMode_ = CompiledMaterialsMode::Off;
     std::unique_ptr<AoRenderer> ao_;          // ADR-034
     std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
     std::unique_ptr<WaterRenderer> water_;           // ADR-099
@@ -1119,6 +1139,7 @@ private:
     AuxTarget emission_;
     AuxTarget ids_;
     AuxTarget linearDepth_;
+    AuxTarget prepassNormal_; // ADR-1813
     wgpu::Texture hdrOutput_;
     wgpu::BindGroupLayout frameLayout_;
     wgpu::BindGroupLayout objectLayout_;
@@ -1153,6 +1174,7 @@ private:
     wgpu::Sampler fogSkySampler_; // binding 17: linear, repeating in azimuth, clamped in elevation
     bool drawFogSky_ = false;     // written when the frame block is packed, read before the scene pass
     wgpu::RenderPipeline depthOnlyPipeline_;   // entities and meshed SDFs, depth prepass and shadows
+    wgpu::RenderPipeline depthNormalPipeline_; // ADR-1813: the same, writing the prepass normal for GTAO
     wgpu::RenderPipeline linearDepthPipeline_; // Depth24Plus -> R32Float view-space distance
     // The auxiliary view is drawn *after* the tone map, straight onto the target, so one pipeline
     // per target format -- the same reason the tone map itself is a map rather than a pipeline.

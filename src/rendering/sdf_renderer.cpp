@@ -10,6 +10,8 @@
 #include "rendering/scene_renderer.hpp" // ObjectUniforms (the shared object slot layout)
 #include "rendering/scene_targets.hpp"  // the five colour targets of the scene pass (ADR-035)
 
+#include "scene/material_compiler.hpp"
+#include <thread>
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/frame_timeline.hpp"
@@ -237,6 +239,10 @@ struct SdfRenderer::Impl {
     bool prewarm = true;       // ADR-1102: every compile-flagged object compiled as soon as the scene has it
     double pieceSeconds = 0.0; // the frame's render time, for the compile log
     std::string raymarchSource;
+    // ADR-1812: the scene's material programs compiled, spliced into every compiled-tree variant (empty: interpreted)
+    CompiledMaterialsMode materialMode = CompiledMaterialsMode::Off;
+    std::uint64_t materialKey = 0;
+    std::string materialLibrary;
     std::map<unsigned, std::shared_ptr<Pipelines>> interpreterVariants; // ADR-1142 / ADR-1152, by surface flags
     std::vector<spatial::SdfNodeGpu> compileScratch;
     std::uint32_t compilesThisFrame = 0;
@@ -757,7 +763,8 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     // ADR-1142: a density-mode object's compiled tree is a different module (the density field spliced
     // in as well), so it is a different variant; so is an engraved one (ADR-1152).
     const unsigned flags = surfaceFlags(object);
-    const std::uint64_t key = spatial::sdfCompileKey(object.tree) ^ (static_cast<std::uint64_t>(flags) * 0x9e3779b97f4a7c15ull);
+    const std::uint64_t key = spatial::sdfCompileKey(object.tree) ^ (static_cast<std::uint64_t>(flags) * 0x9e3779b97f4a7c15ull) ^
+                              (materialLibrary.empty() ? 0u : materialKey * 0xc2b2ae3d27d4eb4full); // ADR-1812
     if (auto it = compiledVariants.find(key); it != compiledVariants.end()) {
         return it->second->failed || it->second->pending > 0 ? nullptr : it->second.get();
     }
@@ -778,6 +785,11 @@ const SdfRenderer::Impl::Pipelines* SdfRenderer::Impl::compiledPipelines(const s
     std::string source = raymarchSource.substr(0, b) + field + raymarchSource.substr(e + kEnd.size());
     if (flags != 0u) {
         source = spliceSurface(source, flags);
+    }
+    if (!materialLibrary.empty()) { // ADR-1812
+        if (std::string spliced = scene::spliceCompiledMaterials(source, materialLibrary); !spliced.empty()) {
+            source = std::move(spliced);
+        }
     }
     auto module = shaders.compile(source, "sdf-raymarch-compiled");
     // ADR-1102: live, a tree the interpreter can also draw compiles on Dawn's workers and is drawn interpreted until
@@ -1016,6 +1028,44 @@ std::size_t SdfRenderer::compiledVariantCount() const {
         n += variant->failed || variant->pending > 0 ? 0 : 1;
     }
     return n;
+}
+
+void SdfRenderer::setCompiledMaterials(CompiledMaterialsMode mode) {
+    impl_->materialMode = mode;
+    if (mode == CompiledMaterialsMode::Off) {
+        impl_->materialLibrary.clear();
+        impl_->materialKey = 0;
+    }
+}
+
+void SdfRenderer::noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs) {
+    Impl& im = *impl_;
+    if (im.materialMode == CompiledMaterialsMode::Off) {
+        return;
+    }
+    const std::uint64_t key = programs.empty() ? 0 : scene::materialStructureKey(programs);
+    if (key == im.materialKey) {
+        return;
+    }
+    im.materialKey = key;
+    im.materialLibrary = programs.empty() ? std::string() : scene::compiledMaterialLibraryWgsl(programs);
+}
+
+std::size_t SdfRenderer::compiledMaterialsPending() const {
+    return impl_->materialLibrary.empty() ? 0 : pendingCompiles();
+}
+
+void SdfRenderer::waitForCompiledMaterials() {
+    // Offline the compiled trees build synchronously (asyncCompile is off), so there is nothing to wait for; with it
+    // on, a Blocking caller waits for the variants in flight.
+    if (impl_->materialMode != CompiledMaterialsMode::Blocking) {
+        return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    while (pendingCompiles() > 0 && std::chrono::steady_clock::now() - start < std::chrono::minutes(10)) {
+        impl_->context.processEvents();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 }
 
 std::size_t SdfRenderer::pendingCompiles() const {

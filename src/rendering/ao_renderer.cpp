@@ -27,7 +27,7 @@ struct AoRenderer::Impl {
     Result<void> createPipelines(const wgpu::ShaderModule& module);
     Result<wgpu::RenderPipeline> finish(const wgpu::RenderPipelineDescriptor& desc, const char* label);
     Result<void> ensureTargets(std::uint32_t width, std::uint32_t height);
-    void rebuildGroups(const wgpu::TextureView& linearDepth);
+    void rebuildGroups(const wgpu::TextureView& linearDepth, const wgpu::TextureView& prepassNormal);
 
     gpu::Context& context;
     gpu::ShaderLibrary& shaders;
@@ -148,11 +148,13 @@ Result<void> AoRenderer::Impl::ensureTargets(std::uint32_t width, std::uint32_t 
     return {};
 }
 
-void AoRenderer::Impl::rebuildGroups(const wgpu::TextureView& linearDepth) {
+void AoRenderer::Impl::rebuildGroups(const wgpu::TextureView& linearDepth, const wgpu::TextureView& prepassNormal) {
     const auto& device = context.device();
     const wgpu::TextureView previous = history[1 - historyIndex].colorView();
+    // ADR-1813: the 1x1 placeholder when there are no prepass normals; the shader treats a 1x1 binding as "none".
+    const wgpu::TextureView normals = prepassNormal != nullptr ? prepassNormal : whiteView;
     auto make = [&](const wgpu::TextureView& historyView, const wgpu::TextureView& rawView, const char* label) {
-        std::array<wgpu::BindGroupEntry, 4> entries{};
+        std::array<wgpu::BindGroupEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].buffer = uniforms;
         entries[0].size = sizeof(AoUniforms);
@@ -162,6 +164,8 @@ void AoRenderer::Impl::rebuildGroups(const wgpu::TextureView& linearDepth) {
         entries[2].textureView = historyView;
         entries[3].binding = 3;
         entries[3].textureView = rawView;
+        entries[4].binding = 4;
+        entries[4].textureView = normals;
         wgpu::BindGroupDescriptor desc{};
         desc.label = label;
         desc.layout = aoLayout;
@@ -187,12 +191,12 @@ Result<void> AoRenderer::init(const wgpu::BindGroupLayout& frameLayout) {
         im.uniforms = device.CreateBuffer(&desc);
     }
     {
-        std::array<wgpu::BindGroupLayoutEntry, 4> entries{};
+        std::array<wgpu::BindGroupLayoutEntry, 5> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Fragment;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
         entries[0].buffer.minBindingSize = sizeof(AoUniforms);
-        for (std::uint32_t i = 1; i < 4; ++i) {
+        for (std::uint32_t i = 1; i < 5; ++i) { // 4: ADR-1813's prepass normals
             entries[i].binding = i;
             entries[i].visibility = wgpu::ShaderStage::Fragment;
             entries[i].texture.sampleType = wgpu::TextureSampleType::UnfilterableFloat;
@@ -251,6 +255,7 @@ Result<void> AoRenderer::reload() {
 }
 
 void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::TextureView& linearDepth,
+                        const wgpu::TextureView& prepassNormal,
                         const QualitySettings& quality, std::uint64_t frameIndex, std::uint32_t frameNonce,
                         float fovYRadians,
                         float aspect, float nearPlane, float farPlane, float worldRadius, float strength) {
@@ -297,7 +302,8 @@ void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::T
     im.lastFrameIndex = frameIndex;
     im.haveLastFrame = true;
     im.historyIndex = 1 - im.historyIndex;
-    im.rebuildGroups(linearDepth);
+    // ADR-1813: the `aodepthnormals` arm keeps GTAO's normals rebuilt from depth (the picture before ADR-1813).
+    im.rebuildGroups(linearDepth, quality.aoDepthNormals ? wgpu::TextureView{} : prepassNormal);
 
     const float tanHalf = std::tan(std::clamp(fovYRadians, 0.05f, 3.0f) * 0.5f);
     AoUniforms u{};

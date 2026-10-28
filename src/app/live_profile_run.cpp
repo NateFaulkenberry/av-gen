@@ -509,7 +509,7 @@ int Application::runLiveProfileHeadless() {
             // before warm-up, and report the wait apart from the frames.
             const auto prewarmStart = Clock::now();
             const std::size_t variantsBefore = renderer_->sdfs().compiledVariantCount();
-            while (renderer_->sdfs().pendingCompiles() + (options_.liveProfile.prewarm ? renderer_->procedurals().pendingCompiles() : 0) > 0 &&
+            while (renderer_->sdfs().pendingCompiles() + (options_.liveProfile.prewarm ? renderer_->compiledMaterialsPending() : 0) > 0 &&
                    msSince(prewarmStart) < 60000.0) {
                 context_->processEvents();
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -525,7 +525,7 @@ int Application::runLiveProfileHeadless() {
             }
             headlessTrace += headlessTraceRow('w', clock.current().renderTime, f, traceCounts(renderer_->stats()),
                                               gpu::pipelineCounters().compiles() - traceCompilesBase,
-                                              renderer_->procedurals().compiledMaterialsActive());
+                                              renderer_->compiledMaterialsActive());
         }
         ++warmFrames;
         const double cost = std::max(f.gpuMs, f.cpuWorkMs);
@@ -591,7 +591,7 @@ int Application::runLiveProfileHeadless() {
         if (o.trace) {
             headlessTrace += headlessTraceRow('m', clock.current().renderTime, f, traceCounts(renderer_->stats()),
                                               gpu::pipelineCounters().compiles() - traceCompilesBase,
-                                              renderer_->procedurals().compiledMaterialsActive());
+                                              renderer_->compiledMaterialsActive());
         }
         measured.push_back(std::move(f));
         stats.push_back(renderer_->stats());
@@ -764,7 +764,7 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
                                                                         autoResolution_.settings().scaleFloor)),
                                autoResolution_.gpuCostMs(), autoResolution_.pacing().periodMs,
                                autoResolution_.pacing().refreshMs,
-                               renderer_->procedurals().compiledMaterialsActive() ? 1 : 0,
+                               renderer_->compiledMaterialsActive() ? 1 : 0,
                                autoResolution_.recentMisses(), drop);
     }
     if (liveDropSerial_ != s.dropSerialNoted && lastLiveDrop_ && (s.phase == P::Warmup || s.phase == P::Measure)) {
@@ -782,7 +782,7 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
                                    frame.frameMs;
         }
         // ADR-1102: wait for the pre-warm (variants compiling on Dawn's workers) too, and time it.
-        if (renderer_->sdfs().pendingCompiles() + (o.prewarm ? renderer_->procedurals().pendingCompiles() : 0) > 0 &&
+        if (renderer_->sdfs().pendingCompiles() + (o.prewarm ? renderer_->compiledMaterialsPending() : 0) > 0 &&
             s.waitFrames < 3000) {
             return true;
         }

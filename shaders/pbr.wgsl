@@ -109,6 +109,26 @@ fn orderedDither(pixel: vec2<f32>) -> f32 {
 
 @fragment
 fn fs_depth(in: VertexOut) {
+    depthPrepassClip(in);
+}
+
+// ADR-1813: the depth prepass with GTAO on also writes the surface's normal -- the interpolated vertex normal the lit
+// pass shades with, turned to face the camera -- and the axial view depth it was written at, so GTAO can tell its own
+// pixels from those a later depth-only draw (a procedural, a raymarched SDF) covered. The same clip and alpha test as
+// `fs_depth`, so the two prepass variants keep exactly the same pixels.
+@fragment
+fn fs_depth_normal(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
+    depthPrepassClip(in);
+    var n = normalize(in.normal);
+    if (!frontFacing) {
+        n = -n;
+    }
+    let axial = dot(in.worldPos - frame.cameraPos.xyz, frame.cameraForward.xyz);
+    return vec4<f32>(octEncode(n), axial, 1.0);
+}
+
+// The prepass's discards: an effect's clip, the alpha mask and blended surfaces' stochastic coverage.
+fn depthPrepassClip(in: VertexOut) {
     // Effect Library Wave 2 (FXL): a dissolving or growing owner's clip, the same test the lit pass
     // makes, so the prepass and every shadow map lose what the colour loses. Decided here (the gate
     // is uniform per draw), discarded at the end, after the alpha test's texture sample: see

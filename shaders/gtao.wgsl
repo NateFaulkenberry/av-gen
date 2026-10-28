@@ -24,6 +24,9 @@ struct AoUniforms {
 @group(1) @binding(1) var linearDepth: texture_2d<f32>;
 @group(1) @binding(2) var aoHistory: texture_2d<f32>;
 @group(1) @binding(3) var aoRaw: texture_2d<f32>;
+// ADR-1813: the depth prepass's surface normals (rg = octahedral world normal, b = axial depth written at, a = 1), or
+// a 1x1 placeholder when there are none.
+@group(1) @binding(4) var prepassNormal: texture_2d<f32>;
 
 struct FsIn {
     @builtin(position) clip: vec4<f32>,
@@ -91,6 +94,33 @@ fn depthNormal(uv: vec2<f32>, p: vec3<f32>) -> vec3<f32> {
     return normalize(n);
 }
 
+// ADR-1813: the surface's own normal in view space, from the depth prepass, where it wrote one for the surface that is
+// in the depth buffer now; `vec4(0)` where it did not (the caller then uses the depth-derived normal, as before).
+//
+// Why: the depth reconstruction is what drew dark fins along long, thin triangles (a landscape's RTIN walls). Across
+// one pixel the depth differences mix two facets, the normal flips between them, and the horizon search reads the
+// facet edge as an occluder. The interpolated vertex normal the lit pass shades with has no such edge.
+fn prepassViewNormal(uv: vec2<f32>, p: vec3<f32>, depth: f32) -> vec4<f32> {
+    let size = textureDimensions(prepassNormal, 0);
+    if (size.x <= 1u) {
+        return vec4<f32>(0.0);
+    }
+    let texel = clamp(vec2<i32>(uv * ao.fullSize.xy), vec2<i32>(0), vec2<i32>(size) - vec2<i32>(1));
+    let s = textureLoad(prepassNormal, texel, 0);
+    // a = 1 where an entity wrote it, and only if that entity is still the nearest surface here (a procedural or a
+    // raymarched SDF drawn after it may cover it). The tolerance is f16's precision on the stored depth.
+    if (s.a < 0.5 || abs(s.b - depth) > max(depth * 2.0e-3, 1.0e-3)) {
+        return vec4<f32>(0.0);
+    }
+    let w = octDecode(s.rg);
+    let viewN = vec3<f32>(dot(w, frame.cameraRight.xyz), dot(w, frame.cameraUp.xyz), -dot(w, frame.cameraForward.xyz));
+    // A vertex normal can face slightly away at a silhouette; keep it on the camera's side of the surface.
+    if (dot(viewN, -p) <= 0.0) {
+        return vec4<f32>(0.0);
+    }
+    return vec4<f32>(normalize(viewN), 1.0);
+}
+
 @fragment
 fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
     let uv = in.uv;
@@ -100,7 +130,16 @@ fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
         return vec4<f32>(octEncode(vec3<f32>(0.0, 1.0, 0.0)), 1.0, depth);
     }
     let p = viewPosition(uv, depth);
-    let n = depthNormal(uv, p);
+    // ADR-1813: the prepass's vertex normal where there is one. The depth buffer still holds the facets, so a sample on
+    // this pixel's own facet stands above the smooth normal's tangent plane by its distance times the sine of the angle
+    // between the two; that much is the surface itself, not an occluder, and the threshold below rises by it. Where
+    // the two normals agree (a flat or smoothly tessellated surface) nothing changes; with no prepass normal, `facetTilt`
+    // is 0 and this is exactly the previous code.
+    let facetN = depthNormal(uv, p);
+    let prepassN = prepassViewNormal(uv, p, depth);
+    let usePrepass = prepassN.w > 0.5;
+    let n = select(facetN, prepassN.xyz, usePrepass);
+    let facetTilt = select(0.0, clamp(length(cross(prepassN.xyz, facetN)), 0.0, 1.0), usePrepass);
     let v = normalize(-p);
 
     let radius = ao.params.x;
@@ -159,7 +198,7 @@ fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
                 let sp = viewPosition(sampleUv, sampleDepth);
                 let delta = sp - p;
                 let dist = length(delta);
-                if (dist < 1e-5 || dot(delta, n) <= occluderBias) {
+                if (dist < 1e-5 || dot(delta, n) <= occluderBias + dist * facetTilt) {
                     continue;
                 }
                 let cosH = dot(delta / dist, v);

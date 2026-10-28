@@ -355,6 +355,12 @@ struct QualitySettings {
     // Diagnostic arm only (ADR-1098): material programs bypassed, every program-driven material drawn as its base
     // material, so a profile can MEASURE what the programs cost. No tier or level sets it.
     bool materialProgramsOff = false;
+    // Diagnostic arm only (ADR-1812): compiled material programs not drawn even where a variant is ready -- every lit
+    // path draws the interpreter -- so an A/B can measure what compiling buys in one process. No tier or level sets it.
+    bool materialProgramsInterpreted = false;
+    // Diagnostic arm only (ADR-1813): GTAO rebuilds its normals from depth differences, as before ADR-1813, and the
+    // depth prepass writes no normals (one depth-only pass). No tier or level sets it.
+    bool aoDepthNormals = false;
     // ADR-1222: the Astral Forge's tier (rendering::AstralRenderer). 0 = offline: every particle, the full-resolution
     // march, and a seek re-simulated from the song's start (exact); 1 = the live reference (the prototype's picture);
     // 2..4 = the live ladder's rungs, each simulating fewer particles (70%, 50%, 33%) with fewer god-ray taps, and no

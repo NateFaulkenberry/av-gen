@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <thread>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -530,6 +531,27 @@ Result<void> SceneRenderer::init() {
         !r) {
         return r;
     }
+    // ADR-1812: the entity lit pass's compiled-materials variants, built from pbr.wgsl with the programs spliced in.
+    entityMaterials_ = std::make_unique<CompiledMaterialVariants>(
+        context_, shaders_, "pbr.wgsl", "entity",
+        [this](const wgpu::ShaderModule& module, std::span<const scene::MaterialProgramGpu> programs,
+               const CompiledMaterialVariants::Start& start) {
+            bool textured = false;
+            for (const scene::MaterialProgramGpu& p : programs) {
+                textured = textured || p.textureOps.x >= 0;
+            }
+            for (const bool withTextures : {false, true}) {
+                if (withTextures && !textured) {
+                    break;
+                }
+                for (const LitVariant v : {LitVariant::OpaqueCull, LitVariant::OpaqueNoCull, LitVariant::Blend}) {
+                    if (!createLitPipeline(module, v, nullptr, withTextures, &start)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        });
     // ADR-099: water draws inside the scene pass with the scene's own frame, object and IBL
     // groups, and one of its own for the surface settings.
     if (auto r = water_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, objectLayout_,
@@ -1139,6 +1161,7 @@ Result<void> SceneRenderer::createAuxTargets(std::uint32_t width, std::uint32_t 
     if (auto r = make(emission_, kEmissionFormat, "aux-emission"); !r) return r;
     if (auto r = make(ids_, kIdFormat, "aux-ids"); !r) return r;
     if (auto r = make(linearDepth_, kLinearDepthFormat, "aux-linear-depth"); !r) return r;
+    if (auto r = make(prepassNormal_, kPrepassNormalFormat, "aux-prepass-normal"); !r) return r; // ADR-1813
     linearDepthGroup_ = nullptr;
     auxDebugGroup_ = nullptr;
 
@@ -1230,6 +1253,9 @@ Result<void> SceneRenderer::createPipelines() {
     auto d = createDepthOnlyPipeline(*pbr);
     if (!d) return std::unexpected(d.error());
     depthOnlyPipeline_ = *d;
+    auto dn = createDepthOnlyPipeline(*pbr, true); // ADR-1813
+    if (!dn) return std::unexpected(dn.error());
+    depthNormalPipeline_ = *dn;
     auto l = createLinearDepthPipeline(*linear);
     if (!l) return std::unexpected(l.error());
     linearDepthPipeline_ = *l;
@@ -1288,7 +1314,8 @@ static_assert(sizeof(scene::Vertex) == 32);
 } // namespace
 
 Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
-                                                               wgpu::RenderPipeline* startInto, bool programTextures) {
+                                                               wgpu::RenderPipeline* startInto, bool programTextures,
+                                                               const CompiledMaterialVariants::Start* sink) {
     VertexLayoutStorage vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -1343,6 +1370,10 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     desc.multisample.count = 1;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
+    if (sink != nullptr) {
+        (*sink)(desc); // ADR-1812: a compiled-materials variant starts it on Dawn's workers
+        return wgpu::RenderPipeline{};
+    }
     if (startInto != nullptr) {
         gpu::startRenderPipeline(context_.device(), &desc, startInto); // ADR-1562
         return wgpu::RenderPipeline{};
@@ -1541,19 +1572,23 @@ Result<wgpu::RenderPipeline> SceneRenderer::createSkyboxPipeline(const wgpu::Sha
 
 // Depth-only entities and meshed SDFs: the same vertex stage as the lit pipeline, so the depth it
 // writes matches exactly, used by the prepass and by every shadow view (ADR-034).
-Result<wgpu::RenderPipeline> SceneRenderer::createDepthOnlyPipeline(const wgpu::ShaderModule& module) {
+Result<wgpu::RenderPipeline> SceneRenderer::createDepthOnlyPipeline(const wgpu::ShaderModule& module,
+                                                                    bool withNormal) {
     VertexLayoutStorage vertex;
     wgpu::FragmentState fragment{};
     fragment.module = module;
-    fragment.entryPoint = "fs_depth";
-    fragment.targetCount = 0;
-    fragment.targets = nullptr;
+    fragment.entryPoint = withNormal ? "fs_depth_normal" : "fs_depth";
+    wgpu::ColorTargetState normalTarget{};
+    normalTarget.format = kPrepassNormalFormat;
+    normalTarget.writeMask = wgpu::ColorWriteMask::All;
+    fragment.targetCount = withNormal ? 1 : 0;
+    fragment.targets = withNormal ? &normalTarget : nullptr;
     wgpu::DepthStencilState depth{};
     depth.format = kDepthFormat;
     depth.depthWriteEnabled = wgpu::OptionalBool::True;
     depth.depthCompare = wgpu::CompareFunction::Less;
     wgpu::RenderPipelineDescriptor desc{};
-    desc.label = "depth-only";
+    desc.label = withNormal ? "depth-normal" : "depth-only";
     desc.layout = scenePipelineLayout_;
     desc.vertex.module = module;
     desc.vertex.entryPoint = "vs_entity"; // the lit pipelines' vertex stage, displacement included
@@ -1566,7 +1601,7 @@ Result<wgpu::RenderPipeline> SceneRenderer::createDepthOnlyPipeline(const wgpu::
     desc.multisample.count = 1;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
-    return finishPipeline(desc, "depth-only");
+    return finishPipeline(desc, withNormal ? "depth-normal" : "depth-only");
 }
 
 // ADR-115: the overdraw / fragment-density counting pass's own bind group layout and pipeline
@@ -2042,12 +2077,34 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
          "particleSpawnScale<=0.7, particleCullDistance=60 m (non-hero emitters beyond it skipped)"},
         {"noprograms", [](QualitySettings& q) { q.materialProgramsOff = true; },
          "materialProgramsOff (programs bypassed: what they cost, a diagnostic arm only)"},
+        {"aodepthnormals", [](QualitySettings& q) { q.aoDepthNormals = true; },
+         "aoDepthNormals (GTAO normals from depth differences, no prepass normals: the picture before ADR-1813)"},
+        {"interpreted", [](QualitySettings& q) { q.materialProgramsInterpreted = true; },
+         "materialProgramsInterpreted (compiled material programs not drawn: what compiling buys, ADR-1812)"},
     };
     return kArms;
 }
 
-void SceneRenderer::setCompiledMaterials(bool on) {
-    procedurals_->setCompiledMaterials(on);
+void SceneRenderer::setCompiledMaterials(CompiledMaterialsMode mode) {
+    compiledMode_ = mode;
+    procedurals_->setCompiledMaterials(mode != CompiledMaterialsMode::Off);
+    if (entityMaterials_) {
+        entityMaterials_->setMode(mode);
+    }
+    skinning_->setCompiledMaterials(mode);
+    sdfs_->setCompiledMaterials(mode);
+}
+
+std::size_t SceneRenderer::compiledMaterialsPending() const {
+    return procedurals_->pendingCompiles() + (entityMaterials_ ? entityMaterials_->pendingCompiles() : 0) +
+           skinning_->compiledMaterialsPending() + sdfs_->compiledMaterialsPending();
+}
+
+bool SceneRenderer::compiledMaterialsActive() const {
+    if (compiledMode_ == CompiledMaterialsMode::Off || compiledMaterialsPending() > 0) {
+        return false;
+    }
+    return procedurals_->compiledMaterialsActive() || (entityMaterials_ && entityMaterials_->active());
 }
 
 bool SceneRenderer::setQualityArm(QualitySettings& settings, std::string_view name) {
@@ -2245,6 +2302,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
             litTexturedBlend_ = nullptr;
             litTexturedFailed_ = false;
             sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_);
+            if (entityMaterials_) {
+                entityMaterials_->reset(); // ADR-1812: rebuilt from the reloaded source on the next frame
+            }
         } else {
             keep("pbr.wgsl", std::unexpected((!a ? a : !b ? b : c).error()));
         }
@@ -3452,7 +3512,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                                           0.15f, 4.0f);
         QualitySettings aoQuality = qualitySettings_;
         aoQuality.ambientOcclusion = aoQuality.ambientOcclusion && toggles_.ao && scene.environment.ambientOcclusion;
-        ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, aoQuality, time.frameIndex,
+        ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, prepassNormal_.view, aoQuality, time.frameIndex,
                     time.frameNonce(),
                     scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane, scene.camera.farPlane,
                     aoRadius, 1.0f);
@@ -4119,9 +4179,41 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     if (!scene.programTextures.empty()) {
         warnUntexturedPaths(scene); // ADR-1642
     }
-    // ADR-1493: the procedural lit pass's compiled-materials variant follows the programs' structure.
-    procedurals_->noteMaterialPrograms(std::span<const scene::MaterialProgramGpu>(
-        materialPrograms_->block().programs, materialPrograms_->count()));
+    // ADR-1493: the procedural lit pass's compiled-materials variant follows the programs' structure; ADR-1812: so do
+    // the entity, skinned and SDF paths' variants.
+    {
+        const std::span<const scene::MaterialProgramGpu> programs(materialPrograms_->block().programs,
+                                                                  materialPrograms_->count());
+        const bool suppressed = qualitySettings_.materialProgramsInterpreted; // ADR-1812's diagnostic arm
+        procedurals_->setCompiledMaterialsSuppressed(suppressed);
+        skinning_->setCompiledMaterialsSuppressed(suppressed);
+        procedurals_->noteMaterialPrograms(programs);
+        if (entityMaterials_) {
+            entityMaterials_->setSuppressed(suppressed);
+            entityMaterials_->note(programs);
+        }
+        skinning_->noteMaterialPrograms(programs);
+        sdfs_->noteMaterialPrograms(programs);
+        if (compiledMode_ == CompiledMaterialsMode::Blocking) {
+            // ADR-1812: an offline frame is drawn compiled or not at all -- never the interpreter on some frames and
+            // the variant on others, which would make a render depend on how fast Dawn's workers were.
+            const auto start = std::chrono::steady_clock::now();
+            while (procedurals_->pendingCompiles() > 0 &&
+                   std::chrono::steady_clock::now() - start < std::chrono::minutes(10)) {
+                context_.processEvents();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            if (entityMaterials_) {
+                entityMaterials_->waitUntilReady();
+            }
+            skinning_->waitForCompiledMaterials();
+            sdfs_->waitForCompiledMaterials();
+        }
+        // Mesh-mode SDF objects draw through the entity lit pipelines (ADR-027), so they take the variant too.
+        const wgpu::RenderPipeline cull = entityMaterials_ ? entityMaterials_->pipeline(0) : wgpu::RenderPipeline{};
+        const wgpu::RenderPipeline noCull = entityMaterials_ ? entityMaterials_->pipeline(1) : wgpu::RenderPipeline{};
+        sdfs_->setMeshPipelines(cull ? cull : litOpaqueCull_, noCull ? noCull : litOpaqueNoCull_);
+    }
     // ---- splines (ADR-026): the sample tables, re-uploaded only when a spline changed ----
     splines_->update(scene.splines);
     stage(cpu.fieldsMs);
@@ -4437,26 +4529,44 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         depth.depthLoadOp = wgpu::LoadOp::Clear;
         depth.depthStoreOp = wgpu::StoreOp::Store;
         depth.depthClearValue = 1.0f;
+        // ADR-1813: with GTAO on, the prepass is two passes. The first draws the entities, the skinned meshes and the
+        // meshed SDFs -- every surface with interpolated vertex normals -- writing those normals beside the depth for
+        // GTAO, which otherwise rebuilds them from depth differences and draws fins along long, thin triangles. The
+        // second draws the procedurals and the raymarched SDFs depth-only, as before, so none of their (heavy)
+        // pipelines needs a normal-writing variant; GTAO tells their pixels apart by the depth each normal was
+        // written at, and falls back to the depth-derived normal there.
+        const bool prepassNormals = ao_->active() && !qualitySettings_.aoDepthNormals && depthNormalPipeline_ &&
+                                    prepassNormal_.valid() &&
+                                    skinning_->depthNormalPipeline();
+        const wgpu::RenderPipeline& entityDepth = prepassNormals ? depthNormalPipeline_ : depthOnlyPipeline_;
+        wgpu::RenderPassColorAttachment normalAttachment{};
+        normalAttachment.view = prepassNormal_.view;
+        normalAttachment.loadOp = wgpu::LoadOp::Clear;
+        normalAttachment.storeOp = wgpu::StoreOp::Store;
+        normalAttachment.clearValue = {0.0, 0.0, 0.0, 0.0};
         wgpu::RenderPassDescriptor pass{};
-        pass.label = "depth-prepass";
-        pass.colorAttachmentCount = 0;
+        pass.label = prepassNormals ? "depth-prepass-normals" : "depth-prepass";
+        pass.colorAttachmentCount = prepassNormals ? 1 : 0;
+        pass.colorAttachments = prepassNormals ? &normalAttachment : nullptr;
         pass.depthStencilAttachment = &depth;
         pass.timestampWrites = timeline_->mark("depth", gpu::FrameTimeline::PassKind::Render);
         wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
         rp.SetBindGroup(0, frameBindGroupAux_);
         rp.SetBindGroup(3, iblBindGroup_);
-        rp.SetPipeline(depthOnlyPipeline_);
+        rp.SetPipeline(entityDepth);
         stats_.state.bindGroupBinds += 2;
         ++stats_.state.pipelineBinds;
         bool skinnedBound = false;
         for (const auto& item : opaque) {
             const GpuMesh& mesh = *item.geometry;
             if (item.skinned()) {
-                bindSkinned(rp, item, mesh, skinning_->depthPipeline(), skinnedBound);
+                bindSkinned(rp, item, mesh,
+                            prepassNormals ? skinning_->depthNormalPipeline() : skinning_->depthPipeline(),
+                            skinnedBound);
                 ++stats_.state.pipelineBinds;
             } else {
                 if (skinnedBound) {
-                    rp.SetPipeline(depthOnlyPipeline_);
+                    rp.SetPipeline(entityDepth);
                     ++stats_.state.pipelineBinds;
                     skinnedBound = false;
                 }
@@ -4472,7 +4582,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.state.indexBufferBinds;
         }
         sdfs_->drawMeshes(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); },
-                          &depthOnlyPipeline_);
+                          &entityDepth);
+        if (prepassNormals) {
+            rp.End();
+            wgpu::RenderPassDepthStencilAttachment depthLoad = depth;
+            depthLoad.depthLoadOp = wgpu::LoadOp::Load;
+            wgpu::RenderPassDescriptor rest{};
+            rest.label = "depth-prepass";
+            rest.colorAttachmentCount = 0;
+            rest.depthStencilAttachment = &depthLoad;
+            rest.timestampWrites = timeline_->mark("depth", gpu::FrameTimeline::PassKind::Render);
+            rp = encoder.BeginRenderPass(&rest);
+            rp.SetBindGroup(0, frameBindGroupAux_);
+            rp.SetBindGroup(3, iblBindGroup_);
+            stats_.state.bindGroupBinds += 2;
+        }
         procedurals_->drawDepthOnly(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
         sdfs_->drawRaymarchDepth(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });
         rp.End();
@@ -4606,7 +4730,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 } else if (lit) {
                     // ADR-1642: a program that samples a texture draws through the textured variant.
                     const bool textured = programSamplesTexture(m) && ensureTexturedLitPipelines();
-                    rp.SetPipeline(m.alphaMode == scene::AlphaMode::Blend
+                    const std::size_t which = (m.alphaMode == scene::AlphaMode::Blend ? 2u
+                                               : (m.doubleSided || item.fxTwoSided) ? 1u
+                                                                                    : 0u) +
+                                              (textured ? 3u : 0u);
+                    // ADR-1812: the compiled-materials variant when one is ready for this frame's programs.
+                    const wgpu::RenderPipeline compiled =
+                        entityMaterials_ ? entityMaterials_->pipeline(which) : wgpu::RenderPipeline{};
+                    rp.SetPipeline(compiled ? compiled
+                                   : m.alphaMode == scene::AlphaMode::Blend
                                        ? (textured ? litTexturedBlend_ : litBlend_)
                                    : (m.doubleSided || item.fxTwoSided)
                                        ? (textured ? litTexturedOpaqueNoCull_ : litOpaqueNoCull_)

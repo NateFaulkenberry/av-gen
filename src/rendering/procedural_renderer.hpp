@@ -332,6 +332,7 @@ public:
     // variant is built on Dawn's workers when the programs' structure changes, and until it is ready (or if it fails)
     // the interpreter's pipelines draw, so a change never stalls a frame.
     void setCompiledMaterials(bool on);
+    void setCompiledMaterialsSuppressed(bool suppressed); // ADR-1812: the `interpreted` diagnostic arm
     // Per frame, after the material program block is packed: the programs the next draws will read.
     void noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs);
     // A variant still compiling (0 or 1), and whether this frame's lit draws use one.

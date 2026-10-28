@@ -5,6 +5,7 @@
 #include "gpu/shader_library.hpp"
 #include "rendering/procedural_renderer.hpp"
 #include "rendering/scene_renderer.hpp"
+#include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -155,7 +156,7 @@ TEST_CASE("A compiled material program renders what the interpreter renders (ADR
 
     rendering::SceneRenderer compiled(*ctx, shaders);
     REQUIRE(compiled.init().has_value());
-    compiled.setCompiledMaterials(true);
+    compiled.setCompiledMaterials(rendering::CompiledMaterialsMode::Async);
     auto first = compiled.renderToImage(s, t, 256, 256); // asks for the variant; drawn interpreted meanwhile
     REQUIRE(first.has_value());
     CHECK(gpu::hashImage(*first) == gpu::hashImage(*reference));
@@ -211,5 +212,101 @@ TEST_CASE("A compiled material program renders what the interpreter renders (ADR
         }
     }
     CHECK(movedWorst <= 1);
+    CHECK(ctx->errorCount() == 0);
+}
+
+namespace {
+
+// ADR-1812: the same program on entity meshes (the path Aurora's fish, Talking Heads' busts and Rift's rocks take),
+// one double-sided and one blended, beside the procedural spheres.
+scene::Scene entityProgramScene() {
+    scene::Scene s = programScene();
+    s.procedurals.clear();
+    const scene::MeshId ball = s.addMesh(scene::makeIcosphere(1.2f, 4));
+    for (int i = 0; i < 3; ++i) {
+        scene::Entity& e = s.addEntity("ball" + std::to_string(i), ball);
+        e.transform.position = glm::vec3(static_cast<float>(i) * 2.8f - 2.8f, 0.0f, 0.0f);
+        e.material.program = "rich";
+        e.material.roughness = 0.5f;
+        e.material.doubleSided = i == 1;
+        if (i == 2) {
+            e.material.alphaMode = scene::AlphaMode::Blend;
+            e.material.opacity = 0.6f;
+        }
+    }
+    return s;
+}
+
+struct Diff {
+    int differing = 0;
+    int worst = 0;
+    int lit = 0;
+};
+
+Diff diff(const gpu::Image8& a, const gpu::Image8& b) {
+    Diff d;
+    for (std::uint32_t y = 0; y < a.height; ++y) {
+        for (std::uint32_t x = 0; x < a.width; ++x) {
+            int m = 0;
+            for (int c = 0; c < 3; ++c) {
+                m = std::max(m, std::abs(static_cast<int>(a.pixel(x, y)[c]) - static_cast<int>(b.pixel(x, y)[c])));
+            }
+            d.differing += m > 0 ? 1 : 0;
+            d.worst = std::max(d.worst, m);
+            d.lit += (b.pixel(x, y)[0] + b.pixel(x, y)[1] + b.pixel(x, y)[2]) > 30 ? 1 : 0;
+        }
+    }
+    return d;
+}
+
+} // namespace
+
+TEST_CASE("Entity meshes draw their material programs compiled, from the first offline frame (ADR-1812)",
+          "[gpu][material][adr1812]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    const scene::Scene s = entityProgramScene();
+    FrameTime t{};
+    t.renderTime = 1.5;
+
+    rendering::SceneRenderer interpreted(*ctx, shaders);
+    REQUIRE(interpreted.init().has_value());
+    auto reference = interpreted.renderToImage(s, t, 256, 256);
+    REQUIRE(reference.has_value());
+
+    // Blocking (an offline render): the first frame waits for the variant, so it is already drawn compiled.
+    rendering::SceneRenderer compiled(*ctx, shaders);
+    REQUIRE(compiled.init().has_value());
+    compiled.setCompiledMaterials(rendering::CompiledMaterialsMode::Blocking);
+    auto image = compiled.renderToImage(s, t, 256, 256);
+    REQUIRE(image.has_value());
+    CHECK(compiled.compiledMaterialsPending() == 0);
+    REQUIRE(compiled.compiledMaterialsActive());
+    const Diff d = diff(*image, *reference);
+    INFO("differing " << d.differing << ", worst " << d.worst << ", lit " << d.lit);
+    CHECK(d.lit > 4000);
+    CHECK(d.worst <= 1);
+    CHECK(d.differing < 64);
+
+    // The `interpreted` diagnostic arm draws the interpreter again, byte for byte, in the same renderer.
+    rendering::QualitySettings q = compiled.qualitySettings();
+    q.materialProgramsInterpreted = true;
+    compiled.setQualitySettings(q);
+    auto armed = compiled.renderToImage(s, t, 256, 256);
+    REQUIRE(armed.has_value());
+    CHECK(gpu::hashImage(*armed) == gpu::hashImage(*reference));
+
+    // A constant moved by a route reaches the compiled program without a rebuild.
+    q.materialProgramsInterpreted = false;
+    compiled.setQualitySettings(q);
+    scene::Scene moved = s;
+    moved.materialPrograms[0].ops[3].constant = {0.1f, 0.9f, 0.2f, 0.0f};
+    auto movedCompiled = compiled.renderToImage(moved, t, 256, 256);
+    REQUIRE(movedCompiled.has_value());
+    CHECK(compiled.compiledMaterialsPending() == 0);
+    auto movedReference = interpreted.renderToImage(moved, t, 256, 256);
+    REQUIRE(movedReference.has_value());
+    CHECK(gpu::hashImage(*movedCompiled) != gpu::hashImage(*image));
+    CHECK(diff(*movedCompiled, *movedReference).worst <= 1);
     CHECK(ctx->errorCount() == 0);
 }
