@@ -145,7 +145,7 @@
       "edgeFade": 0.4,
       "specular": 1.0,
       "ssr": 1.0,
-      "ssrDistance": 450.0,
+      "ssrDistance": 1200.0,
       "ssrSteps": 160.0,
       "ssrGain": 1.0,
       "skyMirror": 0.2

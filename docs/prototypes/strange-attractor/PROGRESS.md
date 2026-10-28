@@ -172,6 +172,12 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-27: Canyon Phase 1b: rebased on main 9b4156ea.
+  - Flicker traced. Cascade pull-back was fixed with `shadowCasterReach` (ADR-1858), and contact shadows are off.
+    Irregularity max went 6.23 -> 0.25.
+  - Look moved toward gate2e: sky, streak clouds, warm bounce, four-colour strata, ledge detail normals and baked
+    occlusion (ADR-1859).
+  - Notes in `05-canyon-phase1b.md`.
 - 2026-10-27: Stage 0 research and plan; the Environment, generator, pass and tests (5 cases, 106 assertions, pass);
   Gate 1 media rendered.
 - 2026-10-27: Canyon Phase 1: rebased on main 2bc26a7a; RTIN mesh conversion (8.27M triangles), engine sun, sky,

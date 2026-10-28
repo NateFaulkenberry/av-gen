@@ -38,5 +38,7 @@ the key raises its shadow bias to match. The Strange Attractor uses 4000 m with 
 ## Consequences
 
 - Full 46 s flythrough at 960x540: frame-difference irregularity max went 5.34 -> 1.47, and p90 went 0.448 -> 0.289.
-  The remaining spikes were contact shadows and water SSR, both scene settings.
+  What remained was the dotted checker that screen-space contact shadows draw on lit walls, a scene setting: with
+  them off, max 0.27 and p90 0.042. (Shortening the river's SSR reach was tried alongside and turned out to make no
+  difference. It is back at 1200 m, because the short reach lost the lit walls' reflections.)
 - Nothing else sets the key, so every other scene's shadows are unchanged. The unit test pins this.
