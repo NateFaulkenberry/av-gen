@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -128,4 +129,36 @@ TEST_CASE("lockBorder reads, round-trips, is written only when set, and changes 
     CHECK_FALSE(scene::ProceduralGeometry::fromJson(
                     nlohmann::json::parse(R"({"source": {"kind": "box"}, "lod": {"lockBorder": "yes"}})"))
                     .has_value());
+}
+
+// ADR-1814: makeLodMesh builds one LOD chain per source and settings and serves every level from it. The memo must be
+// invisible: every call returns the same bytes for a level whichever level was asked first, and the lockBorder chain
+// and the free one are kept apart. (That a memoised level equals the pre-ADR-1814 output is shown on whole frames:
+// tools/picture_check.py, Rainbow World SAME before and after.)
+TEST_CASE("makeLodMesh's chain memo serves every level the same bytes", "[procedural][lod][adr1814]") {
+    const scene::SourceSpec spec = meshSpec();
+    for (const bool lock : {false, true}) {
+        std::vector<MeshData> first;
+        for (int level = 3; level >= 1; --level) { // reversed: the memo is filled by level 3, then read by 2 and 1
+            auto m = scene::makeLodMesh(spec, level, 1.0f, glm::vec3(1.0f), lock);
+            REQUIRE(m.has_value());
+            first.push_back(*m);
+        }
+        for (int level = 1; level <= 3; ++level) {
+            auto again = scene::makeLodMesh(spec, level, 1.0f, glm::vec3(1.0f), lock);
+            REQUIRE(again.has_value());
+            const MeshData& before = first[static_cast<std::size_t>(3 - level)];
+            INFO("lockBorder " << lock << ", level " << level);
+            CHECK(again->indices == before.indices);
+            REQUIRE(again->vertices.size() == before.vertices.size());
+            CHECK(std::memcmp(again->vertices.data(), before.vertices.data(),
+                              before.vertices.size() * sizeof(Vertex)) == 0);
+        }
+    }
+    // The two settings give different chains: the memo did not hand one to the other.
+    auto locked = scene::makeLodMesh(spec, 2, 1.0f, glm::vec3(1.0f), true);
+    auto free = scene::makeLodMesh(spec, 2, 1.0f, glm::vec3(1.0f), false);
+    REQUIRE(locked.has_value());
+    REQUIRE(free.has_value());
+    CHECK(locked->indices != free->indices);
 }

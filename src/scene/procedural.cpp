@@ -108,6 +108,8 @@
 #include "core/noise.hpp"
 #include "scene/procedural_detail.hpp"
 
+#include <memory>
+#include <list>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -1894,6 +1896,70 @@ bool lodLevelIsImpostor(const SourceSpec& spec, int level) {
     return !(spec.kind == PrimitiveKind::Mesh && spec.assetMesh);
 }
 
+namespace {
+
+// ADR-1814: the LOD chains already built, by the source mesh's content and the settings that shaped the chain. A
+// chain is every level at once, but each caller asks for one level, so a procedural with three levels used to simplify
+// its source three times -- Rainbow World's first frame was 7 s of meshoptimizer for exactly that. Same input, same
+// chain: a hit returns the bytes a rebuild would. Bounded, and safe to call from several threads.
+struct LodChainMemo {
+    std::mutex mutex;
+    std::list<std::pair<std::uint64_t, std::shared_ptr<const assets::LodChain>>> entries; // most recent first
+    static constexpr std::size_t kMax = 256; // every chain a prefetch builds must still be here when the frame asks
+};
+
+LodChainMemo& lodChainMemo() {
+    static LodChainMemo memo;
+    return memo;
+}
+
+std::uint64_t lodChainKey(const MeshData& base, const assets::LodChainSettings& settings, bool thinning) {
+    std::uint64_t h = 0xcbf29ce484222325ull;
+    const auto bytes = [&h](const void* data, std::size_t size) {
+        const auto* p = static_cast<const std::uint8_t*>(data);
+        for (std::size_t i = 0; i < size; ++i) {
+            h = (h ^ p[i]) * 0x100000001b3ull;
+        }
+    };
+    bytes(base.vertices.data(), base.vertices.size() * sizeof(Vertex));
+    bytes(base.indices.data(), base.indices.size() * sizeof(std::uint32_t));
+    const std::uint8_t flags[3] = {static_cast<std::uint8_t>(settings.lockBorder),
+                                   static_cast<std::uint8_t>(thinning),
+                                   static_cast<std::uint8_t>(settings.sloppyFallback > 0.0f)};
+    bytes(flags, sizeof(flags));
+    bytes(&settings.sloppyFallback, sizeof(settings.sloppyFallback));
+    return h;
+}
+
+Result<std::shared_ptr<const assets::LodChain>> memoisedLodChain(const MeshData& base,
+                                                                  const assets::LodChainSettings& settings,
+                                                                  bool thinning) {
+    const std::uint64_t key = lodChainKey(base, settings, thinning);
+    LodChainMemo& memo = lodChainMemo();
+    {
+        std::lock_guard lock(memo.mutex);
+        for (auto it = memo.entries.begin(); it != memo.entries.end(); ++it) {
+            if (it->first == key) {
+                memo.entries.splice(memo.entries.begin(), memo.entries, it);
+                return memo.entries.front().second;
+            }
+        }
+    }
+    auto chain = assets::buildLodChain(base, settings);
+    if (!chain) {
+        return std::unexpected(chain.error());
+    }
+    auto shared = std::make_shared<const assets::LodChain>(std::move(*chain));
+    std::lock_guard lock(memo.mutex);
+    memo.entries.emplace_front(key, shared);
+    if (memo.entries.size() > LodChainMemo::kMax) {
+        memo.entries.pop_back();
+    }
+    return shared;
+}
+
+} // namespace
+
 Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSize,
                              const glm::vec3& sourceScale, bool lockBorder, bool thinning) {
     // An imported mesh has no generator parameters to halve, so its levels are simplifications of
@@ -1947,9 +2013,9 @@ Result<MeshData> makeLodMesh(const SourceSpec& spec, int level, float impostorSi
             settings.lockBorder = true;
             settings.sloppyFallback = 0.0f;
         }
-        auto chain = assets::buildLodChain(*base, settings);
-        if (chain && static_cast<std::size_t>(level) < chain->levels.size()) {
-            MeshData out = std::move(chain->levels[static_cast<std::size_t>(level)].mesh);
+        auto chain = memoisedLodChain(*base, settings, thinning); // ADR-1814: one simplification for every level
+        if (chain && static_cast<std::size_t>(level) < (*chain)->levels.size()) {
+            MeshData out = (*chain)->levels[static_cast<std::size_t>(level)].mesh;
             if (!out.indices.empty() && out.valid()) {
                 return out;
             }

@@ -22,6 +22,8 @@
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <set>
 #include <vector>
 #include <limits>
@@ -442,6 +444,11 @@ struct ProceduralRenderer::Impl {
     const WireMesh* ensureWireMesh(const scene::ProceduralGeometry& object);
     // The mesh of one LOD level, cached under a key derived from the object's meshHash.
     const CachedMesh* ensureLodMesh(const scene::ProceduralGeometry& object, int level);
+    // ADR-1814: builds, across worker threads, the LOD chains of every mesh-sourced procedural whose level 1 is not
+    // cached yet, so the frame's `ensureLodMesh` calls find them in makeLodMesh's memo instead of simplifying one
+    // source after another on this thread. Same chains, same bytes; only where they are computed changes.
+    void prefetchLodChains(const scene::Scene& scene);
+    std::uint64_t lodMeshKey(const scene::ProceduralGeometry& object, int level) const;
     // Everything the object needs this frame, in dependency order: record/uniform buffers, the
     // cull buffers (when culling is on) and then every bind group that references them.
     // `sharedVisible` (ADR-108): non-null when this object is a material part whose cull is done
@@ -1675,6 +1682,51 @@ const ProceduralRenderer::Impl::WireMesh* ProceduralRenderer::Impl::ensureWireMe
     return it->second.indexCount > 0 ? &it->second : nullptr;
 }
 
+std::uint64_t ProceduralRenderer::Impl::lodMeshKey(const scene::ProceduralGeometry& object, int level) const {
+    std::uint64_t key = object.meshHash;
+    const auto mix = [&key](std::uint64_t v) { key ^= v + 0x9E3779B97F4A7C15ull + (key << 6) + (key >> 2); };
+    mix(0x10D0000ull + static_cast<std::uint64_t>(level));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.lod.impostorSize)));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.x)));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.y)));
+    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.z)));
+    return key;
+}
+
+void ProceduralRenderer::Impl::prefetchLodChains(const scene::Scene& scene) {
+    std::vector<const scene::ProceduralGeometry*> todo;
+    for (const scene::ProceduralGeometry& object : scene.procedurals) {
+        if (object.source.kind == scene::PrimitiveKind::Mesh && object.source.assetMesh &&
+            object.lod.lodCount > 1 && !meshes.contains(lodMeshKey(object, 1))) {
+            todo.push_back(&object);
+        }
+    }
+    if (todo.size() < 2) {
+        return; // nothing to overlap; the frame builds it as before
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const unsigned workers =
+        std::min<unsigned>(static_cast<unsigned>(todo.size()), std::max(2u, std::thread::hardware_concurrency()));
+    std::atomic<std::size_t> next{0};
+    std::vector<std::thread> threads;
+    threads.reserve(workers);
+    for (unsigned w = 0; w < workers; ++w) {
+        threads.emplace_back([&] {
+            for (std::size_t i = next++; i < todo.size(); i = next++) {
+                const scene::ProceduralGeometry& o = *todo[i];
+                // The result is dropped: the call fills makeLodMesh's chain memo, which the frame reads.
+                static_cast<void>(scene::makeLodMesh(o.source, 1, o.lod.impostorSize, o.sourceTransform.scale,
+                                                     o.lod.lockBorder, o.lod.thinning));
+            }
+        });
+    }
+    for (std::thread& t : threads) {
+        t.join();
+    }
+    log::info("procedural: {} LOD chain(s) built on {} thread(s) in {:.0f} ms (ADR-1814)", todo.size(), workers,
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+}
+
 const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodMesh(const scene::ProceduralGeometry& object,
                                                                                     int level) {
     if (level <= 0) {
@@ -1685,13 +1737,7 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureLodM
     // which is what the impostor is now built at. Two scatter layers over the same asset differ in
     // exactly that: `Composition::flatten` normalises the asset's height onto `sourceTransform`, so
     // a 0.45 m fern layer and a 14 m canopy layer share a `meshHash` and must not share a quad.
-    std::uint64_t key = object.meshHash;
-    const auto mix = [&key](std::uint64_t v) { key ^= v + 0x9E3779B97F4A7C15ull + (key << 6) + (key >> 2); };
-    mix(0x10D0000ull + static_cast<std::uint64_t>(level));
-    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.lod.impostorSize)));
-    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.x)));
-    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.y)));
-    mix(static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(object.sourceTransform.scale.z)));
+    const std::uint64_t key = lodMeshKey(object, level);
     auto it = meshes.find(key);
     if (it == meshes.end()) {
         // What the level actually comes back as, against the level above it. A LOD level is only
@@ -2133,6 +2179,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         im.objects.clear();
         im.objectsScene = scene.identity;
     }
+    im.prefetchLodChains(scene);
     im.items.clear();
     im.computeItems.clear();
     im.generatorItems.clear();

@@ -75,7 +75,7 @@ afterwards). Time to a rendered frame = scene load + first frame + pre-warm, in 
   `WGPUDawnCacheDeviceDescriptor`. Recorded as a limitation, not hidden behind the 1.0x figure.
 - **Rainbow World's 7.1 s first frame is unchanged by either cache** (7.0-7.3 s in every row, cache or not, fresh or
   not), so it is not shader compilation. The audit read it as "translation no cache holds" [H]; this measurement
-  rules a shader cache out. Its cause is not established here; it is left for P1, which works on compiled materials.
+  rules a shader cache out. ADR-1814 found it: LOD meshes simplified on the main thread, every launch (now 1.7 s).
 - Cache size after these runs: 7.2 MB for the two scenes.
 - Pre-warm read 0.0 s in every run: these scenes' variants were all requested and built inside load and the first
   frame, so the live profile's `prewarmMs` is not where this cost shows. Compare load + first frame.
