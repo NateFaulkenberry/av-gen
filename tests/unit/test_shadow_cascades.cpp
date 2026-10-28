@@ -227,3 +227,48 @@ TEST_CASE("cascades stay snapped to their own texel grid", "[shadows][cascades]"
     // The negative control: a fit that never moved would pass the line above trivially.
     CHECK(moved);
 }
+
+TEST_CASE("a cascade's caster reach extends its volume back toward the sun, and 0 changes nothing",
+          "[shadows][cascades]") {
+    // ADR-1858. A near cascade's light-space volume reaches back only a few cascade radii, so under
+    // a low sun a ridge kilometres up-sun falls outside it and a surface pops into shadow when it
+    // crosses into the next cascade. `minPullBack` is the floor on that reach.
+    const float range = 2000.0f;
+    const glm::mat4 inv = invViewProjFor(kNear, range);
+    const std::vector<float> splits = cascadeSplits(kNear, range, 3);
+    const glm::vec3 light = glm::normalize(glm::vec3(0.3f, -0.16f, -0.5f));
+    const float casterDistance = 6000.0f;
+
+    const ShadowView plain = fitDirectionalCascade(inv, kNear, range, kNear, splits[0], light, 2048,
+                                                   casterDistance);
+    const ShadowView zero = fitDirectionalCascade(inv, kNear, range, kNear, splits[0], light, 2048,
+                                                  casterDistance, 0.0f);
+    const ShadowView reach = fitDirectionalCascade(inv, kNear, range, kNear, splits[0], light, 2048,
+                                                   casterDistance, 4000.0f);
+
+    // The default is the old fit, bit for bit.
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r)
+            CHECK(plain.viewProj[c][r] == zero.viewProj[c][r]);
+    CHECK(plain.depthRange == zero.depthRange);
+
+    // A caster 3 km up-sun of the cascade centre: outside the plain volume, inside the reached one.
+    const glm::vec3 caster = plain.center - light * 3000.0f;
+    auto depthOf = [&](const ShadowView& v) {
+        const glm::vec4 clip = v.viewProj * glm::vec4(caster, 1.0f);
+        return clip.z / clip.w;
+    };
+    INFO("plain depth " << depthOf(plain) << ", reached depth " << depthOf(reach));
+    CHECK((depthOf(plain) < 0.0f || depthOf(plain) > 1.0f));
+    CHECK(depthOf(reach) >= 0.0f);
+    CHECK(depthOf(reach) <= 1.0f);
+    CHECK(reach.depthRange > plain.depthRange);
+
+    // The reach never exceeds the caster distance the scene asked for: asking for more than it
+    // is the same as asking for exactly it.
+    const ShadowView capped = fitDirectionalCascade(inv, kNear, range, kNear, splits[0], light, 2048,
+                                                    500.0f, 4000.0f);
+    const ShadowView exact = fitDirectionalCascade(inv, kNear, range, kNear, splits[0], light, 2048,
+                                                   500.0f, 500.0f);
+    CHECK(capped.depthRange == exact.depthRange);
+}

@@ -731,6 +731,11 @@ struct Environment {
     // any shadows at all, and should set it to about the depth its subject actually spans.
     // Clamped to the camera's own planes where it is read.
     float shadowRange = 0.0f; // 0 = ADR-112's automatic range
+    // ADR-1858: the least distance (metres) every directional cascade's light-space volume reaches back toward the sun.
+    // A cascade pulls back at most 3x its own radius, so under a low sun a near cascade drops occluders the far cascades
+    // keep, and a surface crossing between them pops in and out of shadow. A scene of tall relief under a low sun sets
+    // this to about relief height / tan(sun elevation). 0 (the default) changes nothing.
+    float shadowCasterReach = 0.0f;
     // ADR-1406: a scene may say it has no use for screen-space ambient occlusion or contact shadows (an unlit, painted
     // world). Either costs the depth prepass -- the whole opaque geometry drawn twice -- which for a deformed procedural
     // ground re-runs every deformer per vertex. Both default on; the quality tier still decides when they are on.

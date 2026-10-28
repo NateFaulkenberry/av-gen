@@ -138,7 +138,7 @@ Result<void> ShadowRenderer::init(std::uint64_t frameUniformSize) {
 std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLight*>& lights,
                                      const glm::mat4& viewProj, float cameraNear, float cameraFar,
                                      float sceneRadius, const QualitySettings& quality,
-                                     float rangeOverride) {
+                                     float rangeOverride, float casterReach) {
     Impl& im = *impl_;
     views_.clear();
     stats_ = ShadowStats{};
@@ -235,7 +235,7 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
                 // inverse was built from); `splits` only says how deep this cascade reaches.
                 ShadowView view = fitDirectionalCascade(invViewProj, cameraNear, cameraFar, nearDepth,
                                                         splits[c], light.direction, im.resolution,
-                                                        std::max(sceneRadius, 1.0f));
+                                                        std::max(sceneRadius, 1.0f), casterReach);
                 view.lightIndex = static_cast<int>(i);
                 // Nothing else stands between a cascade fit and the GPU. The renderer guards the
                 // camera and the entity matrices; a shadow view is built from the camera's *inverse*

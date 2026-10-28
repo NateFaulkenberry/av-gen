@@ -77,7 +77,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowRange", "shadowCasterReach", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -9574,6 +9574,7 @@ void Composition::applyParameters() {
         env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
+        env.shadowCasterReach = volumeSetting_.shadowCasterReach; // ADR-1858
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
         env.contactShadows = volumeSetting_.contactShadows;
         env.depthPrepass = volumeSetting_.depthPrepass;
@@ -10606,6 +10607,9 @@ nlohmann::json Composition::toJson() const {
         const float range = shadowRange_ != nullptr ? shadowRange_->base() : volumeSetting_.shadowRange;
         if (range > 0.0f) {
             environment["shadowRange"] = range;
+        }
+        if (volumeSetting_.shadowCasterReach > 0.0f) { // ADR-1858: written only when set
+            environment["shadowCasterReach"] = volumeSetting_.shadowCasterReach;
         }
         // ADR-1406: written only when the scene turned them off
         if (!volumeSetting_.ambientOcclusion) {
@@ -11911,7 +11915,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"volumeNoiseSpeed", &v.volumeNoiseSpeed},
                                       FloatKey{"volumeEmission", &v.volumeEmission},
                                       FloatKey{"volumeMaxDistance", &v.volumeMaxDistance},
-                                      FloatKey{"shadowRange", &v.shadowRange}}) {
+                                      FloatKey{"shadowRange", &v.shadowRange},
+                                      FloatKey{"shadowCasterReach", &v.shadowCasterReach}}) {
                 auto value = readFloat(e, fk.key, *fk.target);
                 if (!value) {
                     return std::unexpected(value.error());

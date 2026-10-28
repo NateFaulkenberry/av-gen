@@ -141,7 +141,7 @@ constexpr std::uint32_t kShadowRangeReference = 2048;
 [[nodiscard]] ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear,
                                                float cameraFar, float nearDepth, float farDepth,
                                                const glm::vec3& lightDirection, std::uint32_t resolution,
-                                               float casterDistance);
+                                               float casterDistance, float minPullBack = 0.0f);
 
 // One perspective map covering a spot light's cone.
 [[nodiscard]] ShadowView fitSpotShadow(const scene::PunctualLight& light, std::uint32_t resolution,

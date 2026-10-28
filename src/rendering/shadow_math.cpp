@@ -87,7 +87,7 @@ std::array<glm::vec3, 8> frustumCorners(const glm::mat4& invViewProj) {
 
 ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear, float cameraFar,
                                  float nearDepth, float farDepth, const glm::vec3& lightDirection,
-                                 std::uint32_t resolution, float casterDistance) {
+                                 std::uint32_t resolution, float casterDistance, float minPullBack) {
     const std::array<glm::vec3, 8> corners = frustumCorners(invViewProj);
     const float span = std::max(cameraFar - cameraNear, 1e-4f);
     const float t0 = std::clamp((nearDepth - cameraNear) / span, 0.0f, 1.0f);
@@ -116,7 +116,10 @@ ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear,
     const glm::vec3 dir = safeNormalize(lightDirection, glm::vec3(0.0f, -1.0f, 0.0f));
     // How far behind the cascade the light's near plane sits, so casters outside the visible range
     // still reach it. Every metre of pull-back costs depth precision, so it is kept tight.
-    const float back = std::clamp(casterDistance, radius * 0.5f, radius * 3.0f);
+    // ADR-1858: a scene may require a least pull-back for every cascade (bounded by the casters' own distance), so the
+    // near cascades keep the far occluders a low sun brings in; 0 leaves the rule above exactly as it was.
+    const float back = std::max(std::clamp(casterDistance, radius * 0.5f, radius * 3.0f),
+                                std::min(minPullBack, casterDistance));
     const float texel = 2.0f * radius / static_cast<float>(std::max(resolution, 1u));
 
     // Texel snapping: the cascade's centre is quantised to a light-space grid that is anchored to

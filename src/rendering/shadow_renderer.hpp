@@ -95,9 +95,11 @@ public:
     // reach, in view depth, when the scene has an opinion. 0 -- the default, and what every scene
     // that does not set it passes -- leaves ADR-112's automatic rule in charge. Clamped to the
     // camera's own planes here, because a range past the far plane fits cascades to nothing.
+    // `casterReach` is `scene::Environment::shadowCasterReach` (ADR-1858): the least light-space pull-back of every
+    // cascade, so all cascades see the same occluders. 0 keeps ADR-112's per-cascade rule.
     std::uint32_t update(const std::vector<const scene::PunctualLight*>& lights, const glm::mat4& viewProj,
                          float cameraNear, float cameraFar, float sceneRadius, const QualitySettings& quality,
-                         float rangeOverride = 0.0f);
+                         float rangeOverride = 0.0f, float casterReach = 0.0f);
     // Writes each view's frame-uniform copy (the caller's block with `viewProj` replaced) and the
     // ShadowUniforms block. Call after update() and after the frame block is final.
     void upload(const void* frameUniforms, std::uint64_t frameUniformSize);

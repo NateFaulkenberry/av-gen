@@ -63,7 +63,9 @@
     },
     "shadowRange": 3000.0,
     "shadowCascades": 4,
-    "ambientOcclusion": false
+    "ambientOcclusion": false,
+    "shadowCasterReach": 4000.0,
+    "contactShadows": false
   },
   "post": {
     "bloomIntensity": 0.04,
@@ -106,8 +108,8 @@
       "edgeFade": 0.4,
       "specular": 1.0,
       "ssr": 1.0,
-      "ssrDistance": 1200.0,
-      "ssrSteps": 96.0,
+      "ssrDistance": 450.0,
+      "ssrSteps": 160.0,
       "ssrGain": 1.0,
       "skyMirror": 0.6
     },
