@@ -1,6 +1,6 @@
 # ADR-1855: The Strange Attractor builds its view rays from the camera basis, not from invViewProj
 
-- Status: Accepted, scene/strange-attractor (Gate 2d, 2026-10-27).
+- Status: **Superseded by ADR-1861** (2026-10-28: the ray-march renderer is removed; the canyon is engine geometry, ADR-1857). Was: Accepted, scene/strange-attractor (Gate 2d, 2026-10-27).
 - Scope: scene-local (`src/rendering/attractor_renderer.cpp`, `shaders/attractor/world.wgsl`). No engine code changed.
 
 ## Problem: the jitter in the rendered video

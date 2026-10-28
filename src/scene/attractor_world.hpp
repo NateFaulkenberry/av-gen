@@ -1,14 +1,15 @@
 #pragma once
 
-// THE STRANGE ATTRACTOR (ADR-1850): the fourth Environment (ADR-1200's seam). A scene-level block, `"attractorWorld"`,
-// that holds a procedural surrealist landscape: a baked height field of a few art-directed geological masses, folded
-// strata, a valley, and the composed camera that frames them. `rendering::AttractorRenderer` ray-marches it.
+// THE STRANGE ATTRACTOR (ADR-1850): a scene-level block, `"attractorWorld"`, that holds a procedural canyon: a baked
+// height field of a few art-directed geological masses, folded strata, a valley, the composed camera that frames them
+// and a flythrough. The Composition draws it as engine geometry (ADR-1857); the ray-march that drew it first was
+// removed in canyon Phase 2 (ADR-1861).
 //
 // Two halves, kept apart on purpose (brief §3.1):
 //   * GENERATION is a pure function of `AttractorGen` (the seed and the structural knobs). `generateAttractorWorld`
 //     builds the height field, the material masks, the layout and the camera on the CPU, deterministically. The
 //     Composition regenerates only when the structural hash changes -- never because of audio.
-//   * LOOK is continuous: palette, light, atmosphere, exposure. Those are parameters the renderer reads every frame.
+//   * LOOK is continuous: the sun. Those are parameters the Composition applies every frame.
 //
 // docs/prototypes/strange-attractor/ holds the research, the plan and the progress log.
 
@@ -41,10 +42,9 @@ struct AttractorGen {
     float strataFold = 0.7f;     // an impossible anticline wave through the strata and their terraces (0..1)
     float branchingDensity = 0.6f; // side canyons off the gorge (0 none .. 1 many)
     float flightSeconds = 46.0f;   // the flythrough's length (20..120 s)
-    // ADR-1857: the engine-native triangle mesh. `mesh` builds it with the world; `meshSpacing` is the sampling grid
+    // ADR-1857: the engine-native triangle mesh, built with the world. `meshSpacing` is the sampling grid
     // (metres) the error-bounded triangulation starts from; `meshError` the tolerated vertical error per metre of
     // distance from the flight path (about a pixel at 1080p); `meshMinError` its floor near the path.
-    bool mesh = true;
     float meshSpacing = 2.0f;
     float meshError = 0.004f;    // ~6 px at 1080p from the path; measured indistinguishable from 0.002 (Phase 1)
     float meshMinError = 0.3f;
@@ -55,15 +55,9 @@ struct AttractorGen {
 
 // The continuous look. Every member is an `attractorWorld/<leaf>` parameter.
 struct AttractorLook {
-    float palette = 0.0f;         // 0 Dusk Mineral, 1 Nocturne, 2 Chromatic (fractions blend)
     float sunAzimuth = 70.0f;     // degrees from the composed view, toward the side that lights the escarpment
     float sunElevation = 9.0f;    // degrees above the horizon
     float sunIntensity = 1.0f;
-    float ambient = 1.0f;
-    float atmosphere = 1.0f;      // aerial-perspective density multiplier
-    float strata = 1.0f;          // visibility of the strata bands
-    float exposure = 1.0f;
-    float detail = 1.0f;          // near-field displacement detail
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines
@@ -123,14 +117,12 @@ struct AttractorWorld {
     glm::vec2 origin{0.0f};            // world xz of texel (0, 0)'s corner
     std::vector<float> height;         // res*res metres, row-major (z rows, x columns)
     std::vector<float> strataOffset;   // res*res: the strata coordinate minus the height (tilt, warp, fold)
-    std::vector<float> slopeMax;       // res*res: the steepest slope within 5 texels (the march's step bound)
     std::vector<std::uint32_t> masks;  // res*res RGBA8: r rock, g playa (valley floor), b cavity, a ridge
-    std::vector<std::uint32_t> flow;   // res*res RGBA8: rg the river's downstream direction, b distance from the channel (m), a in a channel
     float minHeight = 0.0f;
     float maxHeight = 0.0f;
     std::vector<AttractorMass> masses;
     std::vector<NetworkBranch> branches;      // the side canyons
-    std::shared_ptr<const AttractorTerrainMesh> terrainMesh; // ADR-1857: null when `gen.mesh` is off
+    std::shared_ptr<const AttractorTerrainMesh> terrainMesh; // ADR-1857
     std::vector<float> networkArc;            // res*res: network distance (m) along the gorges, or -1 off them
     std::vector<glm::vec2> valley;     // the valley's trunk, near to far (world xz)
     std::vector<glm::vec2> gorgeLine;  // the inner gorge's centreline, near to far (world xz)

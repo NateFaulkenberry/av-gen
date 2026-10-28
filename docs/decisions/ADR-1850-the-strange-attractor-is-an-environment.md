@@ -1,6 +1,6 @@
 # ADR-1850: The Strange Attractor is an Environment
 
-- Status: Accepted, scene/strange-attractor (Gate 1, 2026-10-27).
+- Status: **Superseded by ADR-1861** (2026-10-28: the ray-march renderer is removed; the canyon is engine geometry, ADR-1857). Was: Accepted, scene/strange-attractor (Gate 1, 2026-10-27).
 - Code:
   - `src/scene/attractor_world.{hpp,cpp}`: the `attractorWorld` block, its generator and its parameters.
   - `src/rendering/attractor_renderer.{hpp,cpp}`, `shaders/attractor/world.wgsl`: the pass.

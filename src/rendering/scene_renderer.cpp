@@ -208,7 +208,6 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       ecosystem_(std::make_unique<EcosystemRenderer>()),
       astral_(std::make_unique<AstralRenderer>()),
       clouds_(std::make_unique<CloudRenderer>()),
-      attractor_(std::make_unique<AttractorRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
       shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
@@ -582,12 +581,8 @@ Result<void> SceneRenderer::init() {
     if (auto r = clouds_->init(context_, shaders_, kHdrFormat); !r) {
         return std::unexpected(r.error());
     }
-    // ADR-1850: the Strange Attractor writes every pixel (its own sky), so it runs first.
-    if (auto r = attractor_->init(context_, shaders_, kHdrFormat, kDepthFormat); !r) {
-        return std::unexpected(r.error());
-    }
     // ADR-1289: the clouds first -- they are sky, behind the ecosystem's glints and the astral's particles
-    environments_ = {attractor_.get(), clouds_.get(), ecosystem_.get(), astral_.get()}; // ADR-1200: the seam, in run order
+    environments_ = {clouds_.get(), ecosystem_.get(), astral_.get()}; // ADR-1200: the seam, in run order
     // Wave 3: SHELL draws inside the scene pass too, with the frame group, a group of its own and the
     // IBL group (a shield's sheen).
     if (auto r = shells_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_, iblLayout_); !r) {

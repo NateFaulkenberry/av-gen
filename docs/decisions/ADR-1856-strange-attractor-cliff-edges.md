@@ -1,6 +1,6 @@
 # ADR-1856: Strange Attractor cliff edges: resolved terraces, a Lipschitz march, clean terminators
 
-- Status: Accepted, scene/strange-attractor (Gate 2e, 2026-10-27).
+- Status: **Superseded by ADR-1861** (2026-10-28: the ray-march renderer is removed; the canyon is engine geometry, ADR-1857). Was: Accepted, scene/strange-attractor (Gate 2e, 2026-10-27).
 - Scope: scene-local. `src/scene/attractor_world.cpp` (pass 1b' terraces; baked `slopeMax`), the renderer (an
   RGBA32F height texture), `shaders/attractor/world.wgsl`. No engine code changed.
 - Evidence: `docs/prototypes/strange-attractor/gate2e-artifact-catalogue.md`.

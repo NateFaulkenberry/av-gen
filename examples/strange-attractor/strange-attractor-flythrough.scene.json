@@ -2,7 +2,7 @@
   "format": "avgen-scene",
   "version": 1,
   "name": "the-strange-attractor",
-  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853, ADR-1857..1859): a procedural canyon. With \"mesh\" on (the default) the attractorWorld block bakes engine geometry drawn by the scene pass with the canyonRock program (strata, ledge detail normals, baked occlusion from uv.y); \"mesh\": false keeps the ray-march Environment. Phase 1b look: deeper sky with streak clouds (the clouds block, ADR-1289 lobes), two warm unshadowed bounce lights standing in for the canyon's inter-reflection, contact shadows off (they drew a dotted checker on lit walls), shadowCasterReach 4000 m (ADR-1858). docs/prototypes/strange-attractor/.",
+  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853, ADR-1857..1859): a procedural canyon. The attractorWorld block bakes engine geometry drawn by the scene pass with the canyonRock program (strata, ledge detail normals, baked occlusion from uv.y); Phase 1b look: deeper sky with streak clouds (the clouds block, ADR-1289 lobes), two warm unshadowed bounce lights standing in for the canyon's inter-reflection, contact shadows off (they drew a dotted checker on lit walls), shadowCasterReach 4000 m (ADR-1858). docs/prototypes/strange-attractor/.",
   "camera": {
     "mode": 1,
     "position": [
@@ -113,7 +113,6 @@
     "seed": 1,
     "resolution": 4096,
     "look": {
-      "palette": 0.0,
       "sunAzimuth": 70.0,
       "sunElevation": 14.0
     },

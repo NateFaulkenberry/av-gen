@@ -119,21 +119,22 @@ TEST_CASE("the generated world is finite, bounded and framed", "[attractor-world
 
 TEST_CASE("the block parses, round-trips and refuses what it does not know", "[attractor-world][adr1850]") {
     auto a = scene::attractorWorldFromJson(nlohmann::json::parse(
-        R"({"seed": 9, "resolution": 512, "strataFold": 0.3, "camera": "flight", "look": {"palette": 1.5, "exposure": 0.8}})"));
+        R"({"seed": 9, "resolution": 512, "strataFold": 0.3, "camera": "flight", "look": {"sunElevation": 15.5, "sunIntensity": 0.8}})"));
     REQUIRE(a.has_value());
     CHECK(a->enabled);
     CHECK(a->camera == scene::AttractorCameraMode::Flight);
     CHECK(a->gen.seed == 9u);
     CHECK(a->gen.resolution == 512);
     CHECK(a->gen.strataFold == Approx(0.3f));
-    CHECK(a->look.palette == Approx(1.5f));
+    CHECK(a->look.sunElevation == Approx(15.5f));
     auto back = scene::attractorWorldFromJson(scene::attractorWorldToJson(*a));
     REQUIRE(back.has_value());
     CHECK(back->gen.hash() == a->gen.hash());
-    CHECK(back->look.exposure == Approx(0.8f));
+    CHECK(back->look.sunIntensity == Approx(0.8f));
 
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"sead": 1})")).has_value());
-    CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"look": {"pallete": 1}})")).has_value());
+    CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"look": {"palette": 1}})")).has_value());
+    CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"mesh": false})")).has_value()); // ADR-1861
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"resolution": 100000})")).has_value());
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"erosion": 3})")).has_value());
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"terrainScale": "big"})")).has_value());
@@ -143,8 +144,8 @@ TEST_CASE("the block parses, round-trips and refuses what it does not know", "[a
 TEST_CASE("a seed change regenerates the world in place; a look change never does", "[attractor-world][adr1850]") {
     Comp c(sceneWith({{"seed", 4}, {"resolution", 384}}));
     for (const char* leaf : {"seed", "terrainScale", "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion",
-                             "strataFold", "palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
-                             "atmosphere", "strata", "exposure", "detail", "camera", "branchingDensity", "flightSeconds"}) {
+                             "strataFold", "sunAzimuth", "sunElevation", "sunIntensity", "camera", "branchingDensity",
+                             "flightSeconds"}) {
         INFO(leaf);
         CHECK(c.params.find(std::string("attractorWorld/") + leaf) != nullptr);
     }
@@ -157,11 +158,10 @@ TEST_CASE("a seed change regenerates the world in place; a look change never doe
 
     // a look change: same world object, no generation
     const std::uint64_t gens = scene::attractorWorldGenerations();
-    c.params.findAs<float>("attractorWorld/palette")->setBase(2.0f);
     c.params.findAs<float>("attractorWorld/sunElevation")->setBase(20.0f);
     c.frame(1.0 / 30.0);
     CHECK(c.comp->scene().attractorWorld.world == first);
-    CHECK(c.comp->scene().attractorWorld.live.palette == Approx(2.0f));
+    CHECK(c.comp->scene().attractorWorld.live.sunElevation == Approx(20.0f));
     CHECK(scene::attractorWorldGenerations() == gens);
 
     // a seed change: a new world, once, and the camera follows it
@@ -338,10 +338,6 @@ TEST_CASE("the terrain mesh is valid, wound up, finite, bounded, deterministic a
     // the river sits at the water line, over ground that dips below it
     CHECK_FALSE(tm.riverIndices.empty());
     for (const glm::vec3& p : tm.riverPositions) CHECK(p.y == Approx(-0.8f));
-    // off: no mesh
-    scene::AttractorGen g = smallGen(3);
-    g.mesh = false;
-    CHECK(scene::generateAttractorWorld(g)->terrainMesh == nullptr);
 }
 
 TEST_CASE("the composition draws the terrain mesh as scene entities with the block's program, the river as water",

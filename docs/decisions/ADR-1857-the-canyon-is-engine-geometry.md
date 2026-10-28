@@ -1,8 +1,7 @@
 # ADR-1857: The Strange Attractor's canyon is engine geometry
 
-- Status: Proposed, scene/strange-attractor (canyon Phase 1, 2026-10-27). Awaits the owner's acceptance of the
-  conversion. On acceptance, the ray-march path (ADR-1850's pass, `shaders/attractor/world.wgsl`, `"mesh": false`) is
-  removed.
+- Status: Accepted, scene/strange-attractor (canyon Phase 1, 2026-10-27; accepted with Phases 1b/1c, 2026-10-28). The
+  ray-march path it kept behind `"mesh": false` is removed (ADR-1861).
 - Code:
   - `src/scene/attractor_world.{hpp,cpp}`: `SurfaceSampler`, `buildTerrainMesh`, `AttractorTerrainMesh`, the `mesh*`
     knobs and the block's `terrainProgram`, `water`, `sunLux` and `sunShadowBias`.

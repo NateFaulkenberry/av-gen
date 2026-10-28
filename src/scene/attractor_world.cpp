@@ -635,7 +635,6 @@ std::uint64_t AttractorGen::hash() const {
                     branchingDensity, flightSeconds, meshSpacing, meshError, meshMinError}) {
         h = mixHashF(h, v);
     }
-    h = mixHash(h, mesh ? 1u : 0u);
     return h;
 }
 
@@ -767,7 +766,6 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     const float half = 0.5f * g.extent;
     // Pass 1a: the erosion front F and the valley distances, per texel.
     std::vector<float> fieldF(static_cast<std::size_t>(N) * N), trunkD(fieldF.size()), meanderD(fieldF.size());
-    std::vector<std::uint16_t> meanderSeg(fieldF.size(), 0); // the trunk segment nearest in the meander's warped space
     parallelRows(N, [&](int y) {
         for (int x = 0; x < N; ++x) {
             const std::size_t idx = static_cast<std::size_t>(y) * N + x;
@@ -802,16 +800,11 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             trunkD[idx] = best;
             const glm::vec2 mp = p + 260.0f * S * glm::vec2(fbm(p / 900.0f, 3, nseed + 41u), fbm(p / 900.0f, 3, nseed + 42u));
             float bestM = 1e9f;
-            std::size_t bestSeg = 0;
             for (std::size_t i = 0; i + 1 < w.valley.size(); ++i) {
                 const float d = segDist(mp, w.valley[i], w.valley[i + 1], along);
-                if (d < bestM) {
-                    bestM = d;
-                    bestSeg = i;
-                }
+                bestM = std::min(bestM, d);
             }
             meanderD[idx] = bestM;
-            meanderSeg[idx] = static_cast<std::uint16_t>(bestSeg);
         }
     });
 
@@ -1160,64 +1153,6 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
         });
     }
     w.strataOffset = std::move(strataOffset);
-    // ADR-1856: the march's step bound. The largest slope within 5 texels of each texel (a separable max dilation),
-    // so a ray beside a cliff or spike steps by its clearance over (1 + the steepest nearby slope), not straight
-    // into the rock.
-    {
-        std::vector<float> slope(w.height.size()), tmp2(w.height.size());
-        const auto Hh = [&](int x, int y) {
-            return w.height[static_cast<std::size_t>(std::clamp(y, 0, N - 1)) * N + std::clamp(x, 0, N - 1)];
-        };
-        parallelRows(N, [&](int y) {
-            for (int x = 0; x < N; ++x) {
-                const float gx = (Hh(x + 1, y) - Hh(x - 1, y)) / (2.0f * texel);
-                const float gz = (Hh(x, y + 1) - Hh(x, y - 1)) / (2.0f * texel);
-                slope[static_cast<std::size_t>(y) * N + x] = std::sqrt(gx * gx + gz * gz);
-            }
-        });
-        const int RS = 5;
-        parallelRows(N, [&](int y) {
-            for (int x = 0; x < N; ++x) {
-                float m = 0.0f;
-                for (int k = -RS; k <= RS; ++k) m = std::max(m, slope[static_cast<std::size_t>(y) * N + std::clamp(x + k, 0, N - 1)]);
-                tmp2[static_cast<std::size_t>(y) * N + x] = m;
-            }
-        });
-        w.slopeMax.assign(w.height.size(), 0.0f);
-        parallelRows(N, [&](int y) {
-            for (int x = 0; x < N; ++x) {
-                float m = 0.0f;
-                for (int k = -RS; k <= RS; ++k) m = std::max(m, tmp2[static_cast<std::size_t>(std::clamp(y + k, 0, N - 1)) * N + x]);
-                w.slopeMax[static_cast<std::size_t>(y) * N + x] = m;
-            }
-        });
-    }
-    // ---- the river's flow (ADR-1854): along the gorge, downstream (the trunk's direction, near to far) ----
-    // The direction runs along the meander distance's contours (perpendicular to its gradient), its sign taken from the
-    // nearest trunk segment. Packed RGBA8: rg the direction, b the distance from the channel's centre (0..255 m), a 1
-    // where there is a channel to flow in.
-    w.flow.assign(w.height.size(), 0u);
-    parallelRows(N, [&](int y) {
-        for (int x = 0; x < N; ++x) {
-            const std::size_t idx = static_cast<std::size_t>(y) * N + x;
-            const float d = meanderD[idx];
-            if (d > 260.0f * S) continue;
-            const auto at = [&](int xx, int yy) {
-                return meanderD[static_cast<std::size_t>(std::clamp(yy, 0, N - 1)) * N + std::clamp(xx, 0, N - 1)];
-            };
-            const int k = std::max(1, static_cast<int>(std::lround(12.0f / texel)));
-            const glm::vec2 g(at(x + k, y) - at(x - k, y), at(x, y + k) - at(x, y - k));
-            glm::vec2 dir(-g.y, g.x);
-            const float len = glm::length(dir);
-            if (len < 1e-6f) continue;
-            dir /= len;
-            const std::size_t sg = meanderSeg[idx];
-            const glm::vec2 trunk = w.valley[std::min(sg + 1, w.valley.size() - 1)] - w.valley[sg];
-            if (glm::dot(dir, trunk) < 0.0f) dir = -dir;
-            const auto q = [](float v) { return static_cast<std::uint32_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
-            w.flow[idx] = q(0.5f + 0.5f * dir.x) | (q(0.5f + 0.5f * dir.y) << 8) | (q(d / 255.0f) << 16) | (255u << 24);
-        }
-    });
     w.masks.assign(w.height.size(), 0u);
     float lo = 1e30f, hi = -1e30f;
     for (std::size_t i = 0; i < w.height.size(); ++i) {
@@ -1303,9 +1238,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     // ---- the flythrough (ADR-1853) ----
     buildFlight(w, g, Lb, L1);
 
-    if (g.mesh) {
-        w.terrainMesh = buildTerrainMesh(w);
-    }
+    w.terrainMesh = buildTerrainMesh(w);
 
     w.generateSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     ++gGenerations;
@@ -1357,10 +1290,9 @@ namespace {
 
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
-                                      "branchingDensity", "flightSeconds", "mesh", "meshSpacing", "meshError",
+                                      "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
                                       "meshMinError", "water", "terrainProgram", "sunLux", "sunShadowBias", "look"};
-constexpr std::string_view kLookKeys[] = {"palette", "sunAzimuth", "sunElevation", "sunIntensity", "ambient",
-                                          "atmosphere", "strata", "exposure", "detail"};
+constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity"};
 
 } // namespace
 
@@ -1393,7 +1325,6 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.strataFold = j.value("strataFold", g.strataFold);
     g.branchingDensity = j.value("branchingDensity", g.branchingDensity);
     g.flightSeconds = j.value("flightSeconds", g.flightSeconds);
-    g.mesh = j.value("mesh", g.mesh);
     g.meshSpacing = j.value("meshSpacing", g.meshSpacing);
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
@@ -1431,15 +1362,9 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
             }
         }
         AttractorLook& k = a.look;
-        k.palette = l.value("palette", k.palette);
         k.sunAzimuth = l.value("sunAzimuth", k.sunAzimuth);
         k.sunElevation = l.value("sunElevation", k.sunElevation);
         k.sunIntensity = l.value("sunIntensity", k.sunIntensity);
-        k.ambient = l.value("ambient", k.ambient);
-        k.atmosphere = l.value("atmosphere", k.atmosphere);
-        k.strata = l.value("strata", k.strata);
-        k.exposure = l.value("exposure", k.exposure);
-        k.detail = l.value("detail", k.detail);
     }
     a.liveGen = a.gen;
     a.live = a.look;
@@ -1468,7 +1393,6 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"strataFold", g.strataFold},
                 {"branchingDensity", g.branchingDensity},
                 {"flightSeconds", g.flightSeconds},
-                {"mesh", g.mesh},
                 {"meshSpacing", g.meshSpacing},
                 {"meshError", g.meshError},
                 {"meshMinError", g.meshMinError},
@@ -1476,9 +1400,7 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"sunLux", a.sunLux},
                 {"sunShadowBias", a.sunShadowBias},
                 {"look",
-                 {{"palette", k.palette}, {"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation},
-                  {"sunIntensity", k.sunIntensity}, {"ambient", k.ambient}, {"atmosphere", k.atmosphere},
-                  {"strata", k.strata}, {"exposure", k.exposure}, {"detail", k.detail}}}};
+                 {{"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation}, {"sunIntensity", k.sunIntensity}}}};
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------
@@ -1555,16 +1477,9 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("branchingDensity", "branching density (side canyons)", "Geometry", g.branchingDensity, 0.0f, 1.0f);
     r.f("flightSeconds", "flythrough length (s)", "Animation and Camera", g.flightSeconds, 20.0f, 120.0f);
     // Materials and atmosphere (continuous).
-    r.f("palette", "palette (0 Dusk Mineral, 1 Nocturne, 2 Chromatic)", "Materials and Atmosphere", k.palette, 0.0f,
-        2.0f);
     r.f("sunAzimuth", "sun azimuth (deg from the view)", "Materials and Atmosphere", k.sunAzimuth, -180.0f, 180.0f);
     r.f("sunElevation", "sun elevation (deg)", "Materials and Atmosphere", k.sunElevation, -4.0f, 60.0f);
     r.f("sunIntensity", "key light", "Materials and Atmosphere", k.sunIntensity, 0.0f, 3.0f);
-    r.f("ambient", "ambient", "Materials and Atmosphere", k.ambient, 0.0f, 3.0f);
-    r.f("atmosphere", "atmospheric depth", "Materials and Atmosphere", k.atmosphere, 0.0f, 4.0f);
-    r.f("strata", "strata bands", "Materials and Atmosphere", k.strata, 0.0f, 2.0f);
-    r.f("exposure", "exposure", "Materials and Atmosphere", k.exposure, 0.1f, 4.0f);
-    r.f("detail", "near detail", "Quality and Rendering", k.detail, 0.0f, 2.0f);
     r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
         static_cast<int>(rest.camera), 0, 2);
     return p;
@@ -1585,15 +1500,9 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     g.flightSeconds = fval(p, "flightSeconds", g.flightSeconds);
     live.liveGen = g;
     AttractorLook k = rest.look;
-    k.palette = fval(p, "palette", k.palette);
     k.sunAzimuth = fval(p, "sunAzimuth", k.sunAzimuth);
     k.sunElevation = fval(p, "sunElevation", k.sunElevation);
     k.sunIntensity = fval(p, "sunIntensity", k.sunIntensity);
-    k.ambient = fval(p, "ambient", k.ambient);
-    k.atmosphere = fval(p, "atmosphere", k.atmosphere);
-    k.strata = fval(p, "strata", k.strata);
-    k.exposure = fval(p, "exposure", k.exposure);
-    k.detail = fval(p, "detail", k.detail);
     live.live = k;
     live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }
