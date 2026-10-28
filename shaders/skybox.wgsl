@@ -96,12 +96,10 @@ fn effectStars(dir: vec3<f32>, sky: vec3<f32>) -> vec3<f32> {
 
 @fragment
 fn fs_sky(in: SkyOut) -> SceneOut {
-    let near = frame.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
-    let far = frame.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
-    // The two unprojected points differ by the camera position, so their difference -- and every
-    // sample taken along it below -- depends on the camera's orientation alone. That is what puts
-    // the sky at infinity: crossing the 640 m valley does not move it.
-    let dir = normalize(far.xyz / far.w - near.xyz / near.w);
+    // The view ray from the camera's basis (ADR-1807), so it -- and every sample taken along it
+    // below -- depends on the camera's orientation alone. That is what puts the sky at infinity:
+    // crossing the 640 m valley does not move it, and neither does a 1e6 m far plane 20 km out.
+    let dir = cameraViewRay(in.ndc);
     // The HDRI's mip for this ray, from the screen derivatives, taken here in uniform control flow
     // and handed to the shared background (ADR-918). The same numbers the branch that reads the
     // HDRI used to compute inside itself; the other two branches ignore them.

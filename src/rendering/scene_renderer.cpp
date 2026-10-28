@@ -3210,8 +3210,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.prevViewProj = havePrevViewProj_ ? prevViewProj_ : frame.viewProj;
     {
         const glm::mat4 invView = glm::inverse(view);
-        frame.cameraRight = glm::vec4(glm::normalize(glm::vec3(invView[0])), 0.0f);
-        frame.cameraUp = glm::vec4(glm::normalize(glm::vec3(invView[1])), 0.0f);
+        // ADR-1807: w = the tangent of the half field of view on each axis, so the sky, cloud and
+        // atmosphere shaders can build the view ray from this basis (`cameraViewRay`) instead of
+        // unprojecting through `invViewProj`, which f32 rounds badly at large far planes. The
+        // projection is a symmetric perspective, so 1 / proj[0][0] and 1 / proj[1][1] are exact.
+        frame.cameraRight = glm::vec4(glm::normalize(glm::vec3(invView[0])), 1.0f / proj[0][0]);
+        frame.cameraUp = glm::vec4(glm::normalize(glm::vec3(invView[1])), 1.0f / proj[1][1]);
         // The camera looks down -Z in view space; the froxel grid and the contact-shadow march
         // measure depth along this axis.
         frame.cameraForward = glm::vec4(-glm::normalize(glm::vec3(invView[2])), 0.0f);

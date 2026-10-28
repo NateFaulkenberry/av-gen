@@ -113,10 +113,8 @@ fn cPhase(cosT: f32, g: f32) -> f32 {
 fn fs_clouds(in: VsOut) -> @location(0) vec4<f32> {
     let uv = in.clip.xy * frame.targetSize.zw;
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
-    let farP = frame.invViewProj * vec4<f32>(ndc, 1.0, 1.0);
-    let nearP = frame.invViewProj * vec4<f32>(ndc, 0.0, 1.0);
     let ro = frame.cameraPos.xyz;
-    let rd = normalize(farP.xyz / farP.w - nearP.xyz / nearP.w);
+    let rd = cameraViewRay(ndc); // ADR-1807: from the camera basis, exact at any far plane
 
     // the scene's distance along this ray (linear depth is along the camera axis)
     let size = vec2<f32>(textureDimensions(cloudDepth, 0));

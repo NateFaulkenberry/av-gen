@@ -40,13 +40,11 @@ fn vs_atmosphere(@builtin(vertex_index) index: u32) -> AtmosphereOut {
 
 @fragment
 fn fs_atmosphere(in: AtmosphereOut) -> SceneOut {
-    // The same unprojection the skybox uses. The two unprojected points differ by the camera
-    // position, so their difference depends on the camera's orientation alone -- but unlike the sky,
-    // what we do with it depends on the camera's *position* too, because a comet is a finite
-    // distance away and is supposed to move against the stars when the camera crosses the valley.
-    let near = frame.invViewProj * vec4<f32>(in.ndc, 0.0, 1.0);
-    let far = frame.invViewProj * vec4<f32>(in.ndc, 1.0, 1.0);
-    let dir = normalize(far.xyz / far.w - near.xyz / near.w);
+    // The same view ray the skybox uses (ADR-1807: from the camera basis). It depends on the
+    // camera's orientation alone -- but unlike the sky, what we do with it depends on the camera's
+    // *position* too, because a comet is a finite distance away and is supposed to move against the
+    // stars when the camera crosses the valley.
+    let dir = cameraViewRay(in.ndc);
 
     // The angular size of one pixel, from the screen-space derivative of the view ray. Taken here,
     // at the top of a fragment shader and in uniform control flow: derivatives are illegal in a

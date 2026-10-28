@@ -75,8 +75,8 @@ struct FrameUniforms {
     invViewProj: mat4x4<f32>,
     prevViewProj: mat4x4<f32>, // ADR-035: last frame's, for velocity and temporal reprojection
     cameraPos: vec4<f32>,      // xyz = world position
-    cameraRight: vec4<f32>,    // xyz = camera right axis in world space (billboards)
-    cameraUp: vec4<f32>,       // xyz = camera up axis in world space
+    cameraRight: vec4<f32>,    // xyz = camera right axis in world space (billboards); ADR-1807: w = tan(half horizontal FOV)
+    cameraUp: vec4<f32>,       // xyz = camera up axis in world space; ADR-1807: w = tan(half vertical FOV)
     cameraForward: vec4<f32>,  // xyz = camera view axis in world space (froxel depth)
     params: vec4<f32>,         // x = time, y = gridIntensity, z = brightness, w = environmentIntensity
     envParams: vec4<f32>,      // x = env rotation (radians), y = prefiltered mip count - 1, z = light count, w = ibl enabled
@@ -735,6 +735,22 @@ fn meshVertexOut(in: VertexIn, world: vec4<f32>, prevWorld: vec4<f32>) -> Vertex
 @vertex
 fn vs_main(in: VertexIn) -> VertexOut {
     return meshVertexOut(in, meshWorld(in), meshPrevWorld(in));
+}
+
+// ADR-1807: the world-space view ray through `ndc`, built from the camera's own basis and the
+// tangents of its half field of view. Exact to f32 rounding of a unit vector, at any far plane and
+// any distance from the origin.
+//
+// It replaces `normalize(invViewProj * (ndc, 1, 1) / w - invViewProj * (ndc, 0, 1) / w)`, which is
+// the same ray in exact arithmetic but not in f32: the inverse of a projection with a 1e5 m far
+// plane, translated 5 km from the origin, rounds to a ray that is wrong by 2-9 px at 1080p and
+// moves as the camera does. The sky, the clouds and the atmosphere take their ray from here.
+//
+// Requires a symmetric perspective (`glm::perspectiveRH_ZO`, the only projection a scene camera
+// has): cameraRight.w = 1 / proj[0][0], cameraUp.w = 1 / proj[1][1] (SceneRenderer::render).
+fn cameraViewRay(ndc: vec2<f32>) -> vec3<f32> {
+    return normalize(frame.cameraForward.xyz + (ndc.x * frame.cameraRight.w) * frame.cameraRight.xyz
+                     + (ndc.y * frame.cameraUp.w) * frame.cameraUp.xyz);
 }
 
 // Rotates a world direction into the environment map's frame (rotation about +Y).

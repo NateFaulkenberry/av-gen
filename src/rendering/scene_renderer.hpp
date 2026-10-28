@@ -265,8 +265,8 @@ struct FrameUniforms {
     glm::mat4 invViewProj;
     glm::mat4 prevViewProj;   // ADR-035: last frame's, for velocity and temporal reprojection
     glm::vec4 cameraPos;
-    glm::vec4 cameraRight;    // xyz = camera right axis (world), for billboards
-    glm::vec4 cameraUp;       // xyz = camera up axis (world)
+    glm::vec4 cameraRight;    // xyz = camera right axis (world), for billboards; ADR-1807: w = tan(half horizontal FOV)
+    glm::vec4 cameraUp;       // xyz = camera up axis (world); ADR-1807: w = tan(half vertical FOV)
     glm::vec4 cameraForward;  // xyz = camera view axis (world), w = 0; view depth for the froxel grid
     glm::vec4 params;
     glm::vec4 envParams;
