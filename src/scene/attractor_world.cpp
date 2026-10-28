@@ -440,7 +440,11 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
             const glm::vec2 p = w.origin + glm::vec2(x, y) * spacing;
             const glm::vec4 fd = sampler.smooth(p);
             H[static_cast<std::size_t>(y) * gn + x] = fd.x;
-            T[static_cast<std::size_t>(y) * gn + x] = bandWarp(fd.x + fd.y, sampler.band).x / sampler.band; // in bands
+            // ADR-1860: the strata coordinate before the band warp, in bands. It is linear in the height up a wall (the
+            // offset varies slowly across it), so the rasteriser's linear interpolation is exact where the warped
+            // coordinate's was not: the warp bends the bands within a tall triangle, and on a near-vertical face the
+            // band lines came out as a sawtooth that read as vertical streaks. The material program applies the warp.
+            T[static_cast<std::size_t>(y) * gn + x] = (fd.x + fd.y) / sampler.band;
         }
     });
     // the tolerance: from a coarse distance-to-the-flight field
@@ -542,8 +546,8 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
                     const auto ni = static_cast<std::uint32_t>(ch.positions.size());
                     ch.positions.emplace_back(xz.x, h, xz.y);
                     ch.normals.push_back(nrm);
-                    // uv.x: the band coordinate (the strata coordinate under the band warp, in bands), so the material
-                    // program's bands are the very bands the ledges are cut along.
+                    // uv.x: the strata coordinate in bands, before the band warp (ADR-1860); the material program
+                    // applies `bandWarp` per pixel, so its bands are the very bands the ledges are cut along.
                     // uv.y (ADR-1859): the playa floor as a whole level 0..kAttractorPlayaLevels, plus the baked occlusion scaled
                     // into [0, kAttractorOcclusionScale]. Small on purpose: the shader's tangent frame comes from the uv
                     // gradient, and uv.y must not out-vote the band coordinate's.

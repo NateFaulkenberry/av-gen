@@ -89,7 +89,7 @@ enum class AttractorCameraMode : int { Scene = 0, Composed = 1, Flight = 2 };
 struct AttractorTerrainChunk {
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
-    // x the band coordinate (bands; the strata); y (ADR-1859) the playa floor as a whole level 0..kAttractorPlayaLevels
+    // x the strata coordinate in bands before the band warp (ADR-1860: a program applies `bandWarp`); y (ADR-1859) the playa floor as a whole level 0..kAttractorPlayaLevels
     // plus kAttractorOcclusionScale x the baked ambient visibility (0..1)
     std::vector<glm::vec2> uvs;
     std::vector<std::uint32_t> indices;

@@ -404,3 +404,55 @@ TEST_CASE("the terrain mesh packs a whole playa level and the baked occlusion in
     INFO("mean visibility: flat " << sumUp / nUp << ", steep " << sumSteep / nSteep);
     CHECK(sumSteep / nSteep > 0.6); // not the half a sideways-facing horizon search would give
 }
+
+// ---- uv.x is the unwarped strata coordinate (ADR-1860) -----------------------------------------------------------
+
+TEST_CASE("the terrain mesh's uv.x interpolates the strata coordinate better unwarped than warped",
+          "[attractor-world][adr1860]") {
+    const auto w = scene::generateAttractorWorld(smallGen(3));
+    REQUIRE(w->terrainMesh != nullptr);
+    const float band = w->strataSeed[0].z;
+    REQUIRE(band > 0.0f);
+    // attractor_world.cpp's bandWarp, line for line: what uv.x used to carry (and what the program now applies)
+    const auto warp = [band](float s) {
+        const float a = s / (band * 2.3f) + 0.7f, b = s / (band * 0.93f) + 1.7f;
+        return s + band * (0.32f * std::sin(a) + 0.18f * std::sin(b));
+    };
+    const float texel = w->extent / static_cast<float>(w->res);
+    const auto offsetAt = [&](glm::vec2 xz) { // bilinear over the baked strata offset (texel centres)
+        const glm::vec2 u = (xz - w->origin) / texel - 0.5f;
+        const glm::ivec2 i0 = glm::clamp(glm::ivec2(glm::floor(u)), glm::ivec2(0), glm::ivec2(w->res - 2));
+        const glm::vec2 f = glm::clamp(u - glm::vec2(i0), 0.0f, 1.0f);
+        const auto at = [&](int x, int y) { return w->strataOffset[static_cast<std::size_t>(y) * w->res + x]; };
+        return glm::mix(glm::mix(at(i0.x, i0.y), at(i0.x + 1, i0.y), f.x), glm::mix(at(i0.x, i0.y + 1), at(i0.x + 1, i0.y + 1), f.x), f.y);
+    };
+    // At each tall triangle's centroid (several bands of drop, where the streaks were), compare what the rasteriser
+    // interpolates with the true coordinate there, both before and after the warp the program applies.
+    double errUnwarped = 0.0, errWarped = 0.0;
+    std::size_t tall = 0;
+    for (const auto& ch : w->terrainMesh->chunks) {
+        for (std::size_t i = 0; i + 2 < ch.indices.size(); i += 3) {
+            const std::uint32_t v[3] = {ch.indices[i], ch.indices[i + 1], ch.indices[i + 2]};
+            float lo = 1e30f, hi = -1e30f, s = 0.0f, ws = 0.0f;
+            glm::vec3 c(0.0f);
+            for (const std::uint32_t k : v) {
+                lo = std::min(lo, ch.positions[k].y);
+                hi = std::max(hi, ch.positions[k].y);
+                c += ch.positions[k] / 3.0f;
+                s += ch.uvs[k].x * band / 3.0f;
+                ws += warp(ch.uvs[k].x * band) / 3.0f;
+            }
+            if (hi - lo < 4.0f * band) continue;
+            ++tall;
+            const float truth = c.y + offsetAt(glm::vec2(c.x, c.z));
+            // the program warps the interpolated value; the old mesh interpolated the warped values
+            errUnwarped += std::abs(warp(s) - warp(truth)) / band;
+            errWarped += std::abs(ws - warp(truth)) / band;
+        }
+    }
+    REQUIRE(tall > 0u);
+    errUnwarped /= static_cast<double>(tall);
+    errWarped /= static_cast<double>(tall);
+    INFO("tall triangles " << tall << ", mean band error at the centroid: unwarped " << errUnwarped << ", warped " << errWarped);
+    CHECK(errUnwarped < errWarped);
+}
