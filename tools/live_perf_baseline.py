@@ -26,7 +26,18 @@ appends arguments to every avgen run, for an injected regression (e.g. "--qualit
 A threshold the baseline already failed (THE RIFT's T4: it relies on the ladder) is reported, not failed on; one the
 baseline met and this run does not ("LOST") fails. A baseline scene missing from the run fails (a crash must not pass),
 unless `--scenes` narrows the check. A run that exited non-zero fails.
-`write` makes a run the baseline (numbers only: no asset, no image, no audio).
+
+ADR-1808, the gate knows its conditions. Live deadline misses depend on the display's refresh rate (a 120 Hz display
+paces presents differently from the 60 Hz one the baseline was measured on) and on what else the machine is doing. So
+`run` samples the 1-minute load average every 2 s while each avgen run holds the GPU, into `<run>.load.json`, and
+every live rep carries the `displayRefreshHz` its profile recorded. `check` compares them with the baseline's:
+  - a live rep at a refresh rate other than the baseline's, or
+  - a median load during the live reps above `--max-load` (default 4.0; the baseline's own median + 2 if higher)
+make the verdict "CONDITIONS DIFFER" (exit 3) instead of PASS or FAIL: the numbers are printed, but they are not a
+verdict on the code. A run that exited non-zero still FAILs (a crash is not a condition). `--ignore-conditions` judges
+anyway. A baseline with no recorded load is judged against `--max-load` alone.
+`write` makes a run the baseline (numbers and conditions only: no asset, no image, no audio), and refuses a run whose
+own conditions were not quiet (median load above `--max-load`) or mixed refresh rates.
 """
 import argparse
 import csv
@@ -36,6 +47,7 @@ import shlex
 import statistics
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 
@@ -75,6 +87,41 @@ LEVELS = ["Ultra", "High", "Medium", "Low", "Emergency"]
 DEFAULT_BASELINE = os.path.join(ROOT, "docs", "perf", "live-baseline.json")
 MISS_MARGIN = 2.0
 P99_MARGIN_MS = 2.0
+# ADR-1808: the median 1-minute load average above which a live run is not on a quiet machine. The M2 Max has 12 cores
+# and avgen itself contributes about 1-2; the audit's shared-machine runs sat at 3-23.
+MAX_LOAD = 4.0
+LOAD_SAMPLE_S = 2.0
+
+
+class LoadSampler:
+    """Samples the 1-minute load average while a run holds the GPU (ADR-1808)."""
+
+    def __init__(self):
+        self.samples = []
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def _loop(self):
+        while True:
+            try:
+                self.samples.append(round(os.getloadavg()[0], 2))
+            except OSError:
+                pass
+            if self._stop.wait(LOAD_SAMPLE_S):
+                return
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._thread.join()
+
+    def summary(self):
+        if not self.samples:
+            return {"samples": [], "median": None, "max": None}
+        return {"samples": self.samples, "median": statistics.median(self.samples), "max": max(self.samples)}
 
 
 def power():
@@ -144,10 +191,18 @@ def run(a):
         say("== %s %s %s" % (name, datetime.now().strftime("%H:%M:%S"), power()))
         env = dict(os.environ, AVGEN_GPU_LOCK_TIMEOUT=os.environ.get("AVGEN_GPU_LOCK_TIMEOUT", "14400"))
         with open(os.path.join(a.out, name + ".log"), "w") as out:
-            rc = subprocess.run([os.path.join(ROOT, "tools", "gpu-lock.sh"), avgen] + args, cwd=ROOT, env=env,
-                                stdout=out, stderr=subprocess.STDOUT).returncode
+            # ADR-1808: the load while the run holds the GPU. gpu-lock.sh waits for the lock first, so the samples
+            # taken while waiting are included; the run itself dominates them because the wait is usually short and a
+            # long wait is itself a sign the machine was busy.
+            with LoadSampler() as load:
+                rc = subprocess.run([os.path.join(ROOT, "tools", "gpu-lock.sh"), avgen] + args, cwd=ROOT, env=env,
+                                    stdout=out, stderr=subprocess.STDOUT).returncode
+        with open(os.path.join(a.out, name + ".load.json"), "w") as f:
+            json.dump(load.summary(), f)
         exits[name] = rc
-        say("   exit %d %s %s" % (rc, datetime.now().strftime("%H:%M:%S"), power()))
+        ls = load.summary()
+        say("   exit %d %s %s; load median %s max %s" % (rc, datetime.now().strftime("%H:%M:%S"), power(),
+                                                         ls["median"], ls["max"]))
     with open(os.path.join(a.out, "exits.json"), "w") as f:
         json.dump(exits, f, indent=1)
     if skipped:
@@ -187,6 +242,8 @@ def summarise(out):
             b = r["frame"]["budget"]
             frames = max(1, b["frames"])
             share = levels_share(os.path.join(out, "%s-live-r%d.csv" % (scene, rep)))
+            lp = os.path.join(out, "%s-live-r%d.load.json" % (scene, rep))
+            load = json.load(open(lp)) if os.path.exists(lp) else {}
             live.append({"frames": b["frames"], "deadlineMisses": b.get("deadlineMisses"),
                          "missesPer900": (b.get("deadlineMisses") or 0) * 900.0 / frames,
                          "p50": r["frame"]["frameMs"]["p50"], "p99": r["frame"]["frameMs"]["p99"],
@@ -194,7 +251,10 @@ def summarise(out):
                          "mediumOrBetter": sum(share.get(lv, 0.0) for lv in LEVELS[:3]),
                          "levels": {k: round(v, 4) for k, v in sorted(share.items())},
                          "revision": r.get("conditions", {}).get("gitRevision"),
-                         "environment": r.get("conditions", {}).get("environment", "")})
+                         "environment": r.get("conditions", {}).get("environment", ""),
+                         # ADR-1808: the conditions the misses depend on
+                         "displayRefreshHz": r.get("conditions", {}).get("displayRefreshHz"),
+                         "loadMedian": load.get("median"), "loadMax": load.get("max")})
             rep += 1
         head = None
         hp = os.path.join(out, "%s-headless-r1.json" % scene)
@@ -229,6 +289,49 @@ def thresholds(sc):
     return t
 
 
+def run_conditions(scenes):
+    """The refresh rates and the load of a summary's live reps (ADR-1808)."""
+    reps = [r for sc in scenes.values() for r in sc.get("reps", [])]
+    rates = sorted({r.get("displayRefreshHz") for r in reps if r.get("displayRefreshHz")})
+    loads = [r["loadMedian"] for r in reps if r.get("loadMedian") is not None]
+    peaks = [r["loadMax"] for r in reps if r.get("loadMax") is not None]
+    return {"displayRefreshHz": rates, "loadMedian": statistics.median(loads) if loads else None,
+            "loadMax": max(peaks) if peaks else None}
+
+
+def baseline_conditions(base):
+    """The baseline's conditions: from its reps, or from the document's own record for a baseline written before
+    ADR-1808 recorded them per rep."""
+    c = run_conditions(base.get("scenes", {}))
+    recorded = base.get("gateConditions", {})
+    if not c["displayRefreshHz"] and recorded.get("displayRefreshHz"):
+        c["displayRefreshHz"] = [recorded["displayRefreshHz"]]
+    if c["loadMedian"] is None and recorded.get("loadMedian") is not None:
+        c["loadMedian"] = recorded["loadMedian"]
+    return c
+
+
+def conditions_differ(now, base, max_load):
+    """Why a run's conditions do not match the baseline's, as a list of reasons (empty: they match)."""
+    why = []
+    if len(now["displayRefreshHz"]) > 1:
+        why.append("the run's live reps saw different refresh rates (%s Hz)" %
+                   ", ".join("%g" % x for x in now["displayRefreshHz"]))
+    if not now["displayRefreshHz"]:
+        why.append("the run recorded no display refresh rate")
+    elif not base["displayRefreshHz"]:
+        why.append("the baseline recorded no display refresh rate")
+    elif set(now["displayRefreshHz"]) != set(base["displayRefreshHz"]):
+        why.append("display %s Hz, baseline %s Hz" % ("/".join("%g" % x for x in now["displayRefreshHz"]),
+                                                       "/".join("%g" % x for x in base["displayRefreshHz"])))
+    limit = max(max_load, (base["loadMedian"] or 0.0) + 2.0)
+    if now["loadMedian"] is None:
+        why.append("the run recorded no load average (made before ADR-1808)")
+    elif now["loadMedian"] > limit:
+        why.append("load average median %.1f (max %.1f) > %.1f" % (now["loadMedian"], now["loadMax"] or 0.0, limit))
+    return why
+
+
 def check(a):
     now = summarise(a.out)
     if not now:
@@ -238,6 +341,15 @@ def check(a):
     if not base["scenes"]:
         print("no baseline at %s: thresholds only" % a.baseline)
     wanted = a.scenes.split(",") if a.scenes else None
+    nc = run_conditions({k: v for k, v in now.items() if wanted is None or k in wanted})
+    bc = baseline_conditions(base)
+    fmt_load = lambda c: "not recorded" if c["loadMedian"] is None else "median %.1f%s" % (
+        c["loadMedian"], "" if c["loadMax"] is None else " max %.1f" % c["loadMax"])
+    print("conditions: run %s Hz, load %s; baseline %s Hz, load %s" % (
+        "/".join("%g" % x for x in nc["displayRefreshHz"]) or "?", fmt_load(nc),
+        "/".join("%g" % x for x in bc["displayRefreshHz"]) or "?", fmt_load(bc)))
+    differ = conditions_differ(nc, bc, a.max_load) if base["scenes"] else []
+    crashed = False
     failed = False
     print("%-15s %7s %7s %6s %6s %6s  %-23s %s" % ("scene", "misses", "(base)", "p99", "(base)", "Med+",
                                                  "T1 T2 T3 T4", "T9 regression"))
@@ -253,6 +365,7 @@ def check(a):
         reg = []
         if sc["failedRuns"]:
             reg.append("runs exited non-zero: " + ", ".join(sc["failedRuns"]))
+            crashed = True
         if b and sc["missesMedian"] is not None:
             if sc["missesMedian"] > b["missesWorst"] + MISS_MARGIN:
                 reg.append("misses %.1f > %.1f + %.0f" % (sc["missesMedian"], b["missesWorst"], MISS_MARGIN))
@@ -267,6 +380,15 @@ def check(a):
                                                   100 * sc["mediumOrBetter"], "%.0f"),
             marks, "; ".join(reg) or "none"))
         failed = failed or bool(reg) or bool(lost)
+    if differ and not crashed and not a.ignore_conditions:
+        # ADR-1808: misses measured under other conditions are not evidence about the code, either way
+        print("conditions differ from the baseline's: " + "; ".join(differ))
+        print("RESULT: CONDITIONS DIFFER (would have been %s; re-run on a quiet machine at the baseline's refresh "
+              "rate, or pass --ignore-conditions)" % ("FAIL" if failed else "PASS"))
+        return 3
+    if differ:
+        print("conditions differ from the baseline's: " + "; ".join(differ) +
+              (" (judged anyway: --ignore-conditions)" if a.ignore_conditions else " (a run crashed: judged anyway)"))
     print("RESULT:", "FAIL" if failed else "PASS")
     return 1 if failed else 0
 
@@ -289,6 +411,16 @@ def write(a):
         off_ac = [line.strip() for line in open(conditions) if "drawing from" in line and "AC Power" not in line]
         if off_ac:
             sys.exit("refusing to write a baseline from a run not on AC power: " + off_ac[0])
+    # ADR-1808: a baseline is only as good as the conditions it was measured in
+    wc = run_conditions(now)
+    if len(wc["displayRefreshHz"]) != 1:
+        sys.exit("refusing to write a baseline whose live reps recorded %s refresh rates" %
+                 (len(wc["displayRefreshHz"]) or "no"))
+    if wc["loadMedian"] is None:
+        sys.exit("refusing to write a baseline with no recorded load average (run it with this tool's `run`)")
+    if wc["loadMedian"] > a.max_load:
+        sys.exit("refusing to write a baseline from a loaded machine: load median %.1f > %.1f" %
+                 (wc["loadMedian"], a.max_load))
     for sc in now.values():
         sc["thresholds"] = thresholds(sc)
     if getattr(a, "add", False) and os.path.exists(a.baseline):
@@ -301,8 +433,15 @@ def write(a):
     rev = subprocess.run(["git", "describe", "--always", "--dirty", "--abbrev=8"], cwd=ROOT, capture_output=True,
                          text=True).stdout.strip()
     os.makedirs(os.path.dirname(a.baseline), exist_ok=True)
+    if getattr(a, "add", False) and os.path.exists(a.baseline):
+        oc = baseline_conditions(old)
+        if oc["displayRefreshHz"] and set(oc["displayRefreshHz"]) != set(wc["displayRefreshHz"]):
+            sys.exit("refusing to add %s Hz scenes to a %s Hz baseline" % (wc["displayRefreshHz"][0],
+                                                                          oc["displayRefreshHz"][0]))
     doc = {"format": "avgen-live-baseline", "version": 1,
-           "machine": "Apple M2 Max, macOS, 60 Hz display (the owner's)",
+           "machine": "Apple M2 Max, macOS, %g Hz display (the owner's)" % wc["displayRefreshHz"][0],
+           "gateConditions": {"displayRefreshHz": wc["displayRefreshHz"][0], "loadMedian": wc["loadMedian"],
+                              "loadMax": wc["loadMax"]},
            "revision": rev,
            "conditions": "Release; 1920x1080; 30 fps target; Feline Footwear muted (--no-audio) from 60 s; live Auto "
                          "--warmup 5 --measure 30 x %d interleaved reps; headless Ultra --warmup-frames 150 --measure "
@@ -331,6 +470,10 @@ def main():
     ap.add_argument("--gap", type=float, default=0.0, help="seconds between runs, so other GPU users get the lock")
     ap.add_argument("--live-only", action="store_true", help="skip the headless Ultra runs (T4 is then unjudged)")
     ap.add_argument("--add", action="store_true", help="write: keep the baseline's other scenes, add or replace this run's")
+    ap.add_argument("--max-load", type=float, default=MAX_LOAD, help="ADR-1808: the median 1-minute load average "
+                    "above which a run is not on a quiet machine (check: conditions differ; write: refused)")
+    ap.add_argument("--ignore-conditions", action="store_true", help="check: judge PASS/FAIL even when the run's "
+                    "refresh rate or load differ from the baseline's")
     ap.add_argument("--rep-offset", type=int, default=0, help="number this run's reps from offset+1 (to interleave "
                     "two arms rep by rep into one directory each)")
     a = ap.parse_args()

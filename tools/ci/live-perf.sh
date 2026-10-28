@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The live performance regression check (ADR-1608, T9): measure the reference live scenes and judge them against
-# docs/perf/live-baseline.json. Exit 0 pass, 1 fail (a regression or a lost threshold), 2 nothing to judge.
+# docs/perf/live-baseline.json. Exit 0 pass, 1 fail (a regression or a lost threshold), 2 nothing to judge,
+# 3 conditions differ (ADR-1808: another display refresh rate, or a loaded machine; not a verdict on the code).
 #
 #   tools/ci/live-perf.sh [--out <dir>] [--bin <dir>] [--reps <n>] [--scenes a,b] [--check-only]
 #

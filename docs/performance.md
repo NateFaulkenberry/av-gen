@@ -949,3 +949,11 @@ python3 tools/live_perf_baseline.py write --out <a run you reviewed>            
 Exit 1 names the scene and why: a T1-T4 threshold the baseline met and the run lost, or a T9 regression (misses or
 p99 past the baseline's worst repetition + 2). Local only: it needs `assets/audio/feline-footwear.wav` and the
 generated scenes. Sound-to-light latency has its own rig, `tools/sound_to_light.sh` (ADR-1605).
+
+**Conditions (ADR-1808).** Live deadline misses depend on the display's refresh rate and on what else the machine is
+doing, not only on the code: the render audit (2026-10-28) reproduced every GPU median within 5% while misses rose
+from 1 to 12 per 900 frames on a 120 Hz display under a load average of up to 23. So `run` samples the load average
+while each avgen run holds the GPU, every live rep carries the refresh rate its profile recorded, and `check` answers
+**CONDITIONS DIFFER** (exit 3) instead of PASS or FAIL when the refresh rate differs from the baseline's or the median
+load is above `--max-load` (default 4.0). Re-run quietly at the baseline's refresh rate (System Settings > Displays >
+Refresh Rate), or pass `--ignore-conditions` to judge anyway. `write` refuses a loaded or mixed-refresh run.
