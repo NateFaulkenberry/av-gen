@@ -368,3 +368,39 @@ TEST_CASE("the composition draws the terrain mesh as scene entities with the blo
     for (const auto& l : s.lights) sun = sun || l.name == "attractor.sun";
     CHECK(sun);
 }
+
+// ---- the terrain mesh's baked occlusion and uv.y packing (ADR-1859) ---------------------------------------------
+
+TEST_CASE("the terrain mesh packs a whole playa level and the baked occlusion into uv.y", "[attractor-world][adr1859]") {
+    const auto w = scene::generateAttractorWorld(smallGen(3));
+    REQUIRE(w->terrainMesh != nullptr);
+    std::size_t n = 0, occluded = 0, open = 0, playa = 0;
+    double sumUp = 0.0, sumSteep = 0.0;
+    std::size_t nUp = 0, nSteep = 0;
+    for (const auto& ch : w->terrainMesh->chunks) {
+        for (std::size_t i = 0; i < ch.uvs.size(); ++i) {
+            const float y = ch.uvs[i].y;
+            const float level = std::floor(y);
+            const float ao = (y - level) / scene::kAttractorOcclusionScale;
+            REQUIRE(level >= 0.0f);
+            REQUIRE(level <= static_cast<float>(scene::kAttractorPlayaLevels));
+            REQUIRE(ao >= -1e-3f);
+            REQUIRE(ao <= 1.0f + 1e-3f);
+            ++n;
+            if (ao < 0.7f) ++occluded;
+            if (ao > 0.97f) ++open;
+            if (level > 0.0f) ++playa;
+            // the horizon is measured from the tangent plane: a wall is not dark merely for facing sideways
+            if (ch.normals[i].y > 0.95f) { sumUp += ao; ++nUp; }
+            if (ch.normals[i].y < 0.4f) { sumSteep += ao; ++nSteep; }
+        }
+    }
+    REQUIRE(n > 1000u);
+    INFO("occluded " << occluded << ", open " << open << ", playa " << playa << " of " << n);
+    CHECK(occluded > 0u); // crevices exist
+    CHECK(open > n / 10); // and so does open ground
+    REQUIRE(nUp > 0u);
+    REQUIRE(nSteep > 0u);
+    INFO("mean visibility: flat " << sumUp / nUp << ", steep " << sumSteep / nSteep);
+    CHECK(sumSteep / nSteep > 0.6); // not the half a sideways-facing horizon search would give
+}

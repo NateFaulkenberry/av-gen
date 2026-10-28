@@ -67,6 +67,10 @@ struct AttractorLook {
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines
+// ADR-1859: the terrain mesh's uv.y packing. A program recovers the level with `quantize` (1 cell per unit) and the
+// visibility as (uv.y - level) / kAttractorOcclusionScale.
+inline constexpr int kAttractorPlayaLevels = 16;
+inline constexpr float kAttractorOcclusionScale = 0.05f;
 
 // One side canyon of the branching network (ADR-1852): a polyline grown off the gorge.
 struct NetworkBranch {
@@ -85,7 +89,9 @@ enum class AttractorCameraMode : int { Scene = 0, Composed = 1, Flight = 2 };
 struct AttractorTerrainChunk {
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
-    std::vector<glm::vec2> uvs;          // x the band coordinate (bands; the strata), y rock (0..1) + 2 x playa
+    // x the band coordinate (bands; the strata); y (ADR-1859) the playa floor as a whole level 0..kAttractorPlayaLevels
+    // plus kAttractorOcclusionScale x the baked ambient visibility (0..1)
+    std::vector<glm::vec2> uvs;
     std::vector<std::uint32_t> indices;
     glm::vec3 boundsMin{0.0f};
     glm::vec3 boundsMax{0.0f};

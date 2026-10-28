@@ -382,6 +382,40 @@ struct SurfaceSampler {
     [[nodiscard]] float height(glm::vec2 xz, float /*terraces*/) const { return smooth(xz).x; }
 };
 
+namespace {
+
+// ADR-1859: the terrain mesh's baked ambient occlusion. The scene pass's GTAO draws fins along the RTIN's long
+// triangles, so the canyon's crevices are darkened from the height grid instead, once, at bake time: a horizon search
+// in eight directions out to 256 m, each direction's horizon measured from the surface's own elevation in that slice (so a wall
+// is not darkened merely for facing sideways -- the sky term already knows that); only what rises above the
+// horizontal counts. Returns visibility, 0..1.
+float horizonOcclusion(const std::vector<float>& H, int gn, int gx, int gy, float spacing, glm::vec3 n) {
+    static constexpr int kDirs[8][2] = {{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}};
+    const float h0 = H[static_cast<std::size_t>(gy) * gn + gx];
+    float occluded = 0.0f;
+    for (const auto& d : kDirs) {
+        // the surface's own elevation in this direction's vertical slice (the HBAO tangent angle)
+        const glm::vec2 dir = glm::normalize(glm::vec2(static_cast<float>(d[0]), static_cast<float>(d[1])));
+        const float slope = -(n.x * dir.x + n.z * dir.y) / std::max(n.y, 1e-4f);
+        const float sinT = slope / std::sqrt(1.0f + slope * slope);
+        float sinH = -1.0f;
+        for (int step = 1; step <= 128; step *= 2) {
+            const int x = gx + d[0] * step, y = gy + d[1] * step;
+            if (x < 0 || y < 0 || x >= gn || y >= gn) break;
+            const float run = spacing * static_cast<float>(step) * glm::length(glm::vec2(d[0], d[1]));
+            const float rise = H[static_cast<std::size_t>(y) * gn + x] - h0 - 0.5f; // half a metre: no self-shadowing
+            sinH = std::max(sinH, rise / std::sqrt(run * run + rise * rise));
+        }
+        // only what rises above the slice's horizontal (or above the surface itself, where that is higher) occludes:
+        // the ground falling away below a wall is the wall's ordinary view, which the sky term already accounts for
+        const float floorAngle = std::max(sinT, 0.0f);
+        occluded += std::clamp((sinH - floorAngle) / std::max(1.0f - floorAngle, 1e-3f), 0.0f, 1.0f);
+    }
+    return 1.0f - occluded / 8.0f;
+}
+
+} // namespace
+
 // Error-bounded right-triangulated irregular network (Evans, Kirkpatrick & Townsend 2001; the "Martini" formulation):
 // the grid's triangle bintree is refined wherever a hypotenuse's midpoint differs from its linear interpolation by more
 // than the tolerance there. Errors propagate up the tree (a vertex's error is at least its descendants'), which is
@@ -509,8 +543,14 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
                     ch.positions.emplace_back(xz.x, h, xz.y);
                     ch.normals.push_back(nrm);
                     // uv.x: the band coordinate (the strata coordinate under the band warp, in bands), so the material
-                    // program's bands are the very bands the ledges are cut along
-                    ch.uvs.emplace_back(T[static_cast<std::size_t>(v)], rock + 2.0f * playa);
+                    // program's bands are the very bands the ledges are cut along.
+                    // uv.y (ADR-1859): the playa floor as a whole level 0..kAttractorPlayaLevels, plus the baked occlusion scaled
+                    // into [0, kAttractorOcclusionScale]. Small on purpose: the shader's tangent frame comes from the uv
+                    // gradient, and uv.y must not out-vote the band coordinate's.
+                    const float playaMask = std::clamp((rock + 2.0f * playa - 1.2f) / 1.4f, 0.0f, 1.0f);
+                    const float level = std::round(playaMask * static_cast<float>(kAttractorPlayaLevels));
+                    const float ao = horizonOcclusion(H, gn, gx, gy, spacing, nrm);
+                    ch.uvs.emplace_back(T[static_cast<std::size_t>(v)], level + kAttractorOcclusionScale * ao);
                     lo = glm::min(lo, ch.positions.back());
                     hi = glm::max(hi, ch.positions.back());
                     it = remap.emplace(v, ni).first;
