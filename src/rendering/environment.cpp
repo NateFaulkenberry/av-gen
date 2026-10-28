@@ -412,6 +412,11 @@ Result<void> EnvironmentProcessor::recordSky(SkyJob& job, const scene::SkyRuntim
     sky4.skyGround = glm::vec4(sky.groundColor, sky.sunGlowWidth);
     sky4.skySun = glm::vec4(sky.sunColor * sky.sunIntensity, sky.intensity);
     sky4.skySunDir = glm::vec4(sky.sunDirection, 0.0f);
+    {   // ADR-1864: the cube carries `reflection` of the layer (the visible sky draws it whole, from the frame)
+        scene::SkyCirrus cube = sky.cirrus;
+        cube.amount *= cube.reflection;
+        sky4.cirrus = scene::packSkyCirrus(cube);
+    }
 
     job = SkyJob{};
     job.sky = sky;

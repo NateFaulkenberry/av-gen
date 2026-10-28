@@ -6,6 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <nlohmann/json.hpp>
 
 #include <cmath>
 #include <vector>
@@ -244,4 +245,68 @@ TEST_CASE("resolveSky clamps the values a build would divide by", "[sky]") {
     CHECK_THAT(d(glm::length(sky.sunDirection)), WithinAbs(1.0, 1e-5));
     const glm::vec3 c = skyRadiance(sky, {0.0f, 1.0f, 0.0f});
     CHECK(std::isfinite(c.r));
+}
+
+// ---- ADR-1864: the cirrus layer ---------------------------------------------------------------------------------
+
+TEST_CASE("cirrus: amount 0 is no layer, bit for bit, and the layer never reaches below the horizon",
+          "[sky][cirrus][adr1864]") {
+    scene::SkySettings plain;
+    scene::SkySettings off = plain;
+    off.cirrus.coverage = 0.3f; // every other knob moved, amount still 0
+    off.cirrus.litColor = glm::vec3(3.0f);
+    const scene::SkyRuntime a = scene::resolveSky(plain, {});
+    const scene::SkyRuntime b = scene::resolveSky(off, {});
+    CHECK(a.hash() == b.hash());
+    for (const glm::vec3 d : {glm::vec3(0, 1, 0), glm::vec3(0.6f, 0.3f, 0.2f), glm::vec3(-0.3f, 0.05f, 0.9f)}) {
+        CHECK(scene::skyRadiance(a, d) == scene::skyRadiance(b, d));
+    }
+    scene::SkySettings on = plain;
+    on.cirrus.amount = 1.0f;
+    on.cirrus.coverage = 0.3f;
+    const scene::SkyRuntime c = scene::resolveSky(on, {});
+    CHECK(c.hash() != a.hash());
+    int clouded = 0;
+    for (int i = 0; i < 400; ++i) {
+        const float az = 0.0157f * static_cast<float>(i);
+        const glm::vec3 up = glm::normalize(glm::vec3(std::cos(az), 0.15f + 0.002f * static_cast<float>(i), std::sin(az)));
+        const glm::vec3 down(up.x, -up.y, up.z);
+        CHECK(scene::skyCirrus(c.cirrus, glm::normalize(down), c.sunDirection).cover == 0.0f);
+        clouded += scene::skyCirrus(c.cirrus, up, c.sunDirection).cover > 0.5f ? 1 : 0;
+    }
+    INFO("clouded directions " << clouded << " of 400");
+    CHECK(clouded > 40);
+    CHECK(clouded < 360);
+}
+
+TEST_CASE("cirrus: coverage thins the layer; the block round-trips and refuses what it does not know",
+          "[sky][cirrus][adr1864]") {
+    const auto meanCover = [](float coverage) {
+        scene::SkyCirrus c;
+        c.amount = 1.0f;
+        c.coverage = coverage;
+        double sum = 0.0;
+        for (int i = 0; i < 2000; ++i) {
+            const float az = 0.00314f * static_cast<float>(i);
+            const glm::vec3 d = glm::normalize(glm::vec3(std::cos(az * 7.0f), 0.2f + 0.3f * std::sin(az), std::sin(az * 7.0f)));
+            sum += scene::skyCirrus(c, d, glm::vec3(0, 1, 0)).cover;
+        }
+        return sum / 2000.0;
+    };
+    CHECK(meanCover(0.65f) < meanCover(0.45f));
+
+    scene::SkyCirrus c;
+    c.amount = 0.7f;
+    c.width = 1234.0f;
+    c.litColor = glm::vec3(0.9f, 0.5f, 0.4f);
+    c.reflection = 0.25f;
+    auto back = scene::skyCirrusFromJson(scene::skyCirrusToJson(c));
+    REQUIRE(back.has_value());
+    CHECK(back->amount == c.amount);
+    CHECK(back->width == c.width);
+    CHECK(back->litColor == c.litColor);
+    CHECK(back->reflection == c.reflection);
+    CHECK_FALSE(scene::skyCirrusFromJson(nlohmann::json::parse(R"({"amout": 1})")).has_value());
+    CHECK_FALSE(scene::skyCirrusFromJson(nlohmann::json::parse(R"({"amount": 2})")).has_value());
+    CHECK_FALSE(scene::skyCirrusFromJson(nlohmann::json::parse(R"({"litColor": [1, 1]})")).has_value());
 }

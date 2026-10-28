@@ -380,6 +380,11 @@ struct FrameUniforms {
     glm::vec4 bandsSoft2{0.0f}; // falloff, sky fill, 0, 1 = on
     glm::vec4 bandsRate{0.0f};  // dash rates of the strips
     std::array<glm::vec4, 8> bands{};
+    // ADR-1864: the analytic sky's cirrus layer (scene::packSkyCirrus). All zero when the sky has none. Appended last.
+    glm::vec4 skyCirrus0{0.0f};
+    glm::vec4 skyCirrus1{0.0f};
+    glm::vec4 skyCirrus2{0.0f};
+    glm::vec4 skyCirrus3{0.0f};
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -395,7 +400,8 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        48 + // Wave 2: three vec4s of star field
                                        16 + // ADR-918: one vec4 of fog-from-sky
                                        16 + // ADR-1070: one vec4 of the live sky
-                                       192); // ADR-1151: twelve vec4s of reflection bands, appended last
+                                       192 + // ADR-1151: twelve vec4s of reflection bands
+                                       64); // ADR-1864: four vec4s of cirrus, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

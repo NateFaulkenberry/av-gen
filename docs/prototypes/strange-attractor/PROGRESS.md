@@ -172,6 +172,10 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-28: Rebased on main b22d4a91.
+  - Analytic cirrus layer (ADR-1864) replaces the volumetric streak lobes: 20.7 → 0 ms of clouds, GPU 82.7 → 61.3 ms.
+  - The wire and lattice effects are on hold, untouched.
+  - Notes in `08-canyon-cirrus.md`.
 - 2026-10-28: Canyon Phase 2 (geometric revelation). Notes in `07-canyon-phase2.md`.
   - The ray-march is removed (ADR-1861).
   - Mesh wire: the terrain's real triangles, read in place, with a travelling front (ADR-1862).

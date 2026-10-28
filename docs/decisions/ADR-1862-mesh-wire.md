@@ -1,6 +1,6 @@
 # ADR-1862: Mesh wire: a mesh entity's own triangle edges, read in place and revealed by music
 
-- Status: Proposed, scene/strange-attractor (canyon Phase 2, 2026-10-28).
+- Status: Accepted by the owner (2026-10-28), scene/strange-attractor (canyon Phase 2).
 - Extends ADR-1073 (wire lines on procedural nodes) to mesh entities. ADR-1073 left this open: "Mesh entities do not
   get lines yet: ObjectUniforms is full."
 - Code:

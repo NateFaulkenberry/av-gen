@@ -10,10 +10,14 @@
 // folded in from the key light, so the shader takes no light data. `skyRadiance` is the reference
 // implementation `shaders/environment.wgsl`'s fs_sky transliterates.
 
+#include "core/error.hpp"
 #include "scene/scene_types.hpp"
+
+#include <nlohmann/json_fwd.hpp>
 
 #include <glm/glm.hpp>
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -31,6 +35,7 @@ struct SkyRuntime {
     float sunGlowWidth = 0.18f;
     float intensity = 1.0f;
     glm::vec3 sunDirection{0.0f, 1.0f, 0.0f}; // unit, pointing *towards* the sun
+    SkyCirrus cirrus;           // ADR-1864: clamped copies of the authored layer
     [[nodiscard]] std::uint64_t hash() const; // changes exactly when a rebuild is needed
 };
 
@@ -67,10 +72,26 @@ struct SkyRuntime {
 //   disc = 1 - smoothstep(r * 0.85, r * 1.15, theta) with r = max(sunAngularRadius, minRadius),
 //          scaled by (sunAngularRadius / r)^2 so widening the disc conserves its energy
 //   glow = exp(-theta / max(sunGlowWidth, 1e-3)) * 0.02   (the aureole around the disc)
-//   out  = (base + sunColor * sunIntensity * (disc + glow) * band) * intensity
+//   out  = (cirrus(base) + sunColor * sunIntensity * (disc + glow) * band * (1 - 0.6 cover)) * intensity
+//          where cirrus() lays ADR-1864's streak layer over the sky above the horizon (cover = its opacity)
 // `minRadius` is how wide one texel of the target is in radians; it keeps the disc from falling
 // between texels in the coarse mips (the analytic stand-in for downsampling the cube).
 [[nodiscard]] glm::vec3 skyRadiance(const SkyRuntime& sky, const glm::vec3& dir, float minRadius = 0.0f);
+
+// ADR-1864: the cirrus layer's cover (0..1, already times `amount`) and colour in direction `d` (unit). The CPU twin
+// of shaders/sky_cirrus.wgsl, line for line. Cover is 0 at and below the horizon and when `amount` is 0.
+struct CirrusSample {
+    float cover = 0.0f;
+    glm::vec3 color{0.0f};
+};
+[[nodiscard]] CirrusSample skyCirrus(const SkyCirrus& c, const glm::vec3& d, const glm::vec3& sunDirection);
+// The four vec4s the shaders read (FrameUniforms::skyCirrus*; the cube's EnvUniforms::cirrus* take `amount` x
+// `reflection`).
+[[nodiscard]] std::array<glm::vec4, 4> packSkyCirrus(const SkyCirrus& c);
+// The `environment.sky.cirrus` block: {"amount", "coverage", "softness", "altitude", "length", "width", "direction",
+// "litColor", "shadeColor", "sunScatter", "seed", "reflection"}; unknown keys are refused.
+[[nodiscard]] Result<SkyCirrus> skyCirrusFromJson(const nlohmann::json& j);
+[[nodiscard]] nlohmann::json skyCirrusToJson(const SkyCirrus& c);
 
 // The world direction of an equirectangular environment map's brightest feature -- its sun or its
 // moon (ADR-049). Found as the radiance-weighted centroid of every texel within `coreFraction` of

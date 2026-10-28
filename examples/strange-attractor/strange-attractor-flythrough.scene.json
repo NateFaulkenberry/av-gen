@@ -2,7 +2,7 @@
   "format": "avgen-scene",
   "version": 1,
   "name": "the-strange-attractor",
-  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853, ADR-1857..1859): a procedural canyon. The attractorWorld block bakes engine geometry drawn by the scene pass with the canyonRock program (strata, ledge detail normals, baked occlusion from uv.y); Phase 1b look: deeper sky with streak clouds (the clouds block, ADR-1289 lobes), two warm unshadowed bounce lights standing in for the canyon's inter-reflection, contact shadows off (they drew a dotted checker on lit walls), shadowCasterReach 4000 m (ADR-1858). docs/prototypes/strange-attractor/.",
+  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853, ADR-1857..1859): a procedural canyon. The attractorWorld block bakes engine geometry drawn by the scene pass with the canyonRock program (strata, ledge detail normals, baked occlusion from uv.y); Phase 1b look: deeper sky with streak clouds (the analytic sky's cirrus layer, ADR-1864; the volumetric lobes it replaced cost 18-26 ms), two warm unshadowed bounce lights standing in for the canyon's inter-reflection, contact shadows off (they drew a dotted checker on lit walls), shadowCasterReach 4000 m (ADR-1858). docs/prototypes/strange-attractor/.",
   "camera": {
     "mode": 1,
     "position": [
@@ -59,7 +59,29 @@
       "sunIntensity": 6.0,
       "sunSize": 0.04,
       "sunGlow": 0.35,
-      "intensity": 1.0
+      "intensity": 1.0,
+      "cirrus": {
+        "amount": 0.9,
+        "coverage": 0.5,
+        "softness": 0.28,
+        "altitude": 4000,
+        "length": 12000,
+        "width": 1600,
+        "direction": 0,
+        "litColor": [
+          1.0,
+          0.74,
+          0.78
+        ],
+        "shadeColor": [
+          0.36,
+          0.32,
+          0.62
+        ],
+        "sunScatter": 1.2,
+        "seed": 0,
+        "reflection": 0.15
+      }
     },
     "shadowRange": 3000.0,
     "shadowCascades": 4,
@@ -999,326 +1021,6 @@
       "occlusion": 0
     }
   ],
-  "clouds": {
-    "lobes": [
-      {
-        "c": [
-          -7391,
-          3473,
-          -21524
-        ],
-        "r": 1555,
-        "scale": [
-          4.17,
-          0.12,
-          0.4
-        ],
-        "density": 0.67,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          8413,
-          3177,
-          -5636
-        ],
-        "r": 1937,
-        "scale": [
-          4.69,
-          0.12,
-          0.34
-        ],
-        "density": 0.39,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -7997,
-          4209,
-          -1741
-        ],
-        "r": 2207,
-        "scale": [
-          6.0,
-          0.12,
-          0.35
-        ],
-        "density": 0.46,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          3555,
-          4253,
-          -6435
-        ],
-        "r": 2280,
-        "scale": [
-          4.22,
-          0.12,
-          0.45
-        ],
-        "density": 0.59,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          167,
-          3605,
-          -19733
-        ],
-        "r": 1489,
-        "scale": [
-          6.34,
-          0.12,
-          0.52
-        ],
-        "density": 0.54,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -5593,
-          3773,
-          -2187
-        ],
-        "r": 2282,
-        "scale": [
-          6.12,
-          0.12,
-          0.43
-        ],
-        "density": 0.49,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          2770,
-          3074,
-          -13655
-        ],
-        "r": 1705,
-        "scale": [
-          6.03,
-          0.12,
-          0.31
-        ],
-        "density": 0.37,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          3538,
-          3709,
-          -17270
-        ],
-        "r": 1871,
-        "scale": [
-          4.86,
-          0.12,
-          0.55
-        ],
-        "density": 0.42,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -2442,
-          3876,
-          -19136
-        ],
-        "r": 1676,
-        "scale": [
-          4.89,
-          0.12,
-          0.49
-        ],
-        "density": 0.46,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          1639,
-          2972,
-          -2296
-        ],
-        "r": 1462,
-        "scale": [
-          4.57,
-          0.12,
-          0.49
-        ],
-        "density": 0.57,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -7352,
-          3102,
-          -16054
-        ],
-        "r": 1859,
-        "scale": [
-          4.11,
-          0.12,
-          0.47
-        ],
-        "density": 0.66,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          12733,
-          4432,
-          -6363
-        ],
-        "r": 1418,
-        "scale": [
-          4.72,
-          0.12,
-          0.54
-        ],
-        "density": 0.62,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -2508,
-          3855,
-          -1361
-        ],
-        "r": 2218,
-        "scale": [
-          4.73,
-          0.12,
-          0.35
-        ],
-        "density": 0.51,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -10180,
-          4435,
-          -14841
-        ],
-        "r": 1731,
-        "scale": [
-          4.02,
-          0.12,
-          0.31
-        ],
-        "density": 0.41,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          7945,
-          3294,
-          -15295
-        ],
-        "r": 1497,
-        "scale": [
-          6.45,
-          0.12,
-          0.41
-        ],
-        "density": 0.42,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -12338,
-          3087,
-          -22674
-        ],
-        "r": 2077,
-        "scale": [
-          4.37,
-          0.12,
-          0.31
-        ],
-        "density": 0.52,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -7026,
-          3008,
-          -57
-        ],
-        "r": 1929,
-        "scale": [
-          5.93,
-          0.12,
-          0.4
-        ],
-        "density": 0.7,
-        "soft": 0.95
-      },
-      {
-        "c": [
-          -623,
-          3498,
-          -18195
-        ],
-        "r": 1437,
-        "scale": [
-          5.05,
-          0.12,
-          0.36
-        ],
-        "density": 0.66,
-        "soft": 0.95
-      }
-    ],
-    "extinction": 0.0025,
-    "steps": 96,
-    "lightSteps": 3,
-    "lightDistance": 600,
-    "lightDirection": [
-      -0.912,
-      0.242,
-      -0.332
-    ],
-    "lightColor": [
-      1.0,
-      0.55,
-      0.45
-    ],
-    "lightIntensity": 0.9,
-    "anisotropy": 0.4,
-    "ambientTop": [
-      0.16,
-      0.14,
-      0.36
-    ],
-    "ambientBottom": [
-      0.4,
-      0.2,
-      0.3
-    ],
-    "warmColor": [
-      0.7,
-      0.35,
-      0.35
-    ],
-    "warmDirection": [
-      -0.928,
-      0.0,
-      -0.338
-    ],
-    "warmHeight": 6000,
-    "noiseScale": 0.0006,
-    "noiseAmount": 0.35,
-    "hazeColor": [
-      0.3,
-      0.25,
-      0.5
-    ],
-    "hazeDistance": 45000,
-    "powder": 0.2
-  },
   "meshWire": {
     "targets": [
       "attractor.terrain"

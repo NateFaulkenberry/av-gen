@@ -2,6 +2,8 @@
 // importance sampling). Every pass draws one fullscreen triangle into one cube face (or the LUT).
 // Sample sequences are fixed (Hammersley), so results are deterministic for a given GPU.
 
+#include "sky_cirrus.wgsl"
+
 const PI: f32 = 3.14159265;
 
 struct EnvUniforms {
@@ -19,6 +21,10 @@ struct EnvUniforms {
     skyGround: vec4<f32>,   // rgb, w = sunGlowWidth
     skySun: vec4<f32>,      // rgb = sun colour * sun intensity, w = overall intensity
     skySunDir: vec4<f32>,   // xyz = unit direction *towards* the sun
+    cirrus0: vec4<f32>,     // ADR-1864: scene::packSkyCirrus (sky_cirrus.wgsl); x = 0 is no layer
+    cirrus1: vec4<f32>,
+    cirrus2: vec4<f32>,
+    cirrus3: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> env: EnvUniforms;
@@ -133,7 +139,10 @@ fn skyRadiance(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
     let disc = (1.0 - skySmoothstep(radius * 0.85, radius * 1.15, theta)) * energy;
     let glow = exp(-theta / max(env.skyGround.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
     let sun = env.skySun.rgb * (disc + glow) * band;
-    return (base + sun) * env.skySun.w;
+    // ADR-1864: the cirrus layer over the sky, and over most of the sun
+    let cs = skyCirrus(d, env.skySunDir.xyz, env.cirrus0, env.cirrus1, env.cirrus2, env.cirrus3);
+    let clouded = base * (1.0 - cs.x) + cs.yzw * cs.x;
+    return (clouded + sun * (1.0 - 0.6 * cs.x)) * env.skySun.w;
 }
 
 @fragment

@@ -83,7 +83,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "vortex", "bands"};
 constexpr std::string_view kSkyKeys[] = {
     "enabled", "background", "useKeyLight", "zenithColor", "horizonColor", "groundColor",
-    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity"};
+    "sunColor", "sunDirection", "haze", "sunIntensity", "sunSize", "sunGlow", "intensity", "cirrus"};
 
 // Every key a `"lights"` entry may carry. Named after the `PunctualLight` field it sets, except
 // where `LightRig`'s file format already had a name for the same quantity -- `color`, `temperature`,
@@ -10711,6 +10711,7 @@ nlohmann::json Composition::toJson() const {
         if (sky.sunAngularRadius != def.sunAngularRadius) sj["sunSize"] = sky.sunAngularRadius;
         if (sky.sunGlowWidth != def.sunGlowWidth) sj["sunGlow"] = sky.sunGlowWidth;
         if (sky.intensity != def.intensity) sj["intensity"] = sky.intensity;
+        if (sky.cirrus.amount > 0.0f) sj["cirrus"] = skyCirrusToJson(sky.cirrus); // ADR-1864
         if (!sj.empty()) {
             environment["sky"] = std::move(sj);
         }
@@ -12104,6 +12105,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     *sc.target = glm::vec3(sj[sc.key][0].get<float>(), sj[sc.key][1].get<float>(),
                                            sj[sc.key][2].get<float>());
                 }
+            }
+            if (sj.contains("cirrus")) { // ADR-1864
+                auto cirrus = skyCirrusFromJson(sj.at("cirrus"));
+                if (!cirrus) {
+                    return std::unexpected(cirrus.error());
+                }
+                sky.cirrus = *cirrus;
             }
             struct SkyFlag {
                 const char* key;

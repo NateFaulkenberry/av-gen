@@ -51,7 +51,7 @@ struct SkyBuildJob {
         const wgpu::RenderPipeline* pipeline = nullptr;
         wgpu::TextureView target;
         wgpu::BindGroup group;
-        std::array<std::uint8_t, 112> uniforms{}; // an EnvUniforms
+        std::array<std::uint8_t, 176> uniforms{}; // an EnvUniforms
         double cost = 0.0;
     };
     std::vector<Pass> passes;
@@ -108,8 +108,9 @@ private:
         glm::vec4 skyGround;    // rgb, w = sunGlowWidth
         glm::vec4 skySun;       // rgb = sun colour * intensity, w = overall intensity
         glm::vec4 skySunDir;    // xyz = unit direction towards the sun
+        std::array<glm::vec4, 4> cirrus{}; // ADR-1864: scene::packSkyCirrus (amount 0 = no layer)
     };
-    static_assert(sizeof(EnvUniforms) == 32 + 80);
+    static_assert(sizeof(EnvUniforms) == 32 + 80 + 64);
     static_assert(sizeof(EnvUniforms) == sizeof(SkyJob::Pass::uniforms));
 
     struct CubeTexture {

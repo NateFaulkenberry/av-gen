@@ -3507,7 +3507,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-1070: live, the procedural sky's background is drawn from these values rather than
         // from the cube the lighting schedule rebuilds at its capped rate. A blurred background
         // (skyboxBlur > 0) is a prefiltered mip and stays on the cube.
-        const bool liveBackground = liveSky_.enabled && skyIbl && scene.environment.skyboxBlur <= 0.0f;
+        // ADR-1864: a sky with cirrus is drawn from these values offline too -- a cube face cannot hold a streak a
+        // pixel wide, so its own analytic form is the only sharp one (the cube still carries it for the lighting
+        // and reflections).
+        const auto cirrus = scene::packSkyCirrus(resolved.cirrus);
+        frame.skyCirrus0 = cirrus[0];
+        frame.skyCirrus1 = cirrus[1];
+        frame.skyCirrus2 = cirrus[2];
+        frame.skyCirrus3 = cirrus[3];
+        const bool liveBackground = (liveSky_.enabled || resolved.cirrus.amount > 0.0f) && skyIbl &&
+                                    scene.environment.skyboxBlur <= 0.0f;
         frame.skyLive = liveBackground
                             ? glm::vec4(1.0f, resolved.sunIntensity, resolved.intensity,
                                         1.5f * 1.5707963f / static_cast<float>(std::max(ibl_.sourceCubeSize, 1u)))

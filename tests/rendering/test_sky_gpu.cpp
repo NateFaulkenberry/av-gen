@@ -474,3 +474,78 @@ TEST_CASE("The moon is drawn where the sky's sun is, not where light zero points
 
     CHECK(context->errorCount() == 0);
 }
+
+// ---- ADR-1864: the cirrus layer --------------------------------------------------------------------------------
+
+namespace {
+
+scene::Scene skyOnly(float cirrusAmount) {
+    scene::Scene s;
+    s.environment.gridIntensity = 0.0f;
+    s.environment.sky.enabled = true;
+    s.environment.sky.showBackground = true;
+    s.environment.sky.zenithColor = {0.05f, 0.07f, 0.30f};
+    s.environment.sky.horizonColor = {0.6f, 0.4f, 0.45f};
+    s.environment.sky.useKeyLight = false;
+    s.environment.sky.sunDirection = glm::normalize(glm::vec3(-0.9f, 0.2f, -0.3f));
+    s.environment.sky.cirrus.amount = cirrusAmount;
+    s.environment.sky.cirrus.coverage = 0.5f;
+    s.environment.sky.cirrus.softness = 0.15f;
+    s.environment.sky.cirrus.litColor = {1.0f, 1.0f, 1.0f};
+    s.environment.sky.cirrus.shadeColor = {1.0f, 1.0f, 1.0f};
+    s.environment.sky.cirrus.sunScatter = 0.0f;
+    s.post.bloomEnabled = false;
+    s.post.tonemap = scene::TonemapOperator::Clamp;
+    s.camera.position = {0.0f, 2.0f, 0.0f};
+    s.camera.target = {0.0f, 2.6f, -1.0f}; // looking 31 degrees up: all sky
+    s.camera.fovYRadians = glm::radians(50.0f);
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("cirrus: amount 0 draws the sky's bytes, and the streaks are where the CPU twin puts them",
+          "[sky][gpu][cirrus][adr1864]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    constexpr std::uint32_t W = 192, H = 108;
+    const gpu::Image8 none = renderWith(renderer, skyOnly(0.0f), W, H);
+    scene::Scene zero = skyOnly(0.0f);
+    zero.environment.sky.cirrus.coverage = 0.2f; // knobs moved, amount 0
+    const gpu::Image8 zeroed = renderWith(renderer, zero, W, H);
+    CHECK(none.rgba == zeroed.rgba);
+
+    const scene::Scene on = skyOnly(1.0f);
+    const gpu::Image8 clouded = renderWith(renderer, on, W, H);
+    // The CPU twin, per pixel: the camera's ray (the engine's basis), its cover. White streaks on a dark blue sky,
+    // so a covered pixel is visibly brighter than the same pixel without the layer.
+    const scene::SkyRuntime rt = scene::resolveSky(on.environment.sky, on.lights);
+    const glm::vec3 fwd = glm::normalize(on.camera.target - on.camera.position);
+    const glm::vec3 right = glm::normalize(glm::cross(fwd, glm::vec3(0, 1, 0)));
+    const glm::vec3 up = glm::cross(right, fwd);
+    const float tv = std::tan(on.camera.fovYRadians * 0.5f);
+    const float th = tv * static_cast<float>(W) / static_cast<float>(H);
+    int agree = 0, disagree = 0, coveredSeen = 0;
+    for (std::uint32_t y = 0; y < H; ++y) {
+        for (std::uint32_t x = 0; x < W; ++x) {
+            const float sx = (2.0f * (static_cast<float>(x) + 0.5f) / static_cast<float>(W) - 1.0f) * th;
+            const float sy = (1.0f - 2.0f * (static_cast<float>(y) + 0.5f) / static_cast<float>(H)) * tv;
+            const glm::vec3 d = glm::normalize(fwd + right * sx + up * sy);
+            const float cover = scene::skyCirrus(rt.cirrus, d, rt.sunDirection).cover;
+            if (cover > 0.05f && cover < 0.8f) {
+                continue; // an edge: a fraction of a pixel decides it
+            }
+            const float brighter = luminance8(clouded.pixel(x, y)) - luminance8(none.pixel(x, y));
+            const bool gpuCovered = brighter > 0.15f;
+            const bool cpuCovered = cover >= 0.8f;
+            coveredSeen += cpuCovered ? 1 : 0;
+            (gpuCovered == cpuCovered ? agree : disagree) += 1;
+        }
+    }
+    INFO("pixels where the GPU layer and the CPU twin agree " << agree << ", disagree " << disagree << "; covered "
+                                                              << coveredSeen);
+    CHECK(coveredSeen > 300); // the frame has streaks in it, or this proves nothing
+    CHECK(disagree * 100 < agree); // under 1%
+}

@@ -1,6 +1,6 @@
 # ADR-1863: A material program can hold 96 ops
 
-- Status: Proposed, scene/strange-attractor (canyon Phase 2, 2026-10-28). Extends ADR-1661 (48 to 64) and ADR-036.
+- Status: Accepted by the owner (2026-10-28), scene/strange-attractor (canyon Phase 2). Extends ADR-1661 (48 to 64) and ADR-036.
 - Code:
   - `src/scene/material_program.hpp`: `kMaxMaterialOps` 64 → 96. `MaterialProgramGpu` grows from 7,536 to 11,120
     bytes; its `static_assert` is parametric.

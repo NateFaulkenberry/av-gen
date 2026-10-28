@@ -177,6 +177,12 @@ struct FrameUniforms {
     bandsSoft2: vec4<f32>,  // x = falloff, y = sky fill, z = 0, w = 1 when the bands are on
     bandsRate: vec4<f32>,   // the strips' dash rates
     bands: array<vec4<f32>, 8>, // strip k: [2k] axis xyz + offset, [2k + 1] width, intensity, segments, warmth
+    // ADR-1864: the analytic sky's cirrus layer (sky_cirrus.wgsl; scene::packSkyCirrus). x of the first = 0 is no
+    // layer. Mirrors FrameUniforms; appended last.
+    skyCirrus0: vec4<f32>,
+    skyCirrus1: vec4<f32>,
+    skyCirrus2: vec4<f32>,
+    skyCirrus3: vec4<f32>,
 };
 
 struct ObjectUniforms {

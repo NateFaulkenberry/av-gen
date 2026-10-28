@@ -609,6 +609,28 @@ struct PunctualLight {
 
 // ---- environment ------------------------------------------------------------------------------
 
+// ADR-1864: a thin streak cloud layer painted into the analytic sky -- cirrus, as the canyon's dusk has it. Analytic: each
+// direction is projected onto a plane `altitude` metres up and a stretched fbm decides the cover there; no volume march.
+// It is part of the one sky (the cube, the background, the CPU twin), so reflections and the lighting see it too.
+// `amount` 0 (the default) is no layer, and the sky is bit-identical to one without it.
+struct SkyCirrus {
+    float amount = 0.0f;       // 0 off .. 1 the streaks at full opacity
+    float coverage = 0.55f;    // the fbm level above which there is cloud (higher = fewer, thinner streaks)
+    float softness = 0.25f;    // how far above `coverage` the cloud is full
+    float altitude = 3500.0f;  // metres: the layer's height (sets how fast streaks crowd toward the horizon)
+    float length = 6000.0f;    // metres: the noise scale along the streaks
+    float width = 300.0f;      // metres: ... and across them
+    float direction = 0.0f;    // degrees: the streaks' axis, from +X toward +Z
+    glm::vec3 litColor{1.0f, 0.78f, 0.62f};   // radiance of a streak's sunward side (before the sky's intensity)
+    glm::vec3 shadeColor{0.32f, 0.30f, 0.52f}; // ... and of its far side
+    float sunScatter = 1.0f;   // forward scattering: streaks brighten toward the sun
+    float seed = 0.0f;         // offsets the pattern
+    // The share of the layer the sky CUBE carries -- the lighting and every reflection of the sky. A cube face is
+    // too coarse for a streak: at 1 a mirror-still river shows the layer as soft blotches; the visible sky is
+    // always the full, sharp layer.
+    float reflection = 1.0f;
+};
+
 // The sky's authored parameters. `enabled` defaults on; the renderer only reaches for the sky when
 // the scene has no environment map, so an existing scene gains reflections and keeps its look.
 struct SkySettings {
@@ -626,6 +648,7 @@ struct SkySettings {
     bool showBackground = false;     // draw the sky behind the scene instead of the background colour
     bool useKeyLight = true;         // take the sun direction from the scene's key light
     glm::vec3 sunDirection{0.35f, 0.75f, 0.55f}; // fallback direction *towards* the sun
+    SkyCirrus cirrus;                // ADR-1864
 };
 
 // ADR-345. Which background the scene pass should draw, as a function of the environment alone.
