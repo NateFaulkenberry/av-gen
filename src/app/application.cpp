@@ -1523,6 +1523,19 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
 
     gpu::ContextDesc cdesc;
     cdesc.metalLayer = window_ ? window_->metalLayer() : nullptr;
+    // ADR-1811: Dawn's persistent pipeline cache, so a new build starts its shader warm-up warm. AVGEN_PIPELINE_CACHE
+    // =off runs without it (the A/B arm, and a way out if a cache is ever suspected); =<dir> puts it elsewhere.
+    {
+        const char* env = std::getenv("AVGEN_PIPELINE_CACHE");
+        const std::string value = env != nullptr ? env : "";
+        if (value == "off" || value == "0") {
+            log::info("pipeline cache: off (AVGEN_PIPELINE_CACHE={})", value);
+        } else if (!value.empty()) {
+            cdesc.pipelineCacheDir = value;
+        } else if (const auto dir = platform::cacheDirectory(); !dir.empty()) {
+            cdesc.pipelineCacheDir = dir / "pipeline-cache";
+        }
+    }
     auto context = gpu::Context::create(cdesc);
     if (!context) {
         return std::unexpected(context.error());

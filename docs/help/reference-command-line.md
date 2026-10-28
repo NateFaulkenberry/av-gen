@@ -106,6 +106,7 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `AVGEN_QUALITY` | path to the Quality Lab CLI (`avgen_quality`) the live optimizer runs |
 | `AVGEN_DAWN_TOGGLES` | `a,b`: enable Dawn device toggles (investigation only; `dump_shaders` with `--log debug` dumps MSL) |
 | `AVGEN_PIPELINE_TIMING` | log every pipeline's creation time |
+| `AVGEN_PIPELINE_CACHE` | `off` (or `0`): run without the persistent pipeline cache; `<dir>`: keep it there instead of `~/Library/Caches/avgen/pipeline-cache` (ADR-1811). Startup only: it never changes a frame |
 | `AVGEN_SHADOW_STATS` | log the shadow views every thirtieth frame |
 | `AVGEN_EDITOR_TRACE` | print the editor's per-frame inputs and what it made of them |
 | `AVGEN_DIRTY_TRACE` | log each unsaved-changes sample |

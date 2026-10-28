@@ -10,12 +10,15 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 
 namespace avgen::gpu {
 
 class Surface;
+
+class BlobCache; // ADR-1811, gpu/blob_cache.hpp
 
 struct ContextDesc {
     void* metalLayer = nullptr;      // CAMetalLayer*; nullptr = headless (offscreen only)
@@ -24,6 +27,10 @@ struct ContextDesc {
     bool requestSharedTextures = true;
     bool preferHighPerformance = true;
     std::string label = "avgen";
+    // ADR-1811: where Dawn's persistent blob cache lives across processes (compiled shader artefacts). Empty: no
+    // persistent cache, as before -- the tests' contexts, so a test never depends on what an earlier run left. The
+    // cache uses a subdirectory keyed by the Dawn commit, the adapter and the OS build.
+    std::filesystem::path pipelineCacheDir;
 };
 
 struct Capabilities {
@@ -83,10 +90,15 @@ public:
 
     static std::string toString(wgpu::StringView view);
 
+    // ADR-1811: the persistent blob cache, or nullptr when none was asked for (or it could not be opened).
+    [[nodiscard]] const BlobCache* blobCache() const { return blobCache_.get(); }
+
 private:
     Context() = default;
     void onError(wgpu::ErrorType type, wgpu::StringView message);
 
+    // First, so it is destroyed last: Dawn's workers may still store into it while the device goes.
+    std::unique_ptr<BlobCache> blobCache_;
     wgpu::Instance instance_;
     wgpu::Adapter adapter_;
     wgpu::Device device_;

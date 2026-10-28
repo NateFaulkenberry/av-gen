@@ -113,6 +113,8 @@ target_sources(avgen_tests PRIVATE
     "${CMAKE_SOURCE_DIR}/src/rendering/light_data.cpp"
     # The frame timeline's interval arithmetic is GPU-free so it can be pinned without a device.
     "${CMAKE_SOURCE_DIR}/src/gpu/timeline_math.cpp"
+    # ADR-1811: the persistent pipeline cache's file store is plain files; its damage handling is checked here.
+    "${CMAKE_SOURCE_DIR}/src/gpu/blob_cache.cpp"
     # The frame statistics' arithmetic is GPU-free for the same reason (ADR-077): submitted-triangle
     # widening, the per-label medians and the removal attribution are where these can be wrong.
     "${CMAKE_SOURCE_DIR}/src/rendering/render_stats.cpp"

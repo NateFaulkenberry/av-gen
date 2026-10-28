@@ -86,6 +86,8 @@ if(AVGEN_GPU_SOURCES)
             "-framework Metal" "-framework IOSurface" "-framework CoreVideo" "-framework Foundation")
     endif()
     target_compile_definitions(avgen_gpu PUBLIC AVGEN_SHADER_SOURCE_DIR="${AVGEN_SHADER_SOURCE_DIR}")
+    # ADR-1811: the persistent pipeline cache's directory is keyed by the Dawn commit it was filled by.
+    target_compile_definitions(avgen_gpu PRIVATE AVGEN_DAWN_COMMIT="${AVGEN_DAWN_COMMIT}")
     avgen_set_warnings(avgen_gpu)
 endif()
 

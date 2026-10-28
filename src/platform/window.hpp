@@ -23,6 +23,9 @@ namespace avgen::platform {
 
 // Per-user writable directory for avgen settings (SDL_GetPrefPath); empty when unavailable.
 [[nodiscard]] std::filesystem::path preferencesDirectory();
+// ADR-1811: per-user directory for caches that may be deleted at any time (~/Library/Caches/avgen on macOS, else
+// <preferences>/cache); empty when unavailable.
+[[nodiscard]] std::filesystem::path cacheDirectory();
 
 struct WindowDesc {
     std::string title = "avgen";

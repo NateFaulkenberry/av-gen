@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <mutex>
 
 namespace avgen::platform {
@@ -17,6 +18,16 @@ std::filesystem::path preferencesDirectory() {
     std::filesystem::path dir(pref);
     SDL_free(pref);
     return dir;
+}
+
+std::filesystem::path cacheDirectory() {
+#if defined(__APPLE__)
+    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
+        return std::filesystem::path(home) / "Library" / "Caches" / "avgen";
+    }
+#endif
+    const std::filesystem::path prefs = preferencesDirectory();
+    return prefs.empty() ? prefs : prefs / "cache";
 }
 
 namespace {

@@ -1,7 +1,10 @@
 #include "gpu/context.hpp"
 
 #include "core/log.hpp"
+#include "gpu/blob_cache.hpp"
 #include "gpu/surface.hpp"
+
+#include <sys/sysctl.h>
 
 #include <algorithm>
 #include <array>
@@ -13,6 +16,15 @@
 namespace avgen::gpu {
 
 namespace {
+
+std::string osBuild() {
+    char buf[64] = {};
+    std::size_t size = sizeof(buf);
+    if (::sysctlbyname("kern.osversion", buf, &size, nullptr, 0) != 0) {
+        return "unknown";
+    }
+    return std::string(buf);
+}
 
 const char* backendName(wgpu::BackendType type) {
     switch (type) {
@@ -61,6 +73,13 @@ std::string Context::toString(wgpu::StringView view) {
 
 Context::~Context() {
     primarySurface_.reset(); // unconfigures before the device goes away
+    if (blobCache_) {
+        const BlobCacheStats s = blobCache_->stats();
+        log::info("pipeline cache: {} hit(s) ({:.1f} MB), {} miss(es), {} stored ({:.1f} MB), {} discarded as damaged, "
+                  "{} store failure(s)",
+                  s.loadHits, static_cast<double>(s.bytesLoaded) / 1.0e6, s.loadMisses, s.stores,
+                  static_cast<double>(s.bytesStored) / 1.0e6, s.corrupt, s.storeFailures);
+    }
 }
 
 Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
@@ -206,6 +225,35 @@ Result<std::unique_ptr<Context>> Context::create(const ContextDesc& desc) {
         togglesDesc.enabledToggleCount = toggles.size();
         togglesDesc.enabledToggles = toggles.data();
         log::info("Dawn toggles enabled from AVGEN_DAWN_TOGGLES: {}", list);
+    }
+    // ADR-1811: Dawn's persistent blob cache, so a new build does not start its shader warm-up from nothing.
+    wgpu::DawnCacheDeviceDescriptor cacheDesc{};
+    std::string cacheIsolation;
+    if (!desc.pipelineCacheDir.empty() && ctx->caps_.backendName != std::string("Null")) {
+        const std::string adapterKey = toString(info.vendor) + " " + toString(info.architecture) + " " +
+                                       toString(info.device) + " " + toString(info.description) + " " +
+                                       ctx->caps_.backendName;
+        const auto dir = desc.pipelineCacheDir /
+                         BlobCache::directoryKey(AVGEN_DAWN_COMMIT, ctx->caps_.adapterName, osBuild());
+        ctx->blobCache_ = std::make_unique<BlobCache>(dir);
+        cacheIsolation = adapterKey;
+        cacheDesc.isolationKey = wgpu::StringView(cacheIsolation.data(), cacheIsolation.size());
+        // The C++ wrapper's Set*Callback helpers do not compile for these two callbacks in this Dawn pin (no
+        // CArgConverter for them), so the C fields are filled through the wrapper's own layout-identical view of
+        // itself (Dawn static_asserts the layouts match). The cache travels as userdata; it outlives the device.
+        auto& c = const_cast<WGPUDawnCacheDeviceDescriptor&>(static_cast<const WGPUDawnCacheDeviceDescriptor&>(cacheDesc));
+        c.dawnLoadCacheDataCallbackInfo.callback = [](size_t keySize, const uint8_t* key, size_t valueSize,
+                                                      uint8_t* value, void* self, void*) -> size_t {
+            return static_cast<BlobCache*>(self)->load(key, keySize, value, valueSize);
+        };
+        c.dawnLoadCacheDataCallbackInfo.userdata1 = ctx->blobCache_.get();
+        c.dawnStoreCacheDataCallbackInfo.callback = [](size_t keySize, const uint8_t* key, size_t valueSize,
+                                                       const uint8_t* value, void* self, void*) {
+            static_cast<BlobCache*>(self)->store(key, keySize, value, valueSize);
+        };
+        c.dawnStoreCacheDataCallbackInfo.userdata1 = ctx->blobCache_.get();
+        togglesDesc.nextInChain = &cacheDesc;
+        log::info("pipeline cache: {}", dir.string());
     }
     deviceDesc.requiredFeatureCount = features.size();
     deviceDesc.requiredFeatures = features.data();
