@@ -1319,7 +1319,13 @@ hashes are bit-identical with particles on; the render job's sequence hash is th
 - `Analyzer`: bit-identical output for identical samples regardless of chunking or run.
 - Offline `Engine` runs: bit-identical parameter values and matrices across runs (tested).
 - Renderer: identical image hash for identical scene + time on the same GPU (tested). Cross-GPU
-  equality is not promised; a perceptual comparison is planned for visual regression.
+  equality is not promised.
+- Across commits: `tools/picture_check.py` (ADR-1810) captures three fixed frames of each reference live scene into a
+  LOCAL store outside the repository (`~/Library/Application Support/avgen/picture-store`; the frames show commercial
+  assets and are never committed) and compares two captures: SAME, WITHIN (at most 0.1% of pixels beyond 2 levels and
+  a mean change of at most 0.1 level) or DIFFERS. `capture --label before` on main, `capture --label after` on the
+  branch, `compare before after --heatmaps`. A seeded 2% exposure change is DIFFERS on every frame; a clean
+  re-capture is SAME (Rift: WITHIN, 1 level).
 
 ## Conventions
 
