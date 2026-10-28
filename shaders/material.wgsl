@@ -1,6 +1,6 @@
 // Procedural materials on the GPU (ADR-030, layered in ADR-036): the WGSL transliteration of
 // scene::evaluateMaterialProgram (src/scene/material_program.cpp). A packed MaterialProgramGpu
-// (7536 bytes: a 112-byte header (ADR-1642), 4 layer records of 64 bytes and 64 ops of 112 bytes (ADR-1661),
+// (11120 bytes: a 112-byte header (ADR-1642), 4 layer records of 64 bytes and 96 ops of 112 bytes (ADR-1863),
 // scene::packMaterialProgram) per slot in a *storage* MaterialProgramBlock;
 // evaluateMaterialProgram(slot, ctx, base) runs the base's ops over a register file of 8 vec4s
 // (all zero at entry), reads the outputs, then runs and composites each layer, with a register
@@ -48,10 +48,10 @@ struct MaterialProgramGpu {
     flags: vec4<i32>,             // ADR-904: x = MAT_FLAG_WRITES_EMISSION | MAT_FLAG_EMISSION_READS_INSTANCE
     textureOps: vec4<i32>,        // ADR-1642: op index of each texture op (-1 = none), sampled into fields slot 4 + k
     layers: array<MaterialLayerGpu, 4>,
-    ops: array<MaterialOpGpu, 64>,
+    ops: array<MaterialOpGpu, 96>,
 };
 
-// Mirrors rendering::MaterialProgramBlock (16 + 32 x 7536 = 241168 bytes: 32 slots since ADR-1675, 64 ops since ADR-1661; a storage buffer since ADR-036).
+// Mirrors rendering::MaterialProgramBlock (16 + 32 x 11120 = 355856 bytes: 32 slots since ADR-1675, 96 ops since ADR-1863; a storage buffer since ADR-036).
 struct MaterialProgramBlock {
     count: u32,
     pad0: u32,
@@ -60,7 +60,7 @@ struct MaterialProgramBlock {
     programs: array<MaterialProgramGpu, 32>,
 };
 
-const MAT_MAX_OPS: u32 = 64u;
+const MAT_MAX_OPS: u32 = 96u;
 const MAT_MAX_LAYERS: u32 = 4u;
 const MAT_MAX_FIELDS: u32 = 4u;   // scene::kMaxMaterialFields
 const MAT_MAX_PROGRAMS: i32 = 32; // ADR-1675 (was 16, ADR-1290; 8 before that)

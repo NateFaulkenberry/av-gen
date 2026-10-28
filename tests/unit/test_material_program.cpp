@@ -1525,7 +1525,7 @@ TEST_CASE("validate and pack: the layer budget", "[material]") {
     CHECK(p.totalOpCount() == kMaxMaterialOps);
     CHECK(p.validate().has_value());
     p.layers[0].ops.push_back(constantOp(1, glm::vec4(1.0f)));
-    CHECK_FALSE(p.validate().has_value()); // one op over the budget across the base and its layers (64, ADR-1661)
+    CHECK_FALSE(p.validate().has_value()); // one op over the budget across the base and its layers (96, ADR-1863)
 
     p.ops.clear();
     p.layers.clear();
@@ -2161,4 +2161,18 @@ TEST_CASE("texture ops pack their layer, array and pre-pass slot (ADR-1642)", "[
     plain.ops = {constantOp(0, glm::vec4(1.0f))};
     plain.baseColorRegister = 0;
     CHECK(packMaterialProgramWithSlots(plain, {}).textureOps == glm::ivec4(-1));
+}
+
+TEST_CASE("a material program can hold 96 ops, and the pack of a short program is unchanged", "[material][adr1863]") {
+    CHECK(kMaxMaterialOps == 96);
+    CHECK(sizeof(MaterialProgramGpu) == 112 + 64 * 4 + 112 * 96); // 11,120 bytes
+    MaterialProgram p;
+    p.name = "full";
+    p.ops.assign(96, constantOp(0, glm::vec4(0.5f)));
+    p.baseColorRegister = 0;
+    CHECK(p.validate().has_value());
+    const MaterialProgramGpu full = packMaterialProgramWithSlots(p, {});
+    CHECK(full.ops[95].kind == static_cast<std::uint32_t>(MaterialOpKind::Constant));
+    p.ops.push_back(constantOp(0, glm::vec4(0.5f)));
+    CHECK_FALSE(p.validate().has_value());
 }

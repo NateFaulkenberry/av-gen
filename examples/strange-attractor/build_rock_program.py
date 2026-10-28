@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes the canyonRock material program into strange-attractor-flythrough.scene.json (ADR-1857, 1859, 1860).
+"""Writes the canyonRock material program into strange-attractor-flythrough.scene.json (ADR-1857, 1859, 1860, 1862).
 
 The terrain mesh carries, per vertex:
   uv.x  the strata coordinate in bands, before the band warp (linear up a wall, so interpolation is exact)
@@ -22,8 +22,14 @@ FADE_FAR = 700.0   # laminations and relief are gone by here (metres); they star
 AO_AMBIENT, AO_ALBEDO = 0.85, 0.45
 SAND = [0.22, 0.10, 0.045]
 FLAT_BAND = 0.25   # how much of the band colour the flats take
+FLAT_RELIEF = 0.35 # the relief normal's share on flats
 STOPS = [[0.66, 0.44, 0.25, 1], [0.64, 0.31, 0.12, 1], [0.38, 0.11, 0.065, 1], [0.40, 0.22, 0.24, 1]]
 TAU = 2.0 * math.pi
+CONTOUR = 15.0              # metres between contour lines (every fifth is a major line)
+CONTOUR_PHASE = 6.0         # metres: keeps a line off the water line (lines at y = 15k - 6, majors at 75k - 6)
+CONTOUR_SHARP = 0.985       # cos threshold: the line's width (about 0.4 m at 15 m spacing)
+CONTOUR_FADE = 900.0        # metres: the contours are gone by here (from 0.3 of it)
+CONTOUR_COLOR = [1.0, 0.42, 0.14]
 
 ops = []
 def op(kind, dst, **kw):
@@ -96,14 +102,43 @@ op('add', 6, srcA=6, srcB=3)
 op('multiply', 6, srcA=6, srcB=7)                            # ledges and laminations: walls only
 op('remap', 1, srcA=1, constant=[0.25, 0.75, -RELIEF, RELIEF])
 op('multiply', 1, srcA=1, srcB=2)
+op('remap', 3, srcA=7, constant=[0, 1, FLAT_RELIEF, 1])       # flats take less: a grazing sun turns it to blotches
+op('multiply', 1, srcA=1, srcB=3)
 op('add', 6, srcA=6, srcB=1)                                 # relief: everywhere (the flats were glassy)
 op('constant', 3, constant=[1, 0, 0, 0])
 op('multiply', 6, srcA=6, srcB=3)
 op('constant', 3, constant=[0, 0, 1, 0])
 op('add', 6, srcA=6, srcB=3)                                 # (s, 0, 1)
 
-assert len(ops) <= 64, len(ops)
-prog = {'name': 'canyonRock', 'ops': ops, 'baseColor': 4, 'metallic': -1, 'roughness': -1, 'emission': -1,
+# ---- canyon Phase 2 (ADR-1862): contour tracing and the wall glow, as emission -----------------------------------
+# Their strengths arrive on the material's emission (the composition writes rgb = contour, glow from the
+# attractorWorld/contour and /glow parameters, which routes drive); the program writes its own emission.
+op('input', 1, input='worldPosition')
+op('swizzle', 1, srcA=1, constant=[1, 1, 1, 1])               # height
+op('palette', 2, srcA=1, constant=[0, 0, 0, 0], constant2=[1, 1, 1, 0], constant3=[1 / CONTOUR, 1 / CONTOUR, 1 / CONTOUR, 0],
+   constant4=[CONTOUR_PHASE / CONTOUR] * 3 + [0], value=0.0)   # cos(2 pi (y + phase) / spacing)
+op('smoothstep', 2, srcA=2, constant=[CONTOUR_SHARP, 1.0, 0, 0])
+op('palette', 3, srcA=1, constant=[0, 0, 0, 0], constant2=[1, 1, 1, 0],
+   constant3=[1 / (CONTOUR * 5), 1 / (CONTOUR * 5), 1 / (CONTOUR * 5), 0],
+   constant4=[CONTOUR_PHASE / (CONTOUR * 5)] * 3 + [0], value=0.0)
+op('smoothstep', 3, srcA=3, constant=[1 - (1 - CONTOUR_SHARP) / 5, 1.0, 0, 0])  # every fifth line, as wide
+op('remap', 2, srcA=2, constant=[0, 1, 0, 0.5])
+op('add', 2, srcA=2, srcB=3)                                  # minor lines at half the major's strength
+op('input', 3, input='depth')
+op('remap', 3, srcA=3, constant=[CONTOUR_FADE * 0.3, CONTOUR_FADE, 1, 0], value=1)
+op('multiply', 2, srcA=2, srcB=3)                             # gone before they could alias
+op('input', 3, input='materialEmission')
+op('swizzle', 1, srcA=3, constant=[0, 0, 0, 0])               # contour strength
+op('multiply', 2, srcA=2, srcB=1)
+op('constant', 1, constant=CONTOUR_COLOR + [1])
+op('multiply', 2, srcA=2, srcB=1)
+op('swizzle', 1, srcA=3, constant=[1, 1, 1, 1])               # glow strength
+op('multiply', 1, srcA=1, srcB=4)                             # the rock's own colour, lifted
+op('multiply', 1, srcA=1, srcB=7)                             # walls
+op('add', 2, srcA=2, srcB=1)
+
+assert len(ops) <= 96, len(ops)
+prog = {'name': 'canyonRock', 'ops': ops, 'baseColor': 4, 'metallic': -1, 'roughness': -1, 'emission': 2,
         'opacity': -1, 'normal': 6, 'occlusion': 0}
 d = json.load(open(SCENE))
 d['materialPrograms'] = [p for p in d.get('materialPrograms', []) if p['name'] != 'canyonRock'] + [prog]

@@ -10,6 +10,7 @@
 #include "scene/temporal_settings.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
+#include "scene/mesh_wire.hpp"
 #include "scene/composition_data.hpp"
 #include "scene/light_rig.hpp"
 #include "scene/procedural.hpp"
@@ -96,7 +97,8 @@ struct Scene {
     Ecosystem ecosystem;                         // ADR-1200; rendering::EcosystemRenderer (the first Environment)
     AstralForge astral;                          // ADR-1221; rendering::AstralRenderer (the second Environment)
     Clouds clouds;                           // ADR-1289; rendering::CloudRenderer (the third Environment)
-    AttractorWorldBlock attractorWorld;      // ADR-1850; rendering::AttractorRenderer (the Strange Attractor)
+    AttractorWorldBlock attractorWorld;      // ADR-1850 (drawn as engine geometry since ADR-1857/1861)
+    MeshWire meshWire;                       // ADR-1862; rendering::MeshWireRenderer, pass 1's blended section
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     // ADR-1642: the images the programs' texture ops read, decoded, one entry per (resolved path, colour space). Filled
     // by the composition from each program's `textures`; the renderer lays them into one array per colour space.

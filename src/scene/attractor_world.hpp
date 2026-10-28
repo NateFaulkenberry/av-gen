@@ -58,6 +58,10 @@ struct AttractorLook {
     float sunAzimuth = 70.0f;     // degrees from the composed view, toward the side that lights the escarpment
     float sunElevation = 9.0f;    // degrees above the horizon
     float sunIntensity = 1.0f;
+    // ADR-1862 (canyon Phase 2): the terrain program's audio-reactive inputs, carried to it on the chunks' material
+    // emission (rgb = contour, glow, spare; read by the program's `materialEmission` input).
+    float contour = 0.0f;         // contour tracing (Mode A): the iso-height lines' strength
+    float glow = 0.0f;            // a broad warm lift of the walls (sustained energy)
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines

@@ -1292,7 +1292,7 @@ constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
                                       "meshMinError", "water", "terrainProgram", "sunLux", "sunShadowBias", "look"};
-constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity"};
+constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow"};
 
 } // namespace
 
@@ -1365,6 +1365,8 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         k.sunAzimuth = l.value("sunAzimuth", k.sunAzimuth);
         k.sunElevation = l.value("sunElevation", k.sunElevation);
         k.sunIntensity = l.value("sunIntensity", k.sunIntensity);
+        k.contour = l.value("contour", k.contour);
+        k.glow = l.value("glow", k.glow);
     }
     a.liveGen = a.gen;
     a.live = a.look;
@@ -1400,7 +1402,8 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"sunLux", a.sunLux},
                 {"sunShadowBias", a.sunShadowBias},
                 {"look",
-                 {{"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation}, {"sunIntensity", k.sunIntensity}}}};
+                 {{"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation}, {"sunIntensity", k.sunIntensity},
+                  {"contour", k.contour}, {"glow", k.glow}}}};
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------
@@ -1480,6 +1483,8 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("sunAzimuth", "sun azimuth (deg from the view)", "Materials and Atmosphere", k.sunAzimuth, -180.0f, 180.0f);
     r.f("sunElevation", "sun elevation (deg)", "Materials and Atmosphere", k.sunElevation, -4.0f, 60.0f);
     r.f("sunIntensity", "key light", "Materials and Atmosphere", k.sunIntensity, 0.0f, 3.0f);
+    r.f("contour", "contour tracing", "Materials and Atmosphere", k.contour, 0.0f, 4.0f);
+    r.f("glow", "wall glow", "Materials and Atmosphere", k.glow, 0.0f, 4.0f);
     r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
         static_cast<int>(rest.camera), 0, 2);
     return p;
@@ -1503,6 +1508,8 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     k.sunAzimuth = fval(p, "sunAzimuth", k.sunAzimuth);
     k.sunElevation = fval(p, "sunElevation", k.sunElevation);
     k.sunIntensity = fval(p, "sunIntensity", k.sunIntensity);
+    k.contour = fval(p, "contour", k.contour);
+    k.glow = fval(p, "glow", k.glow);
     live.live = k;
     live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }

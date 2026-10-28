@@ -1,0 +1,117 @@
+{
+  "format": "avgen-project",
+  "version": 4,
+  "app": {
+    "name": "The Strange Attractor"
+  },
+  "assets": {
+    "scene": {
+      "kind": "composition",
+      "path": "strange-attractor-flythrough.scene.json"
+    },
+    "audio": "../../assets/audio/feline-footwear.wav",
+    "stems": [
+      {
+        "key": "drums",
+        "label": "Drums",
+        "role": "drums",
+        "file": "../../assets/audio/stems/feline-footwear (Drums).wav"
+      },
+      {
+        "key": "bass",
+        "label": "Bass",
+        "role": "bass",
+        "file": "../../assets/audio/stems/feline-footwear (Bass).wav"
+      },
+      {
+        "key": "synth",
+        "label": "Synth",
+        "role": "synth",
+        "file": "../../assets/audio/stems/feline-footwear (Synth).wav"
+      }
+    ]
+  },
+  "sonic": {
+    "response": {
+      "sensitivity": 0.5,
+      "transient": 0.5,
+      "sustain": 0.5,
+      "attack": 1.0,
+      "release": 1.0
+    }
+  },
+  "feeds": {
+    "beat": "stem.drums"
+  },
+  "sources": [],
+  "routes": [
+    {
+      "source": "response.onsetLow",
+      "target": "meshWire/wave",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 1.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "threshold": "binary",
+        "thresholdLevel": 0.8,
+        "envelope": "linearfall",
+        "envelopeFallPerSecond": 0.5,
+        "envelopeRefractoryMs": 3000.0,
+        "envelopeRearm": 0.3
+      }
+    },
+    {
+      "source": "response.bass",
+      "target": "meshWire/intensity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.75,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.45,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 1200.0,
+        "decayMs": 3000.0
+      }
+    },
+    {
+      "source": "response.high",
+      "target": "attractorWorld/contour",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.4,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.7,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 250.0,
+        "decayMs": 1200.0
+      }
+    }
+  ],
+  "render": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "output": "video",
+    "path": "renders/strange-attractor.mp4"
+  }
+}

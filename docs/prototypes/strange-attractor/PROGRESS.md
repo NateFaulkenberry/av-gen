@@ -172,6 +172,11 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-28: Canyon Phase 2 (geometric revelation). Notes in `07-canyon-phase2.md`.
+  - The ray-march is removed (ADR-1861).
+  - Mesh wire: the terrain's real triangles, read in place, with a travelling front (ADR-1862).
+  - Material programs can hold 96 ops (ADR-1863), for the contours.
+  - Audio routes on Feline Footwear and its stems.
 - 2026-10-28: Canyon Phase 1c.
   - Sun raised to 14° (warm corridor and reflections).
   - Opening streaks traced to the warped band coordinate (ADR-1860); the snow patch was the flat colour.

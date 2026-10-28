@@ -208,6 +208,7 @@ SceneRenderer::SceneRenderer(gpu::Context& context, gpu::ShaderLibrary& shaders)
       ecosystem_(std::make_unique<EcosystemRenderer>()),
       astral_(std::make_unique<AstralRenderer>()),
       clouds_(std::make_unique<CloudRenderer>()),
+      meshWire_(std::make_unique<MeshWireRenderer>()),
       ribbons_(std::make_unique<RibbonRenderer>()),
       shells_(std::make_unique<ShellRenderer>()),
       postProcessor_(std::make_unique<PostProcessor>(context, shaders)),
@@ -568,6 +569,9 @@ Result<void> SceneRenderer::init() {
     }
     // ADR-703: RIBBON draws inside the scene pass with the scene's own frame group and nothing else.
     if (auto r = ribbons_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_); !r) {
+        return r;
+    }
+    if (auto r = meshWire_->init(context_, shaders_, kHdrFormat, kDepthFormat, frameLayout_); !r) {
         return r;
     }
     // ADR-1200: the ecosystem runs its own passes after the lit pass, on the shared targets.
@@ -2544,6 +2548,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
     if (auto r = ribbons_->reload(shaders_); !r) {
         keep("ribbon.wgsl", r);
     }
+    if (auto r = meshWire_->reload(shaders_); !r) {
+        keep("mesh_wire.wgsl", r);
+    }
     for (EnvironmentRenderer* env : environments_) {
         if (auto r = env->reload(shaders_); !r) {
             keep(std::string(env->name()).c_str(), r);
@@ -2662,6 +2669,7 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
     probe2::frame().meshesUploaded += scene.meshes.size();
     meshes_.clear();
     meshes_.reserve(scene.meshes.size());
+    meshWire_->invalidate(); // ADR-1862: its bind groups name the buffers about to go
     // ADR-351. Rebuilt with the meshes and from the same version, because a chain is geometry and
     // a chain left behind by a scene that has been re-flattened is the derived-copy defect this
     // engine has found nine of.
@@ -2679,13 +2687,14 @@ void SceneRenderer::uploadMeshes(const scene::Scene& scene) {
         wgpu::BufferDescriptor vdesc{};
         vdesc.label = "mesh-vertices";
         vdesc.size = mesh.vertices.size() * sizeof(scene::Vertex);
-        vdesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst;
+        // ADR-1862: Storage too, so the mesh wire reads a mesh's triangles where the lit pass does (no copy).
+        vdesc.usage = wgpu::BufferUsage::Vertex | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         gpuMesh.vertices = context_.device().CreateBuffer(&vdesc);
         context_.queue().WriteBuffer(gpuMesh.vertices, 0, mesh.vertices.data(), vdesc.size);
         wgpu::BufferDescriptor idesc{};
         idesc.label = "mesh-indices";
         idesc.size = mesh.indices.size() * sizeof(std::uint32_t);
-        idesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::CopyDst;
+        idesc.usage = wgpu::BufferUsage::Index | wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         gpuMesh.indices = context_.device().CreateBuffer(&idesc);
         context_.queue().WriteBuffer(gpuMesh.indices, 0, mesh.indices.data(), idesc.size);
         gpuMesh.indexCount = static_cast<std::uint32_t>(mesh.indices.size());
@@ -5253,6 +5262,19 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // Nothing at all -- no bind, no upload -- when the frame has no strip (the gate).
         ribbons_->draw(rp, frameBindGroup_, scene.ribbons);
         stats_.drawCalls += ribbons_->stats().draws;
+        // ADR-1862: a mesh's own triangle edges, read from the buffers the lit pass just drew. Nothing at all -- no
+        // bind, no upload -- unless the scene's mesh wire is active (the gate).
+        meshWire_->draw(rp, frameBindGroup_, scene, [this](scene::MeshId id) {
+            MeshWireGeometry g;
+            if (id < meshes_.size() && meshes_[id].indexCount != 0) {
+                g.vertices = meshes_[id].vertices;
+                g.indices = meshes_[id].indices;
+                g.vertexBytes = meshes_[id].vertices.GetSize();
+                g.indexCount = meshes_[id].indexCount;
+            }
+            return g;
+        });
+        stats_.drawCalls += meshWire_->stats().draws;
         // Wave 3: the analytic proxy shells, beside the ribbons. They read the linear depth through
         // the frame group only when the prepass resolved it this frame. Nothing at all -- no bind, no
         // upload -- when the frame has no shell (the gate); group 2 is rebound by every lit draw after.

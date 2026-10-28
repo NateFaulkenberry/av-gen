@@ -1,7 +1,7 @@
 # Procedural materials (user guide and shader spec)
 
 Procedural materials (ADR-030, layered in ADR-036) replace a material's fixed base colour,
-metallic, roughness, emission and opacity with a small *program*: up to 64 ops (ADR-1661; 48 before) over 8 vec4
+metallic, roughness, emission and opacity with a small *program*: up to 96 ops (ADR-1863; 64 from ADR-1661, 48 before) over 8 vec4
 registers, evaluated per fragment by `shaders/material.wgsl` and, identically, on the CPU by
 `scene::evaluateMaterialProgram` (`src/scene/material_program.hpp`). Programs are data: JSON in
 the scene file, hot-editable buffers on the GPU, deterministic everywhere.
@@ -262,7 +262,7 @@ That is what makes wear, grime and oxide follow the surface instead of fading un
 Layers run bottom-up in array order, and each one sees the running height through the `height`
 input, so a second layer can mask itself against what the first one did.
 
-**The op budget is shared**: `base.ops.size() + Σ layer.ops.size() ≤ 64` (ADR-1661). `validate()` rejects more
+**The op budget is shared**: `base.ops.size() + Σ layer.ops.size() ≤ 96` (ADR-1863). `validate()` rejects more
 than that, more than four layers, and any register outside 0..7 (outputs: -1..7) in a base or a
 layer.
 
@@ -309,7 +309,7 @@ Scales, in practice, for an object a few metres across: macro at 0.2–1 cycles 
 
 Each op writes `"kind"` and only its non-default members: `enabled` (true), `dst`/`srcA`/
 `srcB`/`srcC` (0), `value` (1), `constant`…`constant4` (`[0,0,0,0]`), `seed` (1), `input`
-(`worldPosition`), `field` (""). `validate()` rejects more than 64 ops across the base and its
+(`worldPosition`), `field` (""). `validate()` rejects more than 96 ops across the base and its
 layers, more than four layers, more than four distinct field names, register indices outside 0..7,
 output registers outside -1..7 and `field` ops without a name; `fromJson` validates. `structuralHash()` covers every member (name,
 every op member, outputs, emission intensity, and every layer).
@@ -549,7 +549,7 @@ behaves as it always did.
 
 ### Limits
 
-- 8 programs per scene on the GPU, 64 ops each (ADR-1661) across the base and its layers, 4 layers,
+- 8 programs per scene on the GPU, 96 ops each (ADR-1863) across the base and its layers, 4 layers,
   8 registers — the CPU limits (`kMaxMaterialOps`, `kMaxMaterialLayers`, `kMaterialRegisters`)
   with the program count added.
 - 16 fields on the GPU (`spatial::kMaxGpuFields`), so a `field` op past the sixteenth reads zero.

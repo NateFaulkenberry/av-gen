@@ -65,7 +65,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1230,6 +1230,24 @@ void Composition::setAttractorWorld(AttractorWorldBlock block) {
     dirty_ = true;
 }
 
+void Composition::setMeshWire(MeshWire wire) {
+    meshWire_ = std::move(wire);
+    if (params_ != nullptr) { // attached already: register its knobs now
+        if (meshWireParams_) {
+            for (const params::IParameter* q : meshWireParams_->all) {
+                params_->remove(q->path());
+            }
+            meshWireParams_.reset();
+        }
+        if (!meshWire_.targets.empty()) {
+            meshWireParams_ = registerMeshWireParameters(*params_, meshWire_, "meshWire/" + sanitise(prefix_));
+            for (const params::IParameter* q : meshWireParams_->all) {
+                registeredPaths_.push_back(q->path());
+            }
+        }
+    }
+}
+
 void Composition::updateAttractorWorld() {
     AttractorWorldBlock& live = scene_.attractorWorld;
     if (!attractorWorld_.enabled) {
@@ -1285,6 +1303,15 @@ void Composition::updateAttractorWorld() {
         PunctualLight& sun = scene_.lights[static_cast<std::size_t>(attractorSunLight_)];
         sun.direction = -attractorSunDirection(*live.world, live.live);
         sun.intensity = attractorWorld_.sunLux * live.live.sunIntensity;
+    }
+    // ADR-1862: the program's audio-reactive inputs ride on the chunks' material emission (the `materialEmission`
+    // input): r contour, g glow. The program writes its own emission, so the carrier is never drawn as itself.
+    for (const std::size_t i : attractorChunks_) {
+        if (i < scene_.entities.size()) {
+            Material& m = scene_.entities[i].material;
+            m.emissiveColor = glm::vec3(live.live.contour, live.live.glow, 0.0f);
+            m.emissiveIntensity = 1.0f;
+        }
     }
 }
 
@@ -5228,6 +5255,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     if (attractorWorld_.enabled) {
         attractorParams_ = registerAttractorWorldParameters(params, attractorWorld_, "attractorWorld/" + sanitise(prefix_));
     }
+    // ADR-1862: the mesh wire's.
+    meshWireParams_.reset();
+    if (!meshWire_.targets.empty()) {
+        meshWireParams_ = registerMeshWireParameters(params, meshWire_, "meshWire/" + sanitise(prefix_));
+    }
     if (root) {
         addDefaultRoutes(modulator);
     } else {
@@ -7917,6 +7949,7 @@ void Composition::rebuild() {
     // ADR-1857: the Strange Attractor's canyon as engine geometry -- its terrain chunks through the scene pass with
     // the block's material program, its river through the water pipeline, and its sun as the key light.
     attractorSunLight_ = -1;
+    attractorChunks_.clear();
     if (attractorWorld_.enabled && attractorWorld_.world && attractorWorld_.world->terrainMesh) {
         const AttractorTerrainMesh& tm = *attractorWorld_.world->terrainMesh;
         const std::string program = sanitise(prefix_) + attractorWorld_.terrainProgram;
@@ -7934,6 +7967,7 @@ void Composition::rebuild() {
             mesh.indices = ch.indices;
             const auto id = static_cast<MeshId>(scene_.meshes.size());
             scene_.meshes.push_back(std::move(mesh));
+            attractorChunks_.push_back(scene_.entities.size());
             Entity& e = scene_.addEntity(fmt::format("attractor.terrain{}", c), id);
             e.material.baseColor = glm::vec4(0.55f, 0.38f, 0.30f, 1.0f);
             e.material.roughness = 0.92f;
@@ -9208,6 +9242,12 @@ void Composition::applyParameters() {
     applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
     updateAstral(); // ADR-1221: before the camera, which it may place
     updateAttractorWorld(); // ADR-1850: likewise
+    // ADR-1862: the mesh wire, with its finals (a route on meshWire/wave is the revelation front).
+    if (meshWireParams_) {
+        applyMeshWireParameters(*meshWireParams_, meshWire_, scene_.meshWire);
+    } else {
+        scene_.meshWire = meshWire_;
+    }
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -11402,6 +11442,9 @@ nlohmann::json Composition::toJson() const {
     if (!clouds_.lobes.empty()) {
         j["clouds"] = clouds_.toJson(); // ADR-1289
     }
+    if (!meshWire_.targets.empty()) {
+        j["meshWire"] = meshWireToJson(meshWire_); // ADR-1862
+    }
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
     }
@@ -12312,6 +12355,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("scene file '{}': {}", scenePath.string(), added.error().message);
             }
         }
+    }
+    if (j.contains("meshWire")) { // ADR-1862
+        auto wire = meshWireFromJson(j.at("meshWire"));
+        if (!wire) {
+            return fail("scene file '{}': {}", scenePath.string(), wire.error().message);
+        }
+        comp->setMeshWire(std::move(*wire));
     }
     if (j.contains("clouds")) { // ADR-1289
         const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");

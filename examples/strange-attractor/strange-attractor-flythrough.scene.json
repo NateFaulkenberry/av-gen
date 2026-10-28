@@ -114,7 +114,9 @@
     "resolution": 4096,
     "look": {
       "sunAzimuth": 70.0,
-      "sunElevation": 14.0
+      "sunElevation": 14.0,
+      "contour": 0.0,
+      "glow": 0.0
     },
     "strataFold": 0.7,
     "camera": "flight",
@@ -728,6 +730,23 @@
           "srcB": 2
         },
         {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 7,
+          "constant": [
+            0,
+            1,
+            0.35,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 3
+        },
+        {
           "kind": "add",
           "dst": 6,
           "srcA": 6,
@@ -764,12 +783,217 @@
           "dst": 6,
           "srcA": 6,
           "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 1,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 2,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "constant3": [
+            0.06666666666666667,
+            0.06666666666666667,
+            0.06666666666666667,
+            0
+          ],
+          "constant4": [
+            0.4,
+            0.4,
+            0.4,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0.985,
+            1.0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 3,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "constant3": [
+            0.013333333333333334,
+            0.013333333333333334,
+            0.013333333333333334,
+            0
+          ],
+          "constant4": [
+            0.08,
+            0.08,
+            0.08,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0.997,
+            1.0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0,
+            1,
+            0,
+            0.5
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "depth"
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            270.0,
+            900.0,
+            1,
+            0
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "materialEmission"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 3,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            1.0,
+            0.42,
+            0.14,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 3,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 4
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 7
+        },
+        {
+          "kind": "add",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
         }
       ],
       "baseColor": 4,
       "metallic": -1,
       "roughness": -1,
-      "emission": -1,
+      "emission": 2,
       "opacity": -1,
       "normal": 6,
       "occlusion": 0
@@ -1094,5 +1318,29 @@
     ],
     "hazeDistance": 45000,
     "powder": 0.2
+  },
+  "meshWire": {
+    "targets": [
+      "attractor.terrain"
+    ],
+    "color": [
+      1.0,
+      0.45,
+      0.15
+    ],
+    "intensity": 0.0,
+    "width": 1.0,
+    "creaseLow": 2.0,
+    "creaseHigh": 12.0,
+    "reveal": 1.0,
+    "fadeNear": 120.0,
+    "fadeFar": 1400.0,
+    "minPixels": 14.0,
+    "wave": 0.0,
+    "waveRadius": 1100.0,
+    "waveWidth": 60.0,
+    "waveGain": 1.6,
+    "waveAhead": 250.0,
+    "clipBelow": -0.5
   }
 }

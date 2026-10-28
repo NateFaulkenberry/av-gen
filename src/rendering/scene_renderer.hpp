@@ -29,6 +29,7 @@
 #include "rendering/ao_renderer.hpp"
 #include "rendering/shadow_mask_renderer.hpp"
 #include "rendering/water_renderer.hpp"
+#include "rendering/mesh_wire_renderer.hpp"
 #include "rendering/ribbon_renderer.hpp"
 #include "rendering/ecosystem_renderer.hpp"
 #include "rendering/cloud_renderer.hpp"
@@ -597,6 +598,7 @@ public:
     [[nodiscard]] ParticleRenderer& particles() { return *particles_; }
     // ADR-703: the camera-facing strips (Trail), and what they drew last frame.
     [[nodiscard]] const RibbonRenderer& ribbons() const { return *ribbons_; }
+    [[nodiscard]] const MeshWireRenderer& meshWire() const { return *meshWire_; }
     [[nodiscard]] const EcosystemRenderer& ecosystem() const { return *ecosystem_; } // ADR-1200
     // ADR-1200: the Environment seam. Every specialised environment renderer, in the order they run (after the lit
     // pass, before the medium).
@@ -1079,6 +1081,7 @@ private:
     std::unique_ptr<AstralRenderer> astral_;         // ADR-1221: the Astral Forge, the second Environment
     std::unique_ptr<CloudRenderer> clouds_; // ADR-1289
     std::vector<EnvironmentRenderer*> environments_; // ADR-1200: the seam, in run order (owned by SceneRenderer)
+    std::unique_ptr<MeshWireRenderer> meshWire_;     // ADR-1862: a mesh entity's triangle edges, pass 1's blended section
     std::unique_ptr<RibbonRenderer> ribbons_;        // ADR-703 (Wave 1): RIBBON, pass 1's blended section
     std::unique_ptr<ShellRenderer> shells_;          // Wave 3: SHELL, pass 1's blended section
     std::unique_ptr<PostProcessor> postProcessor_;
