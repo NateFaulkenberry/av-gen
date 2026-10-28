@@ -408,6 +408,9 @@ struct BenchmarkConditions {
     // so the wall-clock numbers of such a record are *perturbed* and must not be A/B'd against a
     // record without it. The GPU numbers are unaffected.
     bool clusterStats = false;
+    // ADR-1809: "offline" (the default headless frame) or "live" (`--live-frame`: the live editor's renderer modes).
+    // Two records measuring different frames are two workloads.
+    std::string frame = "offline";
 };
 
 // The workload the timings were taken over. Each is the median over the measured window, because a

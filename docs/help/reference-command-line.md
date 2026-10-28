@@ -72,6 +72,8 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `--profile-csv <f>` | one row per frame; implies `--profile-cpu` |
 | `--debug-target <t>` | show an auxiliary target: `normal`, `roughness`, `velocity`, `emission`, `ids`, `occlusion`, `depth` |
 | `--disable <list>` | switch phases off: `shadows`, `ao`, `volume`, `post`, `shadowmask` |
+| `--ab <phase>`, `--ab-blocks <n>` | headless A/B: the baseline and the phase switched off (or a quality arm), interleaved in one process; `--ab none` is the noise floor |
+| `--live-frame` | with `--headless` (and so `--ab`): measure the frame the **live editor** renders (live sky schedule, velocity on demand, compiled materials, live antialiasing) instead of the offline frame. Use it for live performance decisions (ADR-1809) |
 | `--canvas-scale <f>` | render at this fraction of the canvas's pixels, 0.25 to 1 |
 | `--stress <seed>` | apply random slider-like actions every frame |
 | `--ui-script <arms>` | drive the editor repeatably: `hover`, `sliders`, `panels`, `select`, `scrub`, `camera`, `tabs`, `viewpoint` (take the editor viewpoint, drag, play and seek; fails if anything but the drag moves the frame), or `idle` or `all` |

@@ -260,6 +260,11 @@ struct AppOptions {
     // number from a previous run of this program is not a baseline.
     std::string abArm;
     int abBlocks = 2; // A/B pairs; one pair cannot show whether the difference held
+    // ADR-1809: `--live-frame`. The headless benchmark (and so `--ab`) renders the frame the live editor renders --
+    // the live sky schedule, velocity on demand, compiled materials, pipeline deferral (`installLiveRenderModes`) --
+    // instead of the offline frame. Off by default: `--headless` is the offline engine, and an A/B for an offline
+    // decision must keep measuring the offline frame.
+    bool liveFrame = false;
     // ADR-142: quality arms (ADR-117) applied to an *ordinary* run, comma separated, so that a
     // frame can be captured and looked at under the same arm the A/B timed. Spec 50 requires a
     // quality reduction be inspected and not only timed, and until this existed an arm could only
@@ -385,6 +390,9 @@ private:
     // ADR-1090: `--live-profile`. Headless: its own fixed-step loop (app/live_profile_run.cpp). Live: the editor loop
     // runs as always and hands each frame to `noteLiveProfileFrame`, which ends the run when measurement is done.
     int runLiveProfileHeadless();
+    // ADR-1809: the renderer modes that make a frame the live editor's rather than an offline render's. One function,
+    // called by the live editor, the live profiler and a `--live-frame` benchmark, so the three cannot drift apart.
+    void installLiveRenderModes();
     struct LiveProfileSession;
     std::unique_ptr<LiveProfileSession> liveProfileSession_;
     bool compiledMaterialsSeen_ = false; // ADR-1493: the last frame's compiled-materials state, for the controller

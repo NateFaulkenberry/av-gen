@@ -407,15 +407,12 @@ int Application::runLiveProfileHeadless() {
     if (!options_.liveAntialias.has_value()) {
         base.antialiasFloor = rendering::kLiveAntialiasFloor;
     }
-    renderer_->setVelocityOnDemand(true); // ADR-1492: as the live editor renders
-    renderer_->setCompiledMaterials(true); // ADR-1493
     // ADR-1600: the sky the live editor performs (ADR-233's deferral, ADR-1070's capped, spread lighting rebuild),
-    // exactly as `runLive` sets it. Without it the headless profile rebuilt the procedural sky's lighting whenever its
-    // hash moved -- 697 of about 1,060 frames and 6.2 ms of CPU a frame in Rainbow World, against 0.03 ms live -- so
-    // it measured a frame nobody performs.
-    renderer_->setInteractiveEnvironmentBudget(2.0);
-    renderer_->setInteractivePipelineDeferral(true); // ADR-1805
-    renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
+    // velocity on demand (ADR-1492) and compiled materials (ADR-1493), exactly as `runLive` sets them -- one function
+    // since ADR-1809. Without it the headless profile rebuilt the procedural sky's lighting whenever its hash moved --
+    // 697 of about 1,060 frames and 6.2 ms of CPU a frame in Rainbow World, against 0.03 ms live -- so it measured a
+    // frame nobody performs.
+    installLiveRenderModes();
 
     if (const auto profile = liveQualityProfile()) {
         base = applyQualityProfile(base, *profile);

@@ -370,6 +370,9 @@ std::string usageText() {
            "                      separated, so a frame can be captured under the arm the A/B\n"
            "                      timed -- a quality reduction has to be looked at, not only timed\n"
            "  --ab-blocks <n>     A/B pairs to run (default 2)\n"
+           "  --live-frame        headless benchmark and --ab: render the LIVE editor's frame (live\n"
+           "                      sky schedule, velocity on demand, compiled materials) instead of\n"
+           "                      the offline frame; use it for live performance decisions\n"
            "  --bench-json <f>    write the run's machine-readable record (percentiles, counters,\n"
            "                      and the conditions that make it comparable) to <f>\n"
            "  --cluster-stats     report froxel-grid occupancy; CPU work inside the measured\n"
@@ -911,6 +914,8 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             }
             options.qualityArms = *v;
             ++i;
+        } else if (arg == "--live-frame") {
+            options.liveFrame = true; // ADR-1809
         } else if (arg == "--ab-blocks") {
             auto v = need(i, "--ab-blocks");
             if (!v) return std::unexpected(v.error());
@@ -4981,20 +4986,7 @@ int Application::runLive() {
     if (uiScript_.active()) {
         log::info("ui-script: '{}' driving the editor", options_.uiScript);
     }
-    // ADR-233, live only: above two milliseconds a sky rebuild waits for the drag to stop. The
-    // same number and the same reasoning as Engine::installController's procedural budget --
-    // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
-    // never calls this, so an offline render rebuilds whenever the hash moves, as it always did.
-    renderer_->setInteractiveEnvironmentBudget(2.0);
-    renderer_->setInteractivePipelineDeferral(true); // ADR-1805
-    // ADR-1492, live only as well: the velocity target is computed only on frames something reads it (motion blur
-    // open on the live level, an aux debug view). A render job has its own renderer and keeps it whatever.
-    renderer_->setVelocityOnDemand(true);
-    // ADR-1493: material programs compiled into the procedural lit pass, built on Dawn's workers when they change.
-    renderer_->setCompiledMaterials(true);
-    // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
-    // and rebuilds its lighting at a capped rate, spread across frames.
-    renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
+    installLiveRenderModes(); // ADR-1809
     // ---- the interleaved arms (--ui-ab) ---------------------------------------------------------
     //
     // One process, several interactions, cycled in blocks. The first `uiAbSettle` frames of a block
@@ -6722,6 +6714,23 @@ int Application::runQueue(const std::filesystem::path& queueFile) {
     return failures == 0 ? 0 : 7;
 }
 
+void Application::installLiveRenderModes() {
+    // ADR-233, live only: above two milliseconds a sky rebuild waits for the drag to stop. The
+    // same number and the same reasoning as Engine::installController's procedural budget --
+    // comfortably below a frame's share, comfortably above anything worth deferring. `runHeadless`
+    // calls this only under `--live-frame`, so an offline render rebuilds whenever the hash moves, as it always did.
+    renderer_->setInteractiveEnvironmentBudget(2.0);
+    renderer_->setInteractivePipelineDeferral(true); // ADR-1805
+    // ADR-1492, live only as well: the velocity target is computed only on frames something reads it (motion blur
+    // open on the live level, an aux debug view). A render job has its own renderer and keeps it whatever.
+    renderer_->setVelocityOnDemand(true);
+    // ADR-1493: material programs compiled into the procedural lit pass, built on Dawn's workers when they change.
+    renderer_->setCompiledMaterials(true);
+    // ADR-1070, live only as well: a sky the performance routes draws its background from the frame
+    // and rebuilds its lighting at a capped rate, spread across frames.
+    renderer_->setLiveSkyLighting({.enabled = options_.liveSkyRateHz > 0.0, .maxRateHz = options_.liveSkyRateHz});
+}
+
 int Application::runHeadless() {
     if (options_.liveProfile.enabled) {
         return runLiveProfileHeadless(); // ADR-1090
@@ -6780,6 +6789,23 @@ int Application::runHeadless() {
         return 2;
     }
     renderer_->setClusterStatsEnabled(options_.clusterStats);
+    // ADR-1809: `--live-frame` measures the frame the live editor renders. Without it this is the offline frame: on
+    // Rainbow World that rebuilt the procedural sky's lighting on most frames (6.3 ms of CPU, 37 ms GPU against 18 ms
+    // live) and its own null A/B varied 18% between blocks -- right for an offline decision, wrong for a live one.
+    if (options_.liveFrame) {
+        installLiveRenderModes();
+        if (!options_.liveAntialias.has_value()) {
+            rendering::QualitySettings q = renderer_->qualitySettings();
+            q.antialiasFloor = rendering::kLiveAntialiasFloor; // ADR-1024, as the live profiler does
+            renderer_->setQualitySettings(q);
+        }
+        log::info("headless: --live-frame: measuring the LIVE frame (live sky schedule, velocity on demand, compiled "
+                  "materials, pipeline deferral, live antialiasing); the live sky schedule reads a wall clock, so "
+                  "frames are not bit-reproducible");
+    } else if (!options_.abArm.empty()) {
+        log::info("headless: measuring the OFFLINE frame (the sky rebuilds whenever its hash moves); pass --live-frame "
+                  "for a live decision (ADR-1809)");
+    }
 
     // ---- the run's schedule (ADR-113) ----------------------------------------------------------
     //
@@ -6881,6 +6907,7 @@ int Application::runHeadless() {
     shared.platform = context_->capabilities().adapterName;
     shared.offlineFps = options_.offlineFps;
     shared.clusterStats = options_.clusterStats;
+    shared.frame = options_.liveFrame ? "live" : "offline"; // ADR-1809
     {
         const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         std::tm local{};

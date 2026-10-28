@@ -413,7 +413,8 @@ nlohmann::ordered_json conditionsJson(const BenchmarkConditions& c) {
                                   {"warmupFrames", c.warmupFrames},
                                   {"measuredFrames", c.measuredFrames},
                                   {"offlineFps", c.offlineFps},
-                                  {"clusterStatsPerturbsWallClock", c.clusterStats}};
+                                  {"clusterStatsPerturbsWallClock", c.clusterStats},
+                                  {"frame", c.frame}};
 }
 
 nlohmann::ordered_json countersJson(const BenchmarkCounters& c) {
