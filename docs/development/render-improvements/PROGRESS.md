@@ -31,11 +31,18 @@ Implements the owner-approved recommendations of the render audit (branch `resea
 | R3 quiet 60 Hz re-measure, eda492a6 vs current (owner's LG UltraFine at 60 Hz) | - | NOT RUN: at about 17:50 the only display was the built-in XDR (system_profiler, twice); the LG was not connected. eda492a6 is built and ready in `../av-gen-r3-eda492a6` (detached worktree, `build/release/src/avgen`) |
 | Both suites exit 0, commit (no push), hand back | | done: `cpu-assets` exit 0 (4,563 passed); `gpu` exit 0 (714 passed, 1 skipped: NDI). Commits 1798b90d, fbadf73a and this log; not pushed |
 
-Part 3 (after Part 2 merges; owner-approved): A2 specialised lit shader variants (material lab lit pass 8.4 -> <=5.9 ms,
-pixels within 1/255, reference scenes within picture_check tolerance, few variants, no compile stalls, first-frame time
-measured); A6 contact shadows as a quality-ladder lever (live off unless a scene asks; before/after frames). Sources:
-`git show exp/filament-eval:docs/research/filament-eval/REPORT.md` and `04-performance-and-latency.md`. Not approved:
-A1, A4, A5.
+## Part 3 (owner-approved; Part 2 merged at 8262c034)
+
+| Item | ADR | State |
+|---|---|---|
+| A2 lit-shader specialisation (override gates, per-scene sticky mask, on ADR-1812's variants) | 1815 | done. Lab lit pass 8.30 -> 2.70 ms (-67%, bar 30%); Rift -6.0 ms; pictures within 1 level |
+| A6 contact shadows as a ladder / optimizer lever (no algorithm change) | 1816 | done. Off at Medium and below; Ultra/offline unchanged; Rift -3.1 ms, lab -0.9 ms |
+| Warm-up before/after (Part 2 binary built in a temporary worktree, since removed) | 1815 | warm start-up unchanged within noise; Event Horizon +60 ms first frame |
+| Both suites exit 0, commit (no push) | | done: `cpu-assets` exit 0 (4,564 passed); `gpu` exit 0 (715 passed, 1 skipped: NDI). Commits e0f7cadd (A2), e9059b02 (A6) |
+| R3 eda492a6 vs current, interleaved, LG UltraFine at 60.00 Hz | 1817 | done: both PASS at 60 Hz, load median ~2; no regression (misses 1/2-3/1 per 900); live-only T4 fixed. `../av-gen-r3-eda492a6` can be removed |
+
+Material lab (Filament S1): extract it from `exp/filament-eval:prototypes/filament-eval/scenes/s1/` into scratch and point
+its HDRI at this worktree's `assets/hdri/` (it is not committed here).
 
 ## Notes for resume
 

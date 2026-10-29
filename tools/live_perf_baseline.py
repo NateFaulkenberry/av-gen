@@ -285,7 +285,9 @@ def thresholds(sc):
         return {"T1": False, "T2": False, "T3": False, "T4": False}
     t = {"T1": sc["missesMedian"] <= 5.0, "T2": sc["p99Median"] <= 40.0, "T3": sc["mediumOrBetter"] >= 0.90}
     h = sc.get("headless")
-    t["T4"] = bool(h) and h["gpuP50"] <= 29.3 and h["gpuP95"] <= 1.5 * h["gpuP50"]
+    # None: not judged. A --live-only run has no headless Ultra run, and T4 is that run's threshold; reporting it as
+    # lost made every live-only check FAIL whatever the live numbers said.
+    t["T4"] = None if not h else (h["gpuP50"] <= 29.3 and h["gpuP95"] <= 1.5 * h["gpuP50"])
     return t
 
 
@@ -371,8 +373,8 @@ def check(a):
                 reg.append("misses %.1f > %.1f + %.0f" % (sc["missesMedian"], b["missesWorst"], MISS_MARGIN))
             if sc["p99Median"] > b["p99Worst"] + P99_MARGIN_MS:
                 reg.append("p99 %.1f > %.1f + %.0f ms" % (sc["p99Median"], b["p99Worst"], P99_MARGIN_MS))
-        lost = [k for k, ok in t.items() if not ok and bt.get(k, False)]
-        marks = " ".join(("ok" if ok else ("LOST" if k in lost else "no")) for k, ok in t.items())
+        lost = [k for k, ok in t.items() if ok is False and bt.get(k, False)]
+        marks = " ".join(("-" if ok is None else "ok" if ok else ("LOST" if k in lost else "no")) for k, ok in t.items())
         fmt = lambda x, f="%.1f": "-" if x is None else f % x
         print("%-15s %7s %7s %6s %6s %5s%%  %-23s %s" % (
             scene, fmt(sc["missesMedian"]), fmt(b["missesMedian"]) if b else "-", fmt(sc["p99Median"]),
