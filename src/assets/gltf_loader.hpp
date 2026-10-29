@@ -24,6 +24,9 @@ struct GltfLoadOptions {
     bool loadImages = true;        // decode textures (false: materials keep factors only)
     bool generateNormals = true;   // compute smooth normals when a primitive has none
     std::string namePrefix;        // prepended to entity names (e.g. "helmet/")
+    // ADR-1819: KHR_materials_transmission, _volume and _ior become screen-space refraction (Material::refraction).
+    // Off: such a material imports as the opaque PBR material it was before ADR-1819.
+    bool importTransmission = true;
 };
 
 struct GltfLoadSummary {

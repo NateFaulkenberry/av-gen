@@ -161,6 +161,21 @@ else()
     message(WARNING "No Python 3 interpreter: the stem fixture is not generated and the stem tests will SKIP")
 endif()
 target_compile_definitions(avgen_tests PRIVATE AVGEN_STEM_FIXTURE_DIR="${AVGEN_STEM_FIXTURE_DIR}")
+# ADR-1819: the glTF glass fixture (a glass sphere with KHR_materials_transmission/_ior/_volume and its plain control),
+# built from nothing by a script, never downloaded or committed.
+set(AVGEN_GLASS_FIXTURE_DIR "${CMAKE_BINARY_DIR}/test-fixtures/glass")
+if(Python3_Interpreter_FOUND)
+    add_custom_command(
+        OUTPUT "${AVGEN_GLASS_FIXTURE_DIR}/glass.glb" "${AVGEN_GLASS_FIXTURE_DIR}/plain.glb"
+               "${AVGEN_GLASS_FIXTURE_DIR}/glass-blend.glb"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/make_glass_test_glb.py" --out "${AVGEN_GLASS_FIXTURE_DIR}"
+        DEPENDS "${CMAKE_SOURCE_DIR}/tools/make_glass_test_glb.py"
+        COMMENT "Generating the glTF glass test fixture"
+        VERBATIM)
+    add_custom_target(avgen_glass_fixture DEPENDS "${AVGEN_GLASS_FIXTURE_DIR}/glass.glb")
+    add_dependencies(avgen_tests avgen_glass_fixture)
+endif()
+target_compile_definitions(avgen_tests PRIVATE AVGEN_GLASS_FIXTURE_DIR="${AVGEN_GLASS_FIXTURE_DIR}")
 # ADR-1720: the Audio Response Lab's fixtures (seven categories, tools/audio_lab/make_fixtures.py), generated into the
 # build tree the same way. The causal replay tool (ADR-1725) is a dependency so the live path is scored too.
 set(AVGEN_AUDIO_LAB_FIXTURE_DIR "${CMAKE_BINARY_DIR}/test-fixtures/audio-lab")
@@ -236,6 +251,10 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         # ADR-1100: the engine reads and writes the project's live block through these.
         "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp")
     target_include_directories(avgen_render_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(avgen_render_tests PRIVATE AVGEN_GLASS_FIXTURE_DIR="${AVGEN_GLASS_FIXTURE_DIR}") # ADR-1819
+    if(TARGET avgen_glass_fixture)
+        add_dependencies(avgen_render_tests avgen_glass_fixture)
+    endif()
     # Output windows need the platform layer (SDL); the window smoke test enumerates displays.
     target_link_libraries(avgen_render_tests PRIVATE avgen_gpu avgen_platform Catch2::Catch2WithMain)
     # The Quality Lab's metric engine, so the render -> capture -> analyse path can be checked

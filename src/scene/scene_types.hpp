@@ -267,6 +267,9 @@ struct Refraction {
     // red reads least far, blue most), the two ends this fraction of the offset apart. 0 (the default) is the single
     // read; the live ladder takes it away from Medium (QualitySettings::refractionDispersion).
     float dispersion = 0.0f;
+    // ADR-1819: an imported glass's KHR_materials_transmission factor (0 = the ADR-1603 surface). Above 0 the surface's
+    // diffuse gives way to what it transmits, tinted by its base colour, and its specular stays on top.
+    float transmission = 0.0f;
     [[nodiscard]] bool enabled() const { return strength > 0.0f; }
 };
 

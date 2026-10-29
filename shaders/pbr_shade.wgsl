@@ -30,6 +30,12 @@
 #include "atmosphere_ground.wgsl"
 // ADR-1151: the reflection-only bands, read from the frame block (the particle path supplies its own).
 // ADR-1815: lit-shader specialisation (see lighting.wgsl for the light-loop gates). `true` in the general shader.
+// ADR-1819: set only by the entity refraction pipeline (`fs_main_refract`, an imported glass drawn after the refraction
+// copy): the diffuse is scaled by 1 - its KHR_materials_transmission factor (object.refraction1.w), because the light it
+// transmits replaces its diffuse, as glTF defines. `false` everywhere else, where the code below is compiled out and
+// the shading is the shader before ADR-1819 exactly; so is an imported glass's opaque fallback.
+override LIT_TRANSMISSION: bool = false;
+
 override LIT_PROGRAMS: bool = true;     // ADR-030 material programs (a draw with `materialSelect.program >= 0`)
 override LIT_FX: bool = true;           // ADR-703 entity effect lanes (`fxA.z != 0`)
 override LIT_OPTICS: bool = true;       // ADR-1143 anisotropy and thin film; ADR-1149/1152 surface detail
@@ -634,6 +640,30 @@ fn shadePbrInstanced(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, fr
     return shadeSurface(worldPos, normalIn, uv, frontFacing, colorMul, emissiveMul, info, screenUv).color;
 }
 
+// ADR-1818: the single-scattering directional albedo Ess(nDotV, roughness) of the specular lobe for f0 = 1, which is
+// the split-sum LUT's A + B. Taken from the LUT where the scene has an IBL (the same integral its specular uses) and
+// from Karis's analytic fit of that LUT otherwise, so the direct lights of a scene without an environment are
+// compensated too. Returns the compensation factor 1 + f0 (1 / Ess - 1); exactly 1 with the frame flag off
+// (`frame.lightCounts.w`, QualitySettings::multiScatter, the `nomultiscatter` arm).
+fn specularEnergyCompensation(nDotV: f32, roughness: f32, f0: vec3<f32>) -> vec3<f32> {
+    if (frame.lightCounts.w < 0.5) {
+        return vec3<f32>(1.0);
+    }
+    var ess: f32;
+    if (frame.envParams.w > 0.5) {
+        let dfg = textureSampleLevel(brdfLut, iblSampler, vec2<f32>(nDotV, roughness), 0.0).rg;
+        ess = dfg.x + dfg.y;
+    } else {
+        let c0 = vec4<f32>(-1.0, -0.0275, -0.572, 0.022);
+        let c1 = vec4<f32>(1.0, 0.0425, 1.04, -0.04);
+        let r = roughness * c0 + c1;
+        let a004 = min(r.x * r.x, exp2(-9.28 * nDotV)) * r.x + r.y;
+        let ab = vec2<f32>(-1.04, 1.04) * a004 + r.zw;
+        ess = ab.x + ab.y;
+    }
+    return vec3<f32>(1.0) + f0 * (1.0 / clamp(ess, 0.05, 1.0) - 1.0);
+}
+
 fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFacing: bool,
                 colorMul: vec3<f32>, emissiveMul: vec3<f32>, info: MaterialInstanceInfo,
                 screenUv: vec2<f32>) -> ShadeResult {
@@ -1068,7 +1098,12 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         f0 = clamp(f0 * thinFilmTint(nDotV, object.optics.x + surfaceDetail().film, object.optics.y, substrate, metallic),
                    vec3<f32>(0.0), vec3<f32>(1.0));
     }
-    let diffuseColor = albedo * (1.0 - metallic);
+    var diffuseColor = albedo * (1.0 - metallic);
+    var keptDiffuse = 1.0; // ADR-1819
+    if (LIT_TRANSMISSION) {
+        keptDiffuse = 1.0 - clamp(object.refraction1.w, 0.0, 1.0);
+        diffuseColor = diffuseColor * keptDiffuse;
+    }
     let alphaR = roughness * roughness;
 
     // ADR-1143: the anisotropy tangent. A mesh whose material has a normal map has a tangent frame (the
@@ -1127,7 +1162,12 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     ctx.anisoT = anisoT;
     ctx.anisoB = anisoB;
     let lit = directLighting(ctx);
-    let direct = lit.diffuse + lit.specular;
+    // ADR-1818: multiple-scattering energy compensation (Fdez-Aguera 2019; Filament's `energyCompensation`). A
+    // microfacet BRDF that scatters once loses the light that bounces between microfacets before it leaves, so rough
+    // metals come out too dark. 1 - Ess(nDotV, roughness) of the energy is missing, and scaling every specular lobe by
+    // 1 + f0 (1 / Ess - 1) puts it back.
+    let energyCompensation = specularEnergyCompensation(nDotV, roughness, f0);
+    let direct = lit.diffuse + lit.specular * energyCompensation;
 
     // ---- ambient occlusion (ADR-034): applied to ambient diffuse, and to specular via the bent normal ----
     // A material program already sampled it above (it can read the visibility); otherwise sample
@@ -1163,8 +1203,12 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let maxMip = frame.envParams.y;
         let prefiltered = textureSampleLevel(prefilteredMap, iblSampler, envRotate(r), roughness * maxMip).rgb;
         let brdf = textureSample(brdfLut, iblSampler, vec2<f32>(nDotV, roughness)).rg;
-        let specular = prefiltered * (kS * brdf.x + brdf.y) * specularOcclusion;
-        ambient = (kD * irradiance * albedo * visibility + specular) * frame.params.w;
+        let specular = prefiltered * (kS * brdf.x + brdf.y) * specularOcclusion * energyCompensation; // ADR-1818
+        var ambientDiffuse = kD * irradiance * albedo * visibility;
+        if (LIT_TRANSMISSION) {
+            ambientDiffuse = ambientDiffuse * keptDiffuse; // ADR-1819
+        }
+        ambient = (ambientDiffuse + specular) * frame.params.w;
     } else if (LIT_BANDS && frame.bandsSoft2.w > 0.5) {
         // ADR-1151: with no environment map, a scene that authored bands is lit by them (below) and its own
         // lights, not by the constant hemisphere a scene without either gets: a black void stays black.
@@ -1173,7 +1217,11 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let sky = vec3<f32>(0.10, 0.12, 0.20);
         let ground = vec3<f32>(0.02, 0.015, 0.03);
         let hemi = mix(ground, sky, bentNormal.y * 0.5 + 0.5);
-        ambient = (kD * albedo * hemi * visibility + kS * hemi * 0.5 * specularOcclusion) * 0.8;
+        var hemiDiffuse = kD * albedo * hemi * visibility;
+        if (LIT_TRANSMISSION) {
+            hemiDiffuse = hemiDiffuse * keptDiffuse; // ADR-1819
+        }
+        ambient = (hemiDiffuse + kS * hemi * 0.5 * specularOcclusion) * 0.8;
     }
     // ADR-1151: the reflection-only bands. Specular only (a band lights no diffuse term), with the
     // analytic split-sum scale and bias, the same specular occlusion as the IBL, and the anisotropic bend.

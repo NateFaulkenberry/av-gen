@@ -97,7 +97,7 @@ struct FrameUniforms {
     beat: vec4<f32>,           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
     clusterParams: vec4<f32>,  // xyz = froxel grid dimensions, w = 1 when the clustered path is on
     clusterDepth: vec4<f32>,   // x = slice scale, y = slice bias, z = near, w = far
-    lightCounts: vec4<f32>,    // x = directional lights, y = total lights, z = stylized shading
+    lightCounts: vec4<f32>,    // x = directional lights, y = total lights, z = stylized shading, w = ADR-1818 multi-scatter on
     shadowParams: vec4<f32>,   // x = atlas resolution, y = PCF radius (texels), z = contact steps, w = contact length
     aoParams: vec4<f32>,       // x = strength, y = 1 when AO is on, zw = the AO texture size
     targetSize: vec4<f32>,     // x = width, y = height, z = 1 / width, w = 1 / height
@@ -234,7 +234,8 @@ struct ObjectUniforms {
     optics: vec4<f32>,         // x = film thickness (nm, 0 = off), y = film ior, z = anisotropy strength
                                // (0 = off), w = anisotropy rotation (radians)
     // ADR-1603: screen-space refraction, read by procedural.wgsl's fs_proc_refract only. x = strength (0 = off),
-    // y = opacity, z = thickness (m), w = dispersion (ADR-1640, 0 = one read); refraction1.rgb = absorption per metre.
+    // y = opacity, z = thickness (m), w = dispersion (ADR-1640, 0 = one read); refraction1.rgb = absorption per metre,
+    // refraction1.w = ADR-1819's glTF transmission factor (0 = the ADR-1603 mix).
     refraction0: vec4<f32>,
     refraction1: vec4<f32>,
 };

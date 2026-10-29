@@ -292,7 +292,7 @@ struct FrameUniforms {
     glm::vec4 beat;           // beat phase 0..1, pulse (1 - phase), onset strength, bar phase
     glm::vec4 clusterParams;  // xyz = froxel grid dimensions, w = 1 when the clustered path is on
     glm::vec4 clusterDepth;   // x = slice scale, y = slice bias, z = near, w = far
-    glm::vec4 lightCounts;    // x = directional lights (always shaded), y = total lights, zw = 0
+    glm::vec4 lightCounts;    // x = directional lights (always shaded), y = total lights, z = stylized, w = ADR-1818 multi-scatter
     glm::vec4 shadowParams;   // x = atlas resolution, y = PCF radius (texels), z = contact steps, w = contact length
     glm::vec4 aoParams;       // x = strength, y = 1 when AO is on, zw = the AO texture size
     glm::vec4 targetSize;     // x = width, y = height, z = 1 / width, w = 1 / height
@@ -994,7 +994,10 @@ private:
                                                    wgpu::RenderPipeline* startInto = nullptr,
                                                    bool programTextures = false,
                                                    const CompiledMaterialVariants::Start* sink = nullptr,
-                                                   std::uint32_t litFeatures = 0x1FFu);
+                                                   std::uint32_t litFeatures = 0x1FFu, bool refract = false);
+    // ADR-1819: the refractive entities' pipelines (fs_main_refract culled and two-sided, and the depth lay-down), built
+    // the first time a frame has one. False when they failed (those entities draw opaque).
+    bool ensureEntityRefractPipelines(std::uint32_t litFeatures);
     // ADR-1815: the lit features this frame's entity draws can reach (rendering/lit_features.hpp), from the frame
     // uniforms, the staged object uniforms of `items` and the packed lights. Every feature when the scene has SDF
     // objects (their meshed draws use the entity pipelines with uniforms this scan does not see).
@@ -1165,6 +1168,11 @@ private:
     wgpu::RenderPipeline litOpaqueNoCull_;
     wgpu::RenderPipeline litBlend_;
     // ADR-1642: the same three with MAT_PROGRAM_TEXTURES, for entities whose program samples a texture.
+    wgpu::RenderPipeline entityRefractCull_;   // ADR-1819
+    wgpu::RenderPipeline entityRefractNoCull_; // ADR-1819
+    wgpu::RenderPipeline entityRefractDepth_;  // ADR-1819: the depth lay-down
+    bool entityRefractFailed_ = false;
+    std::uint32_t entityRefractFeatures_ = 0x1FFu; // ADR-1819: the lit features the refraction pipelines keep
     wgpu::RenderPipeline litTexturedOpaqueCull_;
     wgpu::RenderPipeline litTexturedOpaqueNoCull_;
     wgpu::RenderPipeline litTexturedBlend_;

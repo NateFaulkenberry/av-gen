@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -737,8 +738,44 @@ private:
         if (src.occlusionTexture.has_value()) {
             material.occlusionTexture = textureRef(*src.occlusionTexture, false, materialLabel, "occlusion");
         }
-        if (src.transmission || src.volume || src.clearcoat || src.sheen || src.specular || src.iridescence ||
-            src.anisotropy) {
+        // ADR-1819: glass. KHR_materials_transmission's factor, KHR_materials_ior's index and KHR_materials_volume's
+        // thickness and attenuation, onto ADR-1603's screen-space refraction (drawn after the refraction copy):
+        //   strength   = (ior - 1) * 0.08: the screen offset per unit of view-space normal, 0.04 for ior 1.5;
+        //   thickness  = the volume's thicknessFactor in metres (0, a thin wall: no absorption path);
+        //   absorption = -ln(attenuationColor) / attenuationDistance per channel (Beer-Lambert; none at infinity);
+        //   transmission is kept, so the diffuse gives way to what is transmitted (ADR-1819's glass mode).
+        // A transmission texture is not read (the factor stands for the whole surface).
+        if (options_.importTransmission && src.transmission && src.transmission->transmissionFactor > 0.0f) {
+            scene::Refraction& r = material.refraction;
+            r.transmission = std::clamp(static_cast<float>(src.transmission->transmissionFactor), 0.0f, 1.0f);
+            r.strength = std::clamp((static_cast<float>(src.ior) - 1.0f) * 0.08f, 0.005f, 0.5f);
+            r.opacity = 0.0f;
+            r.thickness = 0.0f;
+            r.absorption = glm::vec3(0.0f);
+            if (src.volume) {
+                r.thickness = std::max(static_cast<float>(src.volume->thicknessFactor), 0.0f);
+                const float distance = static_cast<float>(src.volume->attenuationDistance);
+                if (std::isfinite(distance) && distance > 0.0f) {
+                    for (int c = 0; c < 3; ++c) {
+                        const float colour = std::clamp(static_cast<float>(src.volume->attenuationColor[c]), 1e-4f, 1.0f);
+                        r.absorption[c] = -std::log(colour) / distance;
+                    }
+                }
+            }
+            // A transmissive material exported with alphaMode BLEND (Blender and others write that as the fallback
+            // for viewers without KHR_materials_transmission) is a glass, not a fade: the transmission is its
+            // see-through, so it draws opaque and refracts, as Filament's importer does. Its base alpha was the fallback.
+            if (material.alphaMode == scene::AlphaMode::Blend) {
+                material.alphaMode = scene::AlphaMode::Opaque;
+                material.opacity = 1.0f;
+            }
+            if (src.transmission->transmissionTexture.has_value()) {
+                warn(fmt::format("material '{}': the transmission texture is ignored (its factor is used)", materialLabel));
+            }
+        }
+        const bool transmissionUsed = options_.importTransmission && src.transmission;
+        if ((src.transmission && !transmissionUsed) || (src.volume && !transmissionUsed) || src.clearcoat ||
+            src.sheen || src.specular || src.iridescence || src.anisotropy) {
             warn(fmt::format("material '{}': advanced KHR_materials_* extensions ignored", materialLabel));
         }
         return material;
@@ -983,7 +1020,10 @@ Result<GltfLoadSummary> loadGltf(const std::filesystem::path& path, scene::Scene
 
     fastgltf::Parser parser(
         fastgltf::Extensions::KHR_lights_punctual | fastgltf::Extensions::KHR_materials_emissive_strength |
-        fastgltf::Extensions::KHR_texture_transform | fastgltf::Extensions::KHR_mesh_quantization);
+        fastgltf::Extensions::KHR_texture_transform | fastgltf::Extensions::KHR_mesh_quantization |
+        // ADR-1819: glass
+        fastgltf::Extensions::KHR_materials_transmission | fastgltf::Extensions::KHR_materials_volume |
+        fastgltf::Extensions::KHR_materials_ior);
     constexpr auto kOptions = fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages |
                               fastgltf::Options::GenerateMeshIndices |
                               fastgltf::Options::DecomposeNodeMatrices | fastgltf::Options::AllowDouble;

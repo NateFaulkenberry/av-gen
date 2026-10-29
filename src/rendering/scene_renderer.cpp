@@ -1317,7 +1317,7 @@ static_assert(sizeof(scene::Vertex) == 32);
 Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
                                                                wgpu::RenderPipeline* startInto, bool programTextures,
                                                                const CompiledMaterialVariants::Start* sink,
-                                                               std::uint32_t litFeatures) {
+                                                               std::uint32_t litFeatures, bool refract) {
     VertexLayoutStorage vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -1333,10 +1333,16 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
                      variant == LitVariant::Blend ? wgpu::ColorWriteMask::None : wgpu::ColorWriteMask::All);
     wgpu::FragmentState fragment{};
     fragment.module = module;
-    fragment.entryPoint = "fs_main";
+    fragment.entryPoint = refract ? "fs_main_refract" : "fs_main"; // ADR-1819
     fragment.targetCount = kSceneTargetCount;
     fragment.targets = colorTargets.data();
     std::vector<wgpu::ConstantEntry> constants;
+    if (refract) {
+        wgpu::ConstantEntry transmission{}; // ADR-1819: the glass's diffuse gives way to what it transmits
+        transmission.key = "LIT_TRANSMISSION";
+        transmission.value = 1.0;
+        constants.push_back(transmission);
+    }
     if (programTextures) {
         wgpu::ConstantEntry texturesOn{}; // ADR-1642
         texturesOn.key = "MAT_PROGRAM_TEXTURES";
@@ -1384,6 +1390,59 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
         return wgpu::RenderPipeline{};
     }
     return finishPipeline(desc, label);
+}
+
+bool SceneRenderer::ensureEntityRefractPipelines(std::uint32_t litFeatures) {
+    // ADR-1819: specialised to the scene's lit features (ADR-1815), as the opaque entities around the glass are: the
+    // general shader on the glass's pixels cost +1.3 ms on the S3 lab. Rebuilt when the (sticky) mask grows.
+    if (entityRefractCull_ && entityRefractNoCull_ && entityRefractDepth_ && entityRefractFeatures_ == litFeatures) {
+        return true;
+    }
+    if (entityRefractFailed_ || !pbrModule_) {
+        return false;
+    }
+    entityRefractFeatures_ = litFeatures;
+    auto a = createLitPipeline(pbrModule_, LitVariant::OpaqueCull, nullptr, false, nullptr, litFeatures, true);
+    auto b = createLitPipeline(pbrModule_, LitVariant::OpaqueNoCull, nullptr, false, nullptr, litFeatures, true);
+    // The depth lay-down: the prepass's stages inside the scene pass, its colour targets written by nothing.
+    VertexLayoutStorage vertex;
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
+    fillSceneTargets(colorTargets, kHdrFormat, nullptr, wgpu::ColorWriteMask::None, wgpu::ColorWriteMask::None);
+    wgpu::FragmentState fragment{};
+    fragment.module = pbrModule_;
+    fragment.entryPoint = "fs_depth";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = colorTargets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = kDepthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::Less;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "entity-refract-depth";
+    desc.layout = scenePipelineLayout_;
+    desc.vertex.module = pbrModule_;
+    desc.vertex.entryPoint = "vs_entity";
+    desc.vertex.bufferCount = 1;
+    desc.vertex.buffers = &vertex.layout;
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.primitive.frontFace = wgpu::FrontFace::CCW;
+    desc.primitive.cullMode = wgpu::CullMode::None;
+    desc.depthStencil = &depth;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    auto c = finishPipeline(desc, "entity-refract-depth");
+    if (!a || !b || !c) {
+        log::warn("the entity refraction pipelines failed ({}); refractive entities draw opaque (ADR-1819)",
+                  (!a ? a : !b ? b : c).error().message);
+        entityRefractFailed_ = true;
+        return false;
+    }
+    entityRefractCull_ = *a;
+    entityRefractNoCull_ = *b;
+    entityRefractDepth_ = *c;
+    log::info("entity refraction pipelines built (an imported glass or a refractive entity; ADR-1819)");
+    return true;
 }
 
 bool SceneRenderer::ensureTexturedLitPipelines() {
@@ -2082,6 +2141,8 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
          "particleSpawnScale<=0.7, particleCullDistance=60 m (non-hero emitters beyond it skipped)"},
         {"noprograms", [](QualitySettings& q) { q.materialProgramsOff = true; },
          "materialProgramsOff (programs bypassed: what they cost, a diagnostic arm only)"},
+        {"nomultiscatter", [](QualitySettings& q) { q.multiScatter = false; },
+         "multiScatter=false (single-scattering specular: the picture before ADR-1818)"},
         {"generallit", [](QualitySettings& q) { q.litGeneral = true; },
          "litGeneral (the general lit shader, no specialised variant: what ADR-1815 buys)"},
         {"aodepthnormals", [](QualitySettings& q) { q.aoDepthNormals = true; },
@@ -2343,6 +2404,10 @@ Result<void> SceneRenderer::reloadEngineShaders() {
             litTexturedOpaqueNoCull_ = nullptr;
             litTexturedBlend_ = nullptr;
             litTexturedFailed_ = false;
+            entityRefractCull_ = nullptr; // ADR-1819: rebuilt from the reloaded module on next need
+            entityRefractNoCull_ = nullptr;
+            entityRefractDepth_ = nullptr;
+            entityRefractFailed_ = false;
             sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_);
             if (entityMaterials_) {
                 entityMaterials_->reset(); // ADR-1812: rebuilt from the reloaded source on the next frame
@@ -3529,6 +3594,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ---- lights, shadow views and the froxel grid (ADR-033/034) ----
     updateLights(encoder, scene, view, aspect, frame);
     frame.lightCounts.z = scene.environment.stylized ? 1.0f : 0.0f;
+    frame.lightCounts.w = qualitySettings_.multiScatter ? 1.0f : 0.0f; // ADR-1818
     frame.shadowParams = glm::vec4(static_cast<float>(shadows_->resolution()), 1.5f,
                                    qualitySettings_.contactShadows && scene.environment.contactShadows // ADR-1406
                                        ? static_cast<float>(qualitySettings_.contactSteps)
@@ -3904,6 +3970,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             obj.toon2 = toon[2];
         }
         obj.optics = packOptics(m); // ADR-1143
+        {
+            // ADR-1819: an entity's refraction lanes (an imported glass, or a material that asks). Zero for every
+            // material without refraction, the bytes from before ADR-1819.
+            const PackedRefraction refraction = packRefraction(m, qualitySettings_.refractionDispersion);
+            obj.refraction0 = refraction.lane0;
+            obj.refraction1 = refraction.lane1;
+        }
         std::uint32_t mask = 0;
         auto has = [&](const scene::TextureRef& ref) {
             return ref.valid() && ref.texture < textures_.size() && textures_[ref.texture].valid();
@@ -4296,10 +4369,29 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
     });
     // ADR-1603: a refractive procedural surface reads the linear depth behind it (its absorption path).
+    // ADR-1819: refractive entities (imported glass): static opaque meshes only; a skinned or blended one draws as it did.
+    const auto refractiveEntity = [](const DrawItem& item) {
+        return !item.skinned() && item.entity->material.refraction.enabled();
+    };
+    const bool entityRefractive =
+        qualitySettings_.refraction && std::any_of(opaque.begin(), opaque.end(), refractiveEntity);
     const bool refractionWanted =
-        qualitySettings_.refraction &&
-        std::any_of(scene.procedurals.begin(), scene.procedurals.end(),
-                    [](const scene::ProceduralGeometry& p) { return p.material.refraction.enabled(); });
+        entityRefractive ||
+        (qualitySettings_.refraction &&
+         std::any_of(scene.procedurals.begin(), scene.procedurals.end(),
+                     [](const scene::ProceduralGeometry& p) { return p.material.refraction.enabled(); }));
+    // ADR-1819: with the pipelines ready, the refractive entities leave the opaque list (and so the depth prepass and the
+    // opaque draw) and are drawn after the refraction copy; until then they draw opaque, as at the ladder's Low.
+    std::vector<DrawItem> refractive;
+    const std::uint32_t refractFeatures = (compiledMode_ != CompiledMaterialsMode::Off && !qualitySettings_.litGeneral)
+                                              ? litFeaturesSeen_
+                                              : kAllLitFeatures;
+    if (entityRefractive && ensureEntityRefractPipelines(refractFeatures)) {
+        auto split = std::stable_partition(opaque.begin(), opaque.end(),
+                                           [&](const DrawItem& item) { return !refractiveEntity(item); });
+        refractive.assign(split, opaque.end());
+        opaque.erase(split, opaque.end());
+    }
     const bool needsDepthPrepass = refractionWanted || ao_->active() ||
                                    (qualitySettings_.contactShadows && scene.environment.contactShadows) ||
                                    scene.environment.depthPrepass || // ADR-1406
@@ -4918,7 +5010,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // one copy, then the water, then the refractive surfaces (each reads the frame as it stood before either).
         const bool cinematicWater = !water.empty() && water_->ready() && water_->anyCinematic();
         const bool refractiveSurfaces = procedurals_->refractionPhase();
-        if (cinematicWater || refractiveSurfaces) {
+        if (cinematicWater || refractiveSurfaces || !refractive.empty()) { // ADR-1819: the entities' glass too
             rp.End();
             const wgpu::Texture& src = hdr_.colorTexture();
             if (!refractionCopy_ || refractionCopy_.GetWidth() != hdr_.width() ||
@@ -4975,6 +5067,35 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             }
         }
         // ADR-1603: the refractive procedural surfaces, through the frame group that binds the copy.
+        if (!refractive.empty()) {
+            // ADR-1819: the refractive entities, as ADR-1603's procedurals are drawn: their depth first (one shade a
+            // pixel however many overlap), then their colour, through the frame group that binds the copy.
+            rp.SetBindGroup(0, frameBindGroupRefract_);
+            for (const bool layDown : {true, false}) {
+                for (const DrawItem& item : refractive) {
+                    const GpuMesh& mesh = *item.geometry;
+                    const auto& m = item.entity->material;
+                    rp.SetPipeline(layDown ? entityRefractDepth_
+                                   : (m.doubleSided || item.fxTwoSided) ? entityRefractNoCull_
+                                                                         : entityRefractCull_);
+                    rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+                    rp.SetBindGroup(2, materialBindGroup(m));
+                    rp.SetVertexBuffer(0, mesh.vertices);
+                    rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+                    rp.DrawIndexed(mesh.indexCount);
+                    ++stats_.state.pipelineBinds;
+                    stats_.state.bindGroupBinds += 2;
+                    ++stats_.state.vertexBufferBinds;
+                    ++stats_.state.indexBufferBinds;
+                    if (!layDown) {
+                        stats_.geometry.camera.record(mesh.indexCount, 1, false);
+                        ++stats_.drawCalls;
+                    }
+                }
+            }
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
+        }
         if (refractiveSurfaces) {
             rp.SetBindGroup(0, frameBindGroupRefract_);
             procedurals_->drawRefractive(rp, scene, [this](const scene::Material& m) { return materialBindGroup(m); });

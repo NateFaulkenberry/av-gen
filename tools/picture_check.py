@@ -85,7 +85,8 @@ def capture(a):
                 # the checkout the binary was built from (<checkout>/build/<preset>), not necessarily this one
                 "revision": git("rev-parse", "--short=8", "HEAD", cwd=checkout),
                 "dirty": bool(git("status", "--porcelain", "--untracked-files=no", cwd=checkout)),
-                "binary": avgen, "size": a.size, "tier": a.tier or "project", "fps": FPS, "frames": {}}
+                "binary": avgen, "size": a.size, "tier": a.tier or "project", "fps": FPS, "frames": {},
+                "qualityArm": a.quality_arm or ""}
     failed = []
     env = dict(os.environ, AVGEN_GPU_LOCK_TIMEOUT=os.environ.get("AVGEN_GPU_LOCK_TIMEOUT", "14400"))
     for scene in names:
@@ -102,6 +103,8 @@ def capture(a):
                     "--fps", "%g" % FPS, "--range", "%.4f:%.4f" % (t, t + 0.5 / FPS)]
             if a.tier:
                 args += ["--tier", a.tier]
+            if a.quality_arm:
+                args += ["--quality-arm", a.quality_arm] # e.g. the "before" of a change behind an arm, same binary
             log = os.path.join(out, scene, "t%06.2f.log" % t)
             with open(log, "w") as f:
                 rc = subprocess.run([os.path.join(ROOT, "tools", "gpu-lock.sh"), avgen] + args, cwd=ROOT, env=env,
@@ -170,8 +173,9 @@ def compare(a):
     da, db = os.path.join(store, a.a), os.path.join(store, a.b)
     ma = json.load(open(os.path.join(da, "manifest.json")))
     mb = json.load(open(os.path.join(db, "manifest.json")))
-    print("A %s: %s%s, %s, tier %s" % (a.a, ma["revision"], " (dirty)" if ma["dirty"] else "", ma["size"], ma["tier"]))
-    print("B %s: %s%s, %s, tier %s" % (a.b, mb["revision"], " (dirty)" if mb["dirty"] else "", mb["size"], mb["tier"]))
+    for label, m in ((a.a, ma), (a.b, mb)):
+        print("%s %s: %s%s, %s, tier %s%s" % ("A" if m is ma else "B", label, m["revision"], " (dirty)" if m["dirty"] else "",
+                                             m["size"], m["tier"], ", arm " + m["qualityArm"] if m.get("qualityArm") else ""))
     if (ma["size"], ma["tier"]) != (mb["size"], mb["tier"]):
         print("the captures were taken at different sizes or tiers: not comparable")
         return 2
@@ -222,6 +226,7 @@ def main():
     c.add_argument("--scenes", help="comma-separated subset of: " + ", ".join(SCENES))
     c.add_argument("--size", default="960x540")
     c.add_argument("--tier", help="render tier (default: each project's own render settings)")
+    c.add_argument("--quality-arm", help="quality arms (the --ab names, comma separated) applied to every render")
     c.add_argument("--store", default=DEFAULT_STORE)
     d = sub.add_parser("compare")
     d.add_argument("a")

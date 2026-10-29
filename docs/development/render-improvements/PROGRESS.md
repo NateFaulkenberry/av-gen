@@ -57,3 +57,18 @@ its HDRI at this worktree's `assets/hdri/` (it is not committed here).
   GPU work) and `batch2.sh` (the quiet pass used in ADR-1812/1813). The `--ab` arms: `interpreted`, `noprograms`,
   `aodepthnormals`.
 - The GPU lock is not first-come-first-served: another agent's suite can take it while a run of mine waits.
+
+## Part 4 (owner-approved: the rest of the Filament borrow list)
+
+Worktree `../av-gen-render-improve2`, branch `eng/render-borrow` from main `d245d0f0`; ADRs 1818-1839. After adding the
+worktree, link EVERY asset file (the link script misses some: Event Horizon's wreck boulders were absent and its
+frames "changed"): `(cd ../av-gen && find -L assets -type f) | while read f; do [ -e "$f" ] || ln -s ...; done`.
+
+| Item | ADR | State |
+|---|---|---|
+| 4a A5 multiple-scattering energy compensation | 1818 | done. Rough gold +17%; Rainbow/TH change most (<= 29 levels); cost unmeasurable; `nomultiscatter` |
+| 4a A4 glTF glass (transmission, volume, ior) through ADR-1603's refraction | 1819 | done. S3 glass clear, not milky; ~+0.6 ms on S3 (bar 0.5); non-glass models unchanged; fixture `tools/make_glass_test_glb.py` |
+| 4b A1 glossy SSR (Hi-Z, roughness fade, env fallback, ladder lever; flicker on video) | | after 4a merges. Do NOT touch water SSR; ask first if sharing code |
+
+S1 and S3 labs: extract from `exp/filament-eval:prototypes/filament-eval/scenes/s1|s3/` into scratch and point the
+HDRI at the main checkout's `assets/hdri/`.

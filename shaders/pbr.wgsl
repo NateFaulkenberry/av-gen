@@ -24,6 +24,7 @@ fn proceduralRungTier() -> f32 { return 0.0; }
 fn surfaceDetail() -> SurfaceDetail { return SurfaceDetail(vec3<f32>(0.0), 0.0, vec3<f32>(0.0), 0.0, 0.0, 0.0, 0.0); }
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
+#include "refraction.wgsl" // ADR-1819
 
 @group(2) @binding(8) var<uniform> fieldBlock: FieldBlock;
 
@@ -59,8 +60,8 @@ fn vs_entity(in: VertexIn) -> VertexOut {
     return meshVertexOut(in, world, prevWorld);
 }
 
-@fragment
-fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+// The entity's shaded output; the entry points below discard on the effect clip after calling it.
+fn entityShade(in: VertexOut, frontFacing: bool) -> SceneOut {
     let screenUv = in.clip.xy * frame.targetSize.zw;
     // ADR-703: this draw's effect lanes, for `shadeSurface` (pbr_shade.wgsl). A uniform branch: an
     // entity no lane effect touches has `fxA.z == 0`, reads no record, and leaves the lanes zero.
@@ -85,7 +86,25 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     out.emission = vec4<f32>(shaded.emission + energy * max(object.energy2.w, 0.0),
                              shaded.bloomWeight);
     out.ids = packIds(object.ids.x, object.ids.y);
+    return out;
+}
+
+@fragment
+fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    let out = entityShade(in, frontFacing);
     // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
+    if (fxClipDiscard) {
+        discard;
+    }
+    return out;
+}
+
+// ADR-1819: an imported glass (KHR_materials_transmission) drawn after the refraction copy, as ADR-1603's refractive
+// procedurals are: its shaded colour over what it transmits.
+@fragment
+fn fs_main_refract(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    var out = entityShade(in, frontFacing);
+    out.color = vec4<f32>(refractSurface(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
     if (fxClipDiscard) {
         discard;
     }

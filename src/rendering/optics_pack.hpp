@@ -35,7 +35,7 @@ namespace avgen::rendering {
 // so a material without dispersion packs the bytes it packed before ADR-1640.
 struct PackedRefraction {
     glm::vec4 lane0{0.0f}; // x = strength, y = opacity, z = thickness (m), w = dispersion (ADR-1640)
-    glm::vec4 lane1{0.0f}; // rgb = absorption per metre
+    glm::vec4 lane1{0.0f}; // rgb = absorption per metre, w = ADR-1819's transmission (0 = the ADR-1603 mix)
 };
 [[nodiscard]] inline PackedRefraction packRefraction(const scene::Material& m, bool dispersionAllowed) {
     PackedRefraction out;
@@ -43,7 +43,8 @@ struct PackedRefraction {
         const float dispersion = dispersionAllowed ? std::clamp(m.refraction.dispersion, 0.0f, 2.0f) : 0.0f;
         out.lane0 = glm::vec4(std::min(m.refraction.strength, 0.5f), std::clamp(m.refraction.opacity, 0.0f, 1.0f),
                               std::max(m.refraction.thickness, 0.0f), dispersion);
-        out.lane1 = glm::vec4(glm::max(m.refraction.absorption, glm::vec3(0.0f)), 0.0f);
+        out.lane1 = glm::vec4(glm::max(m.refraction.absorption, glm::vec3(0.0f)),
+                              std::clamp(m.refraction.transmission, 0.0f, 1.0f)); // ADR-1819
     }
     return out;
 }
