@@ -1,6 +1,6 @@
 # ADR-1866: Shadow cascades are fitted to the camera's basis, not its inverse view-projection
 
-- Status: Proposed, scene/strange-attractor (canyon shadow-jitter investigation, 2026-10-28).
+- Status: Accepted by the owner (2026-10-29), scene/strange-attractor (canyon shadow-jitter investigation, 2026-10-28).
 - Code:
   - `ShadowCamera` and `fitDirectionalCascade(const ShadowCamera&, …)` (`src/rendering/shadow_math.{hpp,cpp}`). Both fit
     paths share `fitSlice`.

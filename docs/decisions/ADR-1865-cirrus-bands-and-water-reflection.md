@@ -1,6 +1,6 @@
 # ADR-1865: Cirrus bands, and water that reflects the cirrus
 
-- Status: Proposed, scene/strange-attractor (canyon cirrus follow-up, 2026-10-28). Extends ADR-1864.
+- Status: Accepted by the owner (2026-10-29), scene/strange-attractor (canyon cirrus follow-up, 2026-10-28). Extends ADR-1864.
 - Code:
   - `SkyCirrus::bands` and `SkyCirrus::bandWidth` (`src/scene/scene_types.hpp`).
   - `scene::skyCirrus` and `packSkyCirrus` (`src/scene/sky.{hpp,cpp}`). The pack now has a fifth vec4: bands, band
