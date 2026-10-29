@@ -1381,15 +1381,74 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         v3("shallowColor", ws.shallowColor);
         v3("deepColor", ws.deepColor);
         v3("reflectionTint", ws.reflectionTint);
-        for (auto [key, t] : {std::pair{"shallow", &ws.shallow}, std::pair{"roughness", &ws.roughness},
-                              std::pair{"clarity", &ws.clarity}, std::pair{"maxOpacity", &ws.maxOpacity},
-                              std::pair{"edgeFade", &ws.edgeFade}, std::pair{"fresnel", &ws.fresnel},
-                              std::pair{"reflection", &ws.reflection}, std::pair{"specular", &ws.specular},
-                              std::pair{"ripple", &ws.ripple}, std::pair{"rippleScale", &ws.rippleScale},
-                              std::pair{"ssr", &ws.ssr}, std::pair{"ssrDistance", &ws.ssrDistance},
-                              std::pair{"ssrSteps", &ws.ssrSteps}, std::pair{"ssrGain", &ws.ssrGain},
-                              std::pair{"skyMirror", &ws.skyMirror}}) {
-            if (wj.contains(key)) *t = wj.at(key).get<float>();
+        // Every float WaterSettings key the scene file's water reader knows (composition.cpp's terrain water block), and
+        // nothing else: an unknown key fails the load. The list used to be fifteen keys long and dropped the rest in
+        // silence, so `foam`, `reflectionRays` and the like in this block did nothing at all.
+        const std::pair<const char*, float*> floats[] = {
+            std::pair{"shallow", &ws.shallow},
+            std::pair{"roughness", &ws.roughness},
+            std::pair{"emissiveIntensity", &ws.emissiveIntensity},
+            std::pair{"clarity", &ws.clarity},
+            std::pair{"maxOpacity", &ws.maxOpacity},
+            std::pair{"edgeFade", &ws.edgeFade},
+            std::pair{"fresnel", &ws.fresnel},
+            std::pair{"reflection", &ws.reflection},
+            std::pair{"specular", &ws.specular},
+            std::pair{"ripple", &ws.ripple},
+            std::pair{"rippleScale", &ws.rippleScale},
+            std::pair{"rippleSpeed", &ws.rippleSpeed},
+            std::pair{"chop", &ws.chop},
+            std::pair{"foam", &ws.foam},
+            std::pair{"foamWidth", &ws.foamWidth},
+            std::pair{"refraction", &ws.refraction},
+            std::pair{"glow", &ws.glow},
+            std::pair{"glowScale", &ws.glowScale},
+            std::pair{"glowCoverage", &ws.glowCoverage},
+            std::pair{"glowDepth", &ws.glowDepth},
+            std::pair{"sparkle", &ws.sparkle},
+            std::pair{"swell", &ws.swell},
+            std::pair{"cascade", &ws.cascade},
+            std::pair{"tears", &ws.tears},
+            std::pair{"tearShear", &ws.tearShear},
+            std::pair{"tearCoverage", &ws.tearCoverage},
+            std::pair{"tearCell", &ws.tearCell},
+            std::pair{"tearSpacing", &ws.tearSpacing},
+            std::pair{"tearStretch", &ws.tearStretch},
+            std::pair{"tearDrift", &ws.tearDrift},
+            std::pair{"tearWind", &ws.tearWind},
+            std::pair{"ssr", &ws.ssr},
+            std::pair{"ssrDistance", &ws.ssrDistance},
+            std::pair{"ssrSteps", &ws.ssrSteps},
+            std::pair{"ssrGain", &ws.ssrGain},
+            std::pair{"transmission", &ws.transmission},
+            std::pair{"undulation", &ws.undulation},
+            std::pair{"undulationScale", &ws.undulationScale},
+            std::pair{"roughnessVariation", &ws.roughnessVariation},
+            std::pair{"streak", &ws.streak},
+            std::pair{"reflectionRays", &ws.reflectionRays},
+            std::pair{"tintPatches", &ws.tintPatches},
+            std::pair{"tintPatchScale", &ws.tintPatchScale},
+            std::pair{"glints", &ws.glints},
+            std::pair{"flowStreaks", &ws.flowStreaks},
+            std::pair{"streakDensity", &ws.streakDensity},
+            std::pair{"streakLength", &ws.streakLength},
+            std::pair{"streakLines", &ws.streakLines},
+            std::pair{"streakSpeed", &ws.streakSpeed},
+            std::pair{"streakHighlight", &ws.streakHighlight},
+            std::pair{"streakColorScale", &ws.streakColorScale},
+            std::pair{"skyMirror", &ws.skyMirror}};
+        for (auto it = wj.begin(); it != wj.end(); ++it) {
+            const std::string& key = it.key();
+            if (key == "shallowColor" || key == "deepColor" || key == "reflectionTint") continue;
+            bool known = false;
+            for (const auto& [name, target] : floats) {
+                if (key == name) {
+                    known = true;
+                    if (!it->is_number()) return fail("attractorWorld: water '{}' must be a number", key);
+                    *target = it->get<float>();
+                }
+            }
+            if (!known) return fail("attractorWorld: unknown water key '{}'", key);
         }
     }
     if (j.contains("look")) {

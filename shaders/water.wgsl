@@ -120,7 +120,7 @@ fn waterLinearDepthAt(uv: vec2<f32>) -> f32 {
 // Screen-space reflection, marched in world space against the opaque frame's linear depth. Returns the
 // reflected radiance and, in w, how much of it to trust: 0 where the ray leaves the frame, goes behind the
 // camera, or finds nothing within its reach (the environment reflection stands there instead).
-fn waterSsr(p: vec3<f32>, r: vec3<f32>, rough: f32, jitter: f32) -> vec4<f32> {
+fn waterSsr(p: vec3<f32>, r: vec3<f32>, rough: f32, jitter: f32, spread: f32) -> vec4<f32> {
     if (water.params.z < 0.5) {
         return vec4<f32>(0.0);
     }
@@ -177,7 +177,9 @@ fn waterSsr(p: vec3<f32>, r: vec3<f32>, rough: f32, jitter: f32) -> vec4<f32> {
     let far = 1.0 - smoothstep(0.7 * reach, reach, hitS);
     // the reflection blurs with the surface's roughness and with how far the ray travelled to its hit,
     // measured in the hit's own screen size (a metre of travel is fewer pixels far away)
-    let radius = clamp(rough * hitS / max(ch.w, 0.5) * 0.9, 0.0, 0.03);
+    // ADR-1868: plus the reflected ray's own spread across the pixel (ripples bending it), so the hit's colour is the
+    // average over what the pixel's rays see rather than one point of it
+    let radius = clamp((rough * 0.9 + spread * 0.5) * hitS / max(ch.w, 0.5), 0.0, 0.03);
     return vec4<f32>(waterSceneAt(uvh, radius), edge * far);
 }
 // ---- cinematic (ADR-1286) end ----
@@ -950,6 +952,15 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // surface back into a surface.
     let f0 = clamp(water.surface.x, 0.0, 1.0);
     let fresnel = f0 + (1.0 - f0) * pow(1.0 - nDotV, 5.0);
+    // ADR-1868: the reflected ray's spread across one pixel (radians), taken here in uniform control flow. The
+    // ripple layers fade by their own wavelength on screen (rippleLayerFade), but what the eye sees is the REFLECTION
+    // they bend: a ripple three pixels long still swings the reflected ray across a bank edge, a streak or the rim of
+    // an SSR hit within a pixel, and as the camera moves the sample lands on the other side -- the flicker along the
+    // banks. Every reflection lookup below filters itself by this spread.
+    let reflectSpread = length(fwidth(reflect(-v, n)));
+    let reflectFlatSpread = length(fwidth(reflect(-v, vec3<f32>(0.0, 1.0, 0.0))));
+    // how much of the spread is the ripples' (0) rather than the view's own (1)
+    let rippleAlias = smoothstep(1.5, 4.0, reflectSpread / max(reflectFlatSpread, 1e-5));
     var reflected = water.reflectTint.rgb * frame.styledSky.rgb;
     if (frame.envParams.w > 0.5) {
         let r = reflect(-v, n);
@@ -969,7 +980,9 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
             // metres of sky high up but a hair's width of reflected angle), so the streaks see the surface with its
             // ripples eased toward flat by `cirrusFlatten`, and fade where the reflected direction still changes
             // faster across a pixel than a streak is wide.
-            let nc = normalize(mix(n, vec3<f32>(0.0, 1.0, 0.0), WATER_CIRRUS_FLATTEN));
+            // ADR-1868: where the ripples swing the reflected ray by several times the view's own spread across a pixel,
+            // the streaks see a flat mirror: their pattern cannot be resolved there, only aliased.
+            let nc = normalize(mix(n, vec3<f32>(0.0, 1.0, 0.0), mix(WATER_CIRRUS_FLATTEN, 1.0, rippleAlias)));
             let rc = envRotate(reflect(-v, nc));
             let cs = skyCirrus(rc, frame.skySun.xyz, frame.skyCirrus0, frame.skyCirrus1, frame.skyCirrus2,
                                frame.skyCirrus3, frame.skyCirrus4);
@@ -1067,7 +1080,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
             let u = (f32(k) + fract(jitter * 7.13 + f32(k) * 0.618)) / f32(rays) - 0.5;
             let nk = normalize(n + along * (u * water.cineC.x));
             let rr = reflect(-v, nk);
-            let ssr = waterSsr(in.worldPos, rr, cineRough, fract(jitter + f32(k) * 0.37));
+            let ssr = waterSsr(in.worldPos, rr, cineRough, fract(jitter + f32(k) * 0.37), reflectSpread);
             acc = acc + ssr.rgb * ssr.w;
             wsum = wsum + ssr.w;
             peak = max(peak, dot(ssr.rgb * ssr.w, vec3<f32>(0.2126, 0.7152, 0.0722)));

@@ -75,5 +75,49 @@ coarser near triangles, but brings back the teeth.
 
 ## Flicker (coordinator's metric)
 
-On the new clip: median 0.004, p90 0.015, p99 0.041, max 0.13. The `canyon-cirrus2` clip measured 0.004 / 0.014 /
+On the new clip (before the water fixes): median 0.004, p90 0.015, p99 0.041, max 0.13. After them: see `07-measures.txt`. The `canyon-cirrus2` clip measured 0.004 / 0.014 /
 0.044 / 0.15. The offline 46 s render at 2x supersample took 293 s, down from 433.
+
+## Water flicker at the banks (ADR-1868)
+
+Media is in `canyon-shadows2/water/`:
+- `01`–`03`: four frames at 14.0, 16.9 and 20.8 s, before on top and after below.
+- `04-bank-16-19s-LEFT-before-RIGHT-after-1080p-crop.mp4`.
+- `05-measures.txt`.
+
+**Measure.** Luminance flips per frame among water pixels within 4 px of rock. The mask is a same-camera render with
+the river painted flat green.
+
+**Frozen camera.** 0.00–0.01% flips: view-dependent, not noise.
+
+**Floor.** The green render itself flips 4.8%: the waterline's geometric edge stair-stepping. Depth precision was
+ruled out (a 10× near plane changed nothing). This is the floor any edge has without MSAA; the 2x supersampled final
+reduces it.
+
+**Causes:**
+1. **The river carried the engine's default 0.55 foam band.** The attractor's water block silently dropped every water
+   key outside a fifteen-key list. The foam band is 0.42 m of depth, which far away is a one-pixel bright line hugging
+   every bank and crawling in dashes. Fixed by reading every key, refusing unknown ones, and setting `foam` 0.
+2. **ADR-1865's reflected cirrus, ours.** The ripples swing the reflected ray across a streak within a pixel. The water
+   now measures the reflected ray's spread across the pixel; where the ripples dominate, the cirrus is looked up on a
+   flat mirror, and the SSR hit is blurred by the same spread. The GPU test (derived control) measures 2,658 → 595 sign
+   reversals.
+
+**Ruled out:**
+
+| Candidate | Finding |
+|---|---|
+| Sky mirror | No effect |
+| Specular glint | No effect |
+| Depth-based shore fade | No effect, even widened to two pixels |
+| z-fighting / depth precision | Near plane ×10: no effect |
+| SSR hit/miss | Removing SSR is worse; four rays is worse |
+| Reflected shadows | Frozen camera is clean, and shadows don't move with time |
+
+**Result.** Full flight bank flips 6.48% → 5.33%, against the 4.77% floor: the excess fell by two thirds. Open water
+2.85% → 2.17%.
+
+**Cost.** GPU 26.4 → 26.2 ms (no measurable cost).
+
+**Still visible.** Sparse light specks along the waterline sliver (01–03, both rows). They are in the green-mask render
+too, so they are the geometric edge, not shading.

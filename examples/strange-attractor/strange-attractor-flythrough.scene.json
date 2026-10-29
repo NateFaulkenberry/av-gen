@@ -173,7 +173,8 @@
       "ssrDistance": 1200.0,
       "ssrSteps": 160.0,
       "ssrGain": 1.0,
-      "skyMirror": 0.2
+      "skyMirror": 0.2,
+      "foam": 0.0
     },
     "sunLux": 7.0,
     "sunShadowBias": 8.0,

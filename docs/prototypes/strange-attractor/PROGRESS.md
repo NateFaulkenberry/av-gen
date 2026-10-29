@@ -172,6 +172,10 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-29: Bank water flicker.
+  - The river had an unintended default foam line; the attractor's water block silently dropped keys.
+  - The reflected cirrus aliased under the ripples.
+  - Fixed in ADR-1868; bank-flip excess over the geometric floor −67%.
 - 2026-10-29: Rebased on main d245d0f0. Shadow stair-steps, pass 2.
   - Neither the split scheme nor resolution helped: at 8192 the teeth are pixel-identical.
   - The teeth were caster facets plus T-junction cracks from the RTIN's depth-first error propagation. Fixed with

@@ -510,3 +510,18 @@ TEST_CASE("the terrain mesh has no T-junctions: every interior edge is shared by
     REQUIRE(uses.size() > 10000u);
     CHECK(open == 0u);
 }
+
+TEST_CASE("the attractor's water block takes every water key and refuses unknown ones", "[attractor-world][adr1868]") {
+    // ADR-1868. It used to read fifteen keys and drop the rest in silence: `foam` 0 in the scene file did nothing,
+    // and the river drew the engine's default 0.55 foam line along every bank.
+    auto a = scene::attractorWorldFromJson(nlohmann::json::parse(
+        R"({"water": {"foam": 0.0, "reflectionRays": 3, "sparkle": 0.2, "skyMirror": 0.4, "shallowColor": [0, 0, 1]}})"));
+    REQUIRE(a.has_value());
+    CHECK(a->water.foam == Approx(0.0f));
+    CHECK(a->water.reflectionRays == Approx(3.0f));
+    CHECK(a->water.sparkle == Approx(0.2f));
+    CHECK(a->water.skyMirror == Approx(0.4f));
+    CHECK(a->water.shallowColor == glm::vec3(0, 0, 1));
+    CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"water": {"fome": 0}})")).has_value());
+    CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"water": {"foam": "none"}})")).has_value());
+}
