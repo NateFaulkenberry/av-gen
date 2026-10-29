@@ -368,7 +368,7 @@ int Application::writeLiveProfile(LiveProfileRecord& record) {
 namespace {
 
 // The rules' inputs from a built record and the renderer's quality in force.
-CandidateInputs candidateInputs(const LiveProfileRecord& record, const rendering::QualitySettings& q) {
+CandidateInputs candidateInputs(const LiveProfileRecord& record, const rendering::QualitySettings& q, bool glossySsr) {
     CandidateInputs in;
     in.gpu = record.gpu;
     in.passes = record.passMedians;
@@ -384,6 +384,7 @@ CandidateInputs candidateInputs(const LiveProfileRecord& record, const rendering
     in.drawDistanceScale = q.drawDistanceScale;
     in.shadowCasterMinPixels = q.shadowCasterMinPixels;
     in.contactShadows = q.contactShadows && q.contactSteps > 0; // ADR-1816
+    in.glossySsr = glossySsr;                                    // ADR-1820
     in.particleSpawnScale = q.particleSpawnScale;
     in.gpuMs = record.gpuMs.valid() ? record.gpuMs.p50 : 0.0;
     in.budgetMs = record.conditions.budgetMs;
@@ -626,7 +627,7 @@ int Application::runLiveProfileHeadless() {
     buildLiveProfile(record, measured, false);
     fillLiveProfileResources(record, stats);
     fillLiveProfileEntities(record);
-    record.candidates = optimizationCandidates(candidateInputs(record, renderer_->qualitySettings()));
+    record.candidates = optimizationCandidates(candidateInputs(record, renderer_->qualitySettings(), renderer_->glossySsrDrawn()));
     if (automatic) {
         record.notes.push_back(fmt::format("auto: the live controller ran during warm-up on the headless GPU span and "
                                            "settled at {}; that level was held while measuring",
@@ -869,7 +870,7 @@ bool Application::noteLiveProfileFrame(const LiveProfileFrame& frame) {
         buildLiveProfile(r, s.frames, true);
         fillLiveProfileResources(r, s.stats);
         fillLiveProfileEntities(r);
-        r.candidates = optimizationCandidates(candidateInputs(r, renderer_->qualitySettings()));
+        r.candidates = optimizationCandidates(candidateInputs(r, renderer_->qualitySettings(), renderer_->glossySsrDrawn()));
         if (o.trace) {
             std::ofstream out(*o.trace, std::ios::binary);
             out << s.trace;

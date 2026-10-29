@@ -348,3 +348,21 @@ TEST_CASE("A scene may turn off ambient occlusion and contact shadows, and keeps
     const json savedDeep = withPrepass->comp->toJson();
     CHECK(savedDeep.at("environment").at("depthPrepass").get<bool>());
 }
+
+// ADR-1820: glossy screen-space reflections are off unless a scene asks; kept by a save only when asked for.
+TEST_CASE("A scene may ask for glossy screen-space reflections, and keeps the request across a save",
+          "[scene][environment][adr1820]") {
+    auto def = build(writeScene("adr1820-default", oneKeyScene()));
+    CHECK_FALSE(def->comp->scene().environment.glossyReflections);
+    const json savedDefault = def->comp->toJson();
+    CHECK_FALSE((savedDefault.contains("environment") && savedDefault.at("environment").contains("glossyReflections")));
+    json body = oneKeyScene();
+    body["environment"] = json{{"glossyReflections", true}};
+    auto on = build(writeScene("adr1820-on", body));
+    CHECK(on->comp->scene().environment.glossyReflections);
+    const json saved = on->comp->toJson();
+    REQUIRE(saved.at("environment").contains("glossyReflections"));
+    CHECK(saved.at("environment").at("glossyReflections").get<bool>());
+    auto again = build(writeScene("adr1820-again", saved));
+    CHECK(again->comp->scene().environment.glossyReflections);
+}

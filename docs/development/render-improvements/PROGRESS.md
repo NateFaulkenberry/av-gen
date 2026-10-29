@@ -69,7 +69,7 @@ frames "changed"): `(cd ../av-gen && find -L assets -type f) | while read f; do 
 | 4a A5 multiple-scattering energy compensation | 1818 | done. Rough gold +17%; Rainbow/TH change most (<= 29 levels); cost unmeasurable; `nomultiscatter` |
 | 4a A4 glTF glass (transmission, volume, ior) through ADR-1603's refraction | 1819 | done. S3 glass clear, not milky; ~+0.6 ms on S3 (bar 0.5); non-glass models unchanged; fixture `tools/make_glass_test_glb.py` |
 | 4a review fixes (coordinator): arch hidden by glass, dark stepped rim, Low/Emergency BLEND fallback, framing | 1819 | done. Glass follows glTF (no volume = thin-walled, unbent; volume = Filament's solid sphere); silhouette coverage from N.V; BLEND glass refracts or keeps its blend per frame; the framing shift was a misreading. Crops in `a4-gltf-glass/fixes/` |
-| 4b A1 glossy SSR (Hi-Z, roughness fade, env fallback, ladder lever; flicker on video) | | after 4a merges. Do NOT touch water SSR; ask first if sharing code |
+| 4b A1 glossy SSR (Hi-Z, roughness fade, env fallback, ladder lever; flicker on video) | 1820 | done. Opt-in `environment.glossyReflections`; S3 arch reflects in the floor, +0.95 ms at 1080p; reference scenes unchanged; deterministic; flicker measured on a 4 s camera move (oscillation 67 per million pixel-frames over 32 levels, on reflected silhouettes). Reads the refraction copy read-only (approved); water SSR untouched. Media `a1-glossy-ssr/`. Camera-move script: scratch `a1/move.sh` (one composition per frame) |
 
 S1 and S3 labs: extract from `exp/filament-eval:prototypes/filament-eval/scenes/s1|s3/` into scratch and point the
 HDRI at the main checkout's `assets/hdri/`.

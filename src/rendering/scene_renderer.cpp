@@ -420,6 +420,12 @@ Result<void> SceneRenderer::init() {
         desc.bindGroupLayouts = layouts.data();
         scenePipelineLayout_ = device.CreatePipelineLayout(&desc);
     }
+    { // ADR-1820: glossy SSR's pyramid and group 3 (its pipelines are built the first frame a scene asks)
+        glossySsr_ = std::make_unique<GlossySsr>(context_, shaders_);
+        if (auto r = glossySsr_->init(frameLayout_, objectLayout_, materialLayout_); !r) {
+            return std::unexpected(r.error());
+        }
+    }
     {
         wgpu::PipelineLayoutDescriptor desc{};
         desc.label = "tonemap-pipeline-layout";
@@ -1317,7 +1323,7 @@ static_assert(sizeof(scene::Vertex) == 32);
 Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
                                                                wgpu::RenderPipeline* startInto, bool programTextures,
                                                                const CompiledMaterialVariants::Start* sink,
-                                                               std::uint32_t litFeatures, bool refract) {
+                                                               std::uint32_t litFeatures, bool refract, bool ssr) {
     VertexLayoutStorage vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -1331,9 +1337,20 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, kHdrFormat, variant == LitVariant::Blend ? &blend : nullptr,
                      variant == LitVariant::Blend ? wgpu::ColorWriteMask::None : wgpu::ColorWriteMask::All);
+    // ADR-1820: the glossy SSR adds its difference to the colour and leaves the surface's other targets as they are.
+    wgpu::BlendState additive{};
+    additive.color.operation = wgpu::BlendOperation::Add;
+    additive.color.srcFactor = wgpu::BlendFactor::One;
+    additive.color.dstFactor = wgpu::BlendFactor::One;
+    additive.alpha.operation = wgpu::BlendOperation::Add;
+    additive.alpha.srcFactor = wgpu::BlendFactor::Zero;
+    additive.alpha.dstFactor = wgpu::BlendFactor::One;
+    if (ssr) {
+        fillSceneTargets(colorTargets, kHdrFormat, &additive, wgpu::ColorWriteMask::None);
+    }
     wgpu::FragmentState fragment{};
     fragment.module = module;
-    fragment.entryPoint = refract ? "fs_main_refract" : "fs_main"; // ADR-1819
+    fragment.entryPoint = ssr ? "fs_main_ssr" : refract ? "fs_main_refract" : "fs_main"; // ADR-1819, ADR-1820
     fragment.targetCount = kSceneTargetCount;
     fragment.targets = colorTargets.data();
     std::vector<wgpu::ConstantEntry> constants;
@@ -1342,6 +1359,12 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
         transmission.key = "LIT_TRANSMISSION";
         transmission.value = 1.0;
         constants.push_back(transmission);
+    }
+    if (ssr) {
+        wgpu::ConstantEntry ssrOn{}; // ADR-1820: the shading stops at the environment reflection
+        ssrOn.key = "LIT_SSR";
+        ssrOn.value = 1.0;
+        constants.push_back(ssrOn);
     }
     if (programTextures) {
         wgpu::ConstantEntry texturesOn{}; // ADR-1642
@@ -1357,6 +1380,9 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     depth.depthWriteEnabled = variant == LitVariant::Blend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
     depth.depthCompare = variant == LitVariant::Blend ? wgpu::CompareFunction::Less
                                                       : wgpu::CompareFunction::LessEqual;
+    if (ssr) {
+        depth.depthWriteEnabled = wgpu::OptionalBool::False; // ADR-1820: the surface's own depth, already laid
+    }
 
     wgpu::RenderPipelineDescriptor desc{};
     const char* label = programTextures
@@ -1366,8 +1392,8 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
                             : (variant == LitVariant::OpaqueCull     ? "pbr-opaque"
                                : variant == LitVariant::OpaqueNoCull ? "pbr-opaque-twosided"
                                                                      : "pbr-blend");
-    desc.label = label;
-    desc.layout = scenePipelineLayout_;
+    desc.label = ssr ? "pbr-glossy-ssr" : label;
+    desc.layout = ssr ? glossySsr_->pipelineLayout() : scenePipelineLayout_; // ADR-1820: group 3 + the pyramid
     desc.vertex.module = module;
     // `vs_main` plus the Effect Library's per-entity displacement (pbr.wgsl); the depth-only pipeline
     // below uses the same entry, so the prepass, the shadows and the colour see the same surface.
@@ -1390,6 +1416,28 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
         return wgpu::RenderPipeline{};
     }
     return finishPipeline(desc, label);
+}
+
+bool SceneRenderer::ensureEntitySsrPipelines(std::uint32_t litFeatures) {
+    // ADR-1820: specialised to the scene's lit features (ADR-1815) as the opaque entities they draw over are.
+    if (entitySsrCull_ && entitySsrNoCull_ && entitySsrFeatures_ == litFeatures) {
+        return true;
+    }
+    if (entitySsrFailed_ || !pbrModule_ || !glossySsr_) {
+        return false;
+    }
+    entitySsrFeatures_ = litFeatures;
+    auto a = createLitPipeline(pbrModule_, LitVariant::OpaqueCull, nullptr, false, nullptr, litFeatures, false, true);
+    auto b = createLitPipeline(pbrModule_, LitVariant::OpaqueNoCull, nullptr, false, nullptr, litFeatures, false, true);
+    if (!a || !b) {
+        entitySsrFailed_ = true;
+        log::warn("the glossy SSR pipelines failed ({}); no screen-space reflections (ADR-1820)",
+                  (!a ? a : b).error().message);
+        return false;
+    }
+    entitySsrCull_ = *a;
+    entitySsrNoCull_ = *b;
+    return true;
 }
 
 bool SceneRenderer::ensureEntityRefractPipelines(std::uint32_t litFeatures) {
@@ -2027,6 +2075,7 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"astral3", [](QualitySettings& q) { q.astralTier = 3; }, "astralTier=3 (ADR-1222: 50%, 8 taps, no shards)"},
         {"astral4", [](QualitySettings& q) { q.astralTier = 4; }, "astralTier=4 (ADR-1222: 33%, no god rays, no shards)"},
         {"norefraction", [](QualitySettings& q) { q.refraction = false; }, "refraction=false (ADR-1603: refractive surfaces opaque, no phase)"},
+        {"noglossyssr", [](QualitySettings& q) { q.glossySsr = false; }, "glossySsr=false (ADR-1820: the environment reflection alone)"},
         {"nodispersion", [](QualitySettings& q) { q.refractionDispersion = false; }, "refractionDispersion=false (ADR-1640: the single refraction read)"},
         {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
         {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
@@ -2382,6 +2431,7 @@ void SceneRenderer::rebuildIblBindGroup() {
     desc.entryCount = entries.size();
     desc.entries = entries.data();
     iblBindGroup_ = context_.device().CreateBindGroup(&desc);
+    iblEntries_ = entries; // ADR-1820: the SSR's group 3 extends these
 }
 
 Result<void> SceneRenderer::reloadEngineShaders() {
@@ -2408,6 +2458,9 @@ Result<void> SceneRenderer::reloadEngineShaders() {
             entityRefractNoCull_ = nullptr;
             entityRefractDepth_ = nullptr;
             entityRefractFailed_ = false;
+            entitySsrCull_ = nullptr; // ADR-1820
+            entitySsrNoCull_ = nullptr;
+            entitySsrFailed_ = false;
             sdfs_->setMeshPipelines(litOpaqueCull_, litOpaqueNoCull_);
             if (entityMaterials_) {
                 entityMaterials_->reset(); // ADR-1812: rebuilt from the reloaded source on the next frame
@@ -4407,7 +4460,29 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         refractive.assign(split, opaque.end());
         opaque.erase(split, opaque.end());
     }
-    const bool needsDepthPrepass = refractionWanted || ao_->active() ||
+    // ADR-1820: glossy SSR -- the scene opted in and the ladder allows it. The entities it reflects on: static opaque
+    // meshes without a material program, lit (not unlit, not toon), glossy enough to be trusted at all. They stay in
+    // the opaque list and are drawn again after the refraction copy, adding the reflection's difference.
+    std::vector<DrawItem> glossy;
+    if (qualitySettings_.glossySsr && scene.environment.glossyReflections && glossySsr_) {
+        const float roughnessCap = glossySsr_->settings().roughnessFadeEnd;
+        for (const DrawItem& item : opaque) {
+            const scene::Material& m = item.entity->material;
+            if (!item.skinned() && m.program.empty() && !m.unlit && !m.toon.enabled() && m.roughness < roughnessCap) {
+                glossy.push_back(item);
+            }
+        }
+        if (!glossy.empty() && !ensureEntitySsrPipelines(refractFeatures)) {
+            glossy.clear();
+        }
+        if (!glossySsrLogged_) {
+            log::info("glossy SSR on: {} surface(s) eligible (ADR-1820)", glossy.size());
+            glossySsrLogged_ = true;
+        }
+    }
+    const bool glossySsrActive = !glossy.empty();
+    glossySsrDrawn_ = glossySsrActive;
+    const bool needsDepthPrepass = refractionWanted || glossySsrActive || ao_->active() ||
                                    (qualitySettings_.contactShadows && scene.environment.contactShadows) ||
                                    scene.environment.depthPrepass || // ADR-1406
                                    shadowMask_->encoded() || !scene.waters.empty() || shardsWantDepth ||
@@ -4797,6 +4872,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         lrp.End();
         ++stats_.state.pipelineBinds;
         stats_.state.bindGroupBinds += 2;
+        // ADR-1820: the glossy SSR's min-depth pyramid, from the linear depth just resolved.
+        if (glossySsrActive) {
+            glossySsr_->encodePyramid(encoder, linearDepth_.view, linearDepth_.texture.GetWidth(),
+                                      linearDepth_.texture.GetHeight(), [this] {
+                                          return timeline_->mark("depth", gpu::FrameTimeline::PassKind::Render);
+                                      });
+        }
 
         // ---- ground-truth ambient occlusion (ADR-034) ----
         ao_->encode(encoder, frameBindGroupAux_);
@@ -5025,7 +5107,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // one copy, then the water, then the refractive surfaces (each reads the frame as it stood before either).
         const bool cinematicWater = !water.empty() && water_->ready() && water_->anyCinematic();
         const bool refractiveSurfaces = procedurals_->refractionPhase();
-        if (cinematicWater || refractiveSurfaces || !refractive.empty()) { // ADR-1819: the entities' glass too
+        // ADR-1819: the entities' glass too; ADR-1820: and the glossy SSR, which reads the copy (and only reads it)
+        if (cinematicWater || refractiveSurfaces || !refractive.empty() || glossySsrActive) {
             rp.End();
             const wgpu::Texture& src = hdr_.colorTexture();
             if (!refractionCopy_ || refractionCopy_.GetWidth() != hdr_.width() ||
@@ -5056,6 +5139,30 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             rp.SetBindGroup(0, frameBindGroup_);
             rp.SetBindGroup(3, iblBindGroup_);
         }
+        // ADR-1820: the glossy surfaces again, adding their screen-space reflection's difference from the environment's,
+        // before anything is drawn over them (the water, the glass): the frame they reflect is the copy just taken.
+        if (glossySsrActive) {
+            rp.SetBindGroup(0, frameBindGroupRefract_);
+            rp.SetBindGroup(3, glossySsr_->bindGroup(iblEntries_));
+            for (const DrawItem& item : glossy) {
+                const GpuMesh& mesh = *item.geometry;
+                const auto& m = item.entity->material;
+                rp.SetPipeline((m.doubleSided || item.fxTwoSided) ? entitySsrNoCull_ : entitySsrCull_);
+                rp.SetBindGroup(1, objectBindGroup_, 1, &item.offset);
+                rp.SetBindGroup(2, materialBindGroup(m));
+                rp.SetVertexBuffer(0, mesh.vertices);
+                rp.SetIndexBuffer(mesh.indices, wgpu::IndexFormat::Uint32);
+                rp.DrawIndexed(mesh.indexCount);
+                ++stats_.state.pipelineBinds;
+                stats_.state.bindGroupBinds += 2;
+                ++stats_.state.vertexBufferBinds;
+                ++stats_.state.indexBufferBinds;
+                stats_.geometry.camera.record(mesh.indexCount, 1, false);
+                ++stats_.drawCalls;
+            }
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
+        }
         if (!water.empty() && water_->ready()) {
             // ADR-916: a material with tears and one without are drawn by two pipelines, so the bind
             // follows the item -- once per frame for a scene whose waters agree.
@@ -5080,6 +5187,24 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 ++stats_.state.indexBufferBinds;
                 ++stats_.drawCalls;
             }
+        }
+        // ADR-1820: a glass in a frame with glossy reflections sees the reflections behind it (a glass sphere on a
+        // reflecting floor otherwise shows the floor unreflected through it): the frame is copied again for it, after
+        // the reflections and the water. Only then -- a frame without glossy SSR, or without glass, is as it was, and the
+        // water read the first copy.
+        if (glossySsrActive && !refractive.empty()) {
+            rp.End();
+            wgpu::TexelCopyTextureInfo from{};
+            from.texture = hdr_.colorTexture();
+            wgpu::TexelCopyTextureInfo to{};
+            to.texture = refractionCopy_;
+            const wgpu::Extent3D extent{hdr_.width(), hdr_.height(), 1};
+            encoder.CopyTextureToTexture(&from, &to, &extent);
+            pass.label = "scene-pass-after-glossy-ssr-copy";
+            pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
+            rp = encoder.BeginRenderPass(&pass);
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
         }
         // ADR-1603: the refractive procedural surfaces, through the frame group that binds the copy.
         if (!refractive.empty()) {

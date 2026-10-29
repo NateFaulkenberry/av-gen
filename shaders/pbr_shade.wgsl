@@ -35,6 +35,19 @@
 // transmits replaces its diffuse, as glTF defines. `false` everywhere else, where the code below is compiled out and
 // the shading is the shader before ADR-1819 exactly; so is an imported glass's opaque fallback.
 override LIT_TRANSMISSION: bool = false;
+// ADR-1820: set only by the glossy-SSR pipeline (`fs_main_ssr`, the SSR-eligible entities drawn again after the
+// refraction copy). The surface is shaded as usual up to its environment reflection, skipping the direct lights, and
+// what the SSR needs is left in `ssrSurface` for the entry point, which adds the reflection's difference. `false`
+// everywhere else: the code below is compiled out and the shading is the shader before ADR-1820 exactly.
+override LIT_SSR: bool = false;
+struct SsrSurface {
+    normal: vec3<f32>,     // the shading normal (normal map and all)
+    dir: vec3<f32>,        // the reflection direction the environment was read along
+    roughness: f32,
+    weight: vec3<f32>,     // what multiplies the reflected radiance: split-sum DFG x specular occlusion x ADR-1818 x AO
+    environment: vec3<f32>, // the environment reflection the lit pass added (prefiltered x weight x IBL intensity)
+};
+var<private> ssrSurface: SsrSurface;
 
 override LIT_PROGRAMS: bool = true;     // ADR-030 material programs (a draw with `materialSelect.program >= 0`)
 override LIT_FX: bool = true;           // ADR-703 entity effect lanes (`fxA.z != 0`)
@@ -1161,7 +1174,10 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     ctx.anisotropy = select(0.0, object.optics.z, LIT_OPTICS); // ADR-1143 (0 = the isotropic lobe)
     ctx.anisoT = anisoT;
     ctx.anisoB = anisoB;
-    let lit = directLighting(ctx);
+    var lit: LightSample;
+    if (!LIT_SSR) {
+        lit = directLighting(ctx); // ADR-1820: the SSR pass adds only the reflection's difference
+    }
     // ADR-1818: multiple-scattering energy compensation (Fdez-Aguera 2019; Filament's `energyCompensation`). A
     // microfacet BRDF that scatters once loses the light that bounces between microfacets before it leaves, so rough
     // metals come out too dark. 1 - Ess(nDotV, roughness) of the energy is missing, and scaling every specular lobe by
@@ -1204,6 +1220,13 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let prefiltered = textureSampleLevel(prefilteredMap, iblSampler, envRotate(r), roughness * maxMip).rgb;
         let brdf = textureSample(brdfLut, iblSampler, vec2<f32>(nDotV, roughness)).rg;
         let specular = prefiltered * (kS * brdf.x + brdf.y) * specularOcclusion * energyCompensation; // ADR-1818
+        if (LIT_SSR) {
+            ssrSurface.normal = n;
+            ssrSurface.dir = r;
+            ssrSurface.roughness = roughness;
+            ssrSurface.weight = (kS * brdf.x + brdf.y) * specularOcclusion * energyCompensation;
+            ssrSurface.environment = specular * frame.params.w;
+        }
         var ambientDiffuse = kD * irradiance * albedo * visibility;
         if (LIT_TRANSMISSION) {
             ambientDiffuse = ambientDiffuse * keptDiffuse; // ADR-1819
@@ -1275,6 +1298,10 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ambient = ambient + bandSpec;
     }
     ambient = ambient * ao;
+    if (LIT_SSR) {
+        ssrSurface.weight = ssrSurface.weight * ao; // ADR-1820: the AO the ambient took
+        ssrSurface.environment = ssrSurface.environment * ao;
+    }
 
     // Fresnel rim tinted with the emissive colour so glowing objects read as luminous at grazing angles.
     let rim = emissionLane(pow(1.0 - nDotV, 3.0) * emissiveBase * (0.3 * matEmissive.w), ownHue + laneHue,

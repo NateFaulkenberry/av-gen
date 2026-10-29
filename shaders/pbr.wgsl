@@ -25,6 +25,7 @@ fn surfaceDetail() -> SurfaceDetail { return SurfaceDetail(vec3<f32>(0.0), 0.0, 
 #include "pbr_shade.wgsl"
 #include "fields.wgsl"
 #include "refraction.wgsl" // ADR-1819
+#include "glossy_ssr.wgsl" // ADR-1820
 
 @group(2) @binding(8) var<uniform> fieldBlock: FieldBlock;
 
@@ -110,6 +111,31 @@ fn fs_main_refract(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> S
     } else {
         out.color = vec4<f32>(refractSurface(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
     }
+    if (fxClipDiscard) {
+        discard;
+    }
+    return out;
+}
+
+// ADR-1820: glossy SSR. The SSR-eligible entities drawn again after the refraction copy, additively, with LIT_SSR set:
+// the shading stops at the environment reflection (no direct lights), and this adds the screen-space reflection's
+// difference from it -- (reflected x weight - environment) x trust -- carried through the fog as the colour was.
+// Only the colour target is written (the pipeline masks the rest).
+@fragment
+fn fs_main_ssr(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
+    var out = entityShade(in, frontFacing);
+    var delta = vec3<f32>(0.0);
+    let s = ssrSurface;
+    let spread = length(fwidth(s.dir)); // ADR-1820: the reflection's turn per pixel (uniform control flow here)
+    if (dot(s.weight, s.weight) > 0.0) {
+        let reflected = glossySsr(in.worldPos, s.normal, s.dir, s.roughness, spread);
+        if (reflected.a > 0.0) {
+            let change = (reflected.rgb * s.weight - s.environment) * reflected.a;
+            // the fog is affine in the colour: what it does to a difference is its transmittance alone
+            delta = applyFog(change, in.worldPos) - applyFog(vec3<f32>(0.0), in.worldPos);
+        }
+    }
+    out.color = vec4<f32>(delta, 0.0);
     if (fxClipDiscard) {
         discard;
     }

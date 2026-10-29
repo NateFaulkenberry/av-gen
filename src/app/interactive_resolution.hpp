@@ -290,6 +290,9 @@ struct LiveQualityRung {
     float auroraStepScale = 1.0f;       // ADR-1651: ceiling on QualitySettings::auroraStepScale (the ribbons' planes)
     // ADR-1816: QualitySettings::contactShadows (off: no screen-space contact march). Ultra and High keep it.
     bool contactShadows = true;
+    // ADR-1820: QualitySettings::glossySsr (off: a scene's glossy reflections fall back to the environment). Ultra and
+    // High keep it.
+    bool glossySsr = true;
     [[nodiscard]] bool operator==(const LiveQualityRung&) const = default;
 };
 

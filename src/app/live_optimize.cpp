@@ -128,10 +128,10 @@ ContributionReport analyseContribution(const std::vector<LiveProfileEntity>& ent
 
 HeroEffect heroEffectOfLever(std::string_view lever) {
     static constexpr std::array<std::string_view, 4> kExempt{"castercull", "lodbias2", "drawdist75", "particlelod"};
-    static constexpr std::array<std::string_view, 13> kImageWide{
+    static constexpr std::array<std::string_view, 14> kImageWide{
         "volumequarter", "volumesteps", "volumepreview", "posttaps",         "nomotionblur",
         "nodof",         "shadowatlas1k", "scale85",     "scale71",          "pcss",
-        "sdfshadowhalf", "sdfshadowquarter", "nocontact"}; // ADR-1816
+        "sdfshadowhalf", "sdfshadowquarter", "nocontact", "noglossyssr"}; // ADR-1816, ADR-1820
     if (std::find(kExempt.begin(), kExempt.end(), lever) != kExempt.end()) return HeroEffect::Exempt;
     if (std::find(kImageWide.begin(), kImageWide.end(), lever) != kImageWide.end()) return HeroEffect::ImageWide;
     if (lever == "noprograms") return HeroEffect::Degrades;

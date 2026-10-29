@@ -1177,3 +1177,40 @@ TEST_CASE("contact shadows are a lever of the live ladder, kept at Ultra and Hig
     CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::High).contactShadows);
     CHECK_FALSE(rendering::QualitySettings::forTier(rendering::QualityTier::Preview).contactShadows);
 }
+
+// ADR-1820: glossy SSR is a ladder lever as contact shadows are: kept at Ultra and High, given up below, the optimizer's
+// `noglossyssr` lever and a project ceiling can turn it off, the offline tier keeps it and the preview tier does not.
+TEST_CASE("glossy SSR is a lever of the live ladder, kept at Ultra and High", "[unit][resolution][adr1820]") {
+    rendering::QualitySettings base = rendering::QualitySettings::forTier(rendering::QualityTier::Realtime);
+    REQUIRE(base.glossySsr);
+    for (const auto strategy : {LiveQualityStrategy::Balanced, LiveQualityStrategy::ResolutionFirst,
+                                LiveQualityStrategy::EffectsFirst}) {
+        const app::LiveQualityLadder& ladder = app::liveQualityLadder(strategy);
+        INFO("strategy " << app::liveQualityStrategyToken(strategy));
+        CHECK(ladder[0].glossySsr);
+        CHECK(ladder[1].glossySsr);
+        for (std::size_t k = 2; k < ladder.size(); ++k) {
+            CHECK_FALSE(ladder[k].glossySsr);
+        }
+        CHECK(app::applyLiveRung(base, base, ladder[0], 0.0f).glossySsr);
+        const rendering::QualitySettings medium = app::applyLiveRung(base, base, ladder[2], 0.0f);
+        CHECK_FALSE(medium.glossySsr);
+        CHECK(app::applyLiveRung(medium, base, ladder[1], 0.0f).glossySsr);
+    }
+    rendering::QualitySettings off = base;
+    off.glossySsr = false;
+    CHECK_FALSE(app::applyLiveRung(off, off, app::liveQualityLadder(LiveQualityStrategy::Balanced)[0], 0.0f)
+                    .glossySsr);
+    app::LiveQualityRung ceiling;
+    REQUIRE(app::applyLeverToCeiling(ceiling, "noglossyssr"));
+    CHECK_FALSE(ceiling.glossySsr);
+    CHECK_FALSE(app::applyCeiling(base, ceiling).glossySsr);
+    std::string error;
+    const auto parsed = app::ceilingFromJsonText(app::ceilingJsonText(ceiling), error);
+    REQUIRE(parsed.has_value());
+    CHECK_FALSE(parsed->glossySsr);
+    CHECK(app::ceilingJsonText(app::LiveQualityRung{}).find("glossySsr") == std::string::npos);
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Offline).glossySsr);
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::High).glossySsr);
+    CHECK_FALSE(rendering::QualitySettings::forTier(rendering::QualityTier::Preview).glossySsr);
+}

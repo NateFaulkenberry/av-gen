@@ -669,6 +669,15 @@ std::vector<LiveProfileCandidate> optimizationCandidates(const CandidateInputs& 
              "(Filament evaluation); confirm a scene's own share with --ab contact",
              "medium"});
     }
+    if (in.glossySsr) { // ADR-1820
+        const double scenePass = passMs(in.passes, "scene");
+        add({"glossy-ssr", "Glossy screen-space reflections", scenePass,
+             "turn the glossy reflections off at this level (the environment reflection stands)", "noglossyssr",
+             scenePass * 0.05, scenePass * 0.3,
+             "the glossy surfaces drawn again with a Hi-Z march, and the pyramid: confirm a scene's own share with "
+             "--ab noglossyssr",
+             "medium"});
+    }
     // Shadows.
     if (const double cost = categoryMs(gpu, "shadows"); cost > 0.0) {
         const double shadowPass = passMs(in.passes, "shadow");

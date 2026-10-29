@@ -367,6 +367,9 @@ struct QualitySettings {
     // ADR-1818: multiple-scattering energy compensation on every specular lobe (rough metals keep the energy a
     // single-scattering BRDF loses). On in every tier; off is the `nomultiscatter` arm, the picture before ADR-1818.
     bool multiScatter = true;
+    // ADR-1820: glossy screen-space reflections on the opaque entities of a scene that opts in
+    // (`environment.glossyReflections`). Kept at Ultra and High; off at Medium, Low, Emergency and the preview tier.
+    bool glossySsr = true;
     // ADR-1222: the Astral Forge's tier (rendering::AstralRenderer). 0 = offline: every particle, the full-resolution
     // march, and a seek re-simulated from the song's start (exact); 1 = the live reference (the prototype's picture);
     // 2..4 = the live ladder's rungs, each simulating fewer particles (70%, 50%, 33%) with fewer god-ray taps, and no
@@ -407,6 +410,7 @@ struct QualitySettings {
             q.softShadows = false;
             q.contactSteps = 8;
             q.contactShadows = false; // ADR-1816: the preview tier skips the contact march
+            q.glossySsr = false;      // ADR-1820
             q.aoSlices = 2;
             q.aoStepsPerSlice = 4;
             q.aoHistoryFrames = 6;

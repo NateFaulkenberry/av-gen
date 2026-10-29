@@ -37,6 +37,7 @@
 #include "rendering/shell_renderer.hpp"
 #include "rendering/field_uniforms.hpp"
 #include "rendering/frame_overlay.hpp"
+#include "rendering/glossy_ssr.hpp"
 #include "rendering/light_data.hpp"
 #include "rendering/material_programs.hpp"
 #include "rendering/compiled_materials.hpp"
@@ -816,6 +817,8 @@ public:
     [[nodiscard]] const wgpu::TextureView& emissionView() const { return emission_.view; }
     [[nodiscard]] const wgpu::TextureView& identifierView() const { return ids_.view; }
     [[nodiscard]] const wgpu::TextureView& linearDepthView() const { return linearDepth_.view; }
+    // ADR-1820: whether the last frame drew glossy screen-space reflections (the optimizer offers the lever then).
+    [[nodiscard]] bool glossySsrDrawn() const { return glossySsrDrawn_; }
     [[nodiscard]] const wgpu::Texture& normalRoughnessTexture() const { return normalRough_.texture; }
     [[nodiscard]] const wgpu::Texture& velocityTexture() const { return velocity_.texture; }
     [[nodiscard]] const wgpu::Texture& emissionTexture() const { return emission_.texture; }
@@ -994,10 +997,13 @@ private:
                                                    wgpu::RenderPipeline* startInto = nullptr,
                                                    bool programTextures = false,
                                                    const CompiledMaterialVariants::Start* sink = nullptr,
-                                                   std::uint32_t litFeatures = 0x1FFu, bool refract = false);
+                                                   std::uint32_t litFeatures = 0x1FFu, bool refract = false,
+                                                   bool ssr = false); // ADR-1820
     // ADR-1819: the refractive entities' pipelines (fs_main_refract culled and two-sided, and the depth lay-down), built
     // the first time a frame has one. False when they failed (those entities draw opaque).
     bool ensureEntityRefractPipelines(std::uint32_t litFeatures);
+    // ADR-1820: the glossy-SSR pipelines (`fs_main_ssr`, additive, colour only), specialised like the refraction's.
+    bool ensureEntitySsrPipelines(std::uint32_t litFeatures);
     // ADR-1815: the lit features this frame's entity draws can reach (rendering/lit_features.hpp), from the frame
     // uniforms, the staged object uniforms of `items` and the packed lights. Every feature when the scene has SDF
     // objects (their meshed draws use the entity pipelines with uniforms this scan does not see).
@@ -1173,6 +1179,14 @@ private:
     wgpu::RenderPipeline entityRefractDepth_;  // ADR-1819: the depth lay-down
     bool entityRefractFailed_ = false;
     std::uint32_t entityRefractFeatures_ = 0x1FFu; // ADR-1819: the lit features the refraction pipelines keep
+    std::unique_ptr<GlossySsr> glossySsr_;  // ADR-1820: the pyramid and the SSR draws' group 3
+    wgpu::RenderPipeline entitySsrCull_;    // ADR-1820
+    wgpu::RenderPipeline entitySsrNoCull_;  // ADR-1820
+    bool entitySsrFailed_ = false;
+    std::uint32_t entitySsrFeatures_ = 0x1FFu;
+    bool glossySsrLogged_ = false;
+    bool glossySsrDrawn_ = false;
+    std::array<wgpu::BindGroupEntry, 6> iblEntries_{}; // ADR-1820: the IBL group's entries, for the SSR's group 3
     wgpu::RenderPipeline litTexturedOpaqueCull_;
     wgpu::RenderPipeline litTexturedOpaqueNoCull_;
     wgpu::RenderPipeline litTexturedBlend_;

@@ -739,6 +739,10 @@ struct Environment {
     // ADR-1406: ask for the depth prepass whatever else wants it -- a deep, self-occluding surface with a costly material
     // gains more from early depth rejection (hidden fragments never shaded) than the extra geometry pass costs
     bool depthPrepass = false;
+    // ADR-1820: screen-space reflections on glossy opaque entities (a Hi-Z march of this frame's depth, read from the
+    // refraction copy, falling back to the environment). Off by default: a scene opts in, and the quality ladder
+    // (QualitySettings::glossySsr) still decides whether it runs.
+    bool glossyReflections = false;
     // Procedural sky (ADR-036): used as the image-based lighting source whenever `environmentMap`
     // is unset, so metals and rough surfaces always have something to reflect. See scene/sky.hpp.
     SkySettings sky;
