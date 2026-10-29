@@ -9,7 +9,8 @@ Writes two binary glTF files into <dir>:
              bent stripes and absorption as a tint;
   plain.glb  the same scene with the sphere's material carrying no extension at all (the control a model without
              these extensions is compared against);
-  glass-blend.glb  the glass exported as exporters do for viewers without transmission: alphaMode BLEND, alpha 0.25.
+  glass-blend.glb  the glass exported as exporters do for viewers without transmission: alphaMode BLEND, alpha 0.25;
+  glass-thin.glb   the glass without KHR_materials_volume: thin-walled in glTF's terms, so it sees straight through.
 
 Standard library only (struct, json, math), so it runs wherever the build does.
 """
@@ -43,7 +44,7 @@ def quad(x0, x1, y0, y1, z):
     return pos, nrm, [0, 1, 2, 0, 2, 3]
 
 
-def build(glass_extensions, blend_fallback=False):
+def build(glass_extensions, blend_fallback=False, volume=True):
     meshes_data = []  # (positions, normals, indices, material index)
     meshes_data.append(sphere(1.0, 48, 96, (0.0, 1.0, 0.0)) + (0,))
     # the backdrop: twelve vertical stripes, alternating red and white, 2.5 m behind the sphere
@@ -90,6 +91,9 @@ def build(glass_extensions, blend_fallback=False):
                                      "attenuationColor": [0.55, 0.85, 0.8]},
         }
         used = ["KHR_materials_transmission", "KHR_materials_ior", "KHR_materials_volume"]
+        if not volume:
+            del glass["extensions"]["KHR_materials_volume"]
+            used.remove("KHR_materials_volume")
     materials = [
         glass,
         {"name": "red", "pbrMetallicRoughness": {"baseColorFactor": [0.8, 0.05, 0.03, 1.0], "metallicFactor": 0.0,
@@ -118,10 +122,11 @@ def main():
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
-    for name, ext, blend in (("glass.glb", True, False), ("plain.glb", False, False), ("glass-blend.glb", True, True)):
+    for name, ext, blend, volume in (("glass.glb", True, False, True), ("plain.glb", False, False, True),
+                                     ("glass-blend.glb", True, True, True), ("glass-thin.glb", True, False, False)):
         with open(os.path.join(a.out, name), "wb") as f:
-            f.write(build(ext, blend))
-    print("wrote glass.glb, plain.glb and glass-blend.glb to", a.out)
+            f.write(build(ext, blend, volume))
+    print("wrote glass.glb, plain.glb, glass-blend.glb and glass-thin.glb to", a.out)
 
 
 if __name__ == "__main__":

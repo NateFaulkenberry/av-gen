@@ -3733,6 +3733,9 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // Effect Library Wave 2 (FXL): the owner is clipped (Dissolve, Growth), so its inside shows
         // through the holes -- drawn without back-face culling, as a double-sided material is.
         bool fxTwoSided = false;
+        // ADR-1819: a glass exported BLEND (its fallback) that refracts this frame: staged and listed as opaque, so it
+        // reaches the refraction phase. Where the ladder has no refraction it stays the blend it was exported as.
+        bool blendGlassRefracts = false;
         [[nodiscard]] bool skinned() const { return skin.valid(); }
     };
     std::vector<DrawItem> opaque;
@@ -3923,6 +3926,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     };
 
     std::uint32_t objectIndex = 0;
+    // ADR-1819: whether a glass refracts this frame (the ladder's refraction, and pipelines that have not failed).
+    const bool glassRefracts = qualitySettings_.refraction && !entityRefractFailed_;
     // Writes one 256-byte object slot and returns the draw item, or nothing when the budget is
     // spent. Shared by the camera pass and the shadow-only pass so the two cannot describe the
     // same entity differently.
@@ -4044,6 +4049,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             obj.windTune.w = windPrevTime_;
             fxTwoSided = (static_cast<std::uint32_t>(obj.fxA.z + 0.5f) & world::kFxClip) != 0;
         }
+        // ADR-1819: a BLEND-exported glass that refracts draws as the opaque glass it is (its alpha was the fallback for
+        // a viewer without transmission): full alpha, no blend dither in its depth. Skinned glass is not refracted.
+        const bool blendGlassRefracts = glassRefracts && m.alphaMode == scene::AlphaMode::Blend &&
+                                        m.refraction.transmission > 0.0f && !skin.valid();
+        if (blendGlassRefracts) {
+            obj.flags.x = static_cast<float>(scene::AlphaMode::Opaque);
+            obj.baseColor.a = 1.0f;
+        }
         const std::uint32_t offset = objectIndex * kObjectStride;
         std::memcpy(objectStaging_.data() + offset, &obj, sizeof(obj));
         const float depth = -(view * glm::vec4(entity.transform.position, 1.0f)).z;
@@ -4057,6 +4070,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ++objectIndex;
         DrawItem out{offset, &entity, depth, skin};
         out.fxTwoSided = fxTwoSided;
+        out.blendGlassRefracts = blendGlassRefracts;
         // A skinned mesh never has a chain (the builder declines them: every level re-orders the
         // vertex buffer and MeshData::skin is parallel to the one it came from), so this asks only
         // for static geometry and the skinned path is untouched.
@@ -4134,7 +4148,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             const glm::vec3 centre = glm::vec3(entity.transform.matrix() * glm::vec4((lo + hi) * 0.5f, 1.0f));
             w.viewDepth = -(view * glm::vec4(centre, 1.0f)).z;
             water.push_back(w);
-        } else if (entity.material.alphaMode == scene::AlphaMode::Blend) {
+        } else if (entity.material.alphaMode == scene::AlphaMode::Blend && !item->blendGlassRefracts) {
             if (!toggles_.transparency) {
                 continue;
             }
@@ -4369,7 +4383,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         return p.enabled && p.shards.enabled && p.shape2d == scene::ParticleShape::Flake;
     });
     // ADR-1603: a refractive procedural surface reads the linear depth behind it (its absorption path).
-    // ADR-1819: refractive entities (imported glass): static opaque meshes only; a skinned or blended one draws as it did.
+    // ADR-1819: refractive entities (imported glass): static meshes in the opaque list (a BLEND-exported glass is there
+    // when it refracts this frame); a skinned one, or a blended one, draws as it did.
     const auto refractiveEntity = [](const DrawItem& item) {
         return !item.skinned() && item.entity->material.refraction.enabled();
     };

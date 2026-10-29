@@ -739,16 +739,20 @@ private:
             material.occlusionTexture = textureRef(*src.occlusionTexture, false, materialLabel, "occlusion");
         }
         // ADR-1819: glass. KHR_materials_transmission's factor, KHR_materials_ior's index and KHR_materials_volume's
-        // thickness and attenuation, onto ADR-1603's screen-space refraction (drawn after the refraction copy):
-        //   strength   = (ior - 1) * 0.08: the screen offset per unit of view-space normal, 0.04 for ior 1.5;
-        //   thickness  = the volume's thicknessFactor in metres (0, a thin wall: no absorption path);
-        //   absorption = -ln(attenuationColor) / attenuationDistance per channel (Beer-Lambert; none at infinity);
+        // thickness and attenuation, drawn after the refraction copy (ADR-1603's phase), as glTF defines them:
+        //   no volume (or thicknessFactor 0): thin-walled -- the view passes straight through, unbent (the spec's
+        //     thin-walled case; Filament's solid-sphere model moves nothing at thickness 0 either);
+        //   a volume: the view bends by the ior across thicknessFactor (scene units), the exit point projected;
+        //   absorption = -ln(attenuationColor) / attenuationDistance per channel, over that path (none at infinity);
         //   transmission is kept, so the diffuse gives way to what is transmitted (ADR-1819's glass mode).
-        // A transmission texture is not read (the factor stands for the whole surface).
+        // A transmission texture is not read (the factor stands for the whole surface). The alpha mode is left as
+        // exported: a BLEND glass (Blender writes BLEND as the fallback for viewers without the extension) refracts
+        // where the ladder has refraction and falls back to its blend where it does not (SceneRenderer decides).
         if (options_.importTransmission && src.transmission && src.transmission->transmissionFactor > 0.0f) {
             scene::Refraction& r = material.refraction;
             r.transmission = std::clamp(static_cast<float>(src.transmission->transmissionFactor), 0.0f, 1.0f);
-            r.strength = std::clamp((static_cast<float>(src.ior) - 1.0f) * 0.08f, 0.005f, 0.5f);
+            r.ior = std::clamp(static_cast<float>(src.ior), 1.0f, 3.0f);
+            r.strength = 0.0f;
             r.opacity = 0.0f;
             r.thickness = 0.0f;
             r.absorption = glm::vec3(0.0f);
@@ -761,13 +765,6 @@ private:
                         r.absorption[c] = -std::log(colour) / distance;
                     }
                 }
-            }
-            // A transmissive material exported with alphaMode BLEND (Blender and others write that as the fallback
-            // for viewers without KHR_materials_transmission) is a glass, not a fade: the transmission is its
-            // see-through, so it draws opaque and refracts, as Filament's importer does. Its base alpha was the fallback.
-            if (material.alphaMode == scene::AlphaMode::Blend) {
-                material.alphaMode = scene::AlphaMode::Opaque;
-                material.opacity = 1.0f;
             }
             if (src.transmission->transmissionTexture.has_value()) {
                 warn(fmt::format("material '{}': the transmission texture is ignored (its factor is used)", materialLabel));

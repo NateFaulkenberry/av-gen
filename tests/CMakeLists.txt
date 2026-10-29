@@ -167,7 +167,7 @@ set(AVGEN_GLASS_FIXTURE_DIR "${CMAKE_BINARY_DIR}/test-fixtures/glass")
 if(Python3_Interpreter_FOUND)
     add_custom_command(
         OUTPUT "${AVGEN_GLASS_FIXTURE_DIR}/glass.glb" "${AVGEN_GLASS_FIXTURE_DIR}/plain.glb"
-               "${AVGEN_GLASS_FIXTURE_DIR}/glass-blend.glb"
+               "${AVGEN_GLASS_FIXTURE_DIR}/glass-blend.glb" "${AVGEN_GLASS_FIXTURE_DIR}/glass-thin.glb"
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/make_glass_test_glb.py" --out "${AVGEN_GLASS_FIXTURE_DIR}"
         DEPENDS "${CMAKE_SOURCE_DIR}/tools/make_glass_test_glb.py"
         COMMENT "Generating the glTF glass test fixture"

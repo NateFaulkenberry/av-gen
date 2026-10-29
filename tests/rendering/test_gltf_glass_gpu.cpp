@@ -135,6 +135,88 @@ TEST_CASE("An imported glass refracts, and with refraction off is the opaque mat
     CHECK(ctx->errorCount() == 0);
 }
 
+// Mean absolute difference per channel between two frames over a box.
+static double meanDiff(const gpu::Image8& a, const gpu::Image8& b, std::uint32_t x0, std::uint32_t y0, std::uint32_t x1,
+                std::uint32_t y1) {
+    double sum = 0.0;
+    int n = 0;
+    for (std::uint32_t y = y0; y < y1; ++y) {
+        for (std::uint32_t x = x0; x < x1; ++x) {
+            for (int c = 0; c < 3; ++c) {
+                sum += std::abs(static_cast<double>(a.pixel(x, y)[c]) - static_cast<double>(b.pixel(x, y)[c]));
+                ++n;
+            }
+        }
+    }
+    return sum / n;
+}
+
+TEST_CASE("A thin-walled glass sees straight through, unbent", "[gpu][gltf][adr1819]") {
+    // glTF: a transmissive material without KHR_materials_volume is thin-walled -- the view is not bent. The S3 lab's
+    // glass is that kind, and bending it anyway (ADR-1819's first cut) pushed the emissive arch out of the sphere.
+    const fs::path dir(AVGEN_GLASS_FIXTURE_DIR);
+    if (!fs::exists(dir / "glass-thin.glb")) {
+        SKIP("the glass fixture was not generated");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    const glm::vec3 eye(0.8f, 1.5f, 4.5f);
+    const glm::vec3 target(0.0f, 1.0f, 0.0f);
+    scene::Scene thin;
+    REQUIRE(assets::loadGltf(dir / "glass-thin.glb", thin).has_value());
+    lightIt(thin, eye, target);
+    scene::Scene backdrop = thin;
+    backdrop.entities.erase(backdrop.entities.begin()); // the stripes alone (entity 0 is the sphere)
+    scene::Scene solid;
+    REQUIRE(assets::loadGltf(dir / "glass.glb", solid).has_value());
+    lightIt(solid, eye, target);
+
+    const gpu::Image8 seen = render(*ctx, shaders, thin);
+    const gpu::Image8 bare = render(*ctx, shaders, backdrop);
+    const gpu::Image8 bent = render(*ctx, shaders, solid);
+    dump(seen, "glass-thin");
+    dump(bare, "glass-thin-backdrop");
+    // The middle of the sphere, where the Fresnel reflects 4%: the thin glass shows the stripes where they are.
+    const double straight = meanDiff(seen, bare, 190, 100, 270, 170);
+    const double volume = meanDiff(bent, bare, 190, 100, 270, 170);
+    INFO("mean difference from the bare backdrop: thin " << straight << ", with a volume " << volume);
+    CHECK(straight < 12.0);
+    CHECK(volume > 3.0 * straight); // the solid sphere does bend (and absorb)
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("A BLEND-exported glass refracts where refraction is on and keeps its blend where it is off",
+          "[gpu][gltf][adr1819]") {
+    const fs::path dir(AVGEN_GLASS_FIXTURE_DIR);
+    if (!fs::exists(dir / "glass-blend.glb")) {
+        SKIP("the glass fixture was not generated");
+    }
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    const glm::vec3 eye(0.8f, 1.5f, 4.5f);
+    const glm::vec3 target(0.0f, 1.0f, 0.0f);
+    scene::Scene glass;
+    REQUIRE(assets::loadGltf(dir / "glass-blend.glb", glass).has_value());
+    lightIt(glass, eye, target);
+    scene::Scene fade; // the blended fallback, as imported before ADR-1819
+    assets::GltfLoadOptions noTransmission;
+    noTransmission.importTransmission = false;
+    REQUIRE(assets::loadGltf(dir / "glass-blend.glb", fade, noTransmission).has_value());
+    lightIt(fade, eye, target);
+
+    const gpu::Image8 refracted = render(*ctx, shaders, glass);
+    const gpu::Image8 low = render(*ctx, shaders, glass, /*refraction=*/false);
+    const gpu::Image8 before = render(*ctx, shaders, fade);
+    dump(refracted, "glass-blend-refracted");
+    dump(low, "glass-blend-low");
+    // Refraction off (Low, Emergency): exactly the blend it was exported as.
+    CHECK(gpu::hashImage(low) == gpu::hashImage(before));
+    // On: the refracting glass, not the 25% fade.
+    CHECK(gpu::hashImage(refracted) != gpu::hashImage(before));
+    CHECK(meanDiff(refracted, before, 190, 100, 270, 170) > 8.0);
+    CHECK(ctx->errorCount() == 0);
+}
+
 TEST_CASE("Multiple-scattering compensation brightens rough metal, not smooth dielectric", "[gpu][material][adr1818]") {
     auto ctx = makeContext();
     gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});

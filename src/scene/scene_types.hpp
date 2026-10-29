@@ -268,9 +268,12 @@ struct Refraction {
     // read; the live ladder takes it away from Medium (QualitySettings::refractionDispersion).
     float dispersion = 0.0f;
     // ADR-1819: an imported glass's KHR_materials_transmission factor (0 = the ADR-1603 surface). Above 0 the surface's
-    // diffuse gives way to what it transmits, tinted by its base colour, and its specular stays on top.
+    // diffuse gives way to what it transmits, tinted by its base colour, and its specular stays on top, and the glass
+    // follows glTF rather than `strength`: thin-walled (thickness 0, no KHR_materials_volume) it sees straight through;
+    // with a volume it bends the view by `ior` across `thickness` (Filament's solid-sphere model, ADR-1819).
     float transmission = 0.0f;
-    [[nodiscard]] bool enabled() const { return strength > 0.0f; }
+    float ior = 1.5f; // ADR-1819: the glass's index of refraction (read only while transmission > 0)
+    [[nodiscard]] bool enabled() const { return strength > 0.0f || transmission > 0.0f; }
 };
 
 // ADR-1152: a guilloche engraving -- line fields cut into the surface, after THE ASTRAL FORGE prototype's

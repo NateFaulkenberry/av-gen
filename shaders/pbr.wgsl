@@ -104,7 +104,12 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
 @fragment
 fn fs_main_refract(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
     var out = entityShade(in, frontFacing);
-    out.color = vec4<f32>(refractSurface(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
+    // A glass (refraction1.w > 0) as glTF defines it; an entity whose material asks for ADR-1603's refraction, as that.
+    if (object.refraction1.w > 0.0) {
+        out.color = vec4<f32>(refractGlass(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
+    } else {
+        out.color = vec4<f32>(refractSurface(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
+    }
     if (fxClipDiscard) {
         discard;
     }

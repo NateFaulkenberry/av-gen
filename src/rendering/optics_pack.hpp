@@ -34,7 +34,7 @@ namespace avgen::rendering {
 // material authors none or the ladder has taken it away (`dispersionAllowed`, QualitySettings::refractionDispersion),
 // so a material without dispersion packs the bytes it packed before ADR-1640.
 struct PackedRefraction {
-    glm::vec4 lane0{0.0f}; // x = strength, y = opacity, z = thickness (m), w = dispersion (ADR-1640)
+    glm::vec4 lane0{0.0f}; // x = strength, y = opacity (a glass's ior, ADR-1819), z = thickness (m), w = dispersion
     glm::vec4 lane1{0.0f}; // rgb = absorption per metre, w = ADR-1819's transmission (0 = the ADR-1603 mix)
 };
 [[nodiscard]] inline PackedRefraction packRefraction(const scene::Material& m, bool dispersionAllowed) {
@@ -43,6 +43,10 @@ struct PackedRefraction {
         const float dispersion = dispersionAllowed ? std::clamp(m.refraction.dispersion, 0.0f, 2.0f) : 0.0f;
         out.lane0 = glm::vec4(std::min(m.refraction.strength, 0.5f), std::clamp(m.refraction.opacity, 0.0f, 1.0f),
                               std::max(m.refraction.thickness, 0.0f), dispersion);
+        if (m.refraction.transmission > 0.0f) {
+            // ADR-1819: a glass has no use for `opacity` (its diffuse share is 1 - transmission), so y carries its ior.
+            out.lane0.y = std::clamp(m.refraction.ior, 1.0f, 3.0f);
+        }
         out.lane1 = glm::vec4(glm::max(m.refraction.absorption, glm::vec3(0.0f)),
                               std::clamp(m.refraction.transmission, 0.0f, 1.0f)); // ADR-1819
     }
