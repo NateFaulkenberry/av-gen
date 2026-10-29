@@ -173,7 +173,13 @@ fn glossySsr(surface: vec3<f32>, n: vec3<f32>, r: vec3<f32>, roughness: f32, spr
         return vec4<f32>(0.0);
     }
     let uv = (s0 + d * t) / full;
-    let edge = smoothstep(0.0, 0.08, min(uv.x, 1.0 - uv.x)) * smoothstep(0.0, 0.08, min(uv.y, 1.0 - uv.y));
+    // The screen's edge: a hit there is the last thing the frame shows in that direction, and beyond it the march
+    // knows nothing. A narrow band (8% of the screen, first cut) mapped onto the floor as diagonal cuts at the
+    // reflection's lower corners -- with the hard reflected wall-top line between them, a trapezoid painted on the
+    // floor. A quarter of the screen on each side, eased at both ends (smootherstep), makes it a gradient instead.
+    let edgeDistance = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+    let e = clamp(edgeDistance / 0.25, 0.0, 1.0);
+    let edge = e * e * e * (e * (e * 6.0 - 15.0) + 10.0);
     let far = 1.0 - smoothstep(0.75, 1.0, t);
     let snug = 1.0 - smoothstep(0.5, 1.0, hitGap); // a hit well inside the thickness is trusted, its edge less
     // A hit on a silhouette (its neighbours' depths far from its own): which side of the edge a ray lands on flips

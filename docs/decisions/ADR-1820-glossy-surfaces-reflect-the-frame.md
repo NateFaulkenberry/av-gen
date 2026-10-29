@@ -45,7 +45,8 @@ screen-space reflection (ADR-1286), and it is the water's own.
   the hit's screen size; 13 taps, none under 2 px).
 - **The trust** falls to the environment, smoothly: with roughness (full below 0.25, none at 0.45); with how fast the
   reflection turns from pixel to pixel (full below 0.6 degrees a pixel, none at 1.7: a small curved surface's
-  reflection is undersampled by one ray and crawls as the camera moves); toward the screen's edge; toward the ray's
+  reflection is undersampled by one ray and crawls as the camera moves); toward the screen's edge (ADR-1821: a
+  gradient over a quarter of the screen); toward the ray's
   reach; for a ray turning toward the camera (it would find the back of what it hits); and for a hit deep in the
   thickness. A miss is the environment.
 - **Deterministic**: no jitter, no noise, no history. A seek lands on the frame play drew; a still is the same every
