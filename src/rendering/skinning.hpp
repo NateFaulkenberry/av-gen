@@ -94,7 +94,7 @@ public:
     [[nodiscard]] wgpu::RenderPipeline litPipeline(bool blend, bool doubleSided) const;
     // ADR-1812: material programs compiled into the skinned lit pipelines (see SceneRenderer::setCompiledMaterials).
     void setCompiledMaterials(CompiledMaterialsMode mode);
-    void noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs);
+    void noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs, std::uint32_t litFeatures = 0x1FFu);
     [[nodiscard]] std::size_t compiledMaterialsPending() const;
     void waitForCompiledMaterials();
     void setCompiledMaterialsSuppressed(bool suppressed); // the `interpreted` arm
@@ -116,7 +116,7 @@ private:
     // The descriptor of one skinned pipeline, handed to `use` (which creates or starts it).
     void describePipeline(const wgpu::ShaderModule& module, const char* label, bool isBlend, bool doubleSided,
                           bool depthOnly, const std::function<void(const wgpu::RenderPipelineDescriptor&)>& use,
-                          bool writeNormal = false);
+                          bool writeNormal = false, std::uint32_t litFeatures = 0x1FFu);
     std::unique_ptr<CompiledMaterialVariants> compiled_; // ADR-1812: opaque cull, opaque two-sided, blend
     void ensureBuffer(std::uint32_t sliceBytes, std::uint32_t rigCount);
     void rebuildObjectGroup();

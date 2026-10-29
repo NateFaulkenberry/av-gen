@@ -1,4 +1,5 @@
 #include "rendering/scene_renderer.hpp"
+#include "rendering/lit_features.hpp"
 
 #include "gpu/pipeline_compile.hpp"
 #include "gpu/resource_stats.hpp"
@@ -535,7 +536,7 @@ Result<void> SceneRenderer::init() {
     entityMaterials_ = std::make_unique<CompiledMaterialVariants>(
         context_, shaders_, "pbr.wgsl", "entity",
         [this](const wgpu::ShaderModule& module, std::span<const scene::MaterialProgramGpu> programs,
-               const CompiledMaterialVariants::Start& start) {
+               std::uint32_t litFeatures, const CompiledMaterialVariants::Start& start) {
             bool textured = false;
             for (const scene::MaterialProgramGpu& p : programs) {
                 textured = textured || p.textureOps.x >= 0;
@@ -545,7 +546,7 @@ Result<void> SceneRenderer::init() {
                     break;
                 }
                 for (const LitVariant v : {LitVariant::OpaqueCull, LitVariant::OpaqueNoCull, LitVariant::Blend}) {
-                    if (!createLitPipeline(module, v, nullptr, withTextures, &start)) {
+                    if (!createLitPipeline(module, v, nullptr, withTextures, &start, litFeatures)) {
                         return false;
                     }
                 }
@@ -1315,7 +1316,8 @@ static_assert(sizeof(scene::Vertex) == 32);
 
 Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
                                                                wgpu::RenderPipeline* startInto, bool programTextures,
-                                                               const CompiledMaterialVariants::Start* sink) {
+                                                               const CompiledMaterialVariants::Start* sink,
+                                                               std::uint32_t litFeatures) {
     VertexLayoutStorage vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -1334,13 +1336,16 @@ Result<wgpu::RenderPipeline> SceneRenderer::createLitPipeline(const wgpu::Shader
     fragment.entryPoint = "fs_main";
     fragment.targetCount = kSceneTargetCount;
     fragment.targets = colorTargets.data();
-    wgpu::ConstantEntry texturesOn{}; // ADR-1642
-    texturesOn.key = "MAT_PROGRAM_TEXTURES";
-    texturesOn.value = 1.0;
+    std::vector<wgpu::ConstantEntry> constants;
     if (programTextures) {
-        fragment.constantCount = 1;
-        fragment.constants = &texturesOn;
+        wgpu::ConstantEntry texturesOn{}; // ADR-1642
+        texturesOn.key = "MAT_PROGRAM_TEXTURES";
+        texturesOn.value = 1.0;
+        constants.push_back(texturesOn);
     }
+    appendLitFeatureConstants(litFeatures, constants); // ADR-1815: nothing for the general shader
+    fragment.constantCount = constants.size();
+    fragment.constants = constants.empty() ? nullptr : constants.data();
     wgpu::DepthStencilState depth{};
     depth.format = kDepthFormat;
     depth.depthWriteEnabled = variant == LitVariant::Blend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
@@ -2077,12 +2082,49 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
          "particleSpawnScale<=0.7, particleCullDistance=60 m (non-hero emitters beyond it skipped)"},
         {"noprograms", [](QualitySettings& q) { q.materialProgramsOff = true; },
          "materialProgramsOff (programs bypassed: what they cost, a diagnostic arm only)"},
+        {"generallit", [](QualitySettings& q) { q.litGeneral = true; },
+         "litGeneral (the general lit shader, no specialised variant: what ADR-1815 buys)"},
         {"aodepthnormals", [](QualitySettings& q) { q.aoDepthNormals = true; },
          "aoDepthNormals (GTAO normals from depth differences, no prepass normals: the picture before ADR-1813)"},
         {"interpreted", [](QualitySettings& q) { q.materialProgramsInterpreted = true; },
          "materialProgramsInterpreted (compiled material programs not drawn: what compiling buys, ADR-1812)"},
     };
     return kArms;
+}
+
+std::uint32_t SceneRenderer::litFeaturesInUse(const scene::Scene& scene, const FrameUniforms& frame,
+                                              std::span<const std::pair<std::uint32_t, const scene::Entity*>> items,
+                                              std::uint32_t lightCount) const {
+    if (!scene.sdfs.empty()) {
+        return kAllLitFeatures;
+    }
+    std::uint32_t mask = 0;
+    // The frame's gates: each the condition the shader tests, read from the block the shader reads.
+    if (frame.lightCounts.z > 0.5f) mask |= kLitStyled;
+    if (frame.bandsSoft2.w > 0.5f) mask |= kLitBands;
+    if (frame.waveCount.x > 0.0f) mask |= kLitWaves;
+    const glm::vec3 ambient(frame.skyGround.ambient);
+    const glm::vec3 point(frame.skyGround.pointColor);
+    if (ambient.r + ambient.g + ambient.b > 0.0f || point.r + point.g + point.b > 0.0f) mask |= kLitAtmosGround;
+    for (std::uint32_t i = 0; i < std::min<std::uint32_t>(lightCount, static_cast<std::uint32_t>(lightStaging_.size()));
+         ++i) {
+        if (lightStaging_[i].positionType.w > 2.5f) { // LIGHT_RECT and beyond (shadows.wgsl)
+            mask |= kLitAreaLights;
+        }
+    }
+    // The draws' gates, from the object uniforms staged for this frame and each material's program slot.
+    for (const auto& [offset, entity] : items) {
+        ObjectUniforms obj{};
+        std::memcpy(&obj, objectStaging_.data() + offset, sizeof(obj));
+        if (obj.fxA.z != 0.0f) mask |= kLitFx;
+        if (obj.toon0.x > 0.5f) mask |= kLitToon;
+        if (obj.optics.x > 0.0f || obj.optics.z != 0.0f) mask |= kLitOptics;
+        if (!qualitySettings_.materialProgramsOff && entity != nullptr && !entity->material.program.empty() &&
+            materialPrograms_->slotOf(entity->material.program) >= 0) {
+            mask |= kLitPrograms;
+        }
+    }
+    return mask;
 }
 
 void SceneRenderer::setCompiledMaterials(CompiledMaterialsMode mode) {
@@ -4188,11 +4230,27 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         procedurals_->setCompiledMaterialsSuppressed(suppressed);
         skinning_->setCompiledMaterialsSuppressed(suppressed);
         procedurals_->noteMaterialPrograms(programs);
+        // ADR-1815: the lit features the frame's entity draws can reach; the `generallit` arm keeps them all.
+        std::vector<std::pair<std::uint32_t, const scene::Entity*>> litItems;
+        litItems.reserve(opaque.size() + blended.size());
+        for (const auto* list : {&opaque, &blended}) {
+            for (const DrawItem& item : *list) {
+                litItems.emplace_back(item.offset, item.entity);
+            }
+        }
+        if (scene.identity != litFeaturesScene_) {
+            litFeaturesScene_ = scene.identity;
+            litFeaturesSeen_ = 0;
+        }
+        litFeaturesSeen_ |= litFeaturesInUse(scene, frame, litItems,
+                                             static_cast<std::uint32_t>(frame.lightCounts.y + 0.5f));
+        const std::uint32_t litFeatures = qualitySettings_.litGeneral ? kAllLitFeatures : litFeaturesSeen_;
+        stats_.litFeatures = litFeatures;
         if (entityMaterials_) {
             entityMaterials_->setSuppressed(suppressed);
-            entityMaterials_->note(programs);
+            entityMaterials_->note(programs, litFeatures);
         }
-        skinning_->noteMaterialPrograms(programs);
+        skinning_->noteMaterialPrograms(programs, litFeatures);
         sdfs_->noteMaterialPrograms(programs);
         if (compiledMode_ == CompiledMaterialsMode::Blocking) {
             // ADR-1812: an offline frame is drawn compiled or not at all -- never the interpreter on some frames and

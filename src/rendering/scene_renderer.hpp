@@ -103,6 +103,8 @@ struct ShaderFrameInputs {
 };
 
 struct RenderStats {
+    // ADR-1815: the lit features this frame's entity draws used (rendering/lit_features.hpp); 0x1FF = all of them.
+    std::uint32_t litFeatures = 0x1FFu;
     double gpuFrameMs = -1.0; // -1 when timestamp queries are unavailable
     std::uint32_t drawCalls = 0;       // draws recorded by the camera-side passes
     std::uint32_t indirectDraws = 0;   // of the frame's draws, those sourced from a GPU buffer
@@ -991,7 +993,14 @@ private:
     Result<wgpu::RenderPipeline> createLitPipeline(const wgpu::ShaderModule& module, LitVariant variant,
                                                    wgpu::RenderPipeline* startInto = nullptr,
                                                    bool programTextures = false,
-                                                   const CompiledMaterialVariants::Start* sink = nullptr);
+                                                   const CompiledMaterialVariants::Start* sink = nullptr,
+                                                   std::uint32_t litFeatures = 0x1FFu);
+    // ADR-1815: the lit features this frame's entity draws can reach (rendering/lit_features.hpp), from the frame
+    // uniforms, the staged object uniforms of `items` and the packed lights. Every feature when the scene has SDF
+    // objects (their meshed draws use the entity pipelines with uniforms this scan does not see).
+    [[nodiscard]] std::uint32_t litFeaturesInUse(const scene::Scene& scene, const FrameUniforms& frame,
+                                                 std::span<const std::pair<std::uint32_t, const scene::Entity*>> items,
+                                                 std::uint32_t lightCount) const;
     // ADR-1642: the three textured lit variants, built the first time a frame draws an entity whose program has a
     // texture op (none for a scene without one). False when they failed (those entities draw untextured).
     bool ensureTexturedLitPipelines();
@@ -1050,6 +1059,10 @@ private:
     // OpaqueCull, OpaqueNoCull, Blend; 3-5 the same with program textures, present only when a program samples one.
     std::unique_ptr<CompiledMaterialVariants> entityMaterials_;
     CompiledMaterialsMode compiledMode_ = CompiledMaterialsMode::Off;
+    // ADR-1815: the lit features this scene has used since it opened. Sticky, so a feature that comes and goes with the
+    // music (a wave on the beat) costs one more variant once, not a variant switch every time it appears.
+    std::uint32_t litFeaturesSeen_ = 0;
+    std::uint64_t litFeaturesScene_ = 0;
     std::unique_ptr<AoRenderer> ao_;          // ADR-034
     std::unique_ptr<ShadowMaskRenderer> shadowMask_; // ADR-087
     std::unique_ptr<WaterRenderer> water_;           // ADR-099

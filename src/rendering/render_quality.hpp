@@ -361,6 +361,9 @@ struct QualitySettings {
     // Diagnostic arm only (ADR-1813): GTAO rebuilds its normals from depth differences, as before ADR-1813, and the
     // depth prepass writes no normals (one depth-only pass). No tier or level sets it.
     bool aoDepthNormals = false;
+    // Diagnostic arm only (ADR-1815): the entity lit pass draws the general shader (every LIT_* feature compiled in)
+    // even where a specialised variant is ready -- what specialisation buys, measured in one process.
+    bool litGeneral = false;
     // ADR-1222: the Astral Forge's tier (rendering::AstralRenderer). 0 = offline: every particle, the full-resolution
     // march, and a seek re-simulated from the song's start (exact); 1 = the live reference (the prototype's picture);
     // 2..4 = the live ladder's rungs, each simulating fewer particles (70%, 50%, 33%) with fewer god-ray taps, and no

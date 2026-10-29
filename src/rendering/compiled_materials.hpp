@@ -52,8 +52,10 @@ public:
     // Starts the variant's pipelines from `module` (the spliced shader): call `start(desc)` once per pipeline, in a
     // fixed order; `pipeline(i)` later returns the i-th. A builder that cannot make its descriptors returns false.
     using Start = std::function<void(const wgpu::RenderPipelineDescriptor&)>;
+    // `litFeatures` (ADR-1815): the lit features the variant keeps (rendering/lit_features.hpp); the builder sets the
+    // others' override constants to false. `kAllLitFeatures` is the general shader.
     using Builder = std::function<bool(const wgpu::ShaderModule& module, std::span<const scene::MaterialProgramGpu> programs,
-                                       const Start& start)>;
+                                       std::uint32_t litFeatures, const Start& start)>;
 
     CompiledMaterialVariants(gpu::Context& context, gpu::ShaderLibrary& shaders, std::string shaderFile,
                              std::string label, Builder builder);
@@ -63,8 +65,9 @@ public:
     void setSuppressed(bool suppressed) { suppressed_ = suppressed; }
     [[nodiscard]] CompiledMaterialsMode mode() const { return mode_; }
 
-    // Called every frame with the frame's programs; starts a build when their structure is new.
-    void note(std::span<const scene::MaterialProgramGpu> programs);
+    // Called every frame with the frame's programs and (ADR-1815) the lit features the frame uses; starts a build when
+    // the pair is new. With no programs and every feature in use there is nothing to specialise and no variant.
+    void note(std::span<const scene::MaterialProgramGpu> programs, std::uint32_t litFeatures = 0x1FFu);
     // The i-th pipeline of the variant for this frame's programs, or null while there is none ready (the caller then
     // draws its interpreter pipeline).
     [[nodiscard]] wgpu::RenderPipeline pipeline(std::size_t i) const;
@@ -77,7 +80,7 @@ public:
 
 private:
     [[nodiscard]] const Variant* activeVariant() const;
-    void build(std::span<const scene::MaterialProgramGpu> programs, std::uint64_t key);
+    void build(std::span<const scene::MaterialProgramGpu> programs, std::uint64_t key, std::uint32_t litFeatures);
 
     gpu::Context& context_;
     gpu::ShaderLibrary& shaders_;

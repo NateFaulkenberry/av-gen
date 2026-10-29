@@ -105,7 +105,7 @@ struct QualityPolicy {
                settings.lodBias == 1.0f && settings.drawDistanceScale == 1.0f &&
                settings.shadowCasterMinPixels == 0.0f && settings.postEffectQuality == 1.0f &&
                settings.particleCullDistance == 0.0f && settings.particleSpawnScale == 1.0f &&
-               !settings.materialProgramsOff && !settings.materialProgramsInterpreted && !settings.aoDepthNormals &&
+               !settings.materialProgramsOff && !settings.materialProgramsInterpreted && !settings.aoDepthNormals && !settings.litGeneral &&
                settings.sdfShadowScale == 1 && // ADR-1165: every shadow texel of a raymarched caster marched
                settings.astralTier == 0 &&     // ADR-1222: every particle, the full march, the exact seek
                settings.refraction && settings.waterSsrScale == 1.0f && // ADR-1603

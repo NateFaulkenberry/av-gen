@@ -29,6 +29,29 @@
 // draw, and a surface fragment has no use for them.
 #include "atmosphere_ground.wgsl"
 // ADR-1151: the reflection-only bands, read from the frame block (the particle path supplies its own).
+// ADR-1815: lit-shader specialisation (see lighting.wgsl for the light-loop gates). `true` in the general shader.
+override LIT_PROGRAMS: bool = true;     // ADR-030 material programs (a draw with `materialSelect.program >= 0`)
+override LIT_FX: bool = true;           // ADR-703 entity effect lanes (`fxA.z != 0`)
+override LIT_OPTICS: bool = true;       // ADR-1143 anisotropy and thin film; ADR-1149/1152 surface detail
+override LIT_BANDS: bool = true;        // ADR-1151 reflection bands
+override LIT_WAVES: bool = true;        // ADR-207 surface waves
+override LIT_ATMOS_GROUND: bool = true; // ADR-230 sky-effect ground illumination
+
+fn litWavesAt(worldPos: vec3<f32>, normal: vec3<f32>, emission: vec3<f32>) -> WaveResult {
+    if (LIT_WAVES) {
+        return wavesAt(worldPos, normal, emission);
+    }
+    var none: WaveResult;
+    return none;
+}
+
+fn litAtmosphereGroundAt(worldPos: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
+    if (LIT_ATMOS_GROUND) {
+        return atmosphereGroundAt(worldPos, normal);
+    }
+    return vec3<f32>(0.0);
+}
+
 fn bandLaneInfo() -> vec4<f32> { return frame.bandsInfo; }
 fn bandLaneSoft() -> vec4<f32> { return frame.bandsSoft; }
 fn bandLaneSoft2() -> vec4<f32> { return frame.bandsSoft2; }
@@ -651,7 +674,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     var matRoughMetal = object.material.xy; // x = roughness, y = metallic
     var programNormal = vec3<f32>(0.0, 0.0, 1.0); // tangent-space perturbation the program asked for
     var programOcclusion = 1.0;
-    let programIndex = materialSelect.program;
+    let programIndex = select(-1, materialSelect.program, LIT_PROGRAMS);
     let viewDepth = max(dot(worldPos - frame.cameraPos.xyz, frame.cameraForward.xyz), 1e-4);
     // The screen-space geometry, the tangent frame and the ambient occlusion the program reads
     // (ADR-036). All three are hoisted out of the branches that use them because they take
@@ -781,7 +804,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
 
     // ---- Wave 2 (FXL): the clip and the hue cycle on the base colour ----
     // Both behind their own flag bit, read from the lanes the includer filled behind `fxA.z != 0`.
-    let fxSurface = u32(entityFxLanes.a.z + 0.5);
+    let fxSurface = select(0u, u32(entityFxLanes.a.z + 0.5), LIT_FX);
     var fxEdge = vec3<f32>(0.0);
     if ((fxSurface & FX_CLIP) != 0u) {
         // The same test `fs_depth` makes (`fxClipped`), so the prepass and the shadows lose exactly
@@ -812,7 +835,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // intensity lane -- so its emissive texture and the built-in Fresnel rim below scale with it --
     // and the added glow and rim are computed here and added after the texture, scaled by the same
     // gain: emission = (own * tint + added + rim) * gain * band, all before fog.
-    let fxFlags = u32(entityFxLanes.a.z + 0.5);
+    let fxFlags = select(0u, u32(entityFxLanes.a.z + 0.5), LIT_FX);
     var fxAdded = vec3<f32>(0.0);
     if (fxFlags != 0u) {
         var gain = max(entityFxLanes.a.x, 0.0);
@@ -870,7 +893,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     if (object.flags.z > 0.5) { // unlit
         // ADR-207: additive, even here. An unlit surface is one the lighting does not reach, not one
         // the world cannot touch.
-        let fx = wavesAt(worldPos, n, emissive);
+        let fx = litWavesAt(worldPos, n, emissive);
         result.color = vec4<f32>(applyFog(baseColor.rgb + emissive + fx.radiance, worldPos), alpha);
         result.normal = n;
         result.emission = baseColor.rgb + emissive + fx.radiance;
@@ -888,7 +911,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // says. The gate is the object's uniform, so a draw takes this branch whole. Flat by design: no
     // normal map, no IBL, no screen-space AO (its noise is exactly what a flat tone would print);
     // the program's colour and emission, the effect lanes, the waves and the fog all still apply.
-    if (object.toon0.x > 0.5) {
+    if (LIT_TOON && object.toon0.x > 0.5) {
         let roughness = clamp(matRoughMetal.x, 0.15, 1.0);
         var context: ShadeContext;
         context.worldPos = worldPos;
@@ -922,7 +945,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
             let edge = sqrt(max(1.0 - inner * inner, 0.0));
             rim = object.toon2.rgb * (1.0 - smoothstep(edge - s, edge + s, context.nDotV));
         }
-        let fx = wavesAt(worldPos, n, emissive);
+        let fx = litWavesAt(worldPos, n, emissive);
         let radiance = lighting.diffuse + lighting.specular + ambient + emissive + rim + fx.radiance;
         result.color = vec4<f32>(applyFog(radiance, worldPos), alpha);
         result.normal = n;
@@ -939,7 +962,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         return result;
     }
 
-    if (frame.lightCounts.z > 0.5) {
+    if (LIT_STYLED && frame.lightCounts.z > 0.5) {
         let roughness = clamp(matRoughMetal.x, 0.15, 1.0);
         var context: ShadeContext;
         context.worldPos = worldPos;
@@ -979,13 +1002,13 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         // ADR-207: the world-effect contribution, added to the radiance *before* fog so a wave far
         // down a valley is seen through the air that is between it and the eye, and added to the
         // emission target so the bloom chain sees it too.
-        let fx = wavesAt(worldPos, n, emissive);
+        let fx = litWavesAt(worldPos, n, emissive);
         // ADR-230 §6: the sky's light on the ground. Multiplied by the albedo because it is
         // *incoming light* and not paint -- adding it flat would lift every black surface in the
         // valley to the aurora's colour, which is the "flattens the scene" failure §6 warns about.
         // It is deliberately absent from `result.emission`: illumination is not emission, and a
         // ground wash that blooms is a ground wash nobody can control.
-        let skyLit = atmosphereGroundAt(worldPos, n) * baseColor.rgb;
+        let skyLit = litAtmosphereGroundAt(worldPos, n) * baseColor.rgb;
         result.color = vec4<f32>(applyFog(lighting.diffuse + lighting.specular + ambient + emissive + rim
                                           + fx.radiance + skyLit,
                                          worldPos), alpha);
@@ -1040,7 +1063,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // representative-point and the LTC area lights' f0 term) and the IBL split sum's kS below. The gate
     // is the draw's uniform: a material with no film never enters.
     // ADR-1149: plus the regions' film (0 on every path but an engraved SDF, so the sum is the uniform).
-    if (object.optics.x > 0.0 || surfaceDetail().film > 0.0) {
+    if (LIT_OPTICS && (object.optics.x > 0.0 || surfaceDetail().film > 0.0)) {
         let substrate = dot(f0, vec3<f32>(0.2126, 0.7152, 0.0722));
         f0 = clamp(f0 * thinFilmTint(nDotV, object.optics.x + surfaceDetail().film, object.optics.y, substrate, metallic),
                    vec3<f32>(0.0), vec3<f32>(1.0));
@@ -1058,7 +1081,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     var anisoT = vec3<f32>(0.0);
     var anisoB = vec3<f32>(0.0);
     let detail = surfaceDetail(); // ADR-1152 (the zero record on every path but an engraved SDF)
-    if (object.optics.z != 0.0) {
+    if (LIT_OPTICS && object.optics.z != 0.0) {
         var reference = normalize(object.model[1].xyz);
         if (hasNormal) {
             reference = tangentFrame[0];
@@ -1100,7 +1123,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     ctx.maskable = alphaMode < 1.5; // ADR-087: blended surfaces are not in the depth prepass
     ctx.tier = tier;
     ctx.localLightBudget = tierLocalLights;
-    ctx.anisotropy = object.optics.z; // ADR-1143 (0 = the isotropic lobe)
+    ctx.anisotropy = select(0.0, object.optics.z, LIT_OPTICS); // ADR-1143 (0 = the isotropic lobe)
     ctx.anisoT = anisoT;
     ctx.anisoB = anisoB;
     let lit = directLighting(ctx);
@@ -1129,7 +1152,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         // approximated by bending the normal the reflection is taken about towards the plane that
         // contains the stretch direction (the bent-normal trick of McAuley's 2015 Far Cry 4 talk, as
         // Filament does), scaled down on very smooth surfaces where the stretch is sub-pixel.
-        if (object.optics.z != 0.0) {
+        if (LIT_OPTICS && object.optics.z != 0.0) {
             let direction = select(anisoT, anisoB, object.optics.z >= 0.0);
             let tangentAcross = cross(direction, v);
             let bentAniso = cross(tangentAcross, direction);
@@ -1142,7 +1165,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let brdf = textureSample(brdfLut, iblSampler, vec2<f32>(nDotV, roughness)).rg;
         let specular = prefiltered * (kS * brdf.x + brdf.y) * specularOcclusion;
         ambient = (kD * irradiance * albedo * visibility + specular) * frame.params.w;
-    } else if (frame.bandsSoft2.w > 0.5) {
+    } else if (LIT_BANDS && frame.bandsSoft2.w > 0.5) {
         // ADR-1151: with no environment map, a scene that authored bands is lit by them (below) and its own
         // lights, not by the constant hemisphere a scene without either gets: a black void stays black.
         ambient = vec3<f32>(0.0);
@@ -1156,9 +1179,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // analytic split-sum scale and bias, the same specular occlusion as the IBL, and the anisotropic bend.
     // ADR-1152: across an engraved groove the reflection is smeared (five taps across the lines, the
     // prototype's), and the grooves diffract each band into its spectrum.
-    if (frame.bandsSoft2.w > 0.5 && tier < 2u) {
+    if (LIT_BANDS && frame.bandsSoft2.w > 0.5 && tier < 2u) {
         var rb = reflect(-v, n);
-        if (object.optics.z != 0.0) {
+        if (LIT_OPTICS && object.optics.z != 0.0) {
             let direction = select(anisoT, anisoB, object.optics.z >= 0.0);
             let tangentAcross = cross(direction, v);
             let bentAniso = cross(tangentAcross, direction);
@@ -1210,9 +1233,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
                            ownGain * laneGain);
 
     // ADR-207, as on the styled path above: additive, pre-fog, and into the emission target.
-    let fx = wavesAt(worldPos, n, emissive);
+    let fx = litWavesAt(worldPos, n, emissive);
     // ADR-230 §6, as on the styled path above: albedo-multiplied, and not into the emission target.
-    let skyLit = atmosphereGroundAt(worldPos, n) * baseColor.rgb;
+    let skyLit = litAtmosphereGroundAt(worldPos, n) * baseColor.rgb;
     result.color = vec4<f32>(applyFog(direct + ambient + emissive + rim + fx.radiance + skyLit, worldPos), alpha);
     result.normal = n;
     result.roughness = roughness;

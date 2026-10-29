@@ -2,6 +2,7 @@
 
 #include "core/log.hpp"
 #include "gpu/resource_stats.hpp"
+#include "rendering/lit_features.hpp"
 #include "scene/material_compiler.hpp"
 
 #include <thread>
@@ -19,19 +20,21 @@ CompiledMaterialVariants::CompiledMaterialVariants(gpu::Context& context, gpu::S
     : context_(context), shaders_(shaders), shaderFile_(std::move(shaderFile)), label_(std::move(label)),
       builder_(std::move(builder)) {}
 
-void CompiledMaterialVariants::note(std::span<const scene::MaterialProgramGpu> programs) {
+void CompiledMaterialVariants::note(std::span<const scene::MaterialProgramGpu> programs, std::uint32_t litFeatures) {
     if (mode_ == CompiledMaterialsMode::Off) {
         return;
     }
-    key_ = scene::materialStructureKey(programs);
-    if (programs.empty() || (current_ && current_->key == key_)) {
+    litFeatures &= 0x1FFu;
+    key_ = (programs.empty() ? 0x5ec1a1u : scene::materialStructureKey(programs)) ^
+           (static_cast<std::uint64_t>(litFeatures) * 0x9e3779b97f4a7c15ull); // ADR-1815: the features are structure
+    if ((programs.empty() && litFeatures == 0x1FFu) || (current_ && current_->key == key_)) {
         return;
     }
     if (const auto it = variants_.find(key_); it != variants_.end()) {
         current_ = it->second; // built on an earlier visit (or still building)
         return;
     }
-    build(programs, key_);
+    build(programs, key_, litFeatures);
 }
 
 const CompiledMaterialVariants::Variant* CompiledMaterialVariants::activeVariant() const {
@@ -68,7 +71,8 @@ void CompiledMaterialVariants::reset() {
     baseSource_.clear();
 }
 
-void CompiledMaterialVariants::build(std::span<const scene::MaterialProgramGpu> programs, std::uint64_t key) {
+void CompiledMaterialVariants::build(std::span<const scene::MaterialProgramGpu> programs, std::uint64_t key,
+                                     std::uint32_t litFeatures) {
     auto slot = std::make_shared<Variant>();
     slot->key = key;
     slot->started = std::chrono::steady_clock::now();
@@ -101,8 +105,8 @@ void CompiledMaterialVariants::build(std::span<const scene::MaterialProgramGpu> 
     }
     // AllowProcessEvents: a callback runs only inside processEvents, never while the builder is still starting
     // pipelines, so the slot can grow as each one starts.
-    const std::string label = label_;
-    const bool ok = builder_(*module, programs, [&](const wgpu::RenderPipelineDescriptor& d) {
+    const std::string label = label_ + " (lit features: " + litFeatureNames(litFeatures) + ")";
+    const bool ok = builder_(*module, programs, litFeatures, [&](const wgpu::RenderPipelineDescriptor& d) {
         const std::size_t i = slot->pipelines.size();
         slot->pipelines.emplace_back();
         ++slot->pending;
@@ -119,7 +123,7 @@ void CompiledMaterialVariants::build(std::span<const scene::MaterialProgramGpu> 
                               gpu::Context::toString(msg));
                 }
                 if (--slot->pending == 0 && !slot->failed) {
-                    log::info("{}: compiled material programs ready after {:.1f} ms (on Dawn's workers)", label,
+                    log::info("{}: compiled variant ready after {:.1f} ms (on Dawn's workers)", label,
                               msSince(slot->started));
                 }
             });

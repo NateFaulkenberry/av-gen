@@ -21,6 +21,13 @@
 // module that had already included the material interpreter -- an undeclared dependency that
 // water.wgsl (ADR-099), which wants the lighting and has no material program in it, tripped over
 // immediately. One copy of four lines is cheaper than that coupling.
+// ADR-1815: lit-shader specialisation. Each gate is `true` in the general shader, so every pipeline that does not set
+// them is byte for byte the shader before ADR-1815; a specialised lit variant sets to `false` the features its scene
+// never uses, and the compiler then drops their code (and the registers it held) from the light loop.
+override LIT_TOON: bool = true;        // ADR-1071 cel lighting (a material's `toon`)
+override LIT_STYLED: bool = true;      // ADR-058 the scene-wide stylised path (`environment.stylized`)
+override LIT_AREA_LIGHTS: bool = true; // ADR-033 area, disk and tube lights (LTC and representative point)
+
 fn lightSafeNormalize(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
     let len2 = dot(v, v);
     if (len2 > 1e-12) {
@@ -333,7 +340,7 @@ fn shadePainterly(ctx: ShadeContext, direction: vec3<f32>, radiance: vec3<f32>) 
 
 fn shadePunctual(light: GpuLight, ctx: ShadeContext, l: vec3<f32>, attenuation: f32,
                  alphaOverride: f32) -> LightSample {
-    if (frame.lightCounts.z > 0.5) {
+    if (LIT_STYLED && frame.lightCounts.z > 0.5) {
         return shadePainterly(ctx, l, light.colorIntensity.rgb * attenuation);
     }
     var out: LightSample;
@@ -460,6 +467,8 @@ fn evaluateLight(index: u32, ctx: ShadeContext) -> LightSample {
             attenuation = attenuation * spot * spot;
         }
         sample = shadePunctual(light, ctx, toLight, attenuation, ctx.alpha);
+    } else if (!LIT_AREA_LIGHTS) {
+        return sample; // ADR-1815: a variant whose scene has no area light never reaches here
     } else if (kind < LIGHT_DISK + 0.5) {
         toLight = normalize(light.positionType.xyz - ctx.worldPos);
         sample = shadeArea(light, ctx);
@@ -634,7 +643,7 @@ fn uniformLightRadiance(light: Light, worldPos: vec3<f32>) -> vec4<f32> {
 }
 
 fn shadeUniform(light: Light, ctx: ShadeContext, l: vec3<f32>, attenuation: f32) -> LightSample {
-    if (frame.lightCounts.z > 0.5) {
+    if (LIT_STYLED && frame.lightCounts.z > 0.5) {
         return shadePainterly(ctx, l, light.colorIntensity.rgb * attenuation);
     }
     var out: LightSample;
@@ -671,7 +680,7 @@ fn clusterIndexFor(screenUv: vec2<f32>, viewDepth: f32) -> u32 {
 // ADR-1071: the toon branch is chosen per draw (the gate is the object's uniform), so the whole wave
 // takes the same side.
 fn evaluateLightAny(index: u32, ctx: ShadeContext) -> LightSample {
-    if (ctx.toon.x > 0.5) {
+    if (LIT_TOON && ctx.toon.x > 0.5) {
         return evaluateLightToon(index, ctx);
     }
     return evaluateLight(index, ctx);
@@ -717,7 +726,7 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
             let light = frame.lights[i];
             let lr = uniformLightRadiance(light, ctx.worldPos);
             var s = shadeUniform(light, ctx, lr.xyz, lr.w);
-            if (ctx.toon.x > 0.5) { // ADR-1071, unshadowed as this tier always is
+            if (LIT_TOON && ctx.toon.x > 0.5) { // ADR-1071, unshadowed as this tier always is
                 s = shadeToonUnbanded(ctx, lr.xyz, light.colorIntensity.rgb * lr.w);
                 let band = toonBand(dot(ctx.normal, lr.xyz), 1.0, ctx);
                 s.diffuse = s.diffuse * band.x;

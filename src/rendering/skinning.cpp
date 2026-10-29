@@ -1,4 +1,5 @@
 #include "rendering/skinning.hpp"
+#include "rendering/lit_features.hpp"
 #include "gpu/resource_stats.hpp"
 
 #include "core/log.hpp"
@@ -163,7 +164,7 @@ Result<void> SkinningRenderer::reload() {
 void SkinningRenderer::describePipeline(const wgpu::ShaderModule& module, const char* label, bool isBlend,
                                         bool doubleSided, bool depthOnly,
                                         const std::function<void(const wgpu::RenderPipelineDescriptor&)>& use,
-                                        bool writeNormal) {
+                                        bool writeNormal, std::uint32_t litFeatures) {
     SkinnedVertexLayout vertex;
     wgpu::BlendState blend{};
     blend.color.operation = wgpu::BlendOperation::Add;
@@ -183,6 +184,12 @@ void SkinningRenderer::describePipeline(const wgpu::ShaderModule& module, const 
     normalTarget.writeMask = wgpu::ColorWriteMask::All;
     fragment.targetCount = writeNormal ? 1 : depthOnly ? 0 : kSceneTargetCount;
     fragment.targets = writeNormal ? &normalTarget : depthOnly ? nullptr : colorTargets.data();
+    std::vector<wgpu::ConstantEntry> constants; // ADR-1815: a specialised lit variant's closed features
+    if (!depthOnly) {
+        appendLitFeatureConstants(litFeatures, constants);
+    }
+    fragment.constantCount = constants.size();
+    fragment.constants = constants.empty() ? nullptr : constants.data();
     wgpu::DepthStencilState depth{};
     depth.format = depthFormat_;
     depth.depthWriteEnabled = isBlend ? wgpu::OptionalBool::False : wgpu::OptionalBool::True;
@@ -263,21 +270,23 @@ void SkinningRenderer::setCompiledMaterials(CompiledMaterialsMode mode) {
     if (!compiled_) {
         compiled_ = std::make_unique<CompiledMaterialVariants>(
             context_, shaders_, "pbr_skinned.wgsl", "skinned",
-            [this](const wgpu::ShaderModule& module, std::span<const scene::MaterialProgramGpu>,
+            [this](const wgpu::ShaderModule& module, std::span<const scene::MaterialProgramGpu>, std::uint32_t features,
                    const CompiledMaterialVariants::Start& start) {
-                describePipeline(module, "pbr-skinned-opaque-compiled", false, false, false, start);
-                describePipeline(module, "pbr-skinned-opaque-twosided-compiled", false, true, false, start);
-                describePipeline(module, "pbr-skinned-blend-compiled", true, false, false, start);
+                describePipeline(module, "pbr-skinned-opaque-compiled", false, false, false, start, false, features);
+                describePipeline(module, "pbr-skinned-opaque-twosided-compiled", false, true, false, start, false,
+                                 features);
+                describePipeline(module, "pbr-skinned-blend-compiled", true, false, false, start, false, features);
                 return true;
             });
     }
     compiled_->setMode(mode);
 }
 
-void SkinningRenderer::noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs) {
+void SkinningRenderer::noteMaterialPrograms(std::span<const scene::MaterialProgramGpu> programs,
+                                            std::uint32_t litFeatures) {
     // Only a scene with a rig pays for the skinned variant's compile.
     if (compiled_ && ready_ && stats_.rigs > 0) {
-        compiled_->note(programs);
+        compiled_->note(programs, litFeatures);
     }
 }
 
