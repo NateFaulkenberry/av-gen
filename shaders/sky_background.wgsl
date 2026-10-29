@@ -54,7 +54,7 @@ fn skyRadianceFrameScaled(dir: vec3<f32>, minRadius: f32, sunScale: f32) -> vec3
     let glow = exp(-theta / max(frame.skyGroundColor.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
     let sun = frame.skySunRadiance.rgb * sunScale * (disc + glow) * band;
     // ADR-1864: the cirrus layer, as the cube has it (environment.wgsl's skyRadiance)
-    let cs = skyCirrus(d, frame.skySun.xyz, frame.skyCirrus0, frame.skyCirrus1, frame.skyCirrus2, frame.skyCirrus3);
+    let cs = skyCirrus(d, frame.skySun.xyz, frame.skyCirrus0, frame.skyCirrus1, frame.skyCirrus2, frame.skyCirrus3, frame.skyCirrus4);
     return base * (1.0 - cs.x) + cs.yzw * cs.x + sun * (1.0 - 0.6 * cs.x);
 }
 

@@ -385,6 +385,7 @@ struct FrameUniforms {
     glm::vec4 skyCirrus1{0.0f};
     glm::vec4 skyCirrus2{0.0f};
     glm::vec4 skyCirrus3{0.0f};
+    glm::vec4 skyCirrus4{0.0f}; // ADR-1865: bands, band width, the cube's share, the sky's intensity
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -401,7 +402,7 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        16 + // ADR-918: one vec4 of fog-from-sky
                                        16 + // ADR-1070: one vec4 of the live sky
                                        192 + // ADR-1151: twelve vec4s of reflection bands
-                                       64); // ADR-1864: four vec4s of cirrus, appended last
+                                       80); // ADR-1864/1865: five vec4s of cirrus, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

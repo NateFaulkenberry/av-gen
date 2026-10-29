@@ -61,7 +61,7 @@
       "sunGlow": 0.35,
       "intensity": 1.0,
       "cirrus": {
-        "amount": 0.9,
+        "amount": 1.0,
         "coverage": 0.5,
         "softness": 0.28,
         "altitude": 4000,
@@ -79,8 +79,10 @@
           0.62
         ],
         "sunScatter": 1.2,
-        "seed": 0,
-        "reflection": 0.15
+        "seed": 0.0,
+        "reflection": 0.15,
+        "bands": 1.0,
+        "bandWidth": 5000.0
       }
     },
     "shadowRange": 3000.0,

@@ -25,6 +25,7 @@ struct EnvUniforms {
     cirrus1: vec4<f32>,
     cirrus2: vec4<f32>,
     cirrus3: vec4<f32>,
+    cirrus4: vec4<f32>,     // ADR-1865
 };
 
 @group(0) @binding(0) var<uniform> env: EnvUniforms;
@@ -140,7 +141,7 @@ fn skyRadiance(dir: vec3<f32>, minRadius: f32) -> vec3<f32> {
     let glow = exp(-theta / max(env.skyGround.w, 1e-3)) * 0.02; // SKY_AUREOLE, scene/sky.cpp
     let sun = env.skySun.rgb * (disc + glow) * band;
     // ADR-1864: the cirrus layer over the sky, and over most of the sun
-    let cs = skyCirrus(d, env.skySunDir.xyz, env.cirrus0, env.cirrus1, env.cirrus2, env.cirrus3);
+    let cs = skyCirrus(d, env.skySunDir.xyz, env.cirrus0, env.cirrus1, env.cirrus2, env.cirrus3, env.cirrus4);
     let clouded = base * (1.0 - cs.x) + cs.yzw * cs.x;
     return (clouded + sun * (1.0 - 0.6 * cs.x)) * env.skySun.w;
 }

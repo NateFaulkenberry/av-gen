@@ -1,6 +1,6 @@
 # ADR-1864: The analytic sky has a cirrus layer
 
-- Status: Proposed, scene/strange-attractor (2026-10-28). The owner approved building it.
+- Status: Accepted by the owner (2026-10-28), scene/strange-attractor. Extended by ADR-1865 (bands, water).
 - Code:
   - `scene::SkyCirrus` (`src/scene/scene_types.hpp`) and `SkySettings::cirrus`.
   - In `src/scene/sky.{hpp,cpp}`:

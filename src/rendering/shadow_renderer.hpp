@@ -97,7 +97,9 @@ public:
     // camera's own planes here, because a range past the far plane fits cascades to nothing.
     // `casterReach` is `scene::Environment::shadowCasterReach` (ADR-1858): the least light-space pull-back of every
     // cascade, so all cascades see the same occluders. 0 keeps ADR-112's per-cascade rule.
-    std::uint32_t update(const std::vector<const scene::PunctualLight*>& lights, const glm::mat4& viewProj,
+    // ADR-1866: `camera` is the view the cascades are fitted to, as a basis (shadow_math.hpp `ShadowCamera`), not an
+    // inverse view-projection.
+    std::uint32_t update(const std::vector<const scene::PunctualLight*>& lights, const ShadowCamera& camera,
                          float cameraNear, float cameraFar, float sceneRadius, const QualitySettings& quality,
                          float rangeOverride = 0.0f, float casterReach = 0.0f);
     // Writes each view's frame-uniform copy (the caller's block with `viewProj` replaced) and the

@@ -272,3 +272,46 @@ TEST_CASE("a cascade's caster reach extends its volume back toward the sun, and 
                                                    500.0f, 500.0f);
     CHECK(capped.depthRange == exact.depthRange);
 }
+
+TEST_CASE("a cascade fitted to the camera's basis keeps its size frame to frame far from the origin",
+          "[shadows][cascades][adr1866]") {
+    // ADR-1866. The Strange Attractor flies 3 km from the origin with a far plane of tens of kilometres; fitted
+    // through the float inverse view-projection, its nearest cascade's half-extent jumped between 110.7 and 127.7 m
+    // across consecutive frames of a constant field of view -- every frame a different texel, every shadow edge
+    // re-cut. From the basis, the size is a function of the field of view and the split alone.
+    const glm::vec3 light = glm::normalize(glm::vec3(0.96f, -0.24f, 0.13f));
+    const float near = 0.5f, far = 60000.0f, split = 116.3f;
+    const float fovY = glm::radians(36.0f), aspect = 16.0f / 9.0f;
+    std::vector<float> fromMatrix, fromBasis;
+    for (int i = 0; i < 30; ++i) {
+        const float s = static_cast<float>(i);
+        const glm::vec3 eye(95.0f + 0.9f * s, 91.0f - 0.05f * s, 3335.0f - 2.8f * s); // a 30 fps glide
+        const glm::vec3 fwd = glm::normalize(glm::vec3(0.30f + 0.004f * s, -0.12f, -1.0f));
+        const glm::mat4 view = glm::lookAt(eye, eye + fwd, glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 proj = glm::perspective(fovY, aspect, near, far);
+        proj[1][1] *= -1.0f;
+        fromMatrix.push_back(fitDirectionalCascade(glm::inverse(proj * view), near, far, near, split, light, 4096,
+                                                   3000.0f).orthoRadius);
+        const glm::dmat4 inv = glm::inverse(glm::dmat4(view));
+        ShadowCamera cam;
+        cam.eye = glm::dvec3(inv[3]);
+        cam.right = glm::normalize(glm::dvec3(inv[0]));
+        cam.up = glm::normalize(glm::dvec3(inv[1]));
+        cam.forward = -glm::normalize(glm::dvec3(inv[2]));
+        cam.tanHalfY = std::tan(static_cast<double>(fovY) * 0.5);
+        cam.tanHalfX = cam.tanHalfY * static_cast<double>(aspect);
+        fromBasis.push_back(fitDirectionalCascade(cam, near, split, light, 4096, 3000.0f).orthoRadius);
+    }
+    const auto spread = [](const std::vector<float>& v) {
+        return *std::max_element(v.begin(), v.end()) - *std::min_element(v.begin(), v.end());
+    };
+    // The exact radius of the slice's bounding sphere about its centroid, which both fits mean.
+    const double tY = std::tan(static_cast<double>(fovY) * 0.5), tX = tY * static_cast<double>(aspect);
+    const double half = 0.5 * (static_cast<double>(split) - near);
+    const double exact = std::sqrt(half * half + static_cast<double>(split) * static_cast<double>(split) * (tX * tX + tY * tY));
+    INFO("from the matrix: spread " << spread(fromMatrix) << " m; from the basis: spread " << spread(fromBasis)
+                                    << " m, radius " << fromBasis.front() << " against exact " << exact);
+    CHECK(spread(fromBasis) == 0.0f);                        // one size, every frame
+    CHECK(std::abs(fromBasis.front() - exact) < 0.0625 + 1e-3); // the 1/16 m quantisation the fit applies
+    CHECK(spread(fromMatrix) > 1.0f);                         // the control: the matrix path does wander here
+}

@@ -136,7 +136,7 @@ Result<void> ShadowRenderer::init(std::uint64_t frameUniformSize) {
 }
 
 std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLight*>& lights,
-                                     const glm::mat4& viewProj, float cameraNear, float cameraFar,
+                                     const ShadowCamera& camera, float cameraNear, float cameraFar,
                                      float sceneRadius, const QualitySettings& quality,
                                      float rangeOverride, float casterReach) {
     Impl& im = *impl_;
@@ -166,30 +166,11 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
         shadowFar = std::clamp(rangeOverride, near * 4.0f, std::max(cameraFar, near * 4.0f));
     }
     stats_.range = shadowFar;
-    const glm::mat4 invViewProj = glm::inverse(viewProj);
     const std::uint32_t cascades = std::clamp(quality.cascadeCount, 1u, kMaxCascades);
     const std::vector<float> splits = cascadeSplits(cameraNear, shadowFar, cascades);
-    // §15's "camera position", and it is taken from the matrix the fit was made from rather than
-    // from the scene's camera. Those are the same thing until a frozen view or a debug camera makes
-    // them different, and the number worth reporting is the one the cascades were fitted to.
-    //
-    // Recorded because the first version was wrong in a way that read as right: unprojecting
-    // NDC (0, 0, 0) gives the centre of the NEAR PLANE, not the eye, and on a 0.5 m near plane
-    // those differ by half a metre -- small enough to look like the camera and large enough to be
-    // the wrong answer. The eye is that point walked back along the view axis by exactly the near
-    // distance, which is a number this function is already given.
-    {
-        const glm::vec4 nearH = invViewProj * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-        const glm::vec4 farH = invViewProj * glm::vec4(0.0f, 0.0f, 1.0f, 1.0f);
-        if (std::abs(nearH.w) > 1e-8f && std::abs(farH.w) > 1e-8f) {
-            const glm::vec3 nearCentre = glm::vec3(nearH) / nearH.w;
-            const glm::vec3 farCentre = glm::vec3(farH) / farH.w;
-            const glm::vec3 axis = farCentre - nearCentre;
-            const float length = glm::length(axis);
-            stats_.cameraPosition =
-                length > 1e-6f ? nearCentre - axis * (cameraNear / length) : nearCentre;
-        }
-    }
+    // §15's "camera position": the eye the cascades were fitted to (ADR-1866: the basis itself, so there is nothing to
+    // unproject; it used to be recovered from the inverse view-projection's near-plane centre).
+    stats_.cameraPosition = glm::vec3(camera.eye);
     for (std::uint32_t c = 0; c < kMaxCascades; ++c) {
         stats_.splits[c] = c < splits.size() ? splits[c] : shadowFar;
     }
@@ -231,10 +212,8 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
             }
             float nearDepth = cameraNear;
             for (std::uint32_t c = 0; c < cascades; ++c) {
-                // The sub-frustum corners come from the camera's own near/far (the matrix the
-                // inverse was built from); `splits` only says how deep this cascade reaches.
-                ShadowView view = fitDirectionalCascade(invViewProj, cameraNear, cameraFar, nearDepth,
-                                                        splits[c], light.direction, im.resolution,
+                // ADR-1866: the sub-frustum from the camera's basis; `splits` only says how deep this cascade reaches.
+                ShadowView view = fitDirectionalCascade(camera, nearDepth, splits[c], light.direction, im.resolution,
                                                         std::max(sceneRadius, 1.0f), casterReach);
                 view.lightIndex = static_cast<int>(i);
                 // Nothing else stands between a cascade fit and the GPU. The renderer guards the

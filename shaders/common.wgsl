@@ -183,6 +183,7 @@ struct FrameUniforms {
     skyCirrus1: vec4<f32>,
     skyCirrus2: vec4<f32>,
     skyCirrus3: vec4<f32>,
+    skyCirrus4: vec4<f32>, // ADR-1865: bands, band width, the cube's share, the sky's intensity
 };
 
 struct ObjectUniforms {

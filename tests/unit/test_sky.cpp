@@ -310,3 +310,35 @@ TEST_CASE("cirrus: coverage thins the layer; the block round-trips and refuses w
     CHECK_FALSE(scene::skyCirrusFromJson(nlohmann::json::parse(R"({"amount": 2})")).has_value());
     CHECK_FALSE(scene::skyCirrusFromJson(nlohmann::json::parse(R"({"litColor": [1, 1]})")).has_value());
 }
+
+TEST_CASE("cirrus bands: 0 is the even layer exactly; 1 gathers it into fewer bands with clear sky between",
+          "[sky][cirrus][adr1865]") {
+    scene::SkyCirrus even;
+    even.amount = 1.0f;
+    even.coverage = 0.45f;
+    scene::SkyCirrus zeroBands = even;
+    zeroBands.bandWidth = 1234.0f; // the band knobs moved, bands still 0
+    scene::SkyCirrus banded = even;
+    banded.bands = 1.0f;
+    banded.bandWidth = 5000.0f;
+    double sumEven = 0.0, sumBanded = 0.0;
+    int clearEven = 0, clearBanded = 0;
+    for (int i = 0; i < 4000; ++i) {
+        const float az = 0.00157f * static_cast<float>(i);
+        const glm::vec3 d = glm::normalize(glm::vec3(std::cos(az * 3.0f), 0.08f + 0.4f * std::abs(std::sin(az * 1.3f)), std::sin(az * 3.0f)));
+        const auto e = scene::skyCirrus(even, d, glm::vec3(0, 1, 0));
+        const auto z = scene::skyCirrus(zeroBands, d, glm::vec3(0, 1, 0));
+        CHECK(e.cover == z.cover);
+        CHECK(e.color == z.color);
+        const auto b = scene::skyCirrus(banded, d, glm::vec3(0, 1, 0));
+        CHECK(b.cover <= e.cover + 1e-6f); // bands only take cloud away
+        sumEven += e.cover;
+        sumBanded += b.cover;
+        clearEven += e.cover < 0.02f ? 1 : 0;
+        clearBanded += b.cover < 0.02f ? 1 : 0;
+    }
+    INFO("mean cover even " << sumEven / 4000 << ", banded " << sumBanded / 4000 << "; clear " << clearEven << " / "
+                            << clearBanded);
+    CHECK(sumBanded < 0.8 * sumEven);
+    CHECK(clearBanded > clearEven);
+}

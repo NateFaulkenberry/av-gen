@@ -143,6 +143,27 @@ constexpr std::uint32_t kShadowRangeReference = 2048;
                                                const glm::vec3& lightDirection, std::uint32_t resolution,
                                                float casterDistance, float minPullBack = 0.0f);
 
+// ADR-1866: the camera a cascade is fitted to, as a basis -- the eye, its unit axes and the tangents of its half fields
+// of view (a symmetric perspective). The renderer fits its cascades from this rather than from an inverse
+// view-projection: unprojecting through a float `invViewProj` with a far plane tens of kilometres out moves the
+// sub-frustum's corners by metres from frame to frame, the bounding sphere's radius with them, and so the texel size
+// of every cascade -- the whole shadow map rescaled every frame, every edge's staircase re-cut (measured on the
+// Strange Attractor: a near cascade's half-extent 110.7..127.7 m across consecutive frames of a constant field of
+// view). ADR-1807 moved the sky's view rays off the same matrix for the same reason.
+struct ShadowCamera {
+    glm::dvec3 eye{0.0};
+    glm::dvec3 forward{0.0, 0.0, -1.0};
+    glm::dvec3 right{1.0, 0.0, 0.0};
+    glm::dvec3 up{0.0, 1.0, 0.0};
+    double tanHalfX = 1.0;
+    double tanHalfY = 1.0;
+};
+// The same fit as above, from the basis: the slice's corners are computed in double from the eye and the axes, so
+// the sphere -- and with it the texel -- is a function of the field of view and the split alone.
+[[nodiscard]] ShadowView fitDirectionalCascade(const ShadowCamera& camera, float nearDepth, float farDepth,
+                                               const glm::vec3& lightDirection, std::uint32_t resolution,
+                                               float casterDistance, float minPullBack = 0.0f);
+
 // One perspective map covering a spot light's cone.
 [[nodiscard]] ShadowView fitSpotShadow(const scene::PunctualLight& light, std::uint32_t resolution,
                                        float range);

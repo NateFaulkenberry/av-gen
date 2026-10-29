@@ -34,6 +34,10 @@ const kProceduralDraw: bool = false;
 // effects: Glowmere's elder stands in a pool, and an aurora that lit the bank and stopped at the
 // waterline would draw a hard edge across the exact shot the effect exists for.
 #include "atmosphere_ground.wgsl"
+// ADR-1865: the sky's cirrus layer, evaluated along the reflected ray (the cube cannot hold a streak).
+#include "sky_cirrus.wgsl"
+// How far the cirrus reflection eases the surface normal toward flat (0 = every ripple, 1 = a perfect mirror).
+const WATER_CIRRUS_FLATTEN: f32 = 0.6;
 
 struct WaterUniforms {
     shallowColor: vec4<f32>,   // rgb, w = metres of depth over which the colour reaches deep
@@ -955,6 +959,26 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         let lod = frame.envParams.y * clamp(water.surface.z * 2.2, 0.0, 1.0);
         reflected = textureSampleLevel(prefilteredMap, iblSampler, envRotate(r), lod).rgb *
                     water.reflectTint.rgb;
+        // ADR-1865: the sky's cirrus along this reflected ray, the visible sky's own function (sky_cirrus.wgsl), so
+        // the river shows the streaks above it, bent by its swell. The cube carries `share` of the layer already
+        // (blurred: a cube face cannot hold a streak); mixing toward the streak's colour by
+        // k = c (1 - share) / (1 - share c) completes the cube's partial cover to the full cover c without counting
+        // it twice. Only on a near-mirror: a rough surface blurs a streak away, and the cube's share is what is left.
+        if (frame.skyCirrus0.x > 0.0 && frame.skyExtra.x >= 0.5) {
+            // The swell bends the streaks; the finest ripples would shatter them into sparkle (a streak is a few
+            // metres of sky high up but a hair's width of reflected angle), so the streaks see the surface with its
+            // ripples eased toward flat by `cirrusFlatten`, and fade where the reflected direction still changes
+            // faster across a pixel than a streak is wide.
+            let nc = normalize(mix(n, vec3<f32>(0.0, 1.0, 0.0), WATER_CIRRUS_FLATTEN));
+            let rc = envRotate(reflect(-v, nc));
+            let cs = skyCirrus(rc, frame.skySun.xyz, frame.skyCirrus0, frame.skyCirrus1, frame.skyCirrus2,
+                               frame.skyCirrus3, frame.skyCirrus4);
+            let share = clamp(frame.skyCirrus4.z, 0.0, 1.0);
+            let k = cs.x * (1.0 - share) / max(1.0 - share * cs.x, 1e-3);
+            let sharp = (1.0 - smoothstep(0.1, 0.4, water.surface.z)) *
+                        (1.0 - smoothstep(0.02, 0.06, length(fwidth(rc))));
+            reflected = mix(reflected, cs.yzw * frame.skyCirrus4.w * water.reflectTint.rgb, k * sharp);
+        }
     }
     reflected = reflected * water.reflectTint.w;
     // ---- cinematic (ADR-1286) begin ----

@@ -85,6 +85,14 @@ std::array<glm::vec3, 8> frustumCorners(const glm::mat4& invViewProj) {
     return out;
 }
 
+namespace {
+
+ShadowView fitSlice(const std::array<glm::vec3, 8>& slice, float nearDepth, float farDepth,
+                    const glm::vec3& lightDirection, std::uint32_t resolution, float casterDistance,
+                    float minPullBack);
+
+} // namespace
+
 ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear, float cameraFar,
                                  float nearDepth, float farDepth, const glm::vec3& lightDirection,
                                  std::uint32_t resolution, float casterDistance, float minPullBack) {
@@ -101,6 +109,34 @@ ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear,
         slice[i] = rayStart + (rayEnd - rayStart) * t0;
         slice[i + 4] = rayStart + (rayEnd - rayStart) * t1;
     }
+    return fitSlice(slice, nearDepth, farDepth, lightDirection, resolution, casterDistance, minPullBack);
+}
+
+ShadowView fitDirectionalCascade(const ShadowCamera& camera, float nearDepth, float farDepth,
+                                 const glm::vec3& lightDirection, std::uint32_t resolution, float casterDistance,
+                                 float minPullBack) {
+    // ADR-1866: the slice's corners from the basis, in double: the corners at view depth z are
+    // eye + forward z +- right z tanX +- up z tanY, the same four per face (and in the same order) frustumCorners gives.
+    std::array<glm::vec3, 8> slice{};
+    const double depths[2] = {static_cast<double>(nearDepth), static_cast<double>(farDepth)};
+    const double sx[4] = {-1.0, 1.0, 1.0, -1.0};
+    const double sy[4] = {-1.0, -1.0, 1.0, 1.0};
+    for (int f = 0; f < 2; ++f) {
+        const double z = depths[f];
+        for (int i = 0; i < 4; ++i) {
+            const glm::dvec3 p = camera.eye + camera.forward * z + camera.right * (sx[i] * z * camera.tanHalfX) +
+                                 camera.up * (sy[i] * z * camera.tanHalfY);
+            slice[static_cast<std::size_t>(f * 4 + i)] = glm::vec3(p);
+        }
+    }
+    return fitSlice(slice, nearDepth, farDepth, lightDirection, resolution, casterDistance, minPullBack);
+}
+
+namespace {
+
+ShadowView fitSlice(const std::array<glm::vec3, 8>& slice, float nearDepth, float farDepth,
+                    const glm::vec3& lightDirection, std::uint32_t resolution, float casterDistance,
+                    float minPullBack) {
     // Bounding sphere: stable under camera rotation, which is what stops the shadow edges swimming.
     glm::vec3 center(0.0f);
     for (const glm::vec3& c : slice) {
@@ -169,6 +205,8 @@ ShadowView fitDirectionalCascade(const glm::mat4& invViewProj, float cameraNear,
     view.cascade = true;
     return view;
 }
+
+} // namespace
 
 ShadowView fitSpotShadow(const scene::PunctualLight& light, std::uint32_t resolution, float range) {
     const glm::vec3 dir = safeNormalize(light.direction, glm::vec3(0.0f, -1.0f, 0.0f));

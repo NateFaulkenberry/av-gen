@@ -85,11 +85,12 @@ struct CirrusSample {
     glm::vec3 color{0.0f};
 };
 [[nodiscard]] CirrusSample skyCirrus(const SkyCirrus& c, const glm::vec3& d, const glm::vec3& sunDirection);
-// The four vec4s the shaders read (FrameUniforms::skyCirrus*; the cube's EnvUniforms::cirrus* take `amount` x
-// `reflection`).
-[[nodiscard]] std::array<glm::vec4, 4> packSkyCirrus(const SkyCirrus& c);
+// The five vec4s the shaders read (FrameUniforms::skyCirrus*; the cube's EnvUniforms::cirrus* take `amount` x
+// `reflection`). The fifth: x bands, y band width (m), z the cube's share of the layer (`reflection`; ADR-1865: what
+// the water's analytic reflection composites around), w the sky's intensity (the cube's units).
+[[nodiscard]] std::array<glm::vec4, 5> packSkyCirrus(const SkyCirrus& c, float skyIntensity = 1.0f);
 // The `environment.sky.cirrus` block: {"amount", "coverage", "softness", "altitude", "length", "width", "direction",
-// "litColor", "shadeColor", "sunScatter", "seed", "reflection"}; unknown keys are refused.
+// "litColor", "shadeColor", "sunScatter", "seed", "reflection", "bands", "bandWidth"}; unknown keys are refused.
 [[nodiscard]] Result<SkyCirrus> skyCirrusFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json skyCirrusToJson(const SkyCirrus& c);
 

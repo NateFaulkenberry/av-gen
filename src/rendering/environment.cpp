@@ -415,7 +415,7 @@ Result<void> EnvironmentProcessor::recordSky(SkyJob& job, const scene::SkyRuntim
     {   // ADR-1864: the cube carries `reflection` of the layer (the visible sky draws it whole, from the frame)
         scene::SkyCirrus cube = sky.cirrus;
         cube.amount *= cube.reflection;
-        sky4.cirrus = scene::packSkyCirrus(cube);
+        sky4.cirrus = scene::packSkyCirrus(cube, sky.intensity);
     }
 
     job = SkyJob{};

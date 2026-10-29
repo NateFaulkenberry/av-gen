@@ -74,7 +74,8 @@ std::uint64_t SkyRuntime::hash() const {
     // ADR-1864: an absent layer hashes as it always did
     if (cirrus.amount > 0.0f) {
         for (float v : {cirrus.amount, cirrus.coverage, cirrus.softness, cirrus.altitude, cirrus.length, cirrus.width,
-                        cirrus.direction, cirrus.sunScatter, cirrus.seed, cirrus.reflection}) {
+                        cirrus.direction, cirrus.sunScatter, cirrus.seed, cirrus.reflection, cirrus.bands,
+                        cirrus.bandWidth}) {
             h.f32(v);
         }
         h.v3(cirrus.litColor);
@@ -157,6 +158,8 @@ SkyRuntime resolveSky(const SkySettings& settings, const std::vector<PunctualLig
     sky.cirrus.shadeColor = glm::max(settings.cirrus.shadeColor, glm::vec3(0.0f));
     sky.cirrus.sunScatter = std::max(settings.cirrus.sunScatter, 0.0f);
     sky.cirrus.reflection = std::clamp(settings.cirrus.reflection, 0.0f, 1.0f);
+    sky.cirrus.bands = std::clamp(settings.cirrus.bands, 0.0f, 1.0f);
+    sky.cirrus.bandWidth = std::max(settings.cirrus.bandWidth, 1.0f);
 
     const PunctualLight* key = settings.useKeyLight ? skyKeyLight(lights) : nullptr;
     if (key != nullptr) {
@@ -247,6 +250,16 @@ CirrusSample skyCirrus(const SkyCirrus& c, const glm::vec3& d, const glm::vec3& 
     const float n = cirrusFbm(glm::vec2(seeded.x, seeded.y + 3.0f * warp));
     const float horizon = smoothstep1(0.0f, 0.04f, d.y);
     out.cover = smoothstep1(c.coverage, c.coverage + c.softness, n) * c.amount * horizon;
+    // ADR-1865: the bands -- a low-frequency field across (and slowly along) the streaks gathers them into a few broad
+    // bands of uneven width and brightness, with clear sky between
+    float brightness = 1.0f;
+    if (c.bands > 0.0f) {
+        const glm::vec2 bq(glm::dot(plane, axis) / (3.0f * c.length) + 3.7f * c.seed,
+                           glm::dot(plane, glm::vec2(-axis.y, axis.x)) / c.bandWidth + 1.3f * c.seed);
+        const float b = 0.65f * cirrusNoise(bq) + 0.35f * cirrusNoise(bq * 2.3f + glm::vec2(5.1f, 2.9f));
+        out.cover *= 1.0f - c.bands * (1.0f - smoothstep1(0.42f, 0.62f, b));
+        brightness = 1.0f + c.bands * (0.6f * b - 0.3f);
+    }
     // lit toward the sun's side of the sky, shaded away from it, and brighter still near the sun
     const glm::vec2 flatD = glm::length(glm::vec2(d.x, d.z)) > 1e-5f ? glm::normalize(glm::vec2(d.x, d.z)) : glm::vec2(1, 0);
     const glm::vec2 flatS = glm::length(glm::vec2(sunDirection.x, sunDirection.z)) > 1e-5f
@@ -254,16 +267,18 @@ CirrusSample skyCirrus(const SkyCirrus& c, const glm::vec3& d, const glm::vec3& 
                                 : glm::vec2(1, 0);
     const float toward = 0.5f + 0.5f * glm::dot(flatD, flatS);
     const float forward = std::pow(std::max(glm::dot(d, sunDirection), 0.0f), 6.0f);
-    out.color = c.shadeColor + (c.litColor - c.shadeColor) * toward + c.litColor * (c.sunScatter * forward);
+    out.color = (c.shadeColor + (c.litColor - c.shadeColor) * toward + c.litColor * (c.sunScatter * forward)) * brightness;
     return out;
 }
 
-std::array<glm::vec4, 4> packSkyCirrus(const SkyCirrus& c) {
+std::array<glm::vec4, 5> packSkyCirrus(const SkyCirrus& c, float skyIntensity) {
     const float a = glm::radians(c.direction);
     return {glm::vec4(std::clamp(c.amount, 0.0f, 1.0f), c.coverage, std::max(c.softness, 1e-3f), std::max(c.altitude, 1.0f)),
             glm::vec4(glm::max(c.litColor, glm::vec3(0.0f)), std::max(c.length, 1.0f)),
             glm::vec4(glm::max(c.shadeColor, glm::vec3(0.0f)), std::max(c.width, 1.0f)),
-            glm::vec4(std::cos(a), std::sin(a), std::max(c.sunScatter, 0.0f), c.seed)};
+            glm::vec4(std::cos(a), std::sin(a), std::max(c.sunScatter, 0.0f), c.seed),
+            glm::vec4(std::clamp(c.bands, 0.0f, 1.0f), std::max(c.bandWidth, 1.0f), std::clamp(c.reflection, 0.0f, 1.0f),
+                      std::max(skyIntensity, 0.0f))};
 }
 
 glm::vec3 environmentDominantDirection(const TextureData& equirect, float rotationRadians,
@@ -362,7 +377,7 @@ Result<SkyCirrus> skyCirrusFromJson(const nlohmann::json& j) {
     const F floats[] = {{"amount", &c.amount},     {"coverage", &c.coverage},     {"softness", &c.softness},
                         {"altitude", &c.altitude}, {"length", &c.length},         {"width", &c.width},
                         {"direction", &c.direction}, {"sunScatter", &c.sunScatter}, {"seed", &c.seed},
-                        {"reflection", &c.reflection}};
+                        {"reflection", &c.reflection}, {"bands", &c.bands}, {"bandWidth", &c.bandWidth}};
     const C colours[] = {{"litColor", &c.litColor}, {"shadeColor", &c.shadeColor}};
     for (auto it = j.begin(); it != j.end(); ++it) {
         bool known = false;
@@ -389,8 +404,9 @@ Result<SkyCirrus> skyCirrusFromJson(const nlohmann::json& j) {
             return fail("sky cirrus has no key '{}'", it.key());
         }
     }
-    if (c.amount < 0.0f || c.amount > 1.0f || c.reflection < 0.0f || c.reflection > 1.0f) {
-        return fail("sky cirrus 'amount' and 'reflection' must be in [0, 1]");
+    if (c.amount < 0.0f || c.amount > 1.0f || c.reflection < 0.0f || c.reflection > 1.0f || c.bands < 0.0f ||
+        c.bands > 1.0f) {
+        return fail("sky cirrus 'amount', 'reflection' and 'bands' must be in [0, 1]");
     }
     return c;
 }
@@ -401,7 +417,8 @@ nlohmann::json skyCirrusToJson(const SkyCirrus& c) {
             {"length", c.length},       {"width", c.width},
             {"direction", c.direction}, {"litColor", {c.litColor.r, c.litColor.g, c.litColor.b}},
             {"shadeColor", {c.shadeColor.r, c.shadeColor.g, c.shadeColor.b}},
-            {"sunScatter", c.sunScatter}, {"seed", c.seed}, {"reflection", c.reflection}};
+            {"sunScatter", c.sunScatter}, {"seed", c.seed}, {"reflection", c.reflection},
+            {"bands", c.bands}, {"bandWidth", c.bandWidth}};
 }
 
 } // namespace avgen::scene

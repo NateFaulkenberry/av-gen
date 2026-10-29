@@ -2982,7 +2982,19 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     if (scene.environment.shadowCascades > 0) {
         shadowQuality.cascadeCount = std::clamp(scene.environment.shadowCascades, 1u, 4u);
     }
-    shadows_->update(lightOrder_, frame.viewProj, scene.camera.nearPlane, scene.camera.farPlane, sceneRadius,
+    // ADR-1866: the cascades are fitted to the camera's basis -- the eye, the view's axes and the half-angle tangents the
+    // frame block already carries (ADR-1807) -- in double, not to the float inverse view-projection.
+    ShadowCamera shadowCamera;
+    {
+        const glm::dmat4 invView = glm::inverse(glm::dmat4(view));
+        shadowCamera.eye = glm::dvec3(invView[3]);
+        shadowCamera.right = glm::normalize(glm::dvec3(invView[0]));
+        shadowCamera.up = glm::normalize(glm::dvec3(invView[1]));
+        shadowCamera.forward = -glm::normalize(glm::dvec3(invView[2]));
+        shadowCamera.tanHalfX = static_cast<double>(frame.cameraRight.w);
+        shadowCamera.tanHalfY = static_cast<double>(frame.cameraUp.w);
+    }
+    shadows_->update(lightOrder_, shadowCamera, scene.camera.nearPlane, scene.camera.farPlane, sceneRadius,
                      shadowQuality, scene.environment.shadowRange, scene.environment.shadowCasterReach);
     stats_.shadows = shadows_->stats();
     stats_.shadows.shadowMs = shadowMs;
@@ -3510,11 +3522,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-1864: a sky with cirrus is drawn from these values offline too -- a cube face cannot hold a streak a
         // pixel wide, so its own analytic form is the only sharp one (the cube still carries it for the lighting
         // and reflections).
-        const auto cirrus = scene::packSkyCirrus(resolved.cirrus);
+        const auto cirrus = scene::packSkyCirrus(resolved.cirrus, resolved.intensity);
         frame.skyCirrus0 = cirrus[0];
         frame.skyCirrus1 = cirrus[1];
         frame.skyCirrus2 = cirrus[2];
         frame.skyCirrus3 = cirrus[3];
+        frame.skyCirrus4 = cirrus[4];
         const bool liveBackground = (liveSky_.enabled || resolved.cirrus.amount > 0.0f) && skyIbl &&
                                     scene.environment.skyboxBlur <= 0.0f;
         frame.skyLive = liveBackground

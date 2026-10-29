@@ -625,6 +625,10 @@ struct SkyCirrus {
     glm::vec3 shadeColor{0.32f, 0.30f, 0.52f}; // ... and of its far side
     float sunScatter = 1.0f;   // forward scattering: streaks brighten toward the sun
     float seed = 0.0f;         // offsets the pattern
+    // ADR-1865: a large-scale modulation that gathers the streaks into a few broad bands with clear sky between them,
+    // varied in length, spacing and brightness. 0 is the even layer of ADR-1864; 1 is fully banded.
+    float bands = 0.0f;
+    float bandWidth = 6000.0f; // metres: the bands' scale across the streaks (along them it is 3x `length`)
     // The share of the layer the sky CUBE carries -- the lighting and every reflection of the sky. A cube face is
     // too coarse for a streak: at 1 a mirror-still river shows the layer as soft blotches; the visible sky is
     // always the full, sharp layer.

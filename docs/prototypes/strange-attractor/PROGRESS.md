@@ -172,6 +172,12 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-28: Cirrus follow-up.
+  - Bands (ADR-1865) thin the wide sky.
+  - The water reflects the cirrus along its reflected ray (ADR-1865, about 1.5 ms).
+  - Shadow jitter traced to the cascade fit changing size every frame (float `invViewProj`); fixed by fitting to the
+    camera basis (ADR-1866).
+  - Notes in `09-canyon-cirrus-2.md`.
 - 2026-10-28: Rebased on main b22d4a91.
   - Analytic cirrus layer (ADR-1864) replaces the volumetric streak lobes: 20.7 → 0 ms of clouds, GPU 82.7 → 61.3 ms.
   - The wire and lattice effects are on hold, untouched.
