@@ -315,3 +315,39 @@ TEST_CASE("a cascade fitted to the camera's basis keeps its size frame to frame 
     CHECK(std::abs(fromBasis.front() - exact) < 0.0625 + 1e-3); // the 1/16 m quantisation the fit applies
     CHECK(spread(fromMatrix) > 1.0f);                         // the control: the matrix path does wander here
 }
+
+#include "assets/asset_registry.hpp"
+#include "scene/composition.hpp"
+#include "support/temp_dir.hpp"
+
+#include <nlohmann/json.hpp>
+
+TEST_CASE("the split scheme and the shadow resolution are scene knobs, absent by default", "[shadows][adr1867]") {
+    // The split scheme: a lower lambda moves the first splits outward (texels out of the first metres).
+    const std::vector<float> engine = cascadeSplits(0.5f, 3000.0f, 4);
+    const std::vector<float> linearish = cascadeSplits(0.5f, 3000.0f, 4, 0.5f);
+    CHECK(engine == cascadeSplits(0.5f, 3000.0f, 4, 0.85f));
+    CHECK(linearish[0] > engine[0]);
+    CHECK(linearish.back() == engine.back());
+
+    avgen::assets::AssetRegistry registry{avgen::testsupport::processTempDir()};
+    const auto load = [&](const nlohmann::json& env) {
+        nlohmann::json j = {{"format", "avgen-scene"}, {"version", 1}, {"name", "k"}, {"environment", env}};
+        return avgen::scene::Composition::fromJson(j, registry);
+    };
+    auto plain = load(nlohmann::json::object());
+    REQUIRE(plain.has_value());
+    CHECK((*plain)->scene().environment.shadowSplitLambda < 0.0f);
+    CHECK((*plain)->scene().environment.shadowResolution == 0u);
+    CHECK_FALSE((*plain)->toJson()["environment"].contains("shadowSplitLambda"));
+    CHECK_FALSE((*plain)->toJson()["environment"].contains("shadowResolution"));
+
+    auto set = load({{"shadowSplitLambda", 0.5}, {"shadowResolution", 8192}});
+    INFO((set.has_value() ? std::string("ok") : set.error().message));
+    REQUIRE(set.has_value());
+    (*set)->update(avgen::FrameTime{});
+    CHECK((*set)->scene().environment.shadowSplitLambda == 0.5f);
+    CHECK((*set)->scene().environment.shadowResolution == 8192u);
+    CHECK((*set)->toJson()["environment"]["shadowResolution"].get<int>() == 8192);
+    CHECK_FALSE(load({{"shadowResolution", 100}}).has_value());
+}

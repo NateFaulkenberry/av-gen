@@ -176,7 +176,10 @@
       "skyMirror": 0.2
     },
     "sunLux": 7.0,
-    "sunShadowBias": 8.0
+    "sunShadowBias": 8.0,
+    "meshSpacing": 1.0,
+    "meshError": 0.002,
+    "meshMinError": 0.15
   },
   "materialPrograms": [
     {

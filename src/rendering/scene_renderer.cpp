@@ -2982,6 +2982,11 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
     if (scene.environment.shadowCascades > 0) {
         shadowQuality.cascadeCount = std::clamp(scene.environment.shadowCascades, 1u, 4u);
     }
+    // ADR-1867: a scene may ask for a finer shadow map than its tier; never a coarser one.
+    if (scene.environment.shadowResolution > 0) {
+        shadowQuality.shadowResolution = std::max(shadowQuality.shadowResolution,
+                                                  std::clamp(scene.environment.shadowResolution, 256u, 8192u));
+    }
     // ADR-1866: the cascades are fitted to the camera's basis -- the eye, the view's axes and the half-angle tangents the
     // frame block already carries (ADR-1807) -- in double, not to the float inverse view-projection.
     ShadowCamera shadowCamera;
@@ -2995,7 +3000,8 @@ void SceneRenderer::updateLights(wgpu::CommandEncoder& encoder, const scene::Sce
         shadowCamera.tanHalfY = static_cast<double>(frame.cameraUp.w);
     }
     shadows_->update(lightOrder_, shadowCamera, scene.camera.nearPlane, scene.camera.farPlane, sceneRadius,
-                     shadowQuality, scene.environment.shadowRange, scene.environment.shadowCasterReach);
+                     shadowQuality, scene.environment.shadowRange, scene.environment.shadowCasterReach,
+                     scene.environment.shadowSplitLambda);
     stats_.shadows = shadows_->stats();
     stats_.shadows.shadowMs = shadowMs;
 

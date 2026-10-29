@@ -101,7 +101,7 @@ public:
     // inverse view-projection.
     std::uint32_t update(const std::vector<const scene::PunctualLight*>& lights, const ShadowCamera& camera,
                          float cameraNear, float cameraFar, float sceneRadius, const QualitySettings& quality,
-                         float rangeOverride = 0.0f, float casterReach = 0.0f);
+                         float rangeOverride = 0.0f, float casterReach = 0.0f, float splitLambda = -1.0f);
     // Writes each view's frame-uniform copy (the caller's block with `viewProj` replaced) and the
     // ShadowUniforms block. Call after update() and after the frame block is final.
     void upload(const void* frameUniforms, std::uint64_t frameUniformSize);

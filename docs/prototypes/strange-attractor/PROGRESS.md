@@ -172,6 +172,12 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-29: Rebased on main d245d0f0. Shadow stair-steps, pass 2.
+  - Neither the split scheme nor resolution helped: at 8192 the teeth are pixel-identical.
+  - The teeth were caster facets plus T-junction cracks from the RTIN's depth-first error propagation. Fixed with
+    level order and a 1 m mesh (ADR-1867): 2.92M triangles, GPU 26.7 → 24.3 ms.
+  - The lattice pattern changes with the mesh.
+  - Notes in `10-canyon-shadows-2.md`.
 - 2026-10-28: Cirrus follow-up.
   - Bands (ADR-1865) thin the wide sky.
   - The water reflects the cirrus along its reflected ray (ADR-1865, about 1.5 ms).

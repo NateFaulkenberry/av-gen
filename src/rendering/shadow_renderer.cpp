@@ -138,7 +138,7 @@ Result<void> ShadowRenderer::init(std::uint64_t frameUniformSize) {
 std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLight*>& lights,
                                      const ShadowCamera& camera, float cameraNear, float cameraFar,
                                      float sceneRadius, const QualitySettings& quality,
-                                     float rangeOverride, float casterReach) {
+                                     float rangeOverride, float casterReach, float splitLambda) {
     Impl& im = *impl_;
     views_.clear();
     stats_ = ShadowStats{};
@@ -167,7 +167,10 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     }
     stats_.range = shadowFar;
     const std::uint32_t cascades = std::clamp(quality.cascadeCount, 1u, kMaxCascades);
-    const std::vector<float> splits = cascadeSplits(cameraNear, shadowFar, cascades);
+    // ADR-1867: a scene's split scheme, when it has one; the engine's otherwise.
+    const std::vector<float> splits = splitLambda >= 0.0f
+                                          ? cascadeSplits(cameraNear, shadowFar, cascades, std::min(splitLambda, 1.0f))
+                                          : cascadeSplits(cameraNear, shadowFar, cascades);
     // §15's "camera position": the eye the cascades were fitted to (ADR-1866: the basis itself, so there is nothing to
     // unproject; it used to be recovered from the inverse view-projection's near-plane centre).
     stats_.cameraPosition = glm::vec3(camera.eye);

@@ -740,6 +740,10 @@ struct Environment {
     // and saved about 11 ms of an 85 ms frame at 2880x1800 -- by a distance the largest single
     // saving found in this renderer. On an object-scale scene the third cascade earns more.
     std::uint32_t shadowCascades = 0; // 0 = whatever the tier says
+    // ADR-1867: the cascade shadow map's resolution (square, per cascade), when the scene needs more than its tier gives
+    // -- a low sun stretches a texel along every receiver it grazes. 0 = whatever the tier says; otherwise 256..8192,
+    // and it never lowers a tier's resolution.
+    std::uint32_t shadowResolution = 0;
     // How far the directional cascades reach, in view depth (metres), overriding ADR-112's
     // automatic rule when positive. 0 = automatic, which is what every scene that does not set it
     // gets, so this changes no picture but the one that asks for it.
@@ -763,6 +767,10 @@ struct Environment {
     // keep, and a surface crossing between them pops in and out of shadow. A scene of tall relief under a low sun sets
     // this to about relief height / tan(sun elevation). 0 (the default) changes nothing.
     float shadowCasterReach = 0.0f;
+    // ADR-1867: the cascades' split scheme -- 0 uniform .. 1 logarithmic (Zhang's practical split). A negative value (the
+    // default) keeps the engine's 0.85. A scene whose shadowed walls sit mid to far lowers it, moving texels out of
+    // the first metres and into the walls.
+    float shadowSplitLambda = -1.0f;
     // ADR-1406: a scene may say it has no use for screen-space ambient occlusion or contact shadows (an unlit, painted
     // world). Either costs the depth prepass -- the whole opaque geometry drawn twice -- which for a deformed procedural
     // ground re-runs every deformer per vertex. Both default on; the quality tier still decides when they are on.

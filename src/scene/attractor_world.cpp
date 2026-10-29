@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <atomic>
+#include <bit>
 #include <cstring>
 #include <mutex>
 #include <string_view>
@@ -471,32 +472,70 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
         const float d = glm::mix(glm::mix(at(i0.x, i0.y), at(i0.x + 1, i0.y), f.x), glm::mix(at(i0.x, i0.y + 1), at(i0.x + 1, i0.y + 1), f.x), f.y);
         return std::max(g.meshMinError, g.meshError * d);
     };
-    // normalised errors, propagated (post-order over the bintree)
+    // Normalised errors, propagated finest level first (ADR-1867). A triangle's error is the larger of its own (at its
+    // hypotenuse's midpoint) and its two children's -- and a child's midpoint is shared with the NEIGHBOUR across the
+    // child's hypotenuse, so it is only final once both of its triangles have written it. A depth-first pass reads it
+    // before the neighbour's subtree has run; the parent then under-reports, splits where the neighbour does not, and the
+    // mesh has a T-junction: a hairline crack the background shows through, crawling as the camera moves. Martini's
+    // ordering fixes it: every triangle of a level before any of the level above. The triangles are addressed by their
+    // heap index (the same bintree the emit pass walks: odd = the first child), so nothing is stored; within a level they
+    // run in parallel, the shared midpoints written by an atomic max on the float's bits (errors are non-negative).
     std::vector<float> E(H.size(), 0.0f);
     const auto idx = [gn](int x, int y) { return static_cast<std::size_t>(y) * gn + x; };
-    const auto errorOf = [&](auto&& self, int ax, int ay, int bx, int by, int cx, int cy) -> void {
-        const int mx = (ax + bx) / 2, my = (ay + by) / 2;
-        const bool leaf = std::abs(ax - cx) + std::abs(ay - cy) <= 1;
-        if (!leaf) {
-            self(self, cx, cy, ax, ay, mx, my);
-            self(self, bx, by, cx, cy, mx, my);
+    const auto atomicMax = [&](std::size_t i, float v) {
+        std::atomic_ref<std::uint32_t> slot(*reinterpret_cast<std::uint32_t*>(&E[i]));
+        const std::uint32_t bits = std::bit_cast<std::uint32_t>(v);
+        std::uint32_t cur = slot.load(std::memory_order_relaxed);
+        while (bits > cur && !slot.compare_exchange_weak(cur, bits, std::memory_order_relaxed)) {
         }
-        const float interp = 0.5f * (H[idx(ax, ay)] + H[idx(bx, by)]);
+    };
+    const auto localError = [&](int ax, int ay, int bx, int by, int mx, int my) {
         const float tol = tolAt(mx, my);
-        float e = std::abs(interp - H[idx(mx, my)]) / tol;
+        float e = std::abs(0.5f * (H[idx(ax, ay)] + H[idx(bx, by)]) - H[idx(mx, my)]) / tol;
         // the band coordinate is interpolated linearly across each triangle by the rasteriser, so it is an attribute
         // the triangulation must carry too (attribute-aware simplification): on a tall wall a long triangle bends
         // the strata into a sawtooth. Tolerance in bands, growing with distance like the height's.
-        const float bandInterp = 0.5f * (T[idx(ax, ay)] + T[idx(bx, by)]);
-        e = std::max(e, std::abs(bandInterp - T[idx(mx, my)]) / (0.25f * tol / g.meshMinError));
-        if (!leaf) {
-            e = std::max({e, E[idx((ax + cx) / 2, (ay + cy) / 2)], E[idx((bx + cx) / 2, (by + cy) / 2)]});
-        }
-        E[idx(mx, my)] = std::max(E[idx(mx, my)], e);
+        e = std::max(e, std::abs(0.5f * (T[idx(ax, ay)] + T[idx(bx, by)]) - T[idx(mx, my)]) / (0.25f * tol / g.meshMinError));
+        return e;
     };
-    // the two root triangles, each in its own thread (they share only the diagonal's midpoints, written by max)
-    errorOf(errorOf, 0, 0, size, size, size, 0);
-    errorOf(errorOf, size, size, 0, 0, 0, size);
+    // levels: the two roots are heap ids 2 and 3 (level 1); a level-L triangle's ids are [2^L, 2^(L+1)); the leaves
+    // (legs one cell long) are level 2k
+    const int levels = 2 * k;
+    for (int level = levels; level >= 1; --level) {
+        const std::uint64_t first = 1ull << level, count = 1ull << level;
+        const bool parent = level < levels;
+        const int workers = 64;
+        parallelRows(workers, [&](int w) {
+            const std::uint64_t lo = first + count * static_cast<std::uint64_t>(w) / workers;
+            const std::uint64_t hi = first + count * static_cast<std::uint64_t>(w + 1) / workers;
+            for (std::uint64_t id0 = lo; id0 < hi; ++id0) {
+                // decode the heap id into the triangle's corners (Martini): the root by the bit below the leading one,
+                // then one bit per level down
+                int ax, ay, bx, by, cx, cy;
+                const int depth = level; // bits after the leading 1
+                if ((id0 >> (depth - 1)) & 1u) { // root 3: a (size, size), b (0, 0), c (0, size)
+                    ax = size; ay = size; bx = 0; by = 0; cx = 0; cy = size;
+                } else {                          // root 2: a (0, 0), b (size, size), c (size, 0)
+                    ax = 0; ay = 0; bx = size; by = size; cx = size; cy = 0;
+                }
+                for (int bit = depth - 2; bit >= 0; --bit) {
+                    const int mx = (ax + bx) / 2, my = (ay + by) / 2;
+                    if (((id0 >> bit) & 1u) == 0u) { // first child: (c, a, m)
+                        bx = ax; by = ay; ax = cx; ay = cy;
+                    } else {                          // second child: (b, c, m)
+                        ax = bx; ay = by; bx = cx; by = cy;
+                    }
+                    cx = mx; cy = my;
+                }
+                const int mx = (ax + bx) / 2, my = (ay + by) / 2;
+                float e = localError(ax, ay, bx, by, mx, my);
+                if (parent) {
+                    e = std::max({e, E[idx((ax + cx) / 2, (ay + cy) / 2)], E[idx((bx + cx) / 2, (by + cy) / 2)]});
+                }
+                atomicMax(idx(mx, my), e);
+            }
+        });
+    }
     // extract the triangles
     std::vector<glm::ivec3> tris;
     const auto emit = [&](auto&& self, int ax, int ay, int bx, int by, int cx, int cy) -> void {

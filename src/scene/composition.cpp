@@ -77,7 +77,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowRange", "shadowCasterReach", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -9613,8 +9613,10 @@ void Composition::applyParameters() {
         env.volumeShadowStrength = pick(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
         env.volumeJitter = pick(volumeJitter_, volumeSetting_.volumeJitter);
         env.shadowCascades = volumeSetting_.shadowCascades;
+        env.shadowResolution = volumeSetting_.shadowResolution; // ADR-1867
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
         env.shadowCasterReach = volumeSetting_.shadowCasterReach; // ADR-1858
+        env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
         env.contactShadows = volumeSetting_.contactShadows;
         env.depthPrepass = volumeSetting_.depthPrepass;
@@ -10644,9 +10646,15 @@ nlohmann::json Composition::toJson() const {
         // Note for whoever comes to `shadowCascades` next: it is still inside that guard, and a
         // scene that sets cascades without a volume loses them on save for exactly this reason.
         // Left alone here because fixing it changes files this branch does not own.
+        if (volumeSetting_.shadowResolution > 0) { // ADR-1867: outside the volume guard (see above), only when set
+            environment["shadowResolution"] = volumeSetting_.shadowResolution;
+        }
         const float range = shadowRange_ != nullptr ? shadowRange_->base() : volumeSetting_.shadowRange;
         if (range > 0.0f) {
             environment["shadowRange"] = range;
+        }
+        if (volumeSetting_.shadowSplitLambda >= 0.0f) { // ADR-1867: written only when set
+            environment["shadowSplitLambda"] = volumeSetting_.shadowSplitLambda;
         }
         if (volumeSetting_.shadowCasterReach > 0.0f) { // ADR-1858: written only when set
             environment["shadowCasterReach"] = volumeSetting_.shadowCasterReach;
@@ -11960,7 +11968,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"volumeEmission", &v.volumeEmission},
                                       FloatKey{"volumeMaxDistance", &v.volumeMaxDistance},
                                       FloatKey{"shadowRange", &v.shadowRange},
-                                      FloatKey{"shadowCasterReach", &v.shadowCasterReach}}) {
+                                      FloatKey{"shadowCasterReach", &v.shadowCasterReach},
+                                      FloatKey{"shadowSplitLambda", &v.shadowSplitLambda}}) {
                 auto value = readFloat(e, fk.key, *fk.target);
                 if (!value) {
                     return std::unexpected(value.error());
@@ -12032,6 +12041,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("'shadowCascades' must be an unsigned integer (0 = the quality tier)");
                 }
                 v.shadowCascades = std::min(e["shadowCascades"].get<std::uint32_t>(), 4u);
+            }
+            if (e.contains("shadowResolution")) { // ADR-1867
+                if (!e["shadowResolution"].is_number_integer() || e["shadowResolution"].get<std::int64_t>() < 0) {
+                    return fail("'shadowResolution' must be a whole number (0 = the quality tier)");
+                }
+                const auto r = static_cast<std::uint32_t>(std::min<std::int64_t>(e["shadowResolution"].get<std::int64_t>(), 1 << 20));
+                if (r != 0 && (r < 256 || r > 8192)) {
+                    return fail("'shadowResolution' must be 0 (the tier) or 256..8192");
+                }
+                v.shadowResolution = r;
             }
             if (e.contains("volumeSteps")) {
                 if (!e["volumeSteps"].is_number_integer()) {

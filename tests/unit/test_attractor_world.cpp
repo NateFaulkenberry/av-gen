@@ -19,7 +19,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <thread>
+#include <unordered_map>
 
 using namespace avgen;
 using Catch::Approx;
@@ -451,4 +453,60 @@ TEST_CASE("the terrain mesh's uv.x interpolates the strata coordinate better unw
     errWarped /= static_cast<double>(tall);
     INFO("tall triangles " << tall << ", mean band error at the centroid: unwarped " << errUnwarped << ", warped " << errWarped);
     CHECK(errUnwarped < errWarped);
+}
+
+// ---- the terrain mesh is watertight (ADR-1867) -----------------------------------------------------------------
+
+TEST_CASE("the terrain mesh has no T-junctions: every interior edge is shared by exactly two triangles",
+          "[attractor-world][adr1867]") {
+    // ADR-1867. The error propagation used to read a child midpoint's error before the neighbour across that child's
+    // hypotenuse had written it; a parent then split where its neighbour did not, and the mesh had hairline cracks the
+    // background showed through. Count each edge (by its endpoints' positions, across chunks): a T-junction leaves an
+    // interior edge used once.
+    scene::AttractorGen g = smallGen(3);
+    g.meshSpacing = 8.0f; // a finer grid than smallGen's, so the error field has the detail to differ between neighbours
+    const auto w = scene::generateAttractorWorld(g);
+    REQUIRE(w->terrainMesh != nullptr);
+    std::map<std::pair<std::uint64_t, std::uint64_t>, int> uses;
+    const auto key = [](const glm::vec3& p) {
+        return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(std::lround(p.x * 4.0f))) << 32) |
+               static_cast<std::uint32_t>(std::lround(p.z * 4.0f));
+    };
+    float lo = 1e30f, hi = -1e30f;
+    for (const auto& ch : w->terrainMesh->chunks) {
+        for (const glm::vec3& p : ch.positions) {
+            lo = std::min({lo, p.x, p.z});
+            hi = std::max({hi, p.x, p.z});
+        }
+    }
+    std::map<std::pair<std::uint64_t, std::uint64_t>, std::pair<glm::vec3, glm::vec3>> ends;
+    for (const auto& ch : w->terrainMesh->chunks) {
+        for (std::size_t i = 0; i + 2 < ch.indices.size(); i += 3) {
+            for (int e = 0; e < 3; ++e) {
+                const glm::vec3 a = ch.positions[ch.indices[i + e]], b = ch.positions[ch.indices[i + (e + 1) % 3]];
+                std::uint64_t ka = key(a), kb = key(b);
+                if (ka > kb) std::swap(ka, kb);
+                const std::pair<std::uint64_t, std::uint64_t> edge{ka, kb};
+                ++uses[edge];
+                ends[edge] = {a, b};
+            }
+        }
+    }
+    std::size_t open = 0;
+    for (const auto& [edge, n] : uses) {
+        const auto& [a, b] = ends[edge];
+        const bool border = (std::abs(a.x - lo) < 0.5f && std::abs(b.x - lo) < 0.5f) ||
+                            (std::abs(a.x - hi) < 0.5f && std::abs(b.x - hi) < 0.5f) ||
+                            (std::abs(a.z - lo) < 0.5f && std::abs(b.z - lo) < 0.5f) ||
+                            (std::abs(a.z - hi) < 0.5f && std::abs(b.z - hi) < 0.5f);
+        if (!border && n != 2) {
+            if (open < 6) {
+                UNSCOPED_INFO("open edge (" << a.x << ", " << a.z << ") - (" << b.x << ", " << b.z << ") used " << n);
+            }
+            ++open;
+        }
+    }
+    INFO("edges " << uses.size() << ", interior edges not shared by exactly two triangles: " << open);
+    REQUIRE(uses.size() > 10000u);
+    CHECK(open == 0u);
 }
