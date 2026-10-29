@@ -1,6 +1,6 @@
 # ADR-1867: The canyon mesh is watertight and fine enough for a grazing sun; split scheme and shadow resolution become scene knobs
 
-- Status: Proposed, scene/strange-attractor (canyon shadow pass 2, 2026-10-29).
+- Status: Accepted by the owner (2026-10-29), scene/strange-attractor (canyon shadow pass 2, 2026-10-29).
 - Code:
   - `src/scene/attractor_world.cpp`: the RTIN error propagation in level order.
   - `Environment::shadowSplitLambda` and `Environment::shadowResolution`, through the Composition (`environment.*`

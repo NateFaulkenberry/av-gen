@@ -1,6 +1,6 @@
 # ADR-1868: Water flicker at the banks: the reflection is filtered to the pixel; the attractor's water block reads every key
 
-- Status: Proposed, scene/strange-attractor (canyon water flicker, 2026-10-29).
+- Status: Accepted by the owner (2026-10-29), scene/strange-attractor (canyon water flicker, 2026-10-29).
 - Code:
   - `shaders/water.wgsl`, the reflection block:
     - `reflectSpread`: the reflected ray's spread across a pixel;

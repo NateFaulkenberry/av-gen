@@ -1327,6 +1327,61 @@ glm::vec3 attractorSunDirection(const AttractorWorld& w, const AttractorLook& k)
 
 namespace {
 
+// ADR-1869: every float water key the block reads, and so writes: one table for the parser and the save.
+constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[] = {
+    {"shallow", &WaterSettings::shallow},
+    {"roughness", &WaterSettings::roughness},
+    {"emissiveIntensity", &WaterSettings::emissiveIntensity},
+    {"clarity", &WaterSettings::clarity},
+    {"maxOpacity", &WaterSettings::maxOpacity},
+    {"edgeFade", &WaterSettings::edgeFade},
+    {"fresnel", &WaterSettings::fresnel},
+    {"reflection", &WaterSettings::reflection},
+    {"specular", &WaterSettings::specular},
+    {"ripple", &WaterSettings::ripple},
+    {"rippleScale", &WaterSettings::rippleScale},
+    {"rippleSpeed", &WaterSettings::rippleSpeed},
+    {"chop", &WaterSettings::chop},
+    {"foam", &WaterSettings::foam},
+    {"foamWidth", &WaterSettings::foamWidth},
+    {"refraction", &WaterSettings::refraction},
+    {"glow", &WaterSettings::glow},
+    {"glowScale", &WaterSettings::glowScale},
+    {"glowCoverage", &WaterSettings::glowCoverage},
+    {"glowDepth", &WaterSettings::glowDepth},
+    {"sparkle", &WaterSettings::sparkle},
+    {"swell", &WaterSettings::swell},
+    {"cascade", &WaterSettings::cascade},
+    {"tears", &WaterSettings::tears},
+    {"tearShear", &WaterSettings::tearShear},
+    {"tearCoverage", &WaterSettings::tearCoverage},
+    {"tearCell", &WaterSettings::tearCell},
+    {"tearSpacing", &WaterSettings::tearSpacing},
+    {"tearStretch", &WaterSettings::tearStretch},
+    {"tearDrift", &WaterSettings::tearDrift},
+    {"tearWind", &WaterSettings::tearWind},
+    {"ssr", &WaterSettings::ssr},
+    {"ssrDistance", &WaterSettings::ssrDistance},
+    {"ssrSteps", &WaterSettings::ssrSteps},
+    {"ssrGain", &WaterSettings::ssrGain},
+    {"transmission", &WaterSettings::transmission},
+    {"undulation", &WaterSettings::undulation},
+    {"undulationScale", &WaterSettings::undulationScale},
+    {"roughnessVariation", &WaterSettings::roughnessVariation},
+    {"streak", &WaterSettings::streak},
+    {"reflectionRays", &WaterSettings::reflectionRays},
+    {"tintPatches", &WaterSettings::tintPatches},
+    {"tintPatchScale", &WaterSettings::tintPatchScale},
+    {"glints", &WaterSettings::glints},
+    {"flowStreaks", &WaterSettings::flowStreaks},
+    {"streakDensity", &WaterSettings::streakDensity},
+    {"streakLength", &WaterSettings::streakLength},
+    {"streakLines", &WaterSettings::streakLines},
+    {"streakSpeed", &WaterSettings::streakSpeed},
+    {"streakHighlight", &WaterSettings::streakHighlight},
+    {"streakColorScale", &WaterSettings::streakColorScale},
+    {"skyMirror", &WaterSettings::skyMirror}};
+
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
@@ -1384,68 +1439,15 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         // Every float WaterSettings key the scene file's water reader knows (composition.cpp's terrain water block), and
         // nothing else: an unknown key fails the load. The list used to be fifteen keys long and dropped the rest in
         // silence, so `foam`, `reflectionRays` and the like in this block did nothing at all.
-        const std::pair<const char*, float*> floats[] = {
-            std::pair{"shallow", &ws.shallow},
-            std::pair{"roughness", &ws.roughness},
-            std::pair{"emissiveIntensity", &ws.emissiveIntensity},
-            std::pair{"clarity", &ws.clarity},
-            std::pair{"maxOpacity", &ws.maxOpacity},
-            std::pair{"edgeFade", &ws.edgeFade},
-            std::pair{"fresnel", &ws.fresnel},
-            std::pair{"reflection", &ws.reflection},
-            std::pair{"specular", &ws.specular},
-            std::pair{"ripple", &ws.ripple},
-            std::pair{"rippleScale", &ws.rippleScale},
-            std::pair{"rippleSpeed", &ws.rippleSpeed},
-            std::pair{"chop", &ws.chop},
-            std::pair{"foam", &ws.foam},
-            std::pair{"foamWidth", &ws.foamWidth},
-            std::pair{"refraction", &ws.refraction},
-            std::pair{"glow", &ws.glow},
-            std::pair{"glowScale", &ws.glowScale},
-            std::pair{"glowCoverage", &ws.glowCoverage},
-            std::pair{"glowDepth", &ws.glowDepth},
-            std::pair{"sparkle", &ws.sparkle},
-            std::pair{"swell", &ws.swell},
-            std::pair{"cascade", &ws.cascade},
-            std::pair{"tears", &ws.tears},
-            std::pair{"tearShear", &ws.tearShear},
-            std::pair{"tearCoverage", &ws.tearCoverage},
-            std::pair{"tearCell", &ws.tearCell},
-            std::pair{"tearSpacing", &ws.tearSpacing},
-            std::pair{"tearStretch", &ws.tearStretch},
-            std::pair{"tearDrift", &ws.tearDrift},
-            std::pair{"tearWind", &ws.tearWind},
-            std::pair{"ssr", &ws.ssr},
-            std::pair{"ssrDistance", &ws.ssrDistance},
-            std::pair{"ssrSteps", &ws.ssrSteps},
-            std::pair{"ssrGain", &ws.ssrGain},
-            std::pair{"transmission", &ws.transmission},
-            std::pair{"undulation", &ws.undulation},
-            std::pair{"undulationScale", &ws.undulationScale},
-            std::pair{"roughnessVariation", &ws.roughnessVariation},
-            std::pair{"streak", &ws.streak},
-            std::pair{"reflectionRays", &ws.reflectionRays},
-            std::pair{"tintPatches", &ws.tintPatches},
-            std::pair{"tintPatchScale", &ws.tintPatchScale},
-            std::pair{"glints", &ws.glints},
-            std::pair{"flowStreaks", &ws.flowStreaks},
-            std::pair{"streakDensity", &ws.streakDensity},
-            std::pair{"streakLength", &ws.streakLength},
-            std::pair{"streakLines", &ws.streakLines},
-            std::pair{"streakSpeed", &ws.streakSpeed},
-            std::pair{"streakHighlight", &ws.streakHighlight},
-            std::pair{"streakColorScale", &ws.streakColorScale},
-            std::pair{"skyMirror", &ws.skyMirror}};
         for (auto it = wj.begin(); it != wj.end(); ++it) {
             const std::string& key = it.key();
             if (key == "shallowColor" || key == "deepColor" || key == "reflectionTint") continue;
             bool known = false;
-            for (const auto& [name, target] : floats) {
+            for (const auto& [name, member] : kAttractorWaterFloats) {
                 if (key == name) {
                     known = true;
                     if (!it->is_number()) return fail("attractorWorld: water '{}' must be a number", key);
-                    *target = it->get<float>();
+                    ws.*member = it->get<float>();
                 }
             }
             if (!known) return fail("attractorWorld: unknown water key '{}'", key);
@@ -1474,6 +1476,23 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     return fail("attractorWorld: {}", e.what()); // a key of the wrong type
 }
 
+namespace {
+
+// ADR-1869: the water block, every key the parser reads -- an app save used to drop the whole block.
+json waterToJson(const WaterSettings& ws) {
+    json w = json::object();
+    const auto v3 = [](const glm::vec3& c) { return json::array({c.x, c.y, c.z}); };
+    w["shallowColor"] = v3(ws.shallowColor);
+    w["deepColor"] = v3(ws.deepColor);
+    w["reflectionTint"] = v3(ws.reflectionTint);
+    for (const auto& [name, member] : kAttractorWaterFloats) {
+        w[name] = ws.*member;
+    }
+    return w;
+}
+
+} // namespace
+
 json attractorWorldToJson(const AttractorWorldBlock& a) {
     const AttractorGen& g = a.gen;
     const AttractorLook& k = a.look;
@@ -1501,7 +1520,8 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"sunShadowBias", a.sunShadowBias},
                 {"look",
                  {{"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation}, {"sunIntensity", k.sunIntensity},
-                  {"contour", k.contour}, {"glow", k.glow}}}};
+                  {"contour", k.contour}, {"glow", k.glow}}},
+                {"water", waterToJson(a.water)}};
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------

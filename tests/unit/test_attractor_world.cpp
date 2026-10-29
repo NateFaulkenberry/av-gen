@@ -19,6 +19,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <thread>
 #include <unordered_map>
@@ -524,4 +526,52 @@ TEST_CASE("the attractor's water block takes every water key and refuses unknown
     CHECK(a->water.shallowColor == glm::vec3(0, 0, 1));
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"water": {"fome": 0}})")).has_value());
     CHECK_FALSE(scene::attractorWorldFromJson(nlohmann::json::parse(R"({"water": {"foam": "none"}})")).has_value());
+}
+
+TEST_CASE("the water block round-trips through a save, every key", "[attractor-world][adr1869]") {
+    // ADR-1869. The save wrote no water at all; an app save of the canyon dropped its river's look (and its foam 0).
+    auto a = scene::attractorWorldFromJson(nlohmann::json::parse(
+        R"({"water": {"foam": 0.0, "reflectionRays": 3, "ssrDistance": 1200, "skyMirror": 0.2, "roughness": 0.03,
+                      "shallowColor": [0.04, 0.04, 0.1], "reflectionTint": [1, 0.9, 0.8]}})"));
+    REQUIRE(a.has_value());
+    const nlohmann::json saved = scene::attractorWorldToJson(*a);
+    REQUIRE(saved.contains("water"));
+    auto b = scene::attractorWorldFromJson(saved);
+    REQUIRE(b.has_value());
+    CHECK(scene::attractorWorldToJson(*b)["water"] == saved["water"]);
+    CHECK(b->water.foam == 0.0f);
+    CHECK(b->water.reflectionRays == 3.0f);
+    CHECK(b->water.ssrDistance == 1200.0f);
+    CHECK(b->water.shallowColor == a->water.shallowColor);
+    CHECK(b->water.reflectionTint == a->water.reflectionTint);
+}
+
+TEST_CASE("the canyon scene survives an app-style save with its water intact", "[attractor-world][adr1869]") {
+    const std::filesystem::path path = std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "strange-attractor" /
+                                       "strange-attractor-flythrough.scene.json";
+    std::ifstream in(path);
+    REQUIRE(in.good());
+    const nlohmann::json file = nlohmann::json::parse(in);
+    const nlohmann::json& authored = file.at("attractorWorld").at("water");
+    // an app-style save: load the scene file into a Composition and write it back out
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    nlohmann::json small = file;
+    small["attractorWorld"]["resolution"] = 384; // the generator's cost is per texel; the save does not care
+    small["attractorWorld"]["meshSpacing"] = 16.0;
+    auto comp = scene::Composition::fromJson(small, registry);
+    REQUIRE(comp.has_value());
+    const nlohmann::json whole = (*comp)->toJson();
+    REQUIRE(whole.contains("attractorWorld"));
+    REQUIRE(whole["attractorWorld"].contains("water"));
+    const nlohmann::json saved = whole["attractorWorld"]["water"];
+    for (auto it = authored.begin(); it != authored.end(); ++it) {
+        INFO(it.key());
+        REQUIRE(saved.contains(it.key()));
+        if (it->is_array()) {
+            for (std::size_t i = 0; i < it->size(); ++i) CHECK(saved[it.key()][i].get<float>() == Approx((*it)[i].get<float>()));
+        } else {
+            CHECK(saved[it.key()].get<float>() == Approx(it->get<float>()));
+        }
+    }
+    CHECK(saved["foam"].get<float>() == 0.0f);
 }
