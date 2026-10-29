@@ -109,6 +109,11 @@ constexpr LiveQualityRung cascades(LiveQualityRung r, std::uint32_t n) {
     r.cascadeCount = n;
     return r;
 }
+// ADR-1816: the screen-space contact-shadow march off (2.53 ms of an 8.38 ms lit pass on the material lab).
+constexpr LiveQualityRung noContact(LiveQualityRung r) {
+    r.contactShadows = false;
+    return r;
+}
 constexpr LiveQualityRung plainShadows(LiveQualityRung r) {
     r.shadowResolution = 1024;
     r.reducedShadowFiltering = true;
@@ -158,28 +163,28 @@ constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, floa
 constexpr LiveQualityLadder kResolutionFirst{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
-    singleRead(astral(volumes(rung(L::Medium, 0.71f), 0.25f), 2)),
-    auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.75f),
-    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.38f), 0.25f, 0.25f))), 2)),
+    singleRead(astral(volumes(noContact(rung(L::Medium, 0.71f)), 0.25f), 2)),
+    auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Low, 0.5f)), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.75f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Emergency, 0.38f)), 0.25f, 0.25f))), 2)),
                24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
 };
 
 constexpr LiveQualityLadder kBalanced{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
-    auroraPlanes(singleRead(astral(noMotionBlur(volumes(rung(L::Medium, 0.71f), 0.25f)), 2)), 0.75f),
-    auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.5f), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
-    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.42f), 0.25f, 0.25f))), 2)),
+    auroraPlanes(singleRead(astral(noMotionBlur(volumes(noContact(rung(L::Medium, 0.71f)), 0.25f)), 2)), 0.75f),
+    auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Low, 0.5f)), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Emergency, 0.42f)), 0.25f, 0.25f))), 2)),
                24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
 };
 
 constexpr LiveQualityLadder kEffectsFirst{
     rung(L::Ultra, 1.0f),
     auroraPlanes(cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2), 0.75f),
-    auroraPlanes(singleRead(astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Medium, 0.85f), 0.25f, 0.5f))), 2)), 2)), 0.5f),
-    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Low, 0.71f), 0.25f, 0.5f))), 2)), 12.0f,
+    auroraPlanes(singleRead(astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Medium, 0.85f)), 0.25f, 0.5f))), 2)), 2)), 0.5f),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Low, 0.71f)), 0.25f, 0.5f))), 2)), 12.0f,
                80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
-    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(rung(L::Emergency, 0.5f), 0.25f, 0.25f))), 2)),
+    auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noContact(rung(L::Emergency, 0.5f)), 0.25f, 0.25f))), 2)),
                24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
 };
 
@@ -191,6 +196,7 @@ constexpr LiveQualityRung kProfileBalanced = background(volumes(rung(L::Ultra, 1
 constexpr LiveQualityRung profilePerformance() {
     LiveQualityRung r = background(plainShadows(cascades(volumes(rung(L::Ultra, 0.85f), 0.25f), 2)), 24.0f, 60.0f, 2.0f);
     r.postEffectQuality = 0.5f;
+    r.contactShadows = false; // ADR-1816
     r.particleSpawnScale = 0.7f;
     r.drawDistanceScale = 0.8f;
     return r;
@@ -209,7 +215,8 @@ int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
            (a.postEffectQuality != b.postEffectQuality ? 1 : 0) +
            (a.particleCullDistance != b.particleCullDistance ? 1 : 0) +
            (a.particleSpawnScale != b.particleSpawnScale ? 1 : 0) + (a.astralTier != b.astralTier ? 1 : 0) +
-           (a.refraction != b.refraction ? 1 : 0) + (a.waterSsrScale != b.waterSsrScale ? 1 : 0); // ADR-1603
+           (a.refraction != b.refraction ? 1 : 0) + (a.waterSsrScale != b.waterSsrScale ? 1 : 0) + // ADR-1603
+           (a.contactShadows != b.contactShadows ? 1 : 0);                                        // ADR-1816
     // ADR-1651: auroraStepScale is not counted either, for the same reason: it is a gain only where a scene has
     // ribbons, and counting it would promise every other scene's controller a step it cannot take.
     // ADR-1640: refractionDispersion is not counted. Seven reads for one on the refractive pixels only (+0.15 ms at 4K
@@ -250,6 +257,9 @@ void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::Quali
     q.waterSsrScale = std::min(base.waterSsrScale, rung.waterSsrScale);
     q.refractionDispersion = base.refractionDispersion && rung.refractionDispersion; // ADR-1640
     q.auroraStepScale = std::min(base.auroraStepScale, rung.auroraStepScale);         // ADR-1651
+    // ADR-1816: off where the rung turns it off; never on where the base had it off. contactSteps is left as the base
+    // set it, so turning the lever back on restores exactly the base's march.
+    q.contactShadows = base.contactShadows && rung.contactShadows;
 }
 } // namespace
 
@@ -802,6 +812,7 @@ void giveUp(LiveQualityRung& r, std::string_view group, int depth) {
         if (full) {
             r.shadowResolution = 1024;
             r.reducedShadowFiltering = true;
+            r.contactShadows = false; // ADR-1816
         }
     } else if (group == "volumes") {
         r.volumeResolutionScale = 0.25f;
@@ -891,6 +902,7 @@ bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
     else if (lever == "nodof") c.depthOfField = false;
     else if (lever == "castercull") c.shadowCasterMinPixels = std::max(c.shadowCasterMinPixels, 24.0f);
     else if (lever == "shadowatlas1k") c.shadowResolution = std::min<std::uint32_t>(c.shadowResolution, 1024u);
+    else if (lever == "nocontact") c.contactShadows = false; // ADR-1816
     else if (lever == "sdfshadowhalf") c.sdfShadowScale = std::max(c.sdfShadowScale, 2u);    // ADR-1165
     else if (lever == "sdfshadowquarter") c.sdfShadowScale = std::max(c.sdfShadowScale, 4u); // ADR-1165
     else if (lever == "astralfewer") c.astralTier = std::max(c.astralTier, 2u); // ADR-1222: 70% of the particles
@@ -927,6 +939,7 @@ std::string ceilingJsonText(const LiveQualityRung& c) {
     if (c.sdfShadowScale != n.sdfShadowScale) j["sdfShadowScale"] = c.sdfShadowScale;
     if (c.astralTier != n.astralTier) j["astralTier"] = c.astralTier; // ADR-1222
     if (c.refraction != n.refraction) j["refraction"] = c.refraction;   // ADR-1603
+    if (c.contactShadows != n.contactShadows) j["contactShadows"] = c.contactShadows; // ADR-1816
     if (c.waterSsrScale != n.waterSsrScale) j["waterSsrScale"] = c.waterSsrScale;
     if (c.refractionDispersion != n.refractionDispersion) j["refractionDispersion"] = c.refractionDispersion; // ADR-1640
     if (c.auroraStepScale != n.auroraStepScale) j["auroraStepScale"] = c.auroraStepScale;                     // ADR-1651
@@ -961,6 +974,7 @@ std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std:
         else if (key == "sdfShadowScale" && num) c.sdfShadowScale = std::clamp(v.get<std::uint32_t>(), 1u, 8u);
         else if (key == "astralTier" && num) c.astralTier = std::clamp(v.get<std::uint32_t>(), 0u, 4u); // ADR-1222
         else if (key == "refraction" && flag) c.refraction = v.get<bool>();                             // ADR-1603
+        else if (key == "contactShadows" && flag) c.contactShadows = v.get<bool>();                     // ADR-1816
         else if (key == "waterSsrScale" && num) c.waterSsrScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
         else if (key == "refractionDispersion" && flag) c.refractionDispersion = v.get<bool>();         // ADR-1640
         else if (key == "auroraStepScale" && num) c.auroraStepScale = std::clamp(v.get<float>(), 0.1f, 1.0f); // ADR-1651

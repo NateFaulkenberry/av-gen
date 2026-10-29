@@ -403,6 +403,7 @@ struct QualitySettings {
             q.pcssBlockerTaps = 6;
             q.softShadows = false;
             q.contactSteps = 8;
+            q.contactShadows = false; // ADR-1816: the preview tier skips the contact march
             q.aoSlices = 2;
             q.aoStepsPerSlice = 4;
             q.aoHistoryFrames = 6;

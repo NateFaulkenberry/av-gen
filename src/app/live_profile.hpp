@@ -351,6 +351,7 @@ struct CandidateInputs {
     float drawDistanceScale = 1.0f;
     float shadowCasterMinPixels = 0.0f;
     float particleSpawnScale = 1.0f;
+    bool contactShadows = false; // ADR-1816: the contact march runs this frame (a light asks and the tier allows)
     double gpuMs = 0.0;
     double budgetMs = 16.67;
     double perPixelShare = -1.0; // the scene's resolution-dependent share if it is known, else -1

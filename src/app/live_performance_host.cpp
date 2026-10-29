@@ -138,6 +138,7 @@ void Application::wireLivePerformancePanel() {
         in.motionBlur = q.motionBlur;
         in.depthOfField = q.depthOfField;
         in.softShadows = q.softShadows;
+        in.contactShadows = q.contactShadows && q.contactSteps > 0; // ADR-1816
         in.postEffectQuality = q.postEffectQuality;
         in.lodBias = q.lodBias;
         in.drawDistanceScale = q.drawDistanceScale;

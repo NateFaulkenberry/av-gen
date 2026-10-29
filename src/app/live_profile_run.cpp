@@ -383,6 +383,7 @@ CandidateInputs candidateInputs(const LiveProfileRecord& record, const rendering
     in.lodBias = q.lodBias;
     in.drawDistanceScale = q.drawDistanceScale;
     in.shadowCasterMinPixels = q.shadowCasterMinPixels;
+    in.contactShadows = q.contactShadows && q.contactSteps > 0; // ADR-1816
     in.particleSpawnScale = q.particleSpawnScale;
     in.gpuMs = record.gpuMs.valid() ? record.gpuMs.p50 : 0.0;
     in.budgetMs = record.conditions.budgetMs;

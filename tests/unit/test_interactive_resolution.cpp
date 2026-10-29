@@ -1129,3 +1129,51 @@ TEST_CASE("the ladders thin the aurora ribbons' planes from Medium (Balanced)", 
     CHECK((*prioritised)[1].auroraStepScale == 0.75f);
     CHECK((*prioritised)[2].auroraStepScale == 0.5f);
 }
+
+// ADR-1816: contact shadows are a ladder lever. Ultra and High keep them (Ultra is the tier exactly, so its frame is
+// unchanged); Medium and below give them up; the optimizer's `nocontact` lever and a project's ceiling can too; the
+// offline tier keeps them and the preview tier does not.
+TEST_CASE("contact shadows are a lever of the live ladder, kept at Ultra and High", "[unit][resolution][adr1816]") {
+    rendering::QualitySettings base = rendering::QualitySettings::forTier(rendering::QualityTier::Realtime);
+    REQUIRE(base.contactShadows);
+    for (const auto strategy : {LiveQualityStrategy::Balanced, LiveQualityStrategy::ResolutionFirst,
+                                LiveQualityStrategy::EffectsFirst}) {
+        const app::LiveQualityLadder& ladder = app::liveQualityLadder(strategy);
+        INFO("strategy " << app::liveQualityStrategyToken(strategy));
+        CHECK(ladder[0].contactShadows);
+        CHECK(ladder[1].contactShadows);
+        for (std::size_t k = 2; k < ladder.size(); ++k) {
+            CHECK_FALSE(ladder[k].contactShadows);
+        }
+        const rendering::QualitySettings ultra = app::applyLiveRung(base, base, ladder[0], 0.0f);
+        CHECK(ultra.contactShadows);
+        CHECK(ultra.contactSteps == base.contactSteps);
+        const rendering::QualitySettings medium = app::applyLiveRung(base, base, ladder[2], 0.0f);
+        CHECK_FALSE(medium.contactShadows);
+        // Back up the ladder, the base's own march returns unchanged.
+        const rendering::QualitySettings back = app::applyLiveRung(medium, base, ladder[1], 0.0f);
+        CHECK(back.contactShadows);
+        CHECK(back.contactSteps == base.contactSteps);
+    }
+    // A base that has them off is never turned on by a rung.
+    rendering::QualitySettings off = base;
+    off.contactShadows = false;
+    CHECK_FALSE(app::applyLiveRung(off, off, app::liveQualityLadder(LiveQualityStrategy::Balanced)[0], 0.0f)
+                    .contactShadows);
+
+    // The optimizer's lever, and the project ceiling it is kept as.
+    app::LiveQualityRung ceiling;
+    REQUIRE(app::applyLeverToCeiling(ceiling, "nocontact"));
+    CHECK_FALSE(ceiling.contactShadows);
+    CHECK_FALSE(app::applyCeiling(base, ceiling).contactShadows);
+    std::string error;
+    const auto parsed = app::ceilingFromJsonText(app::ceilingJsonText(ceiling), error);
+    REQUIRE(parsed.has_value());
+    CHECK_FALSE(parsed->contactShadows);
+    CHECK(app::ceilingJsonText(app::LiveQualityRung{}).find("contactShadows") == std::string::npos);
+
+    // The tiers: offline (and High) keep them; preview drops them.
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::Offline).contactShadows);
+    CHECK(rendering::QualitySettings::forTier(rendering::QualityTier::High).contactShadows);
+    CHECK_FALSE(rendering::QualitySettings::forTier(rendering::QualityTier::Preview).contactShadows);
+}

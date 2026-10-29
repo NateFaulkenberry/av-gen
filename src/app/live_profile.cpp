@@ -660,6 +660,15 @@ std::vector<LiveProfileCandidate> optimizationCandidates(const CandidateInputs& 
              std::string_view(id) == "motion-blur" ? "nomotionblur" : "nodof", cost * 0.85, cost,
              "the pass's whole measured cost", "medium"});
     }
+    if (in.contactShadows) { // ADR-1816
+        const double scenePass = passMs(in.passes, "scene");
+        add({"contact-shadows", "Contact shadows", scenePass,
+             "turn the screen-space contact-shadow march off at this level", "nocontact", scenePass * 0.05,
+             scenePass * 0.3,
+             "inside the lit pass, on the lights that ask for it: measured 2.53 of 8.38 ms on the material lab "
+             "(Filament evaluation); confirm a scene's own share with --ab contact",
+             "medium"});
+    }
     // Shadows.
     if (const double cost = categoryMs(gpu, "shadows"); cost > 0.0) {
         const double shadowPass = passMs(in.passes, "shadow");
