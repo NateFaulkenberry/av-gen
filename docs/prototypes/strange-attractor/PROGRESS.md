@@ -32,8 +32,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | 2e | cliff edge artifacts traced and fixed (ADR-1856) | done; owner then chose engine-native geometry (`03-canyon-brief.md`) |
 | canyon P1 | the canyon as engine triangle geometry (ADR-1857), `04-canyon-phase1.md` | **done, awaiting the owner**: media in `canyon-p1/` |
 | canyon P2-P6 | revelation, birds, glyphs, (campsite), QA | not started: gated on P1 acceptance |
-| portals R | dimensional portals: research, audit, plan (`12`-`15`) | **done, awaiting the owner**: media in `portals-r/` |
-| portals A-C | the Matrix effect; portal 1 and the Moon; portal 2, dusk, the full ~60 s | not started: gated on R |
+| portals R | dimensional portals: research, audit, plan (`12`-`15`) | **reviewed**: the owner sees "strong potential"; decisions in `15` §6 |
+| portals A | the Matrix effect: the scan, geometric (world-space) mosh, limited glyphs, the site, the opening | **in progress** |
+| portals B-C | portal 1 and the Moon; portal 2, dusk, the full ~60 s | not started |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -174,6 +175,15 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-30: Gate R reviewed. The owner sees "strong potential" in the Matrix effect. The direction is recorded in
+  `15-portals-plan.md` §6:
+  - the portal is cut into the rock and opens as the camera approaches;
+  - the data mosh is on the world geometry, not the screen;
+  - glyphs are limited to bands near the portal;
+  - Earth (Blue Marble) and the LRO Linné DTM are approved;
+  - no stars;
+  - 20–30 m/s at the crossings;
+  - Feline Footwear 0–60 s, with crossings on bar lines.
 - 2026-10-30: Dimensional portals, Gate R (research, audit, plan). Brief `12`, coordinator notes `13`, research `14`,
   plan `15`; media in `portals-r/`. No production code: four throwaway proofs.
   - The portal view and crossing, proved by an offline composite of two engine renders. A per-pixel ray-plane

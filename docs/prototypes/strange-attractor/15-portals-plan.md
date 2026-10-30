@@ -234,3 +234,63 @@ onto the river is the strongest single image in the sequence.
 6. **Speed.** The sequence slows to about 20–30 m/s at each crossing (from today's 80 m/s). Is that acceptable?
 7. **Live.** On portal frames two worlds are rendered, about double the cost. Live is not targeted in this pass.
 8. **Length and audio.** Feline Footwear 0–60 s uncut, crossings on bar lines?
+
+## 6. Decisions after Gate R (owner and coordinator, 2026-10-30)
+
+These override the plan above where they differ.
+
+**The portal is part of the terrain.**
+- Portal 1 is cut into, or torn out of, real rock: a canyon wall or the river's own wall, which the river can run
+  into. It must not float in the valley as it did in proof 02.
+- The aperture follows the wall. Real wall surface stays around its edge, and there is depth where the rock is.
+- The site is chosen from the real camera path and terrain. The candidates are shown as stills at Gate A; the
+  corruption converges there.
+- Portal 2 stays in the lunar crater floor, with the dive out of the dusk sky (approved).
+
+**The portal opens as the camera approaches.**
+- Its state is driven by the camera's distance or progress along the path, not by a timer alone, so a seek lands on
+  the same state.
+- It is monotonic: it never visibly shrinks. It eases, and may surge on beats or bars.
+- It starts as a hairline fracture, a seam of light along a stratum or crack. It splits and peels open: rock edges
+  fold back, tear, or break into shards and moshed blocks that feed the corruption.
+- The shape keeps conforming to the wall as it widens.
+- From Gate B, the Moon is glimpsed early through the narrow slit, and the view widens with the opening.
+- Portal 2 follows the same principle: the crater floor cracks and opens beneath the camera.
+- Gate A shows the opening as a still strip at several camera distances, plus the clip. Through the opening there is
+  only a dark void until Gate B.
+
+**The data mosh is on the world geometry, not the screen.**
+
+The rock's surfaces and vertices behave like corrupted data. Everything is terrain-anchored, lit and shadowed, and
+seen in perspective. Explore:
+- strips and blocks that freeze, slip and smear along the surface;
+- stale previous-state copies of geometry lagging behind as world-space echoes;
+- triangles keeping old positions or UVs while their neighbours move;
+- strata and texture bands sliding across the rock as if the motion vectors had gone wrong;
+- blocks of terrain displaced and duplicated in 3D.
+
+Image-space mosh is at most a light final accent masked to the world near the portal, or it is dropped. This
+replaces "mosh v2" (planned ADR 1877) with a world-space geometric mosh.
+
+**Glyphs are kept, but limited.**
+- They appear only in scan or corruption bands near the portal.
+- They are readable: sized by distance and antialiased.
+- They never appear on the water, and never cover most of a wall.
+- Every layer has a hard ceiling, with recognisable rock kept between the layers. Proof 04's late frames, confetti
+  over the walls and the river, are the failure to avoid.
+
+**Other decisions.**
+
+| Question | Decision |
+|---|---|
+| Earth | Yes: NASA Blue Marble (public domain). Downloaded into a gitignored asset path, never committed. The source and credit are recorded when downloaded (Gate B). |
+| Stars | None |
+| LRO data | The Linné NAC DTM (product `NAC_DTM_LINNECRATER`, LROC, NASA/GSFC/Arizona State University) is approved for calibration only. Gitignored, never committed. Downloaded at Gate B. |
+| Speed at the crossings | 20–30 m/s: approved |
+| Live performance | No target this pass: approved |
+| Audio | Feline Footwear 0–60 s uncut, with crossings on bar lines: approved |
+
+**For later gates (coordinator's review):**
+- The Moon's near ground needs rocks for scale and crisper shadow edges, and the blue cast in its shadows needs
+  explaining.
+- Dusk must be more violet-indigo than pink, without the gorge crushing.
