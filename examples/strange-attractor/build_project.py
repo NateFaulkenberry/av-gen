@@ -42,7 +42,7 @@ routes = [
     # ADR-1873 (Gate A): within the corruption's field
     route('response.bass', 'corruption/share', 0.12, 0.3, remapInMin=0.7, remapInMax=1.0, attackMs=400.0, decayMs=1500.0),
     route('response.onsetLow', 'corruption/slip', 3.0, 6.0, attackMs=120.0, decayMs=900.0),
-    route('response.high', 'corruption/glyph', 1.5, 4.0, remapInMin=0.3, remapInMax=1.0, attackMs=200.0, decayMs=1000.0),
+    route('response.high', 'corruption/glyph', 5.0, 9.0, remapInMin=0.3, remapInMax=1.0, attackMs=200.0, decayMs=1000.0),
 ]
 
 project = {

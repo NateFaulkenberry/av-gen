@@ -294,3 +294,9 @@ replaces "mosh v2" (planned ADR 1877) with a world-space geometric mosh.
 - The Moon's near ground needs rocks for scale and crisper shadow edges, and the blue cast in its shadows needs
   explaining.
 - Dusk must be more violet-indigo than pink, without the gorge crushing.
+
+**Mid-Gate A (owner, 2026-10-30):** "Looks good so far."
+- Make the glyphs more prominent in the opening, and start them sooner. Bring back the dense code around the focus
+  from Gate R's proof 04, combined with the opening; this overrides the "limited glyphs" ceiling above.
+- The early canyon (0–16 s) stays clean.
+- Code on the water near the portal is acceptable if it looks good.

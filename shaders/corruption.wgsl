@@ -185,13 +185,13 @@ struct CrSurface {
     cut: bool, // inside the opening: the rock is gone
 };
 
-fn crGlyphCell(uv: vec2<f32>, duv: f32, t: f32) -> f32 {
+fn crGlyphCell(uv: vec2<f32>, duv: f32, t: f32, share: f32) -> f32 {
     // a cell is 5 x 7 dots inside a 7 x 9 grid; the glyph is hashed from the cell and an epoch that cycles it
     let ci = vec2<i32>(floor(uv));
     let cu = bitcast<vec2<u32>>(ci);
     let seed = crSeed();
-    if (crHash(vec4<u32>(cu, seed, 21u)) > 0.3) {
-        return 0.0; // most cells are dark: never a wall of code
+    if (crHash(vec4<u32>(cu, seed, 21u)) > share) {
+        return 0.0; // the share of lit cells grows with the field: sparse far away, a wall of code at the portal
     }
     let colT = crHash(vec4<u32>(cu.x, 0u, seed, 22u)) * 97.0 + t * (0.7 + 0.6 * crHash(vec4<u32>(cu.x, 1u, seed, 23u)));
     let rain = pow(1.0 - fract((f32(ci.y) * 0.07 + colT) / 0.9), 3.0);
@@ -233,32 +233,38 @@ fn crSurface(p0: vec3<f32>, n: vec3<f32>, t: f32, duv: f32) -> CrSurface {
         // inside the tunnel's back ring the rock is a black void (Gate A); a portal view will be composited there
         s.darken = max(s.darken, (1.0 - smoothstep(0.7, 0.8, ap.e)) * ap.openT * wd);
     }
-    // glyphs: only on wall-like faces, only in the travelling scan bands, only where the field is strong
+    // glyphs (owner, Gate A: more, sooner, dense around the portal): world-anchored code on every face in the field,
+    // the share of lit cells and their brightness growing with the field -- sparse at its edge, a wall of code at the
+    // opening -- with brighter bands travelling out of the focus over it
     let f = crField(p0);
-    if (frame.corruption7.x > 0.0 && f > 0.35 && abs(dot(n, b.ax)) > 0.45) {
-        // thin bands travelling out of the focus: a band of code passes over the rock and the rock returns
+    if (frame.corruption7.x > 0.0 && f > 0.04) {
         let r = distance(p0, frame.corruption0.xyz);
         let ph = fract((r - t * 32.0) / 120.0);
         let dd = min(ph, 1.0 - ph) * 120.0;
-        let band = exp(-(dd / 7.0) * (dd / 7.0)) * smoothstep(0.0, 25.0, r); // born as a ring, never a disk
-        if (band > 0.0) {
-            let q = p0 - frame.corruption0.xyz;
-            let wall = vec2<f32>(dot(q, b.h), dot(q, b.v));
-            // the cell grows by powers of two with distance so a glyph is never under ~16 px; the two nearest
-            // sizes are crossfaded so nothing pops as the camera closes in
-            let pix = distance(frame.cameraPos.xyz, p0) * 2.0 * frame.cameraUp.w * frame.targetSize.w;
-            let size = max(frame.corruption7.y, 0.05);
-            let lv = log2(max(pix * 18.0 / size, 1.0));
-            let l0 = floor(lv);
-            let c0 = size * exp2(l0);
-            let c1 = c0 * 2.0;
-            let a0 = crGlyphCell(wall / vec2<f32>(c0 * 0.72, c0), duv / c0, t);
-            let a1 = crGlyphCell(wall / vec2<f32>(c1 * 0.72, c1) + vec2<f32>(37.0, 11.0), duv / c1, t);
-            let gl = mix(a0, a1, lv - l0) * band * smoothstep(0.35, 0.7, f);
-            let tint = mix(vec3<f32>(1.0, 0.42, 0.12), vec3<f32>(1.0, 0.8, 0.42), gl);
-            s.emission = s.emission + tint * gl * frame.corruption7.x;
-            s.darken = max(s.darken, 0.3 * band * smoothstep(0.35, 0.7, f));
+        let band = exp(-(dd / 14.0) * (dd / 14.0)) * smoothstep(0.0, 25.0, r); // born as a ring, never a disk
+        let grow = smoothstep(0.04, 0.85, f);
+        // each face reads the world plane it faces most: walls along their horizontal, flats from above
+        let an = abs(n);
+        var plane = vec2<f32>(p0.x, p0.z);
+        if (an.y < 0.7) {
+            plane = select(vec2<f32>(p0.x, p0.y), vec2<f32>(p0.z, p0.y), an.x > an.z);
         }
+        // the cell grows by powers of two with distance so a glyph is never under ~16 px; the two nearest
+        // sizes are crossfaded so nothing pops as the camera closes in
+        let pix = distance(frame.cameraPos.xyz, p0) * 2.0 * frame.cameraUp.w * frame.targetSize.w;
+        let size = max(frame.corruption7.y, 0.05);
+        let lv = log2(max(pix * 22.0 / size, 1.0));
+        let l0 = floor(lv);
+        let c0 = size * exp2(l0);
+        let c1 = c0 * 2.0;
+        let share = mix(0.12, 0.72, grow);
+        let a0 = crGlyphCell(plane / vec2<f32>(c0 * 0.72, c0), duv / c0, t, share);
+        let a1 = crGlyphCell(plane / vec2<f32>(c1 * 0.72, c1) + vec2<f32>(37.0, 11.0), duv / c1, t, share);
+        let gl = mix(a0, a1, lv - l0) * grow * (0.45 + 0.55 * band + 0.6 * band * grow);
+        let tint = mix(vec3<f32>(1.0, 0.42, 0.12), vec3<f32>(1.0, 0.8, 0.42), clamp(gl, 0.0, 1.0));
+        s.emission = s.emission + tint * gl * frame.corruption7.x;
+        // the rock under the code darkens as the field takes it, so the code reads and the place is still the place
+        s.darken = max(s.darken, 0.55 * grow + 0.15 * band * grow);
     }
     return s;
 }

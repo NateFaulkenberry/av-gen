@@ -33,7 +33,7 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | canyon P1 | the canyon as engine triangle geometry (ADR-1857), `04-canyon-phase1.md` | **done, awaiting the owner**: media in `canyon-p1/` |
 | canyon P2-P6 | revelation, birds, glyphs, (campsite), QA | not started: gated on P1 acceptance |
 | portals R | dimensional portals: research, audit, plan (`12`-`15`) | **reviewed**: the owner sees "strong potential"; decisions in `15` §6 |
-| portals A | the Matrix effect: the scan, geometric (world-space) mosh, limited glyphs, the site, the opening | **in progress** |
+| portals A | the Matrix effect: the scan, geometric (world-space) mosh, glyphs, the site in the rock, the opening (`16`) | **done, awaiting the owner**: media in `portals-a/` |
 | portals B-C | portal 1 and the Moon; portal 2, dusk, the full ~60 s | not started |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
@@ -175,6 +175,15 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-30: Portals Gate A (`16-portals-gate-a.md`; ADR-1872, 1873, 1881).
+  - Site D is the river's own east bank wall under the escarpment. The camera crosses at 32.0 s, on bar 17, and
+    0–17.9 s is unchanged.
+  - The scan grows out of the portal. The data mosh is on the world geometry: blocks, strips, frozen cells, echoes,
+    the pull, shards.
+  - The opening grows from a seam of light to a torn tunnel as the camera approaches.
+  - After the owner's note, the glyphs are dense and start sooner.
+  - The flicker spike at 15.13 s is fixed (a jump in the front's origin).
+  - CPU-assets and GPU suites exit 0.
 - 2026-10-30: Gate R reviewed. The owner sees "strong potential" in the Matrix effect. The direction is recorded in
   `15-portals-plan.md` §6:
   - the portal is cut into the rock and opens as the camera approaches;

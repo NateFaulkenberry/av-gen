@@ -198,7 +198,10 @@ void MeshWireRenderer::draw(wgpu::RenderPassEncoder& pass, const wgpu::BindGroup
     // The wave's origin: `waveAhead` metres in front of the camera along the ground.
     glm::vec2 flat(forward.x, forward.z);
     flat = glm::length(flat) > 1e-5f ? glm::normalize(flat) : glm::vec2(0.0f, -1.0f);
-    const glm::vec3 origin = eye + glm::vec3(flat.x, 0.0f, flat.y) * w.waveAhead;
+    // ADR-1872: with `fromFocus` the front grows out of the corruption's focus, whether or not the corruption acts yet
+    // (the field reaching zero must not move the front's origin)
+    const bool fromFocus = w.fromFocus > 0.5f && !scene.corruption.targets.empty();
+    const glm::vec3 origin = fromFocus ? scene.corruption.focus : eye + glm::vec3(flat.x, 0.0f, flat.y) * w.waveAhead;
 
     struct Item {
         scene::MeshId mesh;
@@ -248,7 +251,7 @@ void MeshWireRenderer::draw(wgpu::RenderPassEncoder& pass, const wgpu::BindGroup
     p.crease = glm::vec4(w.creaseLow, w.creaseHigh, w.reveal, std::max(w.intensity, 0.0f));
     p.wave = glm::vec4(w.wave, w.waveRadius, w.waveWidth, std::max(w.waveGain, 0.0f));
     p.origin = glm::vec4(origin, w.clipBelow);
-    p.front = glm::vec4(glm::max(w.frontColor, glm::vec3(0.0f)), w.fromFocus > 0.5f ? 1.0f : 0.0f);
+    p.front = glm::vec4(glm::max(w.frontColor, glm::vec3(0.0f)), fromFocus ? 1.0f : 0.0f);
     p.pulse = glm::vec4(std::max(w.pulse, 0.0f), std::max(w.pulseSpacing, 1.0f), w.pulseSpeed, std::max(w.pulseWidth, 0.1f));
     p.extra = glm::vec4(std::max(w.focusGain, 0.0f), std::max(w.rimGain, 0.0f), std::clamp(w.shards, 0.0f, 1.0f),
                         std::max(w.shardRate, 0.0f));

@@ -161,19 +161,19 @@ fn vs_mesh_wire(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u3
     // the travelling front: a ring about the origin, radius (1 - envelope) x radius
     let env = clamp(mw.wave.x, 0.0, 1.0);
     var r = length((mid - mw.origin.xyz).xz);
-    if (mw.front.w > 0.5 && crOn()) {
-        r = distance(restMid, frame.corruption0.xyz); // ADR-1872: the front grows out of the focus
+    if (mw.front.w > 0.5) {
+        r = distance(restMid, mw.origin.xyz); // ADR-1872: the front grows out of the focus (mw.origin)
     }
     let front = (1.0 - env) * mw.wave.y;
     let x = (r - front) / max(mw.wave.z, 1e-3);
     // the lead (outside the front) is hot, the tail cools: heat > 0 only ahead of the crest
     var band = exp(-x * x) * smoothstep(0.0, 0.25, env);
-    if (mw.front.w > 0.5 && crOn()) {
+    if (mw.front.w > 0.5) {
         // a front out of the focus is born as a ring, not a disk lit all at once, and thins as it passes the camera,
         // so neither its birth nor its passing is a one-frame change of the whole picture
         // and dies away before it reaches the camera's own distance from the focus: a front sweeping over the eye at
         // the envelope's speed (hundreds of m/s) lights the whole near wall for two frames
-        let camR = max(distance(frame.cameraPos.xyz, frame.corruption0.xyz), 1.0);
+        let camR = max(distance(frame.cameraPos.xyz, mw.origin.xyz), 1.0);
         band = band * smoothstep(0.0, 2.0 * mw.wave.z, front) * (1.0 - smoothstep(0.45, 0.8, r / camR));
     }
     var heat = band * smoothstep(-0.5, 0.8, x);

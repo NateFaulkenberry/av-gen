@@ -90,9 +90,9 @@ void corrupt(scene::Scene& s, float amount, float open) {
     c.radius = 8.0f;
     c.inner = 0.3f;
     c.block = 1.0f;
-    c.share = 0.6f;
+    c.share = 0.9f;
     c.slip = 0.6f;
-    c.lift = 0.5f;
+    c.lift = 1.2f; // out of the ground: the blocks stand up and throw shadows
     c.strip = 1.0f;
     c.stripSlip = 0.3f;
     c.pull = 0.5f;
@@ -134,7 +134,7 @@ TEST_CASE("corruption: acting, it moves the target's geometry, and opens it", "[
     const gpu::Image8 moved = render(renderer, field);
     const std::size_t byField = changed(rest, moved);
     INFO("pixels the field changed: " << byField);
-    CHECK(byField > 300);
+    CHECK(byField > 300); // a slip along a flat plane is invisible; the lifted blocks are what shows
     scene::Scene opened = field;
     opened.corruption.liveOpen = 1.0f;
     const gpu::Image8 open = render(renderer, opened);

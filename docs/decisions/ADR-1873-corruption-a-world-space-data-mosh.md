@@ -88,13 +88,18 @@ faults in the strata.
 - The edge wanders smoothly around the opening and steps on a 2.5 m grid of the wall: torn, not drawn.
 
 **Surface.**
-- Glyphs appear only on wall-like faces, only in thin bands travelling out of the focus, and only where the field
-  exceeds 0.35.
-- At most 30% of cells are lit.
+- Glyphs grow with the field.
+  - At first, after Gate R, they appeared only in thin bands on walls where the field exceeded 0.35.
+  - The owner wanted them more prominent and sooner, as in Gate R's proof 04. Now they cover every face in the field
+    from a field of 0.04.
+  - The share of lit cells runs from 12% to 72%, and the brightness also grows with the field.
+  - Brighter bands travel out of the focus over them.
+  - The rock under them darkens with the field, so the code reads.
+- Each face reads the world plane it faces most: walls along their horizontal, flats from above.
 - Each glyph is a procedural 5×7 cell, our own design with mirrored strokes, cycling and raining (a stateless
   sawtooth after Rezmason/matrix).
 - Cell size grows by powers of two with distance, crossfaded between the two nearest, so a glyph is never under
-  about 16 px.
+  about 20 px.
 - Glyphs are antialiased from the world footprint taken in uniform control flow.
 - The water is never a target.
 - Targets in the field are drawn double-sided. Their back faces shade dark and faintly warm, the inside of the torn
