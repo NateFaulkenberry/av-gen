@@ -32,6 +32,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | 2e | cliff edge artifacts traced and fixed (ADR-1856) | done; owner then chose engine-native geometry (`03-canyon-brief.md`) |
 | canyon P1 | the canyon as engine triangle geometry (ADR-1857), `04-canyon-phase1.md` | **done, awaiting the owner**: media in `canyon-p1/` |
 | canyon P2-P6 | revelation, birds, glyphs, (campsite), QA | not started: gated on P1 acceptance |
+| portals R | dimensional portals: research, audit, plan (`12`-`15`) | **done, awaiting the owner**: media in `portals-r/` |
+| portals A-C | the Matrix effect; portal 1 and the Moon; portal 2, dusk, the full ~60 s | not started: gated on R |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -172,6 +174,17 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-30: Dimensional portals, Gate R (research, audit, plan). Brief `12`, coordinator notes `13`, research `14`,
+  plan `15`; media in `portals-r/`. No production code: four throwaway proofs.
+  - The portal view and crossing, proved by an offline composite of two engine renders. A per-pixel ray-plane
+    aperture against the canyon depth gives correct perspective and occlusion, and there is no step at the plane.
+  - The Matrix scan to breakdown on the real canyon. Existing tools give a uniform screen glitch (irregularity p90
+    0.67). A world-masked prototype is localised and steadier (p90 0.054).
+  - The Moon: a procedural crater field rendered by the engine with a lunar-Lambert material program. It needs no new
+    shading code; the near field is weak.
+  - Dusk look-dev with existing knobs.
+  - Chosen: a world set with one renderer per world, a portal pass before water, a hand-over at the plane, one
+    corruption field driving meshWire v2, surface code, shards, pull and mosh v2, and a crater-floor portal 2.
 - 2026-10-29: Canyon water pass 2. Notes in `11-canyon-water-2.md`; media in `canyon-water2/`.
   - The black bands were one-frame checkerboards of see-through shallow water. The linear depth, unprojected through
     the f32 invViewProj, was noisy from pixel to pixel. It is now taken from the projection's depth mapping
