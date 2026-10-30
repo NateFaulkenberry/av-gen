@@ -114,10 +114,14 @@ difference.
 
 **Cirrus band.** Stable.
 
-## Not fixed
+## Known limit: the screen-edge seam (kept, owner 2026-10-30)
 
-**Vertical seam, 16.0–16.2 s.** This is the SSR's screen-edge fade. The wall the water should reflect is off the left
-of the frame, so those rays fall back to the sky. The seam is the same before and after. Options for the owner:
+**Vertical seam, 16.0–16.2 s.** This is a known limit of a screen-space reflection, and it stays as it is. The wall
+the water should reflect is off the left of the frame. The frame holds no picture of it, so rays that leave the screen
+fall back to the sky, through the SSR's screen-edge fade (6% of the frame). The seam is the same before and after this
+pass.
+
+The owner chose to keep it. Other options were:
 
 - a wider fade;
 - clamping off-screen rays to the edge column, which smears in general.

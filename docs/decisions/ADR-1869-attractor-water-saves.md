@@ -1,6 +1,6 @@
 # ADR-1869: The attractor's water block is saved, every key the parser reads
 
-- Status: Proposed, scene/strange-attractor (2026-10-29). Follows ADR-1868.
+- Status: Accepted by the owner (2026-10-30), scene/strange-attractor (2026-10-29). Follows ADR-1868.
 - Code: `src/scene/attractor_world.cpp`. `kAttractorWaterFloats` is one table of every float water key, used by both
   the parser and the save; `waterToJson` writes it, along with the three colours.
 - Tests: `[adr1869]` in `tests/unit/test_attractor_world.cpp`. They check two things:

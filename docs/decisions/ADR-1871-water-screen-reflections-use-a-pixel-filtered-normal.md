@@ -1,6 +1,6 @@
 # ADR-1871: The water's screen-space reflections use a pixel-filtered normal
 
-- Status: Proposed, scene/strange-attractor (canyon water pass 2, 2026-10-29).
+- Status: Accepted by the owner (2026-10-30), scene/strange-attractor (canyon water pass 2, 2026-10-29).
 - Code: `shaders/water.wgsl`, the reflection block.
   - `rippleKeep` scales the ripples' tilt down until the reflected ray swings by at most 1.5× the flat mirror's own
     spread from one pixel to the next.

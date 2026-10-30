@@ -1,6 +1,6 @@
 # ADR-1870: The linear depth is taken from the projection's depth mapping, not unprojected through invViewProj
 
-- Status: Proposed, scene/strange-attractor (canyon water pass 2, 2026-10-29).
+- Status: Accepted by the owner (2026-10-30), scene/strange-attractor (canyon water pass 2, 2026-10-29).
 - Code:
   - `src/rendering/scene_renderer.{hpp,cpp}`: `FrameUniforms::depthRange` (appended last).
     - x = `-proj[3][2]`, y = `-(proj[2][2] + 1)`, both formed in double from the float matrix the frame was drawn
