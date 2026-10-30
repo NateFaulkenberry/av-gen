@@ -1230,3 +1230,125 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
         CHECK(rendering::waterUniformsFrom(healthy, 1.0f, inf, true).surface.w == 0.0f);
     }
 }
+
+// ---- ADR-1870: the linear depth far from the origin ---------------------------------------------------------------
+//
+// linear_depth.wgsl used to unproject (ndc, depth) through invViewProj and dot the point with the forward axis. Exact
+// in real arithmetic; in f32, with the camera kilometres from the origin and a far plane of 1e5 m, the inverse rounds
+// to a depth that is wrong by tens of centimetres at a few hundred metres -- differently in neighbouring pixels and
+// differently for every camera pose. The Strange Attractor's river reads that number as the water's thickness over a
+// shallow bed: one frame in a few hundred, the river turned into a checkerboard of see-through pixels with the dark
+// bed in dark bands across it. The target is now the projection's own depth mapping, inverted without cancellation.
+//
+// Measured against the CPU's answer in double: a flat ground seen at a grazing angle from 5 km out, every tap's depth
+// against the ray-plane intersection through that pixel's centre, and the target's roughness along each row (a plane's
+// depth along a row is smooth; the second difference of three neighbours is its noise).
+TEST_CASE("the linear depth stays exact with the camera kilometres from the origin and a far plane of 1e5 m",
+          "[gpu][renderer][forensics][adr1870]") {
+    // The control: the same pass unprojecting through invViewProj, as it did before, derived from the live file.
+    std::string live;
+    {
+        std::ifstream in(fs::path(AVGEN_SHADER_SOURCE_DIR) / "linear_depth.wgsl");
+        REQUIRE(in.good());
+        std::stringstream b;
+        b << in.rdbuf();
+        live = b.str();
+    }
+    const std::string call = "return max(linearViewDepth(depth), 1e-4);";
+    const auto at = live.find(call);
+    REQUIRE(at != std::string::npos);
+    std::string unprojected = live;
+    unprojected.replace(at, call.size(),
+                        "let ndc = vec3<f32>(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0, depth);\n"
+                        "    let world = frame.invViewProj * vec4<f32>(ndc, 1.0);\n"
+                        "    let p = world.xyz / world.w;\n"
+                        "    return max(dot(p - frame.cameraPos.xyz, frame.cameraForward.xyz), 1e-4);");
+    const fs::path controlDir = testsupport::processTempDir() / "linear-depth-unprojected";
+    fs::create_directories(controlDir);
+    {
+        std::ofstream out(controlDir / "linear_depth.wgsl", std::ios::trunc);
+        out << unprojected;
+        REQUIRE(out.good());
+    }
+
+    struct Result {
+        double worstRelative = 0.0;
+        double worstNoise = 0.0; // metres, the row's second difference against the plane's own
+        double farthest = 0.0;
+        std::size_t taps = 0;
+    };
+    const auto measure = [&](std::vector<fs::path> dirs) {
+        auto ctx = makeContext();
+        dirs.emplace_back(AVGEN_SHADER_SOURCE_DIR);
+        gpu::ShaderLibrary shaders(*ctx, dirs);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        renderer.setPassToggles(quantitativeToggles());
+        REQUIRE(renderer.init().has_value());
+
+        constexpr float kOx = 5200.0f;
+        constexpr float kOz = -4700.0f;
+        scene::Scene s;
+        s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+        scene::MeshData ground;
+        const float half = 3000.0f;
+        ground.vertices.push_back({{kOx - half, 0.0f, kOz - half}, {0, 1, 0}, {0, 0}});
+        ground.vertices.push_back({{kOx + half, 0.0f, kOz - half}, {0, 1, 0}, {1, 0}});
+        ground.vertices.push_back({{kOx + half, 0.0f, kOz + half}, {0, 1, 0}, {1, 1}});
+        ground.vertices.push_back({{kOx - half, 0.0f, kOz + half}, {0, 1, 0}, {0, 1}});
+        ground.indices = {0, 2, 1, 0, 3, 2};
+        scene::Entity& floor = s.addEntity("ground", s.addMesh(std::move(ground)));
+        floor.material.baseColor = {0.5f, 0.5f, 0.5f};
+        s.camera.position = {kOx, 14.0f, kOz};
+        s.camera.target = {kOx + 280.0f, 0.0f, kOz + 310.0f};
+        s.camera.nearPlane = 0.1f;
+        s.camera.farPlane = 1.0e5f;
+        REQUIRE(renderer.renderFrame(s, FrameTime{}, kW, kH).has_value());
+        CHECK(ctx->errorCount() == 0);
+
+        const rendering::RendererDiagnosticFrame frame = renderer.diagnosticFrame();
+        const glm::dmat4 inv = glm::inverse(glm::dmat4(frame.viewProjection));
+        const glm::dvec3 eye(frame.cameraPosition);
+        const glm::dvec3 fwd = -glm::normalize(glm::dvec3(glm::inverse(glm::dmat4(frame.view))[2]));
+        const std::vector<float> depth = readLinearDepth(*ctx, renderer.linearDepthTexture());
+        Result r;
+        for (std::uint32_t ty = 1; ty + 1 < kH; ++ty) {
+            const auto expectAt = [&](std::uint32_t x) -> double {
+                const double nx = (x + 0.5) / kW * 2.0 - 1.0;
+                const double ny = 1.0 - (ty + 0.5) / kH * 2.0;
+                const glm::dvec4 a = inv * glm::dvec4(nx, ny, 0.0, 1.0);
+                const glm::dvec4 b = inv * glm::dvec4(nx, ny, 1.0, 1.0);
+                const glm::dvec3 pa = glm::dvec3(a) / a.w;
+                const glm::dvec3 ray = glm::normalize(glm::dvec3(b) / b.w - pa);
+                if (ray.y >= -1e-6) return -1.0;
+                const glm::dvec3 p = eye + ray * (-eye.y / ray.y);
+                return glm::dot(p - eye, fwd);
+            };
+            for (std::uint32_t tx = 1; tx + 1 < kW; ++tx) {
+                // the near and middle field, where the canyon's river is seen; past it a depth buffer's own
+                // resolution (a few parts in 10^3 at 1.5 km with a 0.1 m near plane) is the floor
+                const double l = expectAt(tx - 1), e = expectAt(tx), rr = expectAt(tx + 1);
+                if (l <= 0.0 || e <= 0.0 || rr <= 0.0 || std::max({l, e, rr}) > 600.0) continue;
+                const std::size_t i = static_cast<std::size_t>(ty) * kW + tx;
+                const double m = depth[i];
+                r.worstRelative = std::max(r.worstRelative, std::fabs(m - e) / e);
+                const double noise =
+                    (static_cast<double>(depth[i - 1]) - 2.0 * m + depth[i + 1]) - (l - 2.0 * e + rr);
+                r.worstNoise = std::max(r.worstNoise, std::fabs(noise));
+                r.farthest = std::max(r.farthest, e);
+                ++r.taps;
+            }
+        }
+        return r;
+    };
+    const Result control = measure({controlDir});
+    const Result fixed = measure({});
+    INFO(fixed.taps << " taps out to " << fixed.farthest << " m. Unprojected: worst error "
+                    << control.worstRelative * 100.0 << "%, row noise " << control.worstNoise
+                    << " m. From the projection: " << fixed.worstRelative * 100.0 << "%, " << fixed.worstNoise << " m");
+    REQUIRE(fixed.taps > 2000);
+    REQUIRE(fixed.farthest > 400.0);
+    CHECK(fixed.worstNoise * 4.0 < control.worstNoise); // measured 2.74 m -> 0.27 m when written
+    // The absolute error is the rasteriser's own, interpolating the depth of a 6 km triangle in f32 (under 1% here,
+    // the same in both arms); what the unprojection added was the noise between neighbouring pixels.
+    CHECK(fixed.worstRelative <= control.worstRelative * 1.05);
+}

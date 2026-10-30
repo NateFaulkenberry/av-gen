@@ -172,6 +172,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-29: Canyon water pass 2. Notes in `11-canyon-water-2.md`; media in `canyon-water2/`.
+  - The black bands were one-frame checkerboards of see-through shallow water. The linear depth, unprojected through
+    the f32 invViewProj, was noisy from pixel to pixel. It is now taken from the projection's depth mapping
+    (ADR-1870). Dark transients over 46 s fell from 507 to 151 px/frame.
+  - The opening's saw-teeth were SSR rays bent by aliasing ripples. The march and the sky mirror now use a
+    pixel-filtered normal (ADR-1871). Teeth area fell from 207 to 97 px/frame.
+  - The 16 s seam is the SSR screen-edge fade, not fixed.
+- 2026-10-29: The attractor water block is saved (ADR-1869).
 - 2026-10-29: Bank water flicker.
   - The river had an unintended default foam line; the attractor's water block silently dropped keys.
   - The reflected cirrus aliased under the ripples.

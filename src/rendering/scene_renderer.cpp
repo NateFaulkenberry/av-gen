@@ -3467,6 +3467,13 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // measure depth along this axis.
         frame.cameraForward = glm::vec4(-glm::normalize(glm::vec3(invView[2])), 0.0f);
     }
+    // ADR-1870: the depth mapping of the projection just used, in the form f32 can invert without cancellation.
+    // For glm::perspectiveRH_ZO, depth = -proj[2][2] - proj[3][2] / zView, so the view depth is
+    // -proj[3][2] / ((1 - depth) - (proj[2][2] + 1)). `1 - depth` is exact in f32 wherever the precision matters
+    // (depth >= 0.5), and proj[2][2] + 1 -- about near / far, a cancellation in f32 -- is formed here in double from
+    // the float the GPU used.
+    frame.depthRange = glm::vec4(static_cast<float>(-static_cast<double>(proj[3][2])),
+                                 static_cast<float>(-(static_cast<double>(proj[2][2]) + 1.0)), 0.0f, 0.0f);
     frame.targetSize = glm::vec4(static_cast<float>(hdr_.width()), static_cast<float>(hdr_.height()),
                                  1.0f / static_cast<float>(hdr_.width()), 1.0f / static_cast<float>(hdr_.height()));
     // The IBL is live either from an HDR map or from the procedural sky (ADR-036). The sky carries

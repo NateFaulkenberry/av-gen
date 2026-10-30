@@ -1181,6 +1181,15 @@ TEST_CASE("SDF screen static: snow that changes with time, repeats at the same t
     auto shaders = makeShaders(*ctx);
     rendering::SceneRenderer renderer(*ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    // Ambient occlusion off: its sampling pattern rotates with the time on purpose (frameNonce), so the "nothing
+    // changes with time" claim below is about the static, not about AO noise. With AO on, the claim held only while
+    // the AO happened to contribute exactly nothing to every pixel; ADR-1870's linear depth (the same depths, rounded
+    // differently) gave one centre pixel a 1-level AO term that moved between t = 1.0 and 1.3.
+    {
+        rendering::SceneRenderer::PassToggles toggles;
+        toggles.ao = false;
+        renderer.setPassToggles(toggles);
+    }
     const auto render = [&](float amount, double time) {
         scene::Scene copy = s;
         scene::SdfObject c = o;

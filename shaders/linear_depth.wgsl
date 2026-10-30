@@ -27,8 +27,5 @@ fn fs_linear_depth(in: FsIn) -> @location(0) f32 {
     if (depth >= 1.0) {
         return 1.0e7; // nothing was drawn here: treat it as infinitely far
     }
-    let ndc = vec3<f32>(in.uv.x * 2.0 - 1.0, 1.0 - in.uv.y * 2.0, depth);
-    let world = frame.invViewProj * vec4<f32>(ndc, 1.0);
-    let p = world.xyz / world.w;
-    return max(dot(p - frame.cameraPos.xyz, frame.cameraForward.xyz), 1e-4);
+    return max(linearViewDepth(depth), 1e-4);
 }

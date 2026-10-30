@@ -184,6 +184,9 @@ struct FrameUniforms {
     skyCirrus2: vec4<f32>,
     skyCirrus3: vec4<f32>,
     skyCirrus4: vec4<f32>, // ADR-1865: bands, band width, the cube's share, the sky's intensity
+    // ADR-1870: view depth = x / ((1 - depth) + y) for a depth-buffer value (linearViewDepth). Mirrors FrameUniforms;
+    // appended last.
+    depthRange: vec4<f32>,
 };
 
 struct ObjectUniforms {
@@ -759,6 +762,17 @@ fn vs_main(in: VertexIn) -> VertexOut {
 fn cameraViewRay(ndc: vec2<f32>) -> vec3<f32> {
     return normalize(frame.cameraForward.xyz + (ndc.x * frame.cameraRight.w) * frame.cameraRight.xyz
                      + (ndc.y * frame.cameraUp.w) * frame.cameraUp.xyz);
+}
+
+// ADR-1870: the view-space depth (along cameraForward) of a depth-buffer value, from the projection's own depth
+// mapping (frame.depthRange). It replaces unprojecting `(ndc, depth)` through invViewProj and dotting with the
+// forward axis, which is the same number in exact arithmetic but not in f32: with the camera kilometres from the
+// origin and a 1e5 m far plane, the inverse rounds to a depth that is wrong by up to tens of centimetres at a few
+// hundred metres, differently in neighbouring pixels and differently for every camera pose -- noise that a surface
+// over a shallow bed reads as its thickness (a frame of the river turned into a checkerboard of see-through
+// pixels) and the reflection march as hits.
+fn linearViewDepth(depth: f32) -> f32 {
+    return frame.depthRange.x / max((1.0 - depth) + frame.depthRange.y, 1e-30);
 }
 
 // Rotates a world direction into the environment map's frame (rotation about +Y).

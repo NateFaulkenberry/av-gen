@@ -961,6 +961,19 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     let reflectFlatSpread = length(fwidth(reflect(-v, vec3<f32>(0.0, 1.0, 0.0))));
     // how much of the spread is the ripples' (0) rather than the view's own (1)
     let rippleAlias = smoothstep(1.5, 4.0, reflectSpread / max(reflectFlatSpread, 1e-5));
+    // ADR-1871: the normal the screen-space lookups (the march and the sky mirror) reflect about: the ripples' tilt
+    // scaled down until the reflected ray swings by at most half again the view's own spread from one pixel to the
+    // next. Those lookups read a picture whose pixels are the reflection's own, so a ray that jumps several of them
+    // per screen pixel samples it with gaps -- across the reflected silhouette of a bank, alternately the rock and
+    // the sky behind it, which drew a fringe of saw-teeth hanging into the water that changed every frame. The tilt
+    // taken out is not lost: the march's hit is blurred by the full spread (ADR-1868), which is what that tilt does
+    // to the picture when it is below the pixel.
+    let rippleKeep = clamp(0.5 * reflectFlatSpread / max(reflectSpread - reflectFlatSpread, 1e-6), 0.0, 1.0);
+    var screenUp = vec3<f32>(0.0, 1.0, 0.0);
+    // ---- cascade (ADR-985) begin ----
+    screenUp = cascadeUp;
+    // ---- cascade (ADR-985) end ----
+    let nScreen = normalize(mix(screenUp, n, rippleKeep));
     var reflected = water.reflectTint.rgb * frame.styledSky.rgb;
     if (frame.envParams.w > 0.5) {
         let r = reflect(-v, n);
@@ -1007,7 +1020,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
     // reach: the sky or a distant range; a near bank there is not what this ray sees). The march's hits still win
     // over it below. Independent of the SSR switch: with `ssr` 0 (the ladder's Emergency) the sky stays in the river.
     if (water.mirror.x > 0.0 && !underwater) {
-        let rm = reflect(-v, n);
+        let rm = reflect(-v, nScreen);
         let cm = frame.viewProj * vec4<f32>(rm, 0.0);
         if (cm.w > 1e-4 && rm.y > 0.0) {
             let nm = cm.xy / cm.w;
@@ -1078,7 +1091,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         var peak = 0.0;
         for (var k = 0u; k < rays; k = k + 1u) {
             let u = (f32(k) + fract(jitter * 7.13 + f32(k) * 0.618)) / f32(rays) - 0.5;
-            let nk = normalize(n + along * (u * water.cineC.x));
+            let nk = normalize(nScreen + along * (u * water.cineC.x));
             let rr = reflect(-v, nk);
             let ssr = waterSsr(in.worldPos, rr, cineRough, fract(jitter + f32(k) * 0.37), reflectSpread);
             acc = acc + ssr.rgb * ssr.w;

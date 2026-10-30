@@ -181,3 +181,84 @@ TEST_CASE("a rippled water's cirrus does not flicker as the camera glides: the r
     REQUIRE(control > 200); // the control flickers, or this proves nothing
     CHECK(filtered * 2 < control);
 }
+
+namespace {
+
+// A dark slab standing on a rippled mirror under a bright sky: the reflected silhouette is a hard edge the march has
+// to find through every ripple.
+scene::Scene wallOnRippledWater(glm::vec3 glide) {
+    scene::Scene s = mirrorUnderCirrus(0.0f);
+    s.environment.sky.zenithColor = {0.6f, 0.7f, 1.0f};
+    s.environment.sky.horizonColor = {0.7f, 0.8f, 1.0f};
+    s.camera.position = glm::vec3(0.0f, 6.0f, 0.0f) + glide;
+    s.camera.target = glm::vec3(0.0f, 4.0f, -80.0f) + glide;
+    scene::MeshData slab;
+    const glm::vec3 n(0.0f, 0.0f, 1.0f);
+    slab.vertices.push_back({{-400.0f, -1.0f, -120.0f}, n, {0, 0}});
+    slab.vertices.push_back({{400.0f, -1.0f, -120.0f}, n, {1, 0}});
+    slab.vertices.push_back({{400.0f, 30.0f, -120.0f}, n, {1, 1}});
+    slab.vertices.push_back({{-400.0f, 30.0f, -120.0f}, n, {0, 1}});
+    slab.indices = {0, 1, 2, 0, 2, 3};
+    scene::Entity& wall = s.addEntity("wall", s.addMesh(std::move(slab)));
+    wall.material.baseColor = {0.02f, 0.02f, 0.02f};
+    wall.material.doubleSided = true;
+    scene::WaterSettings& w = s.waters.front().settings;
+    w.ripple = 0.3f;
+    w.rippleScale = 0.6f; // ripples a few pixels long at the wall's reflection: each swings the ray across its edge
+    w.rippleSpeed = 0.0f;
+    w.ssr = 1.0f;
+    w.ssrDistance = 400.0f;
+    w.ssrSteps = 96.0f;
+    w.ssrGain = 1.0f;
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("a bank's reflection keeps a clean edge in rippled water: the march reflects about a pixel-filtered normal",
+          "[water][gpu][ssr][adr1871]") {
+    // ADR-1871. The march (and the sky mirror) read a picture whose pixels are the reflection's own; fine ripples swung
+    // the reflected ray across several of them per screen pixel, so along a reflected silhouette neighbouring pixels
+    // alternately found the rock and the sky -- saw-teeth hanging into the water, redrawn every frame as the camera
+    // moved. Measured: luminance sign reversals over a sub-pixel glide, against the same shader reflecting about the
+    // unfiltered normal (the control, derived from the live file).
+    const std::string live = testsupport::readWaterShaderSource();
+    const std::string unfiltered =
+        testsupport::replaceOnce(live, "normalize(mix(screenUp, n, rippleKeep))", "n");
+    const auto controlDir = testsupport::writeWaterShaderVariant("ssr-unfiltered-normal", unfiltered);
+    const auto measure = [&](const std::vector<std::filesystem::path>& dirs) {
+        auto ctx = makeWaterContext();
+        std::vector<std::filesystem::path> d = dirs;
+        d.emplace_back(AVGEN_SHADER_SOURCE_DIR);
+        gpu::ShaderLibrary shaders(*ctx, d);
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        renderer.setPassToggles(waterQuantitativeToggles());
+        constexpr std::uint32_t W = 256, H = 144;
+        std::vector<std::vector<float>> frames;
+        for (int f = 0; f < 5; ++f) {
+            const scene::Scene s = wallOnRippledWater(glm::vec3(0.11f * f, 0.0f, -0.17f * f));
+            FrameTime t{};
+            t.renderTime = 0.0;
+            renderer.resetTemporalHistory();
+            auto img = renderer.renderToImageFloat(s, t, W, H);
+            REQUIRE(img.has_value());
+            frames.push_back(luminance(*img));
+        }
+        std::size_t n = 0;
+        for (std::size_t i = 0; i < frames[0].size(); ++i) {
+            for (int f = 1; f + 1 < 5; ++f) {
+                const float a = frames[f][i] - frames[f - 1][i], b = frames[f + 1][i] - frames[f][i];
+                if (a * b < 0.0f && std::abs(a) > 0.05f && std::abs(b) > 0.05f) ++n;
+            }
+        }
+        return n;
+    };
+    const std::size_t control = measure({controlDir});
+    const std::size_t filtered = measure({});
+    INFO("sign reversals: unfiltered " << control << ", filtered " << filtered);
+    REQUIRE(control > 500); // the control's reflected edge flickers, or this proves nothing
+    // Measured 1,060 -> 651 when written. Not all of the control's reversals are aliasing: near the camera the
+    // ripples are many pixels long and the reflection rightly wobbles with them, in both arms.
+    CHECK(filtered * 10 < control * 7);
+}
