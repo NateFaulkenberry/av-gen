@@ -390,6 +390,17 @@ struct FrameUniforms {
     // through invViewProj: view depth = x / ((1 - depth) + y). x = -proj[3][2], y = -(proj[2][2] + 1), both taken in
     // double from the matrix the frame was drawn with. Appended last.
     glm::vec4 depthRange{0.0f};
+    // ADR-1873: the world-space data mosh (scene::packCorruption; shaders/corruption.wgsl). All zero unless a scene
+    // authored `corruption`; corruption0.w = 1 is the gate. Appended last.
+    glm::vec4 corruption0{0.0f};
+    glm::vec4 corruption1{0.0f};
+    glm::vec4 corruption2{0.0f};
+    glm::vec4 corruption3{0.0f};
+    glm::vec4 corruption4{0.0f};
+    glm::vec4 corruption5{0.0f};
+    glm::vec4 corruption6{0.0f};
+    glm::vec4 corruption7{0.0f};
+    glm::vec4 corruption8{0.0f};
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -407,7 +418,8 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        16 + // ADR-1070: one vec4 of the live sky
                                        192 + // ADR-1151: twelve vec4s of reflection bands
                                        80 + // ADR-1864/1865: five vec4s of cirrus
-                                       16); // ADR-1870: one vec4 of depth range, appended last
+                                       16 + // ADR-1870: one vec4 of depth range
+                                       144); // ADR-1873: nine vec4s of corruption, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -498,8 +510,10 @@ struct ObjectUniforms {
     // refraction1.rgb = absorption per metre. ADR-1640: w = dispersion (0 = the single read).
     glm::vec4 refraction0{0.0f};
     glm::vec4 refraction1{0.0f};
+    // ADR-1873: x = 1 when the frame's corruption displaces this entity, y = its echo copy (0 the surface itself).
+    glm::vec4 corrupt{0.0f};
 };
-static_assert(sizeof(ObjectUniforms) == 560);
+static_assert(sizeof(ObjectUniforms) == 576);
 static_assert(offsetof(ObjectUniforms, model) == 0);
 static_assert(offsetof(ObjectUniforms, normalMatrix) == 64);
 static_assert(offsetof(ObjectUniforms, prevModel) == 128);

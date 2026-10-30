@@ -3541,6 +3541,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.skyCirrus2 = cirrus[2];
         frame.skyCirrus3 = cirrus[3];
         frame.skyCirrus4 = cirrus[4];
+        // ADR-1873: the corruption block; all zero (and the shaders' gate shut) unless the scene authored one.
+        const auto corruption = scene::packCorruption(scene.corruption, scene.corruption.active());
+        frame.corruption0 = corruption[0];
+        frame.corruption1 = corruption[1];
+        frame.corruption2 = corruption[2];
+        frame.corruption3 = corruption[3];
+        frame.corruption4 = corruption[4];
+        frame.corruption5 = corruption[5];
+        frame.corruption6 = corruption[6];
+        frame.corruption7 = corruption[7];
+        frame.corruption8 = corruption[8];
         const bool liveBackground = (liveSky_.enabled || resolved.cirrus.amount > 0.0f) && skyIbl &&
                                     scene.environment.skyboxBlur <= 0.0f;
         frame.skyLive = liveBackground
@@ -4150,6 +4161,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // a viewer without transmission): full alpha, no blend dither in its depth. Skinned glass is not refracted.
         const bool blendGlassRefracts = glassRefracts && m.alphaMode == scene::AlphaMode::Blend &&
                                         m.refraction.transmission > 0.0f && !skin.valid();
+        // ADR-1873: the world-space data mosh's targets (and their echo copies). Zero for everything else.
+        if (entity.corruptTarget) {
+            obj.corrupt = glm::vec4(1.0f, static_cast<float>(entity.corruptEcho), 0.0f, 0.0f);
+        }
         if (blendGlassRefracts) {
             obj.flags.x = static_cast<float>(scene::AlphaMode::Opaque);
             obj.baseColor.a = 1.0f;

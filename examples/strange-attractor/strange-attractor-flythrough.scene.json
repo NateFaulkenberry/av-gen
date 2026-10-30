@@ -2,7 +2,7 @@
   "format": "avgen-scene",
   "version": 1,
   "name": "the-strange-attractor",
-  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853, ADR-1857..1859): a procedural canyon. The attractorWorld block bakes engine geometry drawn by the scene pass with the canyonRock program (strata, ledge detail normals, baked occlusion from uv.y); Phase 1b look: deeper sky with streak clouds (the analytic sky's cirrus layer, ADR-1864; the volumetric lobes it replaced cost 18-26 ms), two warm unshadowed bounce lights standing in for the canyon's inter-reflection, contact shadows off (they drew a dotted checker on lit walls), shadowCasterReach 4000 m (ADR-1858). docs/prototypes/strange-attractor/.",
+  "_note": "THE STRANGE ATTRACTOR (ADR-1850, ADR-1853, ADR-1857..1859): a procedural canyon. The attractorWorld block bakes engine geometry drawn by the scene pass with the canyonRock program (strata, ledge detail normals, baked occlusion from uv.y); Phase 1b look: deeper sky with streak clouds (the analytic sky's cirrus layer, ADR-1864; the volumetric lobes it replaced cost 18-26 ms), two warm unshadowed bounce lights standing in for the canyon's inter-reflection, contact shadows off (they drew a dotted checker on lit walls), shadowCasterReach 4000 m (ADR-1858). docs/prototypes/strange-attractor/. Dimensional portals Gate A: the approach to the portal in the river's east bank wall (ADR-1881), the corruption around it (ADR-1873) and the scan from it (ADR-1872); docs/prototypes/strange-attractor/16-portals-gate-a.md.",
   "camera": {
     "mode": 1,
     "position": [
@@ -180,7 +180,18 @@
     "sunShadowBias": 8.0,
     "meshSpacing": 1.0,
     "meshError": 0.002,
-    "meshMinError": 0.15
+    "meshMinError": 0.15,
+    "approach": {
+      "site": [
+        188.5,
+        30.0,
+        3314.2
+      ],
+      "departArc": 1572.0,
+      "speed": 22.0,
+      "slowFrom": 21.25,
+      "slowFor": 6.5
+    }
   },
   "materialPrograms": [
     {
@@ -1049,6 +1060,67 @@
     "waveWidth": 60.0,
     "waveGain": 1.6,
     "waveAhead": 250.0,
-    "clipBelow": -0.5
+    "clipBelow": -0.5,
+    "fromFocus": 1.0,
+    "pulse": 1.2,
+    "pulseSpacing": 150.0,
+    "pulseSpeed": 45.0,
+    "pulseWidth": 8.0,
+    "focusGain": 0.5,
+    "rimGain": 6.0,
+    "frontColor": [
+      1.0,
+      0.78,
+      0.4
+    ],
+    "shards": 0.35,
+    "shardRate": 0.35
+  },
+  "corruption": {
+    "targets": [
+      "attractor.terrain"
+    ],
+    "focus": [
+      188.5,
+      30.0,
+      3314.2
+    ],
+    "axis": [
+      0.795,
+      0.0,
+      -0.606
+    ],
+    "amount": 1.0,
+    "radius": 280.0,
+    "inner": 0.1,
+    "fieldNear": 40.0,
+    "fieldFar": 900.0,
+    "openNear": 35.0,
+    "openFar": 320.0,
+    "seam": 0.3,
+    "width": 20.0,
+    "height": 15.0,
+    "depth": 14.0,
+    "block": 5.0,
+    "share": 0.22,
+    "slip": 3.0,
+    "rate": 0.5,
+    "strip": 4.0,
+    "stripSlip": 2.0,
+    "slide": 0.6,
+    "pull": 8.0,
+    "lift": 1.5,
+    "fold": 1.0,
+    "lag": 0.7,
+    "glyph": 3.0,
+    "glyphSize": 1.2,
+    "glow": 4.0,
+    "echoes": 2,
+    "echoOffset": 1.0,
+    "glowColor": [
+      1.0,
+      0.55,
+      0.18
+    ]
   }
 }

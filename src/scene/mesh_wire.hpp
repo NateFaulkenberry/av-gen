@@ -65,10 +65,23 @@ struct MeshWire {
     float waveAhead = 300.0f; // metres in front of the camera, horizontally, where the front starts
     float clipBelow = -1.0e9f; // world height: an edge with an end below it is not drawn (a mesh under water); lines
                                // fade in over the 3 m above it
+    // ADR-1872 (meshWire v2, the dimensional portals' scan). All read the scene's corruption (ADR-1873):
+    float fromFocus = 0.0f;    // 1: the wave grows from the corruption's focus (3D distance), not from ahead of the eye
+    float pulse = 0.0f;        // radiance of periodic scan fronts travelling out of the focus, gated by the corruption
+                               // field, so they appear as the field grows (0 = none)
+    float pulseSpacing = 140.0f; // metres between fronts
+    float pulseSpeed = 45.0f;    // metres per second outward
+    float pulseWidth = 9.0f;     // a front's half-width (m)
+    float focusGain = 0.0f;    // lines brighten (and the density fade relaxes) with the corruption field
+    float rimGain = 0.0f;      // the aperture's rim lit along its real edges
+    float shards = 0.0f;       // share of the opening's lip triangles that break off as shards (0 = none)
+    float shardRate = 0.4f;    // shard cycles per second
+    glm::vec3 frontColor{1.0f, 0.78f, 0.4f}; // the fronts' leading colour (gold), against `color` (copper)
 
     // Whether anything can be drawn this frame: the renderer's gate (nothing bound, nothing drawn when false).
     [[nodiscard]] bool active() const {
-        return !targets.empty() && opacity > 0.0f && (intensity > 0.0f || (wave > 0.0f && waveGain > 0.0f));
+        return !targets.empty() && opacity > 0.0f &&
+               (intensity > 0.0f || (wave > 0.0f && waveGain > 0.0f) || pulse > 0.0f || rimGain > 0.0f || shards > 0.0f);
     }
 };
 

@@ -187,6 +187,17 @@ struct FrameUniforms {
     // ADR-1870: view depth = x / ((1 - depth) + y) for a depth-buffer value (linearViewDepth). Mirrors FrameUniforms;
     // appended last.
     depthRange: vec4<f32>,
+    // ADR-1873: the world-space data mosh (corruption.wgsl; scene::packCorruption). corruption0.w = 1 is the gate.
+    // Mirrors FrameUniforms; appended last.
+    corruption0: vec4<f32>,
+    corruption1: vec4<f32>,
+    corruption2: vec4<f32>,
+    corruption3: vec4<f32>,
+    corruption4: vec4<f32>,
+    corruption5: vec4<f32>,
+    corruption6: vec4<f32>,
+    corruption7: vec4<f32>,
+    corruption8: vec4<f32>,
 };
 
 struct ObjectUniforms {
@@ -248,6 +259,8 @@ struct ObjectUniforms {
     // refraction1.w = ADR-1819's glTF transmission factor (0 = the ADR-1603 mix).
     refraction0: vec4<f32>,
     refraction1: vec4<f32>,
+    // ADR-1873: x = 1 when the frame's corruption displaces this entity, y = its echo copy (0 the surface itself).
+    corrupt: vec4<f32>,
 };
 
 // ADR-703 (FXL): one owner's folded effect state, 16 lanes. Mirrors world::EntityFxRecord; the

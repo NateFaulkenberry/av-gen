@@ -9,6 +9,7 @@
 
 #include "common.wgsl"
 #include "wire.wgsl"
+#include "corruption.wgsl" // ADR-1872/1873: the lines follow the corrupted rock, and the scan reads its field
 
 struct MeshWireParams {
     color: vec4<f32>,  // rgb = colour (scene-linear), w = opacity
@@ -16,11 +17,15 @@ struct MeshWireParams {
     crease: vec4<f32>, // x crease low (deg), y crease high (deg), z reveal (0..1), w structure intensity
     wave: vec4<f32>,   // x envelope (0..1), y radius (m), z width (m), w gain
     origin: vec4<f32>, // xyz the wave's origin (world), w the clip height (no line whose edge lies wholly below it)
+    front: vec4<f32>,  // ADR-1872: rgb the fronts' leading colour, w = 1 when the wave grows from the corruption focus
+    pulse: vec4<f32>,  // x radiance of the periodic fronts, y spacing (m), z speed (m/s), w half-width (m)
+    extra: vec4<f32>,  // x focus gain, y rim gain
 };
 
 struct MeshWireDraw {
     model: mat4x4<f32>,
     normalModel: mat4x4<f32>,
+    flags: vec4<f32>, // ADR-1872: x = 1 when the corruption displaces this mesh
 };
 
 @group(1) @binding(0) var<uniform> mw: MeshWireParams;
@@ -34,6 +39,7 @@ struct MeshWireOut {
     @location(1) across: f32,
     @location(2) @interpolate(flat) widths: vec3<f32>,
     @location(3) @interpolate(flat) strength: f32,
+    @location(4) @interpolate(flat) heat: f32, // ADR-1872: 0 the line's colour .. 1 the fronts' leading colour
 };
 
 struct MeshWireTargets {
@@ -44,9 +50,18 @@ struct MeshWireTargets {
     @location(4) ids: u32,
 };
 
-fn mwPosition(i: u32) -> vec3<f32> {
+fn mwRestPosition(i: u32) -> vec3<f32> {
     let b = i * 8u;
     return (mwDraw.model * vec4<f32>(mwVertices[b], mwVertices[b + 1u], mwVertices[b + 2u], 1.0)).xyz;
+}
+
+// ADR-1872: where the lit pass draws the vertex -- displaced by the corruption when the mesh is one of its targets.
+fn mwPosition(i: u32) -> vec3<f32> {
+    let p = mwRestPosition(i);
+    if (mwDraw.flags.x > 0.5 && crOn()) {
+        return crDisplace(p, frame.params.x, 0u).p;
+    }
+    return p;
 }
 
 fn mwNormal(i: u32) -> vec3<f32> {
@@ -68,6 +83,7 @@ fn mwCollapsed() -> MeshWireOut {
     out.across = 0.0;
     out.widths = vec3<f32>(1.0, 0.0, 0.0);
     out.strength = 0.0;
+    out.heat = 0.0;
     return out;
 }
 
@@ -117,6 +133,7 @@ fn vs_mesh_wire(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u3
         return mwCollapsed(); // below the clip height (under water, for one)
     }
     let mid = 0.5 * (a + b);
+    let restMid = 0.5 * (mwRestPosition(i0) + mwRestPosition(i1)); // the corruption is a property of the rock's place
     let dist = distance(frame.cameraPos.xyz, mid);
     let fade = 1.0 - smoothstep(mw.shape.y, max(mw.shape.z, mw.shape.y + 1e-3), dist);
     if (fade <= 0.0) {
@@ -143,18 +160,63 @@ fn vs_mesh_wire(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u3
     let shown = smoothstep(threshold - 0.25, threshold + 0.02, structure);
     // the travelling front: a ring about the origin, radius (1 - envelope) x radius
     let env = clamp(mw.wave.x, 0.0, 1.0);
-    let r = length((mid - mw.origin.xyz).xz);
+    var r = length((mid - mw.origin.xyz).xz);
+    if (mw.front.w > 0.5 && crOn()) {
+        r = distance(restMid, frame.corruption0.xyz); // ADR-1872: the front grows out of the focus
+    }
     let front = (1.0 - env) * mw.wave.y;
     let x = (r - front) / max(mw.wave.z, 1e-3);
-    let band = exp(-x * x) * smoothstep(0.0, 0.25, env);
+    // the lead (outside the front) is hot, the tail cools: heat > 0 only ahead of the crest
+    var band = exp(-x * x) * smoothstep(0.0, 0.25, env);
+    if (mw.front.w > 0.5 && crOn()) {
+        // a front out of the focus is born as a ring, not a disk lit all at once, and thins as it passes the camera,
+        // so neither its birth nor its passing is a one-frame change of the whole picture
+        // and dies away before it reaches the camera's own distance from the focus: a front sweeping over the eye at
+        // the envelope's speed (hundreds of m/s) lights the whole near wall for two frames
+        let camR = max(distance(frame.cameraPos.xyz, frame.corruption0.xyz), 1.0);
+        band = band * smoothstep(0.0, 2.0 * mw.wave.z, front) * (1.0 - smoothstep(0.45, 0.8, r / camR));
+    }
+    var heat = band * smoothstep(-0.5, 0.8, x);
+    // ADR-1872: the corruption field -- periodic fronts out of the focus, brighter and denser lines near it, and the
+    // aperture's rim drawn along the rock's own edges
+    var field = 0.0;
+    var pulseBand = 0.0;
+    var rimBand = 0.0;
+    var inThroat = false;
+    if (crOn()) {
+        field = crField(restMid);
+        if (mw.pulse.x > 0.0 && field > 0.0) {
+            let rf = distance(restMid, frame.corruption0.xyz);
+            let ph = fract((rf - frame.params.x * mw.pulse.z) / mw.pulse.y);
+            let d = min(ph, 1.0 - ph) * mw.pulse.y;
+            pulseBand = exp(-(d / mw.pulse.w) * (d / mw.pulse.w)) * smoothstep(0.0, 0.35, field) *
+                        smoothstep(0.0, 3.0 * mw.pulse.w, rf) * smoothstep(20.0, 120.0, dist);
+            heat = max(heat, pulseBand * smoothstep(0.0, 0.5, ph) * (1.0 - smoothstep(0.5, 1.0, ph)) * 2.0);
+        }
+        if (frame.corruption2.w > 0.0) {
+            let ap = crAperture(restMid, crBasis());
+            let wd = 1.0 - smoothstep(10.0, 30.0, abs(ap.w));
+            // the opening is a void: no line inside it once it has split; its rim is drawn on the rock's own edges
+            inThroat = ap.e < 0.97 && wd > 0.5 && ap.openT > 0.05;
+            if (mw.extra.y > 0.0) {
+                rimBand = exp(-pow((ap.e - 1.06) / 0.08, 2.0)) * wd * ap.openT;
+                heat = max(heat, rimBand);
+            }
+        }
+    }
     // the clip height's soft edge: lines fade in over the first metres above it (a shoreline's zigzag of short
     // edges stays quiet)
     let shore = smoothstep(mw.origin.w, mw.origin.w + 3.0, min(a.y, b.y));
-    var strength = (mw.crease.w * shown + mw.wave.w * band) * fade * shore * mw.color.w;
+    var strength = (mw.crease.w * shown * (1.0 + mw.extra.x * field) + mw.wave.w * band + mw.pulse.x * pulseBand +
+                    mw.extra.y * rimBand) * fade * shore * mw.color.w;
     // density: a triangle small on screen fades its edges out (its size: the side of a square of its area), so dense
     // or sliver-thin far geometry never piles into a solid luminous mass
     let px = min(mwPixels(a, b), mwSize(a, b, p2));
-    strength = strength * smoothstep(mw.shape.w * 0.5, max(mw.shape.w, 1e-3), px);
+    if (inThroat) {
+        return mwCollapsed();
+    }
+    let minPx = mw.shape.w * (1.0 - 0.3 * clamp(field, 0.0, 1.0)); // a little denser near the focus
+    strength = strength * smoothstep(minPx * 0.5, max(minPx, 1e-3), px);
     if (strength <= 1e-4) {
         return mwCollapsed();
     }
@@ -180,6 +242,7 @@ fn vs_mesh_wire(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u3
     out.across = q.across;
     out.widths = q.widths;
     out.strength = strength;
+    out.heat = clamp(heat, 0.0, 1.0);
     return out;
 }
 
@@ -193,13 +256,109 @@ fn fs_mesh_wire(in: MeshWireOut) -> MeshWireTargets {
     let coverage = wireCoverage(w);
     // light added far away is dimmed by the surface fog, never tinted by it (ribbon.wgsl's rule)
     let transmit = applyFog(vec3<f32>(1.0), in.worldPos) - applyFog(vec3<f32>(0.0), in.worldPos);
-    let radiance = mw.color.rgb * (in.strength * coverage) * transmit;
+    let radiance = mix(mw.color.rgb, mw.front.rgb, in.heat) * (in.strength * coverage) * transmit;
     let a = clamp(coverage * min(in.strength, 1.0), 0.0, 1.0);
     var out: MeshWireTargets;
     out.color = vec4<f32>(radiance, 0.0);
     out.normalRoughness = vec4<f32>(0.0);
     out.velocity = vec4<f32>(0.0);
     out.emission = vec4<f32>(radiance, a);
+    out.ids = 0u;
+    return out;
+}
+
+// ---- ADR-1872: shards -------------------------------------------------------------------------------------------
+// The opening sheds its rock: a share of the triangles on its lips (mw.extra.z, at full opening) break off as free
+// triangles -- read from the same buffers, de-indexed on the fly -- and are drawn in toward the focus and back into the
+// throat, turning and shrinking, then gone; each on its own cycle (mw.extra.w per second), so the shedding is
+// continuous and a pure function of the clock. Opaque, lit by the strongest directional light, edged in the glow.
+struct ShardOut {
+    @builtin(position) clip: vec4<f32>,
+    @location(0) worldPos: vec3<f32>,
+    @location(1) @interpolate(flat) normal: vec3<f32>,
+    @location(2) bary: vec3<f32>,
+    @location(3) @interpolate(flat) life: f32,
+};
+
+fn shardRotate(p: vec3<f32>, axis: vec3<f32>, angle: f32) -> vec3<f32> {
+    let c = cos(angle);
+    let s = sin(angle);
+    return p * c + cross(axis, p) * s + axis * dot(axis, p) * (1.0 - c);
+}
+
+@vertex
+fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u32) -> ShardOut {
+    var out: ShardOut;
+    out.clip = vec4<f32>(0.0, 0.0, -2.0, 1.0);
+    out.worldPos = vec3<f32>(0.0);
+    out.normal = vec3<f32>(0.0, 1.0, 0.0);
+    out.bary = vec3<f32>(0.0);
+    out.life = 0.0;
+    if (!crOn() || mw.extra.z <= 0.0 || frame.corruption2.w <= 0.0 || mwDraw.flags.x < 0.5) {
+        return out;
+    }
+    let r0 = mwRestPosition(mwIndices[tri * 3u]);
+    let r1 = mwRestPosition(mwIndices[tri * 3u + 1u]);
+    let r2 = mwRestPosition(mwIndices[tri * 3u + 2u]);
+    let cR = (r0 + r1 + r2) / 3.0;
+    let b = crBasis();
+    let ap = crAperture(cR, b);
+    if (ap.e < 0.95 || ap.e > 2.4 || abs(ap.w) > 15.0 || ap.openT <= 0.0) {
+        return out;
+    }
+    let seed = crSeed();
+    let h = crHash(vec4<u32>(tri, mwIndices[tri * 3u], seed, 31u));
+    let ring = 1.0 - smoothstep(1.3, 2.4, ap.e);
+    if (h > mw.extra.z * ap.openT * ring) {
+        return out;
+    }
+    let rate = max(mw.extra.w, 0.01);
+    let ph = fract(frame.params.x * rate * (0.7 + 0.6 * crHash(vec4<u32>(tri, 1u, seed, 32u))) + crHash(vec4<u32>(tri, 2u, seed, 33u)));
+    // where it breaks from: the lip as drawn now
+    let c0 = crDisplace(cR, frame.params.x, 0u).p;
+    let focus = frame.corruption0.xyz;
+    let ease = ph * ph * (3.0 - 2.0 * ph);
+    let centre = c0 + (focus - c0) * ease * 0.85 + b.ax * frame.corruption3.z * 0.7 * ph * ph;
+    let axis = normalize(vec3<f32>(crHash(vec4<u32>(tri, 3u, seed, 34u)) - 0.5, crHash(vec4<u32>(tri, 4u, seed, 35u)) - 0.5,
+                                   crHash(vec4<u32>(tri, 5u, seed, 36u)) - 0.5) + vec3<f32>(1e-3, 0.0, 0.0));
+    let angle = ph * 3.1415927 * (1.0 + 2.0 * crHash(vec4<u32>(tri, 6u, seed, 37u)));
+    let scale = (1.0 - smoothstep(0.55, 1.0, ph)) * 0.92;
+    var corners = array<vec3<f32>, 3>(r0, r1, r2);
+    var barys = array<vec3<f32>, 3>(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
+    let k = vi % 3u;
+    let local = shardRotate((corners[k] - cR) * scale, axis, angle);
+    let p = centre + local;
+    let fn0 = normalize(cross(r1 - r0, r2 - r0) + vec3<f32>(0.0, 1e-6, 0.0));
+    out.clip = frame.viewProj * vec4<f32>(p, 1.0);
+    out.worldPos = p;
+    out.normal = shardRotate(fn0, axis, angle);
+    out.bary = barys[k];
+    out.life = ph;
+    return out;
+}
+
+@fragment
+fn fs_mesh_shard(in: ShardOut, @builtin(front_facing) frontFacing: bool) -> MeshWireTargets {
+    var n = normalize(in.normal);
+    if (!frontFacing) {
+        n = -n;
+    }
+    // the strongest directional light
+    var lit = vec3<f32>(0.0);
+    let directional = u32(frame.lightCounts.x + 0.5);
+    for (var i = 0u; i < min(directional, 8u); i = i + 1u) {
+        let l = frame.lights[i];
+        lit = lit + l.colorIntensity.rgb * max(dot(n, -l.directionRange.xyz), 0.0);
+    }
+    let rock = vec3<f32>(0.32, 0.17, 0.10);
+    let edge = 1.0 - smoothstep(0.0, 0.08, min(in.bary.x, min(in.bary.y, in.bary.z)));
+    let glow = frame.corruption8.xyz * frame.corruption7.z * 0.6 * edge * (0.3 + 0.7 * in.life);
+    let colour = applyFog(rock * (lit * 0.6 + vec3<f32>(0.03)) + glow, in.worldPos);
+    var out: MeshWireTargets;
+    out.color = vec4<f32>(colour, 1.0);
+    out.normalRoughness = packNormalRoughness(n, 0.9, 0.0);
+    out.velocity = vec4<f32>(0.0);
+    out.emission = vec4<f32>(glow, min(length(glow), 1.0));
     out.ids = 0u;
     return out;
 }

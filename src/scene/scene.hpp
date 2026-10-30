@@ -10,6 +10,7 @@
 #include "scene/temporal_settings.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
+#include "scene/corruption.hpp"
 #include "scene/mesh_wire.hpp"
 #include "scene/composition_data.hpp"
 #include "scene/light_rig.hpp"
@@ -99,6 +100,7 @@ struct Scene {
     Clouds clouds;                           // ADR-1289; rendering::CloudRenderer (the third Environment)
     AttractorWorldBlock attractorWorld;      // ADR-1850 (drawn as engine geometry since ADR-1857/1861)
     MeshWire meshWire;                       // ADR-1862; rendering::MeshWireRenderer, pass 1's blended section
+    Corruption corruption;                   // ADR-1873; the entity vertex stage and shading, the mesh wire
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     // ADR-1642: the images the programs' texture ops read, decoded, one entry per (resolved path, colour space). Filled
     // by the composition from each program's `textures`; the renderer lays them into one array per colour space.

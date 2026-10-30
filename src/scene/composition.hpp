@@ -1459,6 +1459,8 @@ public:
     // of a structural one regenerates the world on the next frame.
     void setAttractorWorld(AttractorWorldBlock block);
     void setMeshWire(MeshWire wire); // ADR-1862
+    void setCorruption(Corruption corruption); // ADR-1873
+    [[nodiscard]] const Corruption& corruption() const { return corruption_; }
     [[nodiscard]] const MeshWire& meshWire() const { return meshWire_; }
     // ADR-1851: true while a regeneration is running on a worker (the editor can say so).
     [[nodiscard]] bool attractorWorldGenerating() const { return attractorPending_.valid(); }
@@ -2376,6 +2378,11 @@ private:
     std::optional<AttractorWorldParameters> attractorParams_; // its live knobs, while attached
     MeshWire meshWire_;                      // ADR-1862: the authored block (rest values)
     std::optional<MeshWireParameters> meshWireParams_; // its live knobs, while attached
+    Corruption corruption_;                  // ADR-1873: the authored block (rest values)
+    std::optional<CorruptionParameters> corruptionParams_;
+    std::vector<std::size_t> corruptionEchoes_; // the echo copies' entity indices
+    float corruptionTime_ = std::numeric_limits<float>::quiet_NaN(); // last frame's time (the velocity target)
+    void updateCorruption();
     // ADR-1851: a structural change in the live editor generates on a worker; the old world stays on screen until the
     // new one is ready. Offline (no interactive budget) it generates synchronously, so a render is deterministic.
     std::future<std::shared_ptr<const AttractorWorld>> attractorPending_;

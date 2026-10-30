@@ -83,3 +83,30 @@ TEST_CASE("the composition registers the mesh wire's parameters and carries thei
     REQUIRE(saved.contains("meshWire"));
     CHECK(saved["meshWire"]["wave"].get<float>() == Approx(0.0f));
 }
+
+TEST_CASE("mesh wire v2: the focus-driven scan keys parse and round-trip, and pulses or shards alone make it active",
+          "[mesh-wire][adr1872]") {
+    auto w = scene::meshWireFromJson(nlohmann::json::parse(
+        R"({"targets": ["rock"], "fromFocus": 1, "pulse": 1.2, "pulseSpacing": 150, "pulseSpeed": 45, "pulseWidth": 8,
+            "focusGain": 0.5, "rimGain": 6, "shards": 0.35, "shardRate": 0.4, "frontColor": [1, 0.78, 0.4]})"));
+    REQUIRE(w.has_value());
+    CHECK(w->pulse == Approx(1.2f));
+    CHECK(w->shards == Approx(0.35f));
+    CHECK(w->frontColor == glm::vec3(1.0f, 0.78f, 0.4f));
+    auto back = scene::meshWireFromJson(scene::meshWireToJson(*w));
+    REQUIRE(back.has_value());
+    CHECK(back->frontColor == w->frontColor);
+    CHECK(back->pulseSpacing == Approx(150.0f));
+    CHECK(back->fromFocus == Approx(1.0f));
+    CHECK_FALSE(scene::meshWireFromJson(nlohmann::json::parse(R"({"shards": 2})")).has_value());
+    CHECK_FALSE(scene::meshWireFromJson(nlohmann::json::parse(R"({"frontColor": [1]})")).has_value());
+
+    scene::MeshWire a;
+    a.targets = {"rock"};
+    CHECK_FALSE(a.active());
+    a.pulse = 1.0f;
+    CHECK(a.active());
+    a.pulse = 0.0f;
+    a.shards = 0.2f;
+    CHECK(a.active());
+}

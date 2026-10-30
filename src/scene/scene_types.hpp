@@ -486,6 +486,10 @@ struct Entity {
     // on screen and casts nothing anyone can see, and one behind the camera is off screen and may
     // cast across the whole frame. Terrain sets this per chunk from its own shadow distance.
     bool castsShadow = true;
+    // ADR-1873: whether the scene's corruption displaces this entity, and which echo copy it is (0 = the surface).
+    // Set by the Composition when it flattens; never serialised.
+    bool corruptTarget = false;
+    std::uint8_t corruptEcho = 0;
     // ADR-1097: copied from the node at flatten (heroes inferred). Read only by the live scalability levers.
     Importance importance = Importance::Normal;
     // Set per frame by whatever culls against the *camera* frustum (terrain does, per chunk).

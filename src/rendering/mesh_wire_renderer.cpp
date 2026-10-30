@@ -24,14 +24,18 @@ struct ParamsGpu {
     glm::vec4 crease;
     glm::vec4 wave;
     glm::vec4 origin;
+    glm::vec4 front; // ADR-1872: rgb the leading colour, w = 1 when the wave grows from the corruption's focus
+    glm::vec4 pulse; // radiance, spacing, speed, half-width
+    glm::vec4 extra; // focus gain, rim gain, shard share, shard rate
 };
-static_assert(sizeof(ParamsGpu) == 80);
+static_assert(sizeof(ParamsGpu) == 128);
 
 struct DrawGpu {
     glm::mat4 model;
     glm::mat4 normalModel;
+    glm::vec4 flags{0.0f}; // ADR-1872: x = 1 when the corruption displaces this mesh (its lines follow the rock)
 };
-static_assert(sizeof(DrawGpu) == 128);
+static_assert(sizeof(DrawGpu) == 144);
 constexpr std::uint64_t kDrawStride = 256; // WebGPU's minimum uniform offset alignment
 
 } // namespace
@@ -145,6 +149,37 @@ Result<void> MeshWireRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
         return fail("mesh wire pipeline: {}", error);
     }
     pipeline_ = pipeline;
+    // ADR-1872: the shards -- opaque rock, depth-tested and written, every target written like a surface's
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> solid{};
+    for (std::uint32_t i = 0; i < kSceneTargetCount; ++i) {
+        solid[i] = wgpu::ColorTargetState{};
+        solid[i].format = formats[i];
+        solid[i].writeMask = wgpu::ColorWriteMask::All;
+    }
+    wgpu::FragmentState shardFragment = fragment;
+    shardFragment.entryPoint = "fs_mesh_shard";
+    shardFragment.targets = solid.data();
+    wgpu::DepthStencilState shardDepth = depth;
+    shardDepth.depthWriteEnabled = wgpu::OptionalBool::True;
+    wgpu::RenderPipelineDescriptor sd = desc;
+    sd.label = "mesh-shards";
+    sd.vertex.entryPoint = "vs_mesh_shard";
+    sd.depthStencil = &shardDepth;
+    sd.fragment = &shardFragment;
+    device.PushErrorScope(wgpu::ErrorFilter::Validation);
+    wgpu::RenderPipeline shards = gpu::createRenderPipeline(device, &sd);
+    std::string shardError;
+    auto shardFuture = device.PopErrorScope(wgpu::CallbackMode::WaitAnyOnly,
+                                            [&](wgpu::PopErrorScopeStatus, wgpu::ErrorType type, wgpu::StringView msg) {
+                                                if (type != wgpu::ErrorType::NoError) {
+                                                    shardError = std::string(msg.data, msg.length);
+                                                }
+                                            });
+    context_->instance().WaitAny(shardFuture, UINT64_MAX);
+    if (!shardError.empty() || !shards) {
+        return fail("mesh shard pipeline: {}", shardError);
+    }
+    shardPipeline_ = shards;
     return {};
 }
 
@@ -169,6 +204,7 @@ void MeshWireRenderer::draw(wgpu::RenderPassEncoder& pass, const wgpu::BindGroup
         scene::MeshId mesh;
         glm::mat4 model;
         std::uint32_t triangles;
+        bool corrupt;
     };
     std::vector<Item> items;
     for (const scene::Entity& e : scene.entities) {
@@ -191,7 +227,7 @@ void MeshWireRenderer::draw(wgpu::RenderPassEncoder& pass, const wgpu::BindGroup
             ++stats_.culled;
             continue;
         }
-        items.push_back({e.mesh, model, g.indexCount / 3u});
+        items.push_back({e.mesh, model, g.indexCount / 3u, e.corruptTarget && e.corruptEcho == 0});
     }
     if (items.empty()) {
         return;
@@ -212,10 +248,15 @@ void MeshWireRenderer::draw(wgpu::RenderPassEncoder& pass, const wgpu::BindGroup
     p.crease = glm::vec4(w.creaseLow, w.creaseHigh, w.reveal, std::max(w.intensity, 0.0f));
     p.wave = glm::vec4(w.wave, w.waveRadius, w.waveWidth, std::max(w.waveGain, 0.0f));
     p.origin = glm::vec4(origin, w.clipBelow);
+    p.front = glm::vec4(glm::max(w.frontColor, glm::vec3(0.0f)), w.fromFocus > 0.5f ? 1.0f : 0.0f);
+    p.pulse = glm::vec4(std::max(w.pulse, 0.0f), std::max(w.pulseSpacing, 1.0f), w.pulseSpeed, std::max(w.pulseWidth, 0.1f));
+    p.extra = glm::vec4(std::max(w.focusGain, 0.0f), std::max(w.rimGain, 0.0f), std::clamp(w.shards, 0.0f, 1.0f),
+                        std::max(w.shardRate, 0.0f));
     context_->queue().WriteBuffer(params_, 0, &p, sizeof(p));
     std::vector<std::uint8_t> staging(kDrawStride * items.size(), 0);
     for (std::size_t i = 0; i < items.size(); ++i) {
-        DrawGpu d{items[i].model, glm::inverseTranspose(items[i].model)};
+        DrawGpu d{items[i].model, glm::inverseTranspose(items[i].model),
+                  glm::vec4(items[i].corrupt ? 1.0f : 0.0f, 0.0f, 0.0f, 0.0f)};
         std::memcpy(staging.data() + kDrawStride * i, &d, sizeof(d));
     }
     context_->queue().WriteBuffer(draws_, 0, staging.data(), staging.size());
@@ -251,6 +292,20 @@ void MeshWireRenderer::draw(wgpu::RenderPassEncoder& pass, const wgpu::BindGroup
         pass.Draw(18, items[i].triangles, 0, 0);
         ++stats_.draws;
         stats_.triangles += items[i].triangles;
+    }
+    // ADR-1872: the shards, from the corruption's targets only (the shader drops every other triangle at once)
+    if (w.shards > 0.0f && shardPipeline_ && scene.corruption.active() && scene.corruption.liveOpen > 0.0f) {
+        pass.SetPipeline(shardPipeline_);
+        pass.SetBindGroup(0, frameGroup);
+        for (std::size_t i = 0; i < items.size(); ++i) {
+            if (!items[i].corrupt) {
+                continue;
+            }
+            const auto offset = static_cast<std::uint32_t>(kDrawStride * i);
+            pass.SetBindGroup(1, groups_.at(items[i].mesh), 1, &offset);
+            pass.Draw(3, items[i].triangles, 0, 0);
+            ++stats_.draws;
+        }
     }
 }
 

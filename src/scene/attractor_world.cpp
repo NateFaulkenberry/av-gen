@@ -232,19 +232,45 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     const float plateau = L1 + Lb; // the plateau's height above the gorge floor (about)
     const auto phase = [&](float t, float a, float b) { return smoothstepf(a * D, b * D, t); };
     std::vector<glm::vec3> raw(static_cast<std::size_t>(n));
+    // ADR-1881: the approach to a portal in the rock -- off the gorge at `departArc`, straight at the site.
+    const AttractorGen::Approach& ap = g.approach;
+    const glm::vec2 departXZ = ap.enabled ? gorgeAt(ap.departArc) : glm::vec2(0.0f);
+    glm::vec2 approachDir(0.0f, -1.0f);
+    float approachLength = 1.0f;
+    if (ap.enabled) {
+        const glm::vec2 d = glm::vec2(ap.site.x, ap.site.z) - departXZ;
+        approachLength = std::max(glm::length(d), 1.0f);
+        approachDir = d / approachLength;
+    }
+    const auto riverSpeed = [&](float t) {
+        // speed along the gorge: easing in through the dive, fast on the river, slowing for the climb and the reveal
+        return (45.0f + 35.0f * phase(t, 0.10f, 0.22f) - 10.0f * phase(t, 0.72f, 0.80f) -
+                40.0f * phase(t, 0.88f, 1.0f)) * S;
+    };
+    std::vector<std::uint8_t> onApproach(static_cast<std::size_t>(n), 0);
     float sa = s0;
     for (int k = 0; k < n; ++k) {
         const float t = static_cast<float>(k) / rate;
-        // speed along the gorge: easing in through the dive, fast on the river, slowing for the climb and the reveal
-        const float v = (45.0f + 35.0f * phase(t, 0.10f, 0.22f) - 10.0f * phase(t, 0.72f, 0.80f) -
-                         40.0f * phase(t, 0.88f, 1.0f)) * S;
+        float v = riverSpeed(t);
+        if (ap.enabled && t > ap.slowFrom) {
+            v = glm::mix(riverSpeed(ap.slowFrom), ap.speed, smoothstepf(ap.slowFrom, ap.slowFrom + ap.slowFor, t));
+        }
         sa += v / rate * phase(t, 0.06f, 0.16f);
-        const glm::vec2 gxz = gorgeAt(sa);
+        glm::vec2 gxz = gorgeAt(sa);
         // height above the floor: low on the river with a slow swell, rising through the climb and the reveal
         float alt = (34.0f + 9.0f * std::sin(t * 0.55f)) * S;
-        alt += (plateau + 70.0f * S - alt) * phase(t, 0.74f, 0.87f);
-        alt += 40.0f * S * phase(t, 0.87f, 1.0f);
-        const glm::vec3 river(gxz.x, -2.0f + alt, gxz.y); // the gorge floor's height, not a sample of it: no noise
+        if (!ap.enabled) {
+            alt += (plateau + 70.0f * S - alt) * phase(t, 0.74f, 0.87f);
+            alt += 40.0f * S * phase(t, 0.87f, 1.0f);
+        }
+        float y = -2.0f + alt;
+        if (ap.enabled && sa > ap.departArc) {
+            const float along = sa - ap.departArc;
+            gxz = departXZ + approachDir * along;
+            y = glm::mix(y, ap.site.y, smoothstepf(0.0f, 0.6f * approachLength, along));
+            onApproach[static_cast<std::size_t>(k)] = 1;
+        }
+        const glm::vec3 river(gxz.x, y, gxz.y); // the gorge floor's height, not a sample of it: no noise
         // the vista: the composed eye, easing forward
         const glm::vec3 vista = w.eye + glm::vec3(fwd.x, 0.0f, fwd.y) * (30.0f * t);
         const float b = phase(t, 0.03f, 0.19f); // the dive: about nine seconds off the lip into the gorge
@@ -266,7 +292,10 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
         return hmax + 24.0f;
     };
     std::vector<float> c(path.size());
-    for (std::size_t i = 0; i < path.size(); ++i) c[i] = std::max(path[i].y, clearance(path[i]));
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        // ADR-1881: on the approach the camera flies at the rock on purpose; the lift would carry it over the wall
+        c[i] = onApproach[i] ? path[i].y : std::max(path[i].y, clearance(path[i]));
+    }
     // falling is limited by the forward pass, climbing by the backward one: a dive may drop at 45 m/s, a climb rises at
     // 24 m/s
     const float kFall = 45.0f * S / rate, kClimb = 24.0f * S / rate; // metres per sample
@@ -297,7 +326,8 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
             target = eyes[static_cast<std::size_t>(last)] + tangent * (static_cast<float>(i + ahead - last) / 15.0f);
         }
         glm::vec3 d = target - eyes[static_cast<std::size_t>(i)];
-        d.y -= 0.12f * glm::length(d);
+        // looking a little down at the river; on the approach (ADR-1881), level at the aperture
+        d.y -= 0.12f * glm::length(d) * (onApproach[static_cast<std::size_t>(i)] ? 0.0f : 1.0f);
         const float flat = std::max(glm::length(glm::vec2(d.x, d.z)), 1e-3f);
         const float raw = std::atan2(d.y, flat);
         // a soft clamp: -28..+8 degrees through tanh, so the limit is approached smoothly
@@ -489,7 +519,18 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
         while (bits > cur && !slot.compare_exchange_weak(cur, bits, std::memory_order_relaxed)) {
         }
     };
+    // ADR-1881: around the portal site the rock is deformed by the corruption (ADR-1873) at metre scale, which needs
+    // vertices where a planar wall would otherwise be two triangles: no hypotenuse longer than 1.5 m within 140 m of
+    // the site, nor than 4.5 m within 320 m. A forced split is an error above the threshold, so it propagates like any
+    // other and the mesh stays watertight.
+    const glm::vec2 siteXZ(g.approach.site.x, g.approach.site.z);
     const auto localError = [&](int ax, int ay, int bx, int by, int mx, int my) {
+        if (g.approach.enabled) {
+            const glm::vec2 mid = w.origin + glm::vec2(mx, my) * spacing;
+            const float d = glm::length(mid - siteXZ);
+            const float maxEdge = d < 140.0f ? 1.5f : d < 320.0f ? 4.5f : 1e9f;
+            if (glm::length(glm::vec2(ax - bx, ay - by)) * spacing > maxEdge) return 1.0e3f;
+        }
         const float tol = tolAt(mx, my);
         float e = std::abs(0.5f * (H[idx(ax, ay)] + H[idx(bx, by)]) - H[idx(mx, my)]) / tol;
         // the band coordinate is interpolated linearly across each triangle by the rasteriser, so it is an attribute
@@ -663,6 +704,14 @@ Result<void> AttractorGen::validate() const {
     if (!(meshError > 0.0f && meshError <= 0.05f) || !(meshMinError > 0.0f && meshMinError <= 10.0f)) {
         return fail("attractorWorld: meshError must be in (0, 0.05] and meshMinError in (0, 10] m");
     }
+    if (approach.enabled) {
+        const Approach& a = approach;
+        if (!std::isfinite(a.site.x + a.site.y + a.site.z) || !(a.departArc >= 0.0f) || !(a.speed >= 1.0f && a.speed <= 200.0f) ||
+            !(a.slowFrom >= 0.0f && a.slowFrom <= flightSeconds) || !(a.slowFor >= 0.1f && a.slowFor <= 30.0f)) {
+            return fail("attractorWorld: approach needs a finite site, departArc >= 0, speed in [1, 200] m/s, slowFrom in "
+                        "[0, flightSeconds] and slowFor in [0.1, 30] s");
+        }
+    }
     return {};
 }
 
@@ -673,6 +722,12 @@ std::uint64_t AttractorGen::hash() const {
     for (float v : {extent, terrainScale, roughness, ridgeStrength, domainWarp, terraces, erosion, strataFold,
                     branchingDensity, flightSeconds, meshSpacing, meshError, meshMinError}) {
         h = mixHashF(h, v);
+    }
+    if (approach.enabled) { // ADR-1881: absent, the hash is ADR-1853's
+        for (float v : {approach.site.x, approach.site.y, approach.site.z, approach.departArc, approach.speed,
+                        approach.slowFrom, approach.slowFor}) {
+            h = mixHashF(h, v);
+        }
     }
     return h;
 }
@@ -1385,7 +1440,8 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "water", "terrainProgram", "sunLux", "sunShadowBias", "look"};
+                                      "meshMinError", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "approach"};
 constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow"};
 
 } // namespace
@@ -1422,6 +1478,25 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.meshSpacing = j.value("meshSpacing", g.meshSpacing);
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
+    if (j.contains("approach")) { // ADR-1881
+        const json& aj = j.at("approach");
+        if (!aj.is_object()) return fail("attractorWorld: 'approach' must be an object");
+        for (auto it = aj.begin(); it != aj.end(); ++it) {
+            const std::string& k = it.key();
+            if (k != "site" && k != "departArc" && k != "speed" && k != "slowFrom" && k != "slowFor") {
+                return fail("attractorWorld: approach has no key '{}'", k);
+            }
+        }
+        if (!aj.contains("site") || !aj.at("site").is_array() || aj.at("site").size() != 3) {
+            return fail("attractorWorld: approach.site must be [x, y, z]");
+        }
+        g.approach.enabled = true;
+        g.approach.site = glm::vec3(aj.at("site")[0].get<float>(), aj.at("site")[1].get<float>(), aj.at("site")[2].get<float>());
+        g.approach.departArc = aj.value("departArc", g.approach.departArc);
+        g.approach.speed = aj.value("speed", g.approach.speed);
+        g.approach.slowFrom = aj.value("slowFrom", g.approach.slowFrom);
+        g.approach.slowFor = aj.value("slowFor", g.approach.slowFor);
+    }
     if (auto ok = g.validate(); !ok) return std::unexpected(ok.error());
     a.terrainProgram = j.value("terrainProgram", a.terrainProgram);
     a.sunLux = j.value("sunLux", a.sunLux);
@@ -1496,7 +1571,7 @@ json waterToJson(const WaterSettings& ws) {
 json attractorWorldToJson(const AttractorWorldBlock& a) {
     const AttractorGen& g = a.gen;
     const AttractorLook& k = a.look;
-    return json{{"enabled", a.enabled},
+    json out{{"enabled", a.enabled},
                 {"camera", a.camera == AttractorCameraMode::Scene      ? "scene"
                            : a.camera == AttractorCameraMode::Flight ? "flight"
                                                                      : "composed"},
@@ -1522,6 +1597,14 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                  {{"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation}, {"sunIntensity", k.sunIntensity},
                   {"contour", k.contour}, {"glow", k.glow}}},
                 {"water", waterToJson(a.water)}};
+    if (g.approach.enabled) { // ADR-1881
+        out["approach"] = json{{"site", json::array({g.approach.site.x, g.approach.site.y, g.approach.site.z})},
+                               {"departArc", g.approach.departArc},
+                               {"speed", g.approach.speed},
+                               {"slowFrom", g.approach.slowFrom},
+                               {"slowFor", g.approach.slowFor}};
+    }
+    return out;
 }
 
 // ---- parameters -------------------------------------------------------------------------------------------------

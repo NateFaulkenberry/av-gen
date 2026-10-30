@@ -71,6 +71,7 @@ private:
     wgpu::BindGroupLayout groupLayout_;
     wgpu::PipelineLayout layout_;
     wgpu::RenderPipeline pipeline_;
+    wgpu::RenderPipeline shardPipeline_; // ADR-1872
     wgpu::Buffer params_;
     wgpu::Buffer draws_;              // per-draw transforms at kDrawStride
     std::uint32_t drawCapacity_ = 0;

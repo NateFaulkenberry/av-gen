@@ -575,3 +575,72 @@ TEST_CASE("the canyon scene survives an app-style save with its water intact", "
     }
     CHECK(saved["foam"].get<float>() == 0.0f);
 }
+
+
+// ---- ADR-1881: the approach to a portal in the rock -------------------------------------------------------------
+
+TEST_CASE("the flight's approach leaves the gorge for the site, slows to its speed, and leaves the river run alone",
+          "[attractor-world][adr1881]") {
+    const scene::AttractorGen plain = smallGen(5);
+    const auto w0 = scene::generateAttractorWorld(plain);
+    REQUIRE(w0->flight.size() > 30u * 30u);
+    // depart where the plain flight is at 25 s, toward a point 150 m off to its side at the same height
+    const glm::vec3 at25 = glm::vec3(w0->flight[25 * 30]);
+    std::vector<float> arc(w0->gorgeLine.size(), 0.0f);
+    std::size_t nearest = 0;
+    for (std::size_t i = 1; i < arc.size(); ++i) arc[i] = arc[i - 1] + glm::length(w0->gorgeLine[i] - w0->gorgeLine[i - 1]);
+    for (std::size_t i = 0; i < arc.size(); ++i) {
+        if (glm::length(w0->gorgeLine[i] - glm::vec2(at25.x, at25.z)) <
+            glm::length(w0->gorgeLine[nearest] - glm::vec2(at25.x, at25.z))) {
+            nearest = i;
+        }
+    }
+    scene::AttractorGen g = plain;
+    g.approach.enabled = true;
+    g.approach.departArc = arc[nearest];
+    g.approach.site = at25 + glm::vec3(150.0f, 0.0f, 60.0f);
+    g.approach.speed = 22.0f;
+    g.approach.slowFrom = 20.0f;
+    g.approach.slowFor = 4.0f;
+    REQUIRE(g.validate().has_value());
+    CHECK(g.hash() != plain.hash());
+    const auto w1 = scene::generateAttractorWorld(g);
+    REQUIRE(w1->flight.size() == w0->flight.size());
+    // the river run before the slowing (less the smoothing's reach) is the plain flight, exactly
+    for (std::size_t i = 0; i < 16u * 30u; ++i) {
+        INFO("sample " << i);
+        CHECK(glm::length(glm::vec3(w1->flight[i]) - glm::vec3(w0->flight[i])) < 1e-3f);
+    }
+    // it reaches the site, and is flying at the approach speed when it does
+    float closest = 1e9f;
+    std::size_t at = 0;
+    for (std::size_t i = 0; i < w1->flight.size(); ++i) {
+        const float d = glm::length(glm::vec3(w1->flight[i]) - g.approach.site);
+        if (d < closest) {
+            closest = d;
+            at = i;
+        }
+    }
+    INFO("closest " << closest << " m at sample " << at);
+    CHECK(closest < 6.0f);
+    REQUIRE(at + 1 < w1->flight.size());
+    const float speed = glm::length(glm::vec3(w1->flight[at + 1]) - glm::vec3(w1->flight[at])) * scene::AttractorWorld::kFlightRate;
+    CHECK(speed == Approx(22.0f).margin(3.0f));
+
+    // the block round-trips, and refuses a malformed approach
+    nlohmann::json block = {{"seed", 5}, {"resolution", 384}, {"meshSpacing", 16.0}, {"camera", "flight"},
+                            {"approach", {{"site", {1.0, 2.0, 3.0}}, {"departArc", 100.0}, {"speed", 20.0}}}};
+    auto a = scene::attractorWorldFromJson(block);
+    REQUIRE(a.has_value());
+    CHECK(a->gen.approach.enabled);
+    CHECK(a->gen.approach.site == glm::vec3(1.0f, 2.0f, 3.0f));
+    auto back = scene::attractorWorldFromJson(scene::attractorWorldToJson(*a));
+    REQUIRE(back.has_value());
+    CHECK(back->gen.approach.departArc == Approx(100.0f));
+    CHECK(back->gen.hash() == a->gen.hash());
+    block["approach"]["sight"] = 1;
+    CHECK_FALSE(scene::attractorWorldFromJson(block).has_value());
+    block["approach"].erase("sight");
+    block["approach"]["speed"] = 0.0;
+    CHECK_FALSE(scene::attractorWorldFromJson(block).has_value());
+}

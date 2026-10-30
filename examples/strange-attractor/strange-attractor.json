@@ -105,6 +105,63 @@
         "attackMs": 250.0,
         "decayMs": 1200.0
       }
+    },
+    {
+      "source": "response.bass",
+      "target": "corruption/share",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.7,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.12,
+        "remapOutMax": 0.3,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 400.0,
+        "decayMs": 1500.0
+      }
+    },
+    {
+      "source": "response.onsetLow",
+      "target": "corruption/slip",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 3.0,
+        "remapOutMax": 6.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 120.0,
+        "decayMs": 900.0
+      }
+    },
+    {
+      "source": "response.high",
+      "target": "corruption/glyph",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.3,
+        "remapInMax": 1.0,
+        "remapOutMin": 1.5,
+        "remapOutMax": 4.0,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 200.0,
+        "decayMs": 1000.0
+      }
     }
   ],
   "render": {

@@ -11,6 +11,11 @@ The mapping (continuous signals for broad things, events for sparse reveals; bri
   response.onsetLow (event) -> meshWire/wave     a travelling front of revealed triangles, 2 s, at most every 3 s
   response.bass  (cont.)  -> meshWire/intensity   sustained bass phrases bring the triangle topology up (slow)
   response.high  (cont.)  -> attractorWorld/contour  the contour lines, fine and fading
+Dimensional portals, Gate A (ADR-1872/1873): the corruption's field is set by the camera's approach, not by the music;
+the music moves what happens inside it:
+  response.bass  (cont.)  -> corruption/share     more of the rock slips on the bass
+  response.onsetLow (event) -> corruption/slip    a hit drags the slipped blocks further, eased in and out
+  response.high  (cont.)  -> corruption/glyph     the code in the scan bands brightens on the highs
 """
 import json, os
 
@@ -34,6 +39,10 @@ routes = [
     # topology up, slowly, and lets it go more slowly still
     route('response.bass', 'meshWire/intensity', 0.0, 0.45, remapInMin=0.75, remapInMax=1.0, attackMs=1200.0, decayMs=3000.0),
     route('response.high', 'attractorWorld/contour', 0.0, 0.7, remapInMin=0.4, remapInMax=1.0, attackMs=250.0, decayMs=1200.0),
+    # ADR-1873 (Gate A): within the corruption's field
+    route('response.bass', 'corruption/share', 0.12, 0.3, remapInMin=0.7, remapInMax=1.0, attackMs=400.0, decayMs=1500.0),
+    route('response.onsetLow', 'corruption/slip', 3.0, 6.0, attackMs=120.0, decayMs=900.0),
+    route('response.high', 'corruption/glyph', 1.5, 4.0, remapInMin=0.3, remapInMax=1.0, attackMs=200.0, decayMs=1000.0),
 ]
 
 project = {

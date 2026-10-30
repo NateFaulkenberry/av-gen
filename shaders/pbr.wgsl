@@ -26,6 +26,7 @@ fn surfaceDetail() -> SurfaceDetail { return SurfaceDetail(vec3<f32>(0.0), 0.0, 
 #include "fields.wgsl"
 #include "refraction.wgsl" // ADR-1819
 #include "glossy_ssr.wgsl" // ADR-1820
+#include "corruption.wgsl" // ADR-1873
 
 @group(2) @binding(8) var<uniform> fieldBlock: FieldBlock;
 
@@ -58,7 +59,42 @@ fn vs_entity(in: VertexIn) -> VertexOut {
             prevWorld = vec4<f32>(prevWorld.xyz + offPrev, prevWorld.w);
         }
     }
+    // ADR-1873: the world-space data mosh. A uniform branch: an entity the scene's corruption does not target, or a
+    // frame without one, runs the arithmetic above unchanged.
+    if (object.corrupt.x > 0.5 && crOn()) {
+        let echo = u32(object.corrupt.y + 0.5);
+        let c = crDisplace(world.xyz, frame.params.x, echo);
+        let cPrev = crDisplace(prevWorld.xyz, frame.corruption1.w, echo);
+        var out = meshVertexOut(in, vec4<f32>(c.p, world.w), vec4<f32>(cPrev.p, prevWorld.w));
+        out.uv = vec2<f32>(out.uv.x + c.uvShift, out.uv.y);
+        return out;
+    }
     return meshVertexOut(in, world, prevWorld);
+}
+
+// ADR-1873: the corruption's light, darkness and glyphs on a target's surface, read at its undisplaced point.
+fn corruptShade(out: SceneOut, in: VertexOut, frontFacing: bool) -> SceneOut {
+    var o = out;
+    let p0 = (object.model * vec4<f32>(in.localPos, 1.0)).xyz;
+    // the wall coordinates' footprint, for the glyphs' antialiasing (taken here, in uniform control flow)
+    let duv = max(length(fwidth(p0)), 1e-5);
+    let s = crSurface(p0, normalize(in.normal), frame.params.x, duv);
+    o.color = vec4<f32>(o.color.rgb * (1.0 - 0.97 * s.darken) + s.emission, o.color.a);
+    o.emission = vec4<f32>(o.emission.rgb * (1.0 - s.darken) + s.emission, max(o.emission.a, min(length(s.emission), 1.0)));
+    if (!frontFacing && crOn()) {
+        // the underside of torn rock: dark, faintly warm -- the inside of the data, not the sky's blue
+        o.color = vec4<f32>(o.color.rgb * 0.08 + vec3<f32>(0.012, 0.006, 0.003), o.color.a);
+    }
+    return o;
+}
+
+// ADR-1873: an echo copy keeps only its slipped blocks, and nothing of a target stays inside the opening.
+fn corruptEchoDropped(in: VertexOut) -> bool {
+    let p0 = (object.model * vec4<f32>(in.localPos, 1.0)).xyz;
+    if (object.corrupt.y < 0.5) {
+        return crCut(p0);
+    }
+    return !crEchoKeeps(p0, frame.params.x, u32(object.corrupt.y + 0.5));
 }
 
 // The entity's shaded output; the entry points below discard on the effect clip after calling it.
@@ -92,9 +128,12 @@ fn entityShade(in: VertexOut, frontFacing: bool) -> SceneOut {
 
 @fragment
 fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
-    let out = entityShade(in, frontFacing);
+    var out = entityShade(in, frontFacing);
+    if (object.corrupt.x > 0.5) { // ADR-1873: uniform per draw
+        out = corruptShade(out, in, frontFacing);
+    }
     // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
-    if (fxClipDiscard) {
+    if (fxClipDiscard || (object.corrupt.x > 0.5 && corruptEchoDropped(in))) {
         discard;
     }
     return out;
@@ -183,10 +222,10 @@ fn depthPrepassClip(in: VertexOut) {
     // makes, so the prepass and every shadow map lose what the colour loses. Decided here (the gate
     // is uniform per draw), discarded at the end, after the alpha test's texture sample: see
     // `fxClipDiscard` in pbr_shade.wgsl for why a discard may not precede a derivative.
-    var clipped = false;
+    var clipped = object.corrupt.x > 0.5 && corruptEchoDropped(in); // ADR-1873
     if (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_CLIP) != 0u) {
         setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
-        clipped = fxClipped(in.worldPos);
+        clipped = clipped || fxClipped(in.worldPos);
     }
     let alphaMode = object.flags.x;
     let texMask = u32(object.flags.w + 0.5);

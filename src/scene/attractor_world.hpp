@@ -48,6 +48,19 @@ struct AttractorGen {
     float meshSpacing = 2.0f;
     float meshError = 0.004f;    // ~6 px at 1080p from the path; measured indistinguishable from 0.002 (Phase 1)
     float meshMinError = 0.3f;
+    // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
+    // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
+    // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from
+    // `slowFrom`. The climb and the reveal are not flown; past the site the line continues. Disabled, the flight
+    // is ADR-1853's exactly.
+    struct Approach {
+        bool enabled = false;
+        glm::vec3 site{0.0f};
+        float departArc = 0.0f;
+        float speed = 22.0f;
+        float slowFrom = 22.0f;
+        float slowFor = 5.0f;
+    } approach;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;

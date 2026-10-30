@@ -19,7 +19,7 @@ struct FloatKey {
     float lo, hi, softLo, softHi;
 };
 
-constexpr std::array<FloatKey, 15> kFloats{{
+constexpr std::array<FloatKey, 24> kFloats{{
     {"intensity", &MeshWire::intensity, 0.0f, 1000.0f, 0.0f, 4.0f},
     {"opacity", &MeshWire::opacity, 0.0f, 1.0f, 0.0f, 1.0f},
     {"width", &MeshWire::width, 0.0f, 16.0f, 0.25f, 4.0f},
@@ -35,6 +35,15 @@ constexpr std::array<FloatKey, 15> kFloats{{
     {"waveGain", &MeshWire::waveGain, 0.0f, 1000.0f, 0.0f, 20.0f},
     {"waveAhead", &MeshWire::waveAhead, -1.0e5f, 1.0e5f, -500.0f, 3000.0f},
     {"clipBelow", &MeshWire::clipBelow, -1.0e9f, 1.0e9f, -100.0f, 100.0f},
+    {"fromFocus", &MeshWire::fromFocus, 0.0f, 1.0f, 0.0f, 1.0f},          // ADR-1872
+    {"pulse", &MeshWire::pulse, 0.0f, 1000.0f, 0.0f, 20.0f},
+    {"pulseSpacing", &MeshWire::pulseSpacing, 1.0f, 1.0e5f, 10.0f, 1000.0f},
+    {"pulseSpeed", &MeshWire::pulseSpeed, -1.0e4f, 1.0e4f, -200.0f, 200.0f},
+    {"pulseWidth", &MeshWire::pulseWidth, 0.1f, 1.0e4f, 1.0f, 100.0f},
+    {"focusGain", &MeshWire::focusGain, 0.0f, 100.0f, 0.0f, 10.0f},
+    {"rimGain", &MeshWire::rimGain, 0.0f, 1000.0f, 0.0f, 40.0f},
+    {"shards", &MeshWire::shards, 0.0f, 1.0f, 0.0f, 1.0f},
+    {"shardRate", &MeshWire::shardRate, 0.0f, 20.0f, 0.0f, 2.0f},
 }};
 constexpr std::size_t kFloatCount = kFloats.size(); // and `color`, a vec3 parameter; `targets` is structural
 
@@ -68,16 +77,17 @@ Result<MeshWire> meshWireFromJson(const json& j) {
             }
             continue;
         }
-        if (key == "color") {
+        if (key == "color" || key == "frontColor") {
             if (!it->is_array() || it->size() != 3) {
-                return fail("meshWire 'color' must be an array of three numbers");
+                return fail("meshWire '{}' must be an array of three numbers", key);
             }
+            glm::vec3& dst = key == "color" ? w.color : w.frontColor;
             for (int i = 0; i < 3; ++i) {
                 const json& e = (*it)[static_cast<std::size_t>(i)];
                 if (!e.is_number() || !std::isfinite(e.get<double>())) {
-                    return fail("meshWire 'color' must be three finite numbers");
+                    return fail("meshWire '{}' must be three finite numbers", key);
                 }
-                w.color[i] = e.get<float>();
+                dst[i] = e.get<float>();
             }
             continue;
         }
@@ -108,6 +118,7 @@ json meshWireToJson(const MeshWire& w) {
     json j = json::object();
     j["targets"] = w.targets;
     j["color"] = json::array({w.color.x, w.color.y, w.color.z});
+    j["frontColor"] = json::array({w.frontColor.x, w.frontColor.y, w.frontColor.z}); // ADR-1872
     for (std::size_t k = 0; k < kFloatCount; ++k) {
         j[kFloats[k].key] = w.*(kFloats[k].field);
     }
@@ -142,6 +153,11 @@ MeshWireParameters registerMeshWireParameters(params::ParameterSet& params, cons
     d.softMax = glm::vec3(1.0f);
     d.isColor = true;
     out.all.push_back(&params.add(std::move(d)));
+    params::ParamDesc<glm::vec3> fc = d; // ADR-1872
+    fc.path = prefix + "frontColor";
+    fc.label = "frontColor";
+    fc.defaultValue = rest.frontColor;
+    out.all.push_back(&params.add(std::move(fc)));
     return out;
 }
 
@@ -152,9 +168,14 @@ void applyMeshWireParameters(const MeshWireParameters& p, const MeshWire& rest, 
             live.*(kFloats[k].field) = f->value();
         }
     }
-    if (p.all.size() == kFloatCount + 1) {
+    if (p.all.size() >= kFloatCount + 1) {
         if (const auto* c = dynamic_cast<const params::Parameter<glm::vec3>*>(p.all[kFloatCount])) {
             live.color = c->value();
+        }
+    }
+    if (p.all.size() >= kFloatCount + 2) {
+        if (const auto* c = dynamic_cast<const params::Parameter<glm::vec3>*>(p.all[kFloatCount + 1])) {
+            live.frontColor = c->value();
         }
     }
 }

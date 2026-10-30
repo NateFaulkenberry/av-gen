@@ -65,7 +65,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1244,6 +1244,50 @@ void Composition::setMeshWire(MeshWire wire) {
             for (const params::IParameter* q : meshWireParams_->all) {
                 registeredPaths_.push_back(q->path());
             }
+        }
+    }
+}
+
+void Composition::setCorruption(Corruption corruption) { // ADR-1873
+    corruption_ = std::move(corruption);
+    if (params_ != nullptr) {
+        if (corruptionParams_) {
+            for (const params::IParameter* q : corruptionParams_->all) {
+                params_->remove(q->path());
+            }
+            corruptionParams_.reset();
+        }
+        if (!corruption_.targets.empty()) {
+            corruptionParams_ = registerCorruptionParameters(*params_, corruption_, "corruption/" + sanitise(prefix_));
+            for (const params::IParameter* q : corruptionParams_->all) {
+                registeredPaths_.push_back(q->path());
+            }
+        }
+    }
+    dirty_ = true; // the targets and the echo copies are made when the scene is flattened
+}
+
+// ADR-1873: this frame's corruption -- its finals, the field scale and the opening from the camera's distance to the
+// focus, the previous frame's time for the velocity target; and the echo copies shown only while it acts.
+void Composition::updateCorruption() {
+    Corruption& live = scene_.corruption;
+    const float prev = corruptionTime_;
+    if (corruptionParams_) {
+        applyCorruptionParameters(*corruptionParams_, corruption_, live);
+    } else {
+        live = corruption_;
+    }
+    const float distance = glm::distance(scene_.camera.position, live.focus);
+    live.liveAmount = corruptionFieldScale(live, distance);
+    live.liveOpen = corruptionOpening(live, distance);
+    const auto now = static_cast<float>(currentTime_);
+    live.prevTime = std::isfinite(prev) && prev <= now ? prev : now;
+    corruptionTime_ = now;
+    const bool active = live.active();
+    for (const std::size_t i : corruptionEchoes_) {
+        if (i < scene_.entities.size()) {
+            scene_.entities[i].visible = active;
+            scene_.entities[i].castsShadow = active;
         }
     }
 }
@@ -5255,6 +5299,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     if (attractorWorld_.enabled) {
         attractorParams_ = registerAttractorWorldParameters(params, attractorWorld_, "attractorWorld/" + sanitise(prefix_));
     }
+    // ADR-1873: the corruption's.
+    corruptionParams_.reset();
+    if (!corruption_.targets.empty()) {
+        corruptionParams_ = registerCorruptionParameters(params, corruption_, "corruption/" + sanitise(prefix_));
+    }
     // ADR-1862: the mesh wire's.
     meshWireParams_.reset();
     if (!meshWire_.targets.empty()) {
@@ -8050,6 +8099,43 @@ void Composition::rebuild() {
         radius_ = 1.0f;
     }
 
+    // ADR-1873: the corruption's targets, and its echo copies of the target meshes that reach into its field (the same
+    // mesh drawn again; the vertex stage and the fragment keep only the slipped blocks).
+    corruptionEchoes_.clear();
+    if (!corruption_.targets.empty()) {
+        const std::size_t count = scene_.entities.size();
+        std::vector<std::size_t> inField; // targets whose mesh reaches into the field
+        for (std::size_t i = 0; i < count; ++i) {
+            Entity& e = scene_.entities[i];
+            e.corruptTarget = corruptionTargets(corruption_, e.name);
+            if (!e.corruptTarget || e.mesh == kInvalidMesh) {
+                continue;
+            }
+            glm::vec3 lo(std::numeric_limits<float>::max()), hi(std::numeric_limits<float>::lowest());
+            for (const Vertex& v : scene_.meshes[e.mesh].vertices) {
+                lo = glm::min(lo, v.position);
+                hi = glm::max(hi, v.position);
+            }
+            const glm::vec3 localFocus = glm::vec3(glm::inverse(e.transform.matrix()) * glm::vec4(corruption_.focus, 1.0f));
+            if (glm::distance(glm::clamp(localFocus, lo, hi), localFocus) > corruption_.radius) {
+                continue;
+            }
+            // the torn rock shows its underside: a target in the field is drawn from both sides (its back faces shade
+            // dark in pbr.wgsl rather than letting the sky through)
+            e.material.doubleSided = true;
+            inField.push_back(i);
+        }
+        for (int k = 1; k <= std::clamp(corruption_.echoes, 0, kMaxCorruptionEchoes); ++k) {
+            for (const std::size_t i : inField) {
+                Entity copy = scene_.entities[i];
+                copy.name = fmt::format("echo~{}~{}", k, copy.name);
+                copy.corruptEcho = static_cast<std::uint8_t>(k);
+                copy.visible = false; // until the corruption acts (updateCorruption)
+                corruptionEchoes_.push_back(scene_.entities.size());
+                scene_.entities.push_back(std::move(copy));
+            }
+        }
+    }
     ++scene_.meshVersion;
     // And the textures, **only if a texture actually changed**. This used to be unconditional, and
     // it is the renderer's signal to destroy and re-create every GPU texture in the scene: 44 of
@@ -9734,6 +9820,7 @@ void Composition::applyParameters() {
         sky.intensity = f(skyIntensity_, sky.intensity);
     }
     applyDayNight();
+    updateCorruption(); // ADR-1873: after the camera, whose distance to the focus opens the aperture
 }
 
 // ADR-346: resolving the environment map, on its own, so that changing it does not mean rebuilding
@@ -11454,6 +11541,9 @@ nlohmann::json Composition::toJson() const {
     if (!meshWire_.targets.empty()) {
         j["meshWire"] = meshWireToJson(meshWire_); // ADR-1862
     }
+    if (!corruption_.targets.empty()) {
+        j["corruption"] = corruptionToJson(corruption_); // ADR-1873
+    }
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
     }
@@ -12389,6 +12479,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), wire.error().message);
         }
         comp->setMeshWire(std::move(*wire));
+    }
+    if (j.contains("corruption")) { // ADR-1873
+        auto corruption = corruptionFromJson(j.at("corruption"));
+        if (!corruption) {
+            return fail("scene file '{}': {}", scenePath.string(), corruption.error().message);
+        }
+        comp->setCorruption(std::move(*corruption));
     }
     if (j.contains("clouds")) { // ADR-1289
         const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");
