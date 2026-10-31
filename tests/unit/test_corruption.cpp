@@ -213,3 +213,28 @@ TEST_CASE("the composition registers the corruption, marks its targets, makes ec
     (*c)->update(ft);
     CHECK((*c)->scene().corruption.liveAmount == 0.0f);
 }
+
+TEST_CASE("nothing at rest below the floor moves (a river bed stays under its water)", "[corruption][adr1873]") {
+    scene::Corruption c = wall();
+    c.floor = c.focus.y - 10.0f;
+    const auto packed = scene::packCorruption(c, true);
+    std::mt19937 rng(5);
+    int below = 0, movedAbove = 0;
+    for (int i = 0; i < 3000; ++i) {
+        const glm::vec3 p = randomNear(rng, c.focus, 60.0f);
+        const auto q = scene::corruptPoint(packed, p, 2.5f, 0);
+        if (p.y < c.floor) {
+            ++below;
+            CHECK(q.position == p);
+            CHECK(q.uvShift == 0.0f);
+        } else if (p.y > c.floor + 2.0f && glm::length(q.position - p) > 0.01f) {
+            ++movedAbove;
+        }
+    }
+    INFO("below " << below << ", moved above " << movedAbove);
+    CHECK(below > 100);
+    CHECK(movedAbove > 100);
+    // the default floor moves everything as before
+    scene::Corruption d = wall();
+    CHECK(scene::packCorruption(d, true)[9].x <= -1.0e5f);
+}

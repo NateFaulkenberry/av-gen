@@ -194,4 +194,15 @@ TEST_CASE("portal: the other world shows inside the opening, and fills the frame
     here.portal.crossed = true;
     const gpu::Image8 crossed = render(renderer, here);
     CHECK(crossed.pixel(4, 4)[0] > crossed.pixel(4, 4)[2] + 60);
+    // Gate C: portals nest. The other world holds a portal of its own, already crossed: the frame is the third world's
+    scene::Scene third;
+    third.camera = here.camera;
+    third.environment.backgroundColor = glm::vec3(0.1f, 0.8f, 0.2f);
+    there.portal.world = &third;
+    there.portal.crossed = true;
+    const gpu::Image8 nested = render(renderer, here);
+    const auto px = nested.pixel(4, 4);
+    INFO("nested corner " << int(px[0]) << "," << int(px[1]) << "," << int(px[2]));
+    CHECK(px[1] > px[0] + 40); // the tonemap desaturates a pure green
+    CHECK(px[1] > px[2] + 40);
 }

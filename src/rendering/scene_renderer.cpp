@@ -3191,9 +3191,17 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             return r;
         }
     }
-    // ADR-1879: a portal's destination world, drawn first into its own target so this frame can composite it.
-    if (scene.portal.active() && !isPortalView_) {
-        encodePortalView(encoder, scene, time, target.width, target.height);
+    // ADR-1879: a portal's destination world, drawn first into its own target so this frame can composite it. Once
+    // the camera has crossed, the destination's renderer draws the frame itself (its own post chain: the worlds share
+    // the post settings) and nothing of this world is drawn -- three nested worlds would otherwise all render.
+    const bool portalOn = scene.portal.active() && portalDepth_ < kMaxPortalDepth;
+    if (portalOn && scene.portal.crossed) {
+        if (auto r = encodePortalView(encoder, scene, time, target.width, target.height, &target); r) {
+            return r;
+        }
+    }
+    if (portalOn) {
+        (void)encodePortalView(encoder, scene, time, target.width, target.height);
     }
     // Open this frame's timestamp timeline before anything is encoded: the first pass to mark
     // itself also writes the frame origin, and every later pass's cost is the interval from the
@@ -3556,6 +3564,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.corruption6 = corruption[6];
         frame.corruption7 = corruption[7];
         frame.corruption8 = corruption[8];
+        frame.corruption9 = corruption[9];
         const bool liveBackground = (liveSky_.enabled || resolved.cirrus.amount > 0.0f) && skyIbl &&
                                     scene.environment.skyboxBlur <= 0.0f;
         frame.skyLive = liveBackground
@@ -3686,7 +3695,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // setVelocityOnDemand): the motion-blur gate below closed or its shutter at zero, and no aux debug view.
     {
         const float shutter = std::clamp(scene.camera.lens.shutterAngle, 0.0f, 360.0f) / 360.0f;
-        const bool blurReads = toggles_.post && qualitySettings_.motionBlur && scene.post.motionBlurAmount * shutter > 1e-4f;
+        const bool blurReads = toggles_.post && qualitySettings_.motionBlur && postOf(scene).motionBlurAmount * shutter > 1e-4f;
         velocitySkipped_ = velocityOnDemand_ && !blurReads && auxDebugView_ == AuxDebugView::None;
     }
     frame.styledGround = glm::vec4(scene.environment.styledGroundAmbient, velocitySkipped_ ? 1.0f : 0.0f);
@@ -4393,18 +4402,18 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
 
     TonemapUniforms tonemap{};
     tonemap.exposure = scene.environment.brightness;
-    tonemap.operatorId = static_cast<float>(scene.post.tonemap);
-    tonemap.vignette = scene.post.vignette;
-    tonemap.grain = scene.post.grain;
+    tonemap.operatorId = static_cast<float>(postOf(scene).tonemap);
+    tonemap.vignette = postOf(scene).vignette;
+    tonemap.grain = postOf(scene).grain;
     tonemap.size[0] = static_cast<float>(hdr_.width());
     tonemap.size[1] = static_cast<float>(hdr_.height());
     tonemap.seed = static_cast<float>(time.frameNonce() % 1024);
-    tonemap.chromaRetention = scene.post.chromaRetention;
+    tonemap.chromaRetention = postOf(scene).chromaRetention;
     // ADR-1607: the upscaler runs only when the scene target is smaller than the output; at a matched size the fetch
     // is the bilinear one (byte-identical).
     tonemap.upscale[0] = qualitySettings_.spatialUpscaler && (hdr_.width() < target.width || hdr_.height() < target.height) ? 1.0f
                                                                                                              : 0.0f;
-    tonemap.upscale[1] = scene.post.upscaleSharpness; // ADR-1613: a post parameter
+    tonemap.upscale[1] = postOf(scene).upscaleSharpness; // ADR-1613: a post parameter
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;
@@ -5160,7 +5169,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             stats_.state.bindGroupBinds += 2;
         }
         // ---- ADR-1879: the portal view, over the opaque world and under the water (which reflects it) ----
-        if (scene.portal.active() && !isPortalView_ && portalRenderer_ && portalPipeline_) {
+        if (portalOn && portalRenderer_ && portalPipeline_) {
             rp.End();
             wgpu::RenderPassDescriptor portalPass = pass;
             for (auto& attachment : attachments) {
@@ -5416,7 +5425,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // hard-coded half. ADR-140: the two passes are timed separately as `volume.march` and
     // `volume.composite`.
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
-    if (toggles_.volume && !scene.portal.crossed) { // ADR-1879: crossed, the frame is the other world's
+    if (toggles_.volume && !(portalOn && scene.portal.crossed)) { // ADR-1879: crossed, the frame is the other world's
         volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
                          particles_->glowSystems(), qualitySettings_);
         volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
@@ -5521,7 +5530,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // comparing indices, and a float second cannot be compared for equality to do that.
         temporalIn.frameIndex = time.frameIndex;
         temporalIn.renderTime = time.renderTime;
-        temporalIn.settings = &scene.temporal;
+        temporalIn.settings = inheritedTemporal_ != nullptr ? inheritedTemporal_ : &scene.temporal;
         temporalIn.resolutionScale = qualitySettings_.temporalHistoryScale;
         temporalIn.hdrFormat = kHdrFormat;
         if (toggles_.post) {
@@ -5563,7 +5572,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-037/040: the shutter that sets the motion-blur length belongs to the camera. The
         // engine already mirrors the whole lens into post settings; a scene driven through this
         // renderer directly may not have, so the shutter is taken from the camera either way.
-        scene::PostSettings postSettings = scene.post;
+        scene::PostSettings postSettings = postOf(scene);
         postSettings.lens.shutterAngle = scene.camera.lens.shutterAngle;
         // ADR-1024: the live floor on the scene's FXAA. 0 everywhere but the live editor.
         postSettings.antialias = std::max(postSettings.antialias, qualitySettings_.antialiasFloor);
@@ -6144,23 +6153,32 @@ Result<void> SceneRenderer::ensurePortalPipeline() {
     return {};
 }
 
-void SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
-                                     std::uint32_t width, std::uint32_t height) {
+Result<void> SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
+                                             std::uint32_t width, std::uint32_t height, const gpu::TargetView* direct) {
     if (auto r = ensurePortalPipeline(); !r) {
         log::warn("portal view: {}", r.error().message);
-        return;
+        return r;
     }
     if (!portalRenderer_) {
         portalRenderer_ = std::make_unique<SceneRenderer>(context_, shaders_);
-        portalRenderer_->isPortalView_ = true;
+        portalRenderer_->portalDepth_ = portalDepth_ + 1;
         if (auto r = portalRenderer_->init(); !r) {
             log::warn("portal view: {}", r.error().message);
             portalRenderer_.reset();
-            return;
+            return r;
         }
     }
     portalRenderer_->setQualitySettings(qualitySettings_);
     portalRenderer_->setPassToggles(toggles_);
+    // one picture across worlds: the destination is finished with this frame's post and temporal settings (the
+    // engine sets them on the root scene only), so the crossing does not change the grade
+    portalRenderer_->inheritedPost_ = &postOf(scene);
+    portalRenderer_->inheritedTemporal_ = inheritedTemporal_ != nullptr ? inheritedTemporal_ : &scene.temporal;
+    if (direct != nullptr) {
+        auto r = portalRenderer_->render(encoder, *scene.portal.world, time, *direct);
+        if (!r) log::warn("portal view: {}", r.error().message);
+        return r;
+    }
     if (!portalTarget_ || portalTarget_.GetWidth() != width || portalTarget_.GetHeight() != height) {
         wgpu::TextureDescriptor td{};
         td.label = "portal-view-target";
@@ -6170,9 +6188,9 @@ void SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, const scene:
         portalTarget_ = context_.device().CreateTexture(&td);
     }
     const gpu::TargetView target{portalTarget_.CreateView(), wgpu::TextureFormat::RGBA8Unorm, width, height};
-    if (auto r = portalRenderer_->render(encoder, *scene.portal.world, time, target); !r) {
-        log::warn("portal view: {}", r.error().message);
-    }
+    auto r = portalRenderer_->render(encoder, *scene.portal.world, time, target);
+    if (!r) log::warn("portal view: {}", r.error().message);
+    return r;
 }
 
 } // namespace avgen::rendering

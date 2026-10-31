@@ -34,8 +34,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | canyon P2-P6 | revelation, birds, glyphs, (campsite), QA | not started: gated on P1 acceptance |
 | portals R | dimensional portals: research, audit, plan (`12`-`15`) | **reviewed**: the owner sees "strong potential"; decisions in `15` §6 |
 | portals A | the Matrix effect: the scan, geometric (world-space) mosh, glyphs, the site in the rock, the opening (`16`) | **approved by the owner** ("I think it looks good") |
-| portals B | Gate A fixes; the portal view, the crossing at 32.0 s, the Moon and the lunar flight (`17`) | **done, awaiting the owner**: media in `portals-b/` |
-| portals C | portal 2, dusk, the full ~60 s | not started |
+| portals B | Gate A fixes; the portal view, the crossing at 32.0 s, the Moon and the lunar flight (`17`) | **approved by the owner** |
+| portals C | the Moon polish; portal 2 in the crater floor, the dusk canyon, the full 60 s (`18`) | **done, awaiting the owner**: media in `portals-c/` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -176,6 +176,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-31: Portals Gate C (`18-portals-gate-c.md`; ADR-1883, 1884; 1873 and 1882 revised).
+  - The Moon polish: real boulders, micro-relief and craterlets, rays, a 24-degree sun, a reshaped flight with a
+    fresh crater beside the glide and a ridge that reveals the hero early, a 3.2-degree Earth (the Gate B "far cut"
+    was the node scale cap of 100).
+  - The river-bed blocks stay under the water (corruption `floor`); the crossed world is no longer drawn.
+  - Portals nest: the hero crater's floor opens under the diving camera onto the dusk canyon; crossing at 51.830 s
+    (bar 27); the camera joins the canyon's river run at 55.5 s and runs to 60 s.
+  - The dusk canyon: a 2.8-degree sun, a violet-indigo sky, fills that keep the gorge up.
 - 2026-10-30: Portals Gate B (`17-portals-gate-b.md`; ADR-1879, 1880, 1882; 1872/1873 revised).
   - Gate A fixes: a clear centre (shards stay on the rim, nothing camera-facing in the aperture), slab lips, a light
     in the opening, pulses from 16 s and glyphs from 19 s, the Moon through the 25 s slit, the 30–31.6 s shards thinned.

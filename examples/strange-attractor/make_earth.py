@@ -1,4 +1,4 @@
-"""Writes assets/space/earth.glb: a UV sphere (radius 1) carrying NASA's Blue Marble (public domain; Visible Earth,
+"""Writes assets/space/earth.glb: a UV sphere (radius 100 m: a node's scale is capped at 100, so a unit sphere could never be larger than 100 m) carrying NASA's Blue Marble (public domain; Visible Earth,
 'world.topo.bathy.200412.3x5400x2700.jpg', downloaded into assets/space/, gitignored, never committed).
 The Earth in the Strange Attractor's lunar sky (dimensional portals, Gate B).
 
@@ -11,6 +11,9 @@ SPACE = os.path.join(HERE, '..', '..', 'assets', 'space')
 IMAGE = os.path.join(SPACE, 'blue-marble-5400x2700.jpg')
 
 
+R = 100.0  # the sphere's radius in the file
+
+
 def main():
     seg_u, seg_v = 96, 48
     pos, nor, uv, idx = [], [], [], []
@@ -21,7 +24,7 @@ def main():
             u = i / seg_u
             ph = u * 2 * math.pi
             x, y, z = math.sin(th) * math.cos(ph), math.cos(th), -math.sin(th) * math.sin(ph)
-            pos += [x, y, z]
+            pos += [x * R, y * R, z * R]
             nor += [x, y, z]
             uv += [u, v]
     for j in range(seg_v):
@@ -45,7 +48,7 @@ def main():
           'materials': [{'name': 'earth', 'pbrMetallicRoughness': {'baseColorTexture': {'index': 0}, 'metallicFactor': 0.0,
                                                                    'roughnessFactor': 0.7}}],
           'textures': [{'source': 0}], 'images': [{'bufferView': 4, 'mimeType': 'image/jpeg'}],
-          'accessors': [{'bufferView': 0, 'componentType': 5126, 'count': n, 'type': 'VEC3', 'min': [-1, -1, -1], 'max': [1, 1, 1]},
+          'accessors': [{'bufferView': 0, 'componentType': 5126, 'count': n, 'type': 'VEC3', 'min': [-R, -R, -R], 'max': [R, R, R]},
                         {'bufferView': 1, 'componentType': 5126, 'count': n, 'type': 'VEC3'},
                         {'bufferView': 2, 'componentType': 5126, 'count': n, 'type': 'VEC2'},
                         {'bufferView': 3, 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'}],

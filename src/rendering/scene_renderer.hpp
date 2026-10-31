@@ -401,6 +401,7 @@ struct FrameUniforms {
     glm::vec4 corruption6{0.0f};
     glm::vec4 corruption7{0.0f};
     glm::vec4 corruption8{0.0f};
+    glm::vec4 corruption9{0.0f}; // Moon polish: x = the floor (world y) below which nothing is displaced
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -419,7 +420,7 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        192 + // ADR-1151: twelve vec4s of reflection bands
                                        80 + // ADR-1864/1865: five vec4s of cirrus
                                        16 + // ADR-1870: one vec4 of depth range
-                                       144); // ADR-1873: nine vec4s of corruption, appended last
+                                       160); // ADR-1873: ten vec4s of corruption, appended last
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);
@@ -1111,17 +1112,26 @@ private:
     std::vector<EnvironmentRenderer*> environments_; // ADR-1200: the seam, in run order (owned by SceneRenderer)
     std::unique_ptr<MeshWireRenderer> meshWire_;     // ADR-1862: a mesh entity's triangle edges, pass 1's blended section
     // ADR-1879: a portal view. The destination world is drawn by a renderer of its own (its meshes, shadows, sky and
-    // temporal state never churn), into its own target, and composited here. A portal view does not draw portals.
+    // temporal state never churn), into its own target, and composited here. Portals nest (a world seen through a
+    // portal may hold one of its own, Gate C: `portalDepth_` caps the chain); once the camera has crossed, the
+    // destination's renderer draws the whole frame into this renderer's target and this world is not drawn at all.
     std::unique_ptr<SceneRenderer> portalRenderer_;
-    bool isPortalView_ = false;
+    int portalDepth_ = 0;
+    static constexpr int kMaxPortalDepth = 3;
+    const scene::PostSettings* inheritedPost_ = nullptr;         // a portal view's source's (null: the scene's own)
+    const scene::TemporalSettings* inheritedTemporal_ = nullptr;
+    [[nodiscard]] const scene::PostSettings& postOf(const scene::Scene& scene) const {
+        return inheritedPost_ != nullptr ? *inheritedPost_ : scene.post;
+    }
     wgpu::Texture portalTarget_;
     wgpu::RenderPipeline portalPipeline_;
     wgpu::BindGroupLayout portalLayout_;
     wgpu::Buffer portalParams_;
     wgpu::Sampler portalSampler_;
     [[nodiscard]] Result<void> ensurePortalPipeline();
-    void encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
-                          std::uint32_t width, std::uint32_t height);
+    // Draws the destination into the portal target, or, `direct` given (crossed), into that target instead.
+    [[nodiscard]] Result<void> encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
+                                                std::uint32_t width, std::uint32_t height, const gpu::TargetView* direct = nullptr);
     std::unique_ptr<RibbonRenderer> ribbons_;        // ADR-703 (Wave 1): RIBBON, pass 1's blended section
     std::unique_ptr<ShellRenderer> shells_;          // Wave 3: SHELL, pass 1's blended section
     std::unique_ptr<PostProcessor> postProcessor_;

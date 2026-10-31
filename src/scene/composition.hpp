@@ -1470,6 +1470,14 @@ public:
                                                  // generated ground (lunarWorld) y is the height above that ground
         float exitYaw = 0.0f;                    // degrees about +y from this world's frame to the destination's
         std::vector<glm::vec4> flight;           // the destination's flight after the crossing: x, height, z, t
+                                                 // (height above the destination's ground: lunar or canyon terrain)
+        glm::vec3 join{0.0f};                    // Gate C: [from, at, rate] -- at `at` seconds the camera joins the
+                                                 // destination's own flythrough at its second `from`, run at `rate`
+                                                 // (C1); rate 0 = no join
+    };
+    // A camera pose as a pure function of time (what a portal's source hands its destination).
+    struct PortalPose {
+        glm::vec3 eye{0.0f}, target{0.0f, 0.0f, -1.0f}, up{0.0f, 1.0f, 0.0f};
     };
     [[nodiscard]] Result<void> setPortal(PortalBlock block, std::unique_ptr<Composition> world);
     [[nodiscard]] Composition* portalWorld() { return portalWorld_.get(); }
@@ -1477,6 +1485,16 @@ public:
     // A camera that replaces whatever this composition's own camera logic placed, from the next update on (a portal's
     // destination is driven by its source). Empty restores the composition's own camera.
     void setCameraOverride(std::optional<Camera> camera) { cameraOverride_ = std::move(camera); }
+    // Gate C: the same, as a pure function of time, so this composition can find where the camera crosses a portal of
+    // its own (nested portals). Set by the source each frame before it updates this one.
+    void setCameraPath(std::function<std::optional<PortalPose>(double)> path) { cameraPath_ = std::move(path); }
+    // This composition's camera at `seconds` (its source's path, or its own flythrough), if it has a pure one.
+    [[nodiscard]] std::optional<PortalPose> ownCameraAt(double seconds) const;
+    // Its own flythrough at `seconds` (attractorWorld, flight mode), whatever drives it now (a portal's join).
+    [[nodiscard]] std::optional<PortalPose> flythroughAt(double seconds) const;
+    // The camera this composition hands its portal's destination at `seconds` (carried through the portal until the
+    // crossing, then the destination's own flight).
+    [[nodiscard]] std::optional<PortalPose> portalCameraAt(double seconds) const;
     [[nodiscard]] const Corruption& corruption() const { return corruption_; }
     [[nodiscard]] const MeshWire& meshWire() const { return meshWire_; }
     // ADR-1851: true while a regeneration is running on a worker (the editor can say so).
@@ -2407,6 +2425,13 @@ private:
     std::unique_ptr<Composition> portalWorld_;
     double portalCrossing_ = 1e30;           // seconds: when the flight crosses the entry plane
     std::optional<Camera> cameraOverride_;
+    std::function<std::optional<PortalPose>(double)> cameraPath_;
+    // the destination's arrival path (built once the crossing is known): Hermite knots and their tangents
+    std::vector<glm::vec3> portalKnots_, portalTangents_;
+    std::vector<float> portalKnotTimes_;
+    glm::vec3 portalArriveAim_{0.0f, 0.0f, -1.0f}, portalArriveUp_{0.0f, 1.0f, 0.0f};
+    void buildPortalArrival();
+    [[nodiscard]] float portalGround(float x, float z) const;
     void flattenLunar();
     void updatePortal(const FrameTime& time);
     void applyCameraOverride();

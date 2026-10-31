@@ -84,6 +84,8 @@ struct Corruption {
     float echoOffset = 1.0f; // scales how far back the echoes trail (1 = all the way to the original place)
     float light = 0.0f;      // a point light in the opening (candela at full opening): its glow and the other world's
                              // light on the rock around it (0 = none)
+    float floor = -1e9f;     // world y: rest positions below it are never displaced (a river bed stays under its
+                             // water), fading in over the 2 m above it
     int echoes = 0;          // extra copies (0..3)
     glm::vec3 glowColor{1.0f, 0.55f, 0.18f};
 
@@ -97,6 +99,7 @@ struct Corruption {
 };
 
 inline constexpr int kMaxCorruptionEchoes = 3;
+inline constexpr std::size_t kCorruptionVec4s = 10;
 
 // True when `name` starts with one of `c.targets`.
 [[nodiscard]] bool corruptionTargets(const Corruption& c, const std::string& name);
@@ -105,8 +108,8 @@ inline constexpr int kMaxCorruptionEchoes = 3;
 [[nodiscard]] float corruptionFieldScale(const Corruption& c, float cameraDistance);
 [[nodiscard]] float corruptionOpening(const Corruption& c, float cameraDistance);
 
-// The nine vec4s the frame block carries (shaders/corruption.wgsl reads them). All zero when inactive.
-[[nodiscard]] std::array<glm::vec4, 9> packCorruption(const Corruption& c, bool active);
+// The ten vec4s the frame block carries (shaders/corruption.wgsl reads them). All zero when inactive.
+[[nodiscard]] std::array<glm::vec4, kCorruptionVec4s> packCorruption(const Corruption& c, bool active);
 
 // The CPU twin of `crDisplace` in shaders/corruption.wgsl: where a target vertex at `p` (world) is drawn at `time`,
 // and how far its strata coordinate slides. `echo` 0 is the surface itself; k >= 1 an echo copy (`keep` false where
@@ -116,7 +119,7 @@ struct CorruptedPoint {
     float uvShift = 0.0f;
     bool keep = true;
 };
-[[nodiscard]] CorruptedPoint corruptPoint(const std::array<glm::vec4, 9>& packed, glm::vec3 p, float time, int echo);
+[[nodiscard]] CorruptedPoint corruptPoint(const std::array<glm::vec4, kCorruptionVec4s>& packed, glm::vec3 p, float time, int echo);
 
 [[nodiscard]] Result<Corruption> corruptionFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json corruptionToJson(const Corruption& c);

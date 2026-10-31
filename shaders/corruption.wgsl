@@ -182,7 +182,10 @@ fn crDisplace(p0: vec3<f32>, t: f32, echo: u32) -> CrPoint {
             }
         }
     }
-    out.p = p0 + off;
+    // a river bed stays under its water: nothing at rest below the floor moves
+    let keep = smoothstep(frame.corruption9.x, frame.corruption9.x + 2.0, p0.y);
+    out.p = p0 + off * keep;
+    out.uvShift = out.uvShift * keep;
     return out;
 }
 

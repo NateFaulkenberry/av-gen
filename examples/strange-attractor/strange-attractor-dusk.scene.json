@@ -1,0 +1,1060 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "the-strange-attractor-dusk",
+  "_note": "The Strange Attractor canyon at dusk (dimensional portals, Gate C; ADR-1884), written by build_dusk.py from the flythrough scene; the destination of the Moon's crater-floor portal, whose block drives its camera.",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0.0,
+      120.0,
+      3360.0
+    ],
+    "target": [
+      0.0,
+      60.0,
+      0.0
+    ],
+    "fov": 36.0,
+    "orbitSpeed": 0.0
+  },
+  "environment": {
+    "intensity": 0.16,
+    "background": [
+      0.012,
+      0.01,
+      0.055
+    ],
+    "fogColor": [
+      0.1,
+      0.075,
+      0.22
+    ],
+    "volumeDensity": 5e-05,
+    "sky": {
+      "enabled": true,
+      "background": true,
+      "useKeyLight": true,
+      "zenithColor": [
+        0.022,
+        0.02,
+        0.115
+      ],
+      "horizonColor": [
+        0.36,
+        0.22,
+        0.46
+      ],
+      "groundColor": [
+        0.012,
+        0.01,
+        0.045
+      ],
+      "haze": 0.18,
+      "sunColor": [
+        1.0,
+        0.46,
+        0.22
+      ],
+      "sunIntensity": 7.0,
+      "sunSize": 0.05,
+      "sunGlow": 0.55,
+      "intensity": 1.0,
+      "cirrus": {
+        "amount": 1.0,
+        "coverage": 0.5,
+        "softness": 0.28,
+        "altitude": 4000,
+        "length": 12000,
+        "width": 1600,
+        "direction": 0,
+        "litColor": [
+          1.0,
+          0.58,
+          0.42
+        ],
+        "shadeColor": [
+          0.22,
+          0.18,
+          0.48
+        ],
+        "sunScatter": 1.6,
+        "seed": 0.0,
+        "reflection": 0.15,
+        "bands": 1.0,
+        "bandWidth": 5000.0
+      }
+    },
+    "shadowRange": 3000.0,
+    "shadowCascades": 4,
+    "ambientOcclusion": false,
+    "shadowCasterReach": 4000.0,
+    "contactShadows": false
+  },
+  "post": {
+    "bloomIntensity": 0.04,
+    "tonemap": 0
+  },
+  "lights": [
+    {
+      "name": "dusk-sky",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.1,
+        -1.0,
+        0.15
+      ],
+      "color": [
+        0.42,
+        0.4,
+        0.95
+      ],
+      "intensity": 0.7,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "dusk-bounce",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        -0.9,
+        -0.15,
+        0.4
+      ],
+      "color": [
+        0.62,
+        0.4,
+        0.85
+      ],
+      "intensity": 0.45,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "floor-bounce",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "color": [
+        0.55,
+        0.38,
+        0.62
+      ],
+      "intensity": 0.25,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    }
+  ],
+  "attractorWorld": {
+    "seed": 1,
+    "resolution": 4096,
+    "look": {
+      "sunAzimuth": 172.0,
+      "sunElevation": 2.8,
+      "contour": 0.0,
+      "glow": 0.0
+    },
+    "strataFold": 0.7,
+    "camera": "flight",
+    "water": {
+      "shallowColor": [
+        0.0423,
+        0.0423,
+        0.1022
+      ],
+      "deepColor": [
+        0.0044,
+        0.0037,
+        0.016
+      ],
+      "roughness": 0.03,
+      "ripple": 0.12,
+      "rippleScale": 0.08,
+      "fresnel": 0.35,
+      "reflection": 1.3,
+      "reflectionTint": [
+        1,
+        1,
+        1
+      ],
+      "clarity": 0.6,
+      "maxOpacity": 0.97,
+      "edgeFade": 0.4,
+      "specular": 1.0,
+      "ssr": 1.0,
+      "ssrDistance": 1200.0,
+      "ssrSteps": 160.0,
+      "ssrGain": 1.0,
+      "skyMirror": 0.2,
+      "foam": 0.0
+    },
+    "sunLux": 4.5,
+    "sunShadowBias": 8.0,
+    "meshSpacing": 1.0,
+    "meshError": 0.002,
+    "meshMinError": 0.15,
+    "approach": {
+      "site": [
+        188.5,
+        30.0,
+        3314.2
+      ],
+      "departArc": 1572.0,
+      "speed": 22.0,
+      "slowFrom": 21.25,
+      "slowFor": 6.5
+    },
+    "flightSeconds": 46.0
+  },
+  "materialPrograms": [
+    {
+      "name": "canyonRock",
+      "ops": [
+        {
+          "kind": "input",
+          "dst": 0,
+          "input": "uv"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 0,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 2,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            0.32,
+            0.18,
+            0,
+            0
+          ],
+          "constant3": [
+            0.06919780134430233,
+            0.17113434741064013,
+            0,
+            0
+          ],
+          "constant4": [
+            -0.13859153983567327,
+            0.020563403256222076,
+            0,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "add",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
+          "kind": "swizzle",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "quantize",
+          "dst": 2,
+          "srcA": 1,
+          "value": 1.0
+        },
+        {
+          "kind": "swizzle",
+          "dst": 5,
+          "srcA": 2,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0,
+            1,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 5,
+          "srcA": 1,
+          "srcB": 5
+        },
+        {
+          "kind": "noise",
+          "dst": 4,
+          "srcA": 2,
+          "value": 0.23,
+          "seed": 7
+        },
+        {
+          "kind": "input",
+          "dst": 6,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "gradient",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "value": 0.0014285714285714286
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0.3,
+            -0.3
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
+        },
+        {
+          "kind": "remap",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.28,
+            0.8,
+            0,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "oklabRamp",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.66,
+            0.44,
+            0.25,
+            1
+          ],
+          "constant2": [
+            0.64,
+            0.31,
+            0.12,
+            1
+          ],
+          "constant3": [
+            0.38,
+            0.11,
+            0.065,
+            1
+          ],
+          "constant4": [
+            0.4,
+            0.22,
+            0.24,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "swizzle",
+          "dst": 3,
+          "srcA": 2,
+          "constant": [
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0.74,
+            1.12
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 3
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 6,
+          "srcA": 5,
+          "constant": [
+            -0.5,
+            -0.45,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0.72,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
+        },
+        {
+          "kind": "input",
+          "dst": 7,
+          "input": "normal"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0.66,
+            0.4,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.22,
+            0.1,
+            0.045,
+            1
+          ]
+        },
+        {
+          "kind": "mix",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 4,
+          "value": 0.25
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "noise",
+          "dst": 3,
+          "srcA": 3,
+          "value": 0.002631578947368421,
+          "seed": 61
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0.6,
+            1.3
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "mixBy",
+          "dst": 4,
+          "srcA": 6,
+          "srcB": 4,
+          "srcC": 7
+        },
+        {
+          "kind": "swizzle",
+          "dst": 3,
+          "srcA": 0,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "quantize",
+          "dst": 6,
+          "srcA": 3,
+          "value": 1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 6
+        },
+        {
+          "kind": "remap",
+          "dst": 0,
+          "srcA": 3,
+          "constant": [
+            -0.5,
+            -0.45,
+            0.15000000000000002,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            -0.5,
+            -0.45,
+            0.55,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 1,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "triplanar",
+          "dst": 1,
+          "srcA": 1,
+          "value": 0.09,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            4,
+            0,
+            0,
+            0
+          ],
+          "seed": 23
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 6,
+          "srcA": 5,
+          "constant": [
+            -0.5,
+            -0.4,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            -1.5,
+            0
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 5,
+          "constant": [
+            0.36,
+            0.5,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0,
+            0.8250000000000001
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 1,
+          "constant": [
+            0.3,
+            0.7,
+            0.35,
+            1.45
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "palette",
+          "dst": 3,
+          "srcA": 5,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            0.22,
+            0.22,
+            0.22,
+            0
+          ],
+          "constant3": [
+            5,
+            5,
+            5,
+            0
+          ],
+          "constant4": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "input",
+          "dst": 2,
+          "input": "depth"
+        },
+        {
+          "kind": "remap",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            280.0,
+            700.0,
+            1,
+            0
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 2
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "remap",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            0.25,
+            0.75,
+            -0.15,
+            0.15
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 7,
+          "constant": [
+            0,
+            1,
+            0.35,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 3
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 1
+        },
+        {
+          "kind": "constant",
+          "dst": 3,
+          "constant": [
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "constant",
+          "dst": 3,
+          "constant": [
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 1,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 2,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "constant3": [
+            0.06666666666666667,
+            0.06666666666666667,
+            0.06666666666666667,
+            0
+          ],
+          "constant4": [
+            0.4,
+            0.4,
+            0.4,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0.985,
+            1.0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 3,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "constant3": [
+            0.013333333333333334,
+            0.013333333333333334,
+            0.013333333333333334,
+            0
+          ],
+          "constant4": [
+            0.08,
+            0.08,
+            0.08,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0.997,
+            1.0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0,
+            1,
+            0,
+            0.5
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "depth"
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            270.0,
+            900.0,
+            1,
+            0
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "materialEmission"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 3,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            1.0,
+            0.42,
+            0.14,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 3,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 4
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 7
+        },
+        {
+          "kind": "add",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        }
+      ],
+      "baseColor": 4,
+      "metallic": -1,
+      "roughness": -1,
+      "emission": 2,
+      "opacity": -1,
+      "normal": 6,
+      "occlusion": 0
+    }
+  ]
+}

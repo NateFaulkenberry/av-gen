@@ -20,7 +20,7 @@ struct FloatKey {
     float lo, hi, softLo, softHi;
 };
 
-constexpr std::array<FloatKey, 29> kFloats{{
+constexpr std::array<FloatKey, 30> kFloats{{
     {"amount", &Corruption::amount, 0.0f, 1.0f, 0.0f, 1.0f},
     {"radius", &Corruption::radius, 1.0f, 1.0e5f, 10.0f, 2000.0f},
     {"inner", &Corruption::inner, 0.0f, 0.99f, 0.0f, 0.9f},
@@ -50,6 +50,7 @@ constexpr std::array<FloatKey, 29> kFloats{{
     {"glow", &Corruption::glow, 0.0f, 1000.0f, 0.0f, 40.0f},
     {"echoOffset", &Corruption::echoOffset, 0.0f, 2.0f, 0.0f, 1.0f},
     {"light", &Corruption::light, 0.0f, 1.0e8f, 0.0f, 100000.0f},
+    {"floor", &Corruption::floor, -1.0e9f, 1.0e9f, -500.0f, 2000.0f},
 }};
 constexpr std::size_t kFloatCount = kFloats.size();
 
@@ -108,8 +109,8 @@ float corruptionOpening(const Corruption& c, float cameraDistance) {
     return std::clamp(c.open + approach, 0.0f, 1.0f);
 }
 
-std::array<glm::vec4, 9> packCorruption(const Corruption& c, bool active) {
-    std::array<glm::vec4, 9> p{};
+std::array<glm::vec4, kCorruptionVec4s> packCorruption(const Corruption& c, bool active) {
+    std::array<glm::vec4, kCorruptionVec4s> p{};
     if (!active) return p;
     glm::vec3 axis = glm::length(c.axis) > 1e-6f ? glm::normalize(c.axis) : glm::vec3(0.0f, 0.0f, -1.0f);
     p[0] = glm::vec4(c.focus, 1.0f);
@@ -121,10 +122,11 @@ std::array<glm::vec4, 9> packCorruption(const Corruption& c, bool active) {
     p[6] = glm::vec4(c.lift, c.fold, c.lag, std::floor(c.seed));
     p[7] = glm::vec4(c.glyph, c.glyphSize, c.glow, c.echoOffset);
     p[8] = glm::vec4(c.glowColor, static_cast<float>(std::clamp(c.echoes, 0, kMaxCorruptionEchoes)));
+    p[9] = glm::vec4(std::max(c.floor, -1.0e6f), 0.0f, 0.0f, 0.0f); // f32 keeps floor + 2 distinct
     return p;
 }
 
-CorruptedPoint corruptPoint(const std::array<glm::vec4, 9>& f, glm::vec3 p0, float t, int echo) {
+CorruptedPoint corruptPoint(const std::array<glm::vec4, kCorruptionVec4s>& f, glm::vec3 p0, float t, int echo) {
     CorruptedPoint out{p0, 0.0f, echo == 0};
     if (!(f[0].w > 0.5f)) return out;
     const auto field = [&](glm::vec3 p) {
@@ -218,7 +220,10 @@ CorruptedPoint corruptPoint(const std::array<glm::vec4, 9>& f, glm::vec3 p0, flo
             }
         }
     }
-    out.position = p0 + off;
+    // a river bed stays under its water: nothing at rest below the floor moves
+    const float keep = smooth(f[9].x, f[9].x + 2.0f, p0.y);
+    out.position = p0 + off * keep;
+    out.uvShift *= keep;
     return out;
 }
 

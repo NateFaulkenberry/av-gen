@@ -73,3 +73,22 @@ a few degrees of parallax over the lunar flight.
 ## Consequences
 
 - No existing picture changes: the fallback is opt-in.
+
+## Revisions at Gate C (the Moon polish)
+
+- **Boulders** were faceted white tetrahedra. They are now subdivided icospheres (one to three levels by size),
+  rounded and irregular: broad lobes, one or two split faces, finer lumps; smooth normals; squashed, turned and tilted;
+  a sixth to a third of their height buried. Their albedo is the regolith's under them (not brighter). Sizes follow
+  cumulative N(>r) ~ r^-1.6 from 0.22 m (many small, few large, up to 5 m); twice the candidates, gathered on fresh
+  ejecta. Contact shadows are on and the near cascade is tighter (`shadowSplitLambda` 0.92).
+- **Ground detail** the 2.5 m mesh cannot carry is shaded in the regolith program: a directional derivative of noise
+  toward the sun over mu0 (grit at 33 cm, lumps at 2 m) and craterlets (Worley bowls on a 2.5 m 3-D lattice, so their
+  sections come in every size, faded out by 90 m), clamped to 0.55..1.5 so it never blotches. Fresh craters' ejecta
+  carry irregular rays (broad and fine angular streaks, fading as r^-1.8).
+- **The sun** is 24 degrees up from the right-behind (azimuth 110): at 9 degrees every crater floor on the route was
+  in black shadow, the dive's included.
+- **The route**: a fresh 160 m crater close beside the low glide, the rim of an old 900 m basin as the ridge that
+  reveals the hero, and the hero (400 m, its floor Gate C's portal) on the basin floor.
+- **The Earth** is 3.2 degrees across (life: 1.9; enlarged for the composition) at 40 km, low to the upper left of
+  the route. Gate B's "far cut" was not a renderer limit: a node's `scale` parameter is capped at 100, so a unit
+  sphere could never be larger than 100 m. `make_earth.py` now writes a 100 m sphere.

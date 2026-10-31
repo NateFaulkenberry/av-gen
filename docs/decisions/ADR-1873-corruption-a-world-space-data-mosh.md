@@ -123,3 +123,10 @@ faults in the strata.
 - The CPU twin mirrors the vertex displacement. It is the tests' reference, not yet held to the GPU by a parity test.
 - The aperture's in-plane basis assumes `axis` is not vertical. A vertical axis falls back to x along the wall.
   Portal 2, in the crater floor, will need that path.
+
+## Revision at Gate C
+
+- `floor` (world y, default off): rest positions below it are never displaced, fading in over the 2 m above it. The
+  canyon sets it at the river's surface (-0.8 m), so slipped river-bed blocks no longer push up through the water and
+  read as holes (the Gate B weak spot at 23.5 s). It is the tenth vec4 of the frame's corruption block.
+- Over a generated ground (`lunarWorld`) the focus's y is a height above that ground (the Moon's floor portal).

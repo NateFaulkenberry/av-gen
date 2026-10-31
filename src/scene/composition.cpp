@@ -1277,6 +1277,8 @@ void Composition::updateCorruption() {
     } else {
         live = corruption_;
     }
+    // Gate C: over a generated ground (lunarWorld) the focus's y is a height above that ground, as a portal's exit is
+    if (lunar_.world) live.focus.y += lunar_.world->sample(live.focus.x, live.focus.z);
     const float distance = glm::distance(scene_.camera.position, live.focus);
     live.liveAmount = corruptionFieldScale(live, distance);
     live.liveOpen = corruptionOpening(live, distance);
@@ -5328,7 +5330,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     installEntities();
     // ADR-1879: a portal's destination world, under its own prefix
     if (portalWorld_) {
-        portalWorld_->attach(params, modulator, prefix_ + "moon/");
+        // under the destination file's last word ("strange-attractor-moon" -> "moon/")
+        std::string stem = std::filesystem::path(portal_.world).filename().string();
+        stem = stem.substr(0, stem.find('.'));
+        if (const auto dash = stem.rfind('-'); dash != std::string::npos) stem = stem.substr(dash + 1);
+        portalWorld_->attach(params, modulator, prefix_ + (stem.empty() ? std::string("portal") : stem) + "/");
     }
 
     registeredPaths_.clear();
@@ -11589,6 +11595,7 @@ nlohmann::json Composition::toJson() const {
                        {"exit", {portal_.exit.x, portal_.exit.y, portal_.exit.z}},
                        {"exitYaw", portal_.exitYaw},
                        {"flight", flight}};
+        if (portal_.join.z > 0.0f) j["portal"]["join"] = {portal_.join.x, portal_.join.y, portal_.join.z};
     }
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
@@ -12559,8 +12566,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     pb.flight.emplace_back(w.at(0).get<float>(), w.at(1).get<float>(), w.at(2).get<float>(), w.at(3).get<float>());
                 }
             }
+            if (pj.contains("join")) {
+                const json& jn = pj.at("join");
+                pb.join = glm::vec3(jn.at(0).get<float>(), jn.at(1).get<float>(), jn.at(2).get<float>());
+            }
             for (auto it = pj.begin(); it != pj.end(); ++it) {
-                if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight") {
+                if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }

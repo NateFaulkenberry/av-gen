@@ -117,3 +117,65 @@ TEST_CASE("a portal loads its world, carries the camera through its transform, a
     const glm::vec3 fwd = glm::normalize(s.portal.world->camera.target - got);
     CHECK(fwd.x == Approx(1.0f).margin(1e-3));
 }
+
+TEST_CASE("portals nest: the camera crosses into the Moon, then through the Moon's floor into a third world",
+          "[portal][gate-c]") {
+    const auto dir = testsupport::processTempDir();
+    const nlohmann::json third = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "third"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+        {"nodes", {{{"name", "ground"}, {"kind", "grid"}}}}};
+    std::ofstream(dir / "nest-third.scene.json") << third.dump();
+    // the Moon: a floor portal (axis down; its focus y is a height above the generated ground) to the third world
+    const nlohmann::json moon = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "moon"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+        {"lunarWorld", {{"extent", 400}, {"spacing", 8}, {"skirtExtent", 1600}, {"skirtSpacing", 64}, {"rocks", 0}}},
+        {"corruption", {{"targets", {"lunar.surface"}}, {"focus", {0.0, 0.0, 0.0}}, {"axis", {0.0, -1.0, 0.0}}, {"amount", 1.0},
+                        {"width", 40.0}, {"height", 40.0}}},
+        {"portal", {{"world", "nest-third.scene.json"}, {"exit", {500.0, 300.0, 500.0}}, {"exitYaw", 0.0}}}};
+    std::ofstream(dir / "nest-moon.scene.json") << moon.dump();
+    const nlohmann::json canyon = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "canyon"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 30.0, 100.0}}, {"target", {0.0, 30.0, 0.0}}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}}},
+        {"corruption", {{"targets", {"rock"}}, {"focus", {0.0, 30.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0}}},
+        // after the crossing at 2 s: knots over the Moon (heights above its ground), down through its floor's focus at 6 s
+        {"portal", {{"world", "nest-moon.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
+                    {"flight", {{0.0, 20.0, 60.0, 4.0}, {0.0, 0.0, 0.0, 6.0}, {0.0, -30.0, -20.0, 7.0}}}}}};
+    std::ofstream(dir / "nest-canyon.scene.json") << canyon.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "nest-canyon.scene.json", registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    params.resetFinals();
+    // the source's camera as a pure function of time: straight through the wall's focus at 2 s
+    (*c)->setCameraPath([](double t) {
+        const glm::vec3 eye(0.0f, 30.0f, 100.0f - 50.0f * static_cast<float>(t));
+        return std::optional<scene::Composition::PortalPose>(scene::Composition::PortalPose{eye, eye + glm::vec3(0, 0, -1), glm::vec3(0, 1, 0)});
+    });
+    const auto at = [&](double t) {
+        FrameTime ft{};
+        ft.renderTime = t;
+        (*c)->update(ft);
+    };
+    at(1.0);
+    CHECK((*c)->portalCrossingSeconds() == Approx(2.0).margin(0.02));
+    CHECK_FALSE((*c)->scene().portal.crossed);
+    at(3.0);
+    CHECK((*c)->scene().portal.crossed);
+    scene::Composition* moonWorld = (*c)->portalWorld();
+    REQUIRE(moonWorld != nullptr);
+    CHECK(moonWorld->portalCrossingSeconds() == Approx(6.0).margin(0.05));
+    CHECK_FALSE(moonWorld->scene().portal.crossed);
+    at(6.0 + 1.0 / 60.0);
+    REQUIRE(moonWorld->scene().portal.active());
+    CHECK(moonWorld->scene().portal.crossed);
+    // just past the floor, the third world's camera is at the exit (the floor's focus lands there), heading down
+    const scene::Camera& cam = moonWorld->portalWorld()->scene().camera;
+    INFO("third camera (" << cam.position.x << ", " << cam.position.y << ", " << cam.position.z << ")");
+    CHECK(glm::length(cam.position - glm::vec3(500.0f, 300.0f, 500.0f)) < 3.0f);
+    CHECK(glm::normalize(cam.target - cam.position).y < -0.3f);
+}

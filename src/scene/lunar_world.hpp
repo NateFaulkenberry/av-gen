@@ -12,8 +12,9 @@
 //   * an albedo field in uv.x: dark regolith (about 0.12), bright ejecta and walls around fresh craters;
 //   * a fine tile (`extent` square at `spacing`) and a coarse skirt (`skirtExtent` at `skirtSpacing`) sunk under it,
 //     so no edge of the world is ever in view;
-//   * boulders: displaced, squashed icospheres, a power law of sizes, denser on fresh rims and ejecta, set into the
-//     ground, merged per chunk (the near ground's scale).
+//   * boulders: rounded, irregular subdivided icospheres (lobes, split faces, lumps; smooth normals), a power law of
+//     sizes (many small, few large), denser on fresh rims and ejecta, partly buried, the regolith's grey, merged per
+//     chunk (the near ground's scale).
 // The surface is drawn by the scene pass with the scene's material program (`program`, a lunar-Lambert regolith).
 //
 // File block: "lunarWorld": {"seed": 3, "extent": 4000, "spacing": 2.5, "skirtExtent": 32000, "skirtSpacing": 32,

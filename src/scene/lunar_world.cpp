@@ -119,8 +119,11 @@ void applyCraters(Field& f, const std::vector<LunarCrater>& craters, std::uint32
                 float& h = f.h[static_cast<std::size_t>(j) * f.n + i];
                 h = h * (1.0f - 0.8f * kin) + mean * 0.8f * kin + craterProfile(r, c.diameter, c.fresh) * fade;
                 if (c.fresh > 0.55f) {
-                    const float ray = 0.5f + 0.5f * std::sin(ang * static_cast<float>(9 + static_cast<int>(c.diameter) % 7) + c.diameter);
-                    float halo = c.fresh * std::pow(std::max(r, 0.05f), -2.2f) * (0.6f + 0.6f * ray * ray * ray);
+                    // rays: narrow bright streaks at irregular angles, broad ones and fine ones, fading outward
+                    const float a1 = 0.5f + 0.5f * valueNoise(std::cos(ang) * 4.0f + c.x * 0.01f, std::sin(ang) * 4.0f + c.z * 0.01f, cs + 7u);
+                    const float a2 = 0.5f + 0.5f * valueNoise(std::cos(ang) * 13.0f + r * 0.6f, std::sin(ang) * 13.0f - r * 0.4f, cs + 9u);
+                    const float ray = std::pow(a1, 3.0f) * 0.6f + std::pow(a2, 4.0f) * 0.8f;
+                    float halo = c.fresh * std::pow(std::max(r, 0.05f), -1.8f) * (0.35f + 1.3f * ray);
                     if (r < 0.85f) halo = c.fresh * 0.9f;
                     const std::size_t k = static_cast<std::size_t>(j) * f.n + i;
                     f.albedo[k] += 0.07f * std::min(halo, 1.2f) * fade;
@@ -205,58 +208,116 @@ void appendGrid(LunarChunk& ch, const Field& f, int i0, int i1, int j0, int j1, 
     }
 }
 
-// A boulder: an icosphere (level 1), displaced by hashed noise, squashed, turned, set into the ground.
-void appendRock(LunarChunk& ch, glm::vec3 centre, float radius, std::uint32_t seed, float albedo) {
-    static const std::vector<glm::vec3> kVerts = [] {
-        const float t = (1.0f + std::sqrt(5.0f)) * 0.5f;
-        std::vector<glm::vec3> v = {{-1, t, 0}, {1, t, 0}, {-1, -t, 0}, {1, -t, 0}, {0, -1, t}, {0, 1, t},
-                                    {0, -1, -t}, {0, 1, -t}, {t, 0, -1}, {t, 0, 1}, {-t, 0, -1}, {-t, 0, 1}};
-        for (auto& p : v) p = glm::normalize(p);
-        return v;
-    }();
-    static const std::vector<std::array<std::uint32_t, 3>> kFaces = {
-        {0, 11, 5}, {0, 5, 1}, {0, 1, 7}, {0, 7, 10}, {0, 10, 11}, {1, 5, 9}, {5, 11, 4}, {11, 10, 2}, {10, 7, 6}, {7, 1, 8},
-        {3, 9, 4}, {3, 4, 2}, {3, 2, 6}, {3, 6, 8}, {3, 8, 9}, {4, 9, 5}, {2, 4, 11}, {6, 2, 10}, {8, 6, 7}, {9, 8, 1}};
-    // subdivide once
-    std::vector<glm::vec3> v = kVerts;
-    std::vector<std::array<std::uint32_t, 3>> faces;
-    const auto mid = [&](std::uint32_t a, std::uint32_t b) {
-        v.push_back(glm::normalize(v[a] + v[b]));
-        return static_cast<std::uint32_t>(v.size() - 1);
+float valueNoise3(glm::vec3 p, std::uint32_t seed) {
+    const glm::vec3 f0 = glm::floor(p);
+    const glm::ivec3 i0(f0);
+    glm::vec3 t = p - f0;
+    t = t * t * (3.0f - 2.0f * t);
+    const auto h = [&](int x, int y, int z) {
+        return static_cast<float>(hashU(static_cast<std::uint32_t>(x) * 73856093U ^ static_cast<std::uint32_t>(y) * 19349663U ^
+                                        static_cast<std::uint32_t>(z) * 83492791U ^ hashU(seed)) &
+                                  0xFFFFFF) /
+               16777215.0f;
     };
-    for (const auto& f : kFaces) {
-        const std::uint32_t ab = mid(f[0], f[1]), bc = mid(f[1], f[2]), ca = mid(f[2], f[0]);
-        faces.push_back({f[0], ab, ca});
-        faces.push_back({f[1], bc, ab});
-        faces.push_back({f[2], ca, bc});
-        faces.push_back({ab, bc, ca});
-    }
-    const float squash = 0.55f + 0.35f * hash01(static_cast<std::int32_t>(seed), 1, 91);
-    const float yaw = 6.2831853f * hash01(static_cast<std::int32_t>(seed), 2, 92);
-    const float c = std::cos(yaw), s = std::sin(yaw);
-    const float sx = 0.8f + 0.5f * hash01(static_cast<std::int32_t>(seed), 3, 93);
-    // flat-shaded (each face its own vertices): rock is faceted, and the facets catch the hard sun
-    for (const auto& f : faces) {
-        std::array<glm::vec3, 3> p{};
-        for (int k = 0; k < 3; ++k) {
-            glm::vec3 q = v[f[static_cast<std::size_t>(k)]];
-            // the same direction must displace the same way in every face that shares it
-            const float d = 0.75f + 0.5f * valueNoise(q.x * 2.3f + q.z * 1.7f + static_cast<float>(seed % 1000),
-                                                       q.y * 2.9f - q.x * 0.7f, seed);
-            q *= d;
-            q = glm::vec3(q.x * sx, q.y * squash, q.z);
-            q = glm::vec3(c * q.x - s * q.z, q.y, s * q.x + c * q.z);
-            p[static_cast<std::size_t>(k)] = centre + q * radius;
+    const float x00 = glm::mix(h(i0.x, i0.y, i0.z), h(i0.x + 1, i0.y, i0.z), t.x);
+    const float x10 = glm::mix(h(i0.x, i0.y + 1, i0.z), h(i0.x + 1, i0.y + 1, i0.z), t.x);
+    const float x01 = glm::mix(h(i0.x, i0.y, i0.z + 1), h(i0.x + 1, i0.y, i0.z + 1), t.x);
+    const float x11 = glm::mix(h(i0.x, i0.y + 1, i0.z + 1), h(i0.x + 1, i0.y + 1, i0.z + 1), t.x);
+    return 2.0f * glm::mix(glm::mix(x00, x10, t.y), glm::mix(x01, x11, t.y), t.z) - 1.0f;
+}
+
+// A unit icosphere at `level` subdivisions, shared vertices (smooth), built once per level.
+struct IcoMesh {
+    std::vector<glm::vec3> v;
+    std::vector<std::array<std::uint32_t, 3>> f;
+};
+const IcoMesh& icosphere(int level) {
+    static const std::array<IcoMesh, 4> kMeshes = [] {
+        std::array<IcoMesh, 4> out{};
+        const float t = (1.0f + std::sqrt(5.0f)) * 0.5f;
+        IcoMesh m;
+        m.v = {{-1, t, 0}, {1, t, 0}, {-1, -t, 0}, {1, -t, 0}, {0, -1, t}, {0, 1, t},
+               {0, -1, -t}, {0, 1, -t}, {t, 0, -1}, {t, 0, 1}, {-t, 0, -1}, {-t, 0, 1}};
+        for (auto& p : m.v) p = glm::normalize(p);
+        m.f = {{0, 11, 5}, {0, 5, 1}, {0, 1, 7}, {0, 7, 10}, {0, 10, 11}, {1, 5, 9}, {5, 11, 4}, {11, 10, 2}, {10, 7, 6}, {7, 1, 8},
+               {3, 9, 4}, {3, 4, 2}, {3, 2, 6}, {3, 6, 8}, {3, 8, 9}, {4, 9, 5}, {2, 4, 11}, {6, 2, 10}, {8, 6, 7}, {9, 8, 1}};
+        out[0] = m;
+        for (int l = 1; l < 4; ++l) {
+            IcoMesh n;
+            n.v = out[static_cast<std::size_t>(l - 1)].v;
+            std::vector<std::pair<std::uint64_t, std::uint32_t>> cache;
+            const auto mid = [&](std::uint32_t a, std::uint32_t b) {
+                const std::uint64_t key = (static_cast<std::uint64_t>(std::min(a, b)) << 32) | std::max(a, b);
+                for (const auto& [k, idx] : cache) {
+                    if (k == key) return idx;
+                }
+                n.v.push_back(glm::normalize(n.v[a] + n.v[b]));
+                const auto idx = static_cast<std::uint32_t>(n.v.size() - 1);
+                cache.emplace_back(key, idx);
+                return idx;
+            };
+            for (const auto& f : out[static_cast<std::size_t>(l - 1)].f) {
+                const std::uint32_t ab = mid(f[0], f[1]), bc = mid(f[1], f[2]), ca = mid(f[2], f[0]);
+                n.f.push_back({f[0], ab, ca});
+                n.f.push_back({f[1], bc, ab});
+                n.f.push_back({f[2], ca, bc});
+                n.f.push_back({ab, bc, ca});
+            }
+            out[static_cast<std::size_t>(l)] = std::move(n);
         }
-        const glm::vec3 n = glm::normalize(glm::cross(p[1] - p[0], p[2] - p[0]) + glm::vec3(0.0f, 1e-9f, 0.0f));
-        const auto base = static_cast<std::uint32_t>(ch.positions.size());
-        for (int k = 0; k < 3; ++k) {
-            ch.positions.push_back(p[static_cast<std::size_t>(k)]);
-            ch.normals.push_back(n);
-            ch.uvs.emplace_back(albedo, 1.0f);
+        return out;
+    }();
+    return kMeshes[static_cast<std::size_t>(std::clamp(level, 0, 3))];
+}
+
+// A boulder (Moon polish): a subdivided icosphere, rounded and irregular -- a few broad lobes, a flattened face or two
+// where it split, then finer lumps -- squashed, turned, tilted and set well into the ground (lunar boulders sit in
+// their own regolith). Smooth normals: weathered rock is rounded, not faceted. Finer meshes for the bigger rocks.
+void appendRock(LunarChunk& ch, glm::vec3 centre, float radius, std::uint32_t seed, float albedo) {
+    const int level = radius < 0.5f ? 1 : (radius < 2.2f ? 2 : 3);
+    const IcoMesh& ico = icosphere(level);
+    const auto hs = [&](int k) { return hash01(static_cast<std::int32_t>(seed), k, 90 + k); };
+    const float squash = 0.5f + 0.35f * hs(1);
+    const float yaw = 6.2831853f * hs(2);
+    const float sx = 0.8f + 0.45f * hs(3);
+    const float tiltX = (hs(4) - 0.5f) * 0.5f, tiltZ = (hs(5) - 0.5f) * 0.5f;
+    // one or two split faces: planes that cut the lumpy sphere flat
+    const glm::vec3 cut1 = glm::normalize(glm::vec3(hs(6) - 0.5f, (hs(7) - 0.3f), hs(8) - 0.5f) + glm::vec3(1e-4f));
+    const glm::vec3 cut2 = glm::normalize(glm::vec3(hs(9) - 0.5f, (hs(10) - 0.5f), hs(11) - 0.5f) + glm::vec3(1e-4f));
+    const float cutAt1 = 0.55f + 0.3f * hs(12), cutAt2 = hs(13) < 0.5f ? 0.65f + 0.25f * hs(14) : 9.0f;
+    const auto so = static_cast<float>(seed % 977u);
+    const float cy = std::cos(yaw), sy = std::sin(yaw);
+    const auto base = static_cast<std::uint32_t>(ch.positions.size());
+    std::vector<glm::vec3> p(ico.v.size());
+    for (std::size_t i = 0; i < ico.v.size(); ++i) {
+        const glm::vec3 d = ico.v[i];
+        float r = 1.0f + 0.28f * valueNoise3(d * 1.3f + glm::vec3(so), seed) + 0.12f * valueNoise3(d * 3.1f + glm::vec3(so * 0.7f), seed + 1u) +
+                  0.05f * valueNoise3(d * 7.3f + glm::vec3(so * 0.3f), seed + 2u);
+        // a split face: points past the plane are pulled back onto it (softly)
+        for (const auto& [n, at] : {std::pair{cut1, cutAt1}, std::pair{cut2, cutAt2}}) {
+            const float along = glm::dot(d * r, n);
+            if (along > at) r -= (along - at) * 0.85f / std::max(glm::dot(d, n), 0.2f);
         }
-        ch.indices.insert(ch.indices.end(), {base, base + 1, base + 2});
+        glm::vec3 q = d * std::max(r, 0.35f);
+        q = glm::vec3(q.x * sx, q.y * squash, q.z);
+        q = glm::vec3(q.x, q.y * std::cos(tiltX) - q.z * std::sin(tiltX), q.y * std::sin(tiltX) + q.z * std::cos(tiltX));
+        q = glm::vec3(q.x * std::cos(tiltZ) - q.y * std::sin(tiltZ), q.x * std::sin(tiltZ) + q.y * std::cos(tiltZ), q.z);
+        q = glm::vec3(cy * q.x - sy * q.z, q.y, sy * q.x + cy * q.z);
+        p[i] = centre + q * radius;
     }
+    std::vector<glm::vec3> n(p.size(), glm::vec3(0.0f));
+    for (const auto& f : ico.f) {
+        const glm::vec3 fn = glm::cross(p[f[1]] - p[f[0]], p[f[2]] - p[f[0]]); // area-weighted
+        n[f[0]] += fn;
+        n[f[1]] += fn;
+        n[f[2]] += fn;
+    }
+    for (std::size_t i = 0; i < p.size(); ++i) {
+        ch.positions.push_back(p[i]);
+        ch.normals.push_back(glm::normalize(n[i] + glm::vec3(0.0f, 1e-9f, 0.0f)));
+        ch.uvs.emplace_back(albedo, 1.0f);
+    }
+    for (const auto& f : ico.f) ch.indices.insert(ch.indices.end(), {base + f[0], base + f[1], base + f[2]});
 }
 
 } // namespace
@@ -366,7 +427,8 @@ std::shared_ptr<const LunarWorld> generateLunarWorld(const LunarGen& gen) {
         for (std::size_t k = 0; k < candidates; ++k) {
             const float x = (2.0f * u01(rng) - 1.0f) * half, z = (2.0f * u01(rng) - 1.0f) * half;
             const float rmax = u01(rng);
-            const float rad = std::min(0.32f * std::pow(std::max(u01(rng), 1e-4f), -1.0f / 1.6f), 4.5f);
+            // cumulative N(>r) ~ r^-1.6 (lunar boulder counts): many small, few large
+            const float rad = std::min(0.22f * std::pow(std::max(u01(rng), 1e-4f), -1.0f / 1.6f), 5.0f);
             const int i = std::clamp(static_cast<int>((x + gen.extent * 0.5f) / gen.spacing), 0, fine.n - 1);
             const int j = std::clamp(static_cast<int>((z + gen.extent * 0.5f) / gen.spacing), 0, fine.n - 1);
             const float ej = fine.ejecta[static_cast<std::size_t>(j) * fine.n + i];
@@ -374,8 +436,11 @@ std::shared_ptr<const LunarWorld> generateLunarWorld(const LunarGen& gen) {
             const float ground = w->sample(x, z);
             const int ci = std::clamp(static_cast<int>((x + gen.extent * 0.5f) / gen.extent * kChunksPerSide), 0, kChunksPerSide - 1);
             const int cj = std::clamp(static_cast<int>((z + gen.extent * 0.5f) / gen.extent * kChunksPerSide), 0, kChunksPerSide - 1);
-            appendRock(rocks[static_cast<std::size_t>(cj * kChunksPerSide + ci)], glm::vec3(x, ground - 0.3f * rad, z), rad,
-                       static_cast<std::uint32_t>(k) ^ gen.seed, 0.13f + 0.06f * u01(rng));
+            // partly buried (a third to a half of the height), the regolith's own grey: rock and soil share a surface here
+            const float bury = 0.15f + 0.2f * u01(rng);
+            const float alb = fine.albedo[static_cast<std::size_t>(j) * fine.n + i] * (0.95f + 0.15f * u01(rng));
+            appendRock(rocks[static_cast<std::size_t>(cj * kChunksPerSide + ci)], glm::vec3(x, ground - bury * rad, z), rad,
+                       static_cast<std::uint32_t>(k) ^ gen.seed, alb);
             ++w->rockCount;
         }
         for (LunarChunk& ch : rocks) {

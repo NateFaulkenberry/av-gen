@@ -198,6 +198,7 @@ struct FrameUniforms {
     corruption6: vec4<f32>,
     corruption7: vec4<f32>,
     corruption8: vec4<f32>,
+    corruption9: vec4<f32>,
 };
 
 struct ObjectUniforms {
