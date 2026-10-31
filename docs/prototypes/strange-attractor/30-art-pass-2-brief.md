@@ -1,7 +1,6 @@
-> **QUEUED, DO NOT START.** This is the owner's brief for the NEXT art pass, saved verbatim on
-> 2026-10-30. Work begins only after Art Pass 1 (docs 12-16: portals, Moon, dusk return) is
-> finished, reviewed and approved by the owner, and the coordinator briefs it. The coordinator
-> adds working rules and stops at that point.
+> **ACTIVE from 2026-10-31.** The owner's brief for Art Pass 2, saved verbatim on 2026-10-30. Art Pass 1
+> (docs 12-19) is merged to main at 214dafd8. The working rules and stops are in
+> `31-art-pass-2-coordinator-notes.md`; where they differ, the owner's words here win.
 
 # Strange Attractor — Art Pass 2
 ## Extended Dimensional Journey, Unexplained Encounters & UFO Sequence
