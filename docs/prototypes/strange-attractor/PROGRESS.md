@@ -35,7 +35,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | portals R | dimensional portals: research, audit, plan (`12`-`15`) | **reviewed**: the owner sees "strong potential"; decisions in `15` §6 |
 | portals A | the Matrix effect: the scan, geometric (world-space) mosh, glyphs, the site in the rock, the opening (`16`) | **approved by the owner** ("I think it looks good") |
 | portals B | Gate A fixes; the portal view, the crossing at 32.0 s, the Moon and the lunar flight (`17`) | **approved by the owner** |
-| portals C | the Moon polish; portal 2 in the crater floor, the dusk canyon, the full 60 s (`18`) | **done, awaiting the owner**: media in `portals-c/` |
+| portals C | the Moon polish; portal 2 in the crater floor, the dusk canyon, the full 60 s (`18`) | reviewed: the floor opening is the highlight |
+| portals C 2 | portal 2's exit in a canyon wall, the dusk light, the floor's field, the Earth, the dive (`19`) | **done, ready for merge**: media in `portals-c2/` |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -176,6 +177,11 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-31: Portals Gate C 2 (`19-portals-gate-c2.md`; ADR-1883, 1884, 1873 revised).
+  - The second portal's canyon side is in the east wall (site B of four candidates). The Moon's floor is turned onto
+    it (the portal now rotates), so the camera drops into the hole and comes out of the wall level; crossing 53.810 s.
+  - The dusk scene is clipped at the exit plane for the camera (not the shadows), so it looks out through the rock.
+  - Dusk light: a low sun raking the walls, cooler shadow; the floor's field pulled in; the Earth reframed.
 - 2026-10-31: Portals Gate C (`18-portals-gate-c.md`; ADR-1883, 1884; 1873 and 1882 revised).
   - The Moon polish: real boulders, micro-relief and craterlets, rays, a 24-degree sun, a reshaped flight with a
     fresh crater beside the glide and a ridge that reveals the hero early, a 3.2-degree Earth (the Gate B "far cut"

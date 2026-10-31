@@ -130,3 +130,9 @@ faults in the strata.
   canyon sets it at the river's surface (-0.8 m), so slipped river-bed blocks no longer push up through the water and
   read as holes (the Gate B weak spot at 23.5 s). It is the tenth vec4 of the frame's corruption block.
 - Over a generated ground (`lunarWorld`) the focus's y is a height above that ground (the Moon's floor portal).
+
+## Revision at Gate C 2
+
+`front` (m, default 30): how far in front of the opening's plane, on the camera's side, the tear reaches into the
+rock. Behind the plane it still fades from 10 to 30 m. A sloped wall's foot stands in front of a vertical opening;
+the dusk exit sets 0.5. It is `corruption9.y`.

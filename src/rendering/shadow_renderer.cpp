@@ -341,6 +341,9 @@ void ShadowRenderer::upload(const void* frameUniforms, std::uint64_t frameUnifor
         const glm::vec4 up(views_[v].up, 0.0f);
         std::memcpy(copy.data() + kFrameCameraRightOffset, &right, sizeof(glm::vec4));
         std::memcpy(copy.data() + kFrameCameraUpOffset, &up, sizeof(glm::vec4));
+        // Gate C 2: the portal clip plane (the frame block's last vec4) is for the camera: rock behind a portal's
+        // exit still casts its shadows
+        std::memset(copy.data() + copy.size() - sizeof(glm::vec4), 0, sizeof(glm::vec4));
         queue.WriteBuffer(im.viewUniforms[v], 0, copy.data(), copy.size());
     }
 }

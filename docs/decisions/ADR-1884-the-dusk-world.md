@@ -23,3 +23,18 @@ joins the canyon's own river run (ADR-1883).
 
 The walls stay readable in the dive and the river run (`portals-c/`); the look is judged on the render, as the plan
 asked, not measured.
+
+## Revision at Gate C 2
+
+The coordinator found the dusk canyon moody but flat: muddy maroon walls, with warm light only on distant rims.
+
+- **The sun is low and rakes the walls.** It is 8 degrees up, behind-left of the exit, so it rakes across the west
+  wall and the far walls down-canyon. Lit sandstone now stands against violet shadow, and the shadows are long.
+- **The shadows are cooler.** The sky fill is bluer and lower, and the bounce is violet, so shadowed stone reads as
+  violet rather than mud. The gorge still does not crush.
+- **The exit is in the east wall** (site B of four candidates; `portals-c2/00-exit-candidates/`). It is 43 m up a
+  56-degree face, facing down-canyon over 200 m of open water, with the lit far walls ahead. The camera flies out low
+  over the water, drifting right with the river and rising slowly, to 60 s.
+- **No tear on the dusk side.** The wall carries a weak corruption field around the exit, but no tear and no code. The
+  camera looks out through the wall and never sees a tear from the front. The tear's throat stretched the wall's foot
+  into dark slivers in front of the camera, and code on the foot filled the first frames.

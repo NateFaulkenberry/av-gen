@@ -133,7 +133,9 @@ TEST_CASE("portals nest: the camera crosses into the Moon, then through the Moon
         {"lunarWorld", {{"extent", 400}, {"spacing", 8}, {"skirtExtent", 1600}, {"skirtSpacing", 64}, {"rocks", 0}}},
         {"corruption", {{"targets", {"lunar.surface"}}, {"focus", {0.0, 0.0, 0.0}}, {"axis", {0.0, -1.0, 0.0}}, {"amount", 1.0},
                         {"width", 40.0}, {"height", 40.0}}},
-        {"portal", {{"world", "nest-third.scene.json"}, {"exit", {500.0, 300.0, 500.0}}, {"exitYaw", 0.0}}}};
+        // Gate C 2: the floor (axis down) turned onto a wall facing +x: a camera dropping in, its up ahead (-z), leaves level
+        {"portal", {{"world", "nest-third.scene.json"}, {"exit", {500.0, 300.0, 500.0}}, {"exitAxis", {1.0, 0.0, 0.0}},
+                    {"entryUp", {0.0, 0.0, -1.0}}, {"exitUp", {0.0, 1.0, 0.0}}}}};
     std::ofstream(dir / "nest-moon.scene.json") << moon.dump();
     const nlohmann::json canyon = {
         {"format", "avgen-scene"}, {"version", 1}, {"name", "canyon"},
@@ -142,7 +144,7 @@ TEST_CASE("portals nest: the camera crosses into the Moon, then through the Moon
         {"corruption", {{"targets", {"rock"}}, {"focus", {0.0, 30.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0}}},
         // after the crossing at 2 s: knots over the Moon (heights above its ground), down through its floor's focus at 6 s
         {"portal", {{"world", "nest-moon.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
-                    {"flight", {{0.0, 20.0, 60.0, 4.0}, {0.0, 0.0, 0.0, 6.0}, {0.0, -30.0, -20.0, 7.0}}}}}};
+                    {"flight", {{0.0, 20.0, 5.0, 4.0}, {0.0, 0.0, 0.0, 6.0}, {0.0, -30.0, -2.0, 7.0}}}}}};
     std::ofstream(dir / "nest-canyon.scene.json") << canyon.dump();
     assets::AssetRegistry registry{dir};
     auto c = scene::Composition::loadFile(dir / "nest-canyon.scene.json", registry);
@@ -173,9 +175,17 @@ TEST_CASE("portals nest: the camera crosses into the Moon, then through the Moon
     at(6.0 + 1.0 / 60.0);
     REQUIRE(moonWorld->scene().portal.active());
     CHECK(moonWorld->scene().portal.crossed);
-    // just past the floor, the third world's camera is at the exit (the floor's focus lands there), heading down
-    const scene::Camera& cam = moonWorld->portalWorld()->scene().camera;
+    // just past the floor, the third world's camera is at the exit (the floor's focus lands there), leaving the wall
+    // level along +x with the world's up: the drop turned through the portal
+    const scene::Scene& thirdScene = moonWorld->portalWorld()->scene();
+    const scene::Camera& cam = thirdScene.camera;
     INFO("third camera (" << cam.position.x << ", " << cam.position.y << ", " << cam.position.z << ")");
     CHECK(glm::length(cam.position - glm::vec3(500.0f, 300.0f, 500.0f)) < 3.0f);
-    CHECK(glm::normalize(cam.target - cam.position).y < -0.3f);
+    const glm::vec3 fwd = glm::normalize(cam.target - cam.position);
+    INFO("forward (" << fwd.x << ", " << fwd.y << ", " << fwd.z << "), up (" << cam.up.x << ", " << cam.up.y << ", " << cam.up.z << ")");
+    CHECK(fwd.x > 0.9f);
+    CHECK(cam.up.y > 0.9f);
+    // the rock behind the exit wall is clipped for the camera: the plane x = 500, behind it x < 500
+    CHECK(thirdScene.portalClip.x == Approx(1.0f));
+    CHECK(thirdScene.portalClip.w == Approx(-500.0f));
 }

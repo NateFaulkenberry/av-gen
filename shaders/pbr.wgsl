@@ -97,6 +97,12 @@ fn corruptEchoDropped(in: VertexOut) -> bool {
     return !crEchoKeeps(p0, frame.params.x, u32(object.corrupt.y + 0.5));
 }
 
+// Gate C 2: behind a portal's exit wall (scene::Scene::portalClip), where the camera behind the wall looks out.
+fn portalClipped(p: vec3<f32>) -> bool {
+    let n = frame.portalClip.xyz;
+    return dot(n, n) > 0.0 && dot(n, p) + frame.portalClip.w < 0.0;
+}
+
 // The entity's shaded output; the entry points below discard on the effect clip after calling it.
 fn entityShade(in: VertexOut, frontFacing: bool) -> SceneOut {
     let screenUv = in.clip.xy * frame.targetSize.zw;
@@ -133,7 +139,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         out = corruptShade(out, in, frontFacing);
     }
     // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
-    if (fxClipDiscard || (object.corrupt.x > 0.5 && corruptEchoDropped(in))) {
+    if (fxClipDiscard || (object.corrupt.x > 0.5 && corruptEchoDropped(in)) || portalClipped(in.worldPos)) {
         discard;
     }
     return out;
@@ -150,7 +156,7 @@ fn fs_main_refract(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> S
     } else {
         out.color = vec4<f32>(refractSurface(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
     }
-    if (fxClipDiscard) {
+    if (fxClipDiscard || portalClipped(in.worldPos)) {
         discard;
     }
     return out;
@@ -175,7 +181,7 @@ fn fs_main_ssr(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
         }
     }
     out.color = vec4<f32>(delta, 0.0);
-    if (fxClipDiscard) {
+    if (fxClipDiscard || portalClipped(in.worldPos)) {
         discard;
     }
     return out;
@@ -222,7 +228,7 @@ fn depthPrepassClip(in: VertexOut) {
     // makes, so the prepass and every shadow map lose what the colour loses. Decided here (the gate
     // is uniform per draw), discarded at the end, after the alpha test's texture sample: see
     // `fxClipDiscard` in pbr_shade.wgsl for why a discard may not precede a derivative.
-    var clipped = object.corrupt.x > 0.5 && corruptEchoDropped(in); // ADR-1873
+    var clipped = (object.corrupt.x > 0.5 && corruptEchoDropped(in)) || portalClipped(in.worldPos); // ADR-1873, Gate C 2
     if (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_CLIP) != 0u) {
         setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
         clipped = clipped || fxClipped(in.worldPos);

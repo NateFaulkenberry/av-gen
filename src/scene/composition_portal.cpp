@@ -39,6 +39,16 @@ float smooth(float a, float b, float x) {
     return t * t * (3.0f - 2.0f * t);
 }
 
+// The camera's true up: `up` made perpendicular to the view (what a look-at would use), so a rotation through a
+// portal carries it exactly even when the view is nearly vertical.
+glm::vec3 orthoUp(glm::vec3 eye, glm::vec3 target, glm::vec3 up) {
+    const glm::vec3 f = target - eye;
+    if (glm::dot(f, f) < 1e-12f) return up;
+    const glm::vec3 d = glm::normalize(f);
+    const glm::vec3 u = up - d * glm::dot(up, d);
+    return glm::dot(u, u) > 1e-10f ? glm::normalize(u) : up;
+}
+
 glm::vec3 hermite(glm::vec3 p0, glm::vec3 m0, glm::vec3 p1, glm::vec3 m1, float u) {
     const float u2 = u * u, u3 = u2 * u;
     return (2 * u3 - 3 * u2 + 1) * p0 + (u3 - 2 * u2 + u) * m0 + (-2 * u3 + 3 * u2) * p1 + (u3 - u2) * m1;
@@ -135,11 +145,33 @@ float Composition::portalGround(float x, float z) const {
 namespace {
 struct PortalFrame {
     glm::vec3 entry, exit;
-    float cy, sy;
-    [[nodiscard]] glm::vec3 d(glm::vec3 v) const { return glm::vec3(cy * v.x - sy * v.z, v.y, sy * v.x + cy * v.z); }
+    glm::mat3 r;
+    [[nodiscard]] glm::vec3 d(glm::vec3 v) const { return r * v; }
     [[nodiscard]] glm::vec3 p(glm::vec3 v) const { return d(v - entry) + exit; }
 };
+
+// An orthonormal frame from a forward and an up (up made perpendicular to forward).
+glm::mat3 frameOf(glm::vec3 forward, glm::vec3 up) {
+    const glm::vec3 f = glm::normalize(forward);
+    const glm::vec3 u = glm::normalize(up - f * glm::dot(up, f));
+    return glm::mat3(f, u, glm::cross(f, u));
+}
 } // namespace
+
+// The portal's rotation from this world to the destination. A yaw (exitYaw) unless the block names the exit's own
+// crossing direction (exitAxis): then the rotation takes the entry's (the corruption's axis, entryUp) onto the exit's
+// (exitAxis, exitUp) -- Gate C 2: the Moon's floor (axis down) onto a canyon wall (axis level), so that a camera
+// dropping into the floor with its up pointing ahead leaves the wall level, its up the world's.
+glm::mat3 Composition::portalRotation() const {
+    if (glm::length(portal_.exitAxis) > 1e-6f) {
+        const glm::vec3 axis = glm::normalize(scene_.corruption.axis);
+        return frameOf(portal_.exitAxis, portal_.exitUp) * glm::transpose(frameOf(axis, portal_.entryUp));
+    }
+    const float yaw = glm::radians(portal_.exitYaw);
+    const float cy = std::cos(yaw), sy = std::sin(yaw);
+    // columns: the images of x, y, z (x' = cy x - sy z, z' = sy x + cy z)
+    return glm::mat3(glm::vec3(cy, 0.0f, sy), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(-sy, 0.0f, cy));
+}
 
 // The arrival: from where and how the camera crosses (C1), through the authored knots (heights above the
 // destination's ground), and, with a join, into the destination's own flythrough.
@@ -151,12 +183,11 @@ void Composition::buildPortalArrival() {
     const auto arrive = ownCameraAt(portalCrossing_), before = ownCameraAt(portalCrossing_ - 0.05);
     if (!arrive || !before) return;
     const Corruption& c = scene_.corruption;
-    const float yaw = glm::radians(portal_.exitYaw);
-    const PortalFrame f{c.focus, portal_.exit, std::cos(yaw), std::sin(yaw)};
+    const PortalFrame f{c.focus, portal_.exit, portalRotation()};
     const glm::vec3 p0 = f.p(arrive->eye);
     const glm::vec3 v0 = f.d((arrive->eye - before->eye) / 0.05f);
     portalArriveAim_ = glm::normalize(f.d(arrive->target - arrive->eye));
-    portalArriveUp_ = f.d(arrive->up);
+    portalArriveUp_ = f.d(orthoUp(arrive->eye, arrive->target, arrive->up));
     portalKnots_.push_back(p0);
     portalKnotTimes_.push_back(tc);
     for (const glm::vec4& w : portal_.flight) {
@@ -193,12 +224,11 @@ void Composition::buildPortalArrival() {
 std::optional<Composition::PortalPose> Composition::portalCameraAt(double seconds) const {
     if (!portalWorld_) return std::nullopt;
     const Corruption& c = scene_.corruption;
-    const float yaw = glm::radians(portal_.exitYaw);
-    const PortalFrame f{c.focus, portal_.exit, std::cos(yaw), std::sin(yaw)};
+    const PortalFrame f{c.focus, portal_.exit, portalRotation()};
     if (seconds < portalCrossing_ || portalKnots_.empty()) {
         const auto own = ownCameraAt(seconds);
         if (!own) return std::nullopt;
-        return PortalPose{f.p(own->eye), f.p(own->target), f.d(own->up)};
+        return PortalPose{f.p(own->eye), f.p(own->target), f.d(orthoUp(own->eye, own->target, own->up))};
     }
     const auto tc = static_cast<float>(portalCrossing_);
     const auto s = static_cast<float>(seconds);
@@ -221,13 +251,17 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
         return hermite(q[i], m[i] * h, q[i + 1], m[i + 1] * h, std::clamp((t - qt[i]) / h, 0.0f, 1.0f));
     };
     const glm::vec3 p = at(s);
-    const glm::vec3 ahead = at(s + 1.2f) - p;
+    glm::vec3 ahead = at(s + 1.2f) - p;
+    // a climb is not looked up at (a quarter of it): rising over a crater rim to hover above a portal, the view stays
+    // on the ground ahead instead of tipping into the black sky; a descent is looked down at in full
+    if (ahead.y > 0.0f) ahead.y *= 0.25f;
     glm::vec3 look = glm::length(ahead) > 1e-4f ? glm::normalize(ahead + glm::vec3(0.0f, -0.1f, 0.0f) * glm::length(ahead)) : portalArriveAim_;
     glm::vec3 up{0.0f, 1.0f, 0.0f};
     if (joined) {
-        // into the destination's own view (its aim and bank) over the last 1.5 s before the join
+        // into the destination's own view (its aim and bank) over the 3 s before the join, eased at both ends
         const float tj = portal_.join.y;
-        const float wj = smooth(tj - 1.5f, tj, s);
+        const float u = std::clamp((s - (tj - 3.0f)) / 3.0f, 0.0f, 1.0f);
+        const float wj = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f);
         if (const auto d = destAt(std::max(s, tj)); d && wj > 0.0f) {
             look = glm::normalize(glm::mix(look, glm::normalize(d->target - d->eye), wj));
             up = glm::normalize(glm::mix(up, d->up, wj));
@@ -235,7 +269,7 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
     }
     const float w = smooth(tc, tc + 1.6f, s);
     const glm::vec3 dir = glm::normalize(glm::mix(portalArriveAim_, look, w));
-    return PortalPose{p, p + dir * 100.0f, glm::normalize(glm::mix(portalArriveUp_, up, w))};
+    return PortalPose{p, p + dir * 100.0f, orthoUp(p, p + dir, glm::normalize(glm::mix(portalArriveUp_, up, w)))};
 }
 
 // The destination: its camera (the source's camera carried through the portal's transform until the camera crosses
@@ -286,15 +320,22 @@ void Composition::updatePortal(const FrameTime& time) {
         cam.up = pose->up;
     } else {
         // not crossed: this frame's own camera (with everything composed on it) carried through the portal
-        const float yaw = glm::radians(portal_.exitYaw);
-        const PortalFrame f{entry, portal_.exit, std::cos(yaw), std::sin(yaw)};
+        const PortalFrame f{entry, portal_.exit, portalRotation()};
         cam.position = f.p(scene_.camera.position);
         cam.target = f.p(scene_.camera.target);
-        cam.up = f.d(scene_.camera.up);
+        cam.up = f.d(orthoUp(scene_.camera.position, scene_.camera.target, scene_.camera.up));
     }
     portalWorld_->setCameraPath([this](double s) { return portalCameraAt(s); });
     portalWorld_->setCameraOverride(cam);
     portalWorld_->update(time);
+    // an exit cut into the destination's own geometry (exitAxis given): its rock behind the exit plane is not drawn,
+    // so the camera carried behind the wall sees out through the opening
+    if (glm::length(portal_.exitAxis) > 1e-6f) {
+        const glm::vec3 n = glm::normalize(portal_.exitAxis);
+        portalWorld_->scene_.portalClip = glm::vec4(n, -glm::dot(n, portal_.exit));
+    } else {
+        portalWorld_->scene_.portalClip = glm::vec4(0.0f);
+    }
     scene_.portal.world = &portalWorld_->scene();
     scene_.portal.crossed = crossed;
 }

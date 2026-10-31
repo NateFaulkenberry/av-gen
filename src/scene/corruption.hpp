@@ -84,6 +84,8 @@ struct Corruption {
     float echoOffset = 1.0f; // scales how far back the echoes trail (1 = all the way to the original place)
     float light = 0.0f;      // a point light in the opening (candela at full opening): its glow and the other world's
                              // light on the rock around it (0 = none)
+    float front = 30.0f;     // how far in front of the opening's plane (toward the camera's side) the opening reaches
+                             // into the rock (m); a sloped wall's foot stands in front of a vertical plane
     float floor = -1e9f;     // world y: rest positions below it are never displaced (a river bed stays under its
                              // water), fading in over the 2 m above it
     int echoes = 0;          // extra copies (0..3)

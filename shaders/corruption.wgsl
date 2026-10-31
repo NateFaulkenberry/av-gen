@@ -81,6 +81,16 @@ fn crAperture(p: vec3<f32>, b: CrBasis) -> CrAperture {
     return CrAperture(e, seamT, openT, u, v, w);
 }
 
+// How far from the opening's plane its tear reaches: 10..30 m behind it (into the rock), and in front of it a third of
+// `front` .. `front` (Gate C 2: a sloped wall's foot stands in front of a vertical plane and must not be torn)
+fn crReach(w: f32) -> f32 {
+    if (w >= 0.0) {
+        return 1.0 - smoothstep(10.0, 30.0, w);
+    }
+    let f = max(frame.corruption9.y, 0.5);
+    return 1.0 - smoothstep(f / 3.0, f, -w);
+}
+
 struct CrPoint {
     p: vec3<f32>,
     uvShift: f32,
@@ -156,7 +166,7 @@ fn crDisplace(p0: vec3<f32>, t: f32, echo: u32) -> CrPoint {
         out.keep = out.keep && eFull > 1.6;
     } else if (frame.corruption2.w > 0.0) {
         let ap = crAperture(p0, b);
-        let wd = 1.0 - smoothstep(10.0, 30.0, abs(ap.w));
+        let wd = crReach(ap.w);
         if (wd > 0.0 && ap.openT > 0.0) {
             let e = max(ap.e, 1e-3);
             if (ap.e < 1.0) {
@@ -232,7 +242,7 @@ fn crSurface(p0: vec3<f32>, n: vec3<f32>, t: f32, duv: f32) -> CrSurface {
     let glowColor = frame.corruption8.xyz;
     if (frame.corruption2.w > 0.0) {
         let ap = crAperture(p0, b);
-        let wd = 1.0 - smoothstep(10.0, 30.0, abs(ap.w));
+        let wd = crReach(ap.w);
         let inside = 1.0 - smoothstep(0.96, 1.0, ap.e);
         let rim = exp(-pow((ap.e - 1.04) / 0.035, 2.0));
         // the seam is light leaking through a hairline; once it splits, the throat is dark and the rim burns

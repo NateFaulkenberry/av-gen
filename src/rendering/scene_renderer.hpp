@@ -401,7 +401,8 @@ struct FrameUniforms {
     glm::vec4 corruption6{0.0f};
     glm::vec4 corruption7{0.0f};
     glm::vec4 corruption8{0.0f};
-    glm::vec4 corruption9{0.0f}; // Moon polish: x = the floor (world y) below which nothing is displaced
+    glm::vec4 corruption9{0.0f}; // Moon polish: x = the floor (world y) below which nothing is displaced, y = front reach
+    glm::vec4 portalClip{0.0f};  // Gate C 2: scene::Scene::portalClip (last: the shadow views zero it)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
 // term grew by one vec4 when `skySun` was added; this assert is what caught the WGSL side needing
@@ -420,7 +421,9 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        192 + // ADR-1151: twelve vec4s of reflection bands
                                        80 + // ADR-1864/1865: five vec4s of cirrus
                                        16 + // ADR-1870: one vec4 of depth range
-                                       160); // ADR-1873: ten vec4s of corruption, appended last
+                                       160 + // ADR-1873: ten vec4s of corruption
+                                       16); // Gate C 2: the portal clip plane, last
+static_assert(offsetof(FrameUniforms, portalClip) == sizeof(FrameUniforms) - 16); // ShadowRenderer zeroes it
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
 static_assert(offsetof(FrameUniforms, invViewProj) == 64);
 static_assert(offsetof(FrameUniforms, prevViewProj) == 128);

@@ -28,7 +28,7 @@ def direction(az_deg, el_deg):
 
 
 S = direction(110.0, 24.0)                  # toward the sun
-E = direction(-8.0, 4.5)                   # toward the Earth: upper left of the route, above the hero crater
+E = direction(-4.0, 3.0)                    # toward the Earth: ahead, above the hero crater
 EXIT = [0.0, 0.0, 1500.0]
 EARTH_DISTANCE, EARTH_RADIUS = 40000.0, 1120.0   # 3.2 degrees across (life: 1.9; enlarged for the composition, Moon polish)
 EARTH_FILE_RADIUS = 100.0  # make_earth.py's sphere (a node's scale is capped at 100: the Gate B 'far cut' was that cap)
@@ -107,12 +107,17 @@ ops = micro + [
 # Gate C: the portal on P's floor, a little toward the sunlit side; the canyon at dusk beyond it
 PORTAL = [-45.0, 0.0, 835.0]
 GOLD = [0.85, 0.75, 0.45]                 # the lunar scan's cooler gold
-# The dusk canyon: the camera joins its own flythrough on the river run (its second 17, at half speed, from 55.5 s);
-# the exit hangs in the sky upstream of that point and above it, and the yaw turns the dive's heading (-z here) onto
-# the river's (0.202, -0.979) there.
-DUSK_JOIN_FROM, DUSK_JOIN_AT, DUSK_JOIN_RATE = 17.0, 55.5, 0.5
-DUSK_EXIT = [-45.4, 150.0, 4176.3]
-DUSK_YAW = math.degrees(math.asin(0.202))
+# Gate C 2: the canyon-side exit is in a canyon wall, as portal 1 is (owner). Site B of the candidates
+# (portals-c2/00-exit-candidates): the east wall, 35 m up a 56-degree face over the river, facing down-canyon; 200 m of
+# open water straight ahead, the far walls in the last light. The portal turns the floor (axis down) onto that wall:
+# a camera dropping into the floor with its up pointing ahead (-z) leaves the wall level, its up the world's.
+DUSK_OUT = [-0.426, 0.0, -0.905]          # out of the wall (the wall's downhill normal)
+DUSK_EXIT = [166.5, 43.0, 3427.3]       # 7 m above the wall's face where it meets the plane (35.9 m)
+# after the exit: out over the water, low, drifting right with the river, a slow rise (heights above the canyon floor)
+DUSK_FLIGHT = [[166.5 - 0.426 * 45, 26, 3427.3 - 0.905 * 45, 55.3],
+               [166.5 - 0.426 * 105 + 0.905 * 5, 20, 3427.3 - 0.905 * 105 - 0.426 * 5, 57.3],
+               [166.5 - 0.426 * 165 + 0.905 * 10, 28, 3427.3 - 0.905 * 165 - 0.426 * 10, 59.5],
+               [166.5 - 0.426 * 200 + 0.905 * 12, 36, 3427.3 - 0.905 * 200 - 0.426 * 12, 61.0]]
 bounce = unit([S[0], 0.3, S[2]])
 earth = [EXIT[0] + E[0] * EARTH_DISTANCE, 40.0 + E[1] * EARTH_DISTANCE, EXIT[2] + E[2] * EARTH_DISTANCE]
 scene = {
@@ -141,18 +146,18 @@ scene = {
     # canyon at dusk, far below; the same corruption as the canyon's wall (focus y is a height above the ground here),
     # turned to face down, in a cooler gold, with no strata slide (uv.x is the regolith's albedo).
     "corruption": {"targets": ["lunar.surface"], "focus": PORTAL, "axis": [0.0, -1.0, 0.0], "amount": 1.0,
-                   "radius": 260.0, "inner": 0.15, "fieldNear": 60.0, "fieldFar": 700.0, "openNear": 55.0, "openFar": 330.0,
+                   "radius": 60.0, "inner": 0.25, "fieldNear": 50.0, "fieldFar": 450.0, "openNear": 30.0, "openFar": 150.0,
                    "seam": 0.3, "width": 46.0, "height": 40.0, "depth": 10.0, "block": 5.0, "share": 0.18, "slip": 2.5,
                    "rate": 0.5, "strip": 4.0, "stripSlip": 1.5, "slide": 0.0, "pull": 6.0, "lift": 1.2, "fold": 0.8,
                    "lag": 0.7, "glyph": 5.0, "glyphSize": 1.8, "glow": 4.0, "echoes": 0, "echoOffset": 1.0,
                    "glowColor": GOLD, "light": 1800.0},
     "meshWire": {"targets": ["lunar.surface"], "color": [0.75, 0.62, 0.34], "intensity": 0.0, "width": 1.0, "creaseLow": 2.0,
                  "creaseHigh": 12.0, "reveal": 1.0, "fadeNear": 60.0, "fadeFar": 900.0, "minPixels": 14.0, "wave": 0.0,
-                 "waveRadius": 700.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
-                 "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 110.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
+                 "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
+                 "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                  "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.95, 0.88, 0.62], "shards": 0.25, "shardRate": 0.35},
-    "portal": {"world": "strange-attractor-dusk.scene.json", "exit": DUSK_EXIT, "exitYaw": DUSK_YAW,
-               "flight": [], "join": [DUSK_JOIN_FROM, DUSK_JOIN_AT, DUSK_JOIN_RATE]},
+    "portal": {"world": "strange-attractor-dusk.scene.json", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
+               "entryUp": [0.0, 0.0, -1.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT},
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,
                "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True}],
 }

@@ -621,12 +621,12 @@
       0.0
     ],
     "amount": 1.0,
-    "radius": 260.0,
-    "inner": 0.15,
-    "fieldNear": 60.0,
-    "fieldFar": 700.0,
-    "openNear": 55.0,
-    "openFar": 330.0,
+    "radius": 60.0,
+    "inner": 0.25,
+    "fieldNear": 50.0,
+    "fieldFar": 450.0,
+    "openNear": 30.0,
+    "openFar": 150.0,
     "seam": 0.3,
     "width": 46.0,
     "height": 40.0,
@@ -672,14 +672,14 @@
     "fadeFar": 900.0,
     "minPixels": 14.0,
     "wave": 0.0,
-    "waveRadius": 700.0,
+    "waveRadius": 300.0,
     "waveWidth": 40.0,
     "waveGain": 1.6,
     "waveAhead": 200.0,
     "clipBelow": -1000.0,
     "fromFocus": 1.0,
     "pulse": 1.2,
-    "pulseSpacing": 110.0,
+    "pulseSpacing": 60.0,
     "pulseSpeed": 40.0,
     "pulseWidth": 6.0,
     "focusGain": 0.5,
@@ -695,16 +695,50 @@
   "portal": {
     "world": "strange-attractor-dusk.scene.json",
     "exit": [
-      -45.4,
-      150.0,
-      4176.3
+      166.5,
+      43.0,
+      3427.3
     ],
-    "exitYaw": 11.653938009977946,
-    "flight": [],
-    "join": [
-      17.0,
-      55.5,
-      0.5
+    "exitAxis": [
+      -0.426,
+      0.0,
+      -0.905
+    ],
+    "entryUp": [
+      0.0,
+      0.0,
+      -1.0
+    ],
+    "exitUp": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "flight": [
+      [
+        147.33,
+        26,
+        3386.5750000000003,
+        55.3
+      ],
+      [
+        126.29500000000002,
+        20,
+        3330.145,
+        57.3
+      ],
+      [
+        105.26,
+        28,
+        3273.715,
+        59.5
+      ],
+      [
+        92.16,
+        36,
+        3241.188,
+        61.0
+      ]
     ]
   },
   "nodes": [
@@ -713,9 +747,9 @@
       "kind": "gltf",
       "asset": "../../assets/space/earth.glb",
       "position": [
-        -5549.763069459194,
-        3178.3638291137977,
-        -37988.61611083601
+        -2786.4349968486194,
+        2133.4382497177535,
+        -38347.876935954264
       ],
       "rotation": [
         0,

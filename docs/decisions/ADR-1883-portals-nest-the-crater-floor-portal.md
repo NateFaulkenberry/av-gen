@@ -51,3 +51,41 @@ cooler gold (`meshWire` on the regolith), glyphs on the floor, the floor torn op
   search again.
 - Parameter edits that change a flight after its crossing was found do not move the crossing until the portal is
   set again.
+
+## Revision at Gate C 2: the exit in a canyon wall
+
+The owner asked for the second portal's canyon side to be part of a canyon wall, as portal 1 is: we come out of the
+rock, not out of the sky.
+
+**The rotation.** A portal may now turn the camera, not only yaw it. `portal.exitAxis` names the direction the camera
+leaves the exit. With it, the rotation takes the entry's frame (the corruption's axis and `entryUp`) onto the exit's
+(`exitAxis` and `exitUp`). Without it, the rotation is `exitYaw` as before.
+
+**The Moon side stays in the crater floor.** Two options were weighed:
+- **The crater's inner wall** (both sides vertical, a pure yaw). The hero's inner wall slopes at about 30 degrees, so a
+  vertical opening there stands in the slope like a window rather than a hole torn in rock. It would also give up the
+  floor opening, the highlight of Gate C.
+- **The floor, turned** (chosen). The floor's axis (down) maps onto the wall's (level, out of the rock), and the
+  floor's `entryUp`, the dive's heading (-z), maps onto the world's up. The camera tips over above the hole and drops
+  into it almost vertically, its up pointing ahead. It comes out of the wall nearly level, with its up the world's.
+  The horizon does not jank: through the hole, the canyon is seen upright from the moment the hole opens, and the
+  crossing changes nothing on screen.
+
+The camera hovers over the hole before it drops (from 50.2 s), so the hole opens while the camera is above it. A
+camera behind the hole, still moving forward, maps below the exit, where the canyon wall's foot would be seen from
+underneath.
+
+**The clip.** The camera carried through the portal sits behind the canyon wall until the crossing. The destination's
+`Scene::portalClip` is the exit's plane. The camera's passes (lit, prepass, refraction, SSR) discard everything
+behind it, so the camera looks out through the rock. The shadow views zero the plane, so the rock behind the wall
+still casts its shadows. It is the frame block's last vec4.
+
+**The front reach.** A sloped wall's foot stands in front of a vertical opening. The corruption's new `front` sets how
+far in front of its plane the tear reaches (default 30 m, as before).
+
+**No join.** The dusk camera leaves the wall over open water and flies its own knots, so the 55.5 s join and its view
+turn are gone. The join's blend is also now 3 s, eased at both ends, for any scene that uses one. A pose's up is made
+perpendicular to its view before it is carried through a portal (`orthoUp`).
+
+**The look does not follow a climb.** The flight's look-ahead takes only a quarter of an upward motion. Rising over
+the hero's rim to the hover, the full look-ahead tipped the view into the black sky for almost a second.

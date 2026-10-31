@@ -11596,6 +11596,11 @@ nlohmann::json Composition::toJson() const {
                        {"exitYaw", portal_.exitYaw},
                        {"flight", flight}};
         if (portal_.join.z > 0.0f) j["portal"]["join"] = {portal_.join.x, portal_.join.y, portal_.join.z};
+        if (glm::length(portal_.exitAxis) > 1e-6f) {
+            j["portal"]["exitAxis"] = {portal_.exitAxis.x, portal_.exitAxis.y, portal_.exitAxis.z};
+            j["portal"]["entryUp"] = {portal_.entryUp.x, portal_.entryUp.y, portal_.entryUp.z};
+            j["portal"]["exitUp"] = {portal_.exitUp.x, portal_.exitUp.y, portal_.exitUp.z};
+        }
     }
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
@@ -12566,12 +12571,22 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     pb.flight.emplace_back(w.at(0).get<float>(), w.at(1).get<float>(), w.at(2).get<float>(), w.at(3).get<float>());
                 }
             }
+            const auto vec3At = [&](const char* key, glm::vec3& out) {
+                if (pj.contains(key)) {
+                    const json& v = pj.at(key);
+                    out = glm::vec3(v.at(0).get<float>(), v.at(1).get<float>(), v.at(2).get<float>());
+                }
+            };
+            vec3At("exitAxis", pb.exitAxis);
+            vec3At("entryUp", pb.entryUp);
+            vec3At("exitUp", pb.exitUp);
             if (pj.contains("join")) {
                 const json& jn = pj.at("join");
                 pb.join = glm::vec3(jn.at(0).get<float>(), jn.at(1).get<float>(), jn.at(2).get<float>());
             }
             for (auto it = pj.begin(); it != pj.end(); ++it) {
-                if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join") {
+                if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join" &&
+                    it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }

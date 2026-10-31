@@ -109,6 +109,10 @@ struct Scene {
         bool crossed = false;
         [[nodiscard]] bool active() const { return world != nullptr; }
     } portal;
+    // Gate C 2: this scene seen as a portal's destination through an exit in its own geometry (a canyon wall): the
+    // plane n.p + w = 0 and everything behind it (n.p + w < 0, the rock the exit is cut into) is not drawn by the
+    // camera's passes -- the camera behind the wall sees out through the opening. Shadows keep it. Zero = none.
+    glm::vec4 portalClip{0.0f};
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     // ADR-1642: the images the programs' texture ops read, decoded, one entry per (resolved path, colour space). Filled
     // by the composition from each program's `textures`; the renderer lays them into one array per colour space.

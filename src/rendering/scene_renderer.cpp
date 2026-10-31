@@ -3565,6 +3565,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.corruption7 = corruption[7];
         frame.corruption8 = corruption[8];
         frame.corruption9 = corruption[9];
+        frame.portalClip = scene.portalClip; // Gate C 2
         const bool liveBackground = (liveSky_.enabled || resolved.cirrus.amount > 0.0f) && skyIbl &&
                                     scene.environment.skyboxBlur <= 0.0f;
         frame.skyLive = liveBackground

@@ -1471,6 +1471,9 @@ public:
         float exitYaw = 0.0f;                    // degrees about +y from this world's frame to the destination's
         std::vector<glm::vec4> flight;           // the destination's flight after the crossing: x, height, z, t
                                                  // (height above the destination's ground: lunar or canyon terrain)
+        glm::vec3 exitAxis{0.0f};                // Gate C 2: the direction the camera leaves the exit (0 = use exitYaw);
+        glm::vec3 entryUp{0.0f, 1.0f, 0.0f};     // with it, the entry's up (the corruption's axis is its forward)
+        glm::vec3 exitUp{0.0f, 1.0f, 0.0f};      // and the exit's up
         glm::vec3 join{0.0f};                    // Gate C: [from, at, rate] -- at `at` seconds the camera joins the
                                                  // destination's own flythrough at its second `from`, run at `rate`
                                                  // (C1); rate 0 = no join
@@ -2431,6 +2434,7 @@ private:
     std::vector<float> portalKnotTimes_;
     glm::vec3 portalArriveAim_{0.0f, 0.0f, -1.0f}, portalArriveUp_{0.0f, 1.0f, 0.0f};
     void buildPortalArrival();
+    [[nodiscard]] glm::mat3 portalRotation() const;
     [[nodiscard]] float portalGround(float x, float z) const;
     void flattenLunar();
     void updatePortal(const FrameTime& time);

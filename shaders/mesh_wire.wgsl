@@ -195,7 +195,7 @@ fn vs_mesh_wire(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u3
         }
         if (frame.corruption2.w > 0.0) {
             let ap = crAperture(restMid, crBasis());
-            let wd = 1.0 - smoothstep(10.0, 30.0, abs(ap.w));
+            let wd = crReach(ap.w);
             // the opening is a void: no line inside it once it has split; its rim is drawn on the rock's own edges
             inThroat = ap.e < 0.97 && wd > 0.5 && ap.openT > 0.05;
             if (mw.extra.y > 0.0) {

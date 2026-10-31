@@ -238,3 +238,13 @@ TEST_CASE("nothing at rest below the floor moves (a river bed stays under its wa
     scene::Corruption d = wall();
     CHECK(scene::packCorruption(d, true)[9].x <= -1.0e5f);
 }
+
+TEST_CASE("the opening reaches only `front` metres in front of its plane", "[corruption][adr1873]") {
+    scene::Corruption c = wall(); // axis -z: in front of the plane is +z
+    c.liveAmount = 0.0f;           // the aperture alone
+    c.liveOpen = 1.0f;
+    const glm::vec3 near = c.focus + glm::vec3(1.0f, 0.5f, 5.0f); // inside the opening's outline, 5 m in front
+    CHECK(scene::corruptPoint(scene::packCorruption(c, true), near, 1.0f, 0).position != near); // default 30 m: torn
+    c.front = 2.0f;
+    CHECK(scene::corruptPoint(scene::packCorruption(c, true), near, 1.0f, 0).position == near); // 2 m: left whole
+}

@@ -20,7 +20,7 @@ struct FloatKey {
     float lo, hi, softLo, softHi;
 };
 
-constexpr std::array<FloatKey, 30> kFloats{{
+constexpr std::array<FloatKey, 31> kFloats{{
     {"amount", &Corruption::amount, 0.0f, 1.0f, 0.0f, 1.0f},
     {"radius", &Corruption::radius, 1.0f, 1.0e5f, 10.0f, 2000.0f},
     {"inner", &Corruption::inner, 0.0f, 0.99f, 0.0f, 0.9f},
@@ -51,6 +51,7 @@ constexpr std::array<FloatKey, 30> kFloats{{
     {"echoOffset", &Corruption::echoOffset, 0.0f, 2.0f, 0.0f, 1.0f},
     {"light", &Corruption::light, 0.0f, 1.0e8f, 0.0f, 100000.0f},
     {"floor", &Corruption::floor, -1.0e9f, 1.0e9f, -500.0f, 2000.0f},
+    {"front", &Corruption::front, 0.5f, 1000.0f, 1.0f, 60.0f},
 }};
 constexpr std::size_t kFloatCount = kFloats.size();
 
@@ -122,7 +123,7 @@ std::array<glm::vec4, kCorruptionVec4s> packCorruption(const Corruption& c, bool
     p[6] = glm::vec4(c.lift, c.fold, c.lag, std::floor(c.seed));
     p[7] = glm::vec4(c.glyph, c.glyphSize, c.glow, c.echoOffset);
     p[8] = glm::vec4(c.glowColor, static_cast<float>(std::clamp(c.echoes, 0, kMaxCorruptionEchoes)));
-    p[9] = glm::vec4(std::max(c.floor, -1.0e6f), 0.0f, 0.0f, 0.0f); // f32 keeps floor + 2 distinct
+    p[9] = glm::vec4(std::max(c.floor, -1.0e6f), c.front, 0.0f, 0.0f); // f32 keeps floor + 2 distinct
     return p;
 }
 
@@ -201,7 +202,8 @@ CorruptedPoint corruptPoint(const std::array<glm::vec4, kCorruptionVec4s>& f, gl
                              0.04f * std::sin(ang * 13.0f + 2.2f);
         const float rag = 1.0f + wander + 0.07f * (crHash(bits(cx), bits(cy), seed, 11u) - 0.5f);
         const float e = std::sqrt((u / a) * (u / a) + (v / hh) * (v / hh)) * rag;
-        const float wd = 1.0f - smooth(10.0f, 30.0f, std::abs(w));
+        const float front = std::max(f[9].y, 0.5f);
+        const float wd = w >= 0.0f ? 1.0f - smooth(10.0f, 30.0f, w) : 1.0f - smooth(front / 3.0f, front, -w); // crReach
         if (wd > 0.0f && openT > 0.0f) {
             const float ee = std::max(e, 1e-3f);
             if (e < 1.0f) {
