@@ -1245,6 +1245,11 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
             hemiDiffuse = hemiDiffuse * keptDiffuse; // ADR-1819
         }
         ambient = (hemiDiffuse + kS * hemi * 0.5 * specularOcclusion) * 0.8;
+        // ADR-1882: a scene that asks for no fallback (`environment.fallbackAmbient` false) gets none -- the constant
+        // blue hemisphere was the cast in the Moon's shadows (a black sky lights nothing)
+        if (frame.bandsSoft2.z > 0.5) {
+            ambient = vec3<f32>(0.0);
+        }
     }
     // ADR-1151: the reflection-only bands. Specular only (a band lights no diffuse term), with the
     // analytic split-sum scale and bias, the same specular occlusion as the IBL, and the anisotropic bend.

@@ -105,6 +105,15 @@ faults in the strata.
 - Targets in the field are drawn double-sided. Their back faces shade dark and faintly warm, the inside of the torn
   rock, rather than letting the sky through.
 
+## Revisions at Gate B (owner and coordinator)
+
+- **The lips.** The lips are torn back as slabs: strata-shaped cells of the wall, 6 × 2.5 m, each a rigid block. They
+  are pushed into or out of the rock, drawn outward and lifted by hashed amounts. This replaces the smooth radial
+  curl, which read as an even fan of gold petals.
+- **The light.** `light` is a point light 10 m in front of the opening. Its intensity is
+  `light × (0.12·field + opening²)`, and its colour goes from the glow's to a moon-white as it opens. It lights the
+  shadowed face, so the slips and echoes read there.
+
 ## Consequences
 
 - With no block, or a block that does not act, the frame is byte-identical (GPU test). Every other entity is

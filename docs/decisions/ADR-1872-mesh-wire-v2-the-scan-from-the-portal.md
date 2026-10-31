@@ -56,6 +56,15 @@ ADR-1862's front was a ring around a point ahead of the camera, in one colour.
     directional lights and edged in the glow colour.
   - Each shard runs its own cycle at `shardRate`, so the shedding is continuous and a pure function of the clock.
 
+## Revisions at Gate B (owner and coordinator)
+
+- **Shards.** They stream along the rim (a tangent drift), a little in past the edge, and then back through the
+  opening's plane, where the other world covers them. They never cross the middle or hang there facing the camera.
+- **Fewer near the camera.** Their share falls as the camera comes within 70 m of the focus, so the crossing is the
+  opening and not a wall of fragments.
+- **Earlier pulses.** The pulses gate on a field of 0.06 (it was 0.35), so faint fronts hint at the portal from
+  about 16 s.
+
 ## Consequences
 
 - With none of the new keys set, the wire is ADR-1862's. `fromFocus` 0 keeps its origin ahead of the camera.

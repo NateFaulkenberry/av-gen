@@ -33,8 +33,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | canyon P1 | the canyon as engine triangle geometry (ADR-1857), `04-canyon-phase1.md` | **done, awaiting the owner**: media in `canyon-p1/` |
 | canyon P2-P6 | revelation, birds, glyphs, (campsite), QA | not started: gated on P1 acceptance |
 | portals R | dimensional portals: research, audit, plan (`12`-`15`) | **reviewed**: the owner sees "strong potential"; decisions in `15` §6 |
-| portals A | the Matrix effect: the scan, geometric (world-space) mosh, glyphs, the site in the rock, the opening (`16`) | **done, awaiting the owner**: media in `portals-a/` |
-| portals B-C | portal 1 and the Moon; portal 2, dusk, the full ~60 s | not started |
+| portals A | the Matrix effect: the scan, geometric (world-space) mosh, glyphs, the site in the rock, the opening (`16`) | **approved by the owner** ("I think it looks good") |
+| portals B | Gate A fixes; the portal view, the crossing at 32.0 s, the Moon and the lunar flight (`17`) | **done, awaiting the owner**: media in `portals-b/` |
+| portals C | portal 2, dusk, the full ~60 s | not started |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -175,6 +176,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-30: Portals Gate B (`17-portals-gate-b.md`; ADR-1879, 1880, 1882; 1872/1873 revised).
+  - Gate A fixes: a clear centre (shards stay on the rim, nothing camera-facing in the aperture), slab lips, a light
+    in the opening, pulses from 16 s and glyphs from 19 s, the Moon through the 25 s slit, the 30–31.6 s shards thinned.
+  - The Moon is its own scene, rendered by a child renderer through the opening and composited before the water.
+  - The crossing at 32.025 s is seamless; the lunar flight leaves C1 with the arrival velocity.
+  - The Moon: generated craters calibrated on the LROC Linné DTM, ~46k boulders, lunar-Lambert regolith, Blue Marble
+    Earth. The blue shadow cast was a constant fallback ambient; `environment.fallbackAmbient: false` removes it.
+  - NASA data is gitignored under `assets/space/`.
 - 2026-10-30: Portals Gate A (`16-portals-gate-a.md`; ADR-1872, 1873, 1881).
   - Site D is the river's own east bank wall under the escarpment. The camera crosses at 32.0 s, on bar 17, and
     0–17.9 s is unchanged.

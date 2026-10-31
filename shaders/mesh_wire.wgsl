@@ -189,7 +189,7 @@ fn vs_mesh_wire(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u3
             let rf = distance(restMid, frame.corruption0.xyz);
             let ph = fract((rf - frame.params.x * mw.pulse.z) / mw.pulse.y);
             let d = min(ph, 1.0 - ph) * mw.pulse.y;
-            pulseBand = exp(-(d / mw.pulse.w) * (d / mw.pulse.w)) * smoothstep(0.0, 0.35, field) *
+            pulseBand = exp(-(d / mw.pulse.w) * (d / mw.pulse.w)) * smoothstep(0.0, 0.06, field) *
                         smoothstep(0.0, 3.0 * mw.pulse.w, rf) * smoothstep(20.0, 120.0, dist);
             heat = max(heat, pulseBand * smoothstep(0.0, 0.5, ph) * (1.0 - smoothstep(0.5, 1.0, ph)) * 2.0);
         }
@@ -309,7 +309,9 @@ fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u
     let seed = crSeed();
     let h = crHash(vec4<u32>(tri, mwIndices[tri * 3u], seed, 31u));
     let ring = 1.0 - smoothstep(1.3, 2.4, ap.e);
-    if (h > mw.extra.z * ap.openT * ring) {
+    // fewer as the camera closes in: the crossing is the opening, not a wall of fragments
+    let camNear = smoothstep(15.0, 70.0, distance(frame.cameraPos.xyz, frame.corruption0.xyz));
+    if (h > mw.extra.z * ap.openT * ring * camNear) {
         return out;
     }
     let rate = max(mw.extra.w, 0.01);
@@ -318,11 +320,14 @@ fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u
     let c0 = crDisplace(cR, frame.params.x, 0u).p;
     let focus = frame.corruption0.xyz;
     let ease = ph * ph * (3.0 - 2.0 * ph);
-    let centre = c0 + (focus - c0) * ease * 0.85 + b.ax * frame.corruption3.z * 0.7 * ph * ph;
+    // along the rim and in past the edge, then back through the opening's plane (where the other world covers them):
+    // never across its middle, never hanging there facing the camera
+    let along = normalize(cross(b.ax, cR - focus) + vec3<f32>(1e-4, 0.0, 0.0));
+    let centre = c0 + (focus - c0) * ease * 0.18 + along * ease * 6.0 + b.ax * (frame.corruption3.z + 12.0) * pow(ph, 1.5);
     let axis = normalize(vec3<f32>(crHash(vec4<u32>(tri, 3u, seed, 34u)) - 0.5, crHash(vec4<u32>(tri, 4u, seed, 35u)) - 0.5,
                                    crHash(vec4<u32>(tri, 5u, seed, 36u)) - 0.5) + vec3<f32>(1e-3, 0.0, 0.0));
     let angle = ph * 3.1415927 * (1.0 + 2.0 * crHash(vec4<u32>(tri, 6u, seed, 37u)));
-    let scale = (1.0 - smoothstep(0.55, 1.0, ph)) * 0.92;
+    let scale = (1.0 - smoothstep(0.45, 0.85, ph)) * 0.92;
     var corners = array<vec3<f32>, 3>(r0, r1, r2);
     var barys = array<vec3<f32>, 3>(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
     let k = vi % 3u;

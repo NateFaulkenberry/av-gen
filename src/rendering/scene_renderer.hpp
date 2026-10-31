@@ -608,6 +608,8 @@ public:
     // The RGBA16F texture the tonemap pass sampled in the last render() (the HDR target or the
     // last post output; CopySrc usage), for asynchronous HDR readback. Null before the first frame.
     [[nodiscard]] const wgpu::Texture& hdrOutputTexture() const { return hdrOutput_; }
+    // ADR-1879: the scene radiance before the post chain (what a portal view composites into another frame).
+    [[nodiscard]] const wgpu::Texture& sceneHdrTexture() const { return hdr_.colorTexture(); }
     // ADR-918: the fog's view of the sky -- the sky's radiance by direction, low-passed, rebuilt
     // on every frame whose fog takes its colour from the sky (`stats().fogSkyMap`). RGBA16F,
     // `kFogSkyWidth` x `kFogSkyHeight`, u = azimuth as the sky's equirect has it, v = the square
@@ -1108,6 +1110,18 @@ private:
     std::unique_ptr<CloudRenderer> clouds_; // ADR-1289
     std::vector<EnvironmentRenderer*> environments_; // ADR-1200: the seam, in run order (owned by SceneRenderer)
     std::unique_ptr<MeshWireRenderer> meshWire_;     // ADR-1862: a mesh entity's triangle edges, pass 1's blended section
+    // ADR-1879: a portal view. The destination world is drawn by a renderer of its own (its meshes, shadows, sky and
+    // temporal state never churn), into its own target, and composited here. A portal view does not draw portals.
+    std::unique_ptr<SceneRenderer> portalRenderer_;
+    bool isPortalView_ = false;
+    wgpu::Texture portalTarget_;
+    wgpu::RenderPipeline portalPipeline_;
+    wgpu::BindGroupLayout portalLayout_;
+    wgpu::Buffer portalParams_;
+    wgpu::Sampler portalSampler_;
+    [[nodiscard]] Result<void> ensurePortalPipeline();
+    void encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
+                          std::uint32_t width, std::uint32_t height);
     std::unique_ptr<RibbonRenderer> ribbons_;        // ADR-703 (Wave 1): RIBBON, pass 1's blended section
     std::unique_ptr<ShellRenderer> shells_;          // Wave 3: SHELL, pass 1's blended section
     std::unique_ptr<PostProcessor> postProcessor_;

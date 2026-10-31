@@ -14,6 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <glm/gtc/quaternion.hpp>
 #include <filesystem>
 #include <memory>
 
@@ -145,4 +146,52 @@ TEST_CASE("corruption: acting, it moves the target's geometry, and opens it", "[
     scene::Scene untargeted = field;
     untargeted.entities.back().corruptTarget = false;
     CHECK(changed(rest, render(renderer, untargeted)) == 0);
+}
+
+// ADR-1879: the portal view on pixels -- inside the opening, the other world; outside it, this one; crossed, the other
+// world everywhere.
+TEST_CASE("portal: the other world shows inside the opening, and fills the frame once crossed", "[gpu][portal][adr1879]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    // this world: a dark wall facing the camera
+    scene::Scene here;
+    here.camera.position = glm::vec3(0.0f, 0.0f, 12.0f);
+    here.camera.target = glm::vec3(0.0f);
+    here.camera.fovYRadians = glm::radians(60.0f);
+    here.environment.backgroundColor = glm::vec3(0.0f);
+    scene::PunctualLight key;
+    key.type = scene::PunctualLight::Type::Directional;
+    key.direction = glm::normalize(glm::vec3(0.0f, -0.3f, -1.0f));
+    key.intensity = 1.0f;
+    here.addLight(key);
+    const scene::MeshId plane = here.addMesh(scene::makePlane(20.0f, 20));
+    scene::Entity& wall = here.addEntity("wall", plane);
+    wall.transform.rotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    wall.material.baseColor = glm::vec4(0.05f, 0.05f, 0.05f, 1.0f);
+    wall.corruptTarget = true;
+    scene::Corruption& c = here.corruption;
+    c.targets = {"wall"};
+    c.focus = glm::vec3(0.0f);
+    c.axis = glm::vec3(0.0f, 0.0f, -1.0f);
+    c.width = 3.0f;
+    c.height = 3.0f;
+    c.depth = 0.0f;
+    c.liveOpen = 1.0f;
+    // the other world: nothing but a bright background
+    scene::Scene there;
+    there.camera = here.camera;
+    there.environment.backgroundColor = glm::vec3(0.9f, 0.3f, 0.1f);
+    const gpu::Image8 alone = render(renderer, here);
+    here.portal.world = &there;
+    const gpu::Image8 opened = render(renderer, here);
+    const auto centre = opened.pixel(kWidth / 2, kHeight / 2);
+    const auto corner = opened.pixel(4, 4);
+    INFO("centre " << int(centre[0]) << "," << int(centre[1]) << "," << int(centre[2]));
+    CHECK(centre[0] > centre[2] + 60); // the other world's orange
+    CHECK(corner[0] == alone.pixel(4, 4)[0]); // this world outside the opening
+    here.portal.crossed = true;
+    const gpu::Image8 crossed = render(renderer, here);
+    CHECK(crossed.pixel(4, 4)[0] > crossed.pixel(4, 4)[2] + 60);
 }

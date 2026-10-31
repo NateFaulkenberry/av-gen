@@ -101,6 +101,14 @@ struct Scene {
     AttractorWorldBlock attractorWorld;      // ADR-1850 (drawn as engine geometry since ADR-1857/1861)
     MeshWire meshWire;                       // ADR-1862; rendering::MeshWireRenderer, pass 1's blended section
     Corruption corruption;                   // ADR-1873; the entity vertex stage and shading, the mesh wire
+    // ADR-1879: a portal view -- another world, drawn from its own (virtual) camera by the renderer's portal renderer
+    // and composited where the camera's ray meets the corruption's opening (or over the whole frame once crossed).
+    // `world` is owned by the composition that owns this scene; null is no portal.
+    struct PortalView {
+        const Scene* world = nullptr;
+        bool crossed = false;
+        [[nodiscard]] bool active() const { return world != nullptr; }
+    } portal;
     std::vector<MaterialProgram> materialPrograms; // ADR-030; referenced by Material::program
     // ADR-1642: the images the programs' texture ops read, decoded, one entry per (resolved path, colour space). Filled
     // by the composition from each program's `textures`; the renderer lays them into one array per colour space.

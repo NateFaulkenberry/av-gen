@@ -65,14 +65,14 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
     "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "ecologyPoolReach",
     "ecologyPoolFaintest", "skybox",
     "proceduralSkyBackground",
-    "lightFromEnvironment", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
+    "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
@@ -1284,6 +1284,15 @@ void Composition::updateCorruption() {
     live.prevTime = std::isfinite(prev) && prev <= now ? prev : now;
     corruptionTime_ = now;
     const bool active = live.active();
+    // the opening's light: the seam's warm glow, then the other world's light as it opens, on the rock around it
+    if (corruptionLight_ >= 0 && static_cast<std::size_t>(corruptionLight_) < scene_.lights.size()) {
+        PunctualLight& l = scene_.lights[static_cast<std::size_t>(corruptionLight_)];
+        const glm::vec3 axis = glm::length(live.axis) > 1e-6f ? glm::normalize(live.axis) : glm::vec3(0, 0, -1);
+        l.position = live.focus - axis * 10.0f;
+        const float o = live.liveOpen;
+        l.intensity = live.light * (0.12f * live.liveAmount + o * o);
+        l.color = glm::mix(live.glowColor, glm::vec3(0.85f, 0.88f, 0.95f), o);
+    }
     for (const std::size_t i : corruptionEchoes_) {
         if (i < scene_.entities.size()) {
             scene_.entities[i].visible = active;
@@ -5317,6 +5326,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // Last, because an entity binds against the parameters every node above has just registered
     // and against the material part names the rebuild resolved.
     installEntities();
+    // ADR-1879: a portal's destination world, under its own prefix
+    if (portalWorld_) {
+        portalWorld_->attach(params, modulator, prefix_ + "moon/");
+    }
 
     registeredPaths_.clear();
     for (const params::IParameter* q : params.ordered()) {
@@ -8099,9 +8112,22 @@ void Composition::rebuild() {
         radius_ = 1.0f;
     }
 
+    flattenLunar(); // ADR-1882
     // ADR-1873: the corruption's targets, and its echo copies of the target meshes that reach into its field (the same
     // mesh drawn again; the vertex stage and the fragment keep only the slipped blocks).
     corruptionEchoes_.clear();
+    corruptionLight_ = -1;
+    if (!corruption_.targets.empty() && corruption_.light > 0.0f) {
+        PunctualLight l;
+        l.name = "corruption.opening";
+        l.type = PunctualLight::Type::Point;
+        l.position = corruption_.focus;
+        l.intensity = 0.0f;
+        l.range = 260.0f;
+        l.castsShadow = false;
+        corruptionLight_ = static_cast<int>(scene_.lights.size());
+        scene_.addLight(std::move(l));
+    }
     if (!corruption_.targets.empty()) {
         const std::size_t count = scene_.entities.size();
         std::vector<std::size_t> inField; // targets whose mesh reaches into the field
@@ -8269,7 +8295,12 @@ void Composition::update(const FrameTime& time) {
     if (cameraCutThisFrame_) {
         holdRigsForCut();
     }
+    // ADR-1879: a portal's destination is placed by its source (its own camera logic ran above), before anything culls
+    // against the camera; the destination world updates after this one's camera is final
+    applyCameraOverride();
     cullEntityNodes();
+    updateCorruption();
+    updatePortal(time);
 }
 
 // ADR-086. Two things, in order: push each node's authored animation request into its rigs (only
@@ -9779,6 +9810,7 @@ void Composition::applyParameters() {
     scene_.environment.skyBloom = skyBloom_ != nullptr ? skyBloom_->value() : skyBloomSetting_;
     scene_.environment.lightFromEnvironment =
         lightFromEnvironment_ != nullptr ? lightFromEnvironment_->value() : lightFromEnvironmentSetting_;
+    scene_.environment.fallbackAmbient = fallbackAmbientSetting_; // ADR-1882
     if (lightFromEnvironmentSetting_ && envDominantDirection_.has_value()) {
         // Aim the key light away from the map's brightest pixel, after the rig has expanded, so
         // the moon in frame and the moonlight on the terrain are the same moon. The rig still owns
@@ -10723,6 +10755,9 @@ nlohmann::json Composition::toJson() const {
     if (lightFromEnvironmentSetting_) {
         environment["lightFromEnvironment"] = true;
     }
+    if (!fallbackAmbientSetting_) {
+        environment["fallbackAmbient"] = false; // ADR-1882
+    }
     {
         // ADR-358. Out here rather than in the volumetric block below, which is where it was
         // first written and where a test caught it: that block is guarded by the volume being ON,
@@ -11544,6 +11579,17 @@ nlohmann::json Composition::toJson() const {
     if (!corruption_.targets.empty()) {
         j["corruption"] = corruptionToJson(corruption_); // ADR-1873
     }
+    if (lunar_.enabled) {
+        j["lunarWorld"] = lunarWorldToJson(lunar_); // ADR-1882
+    }
+    if (!portal_.world.empty()) { // ADR-1879
+        nlohmann::json flight = nlohmann::json::array();
+        for (const glm::vec4& w : portal_.flight) flight.push_back({w.x, w.y, w.z, w.w});
+        j["portal"] = {{"world", portal_.world},
+                       {"exit", {portal_.exit.x, portal_.exit.y, portal_.exit.z}},
+                       {"exitYaw", portal_.exitYaw},
+                       {"flight", flight}};
+    }
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
     }
@@ -11990,6 +12036,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("'lightFromEnvironment' must be a boolean");
             }
             comp->lightFromEnvironmentSetting_ = e["lightFromEnvironment"].get<bool>();
+        }
+        if (e.contains("fallbackAmbient")) { // ADR-1882
+            if (!e["fallbackAmbient"].is_boolean()) {
+                return fail("'fallbackAmbient' must be a boolean");
+            }
+            comp->fallbackAmbientSetting_ = e["fallbackAmbient"].get<bool>();
         }
         auto readColour = [&](const char* key, glm::vec3& out) -> bool {
             if (e.contains(key) && e[key].is_array() && e[key].size() == 3 && e[key][0].is_number()) {
@@ -12486,6 +12538,43 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), corruption.error().message);
         }
         comp->setCorruption(std::move(*corruption));
+    }
+    if (j.contains("lunarWorld")) { // ADR-1882
+        auto l = lunarWorldFromJson(j.at("lunarWorld"));
+        if (!l) {
+            return fail("scene file '{}': {}", scenePath.string(), l.error().message);
+        }
+        comp->setLunarWorld(std::move(*l));
+    }
+    if (j.contains("portal")) { // ADR-1879
+        const json& pj = j.at("portal");
+        PortalBlock pb;
+        try {
+            pb.world = pj.at("world").get<std::string>();
+            const json& e = pj.at("exit");
+            pb.exit = glm::vec3(e.at(0).get<float>(), e.at(1).get<float>(), e.at(2).get<float>());
+            pb.exitYaw = pj.value("exitYaw", 0.0f);
+            if (pj.contains("flight")) {
+                for (const json& w : pj.at("flight")) {
+                    pb.flight.emplace_back(w.at(0).get<float>(), w.at(1).get<float>(), w.at(2).get<float>(), w.at(3).get<float>());
+                }
+            }
+            for (auto it = pj.begin(); it != pj.end(); ++it) {
+                if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight") {
+                    return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
+                }
+            }
+        } catch (const json::exception& e) {
+            return fail("scene file '{}': portal: {}", scenePath.string(), e.what());
+        }
+        const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : std::filesystem::path(".");
+        auto world = Composition::loadFile(base / pb.world, registry, depth + 1);
+        if (!world) {
+            return fail("scene file '{}': portal world '{}': {}", scenePath.string(), pb.world, world.error().message);
+        }
+        if (auto r = comp->setPortal(std::move(pb), std::move(*world)); !r) {
+            return fail("scene file '{}': {}", scenePath.string(), r.error().message);
+        }
     }
     if (j.contains("clouds")) { // ADR-1289
         const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");

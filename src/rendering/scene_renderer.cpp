@@ -3191,6 +3191,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             return r;
         }
     }
+    // ADR-1879: a portal's destination world, drawn first into its own target so this frame can composite it.
+    if (scene.portal.active() && !isPortalView_) {
+        encodePortalView(encoder, scene, time, target.width, target.height);
+    }
     // Open this frame's timestamp timeline before anything is encoded: the first pass to mark
     // itself also writes the frame origin, and every later pass's cost is the interval from the
     // previous pass's end to its own.
@@ -3638,6 +3642,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.bandsInfo = lanes.info;
         frame.bandsSoft = lanes.soft;
         frame.bandsSoft2 = lanes.soft2;
+        // ADR-1882: z (spare in the bands' lane) = 1 drops the fallback hemisphere ambient (no map, no sky)
+        frame.bandsSoft2.z = scene.environment.fallbackAmbient ? 0.0f : 1.0f;
         frame.bandsRate = lanes.rate;
         frame.bands = lanes.bands;
     }
@@ -5153,6 +5159,45 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             ++stats_.state.pipelineBinds;
             stats_.state.bindGroupBinds += 2;
         }
+        // ---- ADR-1879: the portal view, over the opaque world and under the water (which reflects it) ----
+        if (scene.portal.active() && !isPortalView_ && portalRenderer_ && portalPipeline_) {
+            rp.End();
+            wgpu::RenderPassDescriptor portalPass = pass;
+            for (auto& attachment : attachments) {
+                attachment.loadOp = wgpu::LoadOp::Load;
+            }
+            depth.depthLoadOp = wgpu::LoadOp::Load;
+            portalPass.label = "portal-view";
+            portalPass.timestampWrites = timeline_->mark("portal", gpu::FrameTimeline::PassKind::Render);
+            wgpu::RenderPassEncoder pp = encoder.BeginRenderPass(&portalPass);
+            const float params[4] = {scene.portal.crossed ? 1.0f : 0.0f, 1.0f, 25.0f, 0.0f};
+            context_.queue().WriteBuffer(portalParams_, 0, params, sizeof(params));
+            std::array<wgpu::BindGroupEntry, 3> be{};
+            be[0].binding = 0;
+            be[0].textureView = portalRenderer_->sceneHdrTexture().CreateView();
+            be[1].binding = 1;
+            be[1].sampler = portalSampler_;
+            be[2].binding = 2;
+            be[2].buffer = portalParams_;
+            be[2].size = 16;
+            wgpu::BindGroupDescriptor gd{};
+            gd.label = "portal-view";
+            gd.layout = portalLayout_;
+            gd.entryCount = be.size();
+            gd.entries = be.data();
+            const wgpu::BindGroup group = context_.device().CreateBindGroup(&gd);
+            pp.SetPipeline(portalPipeline_);
+            pp.SetBindGroup(0, frameBindGroup_);
+            pp.SetBindGroup(1, group);
+            pp.Draw(3);
+            pp.End();
+            ++stats_.drawCalls;
+            pass.label = "scene-pass-after-portal";
+            pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
+            rp = encoder.BeginRenderPass(&pass);
+            rp.SetBindGroup(0, frameBindGroup_);
+            rp.SetBindGroup(3, iblBindGroup_);
+        }
         // ---- water (ADR-099) ----
         // After the sky and before the particles: the surface has to composite over the bed and
         // the bank, which are opaque and already drawn, and the motes and spores above it have to
@@ -5371,7 +5416,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // hard-coded half. ADR-140: the two passes are timed separately as `volume.march` and
     // `volume.composite`.
     // Skipped entirely when Environment::volumeDensity is 0, so scenes without fog are unchanged.
-    if (toggles_.volume) {
+    if (toggles_.volume && !scene.portal.crossed) { // ADR-1879: crossed, the frame is the other world's
         volumes_->update(scene, time, hdr_.width(), hdr_.height(), hdr_.depthView(), fields_.get(),
                          particles_->glowSystems(), qualitySettings_);
         volumes_->encode(encoder, hdr_.colorView(), frameBindGroup_);
@@ -6025,6 +6070,109 @@ Result<gpu::ImageF> SceneRenderer::renderToImageFloat(const scene::Scene& scene,
     // measurement in normalised coordinates is comparable across render scales as it stands, and
     // one in pixels was already a measurement of the scene target rather than of the output.
     return gpu::readTextureF16(context_, hdrOutput_, hdrOutput_.GetWidth(), hdrOutput_.GetHeight());
+}
+
+// ---- ADR-1879: the portal view --------------------------------------------------------------------------------------
+
+Result<void> SceneRenderer::ensurePortalPipeline() {
+    if (portalPipeline_) return {};
+    auto module = shaders_.load("portal.wgsl");
+    if (!module) return std::unexpected(module.error());
+    const wgpu::Device& device = context_.device();
+    std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
+    entries[0].binding = 0;
+    entries[0].visibility = wgpu::ShaderStage::Fragment;
+    entries[0].texture.sampleType = wgpu::TextureSampleType::Float;
+    entries[1].binding = 1;
+    entries[1].visibility = wgpu::ShaderStage::Fragment;
+    entries[1].sampler.type = wgpu::SamplerBindingType::Filtering;
+    entries[2].binding = 2;
+    entries[2].visibility = wgpu::ShaderStage::Fragment;
+    entries[2].buffer.type = wgpu::BufferBindingType::Uniform;
+    entries[2].buffer.minBindingSize = 16;
+    wgpu::BindGroupLayoutDescriptor ld{};
+    ld.label = "portal-view";
+    ld.entryCount = entries.size();
+    ld.entries = entries.data();
+    portalLayout_ = device.CreateBindGroupLayout(&ld);
+    const std::array<wgpu::BindGroupLayout, 2> layouts{frameLayout_, portalLayout_};
+    wgpu::PipelineLayoutDescriptor pl{};
+    pl.label = "portal-view";
+    pl.bindGroupLayoutCount = layouts.size();
+    pl.bindGroupLayouts = layouts.data();
+    const wgpu::PipelineLayout layout = device.CreatePipelineLayout(&pl);
+    const auto formats = sceneTargetFormats(kHdrFormat);
+    std::array<wgpu::ColorTargetState, kSceneTargetCount> targets{};
+    for (std::uint32_t i = 0; i < kSceneTargetCount; ++i) {
+        targets[i] = wgpu::ColorTargetState{};
+        targets[i].format = formats[i];
+        // colour, and the emission (cleared: what this world glowed behind the opening must not bloom over the other)
+        targets[i].writeMask = (i == 0 || i == 3) ? wgpu::ColorWriteMask::All : wgpu::ColorWriteMask::None;
+    }
+    wgpu::FragmentState fragment{};
+    fragment.module = *module;
+    fragment.entryPoint = "fs_portal";
+    fragment.targetCount = kSceneTargetCount;
+    fragment.targets = targets.data();
+    wgpu::DepthStencilState depth{};
+    depth.format = kDepthFormat;
+    depth.depthWriteEnabled = wgpu::OptionalBool::True;
+    depth.depthCompare = wgpu::CompareFunction::Less;
+    wgpu::RenderPipelineDescriptor desc{};
+    desc.label = "portal-view";
+    desc.layout = layout;
+    desc.vertex.module = *module;
+    desc.vertex.entryPoint = "vs_portal";
+    desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+    desc.depthStencil = &depth;
+    desc.multisample.count = 1;
+    desc.multisample.mask = 0xFFFFFFFFu;
+    desc.fragment = &fragment;
+    portalPipeline_ = gpu::createRenderPipeline(device, &desc);
+    if (!portalPipeline_) return fail("portal view pipeline could not be created");
+    wgpu::BufferDescriptor bd{};
+    bd.label = "portal-view-params";
+    bd.size = 16;
+    bd.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+    portalParams_ = device.CreateBuffer(&bd);
+    wgpu::SamplerDescriptor sd{};
+    sd.minFilter = wgpu::FilterMode::Linear;
+    sd.magFilter = wgpu::FilterMode::Linear;
+    sd.addressModeU = wgpu::AddressMode::ClampToEdge;
+    sd.addressModeV = wgpu::AddressMode::ClampToEdge;
+    portalSampler_ = device.CreateSampler(&sd);
+    return {};
+}
+
+void SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
+                                     std::uint32_t width, std::uint32_t height) {
+    if (auto r = ensurePortalPipeline(); !r) {
+        log::warn("portal view: {}", r.error().message);
+        return;
+    }
+    if (!portalRenderer_) {
+        portalRenderer_ = std::make_unique<SceneRenderer>(context_, shaders_);
+        portalRenderer_->isPortalView_ = true;
+        if (auto r = portalRenderer_->init(); !r) {
+            log::warn("portal view: {}", r.error().message);
+            portalRenderer_.reset();
+            return;
+        }
+    }
+    portalRenderer_->setQualitySettings(qualitySettings_);
+    portalRenderer_->setPassToggles(toggles_);
+    if (!portalTarget_ || portalTarget_.GetWidth() != width || portalTarget_.GetHeight() != height) {
+        wgpu::TextureDescriptor td{};
+        td.label = "portal-view-target";
+        td.size = {width, height, 1};
+        td.format = wgpu::TextureFormat::RGBA8Unorm;
+        td.usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::TextureBinding;
+        portalTarget_ = context_.device().CreateTexture(&td);
+    }
+    const gpu::TargetView target{portalTarget_.CreateView(), wgpu::TextureFormat::RGBA8Unorm, width, height};
+    if (auto r = portalRenderer_->render(encoder, *scene.portal.world, time, target); !r) {
+        log::warn("portal view: {}", r.error().message);
+    }
 }
 
 } // namespace avgen::rendering

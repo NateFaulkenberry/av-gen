@@ -558,6 +558,7 @@ TEST_CASE("the canyon scene survives an app-style save with its water intact", "
     nlohmann::json small = file;
     small["attractorWorld"]["resolution"] = 384; // the generator's cost is per texel; the save does not care
     small["attractorWorld"]["meshSpacing"] = 16.0;
+    small.erase("portal"); // ADR-1879: the portal names a sibling scene file, which an in-memory composition cannot load
     auto comp = scene::Composition::fromJson(small, registry);
     REQUIRE(comp.has_value());
     const nlohmann::json whole = (*comp)->toJson();

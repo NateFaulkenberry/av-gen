@@ -82,6 +82,8 @@ struct Corruption {
     float glyphSize = 1.6f;  // glyph cell (m) at close range
     float glow = 6.0f;       // the seam and rim radiance
     float echoOffset = 1.0f; // scales how far back the echoes trail (1 = all the way to the original place)
+    float light = 0.0f;      // a point light in the opening (candela at full opening): its glow and the other world's
+                             // light on the rock around it (0 = none)
     int echoes = 0;          // extra copies (0..3)
     glm::vec3 glowColor{1.0f, 0.55f, 0.18f};
 

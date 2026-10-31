@@ -738,6 +738,9 @@ struct Environment {
     // can see and the moonlight falling on the terrain then come from the same pixel by
     // construction, instead of by an author keeping two numbers in step by hand.
     bool lightFromEnvironment = false;
+    // ADR-1882: false drops the constant blue hemisphere a surface gets when there is no environment map and no sky
+    // (a black sky lights nothing; the Moon's shadows took its cast). True, the default, is every scene before it.
+    bool fallbackAmbient = true;
     // Shadow cascades, overriding the quality tier when non-zero. It belongs to the scene because
     // it is a property of the world's scale rather than of the machine: on a 640 m landscape lit by
     // a low moon, dropping the third cascade cost 0.67% of pixels a difference of more than 6/255

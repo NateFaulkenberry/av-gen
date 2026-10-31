@@ -189,3 +189,7 @@ __pycache__/
 # Talking Heads reference downloads (assets/talking-heads.manifest.json): third-party binaries, never committed. No
 # trailing slash: in a worktree the folder is a symlink to the main checkout's, and `dir/` matches directories only.
 /assets/talking-heads
+
+# Dimensional portals (scene/strange-attractor): NASA data downloaded on approval, never committed --
+# NASA Blue Marble (public domain) and the LROC NAC DTM of Linne crater (NASA/GSFC/ASU; calibration only).
+/assets/space/

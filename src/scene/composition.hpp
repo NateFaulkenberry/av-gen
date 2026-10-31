@@ -21,6 +21,7 @@
 #include "graph/graph.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
+#include "scene/lunar_world.hpp"
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
 #include "scene/grid_params.hpp"
@@ -1460,6 +1461,22 @@ public:
     void setAttractorWorld(AttractorWorldBlock block);
     void setMeshWire(MeshWire wire); // ADR-1862
     void setCorruption(Corruption corruption); // ADR-1873
+    void setLunarWorld(LunarWorldBlock block); // ADR-1882
+    [[nodiscard]] const LunarWorldBlock& lunarWorld() const { return lunar_; }
+    // ADR-1879/1880: a portal to another world (loaded from `world`, a scene file beside this one).
+    struct PortalBlock {
+        std::string world;                       // the destination scene file
+        glm::vec3 exit{0.0f};                    // where the entry point (the corruption's focus) lands in it; over a
+                                                 // generated ground (lunarWorld) y is the height above that ground
+        float exitYaw = 0.0f;                    // degrees about +y from this world's frame to the destination's
+        std::vector<glm::vec4> flight;           // the destination's flight after the crossing: x, height, z, t
+    };
+    [[nodiscard]] Result<void> setPortal(PortalBlock block, std::unique_ptr<Composition> world);
+    [[nodiscard]] Composition* portalWorld() { return portalWorld_.get(); }
+    [[nodiscard]] double portalCrossingSeconds() const { return portalCrossing_; }
+    // A camera that replaces whatever this composition's own camera logic placed, from the next update on (a portal's
+    // destination is driven by its source). Empty restores the composition's own camera.
+    void setCameraOverride(std::optional<Camera> camera) { cameraOverride_ = std::move(camera); }
     [[nodiscard]] const Corruption& corruption() const { return corruption_; }
     [[nodiscard]] const MeshWire& meshWire() const { return meshWire_; }
     // ADR-1851: true while a regeneration is running on a worker (the editor can say so).
@@ -1713,6 +1730,7 @@ private:
     // texture per crossing.
     std::vector<EnvironmentTexture> environmentTextureCache_;
     bool lightFromEnvironmentSetting_ = false;
+    bool fallbackAmbientSetting_ = true; // ADR-1882
     bool stylizedSetting_ = false;
     params::Parameter<bool>* stylized_ = nullptr;
     // The environment map's brightest direction, in world space at rotation 0, found once when the
@@ -2381,8 +2399,17 @@ private:
     Corruption corruption_;                  // ADR-1873: the authored block (rest values)
     std::optional<CorruptionParameters> corruptionParams_;
     std::vector<std::size_t> corruptionEchoes_; // the echo copies' entity indices
+    int corruptionLight_ = -1;                  // the opening's light, in scene_.lights
     float corruptionTime_ = std::numeric_limits<float>::quiet_NaN(); // last frame's time (the velocity target)
     void updateCorruption();
+    LunarWorldBlock lunar_;                  // ADR-1882
+    PortalBlock portal_;                     // ADR-1879
+    std::unique_ptr<Composition> portalWorld_;
+    double portalCrossing_ = 1e30;           // seconds: when the flight crosses the entry plane
+    std::optional<Camera> cameraOverride_;
+    void flattenLunar();
+    void updatePortal(const FrameTime& time);
+    void applyCameraOverride();
     // ADR-1851: a structural change in the live editor generates on a worker; the old world stays on screen until the
     // new one is ready. Offline (no interactive budget) it generates synchronously, so a render is deterministic.
     std::future<std::shared_ptr<const AttractorWorld>> attractorPending_;

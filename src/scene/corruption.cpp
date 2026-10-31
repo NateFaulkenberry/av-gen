@@ -20,7 +20,7 @@ struct FloatKey {
     float lo, hi, softLo, softHi;
 };
 
-constexpr std::array<FloatKey, 28> kFloats{{
+constexpr std::array<FloatKey, 29> kFloats{{
     {"amount", &Corruption::amount, 0.0f, 1.0f, 0.0f, 1.0f},
     {"radius", &Corruption::radius, 1.0f, 1.0e5f, 10.0f, 2000.0f},
     {"inner", &Corruption::inner, 0.0f, 0.99f, 0.0f, 0.9f},
@@ -49,6 +49,7 @@ constexpr std::array<FloatKey, 28> kFloats{{
     {"glyphSize", &Corruption::glyphSize, 0.05f, 100.0f, 0.25f, 8.0f},
     {"glow", &Corruption::glow, 0.0f, 1000.0f, 0.0f, 40.0f},
     {"echoOffset", &Corruption::echoOffset, 0.0f, 2.0f, 0.0f, 1.0f},
+    {"light", &Corruption::light, 0.0f, 1.0e8f, 0.0f, 100000.0f},
 }};
 constexpr std::size_t kFloatCount = kFloats.size();
 
@@ -205,10 +206,15 @@ CorruptedPoint corruptPoint(const std::array<glm::vec4, 9>& f, glm::vec3 p0, flo
                 const float band = std::clamp((1.0f - e) / 0.25f, 0.0f, 1.0f);
                 const float k = 1.0f / ee - 1.0f;
                 off += ((h * u + vv * v) * k + ax * f[3].z * band) * openT * wd;
-            } else if (e < 1.5f) {
-                const float lip = 1.0f - (e - 1.0f) / 0.5f;
-                const float l2 = lip * lip * openT * wd;
-                off += -ax * l2 * 0.05f * f[3].x + (h * u + vv * v) / ee * l2 * 0.6f;
+            } else if (e < 1.9f) {
+                const int cx2 = static_cast<int>(std::floor(u / 6.0f)), cy2 = static_cast<int>(std::floor(v / 2.5f));
+                const glm::vec2 ccu((static_cast<float>(cx2) + 0.5f) * 6.0f, (static_cast<float>(cy2) + 0.5f) * 2.5f);
+                const float ce = glm::length(glm::vec2(ccu.x / std::max(f[3].x, 1e-3f), ccu.y / std::max(f[3].y, 1e-3f)));
+                const float lip = std::clamp(1.0f - (ce - 1.0f) / 0.9f, 0.0f, 1.0f) * openT * wd;
+                const float h1 = crHash(bits(cx2), bits(cy2), seed, 41u), h2 = crHash(bits(cx2), bits(cy2), seed, 42u),
+                            h3 = crHash(bits(cx2), bits(cy2), seed, 43u);
+                const glm::vec3 outward = glm::normalize(h * ccu.x + vv * ccu.y + glm::vec3(1e-4f, 0.0f, 0.0f));
+                off += (ax * (h1 * 2.0f - 0.6f) * 4.0f + outward * h2 * 3.0f + vv * (h3 - 0.5f) * 1.5f) * lip;
             }
         }
     }
