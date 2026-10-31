@@ -74,6 +74,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1590-1599 | perf/rainbow-world-live (Rainbow World's late song holding High live: depth programs, rigid normals) |
 | 1700-1719 | eng/midi-mapping (MIDI performance mapping: Learn, scopes and defaults, the monitor, the MIDI panel) |
 | 1800-1849 | eng/qa-pass-2 (the second QA, debugging, refactoring and cleanup pass) |
+| 1930-1969 | scene/chronos (CHRONOS: temporal imaging and its canyon) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -960,3 +961,4 @@ confirm the citation you are about to change is your own.
 | [1882](ADR-1882-the-moon.md) | The Moon: a generated lunar world (crater SFD with LROC-DTM-calibrated Linne profiles, curvature, ejecta albedo, a sunk skirt, boulders) under a lunar-Lambert regolith program; no fallback ambient at zero environment light (the blue cast); the Blue Marble Earth. scene/strange-attractor | Proposed |
 | [1883](ADR-1883-portals-nest-the-crater-floor-portal.md) | Portals nest: a world seen through a portal may hold its own (the Moon's crater floor, facing down); the camera is a pure path handed from source to destination so each world finds its own crossing; a portal can join the destination's own flythrough (C1); once crossed, the destination's renderer draws the frame and the crossed world is not drawn. Gate C 2: a portal may rotate (exitAxis/entryUp), the floor turned onto a canyon wall, and the destination is clipped at the exit plane for the camera. scene/strange-attractor | Proposed |
 | [1884](ADR-1884-the-dusk-world.md) | The dusk world: the same canyon (shared generation) under a low raking sun, a violet-indigo sky and cool fills that keep the gorge from crushing; the exit in its east wall. scene/strange-attractor | Proposed |
+| [1930](ADR-1930-the-rtin-mesher-is-shared.md) | The RTIN terrain mesher is a shared module (`scene::rtin`): grid, level-order error propagation, extraction, chunking and winding moved out of the Strange Attractor's canyon unchanged (pinned mesh hashes), for CHRONOS to reuse. scene/chronos | Accepted |

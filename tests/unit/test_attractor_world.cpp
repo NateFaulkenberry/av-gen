@@ -645,3 +645,41 @@ TEST_CASE("the flight's approach leaves the gorge for the site, slows to its spe
     block["approach"]["speed"] = 0.0;
     CHECK_FALSE(scene::attractorWorldFromJson(block).has_value());
 }
+
+TEST_CASE("the canyon mesh is unchanged by the shared RTIN mesher's extraction",
+          "[attractor-world][adr1930]") {
+    // ADR-1930 moved the RTIN core into scene/terrain_rtin. The move is behaviour-neutral: these hashes were taken from
+    // the mesh the in-file implementation built, bit for bit (positions, normals, uvs, indices, chunk order), with and
+    // without the portal approach's forced splits.
+    const auto meshHash = [](const scene::AttractorTerrainMesh& m) {
+        std::uint64_t h = 1469598103934665603ull;
+        const auto mix = [&h](const void* data, std::size_t bytes) {
+            const auto* p = static_cast<const unsigned char*>(data);
+            for (std::size_t i = 0; i < bytes; ++i) h = (h ^ p[i]) * 1099511628211ull;
+        };
+        for (const auto& ch : m.chunks) {
+            mix(ch.positions.data(), ch.positions.size() * sizeof(glm::vec3));
+            mix(ch.normals.data(), ch.normals.size() * sizeof(glm::vec3));
+            mix(ch.uvs.data(), ch.uvs.size() * sizeof(glm::vec2));
+            mix(ch.indices.data(), ch.indices.size() * sizeof(std::uint32_t));
+        }
+        mix(m.riverPositions.data(), m.riverPositions.size() * sizeof(glm::vec3));
+        mix(m.riverIndices.data(), m.riverIndices.size() * sizeof(std::uint32_t));
+        return h;
+    };
+    scene::AttractorGen g = smallGen(3);
+    g.meshSpacing = 8.0f;
+    const auto plain = scene::generateAttractorWorld(g);
+    REQUIRE(plain->terrainMesh != nullptr);
+    g.approach.enabled = true;
+    g.approach.site = glm::vec3(plain->eye.x * 0.5f, 40.0f, plain->eye.z * 0.5f);
+    g.approach.departArc = 200.0f;
+    const auto portal = scene::generateAttractorWorld(g);
+    REQUIRE(portal->terrainMesh != nullptr);
+    const std::uint64_t plainHash = meshHash(*plain->terrainMesh);
+    const std::uint64_t portalHash = meshHash(*portal->terrainMesh);
+    UNSCOPED_INFO("plain " << plainHash << " triangles " << plain->terrainMesh->triangles);
+    UNSCOPED_INFO("portal " << portalHash << " triangles " << portal->terrainMesh->triangles);
+    CHECK(plainHash == 792846551093013842ull);
+    CHECK(portalHash == 6720694971324766995ull);
+}

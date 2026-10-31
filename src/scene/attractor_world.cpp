@@ -1,4 +1,5 @@
 #include "scene/attractor_world.hpp"
+#include "scene/terrain_rtin.hpp"
 
 #include "core/rng.hpp"
 
@@ -85,24 +86,7 @@ float segDist(glm::vec2 p, glm::vec2 a, glm::vec2 b, float& along) {
     return glm::length(p - (a + ab * t));
 }
 
-// Runs `fn(row)` for every row on all cores. Each row is independent and writes only its own texels, so the result
-// does not depend on the thread count.
-template <class Fn>
-void parallelRows(int rows, Fn&& fn) {
-    const unsigned n = std::max(1u, std::min(16u, std::thread::hardware_concurrency()));
-    std::vector<std::thread> pool;
-    pool.reserve(n);
-    for (unsigned t = 0; t < n; ++t) {
-        pool.emplace_back([&, t] {
-            for (int r = static_cast<int>(t); r < rows; r += static_cast<int>(n)) {
-                fn(r);
-            }
-        });
-    }
-    for (auto& th : pool) {
-        th.join();
-    }
-}
+using rtin::parallelRows; // ADR-1930: shared with the RTIN mesher
 
 std::uint64_t mixHash(std::uint64_t h, std::uint64_t v) {
     return (h ^ (v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2))) * 1099511628211ull;
@@ -458,12 +442,11 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
     auto out = std::make_shared<AttractorTerrainMesh>();
     const AttractorGen& g = w.gen;
     const SurfaceSampler sampler(w);
-    // the grid: 2^k + 1 samples per side over the square
-    int k = 1;
-    while (static_cast<float>(1 << k) * g.meshSpacing < w.extent && k < 14) ++k;
-    const int size = 1 << k;
-    const int gn = size + 1;
-    const float spacing = w.extent / static_cast<float>(size);
+    // the grid: 2^k + 1 samples per side over the square (ADR-1930: the RTIN core is scene/terrain_rtin)
+    const rtin::Grid grid = rtin::gridFor(w.extent, g.meshSpacing);
+    const int size = grid.size;
+    const int gn = grid.gn;
+    const float spacing = grid.spacing;
     out->sampleSpacing = spacing;
     std::vector<float> H(static_cast<std::size_t>(gn) * gn), T(H.size());
     parallelRows(gn, [&](int y) {
@@ -510,15 +493,7 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
     // ordering fixes it: every triangle of a level before any of the level above. The triangles are addressed by their
     // heap index (the same bintree the emit pass walks: odd = the first child), so nothing is stored; within a level they
     // run in parallel, the shared midpoints written by an atomic max on the float's bits (errors are non-negative).
-    std::vector<float> E(H.size(), 0.0f);
     const auto idx = [gn](int x, int y) { return static_cast<std::size_t>(y) * gn + x; };
-    const auto atomicMax = [&](std::size_t i, float v) {
-        std::atomic_ref<std::uint32_t> slot(*reinterpret_cast<std::uint32_t*>(&E[i]));
-        const std::uint32_t bits = std::bit_cast<std::uint32_t>(v);
-        std::uint32_t cur = slot.load(std::memory_order_relaxed);
-        while (bits > cur && !slot.compare_exchange_weak(cur, bits, std::memory_order_relaxed)) {
-        }
-    };
     // ADR-1881: around the portal site the rock is deformed by the corruption (ADR-1873) at metre scale, which needs
     // vertices where a planar wall would otherwise be two triangles: no hypotenuse longer than 1.5 m within 140 m of
     // the site, nor than 4.5 m within 320 m. A forced split is an error above the threshold, so it propagates like any
@@ -539,66 +514,11 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
         e = std::max(e, std::abs(0.5f * (T[idx(ax, ay)] + T[idx(bx, by)]) - T[idx(mx, my)]) / (0.25f * tol / g.meshMinError));
         return e;
     };
-    // levels: the two roots are heap ids 2 and 3 (level 1); a level-L triangle's ids are [2^L, 2^(L+1)); the leaves
-    // (legs one cell long) are level 2k
-    const int levels = 2 * k;
-    for (int level = levels; level >= 1; --level) {
-        const std::uint64_t first = 1ull << level, count = 1ull << level;
-        const bool parent = level < levels;
-        const int workers = 64;
-        parallelRows(workers, [&](int w) {
-            const std::uint64_t lo = first + count * static_cast<std::uint64_t>(w) / workers;
-            const std::uint64_t hi = first + count * static_cast<std::uint64_t>(w + 1) / workers;
-            for (std::uint64_t id0 = lo; id0 < hi; ++id0) {
-                // decode the heap id into the triangle's corners (Martini): the root by the bit below the leading one,
-                // then one bit per level down
-                int ax, ay, bx, by, cx, cy;
-                const int depth = level; // bits after the leading 1
-                if ((id0 >> (depth - 1)) & 1u) { // root 3: a (size, size), b (0, 0), c (0, size)
-                    ax = size; ay = size; bx = 0; by = 0; cx = 0; cy = size;
-                } else {                          // root 2: a (0, 0), b (size, size), c (size, 0)
-                    ax = 0; ay = 0; bx = size; by = size; cx = size; cy = 0;
-                }
-                for (int bit = depth - 2; bit >= 0; --bit) {
-                    const int mx = (ax + bx) / 2, my = (ay + by) / 2;
-                    if (((id0 >> bit) & 1u) == 0u) { // first child: (c, a, m)
-                        bx = ax; by = ay; ax = cx; ay = cy;
-                    } else {                          // second child: (b, c, m)
-                        ax = bx; ay = by; bx = cx; by = cy;
-                    }
-                    cx = mx; cy = my;
-                }
-                const int mx = (ax + bx) / 2, my = (ay + by) / 2;
-                float e = localError(ax, ay, bx, by, mx, my);
-                if (parent) {
-                    e = std::max({e, E[idx((ax + cx) / 2, (ay + cy) / 2)], E[idx((bx + cx) / 2, (by + cy) / 2)]});
-                }
-                atomicMax(idx(mx, my), e);
-            }
-        });
-    }
-    // extract the triangles
-    std::vector<glm::ivec3> tris;
-    const auto emit = [&](auto&& self, int ax, int ay, int bx, int by, int cx, int cy) -> void {
-        const int mx = (ax + bx) / 2, my = (ay + by) / 2;
-        if (std::abs(ax - cx) + std::abs(ay - cy) > 1 && E[idx(mx, my)] > 1.0f) {
-            self(self, cx, cy, ax, ay, mx, my);
-            self(self, bx, by, cx, cy, mx, my);
-        } else {
-            tris.emplace_back(static_cast<int>(idx(ax, ay)), static_cast<int>(idx(bx, by)), static_cast<int>(idx(cx, cy)));
-        }
-    };
-    emit(emit, 0, 0, size, size, size, 0);
-    emit(emit, size, size, 0, 0, 0, size);
+    const std::vector<float> E = rtin::propagateErrors(grid, localError);
+    const std::vector<glm::ivec3> tris = rtin::extractTriangles(grid, E);
     // chunks: 16 x 16 over the square, a triangle by its centroid
     constexpr int C = 16;
-    std::vector<std::vector<int>> byChunk(C * C);
-    for (int t = 0; t < static_cast<int>(tris.size()); ++t) {
-        const glm::ivec3 tr = tris[static_cast<std::size_t>(t)];
-        const int cx = ((tr.x % gn) + (tr.y % gn) + (tr.z % gn)) / 3, cy = ((tr.x / gn) + (tr.y / gn) + (tr.z / gn)) / 3;
-        const int ix = std::min(C - 1, cx * C / gn), iy = std::min(C - 1, cy * C / gn);
-        byChunk[static_cast<std::size_t>(iy) * C + ix].push_back(t);
-    }
+    const std::vector<std::vector<int>> byChunk = rtin::chunkTriangles(grid, tris, C);
     out->chunks.resize(byChunk.size());
     parallelRows(C * C, [&](int c) {
         AttractorTerrainChunk& ch = out->chunks[static_cast<std::size_t>(c)];
@@ -647,10 +567,7 @@ std::shared_ptr<const AttractorTerrainMesh> buildTerrainMesh(const AttractorWorl
     });
     // winding: the bintree emits (a, b, c) with a consistent handedness; make it counter-clockwise seen from above
     for (AttractorTerrainChunk& ch : out->chunks) {
-        for (std::size_t i = 0; i + 2 < ch.indices.size(); i += 3) {
-            const glm::vec3 a = ch.positions[ch.indices[i]], b = ch.positions[ch.indices[i + 1]], c = ch.positions[ch.indices[i + 2]];
-            if (glm::cross(b - a, c - a).y < 0.0f) std::swap(ch.indices[i + 1], ch.indices[i + 2]);
-        }
+        rtin::windUpward(ch.positions, ch.indices);
         out->vertices += ch.positions.size();
         out->triangles += ch.indices.size() / 3;
     }
