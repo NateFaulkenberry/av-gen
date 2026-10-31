@@ -81,11 +81,12 @@ Both suites exit 0 on the final code:
 
 ## Honest weak spots
 
-- **The canyon-side tear is not seen.** The camera looks out through the wall, and the rock behind the exit plane is
+- **The canyon-side tear is not seen** (the owner: leave it off, no look-back). The camera looks out through the wall, and the rock behind the exit plane is
   clipped. The portal's torn language is carried by the Moon's lips around the view. I turned the dusk tear off: its
   throat stretched the wall's foot into dark slivers in front of the camera.
-- **A dark lip at 53.0–53.4 s.** In the last half-second before the crossing, a dark rounded edge of the Moon's torn
-  floor crosses the bottom of the frame.
+- **The dark blob at 53.0–53.4 s is fixed** (after review; `portals-c2/fix-lip/`). It was not the Moon's lip: it was
+  a spur of the canyon wall's foot seen from inside the rock, because the camera's lowest rays cross the exit plane
+  below the rock's face. With a portal clip, back faces are now discarded too.
 - **Later in the dusk run (57–60 s) the near walls are in shade.** Lit sandstone is on the far mesas and the left wall's
   rim only; the first seconds out of the wall carry the strongest warm light.
 - **The hover looks straight down at the field** for about 3 s (50–53 s), the opening growing in the middle. It reads,

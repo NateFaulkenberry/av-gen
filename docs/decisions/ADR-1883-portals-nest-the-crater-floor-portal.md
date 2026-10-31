@@ -89,3 +89,8 @@ perpendicular to its view before it is carried through a portal (`orthoUp`).
 
 **The look does not follow a climb.** The flight's look-ahead takes only a quarter of an upward motion. Rising over
 the hero's rim to the hover, the full look-ahead tipped the view into the black sky for almost a second.
+
+**Back faces too (the merge fix).** The dark rounded blob at 53.0–53.4 s was not the Moon's torn floor. It was a spur
+of the canyon wall's foot, seen from inside the rock. The camera's lowest rays cross the exit plane below the rock's
+face there, so they travel inside the spur and meet its surface from behind. While a scene has a portal clip, its
+camera passes also discard back faces, so those rays pass through to what lies beyond and the blob is gone.

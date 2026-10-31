@@ -97,10 +97,12 @@ fn corruptEchoDropped(in: VertexOut) -> bool {
     return !crEchoKeeps(p0, frame.params.x, u32(object.corrupt.y + 0.5));
 }
 
-// Gate C 2: behind a portal's exit wall (scene::Scene::portalClip), where the camera behind the wall looks out.
-fn portalClipped(p: vec3<f32>) -> bool {
+// Gate C 2: behind a portal's exit wall (scene::Scene::portalClip), where the camera behind the wall looks out; and,
+// while there is such a wall, any surface seen from inside the rock (a back face): the camera's lowest rays cross the
+// exit plane below the rock's face there and would otherwise see a spur of the wall from the inside, as a dark blob.
+fn portalClipped(p: vec3<f32>, frontFacing: bool) -> bool {
     let n = frame.portalClip.xyz;
-    return dot(n, n) > 0.0 && dot(n, p) + frame.portalClip.w < 0.0;
+    return dot(n, n) > 0.0 && (dot(n, p) + frame.portalClip.w < 0.0 || !frontFacing);
 }
 
 // The entity's shaded output; the entry points below discard on the effect clip after calling it.
@@ -139,7 +141,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         out = corruptShade(out, in, frontFacing);
     }
     // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
-    if (fxClipDiscard || (object.corrupt.x > 0.5 && corruptEchoDropped(in)) || portalClipped(in.worldPos)) {
+    if (fxClipDiscard || (object.corrupt.x > 0.5 && corruptEchoDropped(in)) || portalClipped(in.worldPos, frontFacing)) {
         discard;
     }
     return out;
@@ -156,7 +158,7 @@ fn fs_main_refract(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> S
     } else {
         out.color = vec4<f32>(refractSurface(out.color.rgb, in.normal, frontFacing, in.worldPos, in.clip.xy), out.color.a);
     }
-    if (fxClipDiscard || portalClipped(in.worldPos)) {
+    if (fxClipDiscard || portalClipped(in.worldPos, frontFacing)) {
         discard;
     }
     return out;
@@ -181,7 +183,7 @@ fn fs_main_ssr(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> Scene
         }
     }
     out.color = vec4<f32>(delta, 0.0);
-    if (fxClipDiscard || portalClipped(in.worldPos)) {
+    if (fxClipDiscard || portalClipped(in.worldPos, frontFacing)) {
         discard;
     }
     return out;
@@ -203,8 +205,8 @@ fn orderedDither(pixel: vec2<f32>) -> f32 {
 }
 
 @fragment
-fn fs_depth(in: VertexOut) {
-    depthPrepassClip(in);
+fn fs_depth(in: VertexOut, @builtin(front_facing) frontFacing: bool) {
+    depthPrepassClip(in, frontFacing);
 }
 
 // ADR-1813: the depth prepass with GTAO on also writes the surface's normal -- the interpolated vertex normal the lit
@@ -213,7 +215,7 @@ fn fs_depth(in: VertexOut) {
 // `fs_depth`, so the two prepass variants keep exactly the same pixels.
 @fragment
 fn fs_depth_normal(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> @location(0) vec4<f32> {
-    depthPrepassClip(in);
+    depthPrepassClip(in, frontFacing);
     var n = normalize(in.normal);
     if (!frontFacing) {
         n = -n;
@@ -223,12 +225,12 @@ fn fs_depth_normal(in: VertexOut, @builtin(front_facing) frontFacing: bool) -> @
 }
 
 // The prepass's discards: an effect's clip, the alpha mask and blended surfaces' stochastic coverage.
-fn depthPrepassClip(in: VertexOut) {
+fn depthPrepassClip(in: VertexOut, frontFacing: bool) {
     // Effect Library Wave 2 (FXL): a dissolving or growing owner's clip, the same test the lit pass
     // makes, so the prepass and every shadow map lose what the colour loses. Decided here (the gate
     // is uniform per draw), discarded at the end, after the alpha test's texture sample: see
     // `fxClipDiscard` in pbr_shade.wgsl for why a discard may not precede a derivative.
-    var clipped = (object.corrupt.x > 0.5 && corruptEchoDropped(in)) || portalClipped(in.worldPos); // ADR-1873, Gate C 2
+    var clipped = (object.corrupt.x > 0.5 && corruptEchoDropped(in)) || portalClipped(in.worldPos, frontFacing); // ADR-1873, Gate C 2
     if (object.fxA.z != 0.0 && (u32(object.fxA.z + 0.5) & FX_CLIP) != 0u) {
         setEntityFxLanes(object.fxA, object.fxB, entityFx[u32(object.fxA.w + 0.5)]);
         clipped = clipped || fxClipped(in.worldPos);
