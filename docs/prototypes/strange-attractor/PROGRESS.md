@@ -36,7 +36,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | portals A | the Matrix effect: the scan, geometric (world-space) mosh, glyphs, the site in the rock, the opening (`16`) | **approved by the owner** ("I think it looks good") |
 | portals B | Gate A fixes; the portal view, the crossing at 32.0 s, the Moon and the lunar flight (`17`) | **approved by the owner** |
 | portals C | the Moon polish; portal 2 in the crater floor, the dusk canyon, the full 60 s (`18`) | reviewed: the floor opening is the highlight |
-| portals C 2 | portal 2's exit in a canyon wall, the dusk light, the floor's field, the Earth, the dive (`19`) | **done, ready for merge**: media in `portals-c2/` |
+| portals C 2 | portal 2's exit in a canyon wall, the dusk light, the floor's field, the Earth, the dive (`19`) | **merged** (main 214dafd8, Art Pass 1) |
+| Art Pass 2, R2 | research, audit, cast sheet, beat sheet, music, proofs (`30`-`33`, `assets-pass2.md`) | **done, awaiting the owner**: media in `pass2-r/` |
+| Art Pass 2, M1-M5 | Moon extension and the encounters, Mars, night and ocean, UFO, dawn (`33` §6) | not started: gated on R2 |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -177,6 +179,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-31: Art Pass 2, Gate R2 (`32-pass2-research.md`, `33-pass2-plan.md`, `assets-pass2.md`; ADR-1887).
+  - Audit: most machinery exists; missing are fur, morph targets, a cyclic journey (the canyon is visited four times),
+    underwater shaft occluders and a portal at the camera.
+  - Cast: realistic rigged humans from MPFB (CC0): the suited man, Nordics, and bases for the Sasquatch and the Gray.
+    Sketchfab (realistic goat and fallbacks) needs an account: owner decision.
+  - Proofs: terminator crossing (new lunar curvature radius), crater domes, earthshine, underwater depth, fur in fire
+    light (Blender), the interior lighting, the Gray's triangle and beam.
+  - Feline Footwear is 210.5 s; the long cut is about 262 s: music is an owner decision.
 - 2026-10-31: Portals Gate C 2 (`19-portals-gate-c2.md`; ADR-1883, 1884, 1873 revised).
   - The second portal's canyon side is in the east wall (site B of four candidates). The Moon's floor is turned onto
     it (the portal now rotates), so the camera drops into the hole and comes out of the wall level; crossing 53.810 s.

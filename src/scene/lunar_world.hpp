@@ -46,6 +46,8 @@ struct LunarGen {
     float craters = 3.0f;        // N(>100 m) per km^2
     float rocks = 0.004f;        // boulders per m^2 at full ejecta (0 = none)
     float relief = 60.0f;        // the rolling relief's amplitude (m)
+    float curvature = 1737.4e3f; // the radius the ground falls away with (m): the Moon's own, or smaller to bring the
+                                 // terminator (where a low sun meets the curve) within flying reach (Art Pass 2)
     std::vector<LunarCrater> heroes;
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;

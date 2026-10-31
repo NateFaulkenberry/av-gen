@@ -193,3 +193,4 @@ __pycache__/
 # Dimensional portals (scene/strange-attractor): NASA data downloaded on approval, never committed --
 # NASA Blue Marble (public domain) and the LROC NAC DTM of Linne crater (NASA/GSFC/ASU; calibration only).
 /assets/space/
+/assets/strange-attractor/

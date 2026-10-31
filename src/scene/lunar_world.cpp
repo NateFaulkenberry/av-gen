@@ -15,7 +15,6 @@ namespace avgen::scene {
 namespace {
 
 using json = nlohmann::json;
-constexpr float kMoonRadius = 1737.4e3f;
 constexpr int kChunksPerSide = 16;
 
 std::uint32_t hashU(std::uint32_t x) {
@@ -174,7 +173,7 @@ Field buildField(const LunarGen& g, float extent, float spacing, const std::vect
             const float x = f.x(i), z = f.x(j);
             float& h = f.h[static_cast<std::size_t>(j) * f.n + i];
             h += fbm(x, z, 3, 40.0f, 0.6f, 0.5f, g.seed + 5);
-            h -= (x * x + z * z) / (2.0f * kMoonRadius);
+            h -= (x * x + z * z) / (2.0f * g.curvature);
         }
     }
     return f;
@@ -330,6 +329,7 @@ Result<void> LunarGen::validate() const {
     if (!(skirtExtent >= extent && skirtExtent <= 200000.0f) || !(skirtSpacing >= spacing && skirtExtent / skirtSpacing <= 4096.0f)) {
         return fail("lunarWorld: skirtExtent at least extent (at most 200 km), skirtSpacing at least spacing");
     }
+    if (!(curvature >= 1000.0f && curvature <= 1.0e7f)) return fail("lunarWorld: curvature in [1 km, 10000 km]");
     if (!(craters >= 0.0f && craters <= 100.0f) || !(rocks >= 0.0f && rocks <= 0.1f) || !(relief >= 0.0f && relief <= 1000.0f)) {
         return fail("lunarWorld: craters in [0, 100], rocks in [0, 0.1], relief in [0, 1000]");
     }
@@ -348,6 +348,7 @@ std::uint64_t LunarGen::hash() const {
     };
     h = (h ^ seed) * 1099511628211ull;
     for (float v : {extent, spacing, skirtExtent, skirtSpacing, craters, rocks, relief}) mix(v);
+    if (curvature != 1737.4e3f) mix(curvature);
     for (const LunarCrater& c : heroes) {
         for (float v : {c.x, c.z, c.diameter, c.fresh}) mix(v);
     }
@@ -455,8 +456,8 @@ std::shared_ptr<const LunarWorld> generateLunarWorld(const LunarGen& gen) {
 
 Result<LunarWorldBlock> lunarWorldFromJson(const json& j) try {
     if (!j.is_object()) return fail("'lunarWorld' must be an object");
-    static const std::array<const char*, 11> kKeys = {"enabled", "seed", "extent", "spacing", "skirtExtent", "skirtSpacing",
-                                                       "craters", "rocks", "relief", "heroes", "program"};
+    static const std::array<const char*, 12> kKeys = {"enabled", "seed", "extent", "spacing", "skirtExtent", "skirtSpacing",
+                                                       "craters", "rocks", "relief", "heroes", "program", "curvature"};
     for (auto it = j.begin(); it != j.end(); ++it) {
         if (std::find_if(kKeys.begin(), kKeys.end(), [&](const char* k) { return it.key() == k; }) == kKeys.end()) {
             return fail("lunarWorld: unknown key '{}'", it.key());
@@ -473,6 +474,7 @@ Result<LunarWorldBlock> lunarWorldFromJson(const json& j) try {
     g.craters = j.value("craters", g.craters);
     g.rocks = j.value("rocks", g.rocks);
     g.relief = j.value("relief", g.relief);
+    g.curvature = j.value("curvature", g.curvature);
     b.program = j.value("program", b.program);
     if (j.contains("heroes")) {
         for (const json& h : j.at("heroes")) {
@@ -496,7 +498,8 @@ json lunarWorldToJson(const LunarWorldBlock& b) {
     for (const LunarCrater& c : g.heroes) heroes.push_back({{"x", c.x}, {"z", c.z}, {"diameter", c.diameter}, {"fresh", c.fresh}});
     return json{{"enabled", b.enabled}, {"seed", g.seed},       {"extent", g.extent},   {"spacing", g.spacing},
                 {"skirtExtent", g.skirtExtent}, {"skirtSpacing", g.skirtSpacing}, {"craters", g.craters},
-                {"rocks", g.rocks},     {"relief", g.relief},   {"heroes", heroes},     {"program", b.program}};
+                {"rocks", g.rocks},     {"relief", g.relief},   {"heroes", heroes},     {"program", b.program},
+                {"curvature", g.curvature}};
 }
 
 } // namespace avgen::scene

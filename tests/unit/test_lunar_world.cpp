@@ -189,3 +189,23 @@ TEST_CASE("portals nest: the camera crosses into the Moon, then through the Moon
     CHECK(thirdScene.portalClip.x == Approx(1.0f));
     CHECK(thirdScene.portalClip.w == Approx(-500.0f));
 }
+
+TEST_CASE("the lunar curvature radius brings the ground's fall within reach (Art Pass 2's terminator)",
+          "[lunar-world][pass2]") {
+    scene::LunarGen g = small();
+    scene::LunarGen curved = g;
+    curved.curvature = 4000.0f;
+    REQUIRE(curved.validate().has_value());
+    CHECK(curved.hash() != g.hash());
+    const auto flat = scene::generateLunarWorld(g);
+    const auto bent = scene::generateLunarWorld(curved);
+    // at 150 m from the centre the ground has fallen d^2 / 2R further (the Moon's own radius barely moves it)
+    const float drop = flat->sample(150.0f, 0.0f) - bent->sample(150.0f, 0.0f);
+    CHECK(drop == Approx(150.0f * 150.0f / (2.0f * 4000.0f)).margin(0.05f));
+    auto block = scene::lunarWorldFromJson(nlohmann::json::parse(R"({"extent": 400, "spacing": 4, "skirtExtent": 1600,
+        "skirtSpacing": 32, "curvature": 4000})"));
+    REQUIRE(block.has_value());
+    CHECK(block->gen.curvature == Approx(4000.0f));
+    CHECK(scene::lunarWorldFromJson(scene::lunarWorldToJson(*block))->gen.hash() == block->gen.hash());
+    CHECK_FALSE(scene::lunarWorldFromJson(nlohmann::json::parse(R"({"curvature": 10})")).has_value());
+}
