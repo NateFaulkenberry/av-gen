@@ -18,6 +18,9 @@ cmake-build-*/
 # fetcher are committed; ~110 MB of textures and meshes are not.
 /assets/nature/
 /assets/terrain/
+# CHRONOS (The Devourer): third-party downloads and builds, never committed (the repo is public);
+# docs/prototypes/chronos/assets.md and 13-devourer-downloads.md record each one's source and licence
+/assets/chronos/
 # The Quaternius packs are CC0 1.0 (assets/quaternius/License_Standard.txt; assets/imported/ATTRIBUTION.md)
 # and gitignored for size, not licence -- EXCEPT the three test fixtures below, with their textures and
 # the pack's licence file (owner's decision, QA pass 2026-09-28). The GPU LOD, visibility, ecology and
