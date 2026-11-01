@@ -197,3 +197,18 @@ TEST_CASE("The trail memory budget refuses over-large ribbon systems", "[scene][
     }
     CHECK_FALSE(scene::validateParticleSystem(tooMany).has_value());
 }
+
+TEST_CASE("an emitter far from the origin keeps its place through its parameters", "[particles][pass2]") {
+    // The position's hard range was +-1000 m and clamped a campfire placed 1.35 km out (Art Pass 2, M1b).
+    avgen::scene::ParticleSystem sys;
+    sys.name = "far";
+    sys.position = glm::vec3(74.0f, 2.0f, 1350.0f);
+    sys.attractorPosition = glm::vec3(-2500.0f, 0.0f, 4000.0f);
+    avgen::params::ParameterSet ps;
+    const auto p = avgen::scene::registerParticleParameters(ps, sys);
+    avgen::scene::ParticleSystem live = sys;
+    avgen::scene::applyParticleParameters(p, sys, live);
+    CHECK(live.position.z == Catch::Approx(1350.0f));
+    CHECK(live.attractorPosition.x == Catch::Approx(-2500.0f));
+    CHECK(live.attractorPosition.z == Catch::Approx(4000.0f));
+}

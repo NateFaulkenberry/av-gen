@@ -25,3 +25,9 @@ ADR-1888 for a fur decision (shell fur or alpha cards) to be made in M1.
   pale. Roughness 0.95 keeps them from glinting.
 - Flicker is applied to the authored intensity after looks and routes, so a look may switch the fire on (intensity)
   and it still breathes.
+
+## Revision at Art Pass 2, M1b
+
+The flicker's fast terms are gone. At the campfire's rate they ran at 6-12 Hz, near a 30 fps render's Nyquist, and the
+fire-lit ground jumped up to 7 % in brightness from frame to frame. n is now 0.6 sin(2 pi t) sin(2.3 t + 1.7) +
+0.4 sin(4.1 t + 0.4), with t = seconds x flickerRate: a breath of a few hertz at most.

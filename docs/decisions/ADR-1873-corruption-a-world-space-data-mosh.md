@@ -136,3 +136,9 @@ faults in the strata.
 `front` (m, default 30): how far in front of the opening's plane, on the camera's side, the tear reaches into the
 rock. Behind the plane it still fades from 10 to 30 m. A sloped wall's foot stands in front of a vertical opening;
 the dusk exit sets 0.5. It is `corruption9.y`.
+
+## Revision at Art Pass 2, M1b
+
+The canyon's portal no longer sets `floor`. The owner asked for the Gate A spill back: the bed's blocks and glyphs
+rising through the river toward the wall. The key stays in the engine for any corruption that wants a bed kept under
+its water.

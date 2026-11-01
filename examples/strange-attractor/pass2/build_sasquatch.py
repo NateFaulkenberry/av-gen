@@ -25,7 +25,7 @@ src, out = sys.argv[sys.argv.index("--") + 1:][:2]
 variant = int(sys.argv[sys.argv.index("--") + 3]) if len(sys.argv) > sys.argv.index("--") + 3 else 0
 rng = random.Random(29 + variant)
 V = [dict(height=2.35, fur=(0.045, 0.028, 0.017), furlen=1.0, lean=6.0),
-     dict(height=2.5, fur=(0.06, 0.038, 0.022), furlen=1.2, lean=10.0),
+     dict(height=2.5, fur=(0.034, 0.021, 0.013), furlen=1.2, lean=10.0),
      dict(height=2.25, fur=(0.03, 0.02, 0.014), furlen=0.9, lean=4.0)][variant % 3]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -262,4 +262,26 @@ for fr in range(0, frames + 1, 6):
 bpy.ops.object.mode_set(mode="OBJECT")
 bpy.context.scene.frame_start, bpy.context.scene.frame_end = 0, frames
 bpy.ops.export_scene.gltf(filepath=out, export_animations=True, export_animation_mode="ACTIONS")
+
+
+def mask_fur(path):
+    """M1b: the fur cards alpha-tested (glTF MASK), not blended. Blender 5's exporter writes BLEND whatever the
+    material asks, and blended cards let the bright ground behind a back-lit Sasquatch show through its fur: it read
+    pale and cottony."""
+    import json as _json, struct as _struct
+    b = open(path, "rb").read()
+    n = _struct.unpack("<I", b[12:16])[0]
+    js = _json.loads(b[20:20 + n])
+    rest = b[20 + n:]
+    for m in js.get("materials", []):
+        if m.get("name") == "sasquatch_fur":
+            m["alphaMode"] = "MASK"
+            m["alphaCutoff"] = 0.45
+    enc = _json.dumps(js, separators=(",", ":")).encode()
+    enc += b" " * ((-len(enc)) % 4)
+    total = 12 + 8 + len(enc) + len(rest)
+    open(path, "wb").write(_struct.pack("<III", 0x46546C67, 2, total) + _struct.pack("<II", len(enc), 0x4E4F534A) + enc + rest)
+
+
+mask_fur(out)
 print("SASQUATCH", out, "height", H, "verts", len(me.vertices), "cards", N)

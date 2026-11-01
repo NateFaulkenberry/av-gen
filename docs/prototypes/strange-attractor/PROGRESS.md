@@ -38,7 +38,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | portals C | the Moon polish; portal 2 in the crater floor, the dusk canyon, the full 60 s (`18`) | reviewed: the floor opening is the highlight |
 | portals C 2 | portal 2's exit in a canyon wall, the dusk light, the floor's field, the Earth, the dive (`19`) | **merged** (main 214dafd8, Art Pass 1) |
 | Art Pass 2, R2 | research, audit, cast sheet, beat sheet, music, proofs (`30`-`33`, `assets-pass2.md`) | **done, awaiting the owner**: media in `pass2-r/` |
-| Art Pass 2, M1 | the Moon at night (terminator, basin, domes, crater portal), the return to the canyon at dusk, the first Sasquatch encounter (`35`; ADR-1885, 1886, 1888) | **done, awaiting the owner**: media in `pass2-m1/` |
+| Art Pass 2, M1 | the Moon at night (terminator, basin, domes, crater portal), the return to the canyon at dusk, the first Sasquatch encounter (`35`; ADR-1885, 1886, 1888) | reviewed: "overall this direction is great"; revised in M1b |
+| Art Pass 2, M1b | the world scaled to 0.4, the portal's water spill back, a short Moon, a real campfire (`36`; ADR-1893, 1894) | **done, awaiting the owner**: media in `pass2-m1b/` |
 | Art Pass 2, M2-M5 | Mars, night and ocean, UFO, dawn (`33` §6) | not started: gated on M1 |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
@@ -180,6 +181,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-11-01: Art Pass 2, M1b (`36-pass2-m1b.md`; ADR-1893, 1894). Rebased onto main ab41c924.
+  - The canyon at world scale 0.4 (`attractorWorld.worldScale`; every other length by `canyon_scale.py`); portal 1
+    stays in its bank wall; the opening compared with Pass 1.
+  - The corruption spills across the river again (ADR-1873's floor removed).
+  - A short Moon: crossing 2 at 47.87 s (bar 25), the domes glimpsed on the rise, the Earth on the bass; the beat
+    sheet re-timed (crossings on bars 36, 52, 62, 75, 88).
+  - A real campfire (Blender logs and stones, two flame layers, embers, smoke); particle emitters beyond 1 km were
+    clamped by a +-1000 m hard range (fixed); alpha-tested fur; the dusk contour lines at a quarter.
 - 2026-10-31: Art Pass 2, Milestone 1 (`35-pass2-m1.md`; ADR-1885, 1886, 1888; 1884 revised). Rebased onto main
   3d73b32c (CHRONOS ADR-1930, the shared RTIN mesher).
   - The sequence runs 0-86 s on the 210.5 s cut: crossing 1 at 32.025 s, crossing 2 at 67.700 s (bar 35).

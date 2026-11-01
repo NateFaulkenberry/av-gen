@@ -683,3 +683,65 @@ TEST_CASE("the canyon mesh is unchanged by the shared RTIN mesher's extraction",
     CHECK(plainHash == 792846551093013842ull);
     CHECK(portalHash == 6720694971324766995ull);
 }
+
+
+TEST_CASE("a world scale scales the whole generated world, and only when asked", "[attractor-world][pass2][adr1893]") {
+    scene::AttractorGen g;
+    g.resolution = 256;
+    g.meshSpacing = 16.0f;
+    g.meshMinError = 4.0f;
+    auto unit = scene::generateAttractorWorld(g);
+    scene::AttractorGen h = g;
+    h.worldScale = 0.4f;
+    CHECK(h.hash() != g.hash());
+    scene::AttractorGen same = g;
+    same.worldScale = 1.0f;
+    CHECK(same.hash() == g.hash()); // absent and 1 are the same world (Pass 1's hash)
+    auto small = scene::generateAttractorWorld(h);
+    REQUIRE(small->terrainMesh);
+    REQUIRE(unit->terrainMesh);
+    CHECK(small->extent == Approx(0.4f * unit->extent));
+    CHECK(small->gen.worldScale == Approx(0.4f)); // the world keeps the gen it was asked for (the hash check)
+    for (const glm::vec2 q : {glm::vec2(100.0f, 200.0f), glm::vec2(-1500.0f, 3300.0f), glm::vec2(2400.0f, -700.0f)}) {
+        CHECK(small->sample(0.4f * q) == Approx(0.4f * unit->sample(q)).margin(1e-3));
+    }
+    REQUIRE(small->flight.size() == unit->flight.size());
+    for (std::size_t i = 0; i < unit->flight.size(); i += 97) {
+        CHECK(glm::length(glm::vec3(small->flight[i]) - 0.4f * glm::vec3(unit->flight[i])) < 1e-2f);
+        CHECK(small->flight[i].w == Approx(unit->flight[i].w)); // the bank is an angle
+    }
+    CHECK(glm::length(small->eye - 0.4f * unit->eye) < 1e-2f);
+    REQUIRE(small->terrainMesh->chunks.size() == unit->terrainMesh->chunks.size());
+    const auto& a = unit->terrainMesh->chunks.front();
+    const auto& b = small->terrainMesh->chunks.front();
+    REQUIRE(a.positions.size() == b.positions.size());
+    CHECK(glm::length(b.positions[a.positions.size() / 2] - 0.4f * a.positions[a.positions.size() / 2]) < 1e-3f);
+    CHECK(b.uvs[0] == a.uvs[0]); // the strata coordinate is in bands: scale-free
+    // the JSON key round-trips, and is written only when it is not 1
+    nlohmann::json j = {{"seed", 1}, {"worldScale", 0.4}};
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->gen.worldScale == Approx(0.4f));
+    CHECK(scene::attractorWorldToJson(*block).value("worldScale", 1.0) == Approx(0.4));
+    block->gen.worldScale = 1.0f;
+    CHECK_FALSE(scene::attractorWorldToJson(*block).contains("worldScale"));
+    j["worldScale"] = 5.0;
+    CHECK_FALSE(scene::attractorWorldFromJson(j).has_value());
+}
+
+TEST_CASE("a look can quiet the contour lines without touching their route", "[attractor-world][pass2][adr1894]") {
+    auto block = scene::attractorWorldFromJson(nlohmann::json{{"seed", 1}});
+    REQUIRE(block.has_value());
+    CHECK(block->look.contourGain == Approx(1.0f)); // by default the lines are as the route drives them
+    params::ParameterSet ps;
+    const auto p = scene::registerAttractorWorldParameters(ps, *block, "attractorWorld/");
+    params::IParameter* gain = ps.find("attractorWorld/contourGain");
+    REQUIRE(gain != nullptr);
+    gain->setFinalComponent(0, 0.25f);
+    scene::AttractorWorldBlock live = *block;
+    scene::applyAttractorWorldParameters(p, *block, live);
+    CHECK(live.live.contourGain == Approx(0.25f));
+    auto withGain = scene::attractorWorldFromJson(nlohmann::json{{"seed", 1}, {"look", {{"contourGain", 0.5}}}});
+    REQUIRE(withGain.has_value());
+    CHECK(withGain->look.contourGain == Approx(0.5f));
+}

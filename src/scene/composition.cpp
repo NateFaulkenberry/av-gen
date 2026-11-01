@@ -1374,7 +1374,7 @@ void Composition::updateAttractorWorld() {
     for (const std::size_t i : attractorChunks_) {
         if (i < scene_.entities.size()) {
             Material& m = scene_.entities[i].material;
-            m.emissiveColor = glm::vec3(live.live.contour, live.live.glow, 0.0f);
+            m.emissiveColor = glm::vec3(live.live.contour * live.live.contourGain, live.live.glow, 0.0f); // ADR-1894
             m.emissiveIntensity = 1.0f;
         }
     }
@@ -9473,8 +9473,9 @@ void Composition::applyParameters() {
         live.intensity = p.intensity != nullptr ? p.intensity->value() : rest.intensity;
         if (rest.flicker > 0.0f) { // ADR-1888: a fire's flicker, a pure function of the clock
             const auto t = static_cast<float>(currentTime_) * rest.flickerRate;
-            const float n = 0.55f * std::sin(t * 6.2831853f) * std::sin(t * 2.3f + 1.7f) + 0.3f * std::sin(t * 13.7f + 0.4f) +
-                            0.15f * std::sin(t * 29.3f + 2.1f);
+            // slow terms only (M1b): at flickerRate 2.6 the fastest is about 3.5 Hz. The old 13.7 and 29.3 terms ran at
+            // 6-12 Hz, near a 30 fps render's Nyquist, and the lit ground strobed frame to frame (measured 7 %)
+            const float n = 0.6f * std::sin(t * 6.2831853f) * std::sin(t * 2.3f + 1.7f) + 0.4f * std::sin(t * 4.1f + 0.4f);
             live.intensity *= std::max(0.0f, 1.0f + rest.flicker * n);
         }
         live.color = p.color != nullptr ? p.color->value() : rest.color;

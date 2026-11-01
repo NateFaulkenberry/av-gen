@@ -48,6 +48,11 @@ struct AttractorGen {
     float meshSpacing = 2.0f;
     float meshError = 0.004f;    // ~6 px at 1080p from the path; measured indistinguishable from 0.002 (Phase 1)
     float meshMinError = 0.3f;
+    // ADR-1893: a uniform scale of the whole generated world (the height field, the masses, the strata, the side
+    // canyons, the flight, the composed camera, the terrain mesh and the river), 0.1..2. The generator works at scale 1
+    // and the result is scaled, so the world's shape is identical; the flight keeps its timing, so its speeds scale
+    // with it. The approach (site, departArc, speed) is authored in world units, like the rest of the scene.
+    float worldScale = 1.0f;
     // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
     // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
     // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from
@@ -75,6 +80,9 @@ struct AttractorLook {
     // emission (rgb = contour, glow, spare; read by the program's `materialEmission` input).
     float contour = 0.0f;         // contour tracing (Mode A): the iso-height lines' strength
     float glow = 0.0f;            // a broad warm lift of the walls (sustained energy)
+    // ADR-1894: a gain on the contour lines (0..1), for a look: the audio route drives `contour`, so a time of day
+    // that wants the lines quieter scales them here instead of fighting the route
+    float contourGain = 1.0f;
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines

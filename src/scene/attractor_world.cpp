@@ -621,6 +621,7 @@ Result<void> AttractorGen::validate() const {
     if (!(meshError > 0.0f && meshError <= 0.05f) || !(meshMinError > 0.0f && meshMinError <= 10.0f)) {
         return fail("attractorWorld: meshError must be in (0, 0.05] and meshMinError in (0, 10] m");
     }
+    if (!(worldScale >= 0.1f && worldScale <= 2.0f)) return fail("attractorWorld: worldScale must be in [0.1, 2]");
     if (approach.enabled) {
         const Approach& a = approach;
         if (!std::isfinite(a.site.x + a.site.y + a.site.z) || !(a.departArc >= 0.0f) || !(a.speed >= 1.0f && a.speed <= 200.0f) ||
@@ -640,6 +641,7 @@ std::uint64_t AttractorGen::hash() const {
                     branchingDensity, flightSeconds, meshSpacing, meshError, meshMinError}) {
         h = mixHashF(h, v);
     }
+    if (worldScale != 1.0f) h = mixHashF(h ^ 0x1893ull, worldScale); // ADR-1893: absent, the hash is unchanged
     if (approach.enabled) { // ADR-1881: absent, the hash is ADR-1853's
         for (float v : {approach.site.x, approach.site.y, approach.site.z, approach.departArc, approach.speed,
                         approach.slowFrom, approach.slowFor}) {
@@ -665,6 +667,50 @@ float AttractorWorld::sample(glm::vec2 xz) const {
 
 // ---- generation -------------------------------------------------------------------------------------------------
 
+namespace {
+// ADR-1893: every length in a generated world times s. Directions, the strata coordinate (in bands) and the baked
+// visibility are scale-free and stay.
+void scaleWorld(AttractorWorld& w, float s) {
+    for (float& h : w.height) h *= s;
+    for (float& o : w.strataOffset) o *= s;
+    for (float& a : w.networkArc) if (a >= 0.0f) a *= s;
+    w.extent *= s;
+    w.origin *= s;
+    w.minHeight *= s;
+    w.maxHeight *= s;
+    for (AttractorMass& m : w.masses) {
+        m.centre *= s;
+        m.axes *= s;
+        m.height *= s;
+    }
+    for (NetworkBranch& b : w.branches) {
+        for (glm::vec2& q : b.points) q *= s;
+        for (float& v : b.widths) v *= s;
+        for (float& v : b.depths) v *= s;
+        b.startArc *= s;
+    }
+    for (glm::vec2& q : w.valley) q *= s;
+    for (glm::vec2& q : w.gorgeLine) q *= s;
+    w.strataSeed[0].z *= s; // the band (m)
+    w.strataSeed[1].y *= s; // the fold's wavelength (m)
+    w.strataSeed[1].z *= s; // and amplitude (m)
+    w.eye *= s;
+    w.target *= s;
+    for (glm::vec4& f : w.flight) f = glm::vec4(glm::vec3(f) * s, f.w);
+    if (w.terrainMesh) {
+        auto mesh = std::make_shared<AttractorTerrainMesh>(*w.terrainMesh);
+        for (AttractorTerrainChunk& c : mesh->chunks) {
+            for (glm::vec3& p : c.positions) p *= s;
+            c.boundsMin *= s;
+            c.boundsMax *= s;
+        }
+        for (glm::vec3& p : mesh->riverPositions) p *= s;
+        mesh->sampleSpacing *= s;
+        w.terrainMesh = std::move(mesh);
+    }
+}
+} // namespace
+
 std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen& gen) {
     const auto t0 = std::chrono::steady_clock::now();
     auto world = std::make_shared<AttractorWorld>();
@@ -673,8 +719,16 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     if (!g.validate()) {
         g = AttractorGen{}; // an invalid set never reaches here through the parameters; this keeps it safe anyway
     }
-    w.gen = g;
+    // ADR-1893: generate at scale 1 (the approach brought back to generator units), scale the result at the end
+    const float worldScale = g.worldScale;
     w.hash = g.hash();
+    if (worldScale != 1.0f) {
+        g.worldScale = 1.0f;
+        g.approach.site /= worldScale;
+        g.approach.departArc /= worldScale;
+        g.approach.speed /= worldScale;
+    }
+    w.gen = g;
     w.res = g.resolution;
     w.extent = g.extent;
     w.origin = glm::vec2(-0.5f * g.extent);
@@ -1250,6 +1304,8 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     buildFlight(w, g, Lb, L1);
 
     w.terrainMesh = buildTerrainMesh(w);
+    if (worldScale != 1.0f) scaleWorld(w, worldScale);
+    w.gen = gen.validate() ? gen : w.gen;
 
     w.generateSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     ++gGenerations;
@@ -1357,9 +1413,9 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "meshMinError", "worldScale", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
-constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow"};
+constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain"};
 
 } // namespace
 
@@ -1395,6 +1451,7 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.meshSpacing = j.value("meshSpacing", g.meshSpacing);
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
+    g.worldScale = j.value("worldScale", g.worldScale); // ADR-1893
     if (j.contains("approach")) { // ADR-1881
         const json& aj = j.at("approach");
         if (!aj.is_object()) return fail("attractorWorld: 'approach' must be an object");
@@ -1459,6 +1516,7 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         k.sunIntensity = l.value("sunIntensity", k.sunIntensity);
         k.contour = l.value("contour", k.contour);
         k.glow = l.value("glow", k.glow);
+        k.contourGain = l.value("contourGain", k.contourGain);
     }
     a.liveGen = a.gen;
     a.live = a.look;
@@ -1512,8 +1570,9 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                 {"sunShadowBias", a.sunShadowBias},
                 {"look",
                  {{"sunAzimuth", k.sunAzimuth}, {"sunElevation", k.sunElevation}, {"sunIntensity", k.sunIntensity},
-                  {"contour", k.contour}, {"glow", k.glow}}},
+                  {"contour", k.contour}, {"glow", k.glow}, {"contourGain", k.contourGain}}},
                 {"water", waterToJson(a.water)}};
+    if (g.worldScale != 1.0f) out["worldScale"] = g.worldScale; // ADR-1893
     if (g.approach.enabled) { // ADR-1881
         out["approach"] = json{{"site", json::array({g.approach.site.x, g.approach.site.y, g.approach.site.z})},
                                {"departArc", g.approach.departArc},
@@ -1603,6 +1662,7 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("sunIntensity", "key light", "Materials and Atmosphere", k.sunIntensity, 0.0f, 3.0f);
     r.f("contour", "contour tracing", "Materials and Atmosphere", k.contour, 0.0f, 4.0f);
     r.f("glow", "wall glow", "Materials and Atmosphere", k.glow, 0.0f, 4.0f);
+    r.f("contourGain", "contour gain (a look's)", "Materials and Atmosphere", k.contourGain, 0.0f, 1.0f);
     r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
         static_cast<int>(rest.camera), 0, 2);
     return p;
@@ -1628,6 +1688,7 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     k.sunIntensity = fval(p, "sunIntensity", k.sunIntensity);
     k.contour = fval(p, "contour", k.contour);
     k.glow = fval(p, "glow", k.glow);
+    k.contourGain = fval(p, "contourGain", k.contourGain);
     live.live = k;
     live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }

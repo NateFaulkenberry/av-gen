@@ -351,7 +351,14 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.lifetime = &params.add(f(base, "lifetime", 1.0f, 0.01f, 20.0f, 0.1f, 4.0f));
     p.speed = &params.add(f(base, "speed", 1.0f, 0.0f, 50.0f, 0.0f, 5.0f));
     p.spread = &params.add(f(base, "spread", s.spread, 0.0f, 1.0f, 0.0f, 1.0f));
-    p.position = &params.add(v3(base, "position", s.position, -1000.0f, 1000.0f));
+    // Art Pass 2 (M1b): a world position, like a node's; the old +-1000 m hard range silently clamped an emitter
+    // placed further out (the Strange Attractor's campfire, 1.35 km from the origin, drew its flames 350 m away)
+    {
+        params::ParamDesc<glm::vec3> d = v3(base, "position", s.position, -1.0e5f, 1.0e5f);
+        d.softMin = glm::vec3(-1000.0f); // the slider keeps its old reach
+        d.softMax = glm::vec3(1000.0f);
+        p.position = &params.add(std::move(d));
+    }
     // Absolute metres, seeded from the scene, exactly like `position` above and `spread` below.
     //
     // It was a multiplier over the authored value, defaulting to 1.0, and that is what this defect
@@ -367,7 +374,7 @@ ParticleParameters registerParticleParameters(params::ParameterSet& params, cons
     p.turbulence = &params.add(f(base, "turbulence", s.turbulence, 0.0f, 50.0f, 0.0f, 5.0f));
     p.turbulenceScale = &params.add(f(base, "turbulenceScale", s.turbulenceScale, 0.01f, 50.0f, 0.1f, 5.0f));
     p.turbulenceSpeed = &params.add(f(base, "turbulenceSpeed", s.turbulenceSpeed, 0.0f, 20.0f, 0.0f, 3.0f));
-    p.attractorPosition = &params.add(v3(base, "attractorPosition", s.attractorPosition, -1000.0f, 1000.0f));
+    p.attractorPosition = &params.add(v3(base, "attractorPosition", s.attractorPosition, -1.0e5f, 1.0e5f));
     p.attractorStrength = &params.add(f(base, "attractorStrength", s.attractorStrength, -100.0f, 100.0f, -10.0f, 10.0f));
     p.orbit = &params.add(f(base, "orbit", s.orbit, -50.0f, 50.0f, -5.0f, 5.0f));
     // Field forces (ADR-025): one strength per existing slot (1-based).

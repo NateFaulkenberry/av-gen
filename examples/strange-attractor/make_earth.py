@@ -46,7 +46,10 @@ def main():
           'meshes': [{'name': 'earth', 'primitives': [{'attributes': {'POSITION': 0, 'NORMAL': 1, 'TEXCOORD_0': 2},
                                                        'indices': 3, 'material': 0}]}],
           'materials': [{'name': 'earth', 'pbrMetallicRoughness': {'baseColorTexture': {'index': 0}, 'metallicFactor': 0.0,
-                                                                   'roughnessFactor': 0.7}}],
+                                                                   'roughnessFactor': 0.7},
+                         # Art Pass 2, M1b: the day side's own faint glow, which the node's emissiveBoost (routed
+                         # to the music) lifts and drops; the boost's 0 is the plain, sunlit Earth
+                         'emissiveTexture': {'index': 0}, 'emissiveFactor': [0.32, 0.36, 0.44]}],
           'textures': [{'source': 0}], 'images': [{'bufferView': 4, 'mimeType': 'image/jpeg'}],
           'accessors': [{'bufferView': 0, 'componentType': 5126, 'count': n, 'type': 'VEC3', 'min': [-R, -R, -R], 'max': [R, R, R]},
                         {'bufferView': 1, 'componentType': 5126, 'count': n, 'type': 'VEC3'},

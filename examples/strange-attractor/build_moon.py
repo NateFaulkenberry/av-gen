@@ -11,9 +11,11 @@ direction is baked into its ops, so it is written here with the light. The fill 
 warm grey. The scene has no environment light (a black sky lights nothing). The Earth is NASA's Blue Marble
 (make_earth.py; assets/space, gitignored). At Gate C the hero crater's floor carries the portal to the dusk canyon.
 """
-import json, math, os
+import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from canyon_scale import WORLD_SCALE as WS, canyon as canyon_frame  # noqa: E402  (ADR-1893)
 
 
 def unit(v):
@@ -32,7 +34,10 @@ def direction(az_deg, el_deg):
 S = direction(175.0, 2.2)                   # toward the sun
 E = direction(-6.0, 6.0)                    # toward the Earth: ahead, over the basin
 EXIT = [0.0, 0.0, 1500.0]
-CURVATURE = 150000.0                        # the ground's fall (ADR-1887): a gentle sun gradient across the route
+# M1b: a tighter fall (ADR-1887) than M1's 150 km. The plain at the exit tilts toward the low sun behind and is lit;
+# a few kilometres ahead the ground has turned past the terminator into night, below the horizon from low down; the
+# domes stand out there and come over the horizon only as the camera rises
+CURVATURE = 25000.0
 # 3.2 degrees across, 9 km out (a node's position is capped at 10 km and its scale at 100: make_earth.py's sphere is 100 m)
 EARTH_DISTANCE, EARTH_RADIUS = 9000.0, 250.0
 EARTH_FILE_RADIUS = 100.0  # make_earth.py's sphere (a node's scale is capped at 100: the Gate B 'far cut' was that cap)
@@ -108,37 +113,45 @@ ops = micro + [
     {"kind": "constant", "dst": 0, "constant": [0, 0, 0, 0]},
     {"kind": "constant", "dst": 1, "constant": [0.97, 0.97, 0.97, 0.97]},
 ]
-# M1: the portal crater P sits inside the dark basin near its east rim, lit by a dome beside it; the portal at its floor
-PORTAL = [300.0, 0.0, 650.0]
+# M1b: a short Moon (owner). The camera pops out onto the sunlit plain with the Earth ahead, rises over the near rim
+# of the great basin -- the domes glimpsed far across its night -- and dives into the portal crater P on the plain,
+# just short of the rim
+PORTAL = [0.0, 0.0, 1270.0]
 BASIN = (0.0, 0.0, 2200.0)
 # the domes (approved look: 02-crater-domes-in-the-dark): crater, dome scale (x 100 m), the dome's light
-DOMES = [((-320.0, -480.0, 520.0), (2.0, 1.7), 60000.0),
-         ((-760.0, -160.0, 700.0), (2.8, 2.2), 80000.0),
-         ((260.0, -860.0, 600.0), (2.4, 2.0), 70000.0)]
+# M1b: in the great basin's night, as at M1 -- below the near rim's line from low down, revealed whole once the camera
+# rises over the rim
+DOMES = [((-320.0, -480.0, 520.0), (2.0, 1.5), 60000.0),
+         ((-760.0, -160.0, 700.0), (2.8, 1.5), 80000.0),
+         ((260.0, -860.0, 600.0), (2.4, 1.5), 70000.0)]
 # the dome craters' floor heights, measured on the generated ground (a node's y is absolute)
-DOME_FLOOR = {(-320.0, -480.0): -134.5, (-760.0, -160.0): -131.6, (260.0, -860.0): -108.5, (540.0, 520.0): -91.8}
+DOME_FLOOR = {(-320.0, -480.0): -140.0, (-760.0, -160.0): -141.5, (260.0, -860.0): -122.0}  # measured (M1b ground)
+DOME_SINK = {(-320.0, -480.0): 12.0, (-760.0, -160.0): 12.0, (260.0, -860.0): 12.0}
 GOLD = [0.85, 0.75, 0.45]                 # the lunar scan's cooler gold
 # Gate C 2: the canyon-side exit is in a canyon wall, as portal 1 is (owner). Site B of the candidates
 # (portals-c2/00-exit-candidates): the east wall, 35 m up a 56-degree face over the river, facing down-canyon; 200 m of
 # open water straight ahead, the far walls in the last light. The portal turns the floor (axis down) onto that wall:
 # a camera dropping into the floor with its up pointing ahead (-z) leaves the wall level, its up the world's.
 DUSK_OUT = [-0.426, 0.0, -0.905]          # out of the wall (the wall's downhill normal)
-DUSK_EXIT = [166.5, 46.0, 3427.3]       # 10 m above the wall's face where it meets the plane (35.9 m)
+DUSK_EXIT = [*canyon_frame(0, 0)[:1], 46.0 * WS, canyon_frame(0, 0)[1]]  # the Gate C 2 site, scaled (ADR-1893)
 
 
 def canyon(d, lat):
-    """A point d metres out of the wall and lat to the right of that line (x, z)."""
-    return [166.5 - 0.426 * d + 0.905 * lat, 3427.3 - 0.905 * d - 0.426 * lat]
+    """A point d real metres out of the wall and lat to the right of that line (x, z), in the scaled world."""
+    return canyon_frame(d / WS, lat / WS)
 
 
-# after the exit (crossing 67.70 s, bar 35): out over the water, swinging left so the camp on the terrace to the right
-# passes 50-80 m off, then down the canyon and climbing toward the set-back wall that M2 opens (heights above the floor)
+# M1b: the camp is on the low bank right of the exit, 16 m out and 16 m over (real metres; it was the M1 bank's
+# neighbour before the world was scaled down). Crossing 2 at 47.87 s (bar 25). Out of the wall and down over the camp:
+# a slow arc a few metres off the fire, the eye on the Sasquatches, then away down the canyon (heights above the floor;
+# the next crossing, M2's, is planned on bar 36 = 69.69 s)
+CAMP = canyon(16.0, 16.0)
+CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 m at d 40, lat 40)
 DUSK_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t in
-               ((30, -5, 18, 69.4), (58, 10, 9, 71.6), (72, 23, 6, 73.6), (95, 18, 8, 75.6), (135, 5, 15, 77.4), (190, -10, 22, 79.0),
-               (260, 20, 28, 81.0), (350, 60, 38, 83.6), (430, 110, 55, 85.8))]
+               ((6, 2, 11, 49.4), (10, 6, 5, 51.2), (12, 9, 2.1, 53.0), (13.5, 11, 1.8, 55.4), (17.5, 10.5, 1.9, 57.8),
+                (25, 7, 4.0, 60.0), (42, 0, 8, 62.6), (70, -6, 12, 65.4), (105, -4, 16, 67.8), (130, 2, 20, 69.69))]
 EGLOW = [-c for c in direction(-6, 50)]
-CAMP = canyon(75, 45)                     # the terrace right of the exit, about 5 m over the water
-DUSK_AIMS = [[CAMP[0], 4.2, CAMP[1], 69.4, 75.0]]
+DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5]]
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)
@@ -159,7 +172,7 @@ scene = {
         # earthshine alone leaves a flat floor black)
         {"name": "earthglow", "type": "directional", "role": "fill", "direction": EGLOW, "color": [0.62, 0.72, 1.0],
          "intensity": 0.09, "castsShadow": False, "shadowStrength": 0.0}] +
-        [{"name": f"dome{k}", "type": "point", "position": [c[0], DOME_FLOOR[(c[0], c[1])] + 60.0 * sc[1], c[1]],
+        [{"name": f"dome{k}", "type": "point", "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 60.0 * sc[1], c[1]],
           "color": [1.0, 0.74, 0.45], "intensity": I, "range": 900.0, "castsShadow": False}
          for k, (c, sc, I) in enumerate(DOMES)],
     "environment": {"intensity": 0.0, "skyIntensity": 0.0, "fallbackAmbient": False, "background": [0.0, 0.0, 0.0], "fogColor": [0, 0, 0],
@@ -171,9 +184,8 @@ scene = {
                    "rocks": 0.02, "relief": 60, "program": "regolith", "curvature": CURVATURE,
                    # M1: a fresh crater beside the first glide (B); the great old basin whose near rim casts the night
                    # over it; the portal crater P inside it; the dome craters
-                   "heroes": [{"x": 40, "z": 1320, "diameter": 140, "fresh": 1.0},
-                              {"x": BASIN[0], "z": BASIN[1], "diameter": BASIN[2], "fresh": 0.12},
-                              {"x": PORTAL[0], "z": PORTAL[2], "diameter": 380, "fresh": 0.75}] +
+                   "heroes": [{"x": BASIN[0], "z": BASIN[1], "diameter": BASIN[2], "fresh": 0.12},
+                              {"x": PORTAL[0], "z": PORTAL[2], "diameter": 260, "fresh": 0.75}] +
                              [{"x": c[0], "z": c[1], "diameter": c[2], "fresh": 0.45} for c, _, _ in DOMES]},
     # Gate C (ADR-1883): the crater-floor portal. The floor of P cracks and opens under the diving camera onto the
     # canyon at dusk, far below; the same corruption as the canyon's wall (focus y is a height above the ground here),
@@ -195,7 +207,7 @@ scene = {
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,
                "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True}] +
              [{"name": f"dome{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/proofs/dome.glb",
-               "position": [c[0], DOME_FLOOR[(c[0], c[1])] - 12.0, c[1]], "rotation": [0, 37 * k, 0],
+               "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])], c[1]], "rotation": [0, 37 * k, 0],
                "scale": [sc[0], sc[1], sc[0]], "visible": True} for k, (c, sc, _) in enumerate(DOMES)],
 }
 out = os.path.join(HERE, 'strange-attractor-moon.scene.json')

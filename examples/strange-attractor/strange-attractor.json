@@ -135,8 +135,8 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 3.0,
-        "remapOutMax": 6.0,
+        "remapOutMin": 1.2000000000000002,
+        "remapOutMax": 2.4000000000000004,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
@@ -161,6 +161,25 @@
         "clampMax": 1.0,
         "attackMs": 200.0,
         "decayMs": 1000.0
+      }
+    },
+    {
+      "source": "response.bass",
+      "target": "moon/nodes/earth/emissiveBoost",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.3,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 1.6,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 60.0,
+        "decayMs": 450.0
       }
     }
   ],
