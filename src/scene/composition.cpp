@@ -65,7 +65,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal", "chronosCanyon"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1224,30 +1224,6 @@ void Composition::setAttractorWorld(AttractorWorldBlock block) {
             attractorParams_ = registerAttractorWorldParameters(*params_, attractorWorld_, "attractorWorld/" + sanitise(prefix_));
             for (const params::IParameter* q : attractorParams_->all) {
                 registeredPaths_.push_back(q->path());
-            }
-        }
-    }
-    dirty_ = true;
-}
-
-// ADR-1933: CHRONOS's canyon. Generated once per structural hash (seconds, at load); it has no live parameters -- the
-// look lives in the scene's material program, lights and sky, which already have theirs.
-void Composition::setChronosCanyon(ChronosCanyonBlock block) {
-    chronosCanyon_ = std::move(block);
-    if (chronosCanyon_.enabled && (!chronosCanyon_.world || chronosCanyon_.world->hash != chronosCanyon_.gen.hash())) {
-        const std::uint64_t before = chronosCanyonGenerations();
-        chronosCanyon_.world = acquireChronosCanyon(chronosCanyon_.gen);
-        if (chronosCanyon_.world && chronosCanyonGenerations() != before) {
-            const ChronosCanyonWorld& w = *chronosCanyon_.world;
-            log::info("chronosCanyon: seed {} generated in {:.2f} s ({}^2, height {:.0f}..{:.0f} m, river {:.0f} m)",
-                      w.gen.seed, w.generateSeconds, w.res, w.minHeight, w.maxHeight, w.riverLength);
-            if (const auto& m = w.mesh) {
-                const double mib = static_cast<double>(m->vertices * sizeof(Vertex) + m->triangles * 3 * sizeof(std::uint32_t)) /
-                                   (1024.0 * 1024.0);
-                log::info("chronosCanyon: terrain mesh {} vertices, {} triangles in {} chunks ({:.1f} MiB vertex+index), "
-                          "{:.2f} m sampling, built in {:.2f} s; river {} triangles",
-                          m->vertices, m->triangles, m->chunks.size(), mib, m->sampleSpacing, m->buildSeconds,
-                          m->riverIndices.size() / 3);
             }
         }
     }
@@ -8038,59 +8014,6 @@ void Composition::rebuild() {
         scene_.addLight(std::move(light));
     }
 
-    // ADR-1933: CHRONOS's canyon -- the same shape as the Strange Attractor's below: terrain chunks through the scene pass
-    // with the block's material program, the river through the water pipeline. Its lights are the scene file's.
-    if (chronosCanyon_.active() && chronosCanyon_.world->mesh) {
-        const ChronosCanyonMesh& m = *chronosCanyon_.world->mesh;
-        const std::string program = sanitise(prefix_) + chronosCanyon_.terrainProgram;
-        for (std::size_t c = 0; c < m.chunks.size(); ++c) {
-            const ChronosTerrainChunk& ch = m.chunks[c];
-            if (ch.indices.empty()) {
-                continue;
-            }
-            MeshData mesh;
-            mesh.name = fmt::format("chronos.terrain{}", c);
-            mesh.vertices.resize(ch.positions.size());
-            for (std::size_t v = 0; v < ch.positions.size(); ++v) {
-                mesh.vertices[v] = Vertex{ch.positions[v], ch.normals[v], ch.uvs[v]};
-            }
-            mesh.indices = ch.indices;
-            const auto id = static_cast<MeshId>(scene_.meshes.size());
-            scene_.meshes.push_back(std::move(mesh));
-            Entity& e = scene_.addEntity(fmt::format("chronos.terrain{}", c), id);
-            e.material.baseColor = glm::vec4(0.55f, 0.32f, 0.22f, 1.0f);
-            e.material.roughness = 0.92f;
-            e.material.metallic = 0.0f;
-            e.material.program = program;
-            e.castsShadow = true;
-        }
-        if (!m.riverIndices.empty()) {
-            MeshData river;
-            river.name = "chronos.river";
-            river.vertices.resize(m.riverPositions.size());
-            for (std::size_t v = 0; v < m.riverPositions.size(); ++v) {
-                river.vertices[v] = Vertex{m.riverPositions[v], glm::vec3(0, 1, 0), glm::vec2(0.0f)};
-            }
-            river.indices = m.riverIndices;
-            const auto id = static_cast<MeshId>(scene_.meshes.size());
-            scene_.meshes.push_back(std::move(river));
-            Entity& e = scene_.addEntity("chronos.river", id);
-            e.style = MeshStyle::Water;
-            e.material.baseColor = glm::vec4(chronosCanyon_.water.shallowColor, 1.0f);
-            e.material.roughness = chronosCanyon_.water.roughness;
-            e.material.metallic = 0.0f;
-            e.material.doubleSided = true;
-            e.material.program = sanitise(prefix_) + "chronos.river";
-            e.material.surfaceClass = SurfaceClass::Water;
-            e.castsShadow = false;
-            WaterSurface surface;
-            surface.program = e.material.program;
-            surface.settings = chronosCanyon_.water;
-            surface.fastestFlow = 1.0f;
-            scene_.waters.push_back(std::move(surface));
-        }
-    }
-
     // ADR-1857: the Strange Attractor's canyon as engine geometry -- its terrain chunks through the scene pass with
     // the block's material program, its river through the water pipeline, and its sun as the key light.
     attractorSunLight_ = -1;
@@ -11682,9 +11605,6 @@ nlohmann::json Composition::toJson() const {
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
     }
-    if (chronosCanyon_.enabled) {
-        j["chronosCanyon"] = chronosCanyonToJson(chronosCanyon_); // ADR-1933
-    }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
         for (const MaterialProgram& mp : materialPrograms_) {
@@ -12594,13 +12514,6 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': {}", scenePath.string(), a.error().message);
         }
         comp->setAttractorWorld(std::move(*a));
-    }
-    if (j.contains("chronosCanyon")) { // ADR-1933
-        auto c = chronosCanyonFromJson(j.at("chronosCanyon"));
-        if (!c) {
-            return fail("scene file '{}': {}", scenePath.string(), c.error().message);
-        }
-        comp->setChronosCanyon(std::move(*c));
     }
     if (j.contains("astral")) { // ADR-1221
         auto a = astralFromJson(j.at("astral"));

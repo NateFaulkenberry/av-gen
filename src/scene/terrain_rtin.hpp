@@ -1,8 +1,8 @@
 #pragma once
 
 // ADR-1930: the error-bounded right-triangulated irregular network (RTIN) that ADR-1857 / ADR-1867 built for the
-// Strange Attractor's canyon, lifted out of `attractor_world.cpp` so another height-field scene (CHRONOS) triangulates
-// with the same crack-free core instead of a second copy.
+// Strange Attractor's canyon, lifted out of `attractor_world.cpp` so another height-field scene triangulates with the
+// same crack-free core instead of a second copy.
 //
 // Evans, Kirkpatrick & Townsend 2001, in the "Martini" formulation: the (2^k + 1)^2 grid's triangle bintree is refined
 // wherever a hypotenuse's midpoint error exceeds 1. The caller supplies the error *normalised by its own tolerance*

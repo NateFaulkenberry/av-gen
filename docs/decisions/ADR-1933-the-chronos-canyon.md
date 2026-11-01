@@ -1,6 +1,10 @@
 # ADR-1933: CHRONOS's canyon is carved along an authored river
 
-- Status: Accepted (CHRONOS Gate 1, 2026-10-31), scene/chronos.
+- Status: **Superseded** (2026-11-01). The owner pivoted CHRONOS to "The Devourer of Souls"
+  (`docs/prototypes/chronos/10-devourer-brief.md`), and the canyon was removed outright under ADR-441 (no compat
+  shims): the block, its generator, its tests and its scene files. Git history keeps it, at 313b2c47. Its findings
+  stay true and are recorded here; the temporal engine it was built beside (ADR-1931, ADR-1932) carries on.
+- Was: Accepted (CHRONOS Gate 1, 2026-10-31), scene/chronos.
 - Code:
   - `src/scene/chronos_canyon.{hpp,cpp}`: `ChronosCanyonGen`, `generateChronosCanyon`, `acquireChronosCanyon` and the
     `chronosCanyon` block's JSON.

@@ -21,7 +21,6 @@
 #include "graph/graph.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
-#include "scene/chronos_canyon.hpp"
 #include "scene/lunar_world.hpp"
 #include "scene/day_night.hpp"
 #include "scene/field_params.hpp"
@@ -1460,7 +1459,6 @@ public:
     // Generates the world at once; its parameters (`attractorWorld/...`) are registered when attached, and a change
     // of a structural one regenerates the world on the next frame.
     void setAttractorWorld(AttractorWorldBlock block);
-    void setChronosCanyon(ChronosCanyonBlock block); // ADR-1933
     void setMeshWire(MeshWire wire); // ADR-1862
     void setCorruption(Corruption corruption); // ADR-1873
     void setLunarWorld(LunarWorldBlock block); // ADR-1882
@@ -1505,7 +1503,6 @@ public:
     // ADR-1851: true while a regeneration is running on a worker (the editor can say so).
     [[nodiscard]] bool attractorWorldGenerating() const { return attractorPending_.valid(); }
     [[nodiscard]] const AttractorWorldBlock& attractorWorld() const { return attractorWorld_; }
-    [[nodiscard]] const ChronosCanyonBlock& chronosCanyon() const { return chronosCanyon_; } // ADR-1933
     [[nodiscard]] const Clouds& clouds() const { return clouds_; }
     // The song the conductor is reading (null in live mode or before the first frame with a track).
     [[nodiscard]] std::shared_ptr<const AstralSong> astralSong() const { return astralSong_; }
@@ -2416,7 +2413,6 @@ private:
     EcosystemParameters ecosystemParams_;     // its live knobs, while attached
     AstralForge astral_;                      // ADR-1221: the authored block (rest values)
     Clouds clouds_;                          // ADR-1289
-    ChronosCanyonBlock chronosCanyon_;       // ADR-1933: CHRONOS's canyon (rest values and the generated world)
     AttractorWorldBlock attractorWorld_;     // ADR-1850: the authored block (rest values) and the generated world
     std::optional<AttractorWorldParameters> attractorParams_; // its live knobs, while attached
     MeshWire meshWire_;                      // ADR-1862: the authored block (rest values)
