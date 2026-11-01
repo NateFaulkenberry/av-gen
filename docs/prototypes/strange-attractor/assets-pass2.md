@@ -16,6 +16,25 @@ installed into a private Blender user directory (`BLENDER_USER_RESOURCES`), so t
 MakeHuman's licence page says that a model exported from it is CC0, along with its bundled assets
 (https://static.makehumancommunity.org/about/license.html).
 
+## Downloaded by the owner (Sketchfab, CC BY 4.0), placed under `assets/strange-attractor/sketchfab/` (M1)
+
+Shortlisted in `34-pass2-downloads.md`. Licence checked against Sketchfab's model data on 2026-10-31.
+
+| File | Model | Author | Use |
+|---|---|---|---|
+| `goat/boer-goat/source/Meshy_AI_Boer_Goat_Portrait_0616004314_texture.glb` (+ `textures/`) | Boer Goat 🐐 3D Model Free (Meshy AI-generated) | iRahulRajput | the levitating goat (M5) |
+| `gray/grey-alien-idle/grey_alien_idle.glb` | Grey Alien idle | ShaxerTakkuY | the Grays (M3, M4) |
+| `props/biobed-mk1/medical_biobed_mk-1.glb` | Medical Biobed Mk-1 | Krahazik | the examination gurney (M4) |
+| `sasquatch/bigfoot-matrex/bigfoot.glb` | Bigfoot | Mat Rex | the Sasquatches: rigged, furred and posed by `pass2/build_sasquatch.py` (M1) |
+| `ufo/ufo-brunolatour/ufo.glb` | UFO | BrunoLatour | the parked craft and the submersibles (M3) |
+
+Attribution, to carry wherever the work is shown:
+- This work is based on "Boer Goat 🐐 3D Model Free" (https://sketchfab.com/3d-models/boer-goat-3d-model-free-d9a3eea388624b6cb6455ddee8866104) by iRahulRajput, licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+- This work is based on "Grey Alien idle" (https://sketchfab.com/3d-models/grey-alien-idle-4983ac47fa674c1e8e9230c8afa4546e) by ShaxerTakkuY, licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+- This work is based on "Medical Biobed Mk-1" (https://sketchfab.com/3d-models/medical-biobed-mk-1-75a467fe77f844478251ea74c8c8e0c4) by Krahazik, licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+- This work is based on "Bigfoot" (https://sketchfab.com/3d-models/bigfoot-31fb69bb153444a39ff82ae2b9708ca9) by Mat Rex, licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+- This work is based on "UFO" (https://sketchfab.com/3d-models/ufo-9b5d14c4d34d4559abdfc9a392268b8e) by BrunoLatour, licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
+
 ## Built here from those (not committed)
 
 | What | Built by | From | Licence of the result |
@@ -24,6 +43,7 @@ MakeHuman's licence page says that a model exported from it is CC0, along with i
 | `assets/strange-attractor/proofs/gray.glb` (enlarged cranium, almond eyes, forehead triangle, beam) | `pass2/proof_gray_beam.py` | the Gray base | CC0-derived |
 | `assets/strange-attractor/proofs/dome.glb` (geodesic crater dome) | `pass2/proof_dome.py` | nothing third-party | original |
 | `assets/strange-attractor/proofs/interior.glb` (exam hall, gurney, suited man) | `pass2/proof_interior.py` | the suited man | CC0-derived |
+| `assets/strange-attractor/build/sasquatch-{a,b,c}.glb` (rigged, hair cards, idle) | `pass2/build_sasquatch.py` | Mat Rex's Bigfoot (CC BY 4.0) | CC BY 4.0 (attribution above) |
 
 ## Already in the library (reused, not committed)
 

@@ -578,6 +578,10 @@ struct PunctualLight {
     bool castsShadow = false;      // a shadow map is allocated for it (ADR-034)
     bool contactShadow = true;     // screen-space contact march when it casts
     float shadowStrength = 1.0f;   // 0 = no shadowing, 1 = full
+    // Art Pass 2 (ADR-1888): a fire's flicker -- the intensity times 1 + flicker x noise(t x flickerRate), noise in
+    // -1..1 from two incommensurate frequencies, a pure function of the clock (seek-safe). 0 = steady.
+    float flicker = 0.0f;
+    float flickerRate = 6.0f;
     float shadowBias = 0.0015f;    // normal-offset scale in world units
     float softness = 1.0f;         // multiplies the penumbra width of a soft-shadowed light
     // In-scattering into the volumetric atmosphere (ADR-032 volume pass), read by the march

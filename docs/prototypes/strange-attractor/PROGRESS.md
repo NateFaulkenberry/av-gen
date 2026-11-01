@@ -38,7 +38,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | portals C | the Moon polish; portal 2 in the crater floor, the dusk canyon, the full 60 s (`18`) | reviewed: the floor opening is the highlight |
 | portals C 2 | portal 2's exit in a canyon wall, the dusk light, the floor's field, the Earth, the dive (`19`) | **merged** (main 214dafd8, Art Pass 1) |
 | Art Pass 2, R2 | research, audit, cast sheet, beat sheet, music, proofs (`30`-`33`, `assets-pass2.md`) | **done, awaiting the owner**: media in `pass2-r/` |
-| Art Pass 2, M1-M5 | Moon extension and the encounters, Mars, night and ocean, UFO, dawn (`33` §6) | not started: gated on R2 |
+| Art Pass 2, M1 | the Moon at night (terminator, basin, domes, crater portal), the return to the canyon at dusk, the first Sasquatch encounter (`35`; ADR-1885, 1886, 1888) | **done, awaiting the owner**: media in `pass2-m1/` |
+| Art Pass 2, M2-M5 | Mars, night and ocean, UFO, dawn (`33` §6) | not started: gated on M1 |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -179,6 +180,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-10-31: Art Pass 2, Milestone 1 (`35-pass2-m1.md`; ADR-1885, 1886, 1888; 1884 revised). Rebased onto main
+  3d73b32c (CHRONOS ADR-1930, the shared RTIN mesher).
+  - The sequence runs 0-86 s on the 210.5 s cut: crossing 1 at 32.025 s, crossing 2 at 67.700 s (bar 35).
+  - The Moon: 150 km curvature, a shadow basin, earthshine plus earthglow, three domes, the crater portal at the
+    basin's edge with Gate C 2's dive.
+  - One canyon for the whole journey (`@root` portal); dusk is a look. The dusk scene is removed.
+  - Three Sasquatches (Mat Rex's Bigfoot, CC BY, rigged and carded in Blender) at a flickering campfire.
+  - A foreground regression the return portal caused in the opening was found and fixed before the final render.
 - 2026-10-31: Art Pass 2, Gate R2 (`32-pass2-research.md`, `33-pass2-plan.md`, `assets-pass2.md`; ADR-1887).
   - Audit: most machinery exists; missing are fur, morph targets, a cyclic journey (the canyon is visited four times),
     underwater shaft occluders and a portal at the camera.

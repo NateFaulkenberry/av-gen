@@ -1474,6 +1474,8 @@ public:
         glm::vec3 exitAxis{0.0f};                // Gate C 2: the direction the camera leaves the exit (0 = use exitYaw);
         glm::vec3 entryUp{0.0f, 1.0f, 0.0f};     // with it, the entry's up (the corruption's axis is its forward)
         glm::vec3 exitUp{0.0f, 1.0f, 0.0f};      // and the exit's up
+        std::vector<std::array<float, 5>> aims;  // Art Pass 2: [x, y, z, from, to] -- the view turns toward a point
+                                                 // in the destination (eased in and out over 1.2 s), then back
         glm::vec3 join{0.0f};                    // Gate C: [from, at, rate] -- at `at` seconds the camera joins the
                                                  // destination's own flythrough at its second `from`, run at `rate`
                                                  // (C1); rate 0 = no join
@@ -1483,7 +1485,19 @@ public:
         glm::vec3 eye{0.0f}, target{0.0f, 0.0f, -1.0f}, up{0.0f, 1.0f, 0.0f};
     };
     [[nodiscard]] Result<void> setPortal(PortalBlock block, std::unique_ptr<Composition> world);
-    [[nodiscard]] Composition* portalWorld() { return portalWorld_.get(); }
+    // Art Pass 2 (ADR-1885): a portal back to the journey's root ("world": "@root"): the camera returns to the world it
+    // started in (the canyon), which is not loaded again. Linked when the compositions are attached.
+    void setPortalToRoot(PortalBlock block);
+    [[nodiscard]] Composition* portalWorld() { return portalTarget_ != nullptr ? portalTarget_ : portalWorld_.get(); }
+    // The journey's crossings in order (this composition's own, then its destination's, ...), seconds; 1e28 = never.
+    [[nodiscard]] std::vector<double> journeyCrossings() const;
+    // ADR-1886: looks -- parameter snapshots applied from a crossing of the journey on (a world's time of day).
+    struct Look {
+        std::string name;
+        int fromCrossing = 0;
+        std::vector<std::pair<std::string, std::vector<float>>> values; // parameter path (under this prefix) -> components
+    };
+    void setLooks(std::vector<Look> looks) { looks_ = std::move(looks); appliedLook_ = -2; }
     [[nodiscard]] double portalCrossingSeconds() const { return portalCrossing_; }
     // A camera that replaces whatever this composition's own camera logic placed, from the next update on (a portal's
     // destination is driven by its source). Empty restores the composition's own camera.
@@ -2426,6 +2440,18 @@ private:
     LunarWorldBlock lunar_;                  // ADR-1882
     PortalBlock portal_;                     // ADR-1879
     std::unique_ptr<Composition> portalWorld_;
+    bool portalToRoot_ = false;           // ADR-1885: this portal leads back to the root (not owned)
+    Composition* portalTarget_ = nullptr; // the destination when it is not owned (the root)
+    Composition* returnFrom_ = nullptr;   // on the root: the world whose portal returns here
+    Composition* parentPortal_ = nullptr; // the world whose portal leads here
+    void linkPortalRoot();
+    [[nodiscard]] Composition* destWorld() const { return portalTarget_ != nullptr ? portalTarget_ : portalWorld_.get(); }
+    std::vector<Look> looks_;
+    std::vector<std::pair<params::IParameter*, std::vector<float>>> lookOriginals_;
+    int appliedLook_ = -2;
+    [[nodiscard]] int lookIndexAt(double t) const; // -1 = authored; -2 = not yet decidable
+    void applyLook(int index);
+    bool lookRetry_ = false;
     double portalCrossing_ = 1e30;           // seconds: when the flight crosses the entry plane
     std::optional<Camera> cameraOverride_;
     std::function<std::optional<PortalPose>(double)> cameraPath_;

@@ -131,6 +131,62 @@
       "intensity": 0.35,
       "castsShadow": false,
       "shadowStrength": 0.0
+    },
+    {
+      "name": "dusk-sky",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.1,
+        -1.0,
+        0.15
+      ],
+      "color": [
+        0.36,
+        0.38,
+        1.0
+      ],
+      "intensity": 0.0,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "dusk-bounce",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        -0.9,
+        -0.15,
+        0.4
+      ],
+      "color": [
+        0.55,
+        0.42,
+        0.95
+      ],
+      "intensity": 0.0,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "campfire",
+      "type": "point",
+      "position": [
+        175.275,
+        3.9,
+        3340.255
+      ],
+      "color": [
+        1.0,
+        0.52,
+        0.22
+      ],
+      "intensity": 0.0,
+      "range": 45.0,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "flicker": 0.35,
+      "flickerRate": 3.2
     }
   ],
   "attractorWorld": {
@@ -1136,59 +1192,387 @@
     "exitYaw": -24.56,
     "flight": [
       [
-        -6,
-        36,
-        1418,
+        -8,
+        38,
+        1420,
         35.0
       ],
       [
-        -45,
-        13,
-        1325,
-        38.0
+        -60,
+        18,
+        1310,
+        38.2
       ],
       [
-        -28,
-        26,
-        1235,
-        40.5
+        -20,
+        40,
+        1150,
+        42.5
       ],
+      [
+        -120,
+        70,
+        950,
+        47.0
+      ],
+      [
+        -10,
+        75,
+        1010,
+        50.5
+      ],
+      [
+        180,
+        80,
+        960,
+        54.5
+      ],
+      [
+        290,
+        85,
+        860,
+        58.5
+      ],
+      [
+        270,
+        130,
+        690,
+        62.0
+      ],
+      [
+        284,
+        150,
+        650,
+        64.2
+      ],
+      [
+        300,
+        0,
+        650,
+        67.7
+      ],
+      [
+        301,
+        -45,
+        650,
+        68.7
+      ]
+    ],
+    "aims": [
       [
         -30,
-        24,
-        1120,
-        43.5
-      ],
-      [
-        -40,
-        32,
-        1045,
-        45.3
-      ],
-      [
-        -45,
-        90,
-        920,
-        47.8
-      ],
-      [
-        -45,
-        150,
-        850,
-        50.2
-      ],
-      [
-        -45,
-        0,
-        835,
-        53.81
-      ],
-      [
-        -45,
-        -45,
-        834,
-        54.8
+        -60,
+        -670,
+        49.5,
+        59.5
       ]
     ]
-  }
+  },
+  "nodes": [
+    {
+      "name": "sasquatch-a",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sasquatch-a.glb",
+      "position": [
+        172.83179918595664,
+        3.0,
+        3339.3657476273534
+      ],
+      "rotation": [
+        0,
+        69.99999999999976,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false,
+      "animation": {
+        "state": "idle",
+        "cullDistance": 800.0,
+        "speed": 1.0
+      }
+    },
+    {
+      "name": "sasquatch-b",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sasquatch-b.glb",
+      "position": [
+        177.49652888504505,
+        3.0,
+        3338.390915931909
+      ],
+      "rotation": [
+        0,
+        -50.000000000000185,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false,
+      "animation": {
+        "state": "idle",
+        "cullDistance": 800.0,
+        "speed": 1.0
+      }
+    },
+    {
+      "name": "sasquatch-c",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sasquatch-c.glb",
+      "position": [
+        175.69175562640064,
+        3.0,
+        3342.6185386072293
+      ],
+      "rotation": [
+        0,
+        -169.9999999999997,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false,
+      "animation": {
+        "state": "idle",
+        "cullDistance": 800.0,
+        "speed": 1.0
+      }
+    },
+    {
+      "name": "campfire-flames",
+      "kind": "particles",
+      "visible": false,
+      "particles": {
+        "enabled": true,
+        "capacity": 1500,
+        "seed": 31,
+        "shape": "sphere",
+        "position": [
+          175.275,
+          3.1,
+          3340.255
+        ],
+        "extent": [
+          0.35,
+          0.1,
+          0.35
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spawnRate": 260.0,
+        "lifetimeMin": 0.35,
+        "lifetimeMax": 0.8,
+        "spread": 0.18,
+        "speedMin": 0.9,
+        "speedMax": 2.0,
+        "gravity": [
+          0.05,
+          1.6,
+          0
+        ],
+        "drag": 0.5,
+        "turbulence": 0.7,
+        "turbulenceScale": 0.6,
+        "sizeStart": 0.45,
+        "sizeEnd": 0.08,
+        "sizeVariance": 0.4,
+        "colorStart": [
+          1.0,
+          0.62,
+          0.2,
+          0.55
+        ],
+        "colorEnd": [
+          1.0,
+          0.1,
+          0.0,
+          0.0
+        ],
+        "emissive": 7.0,
+        "blend": "additive",
+        "velocityStretch": 0.2,
+        "stretchMax": 0.4
+      }
+    },
+    {
+      "name": "campfire-embers",
+      "kind": "particles",
+      "visible": false,
+      "particles": {
+        "enabled": true,
+        "capacity": 600,
+        "seed": 37,
+        "shape": "sphere",
+        "position": [
+          175.275,
+          3.1,
+          3340.255
+        ],
+        "extent": [
+          0.3,
+          0.1,
+          0.3
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spawnRate": 40.0,
+        "lifetimeMin": 1.5,
+        "lifetimeMax": 3.5,
+        "spread": 0.35,
+        "speedMin": 1.0,
+        "speedMax": 2.6,
+        "gravity": [
+          0.25,
+          0.5,
+          0.1
+        ],
+        "drag": 0.3,
+        "turbulence": 0.9,
+        "turbulenceScale": 0.5,
+        "sizeStart": 0.035,
+        "sizeEnd": 0.008,
+        "colorStart": [
+          1.0,
+          0.7,
+          0.25,
+          1.0
+        ],
+        "colorEnd": [
+          1.0,
+          0.15,
+          0.0,
+          0.0
+        ],
+        "emissive": 16.0,
+        "blend": "additive"
+      }
+    },
+    {
+      "name": "campfire-smoke",
+      "kind": "particles",
+      "visible": false,
+      "particles": {
+        "enabled": true,
+        "capacity": 500,
+        "seed": 41,
+        "shape": "sphere",
+        "position": [
+          175.275,
+          4.3,
+          3340.255
+        ],
+        "extent": [
+          0.3,
+          0.2,
+          0.3
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spawnRate": 18.0,
+        "lifetimeMin": 4.0,
+        "lifetimeMax": 7.0,
+        "spread": 0.25,
+        "speedMin": 0.5,
+        "speedMax": 1.0,
+        "gravity": [
+          0.3,
+          0.35,
+          0.1
+        ],
+        "drag": 0.6,
+        "turbulence": 0.5,
+        "turbulenceScale": 0.3,
+        "sizeStart": 0.5,
+        "sizeEnd": 2.2,
+        "colorStart": [
+          0.18,
+          0.16,
+          0.2,
+          0.25
+        ],
+        "colorEnd": [
+          0.12,
+          0.11,
+          0.16,
+          0.0
+        ],
+        "emissive": 0.0,
+        "blend": "alpha"
+      }
+    }
+  ],
+  "looks": [
+    {
+      "name": "dusk",
+      "from": 1,
+      "params": {
+        "attractorWorld/sunAzimuth": -130.0,
+        "attractorWorld/sunElevation": 8.0,
+        "env/intensity": 0.13,
+        "env/sky/zenithColor": [
+          0.022,
+          0.02,
+          0.115
+        ],
+        "env/sky/horizonColor": [
+          0.36,
+          0.22,
+          0.46
+        ],
+        "env/sky/groundColor": [
+          0.012,
+          0.01,
+          0.045
+        ],
+        "env/sky/haze": 0.18,
+        "env/sky/sunColor": [
+          1.0,
+          0.52,
+          0.26
+        ],
+        "env/sky/sunIntensity": 7.0,
+        "env/sky/sunSize": 0.05,
+        "env/sky/sunGlow": 0.55,
+        "scene/fogColor": [
+          0.1,
+          0.075,
+          0.22
+        ],
+        "lights/canyon-bounce/intensity": 0.0,
+        "lights/floor-bounce/color": [
+          0.55,
+          0.38,
+          0.62
+        ],
+        "lights/floor-bounce/intensity": 0.25,
+        "lights/dusk-sky/intensity": 0.6,
+        "lights/dusk-bounce/intensity": 0.3,
+        "lights/campfire/intensity": 90.0,
+        "nodes/sasquatch-a/visible": true,
+        "nodes/sasquatch-b/visible": true,
+        "nodes/sasquatch-c/visible": true,
+        "nodes/campfire-flames/visible": true,
+        "nodes/campfire-embers/visible": true,
+        "nodes/campfire-smoke/visible": true
+      }
+    }
+  ]
 }

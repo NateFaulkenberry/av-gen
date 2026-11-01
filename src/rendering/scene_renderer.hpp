@@ -1125,6 +1125,13 @@ private:
     std::unique_ptr<SceneRenderer> portalRenderer_;
     int portalDepth_ = 0;
     static constexpr int kMaxPortalDepth = 3;
+    // ADR-1885: one renderer per scene across the journey. The root renderer registers the scene it draws; a portal
+    // that leads back to that scene (a return to the root) asks the root renderer to draw it ("plain": without its
+    // own portal state) rather than uploading the same world into a second renderer.
+    std::shared_ptr<std::unordered_map<const scene::Scene*, SceneRenderer*>> registry_;
+    bool plain_ = false;
+    bool busy_ = false; // ADR-1885: drawing its own world into the current frame
+    SceneRenderer* portalSource_ = nullptr; // whose scene radiance the portal pass reads this frame
     const scene::PostSettings* inheritedPost_ = nullptr;         // a portal view's source's (null: the scene's own)
     const scene::TemporalSettings* inheritedTemporal_ = nullptr;
     [[nodiscard]] const scene::PostSettings& postOf(const scene::Scene& scene) const {

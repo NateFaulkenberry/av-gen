@@ -97,6 +97,91 @@ Result<void> Composition::setPortal(PortalBlock block, std::unique_ptr<Compositi
     return {};
 }
 
+void Composition::setPortalToRoot(PortalBlock block) {
+    portal_ = std::move(block);
+    portalToRoot_ = true;
+    portalCrossing_ = 1e30;
+}
+
+// ADR-1885: find the root (up the chain of portals that led here) and, for a portal back to it, link both ends.
+void Composition::linkPortalRoot() {
+    if (portalWorld_) portalWorld_->parentPortal_ = this;
+    if (!portalToRoot_) return;
+    Composition* root = this;
+    while (root->parentPortal_ != nullptr) root = root->parentPortal_;
+    if (root == this) return;
+    portalTarget_ = root;
+    root->returnFrom_ = this;
+}
+
+std::vector<double> Composition::journeyCrossings() const {
+    std::vector<double> out;
+    const Composition* c = this;
+    for (int guard = 0; c != nullptr && guard < 16; ++guard) {
+        out.push_back(c->portalCrossing_);
+        if (c->portalToRoot_ || !c->portalWorld_) break;
+        c = c->portalWorld_.get();
+    }
+    return out;
+}
+
+int Composition::lookIndexAt(double t) const {
+    const std::vector<double> crossings = journeyCrossings();
+    // how many crossings the journey has passed at t; undecidable while a crossing a look depends on is unknown
+    int passed = 0;
+    for (const double c : crossings) {
+        if (c > 1e29) {
+            for (const Look& l : looks_) {
+                if (l.fromCrossing > passed) return -2;
+            }
+            break;
+        }
+        if (t >= c) ++passed;
+        else break;
+    }
+    int best = -1;
+    for (std::size_t i = 0; i < looks_.size(); ++i) {
+        if (looks_[i].fromCrossing <= passed && (best < 0 || looks_[i].fromCrossing >= looks_[static_cast<std::size_t>(best)].fromCrossing)) {
+            best = static_cast<int>(i);
+        }
+    }
+    return best;
+}
+
+void Composition::applyLook(int index) {
+    if (params_ == nullptr) return;
+    // the authored values of everything any look touches, captured once: the look "-1"
+    if (lookOriginals_.empty()) {
+        for (const Look& l : looks_) {
+            for (const auto& [path, v] : l.values) {
+                params::IParameter* p = params_->find(prefix_ + path);
+                if (p == nullptr) {
+                    log::warn("look '{}': no parameter '{}'", l.name, prefix_ + path);
+                    continue;
+                }
+                if (std::any_of(lookOriginals_.begin(), lookOriginals_.end(), [&](const auto& o) { return o.first == p; })) continue;
+                std::vector<float> orig(p->componentCount());
+                for (std::size_t c = 0; c < orig.size(); ++c) orig[c] = p->baseComponent(c);
+                lookOriginals_.emplace_back(p, std::move(orig));
+            }
+        }
+    }
+    // a look is an authored value (the base, as a preset sets it), not a modulation: the final follows the base as
+    // the frame's reset made it, and the routes that run after may still modulate it
+    const auto set = [](params::IParameter* p, const std::vector<float>& v) {
+        for (std::size_t c = 0; c < p->componentCount() && c < v.size(); ++c) p->setBaseComponent(c, v[c]);
+        p->resetFinal();
+    };
+    for (const auto& [p, v] : lookOriginals_) set(p, v);
+    if (index >= 0) {
+        for (const auto& [path, v] : looks_[static_cast<std::size_t>(index)].values) {
+            if (params::IParameter* p = params_->find(prefix_ + path)) set(p, v);
+        }
+    }
+    appliedLook_ = index;
+    log::info("look: '{}' from {:.3f} s", index >= 0 ? looks_[static_cast<std::size_t>(index)].name : std::string("authored"), currentTime_);
+}
+
 void Composition::applyCameraOverride() {
     if (cameraOverride_) {
         const Camera& o = *cameraOverride_;
@@ -118,6 +203,11 @@ void Composition::applyCameraOverride() {
 
 std::optional<Composition::PortalPose> Composition::ownCameraAt(double seconds) const {
     if (cameraPath_) return cameraPath_(seconds);
+    // ADR-1885: on the root, after its own crossing the camera is the journey's path carried back by the return (once
+    // the arrival is built: building it reads this world's own camera at the crossing)
+    if (returnFrom_ != nullptr && portalCrossing_ < 1e28 && seconds >= portalCrossing_ && !portalKnots_.empty()) {
+        return returnFrom_->portalCameraAt(seconds);
+    }
     return flythroughAt(seconds);
 }
 
@@ -136,9 +226,10 @@ std::optional<Composition::PortalPose> Composition::flythroughAt(double seconds)
 }
 
 float Composition::portalGround(float x, float z) const {
-    if (!portalWorld_) return 0.0f;
-    if (const LunarWorldBlock& lw = portalWorld_->lunarWorld(); lw.world) return lw.world->sample(x, z);
-    if (const AttractorWorldBlock& aw = portalWorld_->attractorWorld(); aw.world) return aw.world->sample(glm::vec2(x, z));
+    const Composition* dest = portalTarget_ != nullptr ? portalTarget_ : portalWorld_.get();
+    if (dest == nullptr) return 0.0f;
+    if (const LunarWorldBlock& lw = dest->lunarWorld(); lw.world) return lw.world->sample(x, z);
+    if (const AttractorWorldBlock& aw = dest->attractorWorld(); aw.world) return aw.world->sample(glm::vec2(x, z));
     return 0.0f;
 }
 
@@ -196,9 +287,9 @@ void Composition::buildPortalArrival() {
     }
     glm::vec3 joinVelocity{0.0f};
     bool joined = false;
-    if (portal_.join.z > 0.0f && portalWorld_) {
-        if (const auto j0 = portalWorld_->flythroughAt(static_cast<double>(portal_.join.x)),
-                       j1 = portalWorld_->flythroughAt(static_cast<double>(portal_.join.x) + 0.05);
+    if (portal_.join.z > 0.0f && destWorld() != nullptr) {
+        if (const auto j0 = destWorld()->flythroughAt(static_cast<double>(portal_.join.x)),
+                       j1 = destWorld()->flythroughAt(static_cast<double>(portal_.join.x) + 0.05);
             j0 && j1) {
             portalKnots_.push_back(j0->eye);
             portalKnotTimes_.push_back(portal_.join.y);
@@ -222,7 +313,7 @@ void Composition::buildPortalArrival() {
 }
 
 std::optional<Composition::PortalPose> Composition::portalCameraAt(double seconds) const {
-    if (!portalWorld_) return std::nullopt;
+    if (destWorld() == nullptr) return std::nullopt;
     const Corruption& c = scene_.corruption;
     const PortalFrame f{c.focus, portal_.exit, portalRotation()};
     if (seconds < portalCrossing_ || portalKnots_.empty()) {
@@ -236,7 +327,7 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
     const auto& m = portalTangents_;
     const auto& qt = portalKnotTimes_;
     const bool joined = portal_.join.z > 0.0f;
-    const auto destAt = [&](float t) { return portalWorld_->flythroughAt(static_cast<double>(portal_.join.x + (t - portal_.join.y) * portal_.join.z)); };
+    const auto destAt = [&](float t) { return destWorld()->flythroughAt(static_cast<double>(portal_.join.x + (t - portal_.join.y) * portal_.join.z)); };
     const auto at = [&](float t) -> glm::vec3 {
         if (q.size() < 2) return q[0] + m[0] * (t - tc);
         if (t >= qt.back()) {
@@ -267,6 +358,11 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
             up = glm::normalize(glm::mix(up, d->up, wj));
         }
     }
+    for (const auto& a : portal_.aims) { // a look toward something passing (eased in and out)
+        const float wa = smooth(a[3], a[3] + 1.2f, s) * (1.0f - smooth(a[4] - 1.2f, a[4], s)) * 0.75f;
+        const glm::vec3 to = glm::vec3(a[0], a[1], a[2]) - p;
+        if (wa > 0.0f && glm::length(to) > 1e-3f) look = glm::normalize(glm::mix(look, glm::normalize(to), wa));
+    }
     const float w = smooth(tc, tc + 1.6f, s);
     const glm::vec3 dir = glm::normalize(glm::mix(portalArriveAim_, look, w));
     return PortalPose{p, p + dir * 100.0f, orthoUp(p, p + dir, glm::normalize(glm::mix(portalArriveUp_, up, w)))};
@@ -276,7 +372,7 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
 // the entry plane inside the opening; then its own flight, which leaves from exactly where and how the source
 // arrived), its update, and the view the renderer composites.
 void Composition::updatePortal(const FrameTime& time) {
-    if (!portalWorld_ || corruption_.targets.empty()) {
+    if (destWorld() == nullptr || corruption_.targets.empty()) {
         scene_.portal = {};
         return;
     }
@@ -325,18 +421,26 @@ void Composition::updatePortal(const FrameTime& time) {
         cam.target = f.p(scene_.camera.target);
         cam.up = f.d(orthoUp(scene_.camera.position, scene_.camera.target, scene_.camera.up));
     }
-    portalWorld_->setCameraPath([this](double s) { return portalCameraAt(s); });
-    portalWorld_->setCameraOverride(cam);
-    portalWorld_->update(time);
-    // an exit cut into the destination's own geometry (exitAxis given): its rock behind the exit plane is not drawn,
-    // so the camera carried behind the wall sees out through the opening
-    if (glm::length(portal_.exitAxis) > 1e-6f) {
-        const glm::vec3 n = glm::normalize(portal_.exitAxis);
-        portalWorld_->scene_.portalClip = glm::vec4(n, -glm::dot(n, portal_.exit));
-    } else {
-        portalWorld_->scene_.portalClip = glm::vec4(0.0f);
+    Composition* dest = destWorld();
+    if (portalTarget_ == nullptr) {
+        dest->setCameraPath([this](double s) { return portalCameraAt(s); });
+        dest->setCameraOverride(cam);
+        dest->update(time);
     }
-    scene_.portal.world = &portalWorld_->scene();
+    // (a return to the root does not update it: the root is updating, and places its own camera on this path)
+    // an exit cut into the destination's own geometry (exitAxis given): its rock behind the exit plane is not drawn,
+    // so the camera carried behind the wall sees out through the opening; on the far side the camera soon flies away
+    // from the wall, and the clip ends a second after the crossing (an infinite plane must not cut the world later)
+    // ADR-1885: a return to the root clips it only once the root has handed the frame on (its own crossing): before
+    // that the root is the world the camera is in, and the plane would cut its own foreground away
+    const bool destElsewhere = portalTarget_ == nullptr || (dest->portalCrossing_ < 1e28 && t >= dest->portalCrossing_);
+    if (glm::length(portal_.exitAxis) > 1e-6f && t < portalCrossing_ + 1.0 && destElsewhere) {
+        const glm::vec3 n = glm::normalize(portal_.exitAxis);
+        dest->scene_.portalClip = glm::vec4(n, -glm::dot(n, portal_.exit));
+    } else {
+        dest->scene_.portalClip = glm::vec4(0.0f);
+    }
+    scene_.portal.world = &dest->scene();
     scene_.portal.crossed = crossed;
 }
 

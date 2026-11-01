@@ -24,7 +24,11 @@ for o in scene.objects:
 rigged = any(o.type == "ARMATURE" for o in scene.objects)
 size = max(hi - lo)
 centre = (lo + hi) / 2
-scene.render.engine = "BLENDER_EEVEE"
+import os
+scene.render.engine = os.environ.get("TT_ENGINE", "BLENDER_EEVEE")
+if scene.render.engine == "CYCLES":
+    scene.cycles.device = "CPU"
+    scene.cycles.samples = 24
 scene.render.resolution_x, scene.render.resolution_y = 640, 640
 world = bpy.data.worlds.new("w")
 world.use_nodes = True

@@ -38,3 +38,9 @@ The coordinator found the dusk canyon moody but flat: muddy maroon walls, with w
 - **No tear on the dusk side.** The wall carries a weak corruption field around the exit, but no tear and no code. The
   camera looks out through the wall and never sees a tear from the front. The tear's throat stretched the wall's foot
   into dark slivers in front of the camera, and code on the foot filled the first frames.
+
+## Revision at Art Pass 2, Milestone 1
+
+The dusk canyon is no longer a scene. `build_dusk.py` and `strange-attractor-dusk.scene.json` are removed: the Moon's
+portal returns to the root canyon (ADR-1885) and the dusk light is the `dusk` look from crossing 1 (ADR-1886), written
+by `build_journey.py`. The sun is now -130 degrees azimuth, 8 degrees up; the exit is unchanged.

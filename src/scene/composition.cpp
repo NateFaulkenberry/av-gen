@@ -65,7 +65,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal", "looks"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -95,7 +95,7 @@ constexpr std::string_view kAuthoredLightKeys[] = {
     "up",          "color",         "intensity",      "temperature", "tint",      "range",
     "innerCone",   "outerCone",     "width",          "height",     "radius",     "castsShadow",
     "contactShadow", "shadowStrength", "shadowBias",  "softness",   "volumetric", "diffuseOnly",
-    "specularOnly", "enabled", "id"};
+    "specularOnly", "enabled", "id", "flicker", "flickerRate"};
 
 std::span<const std::string_view> sceneFileKeys() { return kSceneKeys; }
 std::span<const std::string_view> sceneEnvironmentKeys() { return kEnvironmentKeys; }
@@ -420,7 +420,9 @@ Result<Composition::AuthoredLight> authoredLightFromJson(const json& e, std::str
                                FloatField{"shadowStrength", &l.shadowStrength},
                                FloatField{"shadowBias", &l.shadowBias},
                                FloatField{"softness", &l.softness},
-                               FloatField{"volumetric", &l.volumetricStrength}}) {
+                               FloatField{"volumetric", &l.volumetricStrength},
+                               FloatField{"flicker", &l.flicker},
+                               FloatField{"flickerRate", &l.flickerRate}}) {
         auto v = readFloat(e, f.key, *f.target);
         if (!v) {
             return fail("light '{}': {}", l.name, v.error().message);
@@ -526,6 +528,8 @@ json authoredLightToJson(const Composition::AuthoredLight& a) {
     if (l.shadowBias != def.shadowBias) e["shadowBias"] = l.shadowBias;
     if (l.softness != def.softness) e["softness"] = l.softness;
     if (l.volumetricStrength != def.volumetricStrength) e["volumetric"] = l.volumetricStrength;
+    if (l.flicker != def.flicker) e["flicker"] = l.flicker;
+    if (l.flickerRate != def.flickerRate) e["flickerRate"] = l.flickerRate;
     if (l.diffuseOnly != def.diffuseOnly) e["diffuseOnly"] = l.diffuseOnly;
     if (l.specularOnly != def.specularOnly) e["specularOnly"] = l.specularOnly;
     if (l.enabled != def.enabled) e["enabled"] = l.enabled;
@@ -1282,6 +1286,12 @@ void Composition::updateCorruption() {
     const float distance = glm::distance(scene_.camera.position, live.focus);
     live.liveAmount = corruptionFieldScale(live, distance);
     live.liveOpen = corruptionOpening(live, distance);
+    // ADR-1885: once the camera has crossed this world's portal it is done (the world may be seen again later,
+    // through another portal or on a return, without it)
+    if (portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) {
+        live.liveAmount = 0.0f;
+        live.liveOpen = 0.0f;
+    }
     const auto now = static_cast<float>(currentTime_);
     live.prevTime = std::isfinite(prev) && prev <= now ? prev : now;
     corruptionTime_ = now;
@@ -5329,6 +5339,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // and against the material part names the rebuild resolved.
     installEntities();
     // ADR-1879: a portal's destination world, under its own prefix
+    linkPortalRoot(); // ADR-1885
     if (portalWorld_) {
         // under the destination file's last word ("strange-attractor-moon" -> "moon/")
         std::string stem = std::filesystem::path(portal_.world).filename().string();
@@ -8269,6 +8280,11 @@ void Composition::update(const FrameTime& time) {
     }
 
     currentTime_ = time.renderTime;
+    // ADR-1886: this world's look for this second of the journey, before anything reads the parameters
+    if (!looks_.empty()) {
+        const int look = lookIndexAt(currentTime_);
+        if (look != -2 && look != appliedLook_) applyLook(look);
+    }
     const auto dt = static_cast<float>(time.deltaTime);
     if (rootRotationSpeed_ != nullptr) {
         rootAngle_ += rootRotationSpeed_->value() * dt;
@@ -8307,6 +8323,26 @@ void Composition::update(const FrameTime& time) {
     cullEntityNodes();
     updateCorruption();
     updatePortal(time);
+    // ADR-1885: on the root, once the journey has returned here, the camera is the return's path (and before that,
+    // while another world is the frame, the path carried back through the return portal: the view that portal shows)
+    if (returnFrom_ != nullptr && portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) {
+        if (const auto pose = returnFrom_->portalCameraAt(currentTime_)) {
+            scene_.camera.position = pose->eye;
+            scene_.camera.target = pose->target;
+            scene_.camera.up = pose->up;
+            cullEntityNodes();
+        }
+        if (returnFrom_->portalCrossing_ < 1e28 && currentTime_ >= returnFrom_->portalCrossing_) scene_.portal = {};
+    }
+    // a first frame decides its look before the crossings are known: decide again now, and run the frame again once
+    if (!looks_.empty() && !lookRetry_) {
+        const int look = lookIndexAt(currentTime_);
+        if (look != -2 && look != appliedLook_) {
+            lookRetry_ = true;
+            update(time);
+            lookRetry_ = false;
+        }
+    }
 }
 
 // ADR-086. Two things, in order: push each node's authored animation request into its rigs (only
@@ -9371,6 +9407,9 @@ void Composition::applyParameters() {
     } else {
         scene_.meshWire = meshWire_;
     }
+    // ADR-1885: the scan belongs to this world's portal; once the camera has crossed it, it is done (the world may be
+    // seen again later, through another portal or on a return, without it)
+    if (portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) scene_.meshWire.targets.clear();
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -9432,6 +9471,12 @@ void Composition::applyParameters() {
             live.enabled = false;
         }
         live.intensity = p.intensity != nullptr ? p.intensity->value() : rest.intensity;
+        if (rest.flicker > 0.0f) { // ADR-1888: a fire's flicker, a pure function of the clock
+            const auto t = static_cast<float>(currentTime_) * rest.flickerRate;
+            const float n = 0.55f * std::sin(t * 6.2831853f) * std::sin(t * 2.3f + 1.7f) + 0.3f * std::sin(t * 13.7f + 0.4f) +
+                            0.15f * std::sin(t * 29.3f + 2.1f);
+            live.intensity *= std::max(0.0f, 1.0f + rest.flicker * n);
+        }
         live.color = p.color != nullptr ? p.color->value() : rest.color;
         live.softness = p.angularSize != nullptr ? p.angularSize->value() : rest.softness;
         live.shadowStrength = p.shadowStrength != nullptr ? p.shadowStrength->value() : rest.shadowStrength;
@@ -11596,6 +11641,11 @@ nlohmann::json Composition::toJson() const {
                        {"exitYaw", portal_.exitYaw},
                        {"flight", flight}};
         if (portal_.join.z > 0.0f) j["portal"]["join"] = {portal_.join.x, portal_.join.y, portal_.join.z};
+        if (!portal_.aims.empty()) {
+            nlohmann::json aims = nlohmann::json::array();
+            for (const auto& a : portal_.aims) aims.push_back({a[0], a[1], a[2], a[3], a[4]});
+            j["portal"]["aims"] = aims;
+        }
         if (glm::length(portal_.exitAxis) > 1e-6f) {
             j["portal"]["exitAxis"] = {portal_.exitAxis.x, portal_.exitAxis.y, portal_.exitAxis.z};
             j["portal"]["entryUp"] = {portal_.entryUp.x, portal_.entryUp.y, portal_.entryUp.z};
@@ -12578,6 +12628,12 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
             };
             vec3At("exitAxis", pb.exitAxis);
+            if (pj.contains("aims")) {
+                for (const json& a : pj.at("aims")) {
+                    pb.aims.push_back({a.at(0).get<float>(), a.at(1).get<float>(), a.at(2).get<float>(), a.at(3).get<float>(),
+                                       a.at(4).get<float>()});
+                }
+            }
             vec3At("entryUp", pb.entryUp);
             vec3At("exitUp", pb.exitUp);
             if (pj.contains("join")) {
@@ -12586,7 +12642,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             for (auto it = pj.begin(); it != pj.end(); ++it) {
                 if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join" &&
-                    it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp") {
+                    it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp" && it.key() != "aims") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }
@@ -12594,6 +12650,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             return fail("scene file '{}': portal: {}", scenePath.string(), e.what());
         }
         const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : std::filesystem::path(".");
+        if (pb.world == "@root") { // ADR-1885: back to the journey's root, linked at attach
+            comp->setPortalToRoot(std::move(pb));
+        } else {
         auto world = Composition::loadFile(base / pb.world, registry, depth + 1);
         if (!world) {
             return fail("scene file '{}': portal world '{}': {}", scenePath.string(), pb.world, world.error().message);
@@ -12601,6 +12660,32 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         if (auto r = comp->setPortal(std::move(pb), std::move(*world)); !r) {
             return fail("scene file '{}': {}", scenePath.string(), r.error().message);
         }
+        }
+    }
+    if (j.contains("looks")) { // ADR-1886
+        std::vector<Look> looks;
+        try {
+            for (const json& lj : j.at("looks")) {
+                Look look;
+                look.name = lj.value("name", std::string("look"));
+                look.fromCrossing = lj.value("from", 0);
+                for (auto it = lj.at("params").begin(); it != lj.at("params").end(); ++it) {
+                    std::vector<float> v;
+                    if (it->is_array()) {
+                        for (const json& x : *it) v.push_back(x.get<float>());
+                    } else if (it->is_boolean()) {
+                        v.push_back(it->get<bool>() ? 1.0f : 0.0f);
+                    } else {
+                        v.push_back(it->get<float>());
+                    }
+                    look.values.emplace_back(it.key(), std::move(v));
+                }
+                looks.push_back(std::move(look));
+            }
+        } catch (const json::exception& e) {
+            return fail("scene file '{}': looks: {}", scenePath.string(), e.what());
+        }
+        comp->setLooks(std::move(looks));
     }
     if (j.contains("clouds")) { // ADR-1289
         const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : registry.resolve(".");

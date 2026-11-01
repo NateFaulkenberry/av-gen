@@ -209,3 +209,109 @@ TEST_CASE("the lunar curvature radius brings the ground's fall within reach (Art
     CHECK(scene::lunarWorldFromJson(scene::lunarWorldToJson(*block))->gen.hash() == block->gen.hash());
     CHECK_FALSE(scene::lunarWorldFromJson(nlohmann::json::parse(R"({"curvature": 10})")).has_value());
 }
+
+TEST_CASE("a journey returns to its root: the root's look turns at the first crossing, its camera follows the return",
+          "[portal][pass2][adr1885][adr1886]") {
+    const auto dir = testsupport::processTempDir();
+    const nlohmann::json moon = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "moon"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+        {"lunarWorld", {{"extent", 400}, {"spacing", 8}, {"skirtExtent", 1600}, {"skirtSpacing", 64}, {"rocks", 0}}},
+        {"corruption", {{"targets", {"lunar.surface"}}, {"focus", {0.0, 0.0, 0.0}}, {"axis", {0.0, -1.0, 0.0}}, {"amount", 1.0},
+                        {"width", 40.0}, {"height", 40.0}}},
+        // back to the root: through a wall facing +x at (500, 30, 500)
+        {"portal", {{"world", "@root"}, {"exit", {500.0, 30.0, 500.0}}, {"exitAxis", {1.0, 0.0, 0.0}},
+                    {"entryUp", {0.0, 0.0, -1.0}}, {"exitUp", {0.0, 1.0, 0.0}}}}};
+    std::ofstream(dir / "ret-moon.scene.json") << moon.dump();
+    const nlohmann::json canyon = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "canyon"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 30.0, 100.0}}, {"target", {0.0, 30.0, 0.0}}}},
+        {"environment", {{"intensity", 0.5}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}, {{"name", "camp"}, {"kind", "grid"}, {"visible", false}}}},
+        {"corruption", {{"targets", {"rock"}}, {"focus", {0.0, 30.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0}}},
+        {"portal", {{"world", "ret-moon.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
+                    {"flight", {{0.0, 20.0, 5.0, 4.0}, {0.0, 0.0, 0.0, 6.0}, {0.0, -30.0, -2.0, 7.0}}}}},
+        {"looks", {{{"name", "dusk"}, {"from", 1}, {"params", {{"env/intensity", 0.25}, {"nodes/camp/visible", true}}}}}}};
+    std::ofstream(dir / "ret-canyon.scene.json") << canyon.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "ret-canyon.scene.json", registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    (*c)->setCameraPath([](double t) {
+        const glm::vec3 eye(0.0f, 30.0f, 100.0f - 50.0f * static_cast<float>(t));
+        return std::optional<scene::Composition::PortalPose>(scene::Composition::PortalPose{eye, eye + glm::vec3(0, 0, -1), glm::vec3(0, 1, 0)});
+    });
+    const auto at = [&](double t) {
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = t;
+        (*c)->update(ft);
+    };
+    const auto envIntensity = [&]() { return params.find("env/intensity")->finalComponent(0); };
+    const auto campVisible = [&]() { return params.find("nodes/camp/visible")->finalComponent(0) > 0.5f; };
+    const auto rootClipped = [&]() { return glm::length((*c)->scene().portalClip) > 0.0f; };
+    at(1.0);
+    CHECK(envIntensity() == Approx(0.5f));
+    CHECK_FALSE(campVisible());
+    // the return's exit plane must not clip the root while the camera is still in it (it cut the opening's
+    // foreground away)
+    CHECK_FALSE(rootClipped());
+    at(3.0); // in the Moon: the root is the frame of the Moon's portal view, already at dusk
+    CHECK((*c)->scene().portal.crossed);
+    CHECK(envIntensity() == Approx(0.25f));
+    CHECK(campVisible());
+    scene::Composition* moonWorld = (*c)->portalWorld();
+    REQUIRE(moonWorld != nullptr);
+    CHECK(moonWorld->scene().portal.world == &(*c)->scene()); // the Moon's portal shows the root itself
+    CHECK(moonWorld->portalCrossingSeconds() == Approx(6.0).margin(0.05));
+    CHECK(rootClipped()); // seen through the Moon's portal, from behind the wall: the rock behind the exit is clipped
+    at(6.0 + 1.0 / 60.0); // back in the root: no portal, its camera at the wall's exit
+    CHECK_FALSE((*c)->scene().portal.active());
+    const scene::Camera& cam = (*c)->scene().camera;
+    INFO("root camera (" << cam.position.x << ", " << cam.position.y << ", " << cam.position.z << ")");
+    CHECK(glm::length(cam.position - glm::vec3(500.0f, 30.0f, 500.0f)) < 3.0f);
+    CHECK(rootClipped()); // for a second after the crossing
+    at(1.0); // a seek back is the day again
+    CHECK(envIntensity() == Approx(0.5f));
+    CHECK_FALSE(campVisible());
+    CHECK_FALSE(rootClipped());
+}
+
+TEST_CASE("a light's flicker is a pure function of the clock", "[pass2][adr1888]") {
+    const auto dir = testsupport::processTempDir();
+    const nlohmann::json s = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "fire"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 3.0, 10.0}}, {"target", {0.0, 0.0, 0.0}}}},
+        {"nodes", {{{"name", "ground"}, {"kind", "grid"}}}},
+        {"lights", {{{"name", "fire"}, {"type", "point"}, {"position", {0.0, 1.0, 0.0}}, {"intensity", 100.0},
+                     {"flicker", 0.4}, {"flickerRate", 3.0}}}}};
+    std::ofstream(dir / "fire.scene.json") << s.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "fire.scene.json", registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    const auto intensityAt = [&](double t) {
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = t;
+        (*c)->update(ft);
+        for (const auto& l : (*c)->scene().lights) {
+            if (l.name == "fire") return l.intensity;
+        }
+        return -1.0f;
+    };
+    float lo = 1e9f, hi = -1e9f;
+    for (int k = 0; k < 120; ++k) {
+        const float v = intensityAt(k / 30.0);
+        lo = std::min(lo, v);
+        hi = std::max(hi, v);
+        CHECK(v >= 0.0f);
+        CHECK(v <= 100.0f * 1.41f);
+    }
+    CHECK(hi - lo > 25.0f);                       // it flickers
+    CHECK(intensityAt(1.234) == intensityAt(1.234)); // and a seek lands on the same value
+}

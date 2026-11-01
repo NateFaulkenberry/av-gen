@@ -3194,12 +3194,25 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ADR-1879: a portal's destination world, drawn first into its own target so this frame can composite it. Once
     // the camera has crossed, the destination's renderer draws the frame itself (its own post chain: the worlds share
     // the post settings) and nothing of this world is drawn -- three nested worlds would otherwise all render.
-    const bool portalOn = scene.portal.active() && portalDepth_ < kMaxPortalDepth;
+    if (portalDepth_ == 0) {
+        if (!registry_) registry_ = std::make_shared<std::unordered_map<const scene::Scene*, SceneRenderer*>>();
+        (*registry_)[&scene] = this;
+    }
+    const bool portalOn = !plain_ && scene.portal.active() && portalDepth_ < kMaxPortalDepth;
     if (portalOn && scene.portal.crossed) {
         if (auto r = encodePortalView(encoder, scene, time, target.width, target.height, &target); r) {
             return r;
         }
     }
+    // ADR-1885: from here this renderer draws its own world into this encoder. Its per-frame buffers are written once
+    // per submit, so a second draw of the same renderer in the same frame (a nested view back into this world) would
+    // overwrite them for both; such a view is skipped (see encodePortalView).
+    struct BusyGuard {
+        bool& flag;
+        bool was;
+        ~BusyGuard() { flag = was; }
+    } busyGuard{busy_, busy_};
+    busy_ = true;
     if (portalOn) {
         (void)encodePortalView(encoder, scene, time, target.width, target.height);
     }
@@ -5170,7 +5183,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             stats_.state.bindGroupBinds += 2;
         }
         // ---- ADR-1879: the portal view, over the opaque world and under the water (which reflects it) ----
-        if (portalOn && portalRenderer_ && portalPipeline_) {
+        if (portalOn && portalSource_ != nullptr && portalPipeline_) {
             rp.End();
             wgpu::RenderPassDescriptor portalPass = pass;
             for (auto& attachment : attachments) {
@@ -5184,7 +5197,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             context_.queue().WriteBuffer(portalParams_, 0, params, sizeof(params));
             std::array<wgpu::BindGroupEntry, 3> be{};
             be[0].binding = 0;
-            be[0].textureView = portalRenderer_->sceneHdrTexture().CreateView();
+            be[0].textureView = (portalSource_ != nullptr ? portalSource_ : portalRenderer_.get())->sceneHdrTexture().CreateView();
             be[1].binding = 1;
             be[1].sampler = portalSampler_;
             be[2].binding = 2;
@@ -6166,27 +6179,45 @@ Result<void> SceneRenderer::ensurePortalPipeline() {
 
 Result<void> SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                                              std::uint32_t width, std::uint32_t height, const gpu::TargetView* direct) {
+    // a scene another renderer of this journey already draws (the root, ADR-1885): draw it there, plain, and read its
+    // radiance; no renderer of our own is made for it (a fresh renderer's init in the middle of the owner's frame
+    // disturbed the owner's draw)
+    SceneRenderer* owner = nullptr;
+    if (registry_) {
+        if (const auto it = registry_->find(scene.portal.world); it != registry_->end() && it->second != this) owner = it->second;
+    }
+    // the owner is drawing its own world in this frame already (a view back into the world the camera is still in):
+    // the nested view is not drawn, and the portal pass composites nothing
+    if (owner != nullptr && owner->busy_) {
+        portalSource_ = nullptr;
+        return {};
+    }
     if (auto r = ensurePortalPipeline(); !r) {
         log::warn("portal view: {}", r.error().message);
         return r;
     }
-    if (!portalRenderer_) {
-        portalRenderer_ = std::make_unique<SceneRenderer>(context_, shaders_);
-        portalRenderer_->portalDepth_ = portalDepth_ + 1;
-        if (auto r = portalRenderer_->init(); !r) {
-            log::warn("portal view: {}", r.error().message);
-            portalRenderer_.reset();
-            return r;
+    if (owner == nullptr) {
+        if (!portalRenderer_) {
+            portalRenderer_ = std::make_unique<SceneRenderer>(context_, shaders_);
+            portalRenderer_->portalDepth_ = portalDepth_ + 1;
+            if (auto r = portalRenderer_->init(); !r) {
+                log::warn("portal view: {}", r.error().message);
+                portalRenderer_.reset();
+                return r;
+            }
         }
+        owner = portalRenderer_.get();
+        owner->registry_ = registry_;
+        owner->setQualitySettings(qualitySettings_);
+        owner->setPassToggles(toggles_);
+        // one picture across worlds: the destination is finished with this frame's post and temporal settings (the
+        // engine sets them on the root scene only), so the crossing does not change the grade
+        owner->inheritedPost_ = &postOf(scene);
+        owner->inheritedTemporal_ = inheritedTemporal_ != nullptr ? inheritedTemporal_ : &scene.temporal;
     }
-    portalRenderer_->setQualitySettings(qualitySettings_);
-    portalRenderer_->setPassToggles(toggles_);
-    // one picture across worlds: the destination is finished with this frame's post and temporal settings (the
-    // engine sets them on the root scene only), so the crossing does not change the grade
-    portalRenderer_->inheritedPost_ = &postOf(scene);
-    portalRenderer_->inheritedTemporal_ = inheritedTemporal_ != nullptr ? inheritedTemporal_ : &scene.temporal;
+    portalSource_ = owner;
     if (direct != nullptr) {
-        auto r = portalRenderer_->render(encoder, *scene.portal.world, time, *direct);
+        auto r = owner->render(encoder, *scene.portal.world, time, *direct);
         if (!r) log::warn("portal view: {}", r.error().message);
         return r;
     }
@@ -6199,7 +6230,10 @@ Result<void> SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, cons
         portalTarget_ = context_.device().CreateTexture(&td);
     }
     const gpu::TargetView target{portalTarget_.CreateView(), wgpu::TextureFormat::RGBA8Unorm, width, height};
-    auto r = portalRenderer_->render(encoder, *scene.portal.world, time, target);
+    const bool wasPlain = owner->plain_;
+    owner->plain_ = owner != portalRenderer_.get();
+    auto r = owner->render(encoder, *scene.portal.world, time, target);
+    owner->plain_ = wasPlain;
     if (!r) log::warn("portal view: {}", r.error().message);
     return r;
 }
