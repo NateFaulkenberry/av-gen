@@ -580,6 +580,10 @@ public:
     // This is the *seek* reset: it also restarts the particle pools, because a seek moves the
     // world's clock and the pools are the world's state at that clock.
     void resetTemporalHistory();
+    // ADR-1931: a fixed-step clock's rate, so the temporal ring's capture stride is anchored to the timeline's frame
+    // number rather than to how many frames this renderer has drawn. The offline render job sets it; 0 (the live
+    // default) keys the stride to the frame index.
+    void setTimelineFrameRate(double fps) { timelineFrameRate_ = fps; }
     // The same invalidation without the particle pools: what a change of render-target extent
     // needs, and nothing more. A resize throws away screen-space history because the buffers
     // holding it were reallocated at a new size; it has no claim on the simulation, whose alive
@@ -1143,6 +1147,7 @@ private:
     // `resetTemporalHistory()` along with the AO history and the particle pools -- one hook for
     // every temporal consumer, never a second one.
     std::unique_ptr<TemporalEffects> temporal_;
+    double timelineFrameRate_ = 0.0; // ADR-1931
     std::unique_ptr<DistortionRenderer> distortion_; // DF: after the volume composite, before post
     std::unique_ptr<gpu::TransientPool> pool_;
     glm::mat4 prevViewProj_{1.0f};

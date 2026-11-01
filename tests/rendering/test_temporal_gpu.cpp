@@ -551,11 +551,12 @@ scene::Scene withFeedback(scene::Scene s, float amount) {
     return s;
 }
 
-scene::Scene withSlit(scene::Scene s, float amount, float mode) {
+scene::Scene withSlit(scene::Scene s, float amount, float mode, float angle = 0.0f) {
     s.temporal.slit.enabled = true;
-    s.temporal.slit.frames = 12;
+    s.temporal.slit.span = 12.0f; // ADR-1931: a span in frames (it was `frames`)
     s.temporal.slit.amount = amount;
-    s.temporal.slit.mode = mode;
+    s.temporal.slit.mode = mode;   // ADR-1931: 0 direction, 1 radial, 2 luminance
+    s.temporal.slit.angle = angle;
     return s;
 }
 
@@ -569,8 +570,8 @@ TEST_CASE("feedback and slit-scan are off at zero, act when on, and a late start
     const Shot off = playRange(*ctx, shaders, plain, 0, 24);
     for (const auto& [name, idleScene, onScene] :
          {std::tuple{"feedback", withFeedback(plain, 0.0f), withFeedback(plain, 0.8f)},
-          std::tuple{"slit rows", withSlit(plain, 0.0f, 0.0f), withSlit(plain, 1.0f, 0.0f)},
-          std::tuple{"slit radial", withSlit(plain, 0.0f, 2.0f), withSlit(plain, 1.0f, 2.0f)}}) {
+          std::tuple{"slit rows", withSlit(plain, 0.0f, 0.0f, 90.0f), withSlit(plain, 1.0f, 0.0f, 90.0f)},
+          std::tuple{"slit radial", withSlit(plain, 0.0f, 1.0f), withSlit(plain, 1.0f, 1.0f)}}) {
         INFO(name);
         const Shot idle = playRange(*ctx, shaders, idleScene, 0, 24);
         CHECK_IDENTICAL(off.image, idle.image); // enabled at amount 0: the ring is warm, the picture untouched

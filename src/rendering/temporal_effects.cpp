@@ -21,8 +21,9 @@ struct Uniforms {
     std::array<float, 4> ring{};
     std::array<float, 4> params{};
     std::array<float, 4> extra{}; // ADR-1049: x = the mosh's epoch
+    std::array<float, 4> more{};  // ADR-1931: the sampler's stride, blend, reverse, scan switch
 };
-static_assert(sizeof(Uniforms) == 80);
+static_assert(sizeof(Uniforms) == 96);
 
 // The two ceilings, tied. `scene/` cannot include a WebGPU header, so the constant exists twice;
 // this is the line that stops the copies drifting.
@@ -240,18 +241,25 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
 
     // The bound, taken from the effects themselves. This is the single number that sizes the ring,
     // sizes a seek warm-up and drives the settling badge.
+    // ADR-1931: the ring's layers are the settings' `ringLayers()` -- a fixed capacity when the scene sets one, so a
+    // routed span never reallocates. Not a tier setting: how far back an effect reaches is an artistic control, and the
+    // tier scales only the ring's resolution (`temporalHistoryScale`). The needed count, in layers at the stride,
+    // drives the badge.
     const std::uint32_t needed = settings.historyFrames();
-    history_->setFramesNeeded(needed);
+    const std::uint32_t stride = settings.captureStride();
+    const std::uint32_t layers = settings.ringLayers();
+    history_->setFramesNeeded(std::min((needed + stride - 1) / stride, layers));
 
     TemporalHistoryConfig config{};
     config.resolutionScale = in.resolutionScale;
-    config.frames[static_cast<std::uint32_t>(TemporalChannel::Colour)] = needed;
+    config.stride = stride;
+    config.frames[static_cast<std::uint32_t>(TemporalChannel::Colour)] = layers;
     if (auto r = history_->configure(in.width, in.height, config); !r) {
         // An allocation failure disables the family for the frame rather than dropping the frame.
         stats_.stalled = true;
         return in.sceneHdr;
     }
-    history_->beginFrame(in.frameIndex);
+    history_->beginFrame(in.frameIndex, in.renderTime, in.haveCaptureFrame ? in.captureFrame : in.frameIndex);
 
     const auto& state = history_->state();
     stats_.framesValid = state.framesValid;
@@ -261,6 +269,10 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
     stats_.historyBytes = history_->bytes();
     stats_.historyWidth = history_->width();
     stats_.historyHeight = history_->height();
+    stats_.historyLayers = history_->frames(TemporalChannel::Colour); // ADR-1931
+    stats_.historyStride = history_->stride();
+    stats_.historyWriteLayer = history_->writeLayer(TemporalChannel::Colour);
+    stats_.historyAllocations = history_->allocations();
 
     if (!history_->active()) {
         return in.sceneHdr;
@@ -388,16 +400,25 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
             }
         }
     }
+    // ---- ADR-1931: the sampler. Each pixel's age comes from the slit map (direction, radial or luminance; strips;
+    // a scan that may move); the stored frames are addressed by age with the stride and the newest layer's age, so a
+    // span of any length costs two fetches. FIR over the clean ring like the rest.
     const scene::SlitSettings& sl = settings.slit;
-    if (sl.enabled && sl.amount > 0.0f) {
-        const std::uint32_t taps =
-            std::min<std::uint32_t>(static_cast<std::uint32_t>(std::max(sl.frames, 1)), state.framesValid);
-        if (taps > 0) {
-            Uniforms u = ringUniforms(taps);
-            u.params = {std::clamp(sl.amount, 0.0f, 1.0f), std::round(sl.mode), sl.reverse, 0.0f};
-            if (!ringPass("fs_slit", "temporal-slit", "temporal/slit", im.slit, im.slitFormat, im.slitUniforms, u)) {
-                return result;
-            }
+    if (sl.enabled && sl.amount > 0.0f && state.framesValid > 0 && history_->newestAge() > 0) {
+        Uniforms u = ringUniforms(state.framesValid);
+        u.ring[3] = static_cast<float>(history_->newestAge());
+        u.params = {std::clamp(sl.amount, 0.0f, 1.0f), std::max(sl.span, 0.0f), std::max(std::round(sl.strips), 0.0f),
+                    std::clamp(sl.edge, 0.0f, 1.0f)};
+        const float angle = glm::radians(sl.angle);
+        const bool scanning = sl.scan != 0.0f || sl.scanSpeed != 0.0f;
+        // The scan offset is a pure function of the render time; wrapped here in double so a long piece does not lose
+        // the fraction to float precision.
+        const double offset = static_cast<double>(sl.scan) + static_cast<double>(sl.scanSpeed) * in.renderTime;
+        u.extra = {std::cos(angle), std::sin(angle), static_cast<float>(offset - std::floor(offset)), std::round(sl.mode)};
+        u.more = {static_cast<float>(history_->stride()), std::clamp(sl.blend, 0.0f, 1.0f), sl.reverse > 0.5f ? 1.0f : 0.0f,
+                  scanning ? 1.0f : 0.0f};
+        if (!ringPass("fs_sample", "temporal-sample", "temporal/sample", im.slit, im.slitFormat, im.slitUniforms, u)) {
+            return result;
         }
     }
 

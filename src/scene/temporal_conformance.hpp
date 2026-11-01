@@ -12,7 +12,7 @@
 // So this file asks the family the same questions the engine asks it, per kind, and reports what
 // does not line up:
 //
-//   1. **bounded-k** -- every enabled kind declares a depth in 1..kMaxTemporalFrames. Zero while
+//   1. **bounded-k** -- every enabled kind declares a depth in 1..kMaxTemporalHistoryFrames (ADR-1931). Zero while
 //      enabled means "I did not declare"; over the ceiling means "I declared more than the ring
 //      can hold". Both are the accumulator ADR-410 forbids, arriving by different routes.
 //   2. **paths** -- every parameter a kind's panel row asks for is a path that kind registers,

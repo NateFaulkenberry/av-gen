@@ -101,6 +101,7 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `AVGEN_UI_SELFTEST` | log SDL and ImGui input routing every thirtieth frame |
 | `AVGEN_VIEWPORT_PROBE`, `AVGEN_VIEWPORT_DRAG` | synthesise a viewport click or drag |
 | `AVGEN_NO_WARMUP` | skip the two warm-up frames before an offline render |
+| `AVGEN_NO_TEMPORAL_PREROLL` | skip the temporal pre-roll: a render of a range then opens with an empty frame history instead of the history a render from the start had. A measurement arm only |
 | `AVGEN_FFMPEG` | path to an ffmpeg executable |
 | `AVGEN_NDI_LIB` | path to libndi |
 | `AVGEN_QUALITY` | path to the Quality Lab CLI (`avgen_quality`) the live optimizer runs |

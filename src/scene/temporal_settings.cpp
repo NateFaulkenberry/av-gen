@@ -30,13 +30,16 @@ params::ParamDesc<bool> b(const char* path, bool def) {
     return d;
 }
 
-// The authoring ceiling (§8: 1-32). `scene/` must not include a WebGPU header, so this cannot
-// simply BE `rendering::kMaxTemporalFrames` -- but two ceilings that silently disagree is how an
-// authored 32 becomes a rendered 16. `temporal_effects.cpp` sees both headers and static_asserts
-// them equal, so a change to either fails the build rather than the picture.
-constexpr int kMaxFrames = kMaxTemporalFrames;
+// The tap ceiling of the looping effects (ADR-1931: echo, mosh and feedback keep ADR-410's 32; the ring itself is
+// `kMaxTemporalFrames` layers deep, and `temporal_effects.cpp` static_asserts that against the renderer's copy).
+constexpr int kMaxFrames = kMaxTemporalTaps;
 
 [[nodiscard]] int clampFrames(int frames) { return std::clamp(frames, 1, kMaxFrames); }
+
+constexpr float kMaxSpan = static_cast<float>(kMaxTemporalHistoryFrames);
+[[nodiscard]] float clampSpan(float span) { return std::clamp(span, 1.0f, kMaxSpan); }
+[[nodiscard]] int clampCapacity(int c) { return std::clamp(c, 0, kMaxTemporalFrames); }
+[[nodiscard]] int clampStride(int s) { return std::clamp(s, 1, kMaxTemporalStride); }
 
 } // namespace
 
@@ -59,7 +62,7 @@ std::uint32_t temporalEffectHistoryFrames(TemporalEffectKind kind, const Tempora
     case TemporalEffectKind::Feedback:
         return s.feedback.enabled ? static_cast<std::uint32_t>(clampFrames(s.feedback.frames)) : 0u;
     case TemporalEffectKind::Slit:
-        return s.slit.enabled ? static_cast<std::uint32_t>(clampFrames(s.slit.frames)) : 0u;
+        return s.slit.enabled ? static_cast<std::uint32_t>(std::ceil(clampSpan(s.slit.span))) : 0u;
     case TemporalEffectKind::Count: break;
     }
     return 0u;
@@ -87,6 +90,22 @@ std::uint32_t TemporalSettings::historyFrames() const {
 bool TemporalSettings::anyEnabled() const {
     return std::any_of(kTemporalEffectKinds.begin(), kTemporalEffectKinds.end(),
                        [this](TemporalEffectKind k) { return temporalEffectEnabled(k, *this); });
+}
+
+std::uint32_t TemporalSettings::captureStride() const {
+    return static_cast<std::uint32_t>(clampStride(history.stride));
+}
+
+std::uint32_t TemporalSettings::ringLayers() const {
+    const std::uint32_t needed = historyFrames();
+    if (needed == 0) {
+        return 0;
+    }
+    if (history.capacity > 0) {
+        return static_cast<std::uint32_t>(clampCapacity(history.capacity));
+    }
+    const std::uint32_t stride = captureStride();
+    return std::min<std::uint32_t>((needed + stride - 1) / stride, static_cast<std::uint32_t>(kMaxTemporalFrames));
 }
 
 std::string temporalParameterPrefix(TemporalEffectKind kind) {
@@ -132,11 +151,23 @@ TemporalParameters registerTemporalParameters(params::ParameterSet& params, cons
     const std::string sl = temporalParameterPrefix(TemporalEffectKind::Slit);
     const SlitSettings& sd = defaults.slit;
     p.slitEnabled = &params.add(b((sl + "enabled").c_str(), sd.enabled));
-    p.slitFrames = &params.add(f((sl + "frames").c_str(), static_cast<float>(clampFrames(sd.frames)), 1.0f,
-                                 static_cast<float>(kMaxFrames), 1.0f, 32.0f));
     p.slitAmount = &params.add(f((sl + "amount").c_str(), sd.amount, 0.0f, 1.0f, 0.0f, 1.0f));
-    p.slitMode = &params.add(f((sl + "mode").c_str(), sd.mode, 0.0f, 3.0f, 0.0f, 3.0f));
+    // ADR-1931
+    p.slitSpan = &params.add(f((sl + "span").c_str(), clampSpan(sd.span), 1.0f, kMaxSpan, 1.0f, 256.0f));
+    p.slitMode = &params.add(f((sl + "mode").c_str(), sd.mode, 0.0f, 2.0f, 0.0f, 2.0f));
+    p.slitAngle = &params.add(f((sl + "angle").c_str(), sd.angle, -360.0f, 360.0f, 0.0f, 180.0f));
+    p.slitStrips = &params.add(f((sl + "strips").c_str(), sd.strips, 0.0f, 512.0f, 0.0f, 64.0f));
+    p.slitEdge = &params.add(f((sl + "edge").c_str(), sd.edge, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.slitBlend = &params.add(f((sl + "blend").c_str(), sd.blend, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.slitScan = &params.add(f((sl + "scan").c_str(), sd.scan, -1.0f, 1.0f, 0.0f, 1.0f));
+    p.slitScanSpeed = &params.add(f((sl + "scanSpeed").c_str(), sd.scanSpeed, -4.0f, 4.0f, -0.5f, 0.5f));
     p.slitReverse = &params.add(f((sl + "reverse").c_str(), sd.reverse, 0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-1931: the ring. Floats carrying integers, rounded where read, like `frames`.
+    const TemporalHistorySettings& h = defaults.history;
+    p.historyCapacity = &params.add(f("temporal/history/capacity", static_cast<float>(clampCapacity(h.capacity)), 0.0f,
+                                      static_cast<float>(kMaxTemporalFrames), 0.0f, 128.0f));
+    p.historyStride = &params.add(f("temporal/history/stride", static_cast<float>(clampStride(h.stride)), 1.0f,
+                                    static_cast<float>(kMaxTemporalStride), 1.0f, 4.0f));
     return p;
 }
 
@@ -168,10 +199,19 @@ void applyTemporalParameters(const TemporalParameters& p, TemporalSettings& sett
     if (p.feedbackHue != nullptr) fd.hue = p.feedbackHue->value();
     SlitSettings& sd = settings.slit;
     if (p.slitEnabled != nullptr) sd.enabled = p.slitEnabled->value();
-    if (p.slitFrames != nullptr) sd.frames = clampFrames(static_cast<int>(std::lround(p.slitFrames->value())));
     if (p.slitAmount != nullptr) sd.amount = p.slitAmount->value();
+    if (p.slitSpan != nullptr) sd.span = clampSpan(p.slitSpan->value());
     if (p.slitMode != nullptr) sd.mode = p.slitMode->value();
+    if (p.slitAngle != nullptr) sd.angle = p.slitAngle->value();
+    if (p.slitStrips != nullptr) sd.strips = p.slitStrips->value();
+    if (p.slitEdge != nullptr) sd.edge = p.slitEdge->value();
+    if (p.slitBlend != nullptr) sd.blend = p.slitBlend->value();
+    if (p.slitScan != nullptr) sd.scan = p.slitScan->value();
+    if (p.slitScanSpeed != nullptr) sd.scanSpeed = p.slitScanSpeed->value();
     if (p.slitReverse != nullptr) sd.reverse = p.slitReverse->value();
+    TemporalHistorySettings& h = settings.history; // ADR-1931
+    if (p.historyCapacity != nullptr) h.capacity = clampCapacity(static_cast<int>(std::lround(p.historyCapacity->value())));
+    if (p.historyStride != nullptr) h.stride = clampStride(static_cast<int>(std::lround(p.historyStride->value())));
 }
 
 nlohmann::json temporalToJson(const TemporalSettings& s) {
@@ -194,8 +234,12 @@ nlohmann::json temporalToJson(const TemporalSettings& s) {
                                    {"decay", fd.decay},     {"zoom", fd.zoom},                  {"rotate", fd.rotate},
                                    {"driftX", fd.driftX},   {"driftY", fd.driftY},              {"hue", fd.hue}};
     const SlitSettings& sd = s.slit;
-    j["slit"] = nlohmann::json{{"enabled", sd.enabled}, {"frames", clampFrames(sd.frames)}, {"amount", sd.amount},
-                               {"mode", sd.mode},       {"reverse", sd.reverse}};
+    j["slit"] = nlohmann::json{{"enabled", sd.enabled}, {"amount", sd.amount},   {"span", clampSpan(sd.span)},
+                               {"mode", sd.mode},       {"angle", sd.angle},     {"strips", sd.strips},
+                               {"edge", sd.edge},       {"blend", sd.blend},     {"scan", sd.scan},
+                               {"scanSpeed", sd.scanSpeed}, {"reverse", sd.reverse}};
+    j["history"] = nlohmann::json{{"capacity", clampCapacity(s.history.capacity)}, // ADR-1931
+                                  {"stride", clampStride(s.history.stride)}};
     return j;
 }
 
@@ -273,10 +317,25 @@ Result<TemporalSettings> temporalFromJson(const nlohmann::json& j) {
     if (auto r = block("slit", [&](const nlohmann::json& e) {
             SlitSettings& sd = s.slit;
             if (const auto v = e.find("enabled"); v != e.end() && v->is_boolean()) sd.enabled = v->get<bool>();
-            if (const auto v = e.find("frames"); v != e.end() && v->is_number()) sd.frames = clampFrames(v->get<int>());
             number(e, "amount", sd.amount, 0.0f, 1.0f);
-            number(e, "mode", sd.mode, 0.0f, 3.0f);
+            number(e, "span", sd.span, 1.0f, kMaxSpan);
+            number(e, "mode", sd.mode, 0.0f, 2.0f);
+            number(e, "angle", sd.angle, -360.0f, 360.0f);
+            number(e, "strips", sd.strips, 0.0f, 512.0f);
+            number(e, "edge", sd.edge, 0.0f, 1.0f);
+            number(e, "blend", sd.blend, 0.0f, 1.0f);
+            number(e, "scan", sd.scan, -1.0f, 1.0f);
+            number(e, "scanSpeed", sd.scanSpeed, -4.0f, 4.0f);
             number(e, "reverse", sd.reverse, 0.0f, 1.0f);
+        });
+        !r) {
+        return std::unexpected(r.error());
+    }
+    if (auto r = block("history", [&](const nlohmann::json& e) { // ADR-1931
+            if (const auto v = e.find("capacity"); v != e.end() && v->is_number()) {
+                s.history.capacity = clampCapacity(v->get<int>());
+            }
+            if (const auto v = e.find("stride"); v != e.end() && v->is_number()) s.history.stride = clampStride(v->get<int>());
         });
         !r) {
         return std::unexpected(r.error());

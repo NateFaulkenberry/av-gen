@@ -174,6 +174,10 @@ private:
     // reference makes that a compile error rather than a code review.
     void capturePreview(const gpu::ReadbackRing::Frame& frame);
     [[nodiscard]] Result<void> renderOne();
+    // ADR-1932: the temporal history's pre-roll -- the frames before the range that the ring reads, rendered on the
+    // real renderer and discarded, so a render of a range draws its first frame with the history a play-through had.
+    [[nodiscard]] Result<std::uint32_t> temporalPreRoll();
+    [[nodiscard]] Result<void> renderDiscarded();
     // Hands completed readbacks to the encoders; `all` waits for every frame in flight first.
     [[nodiscard]] Result<void> drain(bool all);
     void handleFrame(gpu::ReadbackRing::Frame frame);

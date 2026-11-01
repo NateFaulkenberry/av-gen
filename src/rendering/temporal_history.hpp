@@ -61,9 +61,11 @@ enum class TemporalChannel : std::uint8_t {
 
 constexpr std::uint32_t kTemporalChannelCount = static_cast<std::uint32_t>(TemporalChannel::Count);
 
-// The hard ceiling the brief names (§8: 1-32 frames). It is also the ceiling on a seek warm-up,
-// because a warm-up re-renders exactly this many frames.
-constexpr std::uint32_t kMaxTemporalFrames = 32;
+// The ceiling on a ring's depth, in layers. ADR-410 set it at 32 (§8: 1-32 frames); ADR-1931 raised it to 256 for slit
+// scan, which needs seconds of history. It is no longer also the seek warm-up's length: a ring deeper than a warm-up
+// can refill settles as it plays, and says so (ADR-1931).
+constexpr std::uint32_t kMaxTemporalFrames = 256;
+constexpr std::uint32_t kMaxTemporalStride = 8; // ADR-1931
 
 [[nodiscard]] constexpr const char* temporalChannelName(TemporalChannel c) {
     switch (c) {
@@ -105,6 +107,8 @@ struct TemporalHistoryConfig {
     // Fraction of the scene resolution the ring is stored at. Driven by the quality tier beside
     // `aoResolutionScale` / `volumeResolutionScale`, which are the existing precedents.
     float resolutionScale = 0.5f;
+    // ADR-1931: capture every `stride`-th frame index (1..kMaxTemporalStride). Structural: a change drops the history.
+    std::uint32_t stride = 1;
 
     [[nodiscard]] bool anyEnabled() const;
     // The longest history any channel asks for: what a seek warm-up has to re-render.
@@ -148,7 +152,31 @@ public:
     // Frame bookkeeping. This is the half that determinism lives or dies on, and it is copied
     // deliberately from `AoRenderer::update` rather than reinvented -- see the .cpp for the two
     // cases and why they need opposite treatment.
-    void beginFrame(std::uint64_t frameIndex);
+    // ADR-1931: `captureFrame` is the frame's number on the TIMELINE (an offline render's `round(t * fps)`), which the
+    // stride is anchored to; `frameIndex` counts from wherever the render started and is what tells a repeat from a
+    // jump. They differ for a render of a range: its frame 0 is the timeline's frame 1800 at 60 s, and a stride keyed
+    // to the former would capture different frames from a full render of the same second.
+    void beginFrame(std::uint64_t frameIndex, double renderTime = 0.0);
+    void beginFrame(std::uint64_t frameIndex, double renderTime, std::uint64_t captureFrame);
+
+    // ADR-1931: whether this frame is one the ring captures (its timeline frame is a multiple of the stride).
+    [[nodiscard]] bool capturesThisFrame() const;
+    // Frames between this frame and the newest stored layer (1..stride once anything is stored, 0 before). Ages
+    // between 0 and this blend the current frame with the newest layer; beyond it, layer j is `newestAge + j*stride`
+    // frames back.
+    [[nodiscard]] std::uint32_t newestAge() const;
+    [[nodiscard]] std::uint32_t stride() const;
+    // ADR-1931: per-layer metadata, recorded at capture: the frame index and render time each layer holds (the layer
+    // index is the ring's own, not an age). For the sampler's stride-correct ages today, and for depth-aware and
+    // reprojecting readers later (CHRONOS brief §11).
+    struct LayerInfo {
+        std::uint64_t frameIndex = 0;
+        double renderTime = 0.0;
+        bool valid = false;
+    };
+    [[nodiscard]] LayerInfo layerInfo(std::uint32_t layer) const;
+    // Counts ring allocations, so a test can prove a span change did not reallocate (ADR-1931).
+    [[nodiscard]] std::uint64_t allocations() const;
 
     // Encodes the capture: one pass that downsamples the frame's signals into the write layer.
     // Views may be null for a channel whose depth is zero. Does nothing when disabled.

@@ -37,6 +37,11 @@ struct TemporalStats {
     std::uint32_t historyWidth = 0;
     std::uint32_t historyHeight = 0;
     double temporalMs = -1.0; // GPU time of the capture + effect passes (-1 = unavailable)
+    // ADR-1931: the ring's layout and its allocation count (a routed span must never move the count).
+    std::uint32_t historyLayers = 0;
+    std::uint32_t historyStride = 1;
+    std::uint32_t historyWriteLayer = 0;
+    std::uint64_t historyAllocations = 0;
 };
 
 struct TemporalFrameInputs {
@@ -46,6 +51,10 @@ struct TemporalFrameInputs {
     std::uint32_t height = 0;
     std::uint64_t frameIndex = 0;
     double renderTime = 0.0; // ADR-1049: the mosh's block choice is a function of the clock
+    // ADR-1931: the frame's number on the timeline, which the capture stride is anchored to (see
+    // `TemporalHistory::beginFrame`). Defaults to the frame index (the live path, which is not reproducible anyway).
+    std::uint64_t captureFrame = 0;
+    bool haveCaptureFrame = false;
     const scene::TemporalSettings* settings = nullptr;
     float resolutionScale = 0.5f; // from the quality tier
     wgpu::TextureFormat hdrFormat = wgpu::TextureFormat::RGBA16Float;

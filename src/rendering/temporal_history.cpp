@@ -33,8 +33,9 @@ struct Uniforms {
     std::array<float, 4> ring{};
     std::array<float, 4> params{};
     std::array<float, 4> extra{}; // ADR-1049: mirrors temporal.wgsl (the mosh's epoch); unused by the capture
+    std::array<float, 4> more{};  // ADR-1931: mirrors temporal.wgsl; unused by the capture
 };
-static_assert(sizeof(Uniforms) == 80);
+static_assert(sizeof(Uniforms) == 96);
 
 } // namespace
 
@@ -53,8 +54,10 @@ struct TemporalHistory::Impl {
         std::vector<wgpu::TextureView> layerViews;
         std::uint32_t frames = 0;
         std::uint32_t writeLayer = 0;
+        std::vector<LayerInfo> info; // ADR-1931: per layer
         [[nodiscard]] bool valid() const { return texture != nullptr; }
     };
+    std::uint64_t allocations = 0; // ADR-1931
 
     explicit Impl(gpu::Context& ctx, gpu::ShaderLibrary& sh) : context(ctx), shaders(sh) {}
 
@@ -106,6 +109,14 @@ struct TemporalHistory::Impl {
     std::uint32_t framesValidAtFrameStart = 0;
     std::array<std::uint32_t, kTemporalChannelCount> writeAtFrameStart{};
     std::uint32_t framesNeeded = 0;
+    // ADR-1931: the stride's bookkeeping. `lastCapture` is the frame index of the newest stored layer; snapshotted at
+    // frame start with the rest, so a repeated frame reads the same ages.
+    std::uint64_t captureFrame = 0; // this frame's number on the timeline
+    double renderTime = 0.0;
+    bool haveCapture = false;
+    std::uint64_t lastCapture = 0;
+    bool haveCaptureAtFrameStart = false;
+    std::uint64_t lastCaptureAtFrameStart = 0;
 
     [[nodiscard]] Result<void> ensureRing(Ring& ring, TemporalChannel channel, std::uint32_t frames,
                                           std::uint32_t w, std::uint32_t h);
@@ -172,6 +183,8 @@ Result<void> TemporalHistory::Impl::ensureRing(Ring& ring, TemporalChannel chann
     ring = Ring{};
     ring.texture = std::move(texture);
     ring.frames = frames;
+    ring.info.assign(frames, LayerInfo{});
+    ++allocations;
     {
         wgpu::TextureViewDescriptor view{};
         view.label = "temporal-ring-array";
@@ -320,6 +333,9 @@ Result<void> TemporalHistory::configure(std::uint32_t sceneWidth, std::uint32_t 
     }
     for (std::uint32_t i = 0; i < kTemporalChannelCount; ++i) {
         const std::uint32_t want = std::min(config.frames[i], kMaxTemporalFrames);
+        if (im.rings[i].valid() && im.rings[i].frames != want) {
+            im.rings[i] = Impl::Ring{}; // a different depth: the layers' ages no longer mean anything
+        }
         if (auto r = im.ensureRing(im.rings[i], static_cast<TemporalChannel>(i), want, w, h); !r) {
             // A failed allocation must not leave a half-built ring that an effect then samples.
             for (auto& ring : im.rings) ring = Impl::Ring{};
@@ -327,17 +343,21 @@ Result<void> TemporalHistory::configure(std::uint32_t sceneWidth, std::uint32_t 
             return r;
         }
     }
-    if (sizeChanged || im.config.maxFrames() != config.maxFrames()) {
-        // A resized or resized-depth ring holds nothing this frame can use.
+    const std::uint32_t stride = std::clamp(config.stride, 1u, kMaxTemporalStride);
+    if (sizeChanged || im.config.maxFrames() != config.maxFrames() || im.config.stride != stride) {
+        // A resized, re-depthed or re-strided ring holds nothing this frame can use.
         im.framesValid = 0;
         im.framesValidAtFrameStart = 0;
         im.haveLastFrame = false;
+        im.haveCapture = false;
+        im.haveCaptureAtFrameStart = false;
     }
     im.width = w;
     im.height = h;
     im.sceneWidth = sceneWidth;
     im.sceneHeight = sceneHeight;
     im.config = config;
+    im.config.stride = stride;
     im.config.frames = {};
     for (std::uint32_t i = 0; i < kTemporalChannelCount; ++i) {
         im.config.frames[i] = std::min(config.frames[i], kMaxTemporalFrames);
@@ -345,25 +365,36 @@ Result<void> TemporalHistory::configure(std::uint32_t sceneWidth, std::uint32_t 
     return {};
 }
 
-void TemporalHistory::beginFrame(std::uint64_t frameIndex) {
+void TemporalHistory::beginFrame(std::uint64_t frameIndex, double renderTime) {
+    beginFrame(frameIndex, renderTime, frameIndex);
+}
+
+void TemporalHistory::beginFrame(std::uint64_t frameIndex, double renderTime, std::uint64_t captureFrame) {
     Impl& im = *impl_;
     const bool repeat = im.haveLastFrame && frameIndex == im.lastFrameIndex;
     if (repeat) {
         // Restore what this frame index started with, so the second render of a frame reads
         // exactly what the first one read. See Impl's comment.
         im.framesValid = im.framesValidAtFrameStart;
+        im.haveCapture = im.haveCaptureAtFrameStart;
+        im.lastCapture = im.lastCaptureAtFrameStart;
         for (std::uint32_t i = 0; i < kTemporalChannelCount; ++i) {
             im.rings[i].writeLayer = im.writeAtFrameStart[i];
         }
     } else {
         if (im.haveLastFrame && frameIndex != im.lastFrameIndex + 1) {
             im.framesValid = 0;
+            im.haveCapture = false;
         }
         im.framesValidAtFrameStart = im.framesValid;
+        im.haveCaptureAtFrameStart = im.haveCapture;
+        im.lastCaptureAtFrameStart = im.lastCapture;
         for (std::uint32_t i = 0; i < kTemporalChannelCount; ++i) {
             im.writeAtFrameStart[i] = im.rings[i].writeLayer;
         }
     }
+    im.captureFrame = captureFrame;
+    im.renderTime = renderTime;
     im.lastFrameIndex = frameIndex;
     im.haveLastFrame = true;
 
@@ -385,6 +416,9 @@ void TemporalHistory::encodeCapture(wgpu::CommandEncoder& encoder, const wgpu::T
     auto& ring = im.rings[static_cast<std::uint32_t>(TemporalChannel::Colour)];
     if (!ring.valid() || ring.frames == 0) {
         return;
+    }
+    if (!capturesThisFrame()) {
+        return; // ADR-1931: a frame between strides stores nothing
     }
 
     Uniforms u{};
@@ -437,6 +471,9 @@ void TemporalHistory::encodeCapture(wgpu::CommandEncoder& encoder, const wgpu::T
     rp.Draw(3);
     rp.End();
 
+    ring.info[ring.writeLayer] = LayerInfo{im.captureFrame, im.renderTime, true};
+    im.haveCapture = true;
+    im.lastCapture = im.captureFrame;
     ring.writeLayer = (ring.writeLayer + 1) % ring.frames;
     if (im.framesValid < ring.frames) {
         ++im.framesValid;
@@ -452,8 +489,32 @@ void TemporalHistory::reset() {
     // way; the same three lines are the fix.
     im.framesValidAtFrameStart = 0;
     im.haveLastFrame = false;
+    im.haveCapture = false;
+    im.haveCaptureAtFrameStart = false;
     state_.framesValid = 0;
 }
+
+bool TemporalHistory::capturesThisFrame() const {
+    const Impl& im = *impl_;
+    return im.captureFrame % std::max(im.config.stride, 1u) == 0;
+}
+
+std::uint32_t TemporalHistory::newestAge() const {
+    const Impl& im = *impl_;
+    if (!im.haveCapture || im.framesValid == 0 || im.captureFrame < im.lastCapture) {
+        return 0;
+    }
+    return static_cast<std::uint32_t>(std::min<std::uint64_t>(im.captureFrame - im.lastCapture, kMaxTemporalStride));
+}
+
+std::uint32_t TemporalHistory::stride() const { return std::max(impl_->config.stride, 1u); }
+
+TemporalHistory::LayerInfo TemporalHistory::layerInfo(std::uint32_t layer) const {
+    const auto& ring = impl_->rings[static_cast<std::uint32_t>(TemporalChannel::Colour)];
+    return layer < ring.info.size() ? ring.info[layer] : LayerInfo{};
+}
+
+std::uint64_t TemporalHistory::allocations() const { return impl_->allocations; }
 
 void TemporalHistory::setFramesNeeded(std::uint32_t frames) {
     Impl& im = *impl_;

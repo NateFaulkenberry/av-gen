@@ -81,10 +81,11 @@ Report checkBounds(std::span<const DeclaredBound> bounds) {
                    "the accumulator ADR-410 forbids");
             continue;
         }
-        if (b.frames > static_cast<std::uint32_t>(kMaxTemporalFrames)) {
+        // ADR-1931: the bound is in frames; the ring holds kMaxTemporalFrames layers at up to kMaxTemporalStride.
+        if (b.frames > static_cast<std::uint32_t>(kMaxTemporalHistoryFrames)) {
             report(r, b.subject, "bounded-k",
                    std::format("declares {} frames, above the {}-frame ceiling the ring can hold", b.frames,
-                               kMaxTemporalFrames));
+                               kMaxTemporalHistoryFrames));
         }
     }
     return r;

@@ -5433,29 +5433,6 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     stats_.volume = volumes_->stats();
 
-    // ---- debug drawing (ADR-031): whatever the host queued this frame, over the lit scene ----
-    if (!debug_->empty()) {
-        debug_->upload();
-        wgpu::RenderPassColorAttachment colour{};
-        colour.view = hdr_.colorView();
-        colour.loadOp = wgpu::LoadOp::Load;
-        colour.storeOp = wgpu::StoreOp::Store;
-        wgpu::RenderPassDepthStencilAttachment depth{};
-        depth.view = hdr_.depthView();
-        depth.depthLoadOp = wgpu::LoadOp::Load;
-        depth.depthStoreOp = wgpu::StoreOp::Store;
-        wgpu::RenderPassDescriptor pass{};
-        pass.label = "debug-pass";
-        pass.colorAttachmentCount = 1;
-        pass.colorAttachments = &colour;
-        pass.depthStencilAttachment = &depth;
-        pass.timestampWrites = timeline_->mark("debug", gpu::FrameTimeline::PassKind::Render);
-        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
-        debug_->render(rp, frameBindGroup_, debugDepthTest_);
-        rp.End();
-        debug_->clear();
-    }
-
     // ---- DF: screen-space distortion (Effect Library Wave 1) ----
     // After the volume composite and the debug pass, so fog, media and god rays bend with the scene;
     // before post layers, temporal capture and the post chain, so bloom, DoF and grading see the bent
@@ -5531,6 +5508,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // comparing indices, and a float second cannot be compared for equality to do that.
         temporalIn.frameIndex = time.frameIndex;
         temporalIn.renderTime = time.renderTime;
+        // ADR-1931: the stride is anchored to the timeline's frame, known when the clock is fixed-step.
+        if (timelineFrameRate_ > 0.0) {
+            temporalIn.captureFrame = static_cast<std::uint64_t>(std::llround(std::max(time.renderTime, 0.0) * timelineFrameRate_));
+            temporalIn.haveCaptureFrame = true;
+        }
         temporalIn.settings = inheritedTemporal_ != nullptr ? inheritedTemporal_ : &scene.temporal;
         temporalIn.resolutionScale = qualitySettings_.temporalHistoryScale;
         temporalIn.hdrFormat = kHdrFormat;
@@ -5539,6 +5521,34 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
         stats_.temporal = temporal_->stats();
     }
+    // ---- debug drawing (ADR-031): whatever the host queued this frame, over the lit scene ----
+    //
+    // ADR-1931: AFTER the temporal stage, which captures the frame into its history. Drawn before it, as it was, the
+    // overlays (`--debug-draw` bounds, lights, paths) were written into the ring and smeared through every temporal
+    // effect for as long as the history reached. Drawn into whatever the temporal stage returned, with the scene's
+    // depth (the same size), so it still sits in the picture and is still graded by the post chain.
+    if (!debug_->empty()) {
+        debug_->upload();
+        wgpu::RenderPassColorAttachment colour{};
+        colour.view = finalHdr;
+        colour.loadOp = wgpu::LoadOp::Load;
+        colour.storeOp = wgpu::StoreOp::Store;
+        wgpu::RenderPassDepthStencilAttachment depth{};
+        depth.view = hdr_.depthView();
+        depth.depthLoadOp = wgpu::LoadOp::Load;
+        depth.depthStoreOp = wgpu::StoreOp::Store;
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "debug-pass";
+        pass.colorAttachmentCount = 1;
+        pass.colorAttachments = &colour;
+        pass.depthStencilAttachment = &depth;
+        pass.timestampWrites = timeline_->mark("debug", gpu::FrameTimeline::PassKind::Render);
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        debug_->render(rp, frameBindGroup_, debugDepthTest_);
+        rp.End();
+        debug_->clear();
+    }
+
 
     // ---- built-in post chain: DoF, motion blur, bloom, grading ----
     {

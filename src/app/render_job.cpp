@@ -205,6 +205,8 @@ Result<void> RenderJob::start() {
     // ADR-521: ADR-360's warm-up, on the renderer that actually produces the output. Clamped by
     // the renderer itself (kMaxWarmUpFrames); asking for more cannot buy anything.
     renderer_->setParticleWarmUpFrames(settings_.particleWarmUpFrames);
+    // ADR-1931: the temporal ring's stride is anchored to the timeline's frame, which a fixed-step render knows.
+    renderer_->setTimelineFrameRate(settings_.fps);
     // ADR-1812: material programs compiled before the frame that first needs them -- Blocking, so every frame of the
     // render is drawn compiled and the sequence stays a pure function of the timeline. AVGEN_RENDER_INTERPRETED=1 is
     // the measurement arm that keeps the interpreter (the picture before ADR-1812).
@@ -457,10 +459,20 @@ Result<void> RenderJob::start() {
         video_ = std::move(*writer);
     }
 
-    // Position the offline engine at the start of the range.
+    // Position the offline engine at the start of the range -- or, with a temporal history to fill, that many frames
+    // before it (ADR-1932): the pre-roll leaves the clock and the engine exactly where a plain start would, one frame
+    // short of the range, with the ring full.
     clock_ = std::make_unique<FixedStepClock>(settings_.fps);
-    clock_->restartAt(settings_.startSeconds);
-    engine_->seekSeconds(settings_.startSeconds);
+    {
+        auto preRolled = temporalPreRoll();
+        if (!preRolled) {
+            return std::unexpected(preRolled.error());
+        }
+        if (*preRolled == 0) {
+            clock_->restartAt(settings_.startSeconds);
+            engine_->seekSeconds(settings_.startSeconds);
+        }
+    }
 
     int threads = settings_.encoderThreads;
     if (threads <= 0) {
@@ -676,6 +688,64 @@ Result<void> RenderJob::writePostStages() {
     }
     log::info("render: wrote {} post stage(s) for frame {} to '{}'", capture.stages.size(), rendered_,
               settings_.postStages.string());
+    return {};
+}
+
+// ADR-1932. ADR-410 specified this pre-roll and it was never built: `render_job.cpp`'s only warm-up was the pipeline one
+// above, so a render of `--range 60:90` opened on an empty ring, and a slit scan or an echo started from nothing at
+// 60 s where a full render had seconds of history. The bound is the ring the settings at the range's start ask for
+// (layers x stride), clamped to the frames that exist before the start. The frames are rendered on the real renderer
+// -- history is what is being filled -- and nothing is read back or written.
+Result<std::uint32_t> RenderJob::temporalPreRoll() {
+    // AVGEN_NO_TEMPORAL_PREROLL=1 is the measurement arm: the render before ADR-1932 (as AVGEN_NO_WARMUP is for the
+    // pipeline warm-up). It exists so the test can show the pre-roll is what makes a range agree.
+    if (settings_.startSeconds <= 0.0 || std::getenv("AVGEN_NO_TEMPORAL_PREROLL") != nullptr) {
+        return 0u;
+    }
+    // The settings at the range's start: one engine update there (seek first, so it is the seeked state, as the real
+    // first frame will see it).
+    {
+        FixedStepClock probe(settings_.fps);
+        probe.restartAt(settings_.startSeconds);
+        engine_->seekSeconds(settings_.startSeconds);
+        const FrameTime t = engine_->tick(probe);
+        engine_->setViewport(settings_.width, settings_.height);
+        engine_->update(t);
+    }
+    const scene::TemporalSettings& temporal = engine_->scene().temporal;
+    const std::uint64_t wanted = static_cast<std::uint64_t>(temporal.ringLayers()) * temporal.captureStride();
+    const auto before = static_cast<std::uint64_t>(std::floor(settings_.startSeconds * settings_.fps + 1.0e-6));
+    const auto frames = static_cast<std::uint32_t>(std::min(wanted, before));
+    if (frames == 0) {
+        return 0u;
+    }
+    const double preStart = settings_.startSeconds - static_cast<double>(frames) / settings_.fps;
+    clock_->restartAt(preStart);
+    engine_->seekSeconds(preStart);
+    for (std::uint32_t i = 0; i < frames; ++i) {
+        if (auto r = renderDiscarded(); !r) {
+            return std::unexpected(r.error());
+        }
+    }
+    log::info("render: temporal pre-roll -- {} frame(s) from {:.3f}s, so the history at {:.3f}s is a play-through's",
+              frames, preStart, settings_.startSeconds);
+    return frames;
+}
+
+Result<void> RenderJob::renderDiscarded() {
+    const FrameTime time = engine_->tick(*clock_);
+    engine_->setViewport(settings_.width, settings_.height);
+    engine_->update(time);
+    const rendering::ShaderFrameInputs shaderInputs{&engine_->shaderLayers(),
+                                                    engine_->hasFrame() ? &engine_->latestFrame() : nullptr,
+                                                    engine_->barPhase()};
+    wgpu::CommandEncoder encoder = context_.device().CreateCommandEncoder();
+    const gpu::TargetView target{ldrView_, wgpu::TextureFormat::RGBA8Unorm, settings_.width, settings_.height};
+    if (auto r = renderer_->render(encoder, engine_->scene(), time, target, &shaderInputs); !r) {
+        return r;
+    }
+    wgpu::CommandBuffer commands = encoder.Finish();
+    context_.queue().Submit(1, &commands);
     return {};
 }
 

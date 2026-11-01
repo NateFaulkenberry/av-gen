@@ -56,7 +56,7 @@ TEST_CASE("the bounded-k check fails for an effect that cannot state a bound", "
     }
 
     SECTION("a depth above the ring's ceiling is the same defect arriving the other way") {
-        const std::vector<conf::DeclaredBound> bounds{{"greedy", true, kMaxTemporalFrames + 1}};
+        const std::vector<conf::DeclaredBound> bounds{{"greedy", true, kMaxTemporalHistoryFrames + 1}}; // ADR-1931: frames
         const auto r = conf::checkBounds(bounds);
         CHECK_FALSE(r.clean());
         INFO(r.summary());
@@ -106,7 +106,65 @@ TEST_CASE("every temporal kind declares a bound that the ring can hold", "[tempo
     CHECK(conf::declaredBounds(s).front().frames == 3u);
     // ...and an authored value beyond the ceiling is clamped, not honoured.
     s.echo.frames = 9999;
-    CHECK(conf::declaredBounds(s).front().frames == static_cast<std::uint32_t>(kMaxTemporalFrames));
+    CHECK(conf::declaredBounds(s).front().frames == static_cast<std::uint32_t>(kMaxTemporalTaps)); // ADR-1931
+}
+
+TEST_CASE("the ring's depth is a fixed capacity when set, so a routed span cannot resize it", "[temporal][adr1931]") {
+    TemporalSettings s;
+    CHECK(s.ringLayers() == 0u); // nothing on: no ring
+    s.slit.enabled = true;
+    s.slit.span = 40.0f;
+    CHECK(s.historyFrames() == 40u);
+    CHECK(s.ringLayers() == 40u); // auto: sized from the bound
+    s.history.stride = 4;
+    CHECK(s.captureStride() == 4u);
+    CHECK(s.ringLayers() == 10u); // 40 frames at every 4th
+    s.history.capacity = 128;
+    CHECK(s.ringLayers() == 128u);
+    s.slit.span = 7.5f;           // a route moving the span...
+    CHECK(s.ringLayers() == 128u); // ...leaves the ring alone
+    CHECK(s.historyFrames() == 8u); // the bound rounds up
+    // the ceilings
+    s.history.capacity = 100000;
+    s.history.stride = 99;
+    const auto j = temporalToJson(s);
+    const auto back = temporalFromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->history.capacity == kMaxTemporalFrames);
+    CHECK(back->history.stride == kMaxTemporalStride);
+    s.slit.span = 1.0e9f;
+    const auto clamped = temporalFromJson(temporalToJson(s));
+    REQUIRE(clamped.has_value());
+    CHECK(clamped->slit.span == static_cast<float>(kMaxTemporalHistoryFrames));
+    CHECK(clamped->historyFrames() == static_cast<std::uint32_t>(kMaxTemporalHistoryFrames));
+    CHECK(conf::checkTemporal(*clamped).clean());
+}
+
+TEST_CASE("the sampler's and the ring's parameters register, apply and round-trip", "[temporal][params][adr1931]") {
+    TemporalSettings s;
+    params::ParameterSet params;
+    const auto p = registerTemporalParameters(params, s);
+    for (const char* path : {"temporal/slit/span", "temporal/slit/angle", "temporal/slit/strips", "temporal/slit/edge",
+                             "temporal/slit/blend", "temporal/slit/scan", "temporal/slit/scanSpeed",
+                             "temporal/history/capacity", "temporal/history/stride"}) {
+        INFO(path);
+        CHECK(conf::registered(params, path));
+    }
+    p.slitSpan->setBase(96.4f);
+    p.slitStrips->setBase(24.0f);
+    p.historyCapacity->setBase(127.6f);
+    p.historyStride->setBase(2.4f);
+    params.resetFinals();
+    applyTemporalParameters(p, s);
+    CHECK(s.slit.span == 96.4f);
+    CHECK(s.slit.strips == 24.0f);
+    CHECK(s.history.capacity == 128);
+    CHECK(s.history.stride == 2);
+    const auto back = temporalFromJson(temporalToJson(s));
+    REQUIRE(back.has_value());
+    CHECK(back->slit.span == 96.4f);
+    CHECK(back->history.capacity == 128);
+    CHECK(back->history.stride == 2);
 }
 
 TEST_CASE("historyFrames is the max over live effects and zero when none is on", "[temporal]") {
@@ -195,7 +253,7 @@ TEST_CASE("temporal settings survive a save, a load, and a second save", "[tempo
         j["echo"]["strength"] = 5.0;
         const auto back = temporalFromJson(j);
         REQUIRE(back.has_value());
-        CHECK(back->echo.frames == kMaxTemporalFrames);
+        CHECK(back->echo.frames == kMaxTemporalTaps); // ADR-1931
         CHECK_THAT(back->echo.strength, Catch::Matchers::WithinAbs(1.0, 1e-5));
     }
 

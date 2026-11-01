@@ -42,10 +42,18 @@ enum class TemporalEffectKind : std::uint8_t {
 
 constexpr std::uint32_t kTemporalEffectKindCount = static_cast<std::uint32_t>(TemporalEffectKind::Count);
 
-// The authored ceiling on a history length (§8: 1-32 frames). Kept here as well as in
-// `rendering::kMaxTemporalFrames` because `scene/` must not include a WebGPU header;
-// `temporal_effects.cpp` static_asserts the two equal.
-constexpr int kMaxTemporalFrames = 32;
+// The ceiling on the ring's depth in LAYERS. ADR-1931 raised it from ADR-410's 32 to 256 for slit scan, which needs
+// seconds of history rather than a second. Kept here as well as in `rendering::kMaxTemporalFrames` because `scene/`
+// must not include a WebGPU header; `temporal_effects.cpp` static_asserts the two equal.
+constexpr int kMaxTemporalFrames = 256;
+// ADR-1931: the per-pixel TAP ceiling of the effects that loop over the ring (echo, mosh, feedback). Their cost is one
+// fetch per tap, so the old 32 stays their limit; only the slit's span, which costs two fetches whatever its length,
+// reaches deeper.
+constexpr int kMaxTemporalTaps = 32;
+// ADR-1931: capture every `stride`-th frame (1..8), so 256 layers can span up to 2,048 frames.
+constexpr int kMaxTemporalStride = 8;
+// The longest history any effect may declare, in frames: every layer, at the widest stride.
+constexpr int kMaxTemporalHistoryFrames = kMaxTemporalFrames * kMaxTemporalStride;
 
 inline constexpr std::array<TemporalEffectKind, kTemporalEffectKindCount> kTemporalEffectKinds{
     TemporalEffectKind::FrameEcho,
@@ -116,15 +124,36 @@ struct FeedbackSettings {
     float hue = 0.0f;        // turns per frame, OKLab
 };
 
-// ADR-1066: slit-scan time displacement. Each pixel shows the frame `d(uv) x frames` ago, blended between the two
-// nearest layers: mode 0 rows (top newest), 1 columns (left newest), 2 radial (centre newest), 3 luminance (bright
-// newest). `reverse` flips which end is newest. FIR over the ring.
+// ADR-1066 / ADR-1931: slit scan as a time map. Each pixel shows the moment `q(d(uv)) x span` frames ago, where d runs
+// 0..1 across the frame and q optionally quantises it into `strips`:
+//   mode 0: along a direction, `angle` degrees (0: age grows left to right, so the left edge is now -- a vertical slit
+//           scan; 90: it grows top to bottom -- a horizontal one; anything between is directional);
+//   mode 1: radial (centre now); mode 2: luminance (bright now).
+// `scan` offsets d and `scanSpeed` moves it (cycles per second), wrapping, so the seam between now and the oldest
+// moment travels through the picture: the moving slit. `edge` softens strip boundaries; `blend` 1 cross-fades between
+// neighbouring stored frames and 0 takes the nearest (crisper strips, visible steps). FIR over the clean ring: the
+// span is in frames and costs two fetches per pixel whatever its length.
 struct SlitSettings {
     bool enabled = false;
-    int frames = 16;
     float amount = 0.0f;     // 0..1: mix (0 encodes nothing)
-    float mode = 0.0f;       // 0 rows, 1 columns, 2 radial, 3 luminance
-    float reverse = 0.0f;    // 1 flips the gradient
+    float span = 16.0f;      // frames back at the far end of the map (the declared bound is ceil(span))
+    float mode = 0.0f;       // 0 direction, 1 radial, 2 luminance
+    float angle = 0.0f;      // degrees, mode 0
+    float strips = 0.0f;     // 0 continuous, else the number of strips
+    float edge = 0.0f;       // 0 hard strip edges .. 1 fully soft
+    float blend = 1.0f;      // 0 nearest stored frame .. 1 linear between the two nearest
+    float scan = 0.0f;       // 0..1 offset of the map
+    float scanSpeed = 0.0f;  // cycles per second
+    float reverse = 0.0f;    // 1 flips which end is now
+};
+
+// ADR-1931: the ring itself. `capacity` 0 sizes it from the live effects' bounds (ADR-410's behaviour, reallocating when
+// a bound changes); above 0 it is that many layers, fixed, so the effects' spans can be routed every frame without the
+// ring ever being reallocated -- which drops the history at exactly the musical moment. Structural: changing capacity
+// or stride resets the history. Not a tier setting (ADR-410's rule for history lengths): the tier scales resolution.
+struct TemporalHistorySettings {
+    int capacity = 0; // layers, 0 = auto, else 1..kMaxTemporalFrames
+    int stride = 1;   // capture every stride-th frame (anchored to the frame index), 1..kMaxTemporalStride
 };
 
 struct TemporalSettings {
@@ -132,12 +161,18 @@ struct TemporalSettings {
     MoshSettings mosh;
     FeedbackSettings feedback; // ADR-1066
     SlitSettings slit;         // ADR-1066
+    TemporalHistorySettings history; // ADR-1931
 
     // The bound. `max` over the live effects, zero when none is on -- and zero means the ring is
     // released, because holding history for a feature nobody has enabled is exactly what §8 says
     // not to do.
     [[nodiscard]] std::uint32_t historyFrames() const;
     [[nodiscard]] bool anyEnabled() const;
+    // ADR-1931: how many layers the ring holds for these settings (0 when no effect is on): `history.capacity` when set,
+    // otherwise enough layers at `stride` for `historyFrames()`. The tier's cap is applied by the renderer.
+    [[nodiscard]] std::uint32_t ringLayers() const;
+    // The stride, clamped.
+    [[nodiscard]] std::uint32_t captureStride() const;
 };
 
 // Per-kind bound, for the conformance check and for the panel's own reporting. Exhaustive switch,
@@ -190,10 +225,18 @@ struct TemporalParameters {
     params::Parameter<float>* feedbackDriftY = nullptr;
     params::Parameter<float>* feedbackHue = nullptr;
     params::Parameter<bool>* slitEnabled = nullptr;
-    params::Parameter<float>* slitFrames = nullptr;
     params::Parameter<float>* slitAmount = nullptr;
+    params::Parameter<float>* slitSpan = nullptr; // ADR-1931
     params::Parameter<float>* slitMode = nullptr;
+    params::Parameter<float>* slitAngle = nullptr;
+    params::Parameter<float>* slitStrips = nullptr;
+    params::Parameter<float>* slitEdge = nullptr;
+    params::Parameter<float>* slitBlend = nullptr;
+    params::Parameter<float>* slitScan = nullptr;
+    params::Parameter<float>* slitScanSpeed = nullptr;
     params::Parameter<float>* slitReverse = nullptr;
+    params::Parameter<float>* historyCapacity = nullptr; // ADR-1931
+    params::Parameter<float>* historyStride = nullptr;
 };
 
 [[nodiscard]] TemporalParameters registerTemporalParameters(params::ParameterSet& params,

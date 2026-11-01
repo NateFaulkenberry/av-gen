@@ -26,7 +26,10 @@ struct TemporalUniforms {
     // w = channel shift px
     params: vec4<f32>,
     // mosh (ADR-1049): x = the epoch (floor(time * rate) + seed), yzw = 0
+    // sample (ADR-1931): x, y = the map's direction, z = the scan offset (wrapped), w = mode
     extra: vec4<f32>,
+    // sample (ADR-1931): x = stride, y = blend between stored frames, z = reverse, w = scanning
+    more: vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> temporal: TemporalUniforms;
@@ -308,49 +311,94 @@ fn fs_feedback(in: FsIn) -> @location(0) vec4<f32> {
     return vec4<f32>(current.rgb + tail * amount, current.a);
 }
 
-// ---- ADR-1066 slit-scan time displacement ------------------------------------------------------------------------
+// ---- ADR-1931: the sampler -- slit scan as a time map over the clean ring ------------------------------------------
 //
-// Each pixel shows the frame d(uv) x taps ago, blended between the two nearest (0 is the current frame): rows,
-// columns, radial or luminance, newest at the top / left / centre / brightest unless reversed.
-//   params: amount, mode (0..3), reverse, 0
+// Each pixel shows the moment `age(uv)` frames ago. The age comes from the slit map:
+//   d(uv) in 0..1: mode 0 along the direction (extra.xy), normalised so the frame spans exactly 0..1 at any angle;
+//                  mode 1 radial (centre 0); mode 2 luminance (bright 0);
+//   the scan offset (extra.z) wraps d when scanning (more.w), so the seam between now and the oldest moment travels;
+//   reverse (more.z) flips it;
+//   strips (params.z) quantise it, with soft edges over params.w of each strip;
+//   age = q * span (params.y).
+// The ring is addressed by age: ages up to `newestAge` (ring.w) blend the current frame into the newest stored layer;
+// beyond that, layer j (0 = newest) is `newestAge + j * stride` frames back. `blend` (more.y) is linear between the two
+// nearest stored frames at 1 and the nearest at 0. Ages past what is stored clamp to the oldest valid layer, so a
+// settling ring shows a shorter span, never a pre-seek frame.
+//   ring: depth, write layer, frames valid (layers), newest age    params: amount, span, strips, edge
 
-@fragment
-fn fs_slit(in: FsIn) -> @location(0) vec4<f32> {
-    let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
-    let taps = i32(temporal.ring.w + 0.5);
-    if (taps <= 0) {
-        return current;
-    }
-    let depth = i32(temporal.ring.x + 0.5);
-    let writeLayer = i32(temporal.ring.y + 0.5);
-    let mode = i32(temporal.params.y + 0.5);
-    var d = in.uv.y;
-    if (mode == 1) {
-        d = in.uv.x;
-    } else if (mode == 2) {
-        d = clamp(length(in.uv - vec2<f32>(0.5)) * 1.41421356, 0.0, 1.0);
-    } else if (mode == 3) {
-        let l = dot(current.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-        d = 1.0 - l / (1.0 + l);
-    }
-    if (temporal.params.z > 0.5) {
-        d = 1.0 - d;
-    }
-    let age = d * f32(taps);
-    let k0 = min(i32(floor(age)), taps);
-    let k1 = min(k0 + 1, taps);
-    let f = clamp(age - f32(k0), 0.0, 1.0);
-    let a = slitTap(in.uv, k0, writeLayer, depth, current.rgb);
-    let b = slitTap(in.uv, k1, writeLayer, depth, current.rgb);
-    let displaced = mix(a, b, f);
-    return vec4<f32>(mix(current.rgb, displaced, clamp(temporal.params.x, 0.0, 1.0)), current.a);
+fn sampleLayer(uv: vec2<f32>, j: i32, writeLayer: i32, depth: i32) -> vec3<f32> {
+    let layer = ((writeLayer - 1 - j) % depth + depth) % depth;
+    return textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;
 }
 
-// Frame k back (0 = the current frame).
-fn slitTap(uv: vec2<f32>, k: i32, writeLayer: i32, depth: i32, current: vec3<f32>) -> vec3<f32> {
-    if (k <= 0) {
+fn sampleAge(uv: vec2<f32>, age: f32, current: vec3<f32>) -> vec3<f32> {
+    let depth = max(i32(temporal.ring.x + 0.5), 1);
+    let writeLayer = i32(temporal.ring.y + 0.5);
+    let valid = i32(temporal.ring.z + 0.5);
+    let newest = max(temporal.ring.w, 1.0);
+    let stride = max(temporal.more.x, 1.0);
+    let blend = clamp(temporal.more.y, 0.0, 1.0);
+    if (valid <= 0 || age <= 0.0) {
         return current;
     }
-    let layer = ((writeLayer - k) % depth + depth) % depth;
-    return textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;
+    if (age < newest) {
+        var f = age / newest;
+        f = mix(step(0.5, f), f, blend);
+        return mix(current, sampleLayer(uv, 0, writeLayer, depth), f);
+    }
+    let j = (age - newest) / stride;
+    let last = valid - 1;
+    let j0 = min(i32(floor(j)), last);
+    let j1 = min(j0 + 1, last);
+    var f = clamp(j - floor(j), 0.0, 1.0);
+    if (j0 == j1) {
+        f = 0.0;
+    }
+    f = mix(step(0.5, f), f, blend);
+    let a = sampleLayer(uv, j0, writeLayer, depth);
+    if (f <= 0.0) {
+        return a;
+    }
+    return mix(a, sampleLayer(uv, j1, writeLayer, depth), f);
+}
+
+@fragment
+fn fs_sample(in: FsIn) -> @location(0) vec4<f32> {
+    let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let mode = i32(temporal.extra.w + 0.5);
+    var d = 0.0;
+    if (mode == 1) {
+        d = clamp(length(in.uv - vec2<f32>(0.5)) * 1.41421356, 0.0, 1.0);
+    } else if (mode == 2) {
+        let l = dot(current.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+        d = 1.0 - l / (1.0 + l);
+    } else {
+        // Along the direction, normalised by its support over the unit square so the frame spans 0..1 at any angle.
+        let dir = temporal.extra.xy;
+        let support = max(abs(dir.x) + abs(dir.y), 1.0e-4);
+        d = clamp(dot(in.uv - vec2<f32>(0.5), dir) / support + 0.5, 0.0, 1.0);
+    }
+    if (temporal.more.w > 0.5) {
+        d = fract(d + temporal.extra.z);
+    }
+    if (temporal.more.z > 0.5) {
+        d = 1.0 - d;
+    }
+    let strips = temporal.params.z;
+    var q = d;
+    if (strips >= 1.0) {
+        // Strip i of N shows age i / (N - 1) of the span; `edge` ramps into the next over the end of the strip.
+        let x = d * strips;
+        let i = min(floor(x), strips - 1.0);
+        let f = x - i;
+        let w = clamp(temporal.params.w, 0.0, 1.0);
+        var t = 0.0;
+        if (w > 0.0) {
+            t = smoothstep(1.0 - w, 1.0, f);
+        }
+        q = min(i + t, strips - 1.0) / max(strips - 1.0, 1.0);
+    }
+    let age = q * temporal.params.y;
+    let displaced = sampleAge(in.uv, age, current.rgb);
+    return vec4<f32>(mix(current.rgb, displaced, clamp(temporal.params.x, 0.0, 1.0)), current.a);
 }

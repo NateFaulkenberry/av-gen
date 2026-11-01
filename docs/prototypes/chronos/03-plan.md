@@ -9,7 +9,9 @@ The recon is `02-recon.md`. This document covers:
 - the music;
 - what the owner needs to decide.
 
-ADR range 1930-1969.
+ADR range 1930-1969. As landed (Gate 1): 1930 the mesher extraction (done first, at the owner's request), 1931 the
+ring and the sampler, 1932 the render pre-roll, 1933 the canyon. Gate 2 starts at 1934, so the numbers in §4 below
+shift by one.
 
 ## 1. The architecture
 

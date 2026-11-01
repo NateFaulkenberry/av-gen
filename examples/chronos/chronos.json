@@ -1,0 +1,96 @@
+{
+ "format": "avgen-project",
+ "version": 4,
+ "app": {
+  "name": "CHRONOS"
+ },
+ "assets": {
+  "scene": {
+   "kind": "composition",
+   "path": "chronos.scene.json"
+  },
+  "audio": "../../assets/audio/feline-footwear.wav",
+  "stems": [
+   {
+    "key": "drums",
+    "label": "Drums",
+    "role": "drums",
+    "file": "../../assets/audio/stems/feline-footwear (Drums).wav"
+   },
+   {
+    "key": "bass",
+    "label": "Bass",
+    "role": "bass",
+    "file": "../../assets/audio/stems/feline-footwear (Bass).wav"
+   },
+   {
+    "key": "synth",
+    "label": "Synth",
+    "role": "synth",
+    "file": "../../assets/audio/stems/feline-footwear (Synth).wav"
+   }
+  ]
+ },
+ "feeds": {
+  "beat": "stem.drums"
+ },
+ "parameters": {
+  "camera/lookAhead": 60.0,
+  "camera/splineBank": 14.0
+ },
+ "sources": [],
+ "routes": [],
+ "timeline": {
+  "enabled": true,
+  "cues": [],
+  "tracks": [
+   {
+    "target": "camera/splineT",
+    "component": -1,
+    "enabled": true,
+    "timeBase": "seconds",
+    "mode": "replace",
+    "loopLength": 0.0,
+    "keys": [
+     {
+      "time": 0.0,
+      "value": 0.0,
+      "interp": "smooth"
+     },
+     {
+      "time": 20.1,
+      "value": 0.105,
+      "interp": "smooth"
+     },
+     {
+      "time": 47.85,
+      "value": 0.24,
+      "interp": "smooth"
+     },
+     {
+      "time": 101.4,
+      "value": 0.5,
+      "interp": "smooth"
+     },
+     {
+      "time": 166.9,
+      "value": 0.81,
+      "interp": "smooth"
+     },
+     {
+      "time": 210.5,
+      "value": 1.0,
+      "interp": "smooth"
+     }
+    ]
+   }
+  ]
+ },
+ "render": {
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "output": "video",
+  "path": "renders/chronos.mp4"
+ }
+}
