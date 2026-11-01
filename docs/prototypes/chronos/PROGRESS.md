@@ -6,8 +6,8 @@
 >
 > | Gate | Phases | State |
 > |---|---|---|
-> | D0 | references, recon, plan, look-dev | **done, awaiting the owner** (`12-devourer-recon-plan.md`, media in `devourer-d0/`) |
-> | D1 | Phase 1, the creature (Test A) | not started |
+> | D0 | references, recon, plan, look-dev | **approved** (main at ab41c924 holds the temporal engine and the canyon removal); downloads shortlist `13-devourer-downloads.md` |
+> | D1 | Phase 1, the creature (Test A) | **done, awaiting the owner** (`14-devourer-d1.md`, media in `devourer-d1/`): the scan route (Blay, CC BY) chosen over MPFB |
 > | D2 | Phases 2-3, the procession and one consumption (Tests B, C) | not started |
 > | D3 | Phases 4-6, many souls, background, drums, polish, profile (Tests D, E, F) | not started |
 >
