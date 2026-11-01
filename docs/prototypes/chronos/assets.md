@@ -16,6 +16,7 @@ records on 2026-11-01. Only the models used are listed here.
 | File | Model | Author | Licence | Used for |
 |---|---|---|---|---|
 | `blay-old-man/old_man_head._miquel_blay.glb` | Old man head. Miquel Blay (https://sketchfab.com/3d-models/old-man-head-miquel-blay-8fe5023517b74eddb564130cbf2e4869) | albert_sierra | CC BY 4.0 | **the creature's base** (the scan route): cut, rigged, pushed past human and repainted by `examples/chronos/devourer/build_scan_creature.py` |
+| `rodin-wissant/1917.722_heroic_head_of_pierre_de_wissant.glb` | 1917.722 Heroic Head of Pierre de Wissant (Rodin) (https://sketchfab.com/3d-models/1917722-heroic-head-of-pierre-de-wissant-6af79e37f2bd4ee0b6c16342b2b06bad) | clevelandart (Cleveland Museum of Art) | CC0 1.0 | **the skin relief (D1b)**: its modelled clay surface is ray-sampled into a high-passed relief and baked into the creature's normal map by `build_scan_creature.py`; no Rodin geometry ships |
 
 Attribution, to carry wherever the work is shown:
 - This work is based on "Old man head. Miquel Blay" (https://sketchfab.com/3d-models/old-man-head-miquel-blay-8fe5023517b74eddb564130cbf2e4869) by albert_sierra, licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/).
@@ -26,7 +27,7 @@ Attribution, to carry wherever the work is shown:
 |---|---|---|---|
 | `devourer-d0-look-*.png` (creature look-dev stills) | `examples/chronos/devourer/lookdev_creature.py` | MPFB + the CC0 assets above | CC0-derived |
 | `assets/chronos/build/chronos-creature.glb` (the MPFB-route creature, D1) | `examples/chronos/devourer/build_creature.py` | MPFB + CC0 assets | CC0-derived |
-| `assets/chronos/build/chronos-scan.glb` (the scan-route creature, D1) | `examples/chronos/devourer/build_scan_creature.py` | the Blay scan (CC BY 4.0) | CC BY 4.0 (attribution above) |
+| `assets/chronos/build/chronos-scan.glb` (the scan-route creature, D1, D1b) | `examples/chronos/devourer/build_scan_creature.py` | the Blay scan (CC BY 4.0), with the Rodin relief (CC0) from D1b | CC BY 4.0 (attribution above) |
 
 ## Reference images
 

@@ -7,7 +7,8 @@
 > | Gate | Phases | State |
 > |---|---|---|
 > | D0 | references, recon, plan, look-dev | **approved** (main at ab41c924 holds the temporal engine and the canyon removal); downloads shortlist `13-devourer-downloads.md` |
-> | D1 | Phase 1, the creature (Test A) | **done, awaiting the owner** (`14-devourer-d1.md`, media in `devourer-d1/`): the scan route (Blay, CC BY) chosen over MPFB |
+> | D1 | Phase 1, the creature (Test A) | **reviewed**: owner chose one more sculpt pass toward inhuman, three-quarter first (`14-devourer-d1.md`, media in `devourer-d1/`) |
+> | D1b | the sculpt pass: eyes, teeth and mouth, Rodin skin, proportions | **done, awaiting the owner** (`15-devourer-d1b.md`, media in `devourer-d1b/`); Rodin Wissant (CC0) logged in `assets.md` |
 > | D2 | Phases 2-3, the procession and one consumption (Tests B, C) | not started |
 > | D3 | Phases 4-6, many souls, background, drums, polish, profile (Tests D, E, F) | not started |
 >

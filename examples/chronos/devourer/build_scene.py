@@ -55,6 +55,9 @@ def scene():
             {"id": "key", "name": "key", "type": "directional", "role": "key", "direction": [0.78, -0.45, -0.43],
              "color": [1.0, 0.66, 0.36], "intensity": 5.0, "castsShadow": True},
             spot("under", (6.0, 2.0, 42.0), (0.0, 26.0, 0.0), [0.9, 0.1, 0.04], 450.0, 14.0, 32.0, False, "fill"),
+            # the eyes, selectively lit (brief 2.2: "selectively illuminated anatomical features"): a narrow warm spot
+            # with no shadow, so the sunk eyes catch light out of the brow's shadow instead of reading as holes
+            spot("eyes", (-14.0, 41.0, 58.0), (-1.0, 34.0, 4.0), [1.0, 0.78, 0.55], 2600.0, 4.0, 9.0, False, "fill"),
             {"id": "rim", "name": "rim", "type": "directional", "role": "rim", "direction": [-0.55, -0.25, 0.8],
              "color": [0.62, 0.12, 0.2], "intensity": 1.5, "castsShadow": False},
         ],

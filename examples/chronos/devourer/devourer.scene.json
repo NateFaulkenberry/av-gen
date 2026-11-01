@@ -93,6 +93,33 @@
    "volumetric": 0.0
   },
   {
+   "id": "eyes",
+   "name": "eyes",
+   "type": "spot",
+   "role": "fill",
+   "position": [
+    -14.0,
+    41.0,
+    58.0
+   ],
+   "direction": [
+    0.2322,
+    -0.125,
+    -0.9646
+   ],
+   "color": [
+    1.0,
+    0.78,
+    0.55
+   ],
+   "intensity": 2600.0,
+   "range": 400.0,
+   "innerCone": 4.0,
+   "outerCone": 9.0,
+   "castsShadow": false,
+   "volumetric": 0.0
+  },
+  {
    "id": "rim",
    "name": "rim",
    "type": "directional",
