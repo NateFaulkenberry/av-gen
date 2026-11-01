@@ -11,6 +11,10 @@
 > | D2 | Phases 2-3, the procession and one consumption (Tests B, C) | not started |
 > | D3 | Phases 4-6, many souls, background, drums, polish, profile (Tests D, E, F) | not started |
 >
+> Suites on the post-removal head (3d964413, clean worktree): GPU 737 passed, 1 skipped (738/738); cpu-assets 4611
+> passed, 29 skipped, 1 expected failure (4641/4641). Both exit 0. The D0 commit after it is docs and a Blender script
+> only; the repo-hygiene tests pass on it.
+>
 > The canyon-era history follows.
 
 Branch `scene/chronos` in `../av-gen-chronos`, from main 214dafd8. ADRs 1930-1969 (used: 1930-1933; next 1934).
