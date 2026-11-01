@@ -1,5 +1,18 @@
 # CHRONOS: progress
 
+> **Art direction pivot (owner, 2026-11-01): "The Devourer of Souls"** (`10-devourer-brief.md`,
+> `11-devourer-coordinator-notes.md`). The temporal canyon is dropped and its code removed (c83ed2c1, ADR-1933
+> superseded). The temporal engine (ADR-1931, 1932, the debug-capture fix) and the shared mesher (ADR-1930) stay.
+>
+> | Gate | Phases | State |
+> |---|---|---|
+> | D0 | references, recon, plan, look-dev | **done, awaiting the owner** (`12-devourer-recon-plan.md`, media in `devourer-d0/`) |
+> | D1 | Phase 1, the creature (Test A) | not started |
+> | D2 | Phases 2-3, the procession and one consumption (Tests B, C) | not started |
+> | D3 | Phases 4-6, many souls, background, drums, polish, profile (Tests D, E, F) | not started |
+>
+> The canyon-era history follows.
+
 Branch `scene/chronos` in `../av-gen-chronos`, from main 214dafd8. ADRs 1930-1969 (used: 1930-1933; next 1934).
 Review media: `~/Desktop/av-gen-review/104-chronos/gate<N>/`.
 
