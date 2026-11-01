@@ -32,7 +32,7 @@ def material(name, color, rough, emit=None, strength=0.0):
 
 bark = material("log_bark", (0.075, 0.05, 0.035), 0.9)
 char = material("log_char", (0.02, 0.018, 0.016), 0.95, (1.0, 0.25, 0.05), 0.25)
-stone = material("stone", (0.23, 0.2, 0.18), 0.85)
+stones = [material("stone_a", (0.045, 0.038, 0.034), 0.9), material("stone_b", (0.066, 0.052, 0.044), 0.85), material("stone_c", (0.034, 0.031, 0.03), 0.92)]
 embers = material("ember_bed", (0.05, 0.03, 0.02), 0.9, (1.0, 0.3, 0.05), 1.8)
 
 
@@ -78,7 +78,7 @@ for i in range(14):
     R = 0.72 + random.uniform(-0.04, 0.04)
     st.location = (math.cos(a) * R, math.sin(a) * R, s * 0.35)
     st.rotation_euler = (random.uniform(-0.3, 0.3), random.uniform(-0.3, 0.3), a)
-    st.data.materials.append(stone)
+    st.data.materials.append(stones[i % 3])
 
 # the ember bed: a low noisy disc of glowing coals
 bpy.ops.mesh.primitive_circle_add(vertices=40, radius=0.5, fill_type="TRIFAN")

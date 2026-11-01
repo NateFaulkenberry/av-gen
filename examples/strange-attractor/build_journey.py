@@ -78,7 +78,8 @@ A = "../../assets/strange-attractor/build/"
 toward_cam = [(canyon(13.0, 10.0)[i] - CAMP[i]) for i in (0, 1)]
 n_ = math.hypot(*toward_cam)
 away = [-toward_cam[0] / n_, -toward_cam[1] / n_]
-for k, (name, ang, dist) in enumerate((("sasquatch-a", -62.0, 2.3), ("sasquatch-b", 4.0, 2.6), ("sasquatch-c", 66.0, 2.2))):
+# M2 (coordinator): none directly behind the fire from the camera -- they stand either side of it and one to the right
+for k, (name, ang, dist) in enumerate((("sasquatch-a", -52.0, 2.3), ("sasquatch-b", 22.0, 2.6), ("sasquatch-c", 64.0, 2.3))):
     a = math.radians(ang)
     ux, uz = away[0] * math.cos(a) - away[1] * math.sin(a), away[0] * math.sin(a) + away[1] * math.cos(a)
     x, z = CAMP[0] + dist * ux, CAMP[1] + dist * uz
@@ -95,18 +96,18 @@ nodes += [
     # flames: tongues rising out of the teepee, licking up and thinning, in two layers (a hot core, a softer outer)
     {"name": "campfire-flames", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 2400, "seed": 31, "shape": "sphere", "position": [fire[0], fire[1] + 0.15, fire[2]],
-        "extent": [0.28, 0.08, 0.28], "direction": [0, 1, 0], "spawnRate": 520.0, "lifetimeMin": 0.3, "lifetimeMax": 0.75,
-        "spread": 0.12, "speedMin": 1.2, "speedMax": 2.4, "gravity": [0.0, 2.2, 0], "drag": 0.8, "turbulence": 1.1,
-        "turbulenceScale": 0.45, "sizeStart": 0.32, "sizeEnd": 0.04, "sizeVariance": 0.45,
-        "colorStart": [1.0, 0.55, 0.15, 0.6], "colorEnd": [0.9, 0.12, 0.0, 0.0], "emissive": 4.5, "blend": "additive",
-        "velocityStretch": 0.6, "stretchMax": 1.2}},
+        "extent": [0.3, 0.06, 0.3], "direction": [0, 1, 0], "spawnRate": 300.0, "lifetimeMin": 0.35, "lifetimeMax": 0.8,
+        "spread": 0.1, "speedMin": 1.3, "speedMax": 2.6, "gravity": [0.0, 2.4, 0], "drag": 0.9, "turbulence": 1.3,
+        "turbulenceScale": 0.5, "sizeStart": 0.2, "sizeEnd": 0.03, "sizeVariance": 0.5,
+        "colorStart": [1.0, 0.36, 0.06, 0.55], "colorEnd": [0.7, 0.06, 0.0, 0.0], "emissive": 2.4, "blend": "additive",
+        "velocityStretch": 1.1, "stretchMax": 2.0}},
     {"name": "campfire-core", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 900, "seed": 33, "shape": "sphere", "position": [fire[0], fire[1] + 0.1, fire[2]],
-        "extent": [0.18, 0.05, 0.18], "direction": [0, 1, 0], "spawnRate": 300.0, "lifetimeMin": 0.2, "lifetimeMax": 0.45,
-        "spread": 0.1, "speedMin": 0.8, "speedMax": 1.6, "gravity": [0.0, 1.8, 0], "drag": 0.8, "turbulence": 0.8,
-        "turbulenceScale": 0.35, "sizeStart": 0.2, "sizeEnd": 0.05, "sizeVariance": 0.3,
-        "colorStart": [1.0, 0.8, 0.45, 0.8], "colorEnd": [1.0, 0.4, 0.05, 0.0], "emissive": 7.0, "blend": "additive",
-        "velocityStretch": 0.3, "stretchMax": 0.6}},
+        "extent": [0.16, 0.04, 0.16], "direction": [0, 1, 0], "spawnRate": 160.0, "lifetimeMin": 0.2, "lifetimeMax": 0.45,
+        "spread": 0.08, "speedMin": 0.9, "speedMax": 1.7, "gravity": [0.0, 2.0, 0], "drag": 0.8, "turbulence": 0.9,
+        "turbulenceScale": 0.35, "sizeStart": 0.14, "sizeEnd": 0.03, "sizeVariance": 0.3,
+        "colorStart": [1.0, 0.72, 0.28, 0.7], "colorEnd": [1.0, 0.3, 0.03, 0.0], "emissive": 3.0, "blend": "additive",
+        "velocityStretch": 0.8, "stretchMax": 1.4}},
     {"name": "campfire-embers", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 600, "seed": 37, "shape": "sphere", "position": [fire[0], fire[1] + 0.3, fire[2]],
         "extent": [0.25, 0.1, 0.25], "direction": [0, 1, 0], "spawnRate": 45.0, "lifetimeMin": 1.5, "lifetimeMax": 3.5,
@@ -117,8 +118,8 @@ nodes += [
         "enabled": True, "capacity": 700, "seed": 41, "shape": "sphere", "position": [fire[0], fire[1] + 1.1, fire[2]],
         "extent": [0.25, 0.15, 0.25], "direction": [0, 1, 0], "spawnRate": 24.0, "lifetimeMin": 5.0, "lifetimeMax": 8.0,
         "spread": 0.2, "speedMin": 0.5, "speedMax": 0.9, "gravity": [0.25, 0.3, 0.08], "drag": 0.6, "turbulence": 0.5,
-        "turbulenceScale": 0.3, "sizeStart": 0.4, "sizeEnd": 2.6, "colorStart": [0.22, 0.19, 0.24, 0.16],
-        "colorEnd": [0.10, 0.09, 0.13, 0.0], "emissive": 0.0, "blend": "alpha"}},
+        "turbulenceScale": 0.3, "sizeStart": 0.4, "sizeEnd": 2.6, "colorStart": [0.5, 0.46, 0.48, 0.035],
+        "colorEnd": [0.3, 0.28, 0.32, 0.0], "emissive": 0.0, "blend": "alpha"}},
 ]
 scene["nodes"] = nodes
 
@@ -133,13 +134,49 @@ dusk = {
     "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.55, 0.38, 0.62],
     "lights/floor-bounce/intensity": 0.25, "lights/dusk-sky/intensity": 0.6, "lights/dusk-bounce/intensity": 0.3,
     "lights/campfire/intensity": 30.0,
-    # M1b: the contour lines quieter at dusk, so the encounter owns the frame (ADR-1894)
-    "attractorWorld/contourGain": 0.25,
+    # the contour lines off at dusk and night (M1b quieted them, M2 removes them: the encounter owns the frame; ADR-1894)
+    "attractorWorld/contourGain": 0.0,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
     "nodes/campfire-logs/visible": True, "nodes/campfire-flames/visible": True, "nodes/campfire-core/visible": True,
     "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
 }
-scene["looks"] = [{"name": "dusk", "from": 1, "params": dusk}]
+# home from the Moon (crossing 2): still dusk, and the second portal's corruption tuned to the outer cliff -- a small
+# field that gathers only once the camera has left the fire and climbs toward the cliff, a larger opening
+dusk_portal = dict(dusk)
+dusk_portal.update({
+    "corruption/radius": 36.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 95.0, "corruption/openNear": 10.0,
+    "corruption/openFar": 55.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
+    "corruption/echoOffset": 0.35,
+})
+# night (crossing 3: the canyon behind the pyramid portal and home): dark, a cold moon, the fire down to embers
+night = {
+    "attractorWorld/sunAzimuth": 60.0, "attractorWorld/sunElevation": 38.0, "attractorWorld/sunIntensity": 0.025,
+    "attractorWorld/contourGain": 0.0,
+    "env/intensity": 0.02,
+    "env/sky/zenithColor": [0.003, 0.005, 0.02], "env/sky/horizonColor": [0.02, 0.028, 0.07],
+    "env/sky/groundColor": [0.003, 0.003, 0.01], "env/sky/haze": 0.1, "env/sky/sunColor": [0.62, 0.72, 1.0],
+    "env/sky/sunIntensity": 0.6, "env/sky/sunSize": 0.03, "env/sky/sunGlow": 0.2,
+    "scene/fogColor": [0.008, 0.01, 0.03],
+    "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.35, 0.42, 0.7],
+    "lights/floor-bounce/intensity": 0.03, "lights/dusk-sky/intensity": 0.06, "lights/dusk-bounce/intensity": 0.0,
+    "lights/campfire/intensity": 5.0, "lights/campfire/color": [1.0, 0.36, 0.1],
+    "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
+    "nodes/campfire-logs/visible": True, "nodes/campfire-flames/visible": False, "nodes/campfire-core/visible": False,
+    "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
+}
+scene["looks"] = [{"name": "dusk", "from": 1, "params": dusk}, {"name": "dusk-portal", "from": 2, "params": dusk_portal},
+                  {"name": "night", "from": 3, "params": night}]
+
+# --- the second leg (ADR-1895): the outer cliff behind the camp opens onto Mars (build_mars.py)
+import build_mars  # noqa: E402
+_, mars_flight = build_mars.write()
+cliff = canyon(-8.0, 91.8)
+into = [canyon(0.0, 1.0)[i] - canyon(0.0, 0.0)[i] for i in (0, 1)]
+n_into = math.hypot(*into)
+scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
+                     "exitAxis": build_mars.EXIT_AXIS, "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0],
+                     "entry": [cliff[0], 95.0, cliff[1]], "entryAxis": [into[0] / n_into, 0.0, into[1] / n_into],
+                     "flight": mars_flight}]
 json.dump(scene, open(PATH, "w"), indent=2)
 
 # --- the project: the Earth answers the music (a first pass for the owner to tune): the bass lifts its glow

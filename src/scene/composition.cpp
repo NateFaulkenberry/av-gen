@@ -65,7 +65,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal", "looks"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal", "portals", "looks"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -1281,14 +1281,27 @@ void Composition::updateCorruption() {
     } else {
         live = corruption_;
     }
+    // ADR-1895: a later leg opens at its own site
+    if (portal_.hasEntry) {
+        live.focus = portal_.entry;
+        live.axis = portal_.entryAxis;
+    }
     // Gate C: over a generated ground (lunarWorld) the focus's y is a height above that ground, as a portal's exit is
     if (lunar_.world) live.focus.y += lunar_.world->sample(live.focus.x, live.focus.z);
-    const float distance = glm::distance(scene_.camera.position, live.focus);
+    // ADR-1895: the camera this world's journey is on (on a later leg the root's camera is only placed on the return
+    // path at the end of the frame)
+    glm::vec3 eye = scene_.camera.position;
+    if (legs_.size() > 1 && activeLeg_ > 0) {
+        if (const auto pose = ownCameraAt(currentTime_)) eye = pose->eye;
+    }
+    const float distance = glm::distance(eye, live.focus);
     live.liveAmount = corruptionFieldScale(live, distance);
     live.liveOpen = corruptionOpening(live, distance);
     // ADR-1885: once the camera has crossed this world's portal it is done (the world may be seen again later,
     // through another portal or on a return, without it)
-    if (portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) {
+    // (ADR-1895: the active leg's portal; after every leg is home there is none)
+    if ((portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) ||
+        (legs_.size() > 1 && legForTime(currentTime_) >= static_cast<int>(legs_.size()))) {
         live.liveAmount = 0.0f;
         live.liveOpen = 0.0f;
     }
@@ -5340,12 +5353,18 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     installEntities();
     // ADR-1879: a portal's destination world, under its own prefix
     linkPortalRoot(); // ADR-1885
-    if (portalWorld_) {
+    {
         // under the destination file's last word ("strange-attractor-moon" -> "moon/")
-        std::string stem = std::filesystem::path(portal_.world).filename().string();
-        stem = stem.substr(0, stem.find('.'));
-        if (const auto dash = stem.rfind('-'); dash != std::string::npos) stem = stem.substr(dash + 1);
-        portalWorld_->attach(params, modulator, prefix_ + (stem.empty() ? std::string("portal") : stem) + "/");
+        const auto attachWorld = [&](const PortalBlock& block, Composition& world) {
+            std::string stem = std::filesystem::path(block.world).filename().string();
+            stem = stem.substr(0, stem.find('.'));
+            if (const auto dash = stem.rfind('-'); dash != std::string::npos) stem = stem.substr(dash + 1);
+            world.attach(params, modulator, prefix_ + (stem.empty() ? std::string("portal") : stem) + "/");
+        };
+        if (portalWorld_) attachWorld(portal_, *portalWorld_);
+        for (std::size_t k = 0; k < legs_.size(); ++k) { // ADR-1895: the legs not active (the active one is above)
+            if (static_cast<int>(k) != activeLeg_ && legs_[k].world) attachWorld(legs_[k].portal, *legs_[k].world);
+        }
     }
 
     registeredPaths_.clear();
@@ -8159,8 +8178,19 @@ void Composition::rebuild() {
                 lo = glm::min(lo, v.position);
                 hi = glm::max(hi, v.position);
             }
-            const glm::vec3 localFocus = glm::vec3(glm::inverse(e.transform.matrix()) * glm::vec4(corruption_.focus, 1.0f));
-            if (glm::distance(glm::clamp(localFocus, lo, hi), localFocus) > corruption_.radius) {
+            // ADR-1895: near any of this world's portal sites (a later leg opens at its own)
+            std::vector<glm::vec3> sites{corruption_.focus};
+            if (portal_.hasEntry) sites.push_back(portal_.entry);
+            for (const LegState& l : legs_) {
+                if (l.portal.hasEntry) sites.push_back(l.portal.entry);
+            }
+            const glm::mat4 toLocal = glm::inverse(e.transform.matrix());
+            bool near = false;
+            for (const glm::vec3& site : sites) {
+                const glm::vec3 localFocus = glm::vec3(toLocal * glm::vec4(site, 1.0f));
+                near = near || glm::distance(glm::clamp(localFocus, lo, hi), localFocus) <= corruption_.radius;
+            }
+            if (!near) {
                 continue;
             }
             // the torn rock shows its underside: a target in the field is drawn from both sides (its back faces shade
@@ -8321,18 +8351,31 @@ void Composition::update(const FrameTime& time) {
     // against the camera; the destination world updates after this one's camera is final
     applyCameraOverride();
     cullEntityNodes();
+    if (legs_.size() > 1) activateLeg(std::min(legForTime(currentTime_), static_cast<int>(legs_.size()) - 1)); // ADR-1895
     updateCorruption();
     updatePortal(time);
     // ADR-1885: on the root, once the journey has returned here, the camera is the return's path (and before that,
     // while another world is the frame, the path carried back through the return portal: the view that portal shows)
-    if (returnFrom_ != nullptr && portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) {
-        if (const auto pose = returnFrom_->portalCameraAt(currentTime_)) {
+    // ADR-1895: over several legs, the latest one crossed whose world returns here
+    if (!legs_.empty() && legCrossing(0) < 1e28 && currentTime_ >= legCrossing(0) && legReturns(0)) {
+        if (const auto pose = ownCameraAt(currentTime_)) {
             scene_.camera.position = pose->eye;
             scene_.camera.target = pose->target;
             scene_.camera.up = pose->up;
             cullEntityNodes();
         }
-        if (returnFrom_->portalCrossing_ < 1e28 && currentTime_ >= returnFrom_->portalCrossing_) scene_.portal = {};
+        if (legForTime(currentTime_) >= static_cast<int>(legs_.size())) scene_.portal = {}; // every leg is home
+    }
+    // ADR-1895: the leg the camera is on, now that this frame may have found a crossing; run the frame again on it
+    if (legs_.size() > 1 && !legRetry_) {
+        const int k = std::min(legForTime(currentTime_), static_cast<int>(legs_.size()) - 1);
+        if (k != activeLeg_) {
+            legRetry_ = true;
+            activateLeg(k);
+            update(time);
+            legRetry_ = false;
+            return;
+        }
     }
     // a first frame decides its look before the crossings are known: decide again now, and run the frame again once
     if (!looks_.empty() && !lookRetry_) {
@@ -9409,7 +9452,7 @@ void Composition::applyParameters() {
     }
     // ADR-1885: the scan belongs to this world's portal; once the camera has crossed it, it is done (the world may be
     // seen again later, through another portal or on a return, without it)
-    if (portalCrossing_ < 1e28 && currentTime_ >= portalCrossing_) scene_.meshWire.targets.clear();
+    if (!legs_.empty() && legCrossing(0) < 1e28 && currentTime_ >= legCrossing(0)) scene_.meshWire.targets.clear();
 
     // ADR-358: the authored lights' own parameters, into the scene copies `rebuild` made.
     //
@@ -11634,23 +11677,37 @@ nlohmann::json Composition::toJson() const {
     if (lunar_.enabled) {
         j["lunarWorld"] = lunarWorldToJson(lunar_); // ADR-1882
     }
-    if (!portal_.world.empty()) { // ADR-1879
-        nlohmann::json flight = nlohmann::json::array();
-        for (const glm::vec4& w : portal_.flight) flight.push_back({w.x, w.y, w.z, w.w});
-        j["portal"] = {{"world", portal_.world},
-                       {"exit", {portal_.exit.x, portal_.exit.y, portal_.exit.z}},
-                       {"exitYaw", portal_.exitYaw},
-                       {"flight", flight}};
-        if (portal_.join.z > 0.0f) j["portal"]["join"] = {portal_.join.x, portal_.join.y, portal_.join.z};
-        if (!portal_.aims.empty()) {
-            nlohmann::json aims = nlohmann::json::array();
-            for (const auto& a : portal_.aims) aims.push_back({a[0], a[1], a[2], a[3], a[4]});
-            j["portal"]["aims"] = aims;
-        }
-        if (glm::length(portal_.exitAxis) > 1e-6f) {
-            j["portal"]["exitAxis"] = {portal_.exitAxis.x, portal_.exitAxis.y, portal_.exitAxis.z};
-            j["portal"]["entryUp"] = {portal_.entryUp.x, portal_.entryUp.y, portal_.entryUp.z};
-            j["portal"]["exitUp"] = {portal_.exitUp.x, portal_.exitUp.y, portal_.exitUp.z};
+    {
+        // ADR-1879; ADR-1895: leg 0 as "portal", the later legs as "portals" (whichever leg is active now)
+        const auto portalJson = [](const PortalBlock& b) {
+            nlohmann::json flight = nlohmann::json::array();
+            for (const glm::vec4& w : b.flight) flight.push_back({w.x, w.y, w.z, w.w});
+            nlohmann::json pj = {{"world", b.world}, {"exit", {b.exit.x, b.exit.y, b.exit.z}}, {"exitYaw", b.exitYaw}, {"flight", flight}};
+            if (b.join.z > 0.0f) pj["join"] = {b.join.x, b.join.y, b.join.z};
+            if (!b.aims.empty()) {
+                nlohmann::json aims = nlohmann::json::array();
+                for (const auto& a : b.aims) aims.push_back({a[0], a[1], a[2], a[3], a[4]});
+                pj["aims"] = aims;
+            }
+            if (glm::length(b.exitAxis) > 1e-6f) {
+                pj["exitAxis"] = {b.exitAxis.x, b.exitAxis.y, b.exitAxis.z};
+                pj["entryUp"] = {b.entryUp.x, b.entryUp.y, b.entryUp.z};
+                pj["exitUp"] = {b.exitUp.x, b.exitUp.y, b.exitUp.z};
+            }
+            if (b.hasEntry) {
+                pj["entry"] = {b.entry.x, b.entry.y, b.entry.z};
+                pj["entryAxis"] = {b.entryAxis.x, b.entryAxis.y, b.entryAxis.z};
+            }
+            return pj;
+        };
+        const auto blockOf = [&](int k) -> const PortalBlock& {
+            return k == activeLeg_ ? portal_ : legs_[static_cast<std::size_t>(k)].portal;
+        };
+        if (!legs_.empty() && !blockOf(0).world.empty()) j["portal"] = portalJson(blockOf(0));
+        if (legs_.size() > 1) {
+            nlohmann::json more = nlohmann::json::array();
+            for (int k = 1; k < static_cast<int>(legs_.size()); ++k) more.push_back(portalJson(blockOf(k)));
+            j["portals"] = more;
         }
     }
     if (attractorWorld_.enabled) {
@@ -12609,9 +12666,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         }
         comp->setLunarWorld(std::move(*l));
     }
-    if (j.contains("portal")) { // ADR-1879
-        const json& pj = j.at("portal");
-        PortalBlock pb;
+    // ADR-1879; ADR-1895: "portal" is the journey's first leg, "portals" the further legs (in order)
+    const auto parsePortal = [&](const json& pj, PortalBlock& pb) -> Result<void> {
         try {
             pb.world = pj.at("world").get<std::string>();
             const json& e = pj.at("exit");
@@ -12637,30 +12693,59 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             vec3At("entryUp", pb.entryUp);
             vec3At("exitUp", pb.exitUp);
+            if (pj.contains("entry")) { // ADR-1895
+                pb.hasEntry = true;
+                vec3At("entry", pb.entry);
+                vec3At("entryAxis", pb.entryAxis);
+            }
             if (pj.contains("join")) {
                 const json& jn = pj.at("join");
                 pb.join = glm::vec3(jn.at(0).get<float>(), jn.at(1).get<float>(), jn.at(2).get<float>());
             }
             for (auto it = pj.begin(); it != pj.end(); ++it) {
                 if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join" &&
-                    it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp" && it.key() != "aims") {
+                    it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp" && it.key() != "aims" &&
+                    it.key() != "entry" && it.key() != "entryAxis") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }
         } catch (const json::exception& e) {
             return fail("scene file '{}': portal: {}", scenePath.string(), e.what());
         }
-        const std::filesystem::path base = !scenePath.empty() ? scenePath.parent_path() : std::filesystem::path(".");
+        return {};
+    };
+    const std::filesystem::path portalBase = !scenePath.empty() ? scenePath.parent_path() : std::filesystem::path(".");
+    if (j.contains("portal")) { // ADR-1879
+        PortalBlock pb;
+        if (auto r = parsePortal(j.at("portal"), pb); !r) return std::unexpected(r.error());
         if (pb.world == "@root") { // ADR-1885: back to the journey's root, linked at attach
             comp->setPortalToRoot(std::move(pb));
         } else {
-        auto world = Composition::loadFile(base / pb.world, registry, depth + 1);
-        if (!world) {
-            return fail("scene file '{}': portal world '{}': {}", scenePath.string(), pb.world, world.error().message);
+            auto world = Composition::loadFile(portalBase / pb.world, registry, depth + 1);
+            if (!world) {
+                return fail("scene file '{}': portal world '{}': {}", scenePath.string(), pb.world, world.error().message);
+            }
+            if (auto r = comp->setPortal(std::move(pb), std::move(*world)); !r) {
+                return fail("scene file '{}': {}", scenePath.string(), r.error().message);
+            }
         }
-        if (auto r = comp->setPortal(std::move(pb), std::move(*world)); !r) {
-            return fail("scene file '{}': {}", scenePath.string(), r.error().message);
+    }
+    if (j.contains("portals")) { // ADR-1895
+        if (!j.contains("portal") || !j.at("portals").is_array()) {
+            return fail("scene file '{}': 'portals' (the later legs) needs a 'portal' (the first) and must be a list",
+                        scenePath.string());
         }
+        for (const json& pj : j.at("portals")) {
+            PortalBlock pb;
+            if (auto r = parsePortal(pj, pb); !r) return std::unexpected(r.error());
+            if (pb.world == "@root") return fail("scene file '{}': a later leg cannot lead to '@root'", scenePath.string());
+            auto world = Composition::loadFile(portalBase / pb.world, registry, depth + 1);
+            if (!world) {
+                return fail("scene file '{}': portal world '{}': {}", scenePath.string(), pb.world, world.error().message);
+            }
+            if (auto r = comp->addPortalLeg(std::move(pb), std::move(*world)); !r) {
+                return fail("scene file '{}': {}", scenePath.string(), r.error().message);
+            }
         }
     }
     if (j.contains("looks")) { // ADR-1886

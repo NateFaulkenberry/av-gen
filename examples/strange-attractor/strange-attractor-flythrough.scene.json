@@ -1242,13 +1242,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-a.glb",
       "position": [
-        73.3368643299011,
+        73.71645404021875,
         1.7600000000000002,
-        1347.519143841202
+        1347.3901259162776
       ],
       "rotation": [
         0,
-        23.772272388592494,
+        13.77227238859237,
         0
       ],
       "scale": [
@@ -1268,13 +1268,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-b.glb",
       "position": [
-        76.01140543699823,
+        76.52081522660542,
         1.7600000000000002,
-        1347.6987534602686
+        1348.3329597090094
       ],
       "rotation": [
         0,
-        -42.227727611407964,
+        -60.227727611408866,
         0
       ],
       "scale": [
@@ -1294,13 +1294,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-c.glb",
       "position": [
-        76.39651835012975,
+        76.51182107694088,
         1.7600000000000002,
-        1350.164708319115
+        1350.1111348951376
       ],
       "rotation": [
         0,
-        -104.22772761140914,
+        -102.2277276114094,
         0
       ],
       "scale": [
@@ -1351,48 +1351,48 @@
           1349.6240000000003
         ],
         "extent": [
-          0.28,
-          0.08,
-          0.28
+          0.3,
+          0.06,
+          0.3
         ],
         "direction": [
           0,
           1,
           0
         ],
-        "spawnRate": 520.0,
-        "lifetimeMin": 0.3,
-        "lifetimeMax": 0.75,
-        "spread": 0.12,
-        "speedMin": 1.2,
-        "speedMax": 2.4,
+        "spawnRate": 300.0,
+        "lifetimeMin": 0.35,
+        "lifetimeMax": 0.8,
+        "spread": 0.1,
+        "speedMin": 1.3,
+        "speedMax": 2.6,
         "gravity": [
           0.0,
-          2.2,
+          2.4,
           0
         ],
-        "drag": 0.8,
-        "turbulence": 1.1,
-        "turbulenceScale": 0.45,
-        "sizeStart": 0.32,
-        "sizeEnd": 0.04,
-        "sizeVariance": 0.45,
+        "drag": 0.9,
+        "turbulence": 1.3,
+        "turbulenceScale": 0.5,
+        "sizeStart": 0.2,
+        "sizeEnd": 0.03,
+        "sizeVariance": 0.5,
         "colorStart": [
           1.0,
-          0.55,
-          0.15,
-          0.6
+          0.36,
+          0.06,
+          0.55
         ],
         "colorEnd": [
-          0.9,
-          0.12,
+          0.7,
+          0.06,
           0.0,
           0.0
         ],
-        "emissive": 4.5,
+        "emissive": 2.4,
         "blend": "additive",
-        "velocityStretch": 0.6,
-        "stretchMax": 1.2
+        "velocityStretch": 1.1,
+        "stretchMax": 2.0
       }
     },
     {
@@ -1410,48 +1410,48 @@
           1349.6240000000003
         ],
         "extent": [
-          0.18,
-          0.05,
-          0.18
+          0.16,
+          0.04,
+          0.16
         ],
         "direction": [
           0,
           1,
           0
         ],
-        "spawnRate": 300.0,
+        "spawnRate": 160.0,
         "lifetimeMin": 0.2,
         "lifetimeMax": 0.45,
-        "spread": 0.1,
-        "speedMin": 0.8,
-        "speedMax": 1.6,
+        "spread": 0.08,
+        "speedMin": 0.9,
+        "speedMax": 1.7,
         "gravity": [
           0.0,
-          1.8,
+          2.0,
           0
         ],
         "drag": 0.8,
-        "turbulence": 0.8,
+        "turbulence": 0.9,
         "turbulenceScale": 0.35,
-        "sizeStart": 0.2,
-        "sizeEnd": 0.05,
+        "sizeStart": 0.14,
+        "sizeEnd": 0.03,
         "sizeVariance": 0.3,
         "colorStart": [
           1.0,
-          0.8,
-          0.45,
-          0.8
+          0.72,
+          0.28,
+          0.7
         ],
         "colorEnd": [
           1.0,
-          0.4,
-          0.05,
+          0.3,
+          0.03,
           0.0
         ],
-        "emissive": 7.0,
+        "emissive": 3.0,
         "blend": "additive",
-        "velocityStretch": 0.3,
-        "stretchMax": 0.6
+        "velocityStretch": 0.8,
+        "stretchMax": 1.4
       }
     },
     {
@@ -1551,15 +1551,15 @@
         "sizeStart": 0.4,
         "sizeEnd": 2.6,
         "colorStart": [
-          0.22,
-          0.19,
-          0.24,
-          0.16
+          0.5,
+          0.46,
+          0.48,
+          0.035
         ],
         "colorEnd": [
-          0.1,
-          0.09,
-          0.13,
+          0.3,
+          0.28,
+          0.32,
           0.0
         ],
         "emissive": 0.0,
@@ -1614,7 +1614,7 @@
         "lights/dusk-sky/intensity": 0.6,
         "lights/dusk-bounce/intensity": 0.3,
         "lights/campfire/intensity": 30.0,
-        "attractorWorld/contourGain": 0.25,
+        "attractorWorld/contourGain": 0.0,
         "nodes/sasquatch-a/visible": true,
         "nodes/sasquatch-b/visible": true,
         "nodes/sasquatch-c/visible": true,
@@ -1624,6 +1624,233 @@
         "nodes/campfire-embers/visible": true,
         "nodes/campfire-smoke/visible": true
       }
+    },
+    {
+      "name": "dusk-portal",
+      "from": 2,
+      "params": {
+        "attractorWorld/sunAzimuth": -130.0,
+        "attractorWorld/sunElevation": 8.0,
+        "env/intensity": 0.13,
+        "env/sky/zenithColor": [
+          0.022,
+          0.02,
+          0.115
+        ],
+        "env/sky/horizonColor": [
+          0.36,
+          0.22,
+          0.46
+        ],
+        "env/sky/groundColor": [
+          0.012,
+          0.01,
+          0.045
+        ],
+        "env/sky/haze": 0.18,
+        "env/sky/sunColor": [
+          1.0,
+          0.52,
+          0.26
+        ],
+        "env/sky/sunIntensity": 7.0,
+        "env/sky/sunSize": 0.05,
+        "env/sky/sunGlow": 0.55,
+        "scene/fogColor": [
+          0.1,
+          0.075,
+          0.22
+        ],
+        "lights/canyon-bounce/intensity": 0.0,
+        "lights/floor-bounce/color": [
+          0.55,
+          0.38,
+          0.62
+        ],
+        "lights/floor-bounce/intensity": 0.25,
+        "lights/dusk-sky/intensity": 0.6,
+        "lights/dusk-bounce/intensity": 0.3,
+        "lights/campfire/intensity": 30.0,
+        "attractorWorld/contourGain": 0.0,
+        "nodes/sasquatch-a/visible": true,
+        "nodes/sasquatch-b/visible": true,
+        "nodes/sasquatch-c/visible": true,
+        "nodes/campfire-logs/visible": true,
+        "nodes/campfire-flames/visible": true,
+        "nodes/campfire-core/visible": true,
+        "nodes/campfire-embers/visible": true,
+        "nodes/campfire-smoke/visible": true,
+        "corruption/radius": 36.0,
+        "corruption/fieldNear": 12.0,
+        "corruption/fieldFar": 95.0,
+        "corruption/openNear": 10.0,
+        "corruption/openFar": 55.0,
+        "corruption/width": 15.0,
+        "corruption/height": 13.0,
+        "corruption/depth": 6.0,
+        "corruption/echoOffset": 0.35
+      }
+    },
+    {
+      "name": "night",
+      "from": 3,
+      "params": {
+        "attractorWorld/sunAzimuth": 60.0,
+        "attractorWorld/sunElevation": 38.0,
+        "attractorWorld/sunIntensity": 0.025,
+        "attractorWorld/contourGain": 0.0,
+        "env/intensity": 0.02,
+        "env/sky/zenithColor": [
+          0.003,
+          0.005,
+          0.02
+        ],
+        "env/sky/horizonColor": [
+          0.02,
+          0.028,
+          0.07
+        ],
+        "env/sky/groundColor": [
+          0.003,
+          0.003,
+          0.01
+        ],
+        "env/sky/haze": 0.1,
+        "env/sky/sunColor": [
+          0.62,
+          0.72,
+          1.0
+        ],
+        "env/sky/sunIntensity": 0.6,
+        "env/sky/sunSize": 0.03,
+        "env/sky/sunGlow": 0.2,
+        "scene/fogColor": [
+          0.008,
+          0.01,
+          0.03
+        ],
+        "lights/canyon-bounce/intensity": 0.0,
+        "lights/floor-bounce/color": [
+          0.35,
+          0.42,
+          0.7
+        ],
+        "lights/floor-bounce/intensity": 0.03,
+        "lights/dusk-sky/intensity": 0.06,
+        "lights/dusk-bounce/intensity": 0.0,
+        "lights/campfire/intensity": 5.0,
+        "lights/campfire/color": [
+          1.0,
+          0.36,
+          0.1
+        ],
+        "nodes/sasquatch-a/visible": true,
+        "nodes/sasquatch-b/visible": true,
+        "nodes/sasquatch-c/visible": true,
+        "nodes/campfire-logs/visible": true,
+        "nodes/campfire-flames/visible": false,
+        "nodes/campfire-core/visible": false,
+        "nodes/campfire-embers/visible": true,
+        "nodes/campfire-smoke/visible": true
+      }
+    }
+  ],
+  "portals": [
+    {
+      "world": "strange-attractor-mars.scene.json",
+      "exit": [
+        0.0,
+        22.0,
+        196.0
+      ],
+      "exitYaw": 0.0,
+      "exitAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "entryUp": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "exitUp": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "entry": [
+        153.087,
+        95.0,
+        1339.0532000000003
+      ],
+      "entryAxis": [
+        0.9047733826479402,
+        0.0,
+        -0.4258933270806249
+      ],
+      "flight": [
+        [
+          0.0,
+          20.0,
+          120.0,
+          71.2
+        ],
+        [
+          -40.0,
+          38.0,
+          -150.0,
+          74.5
+        ],
+        [
+          -90.0,
+          55.0,
+          -520.0,
+          79.0
+        ],
+        [
+          -60.0,
+          62.0,
+          -900.0,
+          84.0
+        ],
+        [
+          30.0,
+          55.0,
+          -1250.0,
+          89.0
+        ],
+        [
+          120.0,
+          48.0,
+          -1560.0,
+          93.5
+        ],
+        [
+          150.0,
+          40.0,
+          -1745.1815169190415,
+          97.0
+        ],
+        [
+          160.0,
+          34.0,
+          -1895.1815169190415,
+          99.6
+        ],
+        [
+          160.0,
+          28.931495949255055,
+          -1965.1815169190415,
+          101.4
+        ],
+        [
+          160.0,
+          28.931495949255055,
+          -1990.1815169190415,
+          102.2
+        ]
+      ]
     }
   ]
 }

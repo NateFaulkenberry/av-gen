@@ -85,6 +85,8 @@ void Composition::flattenLunar() {
 
 Result<void> Composition::setPortal(PortalBlock block, std::unique_ptr<Composition> world) {
     if (!world) return fail("portal: no world");
+    if (activeLeg_ != 0) activateLeg(0);
+    if (legs_.empty()) legs_.resize(1);
     portal_ = std::move(block);
     portalWorld_ = std::move(world);
     portalCrossing_ = 1e30;
@@ -98,24 +100,101 @@ Result<void> Composition::setPortal(PortalBlock block, std::unique_ptr<Compositi
 }
 
 void Composition::setPortalToRoot(PortalBlock block) {
+    if (legs_.empty()) legs_.resize(1);
     portal_ = std::move(block);
     portalToRoot_ = true;
     portalCrossing_ = 1e30;
 }
 
+// ADR-1895: the journey's legs. The active leg's state is in the portal members; a leg not active keeps its own in
+// legs_. Switching swaps them, so all the single-portal code reads the active leg unchanged.
+Result<void> Composition::addPortalLeg(PortalBlock block, std::unique_ptr<Composition> world) {
+    if (!world) return fail("portal leg: no world");
+    if (legs_.empty()) return fail("portal leg: the first leg is the scene's 'portal'");
+    LegState leg;
+    leg.portal = std::move(block);
+    leg.world = std::move(world);
+    if (const LunarWorldBlock& lw = leg.world->lunarWorld(); lw.world) {
+        leg.portal.exit.y += lw.world->sample(leg.portal.exit.x, leg.portal.exit.z);
+    }
+    legs_.push_back(std::move(leg));
+    return {};
+}
+
+void Composition::swapActiveLeg(LegState& with) {
+    std::swap(portal_, with.portal);
+    std::swap(portalWorld_, with.world);
+    std::swap(portalToRoot_, with.toRoot);
+    std::swap(portalTarget_, with.target);
+    std::swap(portalCrossing_, with.crossing);
+    std::swap(portalKnots_, with.knots);
+    std::swap(portalTangents_, with.tangents);
+    std::swap(portalKnotTimes_, with.knotTimes);
+    std::swap(portalArriveAim_, with.arriveAim);
+    std::swap(portalArriveUp_, with.arriveUp);
+}
+
+void Composition::activateLeg(int k) {
+    if (k == activeLeg_ || k < 0 || k >= static_cast<int>(legs_.size())) return;
+    swapActiveLeg(legs_[static_cast<std::size_t>(activeLeg_)]); // the active leg's state back into its slot
+    swapActiveLeg(legs_[static_cast<std::size_t>(k)]);          // and leg k's out of its slot
+    activeLeg_ = k;
+}
+
+const Composition* Composition::legWorld(int k) const {
+    if (k == activeLeg_) return destWorld();
+    const LegState& l = legs_[static_cast<std::size_t>(k)];
+    return l.target != nullptr ? l.target : l.world.get();
+}
+
+double Composition::legCrossing(int k) const {
+    return k == activeLeg_ ? portalCrossing_ : legs_[static_cast<std::size_t>(k)].crossing;
+}
+
+bool Composition::legReturns(int k) const {
+    const Composition* w = legWorld(k);
+    return w != nullptr && w->portalToRoot_ && w->portalTarget_ == this;
+}
+
+double Composition::legReturnCrossing(int k) const {
+    return legReturns(k) ? legWorld(k)->portalCrossing_ : 1e30;
+}
+
+int Composition::legForTime(double t) const {
+    const int n = static_cast<int>(legs_.size());
+    int k = 0;
+    while (k < n && legReturns(k)) {
+        const double back = legReturnCrossing(k);
+        if (back > 1e28 || t < back) break;
+        ++k;
+    }
+    return k; // n: every leg's world has been and gone
+}
+
 // ADR-1885: find the root (up the chain of portals that led here) and, for a portal back to it, link both ends.
 void Composition::linkPortalRoot() {
     if (portalWorld_) portalWorld_->parentPortal_ = this;
+    for (LegState& l : legs_) {
+        if (l.world) l.world->parentPortal_ = this;
+    }
     if (!portalToRoot_) return;
     Composition* root = this;
     while (root->parentPortal_ != nullptr) root = root->parentPortal_;
     if (root == this) return;
     portalTarget_ = root;
-    root->returnFrom_ = this;
 }
 
 std::vector<double> Composition::journeyCrossings() const {
     std::vector<double> out;
+    // ADR-1895: a root with legs out and back: each leg's crossing, then its world's crossing home
+    if (legs_.size() > 1 || (portalWorld_ && portalWorld_->portalToRoot_)) {
+        for (int k = 0; k < static_cast<int>(legs_.size()); ++k) {
+            out.push_back(legCrossing(k));
+            if (!legReturns(k)) break;
+            out.push_back(legReturnCrossing(k));
+        }
+        return out;
+    }
     const Composition* c = this;
     for (int guard = 0; c != nullptr && guard < 16; ++guard) {
         out.push_back(c->portalCrossing_);
@@ -202,12 +281,16 @@ void Composition::applyCameraOverride() {
 }
 
 std::optional<Composition::PortalPose> Composition::ownCameraAt(double seconds) const {
-    if (cameraPath_) return cameraPath_(seconds);
     // ADR-1885: on the root, after its own crossing the camera is the journey's path carried back by the return (once
     // the arrival is built: building it reads this world's own camera at the crossing)
-    if (returnFrom_ != nullptr && portalCrossing_ < 1e28 && seconds >= portalCrossing_ && !portalKnots_.empty()) {
-        return returnFrom_->portalCameraAt(seconds);
+    // ADR-1895: the latest leg the camera has crossed into whose world returns here (its knots built)
+    for (int k = static_cast<int>(legs_.size()) - 1; k >= 0; --k) {
+        const double c = legCrossing(k);
+        if (c > 1e28 || seconds < c || !legReturns(k)) continue;
+        const bool built = k == activeLeg_ ? !portalKnots_.empty() : !legs_[static_cast<std::size_t>(k)].knots.empty();
+        if (built) return legWorld(k)->portalCameraAt(seconds);
     }
+    if (cameraPath_) return cameraPath_(seconds);
     return flythroughAt(seconds);
 }
 
@@ -253,12 +336,14 @@ glm::mat3 frameOf(glm::vec3 forward, glm::vec3 up) {
 // crossing direction (exitAxis): then the rotation takes the entry's (the corruption's axis, entryUp) onto the exit's
 // (exitAxis, exitUp) -- Gate C 2: the Moon's floor (axis down) onto a canyon wall (axis level), so that a camera
 // dropping into the floor with its up pointing ahead leaves the wall level, its up the world's.
-glm::mat3 Composition::portalRotation() const {
-    if (glm::length(portal_.exitAxis) > 1e-6f) {
-        const glm::vec3 axis = glm::normalize(scene_.corruption.axis);
-        return frameOf(portal_.exitAxis, portal_.exitUp) * glm::transpose(frameOf(axis, portal_.entryUp));
+glm::mat3 Composition::portalRotation() const { return legRotation(portal_, scene_.corruption.axis); }
+
+glm::mat3 Composition::legRotation(const PortalBlock& b, glm::vec3 entryAxis) {
+    if (glm::length(b.exitAxis) > 1e-6f) {
+        const glm::vec3 axis = glm::normalize(entryAxis);
+        return frameOf(b.exitAxis, b.exitUp) * glm::transpose(frameOf(axis, b.entryUp));
     }
-    const float yaw = glm::radians(portal_.exitYaw);
+    const float yaw = glm::radians(b.exitYaw);
     const float cy = std::cos(yaw), sy = std::sin(yaw);
     // columns: the images of x, y, z (x' = cy x - sy z, z' = sy x + cy z)
     return glm::mat3(glm::vec3(cy, 0.0f, sy), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(-sy, 0.0f, cy));
@@ -312,22 +397,39 @@ void Composition::buildPortalArrival() {
     if (joined) portalTangents_[n - 1] = joinVelocity;
 }
 
-std::optional<Composition::PortalPose> Composition::portalCameraAt(double seconds) const {
-    if (destWorld() == nullptr) return std::nullopt;
-    const Corruption& c = scene_.corruption;
-    const PortalFrame f{c.focus, portal_.exit, portalRotation()};
-    if (seconds < portalCrossing_ || portalKnots_.empty()) {
+std::optional<Composition::PortalPose> Composition::portalCameraAt(double seconds) const { return legCameraAt(activeLeg_, seconds); }
+
+// ADR-1895: the camera leg k hands its world at `seconds` (any leg: a world reached by an earlier leg keeps asking for
+// its own leg's path, whichever leg is active now)
+std::optional<Composition::PortalPose> Composition::legCameraAt(int k, double seconds) const {
+    const bool active = k == activeLeg_ || legs_.empty();
+    const LegState* stored = active ? nullptr : &legs_[static_cast<std::size_t>(k)];
+    const PortalBlock& block = active ? portal_ : stored->portal;
+    const Composition* dest = active ? destWorld() : (stored->target != nullptr ? stored->target : stored->world.get());
+    if (dest == nullptr) return std::nullopt;
+    const double crossing = active ? portalCrossing_ : stored->crossing;
+    const auto& q = active ? portalKnots_ : stored->knots;
+    const auto& m = active ? portalTangents_ : stored->tangents;
+    const auto& qt = active ? portalKnotTimes_ : stored->knotTimes;
+    const glm::vec3 arriveAim = active ? portalArriveAim_ : stored->arriveAim;
+    const glm::vec3 arriveUp = active ? portalArriveUp_ : stored->arriveUp;
+    // the leg's site: the live corruption for the active leg; a leg's own entry, or the authored corruption, otherwise
+    glm::vec3 entry = scene_.corruption.focus, entryAxis = scene_.corruption.axis;
+    if (!active) {
+        entry = block.hasEntry ? block.entry : corruption_.focus;
+        entryAxis = block.hasEntry ? block.entryAxis : corruption_.axis;
+        if (lunar_.world) entry.y += lunar_.world->sample(entry.x, entry.z);
+    }
+    const PortalFrame f{entry, block.exit, legRotation(block, entryAxis)};
+    if (seconds < crossing || q.empty()) {
         const auto own = ownCameraAt(seconds);
         if (!own) return std::nullopt;
         return PortalPose{f.p(own->eye), f.p(own->target), f.d(orthoUp(own->eye, own->target, own->up))};
     }
-    const auto tc = static_cast<float>(portalCrossing_);
+    const auto tc = static_cast<float>(crossing);
     const auto s = static_cast<float>(seconds);
-    const auto& q = portalKnots_;
-    const auto& m = portalTangents_;
-    const auto& qt = portalKnotTimes_;
-    const bool joined = portal_.join.z > 0.0f;
-    const auto destAt = [&](float t) { return destWorld()->flythroughAt(static_cast<double>(portal_.join.x + (t - portal_.join.y) * portal_.join.z)); };
+    const bool joined = block.join.z > 0.0f;
+    const auto destAt = [&](float t) { return dest->flythroughAt(static_cast<double>(block.join.x + (t - block.join.y) * block.join.z)); };
     const auto at = [&](float t) -> glm::vec3 {
         if (q.size() < 2) return q[0] + m[0] * (t - tc);
         if (t >= qt.back()) {
@@ -346,11 +448,11 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
     // a climb is not looked up at (a quarter of it): rising over a crater rim to hover above a portal, the view stays
     // on the ground ahead instead of tipping into the black sky; a descent is looked down at in full
     if (ahead.y > 0.0f) ahead.y *= 0.25f;
-    glm::vec3 look = glm::length(ahead) > 1e-4f ? glm::normalize(ahead + glm::vec3(0.0f, -0.1f, 0.0f) * glm::length(ahead)) : portalArriveAim_;
+    glm::vec3 look = glm::length(ahead) > 1e-4f ? glm::normalize(ahead + glm::vec3(0.0f, -0.1f, 0.0f) * glm::length(ahead)) : arriveAim;
     glm::vec3 up{0.0f, 1.0f, 0.0f};
     if (joined) {
         // into the destination's own view (its aim and bank) over the 3 s before the join, eased at both ends
-        const float tj = portal_.join.y;
+        const float tj = block.join.y;
         const float u = std::clamp((s - (tj - 3.0f)) / 3.0f, 0.0f, 1.0f);
         const float wj = u * u * u * (u * (u * 6.0f - 15.0f) + 10.0f);
         if (const auto d = destAt(std::max(s, tj)); d && wj > 0.0f) {
@@ -358,14 +460,14 @@ std::optional<Composition::PortalPose> Composition::portalCameraAt(double second
             up = glm::normalize(glm::mix(up, d->up, wj));
         }
     }
-    for (const auto& a : portal_.aims) { // a look toward something passing (eased in and out)
+    for (const auto& a : block.aims) { // a look toward something passing (eased in and out)
         const float wa = smooth(a[3], a[3] + 1.2f, s) * (1.0f - smooth(a[4] - 1.2f, a[4], s)) * 0.75f;
         const glm::vec3 to = glm::vec3(a[0], a[1], a[2]) - p;
         if (wa > 0.0f && glm::length(to) > 1e-3f) look = glm::normalize(glm::mix(look, glm::normalize(to), wa));
     }
     const float w = smooth(tc, tc + 1.6f, s);
-    const glm::vec3 dir = glm::normalize(glm::mix(portalArriveAim_, look, w));
-    return PortalPose{p, p + dir * 100.0f, orthoUp(p, p + dir, glm::normalize(glm::mix(portalArriveUp_, up, w)))};
+    const glm::vec3 dir = glm::normalize(glm::mix(arriveAim, look, w));
+    return PortalPose{p, p + dir * 100.0f, orthoUp(p, p + dir, glm::normalize(glm::mix(arriveUp, up, w)))};
 }
 
 // The destination: its camera (the source's camera carried through the portal's transform until the camera crosses
@@ -381,11 +483,13 @@ void Composition::updatePortal(const FrameTime& time) {
     const glm::vec3 axis = glm::normalize(c.axis);
     // the crossing: the first time the camera's path passes the entry plane inside the opening's reach (a pure
     // function of the path, found once)
-    if (portalCrossing_ > 1e29 && ownCameraAt(0.0)) {
+    // ADR-1895: a later leg is searched from its previous leg's return home
+    const double from = activeLeg_ > 0 ? legReturnCrossing(activeLeg_ - 1) : 0.0;
+    if (portalCrossing_ > 1e29 && from < 1e28 && ownCameraAt(from)) {
         constexpr double kStep = 1.0 / 60.0, kEnd = 240.0;
         const float reach = 2.0f * std::max(c.width, c.height);
-        auto prev = ownCameraAt(0.0);
-        for (double t = kStep; t <= kEnd; t += kStep) {
+        auto prev = ownCameraAt(from);
+        for (double t = from + kStep; t <= kEnd; t += kStep) {
             const auto cur = ownCameraAt(t);
             if (!cur) break;
             const float s0 = glm::dot(prev->eye - entry, axis), s1 = glm::dot(cur->eye - entry, axis);
@@ -410,7 +514,9 @@ void Composition::updatePortal(const FrameTime& time) {
     cam.farPlane = std::max(cam.farPlane, 150000.0f);
     const double t = currentTime_;
     const bool crossed = t >= portalCrossing_ && !portalKnots_.empty();
-    if (const auto pose = portalCameraAt(t); pose && (crossed || cameraPath_ || !scene_.attractorWorld.active())) {
+    // (ADR-1895: on a later leg the root's scene camera is still last leg's until the end of the frame: carry the
+    // journey's camera, as portalCameraAt does, never the stale one)
+    if (const auto pose = portalCameraAt(t); pose && (crossed || cameraPath_ || !scene_.attractorWorld.active() || activeLeg_ > 0)) {
         cam.position = pose->eye;
         cam.target = pose->target;
         cam.up = pose->up;
@@ -423,7 +529,8 @@ void Composition::updatePortal(const FrameTime& time) {
     }
     Composition* dest = destWorld();
     if (portalTarget_ == nullptr) {
-        dest->setCameraPath([this](double s) { return portalCameraAt(s); });
+        const int leg = activeLeg_;
+        dest->setCameraPath([this, leg](double s) { return legCameraAt(leg, s); }); // ADR-1895: bound to its leg
         dest->setCameraOverride(cam);
         dest->update(time);
     }

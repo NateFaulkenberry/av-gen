@@ -39,8 +39,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | portals C 2 | portal 2's exit in a canyon wall, the dusk light, the floor's field, the Earth, the dive (`19`) | **merged** (main 214dafd8, Art Pass 1) |
 | Art Pass 2, R2 | research, audit, cast sheet, beat sheet, music, proofs (`30`-`33`, `assets-pass2.md`) | **done, awaiting the owner**: media in `pass2-r/` |
 | Art Pass 2, M1 | the Moon at night (terminator, basin, domes, crater portal), the return to the canyon at dusk, the first Sasquatch encounter (`35`; ADR-1885, 1886, 1888) | reviewed: "overall this direction is great"; revised in M1b |
-| Art Pass 2, M1b | the world scaled to 0.4, the portal's water spill back, a short Moon, a real campfire (`36`; ADR-1893, 1894) | **done, awaiting the owner**: media in `pass2-m1b/` |
-| Art Pass 2, M2-M5 | Mars, night and ocean, UFO, dawn (`33` §6) | not started: gated on M1 |
+| Art Pass 2, M1b | the world scaled to 0.4, the portal's water spill back, a short Moon, a real campfire (`36`; ADR-1893, 1894) | **approved, merged** (main 4bc5d3da) |
+| Art Pass 2, M2 | Mars: the outer cliff portal, Cydonia (mesas, haze, three pyramids), the pyramid portal, the night return; campfire notes (`37`; ADR-1895, 1896) | **done, awaiting the owner**: media in `pass2-m2/` |
+| Art Pass 2, M3-M5 | night and ocean, UFO, dawn (`33` §6) | not started: gated on M2 |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -181,6 +182,11 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-11-01: Art Pass 2, M2 (`37-pass2-m2.md`; ADR-1895, 1896).
+  - Journey legs: the canyon's `portals` after its `portal`, each at its own site; Moon and Mars legs on one canyon.
+  - The outer cliff behind the camp opens onto Mars (crossing 69.655 s); Cydonia with mesas, yardangs, pads and haze;
+    three eroded pyramids (Blender, original); the pyramid portal (crossing 101.4 s) home to the night canyon.
+  - Campfire: dark stones, flame tongues, all three Sasquatches in view, no contour streaks at dusk or night.
 - 2026-11-01: Art Pass 2, M1b (`36-pass2-m1b.md`; ADR-1893, 1894). Rebased onto main ab41c924.
   - The canyon at world scale 0.4 (`attractorWorld.worldScale`; every other length by `canyon_scale.py`); portal 1
     stays in its bank wall; the opening compared with Pass 1.

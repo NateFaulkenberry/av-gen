@@ -315,3 +315,148 @@ TEST_CASE("a light's flicker is a pure function of the clock", "[pass2][adr1888]
     CHECK(hi - lo > 25.0f);                       // it flickers
     CHECK(intensityAt(1.234) == intensityAt(1.234)); // and a seek lands on the same value
 }
+
+TEST_CASE("a journey goes out and home twice: the second leg opens at its own site after the first return",
+          "[portal][pass2][adr1895]") {
+    const auto dir = testsupport::processTempDir();
+    const auto world = [&](const char* name, glm::vec3 wallExit) {
+        return nlohmann::json{
+            {"format", "avgen-scene"}, {"version", 1}, {"name", name},
+            {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+            {"lunarWorld", {{"extent", 400}, {"spacing", 8}, {"skirtExtent", 1600}, {"skirtSpacing", 64}, {"rocks", 0}}},
+            {"corruption", {{"targets", {"lunar.surface"}}, {"focus", {0.0, 0.0, 0.0}}, {"axis", {0.0, -1.0, 0.0}}, {"amount", 1.0},
+                            {"width", 40.0}, {"height", 40.0}}},
+            {"portal", {{"world", "@root"}, {"exit", {wallExit.x, wallExit.y, wallExit.z}}, {"exitAxis", {1.0, 0.0, 0.0}},
+                        {"entryUp", {0.0, 0.0, -1.0}}, {"exitUp", {0.0, 1.0, 0.0}}}}};
+    };
+    std::ofstream(dir / "legs-moon.scene.json") << world("moon", glm::vec3(500.0f, 30.0f, 500.0f)).dump();
+    std::ofstream(dir / "legs-mars.scene.json") << world("mars", glm::vec3(-500.0f, 30.0f, 900.0f)).dump();
+    const nlohmann::json canyon = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "canyon"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 30.0, 100.0}}, {"target", {0.0, 30.0, 0.0}}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}}},
+        {"corruption", {{"targets", {"rock"}}, {"focus", {0.0, 30.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0}}},
+        // leg 1: to the Moon; its flight comes down through the Moon's floor at 6 s
+        {"portal", {{"world", "legs-moon.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
+                    {"flight", {{0.0, 20.0, 5.0, 4.0}, {0.0, 0.0, 0.0, 6.0}, {0.0, -30.0, -2.0, 7.0}}}}},
+        // leg 2: from the wall the Moon returns to (+x out of it at (500, 30, 500)), along +x into a site at x = 560
+        {"portals", {{{"world", "legs-mars.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
+                      {"entry", {560.0, 30.0, 500.0}}, {"entryAxis", {1.0, 0.0, 0.0}},
+                      {"flight", {{0.0, 20.0, 5.0, 12.0}, {0.0, 0.0, 0.0, 14.0}, {0.0, -30.0, -2.0, 15.0}}}}}},
+        {"looks", {{{"name", "dusk"}, {"from", 1}, {"params", {{"env/intensity", 0.25}}}},
+                   {{"name", "night"}, {"from", 3}, {"params", {{"env/intensity", 0.05}}}}}}};
+    nlohmann::json canyonFile = canyon;
+    // a small canyon world (as in production, where the root's own camera is its flythrough)
+    canyonFile["attractorWorld"] = {{"seed", 3}, {"resolution", 256}, {"meshSpacing", 16.0}, {"meshMinError", 4.0}, {"camera", "flight"}};
+    std::ofstream(dir / "legs-canyon.scene.json") << canyonFile.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "legs-canyon.scene.json", registry);
+    REQUIRE(c.has_value());
+    REQUIRE((*c)->portalLegCount() == 2);
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    (*c)->setCameraPath([](double t) {
+        const glm::vec3 eye(0.0f, 30.0f, 100.0f - 50.0f * static_cast<float>(t));
+        return std::optional<scene::Composition::PortalPose>(scene::Composition::PortalPose{eye, eye + glm::vec3(0, 0, -1), glm::vec3(0, 1, 0)});
+    });
+    const auto at = [&](double t) {
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = t;
+        (*c)->update(ft);
+    };
+    const auto env = [&]() { return params.find("env/intensity")->finalComponent(0); };
+    at(1.0);
+    CHECK((*c)->activePortalLeg() == 0);
+    at(3.0);
+    CHECK((*c)->scene().portal.crossed); // in the Moon
+    at(7.0); // home at dusk (the Moon's crossing at 6 s), out of the wall along +x: leg 2 is next, at its own site
+    CHECK((*c)->activePortalLeg() == 1);
+    CHECK(env() == Approx(0.25f));
+    CHECK(glm::length((*c)->scene().corruption.focus - glm::vec3(560.0f, 30.0f, 500.0f)) < 1e-3f);
+    CHECK((*c)->scene().portal.active());
+    CHECK_FALSE((*c)->scene().portal.crossed);
+    const auto crossings = (*c)->journeyCrossings();
+    REQUIRE(crossings.size() >= 3);
+    CHECK(crossings[0] == Approx(2.0).margin(0.05));  // into the Moon (z from 100 to 0 at 50 m/s)
+    CHECK(crossings[1] == Approx(6.0).margin(0.05));  // home
+    INFO("leg 2 crossing " << crossings[2]);
+    CHECK(crossings[2] > 6.0);
+    CHECK(crossings[2] < 12.0);                         // the return flight flies on along +x through x = 560
+    // the second leg's world sees the journey's camera carried through, not the root's stale scene camera: with no
+    // camera path of its own (as in production), the Mars camera is continuous across the crossing
+    (*c)->setCameraPath(nullptr);
+    scene::Composition* mars = (*c)->portalWorld();
+    REQUIRE(mars != nullptr);
+    at(crossings[2] - 0.034);
+    const glm::vec3 before = mars->scene().camera.position;
+    at(crossings[2] + 0.034);
+    const glm::vec3 after = mars->scene().camera.position;
+    INFO("before (" << before.x << ", " << before.y << ", " << before.z << ") after (" << after.x << ", " << after.y << ", " << after.z << ")");
+    CHECK(glm::length(after - before) < 5.0f);
+    at(crossings[2] + 0.5); // in Mars, the canyon at night behind its portal
+    CHECK((*c)->scene().portal.crossed);
+    CHECK(env() == Approx(0.05f));
+    at(15.0); // home again: the second return
+    CHECK_FALSE((*c)->scene().portal.active());
+    const scene::Camera& cam = (*c)->scene().camera;
+    INFO("root camera (" << cam.position.x << ", " << cam.position.y << ", " << cam.position.z << ")");
+    CHECK(glm::length(cam.position - glm::vec3(-500.0f, 30.0f, 900.0f)) < 60.0f); // near Mars's return exit
+    at(1.0); // a seek back: the first leg, the day
+    CHECK((*c)->activePortalLeg() == 0);
+    CHECK(glm::length((*c)->scene().corruption.focus - glm::vec3(0.0f, 30.0f, 0.0f)) < 1e-3f);
+}
+
+TEST_CASE("Mars: a mesa stands flat-topped with a steep wall, yardangs run along the wind", "[lunar-world][pass2][adr1896]") {
+    scene::LunarGen moon;
+    moon.extent = 1200.0f;
+    moon.spacing = 4.0f;
+    moon.skirtExtent = 4800.0f;
+    moon.skirtSpacing = 64.0f;
+    moon.craters = 0.0f;
+    moon.rocks = 0.0f;
+    moon.relief = 0.0f;
+    scene::LunarGen mars = moon;
+    mars.mesas.push_back(scene::LunarMesa{0.0f, 0.0f, 200.0f, 120.0f, 0.0f, 100.0f, 3});
+    CHECK(mars.hash() != moon.hash());
+    scene::LunarGen same = moon;
+    same.yardangs = 0.0f;
+    CHECK(same.hash() == moon.hash()); // absent, the Moon is the Moon
+    auto flat = scene::generateLunarWorld(moon);
+    auto w = scene::generateLunarWorld(mars);
+    const auto rise = [&](float x, float z) { return w->sample(x, z) - flat->sample(x, z); };
+    CHECK(rise(0.0f, 0.0f) > 85.0f);          // the plateau
+    CHECK(rise(100.0f, 30.0f) > 85.0f);
+    CHECK(rise(420.0f, 0.0f) < 10.0f);        // the plain beyond the apron
+    CHECK(rise(0.0f, 260.0f) < 10.0f);
+    // the wall is steep: most of the height is lost within a quarter of the plateau's half-width
+    const float drop = rise(150.0f, 0.0f) - rise(250.0f, 0.0f);
+    CHECK(drop > 60.0f);
+    // yardangs: more relief across the wind than along it
+    scene::LunarGen yard = moon;
+    yard.yardangs = 8.0f;
+    yard.wind = 0.0f; // along +x
+    auto y = scene::generateLunarWorld(yard);
+    float along = 0.0f, across = 0.0f;
+    for (int i = 0; i < 100; ++i) {
+        along += std::abs(y->sample(-300.0f + 6.0f * static_cast<float>(i + 1), 50.0f) - y->sample(-300.0f + 6.0f * static_cast<float>(i), 50.0f));
+        across += std::abs(y->sample(50.0f, -300.0f + 6.0f * static_cast<float>(i + 1)) - y->sample(50.0f, -300.0f + 6.0f * static_cast<float>(i)));
+    }
+    CHECK(across > 2.0f * along);
+    // a pad eases the ground to its level (a pyramid's footing)
+    scene::LunarGen padded = yard;
+    padded.pads.push_back(scene::LunarPad{0.0f, 0.0f, 150.0f, 2.0f});
+    auto pw = scene::generateLunarWorld(padded);
+    for (float x : {-80.0f, 0.0f, 60.0f, 110.0f}) CHECK(pw->sample(x, 20.0f) == Approx(2.0f).margin(0.05f));
+    // JSON round-trip
+    scene::LunarWorldBlock b;
+    b.enabled = true;
+    b.gen = mars;
+    b.gen.yardangs = 6.0f;
+    b.gen.wind = 30.0f;
+    b.gen.pads.push_back(scene::LunarPad{10.0f, 20.0f, 90.0f, -3.0f});
+    auto back = scene::lunarWorldFromJson(scene::lunarWorldToJson(b));
+    REQUIRE(back.has_value());
+    CHECK(back->gen.hash() == b.gen.hash());
+}

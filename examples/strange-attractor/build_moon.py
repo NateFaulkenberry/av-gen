@@ -149,9 +149,16 @@ CAMP = canyon(16.0, 16.0)
 CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 m at d 40, lat 40)
 DUSK_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t in
                ((6, 2, 11, 49.4), (10, 6, 5, 51.2), (12, 9, 2.1, 53.0), (13.5, 11, 1.8, 55.4), (17.5, 10.5, 1.9, 57.8),
-                (25, 7, 4.0, 60.0), (42, 0, 8, 62.6), (70, -6, 12, 65.4), (105, -4, 16, 67.8), (130, 2, 20, 69.69))]
+                # M2: away from the fire, up and across the benches to the sheer outer cliff behind the camp, where
+                # the canyon's second portal opens (its face 80-122 m between lat 91 and 93: the crossing at lat 91.8,
+                # 69.69 s, bar 36). Heights over the ground; the last two hold 95 m absolute (73.8 and 134.2 below).
+                # up first, almost straight up from the bank, then across at the portal's height to the face
+                (17.5, 11.5, 9.0, 59.7), (19, 24, 15.0, 61.0), (19, 31, 36.0, 62.3), (14, 44, 43.0, 63.6), (8, 58, 65.0, 65.2), (2, 70, 56.0, 66.8),
+                (-4, 80, 38.0, 68.0), (-8, 89, 21.2, 69.2), (-8, 96, -39.2, 70.4))]
 EGLOW = [-c for c in direction(-6, 50)]
-DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5]]
+CLIFF_PORTAL = canyon(-8.0, 91.8)
+DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5],
+             [CLIFF_PORTAL[0], 95.0, CLIFF_PORTAL[1], 59.4, 69.3]]   # M2: the eye on the cliff as the tear opens
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)

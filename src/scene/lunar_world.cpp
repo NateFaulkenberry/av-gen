@@ -149,6 +149,40 @@ std::vector<LunarCrater> population(const LunarGen& g, float area, float dmin, f
     return out;
 }
 
+// ADR-1896: the mesas and the yardangs at (x, z), metres to add to the ground; dusts the albedo in the troughs and at
+// the mesas' feet (the material program reads it as the regolith's brightness)
+float marsRelief(const LunarGen& g, float x, float z, float& albedo) {
+    float add = 0.0f;
+    if (g.yardangs > 0.0f) {
+        const float a = glm::radians(g.wind);
+        const float u = x * std::cos(a) + z * std::sin(a), v = -x * std::sin(a) + z * std::cos(a);
+        // long along the wind, narrow across: ridges where a stretched noise crosses its middle
+        const float n = valueNoise(u / 520.0f, v / 26.0f, g.seed + 21) * 0.65f + valueNoise(u / 210.0f, v / 11.0f, g.seed + 22) * 0.35f;
+        const float ridge = 1.0f - std::abs(2.0f * n - 1.0f);
+        add += g.yardangs * (ridge * ridge - 0.35f);
+        albedo += 0.02f * (0.5f - ridge); // dust settles in the troughs
+    }
+    for (const LunarMesa& m : g.mesas) {
+        const float a = glm::radians(m.angle);
+        const float dx = x - m.x, dz = z - m.z;
+        const float u = (dx * std::cos(a) + dz * std::sin(a)) / m.rx, v = (-dx * std::sin(a) + dz * std::cos(a)) / m.rz;
+        if (std::abs(u) > 2.0f || std::abs(v) > 2.0f) continue;
+        // a rounded-rectangle outline (p = 3), eroded by a noise on the distance
+        float d = std::pow(std::pow(std::abs(u), 3.0f) + std::pow(std::abs(v), 3.0f), 1.0f / 3.0f);
+        d += 0.10f * (fbm(x, z, 4, 180.0f, 1.0f, 0.55f, g.seed + 31) - 0.0f);
+        // the wall: a steep fall from the plateau, cut into terraces; the talus apron below it
+        const float t = 1.0f - smooth(0.98f, 1.14f, d);
+        const float levels = static_cast<float>(std::max(m.terraces, 1));
+        const float tl = t * levels;
+        const float terr = (std::floor(tl) + smooth(0.55f, 1.0f, tl - std::floor(tl))) / levels;
+        const float cap = 1.0f - 0.04f * (fbm(x, z, 3, 90.0f, 1.0f, 0.5f, g.seed + 33) + 1.0f) * 0.5f;
+        const float apron = 0.22f * (1.0f - smooth(1.08f, 1.55f, d));
+        add += m.height * std::max(terr * cap, apron * apron * 4.5f);
+        albedo += 0.015f * apron; // sand piled at the foot
+    }
+    return add;
+}
+
 Field buildField(const LunarGen& g, float extent, float spacing, const std::vector<LunarCrater>& craters) {
     Field f;
     f.extent = extent;
@@ -172,7 +206,12 @@ Field buildField(const LunarGen& g, float extent, float spacing, const std::vect
         for (int i = 0; i < f.n; ++i) {
             const float x = f.x(i), z = f.x(j);
             float& h = f.h[static_cast<std::size_t>(j) * f.n + i];
+            h += marsRelief(g, x, z, f.albedo[static_cast<std::size_t>(j) * f.n + i]); // ADR-1896 (0 on the Moon)
             h += fbm(x, z, 3, 40.0f, 0.6f, 0.5f, g.seed + 5);
+            for (const LunarPad& p : g.pads) { // ADR-1896: a footing, before the curvature (a level on the sphere)
+                const float d = std::hypot(x - p.x, z - p.z);
+                if (d < p.radius) h += (p.level - h) * (1.0f - smooth(0.8f * p.radius, p.radius, d));
+            }
             h -= (x * x + z * z) / (2.0f * g.curvature);
         }
     }
@@ -336,6 +375,15 @@ Result<void> LunarGen::validate() const {
     for (const LunarCrater& c : heroes) {
         if (!(c.diameter > 0.0f) || !(c.fresh >= 0.0f && c.fresh <= 1.0f)) return fail("lunarWorld: a hero needs a diameter and fresh in [0, 1]");
     }
+    for (const LunarMesa& m : mesas) {
+        if (!(m.rx > 0.0f && m.rz > 0.0f && m.height >= 0.0f && m.height <= 2000.0f) || m.terraces < 1 || m.terraces > 12) {
+            return fail("lunarWorld: a mesa needs rx, rz > 0, height in [0, 2000] m and 1-12 terraces");
+        }
+    }
+    if (!(yardangs >= 0.0f && yardangs <= 100.0f)) return fail("lunarWorld: yardangs in [0, 100] m");
+    for (const LunarPad& p : pads) {
+        if (!(p.radius > 0.0f)) return fail("lunarWorld: a pad needs a radius");
+    }
     return {};
 }
 
@@ -351,6 +399,17 @@ std::uint64_t LunarGen::hash() const {
     if (curvature != 1737.4e3f) mix(curvature);
     for (const LunarCrater& c : heroes) {
         for (float v : {c.x, c.z, c.diameter, c.fresh}) mix(v);
+    }
+    // ADR-1896: absent, the hash is the Moon's as before
+    for (const LunarMesa& m : mesas) {
+        for (float v : {m.x, m.z, m.rx, m.rz, m.angle, m.height, static_cast<float>(m.terraces)}) mix(v);
+    }
+    if (yardangs != 0.0f) {
+        mix(yardangs);
+        mix(wind);
+    }
+    for (const LunarPad& p : pads) {
+        for (float v : {p.x, p.z, p.radius, p.level}) mix(v);
     }
     return h;
 }
@@ -456,8 +515,9 @@ std::shared_ptr<const LunarWorld> generateLunarWorld(const LunarGen& gen) {
 
 Result<LunarWorldBlock> lunarWorldFromJson(const json& j) try {
     if (!j.is_object()) return fail("'lunarWorld' must be an object");
-    static const std::array<const char*, 12> kKeys = {"enabled", "seed", "extent", "spacing", "skirtExtent", "skirtSpacing",
-                                                       "craters", "rocks", "relief", "heroes", "program", "curvature"};
+    static const std::array<const char*, 16> kKeys = {"enabled", "seed", "extent", "spacing", "skirtExtent", "skirtSpacing",
+                                                       "craters", "rocks", "relief", "heroes", "program", "curvature",
+                                                       "mesas", "yardangs", "wind", "pads"};
     for (auto it = j.begin(); it != j.end(); ++it) {
         if (std::find_if(kKeys.begin(), kKeys.end(), [&](const char* k) { return it.key() == k; }) == kKeys.end()) {
             return fail("lunarWorld: unknown key '{}'", it.key());
@@ -486,6 +546,26 @@ Result<LunarWorldBlock> lunarWorldFromJson(const json& j) try {
             g.heroes.push_back(c);
         }
     }
+    if (j.contains("mesas")) { // ADR-1896
+        for (const json& mj : j.at("mesas")) {
+            LunarMesa m;
+            m.x = mj.value("x", 0.0f);
+            m.z = mj.value("z", 0.0f);
+            m.rx = mj.value("rx", m.rx);
+            m.rz = mj.value("rz", m.rz);
+            m.angle = mj.value("angle", 0.0f);
+            m.height = mj.value("height", m.height);
+            m.terraces = mj.value("terraces", m.terraces);
+            g.mesas.push_back(m);
+        }
+    }
+    if (j.contains("pads")) {
+        for (const json& pj : j.at("pads")) {
+            g.pads.push_back(LunarPad{pj.value("x", 0.0f), pj.value("z", 0.0f), pj.value("radius", 200.0f), pj.value("level", 0.0f)});
+        }
+    }
+    g.yardangs = j.value("yardangs", g.yardangs);
+    g.wind = j.value("wind", g.wind);
     if (auto ok = g.validate(); !ok) return std::unexpected(ok.error());
     return b;
 } catch (const json::exception& e) {
@@ -496,10 +576,28 @@ json lunarWorldToJson(const LunarWorldBlock& b) {
     const LunarGen& g = b.gen;
     json heroes = json::array();
     for (const LunarCrater& c : g.heroes) heroes.push_back({{"x", c.x}, {"z", c.z}, {"diameter", c.diameter}, {"fresh", c.fresh}});
-    return json{{"enabled", b.enabled}, {"seed", g.seed},       {"extent", g.extent},   {"spacing", g.spacing},
+    json out{{"enabled", b.enabled}, {"seed", g.seed},       {"extent", g.extent},   {"spacing", g.spacing},
                 {"skirtExtent", g.skirtExtent}, {"skirtSpacing", g.skirtSpacing}, {"craters", g.craters},
                 {"rocks", g.rocks},     {"relief", g.relief},   {"heroes", heroes},     {"program", b.program},
                 {"curvature", g.curvature}};
+    if (!g.mesas.empty()) {
+        json mesas = json::array();
+        for (const LunarMesa& m : g.mesas) {
+            mesas.push_back({{"x", m.x}, {"z", m.z}, {"rx", m.rx}, {"rz", m.rz}, {"angle", m.angle}, {"height", m.height},
+                             {"terraces", m.terraces}});
+        }
+        out["mesas"] = mesas;
+    }
+    if (!g.pads.empty()) {
+        json pads = json::array();
+        for (const LunarPad& p : g.pads) pads.push_back({{"x", p.x}, {"z", p.z}, {"radius", p.radius}, {"level", p.level}});
+        out["pads"] = pads;
+    }
+    if (g.yardangs != 0.0f) {
+        out["yardangs"] = g.yardangs;
+        out["wind"] = g.wind;
+    }
+    return out;
 }
 
 } // namespace avgen::scene

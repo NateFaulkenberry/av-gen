@@ -37,6 +37,19 @@ struct LunarCrater {
     float x = 0.0f, z = 0.0f, diameter = 100.0f, fresh = 0.5f;
 };
 
+// ADR-1896: a mesa -- a flat-topped, terraced stamp with an eroded outline and a talus apron (Cydonia's mesas and
+// knobs on Mars). `rx`, `rz` the plateau's half-extents (m) along and across `angle` (degrees from +x toward +z).
+struct LunarMesa {
+    float x = 0.0f, z = 0.0f, rx = 300.0f, rz = 200.0f, angle = 0.0f, height = 120.0f;
+    int terraces = 3;
+};
+
+// ADR-1896: a pad -- the ground eased to a level within a radius (a structure's footing), blending out over the last
+// fifth of it
+struct LunarPad {
+    float x = 0.0f, z = 0.0f, radius = 200.0f, level = 0.0f;
+};
+
 struct LunarGen {
     std::uint32_t seed = 3;
     float extent = 4000.0f;      // fine tile side (m)
@@ -49,6 +62,12 @@ struct LunarGen {
     float curvature = 1737.4e3f; // the radius the ground falls away with (m): the Moon's own, or smaller to bring the
                                  // terminator (where a low sun meets the curve) within flying reach (Art Pass 2)
     std::vector<LunarCrater> heroes;
+    // ADR-1896: Mars. Mesas stamped on the ground, and yardangs -- wind-carved ridges and troughs, long along `wind`
+    // (degrees from +x toward +z) and narrow across it, `yardangs` metres deep. Both absent on the Moon.
+    std::vector<LunarMesa> mesas;
+    std::vector<LunarPad> pads;
+    float yardangs = 0.0f;
+    float wind = 0.0f;
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;
 };

@@ -1479,6 +1479,11 @@ public:
         glm::vec3 join{0.0f};                    // Gate C: [from, at, rate] -- at `at` seconds the camera joins the
                                                  // destination's own flythrough at its second `from`, run at `rate`
                                                  // (C1); rate 0 = no join
+        // ADR-1895: a later leg's own site in this world (the corruption's focus and axis while the leg is active);
+        // unset, the leg uses the scene's corruption as authored
+        bool hasEntry = false;
+        glm::vec3 entry{0.0f};
+        glm::vec3 entryAxis{0.0f, 0.0f, -1.0f};
     };
     // A camera pose as a pure function of time (what a portal's source hands its destination).
     struct PortalPose {
@@ -1488,6 +1493,11 @@ public:
     // Art Pass 2 (ADR-1885): a portal back to the journey's root ("world": "@root"): the camera returns to the world it
     // started in (the canyon), which is not loaded again. Linked when the compositions are attached.
     void setPortalToRoot(PortalBlock block);
+    // ADR-1895: a further leg of the journey from this world (the root): the camera crosses it after it has come back
+    // from the previous leg's world. Legs are visited in order; one is active at a time.
+    [[nodiscard]] Result<void> addPortalLeg(PortalBlock block, std::unique_ptr<Composition> world);
+    [[nodiscard]] int portalLegCount() const { return static_cast<int>(legs_.size()); }
+    [[nodiscard]] int activePortalLeg() const { return activeLeg_; }
     [[nodiscard]] Composition* portalWorld() { return portalTarget_ != nullptr ? portalTarget_ : portalWorld_.get(); }
     // The journey's crossings in order (this composition's own, then its destination's, ...), seconds; 1e28 = never.
     [[nodiscard]] std::vector<double> journeyCrossings() const;
@@ -2438,11 +2448,11 @@ private:
     float corruptionTime_ = std::numeric_limits<float>::quiet_NaN(); // last frame's time (the velocity target)
     void updateCorruption();
     LunarWorldBlock lunar_;                  // ADR-1882
-    PortalBlock portal_;                     // ADR-1879
+    // ADR-1879; the members from here to portalArriveUp_ are the ACTIVE leg's (ADR-1895: the others wait in legs_)
+    PortalBlock portal_;
     std::unique_ptr<Composition> portalWorld_;
     bool portalToRoot_ = false;           // ADR-1885: this portal leads back to the root (not owned)
     Composition* portalTarget_ = nullptr; // the destination when it is not owned (the root)
-    Composition* returnFrom_ = nullptr;   // on the root: the world whose portal returns here
     Composition* parentPortal_ = nullptr; // the world whose portal leads here
     void linkPortalRoot();
     [[nodiscard]] Composition* destWorld() const { return portalTarget_ != nullptr ? portalTarget_ : portalWorld_.get(); }
@@ -2460,7 +2470,31 @@ private:
     std::vector<float> portalKnotTimes_;
     glm::vec3 portalArriveAim_{0.0f, 0.0f, -1.0f}, portalArriveUp_{0.0f, 1.0f, 0.0f};
     void buildPortalArrival();
+    // ADR-1895: the journey's legs from this world. The active leg's state lives in the members above; legs_[i] holds
+    // leg i's while it is not active (legs_[activeLeg_] is an empty shell).
+    struct LegState {
+        PortalBlock portal;
+        std::unique_ptr<Composition> world;
+        bool toRoot = false;
+        Composition* target = nullptr;
+        double crossing = 1e30;
+        std::vector<glm::vec3> knots, tangents;
+        std::vector<float> knotTimes;
+        glm::vec3 arriveAim{0.0f, 0.0f, -1.0f}, arriveUp{0.0f, 1.0f, 0.0f};
+    };
+    std::vector<LegState> legs_;
+    int activeLeg_ = 0;
+    bool legRetry_ = false;
+    void swapActiveLeg(LegState& with);
+    void activateLeg(int k);
+    [[nodiscard]] const Composition* legWorld(int k) const;
+    [[nodiscard]] double legCrossing(int k) const;
+    [[nodiscard]] bool legReturns(int k) const;    // its world's portal leads back here
+    [[nodiscard]] double legReturnCrossing(int k) const;
+    [[nodiscard]] int legForTime(double t) const;  // the leg the camera is on (or last; after the last return, n)
     [[nodiscard]] glm::mat3 portalRotation() const;
+    [[nodiscard]] static glm::mat3 legRotation(const PortalBlock& b, glm::vec3 entryAxis);
+    [[nodiscard]] std::optional<PortalPose> legCameraAt(int k, double seconds) const;
     [[nodiscard]] float portalGround(float x, float z) const;
     void flattenLunar();
     void updatePortal(const FrameTime& time);

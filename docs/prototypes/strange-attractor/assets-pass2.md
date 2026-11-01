@@ -44,6 +44,9 @@ Attribution, to carry wherever the work is shown:
 | `assets/strange-attractor/proofs/dome.glb` (geodesic crater dome) | `pass2/proof_dome.py` | nothing third-party | original |
 | `assets/strange-attractor/proofs/interior.glb` (exam hall, gurney, suited man) | `pass2/proof_interior.py` | the suited man | CC0-derived |
 | `assets/strange-attractor/build/sasquatch-{a,b,c}.glb` (rigged, hair cards, idle) | `pass2/build_sasquatch.py` | Mat Rex's Bigfoot (CC BY 4.0) | CC BY 4.0 (attribution above) |
+| `assets/strange-attractor/build/campfire.glb` (logs, stone ring, ember bed) | `pass2/build_campfire.py` | nothing third-party | original |
+| `assets/strange-attractor/build/pyramid-{a,b,c}.glb` (eroded Cydonia pyramids, sand ramps) | `pass2/build_pyramids.py` | nothing third-party | original |
+| `assets/strange-attractor/build/suited-man.glb` (scale reference) | exported from the MPFB suited man | the suited man | CC0-derived |
 
 ## Already in the library (reused, not committed)
 
