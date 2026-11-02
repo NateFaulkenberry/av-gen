@@ -153,32 +153,38 @@ std::vector<LunarCrater> population(const LunarGen& g, float area, float dmin, f
 // the mesas' feet (the material program reads it as the regolith's brightness)
 float marsRelief(const LunarGen& g, float x, float z, float& albedo) {
     float add = 0.0f;
-    if (g.yardangs > 0.0f) {
-        const float a = glm::radians(g.wind);
-        const float u = x * std::cos(a) + z * std::sin(a), v = -x * std::sin(a) + z * std::cos(a);
-        // long along the wind, narrow across: ridges where a stretched noise crosses its middle
-        const float n = valueNoise(u / 520.0f, v / 26.0f, g.seed + 21) * 0.65f + valueNoise(u / 210.0f, v / 11.0f, g.seed + 22) * 0.35f;
-        const float ridge = 1.0f - std::abs(2.0f * n - 1.0f);
-        add += g.yardangs * (ridge * ridge - 0.35f);
-        albedo += 0.02f * (0.5f - ridge); // dust settles in the troughs
-    }
+    float onMesa = 0.0f; // how much of this point belongs to a mesa (its plateau, wall or apron)
     for (const LunarMesa& m : g.mesas) {
         const float a = glm::radians(m.angle);
         const float dx = x - m.x, dz = z - m.z;
         const float u = (dx * std::cos(a) + dz * std::sin(a)) / m.rx, v = (-dx * std::sin(a) + dz * std::cos(a)) / m.rz;
         if (std::abs(u) > 2.0f || std::abs(v) > 2.0f) continue;
-        // a rounded-rectangle outline (p = 3), eroded by a noise on the distance
+        // a rounded-rectangle outline (p = 3), eroded by noise on the distance at two unrelated scales (M3: one
+        // scale cut the walls into evenly spaced gullies)
         float d = std::pow(std::pow(std::abs(u), 3.0f) + std::pow(std::abs(v), 3.0f), 1.0f / 3.0f);
-        d += 0.10f * (fbm(x, z, 4, 180.0f, 1.0f, 0.55f, g.seed + 31) - 0.0f);
-        // the wall: a steep fall from the plateau, cut into terraces; the talus apron below it
+        d += 0.08f * fbm(x, z, 4, 173.0f, 1.0f, 0.55f, g.seed + 31) + 0.035f * fbm(x, z, 3, 47.0f, 1.0f, 0.6f, g.seed + 32);
+        // the wall: a steep fall from the plateau, cut into terraces of uneven height; the talus apron below it
         const float t = 1.0f - smooth(0.98f, 1.14f, d);
         const float levels = static_cast<float>(std::max(m.terraces, 1));
-        const float tl = t * levels;
-        const float terr = (std::floor(tl) + smooth(0.55f, 1.0f, tl - std::floor(tl))) / levels;
+        const float tl = t * levels + 0.35f * fbm(x, z, 2, 260.0f, 1.0f, 0.5f, g.seed + 34);
+        const float terr = std::clamp((std::floor(tl) + smooth(0.55f, 1.0f, tl - std::floor(tl))) / levels, 0.0f, 1.0f) * (t > 0.0f ? 1.0f : 0.0f);
         const float cap = 1.0f - 0.04f * (fbm(x, z, 3, 90.0f, 1.0f, 0.5f, g.seed + 33) + 1.0f) * 0.5f;
         const float apron = 0.22f * (1.0f - smooth(1.08f, 1.55f, d));
         add += m.height * std::max(terr * cap, apron * apron * 4.5f);
+        onMesa = std::max(onMesa, 1.0f - smooth(1.0f, 1.45f, d));
         albedo += 0.015f * apron; // sand piled at the foot
+    }
+    if (g.yardangs > 0.0f) {
+        const float a = glm::radians(g.wind);
+        // a slow warp so the ridges wander instead of running ruler-straight (M3)
+        const float w = 60.0f * fbm(x, z, 3, 700.0f, 1.0f, 0.5f, g.seed + 23);
+        const float u = x * std::cos(a) + z * std::sin(a), v = -x * std::sin(a) + z * std::cos(a) + w;
+        // long along the wind, narrow across: ridges where a stretched noise crosses its middle
+        const float n = valueNoise(u / 520.0f, v / 26.0f, g.seed + 21) * 0.55f + valueNoise(u / 210.0f, v / 11.0f, g.seed + 22) * 0.3f +
+                        valueNoise(u / 95.0f, v / 6.3f, g.seed + 24) * 0.15f;
+        const float ridge = 1.0f - std::abs(2.0f * n - 1.0f);
+        add += g.yardangs * (ridge * ridge - 0.35f) * (1.0f - onMesa); // M3: not across the mesas' walls
+        albedo += 0.02f * (0.5f - ridge) * (1.0f - onMesa);           // dust settles in the troughs
     }
     return add;
 }

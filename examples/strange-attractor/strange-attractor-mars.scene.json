@@ -244,6 +244,280 @@
           "srcB": 1
         },
         {
+          "kind": "noise",
+          "dst": 3,
+          "srcA": 2,
+          "value": 0.012,
+          "seed": 43
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            -9.0,
+            9.0
+          ]
+        },
+        {
+          "kind": "swizzle",
+          "dst": 4,
+          "srcA": 2,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 3
+        },
+        {
+          "kind": "palette",
+          "dst": 6,
+          "srcA": 4,
+          "constant": [
+            0.92,
+            0.92,
+            0.92,
+            0
+          ],
+          "constant2": [
+            0.14,
+            0.15,
+            0.17,
+            0
+          ],
+          "constant3": [
+            0.137,
+            0.137,
+            0.137,
+            0
+          ],
+          "constant4": [
+            0.0,
+            0.0,
+            0.0,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "palette",
+          "dst": 7,
+          "srcA": 4,
+          "constant": [
+            1.0,
+            0.97,
+            0.95,
+            0
+          ],
+          "constant2": [
+            0.07,
+            0.08,
+            0.09,
+            0
+          ],
+          "constant3": [
+            0.41,
+            0.41,
+            0.41,
+            0
+          ],
+          "constant4": [
+            0.3,
+            0.3,
+            0.3,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "input",
+          "dst": 7,
+          "input": "normal"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0.82,
+            0.45,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 3,
+          "constant": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 6,
+          "srcA": 3,
+          "srcB": 6,
+          "srcC": 7
+        },
+        {
+          "kind": "multiply",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 6
+        },
+        {
+          "kind": "noise",
+          "dst": 3,
+          "srcA": 2,
+          "value": 0.05,
+          "seed": 47
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            -2.5,
+            2.5
+          ]
+        },
+        {
+          "kind": "swizzle",
+          "dst": 4,
+          "srcA": 2,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 3
+        },
+        {
+          "kind": "palette",
+          "dst": 6,
+          "srcA": 4,
+          "constant": [
+            0.97,
+            0.97,
+            0.97,
+            0
+          ],
+          "constant2": [
+            0.06,
+            0.06,
+            0.06,
+            0
+          ],
+          "constant3": [
+            0.62,
+            0.62,
+            0.62,
+            0
+          ],
+          "constant4": [
+            0.0,
+            0.0,
+            0.0,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "input",
+          "dst": 4,
+          "input": "cameraDistance"
+        },
+        {
+          "kind": "remap",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            60.0,
+            220.0,
+            1.0,
+            0.0
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0.0,
+            1.0,
+            1.0,
+            0.0
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 7
+        },
+        {
+          "kind": "constant",
+          "dst": 3,
+          "constant": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 6,
+          "srcA": 3,
+          "srcB": 6,
+          "srcC": 4
+        },
+        {
+          "kind": "multiply",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 6
+        },
+        {
           "kind": "constant",
           "dst": 0,
           "constant": [
@@ -267,6 +541,335 @@
       "baseColor": 5,
       "metallic": 0,
       "roughness": 1
+    },
+    {
+      "name": "pyramid_stone",
+      "ops": [
+        {
+          "kind": "input",
+          "dst": 0,
+          "input": "uv"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 0,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 2,
+          "srcA": 1,
+          "constant": [
+            0.12,
+            0.45,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 1,
+          "constant": [
+            0.75,
+            0.95,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 4,
+          "constant": [
+            0.44,
+            0.3,
+            0.19,
+            1.0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.27,
+            0.15,
+            0.09,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 5,
+          "srcC": 2
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.42,
+            0.21,
+            0.11,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 5,
+          "srcC": 3
+        },
+        {
+          "kind": "input",
+          "dst": 6,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "constant",
+          "dst": 7,
+          "constant": [
+            0.16,
+            0.32,
+            0.16,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 7,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "voronoiEdge",
+          "dst": 5,
+          "srcA": 7,
+          "value": 1.0,
+          "seed": 61
+        },
+        {
+          "kind": "swizzle",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0.0,
+            0.16,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0,
+            1,
+            0.38,
+            1.0
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "constant",
+          "dst": 0,
+          "constant": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 0,
+          "srcC": 7
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 5
+        },
+        {
+          "kind": "noise",
+          "dst": 5,
+          "srcA": 6,
+          "value": 0.06,
+          "seed": 63
+        },
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0.3,
+            0.7,
+            0.66,
+            1.2
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 5
+        },
+        {
+          "kind": "constant",
+          "dst": 7,
+          "constant": [
+            0.07,
+            0.006,
+            0.07,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 7,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "noise",
+          "dst": 5,
+          "srcA": 7,
+          "value": 1.0,
+          "seed": 65
+        },
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0.4,
+            0.75,
+            1.0,
+            0.72
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 5
+        },
+        {
+          "kind": "input",
+          "dst": 7,
+          "input": "normal"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0.78,
+            0.97,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0,
+            1,
+            0,
+            0.75
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.5,
+            0.29,
+            0.15,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 5,
+          "srcC": 7
+        },
+        {
+          "kind": "constant",
+          "dst": 0,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            0.93,
+            0.93,
+            0.93,
+            0.93
+          ]
+        }
+      ],
+      "baseColor": 4,
+      "metallic": 0,
+      "roughness": 1
     }
   ],
   "lunarWorld": {
@@ -276,7 +879,7 @@
     "skirtExtent": 48000,
     "skirtSpacing": 48,
     "craters": 0.4,
-    "rocks": 0.008,
+    "rocks": 0.03,
     "relief": 70,
     "program": "mars_regolith",
     "curvature": 3389500.0,
@@ -292,6 +895,30 @@
         "z": -1050.0,
         "diameter": 180.0,
         "fresh": 0.25
+      },
+      {
+        "x": -120.0,
+        "z": -330.0,
+        "diameter": 55.0,
+        "fresh": 0.95
+      },
+      {
+        "x": 70.0,
+        "z": -1080.0,
+        "diameter": 70.0,
+        "fresh": 0.9
+      },
+      {
+        "x": -20.0,
+        "z": -740.0,
+        "diameter": 34.0,
+        "fresh": 1.0
+      },
+      {
+        "x": 230.0,
+        "z": -1520.0,
+        "diameter": 45.0,
+        "fresh": 0.95
       }
     ],
     "mesas": [
@@ -487,43 +1114,80 @@
         103.6
       ],
       [
-        100.98599999999999,
-        22.0,
-        1317.146,
+        102.37,
+        20.0,
+        1315.3890000000001,
         106.4
       ],
       [
-        85.38900000000001,
-        8.0,
-        1333.3320000000003,
-        109.2
+        88.63600000000002,
+        6.0,
+        1328.487,
+        108.8
       ],
       [
-        79.85300000000001,
+        83.153,
+        3.0,
+        1333.2790000000002,
+        111.2
+      ],
+      [
+        77.85650000000001,
         2.8,
-        1340.3600000000001,
-        112.0
+        1339.6415000000002,
+        113.6
       ],
       [
-        78.469,
-        2.3,
-        1342.1170000000002,
-        115.0
+        65.746,
+        4.0,
+        1350.317,
+        115.6
       ],
       [
-        78.2295,
-        2.3,
-        1342.7825000000003,
-        118.0
+        57.016,
+        7.0,
+        1359.9540000000002,
+        117.5
+      ],
+      [
+        52.651,
+        9.0,
+        1364.7725,
+        118.9
+      ],
+      [
+        51.581100000000006,
+        4.0,
+        1366.4922000000001,
+        120.1
+      ],
+      [
+        51.48,
+        0.3,
+        1366.9820000000002,
+        121.2
+      ],
+      [
+        51.47735,
+        -8.0,
+        1367.0938000000003,
+        122.0
       ]
     ],
     "aims": [
       [
-        74.26400000000001,
-        2.56,
-        1349.6240000000003,
-        104.5,
-        116.0
+        76.3405,
+        3.06,
+        1351.6867500000003,
+        105.4,
+        114.6
+      ],
+      [
+        51.48,
+        -0.5,
+        1366.9820000000002,
+        114.2,
+        119.6
       ]
     ]
   },
@@ -547,7 +1211,8 @@
         1,
         1
       ],
-      "visible": true
+      "visible": true,
+      "program": "pyramid_stone"
     },
     {
       "name": "pyramid-b",
@@ -568,7 +1233,8 @@
         1,
         1
       ],
-      "visible": true
+      "visible": true,
+      "program": "pyramid_stone"
     },
     {
       "name": "pyramid-c",
@@ -589,7 +1255,8 @@
         1,
         1
       ],
-      "visible": true
+      "visible": true,
+      "program": "pyramid_stone"
     }
   ]
 }

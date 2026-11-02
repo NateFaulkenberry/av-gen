@@ -158,7 +158,7 @@ DUSK_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t i
 EGLOW = [-c for c in direction(-6, 50)]
 CLIFF_PORTAL = canyon(-8.0, 91.8)
 DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5],
-             [CLIFF_PORTAL[0], 95.0, CLIFF_PORTAL[1], 59.4, 69.3]]   # M2: the eye on the cliff as the tear opens
+             [CLIFF_PORTAL[0], 95.0, CLIFF_PORTAL[1], 58.9, 69.3]]   # M2: the eye on the cliff as the tear opens
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)

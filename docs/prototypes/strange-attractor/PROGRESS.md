@@ -40,8 +40,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | Art Pass 2, R2 | research, audit, cast sheet, beat sheet, music, proofs (`30`-`33`, `assets-pass2.md`) | **done, awaiting the owner**: media in `pass2-r/` |
 | Art Pass 2, M1 | the Moon at night (terminator, basin, domes, crater portal), the return to the canyon at dusk, the first Sasquatch encounter (`35`; ADR-1885, 1886, 1888) | reviewed: "overall this direction is great"; revised in M1b |
 | Art Pass 2, M1b | the world scaled to 0.4, the portal's water spill back, a short Moon, a real campfire (`36`; ADR-1893, 1894) | **approved, merged** (main 4bc5d3da) |
-| Art Pass 2, M2 | Mars: the outer cliff portal, Cydonia (mesas, haze, three pyramids), the pyramid portal, the night return; campfire notes (`37`; ADR-1895, 1896) | **done, awaiting the owner**: media in `pass2-m2/` |
-| Art Pass 2, M3-M5 | night and ocean, UFO, dawn (`33` §6) | not started: gated on M2 |
+| Art Pass 2, M2 | Mars: the outer cliff portal, Cydonia (mesas, haze, three pyramids), the pyramid portal, the night return; campfire notes (`37`; ADR-1895, 1896) | **approved, merged** (main 60d65ba8) |
+| Art Pass 2, M3 | the night gathering (Gray, UFO, embers), the riverbed portal, the ocean (shelf, base, launch bay, submersibles), the bay portal; Sasquatch idles; Mars notes (`38`) | **done, awaiting the owner**: media in `pass2-m3/` |
+| Art Pass 2, M4-M5 | UFO interior, dawn (`33` §6) | not started: gated on M3 |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -182,6 +183,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-11-01: Art Pass 2, M3 (`38-pass2-m3.md`).
+  - Night: moon, rim, river sheen; the Gray and a parked UFO (CC BY, made opaque) at the embers; a builder bug that
+    stacked copies of them (one a 666 m disc) fixed.
+  - The riverbed portal (crossing 121.2 s); the ocean with the shelf, an original underwater base and launch bay,
+    three timeline-keyed submersibles; the bay portal (crossing 147.0 s) into a first-form UFO interior.
+  - Sasquatch idles: 24 s procedural, a gesture each, out of phase.
+  - Mars: pyramid stone program, finer casing without grid steps, mesa strata and varied erosion, plain boulders,
+    craters and ripples.
 - 2026-11-01: Art Pass 2, M2 (`37-pass2-m2.md`; ADR-1895, 1896).
   - Journey legs: the canyon's `portals` after its `portal`, each at its own site; Moon and Mars legs on one canyon.
   - The outer cliff behind the camp opens onto Mars (crossing 69.655 s); Cydonia with mesas, yardangs, pads and haze;

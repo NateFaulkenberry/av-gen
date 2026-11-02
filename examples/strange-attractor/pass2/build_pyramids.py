@@ -85,7 +85,7 @@ def build(name, base, st):
     H = half * SLOPE
     course = max(base / 90.0, 1.6)          # stone courses (m)
     reach = half * 1.45                      # the grid runs past the base into the sand and the plain
-    step = max(base / 220.0, 0.8)            # grid spacing (m)
+    step = max(base / 320.0, 0.6)            # grid spacing (m)
     n = int(2 * reach / step) + 1
     seed = st["seed"]
 
@@ -99,8 +99,10 @@ def build(name, base, st):
         rough = (fbm(x / 9.0, y / 9.0, seed) - 0.5) * course * 0.6
         corner = min(abs(abs(x) - abs(y)) / max(m, 1e-3), 1.0)   # 0 on a corner's arris, 1 mid-face
         keep = fbm(x / 38.0, y / 38.0, seed + 3) + 0.35 * (pyr / H) - 0.25 * (1.0 - corner)
-        casing_on = keep > (1.0 - st["casing"])
-        h = pyr + rough if casing_on else core
+        # M3: the casing's edge blends over a short band instead of switching per grid cell (the grid steps)
+        cw = smooth(-0.035, 0.035, keep - (1.0 - st["casing"]))
+        casing_on = cw > 0.5
+        h = core + (pyr + rough - core) * cw
         # broken corners: the arrises chewed back, worse up high
         bite = st["corners"] * H * (1.0 - smooth(0.0, 0.18, corner)) * (0.4 + 0.6 * pyr / H) * fbm(x / 20.0, y / 20.0, seed + 5)
         h -= bite
@@ -120,8 +122,8 @@ def build(name, base, st):
         # the plain: the grid's edge sinks a little so the node can sit into the ground without a lip
         sink = -2.0 * smooth(reach * 0.85, reach, m)
         if sand + sink > h:
-            return sand + sink, 2
-        return h, (0 if casing_on else 1)
+            return sand + sink, 2, 1.0
+        return h, (0 if casing_on else 1), cw
 
     mesh = bpy.data.meshes.new(name)
     obj = bpy.data.objects.new(name, mesh)
@@ -129,20 +131,26 @@ def build(name, base, st):
     for m_ in (CASING, CORE, SAND):
         mesh.materials.append(m_)
     bm = bmesh.new()
-    verts, kinds = [], []
+    verts, kinds, cws = [], [], []
     for j in range(n):
         y = -reach + j * step
         for i in range(n):
             x = -reach + i * step
-            h, k = height(x, y)
+            h, k, cw = height(x, y)
             verts.append(bm.verts.new((x, y, h)))
             kinds.append(k)
+            cws.append(cw)
+    # M3: uv.x carries the class to the stone program (0 casing .. 0.5 core, 1 sand), uv.y the height share
+    uv_layer = bm.loops.layers.uv.new("UVMap")
     for j in range(n - 1):
         for i in range(n - 1):
             a = j * n + i
             f = bm.faces.new((verts[a], verts[a + 1], verts[a + n + 1], verts[a + n]))  # wound to face up (+z)
             ks = [kinds[a], kinds[a + 1], kinds[a + n], kinds[a + n + 1]]
             f.material_index = 2 if ks.count(2) >= 2 else (1 if 1 in ks else 0)
+            for loop, vi in zip(f.loops, (a, a + 1, a + n + 1, a + n)):
+                cls = 1.0 if kinds[vi] == 2 else 0.5 * (1.0 - cws[vi])
+                loop[uv_layer].uv = (cls, max(0.0, loop.vert.co.z) / H)
     bm.to_mesh(mesh)
     bm.free()
     mesh.shade_flat()

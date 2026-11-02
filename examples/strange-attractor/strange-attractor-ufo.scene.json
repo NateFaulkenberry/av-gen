@@ -1,0 +1,97 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "the-strange-attractor-ufo",
+  "_note": "The UFO interior's first form (Art Pass 2, M3: the bay portal's destination; M4 builds the interior).",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      3,
+      14
+    ],
+    "target": [
+      0,
+      2,
+      0
+    ],
+    "fov": 44.0,
+    "orbitSpeed": 0.0
+  },
+  "lights": [
+    {
+      "name": "ceiling",
+      "type": "point",
+      "position": [
+        0.0,
+        7.0,
+        0.0
+      ],
+      "color": [
+        0.8,
+        0.9,
+        1.0
+      ],
+      "intensity": 140.0,
+      "range": 40.0,
+      "castsShadow": true
+    },
+    {
+      "name": "rim",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.3,
+        -0.5,
+        -1.0
+      ],
+      "color": [
+        0.4,
+        0.55,
+        0.8
+      ],
+      "intensity": 0.3,
+      "castsShadow": false
+    }
+  ],
+  "environment": {
+    "intensity": 0.08,
+    "background": [
+      0.01,
+      0.012,
+      0.02
+    ],
+    "skybox": false,
+    "sky": {
+      "enabled": false
+    },
+    "fallbackAmbient": false
+  },
+  "post": {
+    "bloomIntensity": 0.05,
+    "tonemap": 0
+  },
+  "nodes": [
+    {
+      "name": "interior",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/proofs/interior.glb",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    }
+  ]
+}

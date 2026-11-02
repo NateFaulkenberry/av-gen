@@ -59,11 +59,18 @@ scene["portal"]["exit"] = [0.0, 8.0, 1500.0]
 # --- the lights: the day's fills, the dusk's (off by day), the campfire
 CAMP = canyon(16.0, 16.0)   # the low bank right of the dusk exit (build_moon.py's CAMP)
 CAMP_Y = 4.4 * WS           # measured on the bank (generator 4.4 m)
+GRAY_SCALE = 0.68           # the downloaded Gray read as tall as a Sasquatch at its own scale: about 1.5 m here
+UFO_SCALE = 0.018           # the model is 666 x 238 units (load log): a 12 m disc, 4.3 m tall
+UFO_LIFT = 1.9              # its underside (-119 units) just above the bank: resting on its keel
 lights = [l for l in scene["lights"] if l["name"] in ("canyon-bounce", "floor-bounce")]
 lights += [
     {"name": "dusk-sky", "type": "directional", "role": "fill", "direction": [0.1, -1.0, 0.15], "color": [0.36, 0.38, 1.0],
      "intensity": 0.0, "castsShadow": False, "shadowStrength": 0.0},
     {"name": "dusk-bounce", "type": "directional", "role": "fill", "direction": [-0.9, -0.15, 0.4], "color": [0.55, 0.42, 0.95],
+     "intensity": 0.0, "castsShadow": False, "shadowStrength": 0.0},
+    {"name": "ufo-glow", "type": "point", "position": [canyon(5.0, 20.0)[0], 2.6 + 0.6, canyon(5.0, 20.0)[1]],
+     "color": [0.45, 0.8, 1.0], "intensity": 0.0, "range": 26.0, "castsShadow": False, "volumetric": 0.0},
+    {"name": "moon-rim", "type": "directional", "role": "fill", "direction": [0.55, -0.45, 0.7], "color": [0.55, 0.65, 1.0],
      "intensity": 0.0, "castsShadow": False, "shadowStrength": 0.0},
     {"name": "campfire", "type": "point", "position": [CAMP[0], CAMP_Y + 1.6, CAMP[1]], "color": [1.0, 0.52, 0.22],
      "intensity": 0.0, "range": 30.0, "castsShadow": True, "shadowStrength": 1.0, "flicker": 0.3, "flickerRate": 2.6},
@@ -71,7 +78,7 @@ lights += [
 scene["lights"] = lights
 
 # --- the encounter: three Sasquatches round the fire, facing it, and the fire itself (particles)
-nodes = [n for n in scene.get("nodes", []) if not n["name"].startswith(("sasquatch-", "campfire"))]
+nodes = [n for n in scene.get("nodes", []) if not n["name"].startswith(("sasquatch-", "campfire", "gray", "ufo-parked"))]
 A = "../../assets/strange-attractor/build/"
 # round the fire on its far side from the camera's arc (which passes about (13, 10) real metres), facing the fire and
 # so, across it, the camera; the fire ring is 0.8 m and they stand back from it
@@ -88,6 +95,20 @@ for k, (name, ang, dist) in enumerate((("sasquatch-a", -52.0, 2.3), ("sasquatch-
     nodes.append({"name": name, "kind": "gltf", "asset": A + f"{name}.glb", "position": [x, CAMP_Y, z],
                   "rotation": [0, yaw, 0], "scale": [1, 1, 1], "visible": False,
                   "animation": {"state": "idle", "cullDistance": 800.0, "speed": 1.0}})
+# M3, the night gathering: a Gray joins the circle (on the camera's side, so the four stand round the embers), and a UFO
+# stands parked on the bank downstream of the fire, dim, its underside lit (shown only in the night look)
+a = math.radians(-112.0)
+ux, uz = away[0] * math.cos(a) - away[1] * math.sin(a), away[0] * math.sin(a) + away[1] * math.cos(a)
+gx, gz = CAMP[0] + 2.2 * ux, CAMP[1] + 2.2 * uz
+nodes.append({"name": "gray", "kind": "gltf", "asset": "../../assets/strange-attractor/sketchfab/gray/grey-alien-idle/grey_alien_idle.glb",
+              "position": [gx, CAMP_Y, gz], "rotation": [0, math.degrees(math.atan2(CAMP[0] - gx, CAMP[1] - gz)), 0],
+              "scale": [GRAY_SCALE] * 3, "visible": False,
+              "animation": {"state": "mixamo.com", "cullDistance": 800.0, "speed": 0.8}})
+UFO_PARK = canyon(5.0, 20.0)
+UFO_GROUND = 2.6
+nodes.append({"name": "ufo-parked", "kind": "gltf", "asset": A + "ufo-craft.glb",
+              "position": [UFO_PARK[0], UFO_GROUND + UFO_LIFT, UFO_PARK[1]], "rotation": [0, 33, 2.5],
+              "scale": [UFO_SCALE] * 3, "visible": False})
 fire = [CAMP[0], CAMP_Y + 0.08, CAMP[1]]
 nodes += [
     # the logs, the stone ring and the glowing ember bed (pass2/build_campfire.py), at real size
@@ -150,22 +171,33 @@ dusk_portal.update({
 })
 # night (crossing 3: the canyon behind the pyramid portal and home): dark, a cold moon, the fire down to embers
 night = {
-    "attractorWorld/sunAzimuth": 60.0, "attractorWorld/sunElevation": 38.0, "attractorWorld/sunIntensity": 0.025,
+    # M3: a real night -- a cold moon high to one side (shadows, a sheen on the river), a sky that keeps the canyon's
+    # skyline readable, a rim from behind for silhouettes
+    "attractorWorld/sunAzimuth": 55.0, "attractorWorld/sunElevation": 34.0, "attractorWorld/sunIntensity": 0.07,
     "attractorWorld/contourGain": 0.0,
-    "env/intensity": 0.02,
-    "env/sky/zenithColor": [0.003, 0.005, 0.02], "env/sky/horizonColor": [0.02, 0.028, 0.07],
+    "env/intensity": 0.035,
+    "env/sky/zenithColor": [0.004, 0.007, 0.028], "env/sky/horizonColor": [0.035, 0.05, 0.12],
     "env/sky/groundColor": [0.003, 0.003, 0.01], "env/sky/haze": 0.1, "env/sky/sunColor": [0.62, 0.72, 1.0],
     "env/sky/sunIntensity": 0.6, "env/sky/sunSize": 0.03, "env/sky/sunGlow": 0.2,
     "scene/fogColor": [0.008, 0.01, 0.03],
     "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.35, 0.42, 0.7],
-    "lights/floor-bounce/intensity": 0.03, "lights/dusk-sky/intensity": 0.06, "lights/dusk-bounce/intensity": 0.0,
-    "lights/campfire/intensity": 5.0, "lights/campfire/color": [1.0, 0.36, 0.1],
+    "lights/floor-bounce/intensity": 0.05, "lights/dusk-sky/intensity": 0.08, "lights/dusk-bounce/intensity": 0.0,
+    "lights/moon-rim/intensity": 0.22, "lights/ufo-glow/intensity": 10.0,
+    "lights/campfire/intensity": 9.0, "lights/campfire/color": [1.0, 0.36, 0.1],
+    "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
     "nodes/campfire-logs/visible": True, "nodes/campfire-flames/visible": False, "nodes/campfire-core/visible": False,
     "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
 }
+# home from Mars (crossing 4): night, and the riverbed portal's corruption: small, gathering as the camera leaves the camp
+night_portal = dict(night)
+night_portal.update({
+    "corruption/radius": 24.0, "corruption/fieldNear": 8.0, "corruption/fieldFar": 48.0, "corruption/openNear": 5.0,
+    "corruption/openFar": 26.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
+    "corruption/echoOffset": 0.35,
+})
 scene["looks"] = [{"name": "dusk", "from": 1, "params": dusk}, {"name": "dusk-portal", "from": 2, "params": dusk_portal},
-                  {"name": "night", "from": 3, "params": night}]
+                  {"name": "night", "from": 3, "params": night}, {"name": "night-portal", "from": 4, "params": night_portal}]
 
 # --- the second leg (ADR-1895): the outer cliff behind the camp opens onto Mars (build_mars.py)
 import build_mars  # noqa: E402
@@ -177,6 +209,17 @@ scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build
                      "exitAxis": build_mars.EXIT_AXIS, "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0],
                      "entry": [cliff[0], 95.0, cliff[1]], "entryAxis": [into[0] / n_into, 0.0, into[1] / n_into],
                      "flight": mars_flight}]
+# the third leg (M3): the riverbed below the camp opens onto the deep ocean (build_ocean.py). The camera drops into it,
+# drifting toward the river's middle; the rotation turns the drop (axis down) into a level exit
+import build_ocean  # noqa: E402
+_, ocean_flight = build_ocean.write()
+river = canyon(10.0, -12.0)
+drift = [canyon(10.0, -12.0)[i] - canyon(11.5, -10.0)[i] for i in (0, 1)]
+n_drift = math.hypot(*drift)
+scene["portals"].append({"world": "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
+                         "exitAxis": build_ocean.EXIT_AXIS, "entryUp": [drift[0] / n_drift, 0.0, drift[1] / n_drift],
+                         "exitUp": [0.0, 1.0, 0.0], "entry": [river[0], -0.5, river[1]], "entryAxis": [0.0, -1.0, 0.0],
+                         "flight": ocean_flight})
 json.dump(scene, open(PATH, "w"), indent=2)
 
 # --- the project: the Earth answers the music (a first pass for the owner to tune): the bass lifts its glow
@@ -186,5 +229,13 @@ routes.append({"source": "response.bass", "target": "moon/nodes/earth/emissiveBo
                                                  "remapOutMin": 0.0, "remapOutMax": 1.6, "clampEnabled": True,
                                                  "clampMin": 0.0, "clampMax": 1.0, "attackMs": 60.0, "decayMs": 450.0}})
 project["routes"] = routes
+# M3: the submersibles' paths and their lights, keyed in the timeline (seconds, smooth)
+tracks = [t for t in project.get("timeline", {}).get("tracks", []) if not t["target"].startswith("ocean/")]
+for node, pos, yaw in build_ocean.sub_tracks():
+    tracks.append({"target": f"ocean/nodes/{node}/position", "keys": [{"time": t, "value": p, "interp": "smooth"} for t, p in pos]})
+    tracks.append({"target": f"ocean/nodes/{node}/rotation", "keys": [{"time": t, "value": [0.0, y, 0.0], "interp": "smooth"} for t, y in yaw]})
+    tracks.append({"target": f"ocean/lights/{node}-light/position",
+                   "keys": [{"time": t, "value": [p[0], p[1] - 3.0, p[2]], "interp": "smooth"} for t, p in pos]})
+project["timeline"] = {"enabled": True, "tracks": tracks, "cues": project.get("timeline", {}).get("cues", [])}
 json.dump(project, open(PROJECT, "w"), indent=2)
 print(PATH)

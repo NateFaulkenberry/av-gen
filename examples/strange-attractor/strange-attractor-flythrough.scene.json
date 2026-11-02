@@ -169,6 +169,42 @@
       "shadowStrength": 0.0
     },
     {
+      "name": "ufo-glow",
+      "type": "point",
+      "position": [
+        82.57000000000001,
+        3.2,
+        1357.875
+      ],
+      "color": [
+        0.45,
+        0.8,
+        1.0
+      ],
+      "intensity": 0.0,
+      "range": 26.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "moon-rim",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.55,
+        -0.45,
+        0.7
+      ],
+      "color": [
+        0.55,
+        0.65,
+        1.0
+      ],
+      "intensity": 0.0,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
       "name": "campfire",
       "type": "point",
       "position": [
@@ -1316,6 +1352,53 @@
       }
     },
     {
+      "name": "gray",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/sketchfab/gray/grey-alien-idle/grey_alien_idle.glb",
+      "position": [
+        72.15165117063042,
+        1.7600000000000002,
+        1349.0091972486557
+      ],
+      "rotation": [
+        0,
+        73.77227238859423,
+        0
+      ],
+      "scale": [
+        0.68,
+        0.68,
+        0.68
+      ],
+      "visible": false,
+      "animation": {
+        "state": "mixamo.com",
+        "cullDistance": 800.0,
+        "speed": 0.8
+      }
+    },
+    {
+      "name": "ufo-parked",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
+      "position": [
+        82.57000000000001,
+        4.5,
+        1357.875
+      ],
+      "rotation": [
+        0,
+        33,
+        2.5
+      ],
+      "scale": [
+        0.018,
+        0.018,
+        0.018
+      ],
+      "visible": false
+    },
+    {
       "name": "campfire-logs",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/campfire.glb",
@@ -1695,20 +1778,20 @@
       "name": "night",
       "from": 3,
       "params": {
-        "attractorWorld/sunAzimuth": 60.0,
-        "attractorWorld/sunElevation": 38.0,
-        "attractorWorld/sunIntensity": 0.025,
+        "attractorWorld/sunAzimuth": 55.0,
+        "attractorWorld/sunElevation": 34.0,
+        "attractorWorld/sunIntensity": 0.07,
         "attractorWorld/contourGain": 0.0,
-        "env/intensity": 0.02,
+        "env/intensity": 0.035,
         "env/sky/zenithColor": [
-          0.003,
-          0.005,
-          0.02
+          0.004,
+          0.007,
+          0.028
         ],
         "env/sky/horizonColor": [
-          0.02,
-          0.028,
-          0.07
+          0.035,
+          0.05,
+          0.12
         ],
         "env/sky/groundColor": [
           0.003,
@@ -1735,15 +1818,19 @@
           0.42,
           0.7
         ],
-        "lights/floor-bounce/intensity": 0.03,
-        "lights/dusk-sky/intensity": 0.06,
+        "lights/floor-bounce/intensity": 0.05,
+        "lights/dusk-sky/intensity": 0.08,
         "lights/dusk-bounce/intensity": 0.0,
-        "lights/campfire/intensity": 5.0,
+        "lights/moon-rim/intensity": 0.22,
+        "lights/ufo-glow/intensity": 10.0,
+        "lights/campfire/intensity": 9.0,
         "lights/campfire/color": [
           1.0,
           0.36,
           0.1
         ],
+        "nodes/gray/visible": true,
+        "nodes/ufo-parked/visible": true,
         "nodes/sasquatch-a/visible": true,
         "nodes/sasquatch-b/visible": true,
         "nodes/sasquatch-c/visible": true,
@@ -1752,6 +1839,82 @@
         "nodes/campfire-core/visible": false,
         "nodes/campfire-embers/visible": true,
         "nodes/campfire-smoke/visible": true
+      }
+    },
+    {
+      "name": "night-portal",
+      "from": 4,
+      "params": {
+        "attractorWorld/sunAzimuth": 55.0,
+        "attractorWorld/sunElevation": 34.0,
+        "attractorWorld/sunIntensity": 0.07,
+        "attractorWorld/contourGain": 0.0,
+        "env/intensity": 0.035,
+        "env/sky/zenithColor": [
+          0.004,
+          0.007,
+          0.028
+        ],
+        "env/sky/horizonColor": [
+          0.035,
+          0.05,
+          0.12
+        ],
+        "env/sky/groundColor": [
+          0.003,
+          0.003,
+          0.01
+        ],
+        "env/sky/haze": 0.1,
+        "env/sky/sunColor": [
+          0.62,
+          0.72,
+          1.0
+        ],
+        "env/sky/sunIntensity": 0.6,
+        "env/sky/sunSize": 0.03,
+        "env/sky/sunGlow": 0.2,
+        "scene/fogColor": [
+          0.008,
+          0.01,
+          0.03
+        ],
+        "lights/canyon-bounce/intensity": 0.0,
+        "lights/floor-bounce/color": [
+          0.35,
+          0.42,
+          0.7
+        ],
+        "lights/floor-bounce/intensity": 0.05,
+        "lights/dusk-sky/intensity": 0.08,
+        "lights/dusk-bounce/intensity": 0.0,
+        "lights/moon-rim/intensity": 0.22,
+        "lights/ufo-glow/intensity": 10.0,
+        "lights/campfire/intensity": 9.0,
+        "lights/campfire/color": [
+          1.0,
+          0.36,
+          0.1
+        ],
+        "nodes/gray/visible": true,
+        "nodes/ufo-parked/visible": true,
+        "nodes/sasquatch-a/visible": true,
+        "nodes/sasquatch-b/visible": true,
+        "nodes/sasquatch-c/visible": true,
+        "nodes/campfire-logs/visible": true,
+        "nodes/campfire-flames/visible": false,
+        "nodes/campfire-core/visible": false,
+        "nodes/campfire-embers/visible": true,
+        "nodes/campfire-smoke/visible": true,
+        "corruption/radius": 24.0,
+        "corruption/fieldNear": 8.0,
+        "corruption/fieldFar": 48.0,
+        "corruption/openNear": 5.0,
+        "corruption/openFar": 26.0,
+        "corruption/width": 8.0,
+        "corruption/height": 8.0,
+        "corruption/depth": 4.0,
+        "corruption/echoOffset": 0.35
       }
     }
   ],
@@ -1849,6 +2012,96 @@
           28.931495949255055,
           -1990.1815169190415,
           102.2
+        ]
+      ]
+    },
+    {
+      "world": "strange-attractor-ocean.scene.json",
+      "exit": [
+        250.0,
+        60.0,
+        320.0
+      ],
+      "exitYaw": 0.0,
+      "exitAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "entryUp": [
+        -0.46828270986990206,
+        0.0,
+        0.8835786912533038
+      ],
+      "exitUp": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "entry": [
+        51.48,
+        -0.5,
+        1366.9820000000002
+      ],
+      "entryAxis": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "flight": [
+        [
+          245.0,
+          55.0,
+          210.0,
+          123.2
+        ],
+        [
+          215.0,
+          46.0,
+          -120.0,
+          127.8
+        ],
+        [
+          175.0,
+          40.0,
+          -430.0,
+          132.4
+        ],
+        [
+          150.0,
+          36.0,
+          -690.0,
+          136.6
+        ],
+        [
+          365.0,
+          91.0,
+          -785.0,
+          140.6
+        ],
+        [
+          215.0,
+          75.6,
+          -870.0,
+          144.0
+        ],
+        [
+          125.0,
+          52.0,
+          -880.0,
+          145.9
+        ],
+        [
+          65.0,
+          38.0,
+          -880.0,
+          147.0
+        ],
+        [
+          40.0,
+          34.0,
+          -880.0,
+          147.8
         ]
       ]
     }

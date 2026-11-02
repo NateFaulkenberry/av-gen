@@ -58,7 +58,10 @@ MESAS = [
     dict(x=-480.0, z=-420.0, rx=160.0, rz=110.0, angle=-12.0, height=85.0, terraces=3),    # close beside the route
     dict(x=520.0, z=-1380.0, rx=150.0, rz=95.0, angle=22.0, height=90.0, terraces=3),
 ]
-CRATERS = [dict(x=520.0, z=-650.0, diameter=260.0, fresh=0.15), dict(x=-420.0, z=-1050.0, diameter=180.0, fresh=0.25)]
+CRATERS = [dict(x=520.0, z=-650.0, diameter=260.0, fresh=0.15), dict(x=-420.0, z=-1050.0, diameter=180.0, fresh=0.25),
+           # M3: young craters beside the route, their rims strewn with boulders (the plain's foreground)
+           dict(x=-120.0, z=-330.0, diameter=55.0, fresh=0.95), dict(x=70.0, z=-1080.0, diameter=70.0, fresh=0.9),
+           dict(x=-20.0, z=-740.0, diameter=34.0, fresh=1.0), dict(x=230.0, z=-1520.0, diameter=45.0, fresh=0.95)]
 
 # --- the pyramids: the Giza diagonal, south-west to north-east (the largest first), 2 km ahead
 PYRAMIDS = [("pyramid-a", -260.0, -1780.0, 300.0, 8.0),
@@ -95,11 +98,20 @@ NIGHT_EXIT = [*canyon(*NIGHT_EXIT_DL)[:1], 86.0, canyon(*NIGHT_EXIT_DL)[1]]
 _o = [canyon(1.0, 0.0)[i] - canyon(0.0, 0.0)[i] for i in (0, 1)]
 _r = [canyon(0.0, 1.0)[i] - canyon(0.0, 0.0)[i] for i in (0, 1)]
 OUT_OF_CLIFF = unit([-_r[0], 0.0, -_r[1]])   # toward the river (-lat)
+# M3: down from the cliff to the gathering (the three Sasquatches, the Gray, the embers, the UFO parked on the bank),
+# held at a distance and near eye height so the camp and the canyon behind it share the frame; then away across the
+# water's edge and up over the riverbed portal, and down through it (crossing 5 at 121.2 s, bar 62). Heights over the
+# ground (the riverbed is at -0.8 m: the crossing is at -0.5 m).
 NIGHT_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t in
-                ((42.0, 80.0, 40.0, 103.6), (34.0, 54.0, 22.0, 106.4), (26.0, 33.0, 8.0, 109.2), (22.0, 25.0, 2.8, 112.0),
-                 (21.0, 23.0, 2.3, 115.0), (20.5, 22.5, 2.3, 118.0))]
+                ((42.0, 80.0, 40.0, 103.6), (35.0, 56.0, 20.0, 106.4), (29.0, 38.0, 6.0, 108.8), (27.0, 31.0, 3.0, 111.2),
+                 (23.5, 23.5, 2.8, 113.6), (19.0, 8.0, 4.0, 115.6), (14.0, -4.0, 7.0, 117.5), (11.5, -10.0, 9.0, 118.9),
+                 (10.4, -11.7, 4.0, 120.1), (10.0, -12.0, 0.3, 121.2), (9.9, -12.05, -8.0, 122.0))]
 CAMP = canyon(16.0, 16.0)
-NIGHT_AIMS = [[CAMP[0], 1.76 + 0.8, CAMP[1], 104.5, 116.0]]
+UFO_PARK = canyon(5.0, 20.0)
+GATHER = [(CAMP[0] * 3 + UFO_PARK[0]) / 4.0, 1.76 + 1.3, (CAMP[1] * 3 + UFO_PARK[1]) / 4.0]
+RIVER_PORTAL = canyon(10.0, -12.0)
+NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.4, 114.6],
+              [RIVER_PORTAL[0], -0.5, RIVER_PORTAL[1], 114.2, 119.6]]
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 MARS_FLIGHT = [
@@ -115,7 +127,8 @@ MARS_FLIGHT = [
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
 ]
 
-# a dusty regolith: rust and ochre by the generator's albedo and a broad noise, grit up close
+# a dusty regolith: rust and ochre by the generator's albedo and a broad noise, grit up close; M3: strata banding on the
+# steep faces (bands of uneven width, warped), wind ripples on the flats near the camera
 regolith = [
     {"kind": "input", "dst": 0, "input": "uv"},
     {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
@@ -130,8 +143,80 @@ regolith = [
     {"kind": "constant", "dst": 6, "constant": [0.46, 0.28, 0.14, 1.0]},     # ochre
     {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 6, "srcC": 4},
     {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 1},
+    # strata: a warped height into two cosine bands of unrelated period, weighted by the steepness
+    {"kind": "noise", "dst": 3, "srcA": 2, "value": 0.012, "seed": 43},
+    {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, -9.0, 9.0]},
+    {"kind": "swizzle", "dst": 4, "srcA": 2, "constant": [1, 1, 1, 1]},
+    {"kind": "add", "dst": 4, "srcA": 4, "srcB": 3},
+    {"kind": "palette", "dst": 6, "srcA": 4, "constant": [0.92, 0.92, 0.92, 0], "constant2": [0.14, 0.15, 0.17, 0],
+     "constant3": [0.137, 0.137, 0.137, 0], "constant4": [0.0, 0.0, 0.0, 0], "value": 0.0},
+    {"kind": "palette", "dst": 7, "srcA": 4, "constant": [1.0, 0.97, 0.95, 0], "constant2": [0.07, 0.08, 0.09, 0],
+     "constant3": [0.41, 0.41, 0.41, 0], "constant4": [0.3, 0.3, 0.3, 0], "value": 0.0},
+    {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 7},
+    {"kind": "input", "dst": 7, "input": "normal"},
+    {"kind": "swizzle", "dst": 7, "srcA": 7, "constant": [1, 1, 1, 1]},
+    {"kind": "smoothstep", "dst": 7, "srcA": 7, "constant": [0.82, 0.45, 0, 0]},     # 0 flat .. 1 steep
+    {"kind": "constant", "dst": 3, "constant": [1.0, 1.0, 1.0, 1.0]},
+    {"kind": "mixBy", "dst": 6, "srcA": 3, "srcB": 6, "srcC": 7},
+    {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
+    # wind ripples on the flats, close to the camera: stripes across x, warped, faded by distance and on slopes
+    {"kind": "noise", "dst": 3, "srcA": 2, "value": 0.05, "seed": 47},
+    {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, -2.5, 2.5]},
+    {"kind": "swizzle", "dst": 4, "srcA": 2, "constant": [0, 0, 0, 0]},
+    {"kind": "add", "dst": 4, "srcA": 4, "srcB": 3},
+    {"kind": "palette", "dst": 6, "srcA": 4, "constant": [0.97, 0.97, 0.97, 0], "constant2": [0.06, 0.06, 0.06, 0],
+     "constant3": [0.62, 0.62, 0.62, 0], "constant4": [0.0, 0.0, 0.0, 0], "value": 0.0},
+    {"kind": "input", "dst": 4, "input": "cameraDistance"},
+    {"kind": "remap", "dst": 4, "srcA": 4, "constant": [60.0, 220.0, 1.0, 0.0], "value": 1.0},
+    {"kind": "remap", "dst": 7, "srcA": 7, "constant": [0.0, 1.0, 1.0, 0.0], "value": 1.0},
+    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 7},
+    {"kind": "constant", "dst": 3, "constant": [1.0, 1.0, 1.0, 1.0]},
+    {"kind": "mixBy", "dst": 6, "srcA": 3, "srcB": 6, "srcC": 4},
+    {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
     {"kind": "constant", "dst": 0, "constant": [0, 0, 0, 0]},
     {"kind": "constant", "dst": 1, "constant": [0.95, 0.95, 0.95, 0.95]},
+]
+
+# M3 (coordinator: the faces read as plaster): weathered stone on the pyramids. uv.x is the class (build_pyramids.py:
+# 0 casing, 0.5 core, 1 sand); courses and irregular block joints from cell edges on a stretched position; value
+# variation; vertical stains; dust settled on the ledges
+stone = [
+    {"kind": "input", "dst": 0, "input": "uv"},
+    {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
+    {"kind": "smoothstep", "dst": 2, "srcA": 1, "constant": [0.12, 0.45, 0, 0]},
+    {"kind": "smoothstep", "dst": 3, "srcA": 1, "constant": [0.75, 0.95, 0, 0]},
+    {"kind": "constant", "dst": 4, "constant": [0.44, 0.3, 0.19, 1.0]},       # casing
+    {"kind": "constant", "dst": 5, "constant": [0.27, 0.15, 0.09, 1.0]},      # core
+    {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 2},
+    {"kind": "constant", "dst": 5, "constant": [0.42, 0.21, 0.11, 1.0]},      # sand
+    {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 3},
+    {"kind": "input", "dst": 6, "input": "worldPosition"},
+    {"kind": "constant", "dst": 7, "constant": [0.16, 0.32, 0.16, 1.0]},      # blocks ~6 m long, courses ~3.1 m: long, level cells
+    {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 7},
+    {"kind": "voronoiEdge", "dst": 5, "srcA": 7, "value": 1.0, "seed": 61},
+    {"kind": "swizzle", "dst": 5, "srcA": 5, "constant": [0, 0, 0, 0]},      # the edge distance (F2 - F1) in all channels
+    {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.16, 0, 0]},
+    {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0, 1, 0.38, 1.0], "value": 1.0},
+    {"kind": "remap", "dst": 7, "srcA": 3, "constant": [0, 1, 0, 1], "value": 1.0},
+    {"kind": "constant", "dst": 0, "constant": [1.0, 1.0, 1.0, 1.0]},
+    {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 0, "srcC": 7},             # no joints in the sand
+    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+    {"kind": "noise", "dst": 5, "srcA": 6, "value": 0.06, "seed": 63},
+    {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.3, 0.7, 0.66, 1.2], "value": 1.0},
+    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+    {"kind": "constant", "dst": 7, "constant": [0.07, 0.006, 0.07, 1.0]},     # stains: long down the faces
+    {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 7},
+    {"kind": "noise", "dst": 5, "srcA": 7, "value": 1.0, "seed": 65},
+    {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.4, 0.75, 1.0, 0.72], "value": 1.0},
+    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+    {"kind": "input", "dst": 7, "input": "normal"},
+    {"kind": "swizzle", "dst": 7, "srcA": 7, "constant": [1, 1, 1, 1]},
+    {"kind": "smoothstep", "dst": 7, "srcA": 7, "constant": [0.78, 0.97, 0, 0]},   # the treads of the courses
+    {"kind": "remap", "dst": 7, "srcA": 7, "constant": [0, 1, 0, 0.75], "value": 1.0},
+    {"kind": "constant", "dst": 5, "constant": [0.5, 0.29, 0.15, 1.0]},       # dust
+    {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 7},
+    {"kind": "constant", "dst": 0, "constant": [0, 0, 0, 0]},
+    {"kind": "constant", "dst": 1, "constant": [0.93, 0.93, 0.93, 0.93]},
 ]
 
 GOLD = [1.0, 0.62, 0.3]
@@ -165,9 +250,10 @@ def write():
                         "shadowRange": 2400.0, "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 5000.0,
                         "contactShadows": False, "shadowSplitLambda": 0.9},
         "post": {"bloomIntensity": 0.04, "tonemap": 0},
-        "materialPrograms": [{"name": "mars_regolith", "ops": regolith, "baseColor": 5, "metallic": 0, "roughness": 1}],
+        "materialPrograms": [{"name": "mars_regolith", "ops": regolith, "baseColor": 5, "metallic": 0, "roughness": 1},
+                             {"name": "pyramid_stone", "ops": stone, "baseColor": 4, "metallic": 0, "roughness": 1}],
         "lunarWorld": {"seed": 11, "extent": 6000, "spacing": 2.5, "skirtExtent": 48000, "skirtSpacing": 48, "craters": 0.4,
-                       "rocks": 0.008, "relief": 70, "program": "mars_regolith", "curvature": CURVATURE,
+                       "rocks": 0.03, "relief": 70, "program": "mars_regolith", "curvature": CURVATURE,
                        "heroes": CRATERS, "mesas": MESAS, "yardangs": 7.0, "wind": 35.0,
                        "pads": [{"x": x, "z": z, "radius": base * 0.75, "level": PAD_LEVEL[name]} for name, x, z, base, _ in PYRAMIDS]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
@@ -182,7 +268,7 @@ def write():
                    "exitUp": [0.0, 1.0, 0.0], "flight": NIGHT_FLIGHT, "aims": NIGHT_AIMS},
         "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
-                   "visible": True} for name, x, z, _, yaw in PYRAMIDS],
+                   "visible": True, "program": "pyramid_stone"} for name, x, z, _, yaw in PYRAMIDS],
     }
     path = os.path.join(HERE, "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)

@@ -240,24 +240,84 @@ bpy.ops.object.modifier_apply(modifier="weights")
 fur_obj.parent = arm_obj
 fur_obj.modifiers.new("Armature", "ARMATURE").object = arm_obj
 
-# 5. the idle
+# 5. the idle (M3, owner: they stood frozen; the M1 idle moved 2 degrees). A 24 s seamless loop of sums of sines with
+# whole cycles per loop, plus a few held beats, different per variant so the three never move together:
+# - breathing in the chest and spine (4-5 s);
+# - a slow weight shift: the hips lean side to side, the spine counters it;
+# - head turns that hold: toward the fire, toward a neighbour, back (the head bone's twist is its yaw);
+# - the arms drift, forearms ease;
+# - one small gesture each: a shrug (b), a look over the shoulder (c), a scratch of the jaw (a).
 bpy.context.view_layer.objects.active = arm_obj
 bpy.ops.object.mode_set(mode="POSE")
 arm_obj.animation_data_create()
 arm_obj.animation_data.action = bpy.data.actions.new("idle")
-fps, frames = 24, 288
+fps, loop = 24, 24.0
+frames = int(fps * loop)
 bpy.context.scene.render.fps = fps
-off = variant * 1.7
-for fr in range(0, frames + 1, 6):
-    ph = 2 * math.pi * fr / fps
-    for name, axis, amp, period in (("chest", "x", 2.0, 4.0), ("spine", "x", 1.0, 4.0), ("head", "z", 10.0, 12.0),
-                                    ("neck", "x", 3.0, 6.0), ("upperarm.L", "x", 3.0, 6.0), ("upperarm.R", "x", 3.0, 6.0),
-                                    ("hips", "y", 1.5, 12.0)):
+
+
+def wave(t, cycles, phase=0.0):
+    return math.sin(2.0 * math.pi * (cycles * t / loop) + phase)
+
+
+def beat(t, start, rise, hold, fall):
+    """0 -> 1 -> 0: eased in over `rise` s from `start`, held, eased out over `fall` s."""
+    def ease(x):
+        x = min(max(x, 0.0), 1.0)
+        return x * x * (3 - 2 * x)
+    return ease((t - start) / rise) * (1.0 - ease((t - start - rise - hold) / fall))
+
+
+# per variant: breath cycles, the head's held turns [(start, rise, hold, fall, degrees)], the gesture
+V_IDLE = [
+    dict(breath=6, sway=2, phase=0.0, turns=[(1.5, 1.6, 4.0, 1.8, 16.0), (12.0, 1.4, 3.0, 1.6, -11.0)], gesture="scratch"),
+    dict(breath=5, sway=2, phase=1.9, turns=[(4.0, 1.8, 5.0, 2.0, -14.0), (16.5, 1.5, 2.5, 1.5, 9.0)], gesture="shrug"),
+    dict(breath=6, sway=3, phase=3.7, turns=[(7.0, 1.5, 3.5, 1.6, 18.0), (19.0, 1.2, 2.0, 1.5, -20.0)], gesture="look"),
+][variant % 3]
+ph0 = V_IDLE["phase"]
+for fr in range(0, frames + 1, 3):
+    t = fr / fps
+    rot = {name: [0.0, 0.0, 0.0] for name in pb.keys()}
+    br = wave(t, V_IDLE["breath"], ph0)
+    rot["chest"][0] += math.radians(2.6) * br
+    rot["spine"][0] += math.radians(1.0) * br
+    rot["shoulder.L"][2] += math.radians(1.2) * br
+    rot["shoulder.R"][2] -= math.radians(1.2) * br
+    sw = wave(t, V_IDLE["sway"], ph0 + 0.7)
+    rot["hips"][2] += math.radians(2.4) * sw          # the side lean (weight onto one leg)
+    rot["spine"][2] -= math.radians(1.6) * sw          # countered up the body
+    rot["thigh.L"][2] -= math.radians(1.5) * sw
+    rot["thigh.R"][2] -= math.radians(1.5) * sw
+    yaw = sum(deg * beat(t, st, ri, ho, fa) for st, ri, ho, fa, deg in V_IDLE["turns"])
+    rot["head"][1] += math.radians(yaw * 0.7)
+    rot["neck"][1] += math.radians(yaw * 0.3)
+    rot["neck"][0] += math.radians(2.0) * wave(t, 3, ph0 + 2.1)
+    for side, sg, k in (("L", 1.0, 0.0), ("R", -1.0, 1.4)):
+        rot[f"upperarm.{side}"][0] += math.radians(3.5) * wave(t, 2, ph0 + k)
+        rot[f"upperarm.{side}"][2] += sg * math.radians(2.0) * wave(t, 3, ph0 + k + 0.5)
+        rot[f"forearm.{side}"][0] += math.radians(5.0) * (0.5 + 0.5 * wave(t, 2, ph0 + k + 1.0))
+    g = V_IDLE["gesture"]
+    if g == "shrug":
+        s_ = beat(t, 10.0, 0.6, 0.5, 0.8)
+        for side in ("L", "R"):
+            rot[f"shoulder.{side}"][2] += (1 if side == "L" else -1) * math.radians(9.0) * s_
+        rot["head"][0] -= math.radians(4.0) * s_
+    elif g == "look":
+        s_ = beat(t, 13.5, 1.4, 1.8, 1.6)
+        rot["chest"][1] += math.radians(9.0) * s_
+        rot["head"][1] += math.radians(22.0) * s_
+    elif g == "scratch":
+        s_ = beat(t, 8.0, 1.1, 1.6, 1.2)
+        rot["upperarm.R"][0] -= math.radians(48.0) * s_
+        rot["upperarm.R"][2] -= math.radians(12.0) * s_
+        rot["forearm.R"][0] -= math.radians(85.0) * s_
+        rot["head"][2] += math.radians(6.0) * s_
+    for name, (rx, ry, rz) in rot.items():
+        if rx == 0.0 and ry == 0.0 and rz == 0.0 and fr not in (0, frames):
+            continue
         b = pb[name]
         b.rotation_mode = "XYZ"
-        e = Euler((0, 0, 0))
-        setattr(e, axis, math.radians(amp) * math.sin(ph / period + off + (1.3 if name.endswith(".R") else 0.0)))
-        b.rotation_euler = e
+        b.rotation_euler = Euler((rx, ry, rz))
         b.keyframe_insert("rotation_euler", frame=fr)
 bpy.ops.object.mode_set(mode="OBJECT")
 bpy.context.scene.frame_start, bpy.context.scene.frame_end = 0, frames

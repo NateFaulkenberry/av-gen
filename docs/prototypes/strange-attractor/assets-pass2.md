@@ -47,6 +47,8 @@ Attribution, to carry wherever the work is shown:
 | `assets/strange-attractor/build/campfire.glb` (logs, stone ring, ember bed) | `pass2/build_campfire.py` | nothing third-party | original |
 | `assets/strange-attractor/build/pyramid-{a,b,c}.glb` (eroded Cydonia pyramids, sand ramps) | `pass2/build_pyramids.py` | nothing third-party | original |
 | `assets/strange-attractor/build/suited-man.glb` (scale reference) | exported from the MPFB suited man | the suited man | CC0-derived |
+| `assets/strange-attractor/build/ufo-craft.glb` (opaque, dimmed emission) | `pass2/prepare_ufo.py` | BrunoLatour's UFO (CC BY 4.0) | CC BY 4.0 (attribution above) |
+| `assets/strange-attractor/build/ocean-base.glb`, `bay-membrane.glb` (underwater base, launch bay) | `pass2/build_base.py` | nothing third-party | original |
 
 ## Already in the library (reused, not committed)
 
