@@ -156,6 +156,7 @@ struct SlitSettings {
         float fracture = 0.0f; // 0..1 of `span`: each strip across the object shows a random moment that far back
         float strips = 24.0f;  // strips across the frame, perpendicular to `angle`, for the fracture
         float angle = 0.0f;    // degrees: the object's direction of travel on screen (0 = toward +x)
+        float rgb = 0.0f;      // ADR-1936: frames; green reads this much further back than red, blue twice as far
     };
     static constexpr int kSlots = 16;
     std::array<Slot, kSlots> slots{};
@@ -257,6 +258,7 @@ struct TemporalParameters {
         params::Parameter<float>* fracture = nullptr;
         params::Parameter<float>* strips = nullptr;
         params::Parameter<float>* angle = nullptr;
+        params::Parameter<float>* rgb = nullptr; // ADR-1936
     };
     std::array<SlotParams, SlitSettings::kSlots> slitSlots{};
     params::Parameter<float>* historyCapacity = nullptr; // ADR-1931

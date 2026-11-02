@@ -22,7 +22,9 @@
 
 namespace avgen::shaders {
 
-enum class LayerStage : std::uint8_t { Background, Post };
+// ADR-1935: Late runs after the temporal stage (on the image the temporal effects return) and before the post chain, so
+// a warp there bends the figures, their temporal trails and the background together.
+enum class LayerStage : std::uint8_t { Background, Post, Late };
 const char* layerStageName(LayerStage stage);
 Result<LayerStage> layerStageFromName(const std::string& name);
 

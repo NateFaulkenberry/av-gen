@@ -5470,10 +5470,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ---- post layers: HDR -> ping-pong HDR ----
     wgpu::TextureView finalHdr = hdr_.colorView();
     hdrOutput_ = hdr_.colorTexture();
-    if (layerSet != nullptr) {
-        int ping = 0;
+    int ping = 0;
+    // ADR-1935: one loop for both image stages -- Post before the temporal stage, Late after it.
+    const auto runImageLayers = [&](shaders::LayerStage which) -> Result<void> {
+        if (layerSet == nullptr) {
+            return {};
+        }
         for (const auto& layer : layerSet->layers()) {
-            if (!layer->enabled || layer->stage != shaders::LayerStage::Post) {
+            if (!layer->enabled || layer->stage != which) {
                 continue;
             }
             auto* gpuLayer = shaderStack_->find(layer->id);
@@ -5491,10 +5495,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             color.loadOp = wgpu::LoadOp::Clear;
             color.storeOp = wgpu::StoreOp::Store;
             wgpu::RenderPassDescriptor pass{};
-            pass.label = "post-layer-pass";
+            pass.label = which == shaders::LayerStage::Late ? "late-layer-pass" : "post-layer-pass";
             pass.colorAttachmentCount = 1;
             pass.colorAttachments = &color;
-            pass.timestampWrites = timeline_->mark("shaderlayer", gpu::FrameTimeline::PassKind::Render);
+            pass.timestampWrites = timeline_->mark(which == shaders::LayerStage::Late ? "shaderlayer/late" : "shaderlayer",
+                                                   gpu::FrameTimeline::PassKind::Render);
             wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
             gpuLayer->drawOutput(rp, kHdrFormat, false, *layer, postCtx);
             rp.End();
@@ -5503,6 +5508,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             hdrOutput_ = post_[ping].colorTexture();
             ping = 1 - ping;
         }
+        return {};
+    };
+    if (auto r = runImageLayers(shaders::LayerStage::Post); !r) {
+        return r;
     }
 
     // ---- temporal media: capture the clean radiance, apply the temporal effects (ADR-410) ----
@@ -5543,6 +5552,12 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             finalHdr = temporal_->run(encoder, temporalIn, *pool_);
         }
         stats_.temporal = temporal_->stats();
+    }
+    // ---- ADR-1935: late layers, on what the temporal stage returned ----
+    // The temporal stage may return a pool texture rather than one of the post targets; the late loop writes the
+    // post target `ping` points at, which is never the one holding `finalHdr` when that is a post target.
+    if (auto r = runImageLayers(shaders::LayerStage::Late); !r) {
+        return r;
     }
     // ---- debug drawing (ADR-031): whatever the host queued this frame, over the lit scene ----
     //

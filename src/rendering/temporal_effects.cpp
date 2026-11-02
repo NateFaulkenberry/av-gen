@@ -29,10 +29,10 @@ static_assert(sizeof(Uniforms) == 96);
 // ADR-1934: the gate's per-slot table, mirrored by `GateUniforms` in temporal.wgsl.
 struct GateUniforms {
     std::array<float, 4> header{}; // layers the trail scan may visit, the fracture's epoch, span, 0
-    std::array<std::array<float, 4>, 32> slots{};
+    std::array<std::array<float, 4>, 48> slots{}; // three per slot (ADR-1936 added the third)
 };
-static_assert(sizeof(GateUniforms) == 528);
-static_assert(scene::SlitSettings::kSlots * 2 == 32);
+static_assert(sizeof(GateUniforms) == 784);
+static_assert(scene::SlitSettings::kSlots * 3 == 48);
 // The identifier's low 16 bits index the slot table, four 8-bit slots to a word.
 constexpr std::uint32_t kSlotTableWords = 65536 / 4;
 // The fracture re-chooses its moments this many times a second (a function of the render time, so scrub-safe).
@@ -656,10 +656,11 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
         for (std::size_t k = 0; k < sl.slots.size(); ++k) {
             const scene::SlitSettings::Slot& s = sl.slots[k];
             const float a = glm::radians(s.angle);
-            const bool live = s.trail > 0.0f || s.fracture > 0.0f;
-            g.slots[k * 2] = {std::max(s.trail, 0.0f), std::max(s.echo, 0.0f), std::clamp(s.fade, 0.0f, 1.0f),
+            const bool live = s.trail > 0.0f || s.fracture > 0.0f || s.rgb > 0.0f;
+            g.slots[k * 3] = {std::max(s.trail, 0.0f), std::max(s.echo, 0.0f), std::clamp(s.fade, 0.0f, 1.0f),
                               std::clamp(s.fracture, 0.0f, 1.0f)};
-            g.slots[k * 2 + 1] = {std::max(std::round(s.strips), 1.0f), std::cos(a), std::sin(a), live ? 1.0f : 0.0f};
+            g.slots[k * 3 + 1] = {std::max(std::round(s.strips), 1.0f), std::cos(a), std::sin(a), live ? 1.0f : 0.0f};
+            g.slots[k * 3 + 2] = {std::clamp(s.rgb, 0.0f, std::max(sl.span, 0.0f) * 0.5f), 0.0f, 0.0f, 0.0f}; // ADR-1936
             maxTrail = std::max(maxTrail, std::min(s.trail, sl.span));
         }
         // The trail scan visits only the layers the longest live trail can reach.

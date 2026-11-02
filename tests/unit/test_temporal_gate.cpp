@@ -10,6 +10,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
 #include "scene/temporal_settings.hpp"
+#include "shaders/shader_layers.hpp"
 #include "support/gltf_fixture.hpp"
 #include "support/temp_dir.hpp"
 
@@ -104,6 +105,7 @@ TEST_CASE("the gate and its slot table round-trip, and a scene without them writ
     s.slit.slots[15].fracture = 0.6f;
     s.slit.slots[15].strips = 30.0f;
     s.slit.slots[15].angle = -20.0f;
+    s.slit.slots[7].rgb = 5.0f; // ADR-1936
     const nlohmann::json j = scene::temporalToJson(s);
     REQUIRE(j.at("slit").at("slots").size() == 16);
     auto back = scene::temporalFromJson(j);
@@ -115,6 +117,7 @@ TEST_CASE("the gate and its slot table round-trip, and a scene without them writ
     CHECK(back->slit.slots[15].fracture == 0.6f);
     CHECK(back->slit.slots[15].strips == 30.0f);
     CHECK(back->slit.slots[15].angle == -20.0f);
+    CHECK(back->slit.slots[7].rgb == 5.0f);
     CHECK(scene::temporalToJson(*back) == j);
     // the bound is still the span: a slot reads no further back than it
     CHECK(s.historyFrames() == static_cast<std::uint32_t>(std::ceil(s.slit.span)));
@@ -126,7 +129,7 @@ TEST_CASE("every slot's parameters are registered and applied", "[temporal][adr1
     const scene::TemporalParameters p = scene::registerTemporalParameters(params, defaults);
     REQUIRE(p.slitGate != nullptr);
     for (int k = 1; k <= scene::SlitSettings::kSlots; ++k) {
-        for (const char* leaf : {"trail", "echo", "fade", "fracture", "strips", "angle"}) {
+        for (const char* leaf : {"trail", "echo", "fade", "fracture", "strips", "angle", "rgb"}) {
             const std::string path = "temporal/slit/slot" + std::to_string(k) + "/" + leaf;
             INFO(path);
             CHECK(params.find(path) != nullptr);
@@ -141,4 +144,12 @@ TEST_CASE("every slot's parameters are registered and applied", "[temporal][adr1
     CHECK(out.slit.gate == 1.0f);
     CHECK(out.slit.slots[4].trail == 25.0f);
     CHECK(out.slit.slots[4].fracture == 0.5f);
+}
+
+TEST_CASE("the late shader stage has a name, and round-trips through it", "[shaders][adr1935]") {
+    auto st = avgen::shaders::layerStageFromName("late");
+    REQUIRE(st.has_value());
+    CHECK(*st == avgen::shaders::LayerStage::Late);
+    CHECK(std::string(avgen::shaders::layerStageName(avgen::shaders::LayerStage::Late)) == "late");
+    CHECK_FALSE(avgen::shaders::layerStageFromName("later").has_value());
 }

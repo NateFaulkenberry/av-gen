@@ -8,7 +8,14 @@
 
 namespace avgen::shaders {
 
-const char* layerStageName(LayerStage stage) { return stage == LayerStage::Post ? "post" : "background"; }
+const char* layerStageName(LayerStage stage) {
+    switch (stage) {
+    case LayerStage::Post: return "post";
+    case LayerStage::Late: return "late"; // ADR-1935
+    case LayerStage::Background: break;
+    }
+    return "background";
+}
 
 Result<LayerStage> layerStageFromName(const std::string& name) {
     if (name == "background") {
@@ -16,6 +23,9 @@ Result<LayerStage> layerStageFromName(const std::string& name) {
     }
     if (name == "post") {
         return LayerStage::Post;
+    }
+    if (name == "late") { // ADR-1935
+        return LayerStage::Late;
     }
     return fail("unknown shader stage '{}'", name);
 }

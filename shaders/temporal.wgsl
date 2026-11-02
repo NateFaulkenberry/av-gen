@@ -410,8 +410,9 @@ fn fs_sample(in: FsIn) -> @location(0) vec4<f32> {
 // that maps an entity to its node's `temporalSlot`. The sampler then reads history only where the stored texel was a
 // gated object, so the creature and the background can never be smeared: their past pixels are rejected.
 //
-// Per slot (`gate.slots`, two vec4s each; slot k at 2(k-1)):
+// Per slot (`gate.slots`, three vec4s each; slot k at 3(k-1)):
 //   a = (trail frames, echo frames, fade, fracture)   b = (strips, cos angle, sin angle, 1 if any term is live)
+//   c = (rgb frames, 0, 0, 0) -- ADR-1936: green reads `rgb` frames further back than red, blue twice that
 // header = (layers the trail scan may visit, the fracture's epoch, span, 0)
 //
 // Two terms:
@@ -425,7 +426,7 @@ fn fs_sample(in: FsIn) -> @location(0) vec4<f32> {
 
 struct GateUniforms {
     header: vec4<f32>,
-    slots: array<vec4<f32>, 32>,
+    slots: array<vec4<f32>, 48>,
 };
 
 @group(0) @binding(4) var slotHistory: texture_2d_array<u32>;
@@ -456,6 +457,37 @@ fn gateHash(a: u32, b: u32, c: u32) -> f32 {
     return f32(moshPcg(a ^ moshPcg(b ^ moshPcg(c))) >> 8u) / 16777216.0;
 }
 
+// ADR-1936: the colour at `age` frames with green from `shift` frames further back and blue from twice that, each read
+// only where the stored texel at its own moment held the same slot (else that channel keeps `base`).
+fn rgbSplit(uv: vec2<f32>, hp: vec2<i32>, base: vec3<f32>, slot: u32, age: f32, shift: f32) -> vec3<f32> {
+    if (shift <= 0.0) {
+        return base;
+    }
+    let depth = max(i32(temporal.ring.x + 0.5), 1);
+    let writeLayer = i32(temporal.ring.y + 0.5);
+    let valid = i32(temporal.ring.z + 0.5);
+    let newest = max(temporal.ring.w, 1.0);
+    let stride = max(temporal.more.x, 1.0);
+    var out = base;
+    for (var k = 1; k <= 2; k = k + 1) {
+        let ak = age + f32(k) * shift;
+        if (ak < newest || valid <= 0) {
+            continue;
+        }
+        let j = min(i32(round((ak - newest) / stride)), valid - 1);
+        let layer = gateLayer(j, writeLayer, depth);
+        if (textureLoad(slotHistory, hp, layer, 0).r == slot) {
+            let c = textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;
+            if (k == 1) {
+                out.g = c.g;
+            } else {
+                out.b = c.b;
+            }
+        }
+    }
+    return out;
+}
+
 @fragment
 fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
     let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
@@ -475,6 +507,10 @@ fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
     if (valid <= 0) {
         return current;
     }
+    // ADR-1936: the gated object itself, its colours pulled apart in time
+    if (s0 != 0u && s0 <= 16u) {
+        outc = rgbSplit(in.uv, hp, current.rgb, s0, 0.0, gate.slots[(s0 - 1u) * 3u + 2u].x);
+    }
     // trail
     if (s0 == 0u) {
         let scan = min(valid, i32(gate.header.x + 0.5));
@@ -488,7 +524,7 @@ fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
             if (sj == 0u || sj > 16u) {
                 continue;
             }
-            let a = gate.slots[(sj - 1u) * 2u];
+            let a = gate.slots[(sj - 1u) * 3u];
             let trail = min(a.x, span);
             if (age > trail) {
                 continue;
@@ -500,7 +536,8 @@ fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
                     continue;
                 }
             }
-            let past = textureSampleLevel(colourHistory, linearSampler, in.uv, layer, 0.0).rgb;
+            var past = textureSampleLevel(colourHistory, linearSampler, in.uv, layer, 0.0).rgb;
+            past = rgbSplit(in.uv, hp, past, sj, age, gate.slots[(sj - 1u) * 3u + 2u].x);
             let opacity = clamp(1.0 - a.z * age / max(trail, 1.0), 0.0, 1.0);
             outc = mix(current.rgb, past, opacity);
             hit = sj;
@@ -513,8 +550,8 @@ fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
         sf = hit;
     }
     if (sf != 0u && sf <= 16u) {
-        let a = gate.slots[(sf - 1u) * 2u];
-        let b = gate.slots[(sf - 1u) * 2u + 1u];
+        let a = gate.slots[(sf - 1u) * 3u];
+        let b = gate.slots[(sf - 1u) * 3u + 1u];
         if (a.w > 0.0) {
             let aspect = temporal.outputSize.x / max(temporal.outputSize.y, 1.0);
             let t = dot((in.uv - vec2<f32>(0.5)) * vec2<f32>(aspect, 1.0), vec2<f32>(b.y, b.z));
@@ -525,7 +562,9 @@ fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
                 let jf = min(i32(round((ageF - newest) / stride)), valid - 1);
                 let layer = gateLayer(jf, writeLayer, depth);
                 if (textureLoad(slotHistory, hp, layer, 0).r == sf) {
-                    outc = textureSampleLevel(colourHistory, linearSampler, in.uv, layer, 0.0).rgb;
+                    let ageL = newest + f32(jf) * stride;
+                    outc = rgbSplit(in.uv, hp, textureSampleLevel(colourHistory, linearSampler, in.uv, layer, 0.0).rgb, sf,
+                                    ageL, gate.slots[(sf - 1u) * 3u + 2u].x);
                 }
             }
         }

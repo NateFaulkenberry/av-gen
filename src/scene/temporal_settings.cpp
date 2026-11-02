@@ -174,6 +174,7 @@ TemporalParameters registerTemporalParameters(params::ParameterSet& params, cons
         q.fracture = &params.add(f((sp + "fracture").c_str(), d.fracture, 0.0f, 1.0f, 0.0f, 1.0f));
         q.strips = &params.add(f((sp + "strips").c_str(), d.strips, 1.0f, 512.0f, 4.0f, 96.0f));
         q.angle = &params.add(f((sp + "angle").c_str(), d.angle, -360.0f, 360.0f, -180.0f, 180.0f));
+        q.rgb = &params.add(f((sp + "rgb").c_str(), d.rgb, 0.0f, kMaxSpan, 0.0f, 16.0f)); // ADR-1936
     }
     // ADR-1931: the ring. Floats carrying integers, rounded where read, like `frames`.
     const TemporalHistorySettings& h = defaults.history;
@@ -232,6 +233,7 @@ void applyTemporalParameters(const TemporalParameters& p, TemporalSettings& sett
         if (q.fracture != nullptr) d.fracture = q.fracture->value();
         if (q.strips != nullptr) d.strips = q.strips->value();
         if (q.angle != nullptr) d.angle = q.angle->value();
+        if (q.rgb != nullptr) d.rgb = q.rgb->value();
     }
     TemporalHistorySettings& h = settings.history; // ADR-1931
     if (p.historyCapacity != nullptr) h.capacity = clampCapacity(static_cast<int>(std::lround(p.historyCapacity->value())));
@@ -267,14 +269,15 @@ nlohmann::json temporalToJson(const TemporalSettings& s) {
     bool slotsAuthored = false;
     for (const auto& sl : sd.slots) {
         slotsAuthored = slotsAuthored || sl.trail != 0.0f || sl.echo != 0.0f || sl.fade != defaultsSlit.slots[0].fade ||
-                        sl.fracture != 0.0f || sl.strips != defaultsSlit.slots[0].strips || sl.angle != 0.0f;
+                        sl.fracture != 0.0f || sl.strips != defaultsSlit.slots[0].strips || sl.angle != 0.0f || sl.rgb != 0.0f;
     }
     if (sd.gate != 0.0f || slotsAuthored) {
         j["slit"]["gate"] = sd.gate;
         nlohmann::json slots = nlohmann::json::array();
         for (const auto& sl : sd.slots) {
             slots.push_back(nlohmann::json{{"trail", sl.trail}, {"echo", sl.echo}, {"fade", sl.fade},
-                                           {"fracture", sl.fracture}, {"strips", sl.strips}, {"angle", sl.angle}});
+                                           {"fracture", sl.fracture}, {"strips", sl.strips}, {"angle", sl.angle},
+                                           {"rgb", sl.rgb}});
         }
         j["slit"]["slots"] = std::move(slots);
     }
@@ -380,6 +383,7 @@ Result<TemporalSettings> temporalFromJson(const nlohmann::json& j) {
                     number(o, "fracture", d.fracture, 0.0f, 1.0f);
                     number(o, "strips", d.strips, 1.0f, 512.0f);
                     number(o, "angle", d.angle, -360.0f, 360.0f);
+                    number(o, "rgb", d.rgb, 0.0f, kMaxSpan); // ADR-1936
                 }
             }
         });
