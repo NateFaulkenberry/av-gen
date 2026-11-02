@@ -65,6 +65,12 @@ This needs a real rebuild, done like a VFX lighting and set-dressing artist woul
 - **Materials and props:** a believable fire (real flame and smoke, embers that rise and die near the
   fire), believable logs and stones, Sasquatch fur that reads with highlights from the fire.
 - Show the before/after at the same camera beats, and stills per beat.
+- **Owner addition: realistic close-up textures** (canyon camp ground and Mars sand, rock and pyramid stone):
+  photoscanned PBR sets (albedo, normal, roughness, ideally height) from free, clearly licensed sources (CC0 such as
+  Poly Haven or ambientCG, or the approved licence list); blended with the procedural strata at distance (close-ups
+  get real detail, wide shots keep the look); tiling broken up (triplanar/stochastic blending, macro variation);
+  each set logged in the asset record, kept in the gitignored assets folder, never committed; stop and send the link
+  if a source needs a login. Show close-up before/after stills at the camp and on Mars.
 
 ## 3. The Moon
 
@@ -105,6 +111,8 @@ This needs a real rebuild, done like a VFX lighting and set-dressing artist woul
   both, do that, with an ADR if it is an engine-level change. This supersedes "another art pass over the landscape"
   above; the sand-embraces-the-pyramids and texture notes still apply on top of it. Show Mars before/after at the
   same camera beats.
+
+- (The close-up texture addition in §2b applies to Mars's sand, rock and pyramid stone too.)
 
 ## Rules
 
