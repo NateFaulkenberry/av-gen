@@ -7,8 +7,8 @@
 >
 > | Gate | Phases | State |
 > |---|---|---|
-> | S0 | recon, plan, Test A (the singularity alone) | **done, awaiting the owner** (`22-singularity-plan.md`, `23-singularity-s0.md`, media in `singularity-s0/`): one stateless background shader layer, no engine change |
-> | S1 | Phases 2-4: figures, temporal transformation, gravitational distortion (Tests B-D) | not started |
+> | S0 | recon, plan, Test A (the singularity alone) | **approved** (`22-singularity-plan.md`, `23-singularity-s0.md`) |
+> | S1 | Phases 2-4: figures, temporal transformation, gravitational distortion (Tests B-D) | **done, awaiting the owner** (`24-singularity-s1.md`, media in `singularity-s1/`): the singularity fixes; ADR-1935 (late layer stage), ADR-1936 (RGB per slot); one field shared by both layers and the figures |
 > | S2 | Phases 5-6: feedback and chaos, drums, polish, profile (Tests E-G) | not started |
 >
 > The Devourer history (D0-D2, docs 10-17) follows, **superseded**.
@@ -32,7 +32,7 @@
 >
 > The canyon-era history follows.
 
-Branch `scene/chronos` in `../av-gen-chronos`, from main 214dafd8. ADRs 1930-1969 (used: 1930-1934; next 1935).
+Branch `scene/chronos` in `../av-gen-chronos`, from main 214dafd8. ADRs 1930-1969 (used: 1930-1936; next 1937).
 Review media: `~/Desktop/av-gen-review/104-chronos/gate<N>/`.
 
 | Gate | Phases | State |

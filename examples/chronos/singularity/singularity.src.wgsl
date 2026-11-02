@@ -1,0 +1,247 @@
+/*{
+  "NAME": "chronos-singularity",
+  "DESCRIPTION": "CHRONOS, Temporal Singularity: the collapse of time and space. A main mass that wanders the frame and three counter-spinning eddies make one gravitational field (field.wgsl); every structure is drawn in its swirled coordinates -- a misshapen near-black core, three accretion bands turning at different speeds and in different directions on a tilting disk, white-hot highlights flowing along them, inward-falling streaks, tidal streams pulled from the eddies that collide in the disk, outward bursts, the eddies' spirals, and the full-screen nebula, filaments and stars. The lensing of everything, figures included, is the late layer lens.wgsl. Stateless: a pure function of the render time.",
+  "CREDIT": "avgen -- CHRONOS",
+  "CATEGORIES": ["Generator", "Background"],
+  "INPUTS": [
+    {"NAME": "intensity", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Overall intensity"},
+    {"NAME": "coreRadius", "TYPE": "float", "DEFAULT": 0.085, "MIN": 0.02, "MAX": 0.3, "LABEL": "Core radius (frame heights)"},
+    {"NAME": "scale", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.3, "MAX": 3.0, "LABEL": "Singularity scale"},
+    {"NAME": "expansion", "TYPE": "float", "DEFAULT": 0.0, "MIN": -1.0, "MAX": 2.0, "LABEL": "Expansion (route a transient here)"},
+    {"NAME": "rotation", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Rotation rate"},
+    {"NAME": "turbulence", "TYPE": "float", "DEFAULT": 0.0, "MIN": 0.0, "MAX": 3.0, "LABEL": "Extra turbulence"},
+    {"NAME": "fragmentation", "TYPE": "float", "DEFAULT": 0.0, "MIN": 0.0, "MAX": 1.0, "LABEL": "Extra tearing shear"},
+    {"NAME": "bandGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Accretion bands"},
+    {"NAME": "highlightGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "White-hot highlights"},
+    {"NAME": "streakGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Radial streaks"},
+    {"NAME": "streamGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Tidal streams"},
+    {"NAME": "burstGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Outward bursts"},
+    {"NAME": "eddyGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Secondary spirals"},
+    {"NAME": "backgroundGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Background"},
+    {"NAME": "starGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Stars"},
+    {"NAME": "timeOffset", "TYPE": "float", "DEFAULT": 0.0, "MIN": -1000.0, "MAX": 1000.0, "LABEL": "Time offset (s)"}
+  ]
+}*/
+
+// Scene-linear HDR, drawn behind the figures. The core is black; the hottest highlights reach about 5; the bands sit at
+// 0.3-3; the background at 0.01-0.1, subordinate but never empty.
+
+//@FIELD
+
+// heat 0..1: deep purple, violet, magenta, crimson, hot orange, amber, gold, white-hot
+fn palette(h: f32) -> vec3<f32> {
+    var cols = array<vec3<f32>, 8>(vec3<f32>(0.10, 0.015, 0.16), vec3<f32>(0.32, 0.04, 0.62), vec3<f32>(0.78, 0.05, 0.48),
+                                   vec3<f32>(0.82, 0.03, 0.07), vec3<f32>(1.0, 0.30, 0.03), vec3<f32>(1.0, 0.55, 0.09),
+                                   vec3<f32>(1.0, 0.78, 0.30), vec3<f32>(1.0, 0.95, 0.86));
+    let x = clamp(h, 0.0, 1.0) * 7.0;
+    let i = i32(floor(min(x, 6.999)));
+    return mix(cols[i], cols[i + 1], x - f32(i));
+}
+
+// a tidal stream: luminous matter pulled from an eddy and wound into the main disk, flowing along its curve
+fn stream(qs: vec2<f32>, src: vec2<f32>, dst: vec2<f32>, curl: f32, t: f32, seed: f32) -> f32 {
+    let ab = dst - src;
+    let L = max(length(ab), 1e-3);
+    let dir = ab / L;
+    let nrm = vec2<f32>(-dir.y, dir.x);
+    let rel = qs - src;
+    let s = clamp(dot(rel, dir) / L, 0.0, 1.0);
+    // the stream bows sideways and winds tighter as it nears the main mass
+    let bow = curl * L * (sin(3.14159 * s) * 0.35 + 0.25 * s * s);
+    let off = dot(rel, nrm) - bow;
+    let width = L * (0.05 + 0.04 * (1.0 - s));
+    let body = exp(-pow(off / width, 2.0)) * smoothstep(0.0, 0.12, s) * smoothstep(1.0, 0.8, s);
+    let flow = ridged(vec3<f32>(s * 9.0 - 1.4 * t, off / width * 0.8, seed + 0.1 * t), 3);
+    return body * pow(flow, 2.5);
+}
+
+fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
+    let t = sys.time + inputs.timeOffset;
+    let aspect = sys.renderSize.x / max(sys.renderSize.y, 1.0);
+    let screen = vec2<f32>((uv.x - 0.5) * aspect, 0.5 - uv.y);
+    let p = rot(screen, frameTurn(t)) / frameZoom(t, inputs.scale);
+
+    let D = clamp(tear(t) + inputs.turbulence * 0.35, 0.0, 2.0);
+    let c0 = mainCenter(t);
+    let R0 = coreRadiusAt(t, inputs.coreRadius, inputs.expansion);
+    let spinT = spinTime(t, inputs.rotation);
+    let e0 = eddy(0, t, c0, R0);
+    let e1 = eddy(1, t, c0, R0);
+    let e2 = eddy(2, t, c0, R0);
+
+    // frame dragging: the swirl that gives every structure its spiral (structure, not lensing -- lens.wgsl lenses)
+    var qs = p;
+    for (var i = 0; i < 3; i = i + 1) {
+        var e = e0;
+        if (i == 1) { e = e1; }
+        if (i == 2) { e = e2; }
+        let de = qs - e.c;
+        qs = e.c + rot(de, e.spin * e.w * 4.0 * e.r * e.r / (dot(de, de) + e.r * e.r));
+    }
+    {
+        let d = qs - c0;
+        let r = length(d);
+        qs = c0 + rot(d, -(1.4 + 0.6 * D) * exp(-r / (6.0 * R0)) - 0.35 * exp(-r / 0.9));
+    }
+
+    // ---- the background ------------------------------------------------------------------------------------------
+    var col = vec3<f32>(0.0);
+    {
+        let d = qs - c0;
+        let r = length(d);
+        let qb = c0 + rot(d, -0.018 * spinT * 0.6);
+        let n1 = fbm(vec3<f32>(qb * 2.1, 0.035 * t), 5);
+        let n2 = fbm(vec3<f32>(qb * 4.3 + vec2<f32>(3.1, -1.7), 0.05 * t + 7.0), 4);
+        let neb = smoothstep(0.45, 0.9, n1) * (0.4 + 0.9 * n2);
+        let tint = mix(vec3<f32>(0.20, 0.025, 0.06), vec3<f32>(0.16, 0.03, 0.30), smoothstep(0.3, 0.7, n2));
+        col = col + tint * neb * 0.055;
+        let f = ridged(vec3<f32>(qb * 3.2, 0.04 * t + 2.0), 4);
+        col = col + mix(vec3<f32>(0.55, 0.05, 0.40), vec3<f32>(0.30, 0.06, 0.65), n1) * pow(f, 9.0) * 0.12;
+        col = col + vec3<f32>(0.22, 0.03, 0.12) * exp(-r / (5.0 * R0)) * 0.18 + vec3<f32>(0.10, 0.02, 0.16) * exp(-r / 0.7) * 0.06;
+        col = col + mix(vec3<f32>(0.006, 0.001, 0.003), vec3<f32>(0.005, 0.0015, 0.011), uv.x);
+        var stars = 0.0;
+        for (var layer = 0; layer < 2; layer = layer + 1) {
+            let sc = select(38.0, 75.0, layer == 1);
+            for (var k = 0; k < 4; k = k + 1) {
+                let sp = c0 + rot(qb - c0, f32(k) * 0.012 * (1.0 + 2.0 * D));
+                let g = sp * sc;
+                let cell = vec2<i32>(floor(g));
+                let h = hash2(cell + vec2<i32>(layer * 977, 13));
+                let jitter = vec2<f32>(hash2(cell + vec2<i32>(7, layer)), hash2(cell + vec2<i32>(layer, 29)));
+                let dd = length(fract(g) - jitter);
+                stars = stars + pow(h, 30.0) * smoothstep(0.09, 0.0, dd) * (1.0 - 0.2 * f32(k));
+            }
+        }
+        col = col + vec3<f32>(1.0, 0.8, 0.9) * stars * 0.5 * inputs.starGain;
+        col = col * inputs.backgroundGain;
+    }
+
+    // ---- the disk: tilted, inclined, misshapen with the core, turning in bands ---------------------------------------
+    let tilt = 0.35 + 0.25 * sin(0.037 * t) + 0.1 * sin(0.11 * t);
+    let incl = 0.58 + 0.12 * sin(0.029 * t + 1.0);
+    var v = rot(qs - c0, tilt);
+    v.y = v.y / incl;
+    let a = atan2(v.y, v.x);
+    let x = length(v) / max(R0 * coreShape(a, t), 1e-4);
+    let lx = log(max(x, 1e-3));
+
+    // the tear: not cells -- a smooth shear field that drags the disk sideways and smears it, strongest in the tear
+    let shearAmt = 0.12 + 1.1 * D + inputs.fragmentation;
+    let sh1 = fbm(vec3<f32>(cos(a) * 1.4, sin(a) * 1.4, lx * 1.2 + 0.23 * t), 3) - 0.5;
+    let sh2 = fbm(vec3<f32>(cos(a) * 1.1 + 7.0, sin(a) * 1.1, lx * 0.9 - 0.17 * t), 3) - 0.5;
+    let da = shearAmt * 1.6 * sh1;
+    let dl = shearAmt * 0.45 * sh2;
+
+    let dent = fbm(vec3<f32>(cos(a) * 1.3, sin(a) * 1.3, 0.09 * t), 3) - 0.5;
+    let warpAmt = 0.35 + 0.9 * D;
+
+    var disk = vec3<f32>(0.0);
+    var hotRib = 0.0;
+    for (var b = 0; b < 3; b = b + 1) {
+        var rc = 1.8;
+        var w = 0.85;
+        var dir = -1.0;
+        var spd = 0.55;
+        var pitch = 2.4;
+        var freq = 3.2;
+        var heatBase = 0.86;
+        var gain = 1.1;
+        var sharp = 3.0;
+        if (b == 1) {
+            rc = 3.6; w = 1.6; dir = 1.0; spd = 0.23; pitch = -1.7; freq = 2.6; heatBase = 0.55; gain = 0.6; sharp = 2.6;
+        } else if (b == 2) {
+            rc = 6.5; w = 2.8; dir = -1.0; spd = 0.09; pitch = 1.1; freq = 2.0; heatBase = 0.22; gain = 0.3; sharp = 2.2;
+        }
+        let xb = x * exp(dl) * (1.0 + 0.35 * dent);
+        let env = exp(-pow((xb - rc) / w, 2.0));
+        if (env < 0.003) {
+            continue;
+        }
+        let ang = a + da + dir * spd * spinT + pitch * log(max(xb, 1e-3));
+        var P = vec3<f32>(cos(ang) * freq, sin(ang) * freq, log(max(xb, 1e-3)) * 1.7 - 0.12 * t * (1.0 + f32(b)));
+        P = P + warpAmt * (vec3<f32>(fbm(P * 0.8 + vec3<f32>(0.0, 0.0, 0.07 * t), 3),
+                                     fbm(P * 0.8 + vec3<f32>(5.2, 1.3, 0.07 * t), 3), 0.0) - 0.5) * 2.0;
+        let rib = ridged(P, 4);
+        let broad = fbm(P * 0.5 + vec3<f32>(9.0), 3);
+        let s = pow(rib, sharp) * (0.35 + 1.2 * broad);
+        let heat = heatBase + 0.18 * (rib - 0.5) - 0.08 * (xb - rc) / w;
+        disk = disk + palette(heat) * s * env * gain;
+        if (b == 0) {
+            hotRib = pow(rib, 10.0) * env * (0.4 + broad);
+        }
+    }
+    let beam = 1.0 + 0.65 * cos(a - (2.2 + 0.4 * sin(0.047 * t) + 0.025 * spinT));
+    disk = disk * inputs.bandGain * beam;
+    // white-hot: not a ring -- the hottest crests of the inner band, flowing along its spiral
+    disk = disk + palette(0.97) * hotRib * 4.5 * beam * inputs.highlightGain;
+
+    // radial streaks, falling inward
+    {
+        let fall = 0.45 * spinT + 0.35 * t;
+        let n = vnoise(vec3<f32>(cos(a + da) * 64.0, sin(a + da) * 64.0, lx * 1.4 + fall));
+        let sector = smoothstep(0.45, 0.75, vnoise(vec3<f32>(cos(a) * 1.8, sin(a) * 1.8, 0.06 * t + 3.0)) + 0.25 * D);
+        let rad = smoothstep(1.05, 1.5, x) * exp(-(x - 1.4) / 1.6) * smoothstep(5.5, 3.5, x);
+        disk = disk + palette(0.74 + 0.12 * n) * pow(n, 14.0) * sector * rad * 2.2 * inputs.streakGain;
+    }
+
+    // outward bursts: broken shells thrown out of the core, rippling as they go, with ejecta streaking outward
+    {
+        var burst = vec3<f32>(0.0);
+        for (var k = 0; k < 16; k = k + 1) {
+            let age = t - burstTime(k);
+            if (age < 0.0 || age > 5.0) {
+                continue;
+            }
+            let front = 1.3 + age * (3.2 + 0.6 * f32(k % 3));
+            let fade = exp(-age * 0.75) * smoothstep(0.0, 0.25, age);
+            let rip = x + 0.25 * (vnoise(vec3<f32>(cos(a) * 4.0, sin(a) * 4.0, f32(k) * 3.1 + age)) - 0.5) * front;
+            let shell = exp(-pow((rip - front) / (0.25 + 0.12 * age), 2.0));
+            let broken = smoothstep(0.35, 0.7, vnoise(vec3<f32>(cos(a) * 3.0, sin(a) * 3.0, f32(k) * 7.7)));
+            let ejecta = pow(vnoise(vec3<f32>(cos(a) * 48.0, sin(a) * 48.0, lx * 1.2 - age * 2.0 + f32(k))), 12.0) *
+                         smoothstep(front + 0.2, front - 2.0, x) * smoothstep(1.2, 2.0, x);
+            burst = burst + (palette(0.9 - 0.08 * age) * shell * broken * 1.6 + palette(0.82) * ejecta * 2.0) * fade;
+        }
+        disk = disk + burst * inputs.burstGain;
+    }
+
+    // the innermost disk runs to crimson and burgundy as it falls toward the shadow
+    let hot = smoothstep(2.0, 1.15, x);
+    disk = mix(disk, disk * vec3<f32>(1.0, 0.32, 0.38), hot * 0.65);
+    disk = disk + vec3<f32>(0.20, 0.008, 0.035) * exp(-(x - 1.0) * 1.3) * step(1.0, x) * 0.7;
+
+    // ---- the eddies' spirals, and the tidal streams they lose to the main mass ------------------------------------------
+    var ed = vec3<f32>(0.0);
+    for (var i = 0; i < 3; i = i + 1) {
+        var e = e0;
+        if (i == 1) { e = e1; }
+        if (i == 2) { e = e2; }
+        let d = qs - e.c;
+        let xe = length(d) / e.r;
+        let ae = atan2(d.y, d.x);
+        let env = exp(-pow((xe - 2.6) / 1.6, 2.0)) * e.w;
+        if (env > 0.003) {
+            let ang = ae + e.spin * 0.9 * spinT + 1.8 * e.spin * log(max(xe, 1e-3));
+            let P = vec3<f32>(cos(ang) * 2.4, sin(ang) * 2.4, 0.15 * t + f32(i) * 11.0);
+            let s = pow(ridged(P, 3), 2.6);
+            ed = ed + palette(0.32 + 0.25 * s + 0.12 * f32(i)) * s * env * 1.1;
+        }
+        col = col * mix(1.0, smoothstep(0.6, 1.6, xe), e.w);
+        // the stream: from the eddy into the disk; two streams meet and cross there
+        let dest = c0 + rot(e.c - c0, 1.1 * e.spin) * 0.18;
+        let st = stream(qs, e.c, dest, 0.6 * e.spin, t, f32(i) * 13.0);
+        ed = ed + palette(0.45 + 0.3 * select(0.0, 1.0, i == 1) + 0.15 * st) * st * e.w * 1.4 * inputs.streamGain;
+    }
+    ed = ed * inputs.eddyGain;
+
+    // ---- compose: the misshapen core swallows everything inside it -----------------------------------------------------
+    var vp = rot(p - c0, tilt);
+    vp.y = vp.y / mix(1.0, incl, 0.5);
+    let ap = atan2(vp.y, vp.x);
+    let xp = length(vp) / max(R0 * coreShape(ap, t), 1e-4);
+    let edge = xp + 0.22 * (vnoise(vec3<f32>(cos(ap) * 2.5, sin(ap) * 2.5, 0.25 * t)) - 0.5) * (1.0 + D);
+    let core = smoothstep(1.0, 1.35, edge);
+    let inner = smoothstep(1.3, 2.2, x);
+    var outc = (col * inner + disk + ed) * core;
+    outc = outc * inputs.intensity;
+    return vec4<f32>(max(outc, vec3<f32>(0.0)), 1.0);
+}
