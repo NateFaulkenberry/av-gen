@@ -23,6 +23,8 @@ import math
 import random
 import sys
 
+from mathutils import Vector
+
 out_dir = sys.argv[sys.argv.index("--") + 1]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
@@ -170,6 +172,165 @@ def build(name, base, st):
     return obj
 
 
-for name, base, st in PYRAMIDS:
-    o = build(name, base, st)
+
+
+# ---- M3b (owner: chipped, coursed stone blocks like the Great Pyramid, stepped, weathered and broken edges, not
+# crackle or cobblestone; much more buried in sand) -------------------------------------------------------------
+# Each pyramid is built course by course from blocks: an outer ring of blocks of random length on each course, a
+# hidden core box per course behind them. Each block is jittered, its top edge chamfered by a random amount, its
+# corners chipped; blocks go missing more at the arrises and toward the top, and the upper courses of the middle
+# pyramid keep a smooth casing cap (as Khafre's does). A sand mound buries the base -- deepest to windward (west) --
+# and blocks wholly under it are not built. Five stone materials, one per block at random, plus dust on the treads.
+STONES = [material(f"block_{k}", c, r) for k, (c, r) in enumerate((
+    ((0.50, 0.37, 0.24), 0.93), ((0.45, 0.32, 0.2), 0.95), ((0.56, 0.42, 0.28), 0.9), ((0.4, 0.27, 0.17), 0.96),
+    ((0.52, 0.34, 0.2), 0.94)))]
+DUST = material("block_dust", (0.52, 0.3, 0.16), 1.0)
+CAP = material("casing_cap", (0.62, 0.48, 0.33), 0.85)
+STATES = {
+    "pyramid-a": dict(burial=0.3, missing=0.07, chip=0.35, cap=0.0, seed=11),
+    "pyramid-b": dict(burial=0.26, missing=0.045, chip=0.3, cap=0.12, seed=23),
+    "pyramid-c": dict(burial=0.36, missing=0.11, chip=0.45, cap=0.0, seed=37),
+}
+
+
+def build_blocks(name, base, st):
+    rnd = random.Random(st["seed"])
+    half = base * 0.5
+    H = half * SLOPE
+    ch = max(base / 120.0, 1.15)        # course height (m)
+    tread = ch / SLOPE                  # each course steps in by this much on every side
+    depth = 2.2 * ch                    # how far a block runs into the pyramid
+    seed = st["seed"]
+
+    def sand(x, y):
+        """The sand's height: a mound burying the base to `burial` of the height, deeper to windward (west), rippled."""
+        m = max(abs(x), abs(y))
+        wind = 0.75 + 0.35 * smooth(-1.0, 1.0, -x / half)
+        crest = st["burial"] * H * wind * (0.8 + 0.4 * fbm(x / 60.0, y / 60.0, seed + 13))
+        ripple = 0.25 * math.sin(x * 0.9 + 2.0 * fbm(x / 30.0, y / 30.0, seed + 15)) * smooth(half * 1.0, half * 1.3, m)
+        if m < half:
+            return crest
+        out = math.hypot(max(abs(x) - half, 0.0), max(abs(y) - half, 0.0))   # rounded around the corners
+        return crest * math.exp(-((out / (half * 0.22)) ** 1.4)) + ripple
+
+    bm = bmesh.new()
+    mats_of = []
+    ncourses = int(H / ch)
+    cap_from = int(ncourses * (1.0 - st["cap"])) if st["cap"] > 0 else ncourses + 1
+
+    def add_box(cx, cy, z0, lx, ly, lz, rot, chip, mat):
+        hx, hy = lx / 2, ly / 2
+        c, sn = math.cos(rot), math.sin(rot)
+        pts = []
+        for zz in (0.0, lz):
+            for (ax, ay) in ((-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)):
+                if zz > 0:   # the top chamfered (worn) and the corners chipped at random
+                    k = 1.0 - chip * rnd.uniform(0.04, 0.16)
+                    ax, ay = ax * k, ay * k
+                    zt = zz - chip * rnd.uniform(0.0, 0.18) * lz
+                else:
+                    zt = zz
+                pts.append(Vector((cx + ax * c - ay * sn, cy + ax * sn + ay * c, z0 + zt)))
+        vs = [bm.verts.new(p) for p in pts]
+        faces = ((0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7))
+        for f in faces:
+            face = bm.faces.new([vs[i] for i in f])
+            mats_of.append(mat)
+
+    for k in range(ncourses):
+        z0 = k * ch
+        s_out = half - k * tread                  # the course's outer half-side
+        if s_out < 1.0:
+            break
+        if k >= cap_from:                         # the casing cap: four smooth faces from here up
+            break
+        # the hidden core behind the blocks
+        core = s_out - depth
+        if core > 0.5:
+            add_box(0.0, 0.0, z0, 2 * core, 2 * core, ch, 0.0, 0.0, 0)
+        # the four sides: blocks along each, from corner to corner
+        for side in range(4):
+            ang = side * math.pi / 2
+            ca, sa = math.cos(ang), math.sin(ang)
+            t = -s_out
+            while t < s_out:
+                L = rnd.uniform(1.6, 3.0) * ch
+                L = min(L, s_out - t)
+                if L < 0.4 * ch:
+                    break
+                mid = t + L / 2
+                # the block's centre on this side (the side's outward normal is (ca, sa))
+                ox, oy = ca * (s_out - depth / 2), sa * (s_out - depth / 2)
+                px, py = ox + -sa * mid, oy + ca * mid
+                corner = 1.0 - min(1.0, (s_out - abs(mid)) / (3.0 * ch))     # 1 at an arris
+                height_frac = z0 / H
+                p_missing = st["missing"] * (1.0 + 4.0 * corner + 2.5 * height_frac)
+                t += L
+                if sand(px + ca * depth / 2, py + sa * depth / 2) > z0 + ch * 1.05:
+                    continue                                                # under the sand: not built
+                if rnd.random() < p_missing:
+                    continue
+                jitter = 0.04 * ch
+                chip = st["chip"] * (1.0 + 1.5 * corner + height_frac)
+                add_box(px + rnd.uniform(-jitter, jitter), py + rnd.uniform(-jitter, jitter), z0 + rnd.uniform(-0.02, 0.0),
+                        L * rnd.uniform(0.93, 0.99), depth * rnd.uniform(0.96, 1.0), ch * rnd.uniform(0.94, 1.0),
+                        ang + rnd.uniform(-0.012, 0.012), chip, 1 + rnd.randrange(5))
+    # the casing cap
+    if st["cap"] > 0:
+        z0 = cap_from * ch
+        s0 = half - cap_from * tread
+        apex = Vector((0, 0, H))
+        corners = [Vector((s0, s0, z0)), Vector((-s0, s0, z0)), Vector((-s0, -s0, z0)), Vector((s0, -s0, z0))]
+        vs = [bm.verts.new(p) for p in corners] + [bm.verts.new(apex)]
+        for i in range(4):
+            bm.faces.new((vs[i], vs[(i + 1) % 4], vs[4]))
+            mats_of.append(6)
+    # the sand mound: a height field ring around the base (and over the buried courses)
+    reach = half * 1.5
+    stepg = max(base / 140.0, 1.2)
+    n = int(2 * reach / stepg) + 1
+    grid = []
+    for j in range(n):
+        y = -reach + j * stepg
+        row = []
+        for i in range(n):
+            x = -reach + i * stepg
+            m = max(abs(x), abs(y))
+            h = sand(x, y)
+            # inside the footprint the sand only shows where it is above the stone's face
+            face = H * (1.0 - m / half) if m < half else 0.0
+            h = max(h, 0.0) - 2.0 * smooth(reach * 0.85, reach, m)
+            if m < half and h < face - ch * 0.2:
+                h = face - ch * 0.6     # tucked under the stone: hidden
+            row.append(bm.verts.new((x, y, h)))
+        grid.append(row)
+    for j in range(n - 1):
+        for i in range(n - 1):
+            bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            mats_of.append(7)
+    me = bpy.data.meshes.new(name)
+    obj = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(obj)
+    for m_ in [STONES[0]] + STONES + [CAP, SAND]:
+        me.materials.append(m_)
+    bm.faces.ensure_lookup_table()
+    for f, mi in zip(bm.faces, mats_of):
+        f.material_index = mi
+        if mi in (1, 2, 3, 4, 5) and f.normal.z > 0.7:
+            f.material_index = 8              # dust settled on the treads
+    me.materials.append(DUST)
+    bm.to_mesh(me)
+    bm.free()
+    me.shade_flat()
+    tris = sum(len(p.vertices) - 2 for p in me.polygons)
+    path = f"{out_dir}/{name}.glb"
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_apply=True)
+    print("PYRAMID", path, "base", base, "height", round(H, 1), "courses", ncourses, "triangles", tris)
+    return obj
+
+
+for name, base, _ in PYRAMIDS:
+    o = build_blocks(name, base, STATES[name])
     o.hide_set(True)

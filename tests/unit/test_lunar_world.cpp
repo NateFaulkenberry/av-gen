@@ -460,3 +460,110 @@ TEST_CASE("Mars: a mesa stands flat-topped with a steep wall, yardangs run along
     REQUIRE(back.has_value());
     CHECK(back->gen.hash() == b.gen.hash());
 }
+
+TEST_CASE("rim particles sit on the live opening, gather with the field and clear before the crossing",
+          "[composition][pass2][adr1898]") {
+    const auto dir = testsupport::processTempDir();
+    const nlohmann::json scene = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "rim"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 0.0, 150.0}}, {"target", {0.0, 0.0, 0.0}}}},
+        {"nodes", {{{"name", "wall"}, {"kind", "grid"}},
+                   {{"name", "rim"}, {"kind", "particles"}, {"portalRim", true},
+                    {"particles", {{"enabled", true}, {"capacity", 2000}, {"shape", "disc"}, {"innerRadius", 0.72},
+                                   {"extent", {1.0, 1.0, 1.0}}, {"spawnRate", 1000.0}}}}}},
+        {"corruption", {{"targets", {"wall"}}, {"focus", {0.0, 0.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0},
+                        {"width", 10.0}, {"height", 8.0}, {"depth", 4.0}, {"fieldNear", 10.0}, {"fieldFar", 200.0},
+                        {"openNear", 8.0}, {"openFar", 100.0}}}};
+    std::ofstream(dir / "rim.scene.json") << scene.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "rim.scene.json", registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    const auto at = [&](float z) {
+        scene::Camera cam = (*c)->scene().camera;
+        cam.position = glm::vec3(0.0f, 0.0f, z);
+        cam.target = glm::vec3(0.0f);
+        (*c)->setCameraOverride(cam);
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = 1.0;
+        (*c)->update(ft);
+        REQUIRE((*c)->scene().particles.size() == 1);
+        return (*c)->scene().particles.front();
+    };
+    const auto far = at(400.0f); // beyond the field: nothing
+    CHECK(far.spawnRate == Approx(0.0f));
+    const auto mid = at(60.0f);  // in the field, opening: the rim spawns, on the opening, facing along the axis
+    CHECK(mid.spawnRate > 100.0f);
+    CHECK(mid.innerRadius == Approx(0.72f));
+    CHECK(glm::length(mid.position - glm::vec3(0.0f, 0.0f, 2.0f)) < 1e-3f); // half the depth in front of the plane
+    CHECK(glm::length(mid.direction - glm::vec3(0.0f, 0.0f, -1.0f)) < 1e-3f);
+    CHECK(mid.extent.x > 4.0f);
+    CHECK(mid.extent.x <= 10.0f + 1e-3f);
+    CHECK(mid.extent.z > mid.extent.x * 0.7f);
+    const auto nearer = at(20.0f); // the opening wider: a thicker, wider rim
+    CHECK(nearer.extent.x > mid.extent.x);
+    const auto last = at(9.0f); // the last stretch: it has stopped spawning, so it clears as the camera passes
+    CHECK(last.spawnRate == Approx(0.0f));
+    CHECK(at(60.0f).spawnRate == Approx(mid.spawnRate)); // a function of the distance: a seek lands on the same rim
+    // saved as authored
+    const nlohmann::json saved = (*c)->toJson();
+    bool found = false;
+    for (const auto& n : saved.at("nodes")) {
+        if (n.value("name", "") != "rim") continue;
+        found = true;
+        CHECK(n.value("portalRim", false));
+        CHECK(n.at("particles").value("innerRadius", 0.0) == Approx(0.72));
+    }
+    CHECK(found);
+}
+
+TEST_CASE("a world reached through a portal finds its way out only after the camera has arrived",
+          "[portal][pass2][adr1899]") {
+    const auto dir = testsupport::processTempDir();
+    // the sea: its own way home is a plane at z = 150 that the root's camera, carried through the portal before the
+    // crossing, passes at 1 s; the camera, once there, flies out to z = 250 and back through it at about 6 s
+    const nlohmann::json sea = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "sea"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+        {"lunarWorld", {{"extent", 400}, {"spacing", 8}, {"skirtExtent", 1600}, {"skirtSpacing", 64}, {"rocks", 0},
+                        {"craters", 0}, {"relief", 0}}},
+        {"corruption", {{"targets", {"lunar.surface"}}, {"focus", {0.0, 20.0, 150.0}}, {"axis", {0.0, 0.0, -1.0}},
+                        {"amount", 1.0}, {"width", 40.0}, {"height", 40.0}}},
+        {"portal", {{"world", "@root"}, {"exit", {0.0, 30.0, -300.0}}, {"exitAxis", {0.0, 0.0, -1.0}},
+                    {"entryUp", {0.0, 1.0, 0.0}}, {"exitUp", {0.0, 1.0, 0.0}}}}};
+    std::ofstream(dir / "home-sea.scene.json") << sea.dump();
+    const nlohmann::json root = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "root"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 30.0, 100.0}}, {"target", {0.0, 30.0, 0.0}}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}}},
+        {"corruption", {{"targets", {"rock"}}, {"focus", {0.0, 30.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0}}},
+        {"portal", {{"world", "home-sea.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
+                    {"flight", {{0.0, 20.0, 180.0, 3.5}, {0.0, 20.0, 250.0, 5.0}, {0.0, 20.0, 100.0, 7.0}}}}}};
+    std::ofstream(dir / "home-root.scene.json") << root.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "home-root.scene.json", registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    (*c)->setCameraPath([](double t) {
+        const glm::vec3 eye(0.0f, 30.0f, 100.0f - 50.0f * static_cast<float>(t));
+        return std::optional<scene::Composition::PortalPose>(scene::Composition::PortalPose{eye, eye + glm::vec3(0, 0, -1), glm::vec3(0, 1, 0)});
+    });
+    for (double t = 0.0; t <= 9.0; t += 0.25) {
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = t;
+        (*c)->update(ft);
+    }
+    const auto crossings = (*c)->journeyCrossings();
+    REQUIRE(crossings.size() >= 2);
+    CHECK(crossings[0] == Approx(2.0).margin(0.05)); // into the sea
+    INFO("home crossing " << crossings[1]);
+    CHECK(crossings[1] > crossings[0]);              // never before the way in (it was found at 1 s)
+    CHECK(crossings[1] > 5.0);
+    CHECK(crossings[1] < 7.0);
+}

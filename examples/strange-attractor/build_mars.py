@@ -17,9 +17,12 @@ import math
 import os
 import sys
 
+from portal_rim import RIM_PARTICLES  # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, canyon as canyon_frame  # noqa: E402
+from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT  # noqa: E402
+from sample_ground import heights  # noqa: E402
 
 
 def unit(v):
@@ -31,11 +34,6 @@ def direction(az_deg, el_deg):
     """Toward azimuth az (degrees, 0 = -z, the arrival heading; positive to the right) and elevation el."""
     az, el = math.radians(az_deg), math.radians(el_deg)
     return [math.cos(el) * math.sin(az), math.sin(el), -math.cos(el) * math.cos(az)]
-
-
-def canyon(d, lat):
-    """d real metres down-canyon of the dusk exit, lat real metres toward the camp bank (x, z), scaled world."""
-    return canyon_frame(d / WS, lat / WS)
 
 
 # --- the light: an afternoon sun from behind and to the right, a dusty sky
@@ -61,7 +59,10 @@ MESAS = [
 CRATERS = [dict(x=520.0, z=-650.0, diameter=260.0, fresh=0.15), dict(x=-420.0, z=-1050.0, diameter=180.0, fresh=0.25),
            # M3: young craters beside the route, their rims strewn with boulders (the plain's foreground)
            dict(x=-120.0, z=-330.0, diameter=55.0, fresh=0.95), dict(x=70.0, z=-1080.0, diameter=70.0, fresh=0.9),
-           dict(x=-20.0, z=-740.0, diameter=34.0, fresh=1.0), dict(x=230.0, z=-1520.0, diameter=45.0, fresh=0.95)]
+           dict(x=-20.0, z=-740.0, diameter=34.0, fresh=1.0), dict(x=230.0, z=-1520.0, diameter=45.0, fresh=0.95),
+           # M3b: more young craters strewing boulders near the route
+           dict(x=-160.0, z=-610.0, diameter=28.0, fresh=1.0), dict(x=150.0, z=-1000.0, diameter=22.0, fresh=1.0),
+           dict(x=-70.0, z=-1450.0, diameter=38.0, fresh=0.9), dict(x=40.0, z=-430.0, diameter=18.0, fresh=1.0)]
 
 # --- the pyramids: the Giza diagonal, south-west to north-east (the largest first), 2 km ahead
 PYRAMIDS = [("pyramid-a", -260.0, -1780.0, 300.0, 8.0),
@@ -86,32 +87,69 @@ EXIT_AXIS = [0.0, 0.0, -1.0]
 
 # --- the pyramid portal: in pyramid-b's south face, where the casing has fallen, 30 m up (absolute y set by measure)
 PB = PYRAMIDS[1]
-FACE_HEIGHT = 32.0
+FACE_HEIGHT = 74.0                  # M3b: above the deeper sand (it buries the base to about 46 m)
 # (a corruption's focus y over a generated ground is a height over that ground: measured 2.7 m at the face's foot)
 FOCUS_GROUND = curved(PAD_LEVEL["pyramid-b"], PYRAMIDS[1][1], PYRAMIDS[1][2] + PYRAMIDS[1][3] * 0.5 - 25.2)
 PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_GROUND,
                 PB[2] + PB[3] * 0.5 - FACE_HEIGHT / math.tan(math.radians(51.8))]
 
-# --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100 real), down to the camp
+# --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100), down to the camp
 NIGHT_EXIT_DL = (46.0, 99.0)
-NIGHT_EXIT = [*canyon(*NIGHT_EXIT_DL)[:1], 86.0, canyon(*NIGHT_EXIT_DL)[1]]
-_o = [canyon(1.0, 0.0)[i] - canyon(0.0, 0.0)[i] for i in (0, 1)]
-_r = [canyon(0.0, 1.0)[i] - canyon(0.0, 0.0)[i] for i in (0, 1)]
-OUT_OF_CLIFF = unit([-_r[0], 0.0, -_r[1]])   # toward the river (-lat)
-# M3: down from the cliff to the gathering (the three Sasquatches, the Gray, the embers, the UFO parked on the bank),
-# held at a distance and near eye height so the camp and the canyon behind it share the frame; then away across the
-# water's edge and up over the riverbed portal, and down through it (crossing 5 at 121.2 s, bar 62). Heights over the
-# ground (the riverbed is at -0.8 m: the crossing is at -0.5 m).
-NIGHT_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t in
-                ((42.0, 80.0, 40.0, 103.6), (35.0, 56.0, 20.0, 106.4), (29.0, 38.0, 6.0, 108.8), (27.0, 31.0, 3.0, 111.2),
-                 (23.5, 23.5, 2.8, 113.6), (19.0, 8.0, 4.0, 115.6), (14.0, -4.0, 7.0, 117.5), (11.5, -10.0, 9.0, 118.9),
-                 (10.4, -11.7, 4.0, 120.1), (10.0, -12.0, 0.3, 121.2), (9.9, -12.05, -8.0, 122.0))]
-CAMP = canyon(16.0, 16.0)
-UFO_PARK = canyon(5.0, 20.0)
-GATHER = [(CAMP[0] * 3 + UFO_PARK[0]) / 4.0, 1.76 + 1.3, (CAMP[1] * 3 + UFO_PARK[1]) / 4.0]
-RIVER_PORTAL = canyon(10.0, -12.0)
-NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.4, 114.6],
-              [RIVER_PORTAL[0], -0.5, RIVER_PORTAL[1], 114.2, 119.6]]
+NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 86.0 * R, site(*NIGHT_EXIT_DL)[1]]
+OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
+CANYON_SCENE = PREFIX + "strange-attractor-flythrough.scene.json"
+CAMP = site(*CAMP_SITE)
+CAMP_GROUND = 4.4 * WS
+# M3b (owner: the night needs a real pass; a lower, closer framing, not tiny figures from high up): down from the cliff
+# over the benches, then low -- eye height, 6-9 m from the fire -- in a slow arc round the gathering on the river side,
+# the bank, the cave mouth and the parked craft behind them; then away toward the river and ONE continuous glide down
+# into the riverbed portal (owner: the water portal felt like a step): a straight line at a constant speed, sloping
+# 25 degrees; the exit frame is tilted to match, so the crossing changes nothing in the motion (crossing 5 at 121.2 s).
+GATHER = [*near(CAMP_SITE, *GATHER_AT)[:1], CAMP_GROUND + 1.3, near(CAMP_SITE, *GATHER_AT)[1]]
+RIVER_PORTAL = site(10.0, -12.0)
+RIVER_Y = -0.5 * R
+_tw = [RIVER_PORTAL[0] - CAMP[0], RIVER_PORTAL[1] - CAMP[1]]
+_tn = math.hypot(*_tw)
+TOWARD_RIVER = (_tw[0] / _tn, _tw[1] / _tn)
+GLIDE_SLOPE = math.radians(25.0)
+GLIDE_SPEED = 3.2                      # m/s along the slope
+T_CROSS = 121.2
+
+
+def glide_point(s_back):
+    """The glide's point s_back metres (along the slope) before the portal: x, absolute y, z."""
+    h = s_back * math.cos(GLIDE_SLOPE)
+    return [RIVER_PORTAL[0] - TOWARD_RIVER[0] * h, RIVER_Y + s_back * math.sin(GLIDE_SLOPE), RIVER_PORTAL[1] - TOWARD_RIVER[1] * h]
+
+
+def night_flight():
+    # absolute heights near the camp (eye height over the camp's ground); the glide in absolute terms; both turned into
+    # heights over the sampled ground (the portal's flight is authored over the ground)
+    eye = CAMP_GROUND + 1.85
+    near_knots = [(-1.0, -9.5, eye + 0.9, 110.2), (-5.5, -7.5, eye + 0.2, 112.0), (-8.0, -3.5, eye, 113.8)]
+    glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
+    pts = []
+    for dd, dl, y, t in near_knots:
+        x, z = near(CAMP_SITE, dd, dl)
+        pts.append((x, y, z, t))
+    for frac in (1.0, 0.66, 0.33):
+        sb = glide_len * frac
+        x, y, z = glide_point(sb)
+        pts.append((x, y, z, T_CROSS - sb / GLIDE_SPEED))
+    x, y, z = glide_point(0.0)
+    pts.append((x, y, z, T_CROSS))
+    x, y, z = glide_point(-GLIDE_SPEED * 0.8)
+    pts.append((x, y, z, T_CROSS + 0.8))
+    try:
+        gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in pts])
+    except Exception:
+        gr = [CAMP_GROUND] * len(pts)
+    out = [knot(42.0, 80.0, 40.0, 103.6), knot(35.0, 56.0, 20.0, 106.4), knot(28.0, 34.0, 7.0, 108.4)]
+    out += [[x, y - g, z, t] for (x, y, z, t), g in zip(pts, gr)]
+    return out
+
+
+NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.2, 116.4]]
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 MARS_FLIGHT = [
@@ -121,8 +159,8 @@ MARS_FLIGHT = [
     [-60.0, 62.0, -900.0, 84.0],    # the pyramids grow against the far wall
     [30.0, 55.0, -1250.0, 89.0],
     [120.0, 48.0, -1560.0, 93.5],   # between the great pyramid and the middle one: their scale
-    [PORTAL_FOCUS[0] - 10.0, 40.0, PORTAL_FOCUS[2] + 220.0, 97.0],
-    [PORTAL_FOCUS[0], 34.0, PORTAL_FOCUS[2] + 70.0, 99.6],
+    [PORTAL_FOCUS[0] - 10.0, 58.0, PORTAL_FOCUS[2] + 220.0, 97.0],     # rising to the portal, up the buried face
+    [PORTAL_FOCUS[0], 70.0, PORTAL_FOCUS[2] + 70.0, 99.6],
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4],          # the crossing (y: the focus)
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
 ]
@@ -177,47 +215,59 @@ regolith = [
     {"kind": "constant", "dst": 1, "constant": [0.95, 0.95, 0.95, 0.95]},
 ]
 
-# M3 (coordinator: the faces read as plaster): weathered stone on the pyramids. uv.x is the class (build_pyramids.py:
-# 0 casing, 0.5 core, 1 sand); courses and irregular block joints from cell edges on a stretched position; value
-# variation; vertical stains; dust settled on the ledges
-stone = [
-    {"kind": "input", "dst": 0, "input": "uv"},
-    {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
-    {"kind": "smoothstep", "dst": 2, "srcA": 1, "constant": [0.12, 0.45, 0, 0]},
-    {"kind": "smoothstep", "dst": 3, "srcA": 1, "constant": [0.75, 0.95, 0, 0]},
-    {"kind": "constant", "dst": 4, "constant": [0.44, 0.3, 0.19, 1.0]},       # casing
-    {"kind": "constant", "dst": 5, "constant": [0.27, 0.15, 0.09, 1.0]},      # core
-    {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 2},
-    {"kind": "constant", "dst": 5, "constant": [0.42, 0.21, 0.11, 1.0]},      # sand
-    {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 3},
-    {"kind": "input", "dst": 6, "input": "worldPosition"},
-    {"kind": "constant", "dst": 7, "constant": [0.16, 0.32, 0.16, 1.0]},      # blocks ~6 m long, courses ~3.1 m: long, level cells
-    {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 7},
-    {"kind": "voronoiEdge", "dst": 5, "srcA": 7, "value": 1.0, "seed": 61},
-    {"kind": "swizzle", "dst": 5, "srcA": 5, "constant": [0, 0, 0, 0]},      # the edge distance (F2 - F1) in all channels
-    {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 0.16, 0, 0]},
-    {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0, 1, 0.38, 1.0], "value": 1.0},
-    {"kind": "remap", "dst": 7, "srcA": 3, "constant": [0, 1, 0, 1], "value": 1.0},
-    {"kind": "constant", "dst": 0, "constant": [1.0, 1.0, 1.0, 1.0]},
-    {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 0, "srcC": 7},             # no joints in the sand
-    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
-    {"kind": "noise", "dst": 5, "srcA": 6, "value": 0.06, "seed": 63},
-    {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.3, 0.7, 0.66, 1.2], "value": 1.0},
-    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
-    {"kind": "constant", "dst": 7, "constant": [0.07, 0.006, 0.07, 1.0]},     # stains: long down the faces
-    {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 7},
-    {"kind": "noise", "dst": 5, "srcA": 7, "value": 1.0, "seed": 65},
-    {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.4, 0.75, 1.0, 0.72], "value": 1.0},
-    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
-    {"kind": "input", "dst": 7, "input": "normal"},
-    {"kind": "swizzle", "dst": 7, "srcA": 7, "constant": [1, 1, 1, 1]},
-    {"kind": "smoothstep", "dst": 7, "srcA": 7, "constant": [0.78, 0.97, 0, 0]},   # the treads of the courses
-    {"kind": "remap", "dst": 7, "srcA": 7, "constant": [0, 1, 0, 0.75], "value": 1.0},
-    {"kind": "constant", "dst": 5, "constant": [0.5, 0.29, 0.15, 1.0]},       # dust
-    {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 5, "srcC": 7},
-    {"kind": "constant", "dst": 0, "constant": [0, 0, 0, 0]},
-    {"kind": "constant", "dst": 1, "constant": [0.93, 0.93, 0.93, 0.93]},
-]
+# M3b: Curiosity (NASA, public domain; pass2/prepare_rover.py), driving slowly toward the pyramids to photograph them,
+# its tracks behind it, its mast camera flashing. It drives on a pad (the yardangs eased flat under its route).
+ROVER_START = (55.0, -1185.0)
+_rd = unit([160.0 - ROVER_START[0], 0.0, -2080.0 - ROVER_START[1]])
+ROVER_DIR = (_rd[0], _rd[2])
+ROVER_YAW = math.degrees(math.atan2(ROVER_DIR[0], ROVER_DIR[1]))
+ROVER_LEVEL = -0.8                     # the mean ground around the pad (sampled without it)
+ROVER_SPEED = 0.25                     # m/s (Curiosity's own is a sixth of this: slow, but visibly moving)
+ROVER_T0, ROVER_T1 = 69.0, 102.0
+ROVER_MAST = (-0.418, 2.110, 0.466)    # the mast camera in the rover's frame (prepare_rover.py)
+ROVER_PAD = dict(x=ROVER_START[0] + ROVER_DIR[0] * -10.0, z=ROVER_START[1] + ROVER_DIR[1] * -10.0, radius=46.0, level=ROVER_LEVEL)
+
+
+def rover_at(t):
+    d = ROVER_SPEED * (min(max(t, ROVER_T0), ROVER_T1) - ROVER_T0)
+    return (ROVER_START[0] + ROVER_DIR[0] * d, ROVER_START[1] + ROVER_DIR[1] * d)
+
+
+def mast_world(t):
+    x, z = rover_at(t)
+    a = math.radians(ROVER_YAW)
+    mx, my, mz = ROVER_MAST
+    return [x + mx * math.cos(a) + mz * math.sin(a), ROVER_LEVEL + my, z - mx * math.sin(a) + mz * math.cos(a)]
+
+
+TRACK_BACK = 38                        # metres of track laid before the shot; then a segment per metre as it drives
+TRACK_AHEAD = int(ROVER_SPEED * (ROVER_T1 - ROVER_T0))
+
+
+def rover_tracks():
+    """[(node, t_visible or None, keys)] for the project's timeline: the rover, its flash, the track segments."""
+    keys = []
+    pos = [(t, [*rover_at(t)[:1], ROVER_LEVEL, rover_at(t)[1]]) for t in (ROVER_T0, ROVER_T1)]
+    keys.append({"target": "mars/nodes/rover/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pos]})
+    keys.append({"target": "mars/nodes/rover-flash/position",
+                 "keys": [{"time": t, "value": mast_world(t), "interp": "linear"} for t in (ROVER_T0, ROVER_T1)]})
+    flashes = []
+    t = ROVER_T0 + 1.3
+    while t < ROVER_T1:
+        flashes += [(t, 0.0), (t + 0.0005, 1.0), (t + 0.12, 1.0), (t + 0.1205, 0.0)]
+        t += 3.1
+    keys.append({"target": "mars/nodes/rover-flash/opacity", "keys": [{"time": 0.0, "value": [0.0], "interp": "step"}] +
+                 [{"time": a, "value": [b], "interp": "step"} for a, b in flashes]})
+    keys.append({"target": "mars/lights/rover-flash-light/intensity", "keys": [{"time": 0.0, "value": [0.0], "interp": "step"}] +
+                 [{"time": a, "value": [b * 900.0], "interp": "step"} for a, b in flashes]})
+    keys.append({"target": "mars/lights/rover-flash-light/position",
+                 "keys": [{"time": t_, "value": mast_world(t_), "interp": "linear"} for t_ in (ROVER_T0, ROVER_T1)]})
+    for i in range(TRACK_AHEAD):   # segment i (i-1.6 to i-0.6 m along the drive) appears as the rear wheels leave it
+        tv = ROVER_T0 + (i + 1.0) / ROVER_SPEED if i > 0 else 0.001
+        keys.append({"target": f"mars/nodes/track-new-{i}/visible",
+                     "keys": [{"time": 0.0, "value": [0.0], "interp": "step"}, {"time": tv, "value": [1.0], "interp": "step"}]})
+    return keys
+
 
 GOLD = [1.0, 0.62, 0.3]
 A = "../../assets/strange-attractor/build/"
@@ -241,6 +291,8 @@ def write():
              "intensity": 0.22, "castsShadow": False, "shadowStrength": 0.0},
             {"name": "ground-bounce", "type": "directional", "role": "fill", "direction": [-c for c in unit([-SUN[0], -0.4, -SUN[2]])],
              "color": [0.85, 0.5, 0.3], "intensity": 0.18, "castsShadow": False, "shadowStrength": 0.0},
+            {"name": "rover-flash-light", "type": "point", "position": mast_world(ROVER_T0), "color": [1.0, 0.97, 0.9],
+             "intensity": 0.0, "range": 12.0, "castsShadow": False, "volumetric": 0.0},
         ],
         "environment": {"intensity": 0.08, "background": SKY_HORIZON, "fogColor": HAZE, "volumeDensity": 0.00016,
                         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": SKY_ZENITH,
@@ -250,12 +302,12 @@ def write():
                         "shadowRange": 2400.0, "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 5000.0,
                         "contactShadows": False, "shadowSplitLambda": 0.9},
         "post": {"bloomIntensity": 0.04, "tonemap": 0},
-        "materialPrograms": [{"name": "mars_regolith", "ops": regolith, "baseColor": 5, "metallic": 0, "roughness": 1},
-                             {"name": "pyramid_stone", "ops": stone, "baseColor": 4, "metallic": 0, "roughness": 1}],
+        "materialPrograms": [{"name": "mars_regolith", "ops": regolith, "baseColor": 5, "metallic": 0, "roughness": 1}],
         "lunarWorld": {"seed": 11, "extent": 6000, "spacing": 2.5, "skirtExtent": 48000, "skirtSpacing": 48, "craters": 0.4,
-                       "rocks": 0.03, "relief": 70, "program": "mars_regolith", "curvature": CURVATURE,
+                       "rocks": 0.065, "relief": 70, "program": "mars_regolith", "curvature": CURVATURE,
                        "heroes": CRATERS, "mesas": MESAS, "yardangs": 7.0, "wind": 35.0,
-                       "pads": [{"x": x, "z": z, "radius": base * 0.75, "level": PAD_LEVEL[name]} for name, x, z, base, _ in PYRAMIDS]},
+                       "pads": [{"x": x, "z": z, "radius": base * 0.82, "level": PAD_LEVEL[name]} for name, x, z, base, _ in PYRAMIDS] +
+                               [ROVER_PAD]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
         "corruption": {"targets": ["pyramid-b"], "focus": PORTAL_FOCUS, "axis": [0.0, 0.0, -1.0], "amount": 1.0,
                        "radius": 70.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 420.0, "openNear": 30.0, "openFar": 170.0,
@@ -265,14 +317,25 @@ def write():
                        "glowColor": GOLD, "light": 2400.0},
         # home: the canyon, at night (its look from crossing 3), out of the outer cliff and down toward the camp's embers
         "portal": {"world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF, "entryUp": [0.0, 1.0, 0.0],
-                   "exitUp": [0.0, 1.0, 0.0], "flight": NIGHT_FLIGHT, "aims": NIGHT_AIMS},
+                   "exitUp": [0.0, 1.0, 0.0], "flight": night_flight(), "aims": NIGHT_AIMS},
         "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
-                   "visible": True, "program": "pyramid_stone"} for name, x, z, _, yaw in PYRAMIDS],
+                   "visible": True} for name, x, z, _, yaw in PYRAMIDS] + [
+            {"name": "rover", "kind": "gltf", "asset": A + "rover.glb", "position": [*rover_at(ROVER_T0)[:1], ROVER_LEVEL, rover_at(ROVER_T0)[1]],
+             "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": True},
+            {"name": "rover-flash", "kind": "gltf", "asset": A + "flash.glb", "position": mast_world(ROVER_T0), "rotation": [0, 0, 0],
+             "scale": [1, 1, 1], "visible": True},
+        ] + [{"name": f"track-old-{i}", "kind": "gltf", "asset": A + "rover-tracks.glb",
+              "position": [ROVER_START[0] + ROVER_DIR[0] * (i - 1.6), ROVER_LEVEL, ROVER_START[1] + ROVER_DIR[1] * (i - 1.6)],
+              "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": True} for i in range(-TRACK_BACK, 0)] + [
+             {"name": f"track-new-{i}", "kind": "gltf", "asset": A + "rover-tracks.glb",
+              "position": [ROVER_START[0] + ROVER_DIR[0] * (i - 1.6), ROVER_LEVEL, ROVER_START[1] + ROVER_DIR[1] * (i - 1.6)],
+              "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": False} for i in range(TRACK_AHEAD)] + [
+             {"name": "pyramid-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES}],
     }
-    path = os.path.join(HERE, "strange-attractor-mars.scene.json")
+    path = os.path.join(HERE, PREFIX + "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
-    return path, flight
+    return path, flight, [[*rover_at(86.0)[:1], ROVER_LEVEL + 1.2, rover_at(86.0)[1], 82.5, 90.8]]
 
 
 if __name__ == "__main__":

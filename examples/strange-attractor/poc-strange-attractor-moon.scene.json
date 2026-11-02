@@ -1,0 +1,1400 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "the-strange-attractor-moon",
+  "_note": "The Strange Attractor's Moon (dimensional portals, Gate B; ADR-1882), written by build_moon.py; the destination of the canyon's portal (ADR-1879), whose 'portal' block drives its camera.",
+  "camera": {
+    "mode": 1,
+    "position": [
+      0,
+      60,
+      1500
+    ],
+    "target": [
+      0,
+      40,
+      0
+    ],
+    "fov": 44.0,
+    "orbitSpeed": 0.0,
+    "far": 150000.0
+  },
+  "lights": [
+    {
+      "name": "sun",
+      "type": "directional",
+      "role": "key",
+      "direction": [
+        -0.08709150167995877,
+        -0.038387809087519945,
+        -0.9954604193279559
+      ],
+      "color": [
+        1.0,
+        0.97,
+        0.93
+      ],
+      "intensity": 5.0,
+      "castsShadow": true,
+      "shadowStrength": 1.0,
+      "softness": 0.15
+    },
+    {
+      "name": "regolith-bounce",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.08347497554774157,
+        0.2875423225144041,
+        0.9541233364824102
+      ],
+      "color": [
+        1.0,
+        0.96,
+        0.9
+      ],
+      "intensity": 0.08,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "earthshine",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.06796861984125294,
+        -0.224951054343865,
+        0.9719965482790865
+      ],
+      "color": [
+        0.62,
+        0.72,
+        1.0
+      ],
+      "intensity": 0.6,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "earthglow",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        0.06718960104802221,
+        -0.766044443118978,
+        0.6392663519046989
+      ],
+      "color": [
+        0.62,
+        0.72,
+        1.0
+      ],
+      "intensity": 0.09,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "rave0-m",
+      "type": "point",
+      "position": [
+        -260.0,
+        -84.5,
+        -480.0
+      ],
+      "color": [
+        1.0,
+        0.15,
+        0.8
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave0-c",
+      "type": "point",
+      "position": [
+        -350.0,
+        -84.5,
+        -428.4
+      ],
+      "color": [
+        0.15,
+        0.85,
+        1.0
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave0-g",
+      "type": "point",
+      "position": [
+        -350.0,
+        -84.5,
+        -531.6
+      ],
+      "color": [
+        0.3,
+        1.0,
+        0.25
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave1-m",
+      "type": "point",
+      "position": [
+        -676.0,
+        -86.0,
+        -160.0
+      ],
+      "color": [
+        1.0,
+        0.15,
+        0.8
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave1-c",
+      "type": "point",
+      "position": [
+        -802.0,
+        -86.0,
+        -87.76
+      ],
+      "color": [
+        0.15,
+        0.85,
+        1.0
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave1-g",
+      "type": "point",
+      "position": [
+        -802.0,
+        -86.0,
+        -232.24
+      ],
+      "color": [
+        0.3,
+        1.0,
+        0.25
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave2-m",
+      "type": "point",
+      "position": [
+        332.0,
+        -66.5,
+        -860.0
+      ],
+      "color": [
+        1.0,
+        0.15,
+        0.8
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave2-c",
+      "type": "point",
+      "position": [
+        224.0,
+        -66.5,
+        -798.08
+      ],
+      "color": [
+        0.15,
+        0.85,
+        1.0
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave2-g",
+      "type": "point",
+      "position": [
+        224.0,
+        -66.5,
+        -921.92
+      ],
+      "color": [
+        0.3,
+        1.0,
+        0.25
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "dome0",
+      "type": "point",
+      "position": [
+        -320.0,
+        -62.0,
+        -480.0
+      ],
+      "color": [
+        1.0,
+        0.74,
+        0.45
+      ],
+      "intensity": 60000.0,
+      "range": 900.0,
+      "castsShadow": false
+    },
+    {
+      "name": "dome1",
+      "type": "point",
+      "position": [
+        -760.0,
+        -63.5,
+        -160.0
+      ],
+      "color": [
+        1.0,
+        0.74,
+        0.45
+      ],
+      "intensity": 80000.0,
+      "range": 900.0,
+      "castsShadow": false
+    },
+    {
+      "name": "dome2",
+      "type": "point",
+      "position": [
+        260.0,
+        -44.0,
+        -860.0
+      ],
+      "color": [
+        1.0,
+        0.74,
+        0.45
+      ],
+      "intensity": 70000.0,
+      "range": 900.0,
+      "castsShadow": false
+    }
+  ],
+  "environment": {
+    "intensity": 0.0,
+    "skyIntensity": 0.0,
+    "fallbackAmbient": false,
+    "background": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "fogColor": [
+      0,
+      0,
+      0
+    ],
+    "volumeDensity": 0.0,
+    "skybox": false,
+    "sky": {
+      "enabled": false
+    },
+    "shadowRange": 2500.0,
+    "shadowCascades": 4,
+    "ambientOcclusion": false,
+    "shadowCasterReach": 6000.0,
+    "contactShadows": false,
+    "shadowSplitLambda": 0.92
+  },
+  "post": {
+    "bloomIntensity": 0.04,
+    "tonemap": 0
+  },
+  "materialPrograms": [
+    {
+      "name": "regolith",
+      "ops": [
+        {
+          "kind": "input",
+          "dst": 7,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "microDetail",
+          "dst": 6,
+          "srcA": 7,
+          "value": 3.0,
+          "seed": 11
+        },
+        {
+          "kind": "microDetail",
+          "dst": 5,
+          "srcA": 7,
+          "value": 3.0,
+          "seed": 11,
+          "constant": [
+            0.015688033694578475,
+            0.0,
+            0.17931504565651418,
+            0.0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 6
+        },
+        {
+          "kind": "microDetail",
+          "dst": 6,
+          "srcA": 7,
+          "value": 0.5,
+          "seed": 12
+        },
+        {
+          "kind": "microDetail",
+          "dst": 4,
+          "srcA": 7,
+          "value": 0.5,
+          "seed": 12,
+          "constant": [
+            0.013073361412148729,
+            0.0,
+            0.14942920471376184,
+            0.0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
+        },
+        {
+          "kind": "remap",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0,
+            1,
+            0,
+            0.4
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 4
+        },
+        {
+          "kind": "voronoi",
+          "dst": 6,
+          "srcA": 7,
+          "value": 0.4,
+          "seed": 13
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0.0,
+            0.3,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "voronoi",
+          "dst": 4,
+          "srcA": 7,
+          "value": 0.4,
+          "seed": 13,
+          "constant": [
+            0.004183475651887593,
+            0.0,
+            0.04781734550840379,
+            0.0
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.0,
+            0.3,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
+        },
+        {
+          "kind": "input",
+          "dst": 6,
+          "input": "cameraDistance"
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            30,
+            90,
+            0.5,
+            0
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
+        },
+        {
+          "kind": "add",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 4
+        },
+        {
+          "kind": "input",
+          "dst": 0,
+          "input": "normal"
+        },
+        {
+          "kind": "gradient",
+          "dst": 1,
+          "srcA": 0,
+          "constant": [
+            0.08709150167995877,
+            0.038387809087519945,
+            0.9954604193279559,
+            0
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "fresnel",
+          "dst": 2,
+          "value": 1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0,
+            1,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 3,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0.03,
+            1.03
+          ]
+        },
+        {
+          "kind": "power",
+          "dst": 3,
+          "srcA": 3,
+          "value": -1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            -1,
+            1
+          ]
+        },
+        {
+          "kind": "input",
+          "dst": 4,
+          "input": "viewDirection"
+        },
+        {
+          "kind": "gradient",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.08709150167995877,
+            0.038387809087519945,
+            0.9954604193279559,
+            0
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 2,
+          "srcA": 4,
+          "constant": [
+            0,
+            1,
+            0.15,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 2
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            1,
+            2
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            4,
+            0,
+            4
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "power",
+          "dst": 4,
+          "srcA": 4,
+          "value": 150.0
+        },
+        {
+          "kind": "remap",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0,
+            1,
+            1,
+            1.8
+          ]
+        },
+        {
+          "kind": "input",
+          "dst": 6,
+          "input": "uv"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "input",
+          "dst": 7,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "microDetail",
+          "dst": 7,
+          "srcA": 7,
+          "value": 1.3,
+          "seed": 5
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0,
+            1,
+            0.8,
+            1.2
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 4
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 1,
+          "constant": [
+            0.22,
+            1,
+            0.22,
+            1
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "power",
+          "dst": 7,
+          "srcA": 7,
+          "value": -1.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 7,
+          "srcA": 7,
+          "srcB": 5
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0,
+            1,
+            1,
+            -0.3999999999999999
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0.55,
+            1.5,
+            0.55,
+            1.5
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "constant",
+          "dst": 7,
+          "constant": [
+            1.0,
+            0.96,
+            0.9,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 7
+        },
+        {
+          "kind": "constant",
+          "dst": 0,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            0.97,
+            0.97,
+            0.97,
+            0.97
+          ]
+        }
+      ],
+      "baseColor": 6,
+      "metallic": 0,
+      "roughness": 1
+    }
+  ],
+  "lunarWorld": {
+    "seed": 3,
+    "extent": 4000,
+    "spacing": 2.5,
+    "skirtExtent": 32000,
+    "skirtSpacing": 32,
+    "craters": 3.0,
+    "rocks": 0.02,
+    "relief": 60,
+    "program": "regolith",
+    "curvature": 25000.0,
+    "heroes": [
+      {
+        "x": 0.0,
+        "z": 0.0,
+        "diameter": 2200.0,
+        "fresh": 0.12
+      },
+      {
+        "x": 0.0,
+        "z": 1270.0,
+        "diameter": 260,
+        "fresh": 0.75
+      },
+      {
+        "x": -320.0,
+        "z": -480.0,
+        "diameter": 520.0,
+        "fresh": 0.45
+      },
+      {
+        "x": -760.0,
+        "z": -160.0,
+        "diameter": 700.0,
+        "fresh": 0.45
+      },
+      {
+        "x": 260.0,
+        "z": -860.0,
+        "diameter": 600.0,
+        "fresh": 0.45
+      }
+    ]
+  },
+  "corruption": {
+    "targets": [
+      "lunar.surface"
+    ],
+    "focus": [
+      0.0,
+      0.0,
+      1270.0
+    ],
+    "axis": [
+      0.0,
+      -1.0,
+      0.0
+    ],
+    "amount": 1.0,
+    "radius": 60.0,
+    "inner": 0.25,
+    "fieldNear": 50.0,
+    "fieldFar": 450.0,
+    "openNear": 30.0,
+    "openFar": 150.0,
+    "seam": 0.3,
+    "width": 46.0,
+    "height": 40.0,
+    "depth": 10.0,
+    "block": 5.0,
+    "share": 0.18,
+    "slip": 2.5,
+    "rate": 0.5,
+    "strip": 4.0,
+    "stripSlip": 1.5,
+    "slide": 0.0,
+    "pull": 6.0,
+    "lift": 1.2,
+    "fold": 0.8,
+    "lag": 0.7,
+    "glyph": 5.0,
+    "glyphSize": 1.8,
+    "glow": 4.0,
+    "echoes": 0,
+    "echoOffset": 1.0,
+    "glowColor": [
+      0.85,
+      0.75,
+      0.45
+    ],
+    "light": 1800.0
+  },
+  "meshWire": {
+    "targets": [
+      "lunar.surface"
+    ],
+    "color": [
+      0.75,
+      0.62,
+      0.34
+    ],
+    "intensity": 0.0,
+    "width": 1.0,
+    "creaseLow": 2.0,
+    "creaseHigh": 12.0,
+    "reveal": 1.0,
+    "fadeNear": 60.0,
+    "fadeFar": 900.0,
+    "minPixels": 14.0,
+    "wave": 0.0,
+    "waveRadius": 300.0,
+    "waveWidth": 40.0,
+    "waveGain": 1.6,
+    "waveAhead": 200.0,
+    "clipBelow": -1000.0,
+    "fromFocus": 1.0,
+    "pulse": 1.2,
+    "pulseSpacing": 60.0,
+    "pulseSpeed": 40.0,
+    "pulseWidth": 6.0,
+    "focusGain": 0.5,
+    "rimGain": 6.0,
+    "frontColor": [
+      0.95,
+      0.88,
+      0.62
+    ],
+    "shards": 0.25,
+    "shardRate": 0.35
+  },
+  "portal": {
+    "world": "@root",
+    "exit": [
+      33.300000000000004,
+      9.200000000000001,
+      685.46
+    ],
+    "exitAxis": [
+      -0.426,
+      0.0,
+      -0.905
+    ],
+    "entryUp": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "exitUp": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "flight": [
+      [
+        32.92700000000001,
+        5.5,
+        682.3190000000001,
+        49.4
+      ],
+      [
+        30.638,
+        5,
+        684.5020000000001,
+        51.2
+      ],
+      [
+        32.501000000000005,
+        2.1,
+        681.4140000000001,
+        53.0
+      ],
+      [
+        33.672000000000004,
+        1.8,
+        679.2045000000002,
+        55.4
+      ],
+      [
+        31.515500000000003,
+        1.9,
+        675.7975000000001,
+        57.8
+      ],
+      [
+        32.420500000000004,
+        9.0,
+        675.3715000000002,
+        59.7
+      ],
+      [
+        43.09400000000001,
+        15.0,
+        668.6890000000001,
+        61.0
+      ],
+      [
+        43.280499999999996,
+        18.0,
+        670.2595000000001,
+        62.3
+      ],
+      [
+        50.228,
+        21.5,
+        669.753,
+        63.6
+      ],
+      [
+        57.841,
+        32.5,
+        669.4860000000001,
+        65.2
+      ],
+      [
+        64.549,
+        28.0,
+        669.645,
+        66.8
+      ],
+      [
+        70.352,
+        19.0,
+        670.2300000000001,
+        68.0
+      ],
+      [
+        75.27650000000001,
+        10.6,
+        670.123,
+        69.2
+      ],
+      [
+        78.44400000000002,
+        -19.6,
+        668.6320000000001,
+        70.4
+      ]
+    ],
+    "aims": [
+      [
+        37.132000000000005,
+        2.38,
+        674.8120000000001,
+        49.0,
+        59.5
+      ],
+      [
+        76.5435,
+        47.5,
+        669.5266000000001,
+        58.9,
+        69.3
+      ]
+    ]
+  },
+  "nodes": [
+    {
+      "name": "earth",
+      "kind": "gltf",
+      "asset": "../../assets/space/earth.glb",
+      "position": [
+        -611.7175785712765,
+        2064.559489094785,
+        -7247.968934511779
+      ],
+      "rotation": [
+        0,
+        200,
+        23
+      ],
+      "scale": [
+        9.5,
+        9.5,
+        9.5
+      ],
+      "visible": true,
+      "emissiveBoost": 2.0
+    },
+    {
+      "name": "earth-echo-r",
+      "kind": "gltf",
+      "asset": "../../assets/space/earth.glb",
+      "position": [
+        -541.8880950530888,
+        2064.559489094785,
+        -7252.851887673867
+      ],
+      "rotation": [
+        0,
+        204.0,
+        23
+      ],
+      "scale": [
+        9.642499999999998,
+        9.642499999999998,
+        9.642499999999998
+      ],
+      "visible": true,
+      "tint": [
+        1.0,
+        0.15,
+        0.3
+      ],
+      "emissiveBoost": 3.0
+    },
+    {
+      "name": "earth-echo-c",
+      "kind": "gltf",
+      "asset": "../../assets/space/earth.glb",
+      "position": [
+        -681.5470620894641,
+        2064.559489094785,
+        -7243.08598134969
+      ],
+      "rotation": [
+        0,
+        196.0,
+        23
+      ],
+      "scale": [
+        9.642499999999998,
+        9.642499999999998,
+        9.642499999999998
+      ],
+      "visible": true,
+      "tint": [
+        0.2,
+        0.9,
+        1.0
+      ],
+      "emissiveBoost": 3.0
+    },
+    {
+      "name": "earth-glow",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 24,
+        "seed": 5,
+        "shape": "sphere",
+        "position": [
+          -611.7175785712765,
+          2064.559489094785,
+          -7247.968934511779
+        ],
+        "extent": [
+          5.0,
+          5.0,
+          5.0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spawnRate": 1.2,
+        "burst": 0.0,
+        "lifetimeMin": 14.0,
+        "lifetimeMax": 16.0,
+        "spread": 1.0,
+        "speedMin": 0.0,
+        "speedMax": 0.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.0,
+        "sizeStart": 1472.5,
+        "sizeEnd": 1472.5,
+        "sizeVariance": 0.04,
+        "colorStart": [
+          0.3,
+          0.6,
+          1.0,
+          0.09
+        ],
+        "colorEnd": [
+          0.3,
+          0.6,
+          1.0,
+          0.09
+        ],
+        "emissive": 3.0,
+        "blend": "additive"
+      }
+    },
+    {
+      "name": "laser0",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "position": [
+        -320.0,
+        -99.5,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        14.0,
+        14.0,
+        14.0
+      ],
+      "visible": true,
+      "emissiveBoost": 0.1
+    },
+    {
+      "name": "laser1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "position": [
+        -760.0,
+        -101.0,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        40,
+        0
+      ],
+      "scale": [
+        19.599999999999998,
+        19.599999999999998,
+        19.599999999999998
+      ],
+      "visible": true,
+      "emissiveBoost": 0.1
+    },
+    {
+      "name": "laser2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "position": [
+        260.0,
+        -81.5,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        80,
+        0
+      ],
+      "scale": [
+        16.8,
+        16.8,
+        16.8
+      ],
+      "visible": true,
+      "emissiveBoost": 0.1
+    },
+    {
+      "name": "crater-rim",
+      "kind": "particles",
+      "visible": true,
+      "portalRim": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 7000,
+        "seed": 91,
+        "shape": "disc",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "extent": [
+          1.0,
+          0.1,
+          1.0
+        ],
+        "innerRadius": 0.72,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "spawnRate": 3200.0,
+        "lifetimeMin": 0.3,
+        "lifetimeMax": 0.75,
+        "spread": 0.55,
+        "speedMin": 1.0,
+        "speedMax": 4.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 1.2,
+        "turbulence": 3.5,
+        "turbulenceScale": 0.35,
+        "sizeStart": 0.05,
+        "sizeEnd": 0.0075,
+        "sizeVariance": 0.6,
+        "colorStart": [
+          0.95,
+          0.9,
+          0.75,
+          0.85
+        ],
+        "colorEnd": [
+          0.85,
+          0.7,
+          0.4,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "velocityStretch": 0.8,
+        "stretchMax": 1.5
+      }
+    },
+    {
+      "name": "dome0",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/proofs/dome.glb",
+      "position": [
+        -320.0,
+        -152.0,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2.0,
+        1.5,
+        2.0
+      ],
+      "visible": true
+    },
+    {
+      "name": "dome1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/proofs/dome.glb",
+      "position": [
+        -760.0,
+        -153.5,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        37,
+        0
+      ],
+      "scale": [
+        2.8,
+        1.5,
+        2.8
+      ],
+      "visible": true
+    },
+    {
+      "name": "dome2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/proofs/dome.glb",
+      "position": [
+        260.0,
+        -134.0,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        74,
+        0
+      ],
+      "scale": [
+        2.4,
+        1.5,
+        2.4
+      ],
+      "visible": true
+    }
+  ]
+}

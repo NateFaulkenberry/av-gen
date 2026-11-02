@@ -1131,6 +1131,7 @@ private:
     std::shared_ptr<std::unordered_map<const scene::Scene*, SceneRenderer*>> registry_;
     bool plain_ = false;
     bool busy_ = false; // ADR-1885: drawing its own world into the current frame
+    bool handingOff_ = false; // handing this frame to the world the camera crossed into (a view back here is skipped)
     SceneRenderer* portalSource_ = nullptr; // whose scene radiance the portal pass reads this frame
     const scene::PostSettings* inheritedPost_ = nullptr;         // a portal view's source's (null: the scene's own)
     const scene::TemporalSettings* inheritedTemporal_ = nullptr;

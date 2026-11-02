@@ -53,6 +53,13 @@ struct AttractorGen {
     // and the result is scaled, so the world's shape is identical; the flight keeps its timing, so its speeds scale
     // with it. The approach (site, departArc, speed) is authored in world units, like the rest of the scene.
     float worldScale = 1.0f;
+    // ADR-1897: footings -- the ground eased to `level` within `radius` (blending out over the last third), in world
+    // units like the approach; applied after the flight is built, so a pad never moves the camera. A stage for the
+    // characters: a flat, open bench without the terraces' steps.
+    struct Pad {
+        float x = 0.0f, z = 0.0f, radius = 10.0f, level = 0.0f;
+    };
+    std::vector<Pad> pads;
     // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
     // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
     // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from
@@ -83,6 +90,7 @@ struct AttractorLook {
     // ADR-1894: a gain on the contour lines (0..1), for a look: the audio route drives `contour`, so a time of day
     // that wants the lines quieter scales them here instead of fighting the route
     float contourGain = 1.0f;
+    float sunWarmth = 1.0f;  // ADR-1900: the key light's colour, 1 the warm sun, 0 a cold moon
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines
@@ -197,6 +205,8 @@ struct AttractorWorldBlock {
 
 // Toward the sun, for a world and a look: `sunAzimuth` degrees from the composed view, toward the escarpment's lit side.
 [[nodiscard]] glm::vec3 attractorSunDirection(const AttractorWorld& world, const AttractorLook& look);
+// ADR-1900: the key light's colour for a look (the warm sun, toward a cold moon as `sunWarmth` falls)
+[[nodiscard]] glm::vec3 attractorSunColor(const AttractorLook& look);
 
 [[nodiscard]] Result<AttractorWorldBlock> attractorWorldFromJson(const nlohmann::json& j);
 [[nodiscard]] nlohmann::json attractorWorldToJson(const AttractorWorldBlock& a);

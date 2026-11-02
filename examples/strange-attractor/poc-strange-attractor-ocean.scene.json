@@ -1,0 +1,2496 @@
+{
+  "format": "avgen-scene",
+  "version": 1,
+  "name": "the-strange-attractor-ocean",
+  "_note": "The Strange Attractor's deep ocean (Art Pass 2, M3), written by build_ocean.py; reached by the canyon's riverbed portal (ADR-1895), left by the launch bay's portal into the UFO.",
+  "camera": {
+    "mode": 1,
+    "position": [
+      250,
+      60,
+      300
+    ],
+    "target": [
+      0,
+      30,
+      -900
+    ],
+    "fov": 44.0,
+    "orbitSpeed": 0.0,
+    "far": 6000.0
+  },
+  "lights": [
+    {
+      "name": "surface-light",
+      "type": "directional",
+      "role": "key",
+      "direction": [
+        0.12,
+        -1.0,
+        0.18
+      ],
+      "color": [
+        0.55,
+        0.85,
+        1.0
+      ],
+      "intensity": 1.1,
+      "castsShadow": true,
+      "shadowStrength": 0.8,
+      "softness": 0.6
+    },
+    {
+      "name": "water-fill",
+      "type": "directional",
+      "role": "fill",
+      "direction": [
+        -0.3,
+        0.2,
+        0.5
+      ],
+      "color": [
+        0.2,
+        0.55,
+        0.65
+      ],
+      "intensity": 0.25,
+      "castsShadow": false,
+      "shadowStrength": 0.0
+    },
+    {
+      "name": "bay-light",
+      "type": "point",
+      "position": [
+        75.0,
+        82.0,
+        -880.0
+      ],
+      "color": [
+        1.0,
+        0.85,
+        0.65
+      ],
+      "intensity": 2600.0,
+      "range": 220.0,
+      "castsShadow": false
+    },
+    {
+      "name": "flood-l",
+      "type": "point",
+      "position": [
+        85.0,
+        100.0,
+        -800.0
+      ],
+      "color": [
+        0.6,
+        0.85,
+        1.0
+      ],
+      "intensity": 3000.0,
+      "range": 160.0,
+      "castsShadow": false
+    },
+    {
+      "name": "flood-r",
+      "type": "point",
+      "position": [
+        85.0,
+        100.0,
+        -960.0
+      ],
+      "color": [
+        0.6,
+        0.85,
+        1.0
+      ],
+      "intensity": 3000.0,
+      "range": 160.0,
+      "castsShadow": false
+    },
+    {
+      "name": "sub-1-light",
+      "type": "point",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "color": [
+        0.55,
+        0.9,
+        1.0
+      ],
+      "intensity": 900.0,
+      "range": 60.0,
+      "castsShadow": false
+    },
+    {
+      "name": "sub-2-light",
+      "type": "point",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "color": [
+        0.55,
+        0.9,
+        1.0
+      ],
+      "intensity": 900.0,
+      "range": 60.0,
+      "castsShadow": false
+    },
+    {
+      "name": "sub-3-light",
+      "type": "point",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "color": [
+        0.55,
+        0.9,
+        1.0
+      ],
+      "intensity": 900.0,
+      "range": 60.0,
+      "castsShadow": false
+    },
+    {
+      "name": "sub-4-light",
+      "type": "point",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "color": [
+        0.55,
+        0.9,
+        1.0
+      ],
+      "intensity": 900.0,
+      "range": 60.0,
+      "castsShadow": false
+    },
+    {
+      "name": "sub-5-light",
+      "type": "point",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "color": [
+        0.55,
+        0.9,
+        1.0
+      ],
+      "intensity": 900.0,
+      "range": 60.0,
+      "castsShadow": false
+    }
+  ],
+  "environment": {
+    "intensity": 0.18,
+    "background": [
+      0.004,
+      0.022,
+      0.035
+    ],
+    "fogColor": [
+      0.012,
+      0.075,
+      0.095
+    ],
+    "volumeDensity": 0.0024,
+    "skybox": false,
+    "sky": {
+      "enabled": false
+    },
+    "fallbackAmbient": false,
+    "shadowRange": 900.0,
+    "shadowCascades": 3,
+    "ambientOcclusion": false,
+    "shadowCasterReach": 1500.0,
+    "contactShadows": false
+  },
+  "post": {
+    "bloomIntensity": 0.06,
+    "tonemap": 0
+  },
+  "materialPrograms": [
+    {
+      "name": "seabed",
+      "ops": [
+        {
+          "kind": "input",
+          "dst": 0,
+          "input": "uv"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 0,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            0.07,
+            0.2,
+            0.6,
+            1.3
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "input",
+          "dst": 2,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "microDetail",
+          "dst": 3,
+          "srcA": 2,
+          "value": 0.6,
+          "seed": 7
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0.82,
+            1.15
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 3
+        },
+        {
+          "kind": "noise",
+          "dst": 4,
+          "srcA": 2,
+          "value": 0.004,
+          "seed": 71
+        },
+        {
+          "kind": "remap",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.3,
+            0.7,
+            0,
+            1
+          ],
+          "value": 1.0
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.16,
+            0.19,
+            0.17,
+            1.0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.09,
+            0.1,
+            0.1,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 6,
+          "srcC": 4
+        },
+        {
+          "kind": "input",
+          "dst": 7,
+          "input": "normal"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 7,
+          "srcA": 7,
+          "constant": [
+            0.85,
+            0.45,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 6,
+          "constant": [
+            0.07,
+            0.075,
+            0.08,
+            1.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 6,
+          "srcC": 7
+        },
+        {
+          "kind": "multiply",
+          "dst": 5,
+          "srcA": 5,
+          "srcB": 1
+        },
+        {
+          "kind": "constant",
+          "dst": 0,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            0.9,
+            0.9,
+            0.9,
+            0.9
+          ]
+        }
+      ],
+      "baseColor": 5,
+      "metallic": 0,
+      "roughness": 1
+    }
+  ],
+  "lunarWorld": {
+    "seed": 23,
+    "extent": 4000,
+    "spacing": 2.5,
+    "skirtExtent": 24000,
+    "skirtSpacing": 48,
+    "craters": 0.0,
+    "rocks": 0.07,
+    "relief": 55,
+    "program": "seabed",
+    "curvature": 6371000.0,
+    "heroes": [],
+    "mesas": [
+      {
+        "x": -800.0,
+        "z": -600.0,
+        "rx": 700.0,
+        "rz": 1600.0,
+        "angle": 0.0,
+        "height": 240.0,
+        "terraces": 4
+      },
+      {
+        "x": 420.0,
+        "z": -300.0,
+        "rx": 60.0,
+        "rz": 45.0,
+        "angle": 30.0,
+        "height": 40.0,
+        "terraces": 2
+      },
+      {
+        "x": 260.0,
+        "z": -1250.0,
+        "rx": 90.0,
+        "rz": 60.0,
+        "angle": -20.0,
+        "height": 55.0,
+        "terraces": 2
+      },
+      {
+        "x": 520.0,
+        "z": -800.0,
+        "rx": 70.0,
+        "rz": 70.0,
+        "angle": 10.0,
+        "height": 35.0,
+        "terraces": 2
+      }
+    ],
+    "yardangs": 2.5,
+    "wind": 70.0
+  },
+  "corruption": {
+    "targets": [
+      "bay-membrane"
+    ],
+    "focus": [
+      65.0,
+      38.0,
+      -880.0
+    ],
+    "axis": [
+      -1.0,
+      0.0,
+      0.0
+    ],
+    "amount": 1.0,
+    "radius": 45.0,
+    "inner": 0.2,
+    "fieldNear": 25.0,
+    "fieldFar": 260.0,
+    "openNear": 20.0,
+    "openFar": 130.0,
+    "seam": 0.3,
+    "width": 22.0,
+    "height": 11.0,
+    "depth": 8.0,
+    "block": 2.5,
+    "share": 0.25,
+    "slip": 1.5,
+    "rate": 0.6,
+    "strip": 2.5,
+    "stripSlip": 1.0,
+    "slide": 0.0,
+    "pull": 4.0,
+    "lift": 0.8,
+    "fold": 0.6,
+    "lag": 0.7,
+    "glyph": 6.0,
+    "glyphSize": 1.0,
+    "glow": 4.0,
+    "echoes": 1,
+    "echoOffset": 0.6,
+    "glowColor": [
+      0.55,
+      0.9,
+      1.0
+    ],
+    "light": 1500.0
+  },
+  "portal": {
+    "world": "@root",
+    "exit": [
+      36.146,
+      2.794095277786255,
+      664.4972500000001
+    ],
+    "exitAxis": [
+      -0.795,
+      0.0,
+      0.606
+    ],
+    "entryUp": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "exitUp": [
+      0.0,
+      1.0,
+      0.0
+    ],
+    "flight": [
+      [
+        32.127,
+        3.253327888250351,
+        668.8765000000001,
+        148.4
+      ],
+      [
+        28.401,
+        3.6619413077831267,
+        675.0525000000001,
+        149.43733721329758
+      ],
+      [
+        24.409000000000002,
+        3.5000000059604646,
+        683.0120000000001,
+        150.76404216929947
+      ],
+      [
+        19.246,
+        3.7000000059604643,
+        693.181,
+        152.65175153164282
+      ],
+      [
+        14.935000000000002,
+        4.6500000059604645,
+        705.1600000000001,
+        155.3758457553817
+      ],
+      [
+        14.190999999999997,
+        6.9000000059604645,
+        717.6710000000002,
+        160.54561456894803
+      ],
+      [
+        16.588,
+        11.400000005960464,
+        729.8090000000001,
+        168.71264617434895
+      ],
+      [
+        18.080000000000002,
+        19.400000005960464,
+        742.373,
+        177.99924939539594
+      ],
+      [
+        17.814999999999994,
+        30.400000005960464,
+        753.5530000000001,
+        187.73070966095003
+      ],
+      [
+        17.1505,
+        42.400000005960464,
+        762.71,
+        197.90567143672024
+      ],
+      [
+        16.539000000000005,
+        50.400000005960464,
+        769.6310000000001,
+        210.5
+      ]
+    ]
+  },
+  "nodes": [
+    {
+      "name": "ocean-base",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ocean-base.glb",
+      "position": [
+        -25.0,
+        50.0,
+        -880.0
+      ],
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "bay-membrane",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/bay-membrane.glb",
+      "position": [
+        -25.0,
+        50.0,
+        -880.0
+      ],
+      "rotation": [
+        0,
+        90,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "sub-1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.026,
+        0.026,
+        0.026
+      ],
+      "visible": true
+    },
+    {
+      "name": "sub-2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.021,
+        0.021,
+        0.021
+      ],
+      "visible": true
+    },
+    {
+      "name": "sub-3",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.017,
+        0.017,
+        0.017
+      ],
+      "visible": true
+    },
+    {
+      "name": "sub-4",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.019,
+        0.019,
+        0.019
+      ],
+      "visible": true
+    },
+    {
+      "name": "sub-5",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
+      "position": [
+        0.0,
+        -500.0,
+        0.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.023,
+        0.023,
+        0.023
+      ],
+      "visible": true
+    },
+    {
+      "name": "marine-snow",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 26000,
+        "seed": 77,
+        "shape": "box",
+        "position": [
+          120.0,
+          60.0,
+          -380.0
+        ],
+        "extent": [
+          360.0,
+          90.0,
+          720.0
+        ],
+        "direction": [
+          0,
+          -1,
+          0
+        ],
+        "spawnRate": 900.0,
+        "lifetimeMin": 25.0,
+        "lifetimeMax": 40.0,
+        "spread": 1.0,
+        "speedMin": 0.02,
+        "speedMax": 0.15,
+        "gravity": [
+          0.05,
+          -0.04,
+          0.02
+        ],
+        "drag": 0.2,
+        "turbulence": 0.2,
+        "turbulenceScale": 0.05,
+        "sizeStart": 0.09,
+        "sizeEnd": 0.09,
+        "sizeVariance": 0.6,
+        "colorStart": [
+          0.7,
+          0.85,
+          0.85,
+          0.35
+        ],
+        "colorEnd": [
+          0.7,
+          0.85,
+          0.85,
+          0.35
+        ],
+        "emissive": 0.3,
+        "blend": "additive"
+      }
+    },
+    {
+      "name": "bay-rim",
+      "kind": "particles",
+      "visible": true,
+      "portalRim": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 7000,
+        "seed": 91,
+        "shape": "disc",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "extent": [
+          1.0,
+          0.1,
+          1.0
+        ],
+        "innerRadius": 0.72,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "spawnRate": 3200.0,
+        "lifetimeMin": 0.3,
+        "lifetimeMax": 0.75,
+        "spread": 0.55,
+        "speedMin": 1.0,
+        "speedMax": 4.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 1.2,
+        "turbulence": 3.5,
+        "turbulenceScale": 0.35,
+        "sizeStart": 0.12,
+        "sizeEnd": 0.018,
+        "sizeVariance": 0.6,
+        "colorStart": [
+          0.7,
+          0.95,
+          1.0,
+          0.85
+        ],
+        "colorEnd": [
+          0.3,
+          0.75,
+          1.0,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "velocityStretch": 0.8,
+        "stretchMax": 1.5
+      }
+    },
+    {
+      "name": "life-0",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        314.0,
+        -10.69293441772461,
+        -472.0
+      ],
+      "rotation": [
+        0,
+        0.0,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        308.460510165402,
+        -10.012025260925293,
+        -468.7577767333545
+      ],
+      "rotation": [
+        0,
+        137.51999999999998,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        312.314996340382,
+        -10.342456245422364,
+        -475.58619259180904
+      ],
+      "rotation": [
+        0,
+        275.03999999999996,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-3",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        313.4596901561633,
+        -10.691465759277344,
+        -470.0949266029888
+      ],
+      "rotation": [
+        0,
+        52.544099999999936,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-4",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        306.87979121860485,
+        -9.737553024291993,
+        -472.90744808938257
+      ],
+      "rotation": [
+        0,
+        190.06409999999994,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-5",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        286.4120975906123,
+        -9.797322654724121,
+        -485.8971958689972
+      ],
+      "rotation": [
+        0,
+        41.08409999999998,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-6",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        282.00060476812945,
+        -9.738990211486817,
+        -487.95081965053805
+      ],
+      "rotation": [
+        0,
+        178.6041,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-7",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        287.45869271263115,
+        -9.576324844360352,
+        -491.3282795434867
+      ],
+      "rotation": [
+        0,
+        316.1241,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-8",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        283.7726182341984,
+        -9.961652183532715,
+        -484.40718807442124
+      ],
+      "rotation": [
+        0,
+        93.62819999999991,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-9",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "position": [
+        282.4939051431715,
+        -9.60431137084961,
+        -489.86860329718075
+      ],
+      "rotation": [
+        0,
+        231.14820000000003,
+        0
+      ],
+      "scale": [
+        1.75,
+        1.75,
+        1.75
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-10",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        304.6000283322666,
+        -7.387854480743409,
+        -535.6411049564738
+      ],
+      "rotation": [
+        0,
+        82.16819999999996,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-11",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        301.5369234682553,
+        -7.217696571350098,
+        -542.0428543753211
+      ],
+      "rotation": [
+        0,
+        219.68819999999985,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-12",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        305.9975812932268,
+        -7.227425003051758,
+        -540.0983309562159
+      ],
+      "rotation": [
+        0,
+        357.2082,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-13",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "position": [
+        300.623563846474,
+        -7.271840953826905,
+        -536.5883026363462
+      ],
+      "rotation": [
+        0,
+        134.71229999999989,
+        0
+      ],
+      "scale": [
+        1.75,
+        1.75,
+        1.75
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-14",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "position": [
+        304.13896513615356,
+        -7.174020195007325,
+        -543.5973168738567
+      ],
+      "rotation": [
+        0,
+        272.2323,
+        0
+      ],
+      "scale": [
+        2.05,
+        2.05,
+        2.05
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-15",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        264.9301119734645,
+        -6.647101306915284,
+        -567.3164343172607
+      ],
+      "rotation": [
+        0,
+        123.25229999999993,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-16",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        267.29296711598516,
+        -6.7789839744567875,
+        -576.3428221815914
+      ],
+      "rotation": [
+        0,
+        260.77229999999986,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-17",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "position": [
+        270.51219862202925,
+        -6.837342166900635,
+        -570.0178652711094
+      ],
+      "rotation": [
+        0,
+        38.27639999999995,
+        0
+      ],
+      "scale": [
+        1.75,
+        1.75,
+        1.75
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-18",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "position": [
+        266.0054134347918,
+        -6.795363807678223,
+        -571.8529475131425
+      ],
+      "rotation": [
+        0,
+        175.79639999999986,
+        0
+      ],
+      "scale": [
+        2.05,
+        2.05,
+        2.05
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-19",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        271.29152093873626,
+        -6.488064193725586,
+        -575.4936928757206
+      ],
+      "rotation": [
+        0,
+        313.3164,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-20",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        289.30414206597766,
+        -5.389472389221192,
+        -611.2434618320476
+      ],
+      "rotation": [
+        0,
+        164.3363999999999,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-21",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "position": [
+        294.95379004281335,
+        -4.520213031768799,
+        -616.7576385300879
+      ],
+      "rotation": [
+        0,
+        301.85639999999984,
+        0
+      ],
+      "scale": [
+        1.75,
+        1.75,
+        1.75
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-22",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "position": [
+        292.81280853982145,
+        -5.334216022491455,
+        -607.6757263872885
+      ],
+      "rotation": [
+        0,
+        79.36049999999973,
+        0
+      ],
+      "scale": [
+        2.05,
+        2.05,
+        2.05
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-23",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        289.43981998747773,
+        -5.272055530548096,
+        -613.9197599598599
+      ],
+      "rotation": [
+        0,
+        216.88050000000004,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-24",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        293.99036738766875,
+        -4.728673362731934,
+        -612.1960552526833
+      ],
+      "rotation": [
+        0,
+        354.40049999999997,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-25",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "position": [
+        242.38681963744654,
+        -4.6861471176147464,
+        -653.7160791554173
+      ],
+      "rotation": [
+        0,
+        205.4204999999999,
+        0
+      ],
+      "scale": [
+        1.75,
+        1.75,
+        1.75
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-26",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "position": [
+        248.6764393438018,
+        -4.582098388671875,
+        -652.8226010205135
+      ],
+      "rotation": [
+        0,
+        342.9404999999998,
+        0
+      ],
+      "scale": [
+        2.05,
+        2.05,
+        2.05
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-27",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        243.16319953005413,
+        -4.777866268157959,
+        -647.17169148731
+      ],
+      "rotation": [
+        0,
+        120.44459999999971,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-28",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        245.0811025968076,
+        -4.453422927856446,
+        -656.3029789172626
+      ],
+      "rotation": [
+        0,
+        257.9646,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-29",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        248.60626907131854,
+        -4.624331378936768,
+        -650.1432928265641
+      ],
+      "rotation": [
+        0,
+        35.468699999999934,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-30",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "position": [
+        275.9253765928842,
+        -4.34306230545044,
+        -694.7682216515853
+      ],
+      "rotation": [
+        0,
+        246.50459999999987,
+        0
+      ],
+      "scale": [
+        2.05,
+        2.05,
+        2.05
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-31",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        281.6539849766119,
+        -4.4338349342346195,
+        -688.372611358435
+      ],
+      "rotation": [
+        0,
+        24.008699999999774,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-32",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        275.344433333618,
+        -4.489543342590332,
+        -689.1123256901313
+      ],
+      "rotation": [
+        0,
+        161.52869999999967,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-33",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        280.71721371670696,
+        -4.425875091552735,
+        -694.8966059283691
+      ],
+      "rotation": [
+        0,
+        299.0487,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-34",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        279.0236375845141,
+        -4.3446368217468265,
+        -685.7207283218321
+      ],
+      "rotation": [
+        0,
+        76.5527999999999,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-35",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        228.72439068241715,
+        -3.247774028778076,
+        -706.2880686482767
+      ],
+      "rotation": [
+        0,
+        287.58869999999985,
+        0
+      ],
+      "scale": [
+        0.94,
+        0.94,
+        0.94
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-36",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        230.19037357499565,
+        -3.324293518066406,
+        -699.2838295618202
+      ],
+      "rotation": [
+        0,
+        65.09279999999976,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-37",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        224.30710215916645,
+        -3.461798334121704,
+        -705.5370444161334
+      ],
+      "rotation": [
+        0,
+        202.61279999999965,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-38",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        230.63293559895544,
+        -3.296799325942993,
+        -704.9527067396388
+      ],
+      "rotation": [
+        0,
+        340.1328,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-39",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        225.403096881882,
+        -3.6011547088623046,
+        -699.0385391067641
+      ],
+      "rotation": [
+        0,
+        117.63689999999988,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-40",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        205.07437244937572,
+        3.356011962890625,
+        -771.8730280410393
+      ],
+      "rotation": [
+        0,
+        328.6727999999998,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-41",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        201.33166521291395,
+        4.431348896026611,
+        -767.6949341414245
+      ],
+      "rotation": [
+        0,
+        106.17689999999973,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-42",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        199.6943173039333,
+        2.9882203102111817,
+        -774.6608826744575
+      ],
+      "rotation": [
+        0,
+        243.69689999999963,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-43",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        205.72930938242413,
+        3.5186458587646485,
+        -768.5535382721401
+      ],
+      "rotation": [
+        0,
+        21.200999999999954,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-44",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "position": [
+        199.39109934119202,
+        4.178615665435791,
+        -768.9833204278283
+      ],
+      "rotation": [
+        0,
+        158.72099999999946,
+        0
+      ],
+      "scale": [
+        2.3499999999999996,
+        2.3499999999999996,
+        2.3499999999999996
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-45",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        182.7308068811659,
+        4.419668292999267,
+        -801.1879247244784
+      ],
+      "rotation": [
+        0,
+        9.740999999999792,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-46",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        174.97225434095367,
+        5.238045787811279,
+        -800.0525000066428
+      ],
+      "rotation": [
+        0,
+        147.2610000000001,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-47",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        178.61145072106777,
+        4.6912942886352536,
+        -804.3208033125851
+      ],
+      "rotation": [
+        0,
+        284.7809999999996,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-48",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "position": [
+        180.41874444472046,
+        5.0351215362548825,
+        -797.396775552818
+      ],
+      "rotation": [
+        0,
+        62.28509999999993,
+        0
+      ],
+      "scale": [
+        2.3499999999999996,
+        2.3499999999999996,
+        2.3499999999999996
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-49",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        174.23624955467574,
+        5.522315120697021,
+        -803.3543199715434
+      ],
+      "rotation": [
+        0,
+        199.80509999999944,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-50",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        141.26348081193493,
+        23.668088531494142,
+        -830.4496399650816
+      ],
+      "rotation": [
+        0,
+        50.82509999999977,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-51",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        135.25065456652842,
+        28.019570922851564,
+        -832.6954983490726
+      ],
+      "rotation": [
+        0,
+        188.3451000000001,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-52",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "position": [
+        142.9789407518818,
+        20.917119598388673,
+        -834.02136389519
+      ],
+      "rotation": [
+        0,
+        325.8650999999996,
+        0
+      ],
+      "scale": [
+        2.3499999999999996,
+        2.3499999999999996,
+        2.3499999999999996
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-53",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        139.44537042268504,
+        25.640672302246095,
+        -829.6649655180346
+      ],
+      "rotation": [
+        0,
+        103.3691999999999,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-54",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        137.46879285157414,
+        25.491056060791017,
+        -836.5423551569377
+      ],
+      "rotation": [
+        0,
+        240.88919999999942,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-55",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seagrass.glb",
+      "position": [
+        149.89376776814248,
+        19.317798233032228,
+        -868.8017638122061
+      ],
+      "rotation": [
+        0,
+        91.90919999999974,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-56",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "position": [
+        148.69877762037413,
+        20.05754623413086,
+        -873.5188220168146
+      ],
+      "rotation": [
+        0,
+        229.42920000000007,
+        0
+      ],
+      "scale": [
+        2.3499999999999996,
+        2.3499999999999996,
+        2.3499999999999996
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-57",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        154.7649044508588,
+        15.915689086914062,
+        -871.4206162116647
+      ],
+      "rotation": [
+        0,
+        6.933299999999567,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-58",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        147.07127773976507,
+        20.702554321289064,
+        -869.9065373367541
+      ],
+      "rotation": [
+        0,
+        144.4532999999999,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-59",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        150.49704296025456,
+        19.232165908813478,
+        -874.3479668429646
+      ],
+      "rotation": [
+        0,
+        281.97329999999937,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-60",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "position": [
+        97.00013380627459,
+        30.45296440124512,
+        -834.7811799025507
+      ],
+      "rotation": [
+        0,
+        132.99329999999972,
+        0
+      ],
+      "scale": [
+        2.3499999999999996,
+        2.3499999999999996,
+        2.3499999999999996
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-61",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-a.glb",
+      "position": [
+        100.0275549222347,
+        31.895921325683595,
+        -841.199881361279
+      ],
+      "rotation": [
+        0,
+        270.5133,
+        0
+      ],
+      "scale": [
+        1.06,
+        1.06,
+        1.06
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-62",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/kelp-b.glb",
+      "position": [
+        101.33790155232639,
+        30.25068244934082,
+        -836.5133865881533
+      ],
+      "rotation": [
+        0,
+        48.01739999999955,
+        0
+      ],
+      "scale": [
+        1.18,
+        1.18,
+        1.18
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-63",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/sponge.glb",
+      "position": [
+        95.22228923172554,
+        31.296964263916017,
+        -838.4620387588875
+      ],
+      "rotation": [
+        0,
+        185.53739999999985,
+        0
+      ],
+      "scale": [
+        0.7,
+        0.7,
+        0.7
+      ],
+      "visible": true
+    },
+    {
+      "name": "life-64",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/fan-coral.glb",
+      "position": [
+        102.8763580486115,
+        31.385858154296876,
+        -840.1648474256141
+      ],
+      "rotation": [
+        0,
+        323.05739999999935,
+        0
+      ],
+      "scale": [
+        0.82,
+        0.82,
+        0.82
+      ],
+      "visible": true
+    },
+    {
+      "name": "fish-school-0",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 260,
+        "seed": 600,
+        "shape": "sphere",
+        "position": [
+          291.0,
+          24.0,
+          -522.0
+        ],
+        "extent": [
+          9.0,
+          2.6999999999999997,
+          9.0
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "spawnRate": 8.666666666666666,
+        "burst": 260.0,
+        "lifetimeMin": 28.0,
+        "lifetimeMax": 32.0,
+        "spread": 0.4,
+        "speedMin": 2.0,
+        "speedMax": 3.5,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.05,
+        "turbulence": 0.4,
+        "turbulenceScale": 0.08,
+        "attractorPosition": [
+          291.0,
+          24.0,
+          -522.0
+        ],
+        "attractorStrength": 2.2,
+        "attractorRadius": 27.0,
+        "orbit": 2.6,
+        "sizeStart": 0.22,
+        "sizeEnd": 0.22,
+        "sizeVariance": 0.3,
+        "colorStart": [
+          0.55,
+          0.68,
+          0.72,
+          0.9
+        ],
+        "colorEnd": [
+          0.55,
+          0.68,
+          0.72,
+          0.9
+        ],
+        "emissive": 0.0,
+        "blend": "alpha",
+        "velocityStretch": 0.9,
+        "stretchMax": 0.5
+      }
+    },
+    {
+      "name": "fish-school-1",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 340,
+        "seed": 601,
+        "shape": "sphere",
+        "position": [
+          270.0,
+          40.0,
+          -660.0
+        ],
+        "extent": [
+          12.0,
+          3.5999999999999996,
+          12.0
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "spawnRate": 11.333333333333334,
+        "burst": 340.0,
+        "lifetimeMin": 28.0,
+        "lifetimeMax": 32.0,
+        "spread": 0.4,
+        "speedMin": 2.0,
+        "speedMax": 3.5,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.05,
+        "turbulence": 0.4,
+        "turbulenceScale": 0.08,
+        "attractorPosition": [
+          270.0,
+          40.0,
+          -660.0
+        ],
+        "attractorStrength": 2.2,
+        "attractorRadius": 36.0,
+        "orbit": 2.6,
+        "sizeStart": 0.22,
+        "sizeEnd": 0.22,
+        "sizeVariance": 0.3,
+        "colorStart": [
+          0.55,
+          0.68,
+          0.72,
+          0.9
+        ],
+        "colorEnd": [
+          0.55,
+          0.68,
+          0.72,
+          0.9
+        ],
+        "emissive": 0.0,
+        "blend": "alpha",
+        "velocityStretch": 0.9,
+        "stretchMax": 0.5
+      }
+    },
+    {
+      "name": "fish-school-2",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 200,
+        "seed": 602,
+        "shape": "sphere",
+        "position": [
+          196.0,
+          62.0,
+          -790.0
+        ],
+        "extent": [
+          8.0,
+          2.4,
+          8.0
+        ],
+        "direction": [
+          1,
+          0,
+          0
+        ],
+        "spawnRate": 6.666666666666667,
+        "burst": 200.0,
+        "lifetimeMin": 28.0,
+        "lifetimeMax": 32.0,
+        "spread": 0.4,
+        "speedMin": 2.0,
+        "speedMax": 3.5,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.05,
+        "turbulence": 0.4,
+        "turbulenceScale": 0.08,
+        "attractorPosition": [
+          196.0,
+          62.0,
+          -790.0
+        ],
+        "attractorStrength": 2.2,
+        "attractorRadius": 24.0,
+        "orbit": 2.6,
+        "sizeStart": 0.22,
+        "sizeEnd": 0.22,
+        "sizeVariance": 0.3,
+        "colorStart": [
+          0.55,
+          0.68,
+          0.72,
+          0.9
+        ],
+        "colorEnd": [
+          0.55,
+          0.68,
+          0.72,
+          0.9
+        ],
+        "emissive": 0.0,
+        "blend": "alpha",
+        "velocityStretch": 0.9,
+        "stretchMax": 0.5
+      }
+    },
+    {
+      "name": "fish-singles",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 40,
+        "seed": 700,
+        "shape": "box",
+        "position": [
+          260.0,
+          40.0,
+          -640.0
+        ],
+        "extent": [
+          70.0,
+          20.0,
+          220.0
+        ],
+        "direction": [
+          0,
+          0,
+          1
+        ],
+        "spawnRate": 1.2,
+        "burst": 30.0,
+        "lifetimeMin": 30.0,
+        "lifetimeMax": 34.0,
+        "spread": 1.0,
+        "speedMin": 0.6,
+        "speedMax": 1.4,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.0,
+        "turbulence": 0.3,
+        "turbulenceScale": 0.02,
+        "sizeStart": 0.45,
+        "sizeEnd": 0.45,
+        "sizeVariance": 0.4,
+        "colorStart": [
+          0.35,
+          0.45,
+          0.5,
+          0.95
+        ],
+        "colorEnd": [
+          0.35,
+          0.45,
+          0.5,
+          0.95
+        ],
+        "emissive": 0.0,
+        "blend": "alpha",
+        "velocityStretch": 1.4,
+        "stretchMax": 1.2
+      }
+    }
+  ]
+}

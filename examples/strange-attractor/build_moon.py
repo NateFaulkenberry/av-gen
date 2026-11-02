@@ -15,7 +15,8 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, canyon as canyon_frame  # noqa: E402  (ADR-1893)
+from canyon_scale import WORLD_SCALE as WS, R, PREFIX, canyon_frame, site, knot  # noqa: E402  (ADR-1893; M3b POC)
+from portal_rim import RIM_PARTICLES_MOON  # noqa: E402  (ADR-1898)
 
 
 def unit(v):
@@ -32,14 +33,15 @@ def direction(az_deg, el_deg):
 # Art Pass 2, M1: the sun is just over the horizon behind the arrival (2.2 degrees), so the plain at the exit is lit
 # with long shadows and the great basin ahead lies in its rim's shadow -- the night side, reached by flying into it
 S = direction(175.0, 2.2)                   # toward the sun
-E = direction(-6.0, 6.0)                    # toward the Earth: ahead, over the basin
+E = direction(-4.0, 13.0)                   # toward the Earth: ahead, over the basin; M3b: higher (a bigger disc clears
+                                            # the horizon) and nearly dead ahead, the first thing out of the portal
 EXIT = [0.0, 0.0, 1500.0]
 # M1b: a tighter fall (ADR-1887) than M1's 150 km. The plain at the exit tilts toward the low sun behind and is lit;
 # a few kilometres ahead the ground has turned past the terminator into night, below the horizon from low down; the
 # domes stand out there and come over the horizon only as the camera rises
 CURVATURE = 25000.0
 # 3.2 degrees across, 9 km out (a node's position is capped at 10 km and its scale at 100: make_earth.py's sphere is 100 m)
-EARTH_DISTANCE, EARTH_RADIUS = 9000.0, 250.0
+EARTH_DISTANCE, EARTH_RADIUS = 9000.0, 950.0  # M3b: 12 degrees across (owner: bigger, brighter, noticed first)
 EARTH_FILE_RADIUS = 100.0  # make_earth.py's sphere (a node's scale is capped at 100: the Gate B 'far cut' was that cap)
 
 SH = unit([S[0], 0.0, S[2]])   # the sun's direction along the ground
@@ -136,18 +138,15 @@ DUSK_OUT = [-0.426, 0.0, -0.905]          # out of the wall (the wall's downhill
 DUSK_EXIT = [*canyon_frame(0, 0)[:1], 46.0 * WS, canyon_frame(0, 0)[1]]  # the Gate C 2 site, scaled (ADR-1893)
 
 
-def canyon(d, lat):
-    """A point d real metres out of the wall and lat to the right of that line (x, z), in the scaled world."""
-    return canyon_frame(d / WS, lat / WS)
-
-
 # M1b: the camp is on the low bank right of the exit, 16 m out and 16 m over (real metres; it was the M1 bank's
 # neighbour before the world was scaled down). Crossing 2 at 47.87 s (bar 25). Out of the wall and down over the camp:
 # a slow arc a few metres off the fire, the eye on the Sasquatches, then away down the canyon (heights above the floor;
 # the next crossing, M2's, is planned on bar 36 = 69.69 s)
-CAMP = canyon(16.0, 16.0)
+# M3b: placements are sites on the terrain (authored at the current canyon's scale, following the terrain at any
+# scale) or, near the camp, real metres from it (canyon_scale.site, near, knot)
+CAMP = site(16.0, 16.0)
 CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 m at d 40, lat 40)
-DUSK_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t in
+DUSK_FLIGHT = [knot(d, lat, h, t) for d, lat, h, t in
                ((6, 2, 11, 49.4), (10, 6, 5, 51.2), (12, 9, 2.1, 53.0), (13.5, 11, 1.8, 55.4), (17.5, 10.5, 1.9, 57.8),
                 # M2: away from the fire, up and across the benches to the sheer outer cliff behind the camp, where
                 # the canyon's second portal opens (its face 80-122 m between lat 91 and 93: the crossing at lat 91.8,
@@ -156,13 +155,14 @@ DUSK_FLIGHT = [[*canyon(d, lat)[:1], h, canyon(d, lat)[1], t] for d, lat, h, t i
                 (17.5, 11.5, 9.0, 59.7), (19, 24, 15.0, 61.0), (19, 31, 36.0, 62.3), (14, 44, 43.0, 63.6), (8, 58, 65.0, 65.2), (2, 70, 56.0, 66.8),
                 (-4, 80, 38.0, 68.0), (-8, 89, 21.2, 69.2), (-8, 96, -39.2, 70.4))]
 EGLOW = [-c for c in direction(-6, 50)]
-CLIFF_PORTAL = canyon(-8.0, 91.8)
+CLIFF_PORTAL = site(-8.0, 91.8)
 DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5],
-             [CLIFF_PORTAL[0], 95.0, CLIFF_PORTAL[1], 58.9, 69.3]]   # M2: the eye on the cliff as the tear opens
+             [CLIFF_PORTAL[0], 95.0 * R, CLIFF_PORTAL[1], 58.9, 69.3]]   # M2: the eye on the cliff as the tear opens
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)
 earth = [EXIT[0] + E[0] * EARTH_DISTANCE, 40.0 + E[1] * EARTH_DISTANCE, EXIT[2] + E[2] * EARTH_DISTANCE]
+ECHO_SIDE = unit([-E[2], 0.0, E[0]])        # sideways across the line of sight (the echoes' offset)
 scene = {
     "format": "avgen-scene", "version": 1, "name": "the-strange-attractor-moon",
     "_note": "The Strange Attractor's Moon (dimensional portals, Gate B; ADR-1882), written by build_moon.py; the destination of the canyon's portal (ADR-1879), whose 'portal' block drives its camera.",
@@ -179,6 +179,13 @@ scene = {
         # earthshine alone leaves a flat floor black)
         {"name": "earthglow", "type": "directional", "role": "fill", "direction": EGLOW, "color": [0.62, 0.72, 1.0],
          "intensity": 0.09, "castsShadow": False, "shadowStrength": 0.0}] +
+        # M3b: the rave -- strobes in three colours in each dome, flashed on the beat (routed in the project; a low
+        # base glow with audio off)
+        [{"name": f"rave{k}-{nm}", "type": "point",
+          "position": [c[0] + dx * sc[0] * 30.0, DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 45.0 * sc[1], c[1] + dz * sc[0] * 30.0],
+          "color": col, "intensity": 9000.0, "range": 1100.0, "castsShadow": False, "volumetric": 0.0}
+         for k, (c, sc, _) in enumerate(DOMES)
+         for nm, col, dx, dz in (("m", [1.0, 0.15, 0.8], 1.0, 0.0), ("c", [0.15, 0.85, 1.0], -0.5, 0.86), ("g", [0.3, 1.0, 0.25], -0.5, -0.86))] +
         [{"name": f"dome{k}", "type": "point", "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 60.0 * sc[1], c[1]],
           "color": [1.0, 0.74, 0.45], "intensity": I, "range": 900.0, "castsShadow": False}
          for k, (c, sc, I) in enumerate(DOMES)],
@@ -212,11 +219,32 @@ scene = {
     "portal": {"world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
                "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT, "aims": DUSK_AIMS},
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,
-               "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True}] +
+               "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True,
+               "emissiveBoost": 2.0}] +
+             # M3b: the datamosh -- two copies a step out of register, red and cyan, flashed on the beat (their
+             # opacity routed in the project; 0 between beats and with audio off)
+             [{"name": f"earth-echo-{c}", "kind": "gltf", "asset": "../../assets/space/earth.glb",
+               "position": [earth[i] + off * ECHO_SIDE[i] for i in range(3)], "rotation": [0, 200 + rot, 23],
+               "scale": [EARTH_RADIUS * 1.015 / EARTH_FILE_RADIUS] * 3, "visible": True, "tint": tint,
+               "emissiveBoost": 3.0} for c, off, rot, tint in (("r", 70.0, 4.0, [1.0, 0.15, 0.3]), ("c", -70.0, -4.0, [0.2, 0.9, 1.0]))] +
+             # the glow: a soft additive halo round the Earth, pulsed on the beat (its emissive routed)
+             [{"name": "earth-glow", "kind": "particles", "visible": True, "particles": {
+                 "enabled": True, "capacity": 24, "seed": 5, "shape": "sphere", "position": earth, "extent": [5.0, 5.0, 5.0],
+                 "direction": [0, 1, 0], "spawnRate": 1.2, "burst": 0.0, "lifetimeMin": 14.0, "lifetimeMax": 16.0,
+                 "spread": 1.0, "speedMin": 0.0, "speedMax": 0.0, "gravity": [0, 0, 0], "drag": 0.0,
+                 "sizeStart": EARTH_RADIUS * 1.55, "sizeEnd": EARTH_RADIUS * 1.55, "sizeVariance": 0.04,
+                 "colorStart": [0.3, 0.6, 1.0, 0.09], "colorEnd": [0.3, 0.6, 1.0, 0.09], "emissive": 3.0,
+                 "blend": "additive"}}] +
+             # the rave in the domes: a laser fan in each, turning (the timeline), flashing (routed)
+             [{"name": f"laser{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+               "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 35.0 * sc[1], c[1]],
+               "rotation": [0, 40 * k, 0], "scale": [7.0 * sc[0]] * 3, "visible": True, "emissiveBoost": 0.1}
+              for k, (c, sc, _) in enumerate(DOMES)] +
+             [{"name": "crater-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES_MOON}] +
              [{"name": f"dome{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/proofs/dome.glb",
                "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])], c[1]], "rotation": [0, 37 * k, 0],
                "scale": [sc[0], sc[1], sc[0]], "visible": True} for k, (c, sc, _) in enumerate(DOMES)],
 }
-out = os.path.join(HERE, 'strange-attractor-moon.scene.json')
+out = os.path.join(HERE, PREFIX + 'strange-attractor-moon.scene.json')
 json.dump(scene, open(out, 'w'), indent=2)
 print(out)

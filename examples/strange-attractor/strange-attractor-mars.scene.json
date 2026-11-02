@@ -74,6 +74,24 @@
       "intensity": 0.18,
       "castsShadow": false,
       "shadowStrength": 0.0
+    },
+    {
+      "name": "rover-flash-light",
+      "type": "point",
+      "position": [
+        55.46945076177689,
+        1.3099999999999998,
+        -1185.4141207339255
+      ],
+      "color": [
+        1.0,
+        0.97,
+        0.9
+      ],
+      "intensity": 0.0,
+      "range": 12.0,
+      "castsShadow": false,
+      "volumetric": 0.0
     }
   ],
   "environment": {
@@ -541,335 +559,6 @@
       "baseColor": 5,
       "metallic": 0,
       "roughness": 1
-    },
-    {
-      "name": "pyramid_stone",
-      "ops": [
-        {
-          "kind": "input",
-          "dst": 0,
-          "input": "uv"
-        },
-        {
-          "kind": "swizzle",
-          "dst": 1,
-          "srcA": 0,
-          "constant": [
-            0,
-            0,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "smoothstep",
-          "dst": 2,
-          "srcA": 1,
-          "constant": [
-            0.12,
-            0.45,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "smoothstep",
-          "dst": 3,
-          "srcA": 1,
-          "constant": [
-            0.75,
-            0.95,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 4,
-          "constant": [
-            0.44,
-            0.3,
-            0.19,
-            1.0
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 5,
-          "constant": [
-            0.27,
-            0.15,
-            0.09,
-            1.0
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 5,
-          "srcC": 2
-        },
-        {
-          "kind": "constant",
-          "dst": 5,
-          "constant": [
-            0.42,
-            0.21,
-            0.11,
-            1.0
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 5,
-          "srcC": 3
-        },
-        {
-          "kind": "input",
-          "dst": 6,
-          "input": "worldPosition"
-        },
-        {
-          "kind": "constant",
-          "dst": 7,
-          "constant": [
-            0.16,
-            0.32,
-            0.16,
-            1.0
-          ]
-        },
-        {
-          "kind": "multiply",
-          "dst": 7,
-          "srcA": 6,
-          "srcB": 7
-        },
-        {
-          "kind": "voronoiEdge",
-          "dst": 5,
-          "srcA": 7,
-          "value": 1.0,
-          "seed": 61
-        },
-        {
-          "kind": "swizzle",
-          "dst": 5,
-          "srcA": 5,
-          "constant": [
-            0,
-            0,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "smoothstep",
-          "dst": 5,
-          "srcA": 5,
-          "constant": [
-            0.0,
-            0.16,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "remap",
-          "dst": 5,
-          "srcA": 5,
-          "constant": [
-            0,
-            1,
-            0.38,
-            1.0
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "remap",
-          "dst": 7,
-          "srcA": 3,
-          "constant": [
-            0,
-            1,
-            0,
-            1
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "constant",
-          "dst": 0,
-          "constant": [
-            1.0,
-            1.0,
-            1.0,
-            1.0
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 5,
-          "srcA": 5,
-          "srcB": 0,
-          "srcC": 7
-        },
-        {
-          "kind": "multiply",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 5
-        },
-        {
-          "kind": "noise",
-          "dst": 5,
-          "srcA": 6,
-          "value": 0.06,
-          "seed": 63
-        },
-        {
-          "kind": "remap",
-          "dst": 5,
-          "srcA": 5,
-          "constant": [
-            0.3,
-            0.7,
-            0.66,
-            1.2
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "multiply",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 5
-        },
-        {
-          "kind": "constant",
-          "dst": 7,
-          "constant": [
-            0.07,
-            0.006,
-            0.07,
-            1.0
-          ]
-        },
-        {
-          "kind": "multiply",
-          "dst": 7,
-          "srcA": 6,
-          "srcB": 7
-        },
-        {
-          "kind": "noise",
-          "dst": 5,
-          "srcA": 7,
-          "value": 1.0,
-          "seed": 65
-        },
-        {
-          "kind": "remap",
-          "dst": 5,
-          "srcA": 5,
-          "constant": [
-            0.4,
-            0.75,
-            1.0,
-            0.72
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "multiply",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 5
-        },
-        {
-          "kind": "input",
-          "dst": 7,
-          "input": "normal"
-        },
-        {
-          "kind": "swizzle",
-          "dst": 7,
-          "srcA": 7,
-          "constant": [
-            1,
-            1,
-            1,
-            1
-          ]
-        },
-        {
-          "kind": "smoothstep",
-          "dst": 7,
-          "srcA": 7,
-          "constant": [
-            0.78,
-            0.97,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "remap",
-          "dst": 7,
-          "srcA": 7,
-          "constant": [
-            0,
-            1,
-            0,
-            0.75
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "constant",
-          "dst": 5,
-          "constant": [
-            0.5,
-            0.29,
-            0.15,
-            1.0
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 4,
-          "srcA": 4,
-          "srcB": 5,
-          "srcC": 7
-        },
-        {
-          "kind": "constant",
-          "dst": 0,
-          "constant": [
-            0,
-            0,
-            0,
-            0
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 1,
-          "constant": [
-            0.93,
-            0.93,
-            0.93,
-            0.93
-          ]
-        }
-      ],
-      "baseColor": 4,
-      "metallic": 0,
-      "roughness": 1
     }
   ],
   "lunarWorld": {
@@ -879,7 +568,7 @@
     "skirtExtent": 48000,
     "skirtSpacing": 48,
     "craters": 0.4,
-    "rocks": 0.03,
+    "rocks": 0.065,
     "relief": 70,
     "program": "mars_regolith",
     "curvature": 3389500.0,
@@ -919,6 +608,30 @@
         "z": -1520.0,
         "diameter": 45.0,
         "fresh": 0.95
+      },
+      {
+        "x": -160.0,
+        "z": -610.0,
+        "diameter": 28.0,
+        "fresh": 1.0
+      },
+      {
+        "x": 150.0,
+        "z": -1000.0,
+        "diameter": 22.0,
+        "fresh": 1.0
+      },
+      {
+        "x": -70.0,
+        "z": -1450.0,
+        "diameter": 38.0,
+        "fresh": 0.9
+      },
+      {
+        "x": 40.0,
+        "z": -430.0,
+        "diameter": 18.0,
+        "fresh": 1.0
       }
     ],
     "mesas": [
@@ -1019,20 +732,26 @@
       {
         "x": -260.0,
         "z": -1780.0,
-        "radius": 225.0,
+        "radius": 245.99999999999997,
         "level": 0.0
       },
       {
         "x": 160.0,
         "z": -2080.0,
-        "radius": 210.0,
+        "radius": 229.6,
         "level": 2.0
       },
       {
         "x": 470.0,
         "z": -2380.0,
-        "radius": 105.0,
+        "radius": 114.8,
         "level": 12.0
+      },
+      {
+        "x": 53.83480687437186,
+        "z": -1175.0681157386935,
+        "radius": 46.0,
+        "level": -0.8
       }
     ]
   },
@@ -1042,8 +761,8 @@
     ],
     "focus": [
       160.0,
-      28.931495949255055,
-      -1965.1815169190415
+      70.93149594925505,
+      -1998.2322578752833
     ],
     "axis": [
       0.0,
@@ -1092,9 +811,9 @@
       1287.1160000000002
     ],
     "exitAxis": [
-      -0.9047733826479402,
+      -0.9047733826479158,
       0.0,
-      0.4258933270806249
+      0.4258933270806764
     ],
     "entryUp": [
       0.0,
@@ -1120,74 +839,67 @@
         106.4
       ],
       [
-        88.63600000000002,
-        6.0,
-        1328.487,
-        108.8
-      ],
-      [
-        83.153,
-        3.0,
-        1333.2790000000002,
-        111.2
-      ],
-      [
-        77.85650000000001,
-        2.8,
-        1339.6415000000002,
-        113.6
-      ],
-      [
-        65.746,
-        4.0,
-        1350.317,
-        115.6
-      ],
-      [
-        57.016,
+        85.44200000000001,
         7.0,
-        1359.9540000000002,
-        117.5
+        1331.0960000000002,
+        108.4
       ],
       [
-        52.651,
-        9.0,
-        1364.7725,
-        118.9
+        66.09250000000002,
+        2.7247517204284675,
+        1354.5760000000002,
+        110.2
       ],
       [
-        51.581100000000006,
-        4.0,
-        1366.4922000000001,
-        120.1
+        69.81950000000002,
+        1.7642195796966558,
+        1357.7965000000002,
+        112.0
+      ],
+      [
+        74.50450000000001,
+        1.8458068227767948,
+        1358.3550000000002,
+        113.8
+      ],
+      [
+        59.00281399444687,
+        4.710000011920929,
+        1361.250740988606,
+        117.93907844321797
+      ],
+      [
+        56.44505723633493,
+        3.210600011920929,
+        1363.19936905248,
+        119.04779177252385
+      ],
+      [
+        53.96252861816747,
+        1.755300011920929,
+        1365.09068452624,
+        120.12389588626193
       ],
       [
         51.48,
-        0.3,
+        0.30000001192092896,
         1366.9820000000002,
         121.2
       ],
       [
-        51.47735,
-        -8.0,
-        1367.0938000000003,
+        49.634432392572954,
+        -0.7819027381352619,
+        1368.3880464593453,
         122.0
       ]
     ],
     "aims": [
       [
-        76.3405,
-        3.06,
-        1351.6867500000003,
-        105.4,
-        114.6
-      ],
-      [
-        51.48,
-        -0.5,
-        1366.9820000000002,
-        114.2,
-        119.6
+        74.96542500000001,
+        3.0600000000000005,
+        1349.7636750000001,
+        105.2,
+        116.4
       ]
     ]
   },
@@ -1211,8 +923,7 @@
         1,
         1
       ],
-      "visible": true,
-      "program": "pyramid_stone"
+      "visible": true
     },
     {
       "name": "pyramid-b",
@@ -1233,8 +944,7 @@
         1,
         1
       ],
-      "visible": true,
-      "program": "pyramid_stone"
+      "visible": true
     },
     {
       "name": "pyramid-c",
@@ -1255,8 +965,1076 @@
         1,
         1
       ],
+      "visible": true
+    },
+    {
+      "name": "rover",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover.glb",
+      "position": [
+        55.0,
+        -0.8,
+        -1185.0
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "rover-flash",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/flash.glb",
+      "position": [
+        55.46945076177689,
+        1.3099999999999998,
+        -1185.4141207339255
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--38",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        50.385835222512554,
+        -0.8,
+        -1145.669738325226
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--37",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        50.50235453507536,
+        -0.8,
+        -1146.6629267513567
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--36",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        50.61887384763818,
+        -0.8,
+        -1147.6561151774874
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--35",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        50.73539316020099,
+        -0.8,
+        -1148.649303603618
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--34",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        50.85191247276381,
+        -0.8,
+        -1149.6424920297486
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--33",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        50.96843178532662,
+        -0.8,
+        -1150.6356804558793
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--32",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.08495109788944,
+        -0.8,
+        -1151.62886888201
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--31",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.20147041045225,
+        -0.8,
+        -1152.6220573081407
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--30",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.31798972301507,
+        -0.8,
+        -1153.6152457342712
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--29",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.43450903557788,
+        -0.8,
+        -1154.6084341604019
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--28",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.5510283481407,
+        -0.8,
+        -1155.6016225865326
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--27",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.667547660703505,
+        -0.8,
+        -1156.5948110126633
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--26",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.78406697326632,
+        -0.8,
+        -1157.587999438794
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--25",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        51.900586285829135,
+        -0.8,
+        -1158.5811878649245
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--24",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.01710559839195,
+        -0.8,
+        -1159.5743762910552
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--23",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.133624910954765,
+        -0.8,
+        -1160.5675647171859
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--22",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.25014422351758,
+        -0.8,
+        -1161.5607531433166
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--21",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.366663536080395,
+        -0.8,
+        -1162.5539415694473
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--20",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.48318284864321,
+        -0.8,
+        -1163.5471299955777
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--19",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.599702161206025,
+        -0.8,
+        -1164.5403184217084
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--18",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.71622147376884,
+        -0.8,
+        -1165.5335068478391
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--17",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.832740786331655,
+        -0.8,
+        -1166.5266952739698
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--16",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        52.94926009889447,
+        -0.8,
+        -1167.5198837001005
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--15",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.06577941145728,
+        -0.8,
+        -1168.513072126231
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--14",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.18229872402009,
+        -0.8,
+        -1169.5062605523617
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--13",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.29881803658291,
+        -0.8,
+        -1170.4994489784924
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--12",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.41533734914572,
+        -0.8,
+        -1171.492637404623
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--11",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.53185666170854,
+        -0.8,
+        -1172.4858258307538
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--10",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.64837597427135,
+        -0.8,
+        -1173.4790142568843
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--9",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.76489528683417,
+        -0.8,
+        -1174.472202683015
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--8",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.88141459939698,
+        -0.8,
+        -1175.4653911091457
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--7",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        53.9979339119598,
+        -0.8,
+        -1176.4585795352764
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--6",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.11445322452261,
+        -0.8,
+        -1177.451767961407
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--5",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.23097253708543,
+        -0.8,
+        -1178.4449563875376
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--4",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.347491849648236,
+        -0.8,
+        -1179.4381448136683
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--3",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.46401116221105,
+        -0.8,
+        -1180.431333239799
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.580530474773866,
+        -0.8,
+        -1181.4245216659297
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-old--1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.69704978733668,
+        -0.8,
+        -1182.4177100920604
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "name": "track-new-0",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.813569099899496,
+        -0.8,
+        -1183.410898518191
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        54.93008841246231,
+        -0.8,
+        -1184.4040869443215
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        55.046607725025126,
+        -0.8,
+        -1185.3972753704522
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-3",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        55.16312703758794,
+        -0.8,
+        -1186.390463796583
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-4",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        55.279646350150756,
+        -0.8,
+        -1187.3836522227136
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-5",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        55.39616566271357,
+        -0.8,
+        -1188.3768406488443
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-6",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        55.512684975276386,
+        -0.8,
+        -1189.3700290749748
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "track-new-7",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
+      "position": [
+        55.6292042878392,
+        -0.8,
+        -1190.3632175011055
+      ],
+      "rotation": [
+        0,
+        173.3087355674477,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": false
+    },
+    {
+      "name": "pyramid-rim",
+      "kind": "particles",
       "visible": true,
-      "program": "pyramid_stone"
+      "portalRim": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 7000,
+        "seed": 91,
+        "shape": "disc",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "extent": [
+          1.0,
+          0.1,
+          1.0
+        ],
+        "innerRadius": 0.72,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "spawnRate": 3200.0,
+        "lifetimeMin": 0.3,
+        "lifetimeMax": 0.75,
+        "spread": 0.55,
+        "speedMin": 1.0,
+        "speedMax": 4.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 1.2,
+        "turbulence": 3.5,
+        "turbulenceScale": 0.35,
+        "sizeStart": 0.05,
+        "sizeEnd": 0.0075,
+        "sizeVariance": 0.6,
+        "colorStart": [
+          1.0,
+          0.8,
+          0.45,
+          0.85
+        ],
+        "colorEnd": [
+          1.0,
+          0.5,
+          0.16,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "velocityStretch": 0.8,
+        "stretchMax": 1.5
+      }
     }
   ]
 }

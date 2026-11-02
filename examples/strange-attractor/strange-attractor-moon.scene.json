@@ -62,9 +62,9 @@
       "type": "directional",
       "role": "fill",
       "direction": [
-        0.10395584540887966,
-        -0.10452846326765347,
-        0.9890738003669027
+        0.06796861984125294,
+        -0.224951054343865,
+        0.9719965482790865
       ],
       "color": [
         0.62,
@@ -92,6 +92,168 @@
       "intensity": 0.09,
       "castsShadow": false,
       "shadowStrength": 0.0
+    },
+    {
+      "name": "rave0-m",
+      "type": "point",
+      "position": [
+        -260.0,
+        -84.5,
+        -480.0
+      ],
+      "color": [
+        1.0,
+        0.15,
+        0.8
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave0-c",
+      "type": "point",
+      "position": [
+        -350.0,
+        -84.5,
+        -428.4
+      ],
+      "color": [
+        0.15,
+        0.85,
+        1.0
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave0-g",
+      "type": "point",
+      "position": [
+        -350.0,
+        -84.5,
+        -531.6
+      ],
+      "color": [
+        0.3,
+        1.0,
+        0.25
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave1-m",
+      "type": "point",
+      "position": [
+        -676.0,
+        -86.0,
+        -160.0
+      ],
+      "color": [
+        1.0,
+        0.15,
+        0.8
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave1-c",
+      "type": "point",
+      "position": [
+        -802.0,
+        -86.0,
+        -87.76
+      ],
+      "color": [
+        0.15,
+        0.85,
+        1.0
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave1-g",
+      "type": "point",
+      "position": [
+        -802.0,
+        -86.0,
+        -232.24
+      ],
+      "color": [
+        0.3,
+        1.0,
+        0.25
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave2-m",
+      "type": "point",
+      "position": [
+        332.0,
+        -66.5,
+        -860.0
+      ],
+      "color": [
+        1.0,
+        0.15,
+        0.8
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave2-c",
+      "type": "point",
+      "position": [
+        224.0,
+        -66.5,
+        -798.08
+      ],
+      "color": [
+        0.15,
+        0.85,
+        1.0
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "rave2-g",
+      "type": "point",
+      "position": [
+        224.0,
+        -66.5,
+        -921.92
+      ],
+      "color": [
+        0.3,
+        1.0,
+        0.25
+      ],
+      "intensity": 9000.0,
+      "range": 1100.0,
+      "castsShadow": false,
+      "volumetric": 0.0
     },
     {
       "name": "dome0",
@@ -811,12 +973,12 @@
     "flight": [
       [
         65.85400000000001,
-        11,
+        11.0,
         1364.6380000000001,
         49.4
       ],
       [
-        67.77,
+        67.77000000000001,
         5,
         1359.3140000000003,
         51.2
@@ -830,7 +992,7 @@
       [
         70.804,
         1.8,
-        1354.0165000000002,
+        1354.0165000000004,
         55.4
       ],
       [
@@ -848,7 +1010,7 @@
       [
         80.226,
         15.0,
-        1343.5010000000002,
+        1343.5010000000004,
         61.0
       ],
       [
@@ -917,9 +1079,9 @@
       "kind": "gltf",
       "asset": "../../assets/space/earth.glb",
       "position": [
-        -935.6026086799169,
-        980.7561694088812,
-        -7401.664203302125
+        -611.7175785712765,
+        2064.559489094785,
+        -7247.968934511779
       ],
       "rotation": [
         0,
@@ -927,11 +1089,249 @@
         23
       ],
       "scale": [
-        2.5,
-        2.5,
-        2.5
+        9.5,
+        9.5,
+        9.5
       ],
-      "visible": true
+      "visible": true,
+      "emissiveBoost": 2.0
+    },
+    {
+      "name": "earth-echo-r",
+      "kind": "gltf",
+      "asset": "../../assets/space/earth.glb",
+      "position": [
+        -541.8880950530888,
+        2064.559489094785,
+        -7252.851887673867
+      ],
+      "rotation": [
+        0,
+        204.0,
+        23
+      ],
+      "scale": [
+        9.642499999999998,
+        9.642499999999998,
+        9.642499999999998
+      ],
+      "visible": true,
+      "tint": [
+        1.0,
+        0.15,
+        0.3
+      ],
+      "emissiveBoost": 3.0
+    },
+    {
+      "name": "earth-echo-c",
+      "kind": "gltf",
+      "asset": "../../assets/space/earth.glb",
+      "position": [
+        -681.5470620894641,
+        2064.559489094785,
+        -7243.08598134969
+      ],
+      "rotation": [
+        0,
+        196.0,
+        23
+      ],
+      "scale": [
+        9.642499999999998,
+        9.642499999999998,
+        9.642499999999998
+      ],
+      "visible": true,
+      "tint": [
+        0.2,
+        0.9,
+        1.0
+      ],
+      "emissiveBoost": 3.0
+    },
+    {
+      "name": "earth-glow",
+      "kind": "particles",
+      "visible": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 24,
+        "seed": 5,
+        "shape": "sphere",
+        "position": [
+          -611.7175785712765,
+          2064.559489094785,
+          -7247.968934511779
+        ],
+        "extent": [
+          5.0,
+          5.0,
+          5.0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ],
+        "spawnRate": 1.2,
+        "burst": 0.0,
+        "lifetimeMin": 14.0,
+        "lifetimeMax": 16.0,
+        "spread": 1.0,
+        "speedMin": 0.0,
+        "speedMax": 0.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 0.0,
+        "sizeStart": 1472.5,
+        "sizeEnd": 1472.5,
+        "sizeVariance": 0.04,
+        "colorStart": [
+          0.3,
+          0.6,
+          1.0,
+          0.09
+        ],
+        "colorEnd": [
+          0.3,
+          0.6,
+          1.0,
+          0.09
+        ],
+        "emissive": 3.0,
+        "blend": "additive"
+      }
+    },
+    {
+      "name": "laser0",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "position": [
+        -320.0,
+        -99.5,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        14.0,
+        14.0,
+        14.0
+      ],
+      "visible": true,
+      "emissiveBoost": 0.1
+    },
+    {
+      "name": "laser1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "position": [
+        -760.0,
+        -101.0,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        40,
+        0
+      ],
+      "scale": [
+        19.599999999999998,
+        19.599999999999998,
+        19.599999999999998
+      ],
+      "visible": true,
+      "emissiveBoost": 0.1
+    },
+    {
+      "name": "laser2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "position": [
+        260.0,
+        -81.5,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        80,
+        0
+      ],
+      "scale": [
+        16.8,
+        16.8,
+        16.8
+      ],
+      "visible": true,
+      "emissiveBoost": 0.1
+    },
+    {
+      "name": "crater-rim",
+      "kind": "particles",
+      "visible": true,
+      "portalRim": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 7000,
+        "seed": 91,
+        "shape": "disc",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "extent": [
+          1.0,
+          0.1,
+          1.0
+        ],
+        "innerRadius": 0.72,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "spawnRate": 3200.0,
+        "lifetimeMin": 0.3,
+        "lifetimeMax": 0.75,
+        "spread": 0.55,
+        "speedMin": 1.0,
+        "speedMax": 4.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 1.2,
+        "turbulence": 3.5,
+        "turbulenceScale": 0.35,
+        "sizeStart": 0.05,
+        "sizeEnd": 0.0075,
+        "sizeVariance": 0.6,
+        "colorStart": [
+          0.95,
+          0.9,
+          0.75,
+          0.85
+        ],
+        "colorEnd": [
+          0.85,
+          0.7,
+          0.4,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "velocityStretch": 0.8,
+        "stretchMax": 1.5
+      }
     },
     {
       "name": "dome0",

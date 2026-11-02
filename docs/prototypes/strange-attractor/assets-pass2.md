@@ -49,6 +49,11 @@ Attribution, to carry wherever the work is shown:
 | `assets/strange-attractor/build/suited-man.glb` (scale reference) | exported from the MPFB suited man | the suited man | CC0-derived |
 | `assets/strange-attractor/build/ufo-craft.glb` (opaque, dimmed emission) | `pass2/prepare_ufo.py` | BrunoLatour's UFO (CC BY 4.0) | CC BY 4.0 (attribution above) |
 | `assets/strange-attractor/build/ocean-base.glb`, `bay-membrane.glb` (underwater base, launch bay) | `pass2/build_base.py` | nothing third-party | original |
+| `assets/strange-attractor/nasa/curiosity/24584_Curiosity_static.glb` (M3b: the Curiosity rover, downloaded from https://assets.science.nasa.gov/content/dam/science/psd/mars/resources/gltf_files/24584_Curiosity_static.glb) | downloaded, no login | NASA/JPL-Caltech 3D resources | public domain (NASA media guidelines; no endorsement implied) |
+| `assets/strange-attractor/build/rover.glb` (centred, facing +z) | `pass2/prepare_rover.py` | the NASA Curiosity model | public domain |
+| `assets/strange-attractor/build/sasquatch-{a,b,c}.glb` (M3b: three individuals, own base poses, IK-planted idles) | `pass2/build_sasquatch.py` | Mat Rex's Bigfoot (CC BY, above) | CC BY (attribution above) |
+| `assets/strange-attractor/build/pyramid-{a,b,c}.glb` (M3b: coursed, chipped blocks, deep sand) | `pass2/build_pyramids.py` | nothing third-party | original |
+| `assets/strange-attractor/build/{scrub-a..c, rock-a..d, seat-rock, basalt-a..c, cave-mouth, laser-fan, kelp-a,b, sponge, fan-coral, seagrass, flash, rover-tracks}.glb` (M3b prop kit) | `pass2/build_kit.py` | nothing third-party | original |
 
 ## Already in the library (reused, not committed)
 

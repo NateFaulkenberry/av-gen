@@ -156,6 +156,14 @@ bool Composition::legReturns(int k) const {
     return w != nullptr && w->portalToRoot_ && w->portalTarget_ == this;
 }
 
+double Composition::arrivalCrossing() const {
+    if (parentPortal_ == nullptr) return 0.0;
+    for (int k = 0; k < std::max(1, static_cast<int>(parentPortal_->legs_.size())); ++k) {
+        if (parentPortal_->legWorld(k) == this) return parentPortal_->legCrossing(k);
+    }
+    return 0.0;
+}
+
 double Composition::legReturnCrossing(int k) const {
     return legReturns(k) ? legWorld(k)->portalCrossing_ : 1e30;
 }
@@ -484,7 +492,9 @@ void Composition::updatePortal(const FrameTime& time) {
     // the crossing: the first time the camera's path passes the entry plane inside the opening's reach (a pure
     // function of the path, found once)
     // ADR-1895: a later leg is searched from its previous leg's return home
-    const double from = activeLeg_ > 0 ? legReturnCrossing(activeLeg_ - 1) : 0.0;
+    // ADR-1899: a world reached through a portal is searched from the camera's arrival in it (before that its camera
+    // path is the source's camera carried through the portal, which can pass its exit plane anywhere)
+    const double from = activeLeg_ > 0 ? legReturnCrossing(activeLeg_ - 1) : arrivalCrossing();
     if (portalCrossing_ > 1e29 && from < 1e28 && ownCameraAt(from)) {
         constexpr double kStep = 1.0 / 60.0, kEnd = 240.0;
         const float reach = 2.0f * std::max(c.width, c.height);

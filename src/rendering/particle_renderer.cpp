@@ -1112,7 +1112,7 @@ void ParticleRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scene&
         // frames; nothing in particles.wgsl seeds randomness from it any more.
         u.nonce = glm::uvec4(time.frameNonce(), 0u, 0u, 0u);
         u.stretch = glm::vec4(std::max(0.0f, sys.velocityStretch), std::max(0.0f, sys.stretchMax),
-                              std::max(0.0f, sys.stretchMin), 0.0f);
+                              std::max(0.0f, sys.stretchMin), std::clamp(sys.innerRadius, 0.0f, 0.99f)); // ADR-1898
         u.trail = glm::vec4(static_cast<float>(pool.historyPoints),
                             static_cast<float>(std::clamp<std::uint32_t>(sys.trailStride, 1, 64)),
                             std::max(0.0f, sys.trailWidth), std::clamp(sys.trailTaper, 0.0f, 1.0f));

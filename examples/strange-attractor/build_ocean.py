@@ -1,5 +1,5 @@
-"""Writes strange-attractor-ocean.scene.json (the deep ocean, Art Pass 2, M3) and strange-attractor-ufo.scene.json (the
-UFO interior's first form, the bay portal's destination; M4 builds the interior).
+"""Writes strange-attractor-ocean.scene.json (the deep ocean, Art Pass 2, M3; M3b: seabed life, fish, five subs, and the
+bay portal home to the canyon at dawn -- the owner cut the UFO interior).
 
     python3 examples/strange-attractor/build_ocean.py
 
@@ -18,6 +18,12 @@ Ocean coordinates: the arrival heads -z; the shelf's wall runs along x = -100; t
 import json
 import math
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, pace  # noqa: E402
+from portal_rim import RIM_PARTICLES_SEA  # noqa: E402
+from sample_ground import heights  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 A = "../../assets/strange-attractor/build/"
@@ -37,7 +43,8 @@ MESAS = [SHELF,
 BASE_XZ = (-25.0, -880.0)
 BASE_GROUND = 50.0                  # the apron at the shelf's foot (measured 44-60 m under the hull)
 # the seabed under the bay approach, measured: (x, z) -> metres
-GROUND = {(365.0, -785.0): -3.0, (215.0, -870.0): 6.4, (125.0, -880.0): 30.0, (65.0, -880.0): 44.0, (40.0, -880.0): 48.0}
+GROUND = {(365.0, -785.0): -3.0, (215.0, -870.0): 6.4, (125.0, -880.0): 30.0, (65.0, -880.0): 44.0, (40.0, -880.0): 48.0,
+          (300.0, -700.0): 0.0}
 BAY_LOCAL = (0.0, 32.0, 90.0)       # the membrane's centre in the glb (y up, front +z)
 
 
@@ -49,29 +56,34 @@ def base_world(local):
 
 BAY = base_world(BAY_LOCAL)
 
-# the arrival: out into open water, heading -z (the exit's y is over the seabed)
-EXIT = [250.0, 60.0, 320.0]
+# the arrival: out into open water, heading -z (the exit's y is over the seabed). M3b: much closer to the base, and the
+# flight leaves at the glide's own speed (3.2 m/s), gathers pace smoothly to a cruise and slows into the launch bay
+# (owner: the water portal felt like a step). Path in absolute heights, turned into heights over the sampled seabed.
+EXIT = [300.0, 22.0, -430.0]
 EXIT_AXIS = [0.0, 0.0, -1.0]
+OCEAN_PATH = [(300.0, None, -437.0), (298.0, 22.5, -458.0), (293.0, 25.0, -500.0), (282.0, 30.0, -565.0),
+              (262.0, 38.0, -645.0), (222.0, 52.0, -735.0), (165.0, 66.0, -812.0), (112.0, 77.0, -862.0),
+              (84.0, 81.0, -878.0), (65.0, 82.0, -880.0), (45.0, 82.0, -880.0)]
+T_EXIT, T_BAY = 121.2, 147.0
+
 
 # the ocean flight (x, height over the seabed, z, t): crossing 5 at 121.2 s (bar 62), crossing 6 at 147.0 s (bar 75)
-def flight(bay_rel_y):
-    by = BAY[1]
-    return [
-        [245.0, 55.0, 210.0, 123.2],
-        [215.0, 46.0, -120.0, 127.8],    # the shelf's wall to the left, the water's depth ahead
-        [175.0, 40.0, -430.0, 132.4],    # the base's lights, faint ahead and to the left
-        [150.0, 36.0, -690.0, 136.6],
-        # turning in toward the launch bay at its height (heights over the measured seabed)
-        [365.0, by - GROUND[(365.0, -785.0)] + 6.0, -785.0, 140.6],
-        [215.0, by - GROUND[(215.0, -870.0)], -870.0, 144.0],
-        [125.0, by - GROUND[(125.0, -880.0)], -880.0, 145.9],
-        [65.0, by - GROUND[(65.0, -880.0)], -880.0, 147.0],      # the crossing, in the membrane
-        [40.0, by - GROUND[(40.0, -880.0)], -880.0, 147.8],
-    ]
+def flight(bay_rel_y=None):
+    try:
+        ground = heights(PREFIX + "strange-attractor-ocean.scene.json", [(x, z) for x, _, z in OCEAN_PATH])
+    except Exception:
+        ground = [0.0] * len(OCEAN_PATH)
+    pts = []
+    for (x, y, z), g in zip(OCEAN_PATH, ground):
+        pts.append((x, (g + EXIT[1] if y is None else y), z))
+    # the first knot is 2.2 s out at the glide speed; the bay knot is the crossing (147.0), one more knot beyond it
+    knots, _ = pace(pts[:-1], T_EXIT + 2.2, T_BAY, 3.4, 9.0, ramp_in=0.3, ramp_out=0.3)
+    knots.append([pts[-1][0], pts[-1][1], pts[-1][2], T_BAY + 2.2])
+    return [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground)]
 
 
 # the submersibles: three discs (the UFO model, scaled), their paths keyed in the project's timeline (build_journey)
-SUBS = [("sub-1", 0.026), ("sub-2", 0.021), ("sub-3", 0.017)]   # 17, 14 and 11 m discs (the model is 666 units across)
+SUBS = [("sub-1", 0.026), ("sub-2", 0.021), ("sub-3", 0.017), ("sub-4", 0.019), ("sub-5", 0.023)]  # 11-17 m discs
 
 
 def sub_tracks():
@@ -89,6 +101,14 @@ def sub_tracks():
         # sub-3 holds station high by the towers, drifting
         ("sub-3", [(118.0, [bx - 60.0, by + 95.0, bz + 70.0]), (147.0, [bx - 40.0, by + 102.0, bz + 30.0])],
          [(118.0, 10.0), (147.0, 35.0)]),
+        # M3b: sub-4 rises out of the bay and away over the shelf; sub-5 comes down from above and goes in behind
+        ("sub-4", [(118.0, [bx - 30.0, by, bz]), (133.0, [bx - 30.0, by, bz]), (137.5, [bx + 70.0, by + 6.0, bz + 20.0]),
+                   (142.0, [bx + 120.0, by + 60.0, bz - 140.0]), (147.0, [bx + 60.0, by + 150.0, bz - 400.0])],
+         [(133.0, 90.0), (137.5, 110.0), (142.0, 160.0), (147.0, 180.0)]),
+        ("sub-5", [(118.0, [bx + 260.0, by + 180.0, bz + 300.0]), (136.0, [bx + 200.0, by + 70.0, bz + 120.0]),
+                   (142.0, [bx + 110.0, by + 12.0, bz + 30.0]), (145.6, [bx + 20.0, by + 1.0, bz + 2.0]),
+                   (147.0, [bx - 30.0, by, bz])],
+         [(118.0, -130.0), (136.0, -115.0), (142.0, -100.0), (147.0, -90.0)]),
     ]
 
 
@@ -140,7 +160,7 @@ def write_ocean(portal_flight):
             {"kind": "constant", "dst": 1, "constant": [0.9, 0.9, 0.9, 0.9]},
         ], "baseColor": 5, "metallic": 0, "roughness": 1}],
         "lunarWorld": {"seed": 23, "extent": 4000, "spacing": 2.5, "skirtExtent": 24000, "skirtSpacing": 48, "craters": 0.0,
-                       "rocks": 0.02, "relief": 55, "program": "seabed", "curvature": 6371.0e3,
+                       "rocks": 0.07, "relief": 55, "program": "seabed", "curvature": 6371.0e3,
                        "heroes": [], "mesas": MESAS, "yardangs": 2.5, "wind": 70.0},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
         "corruption": {"targets": ["bay-membrane"], "focus": [BAY[0], bay_y - GROUND[(65.0, -880.0)], BAY[2]], "axis": [-1.0, 0.0, 0.0],
@@ -149,8 +169,10 @@ def write_ocean(portal_flight):
                        "share": 0.25, "slip": 1.5, "rate": 0.6, "strip": 2.5, "stripSlip": 1.0, "slide": 0.0, "pull": 4.0,
                        "lift": 0.8, "fold": 0.6, "lag": 0.7, "glyph": 6.0, "glyphSize": 1.0, "glow": 4.0, "echoes": 1,
                        "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 1500.0},
-        "portal": {"world": "strange-attractor-ufo.scene.json", "exit": UFO_EXIT, "exitYaw": 0.0, "exitAxis": [0.0, 0.0, -1.0],
-                   "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": UFO_FLIGHT},
+        # M3b (owner: cut the UFO interior): the bay's portal leads home -- out of the canyon wall where the journey
+        # began (portal 1, reversed), at dawn
+        "portal": {"world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
+                   "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
             {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
              "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
@@ -166,44 +188,92 @@ def write_ocean(portal_flight):
                 "drag": 0.2, "turbulence": 0.2, "turbulenceScale": 0.05, "sizeStart": 0.09, "sizeEnd": 0.09,
                 "sizeVariance": 0.6, "colorStart": [0.7, 0.85, 0.85, 0.35], "colorEnd": [0.7, 0.85, 0.85, 0.35],
                 "emissive": 0.3, "blend": "additive"}},
-        ],
+            {"name": "bay-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES_SEA},
+        ] + life_nodes() + fish_nodes(),
     }
-    path = os.path.join(HERE, "strange-attractor-ocean.scene.json")
+    path = os.path.join(HERE, PREFIX + "strange-attractor-ocean.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
     return path
 
 
-# --- the UFO interior's first form (M4 builds the room): the proof hall, lit cold, the camera arriving through the bay
-UFO_EXIT = [0.0, 3.2, 14.0]
-UFO_FLIGHT = [[0.0, 3.0, 6.0, 149.0], [0.0, 2.8, 0.0, 151.5], [0.0, 2.8, -4.0, 153.5]]
+# --- home (M3b): out of portal 1's wall in the canyon, the way the journey went in, now at dawn: out over the river,
+# turning up it past the camp, low along the water, then rising to a high, slowing view as the music ends (210.5 s).
+CANYON_SCENE = PREFIX + "strange-attractor-flythrough.scene.json"
+P1_AXIS = (0.795, 0.0, -0.606)                     # into portal 1's wall (the canyon's portal axis)
+HOME_AXIS = [-P1_AXIS[0], 0.0, -P1_AXIS[2]]       # out of the wall, toward the river
+# (d, lat) in the current canyon's metres (site()), absolute heights there (scaled with the world)
+HOME_PATH = [(35.5, 23.0, 8.0), (31.0, 12.0, 7.4), (23.0, 0.0, 6.6), (12.0, -14.0, 6.2), (-2.0, -32.0, 6.6),
+             (-20.0, -50.0, 8.5), (-42.0, -62.0, 13.0), (-66.0, -68.0, 22.0), (-90.0, -76.0, 38.0),
+             (-110.0, -86.0, 60.0), (-126.0, -95.0, 84.0), (-138.0, -102.0, 100.0)]
+T_HOME, T_END = 147.0, 210.5
 
 
-def write_ufo():
-    scene = {
-        "format": "avgen-scene", "version": 1, "name": "the-strange-attractor-ufo",
-        "_note": "The UFO interior's first form (Art Pass 2, M3: the bay portal's destination; M4 builds the interior).",
-        "camera": {"mode": 1, "position": [0, 3, 14], "target": [0, 2, 0], "fov": 44.0, "orbitSpeed": 0.0},
-        "lights": [
-            {"name": "ceiling", "type": "point", "position": [0.0, 7.0, 0.0], "color": [0.8, 0.9, 1.0], "intensity": 140.0,
-             "range": 40.0, "castsShadow": True},
-            {"name": "rim", "type": "directional", "role": "fill", "direction": [0.3, -0.5, -1.0], "color": [0.4, 0.55, 0.8],
-             "intensity": 0.3, "castsShadow": False},
-        ],
-        "environment": {"intensity": 0.08, "background": [0.01, 0.012, 0.02], "skybox": False, "sky": {"enabled": False},
-                        "fallbackAmbient": False},
-        "post": {"bloomIntensity": 0.05, "tonemap": 0},
-        "nodes": [{"name": "interior", "kind": "gltf", "asset": "../../assets/strange-attractor/proofs/interior.glb",
-                   "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1], "visible": True}],
-    }
-    path = os.path.join(HERE, "strange-attractor-ufo.scene.json")
-    json.dump(scene, open(path, "w"), indent=2)
-    return path
+def _home():
+    xz = [site(d, l) for d, l, _ in HOME_PATH]
+    try:
+        ground = heights(CANYON_SCENE, [tuple(p) for p in xz])
+    except Exception:          # the POC's canyon is not written yet (the builder runs twice)
+        ground = [0.0] * len(xz)
+    pts = [(p[0], y * R, p[1]) for p, (_, _, y) in zip(xz, HOME_PATH)]
+    exit_ = [pts[0][0], pts[0][1] - ground[0], pts[0][2]]
+    # out of the wall at the bay's speed, easing to a slow, held climb as the music ends
+    knots, _ = pace(pts[1:], T_HOME + 1.4, T_END, 7.0, 0.6, ramp_in=0.2, ramp_out=0.35)
+    return exit_, [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground[1:])]
+
+
+HOME_EXIT, HOME_FLIGHT = _home()
+
+
+def life_nodes():
+    """Rock, kelp, sponges, sea fans and grass along the route, set on the sampled seabed."""
+    items = []
+    spots = [(312.0, -472.0), (284.0, -488.0), (304.0, -540.0), (268.0, -572.0), (292.0, -612.0), (246.0, -652.0),
+             (278.0, -690.0), (228.0, -704.0), (202.0, -770.0), (178.0, -802.0), (140.0, -832.0), (150.0, -872.0),
+             (100.0, -838.0)]
+    kinds = ["kelp-a", "kelp-b", "sponge", "fan-coral", "seagrass", "basalt-a", "basalt-b", "kelp-a", "sponge", "fan-coral",
+             "kelp-b", "seagrass", "basalt-c"]
+    pts = []
+    for k, (x, z) in enumerate(spots):
+        for j in range(5):   # a cluster at each spot
+            a = (k * 7 + j * 2.4) % 6.283
+            r = 2.0 + 4.0 * ((k * 13 + j * 7) % 10) / 10.0
+            pts.append((x + r * math.cos(a), z + r * math.sin(a), kinds[(k + j) % len(kinds)], 0.7 + 0.12 * ((k + j) % 5), a * 57.3))
+    try:
+        gr = heights(PREFIX + "strange-attractor-ocean.scene.json", [(p[0], p[1]) for p in pts])
+    except Exception:
+        gr = [0.0] * len(pts)
+    for i, ((x, z, kind, sc, yaw), g) in enumerate(zip(pts, gr)):
+        items.append({"name": f"life-{i}", "kind": "gltf", "asset": A + f"{kind}.glb", "position": [x, g - 0.15, z],
+                      "rotation": [0, yaw, 0], "scale": [sc * (2.5 if kind.startswith(("rock", "basalt")) else 1.0)] * 3,
+                      "visible": True})
+    return items
+
+
+def fish_nodes():
+    """Fish: schools (particles circling a point, streaked along their motion) and a few singles."""
+    out = []
+    for k, (c, n, r) in enumerate((((291.0, 24.0, -522.0), 260, 9.0), ((270.0, 40.0, -660.0), 340, 12.0),
+                                   ((196.0, 62.0, -790.0), 200, 8.0))):
+        out.append({"name": f"fish-school-{k}", "kind": "particles", "visible": True, "particles": {
+            "enabled": True, "capacity": n, "seed": 600 + k, "shape": "sphere", "position": list(c), "extent": [r, r * 0.3, r],
+            "direction": [1, 0, 0], "spawnRate": n / 30.0, "burst": float(n), "lifetimeMin": 28.0, "lifetimeMax": 32.0,
+            "spread": 0.4, "speedMin": 2.0, "speedMax": 3.5, "gravity": [0, 0, 0], "drag": 0.05, "turbulence": 0.4,
+            "turbulenceScale": 0.08, "attractorPosition": list(c), "attractorStrength": 2.2, "attractorRadius": r * 3.0,
+            "orbit": 2.6, "sizeStart": 0.22, "sizeEnd": 0.22, "sizeVariance": 0.3,
+            "colorStart": [0.55, 0.68, 0.72, 0.9], "colorEnd": [0.55, 0.68, 0.72, 0.9], "emissive": 0.0,
+            "blend": "alpha", "velocityStretch": 0.9, "stretchMax": 0.5}})
+    out.append({"name": "fish-singles", "kind": "particles", "visible": True, "particles": {
+        "enabled": True, "capacity": 40, "seed": 700, "shape": "box", "position": [260.0, 40.0, -640.0],
+        "extent": [70.0, 20.0, 220.0], "direction": [0, 0, 1], "spawnRate": 1.2, "burst": 30.0, "lifetimeMin": 30.0,
+        "lifetimeMax": 34.0, "spread": 1.0, "speedMin": 0.6, "speedMax": 1.4, "gravity": [0, 0, 0], "drag": 0.0,
+        "turbulence": 0.3, "turbulenceScale": 0.02, "sizeStart": 0.45, "sizeEnd": 0.45, "sizeVariance": 0.4,
+        "colorStart": [0.35, 0.45, 0.5, 0.95], "colorEnd": [0.35, 0.45, 0.5, 0.95], "emissive": 0.0, "blend": "alpha",
+        "velocityStretch": 1.4, "stretchMax": 1.2}})
+    return out
 
 
 def write():
-    write_ufo()
-    bay_rel_y = BAY[1] - BASE_GROUND   # the bay's centre over the seabed (the pad levels the floor there)
-    return write_ocean(None), flight(bay_rel_y)
+    return write_ocean(None), flight()
 
 
 if __name__ == "__main__":

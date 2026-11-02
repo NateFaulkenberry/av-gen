@@ -1325,6 +1325,28 @@ void Composition::updateCorruption() {
             scene_.entities[i].castsShadow = active;
         }
     }
+    // ADR-1898: the rim particles on the live opening
+    for (std::size_t n = 0; n < nodes_.size() && n < ranges_.size(); ++n) {
+        const CompositionNode& node = *nodes_[n];
+        const int pi = ranges_[n].particleIndex;
+        if (!node.portalRim || node.kind != NodeKind::Particles || pi < 0 || static_cast<std::size_t>(pi) >= scene_.particles.size()) {
+            continue;
+        }
+        ParticleSystem& ps = scene_.particles[static_cast<std::size_t>(pi)];
+        const glm::vec3 axis = glm::length(live.axis) > 1e-6f ? glm::normalize(live.axis) : glm::vec3(0, 0, -1);
+        const float open = std::clamp(live.liveOpen, 0.0f, 1.0f);
+        const float reach = 0.4f + 0.6f * open;
+        ps.position = live.focus - axis * 0.5f * std::max(live.depth, 0.5f);
+        ps.direction = axis;
+        ps.extent.x = node.particleRest.extent.x * live.width * reach;
+        ps.extent.z = node.particleRest.extent.z * live.height * reach;
+        // the field gathers it, the opening thickens it; within the last stretch to the plane it stops, so the rim
+        // has cleared by the time the camera passes through (the camera on the journey's path, as above)
+        const float lastStretch = std::max(live.width, live.height);
+        const float clear = std::clamp((distance - lastStretch) / std::max(lastStretch, 0.1f), 0.0f, 1.0f);
+        ps.spawnRate = node.particleRest.spawnRate * live.liveAmount * (0.25f + 0.75f * open) * clear;
+        ps.enabled = ps.enabled && active; // a pool switched off empties at once: let the last ones live out
+    }
 }
 
 void Composition::updateAttractorWorld() {
@@ -1382,6 +1404,7 @@ void Composition::updateAttractorWorld() {
         PunctualLight& sun = scene_.lights[static_cast<std::size_t>(attractorSunLight_)];
         sun.direction = -attractorSunDirection(*live.world, live.live);
         sun.intensity = attractorWorld_.sunLux * live.live.sunIntensity;
+        sun.color = attractorSunColor(live.live);
     }
     // ADR-1862: the program's audio-reactive inputs ride on the chunks' material emission (the `materialEmission`
     // input): r contour, g glow. The program writes its own emission, so the carrier is never drawn as itself.
@@ -8105,7 +8128,7 @@ void Composition::rebuild() {
         sun.name = "attractor.sun";
         sun.type = PunctualLight::Type::Directional;
         sun.direction = -attractorSunDirection(*attractorWorld_.world, attractorWorld_.look);
-        sun.color = glm::vec3(1.0f, 0.82f, 0.62f);
+        sun.color = attractorSunColor(attractorWorld_.look);
         sun.intensity = attractorWorld_.sunLux * attractorWorld_.look.sunIntensity;
         sun.castsShadow = true;
         sun.shadowBias = attractorWorld_.sunShadowBias; // a low sun over kilometres of rock: the default acnes
@@ -11186,6 +11209,7 @@ nlohmann::json Composition::toJson() const {
             n["canopyFrom"] = node.canopyFrom;
         }
         // ADR-380.
+        if (node.portalRim) n["portalRim"] = true; // ADR-1898
         if (node.vortexAttractor) {
             n["vortexAttractor"] = true;
             n["vortexReach"] = node.vortexReach;
@@ -12924,6 +12948,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             if (item.contains("canopyFrom") && item.at("canopyFrom").is_number()) {
                 node.canopyFrom = item.at("canopyFrom").get<float>();
+            }
+            if (item.contains("portalRim") && item.at("portalRim").is_boolean()) { // ADR-1898
+                node.portalRim = item.at("portalRim").get<bool>();
             }
             if (item.contains("vortexAttractor") && item.at("vortexAttractor").is_boolean()) {
                 node.vortexAttractor = item.at("vortexAttractor").get<bool>();

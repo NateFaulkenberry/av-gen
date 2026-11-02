@@ -642,6 +642,9 @@ std::uint64_t AttractorGen::hash() const {
         h = mixHashF(h, v);
     }
     if (worldScale != 1.0f) h = mixHashF(h ^ 0x1893ull, worldScale); // ADR-1893: absent, the hash is unchanged
+    for (const Pad& p : pads) { // ADR-1897
+        for (float v : {p.x, p.z, p.radius, p.level}) h = mixHashF(h ^ 0x1897ull, v);
+    }
     if (approach.enabled) { // ADR-1881: absent, the hash is ADR-1853's
         for (float v : {approach.site.x, approach.site.y, approach.site.z, approach.departArc, approach.speed,
                         approach.slowFrom, approach.slowFor}) {
@@ -1303,6 +1306,28 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
     // ---- the flythrough (ADR-1853) ----
     buildFlight(w, g, Lb, L1);
 
+    // ---- ADR-1897: footings (world units in the request, generator units here) ----
+    for (const AttractorGen::Pad& pad : gen.pads) {
+        const float sc = gen.worldScale;
+        const glm::vec2 c = glm::vec2(pad.x, pad.z) / sc;
+        const float r = pad.radius / sc, level = pad.level / sc;
+        const float texel = w.extent / static_cast<float>(w.res);
+        const int i0 = std::max(0, static_cast<int>((c.x - r - w.origin.x) / texel) - 1);
+        const int i1 = std::min(w.res - 1, static_cast<int>((c.x + r - w.origin.x) / texel) + 1);
+        const int j0 = std::max(0, static_cast<int>((c.y - r - w.origin.y) / texel) - 1);
+        const int j1 = std::min(w.res - 1, static_cast<int>((c.y + r - w.origin.y) / texel) + 1);
+        for (int j = j0; j <= j1; ++j) {
+            for (int i = i0; i <= i1; ++i) {
+                const glm::vec2 q = w.origin + (glm::vec2(i, j) + 0.5f) * texel;
+                const float d = glm::length(q - c);
+                if (d >= r) continue;
+                const float t = 1.0f - smoothstepf(0.66f * r, r, d);
+                float& h = w.height[static_cast<std::size_t>(j) * w.res + i];
+                h += (level - h) * t;
+            }
+        }
+    }
+
     w.terrainMesh = buildTerrainMesh(w);
     if (worldScale != 1.0f) scaleWorld(w, worldScale);
     w.gen = gen.validate() ? gen : w.gen;
@@ -1340,6 +1365,10 @@ AttractorCameraPose attractorCamera(const AttractorWorld& world, AttractorCamera
     pose.target = pose.eye + 500.0f * d;
     pose.rollDegrees = glm::degrees(e.w);
     return pose;
+}
+
+glm::vec3 attractorSunColor(const AttractorLook& k) { // ADR-1900
+    return glm::mix(glm::vec3(0.62f, 0.72f, 1.0f), glm::vec3(1.0f, 0.82f, 0.62f), std::clamp(k.sunWarmth, 0.0f, 1.0f));
 }
 
 glm::vec3 attractorSunDirection(const AttractorWorld& w, const AttractorLook& k) {
@@ -1413,9 +1442,9 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "worldScale", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "meshMinError", "worldScale", "pads", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
-constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain"};
+constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth"};
 
 } // namespace
 
@@ -1452,6 +1481,18 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
     g.worldScale = j.value("worldScale", g.worldScale); // ADR-1893
+    if (j.contains("pads")) { // ADR-1897
+        if (!j.at("pads").is_array()) return fail("attractorWorld: 'pads' must be a list");
+        for (const json& pj : j.at("pads")) {
+            AttractorGen::Pad pad;
+            pad.x = pj.value("x", 0.0f);
+            pad.z = pj.value("z", 0.0f);
+            pad.radius = pj.value("radius", pad.radius);
+            pad.level = pj.value("level", 0.0f);
+            if (!(pad.radius > 0.0f)) return fail("attractorWorld: a pad needs a radius");
+            g.pads.push_back(pad);
+        }
+    }
     if (j.contains("approach")) { // ADR-1881
         const json& aj = j.at("approach");
         if (!aj.is_object()) return fail("attractorWorld: 'approach' must be an object");
@@ -1517,6 +1558,7 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         k.contour = l.value("contour", k.contour);
         k.glow = l.value("glow", k.glow);
         k.contourGain = l.value("contourGain", k.contourGain);
+        k.sunWarmth = l.value("sunWarmth", k.sunWarmth);
     }
     a.liveGen = a.gen;
     a.live = a.look;
@@ -1573,6 +1615,12 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                   {"contour", k.contour}, {"glow", k.glow}, {"contourGain", k.contourGain}}},
                 {"water", waterToJson(a.water)}};
     if (g.worldScale != 1.0f) out["worldScale"] = g.worldScale; // ADR-1893
+    if (k.sunWarmth != 1.0f) out["look"]["sunWarmth"] = k.sunWarmth; // ADR-1900: absent, the warm sun
+    if (!g.pads.empty()) { // ADR-1897
+        json pads = json::array();
+        for (const AttractorGen::Pad& p : g.pads) pads.push_back({{"x", p.x}, {"z", p.z}, {"radius", p.radius}, {"level", p.level}});
+        out["pads"] = pads;
+    }
     if (g.approach.enabled) { // ADR-1881
         out["approach"] = json{{"site", json::array({g.approach.site.x, g.approach.site.y, g.approach.site.z})},
                                {"departArc", g.approach.departArc},
@@ -1663,6 +1711,7 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("contour", "contour tracing", "Materials and Atmosphere", k.contour, 0.0f, 4.0f);
     r.f("glow", "wall glow", "Materials and Atmosphere", k.glow, 0.0f, 4.0f);
     r.f("contourGain", "contour gain (a look's)", "Materials and Atmosphere", k.contourGain, 0.0f, 1.0f);
+    r.f("sunWarmth", "key light warmth (1 sun, 0 moon)", "Materials and Atmosphere", k.sunWarmth, 0.0f, 1.0f);
     r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
         static_cast<int>(rest.camera), 0, 2);
     return p;
@@ -1689,6 +1738,7 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     k.contour = fval(p, "contour", k.contour);
     k.glow = fval(p, "glow", k.glow);
     k.contourGain = fval(p, "contourGain", k.contourGain);
+    k.sunWarmth = fval(p, "sunWarmth", k.sunWarmth);
     live.live = k;
     live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }

@@ -41,8 +41,9 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | Art Pass 2, M1 | the Moon at night (terminator, basin, domes, crater portal), the return to the canyon at dusk, the first Sasquatch encounter (`35`; ADR-1885, 1886, 1888) | reviewed: "overall this direction is great"; revised in M1b |
 | Art Pass 2, M1b | the world scaled to 0.4, the portal's water spill back, a short Moon, a real campfire (`36`; ADR-1893, 1894) | **approved, merged** (main 4bc5d3da) |
 | Art Pass 2, M2 | Mars: the outer cliff portal, Cydonia (mesas, haze, three pyramids), the pyramid portal, the night return; campfire notes (`37`; ADR-1895, 1896) | **approved, merged** (main 60d65ba8) |
-| Art Pass 2, M3 | the night gathering (Gray, UFO, embers), the riverbed portal, the ocean (shelf, base, launch bay, submersibles), the bay portal; Sasquatch idles; Mars notes (`38`) | **done, awaiting the owner**: media in `pass2-m3/` |
-| Art Pass 2, M4-M5 | UFO interior, dawn (`33` §6) | not started: gated on M3 |
+| Art Pass 2, M3 | the night gathering (Gray, UFO, embers), the riverbed portal, the ocean (shelf, base, launch bay, submersibles), the bay portal; Sasquatch idles; Mars notes (`38`) | reviewed: revised in M3b |
+| Art Pass 2, M3b | the revision (`39`): UFO interior cut, home at dawn; canyon scale POC (0.2); three Sasquatches, planted feet; rim particles; one water glide; Moon rave and Earth; Mars rover and block pyramids; night pass; ocean life and subs (`41`) | **done, awaiting the owner**: media in `pass2-m3b/` |
+| Art Pass 2, M4-M5 | (the UFO interior is cut by the owner; dawn is in M3b) | not started: gated on M3b |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
 
@@ -183,6 +184,18 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-11-02: Art Pass 2, M3b (`41-pass2-m3b.md`; ADR-1897, 1898, 1899, 1900).
+  - The UFO interior cut; the launch bay leads home through portal 1's wall at dawn; the cut runs 0-210.5 s.
+  - The canyon scale POC (`SA_WORLD_SCALE=0.2`, `poc-*` files, `strange-attractor-poc.json`), the current canyon
+    kept; the builders anchor to the terrain (`site`, `near`, `knot`).
+  - Pads open the camp's bench; scrub, rocks, a cave mouth, a seat rock.
+  - Three Sasquatch individuals with base poses and IK-planted idles (foot drift under 0.1 mm).
+  - Rim particles on every portal; the water glide with a tilted exit frame; the ocean and dawn flights paced.
+  - The Moon's rave and a bigger, glowing, datamoshed Earth; Curiosity on Mars, buried block pyramids.
+  - The night: a cold moon key (`sunWarmth`), the fire as the shadow key, the Gray facing the three, the craft's own
+    lights. Ocean rocks, kelp, sponges, sea fans, grass, fish, five subs.
+  - Fixed: a world searching its way out before the camera arrived (a stack overflow on the ocean's way home).
+  - Suites: GPU 737 passed, 0 failed (exit 0); cpu-assets 4623 passed, 0 failed, 1 expected failure (exit 0).
 - 2026-11-01: Art Pass 2, M3 (`38-pass2-m3.md`).
   - Night: moon, rim, river sheen; the Gray and a parked UFO (CC BY, made opaque) at the embers; a builder bug that
     stacked copies of them (one a 666 m disc) fixed.

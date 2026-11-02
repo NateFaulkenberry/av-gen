@@ -92,7 +92,7 @@ struct Params {
     // trail stride counts, because "every Nth frame" is a rate and not a seed; nothing else in this
     // shader may key randomness to it. yzw = 0.
     nonce: vec4<u32>,
-    stretch: vec4<f32>,     // velocityStretch, stretchMax, stretchMin, 0
+    stretch: vec4<f32>,     // velocityStretch, stretchMax, stretchMin, disc inner radius (ADR-1898)
     trail: vec4<f32>,       // history points (0 = trails off), stride, width, taper
     trail2: vec4<f32>,      // tail alpha fraction, tail tint rgb
     fog: vec4<f32>,         // volume density, fog height, height falloff, absorption
@@ -357,7 +357,9 @@ fn cs_emit(@builtin(global_invocation_id) gid: vec3<u32>) {
         let u = normalize(cross(n, helper));
         let v = cross(u, n);
         let ang = 6.28318530 * r1.x;
-        let rad = sqrt(r1.y);
+        // ADR-1898: stretch.w the disc's inner radius (a ring; 0 = the whole disc, unchanged)
+        let inner = params.stretch.w;
+        let rad = sqrt(mix(inner * inner, 1.0, r1.y));
         offset = u * (cos(ang) * rad * params.extent.x) + v * (sin(ang) * rad * params.extent.z);
     } else if (shape > 0.5) {
         offset = sphereDir(r1.xy) * pow(r1.z, 1.0 / 3.0) * params.extent.x;

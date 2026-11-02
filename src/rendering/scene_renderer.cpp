@@ -3199,10 +3199,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         (*registry_)[&scene] = this;
     }
     const bool portalOn = !plain_ && scene.portal.active() && portalDepth_ < kMaxPortalDepth;
-    if (portalOn && scene.portal.crossed) {
-        if (auto r = encodePortalView(encoder, scene, time, target.width, target.height, &target); r) {
-            return r;
-        }
+    if (portalOn && scene.portal.crossed && !handingOff_) {
+        handingOff_ = true;
+        auto r = encodePortalView(encoder, scene, time, target.width, target.height, &target);
+        handingOff_ = false;
+        if (r) return r;
     }
     // ADR-1885: from here this renderer draws its own world into this encoder. Its per-frame buffers are written once
     // per submit, so a second draw of the same renderer in the same frame (a nested view back into this world) would
@@ -6213,7 +6214,9 @@ Result<void> SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, cons
     }
     // the owner is drawing its own world in this frame already (a view back into the world the camera is still in):
     // the nested view is not drawn, and the portal pass composites nothing
-    if (owner != nullptr && owner->busy_) {
+    // (or is handing the frame on to the world this view looks from: two worlds that both report the camera crossed
+    // into the other would otherwise hand the frame back and forth without end)
+    if (owner != nullptr && (owner->busy_ || owner->handingOff_)) {
         portalSource_ = nullptr;
         return {};
     }

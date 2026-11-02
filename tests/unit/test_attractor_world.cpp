@@ -746,3 +746,63 @@ TEST_CASE("a look can quiet the contour lines without touching their route", "[a
     REQUIRE(withGain.has_value());
     CHECK(withGain->look.contourGain == Approx(0.5f));
 }
+
+TEST_CASE("a pad eases the canyon's ground to a level within its radius, and only there", "[attractor-world][pass2][adr1897]") {
+    scene::AttractorGen g;
+    g.resolution = 256;
+    g.meshSpacing = 16.0f;
+    g.meshMinError = 4.0f;
+    g.worldScale = 0.4f;
+    auto bare = scene::generateAttractorWorld(g);
+    REQUIRE(bare->res > 0);
+    const float texel = bare->extent / static_cast<float>(bare->res); // world units
+    const glm::vec2 c = bare->origin + glm::vec2(0.5f * bare->extent); // the middle of the field (world units)
+    const float radius = 12.0f * texel;
+    const float level = bare->sample(c) + 7.5f;
+    scene::AttractorGen p = g;
+    p.pads.push_back({c.x, c.y, radius, level});
+    CHECK(p.hash() != g.hash());
+    auto padded = scene::generateAttractorWorld(p);
+    // flat within two-thirds of the radius
+    for (const glm::vec2 d : {glm::vec2(0.0f), glm::vec2(0.3f, 0.2f), glm::vec2(-0.45f, 0.1f), glm::vec2(0.1f, -0.5f)}) {
+        CHECK(padded->sample(c + d * radius) == Approx(level).margin(0.05f));
+    }
+    // untouched beyond it
+    for (const glm::vec2 d : {glm::vec2(1.3f, 0.0f), glm::vec2(0.0f, -1.4f), glm::vec2(-1.2f, 0.9f)}) {
+        CHECK(padded->sample(c + d * radius) == Approx(bare->sample(c + d * radius)).margin(1e-3f));
+    }
+    // the flight is planned before the pads: the authored flythrough does not move
+    REQUIRE(padded->flight.size() == bare->flight.size());
+    CHECK(glm::length(glm::vec3(padded->flight[padded->flight.size() / 2]) - glm::vec3(bare->flight[bare->flight.size() / 2])) < 1e-4f);
+    // the block round-trips the pads
+    scene::AttractorWorldBlock block;
+    block.enabled = true;
+    block.gen = p;
+    const nlohmann::json j = scene::attractorWorldToJson(block);
+    REQUIRE(j.contains("pads"));
+    auto back = scene::attractorWorldFromJson(j);
+    REQUIRE(back.has_value());
+    REQUIRE(back->gen.pads.size() == 1);
+    CHECK(back->gen.pads[0].radius == Approx(radius));
+    CHECK(back->gen.pads[0].level == Approx(level));
+    CHECK(back->gen.hash() == p.hash());
+}
+
+TEST_CASE("a look's warmth turns the canyon's key from the warm sun to a cold moon", "[attractor-world][pass2][adr1900]") {
+    scene::AttractorLook warm;
+    const glm::vec3 sun = scene::attractorSunColor(warm);
+    CHECK(sun.r == Approx(1.0f));
+    CHECK(sun.b == Approx(0.62f)); // the default is the sun it always was
+    scene::AttractorLook cold = warm;
+    cold.sunWarmth = 0.0f;
+    const glm::vec3 moon = scene::attractorSunColor(cold);
+    CHECK(moon.b > moon.r);        // blue over red
+    nlohmann::json j = nlohmann::json::parse(R"({"enabled": true, "look": {"sunWarmth": 0.25}})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->look.sunWarmth == Approx(0.25f));
+    CHECK(scene::attractorWorldToJson(*block).at("look").value("sunWarmth", 1.0) == Approx(0.25));
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    CHECK_FALSE(scene::attractorWorldToJson(plain).at("look").contains("sunWarmth")); // saved only when set
+}

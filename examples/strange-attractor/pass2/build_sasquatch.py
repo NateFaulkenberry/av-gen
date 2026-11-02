@@ -24,9 +24,14 @@ from mathutils import Euler, Matrix, Vector
 src, out = sys.argv[sys.argv.index("--") + 1:][:2]
 variant = int(sys.argv[sys.argv.index("--") + 3]) if len(sys.argv) > sys.argv.index("--") + 3 else 0
 rng = random.Random(29 + variant)
-V = [dict(height=2.35, fur=(0.045, 0.028, 0.017), furlen=1.0, lean=6.0),
-     dict(height=2.5, fur=(0.034, 0.021, 0.013), furlen=1.2, lean=10.0),
-     dict(height=2.25, fur=(0.03, 0.02, 0.014), furlen=0.9, lean=4.0)][variant % 3]
+# M3b (owner: three copies of one Sasquatch look bad): three individuals -- build, height, fur colour and length, the
+# head, age -- each with its own base pose (standing, crouching, sitting), feet planted by leg IK
+V = [dict(height=2.35, fur=(0.045, 0.028, 0.017), grey=None, furlen=1.0, lean=6.0,        # A: a dark-brown adult
+          shoulders=1.0, belly=0.0, head=1.0, arms=1.0, pose="stand"),
+     dict(height=2.55, fur=(0.03, 0.025, 0.021), grey=(0.2, 0.19, 0.18), furlen=1.45, lean=12.0,  # B: an old silverback
+          shoulders=1.2, belly=0.05, head=1.07, arms=1.08, pose="crouch"),
+     dict(height=2.2, fur=(0.085, 0.034, 0.015), grey=None, furlen=0.8, lean=3.0,         # C: young, lean, auburn
+          shoulders=0.9, belly=-0.015, head=0.94, arms=1.05, pose="sit")][variant % 3]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=src)
@@ -45,6 +50,33 @@ z0, z1 = min(zs), max(zs)
 s = V["height"] / (z1 - z0)
 me.transform(Matrix.Translation((0, 0, -z0 * s)) @ Matrix.Scale(s, 4))
 H = V["height"]
+
+
+def bump(x, a, b):
+    """0 outside [a, b], 1 in the middle, smooth."""
+    if x <= a or x >= b:
+        return 0.0
+    t = (x - a) / (b - a)
+    return math.sin(math.pi * t) ** 2
+
+
+# the individual's build, warped into the T-posed scan before the rig is fitted
+hc = Vector((0.0, sum(v.co.y for v in me.vertices if v.co.z > 0.9 * H) / max(1, sum(1 for v in me.vertices if v.co.z > 0.9 * H)), 0.93 * H))
+for v in me.vertices:
+    c = v.co
+    w = bump(c.z, 0.55 * H, 0.9 * H) * (1.0 if abs(c.x) < 0.3 * H else 0.0)
+    c.x *= 1.0 + (V["shoulders"] - 1.0) * w
+    if c.y < 0.0:
+        c.y -= V["belly"] * H * bump(c.z, 0.36 * H, 0.64 * H) * max(0.0, 1.0 - abs(c.x) / (0.22 * H))
+    if abs(c.x) > 0.14 * H and c.z > 0.6 * H:
+        c.x = math.copysign(0.14 * H + (abs(c.x) - 0.14 * H) * V["arms"], c.x)
+    if c.z > 0.84 * H:
+        k = bump(c.z, 0.84 * H, 1.2 * H) if c.z < 0.98 * H else 1.0
+        f = 1.0 + (V["head"] - 1.0) * min(1.0, k * 2.0)
+        c.x, c.y, c.z = hc.x + (c.x - hc.x) * f, hc.y + (c.y - hc.y) * f, hc.z + (c.z - hc.z) * f
+zs = [v.co.z for v in me.vertices]
+s2 = V["height"] / (max(zs) - min(zs))
+me.transform(Matrix.Translation((0, 0, -min(zs) * s2)) @ Matrix.Scale(s2, 4))
 
 
 def band(f):
@@ -145,7 +177,7 @@ bpy.ops.pose.armature_apply(selected=False)
 bpy.ops.object.mode_set(mode="OBJECT")
 body.modifiers.new("Armature", "ARMATURE").object = arm_obj
 
-# 3. the strand texture, the fur colour baked in
+# 3. the strand texture, the fur colour baked in (the silverback has a second, grey one for its head and back)
 W = 256
 img = bpy.data.images.new("sasquatch_strands", W, W, alpha=True)
 px = [0.0] * (W * W * 4)
@@ -181,6 +213,22 @@ try:
     fur.blend_method = "CLIP"
 except Exception:
     pass
+fur_grey = None
+if V["grey"] is not None:
+    fur_grey = fur.copy()
+    fur_grey.name = "sasquatch_fur_grey"
+    img_g = img.copy()
+    img_g.name = "sasquatch_strands_grey"
+    pg = list(img.pixels)
+    gk = [V["grey"][i] / max(V["fur"][i], 1e-4) for i in range(3)]
+    for i in range(0, len(pg), 4):
+        for c in range(3):
+            pg[i + c] = min(1.0, pg[i + c] * gk[c])
+    img_g.pixels = pg
+    img_g.pack()
+    for nd in fur_grey.node_tree.nodes:
+        if nd.type == "TEX_IMAGE":
+            nd.image = img_g
 
 # 4. hair cards over the body, by area
 bm = bmesh.new()
@@ -216,8 +264,11 @@ for k in range(N):
     ring = [cards.verts.new(p) for p in (root - sd * w, root + sd * w, mid - sd * w * 0.85, mid + sd * w * 0.85,
                                          tip - sd * w * 0.6, tip + sd * w * 0.6)]
     u0 = rng.choice((0.0, 0.25, 0.5, 0.75))
+    # the silverback greys on the head, shoulders and back, and a little everywhere
+    grey = fur_grey is not None and (rng.random() < 0.18 or (zr > 0.58 and (pt.y > -0.02 * H or zr > 0.8) and rng.random() < 0.85))
     for (i0, i1, i2, i3), (v0, v1) in (((0, 1, 3, 2), (0.0, 0.5)), ((2, 3, 5, 4), (0.5, 1.0))):
         face = cards.faces.new((ring[i0], ring[i1], ring[i3], ring[i2]))
+        face.material_index = 1 if grey else 0
         for loop, (uu, vv) in zip(face.loops, ((u0, v0), (u0 + 0.25, v0), (u0 + 0.25, v1), (u0, v1))):
             loop[uvl].uv = (uu, vv)
 cme = bpy.data.meshes.new("sasquatch_fur")
@@ -225,6 +276,8 @@ cards.to_mesh(cme)
 fur_obj = bpy.data.objects.new("sasquatch_fur", cme)
 bpy.context.scene.collection.objects.link(fur_obj)
 fur_obj.data.materials.append(fur)
+if fur_grey is not None:
+    fur_obj.data.materials.append(fur_grey)
 for g in body.vertex_groups:
     fur_obj.vertex_groups.new(name=g.name)
 dt = fur_obj.modifiers.new("weights", "DATA_TRANSFER")
@@ -240,20 +293,22 @@ bpy.ops.object.modifier_apply(modifier="weights")
 fur_obj.parent = arm_obj
 fur_obj.modifiers.new("Armature", "ARMATURE").object = arm_obj
 
-# 5. the idle (M3, owner: they stood frozen; the M1 idle moved 2 degrees). A 24 s seamless loop of sums of sines with
-# whole cycles per loop, plus a few held beats, different per variant so the three never move together:
-# - breathing in the chest and spine (4-5 s);
-# - a slow weight shift: the hips lean side to side, the spine counters it;
-# - head turns that hold: toward the fire, toward a neighbour, back (the head bone's twist is its yaw);
-# - the arms drift, forearms ease;
-# - one small gesture each: a shrug (b), a look over the shoulder (c), a scratch of the jaw (a).
+# 5. the idle. M3 built the upper-body motion (owner: "looks good"); M3b keeps it and fixes what it got wrong:
+# - the feet: the weight shift moved the hips and the legs went with them, so the figure slid. The legs now solve by IK
+#   to targets fixed on the ground (and the feet hold their angle), so every shift comes from the hips over planted
+#   feet; the result is baked, and the feet's drift across the loop is measured and printed ("FEET ...");
+# - the scratch: the arm went back into the body. It now comes up in front of the chest to the jaw;
+# - the base pose: one per individual -- A stands with its weight on one leg, B crouches on its haunches with its
+#   forearms over its knees, C sits (on a boulder the scene places behind it).
+# A 24 s seamless loop: sums of sines with whole cycles per loop, plus held beats, different per individual.
 bpy.context.view_layer.objects.active = arm_obj
 bpy.ops.object.mode_set(mode="POSE")
-arm_obj.animation_data_create()
-arm_obj.animation_data.action = bpy.data.actions.new("idle")
 fps, loop = 24, 24.0
 frames = int(fps * loop)
 bpy.context.scene.render.fps = fps
+bpy.context.scene.frame_start, bpy.context.scene.frame_end = 0, frames
+for b_ in pb:
+    b_.rotation_mode = "QUATERNION"
 
 
 def wave(t, cycles, phase=0.0):
@@ -261,64 +316,154 @@ def wave(t, cycles, phase=0.0):
 
 
 def beat(t, start, rise, hold, fall):
-    """0 -> 1 -> 0: eased in over `rise` s from `start`, held, eased out over `fall` s."""
     def ease(x):
         x = min(max(x, 0.0), 1.0)
         return x * x * (3 - 2 * x)
     return ease((t - start) / rise) * (1.0 - ease((t - start - rise - hold) / fall))
 
 
-# per variant: breath cycles, the head's held turns [(start, rise, hold, fall, degrees)], the gesture
+# the IK: targets at the ankles' rest positions, poles ahead of the knees, the feet holding their rest orientation
+ik_targets = {}
+for side in ("L", "R"):
+    ank = arm_obj.matrix_world @ arm_obj.data.bones[f"foot.{side}"].head_local
+    knee = arm_obj.matrix_world @ arm_obj.data.bones[f"shin.{side}"].head_local
+    tgt = bpy.data.objects.new(f"ik_{side}", None)
+    bpy.context.scene.collection.objects.link(tgt)
+    tgt.location = ank
+    pole = bpy.data.objects.new(f"pole_{side}", None)
+    bpy.context.scene.collection.objects.link(pole)
+    pole.location = knee + Vector((0.0, -1.0 * H, 0.0))
+    frot = bpy.data.objects.new(f"footrot_{side}", None)
+    bpy.context.scene.collection.objects.link(frot)
+    frot.matrix_world = arm_obj.matrix_world @ arm_obj.data.bones[f"foot.{side}"].matrix_local
+    c = pb[f"shin.{side}"].constraints.new("IK")
+    c.target, c.pole_target, c.chain_count = tgt, pole, 2
+    c.pole_angle = 0.0
+    c2 = pb[f"foot.{side}"].constraints.new("COPY_ROTATION")
+    c2.target = frot
+    ik_targets[side] = (tgt, pole, c)
+bpy.context.view_layer.update()
+
+
+def knee_forward(side):
+    bpy.context.view_layer.update()
+    k = arm_obj.matrix_world @ pb[f"shin.{side}"].head
+    h = arm_obj.matrix_world @ pb[f"thigh.{side}"].head
+    return h.y - k.y   # > 0: the knee ahead of the hip (-y is forward)
+
+
+# the pole angle that bends the knees forward, found rather than assumed (it depends on the bones' roll)
+pb["hips"].location = Vector((0.0, 0.0, 0.0))
+pb["hips"].matrix = Matrix.Translation((0, 0, -0.15 * H)) @ pb["hips"].matrix
+for side in ("L", "R"):
+    best = max((-math.pi / 2, 0.0, math.pi / 2, math.pi), key=lambda a: (setattr(ik_targets[side][2], "pole_angle", a), knee_forward(side))[1])
+    ik_targets[side][2].pole_angle = best
+pb["hips"].location = Vector((0.0, 0.0, 0.0))
+bpy.context.view_layer.update()
+
+POSES = {
+    # hips (dx, dy, dz) in H, hips tilt about y (deg), chest pitch, per-arm (upperarm forward, forearm forward) deg
+    "stand": dict(hips=(0.035, 0.0, -0.012), tilt=3.5, chest=0.0, arm=((6.0, 8.0), (4.0, 18.0)), head=(-3.0, 0.0)),
+    "crouch": dict(hips=(0.0, 0.07, -0.3), tilt=0.0, chest=26.0, arm=((38.0, 42.0), (34.0, 48.0)), head=(-24.0, 0.0)),
+    "sit": dict(hips=(0.0, 0.16, -0.23), tilt=0.0, chest=10.0, arm=((24.0, 58.0), (20.0, 62.0)), head=(-8.0, 0.0)),
+}
+P = POSES[V["pose"]]
+
 V_IDLE = [
     dict(breath=6, sway=2, phase=0.0, turns=[(1.5, 1.6, 4.0, 1.8, 16.0), (12.0, 1.4, 3.0, 1.6, -11.0)], gesture="scratch"),
-    dict(breath=5, sway=2, phase=1.9, turns=[(4.0, 1.8, 5.0, 2.0, -14.0), (16.5, 1.5, 2.5, 1.5, 9.0)], gesture="shrug"),
+    dict(breath=5, sway=2, phase=1.9, turns=[(4.0, 1.8, 5.0, 2.0, -14.0), (16.5, 1.5, 2.5, 1.5, 9.0)], gesture="point"),
     dict(breath=6, sway=3, phase=3.7, turns=[(7.0, 1.5, 3.5, 1.6, 18.0), (19.0, 1.2, 2.0, 1.5, -20.0)], gesture="look"),
 ][variant % 3]
 ph0 = V_IDLE["phase"]
-for fr in range(0, frames + 1, 3):
-    t = fr / fps
-    rot = {name: [0.0, 0.0, 0.0] for name in pb.keys()}
+
+
+def rotate(name, axis, deg):
+    """Turn a bone about a WORLD axis through its head (the pose's parents first, so children follow)."""
+    if abs(deg) < 1e-6:
+        return
+    b_ = pb[name]
+    h = b_.head.copy()
+    b_.matrix = Matrix.Translation(h) @ Matrix.Rotation(math.radians(deg), 4, axis) @ Matrix.Translation(-h) @ b_.matrix
+    bpy.context.view_layer.update()
+
+
+def pose_at(t):
+    for b_ in pb:
+        b_.location = Vector((0, 0, 0))
+        b_.rotation_quaternion = (1, 0, 0, 0)
+    bpy.context.view_layer.update()
     br = wave(t, V_IDLE["breath"], ph0)
-    rot["chest"][0] += math.radians(2.6) * br
-    rot["spine"][0] += math.radians(1.0) * br
-    rot["shoulder.L"][2] += math.radians(1.2) * br
-    rot["shoulder.R"][2] -= math.radians(1.2) * br
     sw = wave(t, V_IDLE["sway"], ph0 + 0.7)
-    rot["hips"][2] += math.radians(2.4) * sw          # the side lean (weight onto one leg)
-    rot["spine"][2] -= math.radians(1.6) * sw          # countered up the body
-    rot["thigh.L"][2] -= math.radians(1.5) * sw
-    rot["thigh.R"][2] -= math.radians(1.5) * sw
+    # the hips over the planted feet: the base offset, the weight shift side to side, a little rise with the breath
+    dx, dy, dz = P["hips"]
+    pb["hips"].matrix = Matrix.Translation((H * (dx + 0.012 * sw), H * dy, H * (dz + 0.002 * br))) @ pb["hips"].matrix
+    bpy.context.view_layer.update()
+    rotate("hips", "Y", P["tilt"] + 2.0 * sw)
+    rotate("spine", "Y", -(P["tilt"] + 2.0 * sw) * 0.8)        # the spine counters the hips: the shoulders stay level
+    rotate("spine", "X", P["chest"] * 0.5 + 1.0 * br)
+    rotate("chest", "X", P["chest"] * 0.5 + 2.4 * br)
     yaw = sum(deg * beat(t, st, ri, ho, fa) for st, ri, ho, fa, deg in V_IDLE["turns"])
-    rot["head"][1] += math.radians(yaw * 0.7)
-    rot["neck"][1] += math.radians(yaw * 0.3)
-    rot["neck"][0] += math.radians(2.0) * wave(t, 3, ph0 + 2.1)
-    for side, sg, k in (("L", 1.0, 0.0), ("R", -1.0, 1.4)):
-        rot[f"upperarm.{side}"][0] += math.radians(3.5) * wave(t, 2, ph0 + k)
-        rot[f"upperarm.{side}"][2] += sg * math.radians(2.0) * wave(t, 3, ph0 + k + 0.5)
-        rot[f"forearm.{side}"][0] += math.radians(5.0) * (0.5 + 0.5 * wave(t, 2, ph0 + k + 1.0))
     g = V_IDLE["gesture"]
-    if g == "shrug":
-        s_ = beat(t, 10.0, 0.6, 0.5, 0.8)
-        for side in ("L", "R"):
-            rot[f"shoulder.{side}"][2] += (1 if side == "L" else -1) * math.radians(9.0) * s_
-        rot["head"][0] -= math.radians(4.0) * s_
-    elif g == "look":
-        s_ = beat(t, 13.5, 1.4, 1.8, 1.6)
-        rot["chest"][1] += math.radians(9.0) * s_
-        rot["head"][1] += math.radians(22.0) * s_
-    elif g == "scratch":
-        s_ = beat(t, 8.0, 1.1, 1.6, 1.2)
-        rot["upperarm.R"][0] -= math.radians(48.0) * s_
-        rot["upperarm.R"][2] -= math.radians(12.0) * s_
-        rot["forearm.R"][0] -= math.radians(85.0) * s_
-        rot["head"][2] += math.radians(6.0) * s_
-    for name, (rx, ry, rz) in rot.items():
-        if rx == 0.0 and ry == 0.0 and rz == 0.0 and fr not in (0, frames):
-            continue
-        b = pb[name]
-        b.rotation_mode = "XYZ"
-        b.rotation_euler = Euler((rx, ry, rz))
-        b.keyframe_insert("rotation_euler", frame=fr)
+    look = beat(t, 13.5, 1.4, 1.8, 1.6) if g == "look" else 0.0
+    rotate("chest", "Z", 9.0 * look)
+    rotate("neck", "X", P["head"][0] * 0.5 + 2.0 * wave(t, 3, ph0 + 2.1))
+    rotate("neck", "Z", yaw * 0.3)
+    rotate("head", "X", P["head"][0] * 0.5)
+    rotate("head", "Z", yaw * 0.7 + 22.0 * look)
+    for side, sg, k in (("L", 1.0, 0.0), ("R", -1.0, 1.4)):
+        (ua, fa) = P["arm"][0 if side == "L" else 1]
+        rotate(f"shoulder.{side}", "Y", -sg * 1.2 * br)
+        # (about world X a hanging limb swings BACK for a positive angle: forward is negative)
+        rotate(f"upperarm.{side}", "X", -(ua + 3.5 * wave(t, 2, ph0 + k)))
+        rotate(f"upperarm.{side}", "Y", -sg * 2.0 * wave(t, 3, ph0 + k + 0.5))
+        rotate(f"forearm.{side}", "X", -(fa + 5.0 * (0.5 + 0.5 * wave(t, 2, ph0 + k + 1.0))))
+    if g == "scratch":
+        # in front of the body: the right forearm comes up across the chest and scratches it, a few slow strokes
+        s_ = beat(t, 8.0, 1.1, 1.8, 1.2)
+        rotate("upperarm.R", "X", -26.0 * s_)
+        rotate("forearm.R", "X", (-84.0 + 7.0 * math.sin(2.0 * math.pi * 1.6 * t)) * s_)
+        rotate("head", "X", 8.0 * s_)
+    elif g == "point":
+        # the old one reaches toward the fire, palm down, and settles back
+        s_ = beat(t, 10.0, 1.0, 1.4, 1.3)
+        rotate("upperarm.L", "X", -28.0 * s_)
+        rotate("forearm.L", "X", 30.0 * s_)
+
+
+hand_front = []
+for fr in range(0, frames + 1, 3):
+    bpy.context.scene.frame_set(fr)
+    pose_at(fr / fps)
+    for b_ in pb:
+        b_.keyframe_insert("location", frame=fr)
+        b_.keyframe_insert("rotation_quaternion", frame=fr)
+    if V_IDLE["gesture"] == "scratch" and 9.4 <= fr / fps <= 10.6:
+        hand = arm_obj.matrix_world @ pb["hand.R"].tail
+        chest = arm_obj.matrix_world @ pb["chest"].tail
+        hand_front.append(chest.y - hand.y)   # > 0: the hand is in front of the chest
+if hand_front:
+    print("SCRATCH hand ahead of the chest: min %.3f m" % min(hand_front))
+# bake the IK into plain keys, then drop the constraints and helpers
+bpy.ops.pose.select_all(action="SELECT")
+bpy.ops.nla.bake(frame_start=0, frame_end=frames, step=3, only_selected=False, visual_keying=True,
+                 clear_constraints=True, use_current_action=True, bake_types={"POSE"})
+for side in ("L", "R"):
+    for nm in (f"ik_{side}", f"pole_{side}", f"footrot_{side}"):
+        bpy.data.objects.remove(bpy.data.objects[nm])
+arm_obj.animation_data.action.name = "idle"
+# the evidence: the feet across the loop
+drift = {"L": [], "R": []}
+base = {}
+for fr in range(0, frames + 1, 6):
+    bpy.context.scene.frame_set(fr)
+    for side in ("L", "R"):
+        p_ = arm_obj.matrix_world @ pb[f"foot.{side}"].head
+        base.setdefault(side, p_.copy())
+        drift[side].append((p_ - base[side]).length)
+print("FEET max drift over the loop: L %.4f m, R %.4f m" % (max(drift["L"]), max(drift["R"])))
+import json as _json
+_json.dump({"variant": variant, "pose": V["pose"], "foot_drift_max_m": {k: max(v) for k, v in drift.items()},
+            "foot_drift_samples_m": drift}, open(out + ".feet.json", "w"))
 bpy.ops.object.mode_set(mode="OBJECT")
 bpy.context.scene.frame_start, bpy.context.scene.frame_end = 0, frames
 bpy.ops.export_scene.gltf(filepath=out, export_animations=True, export_animation_mode="ACTIONS")

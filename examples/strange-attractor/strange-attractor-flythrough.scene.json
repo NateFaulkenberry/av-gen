@@ -169,24 +169,6 @@
       "shadowStrength": 0.0
     },
     {
-      "name": "ufo-glow",
-      "type": "point",
-      "position": [
-        82.57000000000001,
-        3.2,
-        1357.875
-      ],
-      "color": [
-        0.45,
-        0.8,
-        1.0
-      ],
-      "intensity": 0.0,
-      "range": 26.0,
-      "castsShadow": false,
-      "volumetric": 0.0
-    },
-    {
       "name": "moon-rim",
       "type": "directional",
       "role": "fill",
@@ -209,7 +191,7 @@
       "type": "point",
       "position": [
         74.26400000000001,
-        3.3600000000000003,
+        2.66,
         1349.6240000000003
       ],
       "color": [
@@ -222,7 +204,98 @@
       "castsShadow": true,
       "shadowStrength": 1.0,
       "flicker": 0.3,
-      "flickerRate": 2.6
+      "flickerRate": 2.6,
+      "volumetric": 0.2
+    },
+    {
+      "name": "ufo-glow",
+      "type": "point",
+      "position": [
+        88.90500000000002,
+        2.66,
+        1354.8930000000003
+      ],
+      "color": [
+        0.45,
+        0.85,
+        1.0
+      ],
+      "intensity": 0.0,
+      "range": 18.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "ufo-rim-0",
+      "type": "point",
+      "position": [
+        94.92361988149133,
+        4.0600000000000005,
+        1356.7547773019667
+      ],
+      "color": [
+        1.0,
+        0.55,
+        0.2
+      ],
+      "intensity": 0.0,
+      "range": 7.5,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "ufo-rim-1",
+      "type": "point",
+      "position": [
+        86.86827572875994,
+        4.0600000000000005,
+        1360.854690552431
+      ],
+      "color": [
+        0.4,
+        0.9,
+        1.0
+      ],
+      "intensity": 0.0,
+      "range": 7.5,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "ufo-rim-2",
+      "type": "point",
+      "position": [
+        83.005322870068,
+        4.0600000000000005,
+        1352.6830656655557
+      ],
+      "color": [
+        1.0,
+        0.25,
+        0.2
+      ],
+      "intensity": 0.0,
+      "range": 7.5,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "ufo-rim-3",
+      "type": "point",
+      "position": [
+        91.2862597790918,
+        4.0600000000000005,
+        1349.0603675013356
+      ],
+      "color": [
+        0.4,
+        0.9,
+        1.0
+      ],
+      "intensity": 0.0,
+      "range": 7.5,
+      "castsShadow": false,
+      "volumetric": 0.0
     }
   ],
   "attractorWorld": {
@@ -286,7 +359,15 @@
       "slowFor": 6.5
     },
     "flightSeconds": 46.0,
-    "worldScale": 0.4
+    "worldScale": 0.4,
+    "pads": [
+      {
+        "x": 80.06700000000002,
+        "z": 1350.209,
+        "radius": 15.0,
+        "level": 1.7600000000000002
+      }
+    ]
   },
   "materialPrograms": [
     {
@@ -1278,13 +1359,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-a.glb",
       "position": [
-        73.71645404021875,
-        1.7600000000000002,
-        1347.3901259162776
+        76.6971,
+        1.7600001096725464,
+        1350.8003
       ],
       "rotation": [
         0,
-        13.77227238859237,
+        -122.48544433360306,
         0
       ],
       "scale": [
@@ -1304,13 +1385,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-b.glb",
       "position": [
-        76.52081522660542,
-        1.7600000000000002,
-        1348.3329597090094
+        75.87965000000001,
+        1.7600001096725464,
+        1348.4765500000003
       ],
       "rotation": [
         0,
-        -60.227727611408866,
+        -54.61726794544308,
         0
       ],
       "scale": [
@@ -1330,13 +1411,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-c.glb",
       "position": [
-        76.51182107694088,
-        1.7600000000000002,
-        1350.1111348951376
+        74.94305,
+        1.7600001096725464,
+        1352.1234500000003
       ],
       "rotation": [
         0,
-        -102.2277276114094,
+        -164.80075858992643,
         0
       ],
       "scale": [
@@ -1352,17 +1433,38 @@
       }
     },
     {
+      "name": "seat-rock",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/seat-rock.glb",
+      "position": [
+        75.03743350468538,
+        1.7200001096725464,
+        1352.4708571876681
+      ],
+      "rotation": [
+        0,
+        -144.80075858992643,
+        0
+      ],
+      "scale": [
+        0.95,
+        0.92,
+        0.95
+      ],
+      "visible": true
+    },
+    {
       "name": "gray",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/sketchfab/gray/grey-alien-idle/grey_alien_idle.glb",
       "position": [
-        72.15165117063042,
-        1.7600000000000002,
-        1349.0091972486557
+        72.34190000000001,
+        1.7600001096725464,
+        1347.6544000000001
       ],
       "rotation": [
         0,
-        73.77227238859423,
+        51.2012370154796,
         0
       ],
       "scale": [
@@ -1382,21 +1484,1513 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
       "position": [
-        82.57000000000001,
-        4.5,
-        1357.875
+        88.90500000000002,
+        3.66,
+        1354.8930000000003
       ],
       "rotation": [
         0,
         33,
-        2.5
+        0
       ],
       "scale": [
         0.018,
         0.018,
         0.018
       ],
-      "visible": false
+      "visible": false,
+      "emissiveBoost": 4.0
+    },
+    {
+      "name": "cave-mouth",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/cave-mouth.glb",
+      "position": [
+        95.0635,
+        1.1600000000000001,
+        1344.2554000000002
+      ],
+      "rotation": [
+        0,
+        -64.79277878848472,
+        0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-0",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        87.70420206460933,
+        3.9299368381500246,
+        1374.9724706141426
+      ],
+      "rotation": [
+        0,
+        68.59608100987435,
+        0
+      ],
+      "scale": [
+        0.7867571608464624,
+        0.7867571608464624,
+        0.7867571608464624
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        64.18163132279368,
+        1.21136577129364,
+        1356.572137971807
+      ],
+      "rotation": [
+        0,
+        265.08978679163107,
+        0
+      ],
+      "scale": [
+        0.7262363439393376,
+        0.7262363439393376,
+        0.7262363439393376
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-c-2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-c.glb",
+      "position": [
+        89.01728499832946,
+        3.7082376003265383,
+        1372.6240995526523
+      ],
+      "rotation": [
+        0,
+        168.82227792204446,
+        0
+      ],
+      "scale": [
+        0.9085780349146158,
+        0.9085780349146158,
+        0.9085780349146158
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-3",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        87.02095072170042,
+        3.031636667251587,
+        1364.1421040348791
+      ],
+      "rotation": [
+        0,
+        79.1661811548052,
+        0
+      ],
+      "scale": [
+        0.7150868944668719,
+        0.7150868944668719,
+        0.7150868944668719
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-4",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        76.76304614489554,
+        5.856829833984375,
+        1373.0253559979838
+      ],
+      "rotation": [
+        0,
+        209.98039279201998,
+        0
+      ],
+      "scale": [
+        0.7358408475433285,
+        0.7358408475433285,
+        0.7358408475433285
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-5",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        68.68187402961999,
+        1.1222596883773803,
+        1340.3122419718522
+      ],
+      "rotation": [
+        0,
+        151.5968969131094,
+        0
+      ],
+      "scale": [
+        0.8944466966395221,
+        0.8944466966395221,
+        0.8944466966395221
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-6",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        80.73157767055878,
+        3.2689489841461183,
+        1368.8289738242495
+      ],
+      "rotation": [
+        0,
+        320.85855570843694,
+        0
+      ],
+      "scale": [
+        1.0659747778762885,
+        1.0659747778762885,
+        1.0659747778762885
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-7",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        88.20506223772092,
+        3.399532985687256,
+        1342.3799052759405
+      ],
+      "rotation": [
+        0,
+        284.6783094216273,
+        0
+      ],
+      "scale": [
+        0.7170158284281413,
+        0.7170158284281413,
+        0.7170158284281413
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-8",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        79.74857630162332,
+        2.5213572502136232,
+        1337.7160510653068
+      ],
+      "rotation": [
+        0,
+        287.46346023354414,
+        0
+      ],
+      "scale": [
+        0.8531884315904542,
+        0.8531884315904542,
+        0.8531884315904542
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-9",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        73.89962723882628,
+        3.1153149127960207,
+        1365.5209906032346
+      ],
+      "rotation": [
+        0,
+        186.03912561515858,
+        0
+      ],
+      "scale": [
+        0.7206570846696786,
+        0.7206570846696786,
+        0.7206570846696786
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-10",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        91.80005584905649,
+        3.569613885879517,
+        1368.992163368899
+      ],
+      "rotation": [
+        0,
+        56.95097160985216,
+        0
+      ],
+      "scale": [
+        0.8655879296223742,
+        0.8655879296223742,
+        0.8655879296223742
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-11",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        66.1677802515328,
+        0.6863446354866027,
+        1327.7052584944395
+      ],
+      "rotation": [
+        0,
+        261.55204353343964,
+        0
+      ],
+      "scale": [
+        0.9368384114659251,
+        0.9368384114659251,
+        0.9368384114659251
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-12",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        87.96189346823309,
+        3.1501330852508547,
+        1365.4872229111206
+      ],
+      "rotation": [
+        0,
+        259.085049793042,
+        0
+      ],
+      "scale": [
+        0.8929000749585588,
+        0.8929000749585588,
+        0.8929000749585588
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-13",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        96.3353342944097,
+        3.807496738433838,
+        1368.199526052247
+      ],
+      "rotation": [
+        0,
+        160.8853828159918,
+        0
+      ],
+      "scale": [
+        1.1738957208167768,
+        1.1738957208167768,
+        1.1738957208167768
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-14",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        85.06618000784445,
+        3.74344916343689,
+        1373.2799635939878
+      ],
+      "rotation": [
+        0,
+        319.55699639212526,
+        0
+      ],
+      "scale": [
+        1.003960567170271,
+        1.003960567170271,
+        1.003960567170271
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-15",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        69.40329914973638,
+        7.5700194358825685,
+        1367.0758087873091
+      ],
+      "rotation": [
+        0,
+        232.03783841540553,
+        0
+      ],
+      "scale": [
+        1.0173259643986439,
+        1.0173259643986439,
+        1.0173259643986439
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-16",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        99.03419484925992,
+        4.06707067489624,
+        1361.438399374836
+      ],
+      "rotation": [
+        0,
+        208.58752790108616,
+        0
+      ],
+      "scale": [
+        0.802397814859531,
+        0.802397814859531,
+        0.802397814859531
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-17",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        79.26667336812089,
+        2.894628477096558,
+        1365.148393523802
+      ],
+      "rotation": [
+        0,
+        63.94908485050658,
+        0
+      ],
+      "scale": [
+        1.1744855104976524,
+        1.1744855104976524,
+        1.1744855104976524
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-c-18",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-c.glb",
+      "position": [
+        82.21873785933055,
+        3.9527403831481935,
+        1375.0763163559413
+      ],
+      "rotation": [
+        0,
+        147.836599671147,
+        0
+      ],
+      "scale": [
+        0.9244412485983612,
+        0.9244412485983612,
+        0.9244412485983612
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-19",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        67.48425634293896,
+        1.4742817401885986,
+        1347.7660631443873
+      ],
+      "rotation": [
+        0,
+        68.92818724173264,
+        0
+      ],
+      "scale": [
+        1.0510487182557122,
+        1.0510487182557122,
+        1.0510487182557122
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-c-20",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
+      "position": [
+        62.64967619251972,
+        7.516686630249024,
+        1375.1038436732388
+      ],
+      "rotation": [
+        0,
+        280.3938924472625,
+        0
+      ],
+      "scale": [
+        0.9250848398726411,
+        0.9250848398726411,
+        0.9250848398726411
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-21",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        72.67707158130766,
+        1.7092167854309082,
+        1344.3436174091528
+      ],
+      "rotation": [
+        0,
+        165.1095367299515,
+        0
+      ],
+      "scale": [
+        1.082373924893497,
+        1.082373924893497,
+        1.082373924893497
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-a-22",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-a.glb",
+      "position": [
+        96.6313232842101,
+        3.7498409271240236,
+        1363.1639609046886
+      ],
+      "rotation": [
+        0,
+        353.6983287861803,
+        0
+      ],
+      "scale": [
+        0.5328120015383697,
+        0.5328120015383697,
+        0.5328120015383697
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-23",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        65.97160389584849,
+        0.989729356765747,
+        1322.7531859815615
+      ],
+      "rotation": [
+        0,
+        341.07246368411154,
+        0
+      ],
+      "scale": [
+        0.6338421766865487,
+        0.6338421766865487,
+        0.6338421766865487
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-c-24",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-c.glb",
+      "position": [
+        85.41847493806681,
+        4.096795749664307,
+        1376.0197001306112
+      ],
+      "rotation": [
+        0,
+        257.84609798981563,
+        0
+      ],
+      "scale": [
+        0.6286113816389359,
+        0.6286113816389359,
+        0.6286113816389359
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-25",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        71.61109273817901,
+        1.6178507328033447,
+        1342.635431313086
+      ],
+      "rotation": [
+        0,
+        99.33980904595562,
+        0
+      ],
+      "scale": [
+        0.8444467365418689,
+        0.8444467365418689,
+        0.8444467365418689
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-26",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        65.47689748328813,
+        0.6648751616477966,
+        1341.603878627203
+      ],
+      "rotation": [
+        0,
+        123.428101140027,
+        0
+      ],
+      "scale": [
+        1.2758391605473096,
+        1.2758391605473096,
+        1.2758391605473096
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-27",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        80.05067544531407,
+        3.1024426937103273,
+        1337.3127073359972
+      ],
+      "rotation": [
+        0,
+        242.20572519640265,
+        0
+      ],
+      "scale": [
+        1.0919618437716916,
+        1.0919618437716916,
+        1.0919618437716916
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-28",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        74.60967075049619,
+        1.7100001096725463,
+        1343.0373941007956
+      ],
+      "rotation": [
+        0,
+        269.99725059008136,
+        0
+      ],
+      "scale": [
+        0.7914310027642869,
+        0.7914310027642869,
+        0.7914310027642869
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-29",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        67.32197745332823,
+        0.986329984664917,
+        1339.5999127597688
+      ],
+      "rotation": [
+        0,
+        257.01496684310035,
+        0
+      ],
+      "scale": [
+        1.1556496897752508,
+        1.1556496897752508,
+        1.1556496897752508
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-30",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        87.01192122323651,
+        3.2651154518127443,
+        1367.7742637728104
+      ],
+      "rotation": [
+        0,
+        307.9158187868866,
+        0
+      ],
+      "scale": [
+        0.6644071242944879,
+        0.6644071242944879,
+        0.6644071242944879
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-a-31",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-a.glb",
+      "position": [
+        75.95115848296749,
+        5.009695720672608,
+        1371.4416585498734
+      ],
+      "rotation": [
+        0,
+        255.4789380092748,
+        0
+      ],
+      "scale": [
+        0.7443949207826461,
+        0.7443949207826461,
+        0.7443949207826461
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-c-32",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-c.glb",
+      "position": [
+        70.07362997392235,
+        2.3424188613891603,
+        1326.7391566855183
+      ],
+      "rotation": [
+        0,
+        86.26996107822322,
+        0
+      ],
+      "scale": [
+        1.315450270332933,
+        1.315450270332933,
+        1.315450270332933
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-33",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        82.02302440120096,
+        2.5435907363891603,
+        1363.485816981075
+      ],
+      "rotation": [
+        0,
+        152.34019536232094,
+        0
+      ],
+      "scale": [
+        1.1517649770772764,
+        1.1517649770772764,
+        1.1517649770772764
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-a-34",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-a.glb",
+      "position": [
+        79.91108231265709,
+        4.191518020629883,
+        1374.3008770289582
+      ],
+      "rotation": [
+        0,
+        184.37002839464418,
+        0
+      ],
+      "scale": [
+        1.1802958101417096,
+        1.1802958101417096,
+        1.1802958101417096
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-a-35",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-a.glb",
+      "position": [
+        82.2261761396877,
+        2.5840172290802004,
+        1339.0467560820528
+      ],
+      "rotation": [
+        0,
+        128.94393675743459,
+        0
+      ],
+      "scale": [
+        0.8266962367657482,
+        0.8266962367657482,
+        0.8266962367657482
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-c-36",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-c.glb",
+      "position": [
+        72.68748495795677,
+        7.873681259155274,
+        1324.7405285335037
+      ],
+      "rotation": [
+        0,
+        125.58757068229714,
+        0
+      ],
+      "scale": [
+        0.8958689963404796,
+        0.8958689963404796,
+        0.8958689963404796
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-37",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        77.31338608245592,
+        1.8834795475006103,
+        1361.124369888183
+      ],
+      "rotation": [
+        0,
+        269.7442440846383,
+        0
+      ],
+      "scale": [
+        1.143683192227888,
+        1.143683192227888,
+        1.143683192227888
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-38",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        87.5491987529185,
+        3.259130668640137,
+        1367.4199632906552
+      ],
+      "rotation": [
+        0,
+        176.23968411366008,
+        0
+      ],
+      "scale": [
+        0.7133896485272415,
+        0.7133896485272415,
+        0.7133896485272415
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-39",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        85.6712535733453,
+        3.1781472682952883,
+        1367.2226133196887
+      ],
+      "rotation": [
+        0,
+        195.00092741582483,
+        0
+      ],
+      "scale": [
+        1.0580251238936862,
+        1.0580251238936862,
+        1.0580251238936862
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-40",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        76.67116179703322,
+        1.8584644317626953,
+        1336.753736621243
+      ],
+      "rotation": [
+        0,
+        288.91908095225745,
+        0
+      ],
+      "scale": [
+        0.8091060707385649,
+        0.8091060707385649,
+        0.8091060707385649
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-41",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        88.7463510268827,
+        3.7844082832336428,
+        1373.6140715582637
+      ],
+      "rotation": [
+        0,
+        257.4759365062802,
+        0
+      ],
+      "scale": [
+        0.9931978200005307,
+        0.9931978200005307,
+        0.9931978200005307
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-42",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        67.0419501596747,
+        0.8624188423156738,
+        1327.0873753573696
+      ],
+      "rotation": [
+        0,
+        341.24392438767495,
+        0
+      ],
+      "scale": [
+        1.5184397276771064,
+        1.5184397276771064,
+        1.5184397276771064
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-c-43",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
+      "position": [
+        62.472379520485624,
+        4.1494895935058596,
+        1368.328212469082
+      ],
+      "rotation": [
+        0,
+        251.39682339020965,
+        0
+      ],
+      "scale": [
+        1.0831588888920383,
+        1.0831588888920383,
+        1.0831588888920383
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-44",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        93.80812792947067,
+        3.6726147651672365,
+        1368.7588813078007
+      ],
+      "rotation": [
+        0,
+        74.45541410468094,
+        0
+      ],
+      "scale": [
+        1.1444946932202056,
+        1.1444946932202056,
+        1.1444946932202056
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-45",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        79.93930909979916,
+        2.7712239742279055,
+        1364.4982842153897
+      ],
+      "rotation": [
+        0,
+        180.2266435708064,
+        0
+      ],
+      "scale": [
+        0.9274522629416944,
+        0.9274522629416944,
+        0.9274522629416944
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-46",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        63.86249669975785,
+        6.844640445709229,
+        1367.2051344077368
+      ],
+      "rotation": [
+        0,
+        90.71596066570079,
+        0
+      ],
+      "scale": [
+        1.163457157339017,
+        1.163457157339017,
+        1.163457157339017
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-a-47",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-a.glb",
+      "position": [
+        95.3387283778141,
+        3.651859474182129,
+        1362.8790905883375
+      ],
+      "rotation": [
+        0,
+        172.13937585442568,
+        0
+      ],
+      "scale": [
+        0.8818118187610368,
+        0.8818118187610368,
+        0.8818118187610368
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-48",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        76.10906930260883,
+        7.591477584838867,
+        1329.425957945756
+      ],
+      "rotation": [
+        0,
+        347.08777486803905,
+        0
+      ],
+      "scale": [
+        1.124042267395736,
+        1.124042267395736,
+        1.124042267395736
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-49",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        76.42699099222985,
+        2.4835960388183596,
+        1334.6735565745223
+      ],
+      "rotation": [
+        0,
+        316.12733306151785,
+        0
+      ],
+      "scale": [
+        0.9015011321433641,
+        0.9015011321433641,
+        0.9015011321433641
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-50",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        88.78094400109252,
+        3.642861795425415,
+        1371.7735077594593
+      ],
+      "rotation": [
+        0,
+        234.4212658270722,
+        0
+      ],
+      "scale": [
+        0.6397031088854715,
+        0.6397031088854715,
+        0.6397031088854715
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-51",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        74.53754396096909,
+        2.1308438301086428,
+        1361.3988333521525
+      ],
+      "rotation": [
+        0,
+        37.435484740482835,
+        0
+      ],
+      "scale": [
+        1.0274413745485342,
+        1.0274413745485342,
+        1.0274413745485342
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-52",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        80.41040788266504,
+        1.7126703977584838,
+        1340.839570145324
+      ],
+      "rotation": [
+        0,
+        146.96316756660642,
+        0
+      ],
+      "scale": [
+        0.9134436618852193,
+        0.9134436618852193,
+        0.9134436618852193
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-53",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        65.11981994045392,
+        0.4359152436256409,
+        1331.5624637428311
+      ],
+      "rotation": [
+        0,
+        319.52832102885156,
+        0
+      ],
+      "scale": [
+        1.1457005542415883,
+        1.1457005542415883,
+        1.1457005542415883
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-c-54",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-c.glb",
+      "position": [
+        89.80486915203238,
+        2.9525122165679933,
+        1344.4735457473444
+      ],
+      "rotation": [
+        0,
+        107.47830370063383,
+        0
+      ],
+      "scale": [
+        0.7637581461574529,
+        0.7637581461574529,
+        0.7637581461574529
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-a-55",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-a.glb",
+      "position": [
+        68.85560490732658,
+        2.188109827041626,
+        1325.174084642562
+      ],
+      "rotation": [
+        0,
+        285.5079498497807,
+        0
+      ],
+      "scale": [
+        1.0732417174849873,
+        1.0732417174849873,
+        1.0732417174849873
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-56",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        72.9688787766054,
+        6.848244857788086,
+        1370.0078624489422
+      ],
+      "rotation": [
+        0,
+        125.76348501348122,
+        0
+      ],
+      "scale": [
+        0.9089450759762785,
+        0.9089450759762785,
+        0.9089450759762785
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-57",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        68.09760404539084,
+        1.0453125953674316,
+        1327.6418278996252
+      ],
+      "rotation": [
+        0,
+        24.2479781747196,
+        0
+      ],
+      "scale": [
+        0.9659421386762046,
+        0.9659421386762046,
+        0.9659421386762046
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-b-58",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-b.glb",
+      "position": [
+        75.28206109894454,
+        1.678156566619873,
+        1339.384678024265
+      ],
+      "rotation": [
+        0,
+        22.480437867013915,
+        0
+      ],
+      "scale": [
+        0.7845446664677808,
+        0.7845446664677808,
+        0.7845446664677808
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-59",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        76.74061503276735,
+        2.9828936576843263,
+        1365.7649489426656
+      ],
+      "rotation": [
+        0,
+        238.73679814795335,
+        0
+      ],
+      "scale": [
+        0.8923751446273851,
+        0.8923751446273851,
+        0.8923751446273851
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-60",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        75.86065331282512,
+        1.7047764778137207,
+        1340.3938322841607
+      ],
+      "rotation": [
+        0,
+        149.94871232506173,
+        0
+      ],
+      "scale": [
+        1.1161294433893711,
+        1.1161294433893711,
+        1.1161294433893711
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-61",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        61.372561854880004,
+        3.9286128997802736,
+        1375.024181518451
+      ],
+      "rotation": [
+        0,
+        230.99043529588985,
+        0
+      ],
+      "scale": [
+        1.2187296297547983,
+        1.2187296297547983,
+        1.2187296297547983
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-62",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        74.40855245808991,
+        1.6159355163574218,
+        1335.798036711394
+      ],
+      "rotation": [
+        0,
+        55.291989876660715,
+        0
+      ],
+      "scale": [
+        0.9931213514815178,
+        0.9931213514815178,
+        0.9931213514815178
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-63",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        65.14073483001815,
+        7.425744724273682,
+        1365.9518816142831
+      ],
+      "rotation": [
+        0,
+        47.35060508454711,
+        0
+      ],
+      "scale": [
+        1.0961430187649057,
+        1.0961430187649057,
+        1.0961430187649057
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-64",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        74.92123853735794,
+        3.171451044082642,
+        1366.5838506155878
+      ],
+      "rotation": [
+        0,
+        358.70739982885505,
+        0
+      ],
+      "scale": [
+        0.963696262821552,
+        0.963696262821552,
+        0.963696262821552
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-rock-d-65",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/rock-d.glb",
+      "position": [
+        98.6359818712784,
+        6.462524127960205,
+        1355.2197005583248
+      ],
+      "rotation": [
+        0,
+        30.156504817681373,
+        0
+      ],
+      "scale": [
+        1.136581901560212,
+        1.136581901560212,
+        1.136581901560212
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-66",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        97.69547316699513,
+        6.32604570388794,
+        1354.4623344048753
+      ],
+      "rotation": [
+        0,
+        117.78660276339629,
+        0
+      ],
+      "scale": [
+        1.1096091850051937,
+        1.1096091850051937,
+        1.1096091850051937
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-67",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        96.24131319351821,
+        3.830332708358765,
+        1369.0813970411016
+      ],
+      "rotation": [
+        0,
+        121.20455906971827,
+        0
+      ],
+      "scale": [
+        0.7816733019413519,
+        0.7816733019413519,
+        0.7816733019413519
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-68",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        70.31201003659888,
+        1.1813624620437622,
+        1337.822724290558
+      ],
+      "rotation": [
+        0,
+        321.59001625554,
+        0
+      ],
+      "scale": [
+        0.9827678851427115,
+        0.9827678851427115,
+        0.9827678851427115
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-69",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        93.59296236118246,
+        3.8021759510040285,
+        1371.5571879793897
+      ],
+      "rotation": [
+        0,
+        301.3855014943537,
+        0
+      ],
+      "scale": [
+        0.8610539253579335,
+        0.8610539253579335,
+        0.8610539253579335
+      ],
+      "visible": true
     },
     {
       "name": "campfire-logs",
@@ -1648,6 +3242,67 @@
         "emissive": 0.0,
         "blend": "alpha"
       }
+    },
+    {
+      "name": "canyon-rim",
+      "kind": "particles",
+      "visible": true,
+      "portalRim": true,
+      "particles": {
+        "enabled": true,
+        "capacity": 7000,
+        "seed": 91,
+        "shape": "disc",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "extent": [
+          1.0,
+          0.1,
+          1.0
+        ],
+        "innerRadius": 0.72,
+        "direction": [
+          0,
+          0,
+          -1
+        ],
+        "spawnRate": 3200.0,
+        "lifetimeMin": 0.3,
+        "lifetimeMax": 0.75,
+        "spread": 0.55,
+        "speedMin": 1.0,
+        "speedMax": 4.0,
+        "gravity": [
+          0,
+          0,
+          0
+        ],
+        "drag": 1.2,
+        "turbulence": 3.5,
+        "turbulenceScale": 0.35,
+        "sizeStart": 0.05,
+        "sizeEnd": 0.0075,
+        "sizeVariance": 0.6,
+        "colorStart": [
+          1.0,
+          0.8,
+          0.45,
+          0.85
+        ],
+        "colorEnd": [
+          1.0,
+          0.5,
+          0.16,
+          0.0
+        ],
+        "emissive": 3.0,
+        "blend": "additive",
+        "velocityStretch": 0.8,
+        "stretchMax": 1.5
+      }
     }
   ],
   "looks": [
@@ -1779,10 +3434,11 @@
       "from": 3,
       "params": {
         "attractorWorld/sunAzimuth": 55.0,
-        "attractorWorld/sunElevation": 34.0,
-        "attractorWorld/sunIntensity": 0.07,
+        "attractorWorld/sunElevation": 38.0,
+        "attractorWorld/sunIntensity": 0.22,
+        "attractorWorld/sunWarmth": 0.0,
         "attractorWorld/contourGain": 0.0,
-        "env/intensity": 0.035,
+        "env/intensity": 0.022,
         "env/sky/zenithColor": [
           0.004,
           0.007,
@@ -1818,25 +3474,30 @@
           0.42,
           0.7
         ],
-        "lights/floor-bounce/intensity": 0.05,
-        "lights/dusk-sky/intensity": 0.08,
+        "lights/floor-bounce/intensity": 0.03,
+        "lights/dusk-sky/intensity": 0.05,
         "lights/dusk-bounce/intensity": 0.0,
-        "lights/moon-rim/intensity": 0.22,
-        "lights/ufo-glow/intensity": 10.0,
-        "lights/campfire/intensity": 9.0,
+        "lights/moon-rim/intensity": 0.2,
+        "lights/ufo-glow/intensity": 90.0,
+        "lights/ufo-rim-0/intensity": 30.0,
+        "lights/ufo-rim-1/intensity": 30.0,
+        "lights/ufo-rim-2/intensity": 30.0,
+        "lights/ufo-rim-3/intensity": 30.0,
+        "lights/campfire/intensity": 12.0,
         "lights/campfire/color": [
           1.0,
-          0.36,
-          0.1
+          0.45,
+          0.16
         ],
+        "lights/campfire/range": 13.0,
         "nodes/gray/visible": true,
         "nodes/ufo-parked/visible": true,
         "nodes/sasquatch-a/visible": true,
         "nodes/sasquatch-b/visible": true,
         "nodes/sasquatch-c/visible": true,
         "nodes/campfire-logs/visible": true,
-        "nodes/campfire-flames/visible": false,
-        "nodes/campfire-core/visible": false,
+        "nodes/campfire-flames/visible": true,
+        "nodes/campfire-core/visible": true,
         "nodes/campfire-embers/visible": true,
         "nodes/campfire-smoke/visible": true
       }
@@ -1846,10 +3507,11 @@
       "from": 4,
       "params": {
         "attractorWorld/sunAzimuth": 55.0,
-        "attractorWorld/sunElevation": 34.0,
-        "attractorWorld/sunIntensity": 0.07,
+        "attractorWorld/sunElevation": 38.0,
+        "attractorWorld/sunIntensity": 0.22,
+        "attractorWorld/sunWarmth": 0.0,
         "attractorWorld/contourGain": 0.0,
-        "env/intensity": 0.035,
+        "env/intensity": 0.022,
         "env/sky/zenithColor": [
           0.004,
           0.007,
@@ -1885,25 +3547,30 @@
           0.42,
           0.7
         ],
-        "lights/floor-bounce/intensity": 0.05,
-        "lights/dusk-sky/intensity": 0.08,
+        "lights/floor-bounce/intensity": 0.03,
+        "lights/dusk-sky/intensity": 0.05,
         "lights/dusk-bounce/intensity": 0.0,
-        "lights/moon-rim/intensity": 0.22,
-        "lights/ufo-glow/intensity": 10.0,
-        "lights/campfire/intensity": 9.0,
+        "lights/moon-rim/intensity": 0.2,
+        "lights/ufo-glow/intensity": 90.0,
+        "lights/ufo-rim-0/intensity": 30.0,
+        "lights/ufo-rim-1/intensity": 30.0,
+        "lights/ufo-rim-2/intensity": 30.0,
+        "lights/ufo-rim-3/intensity": 30.0,
+        "lights/campfire/intensity": 12.0,
         "lights/campfire/color": [
           1.0,
-          0.36,
-          0.1
+          0.45,
+          0.16
         ],
+        "lights/campfire/range": 13.0,
         "nodes/gray/visible": true,
         "nodes/ufo-parked/visible": true,
         "nodes/sasquatch-a/visible": true,
         "nodes/sasquatch-b/visible": true,
         "nodes/sasquatch-c/visible": true,
         "nodes/campfire-logs/visible": true,
-        "nodes/campfire-flames/visible": false,
-        "nodes/campfire-core/visible": false,
+        "nodes/campfire-flames/visible": true,
+        "nodes/campfire-core/visible": true,
         "nodes/campfire-embers/visible": true,
         "nodes/campfire-smoke/visible": true,
         "corruption/radius": 24.0,
@@ -1915,6 +3582,63 @@
         "corruption/height": 8.0,
         "corruption/depth": 4.0,
         "corruption/echoOffset": 0.35
+      }
+    },
+    {
+      "name": "dawn",
+      "from": 5,
+      "params": {
+        "attractorWorld/sunAzimuth": 150.0,
+        "attractorWorld/sunElevation": 7.0,
+        "attractorWorld/sunIntensity": 0.9,
+        "attractorWorld/sunWarmth": 1.0,
+        "attractorWorld/contourGain": 0.0,
+        "env/intensity": 0.32,
+        "env/sky/zenithColor": [
+          0.09,
+          0.15,
+          0.36
+        ],
+        "env/sky/horizonColor": [
+          0.95,
+          0.62,
+          0.42
+        ],
+        "env/sky/groundColor": [
+          0.03,
+          0.025,
+          0.03
+        ],
+        "env/sky/haze": 0.3,
+        "env/sky/sunColor": [
+          1.0,
+          0.66,
+          0.38
+        ],
+        "env/sky/sunIntensity": 6.0,
+        "env/sky/sunSize": 0.05,
+        "env/sky/sunGlow": 0.6,
+        "scene/fogColor": [
+          0.42,
+          0.34,
+          0.36
+        ],
+        "lights/canyon-bounce/intensity": 0.0,
+        "lights/floor-bounce/color": [
+          0.9,
+          0.6,
+          0.5
+        ],
+        "lights/floor-bounce/intensity": 0.2,
+        "lights/dusk-sky/intensity": 0.35,
+        "lights/dusk-bounce/intensity": 0.2,
+        "lights/campfire/intensity": 0.0,
+        "corruption/amount": 0.0,
+        "nodes/sasquatch-a/visible": true,
+        "nodes/sasquatch-b/visible": true,
+        "nodes/sasquatch-c/visible": true,
+        "nodes/campfire-logs/visible": true,
+        "nodes/campfire-smoke/visible": true
       }
     }
   ],
@@ -1991,52 +3715,61 @@
         ],
         [
           150.0,
-          40.0,
-          -1745.1815169190415,
+          58.0,
+          -1778.2322578752833,
           97.0
         ],
         [
           160.0,
-          34.0,
-          -1895.1815169190415,
+          70.0,
+          -1928.2322578752833,
           99.6
         ],
         [
           160.0,
-          28.931495949255055,
-          -1965.1815169190415,
+          70.93149594925505,
+          -1998.2322578752833,
           101.4
         ],
         [
           160.0,
-          28.931495949255055,
-          -1990.1815169190415,
+          70.93149594925505,
+          -2023.2322578752833,
           102.2
+        ]
+      ],
+      "aims": [
+        [
+          55.495207078391964,
+          0.3999999999999999,
+          -1189.2210508110552,
+          82.5,
+          90.8
         ]
       ]
     },
     {
       "world": "strange-attractor-ocean.scene.json",
       "exit": [
-        250.0,
-        60.0,
-        320.0
+        300.0,
+        22.0,
+        -430.0
       ],
       "exitYaw": 0.0,
       "exitAxis": [
         0.0,
-        0.0,
-        -1.0
-      ],
-      "entryUp": [
-        -0.46828270986990206,
-        0.0,
-        0.8835786912533038
+        -0.9063077870366499,
+        -0.42261826174069944
       ],
       "exitUp": [
         0.0,
-        1.0,
-        0.0
+        0.42261826174069944,
+        -0.9063077870366499
+      ],
+      "entryUp": [
+        -0.795452557026343,
+        0.0,
+        0.6060158657331115
       ],
       "entry": [
         51.48,
@@ -2050,58 +3783,70 @@
       ],
       "flight": [
         [
-          245.0,
-          55.0,
-          210.0,
-          123.2
+          300.0,
+          22.0,
+          -437.0,
+          123.4
         ],
         [
-          215.0,
-          46.0,
-          -120.0,
-          127.8
+          298.0,
+          34.92494010925293,
+          -458.0,
+          126.67827250234188
         ],
         [
-          175.0,
-          40.0,
-          -430.0,
-          132.4
+          293.0,
+          33.87996292114258,
+          -500.0,
+          128.72004606697845
         ],
         [
-          150.0,
-          36.0,
-          -690.0,
-          136.6
+          282.0,
+          36.290454387664795,
+          -565.0,
+          131.0130189986164
         ],
         [
-          365.0,
-          91.0,
-          -785.0,
-          140.6
+          262.0,
+          42.704400062561035,
+          -645.0,
+          133.7806370813516
         ],
         [
-          215.0,
-          75.6,
-          -870.0,
-          144.0
+          222.0,
+          55.142680644989014,
+          -735.0,
+          137.10376734359477
         ],
         [
-          125.0,
-          52.0,
-          -880.0,
-          145.9
+          165.0,
+          54.60457229614258,
+          -812.0,
+          140.33906154733876
+        ],
+        [
+          112.0,
+          43.91501235961914,
+          -862.0,
+          143.16809269374534
+        ],
+        [
+          84.0,
+          40.15528106689453,
+          -878.0,
+          145.13549981030675
         ],
         [
           65.0,
-          38.0,
+          35.738975524902344,
           -880.0,
           147.0
         ],
         [
-          40.0,
-          34.0,
+          45.0,
+          34.363590240478516,
           -880.0,
-          147.8
+          149.2
         ]
       ]
     }

@@ -367,6 +367,10 @@ struct CompositionNode {
     // attractor's radius of influence.
     bool vortexAttractor = false;
     float vortexReach = 3.0f;
+    // ADR-1898: this particle system rims the scene's live portal: it is placed on the opening (in its plane, a ring
+    // the opening's size), and its spawn follows the field and the opening by the camera's distance (seek-safe),
+    // clearing as the camera reaches the plane
+    bool portalRim = false;
     params::Parameter<float>* windStrengthParam = nullptr;
     params::Parameter<float>* windTrunkParam = nullptr;
     params::Parameter<float>* windBranchParam = nullptr;
@@ -2492,6 +2496,7 @@ private:
     void activateLeg(int k);
     [[nodiscard]] const Composition* legWorld(int k) const;
     [[nodiscard]] double legCrossing(int k) const;
+    [[nodiscard]] double arrivalCrossing() const; // ADR-1899: when the camera arrives in this world (0 for the root)
     [[nodiscard]] bool legReturns(int k) const;    // its world's portal leads back here
     [[nodiscard]] double legReturnCrossing(int k) const;
     [[nodiscard]] int legForTime(double t) const;  // the leg the camera is on (or last; after the last return, n)

@@ -17,13 +17,52 @@ dimensions (unscaled).
 and applies the ratio.
 """
 
-WORLD_SCALE = 0.4
+import math
+import os
+
+# M3b: the canyon POC (owner: a smaller-scale landscape where the characters read). The builders run at REF (the
+# current canyon) by default; SA_WORLD_SCALE writes the same journey at another scale, into "poc-" files.
+REF = 0.4
+WORLD_SCALE = float(os.environ.get("SA_WORLD_SCALE", REF))
+R = WORLD_SCALE / REF                 # terrain-scale lengths (authored at REF) times this
+POC = abs(WORLD_SCALE - REF) > 1e-9
+PREFIX = "poc-" if POC else ""
 
 
-def canyon(d, lat):
+def canyon_frame(d, lat):
     """The canyon frame used since Gate C 2: d metres down-canyon from the dusk exit, lat metres toward the camp bank.
     Both are in generator metres (scale 1); the result is in world metres."""
     return [WORLD_SCALE * (166.5 - 0.426 * d + 0.905 * lat), WORLD_SCALE * (3427.3 - 0.905 * d - 0.426 * lat)]
+
+
+canyon = canyon_frame  # (the name the scaling and the early builders used)
+
+O_UNIT = (-0.426, -0.905)             # down-canyon
+L_UNIT = (0.905, -0.426)              # toward the camp bank
+
+
+def site(d, lat):
+    """A place on the terrain, authored in REF metres (the current canyon's): it follows the terrain at any scale."""
+    return canyon_frame(d / REF, lat / REF)
+
+
+def near(anchor, dd, dl):
+    """dd, dl real metres (down-canyon, toward the bank) from a site: a character-scale offset, never scaled."""
+    a = site(*anchor)
+    return [a[0] + dd * O_UNIT[0] + dl * L_UNIT[0], a[1] + dd * O_UNIT[1] + dl * L_UNIT[1]]
+
+
+CAMP_SITE = (16.0, 16.0)
+
+
+def knot(d, lat, h, t, anchor=CAMP_SITE, radius=12.0):
+    """A flight knot authored at REF: within `radius` of the camp it is character scale (real metres from the camp,
+    its height real); further out it is terrain scale (a site, its height above the ground scaled)."""
+    if math.hypot(d - anchor[0], lat - anchor[1]) < radius:
+        x, z = near(anchor, d - anchor[0], lat - anchor[1])
+        return [x, h, z, t]
+    x, z = site(d, lat)
+    return [x, h * R, z, t]
 
 
 def _mul(v, r):
@@ -118,3 +157,53 @@ def rescale(scene, project=None):
                 ch["remapOutMin"] *= r
                 ch["remapOutMax"] *= r
     return r
+
+
+def pace(points, t0, t1, v0, v1, ramp_in=0.25, ramp_out=0.25):
+    """Times for a path of 3D points (absolute), a smooth speed profile: v0 at t0, easing (smoothstep) to a held cruise,
+    easing to v1 at t1. The cruise speed is solved so the path takes exactly t1 - t0. Returns [x, y, z, t] knots."""
+    seg = [math.dist(points[i], points[i + 1]) for i in range(len(points) - 1)]
+    total, T = sum(seg), t1 - t0
+    a, b = ramp_in * T, ramp_out * T
+    # distance = v0 a + (vm - v0) a/2 + vm (T - a - b) + v1 b + (vm - v1) b/2  ->  vm
+    vm = (total - v0 * a / 2.0 - v1 * b / 2.0) / (T - a / 2.0 - b / 2.0)
+
+    def speed(t):
+        def ss(x):
+            x = min(max(x, 0.0), 1.0)
+            return x * x * (3.0 - 2.0 * x)
+        v = v0 + (vm - v0) * ss(t / a) if a > 0 else vm
+        if t > T - b:
+            v = vm + (v1 - vm) * ss((t - (T - b)) / b)
+        return v
+
+    # integrate s(t) finely, then invert at each waypoint's arc length
+    n = 4000
+    s, ts = [0.0], [0.0]
+    for i in range(1, n + 1):
+        t = T * i / n
+        s.append(s[-1] + 0.5 * (speed(t - T / n) + speed(t)) * T / n)
+        ts.append(t)
+    scale = total / s[-1]
+    out, acc, j = [], 0.0, 0
+    for k, p in enumerate(points):
+        if k > 0:
+            acc += seg[k - 1]
+        while j < n and s[j + 1] * scale < acc:
+            j += 1
+        f = 0.0 if j >= n else (acc - s[j] * scale) / max((s[j + 1] - s[j]) * scale, 1e-9)
+        out.append([p[0], p[1], p[2], t0 + ts[j] + f * (T / n)])
+    out[-1][3] = t1
+    return out, vm
+
+
+# M3b: the gathering round the fire, in real metres from it (down-canyon, toward the bank). The night camera arcs on
+# the river side (-lat) at eye height; the Gray stands across the fire from the three, facing them, so it reads in
+# profile and three-quarter front as the camera turns; the craft stands behind the group on the opened bench.
+CAST = {
+    "sasquatch-a": (-2.1, 1.7),    # standing
+    "sasquatch-b": (0.35, 1.95),   # crouching by the fire
+    "sasquatch-c": (-2.55, -0.45),  # sitting on a rock
+    "gray": (2.6, -0.9),
+}
+GATHER_AT = (sum(v[0] for v in CAST.values()) / len(CAST), sum(v[1] for v in CAST.values()) / len(CAST))
