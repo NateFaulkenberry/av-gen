@@ -60,7 +60,7 @@ MOUTH_HALF = 0.052                        # half the mouth's width
 HINGE = Vector((-0.024, -0.060, 0.600))   # the jaw's hinge, in front of the ears
 CHIN = Vector((-0.024, -0.235, 0.405))    # the beard's point
 NECK_CUT = 0.335                          # below this is pedestal
-EYE_RADIUS = 0.0215                       # D1b: larger eyes
+EYE_RADIUS = 0.019                        # D1c: scaled to fit the orbit opening (about 0.044 wide), not the reverse
 
 
 def smooth(e0, e1, x):
@@ -217,13 +217,16 @@ def cut(obj):
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < NECK_CUT], context="VERTS")
+    # D1c: weld. The photogrammetry is split along its atlas seams; each side kept its own vertex normal, and under a
+    # raking key the split showed as hard straight steps of light across the cheeks
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
     kill = []
     for f in bm.faces:
         c = f.calc_center_median()
-        dx = (c.x - MOUTH.x) / (MOUTH_HALF * 0.85)  # D1b: the slit stops short of the corners
+        dx = (c.x - MOUTH.x) / (MOUTH_HALF * 1.0)   # D1c: a wider mouth, to the corners
         if abs(dx) > 1.0 or c.y > MOUTH.y + 0.09:
             continue
-        half = 0.0065 * (1.0 - dx * dx) + 0.001
+        half = 0.009 * (1.0 - dx * dx) + 0.0012
         if abs(c.z - (MOUTH.z + 0.004 * dx * dx)) < half:
             kill.append(f)
     bmesh.ops.delete(bm, geom=kill, context="FACES")
@@ -233,6 +236,51 @@ def cut(obj):
     bm.to_mesh(obj.data)
     bm.free()
     obj.data.update()
+
+
+# D1c: the sculpted eyes, measured. Blay carved eyeballs under the brow; their centres, in the frame after shape(),
+# were read off a frontal depth map of the shaped head (a ray grid toward +Y, high-passed). The nose bridge is at
+# x = -0.036; the brow stands 20-35 mm proud of the sculpted eye. D1b's seat_eye took "the deepest hit near the
+# landmark", and the deepest hit is the side of the head: it slid the left eye 45 mm out onto the temple. These move
+# with any change to proportion() or socket_warp() and must be re-measured if those change.
+SCULPT_EYE_R = (-0.112, 0.683)
+SCULPT_EYE_L = (0.026, 0.678)
+OPEN_RX, OPEN_RZ = 0.0195, 0.0125   # the lid opening: wide and tall enough for Goya's white-ringed stare
+
+
+def carve_orbits(obj):
+    """Seat each eye inside the sculpted orbit: the ball sits a little behind where the sculptor's eyeball was, the
+    opening between the lids is carved back to behind the ball's surface so the ball shows through it, and the upper
+    lid is thickened so it overhangs and shadows the top of the ball. Returns the two ball centres."""
+    me = obj.data
+    centres = []
+    for (cx, cz) in (SCULPT_EYE_L, SCULPT_EYE_R):
+        hit, loc, nrm, idx = obj.ray_cast(Vector((cx, -1.0, cz)), Vector((0, 1, 0)))
+        surf = loc.y if hit else -0.24
+        centres.append(Vector((cx, surf + 0.008 + EYE_RADIUS, cz)))   # the ball's front 8 mm behind the sculpted eye
+    R2 = EYE_RADIUS * EYE_RADIUS
+    for v in me.vertices:
+        p = v.co
+        for c in centres:
+            dx, dz = p.x - c.x, p.z - c.z
+            e = (dx / OPEN_RX) ** 2 + (dz / OPEN_RZ) ** 2
+            if e > 3.0 or p.y > c.y + 0.004:
+                continue
+            # carve: the opening goes behind the ball's surface (the ball shows); a socket slope around it
+            w = smooth(1.8, 1.0, e)
+            target = c.y - math.sqrt(max(R2 - dx * dx - dz * dz, 0.0)) + 0.0015
+            if w > 0 and p.y < target:
+                p.y += w * (target - p.y)
+            # the upper lid: a heavy fold that stands forward of the ball and drops a shadow onto its top
+            if dz > 0 and 1.0 < e < 3.0:
+                fold = smooth(3.0, 1.3, e) * smooth(0.0, 0.005, dz)
+                p.y -= 0.004 * fold
+                p.z -= 0.0015 * fold
+            # and a lower lid rim, lighter
+            if dz < 0 and 1.0 < e < 2.4:
+                p.y -= 0.0015 * smooth(2.4, 1.3, e)
+    me.update()
+    return centres
 
 
 def build_rig(obj):
@@ -265,10 +313,11 @@ def build_rig(obj):
         # D1b: across the slit the blend is sharp (it opens); toward and past the corners it widens and rises, so the
         # cheeks at the corners stretch with the jaw instead of tearing away from it
         t = smooth(MOUTH_HALF * 0.6, MOUTH_HALF * 1.3, ax)
-        top = MOUTH.z + 0.004 + 0.035 * t
-        bottom = MOUTH.z - 0.03 - 0.01 * t
+        # D1c: a tight band at the corners -- the cheek folds at a crease instead of smearing into a hanging sheet
+        top = MOUTH.z + 0.004 + 0.018 * t
+        bottom = MOUTH.z - 0.018 - 0.006 * t
         vertical = smooth(top, bottom, p.z)
-        lateral = smooth(MOUTH_HALF + 0.12, MOUTH_HALF + 0.03, ax)
+        lateral = smooth(MOUTH_HALF + 0.07, MOUTH_HALF + 0.015, ax)   # D1c: the jaw no longer drags the cheeks
         front = smooth(HINGE.y + 0.03, HINGE.y - 0.06, p.y)
         wj = lateral * vertical * front
         wn = smooth(NECK_CUT + 0.13, NECK_CUT + 0.04, p.z) * smooth(-0.12, -0.02, p.y) * (1 - wj)
@@ -398,7 +447,6 @@ def seat_eye(obj, guess):
 def eyes_and_lids(rig, skin_color):
     img = eye_image(gaze_uv())
     eye_mat = material("chronos-eye", (1, 1, 1, 1), 0.08, img)  # wet
-    lid_mat = material("chronos-lids", skin_color, 0.62)
     for name, c in (("eye.L", EYE_L), ("eye.R", EYE_R)):
         bpy.ops.mesh.primitive_uv_sphere_add(radius=EYE_RADIUS, segments=48, ring_count=24, location=c)
         o = bpy.context.active_object
@@ -406,26 +454,7 @@ def eyes_and_lids(rig, skin_color):
         o.name = "chronos-" + name
         o.data.materials.append(eye_mat)
         attach(o, rig, name)
-        # the lids: heavy hoods over the top (a third of the ball) and a sagging lower lid, riding the head
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=EYE_RADIUS * 1.07, segments=48, ring_count=24, location=c)
-        lid = bpy.context.active_object
-        bpy.ops.object.shade_smooth()
-        lid.name = "chronos-lids-" + name
-        bm = bmesh.new()
-        bm.from_mesh(lid.data)
-        keep = set()
-        for v in bm.verts:
-            rel = v.co  # object-local, centred on the eye
-            front = rel.y < -EYE_RADIUS * 0.2   # only the front of the ball: no disc edge from the side
-            upper = rel.z > EYE_RADIUS * (0.32 + 0.12 * (rel.x / EYE_RADIUS) ** 2)  # a heavy hood, a slight droop at the corners
-            lower = rel.z < -EYE_RADIUS * 0.62
-            if front and (upper or lower):
-                keep.add(v.index)
-        bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.index not in keep], context="VERTS")
-        bm.to_mesh(lid.data)
-        bm.free()
-        lid.data.materials.append(lid_mat)
-        attach(lid, rig, "head")
+        # D1c: no separate lid shells -- the sculpt's own lids, carved open and thickened (carve_orbits), frame the ball
 
 
 def mouth_cavity_image(g):
@@ -694,7 +723,8 @@ def paint_skin(obj, relief):
     trace = N("ShaderNodeMix")
     trace.data_type = "RGBA"
     trace.blend_type = "MULTIPLY"
-    trace.inputs["Factor"].default_value = 0.25 if src else 0.0
+    # D1c: off -- the plaster trace read through the scan's overlapping atlas and painted hard island seams
+    trace.inputs["Factor"].default_value = 0.0
     L(ao.outputs["AO"], ramp.inputs["Fac"])
     L(coord.outputs["Object"], mapping.inputs["Vector"])
     L(mapping.outputs["Vector"], strokes.inputs["Vector"])
@@ -810,7 +840,7 @@ def paint_skin(obj, relief):
     pw = N("ShaderNodeMath")
     pw.operation = "MULTIPLY_ADD"
     L(pores.outputs["Distance"], pw.inputs[0])
-    pw.inputs[1].default_value = 0.15
+    pw.inputs[1].default_value = 0.075   # D1c: the pores halved (orange-peel in close-up)
     L(rel.outputs["Color"], pw.inputs[2])
     hstreak = N("ShaderNodeTexNoise")
     hstreak.inputs["Scale"].default_value = 4.0
@@ -822,7 +852,7 @@ def paint_skin(obj, relief):
     L(pw.outputs["Value"], hsel.inputs["A"])
     L(hstreak.outputs["Fac"], hsel.inputs["B"])
     bump = N("ShaderNodeBump")
-    bump.inputs["Strength"].default_value = 0.9
+    bump.inputs["Strength"].default_value = 0.75
     bump.inputs["Distance"].default_value = 0.004
     L(hsel.outputs["Result"], bump.inputs["Height"])
     L(bump.outputs["Normal"], bsdf.inputs["Normal"])
@@ -849,7 +879,8 @@ def life_clip(rig):
     for n in pb:
         n.rotation_mode = "XYZ"
     # D1b: the jaw hangs at 12 degrees at rest
-    jaw = [(0, 12), (1.6, 17), (2.9, 13), (4.4, 20), (5.6, 14), (6.6, 28), (8.2, 62), (9.4, 66), (10.6, 32),
+    # D1c: the devour peaks at 52 degrees through a wider mouth (66 stretched the lower face into a sheet)
+    jaw = [(0, 12), (1.6, 17), (2.9, 13), (4.4, 20), (5.6, 14), (6.6, 26), (8.2, 49), (9.4, 52), (10.6, 30),
            (11.4, 16), (12.0, 12)]
     for t, deg in jaw:
         pb["jaw"].rotation_euler = Euler((math.radians(deg), 0, 0))
@@ -860,11 +891,43 @@ def life_clip(rig):
         for n in ("eye.L", "eye.R"):
             pb[n].rotation_euler = Euler((math.radians(p), 0, math.radians(y)))
             pb[n].keyframe_insert("rotation_euler", frame=int(round(t * fps)))
-    head = [(0, (0, 0, 0)), (4.0, (1.2, 0, -1.5)), (8.2, (-6, 0, 1.0)), (9.4, (-7, 0, 1.5)), (12.0, (0, 0, 0))]
+    # D1c: at the devour the head turns toward the three-quarter camera (+X) so the open mouth faces it
+    head = [(0, (0, 0, 0)), (4.0, (1.2, 0, -1.5)), (6.6, (-1, 4, 0.5)), (8.2, (-3, 13, 1.0)), (9.4, (-3, 14, 1.5)),
+            (10.6, (-1, 6, 0.5)), (12.0, (0, 0, 0))]
     for t, rot in head:
         pb["head"].rotation_euler = Euler(tuple(math.radians(v) for v in rot))
         pb["head"].keyframe_insert("rotation_euler", frame=int(round(t * fps)))
     scene.frame_start, scene.frame_end = 0, 12 * fps
+    devour_clip(rig, act)
+
+
+def devour_clip(rig, idle):
+    """D2: the feeding state (`devour`), a 6 s loop: the jaw hangs open and gulps every 3 s -- a soul arrives at each
+    gulp -- the head turned toward the procession coming in from the creature's left (the camera's side), the eyes on
+    the next soul. Both clips are pushed to NLA tracks so the exporter writes both."""
+    fps = 24
+    act = bpy.data.actions.new("devour")
+    rig.animation_data.action = act
+    pb = rig.pose.bones
+    jaw = [(0.0, 36), (1.2, 40), (2.0, 54), (2.4, 55), (2.9, 33), (3.0, 34), (4.2, 41), (5.0, 54), (5.4, 56),
+           (5.9, 35), (6.0, 36)]
+    for t, deg in jaw:
+        pb["jaw"].rotation_euler = Euler((math.radians(deg), 0, 0))
+        pb["jaw"].keyframe_insert("rotation_euler", frame=int(round(t * fps)))
+    for t, (p, y) in [(0, (-2, 7)), (1.9, (-4, 4)), (2.6, (-1, 9)), (4.9, (-4, 4)), (5.6, (-1, 8)), (6.0, (-2, 7))]:
+        for n in ("eye.L", "eye.R"):
+            pb[n].rotation_euler = Euler((math.radians(p), 0, math.radians(y)))
+            pb[n].keyframe_insert("rotation_euler", frame=int(round(t * fps)))
+    for t, rot in [(0, (-2, 11, 0.5)), (2.0, (-4, 13, 1.0)), (3.0, (-2, 11, 0.5)), (5.0, (-4, 14, 1.2)),
+                   (6.0, (-2, 11, 0.5))]:
+        pb["head"].rotation_euler = Euler(tuple(math.radians(v) for v in rot))
+        pb["head"].keyframe_insert("rotation_euler", frame=int(round(t * fps)))
+    rig.animation_data.action = None
+    for a in (idle, act):
+        tr = rig.animation_data.nla_tracks.new()
+        tr.name = a.name
+        tr.strips.new(a.name, 0, a)
+    rig.animation_data.action = idle
 
 
 def export():
@@ -927,10 +990,9 @@ obj = load_normalised(SCAN, "chronos-head")
 warp_landmarks()
 shape(obj)
 cut(obj)
+EYE_L, EYE_R = carve_orbits(obj)
 hair_mask(obj)
 paint_skin(obj, relief)
-EYE_L = seat_eye(obj, EYE_L)
-EYE_R = seat_eye(obj, EYE_R)
 print("eye seats", tuple(round(x, 3) for x in EYE_L), tuple(round(x, 3) for x in EYE_R))
 rig = build_rig(obj)
 eyes_and_lids(rig, (0.30, 0.19, 0.11, 1))
