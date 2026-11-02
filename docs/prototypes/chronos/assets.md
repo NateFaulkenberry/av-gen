@@ -8,7 +8,12 @@ is committed. Outputs built from them stay in gitignored or scratch paths.
 | MPFB 2.0.18 Blender add-on (a tool, not an asset) | https://extensions.blender.org/add-ons/mpfb/ | GPL-3.0 | a private Blender user directory (`BLENDER_USER_RESOURCES`), shared with Strange Attractor Art Pass 2; the user's own Blender is untouched | building the creature base and the souls |
 | MakeHuman system assets (base mesh and targets, old caucasian male skin, high-poly eyes, eyebrow003, eyelashes01, long01 hair, teeth_base, tongue01) | https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip | CC0 1.0 (models exported from MakeHuman are CC0: https://static.makehumancommunity.org/about/license.html) | unpacked into MPFB's data directory in that private Blender user directory | the creature look-dev (Gate D0) |
 
-## Downloaded by the owner from Sketchfab (Gate D1), placed under `assets/chronos/sketchfab/` (gitignored)
+## Downloaded by the owner from Sketchfab (Gate D1) -- no longer used
+
+The Devourer creature was abandoned on 2026-11-02 (`20-singularity-brief.md`): the Blay and Rodin scans below are no
+longer referenced by anything; they stay on disk, gitignored. The log is kept as history.
+
+## (history) Downloaded by the owner from Sketchfab (Gate D1), placed under `assets/chronos/sketchfab/` (gitignored)
 
 All ten models shortlisted in `13-devourer-downloads.md` are present. Licences were checked against Sketchfab's model
 records on 2026-11-01. Only the models used are listed here.

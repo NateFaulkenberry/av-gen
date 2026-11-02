@@ -1,5 +1,18 @@
 # CHRONOS: progress
 
+> **Art direction pivot (owner, 2026-11-02): "Temporal Singularity"** (`20-singularity-brief.md`,
+> `21-singularity-coordinator-notes.md`). The Devourer creature is abandoned and its scene art removed (ADR-441): the
+> creature builds, the D1/D2 scenes and their scripts. Kept: the temporal engine (ADR-1930..1932), ADR-1934 (identity
+> gating, for per-figure destruction) and the MPFB figures (`examples/chronos/singularity/build_souls.py`).
+>
+> | Gate | Phases | State |
+> |---|---|---|
+> | S0 | recon, plan, Test A (the singularity alone) | in progress |
+> | S1 | Phases 2-4: figures, temporal transformation, gravitational distortion (Tests B-D) | not started |
+> | S2 | Phases 5-6: feedback and chaos, drums, polish, profile (Tests E-G) | not started |
+>
+> The Devourer history (D0-D2, docs 10-17) follows, **superseded**.
+
 > **Art direction pivot (owner, 2026-11-01): "The Devourer of Souls"** (`10-devourer-brief.md`,
 > `11-devourer-coordinator-notes.md`). The temporal canyon is dropped and its code removed (c83ed2c1, ADR-1933
 > superseded). The temporal engine (ADR-1931, 1932, the debug-capture fix) and the shared mesher (ADR-1930) stay.

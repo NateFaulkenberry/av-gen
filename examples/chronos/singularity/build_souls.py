@@ -1,6 +1,6 @@
-"""CHRONOS, The Devourer (Gate D2): build the souls in Blender, headless, and export them for AV Gen.
+"""CHRONOS, Temporal Singularity: build the human figures in Blender, headless, and export them for AV Gen.
 
-docs/prototypes/chronos/12-devourer-recon-plan.md §6: MPFB CC0 adults of varied sex, build, height and age, each
+Kept from the Devourer (Gate D2) as the starting cast (docs/prototypes/chronos/21-singularity-coordinator-notes.md): MPFB CC0 adults of varied sex, build, height and age, each
 posed lying flat with its own limbs (arms at the sides, arms up, one knee bent, curled, reaching, limp), the pose baked
 into a static mesh so nothing is skinned at run time; a plain grey-white shroud from shoulders to mid-thigh (neutral,
 never sexualised); pale grey-ivory skin and blank pale eyes, like a painted figure; under 15k triangles each.
@@ -9,7 +9,7 @@ Each soul is exported standing, its long axis along +Y (glTF up), origin at the 
 and carries it along the procession.
 
     BLENDER_USER_RESOURCES=<dir with MPFB> /Applications/Blender.app/Contents/MacOS/Blender --background \
-        --python examples/chronos/devourer/build_souls.py -- <out_dir> [<stills_dir>]
+        --python examples/chronos/singularity/build_souls.py -- <out_dir> [<stills_dir>]
 
 Writes <out_dir>/soul-<n>.glb for n = 1..8. The outputs are derived from CC0 assets but stay out of the public
 repository (assets/chronos/ is gitignored); this script is original code and is committed.
