@@ -80,6 +80,15 @@ This needs a real rebuild, done like a VFX lighting and set-dressing artist woul
   streaks). Use a proper sand material with ripples. Free, clearly licensed textures are fine (log them in
   the asset record; never commit them; ask if a download needs a login).
 
+- **Owner addition: the Mars camera and the rover** (this replaces the M3c circling move):
+  - Come out of the Mars portal LOWER to the ground and closer to the rover.
+  - One continuous fly-over: pass over the rover as it drives toward the pyramids, then carry straight on toward the
+    pyramids. Do NOT orbit or spin round the rover (no behind / alongside / ahead sequence).
+  - Move the rover closer to the pyramids. It is NOT the focal point of the scene; the pyramids are, and the rover is
+    a beat on the way.
+  - Improve the tyre tracks: real treaded ruts pressed into the sand, with raised edges and lighting that reads, not
+    flat dark stripes. They should fade with distance behind the rover.
+
 ## Rules
 
 - **Branch:** same branch and worktree (`scene/strange-attractor`, `../av-gen-attractor`), on e1c11e47.

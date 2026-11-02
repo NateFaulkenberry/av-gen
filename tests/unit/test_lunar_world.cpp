@@ -508,3 +508,27 @@ TEST_CASE("a world reached through a portal finds its way out only after the cam
     CHECK(crossings[1] > 5.0);
     CHECK(crossings[1] < 7.0);
 }
+
+// TEMP (M3d placement sampler; removed before commit): SAMPLE_REQ=<json {"scene": path, "points": [[x, z], ...]}>,
+// writes <SAMPLE_REQ>.out with the ground heights
+#include "scene/attractor_world.hpp"
+#include <cstdlib>
+TEST_CASE("tmp sample heights", "[.sample]") {
+    const char* req = std::getenv("SAMPLE_REQ");
+    if (req == nullptr) return;
+    const nlohmann::json r = nlohmann::json::parse(std::ifstream(req));
+    const nlohmann::json scene = nlohmann::json::parse(std::ifstream(r.at("scene").get<std::string>()));
+    nlohmann::json out = nlohmann::json::array();
+    if (scene.contains("attractorWorld")) {
+        auto block = scene::attractorWorldFromJson(scene.at("attractorWorld"));
+        REQUIRE(block.has_value());
+        auto w = scene::generateAttractorWorld(block->gen);
+        for (const auto& p : r.at("points")) out.push_back(w->sample(glm::vec2(p[0].get<float>(), p[1].get<float>())));
+    } else {
+        auto block = scene::lunarWorldFromJson(scene.at("lunarWorld"));
+        REQUIRE(block.has_value());
+        auto w = scene::generateLunarWorld(block->gen);
+        for (const auto& p : r.at("points")) out.push_back(w->sample(p[0].get<float>(), p[1].get<float>()));
+    }
+    std::ofstream(std::string(req) + ".out") << out.dump();
+}
