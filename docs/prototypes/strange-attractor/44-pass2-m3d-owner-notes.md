@@ -92,6 +92,20 @@ This needs a real rebuild, done like a VFX lighting and set-dressing artist woul
   - Improve the tyre tracks: real treaded ruts pressed into the sand, with raised edges and lighting that reads, not
     flat dark stripes. They should fade with distance behind the rover.
 
+- **Owner addition: Mars terrain.** The canyon looks amazing and Mars looks crude by comparison. Rebuild Mars's
+  geometry with the same procedural terrain pipeline and techniques the canyon uses (terrain generation, erosion and
+  strata, the cliff and mesa treatment, rock scattering, the height cache), retuned for Mars:
+  - wind-eroded mesas and buttes with layered sediment;
+  - yardangs;
+  - dune fields;
+  - scattered basalt;
+  - dusty haze.
+
+  Don't hand-place crude primitives. Reuse rather than duplicate: if the canyon builder needs parameterising to serve
+  both, do that, with an ADR if it is an engine-level change. This supersedes "another art pass over the landscape"
+  above; the sand-embraces-the-pyramids and texture notes still apply on top of it. Show Mars before/after at the
+  same camera beats.
+
 ## Rules
 
 - **Branch:** same branch and worktree (`scene/strange-attractor`, `../av-gen-attractor`), on e1c11e47.

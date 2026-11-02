@@ -45,7 +45,7 @@ HAZE = [0.52, 0.36, 0.23]
 MESAS = [
     # the arrival mesa: the camera comes out of its north wall (M3c: nearer the pyramids, so the rover and the pyramids
     # share one run across the plain)
-    dict(x=0.0, z=-120.0, rx=300.0, rz=200.0, angle=4.0, height=115.0, terraces=3),
+    dict(x=0.0, z=-500.0, rx=300.0, rz=200.0, angle=4.0, height=115.0, terraces=3),   # M3d: nearer again
     dict(x=-1350.0, z=-700.0, rx=520.0, rz=260.0, angle=28.0, height=160.0, terraces=4),   # the great west mesa
     dict(x=1250.0, z=-1100.0, rx=380.0, rz=240.0, angle=-18.0, height=135.0, terraces=3),  # east
     dict(x=-200.0, z=-2950.0, rx=700.0, rz=220.0, angle=8.0, height=180.0, terraces=5),    # the far wall behind the pyramids
@@ -58,10 +58,9 @@ MESAS = [
 ]
 CRATERS = [dict(x=520.0, z=-650.0, diameter=260.0, fresh=0.15), dict(x=-420.0, z=-1050.0, diameter=180.0, fresh=0.25),
            # M3: young craters beside the route, their rims strewn with boulders (the plain's foreground)
-           dict(x=70.0, z=-1080.0, diameter=70.0, fresh=0.9), dict(x=-90.0, z=-760.0, diameter=34.0, fresh=1.0),
-           # M3b: more young craters strewing boulders near the route (M3c: clear of the rover's ground and the drifts)
-           dict(x=-160.0, z=-610.0, diameter=28.0, fresh=1.0), dict(x=150.0, z=-930.0, diameter=22.0, fresh=1.0),
-           dict(x=95.0, z=-560.0, diameter=26.0, fresh=1.0), dict(x=-210.0, z=-880.0, diameter=40.0, fresh=0.95)]
+           dict(x=-70.0, z=-1170.0, diameter=60.0, fresh=0.9), dict(x=-130.0, z=-800.0, diameter=34.0, fresh=1.0),
+           # M3b: more young craters strewing boulders near the route (M3d: clear of the mesa, the rover and the drifts)
+           dict(x=170.0, z=-860.0, diameter=26.0, fresh=1.0), dict(x=-230.0, z=-930.0, diameter=40.0, fresh=0.95)]
 
 # --- the pyramids: the Giza diagonal, south-west to north-east (the largest first), 2 km ahead
 PYRAMIDS = [("pyramid-a", -260.0, -1380.0, 300.0, 8.0),       # M3c: 400 m nearer
@@ -81,7 +80,7 @@ PYRAMID_GROUND = {name: curved(PAD_LEVEL[name], x, z) for name, x, z, _, _ in PY
 PYRAMID_SINK = 3.0
 
 # --- the arrival: out of the arrival mesa's north wall, heading -z (the exit's y is over the ground)
-EXIT = [0.0, 22.0, -344.0]
+EXIT = [0.0, 9.0, -724.0]          # M3d (owner): lower, near the ground
 EXIT_AXIS = [0.0, 0.0, -1.0]
 
 # --- the pyramid portal: in pyramid-b's south face, where the casing has fallen, 30 m up (absolute y set by measure)
@@ -151,20 +150,12 @@ def night_flight():
 NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.2, 116.4]]
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
-MARS_FLIGHT = [
-    # M3c: out of the wall and down to Curiosity: behind it, low alongside on its left as it drives, round ahead of it
-    # (the aim holds on it), then up and away over the plain to the pyramids
-    [0.0, 16.0, -372.0, 71.4],
-    [-5.0, 8.0, -396.0, 73.4],
-    [-11.0, 3.4, -414.0, 75.6],     # behind and to the left, its wheels and mast against the plain
-    [-9.5, 2.6, -428.0, 77.8],      # alongside, low: the wheels turning, the tracks
-    [-4.0, 2.8, -443.0, 80.0],      # ahead-left, the mast camera's flash
-    [6.0, 4.5, -458.0, 82.2],       # ahead, it drives toward the camera
-    [16.0, 14.0, -500.0, 84.6],     # up and away toward the pyramids
-    [40.0, 40.0, -720.0, 88.2],
-    [90.0, 50.0, -1040.0, 92.2],    # between the great pyramid and the middle one: their scale
-    [PORTAL_FOCUS[0] - 10.0, 58.0, PORTAL_FOCUS[2] + 220.0, 96.6],     # rising to the portal, up the buried face
-    [PORTAL_FOCUS[0], 70.0, PORTAL_FOCUS[2] + 70.0, 99.6],
+# M3d (owner): one continuous fly-over -- out of the wall low, over the rover as it drives (no orbit), straight on to
+# the pyramids and up the buried face into the portal. Times from a smooth speed profile (canyon_scale.pace).
+_MARS_PATH = [(2.0, 8.0, -750.0), (16.0, 7.0, -840.0), (34.0, 6.0, -925.0), (52.0, 5.5, -985.0),
+              (64.0, 6.5, -1030.0), (86.0, 14.0, -1140.0), (110.0, 30.0, -1300.0),
+              (PORTAL_FOCUS[0] - 6.0, 50.0, PORTAL_FOCUS[2] + 150.0), (PORTAL_FOCUS[0], 66.0, PORTAL_FOCUS[2] + 55.0)]
+MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, 99.6, 22.0, 18.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4],          # the crossing (y: the focus)
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
 ]
@@ -222,7 +213,7 @@ regolith = [
 # M3b: Curiosity (NASA, public domain; pass2/prepare_rover.py), driving slowly toward the pyramids to photograph them,
 # its tracks behind it, its mast camera flashing. It drives on a pad (the yardangs eased flat under its route).
 # M3c (owner: the rover is the arrival's subject): it is just ahead of the portal's exit, and the camera comes down to it
-ROVER_START = (-6.0, -425.0)
+ROVER_START = (58.0, -990.0)          # M3d (owner): nearer the pyramids, a beat on the way, not the subject
 _rd = unit([PYRAMIDS[1][1] - ROVER_START[0], 0.0, PYRAMIDS[1][2] - ROVER_START[1]])
 ROVER_DIR = (_rd[0], _rd[2])
 ROVER_YAW = math.degrees(math.atan2(ROVER_DIR[0], ROVER_DIR[1]))
@@ -340,7 +331,7 @@ def write():
                                [ROVER_PAD]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
         "corruption": {"targets": ["pyramid-b"], "focus": PORTAL_FOCUS, "axis": [0.0, 0.0, -1.0], "amount": 1.0,
-                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 1100.0, "openNear": 30.0, "openFar": 330.0,
+                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 1700.0, "openNear": 30.0, "openFar": 520.0,
                        "seam": 0.3, "width": 22.0, "height": 17.0, "depth": 12.0, "block": 4.0, "share": 0.22, "slip": 2.5,
                        "rate": 0.5, "strip": 3.5, "stripSlip": 1.5, "slide": 0.0, "pull": 6.0, "lift": 1.2, "fold": 0.8,
                        "lag": 0.7, "glyph": 5.5, "glyphSize": 1.6, "glow": 4.0, "echoes": 1, "echoOffset": 1.0,
@@ -364,8 +355,7 @@ def write():
     }
     path = os.path.join(HERE, PREFIX + "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
-    # M3c: the eye on the rover from the descent until it is left behind
-    return path, flight, [[*rover_at(78.0)[:1], ROVER_LEVEL + 1.1, rover_at(78.0)[1], 72.4, 84.0]]
+    return path, flight, []    # M3d: no aim -- the fly-over looks ahead, to the pyramids
 
 
 if __name__ == "__main__":

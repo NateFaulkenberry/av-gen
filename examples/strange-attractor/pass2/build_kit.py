@@ -14,7 +14,8 @@ Writes, each at the ground (y = 0 after export) unless noted:
 - laser-fan.glb: twelve laser beams from a hub, five colours, 40 m long, emissive (the domes' rave);
 - kelp-{a,b}.glb, sponge.glb, fan-coral.glb, seagrass.glb: deep-water life for the shelf;
 - flash.glb: a small, bright bulb (the rover's mast camera flash);
-- rover-tracks.glb: two wheel ruts with chevron treads, 1 m of track per segment along +z (instanced along the path).
+- rover-tracks.glb: two wheel ruts (a trough between raised berms, chevron treads pressed in), 1 m of track per
+  segment along +z (instanced along the path).
 """
 import bmesh
 import bpy
@@ -311,25 +312,41 @@ def build_sea():
 
 # ---------------------------------------------------------------------------------------------------------- tracks
 def build_tracks():
+    """M3d (owner: real treaded ruts pressed into the sand, raised edges, lighting that reads): per wheel a height
+    field across the rut -- a trough between two raised berms of displaced sand -- with chevron treads pressed into the
+    trough floor; smooth shaded so the berms catch the low sun. It lies on the ground (the trough floor just above it,
+    the berms 4 cm up), 1 m per segment along +z."""
     reset()
-    rut = material("rut", (0.22, 0.1, 0.05), 1.0)
+    sand = material("rut_sand", (0.44, 0.23, 0.12), 1.0)
     bm = bmesh.new()
     gauge = 2.6
+    nx, nz, half = 36, 51, 0.36
     for side in (-1, 1):
         x0 = side * gauge / 2
-        for k in range(10):          # 10 cm chevrons along a 1 m segment
-            z0 = k * 0.1
-            for (xa, za), (xb, zb) in (((-0.22, 0.0), (0.0, 0.05)), ((0.0, 0.05), (0.22, 0.0))):
-                v = [bm.verts.new((x0 + xa, z0 + za, 0.015)), bm.verts.new((x0 + xb, z0 + zb, 0.015)),
-                     bm.verts.new((x0 + xb, z0 + zb + 0.04, 0.015)), bm.verts.new((x0 + xa, z0 + za + 0.04, 0.015))]
-                bm.faces.new(v)
-        v = [bm.verts.new((x0 - 0.25, 0.0, 0.006)), bm.verts.new((x0 + 0.25, 0.0, 0.006)),
-             bm.verts.new((x0 + 0.25, 1.0, 0.006)), bm.verts.new((x0 - 0.25, 1.0, 0.006))]
-        bm.faces.new(v)
-    o = new_obj("rover-tracks", bm, [rut])
+        grid = []
+        for j in range(nz):
+            z = j / (nz - 1)
+            row = []
+            for i in range(nx):
+                dx = -half + 2 * half * i / (nx - 1)
+                a = abs(dx)
+                berm = math.exp(-((a - 0.29) / 0.045) ** 2) * 0.042
+                edge = 1.0 - min(max((a - 0.33) / 0.03, 0.0), 1.0)
+                trough = 0.008 if a < 0.24 else 0.008 + (a - 0.24) * 0.3
+                tread = 0.0
+                if a < 0.22:   # chevrons: grooves in a V across the wheel, every 10 cm
+                    ph = (z * 10.0 + a * 3.0) % 1.0
+                    tread = -0.006 if ph < 0.45 else 0.0
+                h = max(0.0, (trough + tread) * edge) + berm * edge
+                row.append(bm.verts.new((x0 + dx, z, h + 0.002)))
+            grid.append(row)
+        for j in range(nz - 1):
+            for i in range(nx - 1):
+                bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+    o = new_obj("rover-tracks", bm, [sand])
     # Blender +y -> glTF -z: turn so a segment runs along glTF +z
     o.data.transform(Matrix.Rotation(math.pi, 4, "Z"))
-    export("rover-tracks", [o], smooth=False)
+    export("rover-tracks", [o], smooth=True)
 
 
 def build_flash():
