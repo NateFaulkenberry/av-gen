@@ -15,6 +15,9 @@ Owner screenshots (read-only; never commit them) are in
 
 ## 1. Portals
 
+- **Owner addition:** the Moon portal (the crater floor to the dusk canyon) is the best one. It is the reference look
+  for every other portal, including the pyramid and launch-bay passes. Show each portal side by side with it in the
+  hand-back.
 - **Portal 1 (canyon to Moon):** remove the rounded rocks from the portal opening (see the reference).
 - **Pyramid to night canyon (`04-pyramid-to-night-canyon-92-104s.mp4`):**
   - it is missing the triangle shard particles the other portals have; add them;
