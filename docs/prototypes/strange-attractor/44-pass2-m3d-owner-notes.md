@@ -23,6 +23,9 @@ Owner screenshots (read-only; never commit them) are in
   - it is missing the triangle shard particles the other portals have; add them;
   - a single frame of particles is visible as the camera passes through: an animation glitch. Fix it, and
     check every crossing frame by frame for the same one-frame pop.
+- **Owner addition: the pyramid portal starts earlier** than the M3c values (glyph reach 1100 m, tear at 330 m): the
+  glyphs and corruption are already visibly building as the fly-over leaves the rover and heads to the pyramids. Show
+  the timing in the hand-back.
 - **Launch bay to dawn canyon (`06-launch-bay-to-dawn-canyon-139-150s.mp4`): another art pass.**
   - No UFO may fly out of the bay while the portal is opening.
   - It is missing effects that were restored on the original canyon exit portal; bring it to the same look.
