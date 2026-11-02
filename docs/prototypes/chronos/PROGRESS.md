@@ -7,7 +7,7 @@
 >
 > | Gate | Phases | State |
 > |---|---|---|
-> | S0 | recon, plan, Test A (the singularity alone) | in progress |
+> | S0 | recon, plan, Test A (the singularity alone) | **done, awaiting the owner** (`22-singularity-plan.md`, `23-singularity-s0.md`, media in `singularity-s0/`): one stateless background shader layer, no engine change |
 > | S1 | Phases 2-4: figures, temporal transformation, gravitational distortion (Tests B-D) | not started |
 > | S2 | Phases 5-6: feedback and chaos, drums, polish, profile (Tests E-G) | not started |
 >

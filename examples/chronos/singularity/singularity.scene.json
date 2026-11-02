@@ -1,0 +1,42 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "chronos-singularity",
+ "_note": "CHRONOS, Temporal Singularity (docs/prototypes/chronos/20-22). Gate S0: the singularity alone, drawn by the project's background shader layer singularity.wgsl.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.0,
+   30.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 40.0,
+  "near": 0.5,
+  "far": 2000.0
+ },
+ "environment": {
+  "background": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "intensity": 0.0,
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "fallbackAmbient": false,
+  "volumeDensity": 0.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": false,
+   "background": false
+  }
+ },
+ "lights": [],
+ "nodes": []
+}
