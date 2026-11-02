@@ -1,0 +1,359 @@
+{
+ "format": "avgen-scene",
+ "version": 1,
+ "name": "chronos-singularity",
+ "_note": "CHRONOS, Temporal Singularity (docs/prototypes/chronos/20-24): written by build_singularity.py. The singularity is the background layer singularity.wgsl; the lensing is the late layer lens.wgsl.",
+ "camera": {
+  "mode": 1,
+  "position": [
+   0.0,
+   0.0,
+   30.0
+  ],
+  "target": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "fov": 40.0,
+  "near": 0.5,
+  "far": 2000.0
+ },
+ "environment": {
+  "background": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "intensity": 0.0,
+  "skyIntensity": 0.0,
+  "lightFromEnvironment": false,
+  "fallbackAmbient": false,
+  "volumeDensity": 0.0,
+  "ambientOcclusion": false,
+  "contactShadows": false,
+  "sky": {
+   "enabled": false,
+   "background": false
+  }
+ },
+ "lights": [
+  {
+   "id": "core",
+   "name": "core",
+   "type": "point",
+   "role": "key",
+   "position": [
+    0.0,
+    0.0,
+    4.0
+   ],
+   "color": [
+    1.0,
+    0.42,
+    0.16
+   ],
+   "intensity": 3200.0,
+   "range": 120.0,
+   "castsShadow": false
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "role": "rim",
+   "direction": [
+    -0.25,
+    -0.2,
+    1.0
+   ],
+   "color": [
+    0.8,
+    0.15,
+    0.65
+   ],
+   "intensity": 3.2,
+   "castsShadow": false
+  },
+  {
+   "id": "fill",
+   "name": "fill",
+   "type": "directional",
+   "role": "fill",
+   "direction": [
+    0.1,
+    0.8,
+    -0.6
+   ],
+   "color": [
+    0.6,
+    0.05,
+    0.12
+   ],
+   "intensity": 0.8,
+   "castsShadow": false
+  }
+ ],
+ "nodes": [
+  {
+   "name": "figure1",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-1.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 1,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure2",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-2.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 2,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure3",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-3.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 3,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure4",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-4.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 4,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure5",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-5.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 5,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure6",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-6.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 6,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure7",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-7.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 7,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure8",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-8.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 8,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure9",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-1.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 9,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  },
+  {
+   "name": "figure10",
+   "kind": "gltf",
+   "asset": "../../../assets/chronos/build/souls/soul-2.glb",
+   "position": [
+    0.0,
+    0.0,
+    -50.0
+   ],
+   "rotation": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "temporalSlot": 10,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
+  }
+ ]
+}

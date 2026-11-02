@@ -22,7 +22,7 @@ def tear(t):
 
 
 def tear_integral(t):
-    return sum(2.13 * (1.0 + math.tanh(0.6 * (t - tk))) for tk in TEAR_TIMES)
+    return sum(2.13 * (1.0 + math.tanh(max(-10.0, min(10.0, 0.6 * (t - tk))))) for tk in TEAR_TIMES)  # as field.wgsl
 
 
 def main_center(t):

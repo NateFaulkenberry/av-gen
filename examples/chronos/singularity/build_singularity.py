@@ -29,7 +29,8 @@ import random
 import field as F
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DURATION = 48.0       # seconds of keys
+DURATION = 48.0       # seconds of keys for the short tests (B-E)
+SONG = 211.0          # Feline Footwear is 210.5 s: the full render (F)
 DT = 0.2              # key spacing
 SIM_DT = 1.0 / 60.0
 N = 10
@@ -134,7 +135,7 @@ def figure_tracks(index):
     keys = {k: [] for k in ("pos", "rot", "scl", "trail", "echo", "fade", "frac", "rgb", "angle")}
     next_key = 0.0
     prev_rot = None
-    while t <= DURATION + 1e-6:
+    while t <= SONG + 1e-6:
         R0 = F.core_radius_at(t)
         c0 = F.main_center(t)
         hidden = t < hidden_until
@@ -200,10 +201,14 @@ def track(target, keys, interp="linear"):
             "loopLength": 0.0, "keys": [{"time": t, "value": v, "interp": interp} for t, v in keys]}
 
 
-def core_light_track():
+def until(keys, end):
+    return [k for k in keys if k[0] <= end + 1e-6]
+
+
+def core_light_track(end):
     keys = []
     t = 0.0
-    while t <= DURATION + 1e-6:
+    while t <= end + 1e-6:
         ps = F.field_to_screen(F.main_center(t), t)
         w = to_world(ps, 30.0)
         keys.append((round(t, 3), [round(w[0], 3), round(w[1], 3), round(w[2] + 1.5, 3)]))
@@ -211,9 +216,58 @@ def core_light_track():
     return track("lights/core/position", keys)
 
 
+def feedback_centre_tracks(end):
+    """ADR-1937: the feedback pours into the core, wherever it is (uv, y down)."""
+    xs, ys = [], []
+    t = 0.0
+    while t <= end + 1e-6:
+        ps = F.field_to_screen(F.main_center(t), t)
+        xs.append((round(t, 3), round(ps[0] / (16.0 / 9.0) + 0.5, 4)))
+        ys.append((round(t, 3), round(0.5 - ps[1], 4)))
+        t += 0.25
+    return [track("temporal/feedback/centerX", xs), track("temporal/feedback/centerY", ys)]
+
+
+def signal(name, source, gain, attack, decay, offset=0.0):
+    return {"kind": "signal", "name": name, "settings": {"combine": "firstActive", "inputs": [
+        {"source": source, "chain": {"gain": gain, "offset": offset, "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0,
+                                     "attackMs": attack, "decayMs": decay}}]}}
+
+
+def route(src, target, amount):
+    return {"source": f"signal.{src}", "target": target, "amount": amount, "op": "add", "polarity": "unipolar"}
+
+
+# Brief sec. 9, the drum stem only (no classifiers). Every signal is enveloped (attack >= 60 ms, decay >= 450 ms) and
+# nothing is routed to brightness, so the drums move the field -- turbulence, expansion, rotation, the core, the tear
+# -- and never flash the frame. Background and lens receive the same values wherever both draw the same field.
+AUDIO_SOURCES = [
+    signal("drumEnergy", "stem.drums.level", 1.4, 150.0, 900.0),
+    signal("drumHit", "stem.drums.onsetStrength", 0.5, 60.0, 650.0, -0.45),
+    signal("drumPulse", "stem.drums.level", 1.2, 900.0, 2600.0),
+    signal("drumLow", "stem.drums.bass", 2.0, 80.0, 700.0),
+    signal("drumHigh", "stem.drums.treble", 2.5, 60.0, 450.0),
+]
+AUDIO_ROUTES = [
+    route("drumEnergy", "shader/singularity/turbulence", 0.9),
+    route("drumEnergy", "shader/singularity/highlightGain", 0.35),
+    route("drumHit", "shader/singularity/expansion", 0.3),
+    route("drumHit", "shader/lens/expansion", 0.3),
+    route("drumHit", "shader/singularity/fragmentation", 0.45),
+    route("drumHit", "shader/lens/shear", 0.8),
+    route("drumPulse", "shader/singularity/rotation", 0.45),
+    route("drumPulse", "shader/lens/rotation", 0.45),
+    route("drumLow", "shader/singularity/coreRadius", 0.012),
+    route("drumLow", "shader/lens/coreRadius", 0.012),
+    route("drumLow", "shader/lens/lens", 0.35),
+    route("drumHigh", "shader/singularity/streakGain", 1.2),
+    route("drumHigh", "shader/singularity/fragmentation", 0.2),
+]
+
+
 # ---- 3. the scene and the projects ----------------------------------------------------------------------------------
 
-def scene(with_figures):
+def scene(with_figures, lighting="a"):
     nodes = []
     if with_figures:
         for i in range(N):
@@ -232,14 +286,28 @@ def scene(with_figures):
                         "ambientOcclusion": False, "contactShadows": False,
                         "sky": {"enabled": False, "background": False}},
         # the singularity's light rides the core: hot amber from wherever it is; a dim violet fill from the camera side
-        "lights": [
-            {"id": "core", "name": "core", "type": "point", "role": "key", "position": [0.0, 0.0, 4.0],
-             "color": [1.0, 0.55, 0.22], "intensity": 3800.0, "range": 120.0, "castsShadow": False},
-            {"id": "fill", "name": "fill", "type": "directional", "role": "fill", "direction": [0.2, -0.3, -1.0],
-             "color": [0.45, 0.25, 0.75], "intensity": 0.6, "castsShadow": False},
-        ] if with_figures else [],
-        "nodes": nodes,
+        "lights": (LIGHTS_B if lighting == "b" else LIGHTS_A) if with_figures else [],
+        "nodes": [dict(n, tint=[0.86, 0.66, 0.78]) for n in nodes] if lighting == "b" else nodes,
     }
+
+
+# A, the default the owner likes: pale, flat-hot, lit by the core and a dim violet fill
+LIGHTS_A = [
+    {"id": "core", "name": "core", "type": "point", "role": "key", "position": [0.0, 0.0, 4.0],
+     "color": [1.0, 0.55, 0.22], "intensity": 3800.0, "range": 120.0, "castsShadow": False},
+    {"id": "fill", "name": "fill", "type": "directional", "role": "fill", "direction": [0.2, -0.3, -1.0],
+     "color": [0.45, 0.25, 0.75], "intensity": 0.6, "castsShadow": False},
+]
+# B, the variant: lit and tinted by the disk -- an amber-crimson core light, a magenta-violet rim from behind, a crimson
+# fill from below -- and the figures' pale tinted toward rose
+LIGHTS_B = [
+    {"id": "core", "name": "core", "type": "point", "role": "key", "position": [0.0, 0.0, 4.0],
+     "color": [1.0, 0.42, 0.16], "intensity": 3200.0, "range": 120.0, "castsShadow": False},
+    {"id": "rim", "name": "rim", "type": "directional", "role": "rim", "direction": [-0.25, -0.2, 1.0],
+     "color": [0.8, 0.15, 0.65], "intensity": 3.2, "castsShadow": False},
+    {"id": "fill", "name": "fill", "type": "directional", "role": "fill", "direction": [0.1, 0.8, -0.6],
+     "color": [0.6, 0.05, 0.12], "intensity": 0.8, "castsShadow": False},
+]
 
 
 BASE_PARAMS = {
@@ -259,29 +327,44 @@ BASE_PARAMS = {
 
 
 def project(kind, figure_data):
-    scene_file = "singularity.scene.json" if kind == "a" else "singularity-figures.scene.json"
+    scene_file = {"a": "singularity.scene.json", "lightb": "singularity-figures-b.scene.json"}.get(
+        kind, "singularity-figures.scene.json")
+    end = SONG if kind == "f" else DURATION
     shaders = [{"path": "singularity.wgsl", "stage": "background"}]
     params = dict(BASE_PARAMS)
     tracks = []
-    if kind in ("b", "c", "d"):
-        tracks.append(core_light_track())
+    full = kind in ("e", "f", "lightb")
+    if kind in ("b", "c", "d") or full:
+        tracks.append(core_light_track(end))
         for name, slot, keys in figure_data:
-            tracks += [track(f"nodes/{name}/position", keys["pos"]), track(f"nodes/{name}/rotation", keys["rot"]),
-                       track(f"nodes/{name}/scale", keys["scl"])]
-    if kind in ("c", "d"):
+            tracks += [track(f"nodes/{name}/position", until(keys["pos"], end)),
+                       track(f"nodes/{name}/rotation", until(keys["rot"], end)),
+                       track(f"nodes/{name}/scale", until(keys["scl"], end))]
+    if kind in ("c", "d") or full:
         params.update({"temporal/slit/enabled": True, "temporal/slit/amount": 1.0, "temporal/slit/span": 60.0,
                        "temporal/slit/gate": 1.0, "temporal/history/capacity": 64.0, "temporal/history/stride": 1.0})
         for name, slot, keys in figure_data:
             sl = f"temporal/slit/slot{slot}/"
             params[sl + "strips"] = 26.0
-            tracks += [track(sl + "trail", keys["trail"]), track(sl + "echo", keys["echo"]),
-                       track(sl + "fade", keys["fade"]), track(sl + "fracture", keys["frac"]),
-                       track(sl + "rgb", keys["rgb"]), track(sl + "angle", keys["angle"])]
-    if kind in ("c", "d"):
+            tracks += [track(sl + leaf, until(keys[k], end)) for leaf, k in
+                       (("trail", "trail"), ("echo", "echo"), ("fade", "fade"), ("fracture", "frac"), ("rgb", "rgb"),
+                        ("angle", "angle"))]
+    if kind in ("c", "d") or full:
         # Test C has the lens layer too, with its warp at zero: only its palette guard acts
         shaders.append({"path": "lens.wgsl", "stage": "late"})
     if kind == "c":
         params.update({"shader/lens/lens": 0.0, "shader/lens/drag": 0.0, "shader/lens/shear": 0.0})
+    sources, routes = [], []
+    if full:
+        # sec. 5F: the feedback, FIR over the clean ring, poured into the core wherever it is (ADR-1937): the luminous
+        # structures and the figures leave short spiralling after-images falling inward
+        params.update({"temporal/feedback/enabled": True, "temporal/feedback/frames": 10.0,
+                       "temporal/feedback/amount": 0.42, "temporal/feedback/decay": 0.8,
+                       "temporal/feedback/zoom": 0.988, "temporal/feedback/rotate": -0.7,
+                       "temporal/feedback/hue": 0.004})
+        tracks += feedback_centre_tracks(end)
+    if kind in ("f", "lightb"):
+        sources, routes = AUDIO_SOURCES, AUDIO_ROUTES
     return {
         "format": "avgen-project", "version": 4, "app": {"name": "CHRONOS - Temporal Singularity"},
         "assets": {"scene": {"kind": "composition", "path": scene_file},
@@ -291,7 +374,7 @@ def project(kind, figure_data):
         "feeds": {"beat": "stem.drums"},
         "shaders": shaders,
         "parameters": params,
-        "sources": [], "routes": [],
+        "sources": sources, "routes": routes,
         "timeline": {"enabled": True, "cues": [], "tracks": tracks},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                    "path": f"renders/singularity-{kind}.mp4"},
@@ -305,7 +388,9 @@ if __name__ == "__main__":
         json.dump(scene(False), f, indent=1)
     with open(os.path.join(HERE, "singularity-figures.scene.json"), "w") as f:
         json.dump(scene(True), f, indent=1)
-    for kind in ("a", "b", "c", "d"):
+    with open(os.path.join(HERE, "singularity-figures-b.scene.json"), "w") as f:
+        json.dump(scene(True, "b"), f, indent=1)
+    for kind in ("a", "b", "c", "d", "e", "f", "lightb"):
         name = "singularity.json" if kind == "a" else f"singularity-{kind}.json"
         with open(os.path.join(HERE, name), "w") as f:
             json.dump(project(kind, figure_data), f, separators=(",", ":"))

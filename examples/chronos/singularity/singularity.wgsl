@@ -12,6 +12,7 @@
     {"NAME": "turbulence", "TYPE": "float", "DEFAULT": 0.0, "MIN": 0.0, "MAX": 3.0, "LABEL": "Extra turbulence"},
     {"NAME": "fragmentation", "TYPE": "float", "DEFAULT": 0.0, "MIN": 0.0, "MAX": 1.0, "LABEL": "Extra tearing shear"},
     {"NAME": "bandGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Accretion bands"},
+    {"NAME": "rimGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Core edge glow"},
     {"NAME": "highlightGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "White-hot highlights"},
     {"NAME": "streakGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Radial streaks"},
     {"NAME": "streamGain", "TYPE": "float", "DEFAULT": 1.0, "MIN": 0.0, "MAX": 4.0, "LABEL": "Tidal streams"},
@@ -112,7 +113,9 @@ fn tear(t: f32) -> f32 {
 fn tearIntegral(t: f32) -> f32 {
     var s = 0.0;
     for (var k = 0; k < 12; k = k + 1) {
-        s = s + 2.13 * (1.0 + tanh(0.6 * (t - tearTime(k))));
+        // clamped: Metal computes tanh through exp(2x), which overflows a float past x = 44.4 and returns inf/inf =
+        // NaN -- 87 s after the first tear, the whole field went NaN and the frame black. tanh(10) is 1 to float precision.
+        s = s + 2.13 * (1.0 + tanh(clamp(0.6 * (t - tearTime(k)), -10.0, 10.0)));
     }
     return s;
 }
@@ -358,14 +361,20 @@ fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
             if (age < 0.0 || age > 5.0) {
                 continue;
             }
+            // a burst is structure, not a smear: two thin rippled shells made of filaments, and fine radial ejecta whose
+            // heads run gold and tails magenta
             let front = 1.3 + age * (3.2 + 0.6 * f32(k % 3));
-            let fade = exp(-age * 0.75) * smoothstep(0.0, 0.25, age);
-            let rip = x + 0.25 * (vnoise(vec3<f32>(cos(a) * 4.0, sin(a) * 4.0, f32(k) * 3.1 + age)) - 0.5) * front;
-            let shell = exp(-pow((rip - front) / (0.25 + 0.12 * age), 2.0));
-            let broken = smoothstep(0.35, 0.7, vnoise(vec3<f32>(cos(a) * 3.0, sin(a) * 3.0, f32(k) * 7.7)));
-            let ejecta = pow(vnoise(vec3<f32>(cos(a) * 48.0, sin(a) * 48.0, lx * 1.2 - age * 2.0 + f32(k))), 12.0) *
-                         smoothstep(front + 0.2, front - 2.0, x) * smoothstep(1.2, 2.0, x);
-            burst = burst + (palette(0.9 - 0.08 * age) * shell * broken * 1.6 + palette(0.82) * ejecta * 2.0) * fade;
+            let fade = exp(-age * 0.7) * smoothstep(0.0, 0.2, age);
+            let rip = x + 0.22 * (vnoise(vec3<f32>(cos(a) * 4.0, sin(a) * 4.0, f32(k) * 3.1 + age)) - 0.5) * front;
+            let w1 = 0.07 + 0.04 * age;
+            let shell = exp(-pow((rip - front) / w1, 2.0)) + 0.6 * exp(-pow((rip - 0.82 * front) / (0.7 * w1), 2.0));
+            let fil = pow(ridged(vec3<f32>(cos(a) * 9.0, sin(a) * 9.0, f32(k) * 5.3 + 1.5 * age), 3), 3.0);
+            let broken = smoothstep(0.3, 0.65, vnoise(vec3<f32>(cos(a) * 3.0, sin(a) * 3.0, f32(k) * 7.7)));
+            let ray = pow(vnoise(vec3<f32>(cos(a) * 110.0, sin(a) * 110.0, lx * 0.8 - age * 1.6 + f32(k))), 18.0);
+            let along = clamp((x - 1.2) / max(front - 1.2, 0.01), 0.0, 1.0);
+            let ejecta = ray * smoothstep(front + 0.15, front - 0.1, x) * smoothstep(1.2, 1.8, x);
+            burst = burst + (palette(0.94 - 0.1 * age) * shell * fil * broken * 2.6 +
+                             palette(0.5 + 0.42 * along) * ejecta * 2.4) * fade;
         }
         disk = disk + burst * inputs.burstGain;
     }
@@ -405,9 +414,21 @@ fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
     let ap = atan2(vp.y, vp.x);
     let xp = length(vp) / max(R0 * coreShape(ap, t), 1e-4);
     let edge = xp + 0.22 * (vnoise(vec3<f32>(cos(ap) * 2.5, sin(ap) * 2.5, 0.25 * t)) - 0.5) * (1.0 + D);
-    let core = smoothstep(1.0, 1.35, edge);
+    let core = smoothstep(0.95, 1.08, edge);
     let inner = smoothstep(1.3, 2.2, x);
     var outc = (col * inner + disk + ed) * core;
+    // the core's glowing edge: light bleeding round it (photon-ring-like), a soft luminous halo just outside, a thin
+    // continuous ring whose brightness flows (never dashes), and a little light bleeding inward -- the centre stays black
+    {
+        let flow = 0.35 + 0.9 * smoothstep(0.25, 0.75, fbm(vec3<f32>(cos(ap + 0.3 * spinT) * 2.2, sin(ap + 0.3 * spinT) * 2.2, 0.2 * t), 3));
+        let beamC = 1.0 + 0.5 * cos(ap - (2.2 + 0.4 * sin(0.047 * t)));
+        let out1 = max(edge - 1.0, 0.0);
+        let halo = exp(-out1 / 0.22) * step(1.0, edge);
+        let ringC = exp(-pow((edge - 1.06) / 0.035, 2.0));
+        let bleed = exp(-max(1.0 - edge, 0.0) / 0.06) * (1.0 - step(1.0, edge));
+        outc = outc + (palette(0.9) * halo * 0.9 + palette(0.98) * ringC * 1.9) * flow * beamC * inputs.rimGain +
+               vec3<f32>(0.25, 0.04, 0.03) * bleed * 0.5 * flow;
+    }
     outc = outc * inputs.intensity;
     return vec4<f32>(max(outc, vec3<f32>(0.0)), 1.0);
 }

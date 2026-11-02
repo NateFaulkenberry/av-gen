@@ -102,7 +102,9 @@ fn tear(t: f32) -> f32 {
 fn tearIntegral(t: f32) -> f32 {
     var s = 0.0;
     for (var k = 0; k < 12; k = k + 1) {
-        s = s + 2.13 * (1.0 + tanh(0.6 * (t - tearTime(k))));
+        // clamped: Metal computes tanh through exp(2x), which overflows a float past x = 44.4 and returns inf/inf =
+        // NaN -- 87 s after the first tear, the whole field went NaN and the frame black. tanh(10) is 1 to float precision.
+        s = s + 2.13 * (1.0 + tanh(clamp(0.6 * (t - tearTime(k)), -10.0, 10.0)));
     }
     return s;
 }
@@ -236,7 +238,9 @@ fn mainImage(uv: vec2<f32>, fragCoord: vec2<f32>) -> vec4<f32> {
     // back to the screen, and sample what was drawn there
     let back = rot(q * zoom, -turn);
     let suv = vec2<f32>(back.x / aspect + 0.5, 0.5 - back.y);
-    var c = textureSampleLevel(inputImage, linearSampler, clamp(suv, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb;
+    // mirrored at the frame's edges: a clamp smears the edge pixels into streaks wherever the warp reaches outside
+    let mir = vec2<f32>(1.0) - abs(vec2<f32>(1.0) - abs(suv));
+    var c = textureSampleLevel(inputImage, linearSampler, clamp(mir, vec2<f32>(0.0), vec2<f32>(1.0)), 0.0).rgb;
     // the palette guard: the RGB temporal split (ADR-1936) throws complementary fringes, and green and teal are outside
     // the brief's palette (sec. 7). Green may never exceed the warmer of red and blue, so whites stay white and a split
     // fringe runs magenta to amber instead.

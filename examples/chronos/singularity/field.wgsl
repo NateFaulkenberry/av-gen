@@ -82,7 +82,9 @@ fn tear(t: f32) -> f32 {
 fn tearIntegral(t: f32) -> f32 {
     var s = 0.0;
     for (var k = 0; k < 12; k = k + 1) {
-        s = s + 2.13 * (1.0 + tanh(0.6 * (t - tearTime(k))));
+        // clamped: Metal computes tanh through exp(2x), which overflows a float past x = 44.4 and returns inf/inf =
+        // NaN -- 87 s after the first tear, the whole field went NaN and the frame black. tanh(10) is 1 to float precision.
+        s = s + 2.13 * (1.0 + tanh(clamp(0.6 * (t - tearTime(k)), -10.0, 10.0)));
     }
     return s;
 }
