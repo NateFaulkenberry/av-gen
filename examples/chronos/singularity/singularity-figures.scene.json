@@ -50,11 +50,29 @@
    ],
    "color": [
     1.0,
-    0.55,
-    0.22
+    0.42,
+    0.16
    ],
-   "intensity": 3800.0,
+   "intensity": 3200.0,
    "range": 120.0,
+   "castsShadow": false
+  },
+  {
+   "id": "rim",
+   "name": "rim",
+   "type": "directional",
+   "role": "rim",
+   "direction": [
+    -0.25,
+    -0.2,
+    1.0
+   ],
+   "color": [
+    0.8,
+    0.15,
+    0.65
+   ],
+   "intensity": 3.2,
    "castsShadow": false
   },
   {
@@ -63,16 +81,16 @@
    "type": "directional",
    "role": "fill",
    "direction": [
-    0.2,
-    -0.3,
-    -1.0
+    0.1,
+    0.8,
+    -0.6
    ],
    "color": [
-    0.45,
-    0.25,
-    0.75
+    0.6,
+    0.05,
+    0.12
    ],
-   "intensity": 0.6,
+   "intensity": 0.8,
    "castsShadow": false
   }
  ],
@@ -96,7 +114,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 1
+   "temporalSlot": 1,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure2",
@@ -117,7 +140,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 2
+   "temporalSlot": 2,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure3",
@@ -138,7 +166,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 3
+   "temporalSlot": 3,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure4",
@@ -159,7 +192,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 4
+   "temporalSlot": 4,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure5",
@@ -180,7 +218,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 5
+   "temporalSlot": 5,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure6",
@@ -201,7 +244,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 6
+   "temporalSlot": 6,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure7",
@@ -222,7 +270,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 7
+   "temporalSlot": 7,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure8",
@@ -243,7 +296,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 8
+   "temporalSlot": 8,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure9",
@@ -264,7 +322,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 9
+   "temporalSlot": 9,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   },
   {
    "name": "figure10",
@@ -285,7 +348,12 @@
     1.0,
     1.0
    ],
-   "temporalSlot": 10
+   "temporalSlot": 10,
+   "tint": [
+    0.86,
+    0.66,
+    0.78
+   ]
   }
  ]
 }

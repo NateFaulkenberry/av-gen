@@ -267,7 +267,7 @@ AUDIO_ROUTES = [
 
 # ---- 3. the scene and the projects ----------------------------------------------------------------------------------
 
-def scene(with_figures, lighting="a"):
+def scene(with_figures):
     nodes = []
     if with_figures:
         for i in range(N):
@@ -285,22 +285,15 @@ def scene(with_figures, lighting="a"):
                         "lightFromEnvironment": False, "fallbackAmbient": False, "volumeDensity": 0.0,
                         "ambientOcclusion": False, "contactShadows": False,
                         "sky": {"enabled": False, "background": False}},
-        # the singularity's light rides the core: hot amber from wherever it is; a dim violet fill from the camera side
-        "lights": (LIGHTS_B if lighting == "b" else LIGHTS_A) if with_figures else [],
-        "nodes": [dict(n, tint=[0.86, 0.66, 0.78]) for n in nodes] if lighting == "b" else nodes,
+        # the figures are lit and tinted by the disk (the owner chose lighting B at S2): the light rides the core
+        "lights": LIGHTS if with_figures else [],
+        "nodes": [dict(n, tint=[0.86, 0.66, 0.78]) for n in nodes],
     }
 
 
-# A, the default the owner likes: pale, flat-hot, lit by the core and a dim violet fill
-LIGHTS_A = [
-    {"id": "core", "name": "core", "type": "point", "role": "key", "position": [0.0, 0.0, 4.0],
-     "color": [1.0, 0.55, 0.22], "intensity": 3800.0, "range": 120.0, "castsShadow": False},
-    {"id": "fill", "name": "fill", "type": "directional", "role": "fill", "direction": [0.2, -0.3, -1.0],
-     "color": [0.45, 0.25, 0.75], "intensity": 0.6, "castsShadow": False},
-]
-# B, the variant: lit and tinted by the disk -- an amber-crimson core light, a magenta-violet rim from behind, a crimson
-# fill from below -- and the figures' pale tinted toward rose
-LIGHTS_B = [
+# an amber-crimson core light, a magenta-violet rim from behind, a crimson fill from below; the figures' pale is tinted
+# toward rose (the nodes' tint in scene())
+LIGHTS = [
     {"id": "core", "name": "core", "type": "point", "role": "key", "position": [0.0, 0.0, 4.0],
      "color": [1.0, 0.42, 0.16], "intensity": 3200.0, "range": 120.0, "castsShadow": False},
     {"id": "rim", "name": "rim", "type": "directional", "role": "rim", "direction": [-0.25, -0.2, 1.0],
@@ -327,13 +320,12 @@ BASE_PARAMS = {
 
 
 def project(kind, figure_data):
-    scene_file = {"a": "singularity.scene.json", "lightb": "singularity-figures-b.scene.json"}.get(
-        kind, "singularity-figures.scene.json")
+    scene_file = "singularity.scene.json" if kind == "a" else "singularity-figures.scene.json"
     end = SONG if kind == "f" else DURATION
     shaders = [{"path": "singularity.wgsl", "stage": "background"}]
     params = dict(BASE_PARAMS)
     tracks = []
-    full = kind in ("e", "f", "lightb")
+    full = kind in ("e", "f")
     if kind in ("b", "c", "d") or full:
         tracks.append(core_light_track(end))
         for name, slot, keys in figure_data:
@@ -363,7 +355,7 @@ def project(kind, figure_data):
                        "temporal/feedback/zoom": 0.988, "temporal/feedback/rotate": -0.7,
                        "temporal/feedback/hue": 0.004})
         tracks += feedback_centre_tracks(end)
-    if kind in ("f", "lightb"):
+    if kind == "f":
         sources, routes = AUDIO_SOURCES, AUDIO_ROUTES
     return {
         "format": "avgen-project", "version": 4, "app": {"name": "CHRONOS - Temporal Singularity"},
@@ -388,9 +380,7 @@ if __name__ == "__main__":
         json.dump(scene(False), f, indent=1)
     with open(os.path.join(HERE, "singularity-figures.scene.json"), "w") as f:
         json.dump(scene(True), f, indent=1)
-    with open(os.path.join(HERE, "singularity-figures-b.scene.json"), "w") as f:
-        json.dump(scene(True, "b"), f, indent=1)
-    for kind in ("a", "b", "c", "d", "e", "f", "lightb"):
+    for kind in ("a", "b", "c", "d", "e", "f"):
         name = "singularity.json" if kind == "a" else f"singularity-{kind}.json"
         with open(os.path.join(HERE, name), "w") as f:
             json.dump(project(kind, figure_data), f, separators=(",", ":"))

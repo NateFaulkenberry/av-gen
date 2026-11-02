@@ -13,12 +13,10 @@ routable centre.
    - The centre stays black.
 
    See `singularity-s2-core-before-after.png`.
-2. **Figure lighting, an A/B.** A, the pale flat-hot look the owner likes, stays the default.
-   - B is lit and tinted by the disk: an amber-crimson core light, a magenta-violet rim from behind, a crimson fill
-     from below, and the figures' pale tinted toward rose.
-   - Both are shown at the same instants in `singularity-s2-lighting-ab.png`.
-   - B is `singularity-figures-b.scene.json` and `singularity-lightb.json`. Switching means pointing the project at
-     that scene.
+2. **Figure lighting, an A/B.** The owner chose B after the merge (2026-11-02), so it is now the only figure
+   lighting: an amber-crimson core light, a magenta-violet rim from behind, a crimson fill from below, and the
+   figures' pale tinted toward rose. The A/B is kept in `singularity-s2-lighting-ab.png`; A and the `-figures-b`
+   and `lightb` variant files are removed.
 3. **The striped combs and rainbow edges** are kept as they are: no smoothing, no speed-tied echo spacing, no
    warming. The palette guard from S1 is unchanged.
 
