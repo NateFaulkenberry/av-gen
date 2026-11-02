@@ -162,6 +162,19 @@ TemporalParameters registerTemporalParameters(params::ParameterSet& params, cons
     p.slitScan = &params.add(f((sl + "scan").c_str(), sd.scan, -1.0f, 1.0f, 0.0f, 1.0f));
     p.slitScanSpeed = &params.add(f((sl + "scanSpeed").c_str(), sd.scanSpeed, -4.0f, 4.0f, -0.5f, 0.5f));
     p.slitReverse = &params.add(f((sl + "reverse").c_str(), sd.reverse, 0.0f, 1.0f, 0.0f, 1.0f));
+    // ADR-1934: identity gating and its slot table, `temporal/slit/slot<k>/<leaf>` for k = 1..16
+    p.slitGate = &params.add(f((sl + "gate").c_str(), sd.gate, 0.0f, 1.0f, 0.0f, 1.0f));
+    for (int k = 0; k < SlitSettings::kSlots; ++k) {
+        const std::string sp = sl + "slot" + std::to_string(k + 1) + "/";
+        const SlitSettings::Slot& d = sd.slots[static_cast<std::size_t>(k)];
+        TemporalParameters::SlotParams& q = p.slitSlots[static_cast<std::size_t>(k)];
+        q.trail = &params.add(f((sp + "trail").c_str(), d.trail, 0.0f, kMaxSpan, 0.0f, 128.0f));
+        q.echo = &params.add(f((sp + "echo").c_str(), d.echo, 0.0f, kMaxSpan, 0.0f, 32.0f));
+        q.fade = &params.add(f((sp + "fade").c_str(), d.fade, 0.0f, 1.0f, 0.0f, 1.0f));
+        q.fracture = &params.add(f((sp + "fracture").c_str(), d.fracture, 0.0f, 1.0f, 0.0f, 1.0f));
+        q.strips = &params.add(f((sp + "strips").c_str(), d.strips, 1.0f, 512.0f, 4.0f, 96.0f));
+        q.angle = &params.add(f((sp + "angle").c_str(), d.angle, -360.0f, 360.0f, -180.0f, 180.0f));
+    }
     // ADR-1931: the ring. Floats carrying integers, rounded where read, like `frames`.
     const TemporalHistorySettings& h = defaults.history;
     p.historyCapacity = &params.add(f("temporal/history/capacity", static_cast<float>(clampCapacity(h.capacity)), 0.0f,
@@ -209,6 +222,17 @@ void applyTemporalParameters(const TemporalParameters& p, TemporalSettings& sett
     if (p.slitScan != nullptr) sd.scan = p.slitScan->value();
     if (p.slitScanSpeed != nullptr) sd.scanSpeed = p.slitScanSpeed->value();
     if (p.slitReverse != nullptr) sd.reverse = p.slitReverse->value();
+    if (p.slitGate != nullptr) sd.gate = p.slitGate->value(); // ADR-1934
+    for (std::size_t k = 0; k < sd.slots.size(); ++k) {
+        const TemporalParameters::SlotParams& q = p.slitSlots[k];
+        SlitSettings::Slot& d = sd.slots[k];
+        if (q.trail != nullptr) d.trail = q.trail->value();
+        if (q.echo != nullptr) d.echo = q.echo->value();
+        if (q.fade != nullptr) d.fade = q.fade->value();
+        if (q.fracture != nullptr) d.fracture = q.fracture->value();
+        if (q.strips != nullptr) d.strips = q.strips->value();
+        if (q.angle != nullptr) d.angle = q.angle->value();
+    }
     TemporalHistorySettings& h = settings.history; // ADR-1931
     if (p.historyCapacity != nullptr) h.capacity = clampCapacity(static_cast<int>(std::lround(p.historyCapacity->value())));
     if (p.historyStride != nullptr) h.stride = clampStride(static_cast<int>(std::lround(p.historyStride->value())));
@@ -238,6 +262,22 @@ nlohmann::json temporalToJson(const TemporalSettings& s) {
                                {"mode", sd.mode},       {"angle", sd.angle},     {"strips", sd.strips},
                                {"edge", sd.edge},       {"blend", sd.blend},     {"scan", sd.scan},
                                {"scanSpeed", sd.scanSpeed}, {"reverse", sd.reverse}};
+    // ADR-1934: additive, written only when gating is used, so every existing scene round-trips byte for byte
+    const SlitSettings defaultsSlit;
+    bool slotsAuthored = false;
+    for (const auto& sl : sd.slots) {
+        slotsAuthored = slotsAuthored || sl.trail != 0.0f || sl.echo != 0.0f || sl.fade != defaultsSlit.slots[0].fade ||
+                        sl.fracture != 0.0f || sl.strips != defaultsSlit.slots[0].strips || sl.angle != 0.0f;
+    }
+    if (sd.gate != 0.0f || slotsAuthored) {
+        j["slit"]["gate"] = sd.gate;
+        nlohmann::json slots = nlohmann::json::array();
+        for (const auto& sl : sd.slots) {
+            slots.push_back(nlohmann::json{{"trail", sl.trail}, {"echo", sl.echo}, {"fade", sl.fade},
+                                           {"fracture", sl.fracture}, {"strips", sl.strips}, {"angle", sl.angle}});
+        }
+        j["slit"]["slots"] = std::move(slots);
+    }
     j["history"] = nlohmann::json{{"capacity", clampCapacity(s.history.capacity)}, // ADR-1931
                                   {"stride", clampStride(s.history.stride)}};
     return j;
@@ -327,6 +367,21 @@ Result<TemporalSettings> temporalFromJson(const nlohmann::json& j) {
             number(e, "scan", sd.scan, -1.0f, 1.0f);
             number(e, "scanSpeed", sd.scanSpeed, -4.0f, 4.0f);
             number(e, "reverse", sd.reverse, 0.0f, 1.0f);
+            number(e, "gate", sd.gate, 0.0f, 1.0f); // ADR-1934
+            if (const auto v = e.find("slots"); v != e.end() && v->is_array()) {
+                const std::size_t n = std::min(v->size(), sd.slots.size());
+                for (std::size_t k = 0; k < n; ++k) {
+                    const auto& o = (*v)[k];
+                    if (!o.is_object()) continue;
+                    SlitSettings::Slot& d = sd.slots[k];
+                    number(o, "trail", d.trail, 0.0f, kMaxSpan);
+                    number(o, "echo", d.echo, 0.0f, kMaxSpan);
+                    number(o, "fade", d.fade, 0.0f, 1.0f);
+                    number(o, "fracture", d.fracture, 0.0f, 1.0f);
+                    number(o, "strips", d.strips, 1.0f, 512.0f);
+                    number(o, "angle", d.angle, -360.0f, 360.0f);
+                }
+            }
         });
         !r) {
         return std::unexpected(r.error());

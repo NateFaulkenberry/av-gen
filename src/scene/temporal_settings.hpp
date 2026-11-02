@@ -145,6 +145,20 @@ struct SlitSettings {
     float scan = 0.0f;       // 0..1 offset of the map
     float scanSpeed = 0.0f;  // cycles per second
     float reverse = 0.0f;    // 1 flips which end is now
+    // ADR-1934: identity gating. At 1 the time map above is replaced by the per-slot table below, and history is read
+    // only where the stored pixel belonged to a gated object: an entity whose node names a `temporalSlot` (1..16).
+    // Everything else -- the creature, the background -- is never smeared, because its past pixels are rejected.
+    float gate = 0.0f;
+    struct Slot {
+        float trail = 0.0f;    // frames: where the object has been, its last image persists this long (the stretch)
+        float echo = 0.0f;     // frames between echo copies along the trail; 0 is one continuous smear
+        float fade = 0.5f;     // 0..1: how far the trail's opacity falls toward its oldest end
+        float fracture = 0.0f; // 0..1 of `span`: each strip across the object shows a random moment that far back
+        float strips = 24.0f;  // strips across the frame, perpendicular to `angle`, for the fracture
+        float angle = 0.0f;    // degrees: the object's direction of travel on screen (0 = toward +x)
+    };
+    static constexpr int kSlots = 16;
+    std::array<Slot, kSlots> slots{};
 };
 
 // ADR-1931: the ring itself. `capacity` 0 sizes it from the live effects' bounds (ADR-410's behaviour, reallocating when
@@ -235,6 +249,16 @@ struct TemporalParameters {
     params::Parameter<float>* slitScan = nullptr;
     params::Parameter<float>* slitScanSpeed = nullptr;
     params::Parameter<float>* slitReverse = nullptr;
+    params::Parameter<float>* slitGate = nullptr; // ADR-1934
+    struct SlotParams {
+        params::Parameter<float>* trail = nullptr;
+        params::Parameter<float>* echo = nullptr;
+        params::Parameter<float>* fade = nullptr;
+        params::Parameter<float>* fracture = nullptr;
+        params::Parameter<float>* strips = nullptr;
+        params::Parameter<float>* angle = nullptr;
+    };
+    std::array<SlotParams, SlitSettings::kSlots> slitSlots{};
     params::Parameter<float>* historyCapacity = nullptr; // ADR-1931
     params::Parameter<float>* historyStride = nullptr;
 };

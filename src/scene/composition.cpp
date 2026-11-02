@@ -1047,6 +1047,7 @@ Result<std::string> Composition::bakeGeneratorToPoints(const std::string& nodeNa
     baked.tags = source->tags;
     baked.emissiveBoost = source->emissiveBoost;
     baked.importance = source->importance;
+    baked.temporalSlot = source->temporalSlot; // ADR-1934
     baked.proceduralMaterialAuthored = source->proceduralMaterialAuthored;
     baked.procedural = rest;
     baked.procedural.distribution.kind = DistributionKind::Points;
@@ -7987,8 +7988,10 @@ void Composition::rebuild() {
         // ADR-1097: everything this node put in the scene carries its importance; a hero's is inferred.
         {
             const Importance importance = importanceOfNode(node);
+            const auto slot = static_cast<std::uint8_t>(std::clamp(node.temporalSlot, 0, 16)); // ADR-1934
             for (std::size_t e = range.firstEntity; e < scene_.entities.size(); ++e) {
                 scene_.entities[e].importance = importance;
+                scene_.entities[e].temporalSlot = slot;
             }
             for (std::size_t p = range.firstParticle; p < scene_.particles.size(); ++p) {
                 scene_.particles[p].importance = importance;
@@ -11166,6 +11169,9 @@ nlohmann::json Composition::toJson() const {
         if (node.importance) { // ADR-1097: additive, written only when authored
             n["importance"] = importanceName(*node.importance);
         }
+        if (node.temporalSlot != 0) { // ADR-1934: additive, written only when authored
+            n["temporalSlot"] = node.temporalSlot;
+        }
         if (!node.tags.empty()) { // ADR-833: additive, written only when authored
             n["tags"] = node.tags;
         }
@@ -12890,6 +12896,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                 node.name);
                 }
                 node.importance = importance;
+            }
+            if (item.contains("temporalSlot")) { // ADR-1934
+                if (!item.at("temporalSlot").is_number_integer() || item.at("temporalSlot").get<int>() < 0 ||
+                    item.at("temporalSlot").get<int>() > 16) {
+                    return fail("node '{}': 'temporalSlot' must be an integer 0..16", node.name);
+                }
+                node.temporalSlot = item.at("temporalSlot").get<int>();
             }
             // ADR-833 (Phase D §25): the node's semantic words.
             if (item.contains("tags")) {

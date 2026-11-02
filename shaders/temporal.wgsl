@@ -402,3 +402,133 @@ fn fs_sample(in: FsIn) -> @location(0) vec4<f32> {
     let displaced = sampleAge(in.uv, age, current.rgb);
     return vec4<f32>(mix(current.rgb, displaced, clamp(temporal.params.x, 0.0, 1.0)), current.a);
 }
+
+// ---- ADR-1934 identity gating ----------------------------------------------------------------
+//
+// The slit, gated by what each stored pixel WAS. A second ring of the same depth holds, per history texel, the slot
+// (1..16) of the gated object drawn there, or 0. It is captured from the ADR-035 identifier target through a table
+// that maps an entity to its node's `temporalSlot`. The sampler then reads history only where the stored texel was a
+// gated object, so the creature and the background can never be smeared: their past pixels are rejected.
+//
+// Per slot (`gate.slots`, two vec4s each; slot k at 2(k-1)):
+//   a = (trail frames, echo frames, fade, fracture)   b = (strips, cos angle, sin angle, 1 if any term is live)
+// header = (layers the trail scan may visit, the fracture's epoch, span, 0)
+//
+// Two terms:
+//   **trail** -- where the object has been but is no longer, the most recent stored image of it within `trail` frames
+//   persists, fading toward its oldest end; with `echo` > 0 only the stored frames just after each multiple of `echo`
+//   count, so the trail breaks into discrete copies. This is the stretch along the path.
+//   **fracture** -- across the object (strips perpendicular to its direction of travel), each strip shows a random
+//   moment up to `fracture x span` back, re-chosen with the epoch; a strip whose moment did not hold the same object
+//   there keeps the present. Head, torso and limbs show different moments.
+// FIR over the clean rings, like the rest of the family.
+
+struct GateUniforms {
+    header: vec4<f32>,
+    slots: array<vec4<f32>, 32>,
+};
+
+@group(0) @binding(4) var slotHistory: texture_2d_array<u32>;
+@group(0) @binding(5) var idTarget: texture_2d<u32>;
+@group(0) @binding(6) var<storage, read> slotTable: array<u32>;
+@group(0) @binding(7) var<uniform> gate: GateUniforms;
+
+// The identifier's low 16 bits are the tagged pick id (ADR-035): the table is indexed by them, four 8-bit slots a word.
+fn slotOf(id: u32) -> u32 {
+    let idx = id & 0xFFFFu;
+    let word = slotTable[idx >> 2u];
+    return (word >> ((idx & 3u) * 8u)) & 0xFFu;
+}
+
+@fragment
+fn fs_capture_slot(in: FsIn) -> @location(0) vec4<u32> {
+    // The history texel's top-left scene pixel: point-sampled, never filtered -- an identity has no average.
+    let dims = vec2<i32>(textureDimensions(idTarget));
+    let px = clamp(vec2<i32>(floor(in.uv * temporal.outputSize.xy)), vec2<i32>(0), dims - vec2<i32>(1));
+    return vec4<u32>(slotOf(textureLoad(idTarget, px, 0).r), 0u, 0u, 0u);
+}
+
+fn gateLayer(j: i32, writeLayer: i32, depth: i32) -> i32 {
+    return ((writeLayer - 1 - j) % depth + depth) % depth;
+}
+
+fn gateHash(a: u32, b: u32, c: u32) -> f32 {
+    return f32(moshPcg(a ^ moshPcg(b ^ moshPcg(c))) >> 8u) / 16777216.0;
+}
+
+@fragment
+fn fs_gated(in: FsIn) -> @location(0) vec4<f32> {
+    let current = textureSampleLevel(source, linearSampler, in.uv, 0.0);
+    let depth = max(i32(temporal.ring.x + 0.5), 1);
+    let writeLayer = i32(temporal.ring.y + 0.5);
+    let valid = i32(temporal.ring.z + 0.5);
+    let newest = max(temporal.ring.w, 1.0);
+    let stride = max(temporal.more.x, 1.0);
+    let span = gate.header.z;
+    let sdims = vec2<i32>(textureDimensions(idTarget));
+    let sp = clamp(vec2<i32>(floor(in.uv * temporal.outputSize.xy)), vec2<i32>(0), sdims - vec2<i32>(1));
+    let hdims = vec2<i32>(i32(temporal.sizes.x), i32(temporal.sizes.y));
+    let hp = clamp(vec2<i32>(floor(in.uv * temporal.sizes.xy)), vec2<i32>(0), hdims - vec2<i32>(1));
+    let s0 = slotOf(textureLoad(idTarget, sp, 0).r);
+    var outc = current.rgb;
+    var hit = 0u;
+    if (valid <= 0) {
+        return current;
+    }
+    // trail
+    if (s0 == 0u) {
+        let scan = min(valid, i32(gate.header.x + 0.5));
+        for (var j = 0; j < scan; j = j + 1) {
+            let age = newest + f32(j) * stride;
+            if (age > span) {
+                break;
+            }
+            let layer = gateLayer(j, writeLayer, depth);
+            let sj = textureLoad(slotHistory, hp, layer, 0).r;
+            if (sj == 0u || sj > 16u) {
+                continue;
+            }
+            let a = gate.slots[(sj - 1u) * 2u];
+            let trail = min(a.x, span);
+            if (age > trail) {
+                continue;
+            }
+            if (a.y > 0.0) {
+                // only the first stored frame after each multiple of `echo`
+                let m = age / a.y;
+                if ((m - floor(m)) * a.y >= stride) {
+                    continue;
+                }
+            }
+            let past = textureSampleLevel(colourHistory, linearSampler, in.uv, layer, 0.0).rgb;
+            let opacity = clamp(1.0 - a.z * age / max(trail, 1.0), 0.0, 1.0);
+            outc = mix(current.rgb, past, opacity);
+            hit = sj;
+            break;
+        }
+    }
+    // fracture
+    var sf = s0;
+    if (sf == 0u) {
+        sf = hit;
+    }
+    if (sf != 0u && sf <= 16u) {
+        let a = gate.slots[(sf - 1u) * 2u];
+        let b = gate.slots[(sf - 1u) * 2u + 1u];
+        if (a.w > 0.0) {
+            let aspect = temporal.outputSize.x / max(temporal.outputSize.y, 1.0);
+            let t = dot((in.uv - vec2<f32>(0.5)) * vec2<f32>(aspect, 1.0), vec2<f32>(b.y, b.z));
+            let k = i32(floor(t * max(b.x, 1.0)));
+            let h = gateHash(bitcast<u32>(k), sf * 977u, u32(gate.header.y));
+            let ageF = h * a.w * span;
+            if (ageF >= newest) {
+                let jf = min(i32(round((ageF - newest) / stride)), valid - 1);
+                let layer = gateLayer(jf, writeLayer, depth);
+                if (textureLoad(slotHistory, hp, layer, 0).r == sf) {
+                    outc = textureSampleLevel(colourHistory, linearSampler, in.uv, layer, 0.0).rgb;
+                }
+            }
+        }
+    }
+    return vec4<f32>(mix(current.rgb, outc, clamp(temporal.params.x, 0.0, 1.0)), current.a);
+}

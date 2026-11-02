@@ -5529,6 +5529,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         temporalIn.settings = inheritedTemporal_ != nullptr ? inheritedTemporal_ : &scene.temporal;
         temporalIn.resolutionScale = qualitySettings_.temporalHistoryScale;
         temporalIn.hdrFormat = kHdrFormat;
+        // ADR-1934: the identity gate reads the identifier target through each entity's slot.
+        const scene::TemporalSettings& ts = inheritedTemporal_ != nullptr ? *inheritedTemporal_ : scene.temporal;
+        if (ts.slit.enabled && ts.slit.gate > 0.5f) {
+            temporalSlots_.resize(scene.entities.size());
+            for (std::size_t i = 0; i < scene.entities.size(); ++i) {
+                temporalSlots_[i] = scene.entities[i].temporalSlot;
+            }
+            temporalIn.identifier = ids_.view;
+            temporalIn.entitySlots = &temporalSlots_;
+        }
         if (toggles_.post) {
             finalHdr = temporal_->run(encoder, temporalIn, *pool_);
         }

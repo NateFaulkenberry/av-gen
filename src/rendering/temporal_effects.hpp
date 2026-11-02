@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 #include <webgpu/webgpu_cpp.h>
 
 namespace avgen::gpu {
@@ -42,6 +43,9 @@ struct TemporalStats {
     std::uint32_t historyStride = 1;
     std::uint32_t historyWriteLayer = 0;
     std::uint64_t historyAllocations = 0;
+    // ADR-1934: the identity gate's slot ring (bytes, 0 when the gate is off) and whether the gated sampler ran.
+    std::uint64_t slotRingBytes = 0;
+    bool gated = false;
 };
 
 struct TemporalFrameInputs {
@@ -58,6 +62,10 @@ struct TemporalFrameInputs {
     const scene::TemporalSettings* settings = nullptr;
     float resolutionScale = 0.5f; // from the quality tier
     wgpu::TextureFormat hdrFormat = wgpu::TextureFormat::RGBA16Float;
+    // ADR-1934: the identifier target (R32Uint, ADR-035) and each scene entity's `temporalSlot`, indexed by entity.
+    // Both are read only when the slit's gate is on.
+    wgpu::TextureView identifier;
+    const std::vector<std::uint8_t>* entitySlots = nullptr;
 };
 
 class TemporalEffects {

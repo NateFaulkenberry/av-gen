@@ -1134,6 +1134,7 @@ private:
     SceneRenderer* portalSource_ = nullptr; // whose scene radiance the portal pass reads this frame
     const scene::PostSettings* inheritedPost_ = nullptr;         // a portal view's source's (null: the scene's own)
     const scene::TemporalSettings* inheritedTemporal_ = nullptr;
+    std::vector<std::uint8_t> temporalSlots_; // ADR-1934: each entity's gate slot, refreshed per frame
     [[nodiscard]] const scene::PostSettings& postOf(const scene::Scene& scene) const {
         return inheritedPost_ != nullptr ? *inheritedPost_ : scene.post;
     }

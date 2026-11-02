@@ -492,6 +492,8 @@ struct Entity {
     std::uint8_t corruptEcho = 0;
     // ADR-1097: copied from the node at flatten (heroes inferred). Read only by the live scalability levers.
     Importance importance = Importance::Normal;
+    // ADR-1934: the node's slot in the gated slit's table (0 = ungated). Set at flatten; never serialised.
+    std::uint8_t temporalSlot = 0;
     // Set per frame by whatever culls against the *camera* frustum (terrain does, per chunk).
     // "Off screen" and "not in the scene" are different claims, and only the second is a reason to
     // stop casting: a hill behind the camera throws its shadow across the whole frame. An entity

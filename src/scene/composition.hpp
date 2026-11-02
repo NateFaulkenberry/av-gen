@@ -313,6 +313,9 @@ struct CompositionNode {
     // ADR-1097: the node's visual importance for the live scalability levers, when authored. Unset (the default, and
     // what every existing scene has): inferred at flatten -- Hero when the node is a hero in `heroes()`, else Normal.
     std::optional<Importance> importance;
+    // ADR-1934: the slit's identity gate. 1..16 puts everything this node draws in that slot of the gated slit's table
+    // (`temporal/slit/slot<k>/...`); 0, the default, leaves it ungated, so its history is never read.
+    int temporalSlot = 0;
     // ADR-833 (Phase D §25): what this thing IS, in the world's semantic words ("ufo", "rock",
     // "world_effect"), for the characters' perception. Authored as `"tags"`; a generated
     // procedural adds its generator's name ("mushroom") by itself -- see `semanticTagsOf`.
