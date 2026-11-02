@@ -10,7 +10,7 @@
 > | D1 | Phase 1, the creature (Test A) | **reviewed**: owner chose one more sculpt pass toward inhuman, three-quarter first (`14-devourer-d1.md`, media in `devourer-d1/`) |
 > | D1b | the sculpt pass: eyes, teeth and mouth, Rodin skin, proportions | **reviewed** (owner: "kinda looking cool"; the eyes still not in the right position) (`15-devourer-d1b.md`) |
 > | D1c | the eyes re-seated in the measured orbits, a readable maw, pores halved, seams welded | **done** (`16-devourer-d1c.md`, media in `devourer-d1c/`); the owner moved the stop: D2 follows without a review |
-> | D2 | Phases 2-3, the procession and one consumption (Tests B, C) | in progress: ADR-1934 identity gating, the souls, the procession |
+> | D2 | Phases 2-3, the procession and one consumption (Tests B, C) | **done, awaiting the owner** (`17-devourer-d2.md`, media in `devourer-d2/`): ADR-1934 identity gating, eight MPFB souls, a 15-soul procession, stages A-E; rebased onto main 60d65ba8 |
 > | D3 | Phases 4-6, many souls, background, drums, polish, profile (Tests D, E, F) | not started |
 >
 > Suites on the post-removal head (3d964413, clean worktree): GPU 737 passed, 1 skipped (738/738); cpu-assets 4611
@@ -19,7 +19,7 @@
 >
 > The canyon-era history follows.
 
-Branch `scene/chronos` in `../av-gen-chronos`, from main 214dafd8. ADRs 1930-1969 (used: 1930-1933; next 1934).
+Branch `scene/chronos` in `../av-gen-chronos`, from main 214dafd8. ADRs 1930-1969 (used: 1930-1934; next 1935).
 Review media: `~/Desktop/av-gen-review/104-chronos/gate<N>/`.
 
 | Gate | Phases | State |

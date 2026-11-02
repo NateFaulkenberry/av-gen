@@ -28,6 +28,7 @@ Attribution, to carry wherever the work is shown:
 | `devourer-d0-look-*.png` (creature look-dev stills) | `examples/chronos/devourer/lookdev_creature.py` | MPFB + the CC0 assets above | CC0-derived |
 | `assets/chronos/build/chronos-creature.glb` (the MPFB-route creature, D1) | `examples/chronos/devourer/build_creature.py` | MPFB + CC0 assets | CC0-derived |
 | `assets/chronos/build/chronos-scan.glb` (the scan-route creature, D1, D1b) | `examples/chronos/devourer/build_scan_creature.py` | the Blay scan (CC BY 4.0), with the Rodin relief (CC0) from D1b | CC BY 4.0 (attribution above) |
+| `assets/chronos/build/souls/soul-1..8.glb` (the souls, D2) | `examples/chronos/devourer/build_souls.py` | MPFB + the CC0 MakeHuman base and eyes | CC0-derived |
 
 ## Reference images
 
