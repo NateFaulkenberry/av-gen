@@ -114,6 +114,39 @@ This needs a real rebuild, done like a VFX lighting and set-dressing artist woul
 
 - (The close-up texture addition in §2b applies to Mars's sand, rock and pyramid stone too.)
 
+## 5. The ocean (owner additions)
+
+- **Launch bay portal:** see §1 (no launches while it opens, the canyon exit's look, the exit high, no bay-floor
+  occlusion).
+- **The subs' path.** The UFOs fly OUT and UP as they leave the base, not straight up the moment they exit
+  (reference: `00-owner-refs/ocean-ufo-launch-path-arrow.png`, a red arrow from the lit bay window, mostly forward and
+  outward, rising at a shallow angle to the upper right).
+  - Each launch leaves on that kind of shallow climbing line, still fast.
+  - Returns mirror it on a descending shallow line.
+  - Fast and purposeful.
+- **The camera.** The underwater camera rocks at the beginning. Find the cause: an orientation or roll ease, a look-at
+  target swapping, the glide's hand-off out of the river portal, or sway or bob noise.
+  - Make the move smooth from the portal exit through the whole scene: no rocking, wobble or roll oscillation.
+  - Report per-frame camera roll, pitch and yaw rate over the ocean section, before and after.
+  - Show the clip.
+- **Wildlife.** The M3c frames show essentially none. Add:
+  - schools of fish that move as a flock (seek-safe, deterministic), scattering as a UFO whizzes past;
+  - larger single fish cruising through;
+  - life suited to the depth (rays, jellyfish with a soft glow, crabs or other bottom dwellers);
+  - richer kelp, corals and sponges.
+
+  Use free, clearly licensed models (CC0 or the approved list), logged and never committed; ask for the link if a
+  source needs a login. Procedural is fine where it reads well. Everything is animated: fins and tails move, no
+  sliding statues. Show stills and a clip.
+- **The seafloor.** Remove the "basins" (`00-owner-refs/ocean-basins-to-remove.png`): the flat-topped, vertically
+  striated box-like mesa walls on the seafloor and the bright flat strip between them.
+  - Replace them with seafloor built with the canyon's procedural terrain approach: rocky reef outcrops; ledges and
+    boulders with eroded, organic shapes; a sloping drop-off or trench into the distance; sediment drifts against the
+    rocks.
+  - No vertical streak banding, no extruded slabs, no hard flat plateaus.
+  - It hosts the kelp, corals and wildlife.
+  - Show before/after at the same camera beats.
+
 ## Rules
 
 - **Branch:** same branch and worktree (`scene/strange-attractor`, `../av-gen-attractor`), on e1c11e47.
