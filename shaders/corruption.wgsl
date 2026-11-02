@@ -175,20 +175,12 @@ fn crDisplace(p0: vec3<f32>, t: f32, echo: u32) -> CrPoint {
                 let band = clamp((1.0 - ap.e) / 0.25, 0.0, 1.0);
                 let k = 1.0 / e - 1.0;
                 off = off + ((b.h * ap.u + b.v * ap.v) * k + b.ax * frame.corruption3.z * band) * ap.openT * wd;
-            } else if (ap.e < 1.9) {
-                // the lips tear back as slabs: strata-shaped cells of the wall (6 x 2.5 m), each its own rigid block,
-                // pushed back into the rock or out of it and drawn outward by a hashed amount -- irregular, stepped,
-                // no fan and no symmetry
-                let cell = vec2<i32>(floor(vec2<f32>(ap.u / 6.0, ap.v / 2.5)));
-                let cu2 = bitcast<vec2<u32>>(cell);
-                let ccu = (vec2<f32>(cell) + 0.5) * vec2<f32>(6.0, 2.5);
-                let ce = length(vec2<f32>(ccu.x / max(frame.corruption3.x, 1e-3), ccu.y / max(frame.corruption3.y, 1e-3)));
-                let lip = clamp(1.0 - (ce - 1.0) / 0.9, 0.0, 1.0) * ap.openT * wd;
-                let h1 = crHash(vec4<u32>(cu2, seed, 41u));
-                let h2 = crHash(vec4<u32>(cu2, seed, 42u));
-                let h3 = crHash(vec4<u32>(cu2, seed, 43u));
-                let outward = normalize(b.h * ccu.x + b.v * ccu.y + vec3<f32>(1e-4, 0.0, 0.0));
-                off = off + (b.ax * (h1 * 2.0 - 0.6) * 4.0 + outward * h2 * 3.0 + b.v * (h3 - 0.5) * 1.5) * lip;
+            } else if (ap.e < 1.5) {
+                // M3c (ADR-1901; the owner: Gate A was the best the portals looked): the lips fold back a little toward
+                // the camera, as at Gate A -- the fan of torn rock round the opening
+                let lip = (1.0 - (ap.e - 1.0) / 0.5);
+                let l2 = lip * lip * ap.openT * wd;
+                off = off - b.ax * l2 * 0.05 * frame.corruption3.x + (b.h * ap.u + b.v * ap.v) / e * l2 * 0.6;
             }
         }
     }

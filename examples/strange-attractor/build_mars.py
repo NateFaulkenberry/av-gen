@@ -17,7 +17,6 @@ import math
 import os
 import sys
 
-from portal_rim import RIM_PARTICLES  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -37,15 +36,16 @@ def direction(az_deg, el_deg):
 
 
 # --- the light: an afternoon sun from behind and to the right, a dusty sky
-SUN = direction(140.0, 21.0)          # toward the sun
+SUN = direction(128.0, 14.0)          # toward the sun (M3c: lower, for longer shadows over the ripples and rocks)
 SKY_ZENITH = [0.2, 0.12, 0.075]
 SKY_HORIZON = [0.6, 0.41, 0.26]        # butterscotch
 HAZE = [0.52, 0.36, 0.23]
 
 # --- the ground (ADR-1896): mesas and knobs, yardangs along the wind (from the north-east), a few old craters
 MESAS = [
-    # the arrival mesa: the camera comes out of its north wall
-    dict(x=0.0, z=420.0, rx=300.0, rz=200.0, angle=4.0, height=115.0, terraces=3),
+    # the arrival mesa: the camera comes out of its north wall (M3c: nearer the pyramids, so the rover and the pyramids
+    # share one run across the plain)
+    dict(x=0.0, z=-120.0, rx=300.0, rz=200.0, angle=4.0, height=115.0, terraces=3),
     dict(x=-1350.0, z=-700.0, rx=520.0, rz=260.0, angle=28.0, height=160.0, terraces=4),   # the great west mesa
     dict(x=1250.0, z=-1100.0, rx=380.0, rz=240.0, angle=-18.0, height=135.0, terraces=3),  # east
     dict(x=-200.0, z=-2950.0, rx=700.0, rz=220.0, angle=8.0, height=180.0, terraces=5),    # the far wall behind the pyramids
@@ -54,24 +54,23 @@ MESAS = [
     dict(x=900.0, z=-2100.0, rx=110.0, rz=80.0, angle=12.0, height=62.0, terraces=2),
     dict(x=-520.0, z=150.0, rx=70.0, rz=55.0, angle=60.0, height=38.0, terraces=2),
     dict(x=-480.0, z=-420.0, rx=160.0, rz=110.0, angle=-12.0, height=85.0, terraces=3),    # close beside the route
-    dict(x=520.0, z=-1380.0, rx=150.0, rz=95.0, angle=22.0, height=90.0, terraces=3),
+    dict(x=760.0, z=-1050.0, rx=150.0, rz=95.0, angle=22.0, height=90.0, terraces=3),   # M3c: clear of the drifts
 ]
 CRATERS = [dict(x=520.0, z=-650.0, diameter=260.0, fresh=0.15), dict(x=-420.0, z=-1050.0, diameter=180.0, fresh=0.25),
            # M3: young craters beside the route, their rims strewn with boulders (the plain's foreground)
-           dict(x=-120.0, z=-330.0, diameter=55.0, fresh=0.95), dict(x=70.0, z=-1080.0, diameter=70.0, fresh=0.9),
-           dict(x=-20.0, z=-740.0, diameter=34.0, fresh=1.0), dict(x=230.0, z=-1520.0, diameter=45.0, fresh=0.95),
-           # M3b: more young craters strewing boulders near the route
-           dict(x=-160.0, z=-610.0, diameter=28.0, fresh=1.0), dict(x=150.0, z=-1000.0, diameter=22.0, fresh=1.0),
-           dict(x=-70.0, z=-1450.0, diameter=38.0, fresh=0.9), dict(x=40.0, z=-430.0, diameter=18.0, fresh=1.0)]
+           dict(x=70.0, z=-1080.0, diameter=70.0, fresh=0.9), dict(x=-90.0, z=-760.0, diameter=34.0, fresh=1.0),
+           # M3b: more young craters strewing boulders near the route (M3c: clear of the rover's ground and the drifts)
+           dict(x=-160.0, z=-610.0, diameter=28.0, fresh=1.0), dict(x=150.0, z=-930.0, diameter=22.0, fresh=1.0),
+           dict(x=95.0, z=-560.0, diameter=26.0, fresh=1.0), dict(x=-210.0, z=-880.0, diameter=40.0, fresh=0.95)]
 
 # --- the pyramids: the Giza diagonal, south-west to north-east (the largest first), 2 km ahead
-PYRAMIDS = [("pyramid-a", -260.0, -1780.0, 300.0, 8.0),
-            ("pyramid-b", 160.0, -2080.0, 280.0, 0.0),
-            ("pyramid-c", 470.0, -2380.0, 140.0, 14.0)]
+PYRAMIDS = [("pyramid-a", -260.0, -1380.0, 300.0, 8.0),       # M3c: 400 m nearer
+            ("pyramid-b", 160.0, -1680.0, 280.0, 0.0),
+            ("pyramid-c", 470.0, -1980.0, 140.0, 14.0)]
 # each pyramid stands on a pad (ADR-1896: the ground eased to a level under its footing, 1.5 half-bases across), so its
 # sand plain meets the ground; the level is before the planet's curvature, which drops the ground by d^2 / 2R
 CURVATURE = 3389.5e3
-PAD_LEVEL = {"pyramid-a": 0.0, "pyramid-b": 2.0, "pyramid-c": 12.0}
+PAD_LEVEL = {"pyramid-a": -1.7, "pyramid-b": 5.6, "pyramid-c": 19.4}   # M3c: the mean ground round each (sampled)
 
 
 def curved(level, x, z):
@@ -82,7 +81,7 @@ PYRAMID_GROUND = {name: curved(PAD_LEVEL[name], x, z) for name, x, z, _, _ in PY
 PYRAMID_SINK = 3.0
 
 # --- the arrival: out of the arrival mesa's north wall, heading -z (the exit's y is over the ground)
-EXIT = [0.0, 22.0, 196.0]
+EXIT = [0.0, 22.0, -344.0]
 EXIT_AXIS = [0.0, 0.0, -1.0]
 
 # --- the pyramid portal: in pyramid-b's south face, where the casing has fallen, 30 m up (absolute y set by measure)
@@ -153,13 +152,18 @@ NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.2, 116.4]]
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 MARS_FLIGHT = [
-    [0.0, 20.0, 120.0, 71.2],       # out of the wall over the apron, the plain opening ahead
-    [-40.0, 38.0, -150.0, 74.5],    # establish: the mesas, the haze, the pyramids small on the far plain
-    [-90.0, 55.0, -520.0, 79.0],
-    [-60.0, 62.0, -900.0, 84.0],    # the pyramids grow against the far wall
-    [30.0, 55.0, -1250.0, 89.0],
-    [120.0, 48.0, -1560.0, 93.5],   # between the great pyramid and the middle one: their scale
-    [PORTAL_FOCUS[0] - 10.0, 58.0, PORTAL_FOCUS[2] + 220.0, 97.0],     # rising to the portal, up the buried face
+    # M3c: out of the wall and down to Curiosity: behind it, low alongside on its left as it drives, round ahead of it
+    # (the aim holds on it), then up and away over the plain to the pyramids
+    [0.0, 16.0, -372.0, 71.4],
+    [-5.0, 8.0, -396.0, 73.4],
+    [-11.0, 3.4, -414.0, 75.6],     # behind and to the left, its wheels and mast against the plain
+    [-9.5, 2.6, -428.0, 77.8],      # alongside, low: the wheels turning, the tracks
+    [-4.0, 2.8, -443.0, 80.0],      # ahead-left, the mast camera's flash
+    [6.0, 4.5, -458.0, 82.2],       # ahead, it drives toward the camera
+    [16.0, 14.0, -500.0, 84.6],     # up and away toward the pyramids
+    [40.0, 40.0, -720.0, 88.2],
+    [90.0, 50.0, -1040.0, 92.2],    # between the great pyramid and the middle one: their scale
+    [PORTAL_FOCUS[0] - 10.0, 58.0, PORTAL_FOCUS[2] + 220.0, 96.6],     # rising to the portal, up the buried face
     [PORTAL_FOCUS[0], 70.0, PORTAL_FOCUS[2] + 70.0, 99.6],
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4],          # the crossing (y: the focus)
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
@@ -217,15 +221,16 @@ regolith = [
 
 # M3b: Curiosity (NASA, public domain; pass2/prepare_rover.py), driving slowly toward the pyramids to photograph them,
 # its tracks behind it, its mast camera flashing. It drives on a pad (the yardangs eased flat under its route).
-ROVER_START = (55.0, -1185.0)
-_rd = unit([160.0 - ROVER_START[0], 0.0, -2080.0 - ROVER_START[1]])
+# M3c (owner: the rover is the arrival's subject): it is just ahead of the portal's exit, and the camera comes down to it
+ROVER_START = (-6.0, -425.0)
+_rd = unit([PYRAMIDS[1][1] - ROVER_START[0], 0.0, PYRAMIDS[1][2] - ROVER_START[1]])
 ROVER_DIR = (_rd[0], _rd[2])
 ROVER_YAW = math.degrees(math.atan2(ROVER_DIR[0], ROVER_DIR[1]))
-ROVER_LEVEL = -0.8                     # the mean ground around the pad (sampled without it)
-ROVER_SPEED = 0.25                     # m/s (Curiosity's own is a sixth of this: slow, but visibly moving)
+ROVER_LEVEL = 3.2                      # the mean ground around the pad (sampled without it)
+ROVER_SPEED = 0.4                      # m/s (faster than Curiosity's own: slow, but visibly moving up close)
 ROVER_T0, ROVER_T1 = 69.0, 102.0
 ROVER_MAST = (-0.418, 2.110, 0.466)    # the mast camera in the rover's frame (prepare_rover.py)
-ROVER_PAD = dict(x=ROVER_START[0] + ROVER_DIR[0] * -10.0, z=ROVER_START[1] + ROVER_DIR[1] * -10.0, radius=46.0, level=ROVER_LEVEL)
+ROVER_PAD = dict(x=ROVER_START[0] + ROVER_DIR[0] * -10.0, z=ROVER_START[1] + ROVER_DIR[1] * -10.0, radius=60.0, level=ROVER_LEVEL)
 
 
 def rover_at(t):
@@ -273,6 +278,31 @@ GOLD = [1.0, 0.62, 0.3]
 A = "../../assets/strange-attractor/build/"
 
 
+def rover_rocks():
+    """M3c: rocks strewn round the rover's ground at the scale the camera sees them (the kit's basalt), clear of its
+    drive and of the camera's low pass; on the rover's pad, so their ground is the pad's level."""
+    import random
+    rng = random.Random(1901)
+    cam = [(k[0], k[2]) for k in MARS_FLIGHT[:7]]
+    out = []
+    while len(out) < 46:
+        a, r = rng.uniform(0, 2 * math.pi), 5.0 + 48.0 * math.sqrt(rng.random())
+        x, z = ROVER_START[0] + r * math.cos(a), ROVER_START[1] + r * math.sin(a)
+        # off the drive (a band 4 m wide ahead and behind) and 3 m off the camera's path
+        along = (x - ROVER_START[0]) * ROVER_DIR[0] + (z - ROVER_START[1]) * ROVER_DIR[1]
+        across = abs(-(x - ROVER_START[0]) * ROVER_DIR[1] + (z - ROVER_START[1]) * ROVER_DIR[0])
+        if across < 4.0 and -45.0 < along < 30.0:
+            continue
+        if min(math.hypot(x - cx, z - cz) for cx, cz in cam) < 3.0:
+            continue
+        k = len(out)
+        sc = rng.uniform(0.6, 1.6) * (1.6 if rng.random() < 0.15 else 1.0)
+        out.append({"name": f"rock-{k}", "kind": "gltf", "asset": A + f"basalt-{'abc'[k % 3]}.glb",
+                    "position": [x, ROVER_LEVEL - 0.08 * sc, z], "rotation": [0, rng.uniform(0, 360), 0], "scale": [sc] * 3,
+                    "visible": True})
+    return out
+
+
 def write():
     flight = []
     for x, h, z, t in MARS_FLIGHT:
@@ -294,7 +324,7 @@ def write():
             {"name": "rover-flash-light", "type": "point", "position": mast_world(ROVER_T0), "color": [1.0, 0.97, 0.9],
              "intensity": 0.0, "range": 12.0, "castsShadow": False, "volumetric": 0.0},
         ],
-        "environment": {"intensity": 0.08, "background": SKY_HORIZON, "fogColor": HAZE, "volumeDensity": 0.00016,
+        "environment": {"intensity": 0.08, "background": SKY_HORIZON, "fogColor": HAZE, "volumeDensity": 0.00024,
                         "sky": {"enabled": True, "background": True, "useKeyLight": True, "zenithColor": SKY_ZENITH,
                                 "horizonColor": SKY_HORIZON, "groundColor": [0.25, 0.14, 0.08], "haze": 0.3,
                                 "sunColor": [1.0, 0.86, 0.7], "sunIntensity": 3.0, "sunSize": 0.025, "sunGlow": 0.6,
@@ -304,13 +334,13 @@ def write():
         "post": {"bloomIntensity": 0.04, "tonemap": 0},
         "materialPrograms": [{"name": "mars_regolith", "ops": regolith, "baseColor": 5, "metallic": 0, "roughness": 1}],
         "lunarWorld": {"seed": 11, "extent": 6000, "spacing": 2.5, "skirtExtent": 48000, "skirtSpacing": 48, "craters": 0.4,
-                       "rocks": 0.065, "relief": 70, "program": "mars_regolith", "curvature": CURVATURE,
+                       "rocks": 0.095, "relief": 70, "program": "mars_regolith", "curvature": CURVATURE,
                        "heroes": CRATERS, "mesas": MESAS, "yardangs": 7.0, "wind": 35.0,
-                       "pads": [{"x": x, "z": z, "radius": base * 0.82, "level": PAD_LEVEL[name]} for name, x, z, base, _ in PYRAMIDS] +
+                       "pads": [{"x": x, "z": z, "radius": base * 1.4, "level": PAD_LEVEL[name]} for name, x, z, base, _ in PYRAMIDS] +
                                [ROVER_PAD]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
         "corruption": {"targets": ["pyramid-b"], "focus": PORTAL_FOCUS, "axis": [0.0, 0.0, -1.0], "amount": 1.0,
-                       "radius": 70.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 420.0, "openNear": 30.0, "openFar": 170.0,
+                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 1100.0, "openNear": 30.0, "openFar": 330.0,
                        "seam": 0.3, "width": 22.0, "height": 17.0, "depth": 12.0, "block": 4.0, "share": 0.22, "slip": 2.5,
                        "rate": 0.5, "strip": 3.5, "stripSlip": 1.5, "slide": 0.0, "pull": 6.0, "lift": 1.2, "fold": 0.8,
                        "lag": 0.7, "glyph": 5.5, "glyphSize": 1.6, "glow": 4.0, "echoes": 1, "echoOffset": 1.0,
@@ -330,12 +360,12 @@ def write():
               "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": True} for i in range(-TRACK_BACK, 0)] + [
              {"name": f"track-new-{i}", "kind": "gltf", "asset": A + "rover-tracks.glb",
               "position": [ROVER_START[0] + ROVER_DIR[0] * (i - 1.6), ROVER_LEVEL, ROVER_START[1] + ROVER_DIR[1] * (i - 1.6)],
-              "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": False} for i in range(TRACK_AHEAD)] + [
-             {"name": "pyramid-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES}],
+              "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": False} for i in range(TRACK_AHEAD)] + rover_rocks(),
     }
     path = os.path.join(HERE, PREFIX + "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
-    return path, flight, [[*rover_at(86.0)[:1], ROVER_LEVEL + 1.2, rover_at(86.0)[1], 82.5, 90.8]]
+    # M3c: the eye on the rover from the descent until it is left behind
+    return path, flight, [[*rover_at(78.0)[:1], ROVER_LEVEL + 1.1, rover_at(78.0)[1], 72.4, 84.0]]
 
 
 if __name__ == "__main__":

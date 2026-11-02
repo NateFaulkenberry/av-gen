@@ -367,10 +367,6 @@ struct CompositionNode {
     // attractor's radius of influence.
     bool vortexAttractor = false;
     float vortexReach = 3.0f;
-    // ADR-1898: this particle system rims the scene's live portal: it is placed on the opening (in its plane, a ring
-    // the opening's size), and its spawn follows the field and the opening by the camera's distance (seek-safe),
-    // clearing as the camera reaches the plane
-    bool portalRim = false;
     params::Parameter<float>* windStrengthParam = nullptr;
     params::Parameter<float>* windTrunkParam = nullptr;
     params::Parameter<float>* windBranchParam = nullptr;

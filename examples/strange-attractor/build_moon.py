@@ -16,7 +16,6 @@ import json, math, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from canyon_scale import WORLD_SCALE as WS, R, PREFIX, canyon_frame, site, knot  # noqa: E402  (ADR-1893; M3b POC)
-from portal_rim import RIM_PARTICLES_MOON  # noqa: E402  (ADR-1898)
 
 
 def unit(v):
@@ -33,7 +32,7 @@ def direction(az_deg, el_deg):
 # Art Pass 2, M1: the sun is just over the horizon behind the arrival (2.2 degrees), so the plain at the exit is lit
 # with long shadows and the great basin ahead lies in its rim's shadow -- the night side, reached by flying into it
 S = direction(175.0, 2.2)                   # toward the sun
-E = direction(-4.0, 13.0)                   # toward the Earth: ahead, over the basin; M3b: higher (a bigger disc clears
+E = direction(-4.0, 10.0)                   # toward the Earth: ahead, over the basin; M3b: higher (a bigger disc clears
                                             # the horizon) and nearly dead ahead, the first thing out of the portal
 EXIT = [0.0, 0.0, 1500.0]
 # M1b: a tighter fall (ADR-1887) than M1's 150 km. The plain at the exit tilts toward the low sun behind and is lit;
@@ -42,6 +41,8 @@ EXIT = [0.0, 0.0, 1500.0]
 CURVATURE = 25000.0
 # 3.2 degrees across, 9 km out (a node's position is capped at 10 km and its scale at 100: make_earth.py's sphere is 100 m)
 EARTH_DISTANCE, EARTH_RADIUS = 9000.0, 950.0  # M3b: 12 degrees across (owner: bigger, brighter, noticed first)
+HALO = os.environ.get("SA_EARTH_HALO", "c")    # M3c: the Earth's glow, option a, b or c (c: the pick)
+RAVE_GROUPS = ("m", "c", "g", "a", "v")
 EARTH_FILE_RADIUS = 100.0  # make_earth.py's sphere (a node's scale is capped at 100: the Gate B 'far cut' was that cap)
 
 SH = unit([S[0], 0.0, S[2]])   # the sun's direction along the ground
@@ -163,6 +164,8 @@ for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)
 earth = [EXIT[0] + E[0] * EARTH_DISTANCE, 40.0 + E[1] * EARTH_DISTANCE, EXIT[2] + E[2] * EARTH_DISTANCE]
 ECHO_SIDE = unit([-E[2], 0.0, E[0]])        # sideways across the line of sight (the echoes' offset)
+# the halo's plane faces back along the line of sight: its +y (the glb's face) turned onto -E (x first, then y)
+HALO_ROT = [math.degrees(math.acos(-E[1])), math.degrees(math.atan2(-E[0], -E[2])), 0.0]
 scene = {
     "format": "avgen-scene", "version": 1, "name": "the-strange-attractor-moon",
     "_note": "The Strange Attractor's Moon (dimensional portals, Gate B; ADR-1882), written by build_moon.py; the destination of the canyon's portal (ADR-1879), whose 'portal' block drives its camera.",
@@ -179,11 +182,11 @@ scene = {
         # earthshine alone leaves a flat floor black)
         {"name": "earthglow", "type": "directional", "role": "fill", "direction": EGLOW, "color": [0.62, 0.72, 1.0],
          "intensity": 0.09, "castsShadow": False, "shadowStrength": 0.0}] +
-        # M3b: the rave -- strobes in three colours in each dome, flashed on the beat (routed in the project; a low
-        # base glow with audio off)
+        # M3b/M3c: the rave's spill -- three coloured lights at each dome's foot, just outside its glass, flashed on the
+        # beat with the windows (routed in the project; a low base glow with audio off)
         [{"name": f"rave{k}-{nm}", "type": "point",
-          "position": [c[0] + dx * sc[0] * 30.0, DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 45.0 * sc[1], c[1] + dz * sc[0] * 30.0],
-          "color": col, "intensity": 9000.0, "range": 1100.0, "castsShadow": False, "volumetric": 0.0}
+          "position": [c[0] + dx * sc[0] * 112.0, DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 14.0 + 6.0 * sc[1], c[1] + dz * sc[0] * 112.0],
+          "color": col, "intensity": 2500.0, "range": 420.0, "castsShadow": False, "volumetric": 0.0}
          for k, (c, sc, _) in enumerate(DOMES)
          for nm, col, dx, dz in (("m", [1.0, 0.15, 0.8], 1.0, 0.0), ("c", [0.15, 0.85, 1.0], -0.5, 0.86), ("g", [0.3, 1.0, 0.25], -0.5, -0.86))] +
         [{"name": f"dome{k}", "type": "point", "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 60.0 * sc[1], c[1]],
@@ -227,20 +230,17 @@ scene = {
                "position": [earth[i] + off * ECHO_SIDE[i] for i in range(3)], "rotation": [0, 200 + rot, 23],
                "scale": [EARTH_RADIUS * 1.015 / EARTH_FILE_RADIUS] * 3, "visible": True, "tint": tint,
                "emissiveBoost": 3.0} for c, off, rot, tint in (("r", 70.0, 4.0, [1.0, 0.15, 0.3]), ("c", -70.0, -4.0, [0.2, 0.9, 1.0]))] +
-             # the glow: a soft additive halo round the Earth, pulsed on the beat (its emissive routed)
-             [{"name": "earth-glow", "kind": "particles", "visible": True, "particles": {
-                 "enabled": True, "capacity": 24, "seed": 5, "shape": "sphere", "position": earth, "extent": [5.0, 5.0, 5.0],
-                 "direction": [0, 1, 0], "spawnRate": 1.2, "burst": 0.0, "lifetimeMin": 14.0, "lifetimeMax": 16.0,
-                 "spread": 1.0, "speedMin": 0.0, "speedMax": 0.0, "gravity": [0, 0, 0], "drag": 0.0,
-                 "sizeStart": EARTH_RADIUS * 1.55, "sizeEnd": EARTH_RADIUS * 1.55, "sizeVariance": 0.04,
-                 "colorStart": [0.3, 0.6, 1.0, 0.09], "colorEnd": [0.3, 0.6, 1.0, 0.09], "emissive": 3.0,
-                 "blend": "additive"}}] +
-             # the rave in the domes: a laser fan in each, turning (the timeline), flashing (routed)
-             [{"name": f"laser{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/build/laser-fan.glb",
-               "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])] + 35.0 * sc[1], c[1]],
-               "rotation": [0, 40 * k, 0], "scale": [7.0 * sc[0]] * 3, "visible": True, "emissiveBoost": 0.1}
-              for k, (c, sc, _) in enumerate(DOMES)] +
-             [{"name": "crater-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES_MOON}] +
+             # M3c (owner: a much more stylised, cool glow): one of three halos (pass2/build_earth_halo.py) set just
+             # behind the planet, facing the arrival; its emissive pulsed on the beat (routed)
+             [{"name": "earth-halo", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * 1.2 for i in range(3)], "rotation": HALO_ROT,
+               "scale": [EARTH_RADIUS / 10.0] * 3, "visible": True, "emissiveBoost": 1.0}] +
+             # M3c (owner: no beams into the sky): the rave is inside the domes -- their glass lit in five colours in
+             # bands that wind round them, each band on its own beat source (routed), a steady glow with audio off
+             [{"name": f"dome{k}-rave-{g}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/dome-rave-{g}.glb",
+               "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])], c[1]], "rotation": [0, 37 * k, 0],
+               "scale": [sc[0], sc[1], sc[0]], "visible": True, "emissiveBoost": 0.35}
+              for k, (c, sc, _) in enumerate(DOMES) for g in RAVE_GROUPS] +
              [{"name": f"dome{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/proofs/dome.glb",
                "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])], c[1]], "rotation": [0, 37 * k, 0],
                "scale": [sc[0], sc[1], sc[0]], "visible": True} for k, (c, sc, _) in enumerate(DOMES)],

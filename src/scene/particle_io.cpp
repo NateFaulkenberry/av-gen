@@ -158,7 +158,6 @@ json particlesToJson(const ParticleSystem& s) {
     }
     // ADR-040. Only written when they differ from the defaults so existing files stay short and
     // round-tripping a pre-ADR-040 scene produces the same JSON it started with.
-    if (s.innerRadius != 0.0f) j["innerRadius"] = s.innerRadius; // ADR-1898
     if (s.velocityStretch != 0.0f) {
         j["velocityStretch"] = s.velocityStretch;
         j["stretchMax"] = s.stretchMax;
@@ -411,7 +410,6 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
     AVGEN_READ(leafAspect, readFloat);
     AVGEN_READ(twoSided, readFloat);
     // ---- ADR-040: stretching, trails, atmosphere coupling and lifetime curves ----
-    AVGEN_READ(innerRadius, readFloat); // ADR-1898
     AVGEN_READ(velocityStretch, readFloat);
     AVGEN_READ(stretchMax, readFloat);
     AVGEN_READ(stretchMin, readFloat);

@@ -3242,67 +3242,6 @@
         "emissive": 0.0,
         "blend": "alpha"
       }
-    },
-    {
-      "name": "canyon-rim",
-      "kind": "particles",
-      "visible": true,
-      "portalRim": true,
-      "particles": {
-        "enabled": true,
-        "capacity": 7000,
-        "seed": 91,
-        "shape": "disc",
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "extent": [
-          1.0,
-          0.1,
-          1.0
-        ],
-        "innerRadius": 0.72,
-        "direction": [
-          0,
-          0,
-          -1
-        ],
-        "spawnRate": 3200.0,
-        "lifetimeMin": 0.3,
-        "lifetimeMax": 0.75,
-        "spread": 0.55,
-        "speedMin": 1.0,
-        "speedMax": 4.0,
-        "gravity": [
-          0,
-          0,
-          0
-        ],
-        "drag": 1.2,
-        "turbulence": 3.5,
-        "turbulenceScale": 0.35,
-        "sizeStart": 0.05,
-        "sizeEnd": 0.0075,
-        "sizeVariance": 0.6,
-        "colorStart": [
-          1.0,
-          0.8,
-          0.45,
-          0.85
-        ],
-        "colorEnd": [
-          1.0,
-          0.5,
-          0.16,
-          0.0
-        ],
-        "emissive": 3.0,
-        "blend": "additive",
-        "velocityStretch": 0.8,
-        "stretchMax": 1.5
-      }
     }
   ],
   "looks": [
@@ -3418,11 +3357,11 @@
         "nodes/campfire-core/visible": true,
         "nodes/campfire-embers/visible": true,
         "nodes/campfire-smoke/visible": true,
-        "corruption/radius": 36.0,
+        "corruption/radius": 80.0,
         "corruption/fieldNear": 12.0,
-        "corruption/fieldFar": 95.0,
+        "corruption/fieldFar": 260.0,
         "corruption/openNear": 10.0,
-        "corruption/openFar": 55.0,
+        "corruption/openFar": 100.0,
         "corruption/width": 15.0,
         "corruption/height": 13.0,
         "corruption/depth": 6.0,
@@ -3574,10 +3513,10 @@
         "nodes/campfire-embers/visible": true,
         "nodes/campfire-smoke/visible": true,
         "corruption/radius": 24.0,
-        "corruption/fieldNear": 8.0,
-        "corruption/fieldFar": 48.0,
-        "corruption/openNear": 5.0,
-        "corruption/openFar": 26.0,
+        "corruption/fieldNear": 6.0,
+        "corruption/fieldFar": 40.0,
+        "corruption/openNear": 2.5,
+        "corruption/openFar": 14.0,
         "corruption/width": 8.0,
         "corruption/height": 8.0,
         "corruption/depth": 4.0,
@@ -3648,7 +3587,7 @@
       "exit": [
         0.0,
         22.0,
-        196.0
+        -344.0
       ],
       "exitYaw": 0.0,
       "exitAxis": [
@@ -3679,72 +3618,90 @@
       "flight": [
         [
           0.0,
-          20.0,
-          120.0,
-          71.2
+          16.0,
+          -372.0,
+          71.4
         ],
         [
-          -40.0,
-          38.0,
-          -150.0,
-          74.5
+          -5.0,
+          8.0,
+          -396.0,
+          73.4
         ],
         [
-          -90.0,
-          55.0,
-          -520.0,
-          79.0
+          -11.0,
+          3.4,
+          -414.0,
+          75.6
         ],
         [
-          -60.0,
-          62.0,
-          -900.0,
-          84.0
+          -9.5,
+          2.6,
+          -428.0,
+          77.8
         ],
         [
-          30.0,
-          55.0,
-          -1250.0,
-          89.0
+          -4.0,
+          2.8,
+          -443.0,
+          80.0
         ],
         [
-          120.0,
-          48.0,
-          -1560.0,
-          93.5
+          6.0,
+          4.5,
+          -458.0,
+          82.2
+        ],
+        [
+          16.0,
+          14.0,
+          -500.0,
+          84.6
+        ],
+        [
+          40.0,
+          40.0,
+          -720.0,
+          88.2
+        ],
+        [
+          90.0,
+          50.0,
+          -1040.0,
+          92.2
         ],
         [
           150.0,
           58.0,
-          -1778.2322578752833,
-          97.0
+          -1378.2322578752833,
+          96.6
         ],
         [
           160.0,
           70.0,
-          -1928.2322578752833,
+          -1528.2322578752833,
           99.6
         ],
         [
           160.0,
-          70.93149594925505,
-          -1998.2322578752833,
+          70.94504367015784,
+          -1598.2322578752833,
           101.4
         ],
         [
           160.0,
-          70.93149594925505,
-          -2023.2322578752833,
+          70.94504367015784,
+          -1623.2322578752833,
           102.2
         ]
       ],
       "aims": [
         [
-          55.495207078391964,
-          0.3999999999999999,
-          -1189.2210508110552,
-          82.5,
-          90.8
+          -5.527936313013222,
+          4.300000000000001,
+          -428.56891522390606,
+          72.4,
+          84.0
         ]
       ]
     },

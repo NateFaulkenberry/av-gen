@@ -23,7 +23,6 @@ sys.path.insert(0, HERE)
 from canyon_scale import (WORLD_SCALE as WS, R, POC, PREFIX, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
                           rescale)  # (ADR-1893)
 from sample_ground import heights  # noqa: E402
-from portal_rim import RIM_PARTICLES  # noqa: E402
 
 # M3b: the canyon scale POC (SA_WORLD_SCALE=0.2) is the same journey in a canyon half the size: it starts from the
 # current canyon's files and writes its own (poc-*.scene.json, strange-attractor-poc.json); the current canyon is kept
@@ -274,8 +273,10 @@ dusk = {
 # field that gathers only once the camera has left the fire and climbs toward the cliff, a larger opening
 dusk_portal = dict(dusk)
 dusk_portal.update({
-    "corruption/radius": 36.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 95.0, "corruption/openNear": 10.0,
-    "corruption/openFar": 55.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
+    # M3c (owner: too long staring at a plain wall): the field reaches back to the camp, so the code gathers on the
+    # cliff as the camera leaves the fire, and the tear starts 80 m out
+    "corruption/radius": 80.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 260.0, "corruption/openNear": 10.0,
+    "corruption/openFar": 100.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
     "corruption/echoOffset": 0.35,
 })
 # night (crossing 3: the canyon behind the pyramid portal and home): dark, a cold moon, the fire down to embers
@@ -304,8 +305,10 @@ night = {
 # home from Mars (crossing 4): night, and the riverbed portal's corruption: small, gathering as the camera leaves the camp
 night_portal = dict(night)
 night_portal.update({
-    "corruption/radius": 24.0, "corruption/fieldNear": 8.0, "corruption/fieldFar": 48.0, "corruption/openNear": 5.0,
-    "corruption/openFar": 26.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
+    # M3c (the owner: the entrance's animation was lost): the glide starts 25 m out, so the tear now opens during it
+    # (from 14 m), seen whole, not already open when the camera turns to the river
+    "corruption/radius": 24.0, "corruption/fieldNear": 6.0, "corruption/fieldFar": 40.0, "corruption/openNear": 2.5,
+    "corruption/openFar": 14.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
     "corruption/echoOffset": 0.35,
 })
 # dawn (M3b; from crossing 5, so the canyon seen through the launch bay is already the morning one): home through
@@ -357,10 +360,8 @@ scene["portals"].append({"world": PREFIX + "strange-attractor-ocean.scene.json",
                          "entryUp": [build_mars.TOWARD_RIVER[0], 0.0, build_mars.TOWARD_RIVER[1]],
                          "entry": [build_mars.RIVER_PORTAL[0], build_mars.RIVER_Y, build_mars.RIVER_PORTAL[1]],
                          "entryAxis": [0.0, -1.0, 0.0], "flight": ocean_flight})
-# M3b: particles on the canyon portals' inner rims (ADR-1898): they follow whichever portal is live
-nodes = [n for n in scene["nodes"] if n["name"] != "canyon-rim"]
-nodes.append({"name": "canyon-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES})
-scene["nodes"] = nodes
+# M3c (owner): no rim particles on the portals (ADR-1898 withdrawn)
+scene["nodes"] = [n for n in scene["nodes"] if n["name"] != "canyon-rim"]
 json.dump(scene, open(PATH, "w"), indent=2)
 
 # --- the project: the Earth answers the music (a first pass for the owner to tune): the bass lifts its glow
@@ -372,6 +373,7 @@ routes.append({"source": "response.bass", "target": "moon/nodes/earth/emissiveBo
 # M3b: the Moon's rave and the Earth's datamosh, on the beat clock and the response (an envelope that falls in a
 # quarter-second, so a strobe is a deliberate flash, not a shimmer; with audio off the sources rest at 0)
 routes = [r for r in routes if not (r["target"].startswith("moon/lights/rave") or r["target"].startswith("moon/nodes/laser")
+                                    or "-rave-" in r["target"] or r["target"].startswith("moon/nodes/earth-halo")
                                     or r["target"].startswith("moon/nodes/earth-echo"))]
 
 
@@ -382,27 +384,28 @@ def beat_route(source, target, lo, hi, attack=8.0, decay=260.0, op="add"):
 
 
 for k in range(3):
-    routes.append(beat_route("beat.pulse", f"moon/lights/rave{k}-m/intensity", 0.0, 140000.0))
-    routes.append(beat_route("response.high", f"moon/lights/rave{k}-c/intensity", 0.0, 110000.0, decay=200.0))
-    routes.append(beat_route("response.onsetLow", f"moon/lights/rave{k}-g/intensity", 0.0, 120000.0, decay=320.0))
-    routes.append(beat_route("beat.pulse", f"moon/nodes/laser{k}/emissiveBoost", 0.0, 2.2, decay=300.0))
+    routes.append(beat_route("beat.pulse", f"moon/lights/rave{k}-m/intensity", 0.0, 30000.0))
+    routes.append(beat_route("response.high", f"moon/lights/rave{k}-c/intensity", 0.0, 24000.0, decay=200.0))
+    routes.append(beat_route("response.onsetLow", f"moon/lights/rave{k}-g/intensity", 0.0, 28000.0, decay=320.0))
+    # M3c: the windows -- five colour bands per dome, each on its own source, so the strobes move round the glass
+    for g, src, hi, dec in (("m", "beat.pulse", 3.0, 260.0), ("c", "response.high", 2.6, 200.0),
+                            ("g", "response.onsetLow", 3.0, 320.0), ("a", "response.mid", 2.2, 240.0),
+                            ("v", "response.bass", 2.4, 380.0)):
+        routes.append(beat_route(src, f"moon/nodes/dome{k}-rave-{g}/emissiveBoost", 0.0, hi, decay=dec))
 for c in ("r", "c"):
     routes.append(beat_route("beat.pulse", f"moon/nodes/earth-echo-{c}/opacity", 0.0, 0.55, decay=220.0, op="replace"))
 routes.append(beat_route("beat.pulse", "moon/nodes/earth/emissiveBoost", 0.0, 1.2, decay=400.0))
+routes.append(beat_route("beat.pulse", "moon/nodes/earth-halo/emissiveBoost", 0.0, 1.6, decay=360.0))
 project["routes"] = routes
 # M3: the submersibles' paths and their lights, keyed in the timeline (seconds, smooth)
 tracks = [t for t in project.get("timeline", {}).get("tracks", []) if not t["target"].startswith("ocean/")]
 for node, pos, yaw in build_ocean.sub_tracks():
     tracks.append({"target": f"ocean/nodes/{node}/position", "keys": [{"time": t, "value": p, "interp": "smooth"} for t, p in pos]})
-    tracks.append({"target": f"ocean/nodes/{node}/rotation", "keys": [{"time": t, "value": [0.0, y, 0.0], "interp": "smooth"} for t, y in yaw]})
+    tracks.append({"target": f"ocean/nodes/{node}/rotation", "keys": [{"time": t, "value": list(r), "interp": "smooth"} for t, r in yaw]})
     tracks.append({"target": f"ocean/lights/{node}-light/position",
                    "keys": [{"time": t, "value": [p[0], p[1] - 3.0, p[2]], "interp": "smooth"} for t, p in pos]})
-# M3b: the lasers turn (a slow sweep through the Moon leg), the rover drives, its tracks appear, its camera flashes
+# M3b: the rover drives, its tracks appear, its camera flashes (M3c: the lasers are gone)
 tracks = [t for t in tracks if not (t["target"].startswith("moon/nodes/laser") or t["target"].startswith("mars/"))]
-for k in range(3):
-    tracks.append({"target": f"moon/nodes/laser{k}/rotation",
-                   "keys": [{"time": 30.0, "value": [0.0, 40.0 * k, 0.0], "interp": "linear"},
-                            {"time": 50.0, "value": [0.0, 40.0 * k + (150.0 if k % 2 == 0 else -150.0), 0.0], "interp": "linear"}]})
 tracks += build_mars.rover_tracks()
 project["timeline"] = {"enabled": True, "tracks": tracks, "cues": project.get("timeline", {}).get("cues", [])}
 json.dump(project, open(PROJECT, "w"), indent=2)

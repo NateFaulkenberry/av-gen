@@ -5194,7 +5194,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             portalPass.label = "portal-view";
             portalPass.timestampWrites = timeline_->mark("portal", gpu::FrameTimeline::PassKind::Render);
             wgpu::RenderPassEncoder pp = encoder.BeginRenderPass(&portalPass);
-            const float params[4] = {scene.portal.crossed ? 1.0f : 0.0f, 1.0f, 25.0f, 0.0f};
+            // ADR-1901: the plane is pulled toward the eye by a share of the opening's width (Gate B's fixed 25 m covered
+            // Gate A's shard storm round the opening, and at a world scale of 0.4 it reached far out of the wall)
+            const float margin = std::max(1.0f, 0.3f * scene.corruption.width);
+            const float params[4] = {scene.portal.crossed ? 1.0f : 0.0f, 1.0f, margin, 0.0f};
             context_.queue().WriteBuffer(portalParams_, 0, params, sizeof(params));
             std::array<wgpu::BindGroupEntry, 3> be{};
             be[0].binding = 0;
@@ -6214,9 +6217,10 @@ Result<void> SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, cons
     }
     // the owner is drawing its own world in this frame already (a view back into the world the camera is still in):
     // the nested view is not drawn, and the portal pass composites nothing
-    // (or is handing the frame on to the world this view looks from: two worlds that both report the camera crossed
-    // into the other would otherwise hand the frame back and forth without end)
-    if (owner != nullptr && (owner->busy_ || owner->handingOff_)) {
+    // (or, for a hand-off, is itself handing the frame on to the world this view looks from: two worlds that both
+    // report the camera crossed into the other would otherwise hand the frame back and forth without end. A plain view
+    // back into it -- the glimpse through the way home -- is drawn: M3c, the Moon's crater floor showed nothing)
+    if (owner != nullptr && (owner->busy_ || (owner->handingOff_ && direct != nullptr))) {
         portalSource_ = nullptr;
         return {};
     }

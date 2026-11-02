@@ -42,7 +42,8 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | Art Pass 2, M1b | the world scaled to 0.4, the portal's water spill back, a short Moon, a real campfire (`36`; ADR-1893, 1894) | **approved, merged** (main 4bc5d3da) |
 | Art Pass 2, M2 | Mars: the outer cliff portal, Cydonia (mesas, haze, three pyramids), the pyramid portal, the night return; campfire notes (`37`; ADR-1895, 1896) | **approved, merged** (main 60d65ba8) |
 | Art Pass 2, M3 | the night gathering (Gray, UFO, embers), the riverbed portal, the ocean (shelf, base, launch bay, submersibles), the bay portal; Sasquatch idles; Mars notes (`38`) | reviewed: revised in M3b |
-| Art Pass 2, M3b | the revision (`39`): UFO interior cut, home at dawn; canyon scale POC (0.2); three Sasquatches, planted feet; rim particles; one water glide; Moon rave and Earth; Mars rover and block pyramids; night pass; ocean life and subs (`41`) | **done, awaiting the owner**: media in `pass2-m3b/` |
+| Art Pass 2, M3b | the revision (`39`): UFO interior cut, home at dawn; canyon scale POC (0.2); three Sasquatches, planted feet; rim particles; one water glide; Moon rave and Earth; Mars rover and block pyramids; night pass; ocean life and subs (`41`) | reviewed: revised in M3c |
+| Art Pass 2, M3c | the art checkpoint (`42`): portals back to Gate A, the Moon and pyramid/river regressions fixed, earlier tears; dome windows and the Earth glow options; Mars art pass with the rover; fast subs (`43`); suites not run (owner) | **done, awaiting the owner**: media in `pass2-m3c/` |
 | Art Pass 2, M4-M5 | (the UFO interior is cut by the owner; dawn is in M3b) | not started: gated on M3b |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
@@ -184,6 +185,15 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 ## Log
 
+- 2026-11-02: Art Pass 2, M3c (`43-pass2-m3c.md`; ADR-1901; ADR-1898 withdrawn).
+  - Portals: Gate A's shard storm and folded lips restored, the composite margin a share of the opening; rim
+    particles removed; the Moon's glimpse home fixed (the hand-off guard narrowed); the river portal tears during the
+    glide; the Mars cliff and pyramid portals start sooner.
+  - The Moon: the rave in the dome windows (five colour bands, five sources), the lasers gone; Earth glow options
+    (rims, scanlines, pixel corona: the pick), the Earth uncropped.
+  - Mars: the rover up close on the arrival; wind-banked drifts with no cliff or banding; weathered stones and cap;
+    lower sun, denser haze, more rocks. The ocean's subs launch and dive fast.
+  - Art checkpoint only: no full sequence, suites not run (owner).
 - 2026-11-02: Art Pass 2, M3b (`41-pass2-m3b.md`; ADR-1897, 1898, 1899, 1900).
   - The UFO interior cut; the launch bay leads home through portal 1's wall at dawn; the cut runs 0-210.5 s.
   - The canyon scale POC (`SA_WORLD_SCALE=0.2`, `poc-*` files, `strange-attractor-poc.json`), the current canyon

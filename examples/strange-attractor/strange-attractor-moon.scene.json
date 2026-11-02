@@ -62,9 +62,9 @@
       "type": "directional",
       "role": "fill",
       "direction": [
-        0.06796861984125294,
-        -0.224951054343865,
-        0.9719965482790865
+        0.06869671616600713,
+        -0.17364817766693033,
+        0.9824088108221348
       ],
       "color": [
         0.62,
@@ -97,8 +97,8 @@
       "name": "rave0-m",
       "type": "point",
       "position": [
-        -260.0,
-        -84.5,
+        -96.0,
+        -129.0,
         -480.0
       ],
       "color": [
@@ -106,8 +106,8 @@
         0.15,
         0.8
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -115,17 +115,17 @@
       "name": "rave0-c",
       "type": "point",
       "position": [
-        -350.0,
-        -84.5,
-        -428.4
+        -432.0,
+        -129.0,
+        -287.36
       ],
       "color": [
         0.15,
         0.85,
         1.0
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -133,17 +133,17 @@
       "name": "rave0-g",
       "type": "point",
       "position": [
-        -350.0,
-        -84.5,
-        -531.6
+        -432.0,
+        -129.0,
+        -672.64
       ],
       "color": [
         0.3,
         1.0,
         0.25
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -151,8 +151,8 @@
       "name": "rave1-m",
       "type": "point",
       "position": [
-        -676.0,
-        -86.0,
+        -446.40000000000003,
+        -130.5,
         -160.0
       ],
       "color": [
@@ -160,8 +160,8 @@
         0.15,
         0.8
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -169,17 +169,17 @@
       "name": "rave1-c",
       "type": "point",
       "position": [
-        -802.0,
-        -86.0,
-        -87.76
+        -916.8,
+        -130.5,
+        109.69599999999997
       ],
       "color": [
         0.15,
         0.85,
         1.0
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -187,17 +187,17 @@
       "name": "rave1-g",
       "type": "point",
       "position": [
-        -802.0,
-        -86.0,
-        -232.24
+        -916.8,
+        -130.5,
+        -429.69599999999997
       ],
       "color": [
         0.3,
         1.0,
         0.25
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -205,8 +205,8 @@
       "name": "rave2-m",
       "type": "point",
       "position": [
-        332.0,
-        -66.5,
+        528.8,
+        -111.0,
         -860.0
       ],
       "color": [
@@ -214,8 +214,8 @@
         0.15,
         0.8
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -223,17 +223,17 @@
       "name": "rave2-c",
       "type": "point",
       "position": [
-        224.0,
-        -66.5,
-        -798.08
+        125.6,
+        -111.0,
+        -628.832
       ],
       "color": [
         0.15,
         0.85,
         1.0
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -241,17 +241,17 @@
       "name": "rave2-g",
       "type": "point",
       "position": [
-        224.0,
-        -66.5,
-        -921.92
+        125.6,
+        -111.0,
+        -1091.1680000000001
       ],
       "color": [
         0.3,
         1.0,
         0.25
       ],
-      "intensity": 9000.0,
-      "range": 1100.0,
+      "intensity": 2500.0,
+      "range": 420.0,
       "castsShadow": false,
       "volumetric": 0.0
     },
@@ -1079,9 +1079,9 @@
       "kind": "gltf",
       "asset": "../../assets/space/earth.glb",
       "position": [
-        -611.7175785712765,
-        2064.559489094785,
-        -7247.968934511779
+        -618.2704454940641,
+        1602.833599002373,
+        -7341.679297399214
       ],
       "rotation": [
         0,
@@ -1101,9 +1101,9 @@
       "kind": "gltf",
       "asset": "../../assets/space/earth.glb",
       "position": [
-        -541.8880950530888,
-        2064.559489094785,
-        -7252.851887673867
+        -548.4409619758765,
+        1602.833599002373,
+        -7346.562250561303
       ],
       "rotation": [
         0,
@@ -1128,9 +1128,9 @@
       "kind": "gltf",
       "asset": "../../assets/space/earth.glb",
       "position": [
-        -681.5470620894641,
-        2064.559489094785,
-        -7243.08598134969
+        -688.0999290122518,
+        1602.833599002373,
+        -7336.796344237126
       ],
       "rotation": [
         0,
@@ -1151,68 +1151,34 @@
       "emissiveBoost": 3.0
     },
     {
-      "name": "earth-glow",
-      "kind": "particles",
+      "name": "earth-halo",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/earth-halo-c.glb",
+      "position": [
+        -696.5847019233122,
+        1800.7925215426735,
+        -8461.625341736448
+      ],
+      "rotation": [
+        100.0,
+        4.000000000000001,
+        0.0
+      ],
+      "scale": [
+        95.0,
+        95.0,
+        95.0
+      ],
       "visible": true,
-      "particles": {
-        "enabled": true,
-        "capacity": 24,
-        "seed": 5,
-        "shape": "sphere",
-        "position": [
-          -611.7175785712765,
-          2064.559489094785,
-          -7247.968934511779
-        ],
-        "extent": [
-          5.0,
-          5.0,
-          5.0
-        ],
-        "direction": [
-          0,
-          1,
-          0
-        ],
-        "spawnRate": 1.2,
-        "burst": 0.0,
-        "lifetimeMin": 14.0,
-        "lifetimeMax": 16.0,
-        "spread": 1.0,
-        "speedMin": 0.0,
-        "speedMax": 0.0,
-        "gravity": [
-          0,
-          0,
-          0
-        ],
-        "drag": 0.0,
-        "sizeStart": 1472.5,
-        "sizeEnd": 1472.5,
-        "sizeVariance": 0.04,
-        "colorStart": [
-          0.3,
-          0.6,
-          1.0,
-          0.09
-        ],
-        "colorEnd": [
-          0.3,
-          0.6,
-          1.0,
-          0.09
-        ],
-        "emissive": 3.0,
-        "blend": "additive"
-      }
+      "emissiveBoost": 1.0
     },
     {
-      "name": "laser0",
+      "name": "dome0-rave-m",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "asset": "../../assets/strange-attractor/build/dome-rave-m.glb",
       "position": [
         -320.0,
-        -99.5,
+        -152.0,
         -480.0
       ],
       "rotation": [
@@ -1221,117 +1187,320 @@
         0
       ],
       "scale": [
-        14.0,
-        14.0,
-        14.0
+        2.0,
+        1.5,
+        2.0
       ],
       "visible": true,
-      "emissiveBoost": 0.1
+      "emissiveBoost": 0.35
     },
     {
-      "name": "laser1",
+      "name": "dome0-rave-c",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "asset": "../../assets/strange-attractor/build/dome-rave-c.glb",
+      "position": [
+        -320.0,
+        -152.0,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2.0,
+        1.5,
+        2.0
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome0-rave-g",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-g.glb",
+      "position": [
+        -320.0,
+        -152.0,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2.0,
+        1.5,
+        2.0
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome0-rave-a",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-a.glb",
+      "position": [
+        -320.0,
+        -152.0,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2.0,
+        1.5,
+        2.0
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome0-rave-v",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-v.glb",
+      "position": [
+        -320.0,
+        -152.0,
+        -480.0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        2.0,
+        1.5,
+        2.0
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome1-rave-m",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-m.glb",
       "position": [
         -760.0,
-        -101.0,
+        -153.5,
         -160.0
       ],
       "rotation": [
         0,
-        40,
+        37,
         0
       ],
       "scale": [
-        19.599999999999998,
-        19.599999999999998,
-        19.599999999999998
+        2.8,
+        1.5,
+        2.8
       ],
       "visible": true,
-      "emissiveBoost": 0.1
+      "emissiveBoost": 0.35
     },
     {
-      "name": "laser2",
+      "name": "dome1-rave-c",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/laser-fan.glb",
+      "asset": "../../assets/strange-attractor/build/dome-rave-c.glb",
+      "position": [
+        -760.0,
+        -153.5,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        37,
+        0
+      ],
+      "scale": [
+        2.8,
+        1.5,
+        2.8
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome1-rave-g",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-g.glb",
+      "position": [
+        -760.0,
+        -153.5,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        37,
+        0
+      ],
+      "scale": [
+        2.8,
+        1.5,
+        2.8
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome1-rave-a",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-a.glb",
+      "position": [
+        -760.0,
+        -153.5,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        37,
+        0
+      ],
+      "scale": [
+        2.8,
+        1.5,
+        2.8
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome1-rave-v",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-v.glb",
+      "position": [
+        -760.0,
+        -153.5,
+        -160.0
+      ],
+      "rotation": [
+        0,
+        37,
+        0
+      ],
+      "scale": [
+        2.8,
+        1.5,
+        2.8
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome2-rave-m",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-m.glb",
       "position": [
         260.0,
-        -81.5,
+        -134.0,
         -860.0
       ],
       "rotation": [
         0,
-        80,
+        74,
         0
       ],
       "scale": [
-        16.8,
-        16.8,
-        16.8
+        2.4,
+        1.5,
+        2.4
       ],
       "visible": true,
-      "emissiveBoost": 0.1
+      "emissiveBoost": 0.35
     },
     {
-      "name": "crater-rim",
-      "kind": "particles",
+      "name": "dome2-rave-c",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-c.glb",
+      "position": [
+        260.0,
+        -134.0,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        74,
+        0
+      ],
+      "scale": [
+        2.4,
+        1.5,
+        2.4
+      ],
       "visible": true,
-      "portalRim": true,
-      "particles": {
-        "enabled": true,
-        "capacity": 7000,
-        "seed": 91,
-        "shape": "disc",
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "extent": [
-          1.0,
-          0.1,
-          1.0
-        ],
-        "innerRadius": 0.72,
-        "direction": [
-          0,
-          0,
-          -1
-        ],
-        "spawnRate": 3200.0,
-        "lifetimeMin": 0.3,
-        "lifetimeMax": 0.75,
-        "spread": 0.55,
-        "speedMin": 1.0,
-        "speedMax": 4.0,
-        "gravity": [
-          0,
-          0,
-          0
-        ],
-        "drag": 1.2,
-        "turbulence": 3.5,
-        "turbulenceScale": 0.35,
-        "sizeStart": 0.05,
-        "sizeEnd": 0.0075,
-        "sizeVariance": 0.6,
-        "colorStart": [
-          0.95,
-          0.9,
-          0.75,
-          0.85
-        ],
-        "colorEnd": [
-          0.85,
-          0.7,
-          0.4,
-          0.0
-        ],
-        "emissive": 3.0,
-        "blend": "additive",
-        "velocityStretch": 0.8,
-        "stretchMax": 1.5
-      }
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome2-rave-g",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-g.glb",
+      "position": [
+        260.0,
+        -134.0,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        74,
+        0
+      ],
+      "scale": [
+        2.4,
+        1.5,
+        2.4
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome2-rave-a",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-a.glb",
+      "position": [
+        260.0,
+        -134.0,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        74,
+        0
+      ],
+      "scale": [
+        2.4,
+        1.5,
+        2.4
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
+    },
+    {
+      "name": "dome2-rave-v",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/dome-rave-v.glb",
+      "position": [
+        260.0,
+        -134.0,
+        -860.0
+      ],
+      "rotation": [
+        0,
+        74,
+        0
+      ],
+      "scale": [
+        2.4,
+        1.5,
+        2.4
+      ],
+      "visible": true,
+      "emissiveBoost": 0.35
     },
     {
       "name": "dome0",

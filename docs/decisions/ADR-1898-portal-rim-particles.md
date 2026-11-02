@@ -1,6 +1,7 @@
 # ADR-1898: Portal rim particles and the ring emitter
 
-- Status: Proposed (Art Pass 2, M3b), scene/strange-attractor.
+- Status: **Withdrawn** (M3c: the owner did not like the rim particles; the code and its tests are removed, ADR-441).
+  Was: Proposed (Art Pass 2, M3b), scene/strange-attractor.
 - Code: `CompositionNode::portalRim` (`src/scene/composition.*`), `ParticleSystem::innerRadius` (`particles.hpp`,
   `particle_io.cpp`, `particle_renderer.cpp`, `shaders/particles.wgsl`).
 - Tests: `[particles][pass2][adr1898]`, `[composition][pass2][adr1898]`.

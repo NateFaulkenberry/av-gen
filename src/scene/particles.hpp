@@ -261,8 +261,6 @@ struct ParticleSystem {
     std::string spline;              // Spline shape: scene spline name
     glm::vec3 position{0.0f, 1.0f, 0.0f};
     glm::vec3 extent{0.5f};          // sphere radius (x), disc radius (x), box half extents
-    float innerRadius = 0.0f;        // ADR-1898: a disc emits from this fraction of its radius out (0 = the whole disc;
-                                     // 0.7 = a ring), the portal rim's clear centre
     float spawnRate = 2000.0f;       // particles per second (continuous)
     float burst = 0.0f;              // extra particles emitted this frame (impulse; reset by the caller)
     float lifetimeMin = 1.0f;

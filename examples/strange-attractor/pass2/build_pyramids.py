@@ -182,10 +182,12 @@ def build(name, base, st):
 # pyramid keep a smooth casing cap (as Khafre's does). A sand mound buries the base -- deepest to windward (west) --
 # and blocks wholly under it are not built. Five stone materials, one per block at random, plus dust on the treads.
 STONES = [material(f"block_{k}", c, r) for k, (c, r) in enumerate((
-    ((0.50, 0.37, 0.24), 0.93), ((0.45, 0.32, 0.2), 0.95), ((0.56, 0.42, 0.28), 0.9), ((0.4, 0.27, 0.17), 0.96),
-    ((0.52, 0.34, 0.2), 0.94)))]
-DUST = material("block_dust", (0.52, 0.3, 0.16), 1.0)
-CAP = material("casing_cap", (0.62, 0.48, 0.33), 0.85)
+    ((0.43, 0.31, 0.2), 0.94), ((0.38, 0.26, 0.16), 0.95), ((0.48, 0.35, 0.23), 0.92), ((0.34, 0.22, 0.14), 0.96),
+    ((0.45, 0.28, 0.16), 0.95)))]
+DUST = material("block_dust", (0.5, 0.27, 0.14), 1.0)
+CAP = material("casing_cap", (0.44, 0.31, 0.2), 0.95)       # M3c: weathered, not a white tip
+STAIN = material("block_stain", (0.38, 0.2, 0.11), 0.97)    # M3c: sand-scoured, rust-stained low courses
+DARK = material("block_dark", (0.24, 0.16, 0.11), 0.97)     # M3c: weathered dark stones
 STATES = {
     "pyramid-a": dict(burial=0.3, missing=0.07, chip=0.35, cap=0.0, seed=11),
     "pyramid-b": dict(burial=0.26, missing=0.045, chip=0.3, cap=0.12, seed=23),
@@ -203,15 +205,22 @@ def build_blocks(name, base, st):
     seed = st["seed"]
 
     def sand(x, y):
-        """The sand's height: a mound burying the base to `burial` of the height, deeper to windward (west), rippled."""
+        """M3c (owner: realistic, wind-banked sand; no streak banding, no cliff): the drift banked against the faces --
+        deepest to windward (west), long and low there, shorter to leeward -- falling to the plain by a smooth cubic
+        profile with no lip at the crest and none at the toe; broad, low undulations, no geometric ripples (the drift
+        is smooth shaded; ripples belong to the texture's scale, not this grid's)."""
         m = max(abs(x), abs(y))
-        wind = 0.75 + 0.35 * smooth(-1.0, 1.0, -x / half)
-        crest = st["burial"] * H * wind * (0.8 + 0.4 * fbm(x / 60.0, y / 60.0, seed + 13))
-        ripple = 0.25 * math.sin(x * 0.9 + 2.0 * fbm(x / 30.0, y / 30.0, seed + 15)) * smooth(half * 1.0, half * 1.3, m)
+        westness = smooth(-1.0, 1.0, -x / half)
+        crest = st["burial"] * H * (0.7 + 0.45 * westness) * (0.78 + 0.44 * fbm(x / 90.0, y / 90.0, seed + 13))
         if m < half:
             return crest
         out = math.hypot(max(abs(x) - half, 0.0), max(abs(y) - half, 0.0))   # rounded around the corners
-        return crest * math.exp(-((out / (half * 0.22)) ** 1.4)) + ripple
+        run = crest * (2.4 + 2.2 * westness) * (0.85 + 0.3 * fbm(x / 70.0, y / 70.0, seed + 17))
+        run = min(run, half * (0.75 + 0.9 * westness))
+        t = min(out / max(run, 1.0), 1.0)
+        prof = 1.0 - t * t * (3.0 - 2.0 * t)
+        swell = (fbm(x / 45.0, y / 45.0, seed + 19) - 0.5) * 0.12 * crest * (1.0 - t)
+        return crest * prof + swell
 
     bm = bmesh.new()
     mats_of = []
@@ -281,13 +290,35 @@ def build_blocks(name, base, st):
         s0 = half - cap_from * tread
         apex = Vector((0, 0, H))
         corners = [Vector((s0, s0, z0)), Vector((-s0, s0, z0)), Vector((-s0, -s0, z0)), Vector((s0, -s0, z0))]
-        vs = [bm.verts.new(p) for p in corners] + [bm.verts.new(apex)]
+        # M3c (owner: no smooth white capstone): the cap's four faces as a fine grid, eroded by a noise, its edges and
+        # tip broken back, in a weathered casing stone
+        NS = 24
         for i in range(4):
-            bm.faces.new((vs[i], vs[(i + 1) % 4], vs[4]))
-            mats_of.append(6)
+            a_, b_ = corners[i], corners[(i + 1) % 4]
+            rows = []
+            for r in range(NS + 1):
+                fr = r / NS
+                row = []
+                for q in range(NS + 1 - r):
+                    fq = q / max(NS - r, 1) if NS - r > 0 else 0.0
+                    p_ = a_.lerp(b_, fq).lerp(apex, fr) if r < NS else apex.copy()
+                    nrm = Vector((p_.x, p_.y, 0.0))
+                    nrm = nrm.normalized() if nrm.length > 1e-6 else Vector((0, 0, 1))
+                    edge = min(fq, 1.0 - fq) if NS - r > 0 else 0.0
+                    bite = (0.9 - 0.6 * min(edge * 4.0, 1.0)) * (0.5 + fr)
+                    d = (fbm(p_.x / 3.0 + i * 7, p_.y / 3.0 + p_.z / 3.0, seed + 61) - 0.55) * 1.4 - bite * 0.8
+                    row.append(bm.verts.new(p_ + nrm * d - Vector((0, 0, 0.6 * fr * fr))))
+                rows.append(row)
+            for r in range(NS):
+                for q in range(NS - r):
+                    bm.faces.new((rows[r][q], rows[r][q + 1], rows[r + 1][q]))
+                    mats_of.append(6)
+                    if q + 1 < len(rows[r + 1]):
+                        bm.faces.new((rows[r][q + 1], rows[r + 1][q + 1], rows[r + 1][q]))
+                        mats_of.append(6)
     # the sand mound: a height field ring around the base (and over the buried courses)
-    reach = half * 1.5
-    stepg = max(base / 140.0, 1.2)
+    reach = half * 2.7
+    stepg = max(base / 130.0, 1.6)
     n = int(2 * reach / stepg) + 1
     grid = []
     for j in range(n):
@@ -299,7 +330,7 @@ def build_blocks(name, base, st):
             h = sand(x, y)
             # inside the footprint the sand only shows where it is above the stone's face
             face = H * (1.0 - m / half) if m < half else 0.0
-            h = max(h, 0.0) - 2.0 * smooth(reach * 0.85, reach, m)
+            h = max(h, 0.0) - 2.0 * smooth(reach * 0.9, reach, m)
             if m < half and h < face - ch * 0.2:
                 h = face - ch * 0.6     # tucked under the stone: hidden
             row.append(bm.verts.new((x, y, h)))
@@ -314,14 +345,24 @@ def build_blocks(name, base, st):
     for m_ in [STONES[0]] + STONES + [CAP, SAND]:
         me.materials.append(m_)
     bm.faces.ensure_lookup_table()
+    wrnd = random.Random(st["seed"] + 101)
     for f, mi in zip(bm.faces, mats_of):
         f.material_index = mi
-        if mi in (1, 2, 3, 4, 5) and f.normal.z > 0.7:
-            f.material_index = 8              # dust settled on the treads
+        f.smooth = mi == 7                    # the drift smooth, the stone faceted
+        if mi in (1, 2, 3, 4, 5):
+            c = f.calc_center_median()
+            sline = sand(c.x, c.y)
+            if f.normal.z > 0.7 and (c.z < sline + 7.0 * ch or wrnd.random() < 0.35):
+                f.material_index = 8          # sand spilled into the courses, dust on the treads
+            elif c.z < sline + 3.0 * ch and wrnd.random() < 0.6:
+                f.material_index = 9          # sand-scoured, rust-stained low courses
+            elif wrnd.random() < 0.07:
+                f.material_index = 10         # weathered dark stones
     me.materials.append(DUST)
+    me.materials.append(STAIN)
+    me.materials.append(DARK)
     bm.to_mesh(me)
     bm.free()
-    me.shade_flat()
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
     path = f"{out_dir}/{name}.glb"
     bpy.ops.object.select_all(action="DESELECT")

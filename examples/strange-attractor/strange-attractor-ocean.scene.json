@@ -803,67 +803,6 @@
       }
     },
     {
-      "name": "bay-rim",
-      "kind": "particles",
-      "visible": true,
-      "portalRim": true,
-      "particles": {
-        "enabled": true,
-        "capacity": 7000,
-        "seed": 91,
-        "shape": "disc",
-        "position": [
-          0,
-          0,
-          0
-        ],
-        "extent": [
-          1.0,
-          0.1,
-          1.0
-        ],
-        "innerRadius": 0.72,
-        "direction": [
-          0,
-          0,
-          -1
-        ],
-        "spawnRate": 3200.0,
-        "lifetimeMin": 0.3,
-        "lifetimeMax": 0.75,
-        "spread": 0.55,
-        "speedMin": 1.0,
-        "speedMax": 4.0,
-        "gravity": [
-          0,
-          0,
-          0
-        ],
-        "drag": 1.2,
-        "turbulence": 3.5,
-        "turbulenceScale": 0.35,
-        "sizeStart": 0.12,
-        "sizeEnd": 0.018,
-        "sizeVariance": 0.6,
-        "colorStart": [
-          0.7,
-          0.95,
-          1.0,
-          0.85
-        ],
-        "colorEnd": [
-          0.3,
-          0.75,
-          1.0,
-          0.0
-        ],
-        "emissive": 3.0,
-        "blend": "additive",
-        "velocityStretch": 0.8,
-        "stretchMax": 1.5
-      }
-    },
-    {
       "name": "life-0",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",

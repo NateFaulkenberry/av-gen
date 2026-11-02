@@ -309,9 +309,8 @@ fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u
     let seed = crSeed();
     let h = crHash(vec4<u32>(tri, mwIndices[tri * 3u], seed, 31u));
     let ring = 1.0 - smoothstep(1.3, 2.4, ap.e);
-    // fewer as the camera closes in: the crossing is the opening, not a wall of fragments
-    let camNear = smoothstep(15.0, 70.0, distance(frame.cameraPos.xyz, frame.corruption0.xyz));
-    if (h > mw.extra.z * ap.openT * ring * camNear) {
+    // M3c (ADR-1901): Gate A's storm -- the shards stay to the crossing
+    if (h > mw.extra.z * ap.openT * ring) {
         return out;
     }
     let rate = max(mw.extra.w, 0.01);
@@ -320,21 +319,31 @@ fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u
     let c0 = crDisplace(cR, frame.params.x, 0u).p;
     let focus = frame.corruption0.xyz;
     let ease = ph * ph * (3.0 - 2.0 * ph);
-    // along the rim and in past the edge, then back through the opening's plane (where the other world covers them):
-    // never across its middle, never hanging there facing the camera
-    let along = normalize(cross(b.ax, cR - focus) + vec3<f32>(1e-4, 0.0, 0.0));
-    let centre = c0 + (focus - c0) * ease * 0.18 + along * ease * 6.0 + b.ax * (frame.corruption3.z + 12.0) * pow(ph, 1.5);
+    // M3c (ADR-1901): Gate A's burst -- in toward the focus and back into the tunnel, a storm of gold round the
+    // opening; the other world shows through behind it
+    let centre = c0 + (focus - c0) * ease * 0.85 + b.ax * frame.corruption3.z * 0.7 * ph * ph;
     let axis = normalize(vec3<f32>(crHash(vec4<u32>(tri, 3u, seed, 34u)) - 0.5, crHash(vec4<u32>(tri, 4u, seed, 35u)) - 0.5,
                                    crHash(vec4<u32>(tri, 5u, seed, 36u)) - 0.5) + vec3<f32>(1e-3, 0.0, 0.0));
     let angle = ph * 3.1415927 * (1.0 + 2.0 * crHash(vec4<u32>(tri, 6u, seed, 37u)));
-    let scale = (1.0 - smoothstep(0.45, 0.85, ph)) * 0.92;
+    let scale = (1.0 - smoothstep(0.55, 1.0, ph)) * 0.92;
     var corners = array<vec3<f32>, 3>(r0, r1, r2);
     var barys = array<vec3<f32>, 3>(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
     let k = vi % 3u;
     let local = shardRotate((corners[k] - cR) * scale, axis, angle);
     let p = centre + local;
     let fn0 = normalize(cross(r1 - r0, r2 - r0) + vec3<f32>(0.0, 1e-6, 0.0));
-    out.clip = frame.viewProj * vec4<f32>(p, 1.0);
+    // ADR-1901: a shard in the tunnel, behind the plane the destination is composited on, is still drawn over the
+    // glimpse (Gate A's storm, with the other world behind it): its depth is pulled toward the eye, along its own ray
+    // (so it stays where it is on screen), to just in front of that plane
+    let margin = max(1.0, 0.3 * frame.corruption3.x);
+    let behind = dot(p - focus, b.ax) + margin + 0.5;
+    var pd = p;
+    if (behind > 0.0) {
+        let toEye = frame.cameraPos.xyz - p;
+        let dist = length(toEye);
+        pd = p + toEye / max(dist, 1e-3) * min(behind / max(abs(dot(normalize(toEye), b.ax)), 0.2), dist * 0.95);
+    }
+    out.clip = frame.viewProj * vec4<f32>(pd, 1.0);
     out.worldPos = p;
     out.normal = shardRotate(fn0, axis, angle);
     out.bary = barys[k];

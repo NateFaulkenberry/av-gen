@@ -22,7 +22,6 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, pace  # noqa: E402
-from portal_rim import RIM_PARTICLES_SEA  # noqa: E402
 from sample_ground import heights  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -87,29 +86,40 @@ SUBS = [("sub-1", 0.026), ("sub-2", 0.021), ("sub-3", 0.017), ("sub-4", 0.019), 
 
 
 def sub_tracks():
-    """[(node, [(t, [x, y, z])], [(t, yaw)])]: absolute positions (the seabed under the routes is about 0..10 m)."""
+    """[(node, [(t, [x, y, z])], [(t, [pitch, yaw, roll])])]: absolute positions. M3c (owner: much faster -- they whiz in
+    and out of the base and head up toward the surface): launches out of the bay, a hard climb, gone up into the
+    water's gloom in three seconds; returns diving down out of it and into the bay just as fast. Parked inside the
+    base (behind the membrane) when not flying."""
     bx, by, bz = BAY
-    return [
-        # sub-1 leaves the bay, turns out over the seabed and away to the north
-        ("sub-1", [(118.0, [bx - 30.0, by, bz]), (126.0, [bx - 30.0, by, bz]), (131.0, [bx + 60.0, by + 2.0, bz]),
-                   (137.0, [bx + 180.0, by + 18.0, bz + 160.0]), (146.0, [bx + 330.0, by + 40.0, bz + 520.0])],
-         [(126.0, 90.0), (131.0, 90.0), (137.0, 40.0), (146.0, 20.0)]),
-        # sub-2 comes in from the south and enters the bay, ahead of the camera
-        ("sub-2", [(118.0, [bx + 420.0, by + 30.0, bz - 380.0]), (130.0, [bx + 230.0, by + 12.0, bz - 120.0]),
-                   (138.0, [bx + 90.0, by + 2.0, bz - 10.0]), (142.5, [bx + 10.0, by, bz]), (147.0, [bx - 45.0, by, bz])],
-         [(118.0, -40.0), (130.0, -60.0), (138.0, -85.0), (147.0, -90.0)]),
-        # sub-3 holds station high by the towers, drifting
-        ("sub-3", [(118.0, [bx - 60.0, by + 95.0, bz + 70.0]), (147.0, [bx - 40.0, by + 102.0, bz + 30.0])],
-         [(118.0, 10.0), (147.0, 35.0)]),
-        # M3b: sub-4 rises out of the bay and away over the shelf; sub-5 comes down from above and goes in behind
-        ("sub-4", [(118.0, [bx - 30.0, by, bz]), (133.0, [bx - 30.0, by, bz]), (137.5, [bx + 70.0, by + 6.0, bz + 20.0]),
-                   (142.0, [bx + 120.0, by + 60.0, bz - 140.0]), (147.0, [bx + 60.0, by + 150.0, bz - 400.0])],
-         [(133.0, 90.0), (137.5, 110.0), (142.0, 160.0), (147.0, 180.0)]),
-        ("sub-5", [(118.0, [bx + 260.0, by + 180.0, bz + 300.0]), (136.0, [bx + 200.0, by + 70.0, bz + 120.0]),
-                   (142.0, [bx + 110.0, by + 12.0, bz + 30.0]), (145.6, [bx + 20.0, by + 1.0, bz + 2.0]),
-                   (147.0, [bx - 30.0, by, bz])],
-         [(118.0, -130.0), (136.0, -115.0), (142.0, -100.0), (147.0, -90.0)]),
-    ]
+    inside = [bx - 40.0, by, bz]
+
+    def launch(t0, side):
+        pos = [(t0 - 0.6, inside), (t0, [bx + 12.0, by + 1.0, bz]), (t0 + 0.7, [bx + 75.0, by + 14.0, bz + side * 10.0]),
+               (t0 + 1.5, [bx + 150.0, by + 85.0, bz + side * 45.0]), (t0 + 2.4, [bx + 215.0, by + 280.0, bz + side * 110.0]),
+               (t0 + 3.4, [bx + 250.0, by + 650.0, bz + side * 170.0])]
+        rot = [(t0 - 0.6, [0.0, 90.0, 0.0]), (t0 + 0.4, [0.0, 90.0, 0.0]), (t0 + 1.4, [0.0, 90.0 - side * 15.0, 32.0]),
+               (t0 + 3.4, [0.0, 90.0 - side * 20.0, 55.0])]
+        return pos, rot
+
+    def dive(t1, side):
+        pos = [(t1 - 3.2, [bx + 280.0, by + 650.0, bz + side * 180.0]), (t1 - 2.2, [bx + 220.0, by + 260.0, bz + side * 110.0]),
+               (t1 - 1.3, [bx + 120.0, by + 60.0, bz + side * 35.0]), (t1 - 0.5, [bx + 30.0, by + 4.0, bz + side * 4.0]),
+               (t1, inside)]
+        rot = [(t1 - 3.2, [0.0, -90.0 + side * 15.0, -45.0]), (t1 - 1.3, [0.0, -90.0 + side * 8.0, -20.0]),
+               (t1 - 0.4, [0.0, -90.0, 0.0])]
+        return pos, rot
+
+    def park(entries, t_end=150.0):
+        """Hold the first and last key from the start and to the end (seek-safe outside the sorties)."""
+        pos, rot = entries
+        return [(118.0, pos[0][1])] + pos + [(t_end, pos[-1][1])], [(118.0, rot[0][1])] + rot + [(t_end, rot[-1][1])]
+
+    tracks = []
+    for name, kind, t, side in (("sub-1", launch, 126.6, 1.0), ("sub-2", dive, 131.2, -1.0), ("sub-3", launch, 135.4, -1.0),
+                                ("sub-4", dive, 140.2, 1.0), ("sub-5", launch, 143.4, 1.0)):
+        pos, rot = park(kind(t, side))
+        tracks.append((name, pos, rot))
+    return tracks
 
 
 def write_ocean(portal_flight):
@@ -188,7 +198,6 @@ def write_ocean(portal_flight):
                 "drag": 0.2, "turbulence": 0.2, "turbulenceScale": 0.05, "sizeStart": 0.09, "sizeEnd": 0.09,
                 "sizeVariance": 0.6, "colorStart": [0.7, 0.85, 0.85, 0.35], "colorEnd": [0.7, 0.85, 0.85, 0.35],
                 "emissive": 0.3, "blend": "additive"}},
-            {"name": "bay-rim", "kind": "particles", "visible": True, "portalRim": True, "particles": RIM_PARTICLES_SEA},
         ] + life_nodes() + fish_nodes(),
     }
     path = os.path.join(HERE, PREFIX + "strange-attractor-ocean.scene.json")
