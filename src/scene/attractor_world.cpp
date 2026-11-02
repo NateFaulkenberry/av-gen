@@ -616,6 +616,9 @@ Result<void> AttractorGen::validate() const {
     }
     if (!(terrainScale >= 0.5f && terrainScale <= 1.6f)) return fail("attractorWorld: terrainScale must be in [0.5, 1.6]");
     if (!unit(branchingDensity)) return fail("attractorWorld: branchingDensity must be in [0, 1]");
+    if (mars && (!unit(mesaCover) || yardangs < 0.0f || yardangs > 60.0f || dunes < 0.0f || dunes > 40.0f)) {
+        return fail("attractorWorld: mars needs mesaCover in [0, 1], yardangs in [0, 60] and dunes in [0, 40]");
+    }
     if (!(flightSeconds >= 20.0f && flightSeconds <= 120.0f)) return fail("attractorWorld: flightSeconds must be in [20, 120]");
     if (!(meshSpacing >= 0.5f && meshSpacing <= 16.0f)) return fail("attractorWorld: meshSpacing must be in [0.5, 16] m");
     if (!(meshError > 0.0f && meshError <= 0.05f) || !(meshMinError > 0.0f && meshMinError <= 10.0f)) {
@@ -642,6 +645,9 @@ std::uint64_t AttractorGen::hash() const {
         h = mixHashF(h, v);
     }
     if (worldScale != 1.0f) h = mixHashF(h ^ 0x1893ull, worldScale); // ADR-1893: absent, the hash is unchanged
+    if (mars) { // ADR-1902: absent, the hash is unchanged
+        for (float v : {mesaCover, yardangs, wind, dunes}) h = mixHashF(h ^ 0x1902ull, v);
+    }
     for (const Pad& p : pads) { // ADR-1897
         for (float v : {p.x, p.z, p.radius, p.level}) h = mixHashF(h ^ 0x1897ull, v);
     }
@@ -850,10 +856,14 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                 best = std::min(best, segDist(p, w.valley[i], w.valley[i + 1], along));
             }
             const float vpos = std::max(v, 0.0f);
-            const float basinW = (380.0f + 0.14f * vpos) * S;
-            F -= 1.25f * std::exp(-(best * best) / (basinW * basinW));
-            const float dc = glm::length(p - camXZ) / (340.0f * S); // the camera's promontory
-            F += 1.6f * std::exp(-dc * dc);
+            if (g.mars) { // ADR-1902: no valley, no promontory: the plain, the mesas where the front stays high
+                F -= 0.25f + 1.4f * (1.0f - g.mesaCover);
+            } else {
+                const float basinW = (380.0f + 0.14f * vpos) * S;
+                F -= 1.25f * std::exp(-(best * best) / (basinW * basinW));
+                const float dc = glm::length(p - camXZ) / (340.0f * S); // the camera's promontory
+                F += 1.6f * std::exp(-dc * dc);
+            }
             for (std::size_t m = 0; m < w.masses.size(); ++m) { // the composed masses
                 const AttractorMass& ms = w.masses[m];
                 const float c = std::cos(ms.angle), sn = std::sin(ms.angle);
@@ -920,8 +930,27 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             // with stepped walls, wandering on its own meander about the trunk.
             const float chW = (55.0f + 0.010f * vpos) * S;
             const float best = meanderD[idx];
-            const float onBasin = 1.0f - smoothstepf(-40.0f * S, 40.0f * S, d1);
+            const float onBasin = g.mars ? 0.0f : 1.0f - smoothstepf(-40.0f * S, 40.0f * S, d1);
             h += Lb;
+            if (g.mars) { // ADR-1902: the floor's wind forms -- yardangs (long ridges along the wind) and transverse dunes
+                const float floorW = 1.0f - smoothstepf(-60.0f * S, 10.0f * S, d1);
+                const float wa = g.wind * kPi / 180.0f;
+                const glm::vec2 wd(std::cos(wa), std::sin(wa)), wc(-wd.y, wd.x);
+                // yardangs: a noise stretched 12:1 along the wind, ridged
+                const glm::vec2 yq(glm::dot(p, wd) / (900.0f * S), glm::dot(p, wc) / (75.0f * S));
+                const float yr = 1.0f - std::abs(2.0f * fbm(yq, 4, nseed + 61u) - 1.0f);
+                const float yMask = smoothstepf(0.35f, 0.7f, fbm(p / (2600.0f * S), 3, nseed + 62u));
+                h += floorW * yMask * g.yardangs * (yr * yr - 0.35f);
+                // dunes: an asymmetric wave across the wind (a long windward slope, a short slip face), its crests
+                // wandering, in fields where the yardangs are not
+                const float u = glm::dot(p, wd) + 140.0f * S * fbm(p / (1100.0f * S), 3, nseed + 63u);
+                const float lam = 85.0f * S;
+                const float s = u / lam - std::floor(u / lam);
+                const float profile = s < 0.78f ? smoothstepf(0.0f, 0.78f, s) : 1.0f - smoothstepf(0.78f, 1.0f, s);
+                const float dMask = smoothstepf(0.45f, 0.75f, 1.0f - fbm(p / (2600.0f * S), 3, nseed + 62u)) *
+                                    smoothstepf(0.3f, 0.6f, fbm(p / (700.0f * S), 3, nseed + 64u));
+                h += floorW * dMask * g.dunes * profile;
+            }
             const float gorge = smoothstepf(chW * 1.35f, chW * 0.85f, best) * onBasin;
             h += (-2.0f - h) * gorge; // the gorge's floor is flat at -2 m, so the river is the same depth all along (no shoals)
             const float wall = smoothstepf(chW * 1.9f, chW * 1.2f, best) * (1.0f - smoothstepf(chW * 1.0f, chW * 0.75f, best));
@@ -1045,7 +1074,7 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
                 }
             }
         };
-        if (g.branchingDensity > 0.0f && gorge.size() > 8) {
+        if (!g.mars && g.branchingDensity > 0.0f && gorge.size() > 8) { // ADR-1902: no side canyons on Mars
             float arc = brng.range(250.0f, 550.0f) * S;
             float lastSide = brng.nextFloat() < 0.5f ? -1.0f : 1.0f;
             std::size_t gi = 0;
@@ -1442,7 +1471,7 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "worldScale", "pads", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "meshMinError", "worldScale", "pads", "mars", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
 constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth"};
 
@@ -1481,6 +1510,15 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
     g.worldScale = j.value("worldScale", g.worldScale); // ADR-1893
+    if (j.contains("mars")) { // ADR-1902
+        const json& mj = j.at("mars");
+        if (!mj.is_object()) return fail("attractorWorld: 'mars' must be an object");
+        g.mars = true;
+        g.mesaCover = mj.value("mesaCover", g.mesaCover);
+        g.yardangs = mj.value("yardangs", g.yardangs);
+        g.wind = mj.value("wind", g.wind);
+        g.dunes = mj.value("dunes", g.dunes);
+    }
     if (j.contains("pads")) { // ADR-1897
         if (!j.at("pads").is_array()) return fail("attractorWorld: 'pads' must be a list");
         for (const json& pj : j.at("pads")) {
@@ -1615,6 +1653,9 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
                   {"contour", k.contour}, {"glow", k.glow}, {"contourGain", k.contourGain}}},
                 {"water", waterToJson(a.water)}};
     if (g.worldScale != 1.0f) out["worldScale"] = g.worldScale; // ADR-1893
+    if (g.mars) { // ADR-1902
+        out["mars"] = {{"mesaCover", g.mesaCover}, {"yardangs", g.yardangs}, {"wind", g.wind}, {"dunes", g.dunes}};
+    }
     if (k.sunWarmth != 1.0f) out["look"]["sunWarmth"] = k.sunWarmth; // ADR-1900: absent, the warm sun
     if (!g.pads.empty()) { // ADR-1897
         json pads = json::array();

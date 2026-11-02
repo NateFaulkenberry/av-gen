@@ -60,6 +60,15 @@ struct AttractorGen {
         float x = 0.0f, z = 0.0f, radius = 10.0f, level = 0.0f;
     };
     std::vector<Pad> pads;
+    // ADR-1902: the Mars style -- the same pipeline (the domain-warped erosion front, the metric cliffs and talus,
+    // the strata and their terraces, the erosion gullies, the masks) retuned for a dry, wind-carved plain: no gorge,
+    // no river, no side canyons, the plateau reduced to mesas and buttes (`mesaCover` of the land), yardangs on the
+    // floor (`yardangs` metres deep, along `wind` degrees) and fields of transverse dunes (`dunes` metres high).
+    bool mars = false;
+    float mesaCover = 0.3f;   // 0..1: the share of the land the mesas keep
+    float yardangs = 6.0f;    // metres
+    float wind = 30.0f;       // degrees: the wind's direction (x toward z)
+    float dunes = 4.0f;       // metres
     // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
     // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
     // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from
