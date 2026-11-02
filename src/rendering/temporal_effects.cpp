@@ -618,6 +618,7 @@ wgpu::TextureView TemporalEffects::run(wgpu::CommandEncoder& encoder, const Temp
             u.params = {fb.amount, std::clamp(fb.decay, 0.0f, 0.99f), std::max(fb.zoom, 1e-3f), glm::radians(fb.rotate)};
             u.extra = {fb.driftX, fb.driftY, fb.hue,
                        static_cast<float>(in.width) / static_cast<float>(std::max(in.height, 1u))};
+            u.more = {fb.centerX, fb.centerY, 0.0f, 0.0f}; // ADR-1937
             if (!ringPass("fs_feedback", "temporal-feedback", "temporal/feedback", im.feedback, im.feedbackFormat,
                           im.feedbackUniforms, u)) {
                 return result;

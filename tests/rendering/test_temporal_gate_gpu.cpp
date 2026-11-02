@@ -250,3 +250,33 @@ TEST_CASE("a late shader layer runs on the temporal stage's output; a post layer
     std::filesystem::remove(path);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("feedback zooms about its centre: the default is the frame's, a moved one is a different picture", "[gpu][temporal][adr1937]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto withFeedback = [](scene::Scene s, float cx, float cy) {
+        s.temporal.feedback.enabled = true;
+        s.temporal.feedback.frames = 10;
+        s.temporal.feedback.amount = 0.8f;
+        s.temporal.feedback.zoom = 0.96f;
+        s.temporal.feedback.rotate = 2.0f;
+        s.temporal.feedback.centerX = cx;
+        s.temporal.feedback.centerY = cy;
+        return s;
+    };
+    const int last = 40;
+    const Shot centred = playRange(*ctx, shaders, withFeedback(stage(0), 0.5f, 0.5f), 0, last);
+    scene::Scene plain = stage(0);
+    plain.temporal.feedback.enabled = true;
+    plain.temporal.feedback.frames = 10;
+    plain.temporal.feedback.amount = 0.8f;
+    plain.temporal.feedback.zoom = 0.96f;
+    plain.temporal.feedback.rotate = 2.0f; // the centre left at its default
+    CHECK_IDENTICAL(centred.image, playRange(*ctx, shaders, plain, 0, last).image);
+    const Shot moved = playRange(*ctx, shaders, withFeedback(stage(0), 0.2f, 0.7f), 0, last);
+    CHECK_DIFFERS(centred.image, moved.image);
+    // FIR, like the rest of the family. The lead is 20 frames for a 10-tap feedback: a fresh renderer's first frames carry
+    // the 1-LSB pipeline-warm-up effect (ADR-1932) into the ring, and a 12-frame lead read one of them (105 bytes, delta 1)
+    CHECK_IDENTICAL(moved.image, playRange(*ctx, shaders, withFeedback(stage(0), 0.2f, 0.7f), last - 20, last).image);
+    CHECK(ctx->errorCount() == 0);
+}

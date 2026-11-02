@@ -122,6 +122,10 @@ struct FeedbackSettings {
     float driftX = 0.0f;     // frame widths per frame
     float driftY = 0.0f;
     float hue = 0.0f;        // turns per frame, OKLab
+    // ADR-1937: the point (uv, 0..1; y down) the zoom and turn are about -- the frame's centre by default. Routable, so it
+    // can follow a moving subject.
+    float centerX = 0.5f;
+    float centerY = 0.5f;
 };
 
 // ADR-1066 / ADR-1931: slit scan as a time map. Each pixel shows the moment `q(d(uv)) x span` frames ago, where d runs
@@ -239,6 +243,8 @@ struct TemporalParameters {
     params::Parameter<float>* feedbackDriftX = nullptr;
     params::Parameter<float>* feedbackDriftY = nullptr;
     params::Parameter<float>* feedbackHue = nullptr;
+    params::Parameter<float>* feedbackCenterX = nullptr; // ADR-1937
+    params::Parameter<float>* feedbackCenterY = nullptr;
     params::Parameter<bool>* slitEnabled = nullptr;
     params::Parameter<float>* slitAmount = nullptr;
     params::Parameter<float>* slitSpan = nullptr; // ADR-1931

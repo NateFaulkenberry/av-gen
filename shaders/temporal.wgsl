@@ -291,7 +291,9 @@ fn fs_feedback(in: FsIn) -> @location(0) vec4<f32> {
     let turn = temporal.params.w;
     let drift = temporal.extra.xy;
     let aspect = max(temporal.extra.w, 1e-3);
-    let q = (in.uv - vec2<f32>(0.5)) * vec2<f32>(aspect, 1.0);
+    // ADR-1937: the centre the feedback zooms and turns about (uv), in more.xy
+    let centre = temporal.more.xy;
+    let q = (in.uv - centre) * vec2<f32>(aspect, 1.0);
     var tail = vec3<f32>(0.0);
     var weight = 1.0 - decay;
     for (var k = 1; k <= taps; k = k + 1) {
@@ -300,7 +302,7 @@ fn fs_feedback(in: FsIn) -> @location(0) vec4<f32> {
         let back = q - drift * fk * vec2<f32>(aspect, 1.0);
         let a = -turn * fk;
         let r = vec2<f32>(back.x * cos(a) - back.y * sin(a), back.x * sin(a) + back.y * cos(a)) / pow(zoom, fk);
-        let uv = r / vec2<f32>(aspect, 1.0) + vec2<f32>(0.5);
+        let uv = r / vec2<f32>(aspect, 1.0) + centre;
         if (all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0))) {
             let layer = ((writeLayer - k) % depth + depth) % depth;
             let s = textureSampleLevel(colourHistory, linearSampler, uv, layer, 0.0).rgb;

@@ -148,6 +148,8 @@ TemporalParameters registerTemporalParameters(params::ParameterSet& params, cons
     p.feedbackDriftX = &params.add(f((fb + "driftX").c_str(), fd.driftX, -0.5f, 0.5f, -0.05f, 0.05f));
     p.feedbackDriftY = &params.add(f((fb + "driftY").c_str(), fd.driftY, -0.5f, 0.5f, -0.05f, 0.05f));
     p.feedbackHue = &params.add(f((fb + "hue").c_str(), fd.hue, -1.0f, 1.0f, -0.1f, 0.1f));
+    p.feedbackCenterX = &params.add(f((fb + "centerX").c_str(), fd.centerX, -0.5f, 1.5f, 0.0f, 1.0f)); // ADR-1937
+    p.feedbackCenterY = &params.add(f((fb + "centerY").c_str(), fd.centerY, -0.5f, 1.5f, 0.0f, 1.0f));
     const std::string sl = temporalParameterPrefix(TemporalEffectKind::Slit);
     const SlitSettings& sd = defaults.slit;
     p.slitEnabled = &params.add(b((sl + "enabled").c_str(), sd.enabled));
@@ -211,6 +213,8 @@ void applyTemporalParameters(const TemporalParameters& p, TemporalSettings& sett
     if (p.feedbackDriftX != nullptr) fd.driftX = p.feedbackDriftX->value();
     if (p.feedbackDriftY != nullptr) fd.driftY = p.feedbackDriftY->value();
     if (p.feedbackHue != nullptr) fd.hue = p.feedbackHue->value();
+    if (p.feedbackCenterX != nullptr) fd.centerX = p.feedbackCenterX->value(); // ADR-1937
+    if (p.feedbackCenterY != nullptr) fd.centerY = p.feedbackCenterY->value();
     SlitSettings& sd = settings.slit;
     if (p.slitEnabled != nullptr) sd.enabled = p.slitEnabled->value();
     if (p.slitAmount != nullptr) sd.amount = p.slitAmount->value();
@@ -259,6 +263,10 @@ nlohmann::json temporalToJson(const TemporalSettings& s) {
     j["feedback"] = nlohmann::json{{"enabled", fd.enabled}, {"frames", clampFrames(fd.frames)}, {"amount", fd.amount},
                                    {"decay", fd.decay},     {"zoom", fd.zoom},                  {"rotate", fd.rotate},
                                    {"driftX", fd.driftX},   {"driftY", fd.driftY},              {"hue", fd.hue}};
+    if (fd.centerX != 0.5f || fd.centerY != 0.5f) { // ADR-1937: additive, written only when moved
+        j["feedback"]["centerX"] = fd.centerX;
+        j["feedback"]["centerY"] = fd.centerY;
+    }
     const SlitSettings& sd = s.slit;
     j["slit"] = nlohmann::json{{"enabled", sd.enabled}, {"amount", sd.amount},   {"span", clampSpan(sd.span)},
                                {"mode", sd.mode},       {"angle", sd.angle},     {"strips", sd.strips},
@@ -353,6 +361,8 @@ Result<TemporalSettings> temporalFromJson(const nlohmann::json& j) {
             number(e, "driftX", fd.driftX, -0.5f, 0.5f);
             number(e, "driftY", fd.driftY, -0.5f, 0.5f);
             number(e, "hue", fd.hue, -1.0f, 1.0f);
+            number(e, "centerX", fd.centerX, -0.5f, 1.5f); // ADR-1937
+            number(e, "centerY", fd.centerY, -0.5f, 1.5f);
         });
         !r) {
         return std::unexpected(r.error());

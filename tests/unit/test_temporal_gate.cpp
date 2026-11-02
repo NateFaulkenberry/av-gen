@@ -153,3 +153,19 @@ TEST_CASE("the late shader stage has a name, and round-trips through it", "[shad
     CHECK(std::string(avgen::shaders::layerStageName(avgen::shaders::LayerStage::Late)) == "late");
     CHECK_FALSE(avgen::shaders::layerStageFromName("later").has_value());
 }
+
+TEST_CASE("the feedback centre round-trips and is written only when moved", "[temporal][adr1937]") {
+    const scene::TemporalSettings plain;
+    CHECK_FALSE(scene::temporalToJson(plain).at("feedback").contains("centerX"));
+    scene::TemporalSettings s;
+    s.feedback.centerX = 0.31f;
+    s.feedback.centerY = 0.72f;
+    auto back = scene::temporalFromJson(scene::temporalToJson(s));
+    REQUIRE(back.has_value());
+    CHECK(back->feedback.centerX == 0.31f);
+    CHECK(back->feedback.centerY == 0.72f);
+    params::ParameterSet params;
+    (void)scene::registerTemporalParameters(params, plain);
+    CHECK(params.find("temporal/feedback/centerX") != nullptr);
+    CHECK(params.find("temporal/feedback/centerY") != nullptr);
+}
