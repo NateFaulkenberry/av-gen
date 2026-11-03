@@ -72,7 +72,8 @@
       ],
       "intensity": 2600.0,
       "range": 220.0,
-      "castsShadow": false
+      "castsShadow": false,
+      "volumetric": 0.06
     },
     {
       "name": "flood-l",
@@ -472,9 +473,9 @@
           "kind": "constant",
           "dst": 5,
           "constant": [
-            0.55,
+            0.12,
             0.0,
-            0.4,
+            0.08,
             0.0
           ]
         },
@@ -550,9 +551,9 @@
           "kind": "constant",
           "dst": 4,
           "constant": [
-            0.7,
-            0.85,
-            0.85,
+            0.35,
+            0.42,
+            0.42,
             0.0
           ]
         },

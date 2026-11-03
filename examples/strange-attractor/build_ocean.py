@@ -189,7 +189,9 @@ def reef_program():
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
                 # caustics: a cell pattern drifting with time, brightest at the cells' centres, on up-facing surfaces
                 {"kind": "input", "dst": 3, "input": "time"},
-                {"kind": "constant", "dst": 5, "constant": [0.55, 0.0, 0.4, 0.0]},
+                # M3f (owner §2b: the ocean "wobble" -- the camera is smooth; the whole floor's caustics drifting at
+                # 0.7 m/s read as the frame swimming): a slow drift and half the brightness
+                {"kind": "constant", "dst": 5, "constant": [0.12, 0.0, 0.08, 0.0]},
                 {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
                 {"kind": "input", "dst": 5, "input": "worldPosition"},
                 {"kind": "add", "dst": 5, "srcA": 5, "srcB": 3},
@@ -199,7 +201,7 @@ def reef_program():
                 {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
                 {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.3, 0.9, 0, 0]},
                 {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
-                {"kind": "constant", "dst": 4, "constant": [0.7, 0.85, 0.85, 0.0]},
+                {"kind": "constant", "dst": 4, "constant": [0.35, 0.42, 0.42, 0.0]},
                 {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
                 {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
@@ -221,8 +223,13 @@ def write_ocean(portal_flight):
             {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, 0.2, 0.5], "color": [0.2, 0.55, 0.65],
              "intensity": 0.25, "castsShadow": False, "shadowStrength": 0.0},
             # the bay's light into the water, the base's floods
+            # M3f (owner §2b, the white-out before the sea exit): ROOT CAUSE -- this 2600 cd lamp stands 10 m inside the
+            # bay, right behind the opening the camera flies through, and it scattered in the ocean's fog at full
+            # strength: within a few metres of it the in-scatter (falling as 1/d^2) filled the frame white for the last
+            # 0.4 s (with the fog off there is no white-out; the corruption's light and glow and the bloom made no
+            # difference). Its scattering is cut to 6%: it still lights the bay and the water round it
             {"name": "bay-light", "type": "point", "position": base_world((0.0, 32.0, 100.0)), "color": [1.0, 0.85, 0.65],
-             "intensity": 2600.0, "range": 220.0, "castsShadow": False},
+             "intensity": 2600.0, "range": 220.0, "castsShadow": False, "volumetric": 0.06},
             {"name": "flood-l", "type": "point", "position": base_world((-80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],
              "intensity": 3000.0, "range": 160.0, "castsShadow": False},
             {"name": "flood-r", "type": "point", "position": base_world((80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],

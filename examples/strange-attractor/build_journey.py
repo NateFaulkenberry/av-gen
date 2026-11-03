@@ -166,9 +166,15 @@ scene["environment"]["contactShadows"] = True
 scene["attractorWorld"]["look"]["sunContact"] = 0.0
 # M3e (research §3, the river): physical-ish water at every hour -- a dark body that reflects at grazing angles (f0 0.06,
 # not 0.35), rough enough for a moon path and streaks, glints in the colour of what it reflects, a little transmission
-scene["attractorWorld"]["water"].update({"fresnel": 0.06, "reflection": 1.0, "roughness": 0.085, "ripple": 0.48,
-                                         "rippleScale": 0.35, "streak": 0.8, "reflectionRays": 6.0, "glints": 8.0,
-                                         "sparkle": 0.3, "specular": 2.0, "skyMirror": 0.35, "transmission": 0.5})
+# M3f (owner §2a: white streak bands and vertical streaks on the night river): `streak` spreads the surface normal along
+# the view, so EVERY reflection -- the moonlit far bank, the sky -- was drawn out into vertical streaks, and the six
+# reflection rays and glints re-lit them; meant for the fire's streaks, but the water takes no local lights (48- F7).
+# Off; the chop gentler (ripple 0.48 -> 0.3, roughness 0.085 -> 0.06), so the moon path stays but the bands go.
+scene["attractorWorld"]["water"].update({"fresnel": 0.06, "reflection": 1.0, "roughness": 0.06, "ripple": 0.3,
+                                         "rippleScale": 0.35, "sparkle": 0.15, "specular": 1.5, "skyMirror": 0.35,
+                                         "transmission": 0.5})
+for _k in ("streak", "reflectionRays", "glints"):
+    scene["attractorWorld"]["water"].pop(_k, None)
 
 # --- the encounter: three Sasquatches round the fire, the Gray facing them (night), the craft, the fire (particles)
 nodes = [n for n in scene.get("nodes", []) if not n["name"].startswith(
