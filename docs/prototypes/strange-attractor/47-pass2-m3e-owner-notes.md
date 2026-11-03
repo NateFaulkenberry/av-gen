@@ -120,3 +120,29 @@ silhouettes; the rest is a dark brown slope.
   not a black frame with one fire.
 - Also lift the craft's own lighting so it reads as a lit object.
 - Show before/after at the same frames, including this wide angle.
+
+## 9. The night camp: shadows and lighting "still look very off" (owner addition)
+
+`night-camp-shadows-lighting-off.png`: a closer view of the camp (the Gray, the fire, three Sasquatches,
+a boulder and the craft). The coordinator's read of what is wrong:
+
+- **A huge soft black blob shadow** (a capsule shape) on the bank behind the fire. It matches no caster's
+  silhouette; it looks like a stretched, low-resolution point-light shadow.
+- **The fire is inside a Sasquatch:** the flames glow through the front Sasquatch's body, so the fire or
+  that character is misplaced.
+- **The smoke** is a broad pale haze cone drifting across the whole upper frame.
+- **An unmotivated bright white spill** on the bank behind the craft, while the craft itself is dark.
+- **The Gray** is flat white with a hard gold patch down one side, unlike its surroundings.
+- **No convincing contact shadows** under the characters, rocks and fire pit. The shrubs on the right
+  float and are unlit.
+
+Fix the lighting as a whole, not just by adding lights (§8):
+- every shadow must match its caster and its light (resolution, bias, softness, direction from the fire);
+- add contact or AO grounding;
+- no character intersects the fire;
+- tame the smoke into a thin rising column;
+- every bright area needs a visible source;
+- the characters' shading must sit in the scene's light.
+
+If the engine's point-light shadows can't do this (resolution or filtering), say so and fix that
+generically with an ADR. Before/after at this angle and the M3d camera beats.
