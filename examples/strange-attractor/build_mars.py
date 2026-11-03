@@ -145,7 +145,8 @@ def night_flight():
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
     # the camera arrives at the pyramid portal's climbing speed (~14 m/s): the first knot is far enough out along the
     # exit for that speed, so the path does not overshoot and swing back to the cliff (a first try did)
-    far = [knot(60.0, 26.0, 4.5, 0.0), knot(46.0, 23.0, 4.0, 0.0), knot(32.0, 20.0, 3.5, 0.0)]
+    # (on the river's side of the craft at camp (10, 5): a first line through (32, 20) passed 4 m from its centre)
+    far = [knot(60.0, 22.0, 4.5, 0.0), knot(46.0, 14.0, 4.0, 0.0), knot(33.0, 8.0, 3.5, 0.0)]
     pts = []
     # M3g (54- §4): level along the river's edge past the camp, between the craft (10, 5) and the water, past the Gray,
     # and on toward the glide -- clear of the craft, the figures, the rocks and the scrub (traced per frame)

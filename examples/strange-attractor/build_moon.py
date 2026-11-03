@@ -156,10 +156,12 @@ CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 
 # last two knots are the crossing's, as before (95 m absolute at the face). Times from a smooth speed profile.
 # M3g (54- §1): it leaves the exit at the dive's own speed (30 of the 46 m/s it arrives with), easing down, so the line
 # does not overshoot its first knot and swing (the arrival spiked 83 degrees between the look and the travel)
-_DUSK_PATH = [(36, -44, 9.0), (28, -26, 6.0), (22, -8, 4.0), (19, 5, 2.6), (13, 9, 2.4), (6, 15, 4.0), (0, 26, 12.0),
+# M3g (54- §1, the 50.2 s spike: a sharp corner low over the water at (19, 5), where the look led the turn by 28
+# degrees): a rounder arc through the same pass, a little higher
+_DUSK_PATH = [(36, -44, 9.0), (29, -27, 6.5), (23, -11, 5.0), (17, 1, 4.0), (11, 9, 3.6), (5, 16, 5.0), (0, 26, 12.0),
               (-4, 42, 30.0), (-6, 58, 52.0), (-6, 72, 50.0), (-7, 82, 34.0)]
 _dk = [knot(d, lat, h, 0.0) for d, lat, h in _DUSK_PATH]
-DUSK_FLIGHT = [list(k) for k in pace([k_[:3] for k_ in _dk], 48.2, 68.0, 30.0, 9.0, ramp_in=0.2, ramp_out=0.15)[0]] + \
+DUSK_FLIGHT = [list(k) for k in pace([k_[:3] for k_ in _dk], 48.35, 68.0, 24.0, 9.0, ramp_in=0.3, ramp_out=0.15)[0]] + \
     [knot(-8, 89, 21.2, 69.2), knot(-8, 96, -39.2, 70.4)]
 EGLOW = [-c for c in direction(-6, 50)]
 CLIFF_PORTAL = site(-8.0, 91.8)
