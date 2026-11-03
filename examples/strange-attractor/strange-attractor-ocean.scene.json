@@ -73,7 +73,7 @@
       "intensity": 2600.0,
       "range": 220.0,
       "castsShadow": false,
-      "volumetric": 0.06
+      "volumetric": 0.0
     },
     {
       "name": "flood-l",
@@ -90,7 +90,8 @@
       ],
       "intensity": 3000.0,
       "range": 160.0,
-      "castsShadow": false
+      "castsShadow": false,
+      "volumetric": 0.25
     },
     {
       "name": "flood-r",
@@ -107,7 +108,8 @@
       ],
       "intensity": 3000.0,
       "range": 160.0,
-      "castsShadow": false
+      "castsShadow": false,
+      "volumetric": 0.25
     },
     {
       "name": "sub-1-light",

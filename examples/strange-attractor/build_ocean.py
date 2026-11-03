@@ -227,13 +227,14 @@ def write_ocean(portal_flight):
             # bay, right behind the opening the camera flies through, and it scattered in the ocean's fog at full
             # strength: within a few metres of it the in-scatter (falling as 1/d^2) filled the frame white for the last
             # 0.4 s (with the fog off there is no white-out; the corruption's light and glow and the bloom made no
-            # difference). Its scattering is cut to 6%: it still lights the bay and the water round it
+            # difference). Its scattering is off (6% still left a glow and a disc for 3 frames); the floods' cut to 25%.
+            # Both still light the bay, the hull and the water round them
             {"name": "bay-light", "type": "point", "position": base_world((0.0, 32.0, 100.0)), "color": [1.0, 0.85, 0.65],
-             "intensity": 2600.0, "range": 220.0, "castsShadow": False, "volumetric": 0.06},
+             "intensity": 2600.0, "range": 220.0, "castsShadow": False, "volumetric": 0.0},
             {"name": "flood-l", "type": "point", "position": base_world((-80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],
-             "intensity": 3000.0, "range": 160.0, "castsShadow": False},
+             "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
             {"name": "flood-r", "type": "point", "position": base_world((80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],
-             "intensity": 3000.0, "range": 160.0, "castsShadow": False},
+             "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
         ] + [{"name": f"{name}-light", "type": "point", "position": [0.0, -500.0, 0.0], "color": [0.55, 0.9, 1.0],
               "intensity": 900.0, "range": 60.0, "castsShadow": False} for name, _ in SUBS],
         "environment": {"intensity": 0.18, "background": DEEP, "fogColor": WATER, "volumeDensity": 0.0024, "skybox": False,
