@@ -46,3 +46,21 @@ creased, faceted geometry on its face.
 
 - Remove it, so the pyramid is clearly visible over the rover along the whole fly-over.
 - Check the whole Mars camera path for any other terrain hiding the pyramids.
+
+## 4. Tiled texture look, canyon and Mars (owner addition)
+
+`mars-sand-visible-tiling.png`: the Mars sand close to the camera shows a regular grid of repeating
+light and dark patches. The photoscanned texture's tile repeats are plainly visible.
+
+- Fix the tiled look in BOTH the canyon and Mars scenes, on every surface that uses the photoscanned
+  sets or a repeating procedural layer.
+- Use a proper anti-tiling technique, for example:
+  - stochastic or hex-tile texturing (Heitz-Neyret / Mikkelsen style blending of randomly offset and
+    rotated tiles);
+  - layering the texture at two or three incommensurate scales;
+  - large-scale macro variation driven by world-space noise.
+- No visible period anywhere at any camera distance.
+- If the fix belongs in the engine's material or shader code, make it a generic feature with an ADR and
+  tests.
+- Show before/after stills at the same frames: Mars near the rover and the fly-over, and the canyon
+  close-ups (the camp ground, the dusk banks).
