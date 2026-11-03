@@ -64,3 +64,15 @@ light and dark patches. The photoscanned texture's tile repeats are plainly visi
   tests.
 - Show before/after stills at the same frames: Mars near the rover and the fly-over, and the canyon
   close-ups (the camp ground, the dusk banks).
+
+## 5. Mars entrance portal: clipping through a bulge (owner addition)
+
+`mars-entrance-clipping-bulge.png`: as the camera comes through the canyon-cliff portal into Mars, it
+partly clips through a dark rust-brown bulge of terrain or rock right in front of the camera. The bulge's
+cut-open, faceted section fills the middle of the frame while the portal's gold shards still frame the
+edges.
+
+- Fix where the Mars arrival comes out of the geometry, so the camera passes through the portal and
+  into open air without clipping any terrain, rock or bulge. Move the exit or the camera path, or clear
+  the terrain round the exit (pad it, ADR-1897 style).
+- Check every portal arrival frame by frame for the same kind of near-plane clipping, and show it.
