@@ -44,3 +44,23 @@ are in the session scratchpad (`marscheck.py`).
 - `build_sasquatch.py`: every `sasquatch_fur*` material alpha-tested; sasquatch-b patched as a copy.
 - The Gray matte (metallic 0, no emission), as a copy (`pass2/patch_glb_materials.py`).
 - Renderer gaps G1-G6 are noted for Phase 7; not taken in this checkpoint.
+
+## The checkpoint (media in `pass2-m3e/`)
+
+- Engine: ADR-1904 (no projectile shards), 1905 (anti-tiling texture ops), 1906 (shadow budget and perspective bias),
+  1907 (the key's shadow per look). Unit and GPU tests for each; the full suites were not run (art checkpoint).
+- Renders: 26-150 s at 1080p30, supersample 2, in three passes after fixes (the Mars arrival, the night exit).
+- Arrivals checked frame by frame: the Mars arrival clipped a bulge in the butte's talus (fixed); the first night exit
+  was inside the cliff and then swung back to it (fixed: in front of the face, the first knot out along the exit at the
+  arrival's speed). Moon, dusk, ocean and dawn arrivals clear.
+- Critic (preview, session `strange-attractor-m3e`): `pass2-m3e/09-critic/critic-m3d-vs-m3e.md`. The fast scene critic
+  does not apply: the AV Gen adapter reads 0 entities and 0 cameras from this scene's glTF nodes.
+
+## Open
+
+- The sea exit's last half second before the crossing is still a white-out (146.0-146.4 s) with two frames of a disc
+  of the dawn canyon in it. It is not the corruption's light (80 vs 500 made no difference); it was there in M3d.
+- The ocean camera picks up a wobble (critic) on the reshaped reef: the path's heights are over the new ground.
+- The water's local-light streaks (B7/B8), PCSS for local lights (B4), fur wrap (B9), Purkinje shift (C1), and the hero
+  agent's G1-G6.
+- Torches (§8): not added; the quality pass came first (§11) and the wide night shots read now.
