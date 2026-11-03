@@ -2132,6 +2132,82 @@ TEST_CASE("texture ops sample the three world planes and answer in the shader's 
     checkVec3(r.normal, {0.0f, 0.0f, 1.0f}, 1e-6);
 }
 
+TEST_CASE("texture ops break their tiling: hex tiles, a second layer, macro variation (ADR-1905)",
+          "[material][adr1905]") {
+    NamedSampler sampler;
+    MaterialContext ctx;
+    ctx.normal = {0.0f, 1.0f, 0.0f}; // flat ground: the Y plane, uv = (x, z)
+    ctx.tangent = {1.0f, 0.0f, 0.0f};
+    ctx.bitangent = {0.0f, 0.0f, -1.0f};
+    ctx.textures = &sampler;
+    const MaterialResult base;
+    const auto colourAt = [&](const MaterialProgram& p, float x, float z) {
+        MaterialContext c = ctx;
+        c.worldPosition = {x, 0.0f, z};
+        return evaluateMaterialProgram(p, c, base).baseColor;
+    };
+    const MaterialProgram plain = texturedProgram();
+    MaterialProgram hex = plain;
+    hex.ops[0].constant3 = {1.0f, 0.0f, 0.0f, 0.0f};
+    REQUIRE(hex.validate().has_value());
+
+    // off (the default): one tile along is the same colour -- the period ADR-1905 removes
+    int repeats = 0;
+    int samePlain = 0;
+    for (int i = 0; i < 40; ++i) {
+        const float x = 0.137f + 0.71f * static_cast<float>(i);
+        const float z = 0.291f + 0.37f * static_cast<float>(i);
+        if (glm::length(colourAt(plain, x, z) - colourAt(plain, x + 1.0f, z)) < 1e-4f) ++samePlain;
+        if (glm::length(colourAt(hex, x, z) - colourAt(hex, x + 1.0f, z)) < 1e-3f) ++repeats;
+        const glm::vec3 c = colourAt(hex, x, z);
+        CHECK(c.x >= 0.0f);
+        CHECK(c.x <= 1.0f); // a weighted blend of reads: never outside them
+        CHECK(std::abs(c.z - 0.25f) < 1e-5f);
+    }
+    CHECK(samePlain == 40);
+    CHECK(repeats <= 2);
+    // continuous: a step of a millimetre moves the colour little (no seams from the blend)
+    CHECK(glm::length(colourAt(hex, 3.3f, 7.7f) - colourAt(hex, 3.301f, 7.7f)) < 0.05f);
+
+    // a flat normal map stays flat under the turns (its x/y are turned back into the plane)
+    MaterialContext c = ctx;
+    c.worldPosition = {2.2f, 0.0f, 5.1f};
+    MaterialProgram hexNormal = plain;
+    hexNormal.ops[1].constant3 = {1.0f, 0.0f, 0.0f, 0.0f};
+    checkVec3(evaluateMaterialProgram(hexNormal, c, base).normal, {0.0f, 0.0f, 1.0f}, 1e-5);
+
+    // the macro variation darkens and lightens over many tiles, about the plain colour on average
+    MaterialProgram macro = plain;
+    macro.ops[0].constant3 = {0.0f, 1.0f, 4.0f, 0.0f};
+    double ratio = 0.0;
+    float lo = 10.0f;
+    float hi = 0.0f;
+    for (int i = 0; i < 400; ++i) {
+        const float x = 0.5f + 1.0f * static_cast<float>(i % 20) * 1.93f;
+        const float z = 0.5f + 1.0f * static_cast<float>(i / 20) * 2.11f;
+        const float r = colourAt(macro, x, z).z / colourAt(plain, x, z).z;
+        ratio += r;
+        lo = std::min(lo, r);
+        hi = std::max(hi, r);
+    }
+    ratio /= 400.0;
+    CHECK(std::abs(ratio - 1.0) < 0.12);
+    CHECK(hi - lo > 0.3f);
+
+    // the second layer mixes in a larger read of the same image
+    MaterialProgram layered = plain;
+    layered.ops[0].constant3 = {0.0f, 0.0f, 0.0f, 1.0f};
+    sampler.reads.clear();
+    (void)colourAt(layered, 1.25f, 2.5f);
+    CHECK(sampler.reads.size() == 3); // the colour twice (two layers), the normal once
+    CHECK(glm::length(colourAt(layered, 1.25f, 2.5f) - colourAt(plain, 1.25f, 2.5f)) > 1e-3f);
+
+    // round trip: the knobs are the op's constant3
+    const auto back = MaterialProgram::fromJson(hex.toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->ops[0].constant3 == hex.ops[0].constant3);
+}
+
 TEST_CASE("texture ops pack their layer, array and pre-pass slot (ADR-1642)", "[material][adr1642]") {
     MaterialProgram p = texturedProgram();
     p.ops.insert(p.ops.begin(), constantOp(5, glm::vec4(0.5f)));

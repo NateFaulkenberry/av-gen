@@ -432,6 +432,8 @@ for node, pos, yaw in build_ocean.sub_tracks():
 # M3d: the ocean's animals cruise (their swim loops play on their own)
 for n, _, _, pts, _ in build_ocean.creature_tracks():
     tracks.append({"target": f"ocean/nodes/{n}/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pts]})
+tracks.append({"target": "ocean/nodes/bay-strips/emissiveBoost",
+               "keys": [{"time": t, "value": v, "interp": "linear"} for t, v in build_ocean.STRIPS_DIE]})
 # M3b: the rover drives, its tracks appear, its camera flashes (M3c: the lasers are gone)
 tracks = [t for t in tracks if not (t["target"].startswith("moon/nodes/laser") or t["target"].startswith("mars/")
                                     or t["target"].startswith("moon/nodes/earth-halo"))]

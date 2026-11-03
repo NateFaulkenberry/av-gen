@@ -90,7 +90,10 @@ PYRAMID_GROUND = {name: curved(PAD_LEVEL[name], x, z) for name, x, z, _, _ in PY
 PYRAMID_SINK = 3.0
 
 # --- the arrival: out of the arrival mesa's north wall, heading -z (the exit's y is over the ground)
-EXIT = [OX, 47.6 + 9.0, -724.0 + OZ]  # M3d (owner): lower, near the ground (absolute: the talus is at 47.6 here)
+# M3e (owner: the arrival clipped a bulge): the old exit sat in the butte's talus apron (the slope at 61 m just ahead
+# of a 56.6 m exit). Now out of the butte's steep face itself, 4 m in front of it at 95 m (the apron below at 72-75 m),
+# then down over the apron, which a pad clears to the plain ahead (MARS_CORRIDOR)
+EXIT = [OX - 2.0, 95.0, -699.0 + OZ]  # absolute
 EXIT_AXIS = [0.0, 0.0, -1.0]
 
 # --- the pyramid portal: in pyramid-b's south face, where the casing has fallen, 30 m up (absolute y set by measure)
@@ -162,10 +165,26 @@ NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.2, 116.4]]
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 # M3d (owner): one continuous fly-over -- out of the wall low, over the rover as it drives (no orbit), straight on to
 # the pyramids and up the buried face into the portal. Times from a smooth speed profile (canyon_scale.pace).
-_MARS_PATH = [(2.0 + OX, 8.0, -750.0 + OZ), (16.0 + OX, 7.0, -840.0 + OZ), (34.0 + OX, 6.0, -925.0 + OZ),
+_MARS_PATH = [(2.0 + OX, 30.0, -750.0 + OZ), (16.0 + OX, 9.0, -840.0 + OZ), (34.0 + OX, 6.0, -925.0 + OZ),
               (52.0 + OX, 5.5, -985.0 + OZ), (64.0 + OX, 6.5, -1030.0 + OZ), (86.0 + OX, 14.0, -1140.0 + OZ),
               (110.0 + OX, 30.0, -1300.0 + OZ),
               (PORTAL_FOCUS[0] - 6.0, 50.0, PORTAL_FOCUS[2] + 150.0), (PORTAL_FOCUS[0], 66.0, PORTAL_FOCUS[2] + 55.0)]
+# M3e (owner: a mound hid the pyramid, and the arrival clipped the apron): a corridor along the fly-over is eased to the
+# plain (ADR-1897 pads, 34 m apart, 58 m across each), from the apron in front of the butte to pyramid-b's own pad, so
+# no dune, yardang or drift stands between the camera and the pyramids or under the camera
+def _corridor():
+    pts = [(OX + 4.0, -770.0 + OZ)] + [(x, z) for x, _, z in _MARS_PATH[1:7]] + [(PORTAL_FOCUS[0] - 6.0, PB[2] + 330.0)]
+    pads = []
+    for (x0, z0), (x1, z1) in zip(pts, pts[1:]):
+        n = max(1, int(math.hypot(x1 - x0, z1 - z0) / 34.0))
+        for i in range(n):
+            t = i / n
+            pads.append({"x": round(x0 + (x1 - x0) * t, 2), "z": round(z0 + (z1 - z0) * t, 2), "radius": 58.0,
+                         "level": PLAIN})
+    return pads
+
+
+MARS_CORRIDOR = _corridor()
 MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, 99.6, 22.0, 18.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4 + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
@@ -374,7 +393,7 @@ def write():
                            "sunShadowBias": 1.6, "look": {"sunAzimuth": 128.0, "sunElevation": 14.0},
                            "mars": {"mesaCover": 0.45, "yardangs": 10.0, "wind": 30.0, "dunes": 8.0},
                            "pads": [{"x": x, "z": z, "radius": base * 1.2, "level": PAD_LEVEL[name]}
-                                    for name, x, z, base, _ in PYRAMIDS] + [ROVER_PAD]},
+                                    for name, x, z, base, _ in PYRAMIDS] + MARS_CORRIDOR + [ROVER_PAD]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
         "corruption": {"targets": ["pyramid-b"], "focus": PORTAL_FOCUS, "axis": [0.0, 0.0, -1.0], "amount": 1.0,
                        "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 1700.0, "openNear": 30.0, "openFar": 520.0,

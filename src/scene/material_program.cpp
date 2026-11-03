@@ -556,6 +556,51 @@ bool outputRegisterOk(int r) {
 // image-up (B) axes are chosen so U x B is each face's outward normal, for an OpenGL-convention normal map.
 constexpr float kTexturePlaneSkip = 1e-3f; // a plane weighing less is not sampled (the shader skips it too)
 
+// ADR-1905: one plane's read, its tiling broken when `hex` > 0 -- exactly shaders/material.wgsl's matTextureTile
+// (Mikkelsen 2022 hex tiling: a triangle grid, each vertex's read turned and shifted by a hash, the three blended by
+// their barycentric weights to the 6th). The colour, or a normal map's decoded tangent x/y in .xy; nullopt if unread.
+std::optional<glm::vec4> textureTile(const MaterialContext& ctx, const MaterialTexture& texture, glm::vec2 uv, bool isNormal,
+                                     float hex, int plane) {
+    if (!(hex > 0.0f)) {
+        const std::optional<glm::vec4> s = ctx.textures->sample(texture, uv);
+        if (!s || !isNormal) return s;
+        return glm::vec4(glm::vec2(*s) * 2.0f - 1.0f, 0.0f, 0.0f);
+    }
+    const glm::vec2 st = uv * 1.7320508f;
+    const glm::vec2 sk(st.x - 0.57735027f * st.y, 1.15470054f * st.y);
+    const glm::vec2 base = glm::floor(sk);
+    const glm::vec2 fr = sk - base;
+    const float z = 1.0f - fr.x - fr.y;
+    const float s = z <= 0.0f ? 1.0f : 0.0f;
+    const float s2 = 2.0f * s - 1.0f;
+    const glm::vec3 w(-z * s2, s - fr.y * s2, s - fr.x * s2);
+    const std::array<glm::vec2, 3> vs{base + glm::vec2(s, s), base + glm::vec2(s, 1.0f - s), base + glm::vec2(1.0f - s, s)};
+    glm::vec4 acc(0.0f);
+    float wsum = 0.0f;
+    for (int i = 0; i < 3; ++i) {
+        const float wc = std::max(w[i], 0.0f);
+        const float wi = wc * wc * wc * wc * wc * wc;
+        const glm::vec2 v = vs[static_cast<std::size_t>(i)];
+        const auto cx = static_cast<std::int32_t>(v.x);
+        const auto cy = static_cast<std::int32_t>(v.y);
+        const float angle = hex * (noise::hash01(cx, cy, plane, 1905u) * 6.2831853f - 3.1415927f);
+        const glm::vec2 off = glm::vec2(noise::hash01(cx, cy, plane, 1906u), noise::hash01(cx, cy, plane, 1907u)) * 7.0f;
+        const float c = std::cos(angle);
+        const float sn = std::sin(angle);
+        const std::optional<glm::vec4> r =
+            ctx.textures->sample(texture, glm::vec2(c * uv.x - sn * uv.y, sn * uv.x + c * uv.y) + off);
+        if (!r) return std::nullopt;
+        if (isNormal) {
+            const glm::vec2 t = glm::vec2(*r) * 2.0f - 1.0f;
+            acc += wi * glm::vec4(c * t.x + sn * t.y, -sn * t.x + c * t.y, 0.0f, 0.0f);
+        } else {
+            acc += wi * *r;
+        }
+        wsum += wi;
+    }
+    return acc / std::max(wsum, 1e-8f);
+}
+
 glm::vec4 textureOpValue(const MaterialOp& op, const MaterialContext& ctx, const MaterialProgram& program) {
     const bool isNormal = op.kind == MaterialOpKind::TextureTriplanarNormal;
     const glm::vec4 missing = isNormal ? glm::vec4(0.0f, 0.0f, 1.0f, 1.0f) : glm::vec4(1.0f);
@@ -581,19 +626,39 @@ glm::vec4 textureOpValue(const MaterialOp& op, const MaterialContext& ctx, const
         if (!(w[i] >= kTexturePlaneSkip)) {
             continue;
         }
-        const std::optional<glm::vec4> s = ctx.textures->sample(*texture, uv[static_cast<std::size_t>(i)]);
+        const glm::vec4& k3 = op.constant3; // ADR-1905: (hex, macro, macro scale in tiles (0 = 8), layer)
+        const glm::vec2 uvi = uv[static_cast<std::size_t>(i)];
+        const std::optional<glm::vec4> s = textureTile(ctx, *texture, uvi, isNormal, k3.x, i);
         if (!s) {
             return missing;
         }
         if (isNormal) {
-            const glm::vec2 t = glm::vec2(*s) * 2.0f - 1.0f;
+            const glm::vec2 t(*s);
             perturb += w[i] * strength * (t.x * tangentU[static_cast<std::size_t>(i)] +
                                           green * t.y * imageUp[static_cast<std::size_t>(i)]);
         } else {
-            colour += w[i] * *s;
+            glm::vec4 cs = *s;
+            if (k3.w > 0.0f) {
+                // ADR-1905: a second, 4.3x larger layer of the same image, turned 40 degrees, its own hex hashes
+                const float ca = 0.76604444f;
+                const float sa = 0.64278761f;
+                const glm::vec2 uv2 = glm::vec2(ca * uvi.x - sa * uvi.y, sa * uvi.x + ca * uvi.y) * 0.23f + glm::vec2(0.37f, 0.61f);
+                const std::optional<glm::vec4> s2 = textureTile(ctx, *texture, uv2, false, k3.x, i + 3);
+                if (!s2) {
+                    return missing;
+                }
+                cs = mix4(cs, *s2, 0.4f * k3.w);
+            }
+            colour += w[i] * cs;
         }
     }
     if (!isNormal) {
+        const glm::vec4& k3 = op.constant3;
+        if (k3.y > 0.0f) {
+            // ADR-1905: world-space macro variation, in the op's own tile units
+            const float m = noise::fbm3(p / (k3.z <= 0.0f ? 8.0f : k3.z), 1905u) * 2.0f - 1.0f;
+            colour = glm::vec4(glm::vec3(colour) * std::max(1.0f + 0.8f * k3.y * m, 0.0f), colour.a);
+        }
         return colour;
     }
     const glm::vec3 nw = safeNormalize(n + perturb, n);

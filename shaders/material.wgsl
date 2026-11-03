@@ -1004,6 +1004,50 @@ fn matTextureSample(linear: bool, layer: i32, uv: vec2<f32>, lod: f32) -> vec4<f
     return textureSampleLevel(programTexturesSrgb, programTextureSampler, uv, layer, lod);
 }
 
+// ADR-1905: one plane's read, its tiling broken when `hex` > 0 (Mikkelsen 2022, "Practical Real-Time Hex-Tiling"):
+// the plane is covered by a triangle grid (a vertex every ~0.67 tiles); each vertex reads the image turned by up to
+// +-180 x hex degrees and shifted by a hash of the vertex, and the three reads of the fragment's triangle are blended by
+// their barycentric weights raised to the 6th (narrow seams). A normal map's x/y are turned back into the plane's frame.
+// Returns the colour, or for a normal map its decoded tangent x/y in .xy. `plane` keys the hashes (0..5).
+fn matTextureTile(linear: bool, layer: i32, uv: vec2<f32>, lod: f32, isNormal: bool, hex: f32, plane: i32) -> vec4<f32> {
+    if (!(hex > 0.0)) {
+        let s = matTextureSample(linear, layer, uv, lod);
+        if (isNormal) {
+            return vec4<f32>(s.xy * 2.0 - 1.0, 0.0, 0.0);
+        }
+        return s;
+    }
+    let st = uv * 1.7320508;
+    let sk = vec2<f32>(st.x - 0.57735027 * st.y, 1.15470054 * st.y);
+    let base = floor(sk);
+    let fr = sk - base;
+    let z = 1.0 - fr.x - fr.y;
+    let s = select(0.0, 1.0, z <= 0.0);
+    let s2 = 2.0 * s - 1.0;
+    let w = vec3<f32>(-z * s2, s - fr.y * s2, s - fr.x * s2);
+    var vs = array<vec2<f32>, 3>(base + vec2<f32>(s, s), base + vec2<f32>(s, 1.0 - s), base + vec2<f32>(1.0 - s, s));
+    var acc = vec4<f32>(0.0);
+    var wsum = 0.0;
+    for (var i = 0; i < 3; i = i + 1) {
+        let wi2 = max(w[i], 0.0) * max(w[i], 0.0);
+        let wi = wi2 * wi2 * wi2;
+        let cell = vec3<i32>(i32(vs[i].x), i32(vs[i].y), plane);
+        let angle = hex * (hash01(cell, 1905u) * 6.2831853 - 3.1415927);
+        let off = vec2<f32>(hash01(cell, 1906u), hash01(cell, 1907u)) * 7.0;
+        let c = cos(angle);
+        let sn = sin(angle);
+        let r = matTextureSample(linear, layer, vec2<f32>(c * uv.x - sn * uv.y, sn * uv.x + c * uv.y) + off, lod);
+        if (isNormal) {
+            let t = r.xy * 2.0 - 1.0;
+            acc = acc + wi * vec4<f32>(c * t.x + sn * t.y, -sn * t.x + c * t.y, 0.0, 0.0);
+        } else {
+            acc = acc + wi * r;
+        }
+        wsum = wsum + wi;
+    }
+    return acc / max(wsum, 1e-8);
+}
+
 fn matTextureOp(pi: u32, oi: u32, ctx: MaterialContext) -> vec4<f32> {
     let isNormal = materialPrograms.programs[pi].ops[oi].kind == MAT_OP_TEXTURE_TRIPLANAR_NORMAL;
     let missing = select(vec4<f32>(1.0), vec4<f32>(0.0, 0.0, 1.0, 1.0), isNormal);
@@ -1015,6 +1059,7 @@ fn matTextureOp(pi: u32, oi: u32, ctx: MaterialContext) -> vec4<f32> {
     let f = materialPrograms.programs[pi].ops[oi].value;
     let k = materialPrograms.programs[pi].ops[oi].constant;
     let k2 = materialPrograms.programs[pi].ops[oi].constant2;
+    let k3 = materialPrograms.programs[pi].ops[oi].constant3; // ADR-1905: (hex, macro, macro scale in tiles (0 = 8), layer)
     let p = ctx.worldPosition * f + k.xyz;
     let n = matSafeNormalize(ctx.normal, vec3<f32>(0.0, 1.0, 0.0));
     let w = matTriplanarWeights(n, k2.x);
@@ -1045,15 +1090,28 @@ fn matTextureOp(pi: u32, oi: u32, ctx: MaterialContext) -> vec4<f32> {
             uv = vec2<f32>(p.x * sg.z, -p.y);
             tu = vec3<f32>(sg.z, 0.0, 0.0);
         }
-        let s = matTextureSample(linear, layer, uv, lod);
+        let s = matTextureTile(linear, layer, uv, lod, isNormal, k3.x, i);
         if (isNormal) {
-            let t = s.xy * 2.0 - 1.0;
+            let t = s.xy;
             perturb = perturb + wi * strength * (t.x * tu + green * t.y * up);
         } else {
-            colour = colour + wi * s;
+            var cs = s;
+            if (k3.w > 0.0) {
+                // ADR-1905: a second, 4.3x larger layer of the same image, turned 40 degrees, its own hex hashes
+                let ca = 0.76604444;
+                let sa = 0.64278761;
+                let uv2 = vec2<f32>(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y) * 0.23 + vec2<f32>(0.37, 0.61);
+                cs = mix(cs, matTextureTile(linear, layer, uv2, lod - 2.1203, false, k3.x, i + 3), 0.4 * k3.w);
+            }
+            colour = colour + wi * cs;
         }
     }
     if (!isNormal) {
+        if (k3.y > 0.0) {
+            // ADR-1905: world-space macro variation, in the op's own tile units
+            let m = fbm3(p / select(k3.z, 8.0, k3.z <= 0.0), 1905u) * 2.0 - 1.0;
+            colour = vec4<f32>(colour.rgb * max(1.0 + 0.8 * k3.y * m, 0.0), colour.a);
+        }
         return colour;
     }
     let nw = matSafeNormalize(n + perturb, n);

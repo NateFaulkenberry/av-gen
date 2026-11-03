@@ -132,6 +132,20 @@ for x in (-100, -95, 92, 97):
 for x in (-36, 36):
     box(f"stain{x}", (x, -91.0, 4), (8, 0.3, 8), HULL_DARK)
 
+# M3e (owner: the sea portal must not read as confined to the bay's glowing frame): the frame's four light strips are
+# their own glb, bay-strips.glb, so the scene can kill their light as the corruption takes the base
+strips = [o for o in parts if o.name.startswith(("strip_h", "strip_v"))]
+for o in bpy.context.scene.objects:
+    o.select_set(o in strips)
+bpy.context.view_layer.objects.active = strips[0]
+bpy.ops.object.join()
+bpy.context.object.name = "bay-strips"
+bpy.ops.export_scene.gltf(filepath=f"{out_dir}/bay-strips.glb", use_selection=True, export_apply=True)
+print("STRIPS", f"{out_dir}/bay-strips.glb")
+bpy.context.object.hide_set(True)
+bpy.context.object.select_set(False)
+parts = [o for o in parts if o not in strips]
+
 # join and export the structure (Blender z-up -> glTF y-up: the front (-y) becomes +z)
 for o in bpy.context.scene.objects:
     o.select_set(o in parts)

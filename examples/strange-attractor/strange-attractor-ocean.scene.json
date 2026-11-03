@@ -1306,7 +1306,9 @@
   },
   "corruption": {
     "targets": [
-      "bay-membrane"
+      "bay-membrane",
+      "ocean-base",
+      "attractor.terrain"
     ],
     "focus": [
       874.0,
@@ -1319,15 +1321,15 @@
       0.0
     ],
     "amount": 1.0,
-    "radius": 45.0,
+    "radius": 150.0,
     "inner": 0.2,
     "fieldNear": 25.0,
-    "fieldFar": 260.0,
+    "fieldFar": 320.0,
     "openNear": 20.0,
-    "openFar": 130.0,
+    "openFar": 150.0,
     "seam": 0.3,
-    "width": 22.0,
-    "height": 11.0,
+    "width": 36.0,
+    "height": 21.0,
     "depth": 8.0,
     "block": 2.5,
     "share": 0.25,
@@ -1354,7 +1356,9 @@
   },
   "meshWire": {
     "targets": [
-      "bay-membrane"
+      "bay-membrane",
+      "ocean-base",
+      "attractor.terrain"
     ],
     "color": [
       0.45,

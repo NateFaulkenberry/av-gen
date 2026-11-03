@@ -213,17 +213,20 @@ def write_ocean(portal_flight):
                            "mars": {"mesaCover": 0.42, "yardangs": 0.0, "wind": 70.0, "dunes": 3.0},
                            "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
-        "corruption": {"targets": ["bay-membrane"], "focus": [BAY[0], bay_y, BAY[2]], "axis": [-1.0, 0.0, 0.0],
-                       "amount": 1.0, "radius": 45.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 260.0, "openNear": 20.0,
-                       "openFar": 130.0, "seam": 0.3, "width": 22.0, "height": 11.0, "depth": 8.0, "block": 2.5,
+        # M3e (owner: not confined to the bay): the base, its rock and the seafloor are targets too, the field reaches
+        # well past the bay's frame, and the opening is wider and taller than the bay, so the tear breaks out over the hull
+        "corruption": {"targets": ["bay-membrane", "bay-strips", "ocean-base", "attractor.terrain"], "focus": [BAY[0], bay_y, BAY[2]],
+                       "axis": [-1.0, 0.0, 0.0],
+                       "amount": 1.0, "radius": 150.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 320.0, "openNear": 20.0,
+                       "openFar": 150.0, "seam": 0.3, "width": 36.0, "height": 21.0, "depth": 8.0, "block": 2.5,
                        "share": 0.25, "slip": 1.5, "rate": 0.6, "strip": 2.5, "stripSlip": 1.0, "slide": 0.0, "pull": 4.0,
                        "lift": 0.8, "fold": 0.6, "lag": 0.7, "glyph": 6.0, "glyphSize": 1.0, "glow": 4.0, "echoes": 1,
-                       "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 1500.0},
+                       "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 500.0},
         # M3b (owner: cut the UFO interior): the bay's portal leads home -- out of the canyon wall where the journey
         # began (portal 1, reversed), at dawn
         # M3d (owner: the Moon portal is the reference look): the mesh wire on the portal's own surface -- its
         # scan, its rim, and the shards that break off the lips and fly into the opening (the pyramid had none)
-        "meshWire": {"targets": ["bay-membrane"], "color": [0.45, 0.85, 1.0], "intensity": 0.0, "width": 1.0, "creaseLow": 2.0,
+        "meshWire": {"targets": ["bay-membrane", "bay-strips", "ocean-base", "attractor.terrain"], "color": [0.45, 0.85, 1.0], "intensity": 0.0, "width": 1.0, "creaseLow": 2.0,
                      "creaseHigh": 12.0, "reveal": 1.0, "fadeNear": 60.0, "fadeFar": 900.0, "minPixels": 14.0, "wave": 0.0,
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
@@ -234,6 +237,9 @@ def write_ocean(portal_flight):
             {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
              "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
             {"name": "bay-membrane", "kind": "gltf", "asset": A + "bay-membrane.glb",
+             "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
+            # M3e: the bay frame's light strips, apart, so their light dies as the corruption takes the base (the timeline)
+            {"name": "bay-strips", "kind": "gltf", "asset": A + "bay-strips.glb",
              "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
         ] + [{"name": name, "kind": "gltf", "asset": A + "ufo-craft.glb",
               "position": [0.0, -500.0, 0.0], "rotation": [0, 0, 0], "scale": [s, s, s], "visible": True} for name, s in SUBS] + [
@@ -306,6 +312,10 @@ def life_nodes():
                       "rotation": [0, yaw, 0], "scale": [sc * (2.5 if kind.startswith(("rock", "basalt")) else 1.0)] * 3,
                       "visible": True})
     return items
+
+
+# M3e: the bay frame's strips fail as the corruption reaches them -- a few stutters, then dark (seconds, emissiveBoost)
+STRIPS_DIE = [(138.6, 1.0), (139.1, 0.25), (139.3, 0.9), (139.9, 0.1), (140.1, 0.55), (140.8, 0.0)]
 
 
 def creature_tracks():
