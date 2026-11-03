@@ -20,7 +20,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace  # noqa: E402
 from sample_ground import heights  # noqa: E402
 CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
@@ -104,13 +104,13 @@ FOCUS_GROUND = 0.0     # M3d: over the canyon pipeline the focus's y is absolute
 PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_GROUND,
                 PB[2] + PB[3] * 0.5 - FACE_HEIGHT / math.tan(math.radians(51.8))]
 
-# --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100), down to the camp
-# M3e (owner §12): the arrival lower (70 m, not 86 m) and a little further down-canyon from the camp (d 48, not 46). At
-# d 48 the cliff's face rises from the bench (60 m at lat 96) to 90 m by lat 100, so at 70 m the face is at lat ~97.3:
-# the exit is 1.8 m in front of it, the bench 10 m below. (A first try at d 54 turned the camera into a buttress.)
-NIGHT_EXIT_DL = (48.0, 95.5)
-NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 70.0 * R, site(*NIGHT_EXIT_DL)[1]]
-OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
+# --- home, at night. M3g (owner 54- §4: not the high swoop down; a level pass-by): out of the low rock face of the camp's
+# own bank, well down-canyon (d 68, where the face climbs from 1.9 m at lat 31 to 8.4 m at lat 34), at 5 m, 1.5 m in
+# front of it, facing out over the river and up-canyon; then level, 3.5-5 m up, along the river past the camp (the
+# figures glimpsed in passing), and on into the river portal's dive
+NIGHT_EXIT_DL = (68.0, 30.9)
+NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 5.0, site(*NIGHT_EXIT_DL)[1]]
+OUT_OF_CLIFF = unit([-0.55 * O_UNIT[0] - 1.0 * L_UNIT[0], 0.0, -0.55 * O_UNIT[1] - 1.0 * L_UNIT[1]])  # out of the face, up-canyon
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
 CAMP_GROUND = 4.4 * WS
@@ -145,12 +145,11 @@ def night_flight():
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
     # the camera arrives at the pyramid portal's climbing speed (~14 m/s): the first knot is far enough out along the
     # exit for that speed, so the path does not overshoot and swing back to the cliff (a first try did)
-    far = [knot(46.0, 72.0, 20.0, 0.0), knot(39.0, 55.0, 12.0, 0.0), knot(31.0, 40.0, 7.0, 0.0)]
+    far = [knot(60.0, 26.0, 4.5, 0.0), knot(46.0, 23.0, 4.0, 0.0), knot(32.0, 20.0, 3.5, 0.0)]
     pts = []
-    # M3f (owner: the pass clipped geometry; the craft now stands down-canyon at (10, 5)): past the camp on its bank
-    # side, behind the standing Sasquatch, and out past the seated one's back toward the river -- clear of the craft,
-    # the figures, the rocks and the scrub (traced per frame against the terrain and the scene's meshes)
-    for dd, dl, y in ((4.0, 12.5, eye + 1.4), (-1.5, 7.5, eye + 1.0), (-6.5, -2.5, eye + 0.7)):   # past the camp
+    # M3g (54- §4): level along the river's edge past the camp, between the craft (10, 5) and the water, past the Gray,
+    # and on toward the glide -- clear of the craft, the figures, the rocks and the scrub (traced per frame)
+    for dd, dl, y in ((7.0, -4.0, eye + 1.6), (1.0, -8.0, eye + 1.4), (-3.5, -12.0, eye + 1.0)):   # past the camp
         x, z = near(CAMP_SITE, dd, dl)
         pts.append((x, y, z))
     gl = [tuple(glide_point(glide_len * f)) for f in (1.0, 0.5)]
@@ -176,7 +175,7 @@ def night_flight():
             out_.append(b)
         rel = out_
     t_glide = T_CROSS - glide_len / GLIDE_SPEED
-    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], 103.2, t_glide, 12.0, GLIDE_SPEED,
+    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], T_PYR + 0.4, t_glide, 22.0, GLIDE_SPEED,
                     ramp_in=0.15, ramp_out=0.3)
     out = [list(k) for k in knots]
     x, y, z = gl[1]
@@ -188,7 +187,6 @@ def night_flight():
     return out
 
 
-NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 111.6, 114.6]]   # M3e (owner §12): a glance in passing, not a held focus
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 # M3d (owner): one continuous fly-over -- out of the wall low, over the rover as it drives (no orbit), straight on to
@@ -220,9 +218,12 @@ MARS_CORRIDOR = _corridor()
 _over_rover = _MARS_PATH[3]
 PYR_FIELD_FAR = round(math.dist((_over_rover[0], PLAIN + _over_rover[1], _over_rover[2]), PORTAL_FOCUS) - 15.0, 1)
 PYR_OPEN_FAR = round(PYR_FIELD_FAR - 200.0, 1)
-MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, 99.6, 22.0, 18.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
-    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4 + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
-    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
+# M3g (owner 54- §3: shorter or faster): four bars shorter -- the pyramid crossing moves from bar 52 (101.4 s) to bar
+# 48 (93.46 s; 120.97 bpm, a bar 1.984 s), so the same line is flown about a third faster; the night leg gains the 7.9 s
+T_PYR = 101.4 - 4 * 4 * 60.0 / 120.97
+MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, T_PYR - 1.8, 24.0, 20.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
+    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], T_PYR + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
+    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, T_PYR + 0.8],
 ]
 
 # a dusty regolith: rust and ochre by the generator's albedo and a broad noise, grit up close; M3: strata banding on the
@@ -284,7 +285,7 @@ ROVER_DIR = (_rd[0], _rd[2])
 ROVER_YAW = math.degrees(math.atan2(ROVER_DIR[0], ROVER_DIR[1]))
 ROVER_LEVEL = 35.2                     # the mean ground around the pad (sampled without it)
 ROVER_SPEED = 0.4                      # m/s (faster than Curiosity's own: slow, but visibly moving up close)
-ROVER_T0, ROVER_T1 = 69.0, 102.0
+ROVER_T0, ROVER_T1 = 69.0, 94.0
 ROVER_MAST = (-0.418, 2.110, 0.466)    # the mast camera in the rover's frame (prepare_rover.py)
 ROVER_PAD = dict(x=ROVER_START[0] + ROVER_DIR[0] * -10.0, z=ROVER_START[1] + ROVER_DIR[1] * -10.0, radius=60.0, level=ROVER_LEVEL)
 
@@ -461,8 +462,8 @@ def write():
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [1.0, 0.82, 0.5], "shards": 0.3, "shardRate": 0.35},
-        "portal": {"world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF, "entryUp": [0.0, 1.0, 0.0],
-                   "exitUp": [0.0, 1.0, 0.0], "flight": night_flight(), "aims": NIGHT_AIMS},
+        "portal": {**GAZE, "world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF, "entryUp": [0.0, 1.0, 0.0],
+                   "exitUp": [0.0, 1.0, 0.0], "flight": night_flight()},
         "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
                    "visible": True} for name, x, z, _, yaw in PYRAMIDS] + [
@@ -486,7 +487,7 @@ def write():
     json.dump(scene, open(path, "w"), indent=2)
     # M3e (owner §3: the pyramid reads over the rover for the whole fly-over): the eye held on pyramid-b's upper courses
     # from the arrival until the climb to the portal, released 4 s before the crossing so the camera lines up with it
-    return path, flight, [[PB[1], PLAIN + 75.0, PB[2], 69.9, 97.4]]
+    return path, flight, [[PB[1], PLAIN + 75.0, PB[2], 69.9, T_PYR - 4.0]]
 
 
 if __name__ == "__main__":

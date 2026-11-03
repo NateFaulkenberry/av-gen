@@ -203,3 +203,9 @@ CAST = {
     "gray": (2.6, -0.9),
 }
 GATHER_AT = (sum(v[0] for v in CAST.values()) / len(CAST), sum(v[1] for v in CAST.values()) / len(CAST))
+
+
+# M3g (owner, 54- §1, a standing rule: the camera looks where it is going): every portal flight's gaze follows the path
+# -- its look-ahead short (0.35 s, not 1.2 s, which led the curves by up to 60 degrees), barely below the line, and a
+# climb looked at in full (ADR-1909)
+GAZE = {"lookAhead": 0.35, "lookDown": 0.02, "climbLook": 1.0}

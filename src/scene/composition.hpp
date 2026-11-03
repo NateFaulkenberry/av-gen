@@ -1478,6 +1478,11 @@ public:
         glm::vec3 entryUp{0.0f, 1.0f, 0.0f};     // with it, the entry's up (the corruption's axis is its forward)
         glm::vec3 exitUp{0.0f, 1.0f, 0.0f};      // and the exit's up
         std::vector<std::array<float, 5>> aims;  // Art Pass 2: [x, y, z, from, to] -- the view turns toward a point
+        // ADR-1909: the gaze along the flight: it looks at where the path will be `lookAhead` seconds on (1.2 s led the
+        // curves by up to 60 degrees), `lookDown` of that distance below it, and a climb looked up at by `climbLook`
+        float lookAhead = 1.2f;
+        float lookDown = 0.1f;
+        float climbLook = 0.25f;
                                                  // in the destination (eased in and out over 1.2 s), then back
         glm::vec3 join{0.0f};                    // Gate C: [from, at, rate] -- at `at` seconds the camera joins the
                                                  // destination's own flythrough at its second `from`, run at `rate`

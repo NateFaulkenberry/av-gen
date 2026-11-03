@@ -15,7 +15,7 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT  # noqa: E402  (ADR-1893)
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT  # noqa: E402  (ADR-1893)
 
 
 def unit(v):
@@ -154,16 +154,15 @@ CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 
 # M3e (owner §7): one smooth, continuous path -- out of the far wall, across the river, BY the camp on its river side
 # (8-10 m from the fire, low; no circling, no lingering), then up over the benches to the outer cliff's portal. The
 # last two knots are the crossing's, as before (95 m absolute at the face). Times from a smooth speed profile.
+# M3g (54- §1): it leaves the exit at the dive's own speed (30 of the 46 m/s it arrives with), easing down, so the line
+# does not overshoot its first knot and swing (the arrival spiked 83 degrees between the look and the travel)
 _DUSK_PATH = [(36, -44, 9.0), (28, -26, 6.0), (22, -8, 4.0), (19, 5, 2.6), (13, 9, 2.4), (6, 15, 4.0), (0, 26, 12.0),
               (-4, 42, 30.0), (-6, 58, 52.0), (-6, 72, 50.0), (-7, 82, 34.0)]
 _dk = [knot(d, lat, h, 0.0) for d, lat, h in _DUSK_PATH]
-DUSK_FLIGHT = [list(k) for k in pace([k_[:3] for k_ in _dk], 48.9, 68.0, 8.0, 9.0, ramp_in=0.15, ramp_out=0.15)[0]] + \
+DUSK_FLIGHT = [list(k) for k in pace([k_[:3] for k_ in _dk], 48.2, 68.0, 30.0, 9.0, ramp_in=0.2, ramp_out=0.15)[0]] + \
     [knot(-8, 89, 21.2, 69.2), knot(-8, 96, -39.2, 70.4)]
 EGLOW = [-c for c in direction(-6, 50)]
 CLIFF_PORTAL = site(-8.0, 91.8)
-# M3e (owner §7: they are a moment on the way): a short glance at the camp as the camera passes, not a held focus
-DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 54.0, 57.6],
-             [CLIFF_PORTAL[0], 95.0 * R, CLIFF_PORTAL[1], 61.0, 69.3]]   # M2: the eye on the cliff as the tear opens
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)
@@ -229,8 +228,8 @@ scene = {
                  "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                  "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.95, 0.88, 0.62], "shards": 0.25, "shardRate": 0.35},
     # ADR-1885: back to the root -- the canyon, at dusk (its look from crossing 1)
-    "portal": {"world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
-               "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT, "aims": DUSK_AIMS},
+    "portal": {**GAZE, "world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
+               "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT},
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,
                "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True,
                "emissiveBoost": 2.0}] +

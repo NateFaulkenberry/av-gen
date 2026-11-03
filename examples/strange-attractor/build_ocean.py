@@ -21,7 +21,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canyon_scale import WORLD_SCALE as WS, R, site, pace, L_UNIT  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, pace, L_UNIT  # noqa: E402
 from sample_ground import heights  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -305,7 +305,7 @@ def write_ocean(portal_flight):
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.75, 0.95, 1.0], "shards": 0.3, "shardRate": 0.35},
-        "portal": {"world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
+        "portal": {**GAZE, "world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
             {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],

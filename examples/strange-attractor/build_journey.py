@@ -20,7 +20,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import (WORLD_SCALE as WS, R, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
+from canyon_scale import (GAZE, WORLD_SCALE as WS, R, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
                           rescale)  # (ADR-1893)
 from sample_ground import heights  # noqa: E402
 
@@ -80,6 +80,10 @@ scene["portal"].pop("aims", None)
 # the Moon's exit: its y is a height over the Moon's ground (8 m: the arrival settles to 5 m by 34.2 s)
 scene["portal"]["exit"] = [0.0, 8.0, 1500.0]
 scene["portal"]["world"] = "strange-attractor-moon.scene.json"
+scene["portal"].update(GAZE)   # M3g (54- §1, ADR-1909)
+# M3g (54- §1): the canyon's own flythrough looks where it goes, not 2.5 s ahead and down at the river (ADR-1909)
+scene["attractorWorld"]["flightLookAhead"] = 0.6
+scene["attractorWorld"]["flightLookDown"] = 0.03
 
 # --- the camp (M3b): the gathering's places, the ground under them (sampled; the builder runs twice, as the pads change
 # the ground), the opened bench (ADR-1897), the props
@@ -432,7 +436,7 @@ _, mars_flight, mars_aims = build_mars.write()
 cliff = site(-8.0, 91.8)
 into = [site(0.0, 1.0)[i] - site(0.0, 0.0)[i] for i in (0, 1)]
 n_into = math.hypot(*into)
-scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
+scene["portals"] = [{**GAZE, "world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
                      "exitAxis": build_mars.EXIT_AXIS, "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0],
                      "entry": [cliff[0], 95.0 * R, cliff[1]], "entryAxis": [into[0] / n_into, 0.0, into[1] / n_into],
                      "flight": mars_flight, "aims": mars_aims}]
@@ -443,7 +447,7 @@ scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build
 import build_ocean  # noqa: E402
 _, ocean_flight = build_ocean.write()
 sl = build_mars.GLIDE_SLOPE
-scene["portals"].append({"world": "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
+scene["portals"].append({**GAZE, "world": "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
                          "exitAxis": [-math.sin(sl), -math.cos(sl), 0.0], "exitUp": [-math.cos(sl), math.sin(sl), 0.0],   # heading -x (M3d)
                          "entryUp": [build_mars.TOWARD_RIVER[0], 0.0, build_mars.TOWARD_RIVER[1]],
                          "entry": [build_mars.RIVER_PORTAL[0], build_mars.RIVER_Y, build_mars.RIVER_PORTAL[1]],

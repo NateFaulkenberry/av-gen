@@ -298,7 +298,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     for (std::size_t i = 0; i < path.size(); ++i) eyes[i] = glm::vec3(path[i].x, ys[i], path[i].z);
     // Aim (ADR-1854): from the smooth eye path 2.5 s ahead (the tangent extended past the end), a little below it, the
     // pitch held softly between -28 and +8 degrees; then smoothed itself, so no clamp or sample can kink it.
-    const int ahead = static_cast<int>(2.5f * rate);
+    const int ahead = std::max(1, static_cast<int>(g.flightLookAhead * rate)); // ADR-1909
     const int last = static_cast<int>(eyes.size()) - 1;
     std::vector<glm::vec3> aim(eyes.size());
     for (int i = 0; i <= last; ++i) {
@@ -311,7 +311,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
         }
         glm::vec3 d = target - eyes[static_cast<std::size_t>(i)];
         // looking a little down at the river; on the approach (ADR-1881), level at the aperture
-        d.y -= 0.12f * glm::length(d) * (onApproach[static_cast<std::size_t>(i)] ? 0.0f : 1.0f);
+        d.y -= g.flightLookDown * glm::length(d) * (onApproach[static_cast<std::size_t>(i)] ? 0.0f : 1.0f); // ADR-1909
         const float flat = std::max(glm::length(glm::vec2(d.x, d.z)), 1e-3f);
         const float raw = std::atan2(d.y, flat);
         // a soft clamp: -28..+8 degrees through tanh, so the limit is approached smoothly
@@ -647,6 +647,10 @@ std::uint64_t AttractorGen::hash() const {
     if (worldScale != 1.0f) h = mixHashF(h ^ 0x1893ull, worldScale); // ADR-1893: absent, the hash is unchanged
     if (mars) { // ADR-1902: absent, the hash is unchanged
         for (float v : {mesaCover, yardangs, wind, dunes}) h = mixHashF(h ^ 0x1902ull, v);
+    if (flightLookAhead != 2.5f || flightLookDown != 0.12f) { // ADR-1909: hashed only when set (worlds keep their keys)
+        h = mixHashF(h ^ 0x1909ull, flightLookAhead);
+        h = mixHashF(h ^ 0x1909ull, flightLookDown);
+    }
     }
     for (const Pad& p : pads) { // ADR-1897
         for (float v : {p.x, p.z, p.radius, p.level}) h = mixHashF(h ^ 0x1897ull, v);
@@ -1471,7 +1475,7 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "worldScale", "pads", "mars", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "meshMinError", "worldScale", "pads", "mars", "flightLookAhead", "flightLookDown", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
 constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth",
                                           "sunShadowBias", "sunContact", "sunCasts"};
@@ -1511,6 +1515,8 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
     g.worldScale = j.value("worldScale", g.worldScale); // ADR-1893
+    g.flightLookAhead = j.value("flightLookAhead", g.flightLookAhead); // ADR-1909
+    g.flightLookDown = j.value("flightLookDown", g.flightLookDown);
     if (j.contains("mars")) { // ADR-1902
         const json& mj = j.at("mars");
         if (!mj.is_object()) return fail("attractorWorld: 'mars' must be an object");
@@ -1660,6 +1666,8 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
     if (g.mars) { // ADR-1902
         out["mars"] = {{"mesaCover", g.mesaCover}, {"yardangs", g.yardangs}, {"wind", g.wind}, {"dunes", g.dunes}};
     }
+    if (g.flightLookAhead != 2.5f) out["flightLookAhead"] = g.flightLookAhead; // ADR-1909
+    if (g.flightLookDown != 0.12f) out["flightLookDown"] = g.flightLookDown;
     if (k.sunWarmth != 1.0f) out["look"]["sunWarmth"] = k.sunWarmth; // ADR-1900: absent, the warm sun
     if (k.sunShadowBias >= 0.0f) out["look"]["sunShadowBias"] = k.sunShadowBias; // ADR-1907: absent, the block's
     if (k.sunContact != 1.0f) out["look"]["sunContact"] = k.sunContact;

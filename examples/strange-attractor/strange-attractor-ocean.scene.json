@@ -936,6 +936,9 @@
     "shardRate": 0.35
   },
   "portal": {
+    "lookAhead": 0.35,
+    "lookDown": 0.02,
+    "climbLook": 1.0,
     "world": "@root",
     "exit": [
       130.26399999999998,

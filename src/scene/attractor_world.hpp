@@ -69,6 +69,11 @@ struct AttractorGen {
     float yardangs = 6.0f;    // metres
     float wind = 30.0f;       // degrees: the wind's direction (x toward z)
     float dunes = 4.0f;       // metres
+    // ADR-1909: the flythrough's gaze. The eye looks at where it will be `flightLookAhead` seconds on (the default 2.5
+    // s leads every turn and dive by up to 40 degrees) and `flightLookDown` of the distance below it (0.12, toward
+    // the river). A film whose camera "looks where it is going" shortens both.
+    float flightLookAhead = 2.5f; // seconds
+    float flightLookDown = 0.12f; // fraction of the look distance
     // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
     // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
     // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from

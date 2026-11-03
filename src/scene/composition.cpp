@@ -11707,6 +11707,9 @@ nlohmann::json Composition::toJson() const {
             for (const glm::vec4& w : b.flight) flight.push_back({w.x, w.y, w.z, w.w});
             nlohmann::json pj = {{"world", b.world}, {"exit", {b.exit.x, b.exit.y, b.exit.z}}, {"exitYaw", b.exitYaw}, {"flight", flight}};
             if (b.join.z > 0.0f) pj["join"] = {b.join.x, b.join.y, b.join.z};
+            if (b.lookAhead != 1.2f) pj["lookAhead"] = b.lookAhead; // ADR-1909: written only when set
+            if (b.lookDown != 0.1f) pj["lookDown"] = b.lookDown;
+            if (b.climbLook != 0.25f) pj["climbLook"] = b.climbLook;
             if (!b.aims.empty()) {
                 nlohmann::json aims = nlohmann::json::array();
                 for (const auto& a : b.aims) aims.push_back({a[0], a[1], a[2], a[3], a[4]});
@@ -12721,6 +12724,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                        a.at(4).get<float>()});
                 }
             }
+            pb.lookAhead = pj.value("lookAhead", pb.lookAhead); // ADR-1909
+            pb.lookDown = pj.value("lookDown", pb.lookDown);
+            pb.climbLook = pj.value("climbLook", pb.climbLook);
             vec3At("entryUp", pb.entryUp);
             vec3At("exitUp", pb.exitUp);
             if (pj.contains("entry")) { // ADR-1895
@@ -12735,7 +12741,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             for (auto it = pj.begin(); it != pj.end(); ++it) {
                 if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join" &&
                     it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp" && it.key() != "aims" &&
-                    it.key() != "entry" && it.key() != "entryAxis") {
+                    it.key() != "entry" && it.key() != "entryAxis" && it.key() != "lookAhead" && it.key() != "lookDown" &&
+                    it.key() != "climbLook") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }
