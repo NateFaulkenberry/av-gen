@@ -227,7 +227,7 @@
     ],
     "volumeMaxDistance": 45.0,
     "volumeAnisotropy": 0.75,
-    "volumeLocalLights": 1.0
+    "volumeLocalLights": 0.0
   },
   "post": {
     "bloomIntensity": 0.06,

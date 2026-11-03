@@ -249,7 +249,8 @@ def write_ocean(portal_flight):
                         "sky": {"enabled": False}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
                         "ambientOcclusion": True, "shadowCasterReach": 1500.0, "contactShadows": True,
                         "fogSpectral": [2.6, 1.0, 0.62], "volumeMaxDistance": 45.0, "volumeAnisotropy": 0.75,
-                        "volumeLocalLights": 1.0},
+                        "volumeLocalLights": 0.0},   # local lights in the murk: not yet -- the portal's own light at the
+                                                     # bay's opening scatters into a white-out at the crossing (M3f §2b)
         "post": {"bloomIntensity": 0.06, "tonemap": 1},
         "materialPrograms": [reef_program(), {"name": "seabed", "ops": [
             {"kind": "input", "dst": 0, "input": "uv"},
