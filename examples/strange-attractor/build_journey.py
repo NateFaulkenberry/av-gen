@@ -362,9 +362,9 @@ night = {
     "post/tonemap/operator": 1, "camera/exposure/compensation": 1.0,
     "attractorWorld/sunShadowBias": 0.2, "attractorWorld/sunContact": 0.0,
     "scene/shadowRange": 200.0, "scene/volumeDensity": 0.0007, "scene/volumeLocalLights": 1.0,
-    "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 20.0, "lights/fire-bounce/intensity": 5.0,
+    "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 30.0, "lights/fire-bounce/intensity": 5.0,
     "lights/ufo-rim-0/intensity": 4.0, "lights/ufo-rim-1/intensity": 4.0, "lights/ufo-rim-2/intensity": 4.0,
-    "lights/ufo-rim-3/intensity": 4.0, "lights/ufo-spill/intensity": 6.0,
+    "lights/ufo-rim-3/intensity": 4.0, "lights/ufo-spill/intensity": 9.0,
     "lights/campfire/intensity": 34.0, "lights/campfire/color": [1.0, 0.46, 0.15], "lights/campfire/range": 17.0,
     "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
@@ -467,10 +467,11 @@ for c in ("r", "c"):
     routes.append(beat_route("beat.pulse", f"moon/nodes/earth-echo-{c}/opacity", 0.0, 0.55, decay=220.0, op="replace"))
 routes.append(beat_route("beat.pulse", "moon/nodes/earth/emissiveBoost", 0.0, 1.2, decay=400.0))
 # M3f (owner §2): the craft's lights breathe with the beat -- multiplied (a look's 0 by day stays 0), from 0.8 between
-# beats to 1.5 on one, falling over 0.45 s: a pulse, not a strobe; the hull's emissive the same, gentler
+# beats to 3x on one, falling over 0.5 s: a pulse, not a strobe (0.8-1.5 measured a 1.5% swing on the hull, 0.6-2.4
+# about 3%); the hull's emissive 0.6-3x
 for _l in ("ufo-glow", "ufo-spill", "ufo-rim-0", "ufo-rim-1", "ufo-rim-2", "ufo-rim-3"):
-    routes.append(beat_route("beat.pulse", f"lights/{_l}/intensity", 0.8, 1.5, attack=20.0, decay=450.0, op="multiply"))
-routes.append(beat_route("beat.pulse", "nodes/ufo-parked/emissiveBoost", 0.85, 1.35, attack=20.0, decay=450.0,
+    routes.append(beat_route("beat.pulse", f"lights/{_l}/intensity", 0.5, 3.0, attack=25.0, decay=500.0, op="multiply"))
+routes.append(beat_route("beat.pulse", "nodes/ufo-parked/emissiveBoost", 0.6, 3.0, attack=25.0, decay=500.0,
                          op="multiply"))
 # M3e (owner §6): the aura keeps the halo's beat pulse; its glitch and datamosh are deliberate hits, 0 between them
 routes.append(beat_route("beat.pulse", "moon/nodes/earth-aura/emissiveBoost", 0.0, 1.6, decay=360.0))

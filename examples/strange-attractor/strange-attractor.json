@@ -705,13 +705,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.8,
-        "remapOutMax": 1.5,
+        "remapOutMin": 0.5,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
@@ -724,13 +724,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.8,
-        "remapOutMax": 1.5,
+        "remapOutMin": 0.5,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
@@ -743,13 +743,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.8,
-        "remapOutMax": 1.5,
+        "remapOutMin": 0.5,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
@@ -762,13 +762,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.8,
-        "remapOutMax": 1.5,
+        "remapOutMin": 0.5,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
@@ -781,13 +781,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.8,
-        "remapOutMax": 1.5,
+        "remapOutMin": 0.5,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
@@ -800,13 +800,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.8,
-        "remapOutMax": 1.5,
+        "remapOutMin": 0.5,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
@@ -819,13 +819,13 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.85,
-        "remapOutMax": 1.35,
+        "remapOutMin": 0.6,
+        "remapOutMax": 3.0,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
-        "attackMs": 20.0,
-        "decayMs": 450.0
+        "attackMs": 25.0,
+        "decayMs": 500.0
       }
     },
     {
