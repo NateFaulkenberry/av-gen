@@ -12,13 +12,13 @@ Media is in `~/Desktop/av-gen-review/101-strange-attractor/pass2-m3e/`.
 | 3 | Mars mound hides the pyramid | done: a corridor of pads (34 m apart, radius 58 m) eases the fly-over to the plain; a sightline check finds no terrain over any line to the pyramids |
 | 4 | Visible tiling | done (ADR-1905, unit + GPU parity tests): canyon ground, Mars plain sand, the pyramids' drifts (split into `<name>-sand.glb`, drawn through `marsDrift`, ADR-1572), the reef |
 | 5 | Mars arrival clips a bulge | done: the exit is out of the butte's steep face at 95 m (it was in the talus apron); the first knot is 30 m over the ground |
-| 6 | Earth aura, glitch and datamosh | to do |
-| 7 | Dusk arrival across the river, one path past the camp | to do |
+| 6 | Earth aura, glitch and datamosh | done: the pixel corona replaced by `earth-aura` (a radial falloff card, cyan-white at the limb to violet, scaled so its 1.0 R is the limb as seen); the beat pulse kept; RGB split copies on the beat, a torn copy (scanline tears, displaced blocks) on strong transients, two mosh trails on the low onsets; the Earth's own RGB echoes kept |
+| 7 | Dusk arrival across the river, one path past the camp | done: out of the far wall (d 40, lat -53.5, 12 m), across the river, past the camp on its river side, up to the cliff portal; one paced path; the camp aim a 3.6 s glance |
 | 8 | Night camp: more light (optional after §11) | superseded by the brief (`49-`); torches not added yet (§11: quality first) |
 | 9 | Night camp: shadows and lighting quality | first pass done (9021ea67): ADR-1906/1907 + 48- A1-A6; the blob gone, the fire casts, Sasquatch B moved out of the fire (2.0 -> 2.9 m), thin smoke, craft spill tamed; the Gray's flat white is the hero agent's (model) |
 | 10 | The Gray talks across the fire | moved to the hero-asset agent (coordinator) |
 | 11 | §9 first, torches only if still dark | (rule) |
-| 12 | Night arrival lower, one pass by the camp | to do |
+| 12 | Night arrival lower, one pass by the camp | done: the exit at 70 m (was 86) and d 54 (was 46); one paced path past the camp (5-11 m from the fire) into the glide; the aim a 3 s glance |
 | 13 | Reef geometry and texture, the black streaks | done (to verify on render): the streaks were the canyon program's world-height strata bands on steep faces; the reef has its own program (photoscanned rock + sand, hex-tiled, algae, coral, caustics); softer relief and a finer mesh |
 | 14 | Sea portal sooner | done: field 260 -> 770 m (~139 -> ~130 s), tear 130 -> 360 m (~141.6 -> ~137.5 s, after the last sortie at 136.4 s); the strips die 133.6-135.8 s |
 | 15 | Pyramid portal later (after the camera passes the rover) | done: field 1700 -> 611.1 m (the camera's distance from the focus at the knot over the rover, less 15 m), tear 520 -> 411.1 m |
@@ -37,3 +37,10 @@ are in the session scratchpad (`marscheck.py`).
 - Scene: the night look's research values; the river's water at every hour (f0 0.06, roughness 0.085, ripple 0.48,
   streak 0.8, rays 6, glints 8, sparkle 0.3, specular 2, sky mirror 0.35, transmission 0.5).
 - Open: the water's local-light streaks (B7/B8), PCSS for local lights (B4), fur wrap (B9), the Purkinje shift (C1).
+
+## The hero agent's audit (H1), fixed here
+
+- `build_teepee.py`: the logs lay flat (an imported glTF object is QUATERNION; its Euler was ignored); decimated to 8%.
+- `build_sasquatch.py`: every `sasquatch_fur*` material alpha-tested; sasquatch-b patched as a copy.
+- The Gray matte (metallic 0, no emission), as a copy (`pass2/patch_glb_materials.py`).
+- Renderer gaps G1-G6 are noted for Phase 7; not taken in this checkpoint.
