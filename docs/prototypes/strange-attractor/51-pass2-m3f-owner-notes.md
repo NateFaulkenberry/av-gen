@@ -52,6 +52,30 @@ merged. This file collects their notes as they arrive, so it grows.
   already in M3d. Find the cause (exposure or auto-exposure, a bright volume or fog pass, the portal surface,
   or the camera entering geometry) and fix it at the root. Show the crossing frame by frame, M3e against M3f.
 
+## 2c. The ocean: realistic underwater lighting (owner, after M3f; the next work)
+
+- The owner, looking at the octopus test (`hero/07-octopus/05-ocean-130s.png`): the creature "looks very CG". They want
+  **more realistic lighting in the ocean scene**. In that frame:
+  - the seafloor is flat grey and evenly lit, with hard, high-contrast caustic blotches;
+  - nothing falls off with depth or distance, and there is no colour absorption;
+  - creatures sit on the floor with no grounding;
+  - the distant mesa walls read as a flat cyan cut-out.
+- **Research first** (research-and-plan-first), like an underwater DP or VFX lighter. Use reference underwater
+  photography and film, and the physics:
+  - wavelength absorption (red goes first, then green; blue-green dominates with depth and distance);
+  - in-water scattering and veiling haze with distance, and backscatter;
+  - downwelling light from the surface (the sun disc and Snell's window, soft caustics that fade with depth);
+  - soft ambient from above and dark from below;
+  - god rays where they fit;
+  - the base's lights and the subs as local light sources in the murk.
+  Check what the engine already has: the fog and scattering, caustics, AgX, the water's local-light gap, and
+  ADR-1906/1907. Plan before building and show a still before the full pass.
+- **Targets:** creatures and props that sit in the water believably (depth-tinted, grounded with soft contact
+  shadows, rim from above); softer, depth-faded caustics; depth haze; and a colour grade that reads as real water.
+  Don't lose the scene's identity: the base, the subs, the portal, and the beat pulses.
+- **Show:** M3f against the new lighting at the same camera beats (128, 130, 135 and 140 s), the ocean clip
+  121.5–147.5 s with sound, and the octopus close-up under the new lighting.
+
 ## Delivery
 
 - **Once every M3f change is done, render the full video with sound** to
