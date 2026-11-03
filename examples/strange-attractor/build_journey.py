@@ -20,22 +20,17 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import (WORLD_SCALE as WS, R, POC, PREFIX, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
+from canyon_scale import (WORLD_SCALE as WS, R, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
                           rescale)  # (ADR-1893)
 from sample_ground import heights  # noqa: E402
 
-# M3b: the canyon scale POC (SA_WORLD_SCALE=0.2) is the same journey in a canyon half the size: it starts from the
-# current canyon's files and writes its own (poc-*.scene.json, strange-attractor-poc.json); the current canyon is kept
 SRC = os.path.join(HERE, "strange-attractor-flythrough.scene.json")
 SRC_PROJECT = os.path.join(HERE, "strange-attractor.json")
-PATH = os.path.join(HERE, PREFIX + "strange-attractor-flythrough.scene.json")
-PROJECT = os.path.join(HERE, "strange-attractor-poc.json" if POC else "strange-attractor.json")
+PATH = SRC
+PROJECT = SRC_PROJECT
 scene = json.load(open(SRC))
 project = json.load(open(SRC_PROJECT))
 project["assets"]["scene"]["path"] = os.path.basename(PATH)
-if POC:
-    project["app"]["name"] = "The Strange Attractor (canyon scale POC)"
-    project["render"]["path"] = "renders/strange-attractor-poc.mp4"
 
 # --- M1b: the world's scale (ADR-1893). Every Pass 1 length in the scene and the project, once, by ratio.
 rescale(scene, project)
@@ -83,7 +78,7 @@ scene["portal"]["flight"] = [
 scene["portal"].pop("aims", None)
 # the Moon's exit: its y is a height over the Moon's ground (8 m: the arrival settles to 5 m by 34.2 s)
 scene["portal"]["exit"] = [0.0, 8.0, 1500.0]
-scene["portal"]["world"] = PREFIX + "strange-attractor-moon.scene.json"
+scene["portal"]["world"] = "strange-attractor-moon.scene.json"
 
 # --- the camp (M3b): the gathering's places, the ground under them (sampled; the builder runs twice, as the pads change
 # the ground), the opened bench (ADR-1897), the props
@@ -360,7 +355,7 @@ dawn = {
 scene["looks"] = [{"name": "dusk", "from": 1, "params": dusk}, {"name": "dusk-portal", "from": 2, "params": dusk_portal},
                   {"name": "night", "from": 3, "params": night}, {"name": "night-portal", "from": 4, "params": night_portal},
                   {"name": "dawn", "from": 5, "params": dawn}]
-# the portals' sizes follow the terrain (the POC's canyon is half the size)
+# the portals' sizes follow the terrain
 for look in scene["looks"]:
     for k_ in ("radius", "fieldNear", "fieldFar", "openNear", "openFar", "width", "height", "depth"):
         if f"corruption/{k_}" in look["params"]:
@@ -371,7 +366,7 @@ _, mars_flight, mars_aims = build_mars.write()
 cliff = site(-8.0, 91.8)
 into = [site(0.0, 1.0)[i] - site(0.0, 0.0)[i] for i in (0, 1)]
 n_into = math.hypot(*into)
-scene["portals"] = [{"world": PREFIX + "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
+scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
                      "exitAxis": build_mars.EXIT_AXIS, "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0],
                      "entry": [cliff[0], 95.0 * R, cliff[1]], "entryAxis": [into[0] / n_into, 0.0, into[1] / n_into],
                      "flight": mars_flight, "aims": mars_aims}]
@@ -382,7 +377,7 @@ scene["portals"] = [{"world": PREFIX + "strange-attractor-mars.scene.json", "exi
 import build_ocean  # noqa: E402
 _, ocean_flight = build_ocean.write()
 sl = build_mars.GLIDE_SLOPE
-scene["portals"].append({"world": PREFIX + "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
+scene["portals"].append({"world": "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
                          "exitAxis": [-math.sin(sl), -math.cos(sl), 0.0], "exitUp": [-math.cos(sl), math.sin(sl), 0.0],   # heading -x (M3d)
                          "entryUp": [build_mars.TOWARD_RIVER[0], 0.0, build_mars.TOWARD_RIVER[1]],
                          "entry": [build_mars.RIVER_PORTAL[0], build_mars.RIVER_Y, build_mars.RIVER_PORTAL[1]],

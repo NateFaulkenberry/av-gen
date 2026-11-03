@@ -97,8 +97,10 @@ Media is in `~/Desktop/av-gen-review/101-strange-attractor/pass2-m3d/`.
 - The rover's photoscanned boulders are tinted, not re-textured for Mars.
 - The crossing-instant degeneracy is avoided by timing, not fixed in the engine. At 60 fps the shifted instants fall
   on the grid again.
-- The canyon-scale POC files (`poc-*.scene.json`, `strange-attractor-poc.json`) were not rebuilt for M3d. The new Mars
-  and ocean worlds need new ground samples at that scale, and the sampler is a temporary test.
 
-The suites were not run (an art checkpoint; deferred until the art is approved). The builders reproduce the committed
+**Retired at the merge:** the M3b canyon-scale POC (`SA_WORLD_SCALE`, the `poc-*.scene.json` files and
+`strange-attractor-poc.json`) is deleted with its builder path (ADR-441, no compat shims). It had not been rebuilt since
+M3b, and the canyon stayed at 0.4.
+
+At the checkpoint the suites were not run (deferred until the art was approved). The builders reproduce the committed
 main scene files byte for byte from `ground-cache.json`, and the `[attractor-world]` and `[lunar-world]` tests pass.

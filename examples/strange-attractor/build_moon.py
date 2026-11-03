@@ -15,7 +15,7 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, PREFIX, canyon_frame, site, knot  # noqa: E402  (ADR-1893; M3b POC)
+from canyon_scale import WORLD_SCALE as WS, R, canyon_frame, site, knot  # noqa: E402  (ADR-1893)
 
 
 def unit(v):
@@ -252,6 +252,6 @@ scene = {
                "position": [c[0], DOME_FLOOR[(c[0], c[1])] - DOME_SINK[(c[0], c[1])], c[1]], "rotation": [0, 37 * k, 0],
                "scale": [sc[0], sc[1], sc[0]], "visible": True} for k, (c, sc, _) in enumerate(DOMES)],
 }
-out = os.path.join(HERE, PREFIX + 'strange-attractor-moon.scene.json')
+out = os.path.join(HERE, 'strange-attractor-moon.scene.json')
 json.dump(scene, open(out, 'w'), indent=2)
 print(out)

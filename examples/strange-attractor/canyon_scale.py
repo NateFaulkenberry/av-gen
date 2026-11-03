@@ -18,15 +18,11 @@ and applies the ratio.
 """
 
 import math
-import os
 
-# M3b: the canyon POC (owner: a smaller-scale landscape where the characters read). The builders run at REF (the
-# current canyon) by default; SA_WORLD_SCALE writes the same journey at another scale, into "poc-" files.
+# The canyon's scale. (M3b's smaller-scale POC, SA_WORLD_SCALE and its "poc-" files, was retired in M3d.)
 REF = 0.4
-WORLD_SCALE = float(os.environ.get("SA_WORLD_SCALE", REF))
+WORLD_SCALE = REF
 R = WORLD_SCALE / REF                 # terrain-scale lengths (authored at REF) times this
-POC = abs(WORLD_SCALE - REF) > 1e-9
-PREFIX = "poc-" if POC else ""
 
 
 def canyon_frame(d, lat):

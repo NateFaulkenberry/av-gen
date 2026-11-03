@@ -21,7 +21,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, pace, L_UNIT  # noqa: E402
+from canyon_scale import WORLD_SCALE as WS, R, site, pace, L_UNIT  # noqa: E402
 from sample_ground import heights  # noqa: E402
 CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
@@ -86,7 +86,7 @@ T_EXIT, T_BAY = 121.2 + 1.0 / 60.0, 147.0 + 1.0 / 60.0   # half a frame off the 
 # the ocean flight (x, height over the seabed, z, t): crossing 5 at 121.2 s (bar 62), crossing 6 at 147.0 s (bar 75)
 def flight(bay_rel_y=None):
     try:
-        ground = heights(PREFIX + "strange-attractor-ocean.scene.json", [(x, z) for x, _, z in OCEAN_PATH])
+        ground = heights("strange-attractor-ocean.scene.json", [(x, z) for x, _, z in OCEAN_PATH])
     except Exception:
         ground = [0.0] * len(OCEAN_PATH)
     pts = []
@@ -247,14 +247,14 @@ def write_ocean(portal_flight):
                 "emissive": 0.3, "blend": "additive"}},
         ] + life_nodes() + fish_nodes() + creature_nodes(),
     }
-    path = os.path.join(HERE, PREFIX + "strange-attractor-ocean.scene.json")
+    path = os.path.join(HERE, "strange-attractor-ocean.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
     return path
 
 
 # --- home (M3b): out of portal 1's wall in the canyon, the way the journey went in, now at dawn: out over the river,
 # turning up it past the camp, low along the water, then rising to a high, slowing view as the music ends (210.5 s).
-CANYON_SCENE = PREFIX + "strange-attractor-flythrough.scene.json"
+CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 # M3d (owner: exit higher in the canyon, no clipping through rock or shrubs): out of the outer cliff behind the camp,
 # 86 m up its face (the cliff the night came home through), high over the benches, down to the river and up it,
 # rising to the high view as the music ends. (d, lat) in the current canyon's metres, absolute heights there.
@@ -268,10 +268,7 @@ T_HOME, T_END = 147.0, 210.5
 
 def _home():
     xz = [site(d, l) for d, l, _ in HOME_PATH]
-    try:
-        ground = heights(CANYON_SCENE, [tuple(p) for p in xz])
-    except Exception:          # the POC's canyon is not written yet (the builder runs twice)
-        ground = [0.0] * len(xz)
+    ground = heights(CANYON_SCENE, [tuple(p) for p in xz])
     pts = [(p[0], y * R, p[1]) for p, (_, _, y) in zip(xz, HOME_PATH)]
     exit_ = [pts[0][0], pts[0][1], pts[0][2]]          # the root's exit height is absolute
     clear = min(pt[1] - g for pt, g in zip(pts[1:], ground[1:]))
@@ -301,7 +298,7 @@ def life_nodes():
             r = 2.0 + 4.0 * ((k * 13 + j * 7) % 10) / 10.0
             pts.append((x + r * math.cos(a), z + r * math.sin(a), kinds[(k + j) % len(kinds)], 0.7 + 0.12 * ((k + j) % 5), a * 57.3))
     try:
-        gr = heights(PREFIX + "strange-attractor-ocean.scene.json", [(p[0], p[1]) for p in pts])
+        gr = heights("strange-attractor-ocean.scene.json", [(p[0], p[1]) for p in pts])
     except Exception:
         gr = [0.0] * len(pts)
     for i, ((x, z, kind, sc, yaw), g) in enumerate(zip(pts, gr)):

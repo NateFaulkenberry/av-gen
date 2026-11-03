@@ -20,7 +20,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace  # noqa: E402
+from canyon_scale import WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace  # noqa: E402
 from sample_ground import heights  # noqa: E402
 CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
@@ -105,7 +105,7 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
 NIGHT_EXIT_DL = (46.0, 99.0)
 NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 86.0 * R, site(*NIGHT_EXIT_DL)[1]]
 OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
-CANYON_SCENE = PREFIX + "strange-attractor-flythrough.scene.json"
+CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
 CAMP_GROUND = 4.4 * WS
 # M3b (owner: the night needs a real pass; a lower, closer framing, not tiny figures from high up): down from the cliff
@@ -407,7 +407,7 @@ def write():
               "position": [ROVER_START[0] + ROVER_DIR[0] * (i - 1.6), ROVER_LEVEL, ROVER_START[1] + ROVER_DIR[1] * (i - 1.6)],
               "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": False} for i in range(TRACK_AHEAD)] + rover_rocks(),
     }
-    path = os.path.join(HERE, PREFIX + "strange-attractor-mars.scene.json")
+    path = os.path.join(HERE, "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
     return path, flight, []    # M3d: no aim -- the fly-over looks ahead, to the pyramids
 
