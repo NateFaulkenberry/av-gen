@@ -103,3 +103,20 @@ After the Moon exit portal, in the evening (dusk) canyon with the Sasquatches:
 - Keep the arrival readable as a portal exit (the "pop out of the canyon wall" behaviour the owner asked
   for at M3c), with no clipping through rock, shrubs or characters.
 - Show the new dusk section as a clip with stills, beside the M3d version.
+
+## 8. The night scene: more light sources (owner addition)
+
+`night-camp-too-dark.png`: a wide view of the night camp shows the whole bank in near-black. The fire
+and the craft's underside glow are the only pools of light; the Sasquatches and the Gray are tiny
+silhouettes; the rest is a dark brown slope.
+
+- The owner: "the night scene lighting still looks poor". Add more light points to illuminate the area,
+  for example glowing torches round the camp, lanterns, glowing stones, or light spilling from the craft.
+- Placement:
+  - motivated, and set on the ground or in rock (not floating);
+  - warm flicker that is slow and soft, never strobing;
+  - each light casts onto the ground, rocks and characters.
+- The aim is a readable, atmospheric night set with several warm pools and cool moonlight between them,
+  not a black frame with one fire.
+- Also lift the craft's own lighting so it reads as a lit object.
+- Show before/after at the same frames, including this wide angle.
