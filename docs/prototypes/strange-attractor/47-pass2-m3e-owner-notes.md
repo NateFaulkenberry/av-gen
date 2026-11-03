@@ -88,3 +88,18 @@ edges.
   displacement or smear, scanline tears, and macroblock mosh trails, beat-driven and deliberate.
 - No shimmer or aliasing between beats; report the Moon flicker metric.
 - Show stills and a clip with sound.
+
+## 7. The dusk canyon after the Moon: a new arrival and path (owner addition)
+
+After the Moon exit portal, in the evening (dusk) canyon with the Sasquatches:
+
+- **Move the arrival portal** (where the camera comes out of the canyon wall) somewhere else: further
+  down the river, on the opposite side of the river from where the Sasquatches stand.
+- **New camera path:** from that arrival, pass by the Sasquatches, then go on up into the next portal
+  above (the cliff portal to Mars).
+  - No circling round them, and no lingering or heavy focus on them. They are a moment passed on the
+    way, not the subject.
+  - The move should be one continuous, smooth path.
+- Keep the arrival readable as a portal exit (the "pop out of the canyon wall" behaviour the owner asked
+  for at M3c), with no clipping through rock, shrubs or characters.
+- Show the new dusk section as a clip with stills, beside the M3d version.
