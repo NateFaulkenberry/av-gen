@@ -197,3 +197,35 @@ river/water portal into the ocean.
 - No clipping through rock, shrubs, characters or the craft. Keep the arrival readable as a portal exit.
 - The camp lighting (§8, §9, §11) and the Gray (§10) still matter: they are what we glimpse in passing.
 - Show the new night section as a clip with stills, beside the M3d version, with critic before/after.
+
+## 13. Underwater geometry and texturing (owner addition)
+
+`ocean-reef-black-streaks.png`: the M3d reef seafloor (from the canyon pipeline in its Mars style) is
+spiky, crumpled, low-poly faceted terrain with a flat grey material. Its steep faces carry blurry
+black streak bands. The coordinator's guess is a projected or stretched texture: a top-down (XZ) UV or
+strata texture smearing down steep faces, or the canyon's strata bands without triplanar mapping.
+
+- The owner wants **more focus on the underwater geometry**:
+  - **Shapes:** believable reef, rock and seafloor forms: rounded, eroded, layered rock and coral
+    heads, boulders, sediment drifts. Not crumpled spikes. Smooth the normals where facets read; add
+    resolution where silhouettes are jagged.
+  - **Texturing:** proper underwater materials: photoscanned rock and sand (CC0), triplanar so steep
+    faces don't stretch, with anti-tiling (§4). Add encrusting life (algae and coral tint), wet
+    roughness, and caustics if possible.
+  - **Find and fix the black lines:** identify the cause (UV projection, strata on steep faces,
+    shadow or normal artifacts) and remove it at the source.
+- Show before/after stills at the same frames, with critic before/after.
+
+## 14. Sea exit portal: start sooner (owner addition)
+
+- Start the sea exit portal's (launch bay to dawn canyon) animation sooner on the approach: the glyphs,
+  corruption and tear should build earlier, together with §1's spread over the surrounding geometry.
+- No subs launching while it opens (M3d rule).
+- Report the old and new reach and tear distances.
+
+## 15. Pyramid exit portal: start LATER (owner addition)
+
+- This reverses the M3d direction (sooner). Start the pyramid portal's animation **later**: roughly once
+  the camera has passed over the rover. Before that, the pyramid shows no glyphs or corruption.
+- Tie the start to the camera passing the rover (time or distance along the path), and report the
+  values.
