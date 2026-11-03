@@ -117,9 +117,10 @@ before building, and show a plan with stills before the full pass.
     more hidden: low, set into the shelf face, with a few openings and the launch bay; decent textures (weathered
     concrete or metal, marine growth, sediment on its upper surfaces).
   - Keep the illumination the owner likes.
-  - The owner is open to either building a better base (simple, with decent texturing) or finding a model online.
-    The hero agent is searching for a candidate model in parallel; compare a found model against your rebuilt one
-    and pick the better.
+  - **Owner decision (2026-11-03): modify our current base; no downloaded model.** The hero agent's search found
+    no free underwater base. Rework the existing base into the covert form above: sink it into the shelf ledge,
+    simplify the silhouette (lose the chimney towers and the factory read), add weathering, marine growth and
+    sediment, and keep its lights and the launch bay.
 - **Creatures:** the octopus test showed the creatures looking CG. The lighting work should fix most of that.
   Integrate the octopi only when the coordinator says which model (the hero agent is comparing them).
 - **Show:** M3f against M3g at the same camera beats (128, 130, 135 and 140 s), the base before and after, the
