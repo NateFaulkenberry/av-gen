@@ -105,11 +105,11 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
                 PB[2] + PB[3] * 0.5 - FACE_HEIGHT / math.tan(math.radians(51.8))]
 
 # --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100), down to the camp
-# M3e (owner §12): the arrival lower (72 m, not 86 m) and a little further down-canyon from the camp (d 54, not 46). At
-# d 54 the cliff's face rises from the bench (60 m at lat 96) to 87-92 m by lat 100, so at 72 m the face is at lat ~97.8:
-# the exit is 2 m in front of it (lat 95.8), the bench 12 m below (a first try at lat 99 was 15 m inside the rock)
-NIGHT_EXIT_DL = (54.0, 95.8)
-NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 72.0 * R, site(*NIGHT_EXIT_DL)[1]]
+# M3e (owner §12): the arrival lower (70 m, not 86 m) and a little further down-canyon from the camp (d 48, not 46). At
+# d 48 the cliff's face rises from the bench (60 m at lat 96) to 90 m by lat 100, so at 70 m the face is at lat ~97.3:
+# the exit is 1.8 m in front of it, the bench 10 m below. (A first try at d 54 turned the camera into a buttress.)
+NIGHT_EXIT_DL = (48.0, 95.5)
+NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 70.0 * R, site(*NIGHT_EXIT_DL)[1]]
 OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
@@ -143,7 +143,9 @@ def night_flight():
     sampled ground."""
     eye = CAMP_GROUND + 1.85
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
-    far = [knot(48.0, 84.0, 24.0, 0.0), knot(40.0, 62.0, 14.0, 0.0), knot(31.0, 40.0, 7.0, 0.0)]
+    # the camera arrives at the pyramid portal's climbing speed (~14 m/s): the first knot is far enough out along the
+    # exit for that speed, so the path does not overshoot and swing back to the cliff (a first try did)
+    far = [knot(46.0, 72.0, 20.0, 0.0), knot(39.0, 55.0, 12.0, 0.0), knot(31.0, 40.0, 7.0, 0.0)]
     pts = []
     for dd, dl, y in ((7.0, 9.0, eye + 1.6), (5.5, 3.0, eye + 1.0), (3.5, -3.5, eye + 0.6)):   # past the camp
         x, z = near(CAMP_SITE, dd, dl)
@@ -157,7 +159,7 @@ def night_flight():
     # the approach and the pass, timed by a smooth speed profile that arrives at the glide's own speed
     rel = [k[:3] for k in far] + [[x, y - g, z] for (x, y, z), g in zip(pts, gr)]
     t_glide = T_CROSS - glide_len / GLIDE_SPEED
-    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], 104.2, t_glide, 7.5, GLIDE_SPEED,
+    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], 103.2, t_glide, 12.0, GLIDE_SPEED,
                     ramp_in=0.15, ramp_out=0.3)
     out = [list(k) for k in knots]
     x, y, z = gl[1]
