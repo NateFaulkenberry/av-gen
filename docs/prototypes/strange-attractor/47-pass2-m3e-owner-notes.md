@@ -37,3 +37,12 @@ stretched shard triangles.
   burst.
 - Art checkpoint first; suites and the full render after the owner approves (as for M3d).
 - All standing rules in `31-art-pass-2-coordinator-notes.md` apply.
+
+## 3. Mars: the land mass blocking the pyramid (owner addition)
+
+`mars-landmass-blocking-pyramid.png`: during the fly-over past the rover, a big smooth sand mound or
+drift (boxed in red) sits between the rover and the pyramids. It hides most of the pyramid, and it has
+creased, faceted geometry on its face.
+
+- Remove it, so the pyramid is clearly visible over the rover along the whole fly-over.
+- Check the whole Mars camera path for any other terrain hiding the pyramids.
