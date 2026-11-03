@@ -383,10 +383,11 @@ def mars_rock_program():
         {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
         {"kind": "input", "dst": 3, "input": "normal"},
         {"kind": "swizzle", "dst": 3, "srcA": 3, "constant": [1, 1, 1, 1]},
-        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.7, 0.9, 0, 0]},
-        {"kind": "input", "dst": 5, "input": "depth"},
-        {"kind": "remap", "dst": 5, "srcA": 5, "constant": [40.0, 220.0, 0.85, 0.0], "value": 1},
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+        # M3g (owner 54- §3: one sand family; the drifts, the plain and the dunes were three looks): the same sand as the
+        # drifts (marsDrift) on everything but the steep rock -- at every distance, not faded out by 220 m to the
+        # program's flat colour -- blended to the rock over a wide band of slopes (normal.y 0.45-0.75), so an apron or
+        # a dune's flank is sand, not a pale pink slab
+        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.45, 0.75, 0, 0]},
         {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 0, "srcC": 3},
     ]
     return prog
@@ -435,7 +436,7 @@ def write():
                                 "intensity": 1.0},
                         "shadowRange": 2400.0, "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 5000.0,
                         "contactShadows": False, "shadowSplitLambda": 0.9},
-        "post": {"bloomIntensity": 0.04, "tonemap": 0},
+        "post": {"bloomIntensity": 0.04, "tonemap": 1},
         "materialPrograms": [mars_rock_program(), mars_drift_program()],
         # M3d (owner; ADR-1902): the canyon's own terrain pipeline in its Mars style -- wind-eroded mesas and buttes in
         # layered sediment, yardangs, dune fields, the same erosion, strata and terraces -- and its rock program

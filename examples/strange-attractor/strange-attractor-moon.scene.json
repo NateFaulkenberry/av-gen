@@ -335,7 +335,7 @@
   },
   "post": {
     "bloomIntensity": 0.04,
-    "tonemap": 0
+    "tonemap": 1
   },
   "materialPrograms": [
     {

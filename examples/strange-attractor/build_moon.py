@@ -204,7 +204,7 @@ scene = {
     "environment": {"intensity": 0.0, "skyIntensity": 0.0, "fallbackAmbient": False, "background": [0.0, 0.0, 0.0], "fogColor": [0, 0, 0],
                     "volumeDensity": 0.0, "skybox": False, "sky": {"enabled": False}, "shadowRange": 2500.0,
                     "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 6000.0, "contactShadows": False, "shadowSplitLambda": 0.92},
-    "post": {"bloomIntensity": 0.04, "tonemap": 0},
+    "post": {"bloomIntensity": 0.04, "tonemap": 1},
     "materialPrograms": [{"name": "regolith", "ops": ops, "baseColor": 6, "metallic": 0, "roughness": 1}],
     "lunarWorld": {"seed": 3, "extent": 4000, "spacing": 2.5, "skirtExtent": 32000, "skirtSpacing": 32, "craters": 3.0,
                    "rocks": 0.02, "relief": 60, "program": "regolith", "curvature": CURVATURE,

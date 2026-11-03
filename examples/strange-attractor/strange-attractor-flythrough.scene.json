@@ -93,7 +93,7 @@
   },
   "post": {
     "bloomIntensity": 0.04,
-    "tonemap": 0
+    "tonemap": 1
   },
   "lights": [
     {
@@ -1559,7 +1559,7 @@
       "asset": "../../assets/strange-attractor/hero/sasquatch/sasquatch-c-v1.glb",
       "position": [
         74.94305,
-        1.7600001096725464,
+        1.7300001096725464,
         1352.1234500000003
       ],
       "rotation": [
@@ -3360,8 +3360,6 @@
         "lights/floor-bounce/intensity": 0.012,
         "lights/dusk-sky/intensity": 0.02,
         "lights/dusk-bounce/intensity": 0.0,
-        "post/tonemap/operator": 1,
-        "camera/exposure/compensation": 1.0,
         "attractorWorld/sunShadowBias": 0.2,
         "attractorWorld/sunContact": 0.0,
         "scene/shadowRange": 200.0,
@@ -3442,8 +3440,6 @@
         "lights/floor-bounce/intensity": 0.012,
         "lights/dusk-sky/intensity": 0.02,
         "lights/dusk-bounce/intensity": 0.0,
-        "post/tonemap/operator": 1,
-        "camera/exposure/compensation": 1.0,
         "attractorWorld/sunShadowBias": 0.2,
         "attractorWorld/sunContact": 0.0,
         "scene/shadowRange": 200.0,

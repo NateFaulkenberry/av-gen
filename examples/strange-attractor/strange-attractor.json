@@ -2575,6 +2575,46 @@
         ]
       },
       {
+        "target": "camera/exposure/compensation",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
         "target": "mars/nodes/rover/position",
         "keys": [
           {

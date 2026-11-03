@@ -81,6 +81,7 @@ scene["portal"].pop("aims", None)
 scene["portal"]["exit"] = [0.0, 8.0, 1500.0]
 scene["portal"]["world"] = "strange-attractor-moon.scene.json"
 scene["portal"].update(GAZE)   # M3g (54- §1, ADR-1909)
+scene.setdefault("post", {})["tonemap"] = 1   # M3g (54- §2): AgX for the whole film (the frame's tone map is global)
 # M3g (54- §1): the canyon's own flythrough looks where it goes, not 2.5 s ahead and down at the river (ADR-1909)
 scene["attractorWorld"]["flightLookAhead"] = 0.6
 scene["attractorWorld"]["flightLookDown"] = 0.03
@@ -190,6 +191,10 @@ A = "../../assets/strange-attractor/build/"
 cast_xz = {k: at(*v) for k, v in CAST.items()}
 cast_g = dict(zip(cast_xz, ground(cast_xz.values())))
 gray_xz = cast_xz["gray"]
+# M3g (owner 54- §4: he still looks levitating -- the seat was 3 cm over the stone's top, which reads as a gap from the
+# passing camera): Sasquatch C lowered 3 cm onto the stone (check_contacts: no body or card vertex inside the stone;
+# the stone cannot come further forward under the thighs -- 6 cm forward already meets them)
+SEAT_SIT = 0.03
 
 
 def yaw_to(src, dst):
@@ -206,7 +211,7 @@ for name in ("sasquatch-a", "sasquatch-b", "sasquatch-c"):
     # M3f (hero H3, the hero agent's v1 Sasquatches; assets/strange-attractor/hero, never committed): B lifted 1.3 cm
     # (its fur shells dipped into the ground at the toes)
     asset = "../../assets/strange-attractor/hero/sasquatch/" + f"{name}-v1.glb"
-    lift = 0.013 if name == "sasquatch-b" else 0.0
+    lift = 0.013 if name == "sasquatch-b" else (-SEAT_SIT if name == "sasquatch-c" else 0.0)
     nodes.append({"name": name, "kind": "gltf", "asset": asset, "position": [x, cast_g[name] + lift, z],
                   "rotation": [0, yaw_to((x, z), faces[name]), 0], "scale": [1, 1, 1], "visible": False,
                   "animation": {"state": "idle", "cullDistance": 800.0, "speed": 1.0}})
@@ -382,7 +387,6 @@ night = {
     # more moon fill and rim so shadows hold detail; the craft's spill tamed and kept under the hull; the fire's bounce;
     # a little haze the fire lights; the moon's shadow over a short range (finer texels), a small bias (the 3.2 m day
     # offset smeared the figures into the bank's "capsule"; ADR-1907) and no moon contact march
-    "post/tonemap/operator": 1, "camera/exposure/compensation": 1.0,
     "attractorWorld/sunShadowBias": 0.2, "attractorWorld/sunContact": 0.0,
     "scene/shadowRange": 200.0, "scene/volumeDensity": 0.0007, "scene/volumeLocalLights": 1.0,
     "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 30.0, "lights/fire-bounce/intensity": 5.0,
@@ -521,6 +525,16 @@ tracks.append({"target": "ocean/nodes/bay-strips/emissiveBoost",
 # M3b: the rover drives, its tracks appear, its camera flashes (M3c: the lasers are gone)
 tracks = [t for t in tracks if not (t["target"].startswith("moon/nodes/laser") or t["target"].startswith("mars/")
                                     or t["target"].startswith("moon/nodes/earth-halo"))]
+# M3g (owner 54- §2: contrast steps at the Mars and ocean crossings): the cause was the night look -- from crossing 3,
+# the step INTO Mars -- switching the frame's tone map (ACES -> AgX) and exposure (+1 EV), and the dawn look switching
+# them back at crossing 5, the step into the ocean. The whole film is AgX now (the scene's post), and the exposure
+# is a timeline track that eases across each of those crossings over 2 s instead of stepping on one frame
+X_MARS, X_OCEAN = 69.655, 121.217
+tracks = [t for t in tracks if t["target"] != "camera/exposure/compensation"]
+tracks.append({"target": "camera/exposure/compensation", "keys": [
+    {"time": 0.0, "value": [0.0], "interp": "smooth"}, {"time": X_MARS - 1.0, "value": [0.0], "interp": "smooth"},
+    {"time": X_MARS + 1.0, "value": [1.0], "interp": "smooth"}, {"time": X_OCEAN - 1.0, "value": [1.0], "interp": "smooth"},
+    {"time": X_OCEAN + 1.0, "value": [0.0], "interp": "smooth"}]})
 tracks += build_mars.rover_tracks()
 project["timeline"] = {"enabled": True, "tracks": tracks, "cues": project.get("timeline", {}).get("cues", [])}
 json.dump(project, open(PROJECT, "w"), indent=2)
