@@ -19,6 +19,11 @@ merged. This file collects their notes as they arrive, so it grows.
   - Re-check the night pass-by camera path, so it doesn't clip the craft and the craft reads as part of the
     group as the camera passes.
   - Re-check the lighting: the craft's lights now fall on the alien's side.
+- **Give the craft a beat-pulse light animation.** Its lights (rim, window band, underbody glow) pulse on the
+  beat, using the scene's existing beat signal. Make it a tasteful pulse, not a strobe, and keep it seek-safe.
+  The spill onto the ground and the alien pulses with it. Keep the night look the owner likes.
+  - If the hero UFO v1 is integrated later (it adds 48 rim light cells, 4 navigation lights and an underbody
+    ring), carry the pulse over to those lights.
 
 ## 3. Hero assets (the hero agent, scene/sa-hero; for later integration)
 
