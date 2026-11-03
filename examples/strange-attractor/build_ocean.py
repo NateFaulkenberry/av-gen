@@ -23,7 +23,6 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from canyon_scale import WORLD_SCALE as WS, R, site, pace, L_UNIT  # noqa: E402
 from sample_ground import heights  # noqa: E402
-CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 A = "../../assets/strange-attractor/build/"
@@ -144,16 +143,67 @@ def sub_tracks():
 
 
 def reef_program():
-    """M3d: the canyon's rock program (its strata and ledges carry the reef's sediment layers), cooled to the deep's
-    blue-greens and darkened."""
-    f = json.load(open(os.path.join(HERE, "strange-attractor-flythrough.scene.json")))
-    prog = json.loads(json.dumps([p for p in f["materialPrograms"] if p["name"] == "canyonRock"][0]))
-    prog["ops"] = prog["ops"][:CANYON_ROCK_OPS]     # the canyon's own ops, without its close-up detail (M3d)
-    prog.pop("textures", None)
-    prog["name"] = "reefRock"
-    prog["ops"] += [{"kind": "constant", "dst": 0, "constant": [0.42, 0.62, 0.62, 1.0]},
-                    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 0}]
-    return prog
+    """M3e (owner: better texturing; the black streaks): the reef's own program, replacing M3d's cooled copy of the
+    canyon's (whose strata bands, laid by world height, ran down the steep reef faces as dark streaks). Photoscanned rock
+    and sand (Poly Haven, CC0; never committed), triplanar in world space with the anti-tiling (ADR-1905); sand settles
+    on the flats in drifts; algae greens the tops and coral pinks patches; the deep's blue-green; caustics drift across
+    the up-facing rock."""
+    T = "../../assets/strange-attractor/polyhaven/textures/"
+    hexed = [1.0, 0.6, 5.0, 0.7]
+    return {"name": "reefRock", "baseColor": 0, "metallic": -1, "roughness": -1, "emission": -1, "opacity": -1,
+            "normal": 7, "occlusion": -1,
+            "textures": [{"name": "rock", "path": T + "rock_boulder_cracked/rock_boulder_cracked_diff_2k.jpg"},
+                         {"name": "sand", "path": T + "coast_sand_rocks_02/coast_sand_rocks_02_diff_2k.jpg"},
+                         {"name": "rockN", "path": T + "rock_boulder_cracked/rock_boulder_cracked_nor_gl_2k.jpg",
+                          "colorSpace": "linear"}],
+            "ops": [
+                {"kind": "textureTriplanar", "dst": 0, "texture": "rock", "value": 0.1, "constant2": [6.0, 0, 0, 0],
+                 "constant3": hexed},
+                {"kind": "textureTriplanar", "dst": 1, "texture": "sand", "value": 0.25, "constant3": [1.0, 0.5, 6.0, 0.6]},
+                # sand on the flats, in drifts (a broad noise thins it)
+                {"kind": "input", "dst": 2, "input": "normal"},
+                {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.62, 0.86, 0, 0]},
+                {"kind": "input", "dst": 3, "input": "worldPosition"},
+                {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.04, "seed": 3},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.38, 0.58, 0, 0]},
+                {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
+                {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 1, "srcC": 2},
+                # algae on the broad patches
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.52, 0.7, 0, 0]},
+                {"kind": "constant", "dst": 5, "constant": [0.6, 0.92, 0.5, 1.0]},
+                {"kind": "constant", "dst": 6, "constant": [1.0, 1.0, 1.0, 1.0]},
+                {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # coral tint in smaller patches
+                {"kind": "input", "dst": 3, "input": "worldPosition"},
+                {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.12, "seed": 11},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.6, 0.74, 0, 0]},
+                {"kind": "constant", "dst": 5, "constant": [1.2, 0.66, 0.6, 1.0]},
+                {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # the deep's colour
+                {"kind": "constant", "dst": 5, "constant": [0.72, 0.9, 0.95, 1.0]},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # caustics: a cell pattern drifting with time, brightest at the cells' centres, on up-facing surfaces
+                {"kind": "input", "dst": 3, "input": "time"},
+                {"kind": "constant", "dst": 5, "constant": [0.55, 0.0, 0.4, 0.0]},
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+                {"kind": "input", "dst": 5, "input": "worldPosition"},
+                {"kind": "add", "dst": 5, "srcA": 5, "srcB": 3},
+                {"kind": "voronoi", "dst": 5, "srcA": 5, "value": 0.2, "seed": 5},
+                {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.32, 0.04, 0, 0]},
+                {"kind": "input", "dst": 4, "input": "normal"},
+                {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.3, 0.9, 0, 0]},
+                {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
+                {"kind": "constant", "dst": 4, "constant": [0.7, 0.85, 0.85, 0.0]},
+                {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
+                {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                {"kind": "textureTriplanarNormal", "dst": 7, "texture": "rockN", "value": 0.1, "constant2": [6.0, 0, 0, 0],
+                 "constant3": [1.0, 0.0, 0.0, 0.0]},
+            ]}
 
 
 def write_ocean(portal_flight):
@@ -205,20 +255,24 @@ def write_ocean(portal_flight):
         ], "baseColor": 5, "metallic": 0, "roughness": 1}],
         # M3d (owner; ADR-1902): the seafloor on the canyon's pipeline, its Mars style turned to a reef -- eroded
         # outcrops and ledges (no terraces to speak of), sediment drifts between them, the floor falling away
+        # M3e (owner: rounded, eroded rock, not crumpled spikes): softer relief (roughness 1 -> 0.4, ridges 1 -> 0.3),
+        # less warp and terracing, and a finer mesh where the silhouettes were jagged (error 0.003 -> 0.0015)
         "attractorWorld": {"seed": 9, "resolution": 4096, "extent": 16000, "worldScale": 0.35, "camera": "scene",
-                           "terrainScale": 1.0, "roughness": 1.0, "ridgeStrength": 1.0, "domainWarp": 0.7, "terraces": 0.15,
+                           "terrainScale": 1.0, "roughness": 0.4, "ridgeStrength": 0.3, "domainWarp": 0.5, "terraces": 0.05,
                            "erosion": 1.0, "strataFold": 0.3, "branchingDensity": 0.0, "meshSpacing": 1.0,
-                           "meshError": 0.003, "meshMinError": 0.2, "terrainProgram": "reefRock", "sunLux": 2.5,
+                           "meshError": 0.0015, "meshMinError": 0.1, "terrainProgram": "reefRock", "sunLux": 2.5,
                            "sunShadowBias": 1.6, "look": {"sunAzimuth": 20.0, "sunElevation": 70.0, "sunWarmth": 0.0},
                            "mars": {"mesaCover": 0.42, "yardangs": 0.0, "wind": 70.0, "dunes": 3.0},
                            "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
         # M3e (owner: not confined to the bay): the base, its rock and the seafloor are targets too, the field reaches
-        # well past the bay's frame, and the opening is wider and taller than the bay, so the tear breaks out over the hull
+        # well past the bay's frame, and the opening is wider and taller than the bay, so the tear breaks out over the hull.
+        # M3e (owner: sooner): the code reaches out from 770 m (about 130 s; M3d 260 m, 139 s) and the tear starts at 360 m
+        # (about 137.5 s, after the last sortie at 136.4 s; M3d 130 m, 141.6 s)
         "corruption": {"targets": ["bay-membrane", "bay-strips", "ocean-base", "attractor.terrain"], "focus": [BAY[0], bay_y, BAY[2]],
                        "axis": [-1.0, 0.0, 0.0],
-                       "amount": 1.0, "radius": 150.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 320.0, "openNear": 20.0,
-                       "openFar": 150.0, "seam": 0.3, "width": 36.0, "height": 21.0, "depth": 8.0, "block": 2.5,
+                       "amount": 1.0, "radius": 150.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 770.0, "openNear": 20.0,
+                       "openFar": 360.0, "seam": 0.3, "width": 36.0, "height": 21.0, "depth": 8.0, "block": 2.5,
                        "share": 0.25, "slip": 1.5, "rate": 0.6, "strip": 2.5, "stripSlip": 1.0, "slide": 0.0, "pull": 4.0,
                        "lift": 0.8, "fold": 0.6, "lag": 0.7, "glyph": 6.0, "glyphSize": 1.0, "glow": 4.0, "echoes": 1,
                        "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 500.0},
@@ -315,7 +369,7 @@ def life_nodes():
 
 
 # M3e: the bay frame's strips fail as the corruption reaches them -- a few stutters, then dark (seconds, emissiveBoost)
-STRIPS_DIE = [(138.6, 1.0), (139.1, 0.25), (139.3, 0.9), (139.9, 0.1), (140.1, 0.55), (140.8, 0.0)]
+STRIPS_DIE = [(133.6, 1.0), (134.1, 0.25), (134.3, 0.9), (134.9, 0.1), (135.1, 0.55), (135.8, 0.0)]
 
 
 def creature_tracks():

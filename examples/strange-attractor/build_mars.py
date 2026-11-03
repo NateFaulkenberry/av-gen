@@ -185,6 +185,12 @@ def _corridor():
 
 
 MARS_CORRIDOR = _corridor()
+# M3e (owner, reversing M3d's "sooner"): the pyramid's code starts only once the camera has passed the rover -- the field
+# reaches out to the camera's distance from the focus at the knot over the rover, less 15 m; the tear starts 200 m nearer
+# (M3d: 1700 m and 520 m)
+_over_rover = _MARS_PATH[3]
+PYR_FIELD_FAR = round(math.dist((_over_rover[0], PLAIN + _over_rover[1], _over_rover[2]), PORTAL_FOCUS) - 15.0, 1)
+PYR_OPEN_FAR = round(PYR_FIELD_FAR - 200.0, 1)
 MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, 99.6, 22.0, 18.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4 + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
@@ -341,7 +347,8 @@ def mars_rock_program():
     # out by 220 m, where the program's own strata and colour carry the wide shots
     prog["textures"] = [{"name": "sand", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"}]
     prog["ops"] += [
-        {"kind": "textureTriplanar", "dst": 0, "texture": "sand", "value": 0.2},
+        # M3e (owner: no visible tiling; ADR-1905): hex-tiled reads, a second larger layer, macro variation over 30 m
+        {"kind": "textureTriplanar", "dst": 0, "texture": "sand", "value": 0.2, "constant3": [1.0, 0.5, 6.0, 0.7]},
         {"kind": "constant", "dst": 1, "constant": [1.05, 0.6, 0.42, 1.0]},
         {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
         {"kind": "input", "dst": 3, "input": "normal"},
@@ -353,6 +360,22 @@ def mars_rock_program():
         {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 0, "srcC": 3},
     ]
     return prog
+
+
+def mars_drift_program():
+    """M3e (owner: no visible tiling): the pyramids' sand drifts drawn through the plain's own sand (ADR-1572), so the
+    drift and the plain are one sand -- the same photoscan, tint and hex tiling (ADR-1905) -- with its ripple normals."""
+    return {"name": "marsDrift", "baseColor": 0, "metallic": -1, "roughness": -1, "emission": -1, "opacity": -1,
+            "normal": 2, "occlusion": -1,
+            "textures": [{"name": "sand", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"},
+                         {"name": "sandN", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
+                          "colorSpace": "linear"}],
+            "ops": [
+                {"kind": "textureTriplanar", "dst": 0, "texture": "sand", "value": 0.2, "constant3": [1.0, 0.5, 6.0, 0.7]},
+                {"kind": "constant", "dst": 1, "constant": [1.05, 0.6, 0.42, 1.0]},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
+                {"kind": "textureTriplanarNormal", "dst": 2, "texture": "sandN", "value": 0.2, "constant3": [1.0, 0.0, 0.0, 0.0]},
+            ]}
 
 
 def write():
@@ -383,7 +406,7 @@ def write():
                         "shadowRange": 2400.0, "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 5000.0,
                         "contactShadows": False, "shadowSplitLambda": 0.9},
         "post": {"bloomIntensity": 0.04, "tonemap": 0},
-        "materialPrograms": [mars_rock_program()],
+        "materialPrograms": [mars_rock_program(), mars_drift_program()],
         # M3d (owner; ADR-1902): the canyon's own terrain pipeline in its Mars style -- wind-eroded mesas and buttes in
         # layered sediment, yardangs, dune fields, the same erosion, strata and terraces -- and its rock program
         "attractorWorld": {"seed": 11, "resolution": 4096, "extent": 16000, "worldScale": 0.5, "camera": "scene",
@@ -396,7 +419,7 @@ def write():
                                     for name, x, z, base, _ in PYRAMIDS] + MARS_CORRIDOR + [ROVER_PAD]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
         "corruption": {"targets": ["pyramid-b"], "focus": PORTAL_FOCUS, "axis": [0.0, 0.0, -1.0], "amount": 1.0,
-                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 1700.0, "openNear": 30.0, "openFar": 520.0,
+                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": PYR_FIELD_FAR, "openNear": 30.0, "openFar": PYR_OPEN_FAR,
                        "seam": 0.3, "width": 22.0, "height": 17.0, "depth": 12.0, "block": 4.0, "share": 0.22, "slip": 2.5,
                        "rate": 0.5, "strip": 3.5, "stripSlip": 1.5, "slide": 0.0, "pull": 6.0, "lift": 1.2, "fold": 0.8,
                        "lag": 0.7, "glyph": 5.5, "glyphSize": 1.6, "glow": 4.0, "echoes": 1, "echoOffset": 1.0,
@@ -414,6 +437,10 @@ def write():
         "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
                    "visible": True} for name, x, z, _, yaw in PYRAMIDS] + [
+            # M3e: each pyramid's sand drift, drawn through the plain's sand (marsDrift; ADR-1572, ADR-1905)
+            {"name": f"{name}-sand", "kind": "gltf", "asset": A + f"{name}-sand.glb",
+             "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
+             "visible": True, "program": "marsDrift"} for name, x, z, _, yaw in PYRAMIDS] + [
             {"name": "rover", "kind": "gltf", "asset": A + "rover.glb", "position": [*rover_at(ROVER_T0)[:1], ROVER_LEVEL, rover_at(ROVER_T0)[1]],
              "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": True},
             {"name": "rover-flash", "kind": "gltf", "asset": A + "flash.glb", "position": mast_world(ROVER_T0), "rotation": [0, 0, 0],

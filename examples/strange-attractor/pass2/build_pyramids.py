@@ -409,6 +409,23 @@ def build_blocks(name, base, st):
     bm.to_mesh(me)
     bm.free()
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
+    # M3e (owner: no visible tiling): the drift is its own glb, <name>-sand.glb, so the scene can draw it through the
+    # plain's own sand program (ADR-1572, ADR-1905) instead of this UV-mapped tile
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    obj.active_material_index = 7
+    bpy.ops.object.material_slot_select()
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    drift = [o for o in bpy.context.selected_objects if o is not obj][0]
+    drift.name = f"{name}-sand"
+    bpy.ops.object.select_all(action="DESELECT")
+    drift.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=f"{out_dir}/{name}-sand.glb", use_selection=True, export_apply=True)
+    drift.hide_set(True)
     path = f"{out_dir}/{name}.glb"
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)

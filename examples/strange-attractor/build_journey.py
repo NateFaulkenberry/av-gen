@@ -46,7 +46,8 @@ _rock = [p for p in scene["materialPrograms"] if p["name"] == "canyonRock"][0]
 _rock["ops"] = _rock["ops"][:85]
 _rock["textures"] = [{"name": "ground", "path": "../../assets/strange-attractor/polyhaven/textures/dry_ground_rocks/dry_ground_rocks_diff_2k.jpg"}]
 _rock["ops"] += [
-    {"kind": "textureTriplanar", "dst": 0, "texture": "ground", "value": 0.4},
+    # M3e (owner: no visible tiling; ADR-1905): hex-tiled reads, a second larger layer, macro variation over 20 m
+    {"kind": "textureTriplanar", "dst": 0, "texture": "ground", "value": 0.4, "constant3": [1.0, 0.45, 8.0, 0.6]},
     {"kind": "constant", "dst": 1, "constant": [2.1, 2.1, 2.1, 1.0]},
     {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
     {"kind": "constant", "dst": 1, "constant": [1.0, 1.0, 1.0, 1.0]},

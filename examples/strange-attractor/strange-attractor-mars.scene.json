@@ -968,7 +968,13 @@
           "kind": "textureTriplanar",
           "dst": 0,
           "texture": "sand",
-          "value": 0.2
+          "value": 0.2,
+          "constant3": [
+            1.0,
+            0.5,
+            6.0,
+            0.7
+          ]
         },
         {
           "kind": "constant",
@@ -1055,6 +1061,69 @@
         {
           "name": "sand",
           "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"
+        }
+      ]
+    },
+    {
+      "name": "marsDrift",
+      "baseColor": 0,
+      "metallic": -1,
+      "roughness": -1,
+      "emission": -1,
+      "opacity": -1,
+      "normal": 2,
+      "occlusion": -1,
+      "textures": [
+        {
+          "name": "sand",
+          "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"
+        },
+        {
+          "name": "sandN",
+          "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
+          "colorSpace": "linear"
+        }
+      ],
+      "ops": [
+        {
+          "kind": "textureTriplanar",
+          "dst": 0,
+          "texture": "sand",
+          "value": 0.2,
+          "constant3": [
+            1.0,
+            0.5,
+            6.0,
+            0.7
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            1.05,
+            0.6,
+            0.42,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 0,
+          "srcA": 0,
+          "srcB": 1
+        },
+        {
+          "kind": "textureTriplanarNormal",
+          "dst": 2,
+          "texture": "sandN",
+          "value": 0.2,
+          "constant3": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
         }
       ]
     }
@@ -1218,9 +1287,9 @@
     "radius": 120.0,
     "inner": 0.2,
     "fieldNear": 40.0,
-    "fieldFar": 1700.0,
+    "fieldFar": 611.1,
     "openNear": 30.0,
-    "openFar": 520.0,
+    "openFar": 411.1,
     "seam": 0.3,
     "width": 22.0,
     "height": 17.0,
@@ -1449,6 +1518,72 @@
         1
       ],
       "visible": true
+    },
+    {
+      "name": "pyramid-a-sand",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/pyramid-a-sand.glb",
+      "position": [
+        302.0,
+        32.0,
+        1662.0
+      ],
+      "rotation": [
+        0,
+        8.0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true,
+      "program": "marsDrift"
+    },
+    {
+      "name": "pyramid-b-sand",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/pyramid-b-sand.glb",
+      "position": [
+        722.0,
+        32.0,
+        1362.0
+      ],
+      "rotation": [
+        0,
+        0.0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true,
+      "program": "marsDrift"
+    },
+    {
+      "name": "pyramid-c-sand",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/pyramid-c-sand.glb",
+      "position": [
+        1032.0,
+        32.0,
+        1062.0
+      ],
+      "rotation": [
+        0,
+        14.0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true,
+      "program": "marsDrift"
     },
     {
       "name": "rover",
