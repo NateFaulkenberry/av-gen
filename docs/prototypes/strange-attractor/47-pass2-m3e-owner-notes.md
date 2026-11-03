@@ -167,3 +167,16 @@ light in the scene; it just looks poor. So:
   character shading).
 - Add torches or other light points only if, after §9, the wide night shots still read as too dark or
   flat. Say in the hand-back which way you went and why.
+
+## Evaluation (owner, M3e onward)
+
+- Use the Creative Critic (daemon at http://127.0.0.1:8765; CLI `~/Documents/GitHub/creative-critic/.venv/bin/critic`,
+  restart with `critic start --daemon`) in a session `strange-attractor-m3e`.
+- Per changed section (portals, dusk, Mars, Moon, night camp, ocean): a short `intent.json` from the notes in `44-` and
+  `47-`; `critic submit --mode preview --video <clip> --video-start <film time> --intent <intent.json>` on the M3d clip
+  as the baseline, then on the M3e clip; `critic compare <baseline> <candidate>`. The fast scene critic on the scene
+  JSON where it applies (grounding, floating objects, lighting, composition, clipping).
+- The hand-back has a table per section: key metrics before and after (exposure and contrast, shimmer and flicker,
+  stability, aesthetic score, grounding findings), and the top findings acted on and dismissed, with reasons.
+- The critic is evidence, not the judge: the owner's eye wins; model scores (laion_aes etc.) are experimental, and any
+  Ollama vision commentary is labelled as such.
