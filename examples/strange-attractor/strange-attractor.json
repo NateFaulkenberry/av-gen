@@ -697,6 +697,139 @@
     },
     {
       "source": "beat.pulse",
+      "target": "lights/ufo-glow/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.8,
+        "remapOutMax": 1.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-spill/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.8,
+        "remapOutMax": 1.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-0/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.8,
+        "remapOutMax": 1.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-1/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.8,
+        "remapOutMax": 1.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-2/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.8,
+        "remapOutMax": 1.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-3/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.8,
+        "remapOutMax": 1.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "nodes/ufo-parked/emissiveBoost",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.85,
+        "remapOutMax": 1.35,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 20.0,
+        "decayMs": 450.0
+      }
+    },
+    {
+      "source": "beat.pulse",
       "target": "moon/nodes/earth-aura/emissiveBoost",
       "amount": 1.0,
       "op": "add",

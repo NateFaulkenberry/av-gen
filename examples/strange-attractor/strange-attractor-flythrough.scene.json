@@ -239,9 +239,9 @@
       "name": "ufo-glow",
       "type": "spot",
       "position": [
-        88.90500000000002,
-        3.46,
-        1354.8930000000003
+        61.646000000000015,
+        2.05,
+        1343.9555000000003
       ],
       "direction": [
         0.0,
@@ -265,9 +265,9 @@
       "name": "ufo-rim-0",
       "type": "point",
       "position": [
-        94.92361988149133,
-        4.0600000000000005,
-        1356.7547773019667
+        67.66461988149133,
+        2.65,
+        1345.8172773019667
       ],
       "color": [
         1.0,
@@ -275,7 +275,7 @@
         0.2
       ],
       "intensity": 0.0,
-      "range": 3.0,
+      "range": 2.0,
       "castsShadow": false,
       "volumetric": 0.0,
       "contactShadow": false
@@ -284,9 +284,9 @@
       "name": "ufo-rim-1",
       "type": "point",
       "position": [
-        86.86827572875994,
-        4.0600000000000005,
-        1360.854690552431
+        59.60927572875995,
+        2.65,
+        1349.917190552431
       ],
       "color": [
         0.4,
@@ -294,7 +294,7 @@
         1.0
       ],
       "intensity": 0.0,
-      "range": 3.0,
+      "range": 2.0,
       "castsShadow": false,
       "volumetric": 0.0,
       "contactShadow": false
@@ -303,9 +303,9 @@
       "name": "ufo-rim-2",
       "type": "point",
       "position": [
-        83.005322870068,
-        4.0600000000000005,
-        1352.6830656655557
+        55.746322870068,
+        2.65,
+        1341.7455656655557
       ],
       "color": [
         1.0,
@@ -313,7 +313,7 @@
         0.2
       ],
       "intensity": 0.0,
-      "range": 3.0,
+      "range": 2.0,
       "castsShadow": false,
       "volumetric": 0.0,
       "contactShadow": false
@@ -322,9 +322,9 @@
       "name": "ufo-rim-3",
       "type": "point",
       "position": [
-        91.2862597790918,
-        4.0600000000000005,
-        1349.0603675013356
+        64.02725977909179,
+        2.65,
+        1338.1228675013356
       ],
       "color": [
         0.4,
@@ -332,10 +332,29 @@
         1.0
       ],
       "intensity": 0.0,
-      "range": 3.0,
+      "range": 2.0,
       "castsShadow": false,
       "volumetric": 0.0,
       "contactShadow": false
+    },
+    {
+      "name": "ufo-spill",
+      "type": "point",
+      "position": [
+        68.07256007489991,
+        3.45,
+        1346.177959359292
+      ],
+      "color": [
+        0.4,
+        0.78,
+        1.0
+      ],
+      "intensity": 0.0,
+      "range": 9.0,
+      "castsShadow": false,
+      "contactShadow": false,
+      "volumetric": 0.0
     }
   ],
   "attractorWorld": {
@@ -412,6 +431,12 @@
         "z": 1350.209,
         "radius": 15.0,
         "level": 1.7600000000000002
+      },
+      {
+        "x": 61.646000000000015,
+        "z": 1343.9555000000003,
+        "radius": 9.0,
+        "level": 0.35
       }
     ]
   },
@@ -1604,9 +1629,9 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ufo-craft.glb",
       "position": [
-        88.90500000000002,
-        3.66,
-        1354.8930000000003
+        61.646000000000015,
+        2.25,
+        1343.9555000000003
       ],
       "rotation": [
         0,
@@ -1632,7 +1657,7 @@
       ],
       "rotation": [
         0,
-        268.6523903460731,
+        9.685443010658336,
         0
       ],
       "scale": [
@@ -1653,7 +1678,7 @@
       ],
       "rotation": [
         0,
-        302.2752558017777,
+        278.21777065832237,
         0
       ],
       "scale": [
@@ -1674,7 +1699,7 @@
       ],
       "rotation": [
         0,
-        177.94164135655288,
+        3.6472837371085998,
         0
       ],
       "scale": [
@@ -1685,38 +1710,59 @@
       "visible": true
     },
     {
-      "name": "camp-scrub-b-3",
+      "name": "camp-ph-shrub_04-3",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
-        80.73157767055878,
-        3.179060878753662,
-        1368.8289738242495
+        84.14301144714858,
+        1.7000001096725463,
+        1354.4226441107805
       ],
       "rotation": [
         0,
-        103.96776496568813,
+        264.40773407257353,
         0
       ],
       "scale": [
-        1.1585071581235415,
-        1.1585071581235415,
-        1.1585071581235415
+        1.9059763105785803,
+        1.9059763105785803,
+        1.9059763105785803
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_03-4",
+      "name": "camp-scrub-c-4",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
-        73.89962723882628,
-        2.9797920608520507,
-        1365.5209906032346
+        83.15907534094592,
+        1.7000001096725463,
+        1353.9031875000337
       ],
       "rotation": [
         0,
-        237.48235068626067,
+        89.20061530297473,
+        0
+      ],
+      "scale": [
+        1.1565095063427078,
+        1.1565095063427078,
+        1.1565095063427078
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_03-5",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "position": [
+        80.73157767055878,
+        3.1611735248565673,
+        1368.8289738242495
+      ],
+      "rotation": [
+        0,
+        163.18614784814648,
         0
       ],
       "scale": [
@@ -1727,80 +1773,80 @@
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_stones_01-5",
+      "name": "camp-ph-shrub_04-6",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "position": [
+        73.89962723882628,
+        3.0083023929595947,
+        1365.5209906032346
+      ],
+      "rotation": [
+        0,
+        15.39870733873454,
+        0
+      ],
+      "scale": [
+        1.8199255349913617,
+        1.8199255349913617,
+        1.8199255349913617
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_03-7",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
         91.80005584905649,
-        3.5166425132751464,
+        3.534827651977539,
         1368.992163368899
       ],
       "rotation": [
         0,
-        118.34043499676218,
+        285.2620103191002,
         0
       ],
       "scale": [
-        1.5010689629497713,
-        1.5010689629497713,
-        1.5010689629497713
+        0.333124829514283,
+        0.333124829514283,
+        0.333124829514283
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-a-6",
+      "name": "camp-ph-shrub_04-8",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
         87.96189346823309,
-        3.1092752838134765,
+        3.102464380264282,
         1365.4872229111206
       ],
       "rotation": [
         0,
-        181.29773124417827,
+        110.47795301430033,
         0
       ],
       "scale": [
-        1.0906133817038217,
-        1.0906133817038217,
-        1.0906133817038217
+        2.231551917882293,
+        2.231551917882293,
+        2.231551917882293
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-c-7",
+      "name": "camp-ph-namaqualand_boulder_02-9",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
         96.3353342944097,
-        3.772250118255615,
+        3.7714321041107177,
         1368.199526052247
       ],
       "rotation": [
         0,
-        187.98272506980283,
-        0
-      ],
-      "scale": [
-        0.8777474027279613,
-        0.8777474027279613,
-        0.8777474027279613
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_02-8",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
-      "position": [
-        85.06618000784445,
-        3.702580394744873,
-        1373.2799635939878
-      ],
-      "rotation": [
-        0,
-        35.81781438465974,
+        222.12249003042413,
         0
       ],
       "scale": [
@@ -1811,59 +1857,80 @@
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_02-9",
+      "name": "camp-scrub-b-10",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        85.06618000784445,
+        3.6991264247894287,
+        1373.2799635939878
+      ],
+      "rotation": [
+        0,
+        75.37439938963684,
+        0
+      ],
+      "scale": [
+        0.8102115618495831,
+        0.8102115618495831,
+        0.8102115618495831
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_03-11",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "position": [
+        92.25119668682028,
+        3.220052661895752,
+        1360.284383240402
+      ],
+      "rotation": [
+        0,
+        208.5168641070314,
+        0
+      ],
+      "scale": [
+        0.5635951782663532,
+        0.5635951782663532,
+        0.5635951782663532
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_stones_01-12",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
+      "position": [
+        88.97332743673027,
+        1.7067913436889648,
+        1355.0780936366975
+      ],
+      "rotation": [
+        0,
+        110.30295583525817,
+        0
+      ],
+      "scale": [
+        1.2391749042143703,
+        1.2391749042143703,
+        1.2391749042143703
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-c-13",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
         99.03419484925992,
-        3.9794015312194824,
+        3.9965433502197265,
         1361.438399374836
       ],
       "rotation": [
         0,
-        183.11068139868834,
-        0
-      ],
-      "scale": [
-        1.013671886842677,
-        1.013671886842677,
-        1.013671886842677
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_02-10",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
-      "position": [
-        79.26667336812089,
-        2.8015705966949462,
-        1365.148393523802
-      ],
-      "rotation": [
-        0,
-        128.63722016219137,
-        0
-      ],
-      "scale": [
-        1.0117667225633122,
-        1.0117667225633122,
-        1.0117667225633122
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-scrub-c-11",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
-      "position": [
-        82.21873785933055,
-        3.924321594238281,
-        1375.0763163559413
-      ],
-      "rotation": [
-        0,
-        183.2002877919812,
+        272.33795169803733,
         0
       ],
       "scale": [
@@ -1874,17 +1941,17 @@
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-12",
+      "name": "camp-ph-shrub_04-14",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
-        67.48425634293896,
-        1.375850977897644,
-        1347.7660631443873
+        79.26667336812089,
+        2.786494436264038,
+        1365.148393523802
       ],
       "rotation": [
         0,
-        2.9100451391171234,
+        307.21131913440945,
         0
       ],
       "scale": [
@@ -1895,38 +1962,38 @@
       "visible": true
     },
     {
-      "name": "camp-scrub-a-13",
+      "name": "camp-ph-shrub_04-15",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
-        96.6313232842101,
-        3.7018308067321777,
-        1363.1639609046886
+        82.21873785933055,
+        3.9176272773742675,
+        1375.0763163559413
       ],
       "rotation": [
         0,
-        120.82878391667813,
+        141.77325627775534,
         0
       ],
       "scale": [
-        0.9626318183089051,
-        0.9626318183089051,
-        0.9626318183089051
+        1.7947278124177197,
+        1.7947278124177197,
+        1.7947278124177197
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-c-14",
+      "name": "camp-scrub-c-16",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
-        85.41847493806681,
-        4.042371215820313,
-        1376.0197001306112
+        96.6313232842101,
+        3.7060772800445556,
+        1363.1639609046886
       ],
       "rotation": [
         0,
-        317.79984802098915,
+        236.6377375591229,
         0
       ],
       "scale": [
@@ -1937,17 +2004,38 @@
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-15",
+      "name": "camp-ph-shrub_04-17",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
-        65.47689748328813,
-        0.4900868558883667,
-        1341.603878627203
+        89.12338771809367,
+        1.7076950693130493,
+        1347.082497017907
       ],
       "rotation": [
         0,
-        71.98461596603505,
+        76.14523265500777,
+        0
+      ],
+      "scale": [
+        1.8273946464808741,
+        1.8273946464808741,
+        1.8273946464808741
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-shrub_04-18",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "position": [
+        92.76694608240663,
+        3.3065003776550292,
+        1360.1642066284317
+      ],
+      "rotation": [
+        0,
+        257.86372851291094,
         0
       ],
       "scale": [
@@ -1958,122 +2046,164 @@
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-16",
+      "name": "camp-scrub-b-19",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        85.41847493806681,
+        4.031627597808838,
+        1376.0197001306112
+      ],
+      "rotation": [
+        0,
+        84.30307605324019,
+        0
+      ],
+      "scale": [
+        0.9833037965136022,
+        0.9833037965136022,
+        0.9833037965136022
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_03-20",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "position": [
+        86.21746244007531,
+        1.9693543338775634,
+        1360.3324975072844
+      ],
+      "rotation": [
+        0,
+        300.48832816344407,
+        0
+      ],
+      "scale": [
+        0.38932135040237836,
+        0.38932135040237836,
+        0.38932135040237836
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-c-21",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
+      "position": [
+        93.66176401507612,
+        3.430638494491577,
+        1359.355835498706
+      ],
+      "rotation": [
+        0,
+        319.63774174303325,
+        0
+      ],
+      "scale": [
+        1.1958440871904474,
+        1.1958440871904474,
+        1.1958440871904474
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-shrub_04-22",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
         87.01192122323651,
-        3.212536277770996,
+        3.2062181854248046,
         1367.7742637728104
       ],
       "rotation": [
         0,
-        75.02768761797107,
+        36.77835515862065,
         0
       ],
       "scale": [
-        1.8396387807728423,
-        1.8396387807728423,
-        1.8396387807728423
+        2.1121389677629008,
+        2.1121389677629008,
+        2.1121389677629008
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-c-17",
+      "name": "camp-scrub-c-23",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
         82.02302440120096,
-        2.423664035797119,
+        2.401092710494995,
         1363.485816981075
       ],
       "rotation": [
         0,
-        27.552884892796882,
+        181.95199511357617,
         0
       ],
       "scale": [
-        0.940042653358777,
-        0.940042653358777,
-        0.940042653358777
+        1.1122190018435933,
+        1.1122190018435933,
+        1.1122190018435933
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-18",
+      "name": "camp-ph-shrub_04-24",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
         77.31338608245592,
-        1.7893378162384033,
+        1.7466428899765014,
         1361.124369888183
       ],
       "rotation": [
         0,
-        216.75366475934183,
+        295.01518351675514,
         0
       ],
       "scale": [
-        1.701948926961827,
-        1.701948926961827,
-        1.701948926961827
+        2.566047352720723,
+        2.566047352720723,
+        2.566047352720723
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-19",
+      "name": "camp-scrub-b-25",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
       "position": [
         87.5491987529185,
-        3.20826810836792,
+        3.205881299972534,
         1367.4199632906552
       ],
       "rotation": [
         0,
-        32.999246485849845,
+        113.51449939776076,
         0
       ],
       "scale": [
-        1.82576894175102,
-        1.82576894175102,
-        1.82576894175102
+        1.1606267466829856,
+        1.1606267466829856,
+        1.1606267466829856
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-b-20",
+      "name": "camp-ph-shrub_04-26",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
         85.6712535733453,
-        3.1221651458740234,
+        3.1167446994781494,
         1367.2226133196887
       ],
       "rotation": [
         0,
-        146.24719748097147,
-        0
-      ],
-      "scale": [
-        1.0953095387455578,
-        1.0953095387455578,
-        1.0953095387455578
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-shrub_04-21",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
-      "position": [
-        88.7463510268827,
-        3.723708333969116,
-        1373.6140715582637
-      ],
-      "rotation": [
-        0,
-        178.93445731176294,
+        7.258497461130995,
         0
       ],
       "scale": [
@@ -2084,38 +2214,38 @@
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-22",
+      "name": "camp-ph-namaqualand_boulder_04-27",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        93.80812792947067,
-        3.6182093048095703,
-        1368.7588813078007
+        88.7463510268827,
+        3.726865472793579,
+        1373.6140715582637
       ],
       "rotation": [
         0,
-        299.89909305683926,
+        281.6174686902427,
         0
       ],
       "scale": [
-        2.547899789965764,
-        2.547899789965764,
-        2.547899789965764
+        0.4783333352898702,
+        0.4783333352898702,
+        0.4783333352898702
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_02-23",
+      "name": "camp-ph-namaqualand_boulder_02-28",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        79.93930909979916,
-        2.685476722717285,
-        1364.4982842153897
+        93.80812792947067,
+        3.647139730453491,
+        1368.7588813078007
       ],
       "rotation": [
         0,
-        269.06507246122476,
+        55.71802923095361,
         0
       ],
       "scale": [
@@ -2126,59 +2256,59 @@
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_stones_01-24",
+      "name": "camp-ph-namaqualand_stones_01-29",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
       "position": [
         95.3387283778141,
-        3.5822059535980224,
+        3.5583531284332275,
         1362.8790905883375
       ],
       "rotation": [
         0,
-        353.8899601646385,
+        12.878022055069165,
         0
       ],
       "scale": [
-        1.5663656948061166,
-        1.5663656948061166,
-        1.5663656948061166
+        2.0659678207678853,
+        2.0659678207678853,
+        2.0659678207678853
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-c-25",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
-      "position": [
-        88.78094400109252,
-        3.603485527038574,
-        1371.7735077594593
-      ],
-      "rotation": [
-        0,
-        38.63754034638915,
-        0
-      ],
-      "scale": [
-        1.0295089741233971,
-        1.0295089741233971,
-        1.0295089741233971
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_02-26",
+      "name": "camp-ph-namaqualand_boulder_02-30",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        74.53754396096909,
-        2.023045482635498,
-        1361.3988333521525
+        92.8387304021886,
+        3.353705348968506,
+        1360.7307307269284
       ],
       "rotation": [
         0,
-        70.19097170760386,
+        153.33957639374063,
+        0
+      ],
+      "scale": [
+        0.6883502755596114,
+        0.6883502755596114,
+        0.6883502755596114
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_02-31",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
+      "position": [
+        90.50316251446465,
+        1.7750359201431274,
+        1349.5349402540023
+      ],
+      "rotation": [
+        0,
+        321.6538709767604,
         0
       ],
       "scale": [
@@ -2189,101 +2319,143 @@
       "visible": true
     },
     {
-      "name": "camp-scrub-b-27",
+      "name": "camp-ph-shrub_04-32",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "position": [
+        88.78094400109252,
+        3.590297164916992,
+        1371.7735077594593
+      ],
+      "rotation": [
+        0,
+        154.89307514047286,
+        0
+      ],
+      "scale": [
+        1.9880793852458534,
+        1.9880793852458534,
+        1.9880793852458534
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-33",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/scrub-b.glb",
       "position": [
+        74.53754396096909,
+        2.023132743835449,
+        1361.3988333521525
+      ],
+      "rotation": [
+        0,
+        295.1688077675047,
+        0
+      ],
+      "scale": [
+        0.8560813373670058,
+        0.8560813373670058,
+        0.8560813373670058
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_stones_01-34",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
+      "position": [
         76.74061503276735,
-        2.932230176925659,
+        2.9034218215942382,
         1365.7649489426656
       ],
       "rotation": [
         0,
-        103.83382834259749,
+        328.99396151643657,
         0
       ],
       "scale": [
-        0.9397372055705346,
-        0.9397372055705346,
-        0.9397372055705346
+        1.6052347502885245,
+        1.6052347502885245,
+        1.6052347502885245
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-b-28",
+      "name": "camp-scrub-a-35",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        82.24781909672662,
+        1.7000001096725463,
+        1356.2225674716476
+      ],
+      "rotation": [
+        0,
+        260.18546667086974,
+        0
+      ],
+      "scale": [
+        0.8526117834272746,
+        0.8526117834272746,
+        0.8526117834272746
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-36",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
       "position": [
         74.92123853735794,
-        3.095353546142578,
+        3.088716688156128,
         1366.5838506155878
       ],
       "rotation": [
         0,
-        315.56404648883466,
+        244.6639549650272,
         0
       ],
       "scale": [
-        0.8335072275752016,
-        0.8335072275752016,
-        0.8335072275752016
+        0.9463795246215368,
+        0.9463795246215368,
+        0.9463795246215368
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_03-29",
+      "name": "camp-ph-namaqualand_boulder_04-37",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
         96.24131319351821,
-        3.789579095840454,
+        3.7864138507843017,
         1369.0813970411016
       ],
       "rotation": [
         0,
-        346.985098448748,
+        54.354691690488856,
         0
       ],
       "scale": [
-        0.3680870451107904,
-        0.3680870451107904,
-        0.3680870451107904
+        0.44357973482379887,
+        0.44357973482379887,
+        0.44357973482379887
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_stones_01-30",
+      "name": "camp-ph-namaqualand_boulder_03-38",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
         93.59296236118246,
-        3.743006649017334,
+        3.7662088298797607,
         1371.5571879793897
       ],
       "rotation": [
         0,
-        336.5660702020506,
-        0
-      ],
-      "scale": [
-        1.7141234275322028,
-        1.7141234275322028,
-        1.7141234275322028
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_03-31",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
-      "position": [
-        97.76316506001027,
-        3.9001922035217285,
-        1359.6738129228509
-      ],
-      "rotation": [
-        0,
-        52.84901059568383,
+        294.1270438207061,
         0
       ],
       "scale": [
@@ -2294,143 +2466,185 @@
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_stones_01-32",
+      "name": "camp-scrub-a-39",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        97.76316506001027,
+        3.8856303119659423,
+        1359.6738129228509
+      ],
+      "rotation": [
+        0,
+        37.338684293112976,
+        0
+      ],
+      "scale": [
+        1.064790605705539,
+        1.064790605705539,
+        1.064790605705539
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-c-40",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
         82.50953035979065,
-        1.7143468284606933,
+        1.7955561304092407,
         1360.9019616550643
       ],
       "rotation": [
         0,
-        282.1673032878797,
+        83.93188233258712,
         0
       ],
       "scale": [
-        1.9118733120625953,
-        1.9118733120625953,
-        1.9118733120625953
+        0.8001164120224271,
+        0.8001164120224271,
+        0.8001164120224271
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-c-33",
+      "name": "camp-scrub-c-41",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
+        85.60643886602821,
+        1.7000001096725463,
+        1358.3778745357686
+      ],
+      "rotation": [
+        0,
+        23.769989166894913,
+        0
+      ],
+      "scale": [
+        1.1656099457073141,
+        1.1656099457073141,
+        1.1656099457073141
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-42",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        71.74955675924072,
+        3.023360433578491,
+        1364.276092097437
+      ],
+      "rotation": [
+        0,
+        133.18689019149346,
+        0
+      ],
+      "scale": [
+        0.858754769768456,
+        0.858754769768456,
+        0.858754769768456
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_02-43",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
+      "position": [
         83.9408910726394,
-        3.538139762878418,
+        3.5371367359161376,
         1371.1739993927588
       ],
       "rotation": [
         0,
-        205.25031309871903,
+        134.122162100355,
         0
       ],
       "scale": [
-        0.8626728309744577,
-        0.8626728309744577,
-        0.8626728309744577
+        0.7071602642694743,
+        0.7071602642694743,
+        0.7071602642694743
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-b-34",
+      "name": "camp-ph-namaqualand_boulder_02-44",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
         92.48697647904476,
-        3.7233614349365234,
+        3.725733938217163,
         1371.834867659621
       ],
       "rotation": [
         0,
-        73.14187858448926,
+        250.65370931793038,
         0
       ],
       "scale": [
-        1.1216663936589364,
-        1.1216663936589364,
-        1.1216663936589364
+        1.0470294863644465,
+        1.0470294863644465,
+        1.0470294863644465
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_03-35",
+      "name": "camp-ph-namaqualand_stones_01-45",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
       "position": [
         99.45925681753789,
-        3.9549292945861816,
+        3.920112314224243,
         1364.201491991585
       ],
       "rotation": [
         0,
-        309.74219255505466,
+        148.00098141544524,
         0
       ],
       "scale": [
-        0.5764803518927305,
-        0.5764803518927305,
-        0.5764803518927305
+        2.049608085462517,
+        2.049608085462517,
+        2.049608085462517
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-36",
+      "name": "camp-scrub-b-46",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        86.84409917688077,
+        1.7000001096725463,
+        1356.5748805334501
+      ],
+      "rotation": [
+        0,
+        12.781700296181322,
+        0
+      ],
+      "scale": [
+        0.91533752192762,
+        0.91533752192762,
+        0.91533752192762
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_stones_01-47",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
       "position": [
         83.43397798624368,
-        3.6976332092285156,
+        3.6769823455810546,
         1373.2436450677192
       ],
       "rotation": [
         0,
-        87.6701437094993,
-        0
-      ],
-      "scale": [
-        2.3496975361999533,
-        2.3496975361999533,
-        2.3496975361999533
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_04-37",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
-      "position": [
-        79.85679260576528,
-        1.7000001096725463,
-        1352.7863256147727
-      ],
-      "rotation": [
-        0,
-        189.5861780298829,
-        0
-      ],
-      "scale": [
-        0.7674311765586341,
-        0.7674311765586341,
-        0.7674311765586341
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_stones_01-38",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_stones_01.glb",
-      "position": [
-        79.18608392931147,
-        1.700112166404724,
-        1359.7210769588737
-      ],
-      "rotation": [
-        0,
-        315.44164336112783,
+        20.770735907411584,
         0
       ],
       "scale": [
@@ -2441,143 +2655,185 @@
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_03-39",
+      "name": "camp-scrub-b-48",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
+        87.79952604401817,
+        1.7010870599746704,
+        1344.6716260292208
+      ],
+      "rotation": [
+        0,
+        12.864341974367726,
+        0
+      ],
+      "scale": [
+        1.029131505096096,
+        1.029131505096096,
+        1.029131505096096
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-49",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        89.45304386761865,
+        2.0158755207061767,
+        1357.308931705397
+      ],
+      "rotation": [
+        0,
+        257.8778336059256,
+        0
+      ],
+      "scale": [
+        0.8050554749195749,
+        0.8050554749195749,
+        0.8050554749195749
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-a-50",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
+      "position": [
+        79.85679260576528,
+        1.7000001096725463,
+        1352.7863256147727
+      ],
+      "rotation": [
+        0,
+        323.95586984809364,
+        0
+      ],
+      "scale": [
+        0.8934028423873082,
+        0.8934028423873082,
+        0.8934028423873082
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-ph-namaqualand_boulder_03-51",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
+        79.18608392931147,
+        1.7003780031204223,
+        1359.7210769588737
+      ],
+      "rotation": [
+        0,
+        3.138329536671205,
+        0
+      ],
+      "scale": [
+        0.39592922906257855,
+        0.39592922906257855,
+        0.39592922906257855
+      ],
+      "visible": true
+    },
+    {
+      "name": "camp-scrub-b-52",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
+      "position": [
         94.30248969022722,
-        3.6025373363494873,
+        3.6171962642669677,
         1367.551514179609
       ],
       "rotation": [
         0,
-        190.13050846981224,
+        245.6525685221795,
         0
       ],
       "scale": [
-        0.5106233969275474,
-        0.5106233969275474,
-        0.5106233969275474
+        0.8828692514231319,
+        0.8828692514231319,
+        0.8828692514231319
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-40",
+      "name": "camp-ph-namaqualand_boulder_02-53",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
         82.83196362020789,
-        3.4164750003814697,
+        3.44069522857666,
         1370.3332954602042
       ],
       "rotation": [
         0,
-        203.89269614471456,
+        227.02036212405395,
         0
       ],
       "scale": [
-        1.7809226501596407,
-        1.7809226501596407,
-        1.7809226501596407
+        0.6817331270467637,
+        0.6817331270467637,
+        0.6817331270467637
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-c-41",
+      "name": "camp-ph-shrub_04-54",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
         88.53506868776398,
-        3.0517196083068847,
+        3.0374020957946777,
         1363.5028539287894
       ],
       "rotation": [
         0,
-        205.0843187213787,
+        90.03572282309848,
         0
       ],
       "scale": [
-        0.8735481652898499,
-        0.8735481652898499,
-        0.8735481652898499
+        1.6885919265504494,
+        1.6885919265504494,
+        1.6885919265504494
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_03-42",
+      "name": "camp-ph-shrub_04-55",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
+      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
         80.34335776024417,
-        3.5293642902374267,
+        3.559102716445923,
         1371.3342807272509
       ],
       "rotation": [
         0,
-        110.10336147079806,
+        41.93132750357726,
         0
       ],
       "scale": [
-        0.5514535943617069,
-        0.5514535943617069,
-        0.5514535943617069
+        1.7772960232565533,
+        1.7772960232565533,
+        1.7772960232565533
       ],
       "visible": true
     },
     {
-      "name": "camp-scrub-a-43",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
-      "position": [
-        65.34590414495017,
-        0.43820375442504883,
-        1340.6545949868346
-      ],
-      "rotation": [
-        0,
-        348.76206097481946,
-        0
-      ],
-      "scale": [
-        1.117620002688329,
-        1.117620002688329,
-        1.117620002688329
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-scrub-c-44",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-c.glb",
-      "position": [
-        83.63234148365147,
-        2.3954743766784667,
-        1363.0701240219591
-      ],
-      "rotation": [
-        0,
-        14.245743722805617,
-        0
-      ],
-      "scale": [
-        1.1190277740184669,
-        1.1190277740184669,
-        1.1190277740184669
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-shrub_04-45",
+      "name": "camp-ph-shrub_04-56",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
-        89.42714918342972,
-        3.7988707447052,
-        1374.3201944715474
+        87.0054145332692,
+        1.8264359855651855,
+        1359.1734591493955
       ],
       "rotation": [
         0,
-        124.98655660348928,
+        65.7046330568984,
         0
       ],
       "scale": [
@@ -2588,38 +2844,38 @@
       "visible": true
     },
     {
-      "name": "camp-ph-namaqualand_boulder_04-46",
+      "name": "camp-scrub-a-57",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
+      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
       "position": [
-        89.01034455060571,
-        1.7074435377120971,
-        1346.3431659880562
+        83.63234148365147,
+        2.3645729446411132,
+        1363.0701240219591
       ],
       "rotation": [
         0,
-        14.61172583925034,
+        93.87868900491355,
         0
       ],
       "scale": [
-        0.5527554146695516,
-        0.5527554146695516,
-        0.5527554146695516
+        1.0820543055667098,
+        1.0820543055667098,
+        1.0820543055667098
       ],
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-47",
+      "name": "camp-ph-shrub_04-58",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
       "position": [
-        78.72406426427771,
-        1.7000001096725463,
-        1357.9371034834674
+        89.42714918342972,
+        3.7881595516204833,
+        1374.3201944715474
       ],
       "rotation": [
         0,
-        291.27710804707056,
+        219.01473763888174,
         0
       ],
       "scale": [
@@ -2630,254 +2886,23 @@
       "visible": true
     },
     {
-      "name": "camp-ph-shrub_04-48",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
-      "position": [
-        85.06721912527944,
-        1.7000001096725463,
-        1345.3039633408014
-      ],
-      "rotation": [
-        0,
-        216.61587834088309,
-        0
-      ],
-      "scale": [
-        2.166918755454538,
-        2.166918755454538,
-        2.166918755454538
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-shrub_04-49",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
-      "position": [
-        83.44997747048662,
-        3.2080492401123046,
-        1368.7967394933542
-      ],
-      "rotation": [
-        0,
-        159.8006811497983,
-        0
-      ],
-      "scale": [
-        2.2582181327322353,
-        2.2582181327322353,
-        2.2582181327322353
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_03-50",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
-      "position": [
-        85.44853466782988,
-        3.712444725036621,
-        1373.6978698604994
-      ],
-      "rotation": [
-        0,
-        228.96714405679697,
-        0
-      ],
-      "scale": [
-        0.48626080017133866,
-        0.48626080017133866,
-        0.48626080017133866
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_02-51",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
-      "position": [
-        82.80690139844181,
-        3.747204484939575,
-        1373.2363062010545
-      ],
-      "rotation": [
-        0,
-        189.2113007233678,
-        0
-      ],
-      "scale": [
-        0.7579832827063371,
-        0.7579832827063371,
-        0.7579832827063371
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-scrub-a-52",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-a.glb",
-      "position": [
-        97.83295475996505,
-        3.8095862293243408,
-        1365.4622916771993
-      ],
-      "rotation": [
-        0,
-        137.12192321952057,
-        0
-      ],
-      "scale": [
-        0.9792356075750033,
-        0.9792356075750033,
-        0.9792356075750033
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-scrub-b-53",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/scrub-b.glb",
-      "position": [
-        77.35375540378519,
-        1.7941445732116699,
-        1361.124294563729
-      ],
-      "rotation": [
-        0,
-        284.2248166148252,
-        0
-      ],
-      "scale": [
-        0.9457589847962794,
-        0.9457589847962794,
-        0.9457589847962794
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_03-54",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
-      "position": [
-        75.3275993312366,
-        2.3616797351837158,
-        1362.931057086122
-      ],
-      "rotation": [
-        0,
-        357.92677254689835,
-        0
-      ],
-      "scale": [
-        0.3454979683638266,
-        0.3454979683638266,
-        0.3454979683638266
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-shrub_04-55",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
-      "position": [
-        95.13975263838847,
-        3.708376111984253,
-        1368.7915801738168
-      ],
-      "rotation": [
-        0,
-        92.71550905494412,
-        0
-      ],
-      "scale": [
-        1.8950116478673154,
-        1.8950116478673154,
-        1.8950116478673154
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-shrub_04-56",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
-      "position": [
-        68.30490094272223,
-        1.0677589797973632,
-        1342.3316162894685
-      ],
-      "rotation": [
-        0,
-        332.01618353186564,
-        0
-      ],
-      "scale": [
-        2.4767117438132087,
-        2.4767117438132087,
-        2.4767117438132087
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-scrub-c-57",
+      "name": "camp-scrub-c-59",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/scrub-c.glb",
       "position": [
-        88.1586537693656,
-        3.471635284423828,
-        1370.3744017144045
+        89.01034455060571,
+        1.7308289432525634,
+        1346.3431659880562
       ],
       "rotation": [
         0,
-        221.36527801558057,
+        318.157427063868,
         0
       ],
       "scale": [
-        1.1905370020126682,
-        1.1905370020126682,
-        1.1905370020126682
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-namaqualand_boulder_04-58",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
-      "position": [
-        94.940624991672,
-        3.628434362411499,
-        1367.6418690641988
-      ],
-      "rotation": [
-        0,
-        236.05030388872228,
-        0
-      ],
-      "scale": [
-        0.7975451074941413,
-        0.7975451074941413,
-        0.7975451074941413
-      ],
-      "visible": true
-    },
-    {
-      "name": "camp-ph-shrub_04-59",
-      "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-shrub_04.glb",
-      "position": [
-        93.89992085719045,
-        3.715322198867798,
-        1370.558348675542
-      ],
-      "rotation": [
-        0,
-        324.9059247590085,
-        0
-      ],
-      "scale": [
-        2.4052271378974375,
-        2.4052271378974375,
-        2.4052271378974375
+        1.143648242627181,
+        1.143648242627181,
+        1.143648242627181
       ],
       "visible": true
     },
@@ -3340,10 +3365,11 @@
         "lights/moon-rim/intensity": 0.5,
         "lights/ufo-glow/intensity": 20.0,
         "lights/fire-bounce/intensity": 5.0,
-        "lights/ufo-rim-0/intensity": 0.0,
-        "lights/ufo-rim-1/intensity": 0.0,
-        "lights/ufo-rim-2/intensity": 0.0,
-        "lights/ufo-rim-3/intensity": 0.0,
+        "lights/ufo-rim-0/intensity": 4.0,
+        "lights/ufo-rim-1/intensity": 4.0,
+        "lights/ufo-rim-2/intensity": 4.0,
+        "lights/ufo-rim-3/intensity": 4.0,
+        "lights/ufo-spill/intensity": 6.0,
         "lights/campfire/intensity": 34.0,
         "lights/campfire/color": [
           1.0,
@@ -3422,10 +3448,11 @@
         "lights/moon-rim/intensity": 0.5,
         "lights/ufo-glow/intensity": 20.0,
         "lights/fire-bounce/intensity": 5.0,
-        "lights/ufo-rim-0/intensity": 0.0,
-        "lights/ufo-rim-1/intensity": 0.0,
-        "lights/ufo-rim-2/intensity": 0.0,
-        "lights/ufo-rim-3/intensity": 0.0,
+        "lights/ufo-rim-0/intensity": 4.0,
+        "lights/ufo-rim-1/intensity": 4.0,
+        "lights/ufo-rim-2/intensity": 4.0,
+        "lights/ufo-rim-3/intensity": 4.0,
+        "lights/ufo-spill/intensity": 6.0,
         "lights/campfire/intensity": 34.0,
         "lights/campfire/color": [
           1.0,

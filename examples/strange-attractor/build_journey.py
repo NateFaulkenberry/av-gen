@@ -91,7 +91,10 @@ CAMP_Y = 4.4 * WS             # measured on the bank (generator 4.4 m)
 GRAY_SCALE = 0.68             # the downloaded Gray read as tall as a Sasquatch at its own scale: about 1.5 m here
 UFO_SCALE = 0.018             # the model is 666 x 238 units (load log): a 12 m disc, 4.3 m tall
 UFO_LIFT = 1.9                # its underside (-119 units) just above the ground: resting on its keel
-UFO_AT = (-11.0, 11.0)         # behind the group (seen past it from the night arc), on the opened bench, clear of the descent
+# M3f (owner §2): the craft is the Gray's, beside him by the water -- across the Gray from the Sasquatches, landed on the
+# shore (a pad levels its footing just above the water), not behind the group; clear of the night pass by 2.6 m of rim
+UFO_AT = (10.5, -9.0)
+UFO_SHORE = 0.35              # the shore pad's level (the river's surface is at -0.5)
 
 
 def at(dd, dl):
@@ -109,7 +112,8 @@ def ground(points):
 # craft eased to one footing (generator units are the world's: the pad is in world metres)
 PAD_C = at(-3.0, 5.0)
 PORTAL1_XZ = site(37.2, 27.2)          # portal 1's focus on the ground (REF metres)
-scene["attractorWorld"]["pads"] = [{"x": PAD_C[0], "z": PAD_C[1], "radius": 15.0, "level": CAMP_Y}]
+scene["attractorWorld"]["pads"] = [{"x": PAD_C[0], "z": PAD_C[1], "radius": 15.0, "level": CAMP_Y},
+                                   {"x": at(*UFO_AT)[0], "z": at(*UFO_AT)[1], "radius": 9.0, "level": UFO_SHORE}]
 
 lights = [l for l in scene["lights"] if l["name"] in ("canyon-bounce", "floor-bounce")]
 UFO_PARK = at(*UFO_AT)
@@ -135,18 +139,28 @@ lights += [
     # M3b: the craft lit by its own lights -- the underside's glow and its spill on the ground, the rim's lamps
     # M3e (owner §9: a white spill on the bank behind the craft with no source): the underside's glow is a spot straight
     # down from the hull's belly, so it pools on the ground under the craft and nowhere else
-    {"name": "ufo-glow", "type": "spot", "position": [UFO_PARK[0], CAMP_Y + UFO_LIFT - 0.2, UFO_PARK[1]],
+    {"name": "ufo-glow", "type": "spot", "position": [UFO_PARK[0], UFO_SHORE + UFO_LIFT - 0.2, UFO_PARK[1]],
      "direction": [0.0, -1.0, 0.0], "innerCone": 35.0, "outerCone": 62.0,
      "color": [0.35, 0.75, 1.0], "intensity": 0.0, "range": 7.0, "castsShadow": False, "contactShadow": False,
      "volumetric": 0.0},
 ] + [{"name": f"ufo-rim-{k}", "type": "point",
-      "position": [UFO_PARK[0] + 6.3 * math.cos(a_), CAMP_Y + UFO_LIFT + 0.4, UFO_PARK[1] + 6.3 * math.sin(a_)],
-      # M3e (owner §9: an unmotivated white spill behind the craft): the rim lamps light the hull, not the bank behind
-      "color": c, "intensity": 0.0, "range": 3.0, "castsShadow": False, "volumetric": 0.0}
+      "position": [UFO_PARK[0] + 6.3 * math.cos(a_), UFO_SHORE + UFO_LIFT + 0.4, UFO_PARK[1] + 6.3 * math.sin(a_)],
+      # M3e (owner §9: an unmotivated white spill behind the craft): the rim lamps light the hull, not the bank behind;
+      # M3f: back on at night, a 2 m reach, pulsing with the beat
+      "color": c, "intensity": 0.0, "range": 2.0, "castsShadow": False, "volumetric": 0.0}
      for k, (a_, c) in enumerate(((0.3, [1.0, 0.55, 0.2]), (1.9, [0.4, 0.9, 1.0]), (3.5, [1.0, 0.25, 0.2]),
                                    (5.1, [0.4, 0.9, 1.0])))]
 for l_ in lights:   # M3e: only the fire marches contact shadows (the scene's switch is on, ADR-1907 turns the moon's off)
     l_.setdefault("contactShadow", False)
+# M3f (owner §2): the craft's window band spills toward the Gray beside it -- a soft, unshadowed cyan from the hull's rim
+# on his side, falling on him and the shore between them (it pulses with the craft's lights)
+_g = at(*CAST["gray"])
+_d = (_g[0] - UFO_PARK[0], _g[1] - UFO_PARK[1])
+_dn = math.hypot(*_d)
+lights.append({"name": "ufo-spill", "type": "point",
+               "position": [UFO_PARK[0] + _d[0] / _dn * 6.8, UFO_SHORE + UFO_LIFT + 1.2, UFO_PARK[1] + _d[1] / _dn * 6.8],
+               "color": [0.4, 0.78, 1.0], "intensity": 0.0, "range": 9.0, "castsShadow": False, "contactShadow": False,
+               "volumetric": 0.0})
 scene["lights"] = lights
 scene["environment"]["contactShadows"] = True
 scene["attractorWorld"]["look"]["sunContact"] = 0.0
@@ -196,7 +210,7 @@ nodes.append({"name": "gray", "kind": "gltf", "asset": A + "gray-m3e.glb",
               "scale": [GRAY_SCALE] * 3, "visible": False,
               "animation": {"state": "mixamo.com", "cullDistance": 800.0, "speed": 0.8}})
 nodes.append({"name": "ufo-parked", "kind": "gltf", "asset": A + "ufo-craft.glb",
-              "position": [UFO_PARK[0], CAMP_Y + UFO_LIFT, UFO_PARK[1]], "rotation": [0, 33, 0],
+              "position": [UFO_PARK[0], UFO_SHORE + UFO_LIFT, UFO_PARK[1]], "rotation": [0, 33, 0],
               "scale": [UFO_SCALE] * 3, "visible": False, "emissiveBoost": 4.0})
 
 # scrub and rocks across the bench and the banks round it (seeded), kept off the camera's low paths, the gathering,
@@ -349,8 +363,8 @@ night = {
     "attractorWorld/sunShadowBias": 0.2, "attractorWorld/sunContact": 0.0,
     "scene/shadowRange": 200.0, "scene/volumeDensity": 0.0007, "scene/volumeLocalLights": 1.0,
     "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 20.0, "lights/fire-bounce/intensity": 5.0,
-    "lights/ufo-rim-0/intensity": 0.0, "lights/ufo-rim-1/intensity": 0.0, "lights/ufo-rim-2/intensity": 0.0,
-    "lights/ufo-rim-3/intensity": 0.0,
+    "lights/ufo-rim-0/intensity": 4.0, "lights/ufo-rim-1/intensity": 4.0, "lights/ufo-rim-2/intensity": 4.0,
+    "lights/ufo-rim-3/intensity": 4.0, "lights/ufo-spill/intensity": 6.0,
     "lights/campfire/intensity": 34.0, "lights/campfire/color": [1.0, 0.46, 0.15], "lights/campfire/range": 17.0,
     "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
@@ -430,6 +444,7 @@ routes.append({"source": "response.bass", "target": "moon/nodes/earth/emissiveBo
 routes = [r for r in routes if not (r["target"].startswith("moon/lights/rave") or r["target"].startswith("moon/nodes/laser")
                                     or "-rave-" in r["target"] or r["target"].startswith("moon/nodes/earth-halo")
                                     or r["target"].startswith("moon/nodes/earth-aura")
+                                    or r["target"].startswith(("lights/ufo-", "nodes/ufo-parked"))
                                     or r["target"].startswith("moon/nodes/earth-echo"))]
 
 
@@ -451,6 +466,12 @@ for k in range(3):
 for c in ("r", "c"):
     routes.append(beat_route("beat.pulse", f"moon/nodes/earth-echo-{c}/opacity", 0.0, 0.55, decay=220.0, op="replace"))
 routes.append(beat_route("beat.pulse", "moon/nodes/earth/emissiveBoost", 0.0, 1.2, decay=400.0))
+# M3f (owner §2): the craft's lights breathe with the beat -- multiplied (a look's 0 by day stays 0), from 0.8 between
+# beats to 1.5 on one, falling over 0.45 s: a pulse, not a strobe; the hull's emissive the same, gentler
+for _l in ("ufo-glow", "ufo-spill", "ufo-rim-0", "ufo-rim-1", "ufo-rim-2", "ufo-rim-3"):
+    routes.append(beat_route("beat.pulse", f"lights/{_l}/intensity", 0.8, 1.5, attack=20.0, decay=450.0, op="multiply"))
+routes.append(beat_route("beat.pulse", "nodes/ufo-parked/emissiveBoost", 0.85, 1.35, attack=20.0, decay=450.0,
+                         op="multiply"))
 # M3e (owner §6): the aura keeps the halo's beat pulse; its glitch and datamosh are deliberate hits, 0 between them
 routes.append(beat_route("beat.pulse", "moon/nodes/earth-aura/emissiveBoost", 0.0, 1.6, decay=360.0))
 for c in ("r", "c"):   # the RGB split, on the beat
