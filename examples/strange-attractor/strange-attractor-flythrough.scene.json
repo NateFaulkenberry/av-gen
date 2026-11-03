@@ -1503,7 +1503,7 @@
     {
       "name": "sasquatch-b",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/sasquatch-b.glb",
+      "asset": "../../assets/strange-attractor/build/sasquatch-b-m3e.glb",
       "position": [
         76.65155000000001,
         1.7600001096725464,
@@ -1576,7 +1576,7 @@
     {
       "name": "gray",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/sketchfab/gray/grey-alien-idle/grey_alien_idle.glb",
+      "asset": "../../assets/strange-attractor/build/gray-m3e.glb",
       "position": [
         72.34190000000001,
         1.7600001096725464,
@@ -2905,7 +2905,7 @@
     {
       "name": "campfire-teepee",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ph-teepee.glb",
+      "asset": "../../assets/strange-attractor/build/ph-teepee-m3e.glb",
       "position": [
         74.26400000000001,
         1.7400000000000002,

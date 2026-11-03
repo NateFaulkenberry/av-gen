@@ -176,7 +176,9 @@ faces = {"sasquatch-a": [0.5 * (CAMP[0] + gray_xz[0]), 0.5 * (CAMP[1] + gray_xz[
          "sasquatch-b": CAMP, "sasquatch-c": CAMP}
 for name in ("sasquatch-a", "sasquatch-b", "sasquatch-c"):
     x, z = cast_xz[name]
-    nodes.append({"name": name, "kind": "gltf", "asset": A + f"{name}.glb", "position": [x, cast_g[name], z],
+    # M3e: sasquatch-b's grey fur alpha-tested too (pass2/patch_glb_materials.py, a copy under a new name)
+    asset = A + ("sasquatch-b-m3e.glb" if name == "sasquatch-b" else f"{name}.glb")
+    nodes.append({"name": name, "kind": "gltf", "asset": asset, "position": [x, cast_g[name], z],
                   "rotation": [0, yaw_to((x, z), faces[name]), 0], "scale": [1, 1, 1], "visible": False,
                   "animation": {"state": "idle", "cullDistance": 800.0, "speed": 1.0}})
 # Sasquatch C sits: the rock under it, 0.36 m behind its feet (its hips' offset in the sitting pose)
@@ -188,7 +190,8 @@ nodes.append({"name": "seat-rock", "kind": "gltf", "asset": A + "ph-namaqualand_
               "position": [seat[0], cast_g["sasquatch-c"] - 0.05, seat[1]], "rotation": [0, math.degrees(cyaw) + 90.0, 0],
               "scale": [0.85, 0.95, 0.85], "visible": True})
 # the Gray: across the fire from the three, facing them, fully in frame (night only)
-nodes.append({"name": "gray", "kind": "gltf", "asset": "../../assets/strange-attractor/sketchfab/gray/grey-alien-idle/grey_alien_idle.glb",
+# M3e (the hero agent's audit): the Gray matte -- metallic 0, no emission (a patched copy, pass2/patch_glb_materials.py)
+nodes.append({"name": "gray", "kind": "gltf", "asset": A + "gray-m3e.glb",
               "position": [gray_xz[0], cast_g["gray"], gray_xz[1]], "rotation": [0, yaw_to(gray_xz, group_c), 0],
               "scale": [GRAY_SCALE] * 3, "visible": False,
               "animation": {"state": "mixamo.com", "cullDistance": 800.0, "speed": 0.8}})
@@ -262,7 +265,7 @@ nodes += [
     # (Poly Haven, CC0: stone_fire_pit, dead_tree_trunk via pass2/build_teepee.py)
     {"name": "campfire-logs", "kind": "gltf", "asset": A + "ph-stone_fire_pit.glb", "position": [CAMP[0], CAMP_Y - 0.08, CAMP[1]],
      "rotation": [0, 20, 0], "scale": [0.85, 0.85, 0.85], "visible": False},
-    {"name": "campfire-teepee", "kind": "gltf", "asset": A + "ph-teepee.glb", "position": [CAMP[0], CAMP_Y - 0.02, CAMP[1]],
+    {"name": "campfire-teepee", "kind": "gltf", "asset": A + "ph-teepee-m3e.glb", "position": [CAMP[0], CAMP_Y - 0.02, CAMP[1]],
      "rotation": [0, 20, 0], "scale": [0.9, 0.9, 0.9], "visible": False},
     # flames: tongues rising out of the teepee, licking up and thinning, in two layers (a hot core, a softer outer)
     {"name": "campfire-flames", "kind": "particles", "visible": False, "particles": {
@@ -426,6 +429,7 @@ routes.append({"source": "response.bass", "target": "moon/nodes/earth/emissiveBo
 # quarter-second, so a strobe is a deliberate flash, not a shimmer; with audio off the sources rest at 0)
 routes = [r for r in routes if not (r["target"].startswith("moon/lights/rave") or r["target"].startswith("moon/nodes/laser")
                                     or "-rave-" in r["target"] or r["target"].startswith("moon/nodes/earth-halo")
+                                    or r["target"].startswith("moon/nodes/earth-aura")
                                     or r["target"].startswith("moon/nodes/earth-echo"))]
 
 
@@ -447,10 +451,15 @@ for k in range(3):
 for c in ("r", "c"):
     routes.append(beat_route("beat.pulse", f"moon/nodes/earth-echo-{c}/opacity", 0.0, 0.55, decay=220.0, op="replace"))
 routes.append(beat_route("beat.pulse", "moon/nodes/earth/emissiveBoost", 0.0, 1.2, decay=400.0))
-routes.append(beat_route("beat.pulse", "moon/nodes/earth-halo/emissiveBoost", 0.0, 1.6, decay=360.0))
-# M3d: the corona's other layers flicker in on the highs and the low onsets
-routes.append(beat_route("response.high", "moon/nodes/earth-halo-2/opacity", 0.15, 1.0, decay=260.0, op="replace"))
-routes.append(beat_route("response.onsetLow", "moon/nodes/earth-halo-3/opacity", 0.15, 1.0, decay=320.0, op="replace"))
+# M3e (owner §6): the aura keeps the halo's beat pulse; its glitch and datamosh are deliberate hits, 0 between them
+routes.append(beat_route("beat.pulse", "moon/nodes/earth-aura/emissiveBoost", 0.0, 1.6, decay=360.0))
+for c in ("r", "c"):   # the RGB split, on the beat
+    routes.append(beat_route("beat.pulse", f"moon/nodes/earth-aura-{c}/opacity", 0.0, 0.55, decay=240.0, op="replace"))
+_tear = beat_route("response.transient", "moon/nodes/earth-aura-tear/opacity", 0.0, 0.9, decay=200.0, op="replace")
+_tear["chain"]["remapInMin"] = 0.45   # the tear only on the strong transients: deliberate hits, not a constant shimmer
+routes.append(_tear)
+routes.append(beat_route("response.onsetLow", "moon/nodes/earth-aura-trail-1/opacity", 0.0, 0.45, decay=480.0, op="replace"))
+routes.append(beat_route("response.onsetLow", "moon/nodes/earth-aura-trail-2/opacity", 0.0, 0.28, decay=720.0, op="replace"))
 project["routes"] = routes
 # M3: the submersibles' paths and their lights, keyed in the timeline (seconds, smooth)
 tracks = [t for t in project.get("timeline", {}).get("tracks", []) if not t["target"].startswith("ocean/")]
@@ -467,18 +476,6 @@ tracks.append({"target": "ocean/nodes/bay-strips/emissiveBoost",
 # M3b: the rover drives, its tracks appear, its camera flashes (M3c: the lasers are gone)
 tracks = [t for t in tracks if not (t["target"].startswith("moon/nodes/laser") or t["target"].startswith("mars/")
                                     or t["target"].startswith("moon/nodes/earth-halo"))]
-# M3d: the corona's layers breathe in scale out of phase (blocks drifting outward and back), the Moon leg only
-import build_moon as _bm  # noqa: E402
-for k, period, phase in ((2, 3.1, 0.0), (3, 4.3, 1.7)):
-    base = _bm.EARTH_RADIUS / 10.0 * (0.93 if k == 2 else 1.09)
-    sx = (1.0, 1.0, 1.0)
-    keys = []
-    t = 32.0
-    while t <= 48.5:
-        f = 1.0 + 0.07 * math.sin(2 * math.pi * (t - 32.0) / period + phase)
-        keys.append({"time": round(t, 3), "value": [base * f * c for c in sx], "interp": "smooth"})
-        t += period / 4.0
-    tracks.append({"target": f"moon/nodes/earth-halo-{k}/scale", "keys": keys})
 tracks += build_mars.rover_tracks()
 project["timeline"] = {"enabled": True, "tracks": tracks, "cues": project.get("timeline", {}).get("cues", [])}
 json.dump(project, open(PROJECT, "w"), indent=2)

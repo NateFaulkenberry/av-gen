@@ -697,7 +697,7 @@
     },
     {
       "source": "beat.pulse",
-      "target": "moon/nodes/earth-halo/emissiveBoost",
+      "target": "moon/nodes/earth-aura/emissiveBoost",
       "amount": 1.0,
       "op": "add",
       "polarity": "unipolar",
@@ -715,8 +715,8 @@
       }
     },
     {
-      "source": "response.high",
-      "target": "moon/nodes/earth-halo-2/opacity",
+      "source": "beat.pulse",
+      "target": "moon/nodes/earth-aura-r/opacity",
       "amount": 1.0,
       "op": "replace",
       "polarity": "unipolar",
@@ -724,18 +724,56 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.15,
-        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.55,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
         "attackMs": 8.0,
-        "decayMs": 260.0
+        "decayMs": 240.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "moon/nodes/earth-aura-c/opacity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.55,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 8.0,
+        "decayMs": 240.0
+      }
+    },
+    {
+      "source": "response.transient",
+      "target": "moon/nodes/earth-aura-tear/opacity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.45,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.9,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 8.0,
+        "decayMs": 200.0
       }
     },
     {
       "source": "response.onsetLow",
-      "target": "moon/nodes/earth-halo-3/opacity",
+      "target": "moon/nodes/earth-aura-trail-1/opacity",
       "amount": 1.0,
       "op": "replace",
       "polarity": "unipolar",
@@ -743,13 +781,32 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.15,
-        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.45,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
         "attackMs": 8.0,
-        "decayMs": 320.0
+        "decayMs": 480.0
+      }
+    },
+    {
+      "source": "response.onsetLow",
+      "target": "moon/nodes/earth-aura-trail-2/opacity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.28,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 8.0,
+        "decayMs": 720.0
       }
     }
   ],
@@ -2381,358 +2438,6 @@
             "time": 135.8,
             "value": 0.0,
             "interp": "linear"
-          }
-        ]
-      },
-      {
-        "target": "moon/nodes/earth-halo-2/scale",
-        "keys": [
-          {
-            "time": 32.0,
-            "value": [
-              88.35000000000001,
-              88.35000000000001,
-              88.35000000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 32.775,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 33.55,
-            "value": [
-              88.35000000000005,
-              88.35000000000005,
-              88.35000000000005
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 34.325,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 35.1,
-            "value": [
-              88.34999999999994,
-              88.34999999999994,
-              88.34999999999994
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 35.875,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 36.65,
-            "value": [
-              88.35000000000012,
-              88.35000000000012,
-              88.35000000000012
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 37.425,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 38.2,
-            "value": [
-              88.34999999999987,
-              88.34999999999987,
-              88.34999999999987
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 38.975,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 39.75,
-            "value": [
-              88.35000000000018,
-              88.35000000000018,
-              88.35000000000018
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 40.525,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 41.3,
-            "value": [
-              88.34999999999978,
-              88.34999999999978,
-              88.34999999999978
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 42.075,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 42.85,
-            "value": [
-              88.35000000000028,
-              88.35000000000028,
-              88.35000000000028
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 43.625,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 44.4,
-            "value": [
-              88.34999999999971,
-              88.34999999999971,
-              88.34999999999971
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 45.175,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 45.95,
-            "value": [
-              88.35000000000034,
-              88.35000000000034,
-              88.35000000000034
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 46.725,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 47.5,
-            "value": [
-              88.34999999999964,
-              88.34999999999964,
-              88.34999999999964
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 48.275,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          }
-        ]
-      },
-      {
-        "target": "moon/nodes/earth-halo-3/scale",
-        "keys": [
-          {
-            "time": 32.0,
-            "value": [
-              110.73808237856473,
-              110.73808237856473,
-              110.73808237856473
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 33.075,
-            "value": [
-              102.61607068309887,
-              102.61607068309887,
-              102.61607068309887
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 34.15,
-            "value": [
-              96.3619176214353,
-              96.3619176214353,
-              96.3619176214353
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 35.225,
-            "value": [
-              104.4839293169012,
-              104.4839293169012,
-              104.4839293169012
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 36.3,
-            "value": [
-              110.73808237856471,
-              110.73808237856471,
-              110.73808237856471
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 37.375,
-            "value": [
-              102.61607068309876,
-              102.61607068309876,
-              102.61607068309876
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 38.45,
-            "value": [
-              96.36191762143531,
-              96.36191762143531,
-              96.36191762143531
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 39.525,
-            "value": [
-              104.48392931690134,
-              104.48392931690134,
-              104.48392931690134
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 40.6,
-            "value": [
-              110.73808237856471,
-              110.73808237856471,
-              110.73808237856471
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 41.675,
-            "value": [
-              102.61607068309864,
-              102.61607068309864,
-              102.61607068309864
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 42.75,
-            "value": [
-              96.36191762143532,
-              96.36191762143532,
-              96.36191762143532
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 43.825,
-            "value": [
-              104.48392931690145,
-              104.48392931690145,
-              104.48392931690145
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 44.9,
-            "value": [
-              110.73808237856468,
-              110.73808237856468,
-              110.73808237856468
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 45.975,
-            "value": [
-              102.61607068309851,
-              102.61607068309851,
-              102.61607068309851
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 47.05,
-            "value": [
-              96.36191762143535,
-              96.36191762143535,
-              96.36191762143535
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 48.125,
-            "value": [
-              104.48392931690155,
-              104.48392931690155,
-              104.48392931690155
-            ],
-            "interp": "smooth"
           }
         ]
       },

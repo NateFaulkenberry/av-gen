@@ -1145,9 +1145,9 @@
       "emissiveBoost": 3.0
     },
     {
-      "name": "earth-halo",
+      "name": "earth-aura",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/earth-halo-c.glb",
+      "asset": "../../assets/strange-attractor/build/earth-aura.glb",
       "position": [
         -696.5847019233122,
         1800.7925215426735,
@@ -1159,21 +1159,21 @@
         0.0
       ],
       "scale": [
-        95.0,
-        95.0,
-        95.0
+        107.03333333333333,
+        107.03333333333333,
+        107.03333333333333
       ],
       "visible": true,
-      "emissiveBoost": 1.0
+      "emissiveBoost": 1.3
     },
     {
-      "name": "earth-halo-2",
+      "name": "earth-aura-r",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/earth-halo-c.glb",
+      "asset": "../../assets/strange-attractor/build/earth-aura.glb",
       "position": [
-        -699.1951771376205,
-        1807.3911522940168,
-        -8498.956876547689
+        -643.0239167661761,
+        1804.0918369183453,
+        -8484.127715197996
       ],
       "rotation": [
         100.0,
@@ -1181,22 +1181,78 @@
         0.0
       ],
       "scale": [
-        88.35000000000001,
-        88.35000000000001,
-        88.35000000000001
+        108.30622777777778,
+        108.30622777777778,
+        108.30622777777778
       ],
       "visible": true,
-      "emissiveBoost": 0.8,
-      "opacity": 0.5
+      "tint": [
+        1.0,
+        0.2,
+        0.6
+      ],
+      "emissiveBoost": 1.4,
+      "opacity": 0.0
     },
     {
-      "name": "earth-halo-3",
+      "name": "earth-aura-c",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/earth-halo-c.glb",
+      "asset": "../../assets/strange-attractor/build/earth-aura.glb",
       "position": [
-        -700.5004147447746,
+        -752.7559622947566,
+        1804.0918369183453,
+        -8476.45450308614
+      ],
+      "rotation": [
+        100.0,
+        4.000000000000001,
+        0.0
+      ],
+      "scale": [
+        108.30622777777778,
+        108.30622777777778,
+        108.30622777777778
+      ],
+      "visible": true,
+      "tint": [
+        0.2,
+        0.9,
+        1.0
+      ],
+      "emissiveBoost": 1.4,
+      "opacity": 0.0
+    },
+    {
+      "name": "earth-aura-tear",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/earth-aura-tear.glb",
+      "position": [
+        -695.279464316158,
+        1797.4932061670017,
+        -8442.959574330827
+      ],
+      "rotation": [
+        100.0,
+        4.000000000000001,
+        0.0
+      ],
+      "scale": [
+        106.83277777777778,
+        106.83277777777778,
+        106.83277777777778
+      ],
+      "visible": true,
+      "emissiveBoost": 1.6,
+      "opacity": 0.0
+    },
+    {
+      "name": "earth-aura-trail-1",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/earth-aura.glb",
+      "position": [
+        -580.7927287135957,
         1810.6904676696886,
-        -8517.62264395331
+        -8525.993420802604
       ],
       "rotation": [
         100.0,
@@ -1204,13 +1260,36 @@
         0.0
       ],
       "scale": [
-        103.55000000000001,
-        103.55000000000001,
-        103.55000000000001
+        114.0931,
+        114.0931,
+        114.0931
       ],
       "visible": true,
-      "emissiveBoost": 0.8,
-      "opacity": 0.5
+      "emissiveBoost": 0.9,
+      "opacity": 0.0
+    },
+    {
+      "name": "earth-aura-trail-2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/earth-aura.glb",
+      "position": [
+        -442.43899928437446,
+        1813.9897830453601,
+        -8554.425094532402
+      ],
+      "rotation": [
+        100.0,
+        4.000000000000001,
+        0.0
+      ],
+      "scale": [
+        121.85417777777776,
+        121.85417777777776,
+        121.85417777777776
+      ],
+      "visible": true,
+      "emissiveBoost": 0.9,
+      "opacity": 0.0
     },
     {
       "name": "dome0-rave-m",

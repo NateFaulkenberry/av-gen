@@ -41,7 +41,6 @@ EXIT = [0.0, 0.0, 1500.0]
 CURVATURE = 25000.0
 # 3.2 degrees across, 9 km out (a node's position is capped at 10 km and its scale at 100: make_earth.py's sphere is 100 m)
 EARTH_DISTANCE, EARTH_RADIUS = 9000.0, 950.0  # M3b: 12 degrees across (owner: bigger, brighter, noticed first)
-HALO = os.environ.get("SA_EARTH_HALO", "c")    # M3c: the Earth's glow, option a, b or c (c: the pick)
 RAVE_GROUPS = ("m", "c", "g", "a", "v")
 EARTH_FILE_RADIUS = 100.0  # make_earth.py's sphere (a node's scale is capped at 100: the Gate B 'far cut' was that cap)
 
@@ -171,6 +170,11 @@ for (cx, cz, _), _, _ in DOMES:
 earth = [EXIT[0] + E[0] * EARTH_DISTANCE, 40.0 + E[1] * EARTH_DISTANCE, EXIT[2] + E[2] * EARTH_DISTANCE]
 ECHO_SIDE = unit([-E[2], 0.0, E[0]])        # sideways across the line of sight (the echoes' offset)
 # the halo's plane faces back along the line of sight: its +y (the glb's face) turned onto -E (x first, then y)
+# M3e: a card set d Earth radii behind the planet is seen smaller (farther); scaled back so its 1.0 R is the limb as seen
+def AURA_K(d):
+    return EARTH_RADIUS / 10.0 * (EARTH_DISTANCE + d * EARTH_RADIUS) / EARTH_DISTANCE
+
+
 HALO_ROT = [math.degrees(math.acos(-E[1])), math.degrees(math.atan2(-E[0], -E[2])), 0.0]
 scene = {
     "format": "avgen-scene", "version": 1, "name": "the-strange-attractor-moon",
@@ -236,18 +240,27 @@ scene = {
                "position": [earth[i] + off * ECHO_SIDE[i] for i in range(3)], "rotation": [0, 200 + rot, 23],
                "scale": [EARTH_RADIUS * 1.015 / EARTH_FILE_RADIUS] * 3, "visible": True, "tint": tint,
                "emissiveBoost": 3.0} for c, off, rot, tint in (("r", 70.0, 4.0, [1.0, 0.15, 0.3]), ("c", -70.0, -4.0, [0.2, 0.9, 1.0]))] +
-             # M3c (owner: a much more stylised, cool glow): one of three halos (pass2/build_earth_halo.py) set just
-             # behind the planet, facing the arrival; its emissive pulsed on the beat (routed)
-             [{"name": "earth-halo", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
+             # M3e (owner §6: the ring of white pixel blocks replaced): a glowing aura (pass2/build_earth_aura.py) set
+             # just behind the planet, facing the arrival -- soft, hugging the limb, falling off smoothly -- its
+             # emissive pulsed on the beat (routed, as the M3c halo's was); and its glitch and datamosh, each layer at 0
+             # between beats and with audio off (the project's routes): an RGB split (two tinted copies a step either
+             # side), a torn copy (scanline tears and displaced blocks, on the highs) and mosh trails (two larger,
+             # fainter copies smeared sideways, on the low onsets, decaying slowly)
+             [{"name": "earth-aura", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura.glb",
                "position": [earth[i] + E[i] * EARTH_RADIUS * 1.2 for i in range(3)], "rotation": HALO_ROT,
-               "scale": [EARTH_RADIUS / 10.0] * 3, "visible": True, "emissiveBoost": 1.0}] +
-             # M3d (owner: the corona must be animated): two more layers of the same blocks, scaled so
-             # their blocks fall at other radii (scaled), breathing in scale out of phase (the timeline) so the blocks drift in and
-             # out, and flickering in on their own beat sources (the project's routes)
-             [{"name": f"earth-halo-{k}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
-               "position": [earth[i] + E[i] * EARTH_RADIUS * (1.2 + 0.02 * k) for i in range(3)],
-               "rotation": HALO_ROT, "scale": [EARTH_RADIUS / 10.0 * (0.93 if k == 2 else 1.09)] * 3,
-               "visible": True, "emissiveBoost": 0.8, "opacity": 0.5} for k in (2, 3)] +
+               "scale": [AURA_K(1.2)] * 3, "visible": True, "emissiveBoost": 1.3}] +
+             [{"name": f"earth-aura-{c}", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * 1.22 + off * ECHO_SIDE[i] for i in range(3)],
+               "rotation": HALO_ROT, "scale": [AURA_K(1.22) * 1.01] * 3, "visible": True, "tint": tint,
+               "emissiveBoost": 1.4, "opacity": 0.0}
+              for c, off, tint in (("r", 55.0, [1.0, 0.2, 0.6]), ("c", -55.0, [0.2, 0.9, 1.0]))] +
+             [{"name": "earth-aura-tear", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura-tear.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * 1.18 for i in range(3)], "rotation": HALO_ROT,
+               "scale": [AURA_K(1.18)] * 3, "visible": True, "emissiveBoost": 1.6, "opacity": 0.0}] +
+             [{"name": f"earth-aura-trail-{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * (1.24 + 0.02 * k) + off * ECHO_SIDE[i] for i in range(3)],
+               "rotation": HALO_ROT, "scale": [AURA_K(1.24 + 0.02 * k) * sc] * 3, "visible": True, "emissiveBoost": 0.9,
+               "opacity": 0.0} for k, off, sc in ((1, 120.0, 1.06), (2, 260.0, 1.13))] +
              # M3c (owner: no beams into the sky): the rave is inside the domes -- their glass lit in five colours in
              # bands that wind round them, each band on its own beat source (routed), a steady glow with audio off
              [{"name": f"dome{k}-rave-{g}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/dome-rave-{g}.glb",
