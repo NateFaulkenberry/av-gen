@@ -25,6 +25,16 @@ merged. This file collects their notes as they arrive, so it grows.
   - If the hero UFO v1 is integrated later (it adds 48 rim light cells, 4 navigation lights and an underbody
     ring), carry the pulse over to those lights.
 
+## 2b. The ocean (open items carried from M3e)
+
+- **Camera wobble over the reef.** M3e brought in a small new wobble on the ocean path over the reshaped
+  reef, which the critic flagged. Make the move smooth from the river portal exit to the sea exit, with no
+  rocking, roll oscillation or wobble. Report per-frame roll, pitch and yaw rate over the ocean section, M3e
+  against M3f.
+- **The white-out before the sea exit.** About 0.4 s, at 146.0–146.4 s, just before the crossing. It was
+  already in M3d. Find the cause (exposure or auto-exposure, a bright volume or fog pass, the portal surface,
+  or the camera entering geometry) and fix it at the root. Show the crossing frame by frame, M3e against M3f.
+
 ## Delivery
 
 - **Once every M3f change is done, render the full video with sound** to
