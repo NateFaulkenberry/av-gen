@@ -55,6 +55,13 @@ and the moves are smooth and fluid.
   standard deviation of luma) for each frame across ±1 s of each crossing, M3f against M3g, so a step shows up as
   a number.
 
+- **Entity popping entering the ocean.** As the camera passes through the river portal into the ocean, entities
+  pop in visibly; the vegetation (kelp, seagrass, corals) is the most noticeable. Find the cause: cull distance,
+  LOD switches, a streaming or spawn delay on the world switch, scatter density changing with distance, or the
+  `cullDistance` and fog-distance mismatch. Make everything that is visible in the first second after the crossing
+  already be there on the first frame, and make distant things fade in with the haze instead of popping. Check
+  every other crossing for the same thing. Show it frame by frame across the ocean crossing, M3f against M3g.
+
 ## 3. Mars
 
 - **Shorten the Mars fly-through,** or make the camera move faster through it. The owner leaves the choice to you;

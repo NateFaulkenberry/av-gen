@@ -1847,6 +1847,7 @@ private:
     params::Parameter<float>* fogHeightCurve_ = nullptr;
     params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
     params::Parameter<float>* fogPooling_ = nullptr;      // ADR-717
+    params::Parameter<glm::vec3>* fogSpectral_ = nullptr; // ADR-1908
     params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     scene::ReflectionBandParameters bandParams_;         // ADR-1151 (empty unless the scene has bands)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored

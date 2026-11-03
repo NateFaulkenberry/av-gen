@@ -3659,7 +3659,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.terrainMap1 = scene.terrainGround.map1();
     // ADR-717: x is the pooling, 0 -- ADR-715's branch, its frame to the bit -- whenever there is no
     // basin to pool in. The march reads this same lane.
-    frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), 0.0f, 0.0f, 0.0f);
+    // ADR-1908: yzw = the surface fog's extinction weights by colour (0 = grey)
+    frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), scene.environment.fogSpectral);
     {
         // ADR-1151: the reflection-only bands; all zero (the gate closed) unless the scene authored them.
         const scene::ReflectionBandLanes lanes = scene::packReflectionBands(scene.environment.bands);

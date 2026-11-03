@@ -29,6 +29,7 @@ A = "../../assets/strange-attractor/build/"
 
 WATER = [0.012, 0.075, 0.095]       # the fog: the water's own colour
 DEEP = [0.004, 0.022, 0.035]        # the background beyond the fog
+WATER_FAR = [0.006, 0.05, 0.075]    # M3g: the colour distance fades to (red gone, a deeper blue-green)
 LIGHT_DOWN = [0.12, -1.0, 0.18]
 
 # the shelf: a giant mesa whose east wall (x about -100) faces the camera's route
@@ -162,13 +163,16 @@ def reef_program():
                 {"kind": "textureTriplanar", "dst": 1, "texture": "sand", "value": 0.25, "constant3": [1.0, 0.5, 6.0, 0.6]},
                 {"kind": "constant", "dst": 2, "constant": [0.55, 0.6, 0.6, 1.0]},     # the sand darker: deep water
                 {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
+                # M3g: the rock lifted toward the sand, so the floor is not dark blotches on pale sand
+                {"kind": "constant", "dst": 2, "constant": [1.45, 1.45, 1.45, 1.0]},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
                 # sand on the flats, in drifts (a broad noise thins it)
                 {"kind": "input", "dst": 2, "input": "normal"},
                 {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [1, 1, 1, 1]},
                 {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.62, 0.86, 0, 0]},
                 {"kind": "input", "dst": 3, "input": "worldPosition"},
                 {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.04, "seed": 3},
-                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.38, 0.58, 0, 0]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.3, 0.7, 0, 0]},      # M3g: softer drifts
                 {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
                 {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 1, "srcC": 2},
                 # algae on the broad patches
@@ -196,12 +200,12 @@ def reef_program():
                 {"kind": "input", "dst": 5, "input": "worldPosition"},
                 {"kind": "add", "dst": 5, "srcA": 5, "srcB": 3},
                 {"kind": "voronoi", "dst": 5, "srcA": 5, "value": 0.2, "seed": 5},
-                {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.32, 0.04, 0, 0]},
+                {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.5, 0.0, 0, 0]},     # M3g: soft-edged
                 {"kind": "input", "dst": 4, "input": "normal"},
                 {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
                 {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.3, 0.9, 0, 0]},
                 {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
-                {"kind": "constant", "dst": 4, "constant": [0.35, 0.42, 0.42, 0.0]},
+                {"kind": "constant", "dst": 4, "constant": [0.18, 0.24, 0.26, 0.0]},
                 {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
                 {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
@@ -220,7 +224,8 @@ def write_ocean(portal_flight):
         "lights": [
             {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.55, 0.85, 1.0],
              "intensity": 1.1, "castsShadow": True, "shadowStrength": 0.8, "softness": 0.6},
-            {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, 0.2, 0.5], "color": [0.2, 0.55, 0.65],
+            # M3g: the fill from above (the bright water overhead), not from below; the floor's underside stays dark
+            {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, -0.85, 0.4], "color": [0.2, 0.55, 0.65],
              "intensity": 0.25, "castsShadow": False, "shadowStrength": 0.0},
             # the bay's light into the water, the base's floods
             # M3f (owner §2b, the white-out before the sea exit): ROOT CAUSE -- this 2600 cd lamp stands 10 m inside the
@@ -237,10 +242,15 @@ def write_ocean(portal_flight):
              "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
         ] + [{"name": f"{name}-light", "type": "point", "position": [0.0, -500.0, 0.0], "color": [0.55, 0.9, 1.0],
               "intensity": 900.0, "range": 60.0, "castsShadow": False} for name, _ in SUBS],
-        "environment": {"intensity": 0.18, "background": DEEP, "fogColor": WATER, "volumeDensity": 0.0024, "skybox": False,
+        # M3g (owner §2c: real water, not CG; 53-pass2-m3g-plan.md): the distance fog loses red first, then green
+        # (ADR-1908, Jerlov-like weights), toward a deeper blue-green; the march only covers the near water, where its
+        # forward-scattering haze and the local lights' cones live; grounding by AO and contact shadows; AgX
+        "environment": {"intensity": 0.14, "background": DEEP, "fogColor": WATER_FAR, "volumeDensity": 0.0024, "skybox": False,
                         "sky": {"enabled": False}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
-                        "ambientOcclusion": False, "shadowCasterReach": 1500.0, "contactShadows": False},
-        "post": {"bloomIntensity": 0.06, "tonemap": 0},
+                        "ambientOcclusion": True, "shadowCasterReach": 1500.0, "contactShadows": True,
+                        "fogSpectral": [2.6, 1.0, 0.62], "volumeMaxDistance": 45.0, "volumeAnisotropy": 0.75,
+                        "volumeLocalLights": 1.0},
+        "post": {"bloomIntensity": 0.06, "tonemap": 1},
         "materialPrograms": [reef_program(), {"name": "seabed", "ops": [
             {"kind": "input", "dst": 0, "input": "uv"},
             {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},

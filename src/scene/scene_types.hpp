@@ -899,6 +899,10 @@ struct Environment {
     // across each basin and the fog is deep in valleys and thin over ridges. 0 is ADR-715's layer
     // bit for bit; a scene with no terrain is unchanged at any value.
     float fogPooling = 0.0f;
+    // ADR-1908: the surface fog's extinction by colour. 0 (the default) is the one grey extinction there always was, to
+    // the bit; otherwise each channel's optical depth is scaled by its weight -- water's (3, 1, 0.7) loses red first,
+    // then green, so distance tints toward blue-green (scene key `fogSpectral`, parameter `scene/fogSpectral`).
+    glm::vec3 fogSpectral{0.0f};
     // ADR-705, the brief's §7 Horizon Density: extra extinction that grows with distance from the
     // eye. The air at distance s is `1 + horizonDensity * s / 1000` times as dense as at the eye,
     // so 1 doubles it a kilometre out. Applied by the march to every sample of the environment

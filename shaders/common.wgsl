@@ -154,7 +154,7 @@ struct FrameUniforms {
     // catches the two drifting apart.
     terrainMap0: vec4<f32>,         // world origin xz, 1 / spacing xz
     terrainMap1: vec4<f32>,         // height scale, height offset, fade metres, 1 when there is a terrain
-    // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain), yzw = 0.
+    // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain); ADR-1908: yzw = fogSpectral.
     // Appended last, mirroring FrameUniforms; the static_assert's sum catches the two drifting apart.
     fogPool: vec4<f32>,
     // Effect Library Wave 2: the Stars effect (world/effects/star_field.hpp). starsA.x = 0 keeps the
@@ -984,6 +984,18 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     let horizon = frame.fogShape.w; // z is ADR-715's ground follow
     if (horizon > 0.0) {
         depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
+    }
+    // ADR-1908: extinction by colour -- each channel's optical depth scaled by its weight (fogPool.yzw), so a medium
+    // like water loses red first with distance; all three 0 is the grey fog it always was
+    let spectral = frame.fogPool.yzw;
+    if (any(spectral > vec3<f32>(0.0))) {
+        let fs = exp(-depth * spectral);
+        var fogColourS = frame.fogParams.rgb;
+        if (frame.fogSky.x > 0.0) {
+            let towardsSkyS = smoothstep(0.0, frame.fogSky.z, dist);
+            fogColourS = mix(fogColourS, fogSkyRadiance(worldPos - frame.cameraPos.xyz), frame.fogSky.x * towardsSkyS);
+        }
+        return mix(fogColourS, color, fs);
     }
     let f = exp(-depth);
     // ADR-918: aerial perspective. The colour the air fades towards becomes the sky's own radiance in

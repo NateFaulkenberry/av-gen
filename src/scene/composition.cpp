@@ -74,7 +74,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "fogSpectral", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -5192,6 +5192,8 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // BELOW the basin in valleys, which is the opposite of pooling.
     fogPooling_ = &params.add(floatDesc(prefix_ + "scene/fogPooling", volumeSetting_.fogPooling, 0.0f, 1.0f, 0.0f,
                                         1.0f));
+    // ADR-1908: the surface fog's extinction by colour (0 0 0 = the grey fog, unchanged)
+    fogSpectral_ = &params.add(vec3Desc(prefix_ + "scene/fogSpectral", volumeSetting_.fogSpectral, 0.0f, 20.0f, 0.0f, 4.0f));
     // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
     // march, the surface pass and the particle estimate from this one number. An ordinary
     // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
@@ -6432,6 +6434,7 @@ void Composition::detach() {
     fogHeightCurve_ = nullptr;
     fogGroundFollow_ = nullptr;
     fogPooling_ = nullptr;
+    fogSpectral_ = nullptr;
     horizonDensity_ = nullptr;
     bandParams_ = {}; // ADR-1151
     windEnabled_ = nullptr;
@@ -9820,6 +9823,7 @@ void Composition::applyParameters() {
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
         env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
         env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
+        env.fogSpectral = fogSpectral_ != nullptr ? fogSpectral_->value() : volumeSetting_.fogSpectral; // ADR-1908
         env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.bands = volumeSetting_.bands; // ADR-1151
         scene::applyReflectionBandParameters(bandParams_, env.bands);
@@ -11043,6 +11047,11 @@ nlohmann::json Composition::toJson() const {
         if (pooling != 0.0f) {
             environment["fogPooling"] = pooling;
         }
+        // ADR-1908, by the same rule
+        const glm::vec3 spectral = fogSpectral_ != nullptr ? fogSpectral_->base() : volumeSetting_.fogSpectral;
+        if (spectral != glm::vec3(0.0f)) {
+            environment["fogSpectral"] = {spectral.x, spectral.y, spectral.z};
+        }
     }
     // ADR-1151: written only when authored, with the parameters' base values, so a scene without bands
     // saves exactly the file it had.
@@ -12218,6 +12227,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(value.error());
             }
             comp->volumeSetting_.styledAmbientFloor = *value;
+        }
+        if (e.contains("fogSpectral")) { // ADR-1908
+            auto value = readVec<3>(e, "fogSpectral", comp->volumeSetting_.fogSpectral);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogSpectral = *value;
         }
         {
             scene::Environment& v = comp->volumeSetting_;
