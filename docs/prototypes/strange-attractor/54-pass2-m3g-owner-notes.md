@@ -126,6 +126,24 @@ before building, and show a plan with stills before the full pass.
 - **Show:** M3f against M3g at the same camera beats (128, 130, 135 and 140 s), the base before and after, the
   shelf before and after, and the ocean clip 121.5–147.5 s with sound.
 
+## 6. Owner decisions on the dc371248 hand-back (2026-11-03)
+
+- **Yes** to the ocean plan (53-): build it.
+- **Yes** to AgX for the whole film.
+- **Yes** to Mars four bars shorter (the pyramid crossing at 93.46 s).
+- **Yes** to our octopus (octopus-v1, not the scan): integrate it into the ocean, using the nodes and tracks in
+  `hero-03-octopus.md` §3 on scene/sa-hero. The perch octopus is fitted to rock `life-37`. Under the §1 camera
+  rule the octopi are glimpsed, never presented: place them along and just ahead of the path so they pass
+  through frame naturally, with no camera turns or slow-downs for them. Re-fit if the seafloor rebuild moves
+  `life-37` (`build_octopus.py --rock`).
+- **Finish the items left open in the hand-back:**
+  - Mars: noise-broken edges where the drift meets the ground, sand filling the pyramid's base courses, and the
+    before/after at the owner's screenshot camera.
+  - The seated Sasquatch: re-run check_contacts after the 3 cm drop, and show it from the passing camera.
+  - The ocean-entry vegetation pop: isolate it and confirm it at full resolution; check the other crossings.
+  - Re-measure the sea→dawn step on the corrected render.
+  - The 50.2 s dusk spike over 25°: find the cause and fix it.
+
 ## Delivery
 
 - Media: `~/Desktop/av-gen-review/101-strange-attractor/pass2-m3g/`, in numbered folders with exact file names.
