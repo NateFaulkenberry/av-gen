@@ -180,3 +180,20 @@ light in the scene; it just looks poor. So:
   stability, aesthetic score, grounding findings), and the top findings acted on and dismissed, with reasons.
 - The critic is evidence, not the judge: the owner's eye wins; model scores (laion_aes etc.) are experimental, and any
   Ollama vision commentary is labelled as such.
+
+## 12. The night canyon: a new arrival and a pass-by path (owner addition)
+
+This is the arrival from the pyramid portal into the night canyon, and the path from it to the
+river/water portal into the ocean.
+
+- **Move the arrival portal:**
+  - choose a different location, **not as high up**;
+  - **slightly further away from the Sasquatches** (the camp).
+- **New camera path:** fly **by** the camp on the way to the water portal entrance.
+  - No focus on them: no framing on the group, no lingering and no circling.
+  - We only see them as we pass by on the way to the next portal.
+  - One continuous, smooth path from the arrival to the river portal.
+- This is the night counterpart of §7 (the dusk pass-by). Keep both consistent in feel.
+- No clipping through rock, shrubs, characters or the craft. Keep the arrival readable as a portal exit.
+- The camp lighting (§8, §9, §11) and the Gray (§10) still matter: they are what we glimpse in passing.
+- Show the new night section as a clip with stills, beside the M3d version, with critic before/after.
