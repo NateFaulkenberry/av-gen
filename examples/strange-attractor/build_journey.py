@@ -91,10 +91,12 @@ CAMP_Y = 4.4 * WS             # measured on the bank (generator 4.4 m)
 GRAY_SCALE = 0.68             # the downloaded Gray read as tall as a Sasquatch at its own scale: about 1.5 m here
 UFO_SCALE = 0.018             # the model is 666 x 238 units (load log): a 12 m disc, 4.3 m tall
 UFO_LIFT = 1.9                # its underside (-119 units) just above the ground: resting on its keel
-# M3f (owner §2): the craft is the Gray's, beside him by the water -- across the Gray from the Sasquatches, landed on the
-# shore (a pad levels its footing just above the water), not behind the group; clear of the night pass by 2.6 m of rim
-UFO_AT = (10.5, -9.0)
-UFO_SHORE = 0.35              # the shore pad's level (the river's surface is at -0.5)
+# M3f (owner §2): the craft is the Gray's, beside him -- down-canyon of him on the river's side of the group, not behind
+# the Sasquatches. Owner, after 01-craft-move: and inside the owner's camp camera (which looks from the water's edge
+# toward the bank, so the shore itself is behind it): 10 m down-canyon, 5 m bankward of the fire, 9.5 m from the Gray,
+# 27 degrees left of that camera's axis (its frame reaches 44.5), on a pad at the camp's level
+UFO_AT = (10.0, 5.0)
+UFO_SHORE = CAMP_Y
 
 
 def at(dd, dl):
@@ -128,7 +130,8 @@ lights += [
     # M3b: the fire is the night's key -- it casts the gathering's shadows across the bench
     # M3e (48-night-lighting-research.md F1/F3, ADR-1906): the fire's cube now fits beside the moon's cascades and is
     # biased in its own depth, so it casts; its contact march grounds feet, rocks and the pit; it lights the haze
-    {"name": "campfire", "type": "point", "position": [CAMP[0], CAMP_Y + 0.9, CAMP[1]], "color": [1.0, 0.52, 0.22],
+    # M3f (hero H4): raised above the new flames' tips (the light inside the flame sheets lit them from within)
+    {"name": "campfire", "type": "point", "position": [CAMP[0], CAMP_Y + 1.35, CAMP[1]], "color": [1.0, 0.52, 0.22],
      "intensity": 0.0, "range": 30.0, "castsShadow": True, "shadowStrength": 1.0, "contactShadow": True, "softness": 0.45,
      "flicker": 0.3, "flickerRate": 2.6, "volumetric": 0.6},
     # M3e (research A4): the fire's bounce -- a broad, soft, unshadowed warm wrap low at the pit, the light the ground
@@ -196,26 +199,33 @@ faces = {"sasquatch-a": [0.5 * (CAMP[0] + gray_xz[0]), 0.5 * (CAMP[1] + gray_xz[
          "sasquatch-b": CAMP, "sasquatch-c": CAMP}
 for name in ("sasquatch-a", "sasquatch-b", "sasquatch-c"):
     x, z = cast_xz[name]
-    # M3e: sasquatch-b's grey fur alpha-tested too (pass2/patch_glb_materials.py, a copy under a new name)
-    asset = A + ("sasquatch-b-m3e.glb" if name == "sasquatch-b" else f"{name}.glb")
-    nodes.append({"name": name, "kind": "gltf", "asset": asset, "position": [x, cast_g[name], z],
+    # M3f (hero H3, the hero agent's v1 Sasquatches; assets/strange-attractor/hero, never committed): B lifted 1.3 cm
+    # (its fur shells dipped into the ground at the toes)
+    asset = "../../assets/strange-attractor/hero/sasquatch/" + f"{name}-v1.glb"
+    lift = 0.013 if name == "sasquatch-b" else 0.0
+    nodes.append({"name": name, "kind": "gltf", "asset": asset, "position": [x, cast_g[name] + lift, z],
                   "rotation": [0, yaw_to((x, z), faces[name]), 0], "scale": [1, 1, 1], "visible": False,
                   "animation": {"state": "idle", "cullDistance": 800.0, "speed": 1.0}})
-# Sasquatch C sits: the rock under it, 0.36 m behind its feet (its hips' offset in the sitting pose)
+# Sasquatch C sits (hero H3: the v1 seat is 0.48 m up and spans 0.42-0.79 m behind the feet). M3f (owner, not the
+# hero agent's stool-sized stone): a broad boulder it visibly sits on -- its long axis across (1.0 m, wider than the
+# hips), 0.56 m deep, its top about 0.46 m up, its front face about 0.30 m behind the feet (checked with
+# hero/check_contacts.py over the whole loop: SEAT_BACK and SEAT_SY are the values that check passed with)
+SEAT_BACK, SEAT_SY = 0.68, 0.88
 cx, cz = cast_xz["sasquatch-c"]
 cyaw = math.radians(yaw_to((cx, cz), CAMP))
-seat = [cx - 0.36 * math.sin(cyaw), cz - 0.36 * math.cos(cyaw)]
-# M3d (owner: no toy "burger" rocks): a photoscanned boulder (Poly Haven, CC0), 0.54 m high, sunk a few cm
+seat = [cx - SEAT_BACK * math.sin(cyaw), cz - SEAT_BACK * math.cos(cyaw)]
 nodes.append({"name": "seat-rock", "kind": "gltf", "asset": A + "ph-namaqualand_boulder_05.glb",
-              "position": [seat[0], cast_g["sasquatch-c"] - 0.05, seat[1]], "rotation": [0, math.degrees(cyaw) + 90.0, 0],
-              "scale": [0.85, 0.95, 0.85], "visible": True})
+              "position": [seat[0], cast_g["sasquatch-c"] - 0.05, seat[1]], "rotation": [0, math.degrees(cyaw), 0],
+              "scale": [0.75, SEAT_SY, 0.75], "visible": True})
 # the Gray: across the fire from the three, facing them, fully in frame (night only)
 # M3e (the hero agent's audit): the Gray matte -- metallic 0, no emission (a patched copy, pass2/patch_glb_materials.py)
-nodes.append({"name": "gray", "kind": "gltf", "asset": A + "gray-m3e.glb",
+# M3f (hero H2): the grey alien rigged by the hero agent, talking and gesturing across the fire ("talk", 8 s loop)
+nodes.append({"name": "gray", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/alien-grey-h2.glb",
               "position": [gray_xz[0], cast_g["gray"], gray_xz[1]], "rotation": [0, yaw_to(gray_xz, group_c), 0],
               "scale": [GRAY_SCALE] * 3, "visible": False,
-              "animation": {"state": "mixamo.com", "cullDistance": 800.0, "speed": 0.8}})
-nodes.append({"name": "ufo-parked", "kind": "gltf", "asset": A + "ufo-craft.glb",
+              "animation": {"state": "talk", "cullDistance": 800.0, "speed": 1.0}})
+# M3f (hero H5): the reworked craft, the same frame and units (rougher panels, lifted occlusion, warm window band)
+nodes.append({"name": "ufo-parked", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/ufo/ufo-v1.glb",
               "position": [UFO_PARK[0], UFO_SHORE + UFO_LIFT, UFO_PARK[1]], "rotation": [0, 33, 0],
               "scale": [UFO_SCALE] * 3, "visible": False, "emissiveBoost": 4.0})
 
@@ -285,8 +295,11 @@ nodes += [
     # (Poly Haven, CC0: stone_fire_pit, dead_tree_trunk via pass2/build_teepee.py)
     {"name": "campfire-logs", "kind": "gltf", "asset": A + "ph-stone_fire_pit.glb", "position": [CAMP[0], CAMP_Y - 0.08, CAMP[1]],
      "rotation": [0, 20, 0], "scale": [0.85, 0.85, 0.85], "visible": False},
-    {"name": "campfire-teepee", "kind": "gltf", "asset": A + "ph-teepee-m3e.glb", "position": [CAMP[0], CAMP_Y - 0.02, CAMP[1]],
-     "rotation": [0, 20, 0], "scale": [0.9, 0.9, 0.9], "visible": False},
+    # M3f (hero H4): the hero agent's fire -- logs charred and cracked, an ash bed with coals, animated flame sheets
+    # ("burn", a seamless 4 s loop) -- in the pit's own frame; the flame particles retired, the core kept dim
+    {"name": "campfire-teepee", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/campfire/campfire-v1.glb",
+     "position": [CAMP[0], CAMP_Y - 0.08, CAMP[1]], "rotation": [0, 20, 0], "scale": [0.85, 0.85, 0.85], "visible": False,
+     "animation": {"state": "burn", "cullDistance": 800.0, "speed": 1.0}},
     # flames: tongues rising out of the teepee, licking up and thinning, in two layers (a hot core, a softer outer)
     {"name": "campfire-flames", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 2400, "seed": 31, "shape": "sphere", "position": [fire[0], fire[1] + 0.15, fire[2]],
@@ -300,7 +313,7 @@ nodes += [
         "extent": [0.16, 0.04, 0.16], "direction": [0, 1, 0], "spawnRate": 160.0, "lifetimeMin": 0.2, "lifetimeMax": 0.45,
         "spread": 0.08, "speedMin": 0.9, "speedMax": 1.7, "gravity": [0.0, 2.0, 0], "drag": 0.8, "turbulence": 0.9,
         "turbulenceScale": 0.35, "sizeStart": 0.14, "sizeEnd": 0.03, "sizeVariance": 0.3,
-        "colorStart": [1.0, 0.72, 0.28, 0.7], "colorEnd": [1.0, 0.3, 0.03, 0.0], "emissive": 3.0, "blend": "additive",
+        "colorStart": [1.0, 0.72, 0.28, 0.35], "colorEnd": [1.0, 0.3, 0.03, 0.0], "emissive": 1.2, "blend": "additive",
         "velocityStretch": 0.8, "stretchMax": 1.4}},
     {"name": "campfire-embers", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 600, "seed": 37, "shape": "sphere", "position": [fire[0], fire[1] + 0.3, fire[2]],
@@ -332,7 +345,7 @@ dusk = {
     # the contour lines off at dusk and night (M1b quieted them, M2 removes them: the encounter owns the frame; ADR-1894)
     "attractorWorld/contourGain": 0.0,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
-    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-flames/visible": True, "nodes/campfire-core/visible": True,
+    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-core/visible": True,
     "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
 }
 # home from the Moon (crossing 2): still dusk, and the second portal's corruption tuned to the outer cliff -- a small
@@ -374,7 +387,7 @@ night = {
     "lights/campfire/intensity": 34.0, "lights/campfire/color": [1.0, 0.46, 0.15], "lights/campfire/range": 17.0,
     "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
-    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-flames/visible": True, "nodes/campfire-core/visible": True,
+    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-core/visible": True,
     "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
 }
 # home from Mars (crossing 4): night, and the riverbed portal's corruption: small, gathering as the camera leaves the camp
@@ -473,11 +486,11 @@ for c in ("r", "c"):
     routes.append(beat_route("beat.pulse", f"moon/nodes/earth-echo-{c}/opacity", 0.0, 0.55, decay=220.0, op="replace"))
 routes.append(beat_route("beat.pulse", "moon/nodes/earth/emissiveBoost", 0.0, 1.2, decay=400.0))
 # M3f (owner §2): the craft's lights breathe with the beat -- multiplied (a look's 0 by day stays 0), from 0.8 between
-# beats to 3x on one, falling over 0.5 s: a pulse, not a strobe (0.8-1.5 measured a 1.5% swing on the hull, 0.6-2.4
-# about 3%); the hull's emissive 0.6-3x
+# beats to 4.5x on one, falling over 0.6 s: a pulse, not a strobe (0.8-1.5 measured a 1.5% swing, 0.5-3 about 5%: the
+# owner asked for it clearly readable); the hull's emissive 0.35-4.5x
 for _l in ("ufo-glow", "ufo-spill", "ufo-rim-0", "ufo-rim-1", "ufo-rim-2", "ufo-rim-3"):
-    routes.append(beat_route("beat.pulse", f"lights/{_l}/intensity", 0.5, 3.0, attack=25.0, decay=500.0, op="multiply"))
-routes.append(beat_route("beat.pulse", "nodes/ufo-parked/emissiveBoost", 0.6, 3.0, attack=25.0, decay=500.0,
+    routes.append(beat_route("beat.pulse", f"lights/{_l}/intensity", 0.3, 4.5, attack=30.0, decay=600.0, op="multiply"))
+routes.append(beat_route("beat.pulse", "nodes/ufo-parked/emissiveBoost", 0.35, 4.5, attack=30.0, decay=600.0,
                          op="multiply"))
 # M3e (owner §6): the aura keeps the halo's beat pulse; its glitch and datamosh are deliberate hits, 0 between them
 routes.append(beat_route("beat.pulse", "moon/nodes/earth-aura/emissiveBoost", 0.0, 1.6, decay=360.0))

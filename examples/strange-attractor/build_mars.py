@@ -147,7 +147,10 @@ def night_flight():
     # exit for that speed, so the path does not overshoot and swing back to the cliff (a first try did)
     far = [knot(46.0, 72.0, 20.0, 0.0), knot(39.0, 55.0, 12.0, 0.0), knot(31.0, 40.0, 7.0, 0.0)]
     pts = []
-    for dd, dl, y in ((7.0, 9.0, eye + 1.6), (5.5, 3.0, eye + 1.0), (3.5, -3.5, eye + 0.6)):   # past the camp
+    # M3f (owner: the pass clipped geometry; the craft now stands down-canyon at (10, 5)): past the camp on its bank
+    # side, behind the standing Sasquatch, and out past the seated one's back toward the river -- clear of the craft,
+    # the figures, the rocks and the scrub (traced per frame against the terrain and the scene's meshes)
+    for dd, dl, y in ((4.0, 12.5, eye + 1.4), (-1.5, 7.5, eye + 1.0), (-6.5, -2.5, eye + 0.7)):   # past the camp
         x, z = near(CAMP_SITE, dd, dl)
         pts.append((x, y, z))
     gl = [tuple(glide_point(glide_len * f)) for f in (1.0, 0.5)]
@@ -158,6 +161,20 @@ def night_flight():
         gr = [CAMP_GROUND] * (len(pts_all) + 1)
     # the approach and the pass, timed by a smooth speed profile that arrives at the glide's own speed
     rel = [k[:3] for k in far] + [[x, y - g, z] for (x, y, z), g in zip(pts, gr)]
+    # M3f (owner: the pass clipped geometry): the knots' heights are over the ground AT the knots, so a bank between two
+    # knots stood above the line (a per-frame trace found the camera 2.7 m inside one at 109.8 s). Each span is split
+    # where the ground under its middle comes within 3 m of the line, twice over
+    for _ in range(2):
+        gk = heights(CANYON_SCENE, [(k[0], k[2]) for k in rel])
+        mids = [((a[0] + b[0]) / 2.0, (a[2] + b[2]) / 2.0) for a, b in zip(rel, rel[1:])]
+        gm = heights(CANYON_SCENE, mids)
+        out_ = [rel[0]]
+        for i, (a, b) in enumerate(zip(rel, rel[1:])):
+            y_line = 0.5 * ((gk[i] + a[1]) + (gk[i + 1] + b[1]))
+            if y_line < gm[i] + 3.0:
+                out_.append([mids[i][0], max(3.0, y_line - gm[i] + 3.0), mids[i][1]])
+            out_.append(b)
+        rel = out_
     t_glide = T_CROSS - glide_len / GLIDE_SPEED
     knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], 103.2, t_glide, 12.0, GLIDE_SPEED,
                     ramp_in=0.15, ramp_out=0.3)

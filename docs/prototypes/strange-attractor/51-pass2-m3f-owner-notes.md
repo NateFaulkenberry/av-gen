@@ -25,6 +25,16 @@ merged. This file collects their notes as they arrive, so it grows.
   - If the hero UFO v1 is integrated later (it adds 48 rim light cells, 4 navigation lights and an underbody
     ring), carry the pulse over to those lights.
 
+- **Owner, after the 01-craft-move hand-back:**
+  - **A stronger beat pulse.** The 5% swing is too subtle. Make it clearly readable on the beat from the
+    pass-by camera, but still a pulse and not a strobe. Carry it onto the UFO v1 lights.
+  - **The craft must be visible from the owner's camp camera** (`pass2-m3e/08-night-camp` framing). Find a
+    spot that stays by the river, near the alien and not behind the Sasquatches, and is in that framing. If
+    no shore spot works, move it nearer the Gray, up-canyon. Do not change the owner's reference camera.
+  - **The night pass-by camera clips through geometry.** Fix the path so it clears every rock, bank, shrub,
+    the craft and the characters. Check it with a per-frame clearance trace (the minimum distance from the
+    camera to the terrain and the scene meshes) over 101.5–121.5 s, and report the minimum.
+
 ## 2a. The night river streaks
 
 - At about 112 s (see `pass2-m3e/05-night/112s-m3d-left-m3e-right.png`), the night river shows white streak bands
