@@ -279,6 +279,22 @@
           ]
         },
         {
+          "kind": "constant",
+          "dst": 2,
+          "constant": [
+            0.55,
+            0.6,
+            0.6,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
           "kind": "input",
           "dst": 2,
           "input": "normal"

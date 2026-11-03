@@ -105,9 +105,11 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
                 PB[2] + PB[3] * 0.5 - FACE_HEIGHT / math.tan(math.radians(51.8))]
 
 # --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100), down to the camp
-# M3e (owner §12): the arrival lower (70 m, not 86 m) and a little further down-canyon from the camp (d 54, not 46)
-NIGHT_EXIT_DL = (54.0, 99.0)
-NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 70.0 * R, site(*NIGHT_EXIT_DL)[1]]
+# M3e (owner §12): the arrival lower (72 m, not 86 m) and a little further down-canyon from the camp (d 54, not 46). At
+# d 54 the cliff's face rises from the bench (60 m at lat 96) to 87-92 m by lat 100, so at 72 m the face is at lat ~97.8:
+# the exit is 2 m in front of it (lat 95.8), the bench 12 m below (a first try at lat 99 was 15 m inside the rock)
+NIGHT_EXIT_DL = (54.0, 95.8)
+NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 72.0 * R, site(*NIGHT_EXIT_DL)[1]]
 OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
@@ -172,15 +174,16 @@ NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 111.6, 114.6]]   # M3e (owner §
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 # M3d (owner): one continuous fly-over -- out of the wall low, over the rover as it drives (no orbit), straight on to
 # the pyramids and up the buried face into the portal. Times from a smooth speed profile (canyon_scale.pace).
-_MARS_PATH = [(2.0 + OX, 30.0, -750.0 + OZ), (16.0 + OX, 9.0, -840.0 + OZ), (34.0 + OX, 6.0, -925.0 + OZ),
+_MARS_PATH = [(2.0 + OX, 48.0, -750.0 + OZ), (16.0 + OX, 22.0, -840.0 + OZ), (34.0 + OX, 6.0, -925.0 + OZ),
               (52.0 + OX, 5.5, -985.0 + OZ), (64.0 + OX, 6.5, -1030.0 + OZ), (86.0 + OX, 14.0, -1140.0 + OZ),
               (110.0 + OX, 30.0, -1300.0 + OZ),
               (PORTAL_FOCUS[0] - 6.0, 50.0, PORTAL_FOCUS[2] + 150.0), (PORTAL_FOCUS[0], 66.0, PORTAL_FOCUS[2] + 55.0)]
 # M3e (owner: a mound hid the pyramid, and the arrival clipped the apron): a corridor along the fly-over is eased to the
-# plain (ADR-1897 pads, 34 m apart, 58 m across each), from the apron in front of the butte to pyramid-b's own pad, so
+# plain (ADR-1897 pads, 34 m apart, 58 m across each), from beyond the butte's apron to pyramid-b's own pad, so
 # no dune, yardang or drift stands between the camera and the pyramids or under the camera
 def _corridor():
-    pts = [(OX + 4.0, -770.0 + OZ)] + [(x, z) for x, _, z in _MARS_PATH[1:7]] + [(PORTAL_FOCUS[0] - 6.0, PB[2] + 330.0)]
+    # (from the second knot: the camera clears the butte's apron from above, and a pad there cut it into a flat slab)
+    pts = [(x, z) for x, _, z in _MARS_PATH[1:7]] + [(PORTAL_FOCUS[0] - 6.0, PB[2] + 330.0)]
     pads = []
     for (x0, z0), (x1, z1) in zip(pts, pts[1:]):
         n = max(1, int(math.hypot(x1 - x0, z1 - z0) / 34.0))
@@ -462,7 +465,9 @@ def write():
     }
     path = os.path.join(HERE, "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
-    return path, flight, []    # M3d: no aim -- the fly-over looks ahead, to the pyramids
+    # M3e (owner §3: the pyramid reads over the rover for the whole fly-over): the eye held on pyramid-b's upper courses
+    # from the arrival until the climb to the portal, released 4 s before the crossing so the camera lines up with it
+    return path, flight, [[PB[1], PLAIN + 75.0, PB[2], 69.9, 97.4]]
 
 
 if __name__ == "__main__":

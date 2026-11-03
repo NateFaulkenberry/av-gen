@@ -160,6 +160,8 @@ def reef_program():
                 {"kind": "textureTriplanar", "dst": 0, "texture": "rock", "value": 0.1, "constant2": [6.0, 0, 0, 0],
                  "constant3": hexed},
                 {"kind": "textureTriplanar", "dst": 1, "texture": "sand", "value": 0.25, "constant3": [1.0, 0.5, 6.0, 0.6]},
+                {"kind": "constant", "dst": 2, "constant": [0.55, 0.6, 0.6, 1.0]},     # the sand darker: deep water
+                {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
                 # sand on the flats, in drifts (a broad noise thins it)
                 {"kind": "input", "dst": 2, "input": "normal"},
                 {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [1, 1, 1, 1]},
