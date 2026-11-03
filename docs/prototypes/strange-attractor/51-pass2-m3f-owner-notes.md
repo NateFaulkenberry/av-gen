@@ -25,6 +25,12 @@ merged. This file collects their notes as they arrive, so it grows.
   - If the hero UFO v1 is integrated later (it adds 48 rim light cells, 4 navigation lights and an underbody
     ring), carry the pulse over to those lights.
 
+## Delivery
+
+- **Once every M3f change is done, render the full video with sound** to
+  `~/Desktop/av-gen-review/101-strange-attractor/pass2-m3f/10-full/strange-attractor-m3f-full.mp4`, using the same
+  command as the M3e full render. Do this after the hero assets the coordinator releases for integration are in.
+
 ## 3. Hero assets (the hero agent, scene/sa-hero; for later integration)
 
 - The owner's alien verdict: either alien works. The hero agent picks the one that is easier to animate,
