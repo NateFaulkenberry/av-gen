@@ -5,6 +5,21 @@ The SA agent also hands over work here.
 
 Format: one section per item, `Status: open | doing | done (commit)`.
 
+## The shared cameras and the Critic (both agents use these)
+
+- `examples/strange-attractor/pass3/cameras.json`: 52 cameras.
+  - `regression` (40): the film's own frames, 4 per leg (`r-<leg>-<t>`) plus every crossing at +-0.5 s
+    (`x-<from>-<to>-before|after-<t>`).
+  - `eval` (12): per world, an establishing (`e-`) and a hero (`h-`) fixed camera. The traversal distance is the
+    regression frames plus the per-leg clips.
+  - Add cameras freely (supplementary, e.g. `h2-camp-wall`); never change one once its baseline is rendered.
+- Render: `python3 examples/strange-attractor/pass3/render_cameras.py <out_dir> [--only 'h-mars,r-mars-*'] [--set eval]`
+  (1920x1080, supersample 2, through tools/gpu-lock.sh).
+- Judge: `python3 examples/strange-attractor/pass3/critic_run.py <frames_dir> <clips_dir|-> <out.json> --label <l>
+  --worlds mars` (Critic session `sa-pass3`; tracks `stills-<world>`, `clip-<leg>` keep the history).
+- The baseline: `~/Desktop/av-gen-review/101-strange-attractor/pass3-env/00-baseline/` (`frames/`, `clips/`,
+  `critic-baseline.json`).
+
 ## From the SA agent to the hero agent
 
 ### H-1: Mars drift edges (M3g §6 leftover, 54- §3)
