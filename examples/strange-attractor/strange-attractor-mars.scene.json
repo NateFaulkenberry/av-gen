@@ -1412,7 +1412,7 @@
     {
       "name": "pyramid-a",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-a.glb",
+      "asset": "../../assets/strange-attractor/build/pyramid-a-m3g.glb",
       "position": [
         302.0,
         32.0,
@@ -1433,7 +1433,7 @@
     {
       "name": "pyramid-b",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-b.glb",
+      "asset": "../../assets/strange-attractor/build/pyramid-b-m3g.glb",
       "position": [
         722.0,
         32.0,
@@ -1454,7 +1454,7 @@
     {
       "name": "pyramid-c",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-c.glb",
+      "asset": "../../assets/strange-attractor/build/pyramid-c-m3g.glb",
       "position": [
         1032.0,
         32.0,
@@ -1475,7 +1475,7 @@
     {
       "name": "pyramid-a-sand",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-a-sand.glb",
+      "asset": "../../assets/strange-attractor/build/pyramid-a-sand-m3g.glb",
       "position": [
         302.0,
         32.0,
@@ -1497,7 +1497,7 @@
     {
       "name": "pyramid-b-sand",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-b-sand.glb",
+      "asset": "../../assets/strange-attractor/build/pyramid-b-sand-m3g.glb",
       "position": [
         722.0,
         32.0,
@@ -1519,7 +1519,7 @@
     {
       "name": "pyramid-c-sand",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-c-sand.glb",
+      "asset": "../../assets/strange-attractor/build/pyramid-c-sand-m3g.glb",
       "position": [
         1032.0,
         32.0,
