@@ -1,0 +1,17 @@
+{
+ "project": "Strange Attractor (pass 3, environment art)",
+ "subject_priority": ["environment", "effects", "characters"],
+ "visual_language": ["handcrafted cinematic stylized realism", "geological", "atmospheric depth"],
+ "camera_language": ["continuous flythrough", "looks where it travels"],
+ "avoid": ["flat lighting", "excessive saturation", "uniform fog", "excessive bloom", "repetitive textures",
+           "generic procedural terrain"],
+ "segments": {
+  "canyon": {"start": 0.0, "end": 32.025, "intent": "warm geological canyon by day; large sculptural masses, strata"},
+  "moon": {"start": 32.025, "end": 47.87, "intent": "stark and graphic lunar surface; Earth; geometric crater structures", "mood": ["dark", "stark"]},
+  "dusk": {"start": 47.87, "end": 69.655, "intent": "the canyon at dusk, toward the camp"},
+  "mars": {"start": 69.655, "end": 93.46, "intent": "dusty, atmospheric Mars; distinctive geology; the pyramids integrated"},
+  "night": {"start": 93.46, "end": 121.217, "intent": "the night camp: fire, characters glimpsed, the craft", "mood": ["dark", "night"]},
+  "ocean": {"start": 121.217, "end": 147.017, "intent": "underwater depth and light absorption; seabed, the covert base", "mood": ["dark", "deep"]},
+  "dawn": {"start": 147.017, "end": 211.0, "intent": "the canyon at dawn, the climb out"}
+ }
+}
