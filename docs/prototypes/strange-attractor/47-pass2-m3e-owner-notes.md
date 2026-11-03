@@ -158,3 +158,12 @@ generically with an ADR. Before/after at this angle and the M3d camera beats.
 - Optional: the Sasquatches respond subtly (heads turning toward it, a shrug or gesture back), so it
   reads as an exchange.
 - Show a clip at the camp beats, with an idle sheet.
+
+## 11. Priority between §8 and §9 (owner clarification)
+
+The extra torches and light points in §8 are now **optional**. The owner: up close there is plenty of
+light in the scene; it just looks poor. So:
+- Do §9 first: fix the quality of the existing lighting (shadows, grounding, motivated sources, smoke,
+  character shading).
+- Add torches or other light points only if, after §9, the wide night shots still read as too dark or
+  flat. Say in the hand-back which way you went and why.
