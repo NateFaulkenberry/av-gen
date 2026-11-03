@@ -55,3 +55,19 @@ merged. This file collects their notes as they arrive, so it grows.
 - The seated Sasquatch must not clip through its stone. The hero agent is fixing this in the v1 Sasquatch.
 - The campfire, UFO and Sasquatch v1 assets are drop-ins, described in the hero-agent hand-back
   (`hero-02-steps.md` on scene/sa-hero). Integrate them only when the coordinator says so.
+- **Released for integration** (the coordinator, 2026-11-03; the hero agent's list, scene/sa-hero a86276fd).
+  The assets are in the shared gitignored `assets/strange-attractor/hero/`.
+  1. **Alien:** keep the Gray's node position, rotation 54.7 and scale 0.68. Set the asset to
+     `hero/alien-grey-h2.glb` and the animation to `{"state": "talk", "speed": 1.0}`.
+  2. **Sasquatches:** `hero/sasquatch/sasquatch-{a,b,c}-v1.glb` (c is the seated one, with the raised seat).
+     **The seat stone:** the hero agent's stool-sized `seat-rock` ([75.081, 1.71, 1352.631], scale
+     [0.27, 0.81, 0.85]) stops the clipping but reads as a small stone beside a squatting figure. Use instead
+     a broader, flat-topped rock that the Sasquatch visibly sits on: top at about 0.46–0.48 m, its front face
+     about 0.30 m behind the feet, wider than the hips. Verify there is no clipping over the whole 24 s loop
+     with `examples/strange-attractor/hero/check_contacts.py` on scene/sa-hero. Lift the crouching B by 1.3 cm
+     (fur dips into the ground at the toes).
+  3. **Campfire:** `hero/campfire/campfire-v1.glb` with the pit's transform (rotation [0,20,0], scale 0.85) and
+     `animation.state: "burn"`. Turn off the `campfire-flames` particles. Keep a reduced `campfire-core` glow so
+     the "light in the air" survives. Raise the fire light above the flame tips. Keep the night look.
+  4. **UFO:** `hero/ufo/ufo-v1.glb` is a drop-in replacement at the craft's new shore position. Carry the beat
+     pulse onto its rim cells, navigation lights and underbody ring.
