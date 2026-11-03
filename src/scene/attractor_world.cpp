@@ -1473,7 +1473,8 @@ constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
                                       "meshMinError", "worldScale", "pads", "mars", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
-constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth"};
+constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth",
+                                          "sunShadowBias", "sunContact", "sunCasts"};
 
 } // namespace
 
@@ -1597,6 +1598,9 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         k.glow = l.value("glow", k.glow);
         k.contourGain = l.value("contourGain", k.contourGain);
         k.sunWarmth = l.value("sunWarmth", k.sunWarmth);
+        k.sunShadowBias = l.value("sunShadowBias", k.sunShadowBias); // ADR-1907
+        k.sunContact = l.value("sunContact", k.sunContact);
+        k.sunCasts = l.value("sunCasts", k.sunCasts);
     }
     a.liveGen = a.gen;
     a.live = a.look;
@@ -1657,6 +1661,9 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
         out["mars"] = {{"mesaCover", g.mesaCover}, {"yardangs", g.yardangs}, {"wind", g.wind}, {"dunes", g.dunes}};
     }
     if (k.sunWarmth != 1.0f) out["look"]["sunWarmth"] = k.sunWarmth; // ADR-1900: absent, the warm sun
+    if (k.sunShadowBias >= 0.0f) out["look"]["sunShadowBias"] = k.sunShadowBias; // ADR-1907: absent, the block's
+    if (k.sunContact != 1.0f) out["look"]["sunContact"] = k.sunContact;
+    if (k.sunCasts != 1.0f) out["look"]["sunCasts"] = k.sunCasts;
     if (!g.pads.empty()) { // ADR-1897
         json pads = json::array();
         for (const AttractorGen::Pad& p : g.pads) pads.push_back({{"x", p.x}, {"z", p.z}, {"radius", p.radius}, {"level", p.level}});
@@ -1753,6 +1760,10 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("glow", "wall glow", "Materials and Atmosphere", k.glow, 0.0f, 4.0f);
     r.f("contourGain", "contour gain (a look's)", "Materials and Atmosphere", k.contourGain, 0.0f, 1.0f);
     r.f("sunWarmth", "key light warmth (1 sun, 0 moon)", "Materials and Atmosphere", k.sunWarmth, 0.0f, 1.0f);
+    // ADR-1907: the key's shadow, per look
+    r.f("sunShadowBias", "key shadow bias (m; < 0 the block's)", "Materials and Atmosphere", k.sunShadowBias, -1.0f, 10.0f);
+    r.f("sunContact", "key contact shadows (0/1)", "Materials and Atmosphere", k.sunContact, 0.0f, 1.0f);
+    r.f("sunCasts", "key casts shadows (0/1)", "Materials and Atmosphere", k.sunCasts, 0.0f, 1.0f);
     r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
         static_cast<int>(rest.camera), 0, 2);
     return p;
@@ -1780,6 +1791,9 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     k.glow = fval(p, "glow", k.glow);
     k.contourGain = fval(p, "contourGain", k.contourGain);
     k.sunWarmth = fval(p, "sunWarmth", k.sunWarmth);
+    k.sunShadowBias = fval(p, "sunShadowBias", k.sunShadowBias); // ADR-1907
+    k.sunContact = fval(p, "sunContact", k.sunContact);
+    k.sunCasts = fval(p, "sunCasts", k.sunCasts);
     live.live = k;
     live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }

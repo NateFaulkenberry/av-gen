@@ -1383,6 +1383,10 @@ void Composition::updateAttractorWorld() {
         sun.direction = -attractorSunDirection(*live.world, live.live);
         sun.intensity = attractorWorld_.sunLux * live.live.sunIntensity;
         sun.color = attractorSunColor(live.live);
+        // ADR-1907: the key's shadow follows the look too
+        sun.shadowBias = live.live.sunShadowBias >= 0.0f ? live.live.sunShadowBias : attractorWorld_.sunShadowBias;
+        sun.contactShadow = live.live.sunContact > 0.5f;
+        sun.castsShadow = live.live.sunCasts > 0.5f;
     }
     // ADR-1862: the program's audio-reactive inputs ride on the chunks' material emission (the `materialEmission`
     // input): r contour, g glow. The program writes its own emission, so the carrier is never drawn as itself.
@@ -8109,7 +8113,10 @@ void Composition::rebuild() {
         sun.color = attractorSunColor(attractorWorld_.look);
         sun.intensity = attractorWorld_.sunLux * attractorWorld_.look.sunIntensity;
         sun.castsShadow = true;
-        sun.shadowBias = attractorWorld_.sunShadowBias; // a low sun over kilometres of rock: the default acnes
+        sun.shadowBias = attractorWorld_.look.sunShadowBias >= 0.0f ? attractorWorld_.look.sunShadowBias
+                                                                    : attractorWorld_.sunShadowBias; // ADR-1907
+        sun.contactShadow = attractorWorld_.look.sunContact > 0.5f;
+        sun.castsShadow = attractorWorld_.look.sunCasts > 0.5f;
         attractorSunLight_ = static_cast<int>(scene_.lights.size());
         scene_.addLight(std::move(sun));
     }

@@ -100,6 +100,12 @@ struct AttractorLook {
     // that wants the lines quieter scales them here instead of fighting the route
     float contourGain = 1.0f;
     float sunWarmth = 1.0f;  // ADR-1900: the key light's colour, 1 the warm sun, 0 a cold moon
+    // ADR-1907: the key light's shadow, per look. A night that keeps the day's kilometre-scale normal offset smears
+    // every caster across the ground beside it; a look sets its own (metres; < 0 keeps the block's `sunShadowBias`),
+    // and turns the key's contact march and its shadow on or off (1 on, 0 off).
+    float sunShadowBias = -1.0f;
+    float sunContact = 1.0f;
+    float sunCasts = 1.0f;
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines

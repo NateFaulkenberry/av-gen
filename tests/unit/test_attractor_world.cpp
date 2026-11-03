@@ -807,6 +807,29 @@ TEST_CASE("a look's warmth turns the canyon's key from the warm sun to a cold mo
     CHECK_FALSE(scene::attractorWorldToJson(plain).at("look").contains("sunWarmth")); // saved only when set
 }
 
+TEST_CASE("a look sets the key light's shadow bias, contact march and casting", "[attractor-world][pass2][adr1907]") {
+    const scene::AttractorLook day;
+    CHECK(day.sunShadowBias < 0.0f); // the block's own bias
+    CHECK(day.sunContact == 1.0f);   // as the key always was
+    CHECK(day.sunCasts == 1.0f);
+    nlohmann::json j = nlohmann::json::parse(
+        R"({"enabled": true, "sunShadowBias": 3.2, "look": {"sunShadowBias": 0.2, "sunContact": 0, "sunCasts": 1}})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->sunShadowBias == Approx(3.2f));
+    CHECK(block->look.sunShadowBias == Approx(0.2f));
+    CHECK(block->look.sunContact == 0.0f);
+    const nlohmann::json back = scene::attractorWorldToJson(*block).at("look");
+    CHECK(back.value("sunShadowBias", -1.0) == Approx(0.2));
+    CHECK(back.value("sunContact", 1.0) == 0.0);
+    CHECK_FALSE(back.contains("sunCasts")); // the default is not written
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    const nlohmann::json plainLook = scene::attractorWorldToJson(plain).at("look");
+    CHECK_FALSE(plainLook.contains("sunShadowBias"));
+    CHECK_FALSE(plainLook.contains("sunContact"));
+}
+
 TEST_CASE("the Mars style: mesas over an open floor, no gorge, wind forms, and only when asked", "[attractor-world][pass2][adr1902]") {
     scene::AttractorGen canyon;
     canyon.resolution = 256;
