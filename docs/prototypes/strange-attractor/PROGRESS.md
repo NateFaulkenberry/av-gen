@@ -44,7 +44,7 @@ The brief is `00-brief.md`, the research `01-research.md`, the plan `02-plan.md`
 | Art Pass 2, M3 | the night gathering (Gray, UFO, embers), the riverbed portal, the ocean (shelf, base, launch bay, submersibles), the bay portal; Sasquatch idles; Mars notes (`38`) | reviewed: revised in M3b |
 | Art Pass 2, M3b | the revision (`39`): UFO interior cut, home at dawn; canyon scale POC (0.2); three Sasquatches, planted feet; rim particles; one water glide; Moon rave and Earth; Mars rover and block pyramids; night pass; ocean life and subs (`41`) | reviewed: revised in M3c |
 | Art Pass 2, M3c | the art checkpoint (`42`): portals back to Gate A, the Moon and pyramid/river regressions fixed, earlier tears; dome windows and the Earth glow options; Mars art pass with the rover; fast subs (`43`); suites not run (owner) | reviewed: revised in M3d |
-| Art Pass 2, M3d | the art checkpoint (`44` + owner additions): portals to the Moon look, no one-frame pops; Sasquatch area fixed, night camp rebuild; animated corona; Mars and the seafloor on the canyon pipeline (ADR-1902), the rover fly-over, photoscanned textures; ocean subs, camera, wildlife (`46`); suites not run (owner) | **done, awaiting the owner**: media in `pass2-m3d/` |
+| Art Pass 2, M3d | the art checkpoint (`44` + owner additions): portals to the Moon look, no one-frame pops; Sasquatch area fixed, night camp rebuild; animated corona; Mars and the seafloor on the canyon pipeline (ADR-1902), the rover fly-over, photoscanned textures; ocean subs, camera, wildlife (`46`); the M3b canyon-scale POC retired | **approved for merge** (owner): rebased on main 61daadb0, both suites exit 0, full render `pass2-m3d/07-full/` |
 | Art Pass 2, M4-M5 | (the UFO interior is cut by the owner; dawn is in M3b) | not started: gated on M3b |
 | 3 | 4 art direction, 5 audio | not started |
 | Final | 6 tiers and performance, 7 polish, tests and docs | not started |
@@ -188,6 +188,14 @@ tools/gpu-lock.sh build/release/src/avgen --headless --composition examples/stra
 
 - 2026-11-02: Art Pass 2, M3d (`46-pass2-m3d.md`; ADR-1902, 1903). An art checkpoint: no full sequence, the suites
   not run (owner); the open items are listed in `46-`.
+  - Approved for merge by the owner ("run tests, render full video and merge"). Rebased onto main 61daadb0 (CHRONOS,
+    ADR-1934..1937) without conflicts; the ADR index ordered. The M3b canyon-scale POC (`SA_WORLD_SCALE`, `poc-*`
+    files) is retired (ADR-441). The builders rebuild the main scene files byte for byte.
+  - Suites on the rebased HEAD, CMake reconfigured: gpu exit 0 (743 passed, 1 skipped: NDI), cpu-assets exit 0 (4629
+    passed, 29 skipped, 1 expected failure).
+  - Full render, 1080p30 with sound, supersample 2: `pass2-m3d/07-full/strange-attractor-m3d-full.mp4` (6316 frames,
+    210.5 s). No black frames; the only near-white frames are the launch-bay crossing's flash (146.17-146.23 s); the
+    end is a slow dawn hold over the canyon.
 - 2026-11-02: Art Pass 2, M3c (`43-pass2-m3c.md`; ADR-1901; ADR-1898 withdrawn).
   - Portals: Gate A's shard storm and folded lips restored, the composite margin a share of the opening; rim
     particles removed; the Moon's glimpse home fixed (the hand-off guard narrowed); the river portal tears during the

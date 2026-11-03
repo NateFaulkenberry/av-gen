@@ -104,3 +104,9 @@ M3b, and the canyon stayed at 0.4.
 
 At the checkpoint the suites were not run (deferred until the art was approved). The builders reproduce the committed
 main scene files byte for byte from `ground-cache.json`, and the `[attractor-world]` and `[lunar-world]` tests pass.
+
+## The merge
+
+The owner approved M3d for merge. On the rebased HEAD (main 61daadb0) both suites exit 0 (gpu: 743 passed, 1
+skipped; cpu-assets: 4629 passed, 29 skipped, 1 expected failure). The full sequence is rendered at 1080p30 with sound
+to `pass2-m3d/07-full/strange-attractor-m3d-full.mp4`.
