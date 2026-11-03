@@ -466,11 +466,11 @@ def write():
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [1.0, 0.82, 0.5], "shards": 0.3, "shardRate": 0.35},
         "portal": {**GAZE, "world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": night_flight()},
-        "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}.glb",
+        "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}-m3g.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
                    "visible": True} for name, x, z, _, yaw in PYRAMIDS] + [
             # M3e: each pyramid's sand drift, drawn through the plain's sand (marsDrift; ADR-1572, ADR-1905)
-            {"name": f"{name}-sand", "kind": "gltf", "asset": A + f"{name}-sand.glb",
+            {"name": f"{name}-sand", "kind": "gltf", "asset": A + f"{name}-sand-m3g.glb",
              "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
              "visible": True, "program": "marsDrift"} for name, x, z, _, yaw in PYRAMIDS] + [
             {"name": "rover", "kind": "gltf", "asset": A + "rover.glb", "position": [*rover_at(ROVER_T0)[:1], ROVER_LEVEL, rover_at(ROVER_T0)[1]],
