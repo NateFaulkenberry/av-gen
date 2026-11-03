@@ -76,3 +76,15 @@ edges.
   into open air without clipping any terrain, rock or bulge. Move the exit or the camera path, or clear
   the terrain round the exit (pad it, ADR-1897 style).
 - Check every portal arrival frame by frame for the same kind of near-plane clipping, and show it.
+
+## 6. The Moon: Earth's glow becomes an aura (owner addition)
+
+`earth-pixel-corona-to-replace.png`: the M3d pixel corona is a ring of white blocks round the Earth.
+
+- Remove the block ring and replace it with a glowing aura: a soft, luminous, atmospheric glow hugging
+  the Earth's limb and falling off smoothly into space, stylised and vibrant rather than a plain halo.
+- Keep the beat pulse; the owner says it looks good.
+- Add glitching and datamoshing: on the aura and the Earth, for example RGB channel splits, block
+  displacement or smear, scanline tears, and macroblock mosh trails, beat-driven and deliberate.
+- No shimmer or aliasing between beats; report the Moon flicker metric.
+- Show stills and a clip with sound.
