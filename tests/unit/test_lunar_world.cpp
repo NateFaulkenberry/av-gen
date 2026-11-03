@@ -508,3 +508,38 @@ TEST_CASE("a world reached through a portal finds its way out only after the cam
     CHECK(crossings[1] > 5.0);
     CHECK(crossings[1] < 7.0);
 }
+TEST_CASE("a scene's spectral fog and its portal's gaze keys load (ADR-1908, ADR-1909)", "[portal][pass2][adr1908][adr1909]") {
+    const auto dir = testsupport::processTempDir();
+    const nlohmann::json sea = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "sea"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}}}};
+    std::ofstream(dir / "gaze-sea.scene.json") << sea.dump();
+    const nlohmann::json root = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "root"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 30.0, 100.0}}, {"target", {0.0, 30.0, 0.0}}}},
+        {"environment", {{"fogSpectral", {2.6, 1.0, 0.62}}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}}},
+        {"corruption", {{"targets", {"rock"}}, {"focus", {0.0, 30.0, 0.0}}, {"axis", {0.0, 0.0, -1.0}}, {"amount", 1.0}}},
+        {"portal", {{"world", "gaze-sea.scene.json"}, {"exit", {0.0, 20.0, 100.0}}, {"exitYaw", 0.0},
+                    {"lookAhead", 0.35}, {"lookDown", 0.02}, {"climbLook", 1.0},
+                    {"flight", {{0.0, 20.0, 180.0, 3.5}, {0.0, 20.0, 250.0, 5.0}}}}}};
+    std::ofstream(dir / "gaze-root.scene.json") << root.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "gaze-root.scene.json", registry);
+    REQUIRE(c.has_value()); // the portal accepts the gaze keys (an unknown key is refused)
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    params.resetFinals();
+    FrameTime ft{};
+    ft.renderTime = 0.0;
+    (*c)->update(ft);
+    const glm::vec3 w = (*c)->scene().environment.fogSpectral;
+    CHECK(w.x == Approx(2.6f));
+    CHECK(w.y == Approx(1.0f));
+    CHECK(w.z == Approx(0.62f));
+    // the default is the grey fog: no weights
+    CHECK(scene::Environment{}.fogSpectral == glm::vec3(0.0f));
+}
+

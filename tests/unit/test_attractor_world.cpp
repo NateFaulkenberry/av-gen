@@ -830,6 +830,47 @@ TEST_CASE("a look sets the key light's shadow bias, contact march and casting", 
     CHECK_FALSE(plainLook.contains("sunContact"));
 }
 
+TEST_CASE("the flythrough's gaze is authored: a shorter look-ahead keeps the aim on the travel", "[attractor-world][pass2][adr1909]") {
+    scene::AttractorGen lead;
+    lead.resolution = 256;
+    lead.meshSpacing = 16.0f;
+    lead.meshMinError = 4.0f;
+    scene::AttractorGen follow = lead;
+    follow.flightLookAhead = 0.4f;
+    follow.flightLookDown = 0.02f;
+    CHECK(follow.validate().has_value());
+    CHECK(follow.hash() != lead.hash());
+    scene::AttractorGen same = lead;
+    same.flightLookAhead = 2.5f; // the defaults hash as they always did
+    CHECK(same.hash() == lead.hash());
+    // the worst angle between the aim and the direction of travel
+    const auto worst = [](const scene::AttractorWorld& w) {
+        float out = 0.0f;
+        for (std::size_t i = 1; i + 1 < w.flight.size(); ++i) {
+            const glm::vec3 v = glm::vec3(w.flight[i + 1]) - glm::vec3(w.flight[i - 1]);
+            if (glm::length(v) < 1e-3f) continue;
+            const float c = glm::dot(glm::normalize(v), glm::normalize(glm::vec3(w.flightAim[i])));
+            out = std::max(out, glm::degrees(std::acos(std::clamp(c, -1.0f, 1.0f))));
+        }
+        return out;
+    };
+    const auto a = scene::generateAttractorWorld(lead);
+    const auto b = scene::generateAttractorWorld(follow);
+    REQUIRE(a->flight.size() == b->flight.size());
+    INFO("worst aim-to-travel angle: look-ahead 2.5 s " << worst(*a) << ", 0.4 s " << worst(*b));
+    CHECK(worst(*b) < worst(*a));
+    // round trip, and absent when default
+    nlohmann::json j = nlohmann::json::parse(R"({"enabled": true, "flightLookAhead": 0.6, "flightLookDown": 0.03})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->gen.flightLookAhead == Approx(0.6f));
+    const nlohmann::json back = scene::attractorWorldToJson(*block);
+    CHECK(back.value("flightLookDown", 0.0) == Approx(0.03));
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    CHECK_FALSE(scene::attractorWorldToJson(plain).contains("flightLookAhead"));
+}
+
 TEST_CASE("the Mars style: mesas over an open floor, no gorge, wind forms, and only when asked", "[attractor-world][pass2][adr1902]") {
     scene::AttractorGen canyon;
     canyon.resolution = 256;

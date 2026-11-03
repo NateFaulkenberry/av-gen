@@ -647,10 +647,10 @@ std::uint64_t AttractorGen::hash() const {
     if (worldScale != 1.0f) h = mixHashF(h ^ 0x1893ull, worldScale); // ADR-1893: absent, the hash is unchanged
     if (mars) { // ADR-1902: absent, the hash is unchanged
         for (float v : {mesaCover, yardangs, wind, dunes}) h = mixHashF(h ^ 0x1902ull, v);
+    }
     if (flightLookAhead != 2.5f || flightLookDown != 0.12f) { // ADR-1909: hashed only when set (worlds keep their keys)
         h = mixHashF(h ^ 0x1909ull, flightLookAhead);
         h = mixHashF(h ^ 0x1909ull, flightLookDown);
-    }
     }
     for (const Pad& p : pads) { // ADR-1897
         for (float v : {p.x, p.z, p.radius, p.level}) h = mixHashF(h ^ 0x1897ull, v);
