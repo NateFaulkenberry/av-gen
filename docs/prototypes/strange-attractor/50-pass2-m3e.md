@@ -14,9 +14,9 @@ Media is in `~/Desktop/av-gen-review/101-strange-attractor/pass2-m3e/`.
 | 5 | Mars arrival clips a bulge | done: the exit is out of the butte's steep face at 95 m (it was in the talus apron); the first knot is 30 m over the ground |
 | 6 | Earth aura, glitch and datamosh | to do |
 | 7 | Dusk arrival across the river, one path past the camp | to do |
-| 8 | Night camp: more light (optional after §11) | to do |
-| 9 | Night camp: shadows and lighting quality | to do |
-| 10 | The Gray talks across the fire | to do |
+| 8 | Night camp: more light (optional after §11) | superseded by the brief (`49-`); torches not added yet (§11: quality first) |
+| 9 | Night camp: shadows and lighting quality | first pass done (9021ea67): ADR-1906/1907 + 48- A1-A6; the blob gone, the fire casts, Sasquatch B moved out of the fire (2.0 -> 2.9 m), thin smoke, craft spill tamed; the Gray's flat white is the hero agent's (model) |
+| 10 | The Gray talks across the fire | moved to the hero-asset agent (coordinator) |
 | 11 | §9 first, torches only if still dark | (rule) |
 | 12 | Night arrival lower, one pass by the camp | to do |
 | 13 | Reef geometry and texture, the black streaks | done (to verify on render): the streaks were the canyon program's world-height strata bands on steep faces; the reef has its own program (photoscanned rock + sand, hex-tiled, algae, coral, caustics); softer relief and a finer mesh |
@@ -27,3 +27,13 @@ Research: `48-night-lighting-research.md` (coordinator's agent); its top-5 are p
 
 Tools: the ground sampler is a temporary `[.sample]` test that is never committed (`sample_ground.py`); the Mars checks
 are in the session scratchpad (`marscheck.py`).
+
+## Night camp (brief `49-`, this lane: Phases 1.3, 3.3, 4.3, 5, 7, 8)
+
+- Phase 8.1 baseline: the owner's reference camera is the journey camera at about 111.1 s
+  (`pass2-m3e/08-night-camp/00-baseline-m3d-111.1s.png`, beside the reference). Stills are rendered from a 2 s run-up,
+  so the particles are warm (`frames.sh` in the scratchpad).
+- Engine: ADR-1906 (the shadow budget and perspective bias), ADR-1907 (the key's shadow per look).
+- Scene: the night look's research values; the river's water at every hour (f0 0.06, roughness 0.085, ripple 0.48,
+  streak 0.8, rays 6, glints 8, sparkle 0.3, specular 2, sky mirror 0.35, transmission 0.5).
+- Open: the water's local-light streaks (B7/B8), PCSS for local lights (B4), fur wrap (B9), the Purkinje shift (C1).
