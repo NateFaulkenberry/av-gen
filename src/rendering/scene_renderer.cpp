@@ -6220,7 +6220,18 @@ Result<void> SceneRenderer::encodePortalView(wgpu::CommandEncoder& encoder, cons
     // (or, for a hand-off, is itself handing the frame on to the world this view looks from: two worlds that both
     // report the camera crossed into the other would otherwise hand the frame back and forth without end. A plain view
     // back into it -- the glimpse through the way home -- is drawn: M3c, the Moon's crater floor showed nothing)
-    if (owner != nullptr && (owner->busy_ || (owner->handingOff_ && direct != nullptr))) {
+    // ADR-1903: a hand-back to a renderer that is handing off to us (the crossing's own frame, when the world we cross
+    // into still thinks the camera is here) draws that world plainly -- its own world, no portals, so nothing can loop
+    // -- straight into the frame, instead of nothing (which left this world showing: a one-frame pop)
+    if (owner != nullptr && !owner->busy_ && owner->handingOff_ && direct != nullptr) {
+        const bool wasPlain = owner->plain_;
+        owner->plain_ = true;
+        auto r = owner->render(encoder, *scene.portal.world, time, *direct);
+        owner->plain_ = wasPlain;
+        if (!r) log::warn("portal view: {}", r.error().message);
+        return r;
+    }
+    if (owner != nullptr && owner->busy_) {
         portalSource_ = nullptr;
         return {};
     }

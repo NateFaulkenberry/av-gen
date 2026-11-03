@@ -21,25 +21,6 @@
   },
   "lights": [
     {
-      "name": "sun",
-      "type": "directional",
-      "role": "key",
-      "direction": [
-        -0.7646034664841297,
-        -0.24192189559966773,
-        -0.5973736983412611
-      ],
-      "color": [
-        1.0,
-        0.9,
-        0.78
-      ],
-      "intensity": 2.3,
-      "castsShadow": true,
-      "shadowStrength": 1.0,
-      "softness": 0.25
-    },
-    {
       "name": "sky-fill",
       "type": "directional",
       "role": "fill",
@@ -79,9 +60,9 @@
       "name": "rover-flash-light",
       "type": "point",
       "position": [
-        -5.524503266186508,
-        5.3100000000000005,
-        -425.4071644092166
+        620.4816527266812,
+        37.31,
+        2051.600136709761
       ],
       "color": [
         1.0,
@@ -150,7 +131,7 @@
   },
   "materialPrograms": [
     {
-      "name": "mars_regolith",
+      "name": "marsRock",
       "ops": [
         {
           "kind": "input",
@@ -169,119 +150,44 @@
           ]
         },
         {
-          "kind": "remap",
-          "dst": 1,
-          "srcA": 1,
-          "constant": [
-            0.07,
-            0.2,
-            0.62,
-            1.3
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "input",
+          "kind": "palette",
           "dst": 2,
-          "input": "worldPosition"
-        },
-        {
-          "kind": "microDetail",
-          "dst": 3,
-          "srcA": 2,
-          "value": 0.7,
-          "seed": 5
-        },
-        {
-          "kind": "remap",
-          "dst": 3,
-          "srcA": 3,
+          "srcA": 1,
           "constant": [
             0,
-            1,
-            0.84,
-            1.16
-          ]
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            0.32,
+            0.18,
+            0,
+            0
+          ],
+          "constant3": [
+            0.06919780134430233,
+            0.17113434741064013,
+            0,
+            0
+          ],
+          "constant4": [
+            -0.13859153983567327,
+            0.020563403256222076,
+            0,
+            0
+          ],
+          "value": 0.0
         },
         {
-          "kind": "multiply",
+          "kind": "add",
           "dst": 1,
           "srcA": 1,
-          "srcB": 3
-        },
-        {
-          "kind": "noise",
-          "dst": 4,
-          "srcA": 2,
-          "value": 0.0025,
-          "seed": 41
-        },
-        {
-          "kind": "remap",
-          "dst": 4,
-          "srcA": 4,
-          "constant": [
-            0.25,
-            0.75,
-            0,
-            1
-          ],
-          "value": 1.0
-        },
-        {
-          "kind": "constant",
-          "dst": 5,
-          "constant": [
-            0.34,
-            0.14,
-            0.065,
-            1.0
-          ]
-        },
-        {
-          "kind": "constant",
-          "dst": 6,
-          "constant": [
-            0.46,
-            0.28,
-            0.14,
-            1.0
-          ]
-        },
-        {
-          "kind": "mixBy",
-          "dst": 5,
-          "srcA": 5,
-          "srcB": 6,
-          "srcC": 4
-        },
-        {
-          "kind": "multiply",
-          "dst": 5,
-          "srcA": 5,
-          "srcB": 1
-        },
-        {
-          "kind": "noise",
-          "dst": 3,
-          "srcA": 2,
-          "value": 0.012,
-          "seed": 43
-        },
-        {
-          "kind": "remap",
-          "dst": 3,
-          "srcA": 3,
-          "constant": [
-            0,
-            1,
-            -9.0,
-            9.0
-          ]
+          "srcB": 2
         },
         {
           "kind": "swizzle",
-          "dst": 4,
+          "dst": 2,
           "srcA": 2,
           "constant": [
             1,
@@ -292,75 +198,193 @@
         },
         {
           "kind": "add",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "quantize",
+          "dst": 2,
+          "srcA": 1,
+          "value": 1.0
+        },
+        {
+          "kind": "swizzle",
+          "dst": 5,
+          "srcA": 2,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            0,
+            1,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 5,
+          "srcA": 1,
+          "srcB": 5
+        },
+        {
+          "kind": "noise",
+          "dst": 4,
+          "srcA": 2,
+          "value": 0.23,
+          "seed": 7
+        },
+        {
+          "kind": "input",
+          "dst": 6,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "gradient",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "value": 0.0035714285714285713
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            0.3,
+            -0.3
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
+        },
+        {
+          "kind": "remap",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.28,
+            0.8,
+            0,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "oklabRamp",
+          "dst": 4,
+          "srcA": 4,
+          "constant": [
+            0.66,
+            0.44,
+            0.25,
+            1
+          ],
+          "constant2": [
+            0.64,
+            0.31,
+            0.12,
+            1
+          ],
+          "constant3": [
+            0.38,
+            0.11,
+            0.065,
+            1
+          ],
+          "constant4": [
+            0.4,
+            0.22,
+            0.24,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "swizzle",
+          "dst": 3,
+          "srcA": 2,
+          "constant": [
+            3,
+            3,
+            3,
+            3
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0.74,
+            1.12
+          ]
+        },
+        {
+          "kind": "multiply",
           "dst": 4,
           "srcA": 4,
           "srcB": 3
         },
         {
-          "kind": "palette",
+          "kind": "smoothstep",
           "dst": 6,
-          "srcA": 4,
+          "srcA": 5,
           "constant": [
-            0.92,
-            0.92,
-            0.92,
+            -0.5,
+            -0.45,
+            0,
             0
-          ],
-          "constant2": [
-            0.14,
-            0.15,
-            0.17,
-            0
-          ],
-          "constant3": [
-            0.137,
-            0.137,
-            0.137,
-            0
-          ],
-          "constant4": [
-            0.0,
-            0.0,
-            0.0,
-            0
-          ],
-          "value": 0.0
+          ]
         },
         {
-          "kind": "palette",
-          "dst": 7,
-          "srcA": 4,
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
           "constant": [
-            1.0,
-            0.97,
-            0.95,
-            0
-          ],
-          "constant2": [
-            0.07,
-            0.08,
-            0.09,
-            0
-          ],
-          "constant3": [
-            0.41,
-            0.41,
-            0.41,
-            0
-          ],
-          "constant4": [
-            0.3,
-            0.3,
-            0.3,
-            0
-          ],
-          "value": 0.0
+            0,
+            1,
+            0.72,
+            1
+          ]
         },
         {
           "kind": "multiply",
-          "dst": 6,
-          "srcA": 6,
-          "srcB": 7
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 6
         },
         {
           "kind": "input",
@@ -383,41 +407,40 @@
           "dst": 7,
           "srcA": 7,
           "constant": [
-            0.82,
-            0.45,
+            0.66,
+            0.4,
             0,
             0
           ]
         },
         {
           "kind": "constant",
-          "dst": 3,
+          "dst": 6,
           "constant": [
-            1.0,
-            1.0,
-            1.0,
-            1.0
+            0.22,
+            0.1,
+            0.045,
+            1
           ]
         },
         {
-          "kind": "mixBy",
+          "kind": "mix",
           "dst": 6,
-          "srcA": 3,
-          "srcB": 6,
-          "srcC": 7
+          "srcA": 6,
+          "srcB": 4,
+          "value": 0.25
         },
         {
-          "kind": "multiply",
-          "dst": 5,
-          "srcA": 5,
-          "srcB": 6
+          "kind": "input",
+          "dst": 3,
+          "input": "worldPosition"
         },
         {
           "kind": "noise",
           "dst": 3,
-          "srcA": 2,
-          "value": 0.05,
-          "seed": 47
+          "srcA": 3,
+          "value": 0.006578947368421052,
+          "seed": 61
         },
         {
           "kind": "remap",
@@ -426,118 +449,463 @@
           "constant": [
             0,
             1,
-            -2.5,
-            2.5
+            0.6,
+            1.3
           ]
         },
         {
-          "kind": "swizzle",
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "mixBy",
           "dst": 4,
-          "srcA": 2,
+          "srcA": 6,
+          "srcB": 4,
+          "srcC": 7
+        },
+        {
+          "kind": "swizzle",
+          "dst": 3,
+          "srcA": 0,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "quantize",
+          "dst": 6,
+          "srcA": 3,
+          "value": 1.0
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
           "constant": [
             0,
+            1,
             0,
-            0,
-            0
+            -1
           ]
         },
         {
           "kind": "add",
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 6
+        },
+        {
+          "kind": "remap",
+          "dst": 0,
+          "srcA": 3,
+          "constant": [
+            -0.5,
+            -0.45,
+            0.15000000000000002,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            -0.5,
+            -0.45,
+            0.55,
+            1
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
           "dst": 4,
           "srcA": 4,
           "srcB": 3
         },
         {
-          "kind": "palette",
-          "dst": 6,
-          "srcA": 4,
+          "kind": "input",
+          "dst": 1,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "triplanar",
+          "dst": 1,
+          "srcA": 1,
+          "value": 0.22499999999999998,
           "constant": [
-            0.97,
-            0.97,
-            0.97,
+            0,
+            0,
+            0,
             0
           ],
           "constant2": [
-            0.06,
-            0.06,
-            0.06,
+            4,
+            0,
+            0,
+            0
+          ],
+          "seed": 23
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 6,
+          "srcA": 5,
+          "constant": [
+            -0.5,
+            -0.4,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 6,
+          "srcA": 6,
+          "constant": [
+            0,
+            1,
+            -1.5,
+            0
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 5,
+          "constant": [
+            0.36,
+            0.5,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0,
+            1,
+            0,
+            0.8250000000000001
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 1,
+          "constant": [
+            0.3,
+            0.7,
+            0.35,
+            1.45
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "palette",
+          "dst": 3,
+          "srcA": 5,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            0.22,
+            0.22,
+            0.22,
             0
           ],
           "constant3": [
-            0.62,
-            0.62,
-            0.62,
+            5,
+            5,
+            5,
             0
           ],
           "constant4": [
-            0.0,
-            0.0,
-            0.0,
+            0,
+            0,
+            0,
             0
           ],
           "value": 0.0
         },
         {
           "kind": "input",
-          "dst": 4,
-          "input": "cameraDistance"
+          "dst": 2,
+          "input": "depth"
         },
         {
           "kind": "remap",
-          "dst": 4,
-          "srcA": 4,
+          "dst": 2,
+          "srcA": 2,
           "constant": [
-            60.0,
-            220.0,
-            1.0,
-            0.0
+            112.0,
+            280.0,
+            1,
+            0
           ],
-          "value": 1.0
-        },
-        {
-          "kind": "remap",
-          "dst": 7,
-          "srcA": 7,
-          "constant": [
-            0.0,
-            1.0,
-            1.0,
-            0.0
-          ],
-          "value": 1.0
+          "value": 1
         },
         {
           "kind": "multiply",
-          "dst": 4,
-          "srcA": 4,
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 2
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "multiply",
+          "dst": 6,
+          "srcA": 6,
           "srcB": 7
+        },
+        {
+          "kind": "remap",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            0.25,
+            0.75,
+            -0.15,
+            0.15
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 2
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 7,
+          "constant": [
+            0,
+            1,
+            0.35,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 3
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 1
         },
         {
           "kind": "constant",
           "dst": 3,
           "constant": [
-            1.0,
-            1.0,
-            1.0,
-            1.0
+            1,
+            0,
+            0,
+            0
           ]
         },
         {
-          "kind": "mixBy",
-          "dst": 6,
-          "srcA": 3,
-          "srcB": 6,
-          "srcC": 4
-        },
-        {
           "kind": "multiply",
-          "dst": 5,
-          "srcA": 5,
-          "srcB": 6
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
         },
         {
           "kind": "constant",
-          "dst": 0,
+          "dst": 3,
+          "constant": [
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 1,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 2,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "constant3": [
+            0.16666666666666666,
+            0.16666666666666666,
+            0.16666666666666666,
+            0.0
+          ],
+          "constant4": [
+            0.4,
+            0.4,
+            0.4,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0.985,
+            1.0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "palette",
+          "dst": 3,
+          "srcA": 1,
+          "constant": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "constant2": [
+            1,
+            1,
+            1,
+            0
+          ],
+          "constant3": [
+            0.03333333333333333,
+            0.03333333333333333,
+            0.03333333333333333,
+            0.0
+          ],
+          "constant4": [
+            0.08,
+            0.08,
+            0.08,
+            0
+          ],
+          "value": 0.0
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0.997,
+            1.0,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "remap",
+          "dst": 2,
+          "srcA": 2,
+          "constant": [
+            0,
+            1,
+            0,
+            0.5
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "depth"
+        },
+        {
+          "kind": "remap",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            108.0,
+            360.0,
+            1,
+            0
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 3
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "materialEmission"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 3,
           "constant": [
             0,
             0,
@@ -546,200 +914,205 @@
           ]
         },
         {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
           "kind": "constant",
           "dst": 1,
           "constant": [
-            0.95,
-            0.95,
-            0.95,
-            0.95
+            1.0,
+            0.42,
+            0.14,
+            1
           ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
+          "kind": "swizzle",
+          "dst": 1,
+          "srcA": 3,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 4
+        },
+        {
+          "kind": "multiply",
+          "dst": 1,
+          "srcA": 1,
+          "srcB": 7
+        },
+        {
+          "kind": "add",
+          "dst": 2,
+          "srcA": 2,
+          "srcB": 1
+        },
+        {
+          "kind": "textureTriplanar",
+          "dst": 0,
+          "texture": "sand",
+          "value": 0.2
+        },
+        {
+          "kind": "constant",
+          "dst": 1,
+          "constant": [
+            1.05,
+            0.6,
+            0.42,
+            1.0
+          ]
+        },
+        {
+          "kind": "multiply",
+          "dst": 0,
+          "srcA": 0,
+          "srcB": 1
+        },
+        {
+          "kind": "input",
+          "dst": 3,
+          "input": "normal"
+        },
+        {
+          "kind": "swizzle",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "kind": "smoothstep",
+          "dst": 3,
+          "srcA": 3,
+          "constant": [
+            0.7,
+            0.9,
+            0,
+            0
+          ]
+        },
+        {
+          "kind": "input",
+          "dst": 5,
+          "input": "depth"
+        },
+        {
+          "kind": "remap",
+          "dst": 5,
+          "srcA": 5,
+          "constant": [
+            40.0,
+            220.0,
+            0.85,
+            0.0
+          ],
+          "value": 1
+        },
+        {
+          "kind": "multiply",
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 5
+        },
+        {
+          "kind": "mixBy",
+          "dst": 4,
+          "srcA": 4,
+          "srcB": 0,
+          "srcC": 3
         }
       ],
-      "baseColor": 5,
-      "metallic": 0,
-      "roughness": 1
+      "baseColor": 4,
+      "metallic": -1,
+      "roughness": -1,
+      "emission": 2,
+      "opacity": -1,
+      "normal": 6,
+      "occlusion": 0,
+      "textures": [
+        {
+          "name": "sand",
+          "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"
+        }
+      ]
     }
   ],
-  "lunarWorld": {
+  "attractorWorld": {
     "seed": 11,
-    "extent": 6000,
-    "spacing": 2.5,
-    "skirtExtent": 48000,
-    "skirtSpacing": 48,
-    "craters": 0.4,
-    "rocks": 0.095,
-    "relief": 70,
-    "program": "mars_regolith",
-    "curvature": 3389500.0,
-    "heroes": [
-      {
-        "x": 520.0,
-        "z": -650.0,
-        "diameter": 260.0,
-        "fresh": 0.15
-      },
-      {
-        "x": -420.0,
-        "z": -1050.0,
-        "diameter": 180.0,
-        "fresh": 0.25
-      },
-      {
-        "x": 70.0,
-        "z": -1080.0,
-        "diameter": 70.0,
-        "fresh": 0.9
-      },
-      {
-        "x": -90.0,
-        "z": -760.0,
-        "diameter": 34.0,
-        "fresh": 1.0
-      },
-      {
-        "x": -160.0,
-        "z": -610.0,
-        "diameter": 28.0,
-        "fresh": 1.0
-      },
-      {
-        "x": 150.0,
-        "z": -930.0,
-        "diameter": 22.0,
-        "fresh": 1.0
-      },
-      {
-        "x": 95.0,
-        "z": -560.0,
-        "diameter": 26.0,
-        "fresh": 1.0
-      },
-      {
-        "x": -210.0,
-        "z": -880.0,
-        "diameter": 40.0,
-        "fresh": 0.95
-      }
-    ],
-    "mesas": [
-      {
-        "x": 0.0,
-        "z": -120.0,
-        "rx": 300.0,
-        "rz": 200.0,
-        "angle": 4.0,
-        "height": 115.0,
-        "terraces": 3
-      },
-      {
-        "x": -1350.0,
-        "z": -700.0,
-        "rx": 520.0,
-        "rz": 260.0,
-        "angle": 28.0,
-        "height": 160.0,
-        "terraces": 4
-      },
-      {
-        "x": 1250.0,
-        "z": -1100.0,
-        "rx": 380.0,
-        "rz": 240.0,
-        "angle": -18.0,
-        "height": 135.0,
-        "terraces": 3
-      },
-      {
-        "x": -200.0,
-        "z": -2950.0,
-        "rx": 700.0,
-        "rz": 220.0,
-        "angle": 8.0,
-        "height": 180.0,
-        "terraces": 5
-      },
-      {
-        "x": 780.0,
-        "z": -300.0,
-        "rx": 90.0,
-        "rz": 70.0,
-        "angle": 40.0,
-        "height": 55.0,
-        "terraces": 2
-      },
-      {
-        "x": -700.0,
-        "z": -1600.0,
-        "rx": 80.0,
-        "rz": 60.0,
-        "angle": -30.0,
-        "height": 48.0,
-        "terraces": 2
-      },
-      {
-        "x": 900.0,
-        "z": -2100.0,
-        "rx": 110.0,
-        "rz": 80.0,
-        "angle": 12.0,
-        "height": 62.0,
-        "terraces": 2
-      },
-      {
-        "x": -520.0,
-        "z": 150.0,
-        "rx": 70.0,
-        "rz": 55.0,
-        "angle": 60.0,
-        "height": 38.0,
-        "terraces": 2
-      },
-      {
-        "x": -480.0,
-        "z": -420.0,
-        "rx": 160.0,
-        "rz": 110.0,
-        "angle": -12.0,
-        "height": 85.0,
-        "terraces": 3
-      },
-      {
-        "x": 760.0,
-        "z": -1050.0,
-        "rx": 150.0,
-        "rz": 95.0,
-        "angle": 22.0,
-        "height": 90.0,
-        "terraces": 3
-      }
-    ],
-    "yardangs": 7.0,
-    "wind": 35.0,
+    "resolution": 4096,
+    "extent": 16000,
+    "worldScale": 0.5,
+    "camera": "scene",
+    "terrainScale": 1.0,
+    "roughness": 0.6,
+    "ridgeStrength": 0.6,
+    "domainWarp": 0.5,
+    "terraces": 0.6,
+    "erosion": 0.6,
+    "strataFold": 0.5,
+    "branchingDensity": 0.0,
+    "meshSpacing": 1.0,
+    "meshError": 0.003,
+    "meshMinError": 0.2,
+    "terrainProgram": "marsRock",
+    "sunLux": 7.0,
+    "sunShadowBias": 1.6,
+    "look": {
+      "sunAzimuth": 128.0,
+      "sunElevation": 14.0
+    },
+    "mars": {
+      "mesaCover": 0.45,
+      "yardangs": 10.0,
+      "wind": 30.0,
+      "dunes": 8.0
+    },
     "pads": [
       {
-        "x": -260.0,
-        "z": -1380.0,
-        "radius": 420.0,
-        "level": -1.7
+        "x": 302.0,
+        "z": 1662.0,
+        "radius": 360.0,
+        "level": 35.0
       },
       {
-        "x": 160.0,
-        "z": -1680.0,
-        "radius": 392.0,
-        "level": 5.6
+        "x": 722.0,
+        "z": 1362.0,
+        "radius": 336.0,
+        "level": 35.0
       },
       {
-        "x": 470.0,
-        "z": -1980.0,
-        "radius": 196.0,
-        "level": 19.4
+        "x": 1032.0,
+        "z": 1062.0,
+        "radius": 168.0,
+        "level": 35.0
       },
       {
-        "x": -7.311288019407716,
-        "z": -415.0863466002609,
+        "x": 618.5376310270074,
+        "z": 2061.8924959937735,
         "radius": 60.0,
-        "level": 3.2
+        "level": 35.2
       }
     ]
   },
@@ -748,9 +1121,9 @@
       "pyramid-b"
     ],
     "focus": [
-      160.0,
-      70.94504367015784,
-      -1598.2322578752833
+      722.0,
+      106.0,
+      1443.7677421247167
     ],
     "axis": [
       0.0,
@@ -761,9 +1134,9 @@
     "radius": 120.0,
     "inner": 0.2,
     "fieldNear": 40.0,
-    "fieldFar": 1100.0,
+    "fieldFar": 1700.0,
     "openNear": 30.0,
-    "openFar": 330.0,
+    "openFar": 520.0,
     "seam": 0.3,
     "width": 22.0,
     "height": 17.0,
@@ -790,6 +1163,44 @@
       0.3
     ],
     "light": 2400.0
+  },
+  "meshWire": {
+    "targets": [
+      "pyramid-b"
+    ],
+    "color": [
+      1.0,
+      0.62,
+      0.3
+    ],
+    "intensity": 0.0,
+    "width": 1.0,
+    "creaseLow": 2.0,
+    "creaseHigh": 12.0,
+    "reveal": 1.0,
+    "fadeNear": 60.0,
+    "fadeFar": 900.0,
+    "minPixels": 14.0,
+    "wave": 0.0,
+    "waveRadius": 300.0,
+    "waveWidth": 40.0,
+    "waveGain": 1.6,
+    "waveAhead": 200.0,
+    "clipBelow": -1000.0,
+    "fromFocus": 1.0,
+    "pulse": 1.2,
+    "pulseSpacing": 60.0,
+    "pulseSpeed": 40.0,
+    "pulseWidth": 6.0,
+    "focusGain": 0.5,
+    "rimGain": 6.0,
+    "frontColor": [
+      1.0,
+      0.82,
+      0.5
+    ],
+    "shards": 0.3,
+    "shardRate": 0.35
   },
   "portal": {
     "world": "@root",
@@ -854,31 +1265,31 @@
         59.00281399444687,
         4.710000011920929,
         1361.250740988606,
-        117.93907844321797
+        117.95574510988463
       ],
       [
         56.44505723633493,
         3.210600011920929,
         1363.19936905248,
-        119.04779177252385
+        119.06445843919053
       ],
       [
         53.96252861816747,
         1.755300011920929,
         1365.09068452624,
-        120.12389588626193
+        120.1405625529286
       ],
       [
         51.48,
         0.30000001192092896,
         1366.9820000000002,
-        121.2
+        121.21666666666667
       ],
       [
         49.634432392572954,
         -0.7819027381352619,
         1368.3880464593453,
-        122.0
+        122.01666666666667
       ]
     ],
     "aims": [
@@ -897,9 +1308,9 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/pyramid-a.glb",
       "position": [
-        -260.0,
-        -4.990898362590352,
-        -1380.0
+        302.0,
+        32.0,
+        1662.0
       ],
       "rotation": [
         0,
@@ -918,9 +1329,9 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/pyramid-b.glb",
       "position": [
-        160.0,
-        2.1798790382062245,
-        -1680.0
+        722.0,
+        32.0,
+        1362.0
       ],
       "rotation": [
         0,
@@ -939,9 +1350,9 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/pyramid-c.glb",
       "position": [
-        470.0,
-        15.789098687121992,
-        -1980.0
+        1032.0,
+        32.0,
+        1062.0
       ],
       "rotation": [
         0,
@@ -960,13 +1371,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover.glb",
       "position": [
-        -6.0,
-        3.2,
-        -425.0
+        620.0,
+        35.2,
+        2052.0
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -981,9 +1392,9 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/flash.glb",
       "position": [
-        -5.524503266186508,
-        5.3100000000000005,
-        -425.4071644092166
+        620.4816527266812,
+        37.31,
+        2051.600136709761
       ],
       "rotation": [
         0,
@@ -1002,811 +1413,849 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -11.192700556854557,
-        3.2,
-        -385.74193253703334
+        614.2090188669491,
+        35.2,
+        2091.174284135344
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.15,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.04999999999999982
     },
     {
       "name": "track-old--37",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -11.061571754913786,
-        3.2,
-        -386.7332978770072
+        614.3552557642485,
+        35.2,
+        2090.185034535966
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.15,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.07894736842105243
     },
     {
       "name": "track-old--36",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.930442952973014,
-        3.2,
-        -387.7246632169811
+        614.5014926615477,
+        35.2,
+        2089.195784936589
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.15,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.10789473684210504
     },
     {
       "name": "track-old--35",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.799314151032242,
-        3.2,
-        -388.71602855695505
+        614.647729558847,
+        35.2,
+        2088.206535337212
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.15,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.13684210526315788
     },
     {
       "name": "track-old--34",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.66818534909147,
-        3.2,
-        -389.7073938969289
+        614.7939664561462,
+        35.2,
+        2087.217285737834
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.15,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.16578947368421026
     },
     {
       "name": "track-old--33",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.537056547150698,
-        3.2,
-        -390.69875923690284
+        614.9402033534454,
+        35.2,
+        2086.228036138457
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.15,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.19473684210526299
     },
     {
       "name": "track-old--32",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.405927745209926,
-        3.2,
-        -391.69012457687677
+        615.0864402507448,
+        35.2,
+        2085.2387865390797
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.1578947368421053,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.2236842105263156
     },
     {
       "name": "track-old--31",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.274798943269154,
-        3.2,
-        -392.68148991685064
+        615.232677148044,
+        35.2,
+        2084.249536939702
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.1842105263157895,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.2526315789473683
     },
     {
       "name": "track-old--30",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.143670141328382,
-        3.2,
-        -393.67285525682456
+        615.3789140453433,
+        35.2,
+        2083.260287340325
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.21052631578947367,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.28157894736842093
     },
     {
       "name": "track-old--29",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -10.012541339387612,
-        3.2,
-        -394.6642205967985
+        615.5251509426425,
+        35.2,
+        2082.2710377409476
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.23684210526315785,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.31052631578947354
     },
     {
       "name": "track-old--28",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.88141253744684,
-        3.2,
-        -395.6555859367724
+        615.6713878399418,
+        35.2,
+        2081.28178814157
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.26315789473684215,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.33947368421052615
     },
     {
       "name": "track-old--27",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.750283735506068,
-        3.2,
-        -396.6469512767463
+        615.8176247372411,
+        35.2,
+        2080.2925385421927
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.2894736842105263,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.36842105263157876
     },
     {
       "name": "track-old--26",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.619154933565296,
-        3.2,
-        -397.6383166167202
+        615.9638616345403,
+        35.2,
+        2079.3032889428155
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.3157894736842105,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.3973684210526315
     },
     {
       "name": "track-old--25",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.488026131624526,
-        3.2,
-        -398.6296819566941
+        616.1100985318396,
+        35.2,
+        2078.314039343438
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.3421052631578947,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.426315789473684
     },
     {
       "name": "track-old--24",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.356897329683754,
-        3.2,
-        -399.621047296668
+        616.2563354291389,
+        35.2,
+        2077.3247897440606
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.368421052631579,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.4552631578947367
     },
     {
       "name": "track-old--23",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.225768527742982,
-        3.2,
-        -400.6124126366419
+        616.4025723264381,
+        35.2,
+        2076.3355401446834
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.39473684210526316,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.4842105263157893
     },
     {
       "name": "track-old--22",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -9.09463972580221,
-        3.2,
-        -401.60377797661585
+        616.5488092237374,
+        35.2,
+        2075.3462905453057
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.42105263157894735,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.5131578947368419
     },
     {
       "name": "track-old--21",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.963510923861438,
-        3.2,
-        -402.5951433165897
+        616.6950461210366,
+        35.2,
+        2074.3570409459285
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.4473684210526315,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.5421052631578946
     },
     {
       "name": "track-old--20",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.832382121920666,
-        3.2,
-        -403.58650865656364
+        616.841283018336,
+        35.2,
+        2073.3677913465513
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.4736842105263158,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.5710526315789473
     },
     {
       "name": "track-old--19",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.701253319979894,
-        3.2,
-        -404.57787399653756
+        616.9875199156352,
+        35.2,
+        2072.3785417471736
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.5,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.5999999999999999
     },
     {
       "name": "track-old--18",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.570124518039124,
-        3.2,
-        -405.56923933651143
+        617.1337568129344,
+        35.2,
+        2071.3892921477964
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.5263157894736843,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.6289473684210525
     },
     {
       "name": "track-old--17",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.438995716098352,
-        3.2,
-        -406.56060467648535
+        617.2799937102337,
+        35.2,
+        2070.400042548419
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.5526315789473684,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.6578947368421051
     },
     {
       "name": "track-old--16",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.30786691415758,
-        3.2,
-        -407.5519700164593
+        617.426230607533,
+        35.2,
+        2069.4107929490415
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.5789473684210527,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.6868421052631577
     },
     {
       "name": "track-old--15",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.176738112216809,
-        3.2,
-        -408.54333535643315
+        617.5724675048323,
+        35.2,
+        2068.4215433496643
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.6052631578947368,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.7157894736842104
     },
     {
       "name": "track-old--14",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -8.045609310276037,
-        3.2,
-        -409.53470069640707
+        617.7187044021315,
+        35.2,
+        2067.432293750287
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.631578947368421,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.744736842105263
     },
     {
       "name": "track-old--13",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.914480508335266,
-        3.2,
-        -410.526066036381
+        617.8649412994307,
+        35.2,
+        2066.4430441509094
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.6578947368421053,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.7736842105263158
     },
     {
       "name": "track-old--12",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.783351706394494,
-        3.2,
-        -411.51743137635486
+        618.01117819673,
+        35.2,
+        2065.453794551532
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.6842105263157895,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.8026315789473684
     },
     {
       "name": "track-old--11",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.652222904453723,
-        3.2,
-        -412.5087967163288
+        618.1574150940293,
+        35.2,
+        2064.464544952155
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.7105263157894737,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.831578947368421
     },
     {
       "name": "track-old--10",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.521094102512951,
-        3.2,
-        -413.5001620563027
+        618.3036519913286,
+        35.2,
+        2063.4752953527773
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.736842105263158,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.8605263157894736
     },
     {
       "name": "track-old--9",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.389965300572179,
-        3.2,
-        -414.4915273962766
+        618.4498888886278,
+        35.2,
+        2062.4860457534
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.7631578947368421,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.8894736842105262
     },
     {
       "name": "track-old--8",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.258836498631408,
-        3.2,
-        -415.4828927362505
+        618.596125785927,
+        35.2,
+        2061.496796154023
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.7894736842105263,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.9184210526315788
     },
     {
       "name": "track-old--7",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -7.127707696690636,
-        3.2,
-        -416.47425807622443
+        618.7423626832264,
+        35.2,
+        2060.507546554645
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.8157894736842105,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.9473684210526314
     },
     {
       "name": "track-old--6",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.996578894749864,
-        3.2,
-        -417.4656234161983
+        618.8885995805256,
+        35.2,
+        2059.518296955268
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.8421052631578947,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 0.9763157894736841
     },
     {
       "name": "track-old--5",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.865450092809093,
-        3.2,
-        -418.4569887561722
+        619.0348364778249,
+        35.2,
+        2058.5290473558907
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.868421052631579,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 1.0
     },
     {
       "name": "track-old--4",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.734321290868321,
-        3.2,
-        -419.44835409614615
+        619.1810733751241,
+        35.2,
+        2057.539797756513
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.8947368421052632,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 1.0
     },
     {
       "name": "track-old--3",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.603192488927549,
-        3.2,
-        -420.43971943612
+        619.3273102724233,
+        35.2,
+        2056.550548157136
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.9210526315789473,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 1.0
     },
     {
       "name": "track-old--2",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.472063686986778,
-        3.2,
-        -421.43108477609394
+        619.4735471697227,
+        35.2,
+        2055.5612985577586
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.9473684210526316,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 1.0
     },
     {
       "name": "track-old--1",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.340934885046006,
-        3.2,
-        -422.42245011606786
+        619.6197840670219,
+        35.2,
+        2054.572048958381
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
         1,
-        1,
+        0.9736842105263158,
         1
       ],
-      "visible": true
+      "visible": true,
+      "opacity": 1.0
     },
     {
       "name": "track-new-0",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.209806083105234,
-        3.2,
-        -423.41381545604173
+        619.7660209643212,
+        35.2,
+        2053.5827993590037
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1821,13 +2270,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -6.078677281164463,
-        3.2,
-        -424.40518079601566
+        619.9122578616204,
+        35.2,
+        2052.5935497596265
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1842,13 +2291,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.947548479223691,
-        3.2,
-        -425.3965461359896
+        620.0584947589197,
+        35.2,
+        2051.604300160249
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1863,13 +2312,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.816419677282919,
-        3.2,
-        -426.38791147596345
+        620.204731656219,
+        35.2,
+        2050.6150505608716
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1884,13 +2333,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.685290875342148,
-        3.2,
-        -427.3792768159374
+        620.3509685535182,
+        35.2,
+        2049.6258009614944
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1905,13 +2354,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.554162073401376,
-        3.2,
-        -428.3706421559113
+        620.4972054508175,
+        35.2,
+        2048.6365513621167
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1926,13 +2375,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.423033271460605,
-        3.2,
-        -429.36200749588517
+        620.6434423481168,
+        35.2,
+        2047.6473017627395
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1947,13 +2396,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.291904469519833,
-        3.2,
-        -430.3533728358591
+        620.789679245416,
+        35.2,
+        2046.6580521633623
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1968,13 +2417,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.1607756675790615,
-        3.2,
-        -431.344738175833
+        620.9359161427153,
+        35.2,
+        2045.6688025639849
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -1989,13 +2438,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -5.0296468656382896,
-        3.2,
-        -432.3361035158069
+        621.0821530400145,
+        35.2,
+        2044.6795529646074
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -2010,13 +2459,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -4.8985180636975185,
-        3.2,
-        -433.3274688557808
+        621.2283899373139,
+        35.2,
+        2043.6903033652302
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -2031,13 +2480,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -4.767389261756747,
-        3.2,
-        -434.31883419575473
+        621.3746268346131,
+        35.2,
+        2042.7010537658527
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -2052,13 +2501,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/rover-tracks.glb",
       "position": [
-        -4.636260459815976,
-        3.2,
-        -435.3101995357286
+        621.5208637319123,
+        35.2,
+        2041.7118041664753
       ],
       "rotation": [
         0,
-        172.4651736786463,
+        171.5910882673993,
         0
       ],
       "scale": [
@@ -2071,11 +2520,11 @@
     {
       "name": "rock-0",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -26.0550009941622,
-        3.1261448815053745,
-        -428.1537594130622
+        599.9449990058378,
+        35.15014779501613,
+        2048.8462405869377
       ],
       "rotation": [
         0,
@@ -2083,20 +2532,25 @@
         0
       ],
       "scale": [
-        0.9231889811828202,
-        0.9231889811828202,
-        0.9231889811828202
+        0.4154350415322691,
+        0.4154350415322691,
+        0.4154350415322691
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-1",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -14.687533131126935,
-        3.101367234829893,
-        -458.20192250813375
+        611.3124668688731,
+        35.13342288351018,
+        2018.7980774918663
       ],
       "rotation": [
         0,
@@ -2104,20 +2558,25 @@
         0
       ],
       "scale": [
-        1.232909564626337,
-        1.232909564626337,
-        1.232909564626337
+        0.5548093040818517,
+        0.5548093040818517,
+        0.5548093040818517
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-2",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        28.990030458924288,
-        3.140059878544663,
-        -441.39478165579715
+        654.9900304589243,
+        35.15954041801765,
+        2035.605218344203
       ],
       "rotation": [
         0,
@@ -2125,20 +2584,25 @@
         0
       ],
       "scale": [
-        0.7492515181917134,
-        0.7492515181917134,
-        0.7492515181917134
+        0.33716318318627103,
+        0.33716318318627103,
+        0.33716318318627103
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-3",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        26.506529625700402,
-        3.0772574911110264,
-        -422.45905376259327
+        652.5065296257004,
+        35.11714880649995,
+        2054.540946237407
       ],
       "rotation": [
         0,
@@ -2146,20 +2610,25 @@
         0
       ],
       "scale": [
-        1.5342813611121702,
-        1.5342813611121702,
-        1.5342813611121702
+        0.6904266125004765,
+        0.6904266125004765,
+        0.6904266125004765
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-4",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        11.797365402084594,
-        3.1259674640369743,
-        -457.03318118222734
+        637.7973654020846,
+        35.15002803822496,
+        2019.9668188177727
       ],
       "rotation": [
         0,
@@ -2167,872 +2636,1082 @@
         0
       ],
       "scale": [
-        0.925406699537825,
-        0.925406699537825,
-        0.925406699537825
+        0.4164330147920212,
+        0.4164330147920212,
+        0.4164330147920212
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-5",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -13.354118674171657,
-        3.149348183078107,
-        -400.18759375988554
+        655.0968037305972,
+        35.10760433085322,
+        2059.417283863696
       ],
       "rotation": [
         0,
-        168.98195477825624,
+        161.95010120864293,
         0
       ],
       "scale": [
-        0.6331477115236619,
-        0.6331477115236619,
-        0.6331477115236619
+        0.7699639095565125,
+        0.7699639095565125,
+        0.7699639095565125
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-6",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        29.74575019162664,
-        3.1311811500019897,
-        -414.72059407862747
+        660.4950985767744,
+        35.12194256216757,
+        2021.122919958263
       ],
       "rotation": [
         0,
-        322.6748665860954,
+        55.26711539552169,
         0
       ],
       "scale": [
-        0.8602356249751321,
-        0.8602356249751321,
-        0.8602356249751321
+        0.6504786486036258,
+        0.6504786486036258,
+        0.6504786486036258
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-7",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        36.35175839492086,
-        3.1389648078492134,
-        -449.914785026308
+        629.97755746829,
+        35.14274731382606,
+        2014.9158671471662
       ],
       "rotation": [
         0,
-        285.0589334659602,
+        196.6069074991788,
         0
       ],
       "scale": [
-        0.7629399018848331,
-        0.7629399018848331,
-        0.7629399018848331
+        0.4771057181162477,
+        0.4771057181162477,
+        0.4771057181162477
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-8",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -43.380152524996596,
-        3.072934211289703,
-        -421.2931907611893
+        633.9012451446483,
+        35.14289757131776,
+        2066.2423561274404
       ],
       "rotation": [
         0,
-        45.69441229347379,
+        255.7407375519451,
         0
       ],
       "scale": [
-        1.5883223588787108,
-        1.5883223588787108,
-        1.5883223588787108
+        0.47585357235199094,
+        0.47585357235199094,
+        0.47585357235199094
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-9",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        24.802168171194918,
-        3.108257844366634,
-        -403.67288551160425
+        652.5153560164155,
+        35.129116394819796,
+        2073.4692593170766
       ],
       "rotation": [
         0,
-        33.43600933558073,
+        270.11358801083753,
         0
       ],
       "scale": [
-        1.1467769454170766,
-        1.1467769454170766,
-        1.1467769454170766
+        0.5906967098350311,
+        0.5906967098350311,
+        0.5906967098350311
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-10",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        -51.52079271139182,
-        3.083802855226459,
-        -425.19111303531935
+        649.48308271154,
+        35.15456613916586,
+        2079.1869615608744
       ],
       "rotation": [
         0,
-        42.67979480830307,
+        150.59142689149502,
         0
       ],
       "scale": [
-        1.4524643096692682,
-        1.4524643096692682,
-        1.4524643096692682
+        0.3786155069512314,
+        0.3786155069512314,
+        0.3786155069512314
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-11",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -33.89881715214563,
-        3.0894234895319967,
-        -431.21188695132923
+        580.5159334729684,
+        35.146908095861086,
+        2071.6476367357395
       ],
       "rotation": [
         0,
-        153.5446374872468,
+        132.0323336327985,
         0
       ],
       "scale": [
-        1.3822063808500409,
-        1.3822063808500409,
-        1.3822063808500409
+        0.4424325344909673,
+        0.4424325344909673,
+        0.4424325344909673
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-12",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -23.927338187767067,
-        3.126050926770181,
-        -454.72530589940743
+        611.2611918309908,
+        35.15120352466316,
+        2100.7333801693694
       ],
       "rotation": [
         0,
-        100.166160722104,
+        248.3653287109882,
         0
       ],
       "scale": [
-        0.9243634153727395,
-        0.9243634153727395,
-        0.9243634153727395
+        0.40663729447371805,
+        0.40663729447371805,
+        0.40663729447371805
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-13",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        14.031026146405281,
-        3.1365212968260217,
-        -449.2453550833085
+        593.219483063138,
+        35.1172220282923,
+        2089.144745384416
       ],
       "rotation": [
         0,
-        125.79074659164895,
+        355.0963280619705,
         0
       ],
       "scale": [
-        0.7934837896747307,
-        0.7934837896747307,
-        0.7934837896747307
+        0.6898164308975074,
+        0.6898164308975074,
+        0.6898164308975074
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-14",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        -14.918149246663818,
-        3.120199078464058,
-        -475.5821059786924
+        604.4486689820928,
+        35.15270567805926,
+        2018.7480414754812
       ],
       "rotation": [
         0,
-        244.93537042051437,
+        281.58458069162447,
         0
       ],
       "scale": [
-        0.9975115191992768,
-        0.9975115191992768,
-        0.9975115191992768
+        0.3941193495061505,
+        0.3941193495061505,
+        0.3941193495061505
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-15",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -33.828316418966466,
-        3.1108998622689357,
-        -413.2456239305775
+        660.9719182627174,
+        35.16647911951441,
+        2058.8506301360408
       ],
       "rotation": [
         0,
-        9.492222093770128,
+        82.76778797859575,
         0
       ],
       "scale": [
-        1.1137517216383075,
-        1.1137517216383075,
-        1.1137517216383075
+        0.27934067071325047,
+        0.27934067071325047,
+        0.27934067071325047
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-16",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -16.458775404073435,
-        3.072392158637925,
-        -430.70905586931485
+        592.2054801309988,
+        35.129399564399215,
+        2043.9984910315916
       ],
       "rotation": [
         0,
-        196.06009444192338,
+        35.533077491187434,
         0
       ],
       "scale": [
-        1.5950980170259423,
-        1.5950980170259423,
-        1.5950980170259423
+        0.5883369633398962,
+        0.5883369633398962,
+        0.5883369633398962
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-17",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -5.5454268781715275,
-        3.0567772944914693,
-        -379.63043983862775
+        655.6982111764903,
+        35.128891768182065,
+        2046.4030393755952
       ],
       "rotation": [
         0,
-        351.08939460603233,
+        240.633878451409,
         0
       ],
       "scale": [
-        1.7902838188566368,
-        1.7902838188566368,
-        1.7902838188566368
+        0.5925685984827975,
+        0.5925685984827975,
+        0.5925685984827975
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-18",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        -46.09343798299612,
-        3.113279742249097,
-        -403.1949484565153
+        578.9174819022232,
+        35.14231704369807,
+        2056.786963045705
       ],
       "rotation": [
         0,
-        173.35382705346717,
+        276.31133572904406,
         0
       ],
       "scale": [
-        1.084003221886285,
-        1.084003221886285,
-        1.084003221886285
+        0.4806913025160896,
+        0.4806913025160896,
+        0.4806913025160896
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-19",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -39.84574738674766,
-        3.129981522063909,
-        -441.93063931228437
+        570.3982145412564,
+        35.11386993141078,
+        2048.7049970778658
       ],
       "rotation": [
         0,
-        94.41662281139361,
+        257.4402404308454,
         0
       ],
       "scale": [
-        0.8752309742011434,
-        0.8752309742011434,
-        0.8752309742011434
+        0.7177505715768152,
+        0.7177505715768152,
+        0.7177505715768152
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-20",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -21.863909424707337,
-        3.0825873925565945,
-        -389.0467603571158
+        612.4702658717143,
+        35.150965771465266,
+        2010.883718104159
       ],
       "rotation": [
         0,
-        191.9086472520739,
+        284.9469324310609,
         0
       ],
       "scale": [
-        1.4676575930425684,
-        1.4676575930425684,
-        1.4676575930425684
+        0.40861857112282796,
+        0.40861857112282796,
+        0.40861857112282796
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-21",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -15.951414311388836,
-        3.1049776086409158,
-        -469.6674041400987
+        649.8054104390931,
+        35.13164192788134,
+        2085.323841693977
       ],
       "rotation": [
         0,
-        260.351682141509,
+        309.5472986267622,
         0
       ],
       "scale": [
-        1.1877798919885547,
-        1.1877798919885547,
-        1.1877798919885547
+        0.5696506009888559,
+        0.5696506009888559,
+        0.5696506009888559
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-22",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        -23.705430863792866,
-        3.139468613270142,
-        -465.4650325696995
+        607.3074878529411,
+        35.15412717705914,
+        2084.5381104105286
       ],
       "rotation": [
         0,
-        111.3098323996213,
+        304.5021020086669,
         0
       ],
       "scale": [
-        0.7566423341232249,
-        0.7566423341232249,
-        0.7566423341232249
+        0.38227352450718416,
+        0.38227352450718416,
+        0.38227352450718416
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-23",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -28.174819214802334,
-        3.124056177101292,
-        -406.34856191316436
+        668.9719677777873,
+        35.148850151395465,
+        2035.6969056168641
       ],
       "rotation": [
         0,
-        341.5870557508113,
+        353.7397616972987,
         0
       ],
       "scale": [
-        0.9492977862338551,
-        0.9492977862338551,
-        0.9492977862338551
+        0.4262487383711433,
+        0.4262487383711433,
+        0.4262487383711433
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-24",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        25.17954367545477,
-        3.072177441807762,
-        -436.64779666833545
+        633.2384540268878,
+        35.11992793050363,
+        2010.335379291376
       ],
       "rotation": [
         0,
-        287.62705603891095,
+        355.8945295717017,
         0
       ],
       "scale": [
-        1.5977819774029811,
-        1.5977819774029811,
-        1.5977819774029811
+        0.6672672458030962,
+        0.6672672458030962,
+        0.6672672458030962
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-25",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -24.964583105094626,
-        3.1424163401290666,
-        -451.31694969325935
+        645.6869913549028,
+        35.124390791833555,
+        2041.2866759042156
       ],
       "rotation": [
         0,
-        337.3603509462173,
+        342.72904649742514,
         0
       ],
       "scale": [
-        0.7197957483866724,
-        0.7197957483866724,
-        0.7197957483866724
+        0.6300767347204108,
+        0.6300767347204108,
+        0.6300767347204108
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-26",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        1.1267880693697325,
-        3.116957012258213,
-        -377.59564810513984
+        662.7882882031672,
+        35.11596537168539,
+        2050.4365490960204
       ],
       "rotation": [
         0,
-        357.9073875635343,
+        243.8832355302704,
         0
       ],
       "scale": [
-        1.0380373467723432,
-        1.0380373467723432,
-        1.0380373467723432
+        0.7002885692884545,
+        0.7002885692884545,
+        0.7002885692884545
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-27",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -43.70164890640224,
-        3.084812333942815,
-        -460.7215994286695
+        623.6465105903973,
+        35.125823212268145,
+        2085.7990736675206
       ],
       "rotation": [
         0,
-        83.84229725786071,
+        314.9168081546376,
         0
       ],
       "scale": [
-        1.4398458257148155,
-        1.4398458257148155,
-        1.4398458257148155
+        0.6181398977654836,
+        0.6181398977654836,
+        0.6181398977654836
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-28",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -37.20377176236159,
-        3.091523521880469,
-        -389.5599840366995
+        645.4922699368689,
+        35.11647582535611,
+        2054.7146488365606
       ],
       "rotation": [
         0,
-        6.078468496402523,
+        117.58229695317085,
         0
       ],
       "scale": [
-        1.3559559764941382,
-        1.3559559764941382,
-        1.3559559764941382
+        0.6960347886990642,
+        0.6960347886990642,
+        0.6960347886990642
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-29",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        14.583299562495789,
-        3.116201060151805,
-        -377.56931804255845
+        607.6911305170439,
+        35.1359520528361,
+        2034.5263635908614
       ],
       "rotation": [
         0,
-        234.8381694526967,
+        140.35095566556248,
         0
       ],
       "scale": [
-        1.0474867481024372,
-        1.0474867481024372,
-        1.0474867481024372
+        0.5337328930325014,
+        0.5337328930325014,
+        0.5337328930325014
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-30",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        25.077114833825377,
-        3.131069221491965,
-        -397.12543598865597
+        591.943021300376,
+        35.145409353218035,
+        2068.7447917036548
       ],
       "rotation": [
         0,
-        149.1706649472081,
+        127.57756045838991,
         0
       ],
       "scale": [
-        0.8616347313504417,
-        0.8616347313504417,
-        0.8616347313504417
+        0.45492205651642165,
+        0.45492205651642165,
+        0.45492205651642165
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-31",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -23.702565727335216,
-        3.0800811532211347,
-        -393.9175065226463
+        656.1894994677175,
+        35.151123178642635,
+        2023.3294400365749
       ],
       "rotation": [
         0,
-        321.6125300847057,
+        142.4388038109543,
         0
       ],
       "scale": [
-        1.4989855847358164,
-        1.4989855847358164,
-        1.4989855847358164
+        0.40730684464470224,
+        0.40730684464470224,
+        0.40730684464470224
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-32",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -8.834009353988172,
-        3.106771130055378,
-        -456.386668985363
+        653.564180402308,
+        35.11408875022127,
+        2092.3211855275053
       ],
       "rotation": [
         0,
-        50.22531007749873,
+        267.0022132516266,
         0
       ],
       "scale": [
-        1.1653608743077721,
-        1.1653608743077721,
-        1.1653608743077721
+        0.7159270814894395,
+        0.7159270814894395,
+        0.7159270814894395
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-33",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        46.26707788736924,
-        3.0897411336303993,
-        -432.3567700525369
+        597.282107101972,
+        35.15466577876997,
+        2010.8873682897183
       ],
       "rotation": [
         0,
-        241.0759716771178,
+        22.29344892744598,
         0
       ],
       "scale": [
-        1.3782358296200088,
-        1.3782358296200088,
-        1.3782358296200088
+        0.37778517691698515,
+        0.37778517691698515,
+        0.37778517691698515
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-34",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        -8.601901822972074,
-        3.0854635766421414,
-        -441.74383788873524
+        637.0650750578206,
+        35.15084745502058,
+        2021.7315490571937
       ],
       "rotation": [
         0,
-        111.68363319614528,
+        44.33771068833008,
         0
       ],
       "scale": [
-        1.4317052919732323,
-        1.4317052919732323,
-        1.4317052919732323
+        0.4096045414951816,
+        0.4096045414951816,
+        0.4096045414951816
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-35",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -10.616102440296096,
-        3.1438542621216934,
-        -446.3519348166464
+        661.8560993876748,
+        35.12483952286151,
+        2083.1483982589316
       ],
       "rotation": [
         0,
-        97.16865474374677,
+        348.34650594882817,
         0
       ],
       "scale": [
-        0.701821723478836,
-        0.701821723478836,
-        0.701821723478836
+        0.6263373094874936,
+        0.6263373094874936,
+        0.6263373094874936
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-36",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        36.20127668433543,
-        3.085430497520483,
-        -394.2487890094478
+        662.7344645818384,
+        35.119266861644235,
+        2048.362247406513
       ],
       "rotation": [
         0,
-        355.13445145448077,
+        208.08671185602182,
         0
       ],
       "scale": [
-        1.4321187809939602,
-        1.4321187809939602,
-        1.4321187809939602
+        0.6727761529647105,
+        0.6727761529647105,
+        0.6727761529647105
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-37",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -42.07369396190295,
-        3.1315737739768625,
-        -460.2138972697036
+        600.7118310448665,
+        35.16425322966414,
+        2042.2302664387132
       ],
       "rotation": [
         0,
-        206.86286637250768,
+        44.1397154823739,
         0
       ],
       "scale": [
-        0.8553278252892229,
-        0.8553278252892229,
-        0.8553278252892229
+        0.29788975279886876,
+        0.29788975279886876,
+        0.29788975279886876
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-38",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        6.362510842565207,
-        3.0526782598454254,
-        -413.4042703784568
+        595.2860572190837,
+        35.13281020416166,
+        2053.58781535185
       ],
       "rotation": [
         0,
-        176.32392721364505,
+        28.760001549558925,
         0
       ],
       "scale": [
-        1.8415217519321865,
-        1.8415217519321865,
-        1.8415217519321865
+        0.5599149653195326,
+        0.5599149653195326,
+        0.5599149653195326
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-39",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        15.076448092064236,
-        2.9997514505339593,
-        -386.9155873529446
+        641.5881135355609,
+        35.125565791219884,
+        2079.236164877729
       ],
       "rotation": [
         0,
-        51.598714130722215,
+        155.4842603120957,
         0
       ],
       "scale": [
-        2.5031068683255118,
-        2.5031068683255118,
-        2.5031068683255118
+        0.6202850731676376,
+        0.6202850731676376,
+        0.6202850731676376
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-40",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -28.07061698932669,
-        3.1449455879340835,
-        -405.3566462613158
+        609.3380032246771,
+        35.14461834662723,
+        2096.170392483439
       ],
       "rotation": [
         0,
-        103.57065244361954,
+        185.6974853192441,
         0
       ],
       "scale": [
-        0.6881801508239583,
-        0.6881801508239583,
-        0.6881801508239583
+        0.4615137781064142,
+        0.4615137781064142,
+        0.4615137781064142
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-41",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        -15.081510703765382,
-        3.1205234569991003,
-        -460.1598370892944
+        644.8107957942,
+        35.12239560064581,
+        2030.9713728054317
       ],
       "rotation": [
         0,
-        319.7167379391802,
+        355.0982873317014,
         0
       ],
       "scale": [
-        0.9934567875112498,
-        0.9934567875112498,
-        0.9934567875112498
+        0.6467033279516263,
+        0.6467033279516263,
+        0.6467033279516263
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-42",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_04.glb",
       "position": [
-        -20.828814978890286,
-        3.142695026360246,
-        -397.5359615858317
+        599.6792466780519,
+        35.118466634084875,
+        2010.0380884377594
       ],
       "rotation": [
         0,
-        244.16064205446642,
+        131.3684518510532,
         0
       ],
       "scale": [
-        0.7163121704969325,
-        0.7163121704969325,
-        0.7163121704969325
+        0.6794447159594148,
+        0.6794447159594148,
+        0.6794447159594148
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-43",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-b.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_05.glb",
       "position": [
-        -5.376539183885007,
-        3.106242896709173,
-        -475.7821636942382
+        641.1931108289972,
+        35.16522029553119,
+        2012.4638653130082
       ],
       "rotation": [
         0,
-        298.1932701474928,
+        168.25738012713123,
         0
       ],
       "scale": [
-        1.1719637911353404,
-        1.1719637911353404,
-        1.1719637911353404
+        0.28983087057342166,
+        0.28983087057342166,
+        0.28983087057342166
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-44",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-c.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_02.glb",
       "position": [
-        -11.591550035432066,
-        3.115363186318705,
-        -439.00116905439063
+        618.9988195525135,
+        35.135784353542334,
+        2026.318884065686
       ],
       "rotation": [
         0,
-        267.76744983423833,
+        186.39033667119014,
         0
       ],
       "scale": [
-        1.0579601710161937,
-        1.0579601710161937,
-        1.0579601710161937
+        0.5351303871472658,
+        0.5351303871472658,
+        0.5351303871472658
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     },
     {
       "name": "rock-45",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/basalt-a.glb",
+      "asset": "../../assets/strange-attractor/build/ph-namaqualand_boulder_03.glb",
       "position": [
-        10.379529277251073,
-        3.129748506862392,
-        -386.4952357225635
+        627.0649346886161,
+        35.09250418753161,
+        2097.7496420031957
       ],
       "rotation": [
         0,
-        81.2213854091777,
+        276.3617615825643,
         0
       ],
       "scale": [
-        0.8781436642201024,
-        0.8781436642201024,
-        0.8781436642201024
+        0.8957984372366106,
+        0.8957984372366106,
+        0.8957984372366106
       ],
-      "visible": true
+      "visible": true,
+      "tint": [
+        1.0,
+        0.58,
+        0.4
+      ]
     }
   ]
 }

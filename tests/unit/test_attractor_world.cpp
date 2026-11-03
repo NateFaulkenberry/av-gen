@@ -806,3 +806,44 @@ TEST_CASE("a look's warmth turns the canyon's key from the warm sun to a cold mo
     plain.enabled = true;
     CHECK_FALSE(scene::attractorWorldToJson(plain).at("look").contains("sunWarmth")); // saved only when set
 }
+
+TEST_CASE("the Mars style: mesas over an open floor, no gorge, wind forms, and only when asked", "[attractor-world][pass2][adr1902]") {
+    scene::AttractorGen canyon;
+    canyon.resolution = 256;
+    canyon.meshSpacing = 16.0f;
+    canyon.meshMinError = 4.0f;
+    scene::AttractorGen mars = canyon;
+    mars.mars = true;
+    mars.mesaCover = 0.45f;
+    mars.dunes = 8.0f;
+    mars.yardangs = 10.0f;
+    CHECK(mars.validate().has_value());
+    CHECK(mars.hash() != canyon.hash());
+    auto m = scene::generateAttractorWorld(mars);
+    REQUIRE(m->terrainMesh);
+    // no gorge: nothing is cut down to the river's -2 m floor, so there is no river sheet
+    CHECK(m->minHeight > 0.0f);
+    CHECK(m->terrainMesh->riverIndices.empty());
+    // mesas stand over an open floor: the floor is most of the land, the tops are cliffs above it
+    int floor = 0, high = 0, n = 0;
+    for (std::size_t i = 0; i < m->height.size(); i += 7) {
+        const float h = m->height[i];
+        ++n;
+        if (h < m->minHeight + 30.0f) ++floor;
+        if (h > m->minHeight + 150.0f) ++high;
+    }
+    CHECK(floor > n / 3);
+    CHECK(high > n / 50);
+    // round-trips, and a bad value is refused
+    scene::AttractorWorldBlock block;
+    block.enabled = true;
+    block.gen = mars;
+    auto back = scene::attractorWorldFromJson(scene::attractorWorldToJson(block));
+    REQUIRE(back.has_value());
+    CHECK(back->gen.mars);
+    CHECK(back->gen.hash() == mars.hash());
+    scene::AttractorGen bad = mars;
+    bad.mesaCover = 1.5f;
+    CHECK_FALSE(bad.validate().has_value());
+    CHECK_FALSE(scene::attractorWorldToJson(scene::AttractorWorldBlock{}).contains("mars"));
+}

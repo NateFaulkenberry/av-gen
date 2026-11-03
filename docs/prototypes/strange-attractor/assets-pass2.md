@@ -53,6 +53,11 @@ Attribution, to carry wherever the work is shown:
 | `assets/strange-attractor/build/rover.glb` (centred, facing +z) | `pass2/prepare_rover.py` | the NASA Curiosity model | public domain |
 | `assets/strange-attractor/build/sasquatch-{a,b,c}.glb` (M3b: three individuals, own base poses, IK-planted idles) | `pass2/build_sasquatch.py` | Mat Rex's Bigfoot (CC BY, above) | CC BY (attribution above) |
 | `assets/strange-attractor/build/pyramid-{a,b,c}.glb` (M3b: coursed, chipped blocks, deep sand) | `pass2/build_pyramids.py` | nothing third-party | original |
+| `assets/strange-attractor/polyhaven/models/{stone_fire_pit, namaqualand_boulder_02..05, namaqualand_stones_01, rock_07, rock_09, shrub_01, shrub_02, shrub_04, dead_tree_trunk, sand_rocks_small_01}` (M3d: photoscanned camp and Mars props) | https://polyhaven.com (API files, no login) | Poly Haven | CC0 |
+| `assets/strange-attractor/polyhaven/textures/{aerial_sand, red_sand, old_sandstone_02, cliff_side, rock_face, dry_ground_rocks}` (2k albedo + GL normal; M3d close-up textures) | https://polyhaven.com | Poly Haven | CC0 |
+| `assets/strange-attractor/build/ph-*.glb`, `ph-teepee.glb` (centred, grounded, textures embedded) | `pass2/prepare_polyhaven.py`, `pass2/build_teepee.py` | the Poly Haven models | CC0 |
+| `assets/strange-attractor/build/{fish, ray, jelly}.glb` (M3d: rigged, animated sea life) | `pass2/build_sealife.py` | nothing third-party | original |
+| `assets/strange-attractor/refs/{zangaki-sphinx-pyramids, bonfils-sphinx-1888}.jpg` (M3d: the buried-sand references) | Wikimedia Commons | Zangaki (19th c.), Félix Bonfils (1888) | public domain |
 | `assets/strange-attractor/build/dome-rave-{m,c,g,a,v}.glb` (M3c: the domes' glass in five colour bands) | `pass2/build_dome_rave.py` (from `proofs/dome.glb`) | nothing third-party | original |
 | `assets/strange-attractor/build/earth-halo-{a,b,c}.glb` (M3c: the Earth's stylised glow options) | `pass2/build_earth_halo.py` | nothing third-party | original |
 | `assets/strange-attractor/build/{scrub-a..c, rock-a..d, seat-rock, basalt-a..c, cave-mouth, laser-fan, kelp-a,b, sponge, fan-coral, seagrass, flash, rover-tracks}.glb` (M3b prop kit) | `pass2/build_kit.py` | nothing third-party | original |

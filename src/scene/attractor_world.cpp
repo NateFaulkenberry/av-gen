@@ -857,21 +857,21 @@ std::shared_ptr<const AttractorWorld> generateAttractorWorld(const AttractorGen&
             }
             const float vpos = std::max(v, 0.0f);
             if (g.mars) { // ADR-1902: no valley, no promontory: the plain, the mesas where the front stays high
-                F -= 0.25f + 1.4f * (1.0f - g.mesaCover);
+                F -= 1.6f * (0.7f - g.mesaCover);
             } else {
                 const float basinW = (380.0f + 0.14f * vpos) * S;
                 F -= 1.25f * std::exp(-(best * best) / (basinW * basinW));
                 const float dc = glm::length(p - camXZ) / (340.0f * S); // the camera's promontory
                 F += 1.6f * std::exp(-dc * dc);
             }
-            for (std::size_t m = 0; m < w.masses.size(); ++m) { // the composed masses
+            for (std::size_t m = 0; m < (g.mars ? 0u : w.masses.size()); ++m) { // the composed masses (ADR-1902: not on Mars)
                 const AttractorMass& ms = w.masses[m];
                 const float c = std::cos(ms.angle), sn = std::sin(ms.angle);
                 const glm::vec2 d = p - ms.centre;
                 const glm::vec2 n((c * d.x + sn * d.y) / ms.axes.x, (-sn * d.x + c * d.y) / ms.axes.y);
                 F += massStrength[m] * std::exp(-glm::dot(n, n));
             }
-            F += 0.9f * smoothstepf(6500.0f * S, 9500.0f * S, v); // the far ramp up to the upper tier
+            if (!g.mars) F += 0.9f * smoothstepf(6500.0f * S, 9500.0f * S, v); // the far ramp up to the upper tier
             const float edge = std::max(std::abs(p.x), std::abs(p.y)) / half;
             F += 1.4f * smoothstepf(0.82f, 0.95f, edge); // the upper tier near the square's edge hides it
             fieldF[idx] = F;

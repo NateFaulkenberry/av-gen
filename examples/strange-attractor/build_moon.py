@@ -235,6 +235,13 @@ scene = {
              [{"name": "earth-halo", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
                "position": [earth[i] + E[i] * EARTH_RADIUS * 1.2 for i in range(3)], "rotation": HALO_ROT,
                "scale": [EARTH_RADIUS / 10.0] * 3, "visible": True, "emissiveBoost": 1.0}] +
+             # M3d (owner: the corona must be animated): two more layers of the same blocks, scaled so
+             # their blocks fall at other radii (scaled), breathing in scale out of phase (the timeline) so the blocks drift in and
+             # out, and flickering in on their own beat sources (the project's routes)
+             [{"name": f"earth-halo-{k}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * (1.2 + 0.02 * k) for i in range(3)],
+               "rotation": HALO_ROT, "scale": [EARTH_RADIUS / 10.0 * (0.93 if k == 2 else 1.09)] * 3,
+               "visible": True, "emissiveBoost": 0.8, "opacity": 0.5} for k in (2, 3)] +
              # M3c (owner: no beams into the sky): the rave is inside the domes -- their glass lit in five colours in
              # bands that wind round them, each band on its own beat source (routed), a steady glow with audio off
              [{"name": f"dome{k}-rave-{g}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/dome-rave-{g}.glb",

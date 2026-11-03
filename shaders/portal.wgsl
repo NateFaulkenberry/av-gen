@@ -53,6 +53,17 @@ fn fs_portal(in: PortalIn) -> PortalOut {
     let dir = cameraViewRay(ndc);
     let b = crBasis();
     let focus = frame.corruption0.xyz;
+    // ADR-1903: the camera already past the opening's plane but before the crossing's instant (the crossing time is
+    // found on a 1/60 s grid and the frame can land between): inside the aperture it is through, so the other world
+    // fills the frame -- without this, that one frame showed the wall behind the opening (a one-frame pop)
+    // (the crossing's own frame puts the camera ON the plane, where the surface the opening is cut into stands at the
+    // eye: within half a metre of the plane counts as through)
+    let camSide = dot(frame.cameraPos.xyz - focus, b.ax);
+    if (camSide >= -0.5 && crAperture(frame.cameraPos.xyz - b.ax * camSide, b).e < 1.0) {
+        out.color = vec4<f32>(textureSampleLevel(portalHdr, portalSampler, uv, 0.0).rgb, 1.0);
+        out.depth = 0.0;
+        return out;
+    }
     let denom = dot(dir, b.ax);
     if (denom <= 1e-5) {
         discard;

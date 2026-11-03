@@ -21,8 +21,9 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, pace  # noqa: E402
+from canyon_scale import WORLD_SCALE as WS, R, PREFIX, site, pace, L_UNIT  # noqa: E402
 from sample_ground import heights  # noqa: E402
+CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 A = "../../assets/strange-attractor/build/"
@@ -38,9 +39,14 @@ MESAS = [SHELF,
          dict(x=260.0, z=-1250.0, rx=90.0, rz=60.0, angle=-20.0, height=55.0, terraces=2),
          dict(x=520.0, z=-800.0, rx=70.0, rz=70.0, angle=10.0, height=35.0, terraces=2)]
 
-# the base at the shelf's foot, its front (+z in the glb) turned to face +x (yaw 90), measured ground below it
-BASE_XZ = (-25.0, -880.0)
-BASE_GROUND = 50.0                  # the apron at the shelf's foot (measured 44-60 m under the hull)
+# M3d (owner: no box-like "basins"; the seafloor on the canyon's procedural pipeline, ADR-1902): the layout is carried
+# onto the generated reef, whose wall at about x = 690 faces +x over 1.1 km of open floor (found by a search of the
+# height field); every place below is authored as before and offset by (OX, OZ); heights are absolute
+OX, OZ = 809.0, 677.0
+PLAIN = 32.7                        # the floor's level in front of the wall (sampled)
+# the base at the reef wall's foot, its front (+z in the glb) turned to face +x (yaw 90), on a pad at the floor's level
+BASE_XZ = (-25.0 + OX, -880.0 + OZ)
+BASE_GROUND = PLAIN
 # the seabed under the bay approach, measured: (x, z) -> metres
 GROUND = {(365.0, -785.0): -3.0, (215.0, -870.0): 6.4, (125.0, -880.0): 30.0, (65.0, -880.0): 44.0, (40.0, -880.0): 48.0,
           (300.0, -700.0): 0.0}
@@ -58,12 +64,23 @@ BAY = base_world(BAY_LOCAL)
 # the arrival: out into open water, heading -z (the exit's y is over the seabed). M3b: much closer to the base, and the
 # flight leaves at the glide's own speed (3.2 m/s), gathers pace smoothly to a cruise and slows into the launch bay
 # (owner: the water portal felt like a step). Path in absolute heights, turned into heights over the sampled seabed.
-EXIT = [300.0, 22.0, -430.0]
-EXIT_AXIS = [0.0, 0.0, -1.0]
-OCEAN_PATH = [(300.0, None, -437.0), (298.0, 22.5, -458.0), (293.0, 25.0, -500.0), (282.0, 30.0, -565.0),
-              (262.0, 38.0, -645.0), (222.0, 52.0, -735.0), (165.0, 66.0, -812.0), (112.0, 77.0, -862.0),
-              (84.0, 81.0, -878.0), (65.0, 82.0, -880.0), (45.0, 82.0, -880.0)]
-T_EXIT, T_BAY = 121.2, 147.0
+# M3d: on the generated floor the approach runs along the open ground in front of the reef wall, heading -x
+EXIT = [BASE_XZ[0] + 1050.0, PLAIN + 30.0, BASE_XZ[1] + 60.0]   # absolute (over the open floor)
+EXIT_AXIS = [-1.0, 0.0, 0.0]
+_bx, _bz = BASE_XZ
+# (M3d, owner: the camera rocked at the start -- measured: the M3c path's heights over a dipping seabed nodded the
+# camera +-7 degrees in pitch): one smooth line now, level at first, its lateral offset easing in as a cosine (no
+# kink), its height rising 3 m over the whole run
+def _ocean_path():
+    pts = [(_bx + 1050.0 - 7.0, None, _bz + 60.0)]
+    for d in (1020.0, 960.0, 860.0, 730.0, 580.0, 420.0, 260.0, 150.0):
+        u = (1043.0 - d) / (1043.0 - 150.0)
+        pts.append((_bx + d, PLAIN + 30.0 + 2.0 * u, _bz + 60.0 * math.cos(0.5 * math.pi * u)))
+    return pts + [(BAY[0], BAY[1], BAY[2]), (BAY[0] - 20.0, BAY[1], BAY[2])]
+
+
+OCEAN_PATH = _ocean_path()
+T_EXIT, T_BAY = 121.2 + 1.0 / 60.0, 147.0 + 1.0 / 60.0   # half a frame off the 30 fps grid (ADR-1903)
 
 
 # the ocean flight (x, height over the seabed, z, t): crossing 5 at 121.2 s (bar 62), crossing 6 at 147.0 s (bar 75)
@@ -74,7 +91,7 @@ def flight(bay_rel_y=None):
         ground = [0.0] * len(OCEAN_PATH)
     pts = []
     for (x, y, z), g in zip(OCEAN_PATH, ground):
-        pts.append((x, (g + EXIT[1] if y is None else y), z))
+        pts.append((x, (EXIT[1] if y is None else y), z))
     # the first knot is 2.2 s out at the glide speed; the bay knot is the crossing (147.0), one more knot beyond it
     knots, _ = pace(pts[:-1], T_EXIT + 2.2, T_BAY, 3.4, 9.0, ramp_in=0.3, ramp_out=0.3)
     knots.append([pts[-1][0], pts[-1][1], pts[-1][2], T_BAY + 2.2])
@@ -93,19 +110,22 @@ def sub_tracks():
     bx, by, bz = BAY
     inside = [bx - 40.0, by, bz]
 
+    # M3d (owner: out and up, not straight up -- 00-owner-refs/ocean-ufo-launch-path-arrow.png): a launch leaves the
+    # bay along a shallow climbing line, mostly outward across the floor and rising (about 12-20 degrees), fast, and
+    # is gone into the gloom in four seconds; a return mirrors it, coming in on a shallow descent
     def launch(t0, side):
-        pos = [(t0 - 0.6, inside), (t0, [bx + 12.0, by + 1.0, bz]), (t0 + 0.7, [bx + 75.0, by + 14.0, bz + side * 10.0]),
-               (t0 + 1.5, [bx + 150.0, by + 85.0, bz + side * 45.0]), (t0 + 2.4, [bx + 215.0, by + 280.0, bz + side * 110.0]),
-               (t0 + 3.4, [bx + 250.0, by + 650.0, bz + side * 170.0])]
-        rot = [(t0 - 0.6, [0.0, 90.0, 0.0]), (t0 + 0.4, [0.0, 90.0, 0.0]), (t0 + 1.4, [0.0, 90.0 - side * 15.0, 32.0]),
-               (t0 + 3.4, [0.0, 90.0 - side * 20.0, 55.0])]
+        pos = [(t0 - 0.6, inside), (t0, [bx + 12.0, by + 0.5, bz]), (t0 + 0.8, [bx + 85.0, by + 8.0, bz + side * 12.0]),
+               (t0 + 1.7, [bx + 190.0, by + 30.0, bz + side * 40.0]), (t0 + 2.7, [bx + 320.0, by + 70.0, bz + side * 80.0]),
+               (t0 + 4.0, [bx + 480.0, by + 135.0, bz + side * 130.0])]
+        rot = [(t0 - 0.6, [0.0, 90.0, 0.0]), (t0 + 0.6, [0.0, 90.0 - side * 6.0, 6.0]),
+               (t0 + 2.0, [0.0, 90.0 - side * 14.0, 14.0]), (t0 + 4.0, [0.0, 90.0 - side * 16.0, 17.0])]
         return pos, rot
 
     def dive(t1, side):
-        pos = [(t1 - 3.2, [bx + 280.0, by + 650.0, bz + side * 180.0]), (t1 - 2.2, [bx + 220.0, by + 260.0, bz + side * 110.0]),
-               (t1 - 1.3, [bx + 120.0, by + 60.0, bz + side * 35.0]), (t1 - 0.5, [bx + 30.0, by + 4.0, bz + side * 4.0]),
+        pos = [(t1 - 4.0, [bx + 470.0, by + 130.0, bz + side * 140.0]), (t1 - 2.8, [bx + 310.0, by + 68.0, bz + side * 85.0]),
+               (t1 - 1.6, [bx + 170.0, by + 26.0, bz + side * 38.0]), (t1 - 0.6, [bx + 50.0, by + 4.0, bz + side * 8.0]),
                (t1, inside)]
-        rot = [(t1 - 3.2, [0.0, -90.0 + side * 15.0, -45.0]), (t1 - 1.3, [0.0, -90.0 + side * 8.0, -20.0]),
+        rot = [(t1 - 4.0, [0.0, -90.0 + side * 16.0, -15.0]), (t1 - 1.6, [0.0, -90.0 + side * 8.0, -8.0]),
                (t1 - 0.4, [0.0, -90.0, 0.0])]
         return pos, rot
 
@@ -115,11 +135,25 @@ def sub_tracks():
         return [(118.0, pos[0][1])] + pos + [(t_end, pos[-1][1])], [(118.0, rot[0][1])] + rot + [(t_end, rot[-1][1])]
 
     tracks = []
-    for name, kind, t, side in (("sub-1", launch, 126.6, 1.0), ("sub-2", dive, 131.2, -1.0), ("sub-3", launch, 135.4, -1.0),
-                                ("sub-4", dive, 140.2, 1.0), ("sub-5", launch, 143.4, 1.0)):
+    # M3d (owner: no launches while the bay's portal opens -- its code gathers from about 140 s): all done by 140.4
+    for name, kind, t, side in (("sub-1", launch, 124.4, 1.0), ("sub-2", dive, 128.2, -1.0), ("sub-3", launch, 130.6, -1.0),
+                                ("sub-4", dive, 134.6, 1.0), ("sub-5", launch, 136.4, 1.0)):
         pos, rot = park(kind(t, side))
         tracks.append((name, pos, rot))
     return tracks
+
+
+def reef_program():
+    """M3d: the canyon's rock program (its strata and ledges carry the reef's sediment layers), cooled to the deep's
+    blue-greens and darkened."""
+    f = json.load(open(os.path.join(HERE, "strange-attractor-flythrough.scene.json")))
+    prog = json.loads(json.dumps([p for p in f["materialPrograms"] if p["name"] == "canyonRock"][0]))
+    prog["ops"] = prog["ops"][:CANYON_ROCK_OPS]     # the canyon's own ops, without its close-up detail (M3d)
+    prog.pop("textures", None)
+    prog["name"] = "reefRock"
+    prog["ops"] += [{"kind": "constant", "dst": 0, "constant": [0.42, 0.62, 0.62, 1.0]},
+                    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 0}]
+    return prog
 
 
 def write_ocean(portal_flight):
@@ -147,7 +181,7 @@ def write_ocean(portal_flight):
                         "sky": {"enabled": False}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
                         "ambientOcclusion": False, "shadowCasterReach": 1500.0, "contactShadows": False},
         "post": {"bloomIntensity": 0.06, "tonemap": 0},
-        "materialPrograms": [{"name": "seabed", "ops": [
+        "materialPrograms": [reef_program(), {"name": "seabed", "ops": [
             {"kind": "input", "dst": 0, "input": "uv"},
             {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
             {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.07, 0.2, 0.6, 1.3], "value": 1.0},
@@ -169,11 +203,17 @@ def write_ocean(portal_flight):
             {"kind": "constant", "dst": 0, "constant": [0, 0, 0, 0]},
             {"kind": "constant", "dst": 1, "constant": [0.9, 0.9, 0.9, 0.9]},
         ], "baseColor": 5, "metallic": 0, "roughness": 1}],
-        "lunarWorld": {"seed": 23, "extent": 4000, "spacing": 2.5, "skirtExtent": 24000, "skirtSpacing": 48, "craters": 0.0,
-                       "rocks": 0.07, "relief": 55, "program": "seabed", "curvature": 6371.0e3,
-                       "heroes": [], "mesas": MESAS, "yardangs": 2.5, "wind": 70.0},
+        # M3d (owner; ADR-1902): the seafloor on the canyon's pipeline, its Mars style turned to a reef -- eroded
+        # outcrops and ledges (no terraces to speak of), sediment drifts between them, the floor falling away
+        "attractorWorld": {"seed": 9, "resolution": 4096, "extent": 16000, "worldScale": 0.35, "camera": "scene",
+                           "terrainScale": 1.0, "roughness": 1.0, "ridgeStrength": 1.0, "domainWarp": 0.7, "terraces": 0.15,
+                           "erosion": 1.0, "strataFold": 0.3, "branchingDensity": 0.0, "meshSpacing": 1.0,
+                           "meshError": 0.003, "meshMinError": 0.2, "terrainProgram": "reefRock", "sunLux": 2.5,
+                           "sunShadowBias": 1.6, "look": {"sunAzimuth": 20.0, "sunElevation": 70.0, "sunWarmth": 0.0},
+                           "mars": {"mesaCover": 0.42, "yardangs": 0.0, "wind": 70.0, "dunes": 3.0},
+                           "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
-        "corruption": {"targets": ["bay-membrane"], "focus": [BAY[0], bay_y - GROUND[(65.0, -880.0)], BAY[2]], "axis": [-1.0, 0.0, 0.0],
+        "corruption": {"targets": ["bay-membrane"], "focus": [BAY[0], bay_y, BAY[2]], "axis": [-1.0, 0.0, 0.0],
                        "amount": 1.0, "radius": 45.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 260.0, "openNear": 20.0,
                        "openFar": 130.0, "seam": 0.3, "width": 22.0, "height": 11.0, "depth": 8.0, "block": 2.5,
                        "share": 0.25, "slip": 1.5, "rate": 0.6, "strip": 2.5, "stripSlip": 1.0, "slide": 0.0, "pull": 4.0,
@@ -181,6 +221,13 @@ def write_ocean(portal_flight):
                        "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 1500.0},
         # M3b (owner: cut the UFO interior): the bay's portal leads home -- out of the canyon wall where the journey
         # began (portal 1, reversed), at dawn
+        # M3d (owner: the Moon portal is the reference look): the mesh wire on the portal's own surface -- its
+        # scan, its rim, and the shards that break off the lips and fly into the opening (the pyramid had none)
+        "meshWire": {"targets": ["bay-membrane"], "color": [0.45, 0.85, 1.0], "intensity": 0.0, "width": 1.0, "creaseLow": 2.0,
+                     "creaseHigh": 12.0, "reveal": 1.0, "fadeNear": 60.0, "fadeFar": 900.0, "minPixels": 14.0, "wave": 0.0,
+                     "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
+                     "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
+                     "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.75, 0.95, 1.0], "shards": 0.3, "shardRate": 0.35},
         "portal": {"world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
@@ -192,13 +239,13 @@ def write_ocean(portal_flight):
               "position": [0.0, -500.0, 0.0], "rotation": [0, 0, 0], "scale": [s, s, s], "visible": True} for name, s in SUBS] + [
             # marine snow: slow, sparse flecks through the water along the route
             {"name": "marine-snow", "kind": "particles", "visible": True, "particles": {
-                "enabled": True, "capacity": 26000, "seed": 77, "shape": "box", "position": [120.0, 60.0, -380.0],
-                "extent": [360.0, 90.0, 720.0], "direction": [0, -1, 0], "spawnRate": 900.0, "lifetimeMin": 25.0,
+                "enabled": True, "capacity": 26000, "seed": 77, "shape": "box", "position": [BASE_XZ[0] + 560.0, PLAIN + 55.0, BASE_XZ[1]],
+                "extent": [620.0, 80.0, 380.0], "direction": [0, -1, 0], "spawnRate": 900.0, "lifetimeMin": 25.0,
                 "lifetimeMax": 40.0, "spread": 1.0, "speedMin": 0.02, "speedMax": 0.15, "gravity": [0.05, -0.04, 0.02],
                 "drag": 0.2, "turbulence": 0.2, "turbulenceScale": 0.05, "sizeStart": 0.09, "sizeEnd": 0.09,
                 "sizeVariance": 0.6, "colorStart": [0.7, 0.85, 0.85, 0.35], "colorEnd": [0.7, 0.85, 0.85, 0.35],
                 "emissive": 0.3, "blend": "additive"}},
-        ] + life_nodes() + fish_nodes(),
+        ] + life_nodes() + fish_nodes() + creature_nodes(),
     }
     path = os.path.join(HERE, PREFIX + "strange-attractor-ocean.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
@@ -208,12 +255,14 @@ def write_ocean(portal_flight):
 # --- home (M3b): out of portal 1's wall in the canyon, the way the journey went in, now at dawn: out over the river,
 # turning up it past the camp, low along the water, then rising to a high, slowing view as the music ends (210.5 s).
 CANYON_SCENE = PREFIX + "strange-attractor-flythrough.scene.json"
-P1_AXIS = (0.795, 0.0, -0.606)                     # into portal 1's wall (the canyon's portal axis)
-HOME_AXIS = [-P1_AXIS[0], 0.0, -P1_AXIS[2]]       # out of the wall, toward the river
-# (d, lat) in the current canyon's metres (site()), absolute heights there (scaled with the world)
-HOME_PATH = [(35.5, 23.0, 8.0), (31.0, 12.0, 7.4), (23.0, 0.0, 6.6), (12.0, -14.0, 6.2), (-2.0, -32.0, 6.6),
-             (-20.0, -50.0, 8.5), (-42.0, -62.0, 13.0), (-66.0, -68.0, 22.0), (-90.0, -76.0, 38.0),
-             (-110.0, -86.0, 60.0), (-126.0, -95.0, 84.0), (-138.0, -102.0, 100.0)]
+# M3d (owner: exit higher in the canyon, no clipping through rock or shrubs): out of the outer cliff behind the camp,
+# 86 m up its face (the cliff the night came home through), high over the benches, down to the river and up it,
+# rising to the high view as the music ends. (d, lat) in the current canyon's metres, absolute heights there.
+HOME_SITE = (46.0, 92.0)
+HOME_AXIS = [-L_UNIT[0], 0.0, -L_UNIT[1]]          # out of the cliff, toward the river
+HOME_PATH = [(46.0, 92.0, 86.0), (42.0, 82.0, 84.0), (36.0, 60.0, 72.0), (27.0, 32.0, 52.0), (15.0, 6.0, 36.0),
+             (-2.0, -26.0, 30.0), (-26.0, -52.0, 32.0), (-56.0, -66.0, 40.0), (-86.0, -77.0, 56.0),
+             (-110.0, -88.0, 76.0), (-128.0, -97.0, 92.0), (-138.0, -102.0, 100.0)]
 T_HOME, T_END = 147.0, 210.5
 
 
@@ -224,7 +273,9 @@ def _home():
     except Exception:          # the POC's canyon is not written yet (the builder runs twice)
         ground = [0.0] * len(xz)
     pts = [(p[0], y * R, p[1]) for p, (_, _, y) in zip(xz, HOME_PATH)]
-    exit_ = [pts[0][0], pts[0][1] - ground[0], pts[0][2]]
+    exit_ = [pts[0][0], pts[0][1], pts[0][2]]          # the root's exit height is absolute
+    clear = min(pt[1] - g for pt, g in zip(pts[1:], ground[1:]))
+    print(f"home flight: lowest knot {clear:.1f} m over the ground")
     # out of the wall at the bay's speed, easing to a slow, held climb as the music ends
     knots, _ = pace(pts[1:], T_HOME + 1.4, T_END, 7.0, 0.6, ramp_in=0.2, ramp_out=0.35)
     return exit_, [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground[1:])]
@@ -236,14 +287,16 @@ HOME_EXIT, HOME_FLIGHT = _home()
 def life_nodes():
     """Rock, kelp, sponges, sea fans and grass along the route, set on the sampled seabed."""
     items = []
-    spots = [(312.0, -472.0), (284.0, -488.0), (304.0, -540.0), (268.0, -572.0), (292.0, -612.0), (246.0, -652.0),
-             (278.0, -690.0), (228.0, -704.0), (202.0, -770.0), (178.0, -802.0), (140.0, -832.0), (150.0, -872.0),
-             (100.0, -838.0)]
+    bx, bz = BASE_XZ
+    spots = [(bx + d, bz + o) for d, o in ((980.0, 30.0), (940.0, 95.0), (900.0, -25.0), (860.0, 110.0), (800.0, 70.0),
+                                          (760.0, -40.0), (700.0, 120.0), (640.0, -55.0), (600.0, 80.0), (540.0, -30.0),
+                                          (480.0, 100.0), (420.0, -60.0), (360.0, 60.0), (300.0, -45.0), (240.0, 70.0),
+                                          (190.0, -50.0), (150.0, 45.0), (900.0, 40.0))]
     kinds = ["kelp-a", "kelp-b", "sponge", "fan-coral", "seagrass", "basalt-a", "basalt-b", "kelp-a", "sponge", "fan-coral",
              "kelp-b", "seagrass", "basalt-c"]
     pts = []
     for k, (x, z) in enumerate(spots):
-        for j in range(5):   # a cluster at each spot
+        for j in range(9):   # a cluster at each spot (M3d: denser)
             a = (k * 7 + j * 2.4) % 6.283
             r = 2.0 + 4.0 * ((k * 13 + j * 7) % 10) / 10.0
             pts.append((x + r * math.cos(a), z + r * math.sin(a), kinds[(k + j) % len(kinds)], 0.7 + 0.12 * ((k + j) % 5), a * 57.3))
@@ -258,11 +311,54 @@ def life_nodes():
     return items
 
 
+def creature_tracks():
+    """M3d (owner: wildlife, animated, not sliding statues): rigged procedural animals (pass2/build_sealife.py) with
+    their swim loops, cruising along straight lines across the route (keyed in the timeline: deterministic, seek-safe).
+    [(node, asset, scale, [(t, [x, y, z])], yaw)]. Their front is -z in the glb (yaw + 180 from the heading)."""
+    bx, bz = BASE_XZ
+    out = []
+    import random
+    rng = random.Random(1903)
+    # single fish: 12, crossing the route ahead of the camera at 1.5-3 m/s, at 4-30 m over the floor
+    for k in range(12):
+        d0 = rng.uniform(200.0, 980.0)
+        side = 1.0 if k % 2 == 0 else -1.0
+        z0, z1 = bz + side * rng.uniform(60.0, 140.0), bz - side * rng.uniform(40.0, 140.0)
+        x0 = bx + d0
+        x1 = x0 + rng.uniform(-120.0, 60.0)
+        y = PLAIN + rng.uniform(-8.0, 22.0)
+        t0, t1 = 121.0, 148.0
+        yaw = math.degrees(math.atan2(x1 - x0, z1 - z0)) + 180.0
+        out.append((f"cruiser-{k}", "fish", rng.uniform(0.8, 1.6), [(t0, [x0, y, z0]), (t1, [x1, y + rng.uniform(-3, 3), z1])], yaw))
+    # rays: 3, gliding low over the floor
+    for k in range(3):
+        x0 = bx + 800.0 - 260.0 * k
+        out.append((f"ray-{k}", "ray", 1.6 + 0.4 * k, [(121.0, [x0, PLAIN - 9.0 + 2.0 * k, bz + 90.0 - 70.0 * k]),
+                                                      (148.0, [x0 - 70.0, PLAIN - 8.0 + 2.0 * k, bz - 20.0 - 70.0 * k])],
+                    math.degrees(math.atan2(-70.0, -110.0)) + 180.0))
+    # jellyfish: 10, drifting up slowly near the route, glowing softly
+    for k in range(10):
+        x0 = bx + rng.uniform(150.0, 1000.0)
+        z0 = bz + rng.uniform(-50.0, 90.0)
+        y0 = PLAIN + rng.uniform(18.0, 42.0)
+        out.append((f"jelly-{k}", "jelly", rng.uniform(1.0, 2.2), [(121.0, [x0, y0, z0]), (148.0, [x0 + 4.0, y0 + 6.0, z0 - 3.0])],
+                    rng.uniform(0, 360)))
+    return out
+
+
+def creature_nodes():
+    return [{"name": n, "kind": "gltf", "asset": A + f"{a}.glb", "position": pts[0][1], "rotation": [0, yaw, 0],
+             "scale": [sc] * 3, "visible": True, "animation": {"state": "swim", "cullDistance": 900.0, "speed": 1.0}}
+            for n, a, sc, pts, yaw in creature_tracks()]
+
+
 def fish_nodes():
     """Fish: schools (particles circling a point, streaked along their motion) and a few singles."""
     out = []
-    for k, (c, n, r) in enumerate((((291.0, 24.0, -522.0), 260, 9.0), ((270.0, 40.0, -660.0), 340, 12.0),
-                                   ((196.0, 62.0, -790.0), 200, 8.0))):
+    bx, bz = BASE_XZ
+    for k, (c, n, r) in enumerate((((bx + 880.0, PLAIN + 26.0, bz + 75.0), 260, 9.0),
+                                   ((bx + 600.0, PLAIN + 30.0, bz - 45.0), 340, 12.0),
+                                   ((bx + 320.0, PLAIN + 36.0, bz + 55.0), 200, 8.0))):
         out.append({"name": f"fish-school-{k}", "kind": "particles", "visible": True, "particles": {
             "enabled": True, "capacity": n, "seed": 600 + k, "shape": "sphere", "position": list(c), "extent": [r, r * 0.3, r],
             "direction": [1, 0, 0], "spawnRate": n / 30.0, "burst": float(n), "lifetimeMin": 28.0, "lifetimeMax": 32.0,
@@ -272,8 +368,8 @@ def fish_nodes():
             "colorStart": [0.55, 0.68, 0.72, 0.9], "colorEnd": [0.55, 0.68, 0.72, 0.9], "emissive": 0.0,
             "blend": "alpha", "velocityStretch": 0.9, "stretchMax": 0.5}})
     out.append({"name": "fish-singles", "kind": "particles", "visible": True, "particles": {
-        "enabled": True, "capacity": 40, "seed": 700, "shape": "box", "position": [260.0, 40.0, -640.0],
-        "extent": [70.0, 20.0, 220.0], "direction": [0, 0, 1], "spawnRate": 1.2, "burst": 30.0, "lifetimeMin": 30.0,
+        "enabled": True, "capacity": 40, "seed": 700, "shape": "box", "position": [BASE_XZ[0] + 600.0, PLAIN + 38.0, BASE_XZ[1]],
+        "extent": [420.0, 20.0, 160.0], "direction": [1, 0, 0], "spawnRate": 1.2, "burst": 30.0, "lifetimeMin": 30.0,
         "lifetimeMax": 34.0, "spread": 1.0, "speedMin": 0.6, "speedMax": 1.4, "gravity": [0, 0, 0], "drag": 0.0,
         "turbulence": 0.3, "turbulenceScale": 0.02, "sizeStart": 0.45, "sizeEnd": 0.45, "sizeVariance": 0.4,
         "colorStart": [0.35, 0.45, 0.5, 0.95], "colorEnd": [0.35, 0.45, 0.5, 0.95], "emissive": 0.0, "blend": "alpha",

@@ -1173,6 +1173,52 @@
       "emissiveBoost": 1.0
     },
     {
+      "name": "earth-halo-2",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/earth-halo-c.glb",
+      "position": [
+        -699.1951771376205,
+        1807.3911522940168,
+        -8498.956876547689
+      ],
+      "rotation": [
+        100.0,
+        4.000000000000001,
+        0.0
+      ],
+      "scale": [
+        88.35000000000001,
+        88.35000000000001,
+        88.35000000000001
+      ],
+      "visible": true,
+      "emissiveBoost": 0.8,
+      "opacity": 0.5
+    },
+    {
+      "name": "earth-halo-3",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/build/earth-halo-c.glb",
+      "position": [
+        -700.5004147447746,
+        1810.6904676696886,
+        -8517.62264395331
+      ],
+      "rotation": [
+        100.0,
+        4.000000000000001,
+        0.0
+      ],
+      "scale": [
+        103.55000000000001,
+        103.55000000000001,
+        103.55000000000001
+      ],
+      "visible": true,
+      "emissiveBoost": 0.8,
+      "opacity": 0.5
+    },
+    {
       "name": "dome0-rave-m",
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/dome-rave-m.glb",

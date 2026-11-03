@@ -26,6 +26,7 @@ import sys
 from mathutils import Vector
 
 out_dir = sys.argv[sys.argv.index("--") + 1]
+_rest = sys.argv[sys.argv.index("--") + 2:]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
@@ -59,18 +60,42 @@ def smooth(a, b, x):
     return t * t * (3 - 2 * t)
 
 
-def material(name, color, rough):
+TEX = (sys.argv[sys.argv.index("--") + 2] if len(sys.argv) > sys.argv.index("--") + 2 else None)   # M3d: the photoscanned sets (Poly Haven, CC0; assets/strange-attractor/polyhaven/textures, never committed)
+
+
+def material(name, color, rough, tex=None, tint=None):
+    """A material; with `tex` (a Poly Haven set's id) its albedo is the photo, multiplied by `tint` (the stone's own
+    colour: the variation between blocks survives), and its normal map, at the mesh's UVs (M3d)."""
     m = bpy.data.materials.new(name)
     m.use_nodes = True
-    b = m.node_tree.nodes["Principled BSDF"]
+    nt = m.node_tree
+    b = nt.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*color, 1.0)
     b.inputs["Roughness"].default_value = rough
+    if tex and TEX:
+        import os
+        d = os.path.join(TEX, tex)
+        img = nt.nodes.new("ShaderNodeTexImage")
+        img.image = bpy.data.images.load(os.path.join(d, f"{tex}_diff_2k.jpg"))
+        mul = nt.nodes.new("ShaderNodeMix")
+        mul.data_type = "RGBA"
+        mul.blend_type = "MULTIPLY"
+        mul.inputs["Factor"].default_value = 1.0
+        mul.inputs[7].default_value = (*(tint or (1.0, 1.0, 1.0)), 1.0)
+        nt.links.new(img.outputs["Color"], mul.inputs[6])
+        nt.links.new(mul.outputs[2], b.inputs["Base Color"])
+        nimg = nt.nodes.new("ShaderNodeTexImage")
+        nimg.image = bpy.data.images.load(os.path.join(d, f"{tex}_nor_gl_2k.jpg"))
+        nimg.image.colorspace_settings.name = "Non-Color"
+        nmap = nt.nodes.new("ShaderNodeNormalMap")
+        nt.links.new(nimg.outputs["Color"], nmap.inputs["Color"])
+        nt.links.new(nmap.outputs["Normal"], b.inputs["Normal"])
     return m
 
 
 CASING = material("pyramid_casing", (0.50, 0.33, 0.21), 0.92)
 CORE = material("pyramid_core", (0.33, 0.19, 0.12), 0.95)
-SAND = material("pyramid_sand", (0.46, 0.24, 0.13), 1.0)
+SAND = material("pyramid_sand", (0.46, 0.24, 0.13), 1.0, tex="aerial_sand", tint=(1.0, 0.56, 0.36))
 
 SLOPE = math.tan(math.radians(51.8))
 
@@ -181,13 +206,13 @@ def build(name, base, st):
 # corners chipped; blocks go missing more at the arrises and toward the top, and the upper courses of the middle
 # pyramid keep a smooth casing cap (as Khafre's does). A sand mound buries the base -- deepest to windward (west) --
 # and blocks wholly under it are not built. Five stone materials, one per block at random, plus dust on the treads.
-STONES = [material(f"block_{k}", c, r) for k, (c, r) in enumerate((
+STONES = [material(f"block_{k}", c, r, tex="old_sandstone_02", tint=tuple(min(1.0, 1.9 * v) for v in c)) for k, (c, r) in enumerate((
     ((0.43, 0.31, 0.2), 0.94), ((0.38, 0.26, 0.16), 0.95), ((0.48, 0.35, 0.23), 0.92), ((0.34, 0.22, 0.14), 0.96),
     ((0.45, 0.28, 0.16), 0.95)))]
-DUST = material("block_dust", (0.5, 0.27, 0.14), 1.0)
-CAP = material("casing_cap", (0.44, 0.31, 0.2), 0.95)       # M3c: weathered, not a white tip
-STAIN = material("block_stain", (0.38, 0.2, 0.11), 0.97)    # M3c: sand-scoured, rust-stained low courses
-DARK = material("block_dark", (0.24, 0.16, 0.11), 0.97)     # M3c: weathered dark stones
+DUST = material("block_dust", (0.5, 0.27, 0.14), 1.0, tex="aerial_sand", tint=(1.0, 0.56, 0.36))
+CAP = material("casing_cap", (0.44, 0.31, 0.2), 0.95, tex="old_sandstone_02", tint=(0.85, 0.6, 0.42))
+STAIN = material("block_stain", (0.38, 0.2, 0.11), 0.97, tex="old_sandstone_02", tint=(0.75, 0.42, 0.25))
+DARK = material("block_dark", (0.24, 0.16, 0.11), 0.97, tex="old_sandstone_02", tint=(0.48, 0.32, 0.22))
 STATES = {
     "pyramid-a": dict(burial=0.3, missing=0.07, chip=0.35, cap=0.0, seed=11),
     "pyramid-b": dict(burial=0.26, missing=0.045, chip=0.3, cap=0.12, seed=23),
@@ -211,9 +236,15 @@ def build_blocks(name, base, st):
         is smooth shaded; ripples belong to the texture's scale, not this grid's)."""
         m = max(abs(x), abs(y))
         westness = smooth(-1.0, 1.0, -x / half)
+        # M3d (references: the Sphinx buried to the neck, Giza's faces with sand banked up them): the wind piles the
+        # sand highest mid-face and scours the corners, so the burial line dips at every arris
+        mid = 1.0 - min(abs(abs(x) - abs(y)) / max(m, 1e-3), 1.0)        # 1 on a corner's diagonal, 0 mid-face
         crest = st["burial"] * H * (0.7 + 0.45 * westness) * (0.78 + 0.44 * fbm(x / 90.0, y / 90.0, seed + 13))
+        crest *= 1.0 - 0.4 * mid ** 2
         if m < half:
-            return crest
+            # inside the footprint the drift keeps climbing a little into the courses (it fills the steps above the
+            # line, where the stone face is lower than it)
+            return crest + (half - m) * 0.18
         out = math.hypot(max(abs(x) - half, 0.0), max(abs(y) - half, 0.0))   # rounded around the corners
         run = crest * (2.4 + 2.2 * westness) * (0.85 + 0.3 * fbm(x / 70.0, y / 70.0, seed + 17))
         run = min(run, half * (0.75 + 0.9 * westness))
@@ -361,6 +392,20 @@ def build_blocks(name, base, st):
     me.materials.append(DUST)
     me.materials.append(STAIN)
     me.materials.append(DARK)
+    # M3d: UVs for the photo textures -- each face projected on its dominant axis (a box projection), stone at 2.5 m
+    # a tile, the drift at 7 m with a slow rotation of the projection across it (the tiling does not line up)
+    uvl = bm.loops.layers.uv.new("UVMap")
+    for f in bm.faces:
+        n = f.normal
+        ax = max(range(3), key=lambda i: abs(n[i]))
+        tile = 7.0 if f.material_index == 7 else 2.5
+        for loop in f.loops:
+            c = loop.vert.co
+            u, v = [(c.y, c.z), (c.x, c.z), (c.x, c.y)][ax]
+            if f.material_index == 7:
+                a = 0.6 * math.sin(c.x / 90.0) + 0.4 * math.cos(c.y / 70.0)
+                u, v = u * math.cos(a) - v * math.sin(a), u * math.sin(a) + v * math.cos(a)
+            loop[uvl].uv = (u / tile, v / tile)
     bm.to_mesh(me)
     bm.free()
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
