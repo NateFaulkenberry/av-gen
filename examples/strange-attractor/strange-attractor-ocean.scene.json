@@ -62,7 +62,7 @@
       "type": "point",
       "position": [
         884.0,
-        64.7,
+        56.7,
         -203.0
       ],
       "color": [
@@ -80,7 +80,7 @@
       "type": "point",
       "position": [
         894.0,
-        82.7,
+        74.7,
         -123.0
       ],
       "color": [
@@ -98,7 +98,7 @@
       "type": "point",
       "position": [
         894.0,
-        82.7,
+        74.7,
         -283.0
       ],
       "color": [
@@ -342,8 +342,8 @@
           "dst": 2,
           "srcA": 2,
           "constant": [
-            0.62,
-            0.86,
+            0.45,
+            0.7,
             0,
             0
           ]
@@ -365,8 +365,8 @@
           "dst": 4,
           "srcA": 3,
           "constant": [
-            0.3,
-            0.7,
+            0.15,
+            0.45,
             0,
             0
           ]
@@ -399,9 +399,9 @@
           "kind": "constant",
           "dst": 5,
           "constant": [
-            0.6,
-            0.92,
-            0.5,
+            0.82,
+            0.95,
+            0.75,
             1.0
           ]
         },
@@ -455,9 +455,9 @@
           "kind": "constant",
           "dst": 5,
           "constant": [
-            1.2,
-            0.66,
-            0.6,
+            1.04,
+            0.95,
+            0.88,
             1.0
           ]
         },
@@ -810,16 +810,16 @@
     "worldScale": 0.35,
     "camera": "scene",
     "terrainScale": 1.0,
-    "roughness": 0.4,
-    "ridgeStrength": 0.3,
-    "domainWarp": 0.5,
-    "terraces": 0.05,
+    "roughness": 0.3,
+    "ridgeStrength": 0.15,
+    "domainWarp": 0.7,
+    "terraces": 0.35,
     "erosion": 1.0,
     "strataFold": 0.3,
     "branchingDensity": 0.0,
     "meshSpacing": 1.0,
-    "meshError": 0.0015,
-    "meshMinError": 0.1,
+    "meshError": 0.001,
+    "meshMinError": 0.08,
     "terrainProgram": "reefRock",
     "sunLux": 2.5,
     "sunShadowBias": 1.6,
@@ -830,7 +830,7 @@
     },
     "mars": {
       "mesaCover": 0.42,
-      "yardangs": 0.0,
+      "yardangs": 5.0,
       "wind": 70.0,
       "dunes": 3.0
     },
@@ -852,7 +852,7 @@
     ],
     "focus": [
       874.0,
-      64.7,
+      56.7,
       -203.0
     ],
     "axis": [
@@ -1033,10 +1033,10 @@
     {
       "name": "ocean-base",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/ocean-base.glb",
+      "asset": "../../assets/strange-attractor/build/ocean-base-covert.glb",
       "position": [
         784.0,
-        32.7,
+        24.700000000000003,
         -203.0
       ],
       "rotation": [
@@ -1054,10 +1054,10 @@
     {
       "name": "bay-membrane",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/bay-membrane.glb",
+      "asset": "../../assets/strange-attractor/build/bay-membrane-m3g.glb",
       "position": [
         784.0,
-        32.7,
+        24.700000000000003,
         -203.0
       ],
       "rotation": [
@@ -1075,10 +1075,10 @@
     {
       "name": "bay-strips",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/bay-strips.glb",
+      "asset": "../../assets/strange-attractor/build/bay-strips-m3g.glb",
       "position": [
         784.0,
-        32.7,
+        24.700000000000003,
         -203.0
       ],
       "rotation": [
@@ -1261,7 +1261,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1766.0,
-        19.867704010009767,
+        19.870740509033205,
         -173.0
       ],
       "rotation": [
@@ -1282,7 +1282,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1760.460510165402,
-        19.844436264038087,
+        19.8403621673584,
         -169.75777673335446
       ],
       "rotation": [
@@ -1303,7 +1303,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1764.314996340382,
-        19.865369415283205,
+        19.87007865905762,
         -176.58619259180904
       ],
       "rotation": [
@@ -1324,7 +1324,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1765.4596901561633,
-        19.853211975097658,
+        19.856591796875,
         -171.09492660298875
       ],
       "rotation": [
@@ -1345,7 +1345,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1758.8797912186049,
-        19.828668212890626,
+        19.829705810546876,
         -173.90744808938254
       ],
       "rotation": [
@@ -1366,7 +1366,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1767.3758135002302,
-        19.89783630371094,
+        20.40265998840332,
         -175.14566614636652
       ],
       "rotation": [
@@ -1387,7 +1387,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1763.27150937,
-        19.850219345092775,
+        19.849677658081056,
         -170.29642802906926
       ],
       "rotation": [
@@ -1408,7 +1408,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1761.4220421801176,
-        19.839965438842775,
+        19.847047424316408,
         -177.97133115763853
       ],
       "rotation": [
@@ -1429,7 +1429,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1768.1317291198072,
-        19.876464462280275,
+        19.879392242431642,
         -171.48711716232347
       ],
       "rotation": [
@@ -1450,7 +1450,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1726.4120975906123,
-        19.925401306152345,
+        19.912393188476564,
         -105.8971958689972
       ],
       "rotation": [
@@ -1471,7 +1471,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1722.0006047681295,
-        19.973027801513673,
+        20.182727432250978,
         -107.95081965053807
       ],
       "rotation": [
@@ -1492,7 +1492,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1727.458692712631,
-        19.899394607543947,
+        20.245584106445314,
         -111.3282795434867
       ],
       "rotation": [
@@ -1513,7 +1513,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1723.7726182341983,
-        19.93265495300293,
+        19.918506240844728,
         -104.40718807442124
       ],
       "rotation": [
@@ -1534,7 +1534,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1722.4939051431716,
-        19.97031936645508,
+        20.557025527954103,
         -109.86860329718075
       ],
       "rotation": [
@@ -1555,7 +1555,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1729.1408299563034,
-        19.897554016113283,
+        19.890781021118165,
         -107.21778049092806
       ],
       "rotation": [
@@ -1576,7 +1576,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1720.6775567846682,
-        19.96778450012207,
+        19.965442276000978,
         -105.77258645938923
       ],
       "rotation": [
@@ -1597,7 +1597,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1724.6617890388793,
-        19.937854385375978,
+        20.46309623718262,
         -110.72066816573049
       ],
       "rotation": [
@@ -1618,7 +1618,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1726.6985149442683,
-        19.90278015136719,
+        19.89176712036133,
         -103.09306438848435
       ],
       "rotation": [
@@ -1639,7 +1639,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1684.6000283322667,
-        20.81060371398926,
+        20.79723129272461,
         -223.64110495647378
       ],
       "rotation": [
@@ -1660,7 +1660,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1681.5369234682553,
-        20.817065811157228,
+        20.810540771484376,
         -230.04285437532107
       ],
       "rotation": [
@@ -1681,7 +1681,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1685.9975812932269,
-        20.800422286987306,
+        20.78593978881836,
         -228.09833095621593
       ],
       "rotation": [
@@ -1702,7 +1702,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1680.6235638464739,
-        20.834296798706056,
+        20.82705078125,
         -224.58830263634619
       ],
       "rotation": [
@@ -1723,7 +1723,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1684.1389651361535,
-        20.80420837402344,
+        20.793531036376955,
         -231.59731687385664
       ],
       "rotation": [
@@ -1744,7 +1744,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1685.5512493946615,
-        20.80423698425293,
+        20.78992805480957,
         -226.16870938527978
       ],
       "rotation": [
@@ -1765,7 +1765,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1678.8414896343486,
-        20.834071731567384,
+        20.83193359375,
         -228.65556907146959
       ],
       "rotation": [
@@ -1786,7 +1786,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1687.2666660732857,
-        20.791198348999025,
+        20.776048278808595,
         -230.30843946544928
       ],
       "rotation": [
@@ -1807,7 +1807,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1683.4048057688815,
-        20.817727661132814,
+        20.8060661315918,
         -225.2639912596552
       ],
       "rotation": [
@@ -1828,7 +1828,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1640.9301119734644,
-        20.96863136291504,
+        20.967794036865236,
         -88.31643431726064
       ],
       "rotation": [
@@ -1849,7 +1849,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1643.2929671159852,
-        21.00230178833008,
+        20.99602279663086,
         -97.34282218159133
       ],
       "rotation": [
@@ -1870,7 +1870,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1646.5121986220292,
-        20.955865478515626,
+        20.94796714782715,
         -91.01786527110933
       ],
       "rotation": [
@@ -1891,7 +1891,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1642.0054134347918,
-        20.981383895874025,
+        20.978446578979494,
         -92.85294751314247
       ],
       "rotation": [
@@ -1912,7 +1912,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1647.2915209387363,
-        20.964810943603517,
+        20.957620239257814,
         -96.49369287572058
       ],
       "rotation": [
@@ -1933,7 +1933,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1643.9488684957507,
-        20.954324340820314,
+        20.951470947265626,
         -89.40036313369346
       ],
       "rotation": [
@@ -1954,7 +1954,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1642.4041879222368,
-        20.994575119018556,
+        20.989331817626955,
         -94.79259136795444
       ],
       "rotation": [
@@ -1975,7 +1975,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1649.172973044565,
-        20.94876823425293,
+        20.93721160888672,
         -92.4705192352835
       ],
       "rotation": [
@@ -1996,7 +1996,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1640.790644172998,
-        20.9778190612793,
+        20.976455307006837,
         -90.61252535601135
       ],
       "rotation": [
@@ -2017,7 +2017,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1581.3041420659777,
-        21.509034729003908,
+        21.498120880126955,
         -132.24346183204767
       ],
       "rotation": [
@@ -2038,7 +2038,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1586.9537900428134,
-        21.50114212036133,
+        21.494845962524415,
         -137.7576385300879
       ],
       "rotation": [
@@ -2059,7 +2059,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1584.8128085398214,
-        21.484279251098634,
+        21.47449073791504,
         -128.67572638728845
       ],
       "rotation": [
@@ -2080,7 +2080,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1581.4398199874777,
-        21.52409133911133,
+        21.511167144775392,
         -134.91975995985996
       ],
       "rotation": [
@@ -2101,7 +2101,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1585.9903673876688,
-        21.495257949829103,
+        21.48697624206543,
         -133.19605525268335
       ],
       "rotation": [
@@ -2122,7 +2122,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1580.79472272884,
-        21.502292251586915,
+        21.491061782836915,
         -129.4270183858595
       ],
       "rotation": [
@@ -2143,7 +2143,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1583.9626003433868,
-        21.507125473022462,
+        21.498675918579103,
         -136.59980572610317
       ],
       "rotation": [
@@ -2164,7 +2164,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1585.639084828524,
-        21.489427185058595,
+        21.48079643249512,
         -131.24688821665498
       ],
       "rotation": [
@@ -2185,7 +2185,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1578.8155711555298,
-        21.53505096435547,
+        21.51998863220215,
         -133.40211634712625
       ],
       "rotation": [
@@ -2206,7 +2206,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1540.3868196374465,
-        20.654039001464845,
+        20.64533386230469,
         -244.71607915541736
       ],
       "rotation": [
@@ -2227,7 +2227,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1546.6764393438018,
-        20.65460548400879,
+        20.65907440185547,
         -243.82260102051347
       ],
       "rotation": [
@@ -2248,7 +2248,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1541.163199530054,
-        20.61633644104004,
+        20.629108047485353,
         -238.17169148730997
       ],
       "rotation": [
@@ -2269,7 +2269,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1543.0811025968076,
-        20.667535400390626,
+        20.657191848754884,
         -247.30297891726258
       ],
       "rotation": [
@@ -2290,7 +2290,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1546.6062690713186,
-        20.66061935424805,
+        20.668353652954103,
         -241.14329282656405
       ],
       "rotation": [
@@ -2311,7 +2311,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1542.0150101456743,
-        20.650323486328126,
+        20.64833221435547,
         -242.75542837812944
       ],
       "rotation": [
@@ -2332,7 +2332,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1547.1164478041878,
-        20.64332160949707,
+        20.64694938659668,
         -246.6507195295959
       ],
       "rotation": [
@@ -2353,7 +2353,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1544.125241499483,
-        20.64306221008301,
+        20.65329513549805,
         -239.40217919195422
       ],
       "rotation": [
@@ -2374,7 +2374,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1542.3183014795336,
-        20.66086540222168,
+        20.654050445556642,
         -244.7122762879458
       ],
       "rotation": [
@@ -2395,7 +2395,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1481.9253765928843,
-        21.85517272949219,
+        21.84093818664551,
         -87.76822165158535
       ],
       "rotation": [
@@ -2416,7 +2416,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1487.6539849766118,
-        21.825852966308595,
+        21.820399856567384,
         -81.3726113584351
       ],
       "rotation": [
@@ -2437,7 +2437,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1481.344433333618,
-        21.800061798095705,
+        21.795302963256837,
         -82.11232569013133
       ],
       "rotation": [
@@ -2458,7 +2458,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1486.717213716707,
-        21.887065505981447,
+        21.87116394042969,
         -87.89660592836913
       ],
       "rotation": [
@@ -2479,7 +2479,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1485.023637584514,
-        21.786077117919923,
+        21.785405731201173,
         -78.72072832183208
       ],
       "rotation": [
@@ -2500,7 +2500,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1481.348862269098,
-        21.832337951660158,
+        21.82146224975586,
         -84.79205712291422
       ],
       "rotation": [
@@ -2521,7 +2521,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1485.978375566109,
-        21.830348587036134,
+        21.824123001098634,
         -83.2933089146665
       ],
       "rotation": [
@@ -2542,7 +2542,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1480.9735759422422,
-        21.75401840209961,
+        21.757922744750978,
         -79.27431114790507
       ],
       "rotation": [
@@ -2563,7 +2563,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1483.78632532923,
-        21.85969696044922,
+        21.84620056152344,
         -86.59365317400989
       ],
       "rotation": [
@@ -2584,7 +2584,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1424.7243906824172,
-        20.32304153442383,
+        20.318954086303712,
         -260.2880686482768
       ],
       "rotation": [
@@ -2605,7 +2605,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1426.1903735749956,
-        20.2187744140625,
+        20.230653381347658,
         -253.28382956182023
       ],
       "rotation": [
@@ -2626,7 +2626,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1420.3071021591663,
-        20.310031509399415,
+        20.3059440612793,
         -259.53704441613337
       ],
       "rotation": [
@@ -2647,7 +2647,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1426.6329355989556,
-        20.300115203857423,
+        20.299934005737306,
         -258.95270673963876
       ],
       "rotation": [
@@ -2668,7 +2668,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1421.403096881882,
-        20.234828567504884,
+        20.240193939208986,
         -253.03853910676412
       ],
       "rotation": [
@@ -2689,7 +2689,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1422.871443908892,
-        20.344548797607423,
+        20.338580703735353,
         -262.2528062675395
       ],
       "rotation": [
@@ -2710,7 +2710,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1426.6940831205193,
-        20.255534744262697,
+        20.262151336669923,
         -256.2731774440513
       ],
       "rotation": [
@@ -2731,7 +2731,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1422.0293718636842,
-        20.289977645874025,
+        20.28817710876465,
         -257.6584963420977
       ],
       "rotation": [
@@ -2752,7 +2752,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1426.9338935754836,
-        20.34235725402832,
+        20.337386703491212,
         -261.79898255954623
       ],
       "rotation": [
@@ -2773,7 +2773,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1387.0743724493757,
-        20.826837158203126,
+        20.84282455444336,
         -124.87302804103932
       ],
       "rotation": [
@@ -2794,7 +2794,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1383.331665212914,
-        20.835416412353517,
+        20.849336242675783,
         -120.69493414142444
       ],
       "rotation": [
@@ -2815,7 +2815,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1381.6943173039333,
-        20.814038848876955,
+        20.81034049987793,
         -127.66088267445755
       ],
       "rotation": [
@@ -2836,7 +2836,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1387.7293093824242,
-        20.868068313598634,
+        20.884786224365236,
         -121.55353827214016
       ],
       "rotation": [
@@ -2857,7 +2857,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1381.391099341192,
-        20.820483779907228,
+        20.82947883605957,
         -121.9833204278283
       ],
       "rotation": [
@@ -2878,7 +2878,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1386.474114665712,
-        20.82477722167969,
+        20.829942321777345,
         -128.02381892795802
       ],
       "rotation": [
@@ -2899,7 +2899,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1385.2320093670826,
-        20.8668571472168,
+        20.882878875732423,
         -118.77600273207703
       ],
       "rotation": [
@@ -2920,7 +2920,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1381.2642686589052,
-        20.814241027832033,
+        20.8177734375,
         -124.66005241765185
       ],
       "rotation": [
@@ -2941,7 +2941,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1385.9616346151508,
-        20.82713851928711,
+        20.844089126586915,
         -123.38985848283987
       ],
       "rotation": [
@@ -2962,7 +2962,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1328.7308068811658,
-        20.44752082824707,
+        20.417188262939455,
         -232.18792472447845
       ],
       "rotation": [
@@ -2983,7 +2983,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1320.9722543409537,
-        20.42636642456055,
+        20.39331398010254,
         -231.05250000664284
       ],
       "rotation": [
@@ -3004,7 +3004,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1324.6114507210677,
-        20.440333938598634,
+        20.40456352233887,
         -235.32080331258504
       ],
       "rotation": [
@@ -3025,7 +3025,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1326.4187444447205,
-        20.41579399108887,
+        20.394668197631837,
         -228.396775552818
       ],
       "rotation": [
@@ -3046,7 +3046,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1320.2362495546759,
-        20.427661514282228,
+        20.39034423828125,
         -234.35431997154345
       ],
       "rotation": [
@@ -3067,7 +3067,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1326.5831114404973,
-        20.443540191650392,
+        20.410205459594728,
         -234.08052546752597
       ],
       "rotation": [
@@ -3088,7 +3088,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1321.649228150644,
-        20.420001602172853,
+        20.39290771484375,
         -227.91729681052743
       ],
       "rotation": [
@@ -3109,7 +3109,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1322.664494342036,
-        20.432637786865236,
+        20.395322418212892,
         -237.192424672853
       ],
       "rotation": [
@@ -3130,7 +3130,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1326.7754299702817,
-        20.426831817626955,
+        20.40021667480469,
         -231.40720733299608
       ],
       "rotation": [
@@ -3151,7 +3151,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1265.2634808119349,
-        21.054309463500978,
+        21.047303771972658,
         -101.44963996508157
       ],
       "rotation": [
@@ -3172,7 +3172,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1259.2506545665285,
-        21.11361656188965,
+        24.43661460876465,
         -103.6954983490726
       ],
       "rotation": [
@@ -3193,7 +3193,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1266.9789407518817,
-        21.067512130737306,
+        25.77374610900879,
         -105.02136389519004
       ],
       "rotation": [
@@ -3214,7 +3214,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1263.445370422685,
-        21.069472885131837,
+        21.062539672851564,
         -100.66496551803459
       ],
       "rotation": [
@@ -3235,7 +3235,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1261.468792851574,
-        21.11735305786133,
+        32.64072952270508,
         -107.54235515693762
       ],
       "rotation": [
@@ -3256,7 +3256,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1267.7956815078264,
-        21.038432693481447,
+        21.03060302734375,
         -101.73793744562911
       ],
       "rotation": [
@@ -3277,7 +3277,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1261.444028066032,
-        21.09220657348633,
+        21.08782539367676,
         -101.85675572480423
       ],
       "rotation": [
@@ -3298,7 +3298,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1266.2250764538744,
-        21.08994064331055,
+        29.27521667480469,
         -108.13897215155075
       ],
       "rotation": [
@@ -3319,7 +3319,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1265.4374236869708,
-        21.036151504516603,
+        21.094501113891603,
         -98.84141693071604
       ],
       "rotation": [
@@ -3340,7 +3340,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1203.8937677681424,
-        20.490045166015626,
+        20.510476684570314,
         -259.8017638122061
       ],
       "rotation": [
@@ -3361,7 +3361,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1202.6987776203741,
-        20.477946853637697,
+        20.502671813964845,
         -264.5188220168146
       ],
       "rotation": [
@@ -3382,7 +3382,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1208.764904450859,
-        20.5132137298584,
+        20.53435287475586,
         -262.42061621166465
       ],
       "rotation": [
@@ -3403,7 +3403,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1201.071277739765,
-        20.466533279418947,
+        20.490336990356447,
         -260.9065373367542
       ],
       "rotation": [
@@ -3424,7 +3424,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1204.4970429602545,
-        20.495624160766603,
+        20.518750762939455,
         -265.34796684296464
       ],
       "rotation": [
@@ -3445,7 +3445,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1206.6413090709054,
-        20.523164367675783,
+        20.536906814575197,
         -258.5207716745011
       ],
       "rotation": [
@@ -3466,7 +3466,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1200.174431907043,
-        20.459273910522462,
+        20.48515090942383,
         -264.16834445526524
       ],
       "rotation": [
@@ -3487,7 +3487,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1206.5270864722982,
-        20.50614128112793,
+        20.528277969360353,
         -264.2057503728086
       ],
       "rotation": [
@@ -3508,7 +3508,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1201.9010024933955,
-        20.490029907226564,
+        20.507533645629884,
         -257.80825564311306
       ],
       "rotation": [
@@ -3529,7 +3529,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1141.0001338062746,
-        21.222451782226564,
+        21.22518119812012,
         -139.78117990255072
       ],
       "rotation": [
@@ -3550,7 +3550,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1144.0275549222347,
-        21.12214050292969,
+        21.13229904174805,
         -146.19988136127898
       ],
       "rotation": [
@@ -3571,7 +3571,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1145.3379015523265,
-        21.214078521728517,
+        21.211738204956056,
         -141.51338658815325
       ],
       "rotation": [
@@ -3592,7 +3592,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1139.2222892317254,
-        21.155688858032228,
+        21.16224060058594,
         -143.46203875888745
       ],
       "rotation": [
@@ -3613,7 +3613,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1146.8763580486116,
-        21.143046951293947,
+        21.22420654296875,
         -145.16484742561408
       ],
       "rotation": [
@@ -3634,7 +3634,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1143.5604070316485,
-        21.222722625732423,
+        21.2248893737793,
         -140.64060219077496
       ],
       "rotation": [
@@ -3655,7 +3655,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1141.2493446116837,
-        21.102775192260744,
+        21.112041091918947,
         -147.41292362665908
       ],
       "rotation": [
@@ -3676,7 +3676,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1147.852942025228,
-        21.217460250854494,
+        21.487302398681642,
         -141.92536622506466
       ],
       "rotation": [
@@ -3697,7 +3697,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1141.5030924516946,
-        21.194295501708986,
+        21.198749160766603,
         -141.73293540211418
       ],
       "rotation": [
@@ -3718,7 +3718,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1078.4300211641246,
-        22.951442337036134,
+        38.59589157104492,
         -247.4209181682186
       ],
       "rotation": [
@@ -3739,7 +3739,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1086.9198077333683,
-        32.220559692382814,
+        42.46151885986328,
         -251.29161401141786
       ],
       "rotation": [
@@ -3760,7 +3760,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1084.0505461436037,
-        32.33964309692383,
+        35.8982292175293,
         -244.80039923000277
       ],
       "rotation": [
@@ -3781,7 +3781,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1082.6259469242284,
-        28.077668762207033,
+        41.613145446777345,
         -249.4532646506961
       ],
       "rotation": [
@@ -3802,7 +3802,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1088.7875637738425,
-        31.840695953369142,
+        34.93834457397461,
         -247.6546985210129
       ],
       "rotation": [
@@ -3823,7 +3823,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1081.1773315938774,
-        31.268886184692384,
+        41.23615417480469,
         -245.76560006510078
       ],
       "rotation": [
@@ -3844,7 +3844,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1084.3814420380543,
-        29.63892517089844,
+        42.08627471923828,
         -250.36949403282748
       ],
       "rotation": [
@@ -3865,7 +3865,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1086.857533182795,
-        28.638934707641603,
+        29.18321762084961,
         -243.65552027174417
       ],
       "rotation": [
@@ -3886,7 +3886,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1080.1217976107453,
-        22.788144683837892,
+        38.63242111206055,
         -248.97956430517775
       ],
       "rotation": [
@@ -3907,7 +3907,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1021.7104643440882,
-        20.190488433837892,
+        20.200439071655275,
         -134.6118394710109
       ],
       "rotation": [
@@ -3928,7 +3928,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1029.5540548396077,
-        20.4744010925293,
+        20.2818904876709,
         -133.71587347948523
       ],
       "rotation": [
@@ -3949,7 +3949,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1021.1613935023205,
-        20.28423080444336,
+        20.28212699890137,
         -129.63810869430145
       ],
       "rotation": [
@@ -3970,7 +3970,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1023.8707903987412,
-        20.332532501220705,
+        20.19830665588379,
         -136.19739032320774
       ],
       "rotation": [
@@ -3991,7 +3991,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1025.4091106337673,
-        20.274081802368165,
+        20.45513496398926,
         -131.5807018559147
       ],
       "rotation": [
@@ -4012,7 +4012,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1019.2053928854483,
-        20.189691162109376,
+        20.222932434082033,
         -133.2274700355879
       ],
       "rotation": [
@@ -4033,7 +4033,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1026.7668705913586,
-        20.73482475280762,
+        20.2398983001709,
         -135.30313419727884
       ],
       "rotation": [
@@ -4054,7 +4054,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1023.6764988921653,
-        20.27540168762207,
+        20.277450180053712,
         -130.62190264429108
       ],
       "rotation": [
@@ -4075,7 +4075,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1021.036499374071,
-        24.898479080200197,
+        19.455966567993165,
         -137.27289878655208
       ],
       "rotation": [
@@ -4096,7 +4096,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         973.0476782405846,
-        20.033435440063478,
+        20.114562606811525,
         -256.88498175884314
       ],
       "rotation": [
@@ -4117,7 +4117,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         976.3281905487681,
-        19.996688461303712,
+        20.00547561645508,
         -251.4445165482633
       ],
       "rotation": [
@@ -4138,7 +4138,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         968.4650702423022,
-        20.018397903442384,
+        20.493917083740236,
         -252.14879345787799
       ],
       "rotation": [
@@ -4159,7 +4159,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         976.755078653675,
-        20.034160232543947,
+        20.121718978881837,
         -256.4306765531108
       ],
       "rotation": [
@@ -4180,7 +4180,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         974.2072031820545,
-        19.993415451049806,
+        20.02082977294922,
         -249.8067153522828
       ],
       "rotation": [
@@ -4201,7 +4201,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         972.5564146694754,
-        20.015704727172853,
+        20.025092697143556,
         -254.38421869424386
       ],
       "rotation": [
@@ -4222,7 +4222,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         978.7987304559672,
-        20.00849494934082,
+        20.01761589050293,
         -252.88960973334255
       ],
       "rotation": [
@@ -4243,7 +4243,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         971.2901613189314,
-        19.997062301635744,
+        20.142673110961915,
         -250.6300265143711
       ],
       "rotation": [
@@ -4264,7 +4264,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         974.2649254567506,
-        20.02422103881836,
+        20.075284576416017,
         -255.38533320573154
       ],
       "rotation": [
@@ -4285,7 +4285,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         936.3856067096845,
-        21.483907318115236,
+        21.495236968994142,
         -162.62048489086467
       ],
       "rotation": [
@@ -4306,7 +4306,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         935.0468507969426,
-        21.1513916015625,
+        21.17244873046875,
         -154.13941670094522
       ],
       "rotation": [
@@ -4327,7 +4327,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         931.634263849084,
-        22.36298522949219,
+        22.369134521484376,
         -159.49776248592678
       ],
       "rotation": [
@@ -4348,7 +4348,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         939.5123247655368,
-        20.703652954101564,
+        20.718309020996095,
         -158.9870540406933
       ],
       "rotation": [
@@ -4369,7 +4369,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         931.3294673290096,
-        21.981813049316408,
+        21.99954948425293,
         -154.50310777215356
       ],
       "rotation": [
@@ -4390,7 +4390,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         933.7143360454328,
-        21.985906219482423,
+        21.99415168762207,
         -161.18722388687414
       ],
       "rotation": [
@@ -4411,7 +4411,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         935.4769371174592,
-        21.257209396362306,
+        21.27344856262207,
         -156.65142417674372
       ],
       "rotation": [
@@ -4432,7 +4432,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         929.2000060877078,
-        22.860860443115236,
+        22.866937255859376,
         -157.99235526600089
       ],
       "rotation": [
@@ -4453,7 +4453,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         936.6507412069142,
-        21.289609527587892,
+        21.30195198059082,
         -160.4358922500733
       ],
       "rotation": [
@@ -4474,7 +4474,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1686.2312919585083,
-        20.468728637695314,
+        20.46279106140137,
         -163.88393223490039
       ],
       "rotation": [
@@ -4495,7 +4495,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-a.glb",
       "position": [
         1681.7278664088792,
-        20.53791389465332,
+        20.537000274658205,
         -158.32267074666524
       ],
       "rotation": [
@@ -4516,7 +4516,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-b.glb",
       "position": [
         1682.8585333361693,
-        20.5630126953125,
+        20.554055786132814,
         -166.83367367617058
       ],
       "rotation": [
@@ -4537,7 +4537,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-a.glb",
       "position": [
         1686.4015843078187,
-        20.44099006652832,
+        20.439651107788087,
         -161.5604192233713
       ],
       "rotation": [
@@ -4558,7 +4558,7 @@
       "asset": "../../assets/strange-attractor/build/sponge.glb",
       "position": [
         1678.5134060280602,
-        20.64850769042969,
+        20.640834426879884,
         -161.87871208555802
       ],
       "rotation": [
@@ -4579,7 +4579,7 @@
       "asset": "../../assets/strange-attractor/build/fan-coral.glb",
       "position": [
         1686.5837359535683,
-        20.484260177612306,
+        20.474349594116212,
         -166.56150368836515
       ],
       "rotation": [
@@ -4600,7 +4600,7 @@
       "asset": "../../assets/strange-attractor/build/kelp-b.glb",
       "position": [
         1684.3633628251976,
-        20.472648239135744,
+        20.47372970581055,
         -159.8206970170705
       ],
       "rotation": [
@@ -4621,7 +4621,7 @@
       "asset": "../../assets/strange-attractor/build/seagrass.glb",
       "position": [
         1682.490347769658,
-        20.55710372924805,
+        20.550191497802736,
         -164.3118498936323
       ],
       "rotation": [
@@ -4642,7 +4642,7 @@
       "asset": "../../assets/strange-attractor/build/basalt-c.glb",
       "position": [
         1688.7983544852775,
-        20.41944465637207,
+        22.048944091796876,
         -163.12567511136433
       ],
       "rotation": [
@@ -5568,6 +5568,84 @@
       "animation": {
         "state": "swim",
         "cullDistance": 900.0,
+        "speed": 1.0
+      }
+    },
+    {
+      "name": "octo-crawl",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/hero/octopus/octopus-v1.glb",
+      "position": [
+        1590.0,
+        21.723011779785157,
+        -146.0
+      ],
+      "rotation": [
+        0,
+        120,
+        0
+      ],
+      "scale": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "visible": true,
+      "animation": {
+        "state": "crawl",
+        "cullDistance": 800.0,
+        "speed": 1.0
+      }
+    },
+    {
+      "name": "octo-perch",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/hero/octopus/octopus-v1.glb",
+      "position": [
+        1586.9537900428134,
+        22.294845962524416,
+        -137.7576385300879
+      ],
+      "rotation": [
+        0,
+        200,
+        0
+      ],
+      "scale": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "visible": true,
+      "animation": {
+        "state": "perch",
+        "cullDistance": 800.0,
+        "speed": 1.0
+      }
+    },
+    {
+      "name": "octo-swim",
+      "kind": "gltf",
+      "asset": "../../assets/strange-attractor/hero/octopus/octopus-v1.glb",
+      "position": [
+        1600.0,
+        52.0,
+        -255.6
+      ],
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "scale": [
+        8.0,
+        8.0,
+        8.0
+      ],
+      "visible": true,
+      "animation": {
+        "state": "jet",
+        "cullDistance": 800.0,
         "speed": 1.0
       }
     }

@@ -46,7 +46,7 @@ OX, OZ = 809.0, 677.0
 PLAIN = 32.7                        # the floor's level in front of the wall (sampled)
 # the base at the reef wall's foot, its front (+z in the glb) turned to face +x (yaw 90), on a pad at the floor's level
 BASE_XZ = (-25.0 + OX, -880.0 + OZ)
-BASE_GROUND = PLAIN
+BASE_GROUND = PLAIN - 8.0   # M3g (owner 54- §5): sunk 8 m into the ledge (the bay floor still 7 m clear)
 # the seabed under the bay approach, measured: (x, z) -> metres
 GROUND = {(365.0, -785.0): -3.0, (215.0, -870.0): 6.4, (125.0, -880.0): 30.0, (65.0, -880.0): 44.0, (40.0, -880.0): 48.0,
           (300.0, -700.0): 0.0}
@@ -169,15 +169,15 @@ def reef_program():
                 # sand on the flats, in drifts (a broad noise thins it)
                 {"kind": "input", "dst": 2, "input": "normal"},
                 {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [1, 1, 1, 1]},
-                {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.62, 0.86, 0, 0]},
+                {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.45, 0.7, 0, 0]},   # M3g: sediment drapes the floor
                 {"kind": "input", "dst": 3, "input": "worldPosition"},
                 {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.04, "seed": 3},
-                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.3, 0.7, 0, 0]},      # M3g: softer drifts
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.15, 0.45, 0, 0]},    # M3g: mostly sediment
                 {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
                 {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 1, "srcC": 2},
                 # algae on the broad patches
                 {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.52, 0.7, 0, 0]},
-                {"kind": "constant", "dst": 5, "constant": [0.6, 0.92, 0.5, 1.0]},
+                {"kind": "constant", "dst": 5, "constant": [0.82, 0.95, 0.75, 1.0]},   # M3g: quieter algae
                 {"kind": "constant", "dst": 6, "constant": [1.0, 1.0, 1.0, 1.0]},
                 {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
@@ -185,7 +185,7 @@ def reef_program():
                 {"kind": "input", "dst": 3, "input": "worldPosition"},
                 {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.12, "seed": 11},
                 {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.6, 0.74, 0, 0]},
-                {"kind": "constant", "dst": 5, "constant": [1.2, 0.66, 0.6, 1.0]},
+                {"kind": "constant", "dst": 5, "constant": [1.04, 0.95, 0.88, 1.0]},   # M3g: encrusting tint, not coral red
                 {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
                 # the deep's colour
@@ -279,11 +279,13 @@ def write_ocean(portal_flight):
         # M3e (owner: rounded, eroded rock, not crumpled spikes): softer relief (roughness 1 -> 0.4, ridges 1 -> 0.3),
         # less warp and terracing, and a finer mesh where the silhouettes were jagged (error 0.003 -> 0.0015)
         "attractorWorld": {"seed": 9, "resolution": 4096, "extent": 16000, "worldScale": 0.35, "camera": "scene",
-                           "terrainScale": 1.0, "roughness": 0.4, "ridgeStrength": 0.3, "domainWarp": 0.5, "terraces": 0.05,
+                           # M3g (owner 54- §5): the shelf top varied -- terraces and gullies cutting its edge -- and the
+                           # floor rounder and sediment-draped (softer ridges, more erosion, a finer mesh)
+                           "terrainScale": 1.0, "roughness": 0.3, "ridgeStrength": 0.15, "domainWarp": 0.7, "terraces": 0.35,
                            "erosion": 1.0, "strataFold": 0.3, "branchingDensity": 0.0, "meshSpacing": 1.0,
-                           "meshError": 0.0015, "meshMinError": 0.1, "terrainProgram": "reefRock", "sunLux": 2.5,
+                           "meshError": 0.001, "meshMinError": 0.08, "terrainProgram": "reefRock", "sunLux": 2.5,
                            "sunShadowBias": 1.6, "look": {"sunAzimuth": 20.0, "sunElevation": 70.0, "sunWarmth": 0.0},
-                           "mars": {"mesaCover": 0.42, "yardangs": 0.0, "wind": 70.0, "dunes": 3.0},
+                           "mars": {"mesaCover": 0.42, "yardangs": 5.0, "wind": 70.0, "dunes": 3.0},
                            "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
         # M3e (owner: not confined to the bay): the base, its rock and the seafloor are targets too, the field reaches
@@ -309,12 +311,12 @@ def write_ocean(portal_flight):
         "portal": {**GAZE, "world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
-            {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
+            {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base-covert.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
              "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
-            {"name": "bay-membrane", "kind": "gltf", "asset": A + "bay-membrane.glb",
+            {"name": "bay-membrane", "kind": "gltf", "asset": A + "bay-membrane-m3g.glb",
              "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
             # M3e: the bay frame's light strips, apart, so their light dies as the corruption takes the base (the timeline)
-            {"name": "bay-strips", "kind": "gltf", "asset": A + "bay-strips.glb",
+            {"name": "bay-strips", "kind": "gltf", "asset": A + "bay-strips-m3g.glb",
              "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
         ] + [{"name": name, "kind": "gltf", "asset": A + "ufo-craft.glb",
               "position": [0.0, -500.0, 0.0], "rotation": [0, 0, 0], "scale": [s, s, s], "visible": True} for name, s in SUBS] + [
@@ -326,7 +328,7 @@ def write_ocean(portal_flight):
                 "drag": 0.2, "turbulence": 0.2, "turbulenceScale": 0.05, "sizeStart": 0.09, "sizeEnd": 0.09,
                 "sizeVariance": 0.6, "colorStart": [0.7, 0.85, 0.85, 0.35], "colorEnd": [0.7, 0.85, 0.85, 0.35],
                 "emissive": 0.3, "blend": "additive"}},
-        ] + life_nodes() + fish_nodes() + creature_nodes(),
+        ] + life_nodes() + fish_nodes() + creature_nodes() + octopus_nodes(),
     }
     path = os.path.join(HERE, "strange-attractor-ocean.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
@@ -391,6 +393,35 @@ def life_nodes():
 
 # M3e: the bay frame's strips fail as the corruption reaches them -- a few stutters, then dark (seconds, emissiveBoost)
 STRIPS_DIE = [(133.6, 1.0), (134.1, 0.25), (134.3, 0.9), (134.9, 0.1), (135.1, 0.55), (135.8, 0.0)]
+
+
+# M3g (owner 54- §6: our octopus, octopus-v1; the hero agent's placement, hero-03-octopus.md §3, on the rebuilt floor):
+# a crawler on the floor under the path, one draped over the basalt rock life-37, a swimmer crossing ahead of the camera
+# about 10 m under its eye line. Glimpsed in passing (54- §1): no camera turn or slow-down for them.
+OCTO = "../../assets/strange-attractor/hero/octopus/octopus-v1.glb"
+OCTO_CRAWL = [(1590.0, -146.0, 121.0), (1581.0, -139.0, 148.0)]   # x, z, t (linear)
+OCTO_SWIM = [([1600.0, 52.0, -255.6], 121.0), ([1600.0, 56.0, -75.6], 136.0), ([1600.0, 58.0, 68.4], 148.0)]
+
+
+def octopus_nodes():
+    life = {n["name"]: n for n in life_nodes()}
+    rock = life["life-37"]["position"]
+    g = heights("strange-attractor-ocean.scene.json", [(OCTO_CRAWL[0][0], OCTO_CRAWL[0][1])])[0]
+    anim = lambda clip: {"state": clip, "cullDistance": 800.0, "speed": 1.0}
+    return [
+        {"name": "octo-crawl", "kind": "gltf", "asset": OCTO, "position": [OCTO_CRAWL[0][0], g + 0.05, OCTO_CRAWL[0][1]],
+         "rotation": [0, 120, 0], "scale": [5.0] * 3, "visible": True, "animation": anim("crawl")},
+        {"name": "octo-perch", "kind": "gltf", "asset": OCTO, "position": [rock[0], rock[1] + 0.8, rock[2]],
+         "rotation": [0, 200, 0], "scale": [5.0] * 3, "visible": True, "animation": anim("perch")},
+        {"name": "octo-swim", "kind": "gltf", "asset": OCTO, "position": OCTO_SWIM[0][0], "rotation": [0, 180, 0],
+         "scale": [8.0] * 3, "visible": True, "animation": anim("jet")},
+    ]
+
+
+def octopus_tracks():
+    g = heights("strange-attractor-ocean.scene.json", [(x, z) for x, z, _ in OCTO_CRAWL])
+    return [("octo-crawl", [(t, [x, gg + 0.05, z]) for (x, z, t), gg in zip(OCTO_CRAWL, g)]),
+            ("octo-swim", [(t, p) for p, t in OCTO_SWIM])]
 
 
 def creature_tracks():

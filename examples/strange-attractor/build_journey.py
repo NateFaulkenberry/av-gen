@@ -517,6 +517,8 @@ for node, pos, yaw in build_ocean.sub_tracks():
     tracks.append({"target": f"ocean/nodes/{node}/rotation", "keys": [{"time": t, "value": list(r), "interp": "smooth"} for t, r in yaw]})
     tracks.append({"target": f"ocean/lights/{node}-light/position",
                    "keys": [{"time": t, "value": [p[0], p[1] - 3.0, p[2]], "interp": "smooth"} for t, p in pos]})
+for n, pts in build_ocean.octopus_tracks():   # M3g: the octopi
+    tracks.append({"target": f"ocean/nodes/{n}/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pts]})
 # M3d: the ocean's animals cruise (their swim loops play on their own)
 for n, _, _, pts, _ in build_ocean.creature_tracks():
     tracks.append({"target": f"ocean/nodes/{n}/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pts]})
