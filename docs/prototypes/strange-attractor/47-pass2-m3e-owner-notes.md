@@ -146,3 +146,15 @@ Fix the lighting as a whole, not just by adding lights (§8):
 
 If the engine's point-light shadows can't do this (resolution or filtering), say so and fix that
 generically with an ADR. Before/after at this angle and the M3d camera beats.
+
+## 10. The Gray's animation: talking to the Sasquatches (owner addition)
+
+- Change the Gray's animation so it reads as talking or communicating with the Sasquatches **from across
+  the fire**:
+  - pointing and gesturing (arm and hand gestures, head turns and nods toward them);
+  - the body in a **neutral stance**: upright, relaxed, feet planted, no crouch or creep.
+- Placement: put the Gray on the far side of the fire from the Sasquatches, facing them.
+- Seek-safe and deterministic; no foot sliding, and no limb passing through the body.
+- Optional: the Sasquatches respond subtly (heads turning toward it, a shrug or gesture back), so it
+  reads as an exchange.
+- Show a clip at the camp beats, with an idle sheet.
