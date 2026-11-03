@@ -25,6 +25,13 @@ merged. This file collects their notes as they arrive, so it grows.
   - If the hero UFO v1 is integrated later (it adds 48 rim light cells, 4 navigation lights and an underbody
     ring), carry the pulse over to those lights.
 
+## 2a. The night river streaks
+
+- At about 112 s (see `pass2-m3e/05-night/112s-m3d-left-m3e-right.png`), the night river shows white streak bands
+  and vertical streak artifacts that were not in M3d. They are likely a side effect of the M3e lighting changes
+  (AgX, moon bias and cascades, reflections of the sky or moon). Find the cause and fix it without changing the
+  night look the owner likes. Show the river at 108, 112 and 114 s, M3e against M3f, as stills and a short clip.
+
 ## 2b. The ocean (open items carried from M3e)
 
 - **Camera wobble over the reef.** M3e brought in a small new wobble on the ocean path over the reshaped
