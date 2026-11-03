@@ -198,7 +198,7 @@ def pace(points, t0, t1, v0, v1, ramp_in=0.25, ramp_out=0.25):
 # profile and three-quarter front as the camera turns; the craft stands behind the group on the opened bench.
 CAST = {
     "sasquatch-a": (-2.1, 1.7),    # standing
-    "sasquatch-b": (0.35, 1.95),   # crouching by the fire
+    "sasquatch-b": (0.45, 2.85),   # crouching by the fire (M3e, owner: no character in the fire -- 2.9 m out, not 2.0)
     "sasquatch-c": (-2.55, -0.45),  # sitting on a rock
     "gray": (2.6, -0.9),
 }

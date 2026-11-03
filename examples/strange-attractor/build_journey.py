@@ -122,18 +122,36 @@ lights += [
     {"name": "moon-rim", "type": "directional", "role": "fill", "direction": [0.55, -0.45, 0.7], "color": [0.55, 0.65, 1.0],
      "intensity": 0.0, "castsShadow": False, "shadowStrength": 0.0},
     # M3b: the fire is the night's key -- it casts the gathering's shadows across the bench
+    # M3e (48-night-lighting-research.md F1/F3, ADR-1906): the fire's cube now fits beside the moon's cascades and is
+    # biased in its own depth, so it casts; its contact march grounds feet, rocks and the pit; it lights the haze
     {"name": "campfire", "type": "point", "position": [CAMP[0], CAMP_Y + 0.9, CAMP[1]], "color": [1.0, 0.52, 0.22],
-     "intensity": 0.0, "range": 30.0, "castsShadow": True, "shadowStrength": 1.0, "flicker": 0.3, "flickerRate": 2.6,
-     "volumetric": 0.2},
+     "intensity": 0.0, "range": 30.0, "castsShadow": True, "shadowStrength": 1.0, "contactShadow": True, "softness": 0.45,
+     "flicker": 0.3, "flickerRate": 2.6, "volumetric": 0.6},
+    # M3e (research A4): the fire's bounce -- a broad, soft, unshadowed warm wrap low at the pit, the light the ground
+    # and the bank throw back onto the figures' undersides and the shrubs
+    {"name": "fire-bounce", "type": "point", "position": [CAMP[0], CAMP_Y + 0.3, CAMP[1]], "color": [1.0, 0.62, 0.38],
+     "intensity": 0.0, "range": 24.0, "castsShadow": False, "contactShadow": False, "flicker": 0.15, "flickerRate": 1.5,
+     "volumetric": 0.0},
     # M3b: the craft lit by its own lights -- the underside's glow and its spill on the ground, the rim's lamps
     {"name": "ufo-glow", "type": "point", "position": [UFO_PARK[0], CAMP_Y + 0.9, UFO_PARK[1]],
-     "color": [0.45, 0.85, 1.0], "intensity": 0.0, "range": 18.0, "castsShadow": False, "volumetric": 0.0},
+     "color": [0.35, 0.75, 1.0], "intensity": 0.0, "range": 8.0, "castsShadow": False, "contactShadow": False,
+     "volumetric": 0.0},
 ] + [{"name": f"ufo-rim-{k}", "type": "point",
       "position": [UFO_PARK[0] + 6.3 * math.cos(a_), CAMP_Y + UFO_LIFT + 0.4, UFO_PARK[1] + 6.3 * math.sin(a_)],
-      "color": c, "intensity": 0.0, "range": 7.5, "castsShadow": False, "volumetric": 0.0}
+      # M3e (owner §9: an unmotivated white spill behind the craft): the rim lamps light the hull, not the bank behind
+      "color": c, "intensity": 0.0, "range": 3.0, "castsShadow": False, "volumetric": 0.0}
      for k, (a_, c) in enumerate(((0.3, [1.0, 0.55, 0.2]), (1.9, [0.4, 0.9, 1.0]), (3.5, [1.0, 0.25, 0.2]),
                                    (5.1, [0.4, 0.9, 1.0])))]
+for l_ in lights:   # M3e: only the fire marches contact shadows (the scene's switch is on, ADR-1907 turns the moon's off)
+    l_.setdefault("contactShadow", False)
 scene["lights"] = lights
+scene["environment"]["contactShadows"] = True
+scene["attractorWorld"]["look"]["sunContact"] = 0.0
+# M3e (research §3, the river): physical-ish water at every hour -- a dark body that reflects at grazing angles (f0 0.06,
+# not 0.35), rough enough for a moon path and streaks, glints in the colour of what it reflects, a little transmission
+scene["attractorWorld"]["water"].update({"fresnel": 0.06, "reflection": 1.0, "roughness": 0.085, "ripple": 0.48,
+                                         "rippleScale": 0.35, "streak": 0.8, "reflectionRays": 6.0, "glints": 8.0,
+                                         "sparkle": 0.3, "specular": 2.0, "skyMirror": 0.35, "transmission": 0.5})
 
 # --- the encounter: three Sasquatches round the fire, the Gray facing them (night), the craft, the fire (particles)
 nodes = [n for n in scene.get("nodes", []) if not n["name"].startswith(
@@ -266,9 +284,10 @@ nodes += [
         "colorEnd": [1.0, 0.15, 0.0, 0.0], "emissive": 16.0, "blend": "additive"}},
     {"name": "campfire-smoke", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 700, "seed": 41, "shape": "sphere", "position": [fire[0], fire[1] + 1.1, fire[2]],
-        "extent": [0.25, 0.15, 0.25], "direction": [0, 1, 0], "spawnRate": 24.0, "lifetimeMin": 5.0, "lifetimeMax": 8.0,
-        "spread": 0.2, "speedMin": 0.5, "speedMax": 0.9, "gravity": [0.25, 0.3, 0.08], "drag": 0.6, "turbulence": 0.5,
-        "turbulenceScale": 0.3, "sizeStart": 0.4, "sizeEnd": 1.9, "colorStart": [0.9, 0.62, 0.42, 0.045],
+        # M3e (owner: a thin column, not a haze cone): a narrow source, little spread and drift, small puffs
+        "extent": [0.08, 0.1, 0.08], "direction": [0, 1, 0], "spawnRate": 30.0, "lifetimeMin": 5.0, "lifetimeMax": 8.0,
+        "spread": 0.06, "speedMin": 0.6, "speedMax": 0.9, "gravity": [0.1, 0.3, 0.04], "drag": 0.6, "turbulence": 0.25,
+        "turbulenceScale": 0.4, "sizeStart": 0.12, "sizeEnd": 0.75, "colorStart": [0.9, 0.62, 0.42, 0.07],
         "colorEnd": [0.45, 0.42, 0.48, 0.0], "emissive": 0.35, "blend": "alpha"}},
 ]
 scene["nodes"] = nodes
@@ -283,7 +302,7 @@ dusk = {
     "scene/fogColor": [0.10, 0.075, 0.22],
     "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.55, 0.38, 0.62],
     "lights/floor-bounce/intensity": 0.25, "lights/dusk-sky/intensity": 0.6, "lights/dusk-bounce/intensity": 0.3,
-    "lights/campfire/intensity": 30.0,
+    "lights/campfire/intensity": 30.0, "lights/fire-bounce/intensity": 4.0,
     # the contour lines off at dusk and night (M1b quieted them, M2 removes them: the encounter owns the frame; ADR-1894)
     "attractorWorld/contourGain": 0.0,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
@@ -309,16 +328,23 @@ night = {
     # darkness frames the group; the fire the warm key with a short, strong reach
     "attractorWorld/sunAzimuth": 150.0, "attractorWorld/sunElevation": 24.0, "attractorWorld/sunIntensity": 0.3, "attractorWorld/sunWarmth": 0.0,
     "attractorWorld/contourGain": 0.0,
-    "env/intensity": 0.012,
+    "env/intensity": 0.035,
     "env/sky/zenithColor": [0.004, 0.007, 0.028], "env/sky/horizonColor": [0.035, 0.05, 0.12],
     "env/sky/groundColor": [0.003, 0.003, 0.01], "env/sky/haze": 0.1, "env/sky/sunColor": [0.62, 0.72, 1.0],
     "env/sky/sunIntensity": 0.6, "env/sky/sunSize": 0.03, "env/sky/sunGlow": 0.2,
     "scene/fogColor": [0.008, 0.01, 0.03],
     "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.35, 0.42, 0.7],
     "lights/floor-bounce/intensity": 0.012, "lights/dusk-sky/intensity": 0.02, "lights/dusk-bounce/intensity": 0.0,
-    "lights/moon-rim/intensity": 0.32, "lights/ufo-glow/intensity": 90.0,
-    "lights/ufo-rim-0/intensity": 30.0, "lights/ufo-rim-1/intensity": 30.0, "lights/ufo-rim-2/intensity": 30.0,
-    "lights/ufo-rim-3/intensity": 30.0,
+    # M3e (48-night-lighting-research.md §2 A1-A6; owner §9): AgX and a stop up (ACES's toe crushed the night to black);
+    # more moon fill and rim so shadows hold detail; the craft's spill tamed and kept under the hull; the fire's bounce;
+    # a little haze the fire lights; the moon's shadow over a short range (finer texels), a small bias (the 3.2 m day
+    # offset smeared the figures into the bank's "capsule"; ADR-1907) and no moon contact march
+    "post/tonemap/operator": 1, "camera/exposure/compensation": 1.0,
+    "attractorWorld/sunShadowBias": 0.2, "attractorWorld/sunContact": 0.0,
+    "scene/shadowRange": 200.0, "scene/volumeDensity": 0.0007, "scene/volumeLocalLights": 1.0,
+    "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 20.0, "lights/fire-bounce/intensity": 5.0,
+    "lights/ufo-rim-0/intensity": 6.0, "lights/ufo-rim-1/intensity": 6.0, "lights/ufo-rim-2/intensity": 6.0,
+    "lights/ufo-rim-3/intensity": 6.0,
     "lights/campfire/intensity": 34.0, "lights/campfire/color": [1.0, 0.46, 0.15], "lights/campfire/range": 17.0,
     "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,

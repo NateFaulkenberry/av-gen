@@ -89,7 +89,7 @@
     "shadowCascades": 4,
     "ambientOcclusion": false,
     "shadowCasterReach": 1600.0,
-    "contactShadows": false
+    "contactShadows": true
   },
   "post": {
     "bloomIntensity": 0.04,
@@ -112,7 +112,8 @@
       ],
       "intensity": 0.85,
       "castsShadow": false,
-      "shadowStrength": 0.0
+      "shadowStrength": 0.0,
+      "contactShadow": false
     },
     {
       "name": "floor-bounce",
@@ -130,7 +131,8 @@
       ],
       "intensity": 0.35,
       "castsShadow": false,
-      "shadowStrength": 0.0
+      "shadowStrength": 0.0,
+      "contactShadow": false
     },
     {
       "name": "dusk-sky",
@@ -148,7 +150,8 @@
       ],
       "intensity": 0.0,
       "castsShadow": false,
-      "shadowStrength": 0.0
+      "shadowStrength": 0.0,
+      "contactShadow": false
     },
     {
       "name": "dusk-bounce",
@@ -166,7 +169,8 @@
       ],
       "intensity": 0.0,
       "castsShadow": false,
-      "shadowStrength": 0.0
+      "shadowStrength": 0.0,
+      "contactShadow": false
     },
     {
       "name": "moon-rim",
@@ -184,7 +188,8 @@
       ],
       "intensity": 0.0,
       "castsShadow": false,
-      "shadowStrength": 0.0
+      "shadowStrength": 0.0,
+      "contactShadow": false
     },
     {
       "name": "campfire",
@@ -203,9 +208,32 @@
       "range": 30.0,
       "castsShadow": true,
       "shadowStrength": 1.0,
+      "contactShadow": true,
+      "softness": 0.45,
       "flicker": 0.3,
       "flickerRate": 2.6,
-      "volumetric": 0.2
+      "volumetric": 0.6
+    },
+    {
+      "name": "fire-bounce",
+      "type": "point",
+      "position": [
+        74.26400000000001,
+        2.06,
+        1349.6240000000003
+      ],
+      "color": [
+        1.0,
+        0.62,
+        0.38
+      ],
+      "intensity": 0.0,
+      "range": 24.0,
+      "castsShadow": false,
+      "contactShadow": false,
+      "flicker": 0.15,
+      "flickerRate": 1.5,
+      "volumetric": 0.0
     },
     {
       "name": "ufo-glow",
@@ -216,13 +244,14 @@
         1354.8930000000003
       ],
       "color": [
-        0.45,
-        0.85,
+        0.35,
+        0.75,
         1.0
       ],
       "intensity": 0.0,
-      "range": 18.0,
+      "range": 8.0,
       "castsShadow": false,
+      "contactShadow": false,
       "volumetric": 0.0
     },
     {
@@ -239,9 +268,10 @@
         0.2
       ],
       "intensity": 0.0,
-      "range": 7.5,
+      "range": 3.0,
       "castsShadow": false,
-      "volumetric": 0.0
+      "volumetric": 0.0,
+      "contactShadow": false
     },
     {
       "name": "ufo-rim-1",
@@ -257,9 +287,10 @@
         1.0
       ],
       "intensity": 0.0,
-      "range": 7.5,
+      "range": 3.0,
       "castsShadow": false,
-      "volumetric": 0.0
+      "volumetric": 0.0,
+      "contactShadow": false
     },
     {
       "name": "ufo-rim-2",
@@ -275,9 +306,10 @@
         0.2
       ],
       "intensity": 0.0,
-      "range": 7.5,
+      "range": 3.0,
       "castsShadow": false,
-      "volumetric": 0.0
+      "volumetric": 0.0,
+      "contactShadow": false
     },
     {
       "name": "ufo-rim-3",
@@ -293,9 +325,10 @@
         1.0
       ],
       "intensity": 0.0,
-      "range": 7.5,
+      "range": 3.0,
       "castsShadow": false,
-      "volumetric": 0.0
+      "volumetric": 0.0,
+      "contactShadow": false
     }
   ],
   "attractorWorld": {
@@ -305,7 +338,8 @@
       "sunAzimuth": 70.0,
       "sunElevation": 14.0,
       "contour": 0.0,
-      "glow": 0.0
+      "glow": 0.0,
+      "sunContact": 0.0
     },
     "strataFold": 0.7,
     "camera": "flight",
@@ -320,11 +354,11 @@
         0.0037,
         0.016
       ],
-      "roughness": 0.03,
-      "ripple": 0.12,
-      "rippleScale": 0.19999999999999998,
-      "fresnel": 0.35,
-      "reflection": 1.3,
+      "roughness": 0.085,
+      "ripple": 0.48,
+      "rippleScale": 0.35,
+      "fresnel": 0.06,
+      "reflection": 1.0,
       "reflectionTint": [
         1,
         1,
@@ -333,14 +367,19 @@
       "clarity": 0.24,
       "maxOpacity": 0.97,
       "edgeFade": 0.16000000000000003,
-      "specular": 1.0,
+      "specular": 2.0,
       "ssr": 1.0,
       "ssrDistance": 480.0,
       "ssrSteps": 160.0,
       "ssrGain": 1.0,
-      "skyMirror": 0.2,
+      "skyMirror": 0.35,
       "foam": 0.0,
-      "rippleSpeed": 0.4
+      "rippleSpeed": 0.4,
+      "streak": 0.8,
+      "reflectionRays": 6.0,
+      "glints": 8.0,
+      "sparkle": 0.3,
+      "transmission": 0.5
     },
     "sunLux": 7.0,
     "sunShadowBias": 3.2,
@@ -1459,13 +1498,13 @@
       "kind": "gltf",
       "asset": "../../assets/strange-attractor/build/sasquatch-b.glb",
       "position": [
-        75.87965000000001,
+        76.65155000000001,
         1.7600001096725464,
-        1348.4765500000003
+        1348.0026500000004
       ],
       "rotation": [
         0,
-        -54.61726794544308,
+        -55.820152173590145,
         0
       ],
       "scale": [
@@ -1538,7 +1577,7 @@
       ],
       "rotation": [
         0,
-        51.2012370154796,
+        54.74600347107438,
         0
       ],
       "scale": [
@@ -3066,36 +3105,36 @@
           1349.6240000000003
         ],
         "extent": [
-          0.25,
-          0.15,
-          0.25
+          0.08,
+          0.1,
+          0.08
         ],
         "direction": [
           0,
           1,
           0
         ],
-        "spawnRate": 24.0,
+        "spawnRate": 30.0,
         "lifetimeMin": 5.0,
         "lifetimeMax": 8.0,
-        "spread": 0.2,
-        "speedMin": 0.5,
+        "spread": 0.06,
+        "speedMin": 0.6,
         "speedMax": 0.9,
         "gravity": [
-          0.25,
+          0.1,
           0.3,
-          0.08
+          0.04
         ],
         "drag": 0.6,
-        "turbulence": 0.5,
-        "turbulenceScale": 0.3,
-        "sizeStart": 0.4,
-        "sizeEnd": 1.9,
+        "turbulence": 0.25,
+        "turbulenceScale": 0.4,
+        "sizeStart": 0.12,
+        "sizeEnd": 0.75,
         "colorStart": [
           0.9,
           0.62,
           0.42,
-          0.045
+          0.07
         ],
         "colorEnd": [
           0.45,
@@ -3155,6 +3194,7 @@
         "lights/dusk-sky/intensity": 0.6,
         "lights/dusk-bounce/intensity": 0.3,
         "lights/campfire/intensity": 30.0,
+        "lights/fire-bounce/intensity": 4.0,
         "attractorWorld/contourGain": 0.0,
         "nodes/sasquatch-a/visible": true,
         "nodes/sasquatch-b/visible": true,
@@ -3213,6 +3253,7 @@
         "lights/dusk-sky/intensity": 0.6,
         "lights/dusk-bounce/intensity": 0.3,
         "lights/campfire/intensity": 30.0,
+        "lights/fire-bounce/intensity": 4.0,
         "attractorWorld/contourGain": 0.0,
         "nodes/sasquatch-a/visible": true,
         "nodes/sasquatch-b/visible": true,
@@ -3243,7 +3284,7 @@
         "attractorWorld/sunIntensity": 0.3,
         "attractorWorld/sunWarmth": 0.0,
         "attractorWorld/contourGain": 0.0,
-        "env/intensity": 0.012,
+        "env/intensity": 0.035,
         "env/sky/zenithColor": [
           0.004,
           0.007,
@@ -3282,12 +3323,20 @@
         "lights/floor-bounce/intensity": 0.012,
         "lights/dusk-sky/intensity": 0.02,
         "lights/dusk-bounce/intensity": 0.0,
-        "lights/moon-rim/intensity": 0.32,
-        "lights/ufo-glow/intensity": 90.0,
-        "lights/ufo-rim-0/intensity": 30.0,
-        "lights/ufo-rim-1/intensity": 30.0,
-        "lights/ufo-rim-2/intensity": 30.0,
-        "lights/ufo-rim-3/intensity": 30.0,
+        "post/tonemap/operator": 1,
+        "camera/exposure/compensation": 1.0,
+        "attractorWorld/sunShadowBias": 0.2,
+        "attractorWorld/sunContact": 0.0,
+        "scene/shadowRange": 200.0,
+        "scene/volumeDensity": 0.0007,
+        "scene/volumeLocalLights": 1.0,
+        "lights/moon-rim/intensity": 0.5,
+        "lights/ufo-glow/intensity": 20.0,
+        "lights/fire-bounce/intensity": 5.0,
+        "lights/ufo-rim-0/intensity": 6.0,
+        "lights/ufo-rim-1/intensity": 6.0,
+        "lights/ufo-rim-2/intensity": 6.0,
+        "lights/ufo-rim-3/intensity": 6.0,
         "lights/campfire/intensity": 34.0,
         "lights/campfire/color": [
           1.0,
@@ -3317,7 +3366,7 @@
         "attractorWorld/sunIntensity": 0.3,
         "attractorWorld/sunWarmth": 0.0,
         "attractorWorld/contourGain": 0.0,
-        "env/intensity": 0.012,
+        "env/intensity": 0.035,
         "env/sky/zenithColor": [
           0.004,
           0.007,
@@ -3356,12 +3405,20 @@
         "lights/floor-bounce/intensity": 0.012,
         "lights/dusk-sky/intensity": 0.02,
         "lights/dusk-bounce/intensity": 0.0,
-        "lights/moon-rim/intensity": 0.32,
-        "lights/ufo-glow/intensity": 90.0,
-        "lights/ufo-rim-0/intensity": 30.0,
-        "lights/ufo-rim-1/intensity": 30.0,
-        "lights/ufo-rim-2/intensity": 30.0,
-        "lights/ufo-rim-3/intensity": 30.0,
+        "post/tonemap/operator": 1,
+        "camera/exposure/compensation": 1.0,
+        "attractorWorld/sunShadowBias": 0.2,
+        "attractorWorld/sunContact": 0.0,
+        "scene/shadowRange": 200.0,
+        "scene/volumeDensity": 0.0007,
+        "scene/volumeLocalLights": 1.0,
+        "lights/moon-rim/intensity": 0.5,
+        "lights/ufo-glow/intensity": 20.0,
+        "lights/fire-bounce/intensity": 5.0,
+        "lights/ufo-rim-0/intensity": 6.0,
+        "lights/ufo-rim-1/intensity": 6.0,
+        "lights/ufo-rim-2/intensity": 6.0,
+        "lights/ufo-rim-3/intensity": 6.0,
         "lights/campfire/intensity": 34.0,
         "lights/campfire/color": [
           1.0,
