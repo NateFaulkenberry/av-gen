@@ -237,19 +237,26 @@
     },
     {
       "name": "ufo-glow",
-      "type": "point",
+      "type": "spot",
       "position": [
         88.90500000000002,
-        2.66,
+        3.46,
         1354.8930000000003
       ],
+      "direction": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "innerCone": 35.0,
+      "outerCone": 62.0,
       "color": [
         0.35,
         0.75,
         1.0
       ],
       "intensity": 0.0,
-      "range": 8.0,
+      "range": 7.0,
       "castsShadow": false,
       "contactShadow": false,
       "volumetric": 0.0
@@ -3333,10 +3340,10 @@
         "lights/moon-rim/intensity": 0.5,
         "lights/ufo-glow/intensity": 20.0,
         "lights/fire-bounce/intensity": 5.0,
-        "lights/ufo-rim-0/intensity": 6.0,
-        "lights/ufo-rim-1/intensity": 6.0,
-        "lights/ufo-rim-2/intensity": 6.0,
-        "lights/ufo-rim-3/intensity": 6.0,
+        "lights/ufo-rim-0/intensity": 0.0,
+        "lights/ufo-rim-1/intensity": 0.0,
+        "lights/ufo-rim-2/intensity": 0.0,
+        "lights/ufo-rim-3/intensity": 0.0,
         "lights/campfire/intensity": 34.0,
         "lights/campfire/color": [
           1.0,
@@ -3415,10 +3422,10 @@
         "lights/moon-rim/intensity": 0.5,
         "lights/ufo-glow/intensity": 20.0,
         "lights/fire-bounce/intensity": 5.0,
-        "lights/ufo-rim-0/intensity": 6.0,
-        "lights/ufo-rim-1/intensity": 6.0,
-        "lights/ufo-rim-2/intensity": 6.0,
-        "lights/ufo-rim-3/intensity": 6.0,
+        "lights/ufo-rim-0/intensity": 0.0,
+        "lights/ufo-rim-1/intensity": 0.0,
+        "lights/ufo-rim-2/intensity": 0.0,
+        "lights/ufo-rim-3/intensity": 0.0,
         "lights/campfire/intensity": 34.0,
         "lights/campfire/color": [
           1.0,

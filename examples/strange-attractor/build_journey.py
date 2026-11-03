@@ -133,8 +133,11 @@ lights += [
      "intensity": 0.0, "range": 24.0, "castsShadow": False, "contactShadow": False, "flicker": 0.15, "flickerRate": 1.5,
      "volumetric": 0.0},
     # M3b: the craft lit by its own lights -- the underside's glow and its spill on the ground, the rim's lamps
-    {"name": "ufo-glow", "type": "point", "position": [UFO_PARK[0], CAMP_Y + 0.9, UFO_PARK[1]],
-     "color": [0.35, 0.75, 1.0], "intensity": 0.0, "range": 8.0, "castsShadow": False, "contactShadow": False,
+    # M3e (owner §9: a white spill on the bank behind the craft with no source): the underside's glow is a spot straight
+    # down from the hull's belly, so it pools on the ground under the craft and nowhere else
+    {"name": "ufo-glow", "type": "spot", "position": [UFO_PARK[0], CAMP_Y + UFO_LIFT - 0.2, UFO_PARK[1]],
+     "direction": [0.0, -1.0, 0.0], "innerCone": 35.0, "outerCone": 62.0,
+     "color": [0.35, 0.75, 1.0], "intensity": 0.0, "range": 7.0, "castsShadow": False, "contactShadow": False,
      "volumetric": 0.0},
 ] + [{"name": f"ufo-rim-{k}", "type": "point",
       "position": [UFO_PARK[0] + 6.3 * math.cos(a_), CAMP_Y + UFO_LIFT + 0.4, UFO_PARK[1] + 6.3 * math.sin(a_)],
@@ -343,8 +346,8 @@ night = {
     "attractorWorld/sunShadowBias": 0.2, "attractorWorld/sunContact": 0.0,
     "scene/shadowRange": 200.0, "scene/volumeDensity": 0.0007, "scene/volumeLocalLights": 1.0,
     "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 20.0, "lights/fire-bounce/intensity": 5.0,
-    "lights/ufo-rim-0/intensity": 6.0, "lights/ufo-rim-1/intensity": 6.0, "lights/ufo-rim-2/intensity": 6.0,
-    "lights/ufo-rim-3/intensity": 6.0,
+    "lights/ufo-rim-0/intensity": 0.0, "lights/ufo-rim-1/intensity": 0.0, "lights/ufo-rim-2/intensity": 0.0,
+    "lights/ufo-rim-3/intensity": 0.0,
     "lights/campfire/intensity": 34.0, "lights/campfire/color": [1.0, 0.46, 0.15], "lights/campfire/range": 17.0,
     "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,

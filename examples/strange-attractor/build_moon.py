@@ -15,7 +15,7 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, canyon_frame, site, knot  # noqa: E402  (ADR-1893)
+from canyon_scale import WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT  # noqa: E402  (ADR-1893)
 
 
 def unit(v):
@@ -135,8 +135,13 @@ GOLD = [0.85, 0.75, 0.45]                 # the lunar scan's cooler gold
 # (portals-c2/00-exit-candidates): the east wall, 35 m up a 56-degree face over the river, facing down-canyon; 200 m of
 # open water straight ahead, the far walls in the last light. The portal turns the floor (axis down) onto that wall:
 # a camera dropping into the floor with its up pointing ahead (-z) leaves the wall level, its up the world's.
-DUSK_OUT = [-0.426, 0.0, -0.905]          # out of the wall (the wall's downhill normal)
-DUSK_EXIT = [*canyon_frame(0, 0)[:1], 46.0 * WS, canyon_frame(0, 0)[1]]  # the Gate C 2 site, scaled (ADR-1893)
+# M3e (owner §7): the arrival moves down the river to the FAR bank, opposite the camp -- out of the far wall's face
+# (d 40, lat -53.5: its foot at lat -48, 2.7 m; its top at lat -64, 26.7 m; the face 12 m up here), facing across the
+# river and a little up-canyon, toward the camp
+_out = (-0.33 * O_UNIT[0] + 0.94 * L_UNIT[0], -0.33 * O_UNIT[1] + 0.94 * L_UNIT[1])
+_on = math.hypot(*_out)
+DUSK_OUT = [_out[0] / _on, 0.0, _out[1] / _on]
+DUSK_EXIT = [site(40.0, -53.5)[0], 12.0, site(40.0, -53.5)[1]]   # absolute (the root's exit y is absolute)
 
 
 # M1b: the camp is on the low bank right of the exit, 16 m out and 16 m over (real metres; it was the M1 bank's
@@ -147,18 +152,19 @@ DUSK_EXIT = [*canyon_frame(0, 0)[:1], 46.0 * WS, canyon_frame(0, 0)[1]]  # the G
 # scale) or, near the camp, real metres from it (canyon_scale.site, near, knot)
 CAMP = site(16.0, 16.0)
 CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 m at d 40, lat 40)
-DUSK_FLIGHT = [knot(d, lat, h, t) for d, lat, h, t in
-               ((6, 2, 11, 49.4), (10, 6, 5, 51.2), (12, 9, 2.1, 53.0), (13.5, 11, 1.8, 55.4), (17.5, 10.5, 1.9, 57.8),
-                # M2: away from the fire, up and across the benches to the sheer outer cliff behind the camp, where
-                # the canyon's second portal opens (its face 80-122 m between lat 91 and 93: the crossing at lat 91.8,
-                # 69.69 s, bar 36). Heights over the ground; the last two hold 95 m absolute (73.8 and 134.2 below).
-                # up first, almost straight up from the bank, then across at the portal's height to the face
-                (17.5, 11.5, 9.0, 59.7), (19, 24, 15.0, 61.0), (19, 31, 36.0, 62.3), (14, 44, 43.0, 63.6), (8, 58, 65.0, 65.2), (2, 70, 56.0, 66.8),
-                (-4, 80, 38.0, 68.0), (-8, 89, 21.2, 69.2), (-8, 96, -39.2, 70.4))]
+# M3e (owner §7): one smooth, continuous path -- out of the far wall, across the river, BY the camp on its river side
+# (8-10 m from the fire, low; no circling, no lingering), then up over the benches to the outer cliff's portal. The
+# last two knots are the crossing's, as before (95 m absolute at the face). Times from a smooth speed profile.
+_DUSK_PATH = [(36, -44, 9.0), (28, -26, 6.0), (22, -8, 4.0), (19, 5, 2.6), (13, 9, 2.4), (6, 15, 4.0), (0, 26, 12.0),
+              (-4, 42, 30.0), (-6, 58, 52.0), (-6, 72, 50.0), (-7, 82, 34.0)]
+_dk = [knot(d, lat, h, 0.0) for d, lat, h in _DUSK_PATH]
+DUSK_FLIGHT = [list(k) for k in pace([k_[:3] for k_ in _dk], 48.9, 68.0, 8.0, 9.0, ramp_in=0.15, ramp_out=0.15)[0]] + \
+    [knot(-8, 89, 21.2, 69.2), knot(-8, 96, -39.2, 70.4)]
 EGLOW = [-c for c in direction(-6, 50)]
 CLIFF_PORTAL = site(-8.0, 91.8)
-DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5],
-             [CLIFF_PORTAL[0], 95.0 * R, CLIFF_PORTAL[1], 58.9, 69.3]]   # M2: the eye on the cliff as the tear opens
+# M3e (owner §7: they are a moment on the way): a short glance at the camp as the camera passes, not a held focus
+DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 54.0, 57.6],
+             [CLIFF_PORTAL[0], 95.0 * R, CLIFF_PORTAL[1], 61.0, 69.3]]   # M2: the eye on the cliff as the tear opens
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)

@@ -105,8 +105,9 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
                 PB[2] + PB[3] * 0.5 - FACE_HEIGHT / math.tan(math.radians(51.8))]
 
 # --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100), down to the camp
-NIGHT_EXIT_DL = (46.0, 99.0)
-NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 86.0 * R, site(*NIGHT_EXIT_DL)[1]]
+# M3e (owner §12): the arrival lower (70 m, not 86 m) and a little further down-canyon from the camp (d 54, not 46)
+NIGHT_EXIT_DL = (54.0, 99.0)
+NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 70.0 * R, site(*NIGHT_EXIT_DL)[1]]
 OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
@@ -134,33 +135,39 @@ def glide_point(s_back):
 
 
 def night_flight():
-    # absolute heights near the camp (eye height over the camp's ground); the glide in absolute terms; both turned into
-    # heights over the sampled ground (the portal's flight is authored over the ground)
+    """M3e (owner §12, the night counterpart of §7): one smooth path from the cliff, down over the benches, BY the camp
+    (5-7 m from the fire, low, no circling and no lingering), on into the glide down into the riverbed portal. The glide
+    is the M3b one (a straight line, 25 degrees down at 3.2 m/s; the exit frame tilted to match). Heights over the
+    sampled ground."""
     eye = CAMP_GROUND + 1.85
-    near_knots = [(-1.0, -9.5, eye + 0.9, 110.2), (-5.5, -7.5, eye + 0.2, 112.0), (-8.0, -3.5, eye, 113.8)]
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
+    far = [knot(48.0, 84.0, 24.0, 0.0), knot(40.0, 62.0, 14.0, 0.0), knot(31.0, 40.0, 7.0, 0.0)]
     pts = []
-    for dd, dl, y, t in near_knots:
+    for dd, dl, y in ((7.0, 9.0, eye + 1.6), (5.5, 3.0, eye + 1.0), (3.5, -3.5, eye + 0.6)):   # past the camp
         x, z = near(CAMP_SITE, dd, dl)
-        pts.append((x, y, z, t))
-    for frac in (1.0, 0.66, 0.33):
-        sb = glide_len * frac
-        x, y, z = glide_point(sb)
-        pts.append((x, y, z, T_CROSS - sb / GLIDE_SPEED))
-    x, y, z = glide_point(0.0)
-    pts.append((x, y, z, T_CROSS))
-    x, y, z = glide_point(-GLIDE_SPEED * 0.8)
-    pts.append((x, y, z, T_CROSS + 0.8))
+        pts.append((x, y, z))
+    gl = [tuple(glide_point(glide_len * f)) for f in (1.0, 0.5)]
+    pts_all = pts + gl
     try:
-        gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in pts])
+        gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in pts_all] + [(x, z) for x, _, z in [tuple(glide_point(0.0))]])
     except Exception:
-        gr = [CAMP_GROUND] * len(pts)
-    out = [knot(42.0, 80.0, 40.0, 103.6), knot(35.0, 56.0, 20.0, 106.4), knot(28.0, 34.0, 7.0, 108.4)]
-    out += [[x, y - g, z, t] for (x, y, z, t), g in zip(pts, gr)]
+        gr = [CAMP_GROUND] * (len(pts_all) + 1)
+    # the approach and the pass, timed by a smooth speed profile that arrives at the glide's own speed
+    rel = [k[:3] for k in far] + [[x, y - g, z] for (x, y, z), g in zip(pts, gr)]
+    t_glide = T_CROSS - glide_len / GLIDE_SPEED
+    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], 104.2, t_glide, 7.5, GLIDE_SPEED,
+                    ramp_in=0.15, ramp_out=0.3)
+    out = [list(k) for k in knots]
+    x, y, z = gl[1]
+    out.append([x, y - gr[len(pts) + 1], z, T_CROSS - glide_len * 0.5 / GLIDE_SPEED])
+    x, y, z = glide_point(0.0)
+    out.append([x, y - gr[-1], z, T_CROSS])
+    x, y, z = glide_point(-GLIDE_SPEED * 0.8)
+    out.append([x, y - gr[-1], z, T_CROSS + 0.8])
     return out
 
 
-NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.2, 116.4]]
+NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 111.6, 114.6]]   # M3e (owner §12): a glance in passing, not a held focus
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 # M3d (owner): one continuous fly-over -- out of the wall low, over the rover as it drives (no orbit), straight on to
