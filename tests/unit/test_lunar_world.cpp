@@ -542,4 +542,38 @@ TEST_CASE("a scene's spectral fog and its portal's gaze keys load (ADR-1908, ADR
     // the default is the grey fog: no weights
     CHECK(scene::Environment{}.fogSpectral == glm::vec3(0.0f));
 }
-
+TEST_CASE("a scene's water column loads, is a parameter, and is saved only when it absorbs (ADR-1910)",
+          "[pass3][adr1910]") {
+    const auto dir = testsupport::processTempDir();
+    const nlohmann::json sea = {
+        {"format", "avgen-scene"}, {"version", 1}, {"name", "column"},
+        {"camera", {{"mode", 1}, {"position", {0.0, 10.0, 0.0}}, {"target", {0.0, 0.0, -10.0}}}},
+        {"environment", {{"waterSurface", 140.0}, {"waterDownwelling", {0.06, 0.02, 0.012}}}},
+        {"nodes", {{{"name", "rock"}, {"kind", "grid"}}}}};
+    std::ofstream(dir / "column.scene.json") << sea.dump();
+    assets::AssetRegistry registry{dir};
+    auto c = scene::Composition::loadFile(dir / "column.scene.json", registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    params.resetFinals();
+    FrameTime ft{};
+    (*c)->update(ft);
+    const auto& env = (*c)->scene().environment;
+    CHECK(env.waterSurface == Approx(140.0f));
+    CHECK(env.waterDownwelling.x == Approx(0.06f));
+    CHECK(env.waterDownwelling.z == Approx(0.012f));
+    // a parameter: the timeline and audio can drive it
+    auto* surface = params.findAs<float>("scene/waterSurface");
+    REQUIRE(surface != nullptr);
+    surface->setBase(120.0f);
+    params.resetFinals();
+    (*c)->update(ft);
+    CHECK((*c)->scene().environment.waterSurface == Approx(120.0f));
+    // saved with the scene when it absorbs; the default is no column at all
+    const nlohmann::json saved = (*c)->toJson();
+    REQUIRE(saved.contains("environment"));
+    CHECK(saved["environment"].contains("waterDownwelling"));
+    CHECK(scene::Environment{}.waterDownwelling == glm::vec3(0.0f));
+}

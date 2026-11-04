@@ -34,12 +34,17 @@ def fixed_project(cam):
             s.pop("looks")
     if "attractorWorld" in s:
         s["attractorWorld"]["camera"] = "scene"
+    for key, value in cam.get("replace", {}).items():   # probes: set a top-level key outright
+        s[key] = value
     drop = cam.get("dropNodes", [])   # probes: node names or asset substrings to leave out
     if drop:
         s["nodes"] = [n for n in s.get("nodes", []) if not any(d in n.get("name", "") or d in str(n.get("asset", ""))
                                                               for d in drop)]
     for block, values in cam.get("patch", {}).items():   # probes: {"environment": {"volumeDensity": 0}, ...}
-        s.setdefault(block, {}).update(values)
+        if isinstance(values, list):
+            s[block] = s.get(block, []) + values     # a list is appended to (e.g. a probe material program)
+        else:
+            s.setdefault(block, {}).update(values)
     s["camera"] = {"mode": 1, "position": cam["pos"], "target": cam["tgt"], "fov": cam["fov"], "orbitSpeed": 0.0}
     json.dump(s, open(os.path.join(E, "tmp-camref.scene.json"), "w"), indent=1)
     p = json.load(open(os.path.join(E, "strange-attractor.json")))
@@ -47,6 +52,25 @@ def fixed_project(cam):
     p["timeline"]["tracks"] = [t for t in p["timeline"]["tracks"]
                                if not (t["target"].startswith(("camera", "journey"))
                                        and not t["target"].startswith("camera/exposure"))]
+    # A portal world drawn as the root: the film addresses its parameters as "<world>/..." (moon/, mars/, ocean/) and
+    # the root's own as unprefixed. Re-address this world's tracks and routes to the root, and drop the ones meant for
+    # the film's root (the canyon's contour, wire, corruption and craft lights), which would otherwise land on this
+    # world's parameters of the same name -- the ocean's terrain went red from the canyon's contour route.
+    world = {"strange-attractor-moon.scene.json": "moon/", "strange-attractor-mars.scene.json": "mars/",
+             "strange-attractor-ocean.scene.json": "ocean/"}.get(cam["scene"])
+    if world:
+        worlds = ("moon/", "mars/", "ocean/")
+        def readdress(items, key):
+            out = []
+            for it in items:
+                t = it[key]
+                if t.startswith(world):
+                    out.append({**it, key: t[len(world):]})
+                elif t.startswith("camera/exposure") and key == "target":
+                    out.append(it)
+            return out
+        p["timeline"]["tracks"] = readdress(p["timeline"]["tracks"], "target")
+        p["routes"] = readdress(p.get("routes", []), "target")
     json.dump(p, open(os.path.join(E, "tmp-camref.json"), "w"), indent=1)
     return os.path.join(E, "tmp-camref.json")
 
@@ -96,10 +120,12 @@ def main():
     ap.add_argument("--size", default="1920x1080")
     ap.add_argument("--supersample", type=int, default=2)
     ap.add_argument("--cam", action="append", default=[], help="an ad-hoc camera as JSON (replaces the set)")
+    ap.add_argument("--journey", default="", help="comma-separated film times: ad-hoc film frames j-<t> (replaces the set)")
     a = ap.parse_args()
     cams = json.load(open(os.path.join(HERE, "cameras.json")))["cameras"]
-    if a.cam:
-        cams = [adhoc(c) for c in a.cam]
+    if a.cam or a.journey:
+        cams = [adhoc(c) for c in a.cam] + [{"id": f"j-{float(t):07.2f}", "set": "adhoc", "kind": "journey",
+                                             "t": float(t)} for t in a.journey.split(",") if t]
     if a.set:
         cams = [c for c in cams if c["set"] == a.set]
     if a.only:

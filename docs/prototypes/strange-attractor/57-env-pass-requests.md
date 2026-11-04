@@ -45,6 +45,32 @@ The 3 cm drop is too much for the animation's lowest frames. Suggest: the seat r
 flat top in Phase C, then SEAT_SIT re-fitted with check_contacts. SEAT_SIT stays in `build_journey.py` (shared file):
 request the value here and the SA agent sets it.
 
+### H-4: the new night pass -- keep the clearing's geology out of its corridor (Phase C)
+Status: open, for the hero agent's Phase C. The SA agent owns the path (`build_mars.py`, `night_flight`).
+The owner found the M3g night pass crept past one boulder for 18 s (104-118 s). It is replaced by a longer level pass
+(coordinator, 2026-11-04). Knots, absolute world x, z of the canyon scene, with heights over the ground (over the water,
+over its surface):
+
+| t (s) | x | z | height | where |
+|---|---|---|---|---|
+| 93.46 | 66.5 | 1295 | 5.0 (abs) | the exit out of the bank (unchanged) |
+| 93.9 | 58.0 | 1318 | 4.0 | out over the river |
+| 94.5 | 47.0 | 1326.5 | 4.0 | |
+| ~97 | 34.0 | 1329 | 4.0 | the wide left curve over the water |
+| ~100 | 23.5 | 1336 | 4.0 | |
+| ~104 | 21.0 | 1346 | 4.0 | |
+| ~107 | 28.0 | 1351 | 4.0 | heading east, straight at the camp across the water |
+| ~111 | 37.0 | 1352.5 | 4.0 | the camp, the fire and the craft ahead, 30-40 m |
+| ~114 | 43.0 | 1354 | 4.0 | turning right |
+| 117-121.2 | 47.8 -> 51.5 | 1358.6 -> 1367 | glide | the river portal's glide (25 deg, 3.2 m/s), heading (0.4, 0.92) |
+
+- The corridor to keep clear: 4 m either side of that line and 3 m under it. It is all over the water except its
+  last 6 m into the glide.
+- **What the camera sees from it:** the clearing's river face and the gathering, from the west across the water.
+  That makes the clearing's river side, the bank's lip and the far wall behind the camp the composition of 107-115 s.
+  Anything placed on the bank's water edge between z 1340 and 1365 is in the shot.
+- `campmap3.png` (top view, M3g path red, new path green) is in `pass3-env/08-regression/`.
+
 ## From the hero agent to the SA agent
 
 (none yet)

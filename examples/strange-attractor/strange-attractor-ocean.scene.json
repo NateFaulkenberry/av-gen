@@ -34,7 +34,7 @@
         0.85,
         1.0
       ],
-      "intensity": 1.1,
+      "intensity": 1.824,
       "castsShadow": true,
       "shadowStrength": 0.8,
       "softness": 0.6
@@ -53,7 +53,7 @@
         0.55,
         0.65
       ],
-      "intensity": 0.25,
+      "intensity": 0.414,
       "castsShadow": false,
       "shadowStrength": 0.0
     },
@@ -110,6 +110,42 @@
       "range": 160.0,
       "castsShadow": false,
       "volumetric": 0.25
+    },
+    {
+      "name": "foot-lamp-l",
+      "type": "point",
+      "position": [
+        876.0,
+        36.7,
+        -143.0
+      ],
+      "color": [
+        1.0,
+        0.55,
+        0.25
+      ],
+      "intensity": 520.0,
+      "range": 45.0,
+      "castsShadow": false,
+      "volumetric": 0.0
+    },
+    {
+      "name": "foot-lamp-r",
+      "type": "point",
+      "position": [
+        876.0,
+        36.7,
+        -263.0
+      ],
+      "color": [
+        1.0,
+        0.55,
+        0.25
+      ],
+      "intensity": 520.0,
+      "range": 45.0,
+      "castsShadow": false,
+      "volumetric": 0.0
     },
     {
       "name": "sub-1-light",
@@ -210,9 +246,31 @@
       0.075
     ],
     "volumeDensity": 0.0024,
-    "skybox": false,
+    "skybox": true,
     "sky": {
-      "enabled": false
+      "enabled": true,
+      "background": true,
+      "useKeyLight": false,
+      "zenithColor": [
+        0.016,
+        0.085,
+        0.115
+      ],
+      "horizonColor": [
+        0.005,
+        0.038,
+        0.058
+      ],
+      "groundColor": [
+        0.002,
+        0.008,
+        0.013
+      ],
+      "haze": 0.25,
+      "sunIntensity": 0.0,
+      "sunSize": 0.0,
+      "sunGlow": 0.0,
+      "intensity": 1.0
     },
     "fallbackAmbient": false,
     "shadowRange": 900.0,
@@ -227,7 +285,15 @@
     ],
     "volumeMaxDistance": 45.0,
     "volumeAnisotropy": 0.75,
-    "volumeLocalLights": 0.0
+    "volumeLocalLights": 0.0,
+    "waterSurface": 192.7,
+    "waterDownwelling": [
+      0.016,
+      0.0055,
+      0.0032
+    ],
+    "fogSky": 1.0,
+    "fogSkyDistance": 420.0
   },
   "post": {
     "bloomIntensity": 0.06,
@@ -618,6 +684,189 @@
             0.0,
             0.0
           ]
+        }
+      ]
+    },
+    {
+      "name": "baseSilt",
+      "baseColor": -1,
+      "metallic": -1,
+      "roughness": -1,
+      "emission": -1,
+      "opacity": -1,
+      "normal": -1,
+      "occlusion": -1,
+      "ops": [],
+      "layers": [
+        {
+          "name": "silt",
+          "ops": [
+            {
+              "kind": "input",
+              "dst": 0,
+              "input": "normal"
+            },
+            {
+              "kind": "swizzle",
+              "dst": 0,
+              "srcA": 0,
+              "constant": [
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "smoothstep",
+              "dst": 0,
+              "srcA": 0,
+              "constant": [
+                0.35,
+                0.8,
+                0,
+                0
+              ]
+            },
+            {
+              "kind": "input",
+              "dst": 1,
+              "input": "worldPosition"
+            },
+            {
+              "kind": "swizzle",
+              "dst": 1,
+              "srcA": 1,
+              "constant": [
+                1,
+                1,
+                1,
+                1
+              ]
+            },
+            {
+              "kind": "smoothstep",
+              "dst": 1,
+              "srcA": 1,
+              "constant": [
+                54.7,
+                28.700000000000003,
+                0,
+                0
+              ]
+            },
+            {
+              "kind": "input",
+              "dst": 2,
+              "input": "worldPosition"
+            },
+            {
+              "kind": "noise",
+              "dst": 2,
+              "srcA": 2,
+              "value": 0.15,
+              "seed": 23
+            },
+            {
+              "kind": "smoothstep",
+              "dst": 2,
+              "srcA": 2,
+              "constant": [
+                0.3,
+                0.7,
+                0,
+                0
+              ]
+            },
+            {
+              "kind": "multiply",
+              "dst": 3,
+              "srcA": 1,
+              "srcB": 2
+            },
+            {
+              "kind": "add",
+              "dst": 3,
+              "srcA": 3,
+              "srcB": 1
+            },
+            {
+              "kind": "multiply",
+              "dst": 3,
+              "srcA": 3,
+              "srcB": 0
+            },
+            {
+              "kind": "multiply",
+              "dst": 4,
+              "srcA": 1,
+              "srcB": 1
+            },
+            {
+              "kind": "multiply",
+              "dst": 4,
+              "srcA": 4,
+              "srcB": 2
+            },
+            {
+              "kind": "add",
+              "dst": 3,
+              "srcA": 3,
+              "srcB": 4
+            },
+            {
+              "kind": "remap",
+              "dst": 3,
+              "srcA": 3,
+              "constant": [
+                0.0,
+                1.0,
+                0.0,
+                1.0
+              ],
+              "value": 1.0
+            },
+            {
+              "kind": "constant",
+              "dst": 5,
+              "constant": [
+                0.2,
+                0.22,
+                0.19,
+                1.0
+              ]
+            },
+            {
+              "kind": "constant",
+              "dst": 6,
+              "constant": [
+                0.07,
+                0.08,
+                0.07,
+                1.0
+              ]
+            },
+            {
+              "kind": "mixBy",
+              "dst": 5,
+              "srcA": 5,
+              "srcB": 6,
+              "srcC": 4
+            },
+            {
+              "kind": "constant",
+              "dst": 6,
+              "constant": [
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ]
+            }
+          ],
+          "mask": 3,
+          "baseColor": 5,
+          "roughness": 6
         }
       ]
     },
@@ -1049,7 +1298,8 @@
         1,
         1
       ],
-      "visible": true
+      "visible": true,
+      "program": "baseSilt"
     },
     {
       "name": "bay-membrane",

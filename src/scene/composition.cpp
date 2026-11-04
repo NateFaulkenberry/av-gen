@@ -74,7 +74,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "fogSpectral", "horizonDensity",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "fogSpectral", "waterSurface", "waterDownwelling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -5194,6 +5194,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                         1.0f));
     // ADR-1908: the surface fog's extinction by colour (0 0 0 = the grey fog, unchanged)
     fogSpectral_ = &params.add(vec3Desc(prefix_ + "scene/fogSpectral", volumeSetting_.fogSpectral, 0.0f, 20.0f, 0.0f, 4.0f));
+    // ADR-1910: the water column's surface (world y) and its absorption of light per metre, by channel (0 = off)
+    waterSurface_ = &params.add(floatDesc(prefix_ + "scene/waterSurface", volumeSetting_.waterSurface, -100000.0f,
+                                          100000.0f, -1000.0f, 1000.0f));
+    waterDownwelling_ = &params.add(vec3Desc(prefix_ + "scene/waterDownwelling", volumeSetting_.waterDownwelling, 0.0f,
+                                             2.0f, 0.0f, 0.2f));
     // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
     // march, the surface pass and the particle estimate from this one number. An ordinary
     // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
@@ -6435,6 +6440,8 @@ void Composition::detach() {
     fogGroundFollow_ = nullptr;
     fogPooling_ = nullptr;
     fogSpectral_ = nullptr;
+    waterSurface_ = nullptr;
+    waterDownwelling_ = nullptr;
     horizonDensity_ = nullptr;
     bandParams_ = {}; // ADR-1151
     windEnabled_ = nullptr;
@@ -9824,6 +9831,8 @@ void Composition::applyParameters() {
         env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
         env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
         env.fogSpectral = fogSpectral_ != nullptr ? fogSpectral_->value() : volumeSetting_.fogSpectral; // ADR-1908
+        env.waterSurface = pick(waterSurface_, volumeSetting_.waterSurface);                              // ADR-1910
+        env.waterDownwelling = waterDownwelling_ != nullptr ? waterDownwelling_->value() : volumeSetting_.waterDownwelling;
         env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.bands = volumeSetting_.bands; // ADR-1151
         scene::applyReflectionBandParameters(bandParams_, env.bands);
@@ -11052,6 +11061,12 @@ nlohmann::json Composition::toJson() const {
         if (spectral != glm::vec3(0.0f)) {
             environment["fogSpectral"] = {spectral.x, spectral.y, spectral.z};
         }
+        // ADR-1910, by the same rule: the column is written only when it absorbs
+        const glm::vec3 down = waterDownwelling_ != nullptr ? waterDownwelling_->base() : volumeSetting_.waterDownwelling;
+        if (down != glm::vec3(0.0f)) {
+            environment["waterDownwelling"] = {down.x, down.y, down.z};
+            environment["waterSurface"] = waterSurface_ != nullptr ? waterSurface_->base() : volumeSetting_.waterSurface;
+        }
     }
     // ADR-1151: written only when authored, with the parameters' base values, so a scene without bands
     // saves exactly the file it had.
@@ -12237,6 +12252,20 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(value.error());
             }
             comp->volumeSetting_.fogSpectral = *value;
+        }
+        if (e.contains("waterDownwelling")) { // ADR-1910
+            auto value = readVec<3>(e, "waterDownwelling", comp->volumeSetting_.waterDownwelling);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.waterDownwelling = glm::max(*value, glm::vec3(0.0f));
+        }
+        if (e.contains("waterSurface")) { // ADR-1910
+            auto value = readFloat(e, "waterSurface", comp->volumeSetting_.waterSurface);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.waterSurface = *value;
         }
         {
             scene::Environment& v = comp->volumeSetting_;

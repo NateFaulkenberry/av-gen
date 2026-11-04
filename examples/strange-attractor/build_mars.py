@@ -122,7 +122,10 @@ CAMP_GROUND = 4.4 * WS
 GATHER = [*near(CAMP_SITE, *GATHER_AT)[:1], CAMP_GROUND + 1.3, near(CAMP_SITE, *GATHER_AT)[1]]
 RIVER_PORTAL = site(10.0, -12.0)
 RIVER_Y = -0.5 * R
-_tw = [RIVER_PORTAL[0] - CAMP[0], RIVER_PORTAL[1] - CAMP[1]]
+# the glide's heading (x, z). Pass 3: the night pass now comes at the portal from out over the river, heading in toward
+# the camp, so the glide turns down into the opening on that heading (down the river) rather than on the camp's line
+# out to it (M3b-M3g); the crossing is unchanged in the ocean, whose arrival is mapped from this heading (entryUp)
+_tw = [-0.15, 0.99]
 _tn = math.hypot(*_tw)
 TOWARD_RIVER = (_tw[0] / _tn, _tw[1] / _tn)
 GLIDE_SLOPE = math.radians(25.0)
@@ -137,30 +140,25 @@ def glide_point(s_back):
 
 
 def night_flight():
-    """M3e (owner §12, the night counterpart of §7): one smooth path from the cliff, down over the benches, BY the camp
-    (5-7 m from the fire, low, no circling and no lingering), on into the glide down into the riverbed portal. The glide
-    is the M3b one (a straight line, 25 degrees down at 3.2 m/s; the exit frame tilted to match). Heights over the
-    sampled ground."""
+    """The night pass (M3e §12, M3g §4 level, pass 3 lengthened): out of the bank's exit, level 3.7-4.4 m over the
+    ground, by the camp (no circling and no lingering), on into the glide down into the riverbed portal. The glide is
+    the M3b one (a straight line, 25 degrees down at 3.2 m/s; the exit frame tilted to match)."""
     eye = CAMP_GROUND + 1.85
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
-    # the camera arrives at the pyramid portal's climbing speed (~14 m/s): the first knot is far enough out along the
-    # exit for that speed, so the path does not overshoot and swing back to the cliff (a first try did)
-    # (on the river's side of the craft at camp (10, 5): a first line through (32, 20) passed 4 m from its centre)
-    far = [knot(60.0, 22.0, 4.5, 0.0), knot(46.0, 14.0, 4.0, 0.0), knot(33.0, 8.0, 3.5, 0.0)]
-    pts = []
-    # M3g (54- §4): level along the river's edge past the camp, between the craft (10, 5) and the water, past the Gray,
-    # and on toward the glide -- clear of the craft, the figures, the rocks and the scrub (traced per frame)
-    for dd, dl, y in ((7.0, -4.0, eye + 1.6), (1.0, -8.0, eye + 1.4), (-3.5, -12.0, eye + 1.0)):   # past the camp
-        x, z = near(CAMP_SITE, dd, dl)
-        pts.append((x, y, z))
+    # Pass 3 (owner 2026-11-04: the M3g pass crept past one boulder for 18 s -- Mars's four-bar cut left the same short
+    # path 8 s longer, and the speed profile spent them at 0.5 m/s beside the bank's boulder). The level pass-by now has
+    # the length its time needs, over the water: out of the exit and out over the river, a wide left curve that turns
+    # the camera toward the bank (the camp, the fire and the craft ahead across the water), then right and down into
+    # the river portal's glide (same slope and speed, its heading turned to this approach). Absolute x, z (measured on the camp map), heights over the ground
+    # (the water's surface over the river); the corridor is in 57- (H-4) so the clearing's geology stays out of it.
+    far = [[58.0, 4.0, 1318.0], [47.0, 4.0, 1329.0], [36.0, 4.0, 1334.0], [28.5, 4.0, 1341.0], [26.5, 4.0, 1348.0], [31.0, 4.0, 1352.5]]
+    pts = [(39.0, 4.0, 1353.5), (46.0, 4.0, 1354.0), (50.8, 4.2, 1355.4)]   # heading in toward the gathering across the water, then right into the glide
     gl = [tuple(glide_point(glide_len * f)) for f in (1.0, 0.5)]
     pts_all = pts + gl
-    try:
-        gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in pts_all] + [(x, z) for x, _, z in [tuple(glide_point(0.0))]])
-    except Exception:
-        gr = [CAMP_GROUND] * (len(pts_all) + 1)
+    gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in gl] + [(x, z) for x, _, z in [tuple(glide_point(0.0))]])
+    gr = [0.0] * len(pts) + gr
     # the approach and the pass, timed by a smooth speed profile that arrives at the glide's own speed
-    rel = [k[:3] for k in far] + [[x, y - g, z] for (x, y, z), g in zip(pts, gr)]
+    rel = [list(k) for k in far] + [list(p) for p in pts]
     # M3f (owner: the pass clipped geometry): the knots' heights are over the ground AT the knots, so a bank between two
     # knots stood above the line (a per-frame trace found the camera 2.7 m inside one at 109.8 s). Each span is split
     # where the ground under its middle comes within 3 m of the line, twice over
@@ -177,7 +175,7 @@ def night_flight():
         rel = out_
     t_glide = T_CROSS - glide_len / GLIDE_SPEED
     knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], T_PYR + 0.4, t_glide, 22.0, GLIDE_SPEED,
-                    ramp_in=0.15, ramp_out=0.3)
+                    ramp_in=0.1, ramp_out=0.25)
     out = [list(k) for k in knots]
     x, y, z = gl[1]
     out.append([x, y - gr[len(pts) + 1], z, T_CROSS - glide_len * 0.5 / GLIDE_SPEED])

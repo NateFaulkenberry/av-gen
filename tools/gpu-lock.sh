@@ -83,6 +83,9 @@ WAITED=0
 MAX_WAIT="${AVGEN_GPU_LOCK_TIMEOUT:-3600}"
 
 UNOWNED_GRACE=30
+POLL="${AVGEN_GPU_LOCK_POLL:-5}"
+POLLS_PER_5S=$(awk -v p="$POLL" 'BEGIN { n = int(5 / p + 0.5); print (n < 1 ? 1 : n) }')
+POLLS=0
 
 while ! mkdir "$LOCK" 2>/dev/null; do
     holder=$(cat "$LOCK/pid" 2>/dev/null)
@@ -110,9 +113,13 @@ while ! mkdir "$LOCK" 2>/dev/null; do
         echo "gpu-lock: timed out after ${MAX_WAIT}s waiting for $LOCK" >&2
         exit 75
     fi
-    [ $((WAITED % 60)) -eq 0 ] && echo "gpu-lock: waiting for the GPU (${WAITED}s)..." >&2
-    sleep 5
-    WAITED=$((WAITED + 5))
+    [ $((WAITED % 60)) -eq 0 ] && [ "$POLLS" -eq 0 ] && echo "gpu-lock: waiting for the GPU (${WAITED}s)..." >&2
+    # AVGEN_GPU_LOCK_POLL (seconds, default 5): a waiter that polls every 5 s loses every race to an agent whose next
+    # job starts the instant its last one releases, and starves for as long as that agent's batch runs (measured: 40
+    # min, 2026-11-04). A short poll takes its turn between jobs. The total wait is still counted in seconds.
+    sleep "$POLL"
+    POLLS=$(( (POLLS + 1) % POLLS_PER_5S ))
+    [ "$POLLS" -eq 0 ] && WAITED=$((WAITED + 5))
 done
 
 echo $$ > "$LOCK/pid.$$" && mv "$LOCK/pid.$$" "$LOCK/pid"

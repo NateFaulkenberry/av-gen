@@ -199,6 +199,7 @@ struct FrameUniforms {
     corruption7: vec4<f32>,
     corruption8: vec4<f32>,
     corruption9: vec4<f32>,
+    waterColumn: vec4<f32>, // ADR-1910: x = the water surface (world y), yzw = downwelling absorption per metre
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 
@@ -928,6 +929,36 @@ fn fogSkyUv(dir: vec3<f32>) -> vec2<f32> {
 // The sky's low-passed radiance along `dir`, as the fog map holds it.
 fn fogSkyRadiance(dir: vec3<f32>) -> vec3<f32> {
     return textureSampleLevel(fogSkyTex, fogSkySampler, fogSkyUv(dir), 0.0).rgb;
+}
+
+// ADR-1910: the water column. Light that reaches a point under the water from above (the sun, the sky, the ambient)
+// has crossed the water between the surface and the point; light from a lamp in the water has crossed the water
+// between the lamp and the point. Each channel keeps exp(-k * metres). All-zero k (every scene but a water column's)
+// returns 1 before reading anything else.
+fn waterDownwelling(p: vec3<f32>) -> vec3<f32> {
+    let k = frame.waterColumn.yzw;
+    if (!any(k > vec3<f32>(0.0))) {
+        return vec3<f32>(1.0);
+    }
+    return exp(-k * max(frame.waterColumn.x - p.y, 0.0));
+}
+
+fn waterPathFrom(lightPos: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
+    let k = frame.waterColumn.yzw;
+    if (!any(k > vec3<f32>(0.0))) {
+        return vec3<f32>(1.0);
+    }
+    // the share of the lamp-to-point segment that lies under the surface
+    let s = frame.waterColumn.x;
+    let a = lightPos.y;
+    let b = p.y;
+    var under = 1.0;
+    if (a > s && b > s) {
+        under = 0.0;
+    } else if (a > s || b > s) {
+        under = clamp((s - min(a, b)) / max(abs(a - b), 1e-4), 0.0, 1.0);
+    }
+    return exp(-k * distance(lightPos, p) * under);
 }
 
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {

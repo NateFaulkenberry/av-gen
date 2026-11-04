@@ -903,6 +903,12 @@ struct Environment {
     // the bit; otherwise each channel's optical depth is scaled by its weight -- water's (3, 1, 0.7) loses red first,
     // then green, so distance tints toward blue-green (scene key `fogSpectral`, parameter `scene/fogSpectral`).
     glm::vec3 fogSpectral{0.0f};
+    // ADR-1910: the water column. Light reaching a surface under water has come down from the surface (sun, sky,
+    // ambient) or across from a lamp in the water, and loses each channel to absorption on the way:
+    // exp(-waterDownwelling * metres of water). waterSurface is the surface's world y; all-zero downwelling is off.
+    // Scene keys `waterSurface`, `waterDownwelling`; parameters `scene/waterSurface`, `scene/waterDownwelling`.
+    float waterSurface = 0.0f;
+    glm::vec3 waterDownwelling{0.0f};
     // ADR-705, the brief's §7 Horizon Density: extra extinction that grows with distance from the
     // eye. The air at distance s is `1 + horizonDensity * s / 1000` times as dense as at the eye,
     // so 1 doubles it a kilometre out. Applied by the march to every sample of the environment

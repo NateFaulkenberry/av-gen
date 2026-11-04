@@ -214,6 +214,46 @@ def reef_program():
             ]}
 
 
+# Pass 3 Phase E (ADR-1910): the surface over the floor, and the column's absorption per metre (red, green, blue)
+WATER_SURFACE = PLAIN + 160.0
+WATER_DOWN = [0.016, 0.0055, 0.0032]
+# the light that comes down is brighter at the surface to arrive at about the M3g level on the floor
+WATER_UP = [0.016, 0.085, 0.115]        # toward the surface
+WATER_DOWN_COLOR = [0.002, 0.008, 0.013]  # toward the deep
+WATER_HORIZON = [0.005, 0.038, 0.058]     # level: a little darker than the fog's own colour
+SURFACE_GAIN = 1.0 / (sum(math.exp(-k * 160.0) for k in WATER_DOWN) / 3.0) ** 0.5
+
+
+def base_silt_program():
+    """Pass 3 Phase E (brief §6.4, the structure belongs under water): a layer over the base's own materials -- silt
+    settled on everything facing up, thickest low down (the 8 m it is sunk into the ledge and the first 10 m above),
+    a darker stain band at the foot, and a mottle so it is not a paint line. Emission untouched (its lamps stay)."""
+    return {"name": "baseSilt", "baseColor": -1, "metallic": -1, "roughness": -1, "emission": -1, "opacity": -1,
+            "normal": -1, "occlusion": -1, "ops": [], "layers": [{
+                "name": "silt", "ops": [
+                    {"kind": "input", "dst": 0, "input": "normal"},
+                    {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [1, 1, 1, 1]},
+                    {"kind": "smoothstep", "dst": 0, "srcA": 0, "constant": [0.35, 0.8, 0, 0]},      # up-facing
+                    {"kind": "input", "dst": 1, "input": "worldPosition"},
+                    {"kind": "swizzle", "dst": 1, "srcA": 1, "constant": [1, 1, 1, 1]},
+                    {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [PLAIN + 22.0, PLAIN - 4.0, 0, 0]},  # low
+                    {"kind": "input", "dst": 2, "input": "worldPosition"},
+                    {"kind": "noise", "dst": 2, "srcA": 2, "value": 0.15, "seed": 23},
+                    {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.3, 0.7, 0, 0]},
+                    {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 2},
+                    {"kind": "add", "dst": 3, "srcA": 3, "srcB": 1},
+                    {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 0},
+                    {"kind": "multiply", "dst": 4, "srcA": 1, "srcB": 1},
+                    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 2},
+                    {"kind": "add", "dst": 3, "srcA": 3, "srcB": 4},                                   # + the foot's stain
+                    {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0.0, 1.0, 0.0, 1.0], "value": 1.0},
+                    {"kind": "constant", "dst": 5, "constant": [0.20, 0.22, 0.19, 1.0]},              # silt
+                    {"kind": "constant", "dst": 6, "constant": [0.07, 0.08, 0.07, 1.0]},              # the stain
+                    {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 6, "srcC": 4},
+                    {"kind": "constant", "dst": 6, "constant": [1.0, 1.0, 1.0, 1.0]}],
+                "mask": 3, "baseColor": 5, "roughness": 6}]}
+
+
 def write_ocean(portal_flight):
     bay_y = BAY[1]
     scene = {
@@ -223,10 +263,10 @@ def write_ocean(portal_flight):
         "camera": {"mode": 1, "position": [250, 60, 300], "target": [0, 30, -900], "fov": 44.0, "orbitSpeed": 0.0, "far": 6000.0},
         "lights": [
             {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.55, 0.85, 1.0],
-             "intensity": 1.1, "castsShadow": True, "shadowStrength": 0.8, "softness": 0.6},
+             "intensity": round(1.1 * SURFACE_GAIN, 3), "castsShadow": True, "shadowStrength": 0.8, "softness": 0.6},
             # M3g: the fill from above (the bright water overhead), not from below; the floor's underside stays dark
             {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, -0.85, 0.4], "color": [0.2, 0.55, 0.65],
-             "intensity": 0.25, "castsShadow": False, "shadowStrength": 0.0},
+             "intensity": round(0.25 * SURFACE_GAIN, 3), "castsShadow": False, "shadowStrength": 0.0},
             # the bay's light into the water, the base's floods
             # M3f (owner §2b, the white-out before the sea exit): ROOT CAUSE -- this 2600 cd lamp stands 10 m inside the
             # bay, right behind the opening the camera flies through, and it scattered in the ocean's fog at full
@@ -240,19 +280,39 @@ def write_ocean(portal_flight):
              "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
             {"name": "flood-r", "type": "point", "position": base_world((80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],
              "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
+            # Pass 3 Phase E (brief §6.4: localized light at the structure, subtle warm accents): two sodium work lamps at the
+            # foot of the base's front, low and short; the water takes their red within ~30 m (ADR-1910), so they pool
+            {"name": "foot-lamp-l", "type": "point", "position": base_world((-60.0, 12.0, 92.0)), "color": [1.0, 0.55, 0.25],
+             "intensity": 520.0, "range": 45.0, "castsShadow": False, "volumetric": 0.0},
+            {"name": "foot-lamp-r", "type": "point", "position": base_world((60.0, 12.0, 92.0)), "color": [1.0, 0.55, 0.25],
+             "intensity": 520.0, "range": 45.0, "castsShadow": False, "volumetric": 0.0},
         ] + [{"name": f"{name}-light", "type": "point", "position": [0.0, -500.0, 0.0], "color": [0.55, 0.9, 1.0],
               "intensity": 900.0, "range": 60.0, "castsShadow": False} for name, _ in SUBS],
         # M3g (owner §2c: real water, not CG; 53-pass2-m3g-plan.md): the distance fog loses red first, then green
         # (ADR-1908, Jerlov-like weights), toward a deeper blue-green; the march only covers the near water, where its
         # forward-scattering haze and the local lights' cones live; grounding by AO and contact shadows; AgX
-        "environment": {"intensity": 0.14, "background": DEEP, "fogColor": WATER_FAR, "volumeDensity": 0.0024, "skybox": False,
-                        "sky": {"enabled": False}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
+        "environment": {"intensity": 0.14, "background": DEEP, "fogColor": WATER_FAR, "volumeDensity": 0.0024, "skybox": True,
+                        "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": WATER_UP,
+                                "horizonColor": WATER_HORIZON, "groundColor": WATER_DOWN_COLOR, "haze": 0.25,
+                                "sunIntensity": 0.0, "sunSize": 0.0, "sunGlow": 0.0, "intensity": 1.0}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
                         "ambientOcclusion": True, "shadowCasterReach": 1500.0, "contactShadows": True,
                         "fogSpectral": [2.6, 1.0, 0.62], "volumeMaxDistance": 45.0, "volumeAnisotropy": 0.75,
-                        "volumeLocalLights": 0.0},   # local lights in the murk: not yet -- the portal's own light at the
-                                                     # bay's opening scatters into a white-out at the crossing (M3f §2b)
+                        "volumeLocalLights": 0.0,   # local lights in the murk: not yet -- the portal's own light at the
+                                                    # bay's opening scatters into a white-out at the crossing (M3f §2b)
+                        # Pass 3 Phase E (ADR-1910): the water column. The surface 160 m over the floor; the light coming
+                        # down loses red first, so the floor sits in a bluer, darker layer than the shelf and the base's
+                        # roof, and a lamp's warm light dies within tens of metres
+                        "waterSurface": WATER_SURFACE, "waterDownwelling": WATER_DOWN,
+                        # Pass 3 Phase E (brief §6.4: the water as a medium, not a backdrop): the water's own light is
+                        # brighter toward the surface and falls to near black below -- the procedural sky drawn as
+                        # the water (no sun disc), lighting the ambient from above -- and the distance fog fades each
+                        # surface toward the water's colour in ITS direction (ADR-918), so the shelf's top lifts out
+                        # against the brighter water above and the far floor sinks into the dark below.
+                        # (A 140 m shadowed march for shafts was tried first: a grey veil, no shafts -- the light
+                        # comes from straight above and nothing overhangs the open floor; reverted)
+                        "fogSky": 1.0, "fogSkyDistance": 420.0},
         "post": {"bloomIntensity": 0.06, "tonemap": 1},
-        "materialPrograms": [reef_program(), {"name": "seabed", "ops": [
+        "materialPrograms": [reef_program(), base_silt_program(), {"name": "seabed", "ops": [
             {"kind": "input", "dst": 0, "input": "uv"},
             {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
             {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.07, 0.2, 0.6, 1.3], "value": 1.0},
@@ -312,7 +372,7 @@ def write_ocean(portal_flight):
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
             {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base-covert.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
-             "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
+             "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True, "program": "baseSilt"},
             {"name": "bay-membrane", "kind": "gltf", "asset": A + "bay-membrane-m3g.glb",
              "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
             # M3e: the bay frame's light strips, apart, so their light dies as the corruption takes the base (the timeline)
