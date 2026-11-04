@@ -149,3 +149,37 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
     The only flags are 93.5-100.5 s, the approved Mars cut shifting the night.
 - **Crossings:** canyon to Moon and Moon to dusk are unchanged (`06-moon/10-moon-regression-before-after.png`).
 - Earthglow stays at 0.09.
+
+## 7. The ocean, round 2 (owner: "the direction is right")
+
+**What changed (`build_ocean.py`):**
+- **Half the fade into the water:** `fogSky` from 1 to 0.5.
+- **A darker horizon:** (0.003, 0.026, 0.042).
+- **The light patches softened:**
+  - the light from above: shadow strength 0.8 to 0.45, softness 0.6 to 1.0;
+  - the caustics at half again;
+  - the sand drifts' mask widened (0.02-0.8);
+  - sand and rock brought nearer in value (0.7 / 1.25).
+- **The shelf tops brighter with height** (up to x1.3, 8-55 m over the floor), and broad patches of lighter and
+  darker sediment across them (x0.78-1.18).
+- **The mounds:** they were the mesas' last remnants on the floor, cut into facets by the strata steps.
+  - Now: terraces 0.35 to 0.05, no strata fold, erosion 1.0 to 0.3, yardangs a third, dunes low, and mesaCover 0.42 to
+    0.39.
+  - mesaCover 0.25 also took the shelf's walls, and 0.36 most of the left one.
+  - Roughness, ridges, erosion and yardangs alone changed almost nothing in frame.
+- **Kept:** the water column, the gradient, the base's silt and lighting, and its warm lamps.
+
+**Results** (`05-ocean/02-...`, `03-...`, `critic-round2.json`):
+- **By eye:**
+  - The mounds are rounded and sediment-draped, and the sawtooth has gone.
+  - The floor's blotches are soft drifts.
+  - The base sits in silt.
+  - The shelf behind the base keeps its walls. The left wall in the 124-130 s frames is lower than before.
+- **By the numbers, the contrast did not come back.** RMS contrast on the film frames is 0.046-0.061, against round
+  1's 0.062-0.072 and the baseline's 0.085-0.094. Softening the shadows and the sand/rock split took more contrast
+  than halving the fade returned.
+  - topiq_iaa rose on every film frame (5.45 to 5.66-5.94).
+  - The clip has no findings. Flicker 0.0175, shimmer 0.044.
+  - No luma regression anywhere in the film (`04-luma-after-round2-vs-baseline.txt`).
+- **What would bring contrast back without the old blotches:** a darker water body overhead (the gradient's zenith),
+  a stronger column on the deep floor (k up about 30%), and the shelf walls' faces kept darker than their tops.

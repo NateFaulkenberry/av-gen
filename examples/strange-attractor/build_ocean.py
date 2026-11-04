@@ -161,10 +161,10 @@ def reef_program():
                 {"kind": "textureTriplanar", "dst": 0, "texture": "rock", "value": 0.1, "constant2": [6.0, 0, 0, 0],
                  "constant3": hexed},
                 {"kind": "textureTriplanar", "dst": 1, "texture": "sand", "value": 0.25, "constant3": [1.0, 0.5, 6.0, 0.6]},
-                {"kind": "constant", "dst": 2, "constant": [0.55, 0.6, 0.6, 1.0]},     # the sand darker: deep water
+                {"kind": "constant", "dst": 2, "constant": [0.7, 0.75, 0.75, 1.0]},   # E round 2: sand nearer the rock's value     # the sand darker: deep water
                 {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
                 # M3g: the rock lifted toward the sand, so the floor is not dark blotches on pale sand
-                {"kind": "constant", "dst": 2, "constant": [1.45, 1.45, 1.45, 1.0]},
+                {"kind": "constant", "dst": 2, "constant": [1.25, 1.25, 1.25, 1.0]},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
                 # sand on the flats, in drifts (a broad noise thins it)
                 {"kind": "input", "dst": 2, "input": "normal"},
@@ -172,7 +172,7 @@ def reef_program():
                 {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.45, 0.7, 0, 0]},   # M3g: sediment drapes the floor
                 {"kind": "input", "dst": 3, "input": "worldPosition"},
                 {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.04, "seed": 3},
-                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.15, 0.45, 0, 0]},    # M3g: mostly sediment
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.02, 0.8, 0, 0]},     # E round 2: drifts that fade, not blotches
                 {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
                 {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 1, "srcC": 2},
                 # algae on the broad patches
@@ -205,10 +205,23 @@ def reef_program():
                 {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
                 {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.3, 0.9, 0, 0]},
                 {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
-                {"kind": "constant", "dst": 4, "constant": [0.18, 0.24, 0.26, 0.0]},
+                {"kind": "constant", "dst": 4, "constant": [0.09, 0.12, 0.13, 0.0]},          # E round 2: half again
                 {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
                 {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # Pass 3 E round 2 (brief §6.4; the owner's shelf "flat across the frame"): the shelf tops lifted --
+                # brighter with height over the floor (they are shallower and catch more of the light from above) --
+                # and broad patches of lighter and darker sediment across them, so no two stretches read the same
+                {"kind": "input", "dst": 3, "input": "worldPosition"},
+                {"kind": "swizzle", "dst": 3, "srcA": 3, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [PLAIN + 8.0, PLAIN + 55.0, 0, 0]},
+                {"kind": "constant", "dst": 2, "constant": [1.32, 1.3, 1.26, 1.0]},
+                {"kind": "mixBy", "dst": 2, "srcA": 6, "srcB": 2, "srcC": 4},
+                {"kind": "input", "dst": 5, "input": "worldPosition"},
+                {"kind": "noise", "dst": 5, "srcA": 5, "value": 0.006, "seed": 41},
+                {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.25, 0.75, 0.78, 1.18], "value": 1.0},
+                {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 5},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
                 {"kind": "textureTriplanarNormal", "dst": 7, "texture": "rockN", "value": 0.1, "constant2": [6.0, 0, 0, 0],
                  "constant3": [1.0, 0.0, 0.0, 0.0]},
             ]}
@@ -220,7 +233,7 @@ WATER_DOWN = [0.016, 0.0055, 0.0032]
 # the light that comes down is brighter at the surface to arrive at about the M3g level on the floor
 WATER_UP = [0.016, 0.085, 0.115]        # toward the surface
 WATER_DOWN_COLOR = [0.002, 0.008, 0.013]  # toward the deep
-WATER_HORIZON = [0.005, 0.038, 0.058]     # level: a little darker than the fog's own colour
+WATER_HORIZON = [0.003, 0.026, 0.042]     # level: a little darker than the fog's own colour
 SURFACE_GAIN = 1.0 / (sum(math.exp(-k * 160.0) for k in WATER_DOWN) / 3.0) ** 0.5
 
 
@@ -263,7 +276,9 @@ def write_ocean(portal_flight):
         "camera": {"mode": 1, "position": [250, 60, 300], "target": [0, 30, -900], "fov": 44.0, "orbitSpeed": 0.0, "far": 6000.0},
         "lights": [
             {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.55, 0.85, 1.0],
-             "intensity": round(1.1 * SURFACE_GAIN, 3), "castsShadow": True, "shadowStrength": 0.8, "softness": 0.6},
+             # Pass 3 E round 2 (the blotchy light patches): the light from above is diffuse in water -- the shadow
+             # pattern on the floor softened and lifted (0.8 -> 0.45, softness 0.6 -> 1.0)
+             "intensity": round(1.1 * SURFACE_GAIN, 3), "castsShadow": True, "shadowStrength": 0.45, "softness": 1.0},
             # M3g: the fill from above (the bright water overhead), not from below; the floor's underside stays dark
             {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, -0.85, 0.4], "color": [0.2, 0.55, 0.65],
              "intensity": round(0.25 * SURFACE_GAIN, 3), "castsShadow": False, "shadowStrength": 0.0},
@@ -310,7 +325,7 @@ def write_ocean(portal_flight):
                         # against the brighter water above and the far floor sinks into the dark below.
                         # (A 140 m shadowed march for shafts was tried first: a grey veil, no shafts -- the light
                         # comes from straight above and nothing overhangs the open floor; reverted)
-                        "fogSky": 1.0, "fogSkyDistance": 420.0},
+                        "fogSky": 0.5, "fogSkyDistance": 420.0},   # E round 2: half the fade (the walls keep their edge)
         "post": {"bloomIntensity": 0.06, "tonemap": 1},
         "materialPrograms": [reef_program(), base_silt_program(), {"name": "seabed", "ops": [
             {"kind": "input", "dst": 0, "input": "uv"},
@@ -341,11 +356,17 @@ def write_ocean(portal_flight):
         "attractorWorld": {"seed": 9, "resolution": 4096, "extent": 16000, "worldScale": 0.35, "camera": "scene",
                            # M3g (owner 54- §5): the shelf top varied -- terraces and gullies cutting its edge -- and the
                            # floor rounder and sediment-draped (softer ridges, more erosion, a finer mesh)
-                           "terrainScale": 1.0, "roughness": 0.3, "ridgeStrength": 0.15, "domainWarp": 0.7, "terraces": 0.35,
-                           "erosion": 1.0, "strataFold": 0.3, "branchingDensity": 0.0, "meshSpacing": 1.0,
+                           "terrainScale": 1.0, "roughness": 0.2, "ridgeStrength": 0.05, "domainWarp": 0.7, "terraces": 0.05,   # E round 2: the strata steps that cut the mounds into facets
+                           
+                           # E round 2: the gullies on every steep face were the mounds' sawtooth -- erosion 1.0 -> 0.3
+                           "erosion": 0.3, "strataFold": 0.0, "branchingDensity": 0.0, "meshSpacing": 1.0,
                            "meshError": 0.001, "meshMinError": 0.08, "terrainProgram": "reefRock", "sunLux": 2.5,
                            "sunShadowBias": 1.6, "look": {"sunAzimuth": 20.0, "sunElevation": 70.0, "sunWarmth": 0.0},
-                           "mars": {"mesaCover": 0.42, "yardangs": 5.0, "wind": 70.0, "dunes": 3.0},
+                           # Pass 3 E round 2 (owner: the floor's mounds spiky and faceted, a
+                           # sawtooth): they are the mesas' last remnants on the floor -- fewer of them (mesaCover 0.42 ->
+                           # 0.39; 0.25 also took the shelf's walls, 0.36 most of the left one), no strata steps cutting
+                           # them into facets (terraces 0.05, no fold), softer gullies; yardangs a third, dunes low
+                           "mars": {"mesaCover": 0.39, "yardangs": 1.6, "wind": 70.0, "dunes": 2.2},
                            "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
         # M3e (owner: not confined to the bay): the base, its rock and the seafloor are targets too, the field reaches
