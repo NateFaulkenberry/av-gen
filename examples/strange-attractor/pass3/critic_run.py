@@ -42,11 +42,16 @@ def main():
     ap.add_argument("frames"); ap.add_argument("clips"); ap.add_argument("out")
     ap.add_argument("--label", required=True)
     ap.add_argument("--worlds", default=",".join(WORLDS))
+    ap.add_argument("--no-stills", action="store_true")
+    ap.add_argument("--merge", help="an earlier out.json whose entries this run keeps unless it replaces them")
     a = ap.parse_args()
     want = a.worlds.split(",")
     cams = {c["id"]: c for c in json.load(open(os.path.join(HERE, "cameras.json")))["cameras"]}
     res = {"label": a.label, "stills": {}, "clips": {}}
-    for w in want:
+    if a.merge:
+        old = json.load(open(a.merge))
+        res["stills"].update(old.get("stills", {})); res["clips"].update(old.get("clips", {}))
+    for w in ([] if a.no_stills else want):
         ids = sorted(i for i in cams if os.path.exists(os.path.join(a.frames, i + ".png")) and world_of(i) == w)
         if not ids:
             continue
@@ -77,7 +82,18 @@ def main():
                 continue
             s, r = submit(["--mode", "preview", "--video", clip, "--video-start", str(t0), "--intent", intent,
                            "--track", f"clip-{leg}", "--label", a.label])
+            meas = {}
+            for sh in r["measurements"]["shots"].values():
+                for grp, keys in (("image", ("luma_mean", "contrast_rms", "sat_mean", "sharpness", "crush_frac")),
+                                  ("motion", ("shimmer", "jitter")), ("temporal", ("flicker", "change_mean"))):
+                    g = sh.get(grp) or {}
+                    for k in keys:
+                        v = g.get(k)
+                        v = v.get("mean") if isinstance(v, dict) else v
+                        if isinstance(v, (int, float)):
+                            meas.setdefault(k, []).append(v)
             res["clips"][leg] = {"job": s["job_id"], "headline": s["headline"], "dimensions": s["dimensions"],
+                                 "measured": {k: round(sum(v) / len(v), 4) for k, v in meas.items()},
                                  "findings": [f"{f['severity']}: {f['title']} ({f.get('shot')})" for f in r["findings"]][:15]}
             print(f"clip {leg}: {s['job_id']}", flush=True)
     json.dump(res, open(a.out, "w"), indent=1)

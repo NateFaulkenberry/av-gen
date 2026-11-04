@@ -22,7 +22,8 @@ AVGEN = os.path.join(ROOT, "build/release/src/avgen")
 def fixed_project(cam):
     s = json.load(open(os.path.join(E, cam["scene"])))
     for k in ("portal", "portals", "corruption", "meshWire"):
-        s.pop(k, None)
+        if k not in cam.get("keep", []):
+            s.pop(k, None)
     look = cam.get("look", "none")
     if "looks" in s:
         if look != "none":
@@ -33,6 +34,12 @@ def fixed_project(cam):
             s.pop("looks")
     if "attractorWorld" in s:
         s["attractorWorld"]["camera"] = "scene"
+    drop = cam.get("dropNodes", [])   # probes: node names or asset substrings to leave out
+    if drop:
+        s["nodes"] = [n for n in s.get("nodes", []) if not any(d in n.get("name", "") or d in str(n.get("asset", ""))
+                                                              for d in drop)]
+    for block, values in cam.get("patch", {}).items():   # probes: {"environment": {"volumeDensity": 0}, ...}
+        s.setdefault(block, {}).update(values)
     s["camera"] = {"mode": 1, "position": cam["pos"], "target": cam["tgt"], "fov": cam["fov"], "orbitSpeed": 0.0}
     json.dump(s, open(os.path.join(E, "tmp-camref.scene.json"), "w"), indent=1)
     p = json.load(open(os.path.join(E, "strange-attractor.json")))
@@ -74,6 +81,13 @@ def render(cam, out_dir, size, ss):
                     pass
 
 
+def adhoc(spec):
+    """--cam '<json>': one extra fixed camera not in the set (for probes); needs id, scene, look, t, pos, tgt, fov."""
+    c = json.loads(spec)
+    c.setdefault("kind", "fixed"); c.setdefault("set", "adhoc")
+    return c
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("out_dir")
@@ -81,8 +95,11 @@ def main():
     ap.add_argument("--set", default="", help="regression | eval (default: both)")
     ap.add_argument("--size", default="1920x1080")
     ap.add_argument("--supersample", type=int, default=2)
+    ap.add_argument("--cam", action="append", default=[], help="an ad-hoc camera as JSON (replaces the set)")
     a = ap.parse_args()
     cams = json.load(open(os.path.join(HERE, "cameras.json")))["cameras"]
+    if a.cam:
+        cams = [adhoc(c) for c in a.cam]
     if a.set:
         cams = [c for c in cams if c["set"] == a.set]
     if a.only:
