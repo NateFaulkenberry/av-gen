@@ -51,8 +51,64 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
 - **Calibrated on the M3g night:** the boulder sat at 11-17 m (median depth under 20 m from 102.5 to 114.5 s). The
   defaults are therefore 20 m, half the frame, 4 s.
 - A 6 m threshold, the first guess, would have missed it.
-- (Results for the whole film, the M3g baseline against now, are below.)
+- **The whole film at 2 fps:**
+  - The M3g baseline flags exactly one stretch: `REGRESSION? 103.0-114.5 s`.
+  - The new film flags nothing.
+  - Files: `08-regression/02-near-geometry-whole-film-M3g.txt`, `03-...-new.txt`.
 
-## 4. The water column (ADR-1910)
+## 4. The ocean (Phase E, first pass)
 
-(in progress)
+**What changed (`build_ocean.py`):**
+- **ADR-1910's water column is on.**
+  - The surface sits 160 m over the floor, with k = (0.016, 0.0055, 0.0032) per metre.
+  - The light from above is raised to arrive at about the M3g level on the floor (x1.43).
+  - Effect: the floor sits in a bluer, darker layer than the shelf tops and the base's roof, and close surfaces lose
+    their dry colour (`h-ocean`).
+- **The water is drawn as a gradient:** brighter toward the surface and near black below, using the procedural sky as
+  the water, with no sun.
+  - The distance fog fades each surface toward the water in its own direction (ADR-918, `fogSky` 1, 420 m).
+  - The flat navy backdrop is gone. The far shelf dissolves into the medium instead of standing in front of a colour.
+- **The base belongs to the floor:**
+  - a silt layer over its own materials: up-facing faces, thickest in its lowest 26 m, a darker stain at the foot,
+    mottled; emission is untouched;
+  - two sodium work lamps at its foot (520 cd, 45 m range). The water takes their red within about 30 m, so they
+    pool, and they are the brief's warm accent.
+- **Tried and reverted:** a 140 m shadowed march with drifting density, for shafts. It gave a grey veil and no
+  shafts, because the light comes from straight above and nothing overhangs the open floor.
+
+**Results** (`05-ocean/01-ocean-before-after.png`; numbers from `05-ocean/critic-E.json` against
+`00-baseline/critic-baseline.json`):
+- **The film's ocean frames got bluer and lost contrast.**
+  - RMS contrast fell from 0.085-0.094 to 0.062-0.072. Luma is about the same.
+  - The clip's saturation rose from 0.46 to 0.53. Its sharpness rose from 773 to 1105, because the floor's
+    texture reads through the blue. Flicker fell from 0.028 to 0.017. There are no findings.
+- **Judged by eye:**
+  - The water reads as a medium: brighter above, the far floor sinking into it.
+  - The floor no longer reads as dry sediment.
+  - But the whole picture is hazier and flatter than M3g's. The silhouettes of the shelf walls against the water
+    are softer.
+- **The next step, if the owner agrees:** keep the column and the gradient, and win the contrast back:
+  - fogSky from 1 to about 0.5, and a darker horizon, so the walls keep their edge;
+  - the shelf tops lit a little more than the floor;
+  - the seabed's geometry: the evenly scattered cone mounds noted in 59- §4.
+- `e-ocean` and `h-ocean` compare against the re-rendered baseline in `00-baseline/frames/`. The Critic's baseline
+  numbers for those two are from the superseded red renders, so only the film frames' numbers are like for like.
+
+## 5. The regression guard after E
+
+- **Re-rendered:** every regression frame, the ocean's eval cameras, and the night and ocean clips. Results are in
+  `08-regression/`.
+- **Luma every half second against the baseline** (night and ocean new, the other legs unchanged): no flagged
+  half-second (`11-luma-after-E-vs-baseline.txt`).
+- **Near geometry:** no flags over the whole film.
+- **The night:** forward vs velocity 20.1 / 7.3 (M3g 20.3 / 10.0); clearance 3.45 m over the terrain before the
+  dive, 16.5 m to a mesh.
+- **The crossings:**
+  - Mars to night is unchanged.
+  - Night to ocean: the glide's new heading is mapped through the portal, so the ocean side's arrival is the same
+    frame.
+  - Ocean to dawn is unchanged.
+- **The other legs** (canyon, Moon, dusk, Mars, dawn, and their crossings: 26 frames) were re-rendered after the
+  ADR-1910 shader change. They are **bit-identical** to the baseline (mean and max difference 0), so the column is a
+  true no-op where it is off (`12-other-legs-pixel-diff-vs-baseline.txt`).
+- **Still open, unchanged by E:** the Moon's black 37.5-43 s (Phase F, fix (a)).
