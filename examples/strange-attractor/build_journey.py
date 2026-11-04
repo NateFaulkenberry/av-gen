@@ -80,7 +80,12 @@ scene["portal"].pop("aims", None)
 # the Moon's exit: its y is a height over the Moon's ground (8 m: the arrival settles to 5 m by 34.2 s)
 scene["portal"]["exit"] = [0.0, 8.0, 1500.0]
 scene["portal"]["world"] = "strange-attractor-moon.scene.json"
-scene["portal"].update(GAZE)   # M3g (54- §1, ADR-1909)
+# Pass 3 Phase F (owner 2026-11-04: "the moon camera path we had before"): the Moon keeps M3f's gaze (the portal
+# defaults, ADR-1909: look 1.2 s ahead, a little down, a quarter of the climb's pitch), not M3g's GAZE, which followed
+# the 8 -> 158 m climb (37.4-43.2 s) up into the empty sky for 5.5 s. The Moon-only exception to 54- §1 is the
+# owner's: its forward-vs-velocity overshoots 25 deg on the climb (60- §6)
+for _k in GAZE:
+    scene["portal"].pop(_k, None)
 scene.setdefault("post", {})["tonemap"] = 1   # M3g (54- §2): AgX for the whole film (the frame's tone map is global)
 # M3g (54- §1): the canyon's own flythrough looks where it goes, not 2.5 s ahead and down at the river (ADR-1909)
 scene["attractorWorld"]["flightLookAhead"] = 0.6

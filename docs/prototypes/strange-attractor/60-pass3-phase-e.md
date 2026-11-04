@@ -131,3 +131,21 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
 - **A blind spot in the guard:** while the camera is in a portal world (Moon, Mars, ocean), the depth AOV is the
   root's, which is the sky. `near_track.py` therefore measures only the canyon legs. The luma track does see the
   portal worlds, and caught this one.
+
+**The owner's decision (2026-11-04): the Moon camera as it was in M3f.**
+- **The change:** the Moon portal block no longer takes M3g's GAZE. It takes the portal defaults (ADR-1909: look
+  1.2 s ahead, a little down, a quarter of the climb's pitch), which is M3f's Moon gaze. The flight's knots are the
+  same as in M3f.
+  - The change is scoped to the Moon: `build_journey.py` pops the GAZE keys from that one block.
+  - Every other leg's camera trace is unchanged. The canyon, Mars, night, ocean and dawn are identical; dusk differs
+    only at the hand-over out of the Moon portal, which moved from 41.7 deg to 40.4 deg.
+- **An owner-approved exception to 54- §1, for the Moon climb only:** forward vs velocity is over 25 deg from 37.40 to
+  44.37 s (max 64.5, p95 50.1). The camera keeps the Earth and the domes in frame instead of the empty sky it
+  climbs toward. The guard treats that span as approved, not as a regression
+  (`06-moon/14-forward-vs-velocity-M3f-moon-gaze-owner-exception.txt`).
+- **Luma:**
+  - Against the pass-3 baseline: nothing flagged. The black 37.5-43 s is gone.
+  - Against the M3f render: 36-44 s matches within a few levels (for example 40.0 s: 21.4 now against 20.9 in M3f).
+    The only flags are 93.5-100.5 s, the approved Mars cut shifting the night.
+- **Crossings:** canyon to Moon and Moon to dusk are unchanged (`06-moon/10-moon-regression-before-after.png`).
+- Earthglow stays at 0.09.
