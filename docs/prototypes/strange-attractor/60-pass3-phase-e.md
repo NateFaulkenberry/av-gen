@@ -112,3 +112,22 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
   ADR-1910 shader change. They are **bit-identical** to the baseline (mean and max difference 0), so the column is a
   true no-op where it is off (`12-other-legs-pixel-diff-vs-baseline.txt`).
 - **Still open, unchanged by E:** the Moon's black 37.5-43 s (Phase F, fix (a)).
+
+## 6. Phase F (the Moon): fix (a) cannot work -- the camera is looking at the empty sky
+
+- **What the black frames contain:** nothing. The depth AOV of 38-40 s is the sky in every pixel.
+  - From 37.4 to 43.2 s the Moon flight climbs from 8 m to 158 m over the ground (the portal block's knots).
+  - M3g's gaze has `climbLook` 1.0: the camera looks along the climb, up into the black sky.
+  - The Earth slides out of the bottom of the frame, and no ground is in view.
+  - In M3f the aims held the Earth in frame.
+- **Fix (a) tested:** earthglow raised from 0.09 to 0.6, an unshadowed fill. The frames stay 100% black (luma 0.0 at
+  40 and 42 s), because there is no lit surface in them to light. Reverted.
+- **Fix (b) probed, not applied:** the Moon portal's `climbLook` 0 and `lookDown` 0.12. The camera then looks along
+  its horizontal travel while it climbs. The Earth, the regolith and the domes are back in frame from 37 to 43 s,
+  much as in M3f.
+  - It is still "looking where it travels" in heading. Only the pitch no longer follows the climb.
+  - Evidence: `06-moon/01-moon-37-43s-left-now-right-probe-level-gaze-b.png` (640 px probes at 2 fps).
+- **Waiting on the owner,** as asked ("show me before you add (b)").
+- **A blind spot in the guard:** while the camera is in a portal world (Moon, Mars, ocean), the depth AOV is the
+  root's, which is the sky. `near_track.py` therefore measures only the canyon legs. The luma track does see the
+  portal worlds, and caught this one.
