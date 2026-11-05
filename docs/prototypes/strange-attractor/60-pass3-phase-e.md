@@ -218,3 +218,40 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
   - The other legs' scene files were not touched. The flythrough changed only in the ocean flight's heights over
     the new floor (each knot keeps its absolute height).
   - `near_track.py` is blind in portal worlds (§6), so it does not cover the ocean.
+
+## 9. The ocean, final (owner: "do last tweak call it done")
+
+**What changed from round 3 (`build_ocean.py`):**
+- **The floor desaturated about halfway back toward the baseline's grey-green.** Its saturation came from the red the
+  column takes on the way down.
+  - The red absorption went from 0.021 to 0.015 per metre; green and blue stay about the same (0.0072, 0.0052).
+  - The light from above is less cyan: (0.55, 0.85, 1.0) to (0.7, 0.88, 0.95).
+  - The program's deep tint is nearer neutral: (0.72, 0.9, 0.95) to (0.84, 0.92, 0.92).
+  - The falloff in value is unchanged, and so is the dark water overhead.
+- **The pointed mound tips:** left as they are. There was no cheap control that rounds the few left without reopening
+  the geometry.
+
+**Results** (`05-ocean/07-ocean-baseline-round3-final.png`):
+
+Floor saturation (the lower 40% of the frame):
+
+| Film frame | Baseline | Round 3 | Final |
+|---|---|---|---|
+| r-ocean-124 | 0.275 | 0.692 | **0.496** |
+| r-ocean-130 | 0.288 | 0.677 | **0.481** |
+| r-ocean-137 | 0.275 | 0.677 | **0.482** |
+
+RMS contrast stayed above the target:
+
+| Film frame | Baseline | Final |
+|---|---|---|
+| r-ocean-124 | 0.089 | 0.090 |
+| r-ocean-130 | 0.084 | 0.100 |
+| r-ocean-137 | 0.091 | 0.097 |
+
+- `e-ocean` is 0.097 and `h-ocean` 0.121.
+- **The guard:**
+  - Luma every half second against the baseline: nothing flagged (`08-luma-final-vs-baseline.txt`).
+  - The night to ocean and ocean to dawn crossings are unchanged.
+  - No other leg's files changed.
+- Phases E and F are closed.

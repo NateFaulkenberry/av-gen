@@ -189,7 +189,7 @@ def reef_program():
                 {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
                 # the deep's colour
-                {"kind": "constant", "dst": 5, "constant": [0.72, 0.9, 0.95, 1.0]},
+                {"kind": "constant", "dst": 5, "constant": [0.84, 0.92, 0.92, 1.0]},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
                 # caustics: a cell pattern drifting with time, brightest at the cells' centres, on up-facing surfaces
                 {"kind": "input", "dst": 3, "input": "time"},
@@ -236,7 +236,7 @@ def reef_program():
 
 # Pass 3 Phase E (ADR-1910): the surface over the floor, and the column's absorption per metre (red, green, blue)
 WATER_SURFACE = PLAIN + 160.0
-WATER_DOWN = [0.021, 0.0072, 0.0042]   # E round 3: +30% (depth from the light's falloff)
+WATER_DOWN = [0.0150, 0.0072, 0.0052]   # final: less red lost than round 3 (0.021) -- the floor's colour halfway back toward the baseline's grey-green, the same falloff in value (round 3: +30% for depth from the light's falloff)
 # the light that comes down is brighter at the surface to arrive at about the M3g level on the floor
 WATER_UP = [0.002, 0.014, 0.022]        # toward the surface (E round 3: darker overhead)
 WATER_DOWN_COLOR = [0.002, 0.008, 0.013]  # toward the deep
@@ -283,7 +283,7 @@ def write_ocean(portal_flight):
                  "riverbed portal (ADR-1895), left by the launch bay's portal into the UFO.",
         "camera": {"mode": 1, "position": [250, 60, 300], "target": [0, 30, -900], "fov": 44.0, "orbitSpeed": 0.0, "far": 6000.0},
         "lights": [
-            {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.55, 0.85, 1.0],
+            {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.7, 0.88, 0.95],
              # Pass 3 E round 2 (the blotchy light patches): the light from above is diffuse in water -- the shadow
              # pattern on the floor softened and lifted (0.8 -> 0.45, softness 0.6 -> 1.0)
              "intensity": round(1.1 * SURFACE_GAIN, 3), "castsShadow": True, "shadowStrength": 0.45, "softness": 1.0},

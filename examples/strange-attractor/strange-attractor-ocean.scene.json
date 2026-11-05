@@ -30,11 +30,11 @@
         0.18
       ],
       "color": [
-        0.55,
-        0.85,
-        1.0
+        0.7,
+        0.88,
+        0.95
       ],
-      "intensity": 5.132,
+      "intensity": 5.191,
       "castsShadow": true,
       "shadowStrength": 0.45,
       "softness": 1.0
@@ -53,7 +53,7 @@
         0.55,
         0.65
       ],
-      "intensity": 1.166,
+      "intensity": 1.18,
       "castsShadow": false,
       "shadowStrength": 0.0
     },
@@ -288,9 +288,9 @@
     "volumeLocalLights": 0.0,
     "waterSurface": 192.7,
     "waterDownwelling": [
-      0.021,
+      0.015,
       0.0072,
-      0.0042
+      0.0052
     ],
     "fogSky": 0.5,
     "fogSkyDistance": 420.0
@@ -544,9 +544,9 @@
           "kind": "constant",
           "dst": 5,
           "constant": [
-            0.72,
-            0.9,
-            0.95,
+            0.84,
+            0.92,
+            0.92,
             1.0
           ]
         },
