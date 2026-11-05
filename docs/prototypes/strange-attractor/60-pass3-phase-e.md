@@ -183,3 +183,38 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
   - No luma regression anywhere in the film (`04-luma-after-round2-vs-baseline.txt`).
 - **What would bring contrast back without the old blotches:** a darker water body overhead (the gradient's zenith),
   a stronger column on the deep floor (k up about 30%), and the shelf walls' faces kept darker than their tops.
+
+## 8. The ocean, round 3 (owner: "depth from light falloff, not haze")
+
+**What changed from round 2 (`build_ocean.py`):**
+- **A darker water body overhead:** the gradient's surface-ward colour (0.002, 0.014, 0.022), its horizon
+  (0.001, 0.009, 0.016), and the distance fog's colour (0.002, 0.018, 0.030; it was 0.006, 0.05, 0.075). The distance
+  now falls off into dark water instead of fading into a lit teal haze.
+- **About 30% more absorption:** k = (0.021, 0.0072, 0.0042) per metre. The light from above is 2.5x the column's
+  mean loss, so the floor sits lit against the dark water.
+- **Less haze:** volume density 0.0024 to 0.0012.
+- **The walls' faces darker than their tops:** a face at normal.y under 0.25 is x0.4-0.45; tops are x1.
+- **The left shelf wall:** mesaCover back to 0.42 (round 2: 0.39). The terraces stay at 0.05 with no fold, and the
+  erosion stays at 0.3, so the remnants stay rounded. The wall in the 124-130 s frames is back.
+- **Kept from round 2:** the rounded mounds, the soft drifts, the water column and gradient, and the base's silt,
+  lighting and warm lamps.
+
+**Results** (`05-ocean/05-ocean-baseline-round2-round3.png`; the same cameras, all three side by side):
+
+| Film frame | Baseline | Round 2 | Round 3 |
+|---|---|---|---|
+| r-ocean-124 | 0.089 | 0.045 | **0.085** |
+| r-ocean-130 | 0.084 | 0.046 | **0.094** |
+| r-ocean-137 | 0.091 | 0.059 | **0.093** |
+
+- `e-ocean` is 0.092 and `h-ocean` 0.120.
+- Mean luma is 0.21-0.22 (the baseline's was 0.23). The image is a little darker overall, with brighter lights
+  against darker water.
+- **By eye:** the water is deep and dark overhead and the floor is lit beneath it. Distance falls away into the dark.
+  The walls' faces are dark under bright tops. There are no blotches, and the mounds are rounded.
+- **The regression guard:**
+  - Luma every half second against the baseline: nothing flagged (`06-luma-after-round3-vs-baseline.txt`).
+  - Ocean to dawn, and night to ocean: unchanged.
+  - The other legs' scene files were not touched. The flythrough changed only in the ocean flight's heights over
+    the new floor (each knot keeps its absolute height).
+  - `near_track.py` is blind in portal worlds (§6), so it does not cover the ocean.

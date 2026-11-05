@@ -212,6 +212,13 @@ def reef_program():
                 # Pass 3 E round 2 (brief §6.4; the owner's shelf "flat across the frame"): the shelf tops lifted --
                 # brighter with height over the floor (they are shallower and catch more of the light from above) --
                 # and broad patches of lighter and darker sediment across them, so no two stretches read the same
+                # E round 3: the walls' faces darker than their tops (the light comes from above; a face sees less of it)
+                {"kind": "input", "dst": 4, "input": "normal"},
+                {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.25, 0.75, 0, 0]},
+                {"kind": "constant", "dst": 2, "constant": [0.4, 0.42, 0.45, 1.0]},
+                {"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 6, "srcC": 4},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
                 {"kind": "input", "dst": 3, "input": "worldPosition"},
                 {"kind": "swizzle", "dst": 3, "srcA": 3, "constant": [1, 1, 1, 1]},
                 {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [PLAIN + 8.0, PLAIN + 55.0, 0, 0]},
@@ -229,12 +236,13 @@ def reef_program():
 
 # Pass 3 Phase E (ADR-1910): the surface over the floor, and the column's absorption per metre (red, green, blue)
 WATER_SURFACE = PLAIN + 160.0
-WATER_DOWN = [0.016, 0.0055, 0.0032]
+WATER_DOWN = [0.021, 0.0072, 0.0042]   # E round 3: +30% (depth from the light's falloff)
 # the light that comes down is brighter at the surface to arrive at about the M3g level on the floor
-WATER_UP = [0.016, 0.085, 0.115]        # toward the surface
+WATER_UP = [0.002, 0.014, 0.022]        # toward the surface (E round 3: darker overhead)
 WATER_DOWN_COLOR = [0.002, 0.008, 0.013]  # toward the deep
-WATER_HORIZON = [0.003, 0.026, 0.042]     # level: a little darker than the fog's own colour
-SURFACE_GAIN = 1.0 / (sum(math.exp(-k * 160.0) for k in WATER_DOWN) / 3.0) ** 0.5
+WATER_HORIZON = [0.001, 0.009, 0.016]
+WATER_FOG = [0.002, 0.018, 0.030]        # E round 3: the distance falls off into a darker water (WATER_FAR was 0.006 0.05 0.075)     # level: a little darker than the fog's own colour
+SURFACE_GAIN = 2.5 * 1.0 / (sum(math.exp(-k * 160.0) for k in WATER_DOWN) / 3.0) ** 0.5
 
 
 def base_silt_program():
@@ -306,7 +314,7 @@ def write_ocean(portal_flight):
         # M3g (owner §2c: real water, not CG; 53-pass2-m3g-plan.md): the distance fog loses red first, then green
         # (ADR-1908, Jerlov-like weights), toward a deeper blue-green; the march only covers the near water, where its
         # forward-scattering haze and the local lights' cones live; grounding by AO and contact shadows; AgX
-        "environment": {"intensity": 0.14, "background": DEEP, "fogColor": WATER_FAR, "volumeDensity": 0.0024, "skybox": True,
+        "environment": {"intensity": 0.14, "background": DEEP, "fogColor": WATER_FOG, "volumeDensity": 0.0012, "skybox": True,
                         "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": WATER_UP,
                                 "horizonColor": WATER_HORIZON, "groundColor": WATER_DOWN_COLOR, "haze": 0.25,
                                 "sunIntensity": 0.0, "sunSize": 0.0, "sunGlow": 0.0, "intensity": 1.0}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
@@ -366,7 +374,7 @@ def write_ocean(portal_flight):
                            # sawtooth): they are the mesas' last remnants on the floor -- fewer of them (mesaCover 0.42 ->
                            # 0.39; 0.25 also took the shelf's walls, 0.36 most of the left one), no strata steps cutting
                            # them into facets (terraces 0.05, no fold), softer gullies; yardangs a third, dunes low
-                           "mars": {"mesaCover": 0.39, "yardangs": 1.6, "wind": 70.0, "dunes": 2.2},
+                           "mars": {"mesaCover": 0.42, "yardangs": 1.6, "wind": 70.0, "dunes": 2.2},
                            "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
         # M3e (owner: not confined to the bay): the base, its rock and the seafloor are targets too, the field reaches
