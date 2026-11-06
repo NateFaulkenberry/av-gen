@@ -21,7 +21,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, pace, L_UNIT  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, pace, L_UNIT, line_points  # noqa: E402
 from sample_ground import heights  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -72,9 +72,9 @@ _bx, _bz = BASE_XZ
 # camera +-7 degrees in pitch): one smooth line now, level at first, its lateral offset easing in as a cosine (no
 # kink), its height rising 3 m over the whole run
 def _ocean_path():
-    pts = [(_bx + 1050.0 - 7.0, None, _bz + 60.0)]
-    for d in (1020.0, 960.0, 860.0, 730.0, 580.0, 420.0, 260.0, 150.0):
-        u = (1043.0 - d) / (1043.0 - 150.0)
+    pts = [(_bx + 1050.0 - 13.2, None, _bz + 60.0)]   # Pass 3: 2.2 s out at the glide's 6 m/s
+    for d in [1020.0 - 40.0 * i for i in range(22)] + [150.0]:   # Pass 3: dense, so the spline follows the pace
+        u = (1036.8 - d) / (1036.8 - 150.0)
         pts.append((_bx + d, PLAIN + 30.0 + 2.0 * u, _bz + 60.0 * math.cos(0.5 * math.pi * u)))
     return pts + [(BAY[0], BAY[1], BAY[2]), (BAY[0] - 20.0, BAY[1], BAY[2])]
 
@@ -93,7 +93,9 @@ def flight(bay_rel_y=None):
     for (x, y, z), g in zip(OCEAN_PATH, ground):
         pts.append((x, (EXIT[1] if y is None else y), z))
     # the first knot is 2.2 s out at the glide speed; the bay knot is the crossing (147.0), one more knot beyond it
-    knots, _ = pace(pts[:-1], T_EXIT + 2.2, T_BAY, 3.4, 9.0, ramp_in=0.3, ramp_out=0.3)
+    # Pass 3 (61- §3: even pacing): out of the glide at its 6 m/s (owner 2026-11-05: 3.2 -> 6), up to the cruise in
+    # about 5 s, held, and eased into the bay over the last 3 s
+    knots, _ = pace(pts[:-1], T_EXIT + 2.2, T_BAY, 6.0, 9.0, ramp_in=0.36, ramp_out=0.13)
     knots.append([pts[-1][0], pts[-1][1], pts[-1][2], T_BAY + 2.2])
     return [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground)]
 
@@ -397,7 +399,8 @@ def write_ocean(portal_flight):
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.75, 0.95, 1.0], "shards": 0.3, "shardRate": 0.35},
-        "portal": {**GAZE, "world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
+        "portal": {**GAZE, "climbLook": 0.2, "lookDown": 0.08,   # Pass 3: the outro keeps the canyon in frame (no 25 s of sky)
+                   "world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
             {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base-covert.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
@@ -445,9 +448,20 @@ def _home():
     exit_ = [pts[0][0], pts[0][1], pts[0][2]]          # the root's exit height is absolute
     clear = min(pt[1] - g for pt, g in zip(pts[1:], ground[1:]))
     print(f"home flight: lowest knot {clear:.1f} m over the ground")
-    # out of the wall at the bay's speed, easing to a slow, held climb as the music ends
-    knots, _ = pace(pts[1:], T_HOME + 1.4, T_END, 7.0, 0.6, ramp_in=0.2, ramp_out=0.35)
-    return exit_, [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground[1:])]
+    # Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): one gentle curve from the first knot out of the wall to
+    # the last, bowed 30 m toward the camp so the gathering passes about 15 m off (the straight chord passed 30 m
+    # off), down to the river past the camp, then a modest rise (to 58 m, not 100) so the canyon's rim stays in the
+    # frame to the end (owner: no 25 s of sky), at an even pace eased only at the ends
+    A, B = (pts[1][0], pts[1][2]), (pts[-1][0], pts[-1][2])
+    mx, mz = (A[0] + B[0]) / 2.0, (A[1] + B[1]) / 2.0
+    L = math.hypot(B[0] - A[0], B[1] - A[1])
+    C = (mx - (B[1] - A[1]) / L * 30.0, mz + (B[0] - A[0]) / L * 30.0)
+    line = line_points(A, B, [(0.0, pts[1][1]), (0.18, 40.0), (0.3, 30.0), (0.5, 34.0), (0.8, 50.0), (1.0, 58.0)],
+                       n=16, control=C)
+    lg = heights(CANYON_SCENE, [(p[0], p[2]) for p in line])
+    print(f"home flight: lowest point {min(p[1] - g for p, g in zip(line, lg)):.1f} m over the ground")
+    knots, _ = pace([list(p) for p in line], T_HOME + 1.4, T_END, 7.0, 3.0, ramp_in=0.04, ramp_out=0.06)
+    return exit_, [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, lg)]
 
 
 HOME_EXIT, HOME_FLIGHT = _home()

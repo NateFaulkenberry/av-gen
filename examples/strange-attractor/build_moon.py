@@ -15,7 +15,7 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import GAZE, WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT  # noqa: E402  (ADR-1893)
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT, line_points  # noqa: E402  (ADR-1893)
 
 
 def unit(v):
@@ -161,7 +161,22 @@ CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 
 _DUSK_PATH = [(36, -44, 9.0), (29, -27, 6.5), (23, -11, 5.0), (17, 1, 4.0), (11, 9, 3.6), (5, 16, 5.0), (0, 26, 12.0),
               (-4, 42, 30.0), (-6, 58, 52.0), (-6, 72, 50.0), (-7, 82, 34.0)]
 _dk = [knot(d, lat, h, 0.0) for d, lat, h in _DUSK_PATH]
-DUSK_FLIGHT = [list(k) for k in pace([k_[:3] for k_ in _dk], 48.35, 68.0, 24.0, 9.0, ramp_in=0.3, ramp_out=0.15)[0]] + \
+# Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): one gentle curve from the exit to the outer cliff's portal,
+# bowed 30 m to the river's side so the gathering passes about 15 m off (it ran within 3 m on the straight chord),
+# low past the camp, then up over the benches early and high so the mound below the cliff stays under the frame
+# (it filled the frame at 52-62 s), at an even pace; the last two knots are the crossing's, as before
+_A, _B = (_dk[0][0], _dk[0][2]), (_dk[-1][0], _dk[-1][2])
+_mx, _mz = (_A[0] + _B[0]) / 2.0, (_A[1] + _B[1]) / 2.0
+_L = math.hypot(_B[0] - _A[0], _B[1] - _A[1])
+_C = (_mx - (_B[1] - _A[1]) / _L * 30.0, _mz + (_B[0] - _A[0]) / _L * 30.0)
+# heights as a smooth line in absolute terms (heights over the ground passed the benches' steps into the look's pitch)
+_dusk_xz = line_points(_A, _B, [(0.0, 0.0), (1.0, 0.0)], n=14, control=_C)
+from sample_ground import heights as _heights  # noqa: E402
+_dg = _heights("strange-attractor-flythrough.scene.json", [(p[0], p[2]) for p in _dusk_xz])
+_i28 = round(0.28 * 14)
+_ya = line_points((0.0, 0.0), (1.0, 0.0), [(0.0, _dg[0] + 9.0), (0.28, _dg[_i28] + 5.0), (1.0, _dg[-1] + 34.0)], n=14)
+_dusk_abs = [(p[0], max(y[1], g + 3.0), p[2]) for p, y, g in zip(_dusk_xz, _ya, _dg)]
+DUSK_FLIGHT = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(pace([list(p) for p in _dusk_abs], 48.35, 68.0, 24.0, 9.0, ramp_in=0.08, ramp_out=0.1)[0], _dg)] + \
     [knot(-8, 89, 21.2, 69.2), knot(-8, 96, -39.2, 70.4)]
 EGLOW = [-c for c in direction(-6, 50)]
 CLIFF_PORTAL = site(-8.0, 91.8)
@@ -230,7 +245,8 @@ scene = {
                  "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                  "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.95, 0.88, 0.62], "shards": 0.25, "shardRate": 0.35},
     # ADR-1885: back to the root -- the canyon, at dusk (its look from crossing 1)
-    "portal": {**GAZE, "world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
+    "portal": {**GAZE,
+               "world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
                "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT},
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,
                "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True,

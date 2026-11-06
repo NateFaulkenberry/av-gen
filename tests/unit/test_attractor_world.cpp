@@ -871,6 +871,44 @@ TEST_CASE("the flythrough's gaze is authored: a shorter look-ahead keeps the aim
     CHECK_FALSE(scene::attractorWorldToJson(plain).contains("flightLookAhead"));
 }
 
+TEST_CASE("the flythrough's path smoothing is authored: a longer window turns the gorge's bends into one curve",
+          "[attractor-world][pass3][adr1911]") {
+    scene::AttractorGen bends;
+    bends.resolution = 256;
+    bends.meshSpacing = 16.0f;
+    bends.meshMinError = 4.0f;
+    scene::AttractorGen curve = bends;
+    curve.flightSmooth = 4.0f;
+    CHECK(curve.validate().has_value());
+    CHECK(curve.hash() != bends.hash());
+    scene::AttractorGen bad = bends;
+    bad.flightSmooth = 0.0f;
+    CHECK_FALSE(bad.validate().has_value());
+    // the path's total horizontal turning (degrees), a measure of how much it snakes
+    const auto turning = [](const scene::AttractorWorld& w) {
+        float out = 0.0f;
+        for (std::size_t i = 2; i < w.flight.size(); ++i) {
+            const glm::vec2 a(w.flight[i - 1].x - w.flight[i - 2].x, w.flight[i - 1].z - w.flight[i - 2].z);
+            const glm::vec2 b(w.flight[i].x - w.flight[i - 1].x, w.flight[i].z - w.flight[i - 1].z);
+            if (glm::length(a) < 1e-3f || glm::length(b) < 1e-3f) continue;
+            out += glm::degrees(std::abs(std::atan2(a.x * b.y - a.y * b.x, glm::dot(a, b))));
+        }
+        return out;
+    };
+    const auto a = scene::generateAttractorWorld(bends);
+    const auto b = scene::generateAttractorWorld(curve);
+    INFO("total turning: smooth 0.6 s " << turning(*a) << ", 4 s " << turning(*b));
+    CHECK(turning(*b) < turning(*a));
+    nlohmann::json j = nlohmann::json::parse(R"({"enabled": true, "flightSmooth": 4.0})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->gen.flightSmooth == Approx(4.0f));
+    CHECK(scene::attractorWorldToJson(*block).value("flightSmooth", 0.0) == Approx(4.0));
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    CHECK_FALSE(scene::attractorWorldToJson(plain).contains("flightSmooth"));
+}
+
 TEST_CASE("the Mars style: mesas over an open floor, no gorge, wind forms, and only when asked", "[attractor-world][pass2][adr1902]") {
     scene::AttractorGen canyon;
     canyon.resolution = 256;

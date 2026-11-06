@@ -261,7 +261,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
         raw[static_cast<std::size_t>(k)] = glm::mix(vista, river, b);
     }
     // smooth (the odd-reflected ends keep the vista's linear push exact at frame 0)
-    const std::vector<glm::vec3> path = smoothSamples(raw, 0.6f * rate);
+    const std::vector<glm::vec3> path = smoothSamples(raw, std::max(g.flightSmooth, 0.05f) * rate); // ADR-1911
     // Height (ADR-1854). The clearance is the highest ground within 22 m, plus a margin; it moves by metres from one
     // sample to the next as the path crosses metre-scale relief, so it must never reach the camera directly (Gate 2b
     // re-clamped to it after smoothing, and that noise -- magnified by the look-ahead -- was the jitter). So: lift by a
@@ -620,6 +620,7 @@ Result<void> AttractorGen::validate() const {
         return fail("attractorWorld: mars needs mesaCover in [0, 1], yardangs in [0, 60] and dunes in [0, 40]");
     }
     if (!(flightSeconds >= 20.0f && flightSeconds <= 120.0f)) return fail("attractorWorld: flightSeconds must be in [20, 120]");
+    if (!(flightSmooth >= 0.05f && flightSmooth <= 20.0f)) return fail("attractorWorld: flightSmooth must be in [0.05, 20] seconds"); // ADR-1911
     if (!(meshSpacing >= 0.5f && meshSpacing <= 16.0f)) return fail("attractorWorld: meshSpacing must be in [0.5, 16] m");
     if (!(meshError > 0.0f && meshError <= 0.05f) || !(meshMinError > 0.0f && meshMinError <= 10.0f)) {
         return fail("attractorWorld: meshError must be in (0, 0.05] and meshMinError in (0, 10] m");
@@ -651,6 +652,9 @@ std::uint64_t AttractorGen::hash() const {
     if (flightLookAhead != 2.5f || flightLookDown != 0.12f) { // ADR-1909: hashed only when set (worlds keep their keys)
         h = mixHashF(h ^ 0x1909ull, flightLookAhead);
         h = mixHashF(h ^ 0x1909ull, flightLookDown);
+    }
+    if (flightSmooth != 0.6f) { // ADR-1911: hashed only when set
+        h = mixHashF(h ^ 0x1911ull, flightSmooth);
     }
     for (const Pad& p : pads) { // ADR-1897
         for (float v : {p.x, p.z, p.radius, p.level}) h = mixHashF(h ^ 0x1897ull, v);
@@ -1475,7 +1479,7 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "worldScale", "pads", "mars", "flightLookAhead", "flightLookDown", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "meshMinError", "worldScale", "pads", "mars", "flightLookAhead", "flightLookDown", "flightSmooth", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
 constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth",
                                           "sunShadowBias", "sunContact", "sunCasts"};
@@ -1517,6 +1521,7 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.worldScale = j.value("worldScale", g.worldScale); // ADR-1893
     g.flightLookAhead = j.value("flightLookAhead", g.flightLookAhead); // ADR-1909
     g.flightLookDown = j.value("flightLookDown", g.flightLookDown);
+    g.flightSmooth = j.value("flightSmooth", g.flightSmooth); // ADR-1911
     if (j.contains("mars")) { // ADR-1902
         const json& mj = j.at("mars");
         if (!mj.is_object()) return fail("attractorWorld: 'mars' must be an object");
@@ -1668,6 +1673,7 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
     }
     if (g.flightLookAhead != 2.5f) out["flightLookAhead"] = g.flightLookAhead; // ADR-1909
     if (g.flightLookDown != 0.12f) out["flightLookDown"] = g.flightLookDown;
+    if (g.flightSmooth != 0.6f) out["flightSmooth"] = g.flightSmooth; // ADR-1911
     if (k.sunWarmth != 1.0f) out["look"]["sunWarmth"] = k.sunWarmth; // ADR-1900: absent, the warm sun
     if (k.sunShadowBias >= 0.0f) out["look"]["sunShadowBias"] = k.sunShadowBias; // ADR-1907: absent, the block's
     if (k.sunContact != 1.0f) out["look"]["sunContact"] = k.sunContact;

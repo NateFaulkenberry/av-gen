@@ -45,31 +45,17 @@ The 3 cm drop is too much for the animation's lowest frames. Suggest: the seat r
 flat top in Phase C, then SEAT_SIT re-fitted with check_contacts. SEAT_SIT stays in `build_journey.py` (shared file):
 request the value here and the SA agent sets it.
 
-### H-4: the new night pass -- keep the clearing's geology out of its corridor (Phase C)
-Status: open, for the hero agent's Phase C. The SA agent owns the path (`build_mars.py`, `night_flight`).
-The owner found the M3g night pass crept past one boulder for 18 s (104-118 s). It is replaced by a longer level pass
-(coordinator, 2026-11-04). Knots, absolute world x, z of the canyon scene, with heights over the ground (over the water,
-over its surface):
-
-| t (s) | x | z | height | where |
-|---|---|---|---|---|
-| 93.46 | 66.5 | 1295 | 5.0 (abs) | the exit out of the bank (unchanged) |
-| 93.9 | 58.0 | 1318 | 4.0 | out over the river |
-| 94.5 | 47.0 | 1326.5 | 4.0 | |
-| ~97 | 34.0 | 1329 | 4.0 | the wide left curve over the water |
-| ~100 | 23.5 | 1336 | 4.0 | |
-| ~104 | 21.0 | 1346 | 4.0 | |
-| ~107 | 28.0 | 1351 | 4.0 | heading east, straight at the camp across the water |
-| ~111 | 37.0 | 1352.5 | 4.0 | the camp, the fire and the craft ahead, 30-40 m |
-| ~114 | 43.0 | 1354 | 4.0 | turning right |
-| 117-121.2 | 47.8 -> 51.5 | 1358.6 -> 1367 | glide | the river portal's glide (25 deg, 3.2 m/s), heading (0.4, 0.92) |
-
-- The corridor to keep clear: 4 m either side of that line and 3 m under it. It is all over the water except its
-  last 6 m into the glide.
-- **What the camera sees from it:** the clearing's river face and the gathering, from the west across the water.
-  That makes the clearing's river side, the bank's lip and the far wall behind the camp the composition of 107-115 s.
-  Anything placed on the bank's water edge between z 1340 and 1365 is in the shot.
-- `campmap3.png` (top view, M3g path red, new path green) is in `pass3-env/08-regression/`.
+### H-4: the night and dusk lines -- keep the clearing's geology out of their corridors (Phase C, if it resumes)
+Status: open, updated 2026-11-05 for the A-to-B paths (61-, 62-, 63-). The SA agent owns the paths.
+- **Night (93.5-121.2 s):** one straight line, 4 m over the water along the river's edge, from the bank's exit
+  (66.5, 1295) to the river portal (51.5, 1367). The last ~9 m is the 25-degree glide into the portal.
+  - The camp passes about 19 m to its left and the bank's boulder (66, 1347) about 10 m.
+  - Corridor: 4 m either side, 3 m under.
+  - The clearing's river face, the gathering and the craft are seen ahead and then beside from 100 to 116 s.
+- **Dusk (47.9-69.7 s):** one gentle curve from the far bank's exit over the river, past the gathering about 15 m
+  on its river side, about 5 m up, then up over the benches to the outer cliff's portal.
+  - Corridor: 4 m either side, 3 m under.
+  - Knots: `strange-attractor-moon.scene.json`, `portal.flight`.
 
 ## From the hero agent to the SA agent
 

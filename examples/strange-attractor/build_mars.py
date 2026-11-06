@@ -20,7 +20,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace, line_points  # noqa: E402
 from sample_ground import heights  # noqa: E402
 CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
@@ -110,7 +110,8 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
 # figures glimpsed in passing), and on into the river portal's dive
 NIGHT_EXIT_DL = (68.0, 30.9)
 NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 5.0, site(*NIGHT_EXIT_DL)[1]]
-OUT_OF_CLIFF = unit([-0.55 * O_UNIT[0] - 1.0 * L_UNIT[0], 0.0, -0.55 * O_UNIT[1] - 1.0 * L_UNIT[1]])  # out of the face, up-canyon
+# Pass 3 (61- §3): the exit faces along the straight night line (the position is kept), so the arrival does not swing
+OUT_OF_CLIFF = None
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
 CAMP_GROUND = 4.4 * WS
@@ -125,11 +126,12 @@ RIVER_Y = -0.5 * R
 # the glide's heading (x, z). Pass 3: the night pass now comes at the portal from out over the river, heading in toward
 # the camp, so the glide turns down into the opening on that heading (down the river) rather than on the camp's line
 # out to it (M3b-M3g); the crossing is unchanged in the ocean, whose arrival is mapped from this heading (entryUp)
-_tw = [-0.15, 0.99]
+_tw = [RIVER_PORTAL[0] - NIGHT_EXIT[0], RIVER_PORTAL[1] - NIGHT_EXIT[2]]   # Pass 3 (61-): the glide continues the straight night line
 _tn = math.hypot(*_tw)
 TOWARD_RIVER = (_tw[0] / _tn, _tw[1] / _tn)
+OUT_OF_CLIFF = [TOWARD_RIVER[0], 0.0, TOWARD_RIVER[1]]
 GLIDE_SLOPE = math.radians(25.0)
-GLIDE_SPEED = 3.2                      # m/s along the slope
+GLIDE_SPEED = 6.0                      # m/s along the slope (owner 2026-11-05: 3.2 -> 6, a gentler start to the ocean)
 T_CROSS = 121.2 + 1.0 / 60.0   # M3d (ADR-1903): half a frame off the 30 fps grid, so no frame lands on the crossing
 
 
@@ -145,14 +147,17 @@ def night_flight():
     the M3b one (a straight line, 25 degrees down at 3.2 m/s; the exit frame tilted to match)."""
     eye = CAMP_GROUND + 1.85
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
-    # Pass 3 (owner 2026-11-04: the M3g pass crept past one boulder for 18 s -- Mars's four-bar cut left the same short
-    # path 8 s longer, and the speed profile spent them at 0.5 m/s beside the bank's boulder). The level pass-by now has
-    # the length its time needs, over the water: out of the exit and out over the river, a wide left curve that turns
-    # the camera toward the bank (the camp, the fire and the craft ahead across the water), then right and down into
-    # the river portal's glide (same slope and speed, its heading turned to this approach). Absolute x, z (measured on the camp map), heights over the ground
-    # (the water's surface over the river); the corridor is in 57- (H-4) so the clearing's geology stays out of it.
-    far = [[58.0, 4.0, 1318.0], [47.0, 4.0, 1329.0], [36.0, 4.0, 1334.0], [28.5, 4.0, 1341.0], [26.5, 4.0, 1348.0], [31.0, 4.0, 1352.5]]
-    pts = [(39.0, 4.0, 1353.5), (46.0, 4.0, 1354.0), (50.8, 4.2, 1355.4)]   # heading in toward the gathering across the water, then right into the glide
+    # Pass 3, the A-to-B rule (owner, 61- §3 and 2026-11-05): one straight line from the bank's exit to the river
+    # portal, 4 m over the water along the river's edge -- the camp passes about 19 m to its left, the bank's boulder
+    # about 10 m -- at an even cruise (a 70 m line in 27.8 s fixes it at about 2.5 m/s), easing up to the glide's 6 m/s
+    # over the last ~3 s; the glide continues the same line, 25 degrees down (TOWARD_RIVER)
+    g0 = glide_point(glide_len)
+    line = line_points((NIGHT_EXIT[0], NIGHT_EXIT[2]), (g0[0], g0[2]), [(0.0, 4.0), (1.0, 4.0)], n=24)
+    # (no knot in the first 14 m: the arrival covers them in the first half second, and a nearer knot makes the spline
+    # overshoot and come back; none in the last 3 m, where the level line bends into the glide)
+    far = [list(p) for p in line[1:-1] if math.dist((p[0], p[2]), (NIGHT_EXIT[0], NIGHT_EXIT[2])) > 14.0
+           and math.dist((p[0], p[2]), (g0[0], g0[2])) > 3.0]
+    pts = []
     gl = [tuple(glide_point(glide_len * f)) for f in (1.0, 0.5)]
     pts_all = pts + gl
     gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in gl] + [(x, z) for x, _, z in [tuple(glide_point(0.0))]])
@@ -174,8 +179,9 @@ def night_flight():
             out_.append(b)
         rel = out_
     t_glide = T_CROSS - glide_len / GLIDE_SPEED
-    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], T_PYR + 0.4, t_glide, 22.0, GLIDE_SPEED,
-                    ramp_in=0.1, ramp_out=0.25)
+    T = t_glide - (T_PYR + 1.0)
+    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], T_PYR + 1.0, t_glide, 10.0, GLIDE_SPEED,
+                    ramp_in=1.0 / T, ramp_out=3.0 / T)
     out = [list(k) for k in knots]
     x, y, z = gl[1]
     out.append([x, y - gr[len(pts) + 1], z, T_CROSS - glide_len * 0.5 / GLIDE_SPEED])
@@ -220,7 +226,15 @@ PYR_OPEN_FAR = round(PYR_FIELD_FAR - 200.0, 1)
 # M3g (owner 54- §3: shorter or faster): four bars shorter -- the pyramid crossing moves from bar 52 (101.4 s) to bar
 # 48 (93.46 s; 120.97 bpm, a bar 1.984 s), so the same line is flown about a third faster; the night leg gains the 7.9 s
 T_PYR = 101.4 - 4 * 4 * 60.0 / 120.97
-MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, T_PYR - 1.8, 24.0, 20.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
+# Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): the fly-over on one straight line from the exit's first knot
+# to the pyramid's face (the M3d path wandered 2% off it), its heights as before by distance along, at an even pace
+_mars_h = []
+_acc = [0.0]
+for _a, _b in zip(_MARS_PATH, _MARS_PATH[1:]):
+    _acc.append(_acc[-1] + math.hypot(_b[0] - _a[0], _b[2] - _a[2]))
+_MARS_LINE = line_points((_MARS_PATH[0][0], _MARS_PATH[0][2]), (_MARS_PATH[-1][0], _MARS_PATH[-1][2]),
+                         [(a / _acc[-1], p[1]) for a, p in zip(_acc, _MARS_PATH)], n=14)
+MARS_FLIGHT = [list(k) for k in pace([list(p) for p in _MARS_LINE], 71.4, T_PYR - 1.8, 24.0, 20.0, ramp_in=0.06, ramp_out=0.08)[0]] + [
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], T_PYR + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
     [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, T_PYR + 0.8],
 ]

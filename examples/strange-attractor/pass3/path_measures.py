@@ -47,14 +47,19 @@ def measures(seg):
     vel = np.gradient(eye, axis=0) / dt[:, None]
     speed = np.linalg.norm(vel, axis=1)
     fwd = tgt - eye; fwd /= np.linalg.norm(fwd, axis=1)[:, None]
-    yaw = np.degrees(np.unwrap(np.arctan2(fwd[:, 0], fwd[:, 2])))
-    pitch = np.degrees(np.arcsin(np.clip(fwd[:, 1], -1, 1)))
+    # yaw and pitch in the camera's own world frame: the up vector of the trace (a portal world's ground need not be the
+    # root's y, so the root's y-axis would make up pitch and yaw that are not there)
+    up = seg[:, 7:10] / np.linalg.norm(seg[:, 7:10], axis=1)[:, None]
+    upm = up.mean(0); upm /= np.linalg.norm(upm)
+    ref = np.cross(upm, [1.0, 0.0, 0.0]) if abs(upm[0]) < 0.9 else np.cross(upm, [0.0, 0.0, 1.0])
+    ref /= np.linalg.norm(ref); ref2 = np.cross(upm, ref)
+    yaw = np.degrees(np.unwrap(np.arctan2(fwd @ ref2, fwd @ ref)))
+    pitch = np.degrees(np.arcsin(np.clip(fwd @ upm, -1, 1)))
     yr = abs(np.gradient(yaw) / dt); pr = abs(np.gradient(pitch) / dt)
     length = float(np.sum(np.linalg.norm(np.diff(eye, axis=0), axis=1)))
     straight = float(np.linalg.norm(eye[-1] - eye[0]))
     # heading reversals: the sign of the horizontal path's turn rate, smoothed over 1 s, ignoring turns under 3 deg/s
-    hv = vel[:, [0, 2]]
-    head = np.unwrap(np.arctan2(hv[:, 0], hv[:, 1]))
+    head = np.unwrap(np.arctan2(vel @ ref2, vel @ ref))
     k = 30
     turn = np.degrees(np.convolve(np.gradient(head) / dt, np.ones(k) / k, mode="same"))
     signs = [np.sign(v) for v in turn[k:-k] if abs(v) > 3.0]

@@ -74,6 +74,10 @@ struct AttractorGen {
     // the river). A film whose camera "looks where it is going" shortens both.
     float flightLookAhead = 2.5f; // seconds
     float flightLookDown = 0.12f; // fraction of the look distance
+    // ADR-1911: the flight's horizontal path is smoothed over this many seconds before it is lifted clear of the
+    // terrain. 0.6 follows every bend of the gorge; a few seconds turn the bends into one long curve (Pass 3, the
+    // owner's A-to-B rule: no S-bends). The clearance lift that follows keeps it off the walls either way.
+    float flightSmooth = 0.6f;    // seconds
     // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
     // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
     // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from
