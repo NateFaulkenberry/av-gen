@@ -63,6 +63,8 @@ Measures: length/A->B 1.15, 4.8 m/s cruise, lowest 20.4 m over the ground, neare
 with a real bend: heading turns about 45 degrees over the leg. The camp is small, and the fire barely reads in dawn
 light. Pitch goes to about -47 for the dive and levels at up to 19 deg/s around 170 s.
 
+**Owner's decision (2026-11-06):** keep the dawn as it is at 133ce870.
+
 ## Ocean
 
 The step at 127.5-128 s is gone: the ramp runs smoothly from 6 to 49 m/s over 124 to 130 s
