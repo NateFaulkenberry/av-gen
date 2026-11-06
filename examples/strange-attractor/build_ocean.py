@@ -21,7 +21,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, pace, L_UNIT, line_points  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, pace, pace_even, L_UNIT, line_points  # noqa: E402
 from sample_ground import heights  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -85,18 +85,14 @@ T_EXIT, T_BAY = 121.2 + 1.0 / 60.0, 147.0 + 1.0 / 60.0   # half a frame off the 
 
 # the ocean flight (x, height over the seabed, z, t): crossing 5 at 121.2 s (bar 62), crossing 6 at 147.0 s (bar 75)
 def flight(bay_rel_y=None):
-    try:
-        ground = heights("strange-attractor-ocean.scene.json", [(x, z) for x, _, z in OCEAN_PATH])
-    except Exception:
-        ground = [0.0] * len(OCEAN_PATH)
-    pts = []
-    for (x, y, z), g in zip(OCEAN_PATH, ground):
-        pts.append((x, (EXIT[1] if y is None else y), z))
-    # the first knot is 2.2 s out at the glide speed; the bay knot is the crossing (147.0), one more knot beyond it
-    # Pass 3 (61- §3: even pacing): out of the glide at its 6 m/s (owner 2026-11-05: 3.2 -> 6), up to the cruise in
-    # about 5 s, held, and eased into the bay over the last 3 s
-    knots, _ = pace(pts[:-1], T_EXIT + 2.2, T_BAY, 6.0, 9.0, ramp_in=0.36, ramp_out=0.13)
+    pts = [(x, (EXIT[1] if y is None else y), z) for x, y, z in OCEAN_PATH]
+    # Pass 3 (61- §3, 65- §4): out of the glide at its 6 m/s, up to the cruise over 7 s, held, and eased into the bay over
+    # the last 3 s, with knots at even times (fixed knots on a ramp gave the 24-34 m/s step at 127.5 s). 950 m in 23.6 s
+    # is 40 m/s on average, so the cruise cannot be 37: it holds about 49 m/s with these ramps
+    knots, cruise = pace_even([list(p) for p in pts[:-1]], T_EXIT + 2.2, T_BAY, 6.0, 9.0, 7.0, 3.0, dt=1.2)
+    print(f"ocean flight: cruise {cruise:.1f} m/s")
     knots.append([pts[-1][0], pts[-1][1], pts[-1][2], T_BAY + 2.2])
+    ground = heights("strange-attractor-ocean.scene.json", [(k[0], k[2]) for k in knots])
     return [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground)]
 
 
@@ -399,7 +395,7 @@ def write_ocean(portal_flight):
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.75, 0.95, 1.0], "shards": 0.3, "shardRate": 0.35},
-        "portal": {**GAZE, "climbLook": 0.2, "lookDown": 0.08,   # Pass 3: the outro keeps the canyon in frame (no 25 s of sky)
+        "portal": {**GAZE, "climbLook": 0.2, "lookDown": 0.04,   # Pass 3: the outro keeps the canyon in frame (no 25 s of sky)
                    "world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
@@ -448,16 +444,13 @@ def _home():
     exit_ = [pts[0][0], pts[0][1], pts[0][2]]          # the root's exit height is absolute
     clear = min(pt[1] - g for pt, g in zip(pts[1:], ground[1:]))
     print(f"home flight: lowest knot {clear:.1f} m over the ground")
-    # Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): one gentle curve from the first knot out of the wall to
-    # the last, bowed 30 m toward the camp so the gathering passes about 15 m off (the straight chord passed 30 m
-    # off), down to the river past the camp, then a modest rise (to 58 m, not 100) so the canyon's rim stays in the
-    # frame to the end (owner: no 25 s of sky), at an even pace eased only at the ends
+    # Pass 3 (61- §3, the A-to-B rule; 65-): one gentle curve from the first knot out of the wall to the last, down
+    # over the river side of the beach with the camp low in the frame on the way in, then up the river, rising to 58 m
+    # so the canyon's rim stays in the frame to the end. The exit is 86 m up and only 75 m from the camp, so the camp
+    # can only be seen looking down at it. A line over the bench puts that look on the hillside (65- Dawn); this one
+    # puts it on the water.
     A, B = (pts[1][0], pts[1][2]), (pts[-1][0], pts[-1][2])
-    mx, mz = (A[0] + B[0]) / 2.0, (A[1] + B[1]) / 2.0
-    L = math.hypot(B[0] - A[0], B[1] - A[1])
-    C = (mx - (B[1] - A[1]) / L * 30.0, mz + (B[0] - A[0]) / L * 30.0)
-    line = line_points(A, B, [(0.0, pts[1][1]), (0.18, 40.0), (0.3, 30.0), (0.5, 34.0), (0.8, 50.0), (1.0, 58.0)],
-                       n=16, control=C)
+    line = line_points(A, B, [(0.0, pts[1][1]), (0.36, 22.0), (1.0, 58.0)], n=30, control=(14.0, 1372.0))
     lg = heights(CANYON_SCENE, [(p[0], p[2]) for p in line])
     print(f"home flight: lowest point {min(p[1] - g for p, g in zip(line, lg)):.1f} m over the ground")
     knots, _ = pace([list(p) for p in line], T_HOME + 1.4, T_END, 7.0, 3.0, ramp_in=0.04, ramp_out=0.06)

@@ -213,6 +213,43 @@ GAZE = {"lookAhead": 0.35, "lookDown": 0.02, "climbLook": 1.0}
 
 # --- Pass 3 (61- §3, the owner's standing rule): each leg from its arrival A to its next portal B on a straight line,
 # or one gentle curve, at an even speed. `line_points` lays the points; `pace` times them.
+def pace_even(points, t0, t1, v0, v1, ramp_in_s, ramp_out_s, dt=1.0):
+    """Knots at even TIME steps along a polyline, a speed profile v0 -> cruise -> v1 with smoothstep ramps (seconds).
+    `pace` times fixed points, and a ramp over fixed points leaves the knots crowded at one end and sparse at the
+    other, which the spline turns into speed steps; even time steps do not. Returns [x, y, z, t] knots."""
+    seg = [math.dist(points[i], points[i + 1]) for i in range(len(points) - 1)]
+    total, T = sum(seg), t1 - t0
+    a, b = ramp_in_s, ramp_out_s
+    vm = (total - v0 * a / 2.0 - v1 * b / 2.0) / (T - a / 2.0 - b / 2.0)
+
+    def ss(x):
+        x = min(max(x, 0.0), 1.0)
+        return x * x * (3.0 - 2.0 * x)
+
+    def speed(t):
+        v = v0 + (vm - v0) * ss(t / a)
+        if t > T - b:
+            v = vm + (v1 - vm) * ss((t - (T - b)) / b)
+        return v
+    n = 4000
+    s = [0.0]
+    for i in range(1, n + 1):
+        s.append(s[-1] + 0.5 * (speed(T * (i - 1) / n) + speed(T * i / n)) * T / n)
+    scale = total / s[-1]
+    out = []
+    steps = max(1, round(T / dt))
+    for k in range(steps + 1):
+        d = s[round(n * k / steps)] * scale
+        acc, i = 0.0, 0
+        while i < len(seg) - 1 and acc + seg[i] < d:
+            acc += seg[i]
+            i += 1
+        u = (d - acc) / max(seg[i], 1e-9)
+        p = [points[i][c] + (points[i + 1][c] - points[i][c]) * u for c in range(3)]
+        out.append([p[0], p[1], p[2], t0 + T * k / steps])
+    return out, vm
+
+
 def line_points(a, b, profile, n=12, control=None):
     """Points from a to b (x, z) -- straight, or one quadratic curve bowed toward `control` -- with the height (second
     value) interpolated from `profile`, a list of (fraction along, height). Returns [(x, h, z)]."""

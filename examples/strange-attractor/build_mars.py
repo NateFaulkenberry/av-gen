@@ -109,7 +109,8 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
 # front of it, facing out over the river and up-canyon; then level, 3.5-5 m up, along the river past the camp (the
 # figures glimpsed in passing), and on into the river portal's dive
 NIGHT_EXIT_DL = (68.0, 30.9)
-NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 5.0, site(*NIGHT_EXIT_DL)[1]]
+# Owner 2026-11-06 (65- §3, overriding "portals stay" for this leg): a new entrance, out of the far bank's rock face
+NIGHT_EXIT = [25.0, 5.0, 1205.0]
 # Pass 3 (61- §3): the exit faces along the straight night line (the position is kept), so the arrival does not swing
 OUT_OF_CLIFF = None
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
@@ -121,7 +122,7 @@ CAMP_GROUND = 4.4 * WS
 # into the riverbed portal (owner: the water portal felt like a step): a straight line at a constant speed, sloping
 # 25 degrees; the exit frame is tilted to match, so the crossing changes nothing in the motion (crossing 5 at 121.2 s).
 GATHER = [*near(CAMP_SITE, *GATHER_AT)[:1], CAMP_GROUND + 1.3, near(CAMP_SITE, *GATHER_AT)[1]]
-RIVER_PORTAL = site(10.0, -12.0)
+RIVER_PORTAL = [53.0, 1385.0]   # owner 2026-11-06: the same portal, moved down the river, beyond the camp
 RIVER_Y = -0.5 * R
 # the glide's heading (x, z). Pass 3: the night pass now comes at the portal from out over the river, heading in toward
 # the camp, so the glide turns down into the opening on that heading (down the river) rather than on the camp's line
@@ -147,10 +148,9 @@ def night_flight():
     the M3b one (a straight line, 25 degrees down at 3.2 m/s; the exit frame tilted to match)."""
     eye = CAMP_GROUND + 1.85
     glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
-    # Pass 3, the A-to-B rule (owner, 61- §3 and 2026-11-05): one straight line from the bank's exit to the river
-    # portal, 4 m over the water along the river's edge -- the camp passes about 19 m to its left, the bank's boulder
-    # about 10 m -- at an even cruise (a 70 m line in 27.8 s fixes it at about 2.5 m/s), easing up to the glide's 6 m/s
-    # over the last ~3 s; the glide continues the same line, 25 degrees down (TOWARD_RIVER)
+    # Owner 2026-11-06 (65- §3): one straight line down the river, from the far bank's new entrance to the river portal
+    # beyond the camp, 4 m over the water: 182 m in 27.8 s, a steady 6 m/s, the camp on the left about 27 m off (the
+    # river's east bank at z 1385 stops it passing nearer on a straight line), and into the same 25-degree glide
     g0 = glide_point(glide_len)
     line = line_points((NIGHT_EXIT[0], NIGHT_EXIT[2]), (g0[0], g0[2]), [(0.0, 4.0), (1.0, 4.0)], n=24)
     # (no knot in the first 14 m: the arrival covers them in the first half second, and a nearer knot makes the spline

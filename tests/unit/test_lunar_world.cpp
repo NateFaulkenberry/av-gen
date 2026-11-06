@@ -542,6 +542,40 @@ TEST_CASE("a scene's spectral fog and its portal's gaze keys load (ADR-1908, ADR
     // the default is the grey fog: no weights
     CHECK(scene::Environment{}.fogSpectral == glm::vec3(0.0f));
 }
+TEST_CASE("a lunar hero's clear radius removes what overprinted its floor (ADR-1912)", "[pass3][adr1912]") {
+    scene::LunarGen plain;
+    plain.seed = 3;
+    plain.extent = 800.0f;
+    plain.spacing = 5.0f;
+    plain.skirtExtent = 3200.0f;
+    plain.skirtSpacing = 64.0f;
+    plain.craters = 6.0f;
+    plain.rocks = 0.0f;
+    plain.heroes = {{0.0f, 0.0f, 260.0f, 0.75f}};
+    scene::LunarGen cleared = plain;
+    cleared.heroes[0].clear = 110.0f;
+    CHECK(cleared.hash() != plain.hash());
+    // the spread round a ring is what an overprinted rim adds; a cleared floor has none inside the radius
+    const auto spread = [](const scene::LunarWorld& w) {
+        float out = 0.0f;
+        for (float r : {20.0f, 40.0f, 60.0f}) {
+            float lo = 1e9f, hi = -1e9f;
+            for (int a = 0; a < 24; ++a) {
+                const float t = static_cast<float>(a) * 0.2618f;
+                const float h = w.sample(r * std::cos(t), r * std::sin(t));
+                lo = std::min(lo, h);
+                hi = std::max(hi, h);
+            }
+            out = std::max(out, hi - lo);
+        }
+        return out;
+    };
+    const auto a = scene::generateLunarWorld(plain);
+    const auto b = scene::generateLunarWorld(cleared);
+    INFO("ring spread: plain " << spread(*a) << ", cleared " << spread(*b));
+    CHECK(spread(*b) <= spread(*a));
+    CHECK(spread(*b) < 1.5f);
+}
 TEST_CASE("a scene's water column loads, is a parameter, and is saved only when it absorbs (ADR-1910)",
           "[pass3][adr1910]") {
     const auto dir = testsupport::processTempDir();

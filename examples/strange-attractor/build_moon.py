@@ -169,12 +169,15 @@ _A, _B = (_dk[0][0], _dk[0][2]), (_dk[-1][0], _dk[-1][2])
 _mx, _mz = (_A[0] + _B[0]) / 2.0, (_A[1] + _B[1]) / 2.0
 _L = math.hypot(_B[0] - _A[0], _B[1] - _A[1])
 _C = (_mx - (_B[1] - _A[1]) / _L * 30.0, _mz + (_B[0] - _A[0]) / _L * 30.0)
+# (owner 2026-11-06: no tilt out of the portal: level at the exit's 12 m, a long shallow settle toward the camp)
 # heights as a smooth line in absolute terms (heights over the ground passed the benches' steps into the look's pitch)
 _dusk_xz = line_points(_A, _B, [(0.0, 0.0), (1.0, 0.0)], n=14, control=_C)
 from sample_ground import heights as _heights  # noqa: E402
 _dg = _heights("strange-attractor-flythrough.scene.json", [(p[0], p[2]) for p in _dusk_xz])
-_i28 = round(0.28 * 14)
-_ya = line_points((0.0, 0.0), (1.0, 0.0), [(0.0, _dg[0] + 9.0), (0.28, _dg[_i28] + 5.0), (1.0, _dg[-1] + 34.0)], n=14)
+# the highest ground under the pass, sampled finely (the bank's lip stands between the knots)
+_fine = line_points(_A, _B, [(0.0, 0.0), (1.0, 0.0)], n=70, control=_C)
+_gpass = max(_heights("strange-attractor-flythrough.scene.json", [(p[0], p[2]) for p in _fine[10:32]]))
+_ya = line_points((0.0, 0.0), (1.0, 0.0), [(0.0, 12.0), (0.35, _gpass + 4.5), (1.0, _dg[-1] + 34.0)], n=14)
 _dusk_abs = [(p[0], max(y[1], g + 3.0), p[2]) for p, y, g in zip(_dusk_xz, _ya, _dg)]
 DUSK_FLIGHT = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(pace([list(p) for p in _dusk_abs], 48.35, 68.0, 24.0, 9.0, ramp_in=0.08, ramp_out=0.1)[0], _dg)] + \
     [knot(-8, 89, 21.2, 69.2), knot(-8, 96, -39.2, 70.4)]
@@ -228,7 +231,8 @@ scene = {
                    # M1: a fresh crater beside the first glide (B); the great old basin whose near rim casts the night
                    # over it; the portal crater P inside it; the dome craters
                    "heroes": [{"x": BASIN[0], "z": BASIN[1], "diameter": BASIN[2], "fresh": 0.12},
-                              {"x": PORTAL[0], "z": PORTAL[2], "diameter": 260, "fresh": 0.75}] +
+                              {"x": PORTAL[0], "z": PORTAL[2], "diameter": 260, "fresh": 0.75,
+                               "clear": 125.0}] +   # owner 2026-11-06 (ADR-1912): no blob where the portal opens
                              [{"x": c[0], "z": c[1], "diameter": c[2], "fresh": 0.45} for c, _, _ in DOMES]},
     # Gate C (ADR-1883): the crater-floor portal. The floor of P cracks and opens under the diving camera onto the
     # canyon at dusk, far below; the same corruption as the canyon's wall (focus y is a height above the ground here),
@@ -245,7 +249,7 @@ scene = {
                  "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                  "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.95, 0.88, 0.62], "shards": 0.25, "shardRate": 0.35},
     # ADR-1885: back to the root -- the canyon, at dusk (its look from crossing 1)
-    "portal": {**GAZE,
+    "portal": {**GAZE, "climbLook": 0.35,   # 65- §1: no pitch swing out of the arrival; the climb to the outer cliff is not looked at in full
                "world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
                "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT},
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,

@@ -67,12 +67,13 @@ def canyon(d, lat):
 # plain, the Earth ahead; rising over the near rim of the great basin, the domes glimpsed far across its night; the
 # dive into the portal crater on the plain (Gate C 2's near-vertical drop along +x). Crossing 1 at 32.025 s (bar 17),
 # crossing 2 at 47.87 s (bar 25).
-# Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): one straight line from the arrival over the plain to the
-# portal crater, rising gently to 30 m (the 158 m climb was the black-sky stretch) at an even pace, then the dive
-# through the floor (kept). The Earth stays ahead along the line (it lies toward -z).
-_moon_line = line_points((0.0, 1445.0), (0.0, 1292.0), [(0.0, 5.0), (0.4, 24.0), (1.0, 30.0)], n=8)
-_moon_knots, _ = pace([list(p) for p in _moon_line], 34.2, 45.9, 21.0, 14.0, ramp_in=0.12, ramp_out=0.1)
-scene["portal"]["flight"] = [list(k) for k in _moon_knots] + [
+# Owner 2026-11-06 (65- §2): the original Moon camera path, kept for good. The Moon is out of the A-to-B rule (61- §3).
+scene["portal"]["flight"] = [
+    [0, 5, 1445, 34.2],        # low over the plain, the Earth ahead (the domes are below the far rim's line)
+    [-14, 8, 1395, 37.4],
+    [-30, 80, 1345, 40.6],     # rising: the far domes come over the rim, out on the night side
+    [-34, 158, 1300, 43.2],    # the top, slowing
+    [-16, 150, 1270, 44.5],    # over the crater; the floor opens beneath
     [0, 0, 1270, 47.87],       # the drop through the floor (the portal turns it into the wall's level exit)
     [1, -45, 1270, 48.9],
 ]
@@ -84,8 +85,8 @@ scene["portal"]["world"] = "strange-attractor-moon.scene.json"
 # defaults, ADR-1909: look 1.2 s ahead, a little down, a quarter of the climb's pitch), not M3g's GAZE, which followed
 # the 8 -> 158 m climb (37.4-43.2 s) up into the empty sky for 5.5 s. The Moon-only exception to 54- §1 is the
 # owner's: its forward-vs-velocity overshoots 25 deg on the climb (60- §6)
-# Pass 3 (61- §3): the Moon's line is now level (a 30 m rise, no climb into the sky), so the gaze follows it again
-scene["portal"].update({**GAZE, "climbLook": 0.2, "lookDown": 0.06})   # the shallow rise must not tip the look into the sky
+for _k in GAZE:      # the M3f gaze: the portal defaults (ADR-1909), the owner's Moon exception (60- §6)
+    scene["portal"].pop(_k, None)
 scene.setdefault("post", {})["tonemap"] = 1   # M3g (54- §2): AgX for the whole film (the frame's tone map is global)
 # M3g (54- §1): the canyon's own flythrough looks where it goes, not 2.5 s ahead and down at the river (ADR-1909)
 scene["attractorWorld"]["flightLookAhead"] = 0.6
@@ -267,7 +268,7 @@ def build_ocean_home_path():
 
 keep_paths = [[at(-4.0, -7.0), at(-2.5, -5.0), at(1.5, -5.5), at(1.5, -4.5)],              # the dusk arrival
               [at(-1.0, -9.5), at(-5.5, -7.5), at(-8.0, -3.5),
-               [build_mars.RIVER_PORTAL[0], build_mars.RIVER_PORTAL[1]]],                # the night arc and glide
+               site(10.0, -12.0)],                                                       # the old night arc (the scatter is kept as it was)
               [site(d, l) for d, l, _ in build_ocean_home_path()]]                       # home at dawn
 rng = random.Random(1897)
 cands = []

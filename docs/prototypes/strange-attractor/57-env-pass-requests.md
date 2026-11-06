@@ -46,12 +46,13 @@ flat top in Phase C, then SEAT_SIT re-fitted with check_contacts. SEAT_SIT stays
 request the value here and the SA agent sets it.
 
 ### H-4: the night and dusk lines -- keep the clearing's geology out of their corridors (Phase C, if it resumes)
-Status: open, updated 2026-11-05 for the A-to-B paths (61-, 62-, 63-). The SA agent owns the paths.
-- **Night (93.5-121.2 s):** one straight line, 4 m over the water along the river's edge, from the bank's exit
-  (66.5, 1295) to the river portal (51.5, 1367). The last ~9 m is the 25-degree glide into the portal.
-  - The camp passes about 19 m to its left and the bank's boulder (66, 1347) about 10 m.
-  - Corridor: 4 m either side, 3 m under.
-  - The clearing's river face, the gathering and the craft are seen ahead and then beside from 100 to 116 s.
+Status: open, updated 2026-11-06 for round 2 of the paths (65-, 66-). The SA agent owns the paths.
+- **Night (93.5-121.2 s):** one straight line, 182 m, about 3.2 m over the water, down the river at about 6 m/s, from
+  the new entrance in the far bank's rock (25, 1205) to the moved river portal (53, 1385), in open water. The last
+  few metres are the same glide into the same portal.
+  - The camp passes 26.6 m off on the camera's left at 115.9 s. The bank stops the line going closer.
+  - Corridor: 4 m either side, 3 m under, along the whole line and around the portal.
+  - The gathering and the craft are in frame on the left until 108.5 s, readable from about 100 s.
 - **Dusk (47.9-69.7 s):** one gentle curve from the far bank's exit over the river, past the gathering about 15 m
   on its river side, about 5 m up, then up over the benches to the outer cliff's portal.
   - Corridor: 4 m either side, 3 m under.
