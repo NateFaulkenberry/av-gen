@@ -45,3 +45,18 @@ rendering"). The owner's decisions of 2026-11-08 narrow the landforms: rolling l
   integer, so this holds at any distance. Positions are f32, as for every generator (ADR-1117).
 - Dynamic terms (waves, breathing, events, landing springs) are Phase 3. They add to `dyn` in both halves, and the
   parity test grows with them.
+
+## Amendment (2026-11-08, CP-A): the river valley, and the height scale
+
+The owner-approved r2 mock-up has a wide, smooth valley with a river. The formation set gains one:
+- `tiles.river` is a polyline of up to 16 points.
+- Within `valleyWidth / 2` of it, the land eases down to the river bed (the sea floor's level) on a smoothstep
+  profile: smooth sides, no walls.
+- Within `riverWidth / 2`, the tiles are water (water channel 1).
+- The same polyline, like `path`, is what the flight (Phase 5) and the characters (Phase 6) follow.
+
+`tiles.heightScale` multiplies the land's relief above the shore, so the art can raise how tall the world stands
+without retuning the shapes. Both halves change together. Tests:
+- the CPU cases hold the channel at the bed and the land far from the river untouched;
+- heightScale doubles the relief above `shoreRise` and leaves the sea alone;
+- the GPU parity case runs with a river.

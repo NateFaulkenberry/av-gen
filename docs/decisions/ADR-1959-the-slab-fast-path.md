@@ -55,3 +55,25 @@ In the lit pass, a side face's normal now eases toward the top's normal:
 - fully at the top's normal by 3 pixels.
 
 Far steps then read by their outline, not by aliased slivers of light. Depth and shadow passes are untouched.
+
+## Amendment (2026-11-08, CP-A, second pass): the far-tile rule
+
+The art agent's r2 look showed three artefacts:
+- moiré rings on the 1× ring at 50–150 m in the low views;
+- horizontal streaks on the flat glossy sea;
+- dark speckle on the mid-ground hillsides.
+
+All three come from detail finer than the pixels: the geometric gap, and the side faces of the height steps. So a
+slab draw now follows one rule by the tile's width on screen, measured in the vertex stage from the frame's own camera,
+so the prepass and the lit pass agree to the bit:
+- **Below `slabFarPixels` (default 6, `"slabFarPixels"` on the node, 0 = never), the gap closes.** The footprint
+  eases out to the lattice pitch (a "tiles" generator's `cellSize`), so the background through the gaps stops
+  strobing. The painted `tileBorder` carries the separation from there.
+- **Below twice that, the sides read as the top.** A side face's local height (`localPosition.y`) and normal ease to
+  the top's, so a program's side shading gives it the top's colour and the light treats it as part of the top. Full
+  by `slabFarPixels`, none by twice it.
+- **Size on screen is measured along both horizontal axes, and the smaller one wins.** At a grazing angle a tile is
+  wide across the view but only a pixel or two deep along it, and the depth is what aliases. The first version of
+  this rule measured the width only, and it left the moiré rings and the sea streaks in place.
+
+The pitch rides in `windPlant`, which a slab draw never uses for wind, because slabs are not eligible with wind.
