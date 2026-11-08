@@ -372,6 +372,10 @@ def mars_rock_program():
     f = json.load(open(os.path.join(HERE, "strange-attractor-flythrough.scene.json")))
     prog = json.loads(json.dumps([p for p in f["materialPrograms"] if p["name"] == "canyonRock"][0]))
     prog["ops"] = prog["ops"][:CANYON_ROCK_OPS]     # the canyon's own ops, without its close-up detail (M3d)
+    # Pass 3, 67- §4: without the wall glow's last 4 ops (the `glow` key is 0 on Mars and nothing routes it), for the
+    # op budget the sand below needs
+    assert [o["kind"] for o in prog["ops"][81:85]] == ["swizzle", "multiply", "multiply", "add"]
+    prog["ops"] = prog["ops"][:81]
     prog.pop("textures", None)
     prog["name"] = "marsRock"
     # M3d (owner: a proper sand with ripples, photoscanned close up): a rippled sand (Poly Haven `aerial_sand`, CC0;
@@ -385,21 +389,48 @@ def mars_rock_program():
         {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
         {"kind": "input", "dst": 3, "input": "normal"},
         {"kind": "swizzle", "dst": 3, "srcA": 3, "constant": [1, 1, 1, 1]},
+        # Pass 3, 67- §4: the sand-to-rock line broken by a noise (9 m), not drawn along one slope contour
+        {"kind": "input", "dst": 1, "input": "worldPosition"},
+        {"kind": "noise", "dst": 1, "srcA": 1, "value": 1.0 / 9.0, "seed": 67},
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, -0.12, 0.12]},
+        {"kind": "add", "dst": 3, "srcA": 3, "srcB": 1},
         # M3g (owner 54- §3: one sand family; the drifts, the plain and the dunes were three looks): the same sand as the
         # drifts (marsDrift) on everything but the steep rock -- at every distance, not faded out by 220 m to the
         # program's flat colour -- blended to the rock over a wide band of slopes (normal.y 0.45-0.75), so an apron or
         # a dune's flank is sand, not a pale pink slab
-        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.45, 0.75, 0, 0]},
+        # Pass 3, 67- §4 (the owner's screenshot: a pale, smooth slab beside the darker ground): sand up to much
+        # steeper slopes (normal.y 0.2-0.45, about 63-78 degrees, was 0.45-0.75), so dune flanks, the yardangs' sides
+        # and banks are the ground's sand and only cliffs and mesa walls take the rock palette
+        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.2, 0.45, 0, 0]},
         {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 0, "srcC": 3},
+        # Pass 3, 67- §4 (owner: the piles and the ground are two surfaces): the sand's ripple normals and roughness
+        # where it is sand, exactly as the drifts (marsDrift) draw them, in place of the canyon's strata relief (the
+        # "scaly" dunes of the owner's screenshot); the rock keeps its own relief
+        SAND_NORMAL,
+        {"kind": "mixBy", "dst": 6, "srcA": 6, "srcB": 1, "srcC": 3},
+        SAND_ROUGHNESS,
     ]
+    prog["textures"].append(SAND_NORMAL_TEXTURE)
+    prog["roughness"] = 5
     return prog
+
+
+# Pass 3, 67- §4: one sand. The drifts and the plain share the photoscan, its tint, its hex tiling (ADR-1905), its
+# ripple normals and its roughness. The drift also takes the terrain's occlusion output: marsRock's occlusion register
+# (r0) carries the sand texture times its tint (the M3d ops write it there), so the plain's ambient has been scaled by
+# it since M3d; the drift had none, which made it the pale, flat slab of the owner's screenshot. Matching it keeps the
+# plain's approved brightness and makes the two lit alike.
+SAND_NORMAL_TEXTURE = {"name": "sandN", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
+                       "colorSpace": "linear"}
+SAND_NORMAL = {"kind": "textureTriplanarNormal", "dst": 1, "texture": "sandN", "value": 0.2, "constant3": [1.0, 0.0, 0.0, 0.0]}
+SAND_ROUGHNESS = {"kind": "constant", "dst": 5, "constant": [0.95, 0.95, 0.95, 1.0]}
 
 
 def mars_drift_program():
     """M3e (owner: no visible tiling): the pyramids' sand drifts drawn through the plain's own sand (ADR-1572), so the
     drift and the plain are one sand -- the same photoscan, tint and hex tiling (ADR-1905) -- with its ripple normals."""
-    return {"name": "marsDrift", "baseColor": 0, "metallic": -1, "roughness": -1, "emission": -1, "opacity": -1,
-            "normal": 2, "occlusion": -1,
+    return {"name": "marsDrift", "baseColor": 0, "metallic": -1, "roughness": 5, "emission": -1, "opacity": -1,
+            "normal": 2, "occlusion": 0,
             "textures": [{"name": "sand", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"},
                          {"name": "sandN", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
                           "colorSpace": "linear"}],
@@ -408,6 +439,7 @@ def mars_drift_program():
                 {"kind": "constant", "dst": 1, "constant": [1.05, 0.6, 0.42, 1.0]},
                 {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
                 {"kind": "textureTriplanarNormal", "dst": 2, "texture": "sandN", "value": 0.2, "constant3": [1.0, 0.0, 0.0, 0.0]},
+                SAND_ROUGHNESS,
             ]}
 
 
@@ -473,7 +505,9 @@ def write():
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
                    "visible": True} for name, x, z, _, yaw in PYRAMIDS] + [
             # M3e: each pyramid's sand drift, drawn through the plain's sand (marsDrift; ADR-1572, ADR-1905)
-            {"name": f"{name}-sand", "kind": "gltf", "asset": A + f"{name}-sand-m3g.glb",
+            # Pass 3, 67- §4: the drifts laid on the real ground (hero/build_mars_sand.py), meeting it at a thin, nearly
+            # tangent, noise-broken toe
+            {"name": f"{name}-sand", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/mars/" + f"{name}-sand-p3.glb",
              "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
              "visible": True, "program": "marsDrift"} for name, x, z, _, yaw in PYRAMIDS] + [
             {"name": "rover", "kind": "gltf", "asset": A + "rover.glb", "position": [*rover_at(ROVER_T0)[:1], ROVER_LEVEL, rover_at(ROVER_T0)[1]],

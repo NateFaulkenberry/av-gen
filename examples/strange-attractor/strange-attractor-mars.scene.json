@@ -936,35 +936,6 @@
           "srcB": 1
         },
         {
-          "kind": "swizzle",
-          "dst": 1,
-          "srcA": 3,
-          "constant": [
-            1,
-            1,
-            1,
-            1
-          ]
-        },
-        {
-          "kind": "multiply",
-          "dst": 1,
-          "srcA": 1,
-          "srcB": 4
-        },
-        {
-          "kind": "multiply",
-          "dst": 1,
-          "srcA": 1,
-          "srcB": 7
-        },
-        {
-          "kind": "add",
-          "dst": 2,
-          "srcA": 2,
-          "srcB": 1
-        },
-        {
           "kind": "textureTriplanar",
           "dst": 0,
           "texture": "sand",
@@ -1009,12 +980,41 @@
           ]
         },
         {
+          "kind": "input",
+          "dst": 1,
+          "input": "worldPosition"
+        },
+        {
+          "kind": "noise",
+          "dst": 1,
+          "srcA": 1,
+          "value": 0.1111111111111111,
+          "seed": 67
+        },
+        {
+          "kind": "remap",
+          "dst": 1,
+          "srcA": 1,
+          "constant": [
+            0.0,
+            1.0,
+            -0.12,
+            0.12
+          ]
+        },
+        {
+          "kind": "add",
+          "dst": 3,
+          "srcA": 3,
+          "srcB": 1
+        },
+        {
           "kind": "smoothstep",
           "dst": 3,
           "srcA": 3,
           "constant": [
+            0.2,
             0.45,
-            0.75,
             0,
             0
           ]
@@ -1025,11 +1025,40 @@
           "srcA": 4,
           "srcB": 0,
           "srcC": 3
+        },
+        {
+          "kind": "textureTriplanarNormal",
+          "dst": 1,
+          "texture": "sandN",
+          "value": 0.2,
+          "constant3": [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "kind": "mixBy",
+          "dst": 6,
+          "srcA": 6,
+          "srcB": 1,
+          "srcC": 3
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
+          ]
         }
       ],
       "baseColor": 4,
       "metallic": -1,
-      "roughness": -1,
+      "roughness": 5,
       "emission": 2,
       "opacity": -1,
       "normal": 6,
@@ -1038,6 +1067,11 @@
         {
           "name": "sand",
           "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"
+        },
+        {
+          "name": "sandN",
+          "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
+          "colorSpace": "linear"
         }
       ]
     },
@@ -1045,11 +1079,11 @@
       "name": "marsDrift",
       "baseColor": 0,
       "metallic": -1,
-      "roughness": -1,
+      "roughness": 5,
       "emission": -1,
       "opacity": -1,
       "normal": 2,
-      "occlusion": -1,
+      "occlusion": 0,
       "textures": [
         {
           "name": "sand",
@@ -1100,6 +1134,16 @@
             0.0,
             0.0,
             0.0
+          ]
+        },
+        {
+          "kind": "constant",
+          "dst": 5,
+          "constant": [
+            0.95,
+            0.95,
+            0.95,
+            1.0
           ]
         }
       ]
@@ -1769,7 +1813,7 @@
     {
       "name": "pyramid-a-sand",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-a-sand-m3g.glb",
+      "asset": "../../assets/strange-attractor/hero/mars/pyramid-a-sand-p3.glb",
       "position": [
         302.0,
         32.0,
@@ -1791,7 +1835,7 @@
     {
       "name": "pyramid-b-sand",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-b-sand-m3g.glb",
+      "asset": "../../assets/strange-attractor/hero/mars/pyramid-b-sand-p3.glb",
       "position": [
         722.0,
         32.0,
@@ -1813,7 +1857,7 @@
     {
       "name": "pyramid-c-sand",
       "kind": "gltf",
-      "asset": "../../assets/strange-attractor/build/pyramid-c-sand-m3g.glb",
+      "asset": "../../assets/strange-attractor/hero/mars/pyramid-c-sand-p3.glb",
       "position": [
         1032.0,
         32.0,
