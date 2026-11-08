@@ -290,8 +290,9 @@ Driven by `dayPhase` on the timeline and never by audio (brief §7).
   per-formation step bound (§4.1); this is the number.
 
 **Distance behaviour.**
-- The 0.085 gap is a sub-pixel line beyond about 200 tiles, so it aliases. Fade the gap and the edge band by pixel
-  footprint (request 1976).
+- The 0.085 gap is a sub-pixel line beyond about 200 tiles, so it aliases, and the tiles blur into texture from the
+  reveal altitude.
+- Request 1976 and the look requirement in §11 ask for a separation that survives distance, not a fade.
 - With sharp edges, LOD 1 is the same box, so the LOD saving is only in vertices. That is the plan's lever, not
   mine.
 
@@ -487,7 +488,8 @@ that served walls and strata.
    - `column` mode off, `thickness` 0.3, `bevel` 0. The plan lists these; this asks that they be the scene's
      defaults.
    - Top-only emission and the side fade to 18% at the underside in the material program, from `localPosition`.
-7. **ADR-1976: a distance fade for the gap and the edge band** by pixel footprint, against grazing-angle moiré.
+7. **ADR-1976: tile separation by pixel footprint.** Against grazing-angle moiré, and so that the tile still reads
+   at altitude. Do not simply fade the gap: keep a readable separation. See the look requirements in §11.
 8. **ADR-1977: fog and the under-surface.**
    - Fog: confirm ADR-347's horizon fog supports an exponential-squared curve, a height falloff (factor 0.45–1.0, rate
      0.035/tile) and a sun-facing tint (power 6). Tie the window radius to the 0.98 distance.
@@ -517,24 +519,48 @@ that served walls and strata.
 
 ---
 
-## 11. Open questions for the owner (round 2)
+## 11. The owner's decisions
 
-1. **Contours.** On or off, judged on the pairs in `r2/03-*` and `r2/04-*`. My recommendation is on at dusk and night,
-   off by day.
-2. **Daylight.** Is r2's bright, saturated day right, or has it gone too far toward a rainbow? Its saturation is one
-   grade key.
-3. **Alien tint.** Do the aliens keep their own green in every state, or take a per-state tint (most needed at dawn)?
-
-Resolved by the owner at Gate 1:
+**Gate 1, round 1:**
 - slabs everywhere;
-- rolling hills;
+- rolling hills as the main landform;
 - sharp edges;
-- brighter day;
+- a brighter day;
 - the Glowmere aliens;
-- the top-down pass allowed.
-The colour arc is my recommendation (§3).
+- one short top-down pass allowed.
 
----
+The colour arc (day → sunset → night → dawn) is my recommendation, in §3.
+
+**Gate 1, round 2 (2026-11-08):**
+1. **Contours: on at dusk and night, faint or off by day.** Accepted as recommended. The edge-gain keys in §3 already
+   do this: day 0, dawn 0.5, sunset 2.0, night 7.
+2. **The bright day: "looks good".** Day palette r2 is approved as written in §3.
+3. **The aliens stay green in every state,** with no tint per time of day.
+
+### Look requirements from the coordinator's review of r2
+
+These are binding on the build. They are look defects, not taste questions.
+
+1. **No banding in the sky or the fog.**
+   - The sky gradients band visibly in `r2/01` and `r2/07` (8-bit steps across a slow gradient).
+   - The engine's sky, fog and post must not band. Fix it with output dither (triangular noise of about ±1 LSB before
+     quantising), or with a sky and fog evaluated and stored at higher precision, or both.
+   - Check on a frame with a large sky area at each palette state, especially the dusk and night gradients, which are
+     the slowest.
+2. **The tile identity has to read at reveal altitude.**
+   - From high up (`r2/02`) the tiles blur into texture: the 8.5% gap is sub-pixel beyond about 200 tiles. The brief's
+     "the squares remain the primary visual identity" fails there.
+   - Acceptable remedies, alone or together:
+     - **edge contrast that survives distance.** Darken the gap and the side lip by pixel footprint rather than
+       fading them out, so far tiles keep a visible separation. This changes request 1976 from "fade" to "keep
+       readable";
+     - **fewer, bigger tiles in the distance.** A far ring of tiles at 2× or 4× pitch (aligned to the lattice, merged
+       in whole blocks, with fog over the seam), so the square stays several pixels wide at the horizon;
+     - per-tile value jitter raised with distance (±2% up close, up to ±6% far) so neighbours stay distinct.
+   - **Acceptance:** at the reveal leg (70–100 tiles up, 35–50 mm) individual squares are distinguishable across the
+     whole land area of the frame, not only in the foreground third.
+   - This interacts with the lattice and LOD plan (§4.2 of 03-), so engineering owns the mechanism. Art judges the
+     result at CP-A.
 
 ## 12. Gate 1 stills, round 2
 
