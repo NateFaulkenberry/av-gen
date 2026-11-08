@@ -3216,6 +3216,9 @@ json ProceduralGeometry::toJson() const {
     if (slabs) {
         j["slabs"] = true; // ADR-1959: written only when on
     }
+    if (slabSidePixels != 0.0f) {
+        j["slabSidePixels"] = slabSidePixels; // CP-A r3
+    }
     if (slabFarPixels != 6.0f) {
         j["slabFarPixels"] = slabFarPixels; // ADR-1959 (amended)
     }
@@ -3520,6 +3523,8 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.flatFarRungs, "flatFarRungs", readBool); // ADR-1576
         AVGEN_PROC_READ(g.slabs, "slabs", readBool); // ADR-1959
         AVGEN_PROC_READ(g.slabFarPixels, "slabFarPixels", readFloat); // ADR-1959 (amended)
+        AVGEN_PROC_READ(g.slabSidePixels, "slabSidePixels", readFloat); // CP-A r3
+        AVGEN_PROC_READ(g.slabDebugFaces, "slabDebugFaces", readBool); // CP-A r3 diagnostic
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);
         AVGEN_PROC_READ(g.emissiveField, "emissiveField", readString);
