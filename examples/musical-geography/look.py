@@ -34,13 +34,14 @@ def hexlin(h: str) -> list[float]:
 # 0.0 (=1.0) -> 0.27, always forward in time.
 STATES = {
     "day": dict(
-        fill_col="#9A6CFF", fill_int=2.2,
-        fill=0.38, contrast=1.3,
+        stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r7: day only -- gold over whole hill masses, magenta-orchid lowlands
+        fill_col="#C060FF", fill_int=1.4,
+        fill=0.25, contrast=1.3,
         sky_int=1.0, haze=0.35,
         moon_int=0.0, phase=0.61,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
-        sky_zen="#2F6BFF", sky_hor="#A8C4FF", sky_ground="#A8C4FF", fog="#A8C4FF", fog_sun="#FFF2D6",
+        sky_zen="#2F6BFF", sky_hor="#C4C4F4", sky_ground="#C4C4F4", fog="#C4C4F4", fog_sun="#FFF2D6",
         sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
-        land=["#5E4ACC", "#9A52D6", "#FF7A8C", "#FF8A44", "#FFB03A"],   # r6: cooler, darker low end
+        land=["#A848C8", "#DC56AE", "#FF7486", "#FF9442", "#FFC03A"],   # r7: magenta-orchid lowlands, gold hill masses
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
         path="#FFF5E2", path_emit=0.35, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
@@ -224,6 +225,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None):
     far = cell > 1.0 if far is None else far
     name = name or "mgTile%dx_%s" % (int(cell), state)
     land = [hexlin(c) for c in s["land"]]
+    LS = s.get("stops", LAND_STOPS)
     gap = TILE["tileSize"] if cell == 1.0 else 1.0
     half = cell * gap / 2.0
     thick = RING_THICKNESS.get(cell, 0.3)
@@ -236,11 +238,11 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None):
          "constant2": [sub, 0, 0, 0], "value": 1.0})
     add({"kind": "input", "input": "worldPosition", "dst": 4})
     add({"kind": "swizzle", "dst": 3, "srcA": 4, "constant": B(1)})                       # y
-    # the height ramp, blended in OKLab: stops 0-3 over 0..LAND_STOPS[3] (evenly spaced, ADR-1470), then the top stop
-    add({"kind": "remap", "dst": 7, "srcA": 3, "constant": [0, LAND_STOPS[3], 0, 1], "value": 1.0})
+    # the height ramp, blended in OKLab: stops 0-3 over 0..LS[3] (evenly spaced, ADR-1470), then the top stop
+    add({"kind": "remap", "dst": 7, "srcA": 3, "constant": [0, LS[3], 0, 1], "value": 1.0})
     add({"kind": "oklabRamp", "dst": 2, "srcA": 7, "value": 1.0, "constant": _c4(land[0]),
          "constant2": _c4(land[1]), "constant3": _c4(land[2]), "constant4": _c4(land[3])})
-    add({"kind": "smoothstep", "dst": 7, "srcA": 3, "constant": [LAND_STOPS[3], LAND_STOPS[4], 0, 0]})
+    add({"kind": "smoothstep", "dst": 7, "srcA": 3, "constant": [LS[3], LS[4], 0, 0]})
     add({"kind": "constant", "dst": 6, "constant": _c4(land[4])})
     add({"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 6, "srcC": 7})
     if not far:   # pads: crown x high x a 5-tile block picked by its hash (before r3/r4 are reused)

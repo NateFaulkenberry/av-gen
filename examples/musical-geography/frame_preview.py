@@ -55,14 +55,14 @@ def preview(name, out_dir):
     import look
     st = look.STATES[STATE]
     lin = np.array([look.hexlin(c) for c in st["land"]])
-    t = np.clip(np.interp(s["height"], look.LAND_STOPS, np.linspace(0, 1, 5)), 0, 1) * 4
+    t = np.clip(np.interp(s["height"], st.get("stops", look.LAND_STOPS), np.linspace(0, 1, 5)), 0, 1) * 4
     i = np.minimum(np.floor(t).astype(int), 3)
     fr = (t - i)[..., None]
     col = lin[i] * (1 - fr) + lin[i + 1] * fr
     img = 255 * np.clip(col, 0, 1) ** (1 / 2.2)
     img[s["water"] > 0.5] = 255 * np.array(look.hexlin(st["water"][0])) ** (1 / 2.2)
     land = np.isfinite(hit) & (s["water"] <= 0.5)
-    warm = land & (s["height"] >= look.LAND_STOPS[2])
+    warm = land & (s["height"] >= st.get("stops", look.LAND_STOPS)[2])
     print("   warm (>= stop 2) %.0f%% of land" % (100 * warm.sum() / max(land.sum(), 1)))
     img[s["path"] > 0.5] = [255, 255, 255]
     fog = np.clip(np.where(np.isfinite(hit), hit, 700) / 700.0, 0, 1)[..., None] ** 2

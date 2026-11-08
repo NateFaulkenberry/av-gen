@@ -749,3 +749,25 @@ p50.
 
 The stills are `02-terrain/cpa-41..46-*-r6.png`, with the comparison sheet `cpa-47`. The day reveal is GPU p50
 30.7 ms, up from 23.5 ms; ambient occlusion, the longer shadows and the fill account for the difference.
+
+### Day pass after r6 (r7 check)
+
+The coordinator reviewed r6: sunset and night are kept; day was dominated by blue-lavender.
+
+**Changes, day only:**
+- **Land ramp:** magenta-orchid lowlands and gold hills: `#A848C8`, `#DC56AE`, `#FF7486`, `#FF9442`, `#FFC03A`.
+- **Height stops:** now `stops` per state. Day uses 0 / 2 / 4 / 6 / 12 m, so the gold covers whole hill masses, not
+  only the crests. Sunset and night keep 0 / 3.3 / 6.7 / 10 / 20 m.
+- **Blue cast:** the sky fill is down to 0.25. The horizon and fog are a neutral lavender-white (`#C4C4F4`) instead of
+  pale blue. The violet fill is now magenta-violet (`#C060FF`) at 1.4.
+
+**Checks:** `cpa-41b` and `cpa-42b` (`02-terrain/`). Blue now stays on the water: the bay and the river.
+
+**Cost, and which lever goes first.** The r6 reveal is 30.7 ms of the 33.3 ms budget, which leaves about 2.6 ms for
+Phase 3. Cut in this order:
+1. **Shadow range:** 480 m back to about 320 m. That saves about 0.5 ms. The long shadows matter most in the middle
+   ground, and they fall off past 300 m.
+2. **AO fade band:** pull it nearer, for example 120–260 m on the reveal. On the reveal, AO pays mainly for detail at
+   the near edge.
+3. **Violet fill:** fold it into the sky fill colour if the engine exposes one. This needs a request.
+4. **High live tier** for the reveal leg only.
