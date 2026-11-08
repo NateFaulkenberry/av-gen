@@ -192,3 +192,189 @@ fn cs_generate(@builtin(global_invocation_id) gid: vec3<u32>) {
     r.emissive = vec4<f32>(emission, emission, emission, 0.0);
     records[index] = r;
 }
+
+// ---- ADR-1950: the "tiles" kernel ------------------------------------------------------------------
+// Musical Geography's ground. Every cell holds its tile, at the cell centre, unrotated, at the one surface's height
+// (scene/tile_terrain.cpp `tileSample`, operation for operation). A coarser ring's cell stands at the mean of the
+// fine tiles it covers (ADR-1976), and a ring leaves the finer ring's window empty (the hole, in this ring's cells).
+// The record's random lanes carry the material channels (water, shore, flat, path); the colour's alpha carries the
+// tile's lattice hash (request 1978), so a program varies a tile by its world identity.
+
+struct TileParams {
+    a: vec4<f32>,          // continent wavelength, land threshold, shore band, inland band
+    b: vec4<f32>,          // sea level, sea depth, shore rise, hill wavelength
+    c: vec4<f32>,          // hill height, octaves, hill warp, warp wavelength
+    d: vec4<f32>,          // hill low, hill high, crown threshold, crown flatten
+    e: vec4<f32>,          // region wavelength, region variation, path width, path lift
+    info: vec4<u32>,       // seed, path points, children per side, hole valid
+    hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
+    path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
+};
+
+@group(0) @binding(2) var<uniform> tile: TileParams;
+
+const TILE_REGION_SEED: u32 = 0xA5A5A5A5u;
+const TILE_CONTINENT_SEED: u32 = 0x00C0FFEEu;
+const TILE_WARPX_SEED: u32 = 0x01234567u;
+const TILE_WARPZ_SEED: u32 = 0x07654321u;
+const TILE_HILL_SEED: u32 = 0x0000BEEFu;
+
+fn tileSmooth(e0: f32, e1: f32, x: f32) -> f32 {
+    let t = clamp((x - e0) / max(e1 - e0, 1e-6), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+fn tileValueNoise(seed: u32, x: f32, z: f32) -> f32 {
+    let xf = floor(x);
+    let zf = floor(z);
+    let ix = i32(xf);
+    let iz = i32(zf);
+    let fx = x - xf;
+    let fz = z - zf;
+    let sx = fx * fx * (3.0 - 2.0 * fx);
+    let sz = fz * fz * (3.0 - 2.0 * fz);
+    let c00 = genUnit(genHash(ix, iz, seed, 101u));
+    let c10 = genUnit(genHash(ix + 1, iz, seed, 101u));
+    let c01 = genUnit(genHash(ix, iz + 1, seed, 101u));
+    let c11 = genUnit(genHash(ix + 1, iz + 1, seed, 101u));
+    let a = c00 + (c10 - c00) * sx;
+    let b = c01 + (c11 - c01) * sx;
+    return a + (b - a) * sz;
+}
+
+fn tileFbm(seed: u32, x: f32, z: f32, octaves: i32) -> f32 {
+    var sum = 0.0;
+    var norm = 0.0;
+    var amp = 1.0;
+    var freq = 1.0;
+    let n = clamp(octaves, 1, 6);
+    for (var o = 0; o < n; o = o + 1) {
+        let uo = u32(o);
+        let fo = f32(o);
+        sum = sum + amp * tileValueNoise(seed + uo * 1013u, x * freq + fo * 17.31, z * freq - fo * 9.17);
+        norm = norm + amp;
+        amp = amp * 0.5;
+        freq = freq * 2.0;
+    }
+    return sum / norm;
+}
+
+fn tilePathPoint(i: u32) -> vec2<f32> {
+    let lane = tile.path[i / 2u];
+    return select(lane.xy, lane.zw, (i & 1u) == 1u);
+}
+
+fn tilePathDistance(x: f32, z: f32) -> f32 {
+    var best = 1e9;
+    let n = min(tile.info.y, 16u);
+    if (n == 1u) {
+        return length(vec2<f32>(x, z) - tilePathPoint(0u));
+    }
+    for (var i = 0u; i + 1u < n; i = i + 1u) {
+        let a = tilePathPoint(i);
+        let ab = tilePathPoint(i + 1u) - a;
+        let ap = vec2<f32>(x, z) - a;
+        let t = clamp(dot(ap, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+        best = min(best, length(ap - ab * t));
+    }
+    return best;
+}
+
+// (height, water, shore, flat) and the path in `pathOut`.
+struct TileOut {
+    height: f32,
+    water: f32,
+    shore: f32,
+    flat: f32,
+    path: f32,
+};
+
+fn tileSample(x: f32, z: f32) -> TileOut {
+    let seed = tile.info.x;
+    let region = tileValueNoise(seed ^ TILE_REGION_SEED, x / tile.e.x, z / tile.e.x);
+    let k = 1.0 + tile.e.y * (2.0 * region - 1.0);
+    let c = tileFbm(seed ^ TILE_CONTINENT_SEED, x / tile.a.x, z / tile.a.x, 3);
+    let land = tileSmooth(tile.a.y - tile.a.z, tile.a.y + tile.a.z, c);
+    let inland = tileSmooth(tile.a.y, tile.a.y + tile.a.w, c);
+    let wx = (tileFbm(seed ^ TILE_WARPX_SEED, x / tile.c.w, z / tile.c.w, 2) * 2.0 - 1.0) * tile.c.z;
+    let wz = (tileFbm(seed ^ TILE_WARPZ_SEED, x / tile.c.w + 31.7, z / tile.c.w - 11.3, 2) * 2.0 - 1.0) * tile.c.z;
+    let hwl = tile.b.w * k;
+    let hn = tileFbm(seed ^ TILE_HILL_SEED, (x + wx) / hwl, (z + wz) / hwl, i32(tile.c.y + 0.5));
+    let shaped = tileSmooth(tile.d.x, tile.d.y, hn);
+    let excess = max(shaped - tile.d.z, 0.0);
+    let hill = shaped - excess * tile.d.w;
+    let landHeight = tile.b.z + tile.c.x * k * hill * inland;
+    var out: TileOut;
+    out.height = (tile.b.x - tile.b.y) + ((tile.b.x + landHeight) - (tile.b.x - tile.b.y)) * land;
+    out.water = 1.0 - land;
+    out.shore = 1.0 - tileSmooth(0.0, 3.0 * tile.a.z, abs(c - tile.a.y));
+    out.flat = tileSmooth(tile.d.z, tile.d.z + 0.06, shaped) * tile.d.w * inland * land;
+    out.path = 0.0;
+    if (tile.info.y > 0u) {
+        let d = tilePathDistance(x, z);
+        let p = (1.0 - tileSmooth(0.5 * tile.e.z, 0.5 * tile.e.z + 0.75, d)) * land;
+        out.height = out.height + tile.e.w * p;
+        out.path = p;
+    }
+    return out;
+}
+
+@compute @workgroup_size(8, 8)
+fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let countX = u32(gen.window.z);
+    let countZ = u32(gen.window.w);
+    if (gid.x >= countX || gid.y >= countZ) {
+        return;
+    }
+    let index = gid.y * countX + gid.x;
+    let ix = gen.window.x + i32(gid.x);
+    let iz = gen.window.y + i32(gid.y);
+    var r: InstanceRecord;
+    if (tile.info.w != 0u && ix >= tile.hole.x && ix <= tile.hole.z && iz >= tile.hole.y && iz <= tile.hole.w) {
+        r.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        r.rotation = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        r.scale = vec4<f32>(0.0);
+        r.random = vec4<f32>(0.0);
+        r.color = vec4<f32>(0.0);
+        r.emissive = vec4<f32>(0.0);
+        records[index] = r;
+        return;
+    }
+    let cellSize = gen.cell.x;
+    let m = max(tile.info.z, 1u);
+    var t: TileOut;
+    if (m == 1u) {
+        t = tileSample((f32(ix) + 0.5) * cellSize, (f32(iz) + 0.5) * cellSize);
+    } else {
+        let fine = cellSize / f32(m);
+        t.height = 0.0;
+        t.water = 0.0;
+        t.shore = 0.0;
+        t.flat = 0.0;
+        t.path = 0.0;
+        for (var b = 0u; b < m; b = b + 1u) {
+            for (var a = 0u; a < m; a = a + 1u) {
+                let s = tileSample(f32(ix) * cellSize + (f32(a) + 0.5) * fine, f32(iz) * cellSize + (f32(b) + 0.5) * fine);
+                t.height = t.height + s.height;
+                t.water = t.water + s.water;
+                t.shore = t.shore + s.shore;
+                t.flat = t.flat + s.flat;
+                t.path = t.path + s.path;
+            }
+        }
+        let inv = 1.0 / f32(m * m);
+        t.height = t.height * inv;
+        t.water = t.water * inv;
+        t.shore = t.shore * inv;
+        t.flat = t.flat * inv;
+        t.path = t.path * inv;
+    }
+    let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height, (f32(iz) + 0.5) * cellSize);
+    r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 1.0);
+    r.rotation = gen.rotation;
+    r.scale = vec4<f32>(gen.scaleInfo.xyz, 0.0);
+    r.random = vec4<f32>(t.water, t.shore, t.flat, t.path);
+    r.color = vec4<f32>(1.0, 1.0, 1.0, genUnit(genHash(ix, iz, gen.hashing.x, 21u)));
+    r.emissive = vec4<f32>(1.0, 1.0, 1.0, 0.0);
+    records[index] = r;
+}

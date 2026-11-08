@@ -545,7 +545,8 @@ struct TonemapUniforms {
     float size[2];
     float seed;
     float chromaRetention;
-    float upscale[4]; // ADR-1607: x = the spatial upscaler on (a smaller scene target), y = sharpness
+    float upscale[4]; // ADR-1607: x = the spatial upscaler on (a smaller scene target), y = sharpness;
+                      // z = ADR-1977's output dither in 8-bit steps (0 = off)
 };
 static_assert(sizeof(TonemapUniforms) == 48);
 

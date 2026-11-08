@@ -1,7 +1,8 @@
 # Throwaway tile-instancing spike: N x N thin sharp slabs (0.9 x 0.15 x 0.9, pitch 1), per-instance height from field effectors.
-# Usage: python3 make_spike.py <N> <shadows 0|1> <cull 0|1> <outdir>. Writes spike.scene.json + spike.json (Phase 1, throwaway).
+# Usage: python3 make_spike.py <N> <shadows 0|1> <cull 0|1> <outdir> [slabs 0|1]. Writes spike.scene.json + spike.json (Phase 1, throwaway).
 import json, sys, os
 N = int(sys.argv[1]); shadow = sys.argv[2] == "1"; cull = sys.argv[3] == "1"; out = sys.argv[4]
+slabs = len(sys.argv) > 5 and sys.argv[5] == "1"
 spacing = 1.0; tile = 0.9
 def field(name, f): return {"name": name, "kind": "field", "position": [0,0,0], "field": dict({"strength": 1.0, "falloff": {"kind": "none"}, "position": [0,0,0]}, **f)}
 nodes = [
@@ -9,7 +10,7 @@ nodes = [
  field("swellA", {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine", "axis": [1,0,0.3], "point": [0,0,0], "wavelength": 60.0, "waveSpeed": 6.0, "waveWidth": 0.0, "amplitude": 1.0, "strength": 2.5}),
  field("swellB", {"kind": "wave", "waveGeometry": "planar", "waveShape": "sine", "axis": [-0.4,0,1], "point": [0,0,0], "wavelength": 37.0, "waveSpeed": 4.0, "waveWidth": 0.0, "amplitude": 1.0, "strength": 1.5}),
  field("tint", {"kind": "gradient", "axis": [0,1,0], "length": 20.0, "colorA": [0.1,0.2,0.8,1], "colorB": [1.0,0.5,0.4,1]}),
- {"name": "tiles", "kind": "procedural", "position": [0,0,0], "procedural": {
+ {"name": "tiles", "kind": "procedural", "position": [0,0,0], "procedural": dict(({"slabs": True} if slabs else {}), **{
    "source": {"kind": "box", "size": [tile, 0.15, tile]},
    "distribution": {"kind": "grid", "gridCount": [N,1,N], "gridSpacing": [spacing,1,spacing]},
    "material": {"baseColor": [0.6,0.65,0.9], "roughness": 0.45, "metallic": 0.0},
@@ -18,7 +19,7 @@ nodes = [
      {"field": "hills", "op": "positionOffset", "blend": "add", "strength": 1.0, "axis": [0,1,0]},
      {"field": "swellA", "op": "positionOffset", "blend": "add", "strength": 1.0, "axis": [0,1,0]},
      {"field": "swellB", "op": "positionOffset", "blend": "add", "strength": 1.0, "axis": [0,1,0]},
-     {"field": "tint", "op": "color", "blend": "add", "strength": 1.0}]}}]
+     {"field": "tint", "op": "color", "blend": "add", "strength": 1.0}]})}]
 fogc = [0.55,0.6,0.85]
 scene = {"format": "avgen-scene", "version": 1, "name": "geo-spike",
  "camera": {"mode": 1, "position": [0.0, 9.0, N*0.45], "target": [0.0, 3.0, -N*0.1], "fov": 45.0, "orbitSpeed": 0.0},

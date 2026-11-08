@@ -9,7 +9,8 @@ struct TonemapUniforms {
     seed: f32,
     chromaRetention: f32,  // 0 = the operator's own highlight rolloff, 1 = hold the source hue
     // ADR-1607: the spatial upscaler. x = 1 when the scene target is smaller than the output and the upscaler is on
-    // (0: the bilinear fetch, exactly as before); y = the sharpening amount, 0..1.
+    // (0: the bilinear fetch, exactly as before); y = the sharpening amount, 0..1; z = ADR-1977's output dither in
+    // 8-bit steps (0 = off, byte-identical).
     upscale: vec4<f32>,
 };
 
@@ -236,5 +237,16 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
         let n = hash12(in.uv * size + vec2<f32>(tonemap.seed * 17.0, tonemap.seed * 3.0)) - 0.5;
         mapped = clamp(mapped + n * tonemap.grain * 0.12, vec3<f32>(0.0), vec3<f32>(1.0));
     }
-    return vec4<f32>(linearToSrgb(mapped), 1.0);
+    var encoded = linearToSrgb(mapped);
+    // ADR-1977: a triangular-PDF dither (the sum of two uniform hashes, -1..1) of `upscale.z` 8-bit steps, in the
+    // encoded space the 8-bit output quantises, per output pixel and per frame (the frame nonce: deterministic, so an
+    // offline render repeats). Each channel draws its own pair, so the noise is not grey.
+    if (tonemap.upscale.z > 0.0) {
+        let px = in.uv * size + vec2<f32>(tonemap.seed * 7.31, tonemap.seed * 1.97);
+        let t = vec3<f32>(hash12(px) + hash12(px + vec2<f32>(19.19, 7.7)) - 1.0,
+                          hash12(px + vec2<f32>(3.1, 47.3)) + hash12(px + vec2<f32>(61.7, 11.9)) - 1.0,
+                          hash12(px + vec2<f32>(29.3, 5.3)) + hash12(px + vec2<f32>(13.1, 71.1)) - 1.0);
+        encoded = clamp(encoded + t * (tonemap.upscale.z / 255.0), vec3<f32>(0.0), vec3<f32>(1.0));
+    }
+    return vec4<f32>(encoded, 1.0);
 }

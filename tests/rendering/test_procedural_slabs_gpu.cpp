@@ -1,0 +1,146 @@
+// ADR-1959: the slab fast path draws what the general path draws. A lattice of boxes at varied heights (and a few
+// turned about y) is rendered twice -- `slabs` off and on -- from above, from the side and from below, with a
+// shadow-casting key and the depth prepass, and the two frames must agree. They are not bit-identical by design: a
+// turned quad covers the same face as makeBox's opposite face but splits it along the other diagonal, and its uv runs
+// the other way; neither changes a lit, untextured surface by more than rounding. What would show here is a wrong face
+// (a hole where a side should be), a face turned to the camera in a shadow view (light leaking through the casters),
+// or a depth disagreement between the prepass and the lit pass (missing surfaces).
+
+#include "core/log.hpp"
+#include "gpu/context.hpp"
+#include "gpu/readback.hpp"
+#include "gpu/shader_library.hpp"
+#include "rendering/scene_renderer.hpp"
+#include "scene/procedural.hpp"
+#include "scene/scene.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <memory>
+#include <vector>
+
+using namespace avgen;
+
+namespace {
+
+std::unique_ptr<gpu::Context> makeContext() {
+    static bool logInit = false;
+    if (!logInit) {
+        log::init(log::Level::Warn);
+        logInit = true;
+    }
+    auto ctx = gpu::Context::create(gpu::ContextDesc{});
+    if (!ctx) {
+        SKIP("no GPU adapter available: " << ctx.error().message);
+    }
+    return std::move(*ctx);
+}
+
+scene::ProceduralGeometry lattice(bool slabs) {
+    scene::ProceduralGeometry g;
+    g.name = "tiles";
+    g.slabs = slabs;
+    g.source.kind = scene::PrimitiveKind::Box;
+    g.source.size = {0.9f, 0.3f, 0.9f};
+    const int n = 12;
+    for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < n; ++i) {
+            scene::InstanceRecord r{};
+            const float x = static_cast<float>(i) - 0.5f * static_cast<float>(n - 1);
+            const float z = static_cast<float>(j) - 0.5f * static_cast<float>(n - 1);
+            const float y = 0.8f * std::sin(0.6f * x) * std::cos(0.45f * z);
+            r.position = {x, y, z, 1.0f};
+            // every seventh tile turned about y, so the side choice is tested off the world axes too
+            const glm::quat q = ((i + j * n) % 7 == 0) ? glm::angleAxis(0.5f, glm::vec3(0.0f, 1.0f, 0.0f))
+                                                       : glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            r.rotation = {q.x, q.y, q.z, q.w};
+            r.scale = {1.0f, 1.0f, 1.0f, static_cast<float>(i + j * n) / static_cast<float>(n * n - 1)};
+            r.color = {1.0f, 1.0f, 1.0f, static_cast<float>(i + j * n)};
+            r.emissive = {1.0f, 1.0f, 1.0f, 0.0f};
+            g.instances.push_back(r);
+        }
+    }
+    g.structureVersion = 1;
+    g.meshHash = 0x5EED1959u;
+    g.material.baseColor = {0.8f, 0.6f, 0.7f};
+    g.material.roughness = 0.5f;
+    return g;
+}
+
+scene::Scene latticeScene(bool slabs, glm::vec3 eye) {
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.environment.depthPrepass = true;
+    s.camera.position = eye;
+    s.camera.target = {0.0f, 0.0f, 0.0f};
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.5f, -0.6f, -0.35f));
+    key.intensity = 3.0f;
+    key.castsShadow = true;
+    s.addLight(key);
+    s.procedurals.push_back(lattice(slabs));
+    return s;
+}
+
+gpu::Image8 render(gpu::Context& ctx, const scene::Scene& s) {
+    gpu::ShaderLibrary shaders(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    FrameTime t{};
+    t.renderTime = 1.0;
+    auto img = renderer.renderToImage(s, t, 320, 240);
+    REQUIRE(img.has_value());
+    return *img;
+}
+
+struct Diff {
+    int lit = 0;       // pixels the general path drew (not background)
+    int differ = 0;    // pixels whose channels differ by more than 6 levels
+};
+
+Diff compare(const gpu::Image8& a, const gpu::Image8& b) {
+    Diff d;
+    for (std::uint32_t y = 0; y < a.height; ++y) {
+        for (std::uint32_t x = 0; x < a.width; ++x) {
+            const auto* p = a.pixel(x, y);
+            const auto* q = b.pixel(x, y);
+            if (p[0] + p[1] + p[2] > 15) {
+                ++d.lit;
+            }
+            for (int c = 0; c < 3; ++c) {
+                if (std::abs(static_cast<int>(p[c]) - static_cast<int>(q[c])) > 6) {
+                    ++d.differ;
+                    break;
+                }
+            }
+        }
+    }
+    return d;
+}
+
+} // namespace
+
+TEST_CASE("The slab fast path draws the box lattice the general path draws", "[gpu][procedural][geography][adr1959]") {
+    auto ctx = makeContext();
+    const std::vector<glm::vec3> eyes{
+        {3.0f, 9.0f, 11.0f},   // above, oblique: tops and two sides
+        {-12.0f, 1.5f, -4.0f}, // low from the other quadrant: the opposite sides
+        {2.0f, -6.0f, 9.0f},   // below: the bottoms
+    };
+    for (const glm::vec3& eye : eyes) {
+        CAPTURE(eye.x, eye.y, eye.z);
+        const auto general = render(*ctx, latticeScene(false, eye));
+        const auto slab = render(*ctx, latticeScene(true, eye));
+        const Diff d = compare(general, slab);
+        CAPTURE(d.lit, d.differ);
+        CHECK(d.lit > 4000);
+        // Rounding along a face diagonal and at silhouette edges only: under half a percent of the frame.
+        CHECK(d.differ < static_cast<int>(general.width * general.height / 200));
+    }
+    CHECK(ctx->errorCount() == 0);
+}

@@ -203,6 +203,7 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     }
     p.vignette = &params.add(f("post/output/vignette", s.vignette, 0.0f, 1.0f, 0.0f, 1.0f));
     p.grain = &params.add(f("post/output/grain", s.grain, 0.0f, 1.0f, 0.0f, 1.0f));
+    p.dither = &params.add(f("post/output/dither", s.dither, 0.0f, 2.0f, 0.0f, 2.0f)); // ADR-1977
     p.chromaRetention =
         &params.add(f("post/tonemap/chroma-retention", s.chromaRetention, 0.0f, 1.0f, 0.0f, 1.0f));
     // ADR-1613: the upscaler's sharpening, so a scene (and the live ladder's reduced rungs) can set it.
@@ -286,6 +287,7 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         {"fisheye", p.fisheye},               {"fisheyeModel", p.fisheyeModel}, // ADR-1540
         {"sharpen", p.sharpen},               {"vignette", p.vignette},
         {"grain", p.grain},                   {"chromaRetention", p.chromaRetention},
+        {"dither", p.dither}, // ADR-1977
         {"upscaleSharpness", p.upscaleSharpness}, // ADR-1613
         {"contrast", p.contrast},             {"saturation", p.saturation},
         {"tiltShiftRotation", p.tiltShiftRotation},
@@ -482,6 +484,9 @@ void applyPostParameters(const PostParameters& p, PostSettings& s) {
     s.tonemap = static_cast<TonemapOperator>(std::clamp(p.tonemap->value(), 0, 4));
     s.vignette = p.vignette->value();
     s.grain = p.grain->value();
+    if (p.dither != nullptr) { // ADR-1977
+        s.dither = p.dither->value();
+    }
     s.chromaRetention = p.chromaRetention->value();
     if (p.upscaleSharpness != nullptr) { // ADR-1613
         s.upscaleSharpness = p.upscaleSharpness->value();

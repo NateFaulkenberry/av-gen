@@ -226,6 +226,10 @@ struct PostSettings {
     TonemapOperator tonemap = TonemapOperator::AgX; // ADR-039: AgX is the default operator
     float vignette = 0.0f;         // 0..1
     float grain = 0.0f;            // 0..1
+    // ADR-1977 (request A): a triangular-PDF dither of the encoded output, in 8-bit steps (1 = +-1 LSB), added after
+    // the tone map and the sRGB encode and before anything quantises the frame, so a slow sky or fog gradient breaks
+    // into noise finer than a step instead of bands. 0 (the default) is byte-identical to before.
+    float dither = 0.0f;           // 0..2
     float chromaRetention = 0.0f;  // 0..1 how much hue to hold in compressed highlights, so a
                                    // bright narrow-band light stays coloured instead of going
                                    // white. 0 leaves the operator's own rolloff untouched.
@@ -332,6 +336,7 @@ struct PostParameters {
     params::Parameter<int>* tonemap = nullptr;
     params::Parameter<float>* vignette = nullptr;
     params::Parameter<float>* grain = nullptr;
+    params::Parameter<float>* dither = nullptr; // ADR-1977
     params::Parameter<float>* chromaRetention = nullptr;
     params::Parameter<float>* upscaleSharpness = nullptr; // ADR-1613
     // ---- cinematic integration (§52.1, §54's namespaced IDs: post/look/*) -------------------------

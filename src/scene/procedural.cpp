@@ -1188,6 +1188,37 @@ std::uint64_t SourceSpec::structuralHash() const {
 }
 
 // Six (n+1)^2 grids with faceted normals; uv 0..1 per face. 6(n+1)^2 vertices, 36n^2 indices.
+MeshData makeSlabMesh(glm::vec3 size) {
+    // The three faces of makeBox whose normals point along +x, +y and +z, with makeBox's own u/v so the material inputs
+    // (uv, localPosition) read exactly as they do on the full box.
+    struct Face {
+        glm::vec3 normal;
+        glm::vec3 u;
+        glm::vec3 v; // u x v == normal
+    };
+    const std::array<Face, 3> faces{{{{1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f, 0.0f}},
+                                     {{0.0f, 1.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
+                                     {{0.0f, 0.0f, 1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}}}};
+    const glm::vec3 half = size * 0.5f;
+    MeshData mesh;
+    mesh.name = "slab";
+    mesh.vertices.reserve(12);
+    mesh.indices.reserve(18);
+    for (const Face& face : faces) {
+        const auto base = static_cast<std::uint32_t>(mesh.vertices.size());
+        for (int row = 0; row <= 1; ++row) {
+            for (int col = 0; col <= 1; ++col) {
+                const auto tu = static_cast<float>(col);
+                const auto tv = static_cast<float>(row);
+                const glm::vec3 unitPos = face.normal + face.u * (tu * 2.0f - 1.0f) + face.v * (tv * 2.0f - 1.0f);
+                mesh.vertices.push_back(Vertex{unitPos * half, face.normal, {tu, tv}});
+            }
+        }
+        mesh.indices.insert(mesh.indices.end(), {base, base + 1, base + 3, base, base + 3, base + 2});
+    }
+    return mesh;
+}
+
 MeshData makeBox(glm::vec3 size, int subdivisions) {
     struct Face {
         glm::vec3 normal;
@@ -3172,6 +3203,9 @@ json ProceduralGeometry::toJson() const {
     if (!flatFarRungs) {
         j["flatFarRungs"] = false; // ADR-1576: likewise
     }
+    if (slabs) {
+        j["slabs"] = true; // ADR-1959: written only when on
+    }
     {
         json s = json::object();
         s["kind"] = primitiveKindName(source.kind);
@@ -3282,6 +3316,16 @@ json ProceduralGeometry::toJson() const {
             gj["groundAmplitude"] = g.groundAmplitude;
             gj["groundFrequency"] = g.groundFrequency;
             gj["groundSeed"] = g.groundSeed;
+            if (g.isTiles()) { // ADR-1950/1976
+                gj["tiles"] = tileTerrainToJson(g.tiles);
+                gj["align"] = g.align;
+                gj["finePitch"] = g.finePitch;
+                if (g.holeCellSize > 0.0f) {
+                    gj["hole"] = json{{"cellSize", g.holeCellSize},
+                                      {"viewDistance", g.holeViewDistance},
+                                      {"align", g.holeAlign}};
+                }
+            }
             s["generator"] = std::move(gj);
         }
         if (d.kind == DistributionKind::Points && d.points) {
@@ -3455,6 +3499,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.visible, "visible", readBool);
         AVGEN_PROC_READ(g.castsShadow, "castsShadow", readBool); // ADR-1545
         AVGEN_PROC_READ(g.flatFarRungs, "flatFarRungs", readBool); // ADR-1576
+        AVGEN_PROC_READ(g.slabs, "slabs", readBool); // ADR-1959
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);
         AVGEN_PROC_READ(g.emissiveField, "emissiveField", readString);
@@ -3625,6 +3670,35 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                 AVGEN_PROC_READ(gs.groundAmplitude, "groundAmplitude", readFloat);
                 AVGEN_PROC_READ(gs.groundFrequency, "groundFrequency", readFloat);
                 AVGEN_PROC_READ(gs.groundSeed, "groundSeed", readU32);
+                AVGEN_PROC_READ(gs.finePitch, "finePitch", readFloat); // ADR-1976
+                if (j.contains("align")) {
+                    if (!j.at("align").is_number_integer()) {
+                        return fail("'distribution.generator.align' must be an integer");
+                    }
+                    gs.align = j.at("align").get<std::int32_t>();
+                }
+                if (j.contains("tiles")) { // ADR-1950
+                    auto tiles = tileTerrainFromJson(j.at("tiles"));
+                    if (!tiles) {
+                        return std::unexpected(tiles.error());
+                    }
+                    gs.tiles = std::move(*tiles);
+                }
+                if (j.contains("hole")) { // ADR-1976
+                    const json& h = j.at("hole");
+                    if (!h.is_object() || !h.contains("cellSize") || !h.at("cellSize").is_number() ||
+                        !h.contains("viewDistance") || !h.at("viewDistance").is_number()) {
+                        return fail("'distribution.generator.hole' must be {cellSize, viewDistance, align}");
+                    }
+                    gs.holeCellSize = h.at("cellSize").get<float>();
+                    gs.holeViewDistance = h.at("viewDistance").get<float>();
+                    if (h.contains("align")) {
+                        if (!h.at("align").is_number_integer()) {
+                            return fail("'distribution.generator.hole.align' must be an integer");
+                        }
+                        gs.holeAlign = h.at("align").get<std::int32_t>();
+                    }
+                }
                 for (const auto& [key, target] : {std::pair<const char*, glm::vec2*>{"regionMin", &gs.regionMin},
                                                   std::pair<const char*, glm::vec2*>{"regionMax", &gs.regionMax}}) {
                     if (!j.contains(key)) {

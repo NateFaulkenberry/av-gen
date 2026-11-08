@@ -4429,6 +4429,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     tonemap.upscale[0] = qualitySettings_.spatialUpscaler && (hdr_.width() < target.width || hdr_.height() < target.height) ? 1.0f
                                                                                                              : 0.0f;
     tonemap.upscale[1] = postOf(scene).upscaleSharpness; // ADR-1613: a post parameter
+    tonemap.upscale[2] = postOf(scene).dither;           // ADR-1977
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;

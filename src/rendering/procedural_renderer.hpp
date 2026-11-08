@@ -170,6 +170,22 @@ struct GeneratorUniforms {
     glm::vec4 disc;          // centre x, centre z, radius, 0
 };
 static_assert(sizeof(GeneratorUniforms) == 224);
+// ADR-1950: the "tiles" kernel's own block (shaders/generator.wgsl TileParams), bound at 2 beside GeneratorParams. A
+// "cells" generator binds one too, of zeros, which its kernel never reads.
+struct GeneratorTileUniforms {
+    glm::vec4 a;          // continent wavelength, land threshold, shore band, inland band
+    glm::vec4 b;          // sea level, sea depth, shore rise, hill wavelength
+    glm::vec4 c;          // hill height, octaves, hill warp, warp wavelength
+    glm::vec4 d;          // hill low, hill high, crown threshold, crown flatten
+    glm::vec4 e;          // region wavelength, region variation, path width, path lift
+    glm::uvec4 info;      // seed, path points, children per side, hole valid
+    glm::ivec4 hole;      // min x, min z, max x, max z (this ring's cells)
+    std::array<glm::vec4, 8> path; // two points per lane
+};
+static_assert(sizeof(GeneratorTileUniforms) == 240);
+// Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied.
+[[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,
+                                                       float reach);
 // Packs one generator object's kernel parameters for `window` (scene/generator.hpp).
 [[nodiscard]] GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const scene::GeneratorWindow& window);
 // The camera in a generator object's own lattice space: inverse(objectMatrix * distributionTransform).
