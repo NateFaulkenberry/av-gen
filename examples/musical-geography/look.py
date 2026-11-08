@@ -34,7 +34,7 @@ def hexlin(h: str) -> list[float]:
 # 0.0 (=1.0) -> 0.27, always forward in time.
 STATES = {
     "day": dict(
-        side_px=18,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
+        side_px=0,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r7: day only -- gold over whole hill masses, magenta-orchid lowlands
         fill_col="#C060FF", fill_int=1.4,
         fill=0.25, contrast=1.3,
@@ -75,17 +75,17 @@ STATES = {
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
         stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r8: the day treatment -- warm bands over whole hill masses
-        side_px=18,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
+        side_px=0,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         fill=0.3, contrast=1.25,
         sky_int=1.0, haze=0.55,
         moon_int=0.0, phase=0.27,
-        sky_zen="#A6BCDC", sky_hor="#FFD9A4", sky_ground="#FFD9A4", fog="#FFD9A4", fog_sun="#FFE2A0",
+        sky_zen="#8FB0E8", sky_hor="#FFD3A0", sky_ground="#FFD3A0", fog="#FFD3A0", fog_sun="#FFE2A0",
         sun="#FFC874", sun_int=4.4, amb="#B8C8D8", amb_int=0.55,
-        land=["#6FB57E", "#9CCC84", "#DCE08E", "#F4D68C", "#FBE9C4"],
+        land=["#4FA88A", "#7EC48A", "#E0D47A", "#F6B85A", "#FFE2A8"],
         water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8", under="#4A6A55",
         path="#F2A93B", path_emit=0.25, pad="#FFC060", pad_emit=0.0,
         drift="#F4C49A", drift_amt=0.28, edge="#FFD27A", edge_gain=0.5, crest_gain=0.4,
-        fog_mult=3.0, exposure=-0.3, saturation=1.3, look="medium-high", bloom=0.25),
+        fog_mult=6.0, exposure=-0.3, saturation=1.3, look="medium-high", bloom=0.25),
 }
 # Contour gains as approved by the owner (04- §11): on at dusk and night, faint or off by day. The sunset key is 0.6
 # (faint); the dusk key between sunset and night brings the lines in at full night strength.

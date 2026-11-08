@@ -811,3 +811,28 @@ at p50.
   - a slightly larger per-tile value jitter at distance;
   - a sharpen in post (`post/output/sharpen`).
 - Judge each one against moiré.
+
+### CP-A r8 (2026-11-08, on engineering 20077b4c: the side ease now reaches live frames)
+
+**Side threshold (`slabSidePixels`) per state:**
+- Sunset 26. It kills the low-sun flecks.
+- Night 12.
+- Day and dawn use the engine default (12 px). At 18 the day hills lost their tile texture and read as smooth
+  gradients, which breaks §11's "tiles read at reveal altitude".
+
+**Dawn:**
+- The day treatment: its own height stops, fill 0.3, contrast 1.25 and thinner fog.
+- Fresher teal-green to gold to cream colours, and a bluer zenith.
+
+The stills are `02-terrain/cpa-61..68-*-r8.png` (six frames plus two dawn), with the comparison sheet `cpa-69`.
+
+**What the r8 frames show:**
+- **Day and sunset:** clean. No flecks, dashes or rectangle.
+- **Day after the fix:** the mid-distance tiles read more softly than before. This is the Phase 4 crispness item.
+- **Night:** a faint dash texture under the moon. The rectangle is barely visible.
+- **Dawn still falls short.** It reads hazy and olive, because its sun sits low in the north-west, straight ahead of
+  these views. It is back-lit into haze. One day/night arc cannot give both day and dawn side light on the same
+  cameras, so dawn needs either its own camera headings or the dawn sun moved (a request for a per-key sun azimuth).
+
+**Cost:** the day reveal is GPU p50 23.9 ms, with p95 31.6 and p99 37.6 ms. The spikes appear in this run only; it is
+worth re-measuring when the GPU is quiet.
