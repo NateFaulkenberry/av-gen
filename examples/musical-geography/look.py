@@ -118,6 +118,10 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
         "moonIntensity": [{"phase": st["phase"], "value": st["moon_int"]} for _, st in ordered_states()],
         # 42 deg at noon (04- §3 daylight); sunset and dawn elevations come from their phases (9 and 13 deg)
         "sunPeakElevation": 0.733,
+        # r6: the engine's default arc put the afternoon sun in the north-west, behind every north-west view (they
+        # were back-lit and flat). Turning the arc puts the day sun in the south-west (side light from the camera's
+        # left) and the sunset sun in the south.
+        "sunAzimuthAtDawn": 3.24,
         "zenithColor": col("sky_zen"),
         "horizonColor": col("sky_hor"),
         "groundColor": col("fog"),        # below the horizon the sky is the fog: no band where the window ends
@@ -173,7 +177,7 @@ def fill_light(state):
     """A shadowless violet fill from opposite the sun (r6): the shaded side of orange land under a blue sky turned
     brown -- the brief's "muddy" trap. A painter's coloured fill puts violet in the shadows instead (04- §3)."""
     s = STATES[state]
-    return {"id": "fill", "name": "fill", "type": "directional", "direction": [-0.62, -0.3, 0.62],   # from the north-east, opposite the afternoon sun
+    return {"id": "fill", "name": "fill", "type": "directional", "direction": [-0.62, -0.3, 0.62],   # travels south-west: from the north-east, opposite the turned day sun
             "color": hexlin(s.get("fill_col", "#000000")), "intensity": s.get("fill_int", 0.0),
             "castsShadow": False, "softness": 1.0}
 
