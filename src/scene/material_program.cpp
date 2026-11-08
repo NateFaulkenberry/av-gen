@@ -121,6 +121,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::OklabRamp, "oklabRamp"}, // ADR-1470
     {MaterialOpKind::TextureTriplanar, "textureTriplanar"},             // ADR-1642
     {MaterialOpKind::TextureTriplanarNormal, "textureTriplanarNormal"}, // ADR-1642
+    {MaterialOpKind::TileBorder, "tileBorder"},                         // ADR-1976
 };
 
 struct InputName {
@@ -764,6 +765,22 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
     }
     case MaterialOpKind::OklabRamp:
         return oklabRamp4(op.constant, op.constant2, op.constant3, op.constant4, a.x, f < 0.0f);
+    case MaterialOpKind::TileBorder: {
+        // ADR-1976: the band per axis, never under `f` pixels; the twin of matKTileBorder.
+        const auto axis = [&](float half, float local, float fw) {
+            const float pixel = std::max(fw, 1e-6f);
+            const float d = half - std::abs(local);
+            const float width = std::max(k.z, f * fw);
+            const float lo = width - 0.5f * pixel;
+            const float hi = width + 0.5f * pixel;
+            const float t = std::clamp((d - lo) / std::max(hi - lo, 1e-9f), 0.0f, 1.0f);
+            return glm::vec2(1.0f - t * t * (3.0f - 2.0f * t), d / pixel);
+        };
+        const glm::vec2 bx = axis(k.x, a.x, ctx.localFootprint.x);
+        const glm::vec2 bz = axis(k.y, a.z, ctx.localFootprint.y);
+        const float top = a.y >= k.w - 1e-3f ? 1.0f : 0.0f;
+        return {std::max(bx.x, bz.x), std::min(bx.y, bz.y), top, 0.0f};
+    }
     case MaterialOpKind::TextureTriplanar:
     case MaterialOpKind::TextureTriplanarNormal:
         return textureOpValue(op, ctx, program); // ADR-1642
@@ -913,6 +930,7 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::VoronoiEdge:
     case MaterialOpKind::Quantize:
     case MaterialOpKind::OklabRamp:
+    case MaterialOpKind::TileBorder:
         return {true, false, false};
     case MaterialOpKind::Multiply:
     case MaterialOpKind::Add:
@@ -974,7 +992,7 @@ bool MaterialProgram::unlitFastEligible() const {
         case MaterialOpKind::MixBy: case MaterialOpKind::Power: case MaterialOpKind::Smoothstep:
         case MaterialOpKind::Threshold: case MaterialOpKind::HueShift: case MaterialOpKind::Saturate:
         case MaterialOpKind::Palette: case MaterialOpKind::Swizzle: case MaterialOpKind::VoronoiEdge:
-        case MaterialOpKind::Quantize: case MaterialOpKind::OklabRamp:
+        case MaterialOpKind::Quantize: case MaterialOpKind::OklabRamp: case MaterialOpKind::TileBorder:
             break;
         default:
             return false;

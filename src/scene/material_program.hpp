@@ -104,6 +104,14 @@ enum class MaterialOpKind : std::uint8_t {
     OklabRamp,
     // ADR-1642, appended: an image the program names, projected triplanar in world space (colour, and a normal map).
     TextureTriplanar, TextureTriplanarNormal,
+    // ADR-1976, appended: a tile's border that survives distance. a = the local position (on a box: its own half
+    // extents); constant.xy = the top face's half extents (x, z); constant.z = the border's authored width, in local
+    // units; constant.w = the half thickness (the top face is a.y >= constant.w - 1e-3); value = the least width in
+    // PIXELS the border may have. Per axis the band is max(constant.z, value x the pixel's local footprint on that axis)
+    // wide, antialiased over one pixel, so up close it is the authored line and far off it never thins below `value`
+    // pixels: the squares still read from altitude instead of aliasing into moire. out = (border coverage 0..1, the
+    // distance to the nearest top edge in pixels, top-face mask, 0).
+    TileBorder,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
 [[nodiscard]] std::optional<MaterialOpKind> materialOpKindFromName(std::string_view name);
@@ -306,6 +314,8 @@ struct MaterialContext {
     float height = 0.0f;          // running surface height (the base's height output, for layers)
     float normalVariance = 0.0f;  // 0.5 (|dN/dx|^2 + |dN/dy|^2)
     float footprint = 0.0f;       // world units covered by one pixel
+    // ADR-1976: local units per pixel along the local x and z axes (fwidth of the local position); 0 = unknown.
+    glm::vec2 localFootprint{0.0f};
     float materialId = 0.0f;
     // ADR-904: the material's emission with the instance's variation applied (rgb), w = 1.
     glm::vec4 materialEmission{0.0f};

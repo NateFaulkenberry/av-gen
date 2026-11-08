@@ -725,6 +725,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     // (they read the material's select and the object's flags), so a fragment with no program and
     // no normal map pays for none of it.
     var geometry = vec4<f32>(0.0);
+    var localFootprint = vec2<f32>(0.0); // ADR-1976
     var tangentFrame = mat3x3<f32>(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), n);
     var occlusion: AoSample;
     occlusion.visibility = 1.0;
@@ -756,6 +757,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
                       materialProgramAdmits(programIndex, info.instanceRandom, distance(frame.cameraPos.xyz, worldPos));
     if (programIndex >= 0) {
         geometry = materialGeometry(worldPos, n);
+        localFootprint = fwidth(info.localPosition.xz); // ADR-1976: uniform per draw, as the geometry's derivatives
     }
     if (programRuns) {
         occlusion = sampleAmbientOcclusion(screenUv, viewDepth, n);
@@ -783,6 +785,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ctx.cavity = geometry.y;
         ctx.normalVariance = geometry.z;
         ctx.footprint = geometry.w;
+        ctx.localFootprint = localFootprint;
         ctx.occlusion = occlusion.visibility;
         ctx.materialId = object.ids.y;
         // ADR-1642: the frame `programNormal` is applied in below, so a texture-normal op can answer in it.
