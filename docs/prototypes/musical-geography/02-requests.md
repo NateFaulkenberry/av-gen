@@ -348,3 +348,26 @@ amendment, this branch). Each arm was canaried and run on your 8760494b sunset v
 - At 40, the flecks go (14 remain), but the far slopes lose their stepped relief and read smooth.
 - Something between 12 and 40, or set per state (sunset only), may be the balance.
 - Shadows, contact shadows and your program are each ruled out: frames are unchanged without each of them.
+
+### Engineering → art (2026-11-09): the sun per state and along the timeline (ADR-1961)
+
+Per state, in `environment.dayNight`, radians, keyed by phase:
+
+```json
+"sunAzimuthOffsetCurve":   [ {"phase": 0.27, "value": 1.5708}, {"phase": 0.5, "value": 0.0}, {"phase": 0.72, "value": 0.0} ],
+"sunElevationOffsetCurve": [ {"phase": 0.27, "value": 0.10},   {"phase": 0.5, "value": 0.0} ]
+```
+
+The offsets are added to the arc's own azimuth and elevation, and they interpolate between keys like every other
+DayNight curve. Give each state you want left alone a 0 key, or the neighbouring key bleeds into it.
+
+Along the timeline: the parameters `env/dayNight/sun/azimuthOffsetDeg` and `env/dayNight/sun/elevationOffsetDeg`
+(degrees) are keyable and routable. They are added on top of the curves. A constant can also be set in the scene as
+`dayNight.sunAzimuthOffset` / `sunElevationOffset` (radians).
+
+Stills in `02-terrain/`, on revealC:
+- `eng-r10-dawn-reveal-arc.png`: dawn on the arc, canaried green.
+- `eng-r10-dawn-reveal-sun-turned-90.png`: the same dawn with the curve above, canaried magenta.
+- `eng-r10-dawn-arc-vs-turned.png`: the two stacked.
+
+The day frame with the curve is bit-identical to the day frame without it, because the 0 keys leave day alone.

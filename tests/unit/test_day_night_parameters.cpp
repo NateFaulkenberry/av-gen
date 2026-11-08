@@ -20,6 +20,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -207,4 +209,76 @@ TEST_CASE("A saved scene keeps its day/night cycle", "[daynight][parameters][env
         }
     }
     CHECK(noonSurvivedTwice);
+}
+
+// ADR-1961: the sun placed per palette state (a phase-keyed offset curve) or along the timeline (a
+// keyable scalar), independent of the arc. Empty and zero, nothing moves.
+TEST_CASE("The sun can be turned and raised per state and along the timeline", "[daynight][parameters][environment]") {
+    scene::DayNightSettings arc;
+    arc.enabled = true;
+    const float dawn = 0.27f;
+    const float noon = 0.5f;
+    const auto azimuthOf = [](const glm::vec3& travel) { return std::atan2(-travel.x, -travel.z); };
+    const auto elevationOf = [](const glm::vec3& travel) { return std::asin(std::clamp(-travel.y, -1.0f, 1.0f)); };
+
+    // Unset: the arc exactly as before.
+    scene::DayNightSettings same = arc;
+    same.sunAzimuthOffset = {};
+    CHECK(scene::resolveDayNight(same, dawn).sunDirection == scene::resolveDayNight(arc, dawn).sunDirection);
+
+    // Keyed per state: dawn turned 1.2 rad and raised 0.1 rad, noon left alone.
+    scene::DayNightSettings keyed = arc;
+    keyed.sunAzimuthOffset = {{dawn, 1.2f}, {0.4f, 0.0f}, {0.6f, 0.0f}};
+    keyed.sunElevationOffset = {{dawn, 0.1f}, {0.4f, 0.0f}, {0.6f, 0.0f}};
+    const glm::vec3 a0 = scene::resolveDayNight(arc, dawn).sunDirection;
+    const glm::vec3 a1 = scene::resolveDayNight(keyed, dawn).sunDirection;
+    CHECK(std::remainder(azimuthOf(a1) - azimuthOf(a0), 6.2831853f) == Approx(1.2f).margin(1e-4));
+    CHECK(elevationOf(a1) - elevationOf(a0) == Approx(0.1f).margin(1e-4));
+    const glm::vec3 n0 = scene::resolveDayNight(arc, noon).sunDirection;
+    const glm::vec3 n1 = scene::resolveDayNight(keyed, noon).sunDirection;
+    CHECK(glm::length(n1 - n0) < 1e-5f);
+
+    // The timeline scalar: a parameter, in degrees on the panel, added on top.
+    assets::AssetRegistry registry;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    scene::Composition comp(registry, "composition");
+    comp.attach(params, modulator);
+    CHECK(registered(params, "env/dayNight/sun/azimuthOffsetDeg"));
+    CHECK(registered(params, "env/dayNight/sun/elevationOffsetDeg"));
+    scene::DayNightSettings biased = arc;
+    biased.sunAzimuthBias = -0.5f;
+    const glm::vec3 b1 = scene::resolveDayNight(biased, noon).sunDirection;
+    CHECK(std::remainder(azimuthOf(b1) - azimuthOf(n0), 6.2831853f) == Approx(-0.5f).margin(1e-4));
+    CHECK(biased.hash() != arc.hash());
+    CHECK(keyed.hash() != arc.hash());
+
+    // A scene file carries both and a save keeps them.
+    json doc;
+    doc["format"] = "avgen-scene";
+    doc["version"] = 1;
+    doc["name"] = "sunturn";
+    doc["environment"] = {
+        {"dayNight",
+         {{"enabled", true},
+          {"sunLight", "key"},
+          {"sunAzimuthOffset", 0.25},
+          {"sunElevationOffsetCurve", json::array({json{{"phase", 0.27}, {"value", 0.15}}, json{{"phase", 0.5}, {"value", 0.0}}})},
+          {"sunAzimuthOffsetCurve", json::array({json{{"phase", 0.27}, {"value", 1.1}}, json{{"phase", 0.5}, {"value", 0.0}}})}}}};
+    doc["nodes"] = json::array();
+    const auto path = scratch() / "sunturn.scene.json";
+    std::ofstream(path) << doc.dump(1);
+    registry.setBaseDirectory(scratch());
+    auto loaded = scene::Composition::loadFile(path, registry);
+    REQUIRE(loaded.has_value());
+    const auto out = scratch() / "sunturn.out.scene.json";
+    REQUIRE((*loaded)->saveFile(out).has_value());
+    json round;
+    std::ifstream(out) >> round;
+    const json& d = round.at("environment").at("dayNight");
+    CHECK(d.value("sunAzimuthOffset", 0.0f) == Approx(0.25f));
+    REQUIRE(d.contains("sunAzimuthOffsetCurve"));
+    REQUIRE(d.contains("sunElevationOffsetCurve"));
+    CHECK(d.at("sunAzimuthOffsetCurve")[0].value("value", 0.0f) == Approx(1.1f));
+    CHECK(d.at("sunElevationOffsetCurve")[0].value("value", 0.0f) == Approx(0.15f));
 }

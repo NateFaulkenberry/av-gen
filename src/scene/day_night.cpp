@@ -194,6 +194,8 @@ std::uint64_t DayNightSettings::hash() const {
     h.f32(sunPeakElevation);
     h.f32(sunAzimuthAtDawn);
     h.f32(sunAzimuthSweep);
+    h.f32(sunAzimuthBias);
+    h.f32(sunElevationBias);
     h.f32(sunIntensityScale);
     h.f32(moonIntensityScale);
     h.f32(starBrightnessScale);
@@ -226,6 +228,8 @@ std::uint64_t DayNightSettings::hash() const {
     };
     hv(sunColor);
     hf(sunIntensity);
+    hf(sunAzimuthOffset);
+    hf(sunElevationOffset);
     hf(moonIntensity);
     hv(zenithColor);
     hv(horizonColor);
@@ -265,10 +269,12 @@ DayNightState resolveDayNight(const DayNightSettings& settings, float phase) {
     // construction: -1 at midnight, +1 at noon, and crossing zero exactly at sunrise and sunset.
     const float twoPi = 6.2831853071795864f;
     const float elevationT = -std::cos(s.phase * twoPi);
-    const float elevation = settings.sunPeakElevation * elevationT;
+    const float elevation = settings.sunPeakElevation * elevationT +
+                            samplePhase(settings.sunElevationOffset, s.phase) + settings.sunElevationBias; // ADR-1961
     // Azimuth sweeps across the day so that dawn and dusk are on opposite horizons. Using the
     // same phase keeps it continuous across midnight.
-    const float azimuth = settings.sunAzimuthAtDawn + settings.sunAzimuthSweep * (s.phase - 0.25f) * 2.0f;
+    const float azimuth = settings.sunAzimuthAtDawn + settings.sunAzimuthSweep * (s.phase - 0.25f) * 2.0f +
+                          samplePhase(settings.sunAzimuthOffset, s.phase) + settings.sunAzimuthBias; // ADR-1961
     const glm::vec3 towardsSun(std::cos(elevation) * std::sin(azimuth),
                                std::sin(elevation),
                                std::cos(elevation) * std::cos(azimuth));
