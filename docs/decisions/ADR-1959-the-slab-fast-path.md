@@ -77,3 +77,17 @@ so the prepass and the lit pass agree to the bit:
   this rule measured the width only, and it left the moiré rings and the sea streaks in place.
 
 The pitch rides in `windPlant`, which a slab draw never uses for wind, because slabs are not eligible with wind.
+
+## Amendment (2026-11-08, CP-A r8): the side ease reaches the lit pass in live frames
+
+The ease of a far side's normal toward its top sat after the slab vertex stage's early return. That return also takes
+the lit pass whenever nothing reads the velocity target (`styledGround.w`, ADR-1492): the live editor and the live
+profiler, with no motion blur. In those frames every side kept its own normal, so under a low sun the risers facing
+the sun lit up as bright flecks, and `slabSidePixels` did nothing. Offline renders read the velocity target and were
+not affected.
+
+The ease now comes before the return. The GPU test `The side rule's normal ease reaches the lit pass` renders both
+modes, and on the old shader it fails in the on-demand mode with a change of 0.0. Measured on art 8760494b:
+
+- Plain material on revealC: the far dash energy drops from 4.53 to 0.77.
+- Sunset valleyC with every side flattened: the foreground flecks drop from 53,434 to 16.

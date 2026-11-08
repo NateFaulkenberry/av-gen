@@ -1106,16 +1106,18 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     out.clip = frame.viewProj * vec4<f32>(world, 1.0);
     out.worldPos = world;
     out.normal = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, srcNormal / safeScale), 0.0)).xyz);
+    // ADR-1959 (amended): a side face that is a line of a pixel or two -- a tile a few pixels across, seen at a slant --
+    // shades as a sliver of sun or shadow next to its top, and a slope of them strobes into bands of stripes. Below the
+    // side threshold the side's normal eases toward the top's. The lit pass only; depth is untouched. It comes before
+    // the early return below, because that return also takes the lit pass whenever nothing reads the velocity target
+    // (styledGround.w). When the ease sat after it, the sides kept their own normal in every such frame (CP-A r8).
+    if (!depthOnly && abs(in.normal.y) < 0.5) {
+        let top = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0) / safeScale), 0.0)).xyz);
+        out.normal = normalize(mix(top, out.normal, sideKeep));
+    }
     if (depthOnly || frame.styledGround.w > 0.5) {
         out.prevClip = out.clip;
         return out;
-    }
-    // ADR-1959 (amended): a side face that is a line of a pixel or two -- a tile a few pixels across, seen at a slant --
-    // shades as a sliver of sun or shadow next to its top, and a slope of them strobes into bands of stripes. Below the
-    // side threshold the side's normal eases toward the top's. The lit pass only; depth is untouched.
-    if (abs(in.normal.y) < 0.5) {
-        let top = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0) / safeScale), 0.0)).xyz);
-        out.normal = normalize(mix(top, out.normal, sideKeep));
     }
     let prev = (object.prevModel * vec4<f32>(instancePoint(inst, srcPos), 1.0)).xyz;
     out.prevClip = frame.prevViewProj * vec4<f32>(prev, 1.0);

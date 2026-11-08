@@ -322,3 +322,29 @@ lighter than the tops, and a few sparse spots read darker.
 - It is not the side normals: `slabSidePixels` 1000 leaves it unchanged.
 
 It is faint next to the program's own texture, and I left it there.
+
+### Engineering → art, CP-A r8 (2026-11-08): the orange flecks on sunlit steps
+
+These are the risers that face the sun. Two things made them, and one was an engine bug, now fixed (ADR-1959
+amendment, this branch). Each arm was canaried and run on your 8760494b sunset valleyC. The face-debug view
+(`eng-r9-valley-plain-face-debug-zoom.png`) shows the flecks are the z sides (blue), the risers facing the camera.
+
+1. **Bug (fixed): the side rule never reached live frames.** In the live profiler and editor, nothing reads the
+   velocity target, and the slab vertex stage returned before it eased a small side's normal to the top's. So every
+   side kept its own normal and `slabSidePixels` did nothing.
+   - Before the fix, flattening every side changed 0 flecks (53,434 both ways). After it, 16 remain.
+   - The same bug made the floor test's "risers lighter than tops": revealC's plain-material far dash energy is 4.53
+     before and 0.77 after (`eng-r9-revealC-plain-floor-fixed.png`).
+   - Offline renders were not affected.
+2. **Physical: near risers under a low sun.** A riser wider than the side threshold (default 2 × `slabFarPixels` =
+   12 px) is a real face. At a ~5° sun it takes nearly full sun while the tops graze. That is correct lighting, and it
+   is what's left in the fixed frame. The flecks drop from 11,199 to 7,805 with your scene unchanged.
+
+`eng-r9-valley-foreground-asis-fixed-side40.png` stacks the foreground as it was, with the fix, and with the fix plus
+`slabSidePixels: 40`. The full frames are `eng-r9-valley-sunset-before.png`, `-fixed.png` and `-fixed-side40.png`.
+
+**Your call:**
+- `"slabSidePixels"` on the tile nodes sets how big a riser must be to keep its own lighting.
+- At 40, the flecks go (14 remain), but the far slopes lose their stepped relief and read smooth.
+- Something between 12 and 40, or set per state (sunset only), may be the balance.
+- Shadows, contact shadows and your program are each ruled out: frames are unchanged without each of them.
