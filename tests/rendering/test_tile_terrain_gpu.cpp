@@ -57,6 +57,8 @@ scene::ProceduralGeometry tilesObject(const std::string& name, float cell, float
     g.tiles.seed = 11;
     g.tiles.continentWavelength = 260.0f; // sea and land inside a small window
     g.tiles.path = {{-30.0f, -10.0f}, {0.0f, 5.0f}, {40.0f, -12.0f}};
+    g.tiles.river = {{-60.0f, 30.0f}, {-10.0f, 20.0f}, {50.0f, 35.0f}};
+    g.tiles.valleyWidth = 60.0f;
     pg.variation.seed = 5;
     REQUIRE(pg.validate().has_value());
     REQUIRE(pg.rebuild());

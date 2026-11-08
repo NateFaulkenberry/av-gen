@@ -1239,6 +1239,18 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
                         hole.valid ? 1u : 0u);
     u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
     u.blend = glm::ivec4(g.blendCells, g.blendRatio, 0, 0);
+    const auto riverPoints = static_cast<std::uint32_t>(std::min(t.river.size(), scene::kMaxTilePathPoints));
+    u.river = glm::vec4(t.riverWidth, t.valleyWidth, t.heightScale, static_cast<float>(riverPoints));
+    for (std::uint32_t i = 0; i < riverPoints; ++i) {
+        glm::vec4& lane = u.rivers[i / 2];
+        if ((i & 1u) == 0u) {
+            lane.x = t.river[i].x;
+            lane.y = t.river[i].y;
+        } else {
+            lane.z = t.river[i].x;
+            lane.w = t.river[i].y;
+        }
+    }
     for (std::uint32_t i = 0; i < points; ++i) {
         glm::vec4& lane = u.path[i / 2];
         if ((i & 1u) == 0u) {
@@ -2942,6 +2954,17 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             if (const Impl::CachedMesh* slabMesh = im.ensureSlabMesh(object); slabMesh != nullptr) {
                 lodMeshes[0] = slabMesh;
                 slabDraw = true;
+                // ADR-1959 (amended): the far-tile rule. A slab draw has no wind (it is not eligible with any), so
+                // windPlant is free: x/z = the footprint's scale to the lattice pitch, y = the pixels below which the
+                // tile closes its gap and its sides read as its top, w = 1.
+                glm::vec2 close{1.0f};
+                if (object.isGenerator() && object.distribution.generator.isTiles()) {
+                    const float pitch = object.distribution.generator.cellSize;
+                    close = glm::vec2(pitch / std::max(object.source.size.x, 1e-4f),
+                                      pitch / std::max(object.source.size.z, 1e-4f));
+                    close = glm::max(close, glm::vec2(1.0f));
+                }
+                u.windPlant = glm::vec4(close.x, std::max(object.slabFarPixels, 0.0f), close.y, 1.0f);
             }
         }
         im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);

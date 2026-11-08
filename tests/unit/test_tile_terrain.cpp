@@ -22,6 +22,7 @@ namespace {
 TileTerrainSpec withPath() {
     TileTerrainSpec s;
     s.path = {{-200.0f, -40.0f}, {-60.0f, 10.0f}, {80.0f, -15.0f}, {220.0f, 60.0f}};
+    s.river = {{-300.0f, 260.0f}, {-120.0f, 160.0f}, {40.0f, 200.0f}, {260.0f, 120.0f}};
     return s;
 }
 
@@ -260,4 +261,51 @@ TEST_CASE("tiles: the seam band meets the coarser ring at its height", "[geograp
         }
     }
     CHECK(edgeChecked > 100);
+}
+
+TEST_CASE("tiles: the river valley -- water on the line, smooth banks, no walls", "[geography][tiles][adr1950]") {
+    const TileTerrainSpec s = withPath();
+    int onLand = 0;
+    for (int i = 0; i <= 100; ++i) {
+        // along the river's second segment
+        const glm::vec2 a = s.river[1];
+        const glm::vec2 b = s.river[2];
+        const glm::vec2 p = a + (b - a) * (static_cast<float>(i) / 100.0f);
+        TileTerrainSpec dry = s;
+        dry.river.clear();
+        const TileSample without = scene::tileSample(dry, p.x, p.y);
+        if (without.water > 0.01f) {
+            continue; // the sea is already water
+        }
+        ++onLand;
+        const TileSample t = scene::tileSample(s, p.x, p.y);
+        CHECK(t.water > 0.99f);                                       // the channel is water
+        CHECK(t.height == Catch::Approx(s.seaLevel - s.seaDepth).margin(1e-3)); // at the bed
+    }
+    CHECK(onLand > 20);
+    // Far from the river the land is untouched.
+    TileTerrainSpec dry = s;
+    dry.river.clear();
+    CHECK(scene::tileSample(s, 600.5f, -700.5f).height == scene::tileSample(dry, 600.5f, -700.5f).height);
+}
+
+TEST_CASE("tiles: heightScale scales the land's relief, not the sea", "[geography][tiles][adr1950]") {
+    TileTerrainSpec s;
+    TileTerrainSpec tall = s;
+    tall.heightScale = 2.0f;
+    int checked = 0;
+    for (int i = 0; i < 400; ++i) {
+        const float x = static_cast<float>(i) * 13.0f - 2600.0f + 0.5f;
+        const float z = static_cast<float>(i) * 7.0f - 1400.0f + 0.5f;
+        const TileSample a = scene::tileSample(s, x, z);
+        const TileSample b = scene::tileSample(tall, x, z);
+        if (a.water > 0.999f) {
+            CHECK(b.height == a.height);
+        } else if (a.water < 0.001f && a.height > s.shoreRise + 1.0f) {
+            // land above the shore: the relief above shoreRise doubles
+            CHECK(b.height - s.shoreRise == Catch::Approx(2.0f * (a.height - s.shoreRise)).epsilon(1e-3));
+            ++checked;
+        }
+    }
+    CHECK(checked > 20);
 }

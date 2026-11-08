@@ -64,21 +64,29 @@ float tileFbm(std::uint32_t seed, float x, float z, int octaves) {
     return sum / norm;
 }
 
-float tilePathDistance(const TileTerrainSpec& spec, float x, float z) {
+namespace {
+
+float polylineDistance(const std::vector<glm::vec2>& line, float x, float z) {
     float best = 1e9f;
-    const std::size_t n = std::min(spec.path.size(), kMaxTilePathPoints);
+    const std::size_t n = std::min(line.size(), kMaxTilePathPoints);
     if (n == 1) {
-        return glm::length(glm::vec2(x, z) - spec.path[0]);
+        return glm::length(glm::vec2(x, z) - line[0]);
     }
     for (std::size_t i = 0; i + 1 < n; ++i) {
-        const glm::vec2 a = spec.path[i];
-        const glm::vec2 ab = spec.path[i + 1] - a;
+        const glm::vec2 a = line[i];
+        const glm::vec2 ab = line[i + 1] - a;
         const glm::vec2 ap = glm::vec2(x, z) - a;
         const float t = std::clamp(glm::dot(ap, ab) / std::max(glm::dot(ab, ab), 1e-6f), 0.0f, 1.0f);
         best = std::min(best, glm::length(ap - ab * t));
     }
     return best;
 }
+
+} // namespace
+
+float tilePathDistance(const TileTerrainSpec& spec, float x, float z) { return polylineDistance(spec.path, x, z); }
+
+float tileRiverDistance(const TileTerrainSpec& spec, float x, float z) { return polylineDistance(spec.river, x, z); }
 
 TileSample tileSample(const TileTerrainSpec& s, float x, float z) {
     const std::uint32_t seed = s.seed;
@@ -96,10 +104,18 @@ TileSample tileSample(const TileTerrainSpec& s, float x, float z) {
     const float shaped = smooth01(s.hillLow, s.hillHigh, hn);
     const float excess = std::max(shaped - s.crownThreshold, 0.0f);
     const float hill = shaped - excess * s.crownFlatten;
-    const float landHeight = s.shoreRise + s.hillHeight * k * hill * inland;
+    float landHeight = s.shoreRise + s.hillHeight * k * hill * inland * s.heightScale;
+    float channel = 0.0f;
+    if (!s.river.empty()) {
+        // The valley: the land eases to the bed (the sea floor's level) over the valley's half-width, the channel water.
+        const float d = tileRiverDistance(s, x, z);
+        const float v = 1.0f - smooth01(0.5f * s.riverWidth, 0.5f * s.valleyWidth, d);
+        landHeight = landHeight + (-s.seaDepth - landHeight) * v;
+        channel = 1.0f - smooth01(0.5f * s.riverWidth - 0.5f, 0.5f * s.riverWidth + 0.5f, d);
+    }
     TileSample out;
     out.height = (s.seaLevel - s.seaDepth) + ((s.seaLevel + landHeight) - (s.seaLevel - s.seaDepth)) * land;
-    out.water = 1.0f - land;
+    out.water = 1.0f - land + channel * land;
     out.shore = 1.0f - smooth01(0.0f, 3.0f * s.shoreBand, std::abs(c - s.landThreshold));
     out.flat = smooth01(s.crownThreshold, s.crownThreshold + 0.06f, shaped) * s.crownFlatten * inland * land;
     if (!s.path.empty()) {
@@ -142,8 +158,11 @@ Result<void> TileTerrainSpec::validate() const {
     if (regionVariation < 0.0f || regionVariation > 0.9f) {
         return fail("tiles: regionVariation must be 0..0.9");
     }
-    if (path.size() > kMaxTilePathPoints) {
-        return fail("tiles: the path has {} points; at most {}", path.size(), kMaxTilePathPoints);
+    if (path.size() > kMaxTilePathPoints || river.size() > kMaxTilePathPoints) {
+        return fail("tiles: the path and the river have at most {} points each", kMaxTilePathPoints);
+    }
+    if (!(riverWidth > 0.0f) || !(valleyWidth > riverWidth) || !(heightScale >= 0.0f) || heightScale > 8.0f) {
+        return fail("tiles: riverWidth must be positive, valleyWidth above it, heightScale 0..8");
     }
     if (!(pathWidth > 0.0f)) {
         return fail("tiles: pathWidth must be positive");
@@ -167,8 +186,14 @@ std::uint64_t TileTerrainSpec::hash() const {
     mix(seed);
     for (const float v : {continentWavelength, landThreshold, shoreBand, inlandBand, seaLevel, seaDepth, shoreRise,
                           hillWavelength, hillHeight, hillWarp, warpWavelength, hillLow, hillHigh, crownThreshold,
-                          crownFlatten, regionWavelength, regionVariation, pathWidth, pathLift}) {
+                          crownFlatten, regionWavelength, regionVariation, pathWidth, pathLift, riverWidth,
+                          valleyWidth, heightScale}) {
         f(v);
+    }
+    mix(0x52495645u); // "RIVE": separates the path's points from the river's
+    for (const glm::vec2& p : river) {
+        f(p.x);
+        f(p.y);
     }
     mix(static_cast<std::uint64_t>(hillOctaves));
     for (const glm::vec2& p : path) {
@@ -204,6 +229,9 @@ constexpr FloatKey kFloatKeys[] = {
     {"regionVariation", &TileTerrainSpec::regionVariation},
     {"pathWidth", &TileTerrainSpec::pathWidth},
     {"pathLift", &TileTerrainSpec::pathLift},
+    {"riverWidth", &TileTerrainSpec::riverWidth},
+    {"valleyWidth", &TileTerrainSpec::valleyWidth},
+    {"heightScale", &TileTerrainSpec::heightScale},
 };
 
 } // namespace
@@ -220,6 +248,11 @@ nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec) {
         path.push_back(nlohmann::json::array({p.x, p.y}));
     }
     j["path"] = std::move(path);
+    nlohmann::json river = nlohmann::json::array();
+    for (const glm::vec2& p : spec.river) {
+        river.push_back(nlohmann::json::array({p.x, p.y}));
+    }
+    j["river"] = std::move(river);
     return j;
 }
 
@@ -243,16 +276,17 @@ Result<TileTerrainSpec> tileTerrainFromJson(const nlohmann::json& j) {
             spec.hillOctaves = value.get<int>();
             continue;
         }
-        if (key == "path") {
+        if (key == "path" || key == "river") {
             if (!value.is_array()) {
-                return fail("'tiles.path' must be an array of [x, z]");
+                return fail("'tiles.{}' must be an array of [x, z]", key);
             }
-            spec.path.clear();
+            std::vector<glm::vec2>& line = key == "path" ? spec.path : spec.river;
+            line.clear();
             for (const auto& p : value) {
                 if (!p.is_array() || p.size() != 2 || !p[0].is_number() || !p[1].is_number()) {
-                    return fail("'tiles.path' must be an array of [x, z]");
+                    return fail("'tiles.{}' must be an array of [x, z]", key);
                 }
-                spec.path.emplace_back(p[0].get<float>(), p[1].get<float>());
+                line.emplace_back(p[0].get<float>(), p[1].get<float>());
             }
             continue;
         }

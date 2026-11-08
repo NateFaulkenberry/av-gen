@@ -1052,6 +1052,20 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     let az = objectLinear * quatRotate(inst.rotation, vec3<f32>(0.0, 0.0, 1.0));
     var p = in.position;
     var n = in.normal;
+    // ADR-1959 (amended at CP-A): the far-tile rule. The tile's width in pixels, from the frame's own camera (so the
+    // prepass and the lit pass agree to the bit); below proc.windPlant.y pixels the gap closes (the footprint eases
+    // out to the lattice pitch, windPlant.xz) and, further below, the sides read as the top (their local height and
+    // normal become the top's). A shadow view measures the same way through its own matrices.
+    let halfW = max(abs(in.position.x), abs(in.position.z));
+    let s0 = inst.scale.xyz;
+    let widthPx = pixelsPerMetreAt(centre, normalize(ax), 0.5) * 2.0 * halfW * length(ax) * max(abs(s0.x), abs(s0.z));
+    let farPx = proc.windPlant.y;
+    var close = 0.0;
+    var flatten = 0.0;
+    if (proc.windPlant.w > 0.5 && farPx > 0.0) {
+        close = 1.0 - smoothstep(0.5 * farPx, farPx, widthPx);
+        flatten = 1.0 - smoothstep(0.25 * farPx, 0.5 * farPx, widthPx);
+    }
     if (abs(in.normal.y) > 0.5) {
         if (dot(toCam, ay) < 0.0) { p = vec3<f32>(p.x, -p.y, -p.z); n = vec3<f32>(n.x, -n.y, -n.z); }
     } else if (abs(in.normal.x) > 0.5) {
@@ -1059,7 +1073,11 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     } else {
         if (dot(toCam, az) < 0.0) { p = vec3<f32>(-p.x, p.y, -p.z); n = vec3<f32>(-n.x, n.y, -n.z); }
     }
-    out.localPos = p;
+    // The gap closes: x and z ease out to the pitch.
+    p = vec3<f32>(p.x * mix(1.0, proc.windPlant.x, close), p.y, p.z * mix(1.0, proc.windPlant.z, close));
+    // The sides read as the top to a program (its local height): a far step's side is a sliver of the top's colour.
+    let topY = abs(in.position.y);
+    out.localPos = vec3<f32>(p.x, select(p.y, mix(p.y, topY, flatten), abs(in.normal.y) < 0.5), p.z);
     let srcPos = (proc.sourceMatrix * vec4<f32>(p, 1.0)).xyz;
     let srcNormal = (proc.sourceNormalMatrix * vec4<f32>(n, 0.0)).xyz;
     let s = inst.scale.xyz;
@@ -1077,9 +1095,6 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     // pixels a tile the side's normal eases toward the top's (fully by 3), so far sides shade as the land and the steps
     // read by their outline, not by aliased slivers. The lit pass only; depth is untouched.
     if (abs(in.normal.y) < 0.5) {
-        let half = max(abs(in.position.x), abs(in.position.z));
-        let across = normalize(ax);
-        let widthPx = pixelsPerMetreAt(world, across, half) * 2.0 * half * length(ax) * max(s.x, s.z);
         let top = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0) / safeScale), 0.0)).xyz);
         out.normal = normalize(mix(top, out.normal, smoothstep(3.0, 8.0, widthPx)));
     }

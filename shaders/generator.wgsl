@@ -209,7 +209,9 @@ struct TileParams {
     info: vec4<u32>,       // seed, path points, children per side, hole valid
     hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
     blend: vec4<i32>,      // seam band cells (0 = off), block ratio (ADR-1976 amended)
+    river: vec4<f32>,      // river width, valley width, height scale, river points
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
+    rivers: array<vec4<f32>, 8>, // the river's points, two per lane
 };
 
 @group(0) @binding(2) var<uniform> tile: TileParams;
@@ -265,6 +267,27 @@ fn tilePathPoint(i: u32) -> vec2<f32> {
     return select(lane.xy, lane.zw, (i & 1u) == 1u);
 }
 
+fn tileRiverPoint(i: u32) -> vec2<f32> {
+    let lane = tile.rivers[i / 2u];
+    return select(lane.xy, lane.zw, (i & 1u) == 1u);
+}
+
+fn tileRiverDistance(x: f32, z: f32) -> f32 {
+    var best = 1e9;
+    let n = min(u32(tile.river.w + 0.5), 16u);
+    if (n == 1u) {
+        return length(vec2<f32>(x, z) - tileRiverPoint(0u));
+    }
+    for (var i = 0u; i + 1u < n; i = i + 1u) {
+        let a = tileRiverPoint(i);
+        let ab = tileRiverPoint(i + 1u) - a;
+        let ap = vec2<f32>(x, z) - a;
+        let t = clamp(dot(ap, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+        best = min(best, length(ap - ab * t));
+    }
+    return best;
+}
+
 fn tilePathDistance(x: f32, z: f32) -> f32 {
     var best = 1e9;
     let n = min(tile.info.y, 16u);
@@ -304,10 +327,17 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     let shaped = tileSmooth(tile.d.x, tile.d.y, hn);
     let excess = max(shaped - tile.d.z, 0.0);
     let hill = shaped - excess * tile.d.w;
-    let landHeight = tile.b.z + tile.c.x * k * hill * inland;
+    var landHeight = tile.b.z + tile.c.x * k * hill * inland * tile.river.z;
+    var channel = 0.0;
+    if (tile.river.w > 0.5) {
+        let dr = tileRiverDistance(x, z);
+        let v = 1.0 - tileSmooth(0.5 * tile.river.x, 0.5 * tile.river.y, dr);
+        landHeight = landHeight + (-tile.b.y - landHeight) * v;
+        channel = 1.0 - tileSmooth(0.5 * tile.river.x - 0.5, 0.5 * tile.river.x + 0.5, dr);
+    }
     var out: TileOut;
     out.height = (tile.b.x - tile.b.y) + ((tile.b.x + landHeight) - (tile.b.x - tile.b.y)) * land;
-    out.water = 1.0 - land;
+    out.water = 1.0 - land + channel * land;
     out.shore = 1.0 - tileSmooth(0.0, 3.0 * tile.a.z, abs(c - tile.a.y));
     out.flat = tileSmooth(tile.d.z, tile.d.z + 0.06, shaped) * tile.d.w * inland * land;
     out.path = 0.0;

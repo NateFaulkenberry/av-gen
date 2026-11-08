@@ -67,6 +67,16 @@ struct TileTerrainSpec {
     std::vector<glm::vec2> path;
     float pathWidth = 1.0f;          // metres
     float pathLift = 0.35f;          // metres
+    // The river valley (CP-A, the owner-approved r2 look): a polyline in metres (x, z), at most kMaxTilePathPoints;
+    // empty = none. Within `valleyWidth / 2` of it the land eases down to the river bed (the sea's floor level) with a
+    // smoothstep profile -- smooth sides, no walls -- and within `riverWidth / 2` the tiles are water (the water
+    // channel is 1). The same polyline is what a camera or a character follows (`river`, like `path`).
+    std::vector<glm::vec2> river;
+    float riverWidth = 8.0f;         // metres
+    float valleyWidth = 200.0f;      // metres, wall to wall of the valley's smooth sides
+    // Scales the land's relief above the shore (hills, crowns, the valley's banks): the art's lever on how tall the
+    // world stands without retuning the shapes. 1 = as authored.
+    float heightScale = 1.0f;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t hash() const;
@@ -89,8 +99,9 @@ struct TileSample {
 // The value noise and fBm the formations are built from, exposed for the parity tests. `n` is in [0, 1).
 [[nodiscard]] float tileValueNoise(std::uint32_t seed, float x, float z);
 [[nodiscard]] float tileFbm(std::uint32_t seed, float x, float z, int octaves);
-// Distance from (x, z) to the path polyline (a large number when there is no path).
+// Distance from (x, z) to the path polyline (a large number when there is no path), and to the river's.
 [[nodiscard]] float tilePathDistance(const TileTerrainSpec& spec, float x, float z);
+[[nodiscard]] float tileRiverDistance(const TileTerrainSpec& spec, float x, float z);
 
 // The tile under a generator-space point, and its centre, for a lattice of `pitch` metres.
 [[nodiscard]] glm::ivec2 tileIndexAt(float pitch, float x, float z);
