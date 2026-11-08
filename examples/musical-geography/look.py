@@ -157,7 +157,9 @@ def sky(state):
 def moon_light(state):
     """The night key (DayNight drives its intensity and direction; the sun is below the horizon at night)."""
     return {"id": "moon", "name": "moon", "type": "directional", "direction": [-0.4, -0.7, 0.55],
-            "color": hexlin(STATES["night"]["sun"]), "intensity": STATES[state]["moon_int"], "castsShadow": True,
+            "color": hexlin(STATES["night"]["sun"]), "intensity": STATES[state]["moon_int"],
+            # only the night casts moon shadows: a second shadow map in daylight costs GPU time for nothing
+            "castsShadow": STATES[state]["moon_int"] > 0.0,
             "softness": 0.35}
 
 

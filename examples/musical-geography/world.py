@@ -38,7 +38,7 @@ TILES = {
 # gap near; 2x and 4x blocks beyond with NO geometric gap (box = cell), each the mean of its children, painting the fine
 # lattice with tileBorder's subdivisions (look.tile_program); the dark underlay under the fine ring only, 4 m blocks
 # 2.2 below, so a block's mean never pokes through a slope.
-FINE_VIEW = 160.0
+FINE_VIEW = 120.0   # 160 -> 120 (engineering, CP-A r4): the composed reveal fits 33.3 ms
 RINGS = [
     # name, cellSize, viewDistance, align, hole (finer ring), thickness, castsShadow, gap (tileSize / cell)
     ("mgTiles1", 1.0, FINE_VIEW, 4, None, 0.30, True, 0.915),
@@ -56,7 +56,8 @@ def ring_nodes(program_for_cell, under_rgb, under_program=None):
     nodes = []
     for name, cell, view, align, hole, thick, shadow, gap in RINGS:
         gen = {"name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": align,
-               "finePitch": 1.0 if cell > 1.0 else 0.0, "tiles": TILES}
+               "finePitch": 1.0 if cell > 1.0 else 0.0, "tiles": TILES,
+               "skirt": 3}   # 32a7e743: closes the cracks under thin slabs at height steps (rings, streaks)
         if hole:
             gen["hole"] = hole
         proc = {"source": {"kind": "box", "size": [cell * gap, thick, cell * gap]},
