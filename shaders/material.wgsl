@@ -845,24 +845,35 @@ fn matKQuantize(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f3
     return vec4<f32>((cell + vec3<f32>(0.5) - k.xyz) / f, hash01(vec3<i32>(cell), matOpSeed(pi, oi)));
 }
 
-// ADR-1976: a tile's border that never thins below `value` pixels (material_program.hpp TileBorder).
-fn matTileBorderAxis(half: f32, local: f32, fw: f32, band: f32, minPixels: f32) -> vec2<f32> {
+// ADR-1976: a tile's border that never thins below `value` pixels and is prefiltered under 4 pixels a (sub)tile
+// (material_program.hpp TileBorder). Returns (coverage, distance in pixels, (sub)tile size in pixels).
+fn matTileBorderAxis(half: f32, local: f32, fw: f32, band: f32, minPixels: f32, sub: f32) -> vec3<f32> {
     let pixel = max(fw, 1e-6);
-    let d = half - abs(local);
+    let cell = 2.0 * half / sub;
+    let h = 0.5 * cell;
+    var l = local;
+    if (sub > 1.0) {
+        l = (local + half) - floor((local + half) / cell) * cell - h;
+    }
+    let d = h - abs(l);
     let width = max(band, minPixels * fw);
-    let lo = width - 0.5 * pixel;
-    let hi = width + 0.5 * pixel;
-    let t = clamp((d - lo) / max(hi - lo, 1e-9), 0.0, 1.0);
-    return vec2<f32>(1.0 - t * t * (3.0 - 2.0 * t), d / pixel);
+    let t = clamp((d - (width - 0.5 * pixel)) / pixel, 0.0, 1.0);
+    let cover = 1.0 - t * t * (3.0 - 2.0 * t);
+    let size = cell / pixel;
+    let mean = min(2.0 * width / max(cell, 1e-6), 1.0);
+    let keep = smoothstep(2.0, 4.0, size);
+    return vec3<f32>(mean + (cover - mean) * keep, d / pixel, size);
 }
 
 fn matKTileBorder(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
     let k = materialPrograms.programs[pi].ops[oi].constant;
+    let k2 = materialPrograms.programs[pi].ops[oi].constant2;
     let f = materialPrograms.programs[pi].ops[oi].value;
-    let bx = matTileBorderAxis(k.x, a.x, ctx.localFootprint.x, k.z, f);
-    let bz = matTileBorderAxis(k.y, a.z, ctx.localFootprint.y, k.z, f);
+    let sub = max(k2.x, 1.0);
+    let bx = matTileBorderAxis(k.x, a.x, ctx.localFootprint.x, k.z, f, sub);
+    let bz = matTileBorderAxis(k.y, a.z, ctx.localFootprint.y, k.z, f, sub);
     let top = select(0.0, 1.0, a.y >= k.w - 1e-3);
-    return vec4<f32>(max(bx.x, bz.x), min(bx.y, bz.y), top, 0.0);
+    return vec4<f32>(1.0 - (1.0 - bx.x) * (1.0 - bz.x), min(bx.y, bz.y), top, min(bx.z, bz.z));
 }
 
 fn matKOklabRamp(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {

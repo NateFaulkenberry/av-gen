@@ -109,8 +109,11 @@ enum class MaterialOpKind : std::uint8_t {
     // units; constant.w = the half thickness (the top face is a.y >= constant.w - 1e-3); value = the least width in
     // PIXELS the border may have. Per axis the band is max(constant.z, value x the pixel's local footprint on that axis)
     // wide, antialiased over one pixel, so up close it is the authored line and far off it never thins below `value`
-    // pixels: the squares still read from altitude instead of aliasing into moire. out = (border coverage 0..1, the
-    // distance to the nearest top edge in pixels, top-face mask, 0).
+    // pixels: the squares still read from altitude instead of aliasing into moire. constant2.x = subdivisions per side
+    // (0 or 1 = none): a coarse ring's block draws the borders of the fine tiles it stands for, so the lattice reads
+    // the same across rings. Where a (sub)tile is under 4 pixels the coverage eases to its mean over the tile (gone by
+    // 2 pixels), so a pattern finer than the pixels is prefiltered rather than aliased. out = (border coverage 0..1,
+    // the distance to the nearest edge in pixels, top-face mask, the (sub)tile's size in pixels).
     TileBorder,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
