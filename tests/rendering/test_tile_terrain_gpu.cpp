@@ -175,3 +175,45 @@ TEST_CASE("A coarse tile ring leaves the fine window empty and stands at its chi
     CHECK(pc.worstChannel <= 1e-4f);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("A skirt drops a land tile's box below its top and leaves the sea's slabs thin",
+          "[gpu][generator][geography][adr1950]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    auto pg = tilesObject("skirted", 1.0f, 32.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    pg.distribution.generator.skirt = 2.0f;
+    REQUIRE(pg.validate().has_value());
+    const glm::vec3 camera{0.5f, 30.0f, 0.5f};
+    scene::Scene s;
+    s.procedurals.push_back(pg);
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const scene::GeneratorSpec& g = pg.distribution.generator;
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+    auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+    REQUIRE(records.has_value());
+    REQUIRE(records->size() == w.cells());
+    float worst = 0.0f;
+    int land = 0;
+    int sea = 0;
+    for (std::int32_t z = 0; z < w.countZ; ++z) {
+        for (std::int32_t x = 0; x < w.countX; ++x) {
+            const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                       static_cast<std::size_t>(x)];
+            const scene::TileSample t = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w);
+            const float k = 2.0f * (1.0f - std::clamp(t.water, 0.0f, 1.0f));
+            // The box's top (centre + half the stretched thickness) stays at the tile's height + half the thickness.
+            const float thickness = pg.source.size.y;
+            const float top = r.position.y + 0.5f * thickness * r.scale.y;
+            worst = std::max(worst, std::abs(top - (t.height + 0.5f * thickness)));
+            worst = std::max(worst, std::abs(r.scale.y - (thickness + k) / thickness));
+            land += t.water < 0.01f;
+            sea += t.water > 0.99f;
+        }
+    }
+    CAPTURE(worst, land, sea);
+    CHECK(worst <= 1e-3f);
+    CHECK(land > 100);
+    CHECK(ctx->errorCount() == 0);
+}

@@ -3,7 +3,13 @@
 // shape -- the three faces of makeBox that point along +x, +y and +z, wound counter-clockwise from outside, with
 // makeBox's own vertices, normals and uv, so the material inputs read the same on either path.
 
+#include "assets/asset_registry.hpp"
+#include "core/time.hpp"
+#include "params/modulation.hpp"
+#include "params/parameter_set.hpp"
+#include "scene/composition.hpp"
 #include "scene/material_program.hpp"
+#include "support/temp_dir.hpp"
 #include "scene/procedural.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -115,4 +121,58 @@ TEST_CASE("tileBorder holds the authored band near and never thins below its pix
     CHECK(run({0.0f, 0.09f, 0.0f}, {0.01f, 0.01f}).z == Catch::Approx(1.0f));
     CHECK(run({0.46f, 0.0f, 0.0f}, {0.01f, 0.01f}).z == Catch::Approx(0.0f));
     CHECK(run({0.36f, 0.09f, 0.0f}, {0.01f, 0.01f}).y == Catch::Approx(10.0f).margin(1e-3));
+}
+
+TEST_CASE("a tiles ring's slabs and far-tile threshold reach the flattened scene and its uniform",
+          "[procedural][composition][geography][adr1959]") {
+    // The shape of the art agent's rings (examples/musical-geography/world.py): a "tiles" generator with slabs, a 1x
+    // ring with a gap and an explicit threshold, and a 2x ring with no gap and the default.
+    const auto json = nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "rings",
+        "nodes": [
+            {"name": "mgTiles1", "kind": "procedural", "position": [0, 0, 0], "procedural": {
+                "slabs": true, "slabFarPixels": 9.0,
+                "source": {"kind": "box", "size": [0.915, 0.3, 0.915]},
+                "distribution": {"kind": "generator", "generator": {"name": "tiles", "version": 1, "cellSize": 1.0,
+                    "viewDistance": 40.0, "align": 4, "tiles": {"seed": 3}}},
+                "lod": {"cull": true}}},
+            {"name": "mgTiles2", "kind": "procedural", "position": [0, 0, 0], "procedural": {
+                "slabs": true,
+                "source": {"kind": "box", "size": [2.0, 0.36, 2.0]},
+                "distribution": {"kind": "generator", "generator": {"name": "tiles", "version": 1, "cellSize": 2.0,
+                    "viewDistance": 80.0, "align": 2, "finePitch": 1.0,
+                    "hole": {"cellSize": 1.0, "viewDistance": 40.0, "align": 4}, "tiles": {"seed": 3}}},
+                "lod": {"cull": true}}}
+        ]})");
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::fromJson(json, registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    for (int frame = 0; frame < 2; ++frame) {
+        params.resetFinals();
+        FrameTime ft{};
+        ft.renderTime = frame / 30.0;
+        (*c)->update(ft);
+    }
+    int seen = 0;
+    for (const auto& p : (*c)->scene().procedurals) {
+        CAPTURE(p.name);
+        CHECK(p.slabs);
+        const glm::vec4 rule = scene::slabFarRule(p);
+        CHECK(rule.w == 1.0f);
+        if (p.name.find("mgTiles1") != std::string::npos) {
+            ++seen;
+            CHECK(p.slabFarPixels == 9.0f);
+            CHECK(rule.y == 9.0f);
+            CHECK(rule.x == Catch::Approx(1.0f / 0.915f));
+        } else if (p.name.find("mgTiles2") != std::string::npos) {
+            ++seen;
+            CHECK(p.slabFarPixels == 6.0f);
+            CHECK(rule.y == 6.0f);
+            CHECK(rule.x == Catch::Approx(1.0f));
+        }
+    }
+    CHECK(seen == 2);
 }

@@ -1188,6 +1188,16 @@ std::uint64_t SourceSpec::structuralHash() const {
 }
 
 // Six (n+1)^2 grids with faceted normals; uv 0..1 per face. 6(n+1)^2 vertices, 36n^2 indices.
+glm::vec4 slabFarRule(const ProceduralGeometry& object) {
+    glm::vec2 close{1.0f};
+    if (object.isGenerator() && object.distribution.generator.isTiles()) {
+        const float pitch = object.distribution.generator.cellSize;
+        close = glm::vec2(pitch / std::max(object.source.size.x, 1e-4f), pitch / std::max(object.source.size.z, 1e-4f));
+        close = glm::max(close, glm::vec2(1.0f));
+    }
+    return {close.x, std::max(object.slabFarPixels, 0.0f), close.y, 1.0f};
+}
+
 MeshData makeSlabMesh(glm::vec3 size) {
     // The three faces of makeBox whose normals point along +x, +y and +z, with makeBox's own u/v so the material inputs
     // (uv, localPosition) read exactly as they do on the full box.
@@ -3323,6 +3333,9 @@ json ProceduralGeometry::toJson() const {
                 gj["tiles"] = tileTerrainToJson(g.tiles);
                 gj["align"] = g.align;
                 gj["finePitch"] = g.finePitch;
+                if (g.skirt > 0.0f) {
+                    gj["skirt"] = g.skirt;
+                }
                 if (g.blendCells > 0) {
                     gj["blend"] = json{{"cells", g.blendCells}, {"ratio", g.blendRatio}};
                 }
@@ -3691,6 +3704,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                     }
                     gs.tiles = std::move(*tiles);
                 }
+                AVGEN_PROC_READ(gs.skirt, "skirt", readFloat); // CP-A r3: the slab skirt
                 if (j.contains("blend")) { // ADR-1976 (amended): the seam band
                     const json& bj = j.at("blend");
                     if (!bj.is_object() || !bj.contains("cells") || !bj.at("cells").is_number_integer() ||

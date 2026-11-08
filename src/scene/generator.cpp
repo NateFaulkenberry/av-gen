@@ -74,6 +74,9 @@ Result<void> GeneratorSpec::validate() const {
         if (align < 1 || align > 64 || holeAlign < 1 || holeAlign > 64) {
             return fail("generator 'tiles': align and hole.align must be 1..64");
         }
+        if (!(skirt >= 0.0f) || skirt > 100.0f) {
+            return fail("generator 'tiles': skirt must be 0..100 metres");
+        }
         if (blendCells < 0 || blendCells > 64 || blendRatio < 2 || blendRatio > 8) {
             return fail("generator 'tiles': blend.cells must be 0..64 and blend.ratio 2..8");
         }
@@ -171,6 +174,7 @@ std::uint64_t GeneratorSpec::hash() const {
         h.f32(holeViewDistance);
         h.u32(static_cast<std::uint32_t>(holeAlign));
         h.u32(static_cast<std::uint32_t>(blendCells));
+        h.f32(skirt);
         h.u32(static_cast<std::uint32_t>(blendRatio));
     }
     return h.value();

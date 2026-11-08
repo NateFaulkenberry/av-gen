@@ -80,6 +80,12 @@ struct GeneratorSpec {
     // stepping in a straight line. 0 = off.
     std::int32_t blendCells = 0;
     std::int32_t blendRatio = 2;
+    // The skirt (CP-A r3): a thin slab on a slope opens a see-through crack under its upper edge wherever a step is
+    // taller than the slab, and seen at a slant those cracks read as rings, streak rows and a lighter patch of ground.
+    // With `skirt` > 0 metres each land tile's box reaches that far further down -- its top stays where it was -- so a
+    // step's riser is solid. Water tiles keep their thickness (scaled by 1 - water), so the sea's slabs still float.
+    // The box's own thickness (`skirtThickness`) is the source box's y size; the renderer fills it. 0 = no skirt.
+    float skirt = 0.0f;
 
     [[nodiscard]] bool isTiles() const;
 
