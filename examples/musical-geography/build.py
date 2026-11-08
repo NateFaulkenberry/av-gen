@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Musical Geography: assemble the scene and the project from look.py (art direction) and world.py (the land).
 
-    python3 examples/musical-geography/build.py [--state day|sunset|night|dawn] [--interim] [--geography]
-                                                [--camera low|reveal] [--out DIR]
+    python3 examples/musical-geography/build.py [--state day|sunset|night|dawn] [--interim]
+                                                [--camera low|reveal|land|bay|topdown|overview] [--out DIR]
 
 --state      the palette state: pins DayNight's phase there, and bakes that state's terrain colours into the tile
              program (until request 1972 makes them curves).
---interim    stand today's procedural slab grid (world.interim_nodes) so the look can be judged before TileTerrain.
---geography  write world.GEOGRAPHY into the scene (only once the engine reads it).
+--interim    the pre-generator stand-in (world.interim_nodes) instead of the "tiles" rings.
 --camera     a still camera for look development (the flight comes in Phase 5).
 
 Writes <out>/musical-geography.scene.json and <out>/musical-geography.json (both gitignored). Pure Python.
@@ -24,14 +23,33 @@ sys.path.insert(0, HERE)
 import look   # noqa: E402
 import world  # noqa: E402
 
+# Still cameras for look development (engine axes, y up, north = -z). The camera's y and the target's y are ABOVE THE
+# GROUND there (terrain_mirror) when "ground" is set. The seed-3 world: a deep bay at the origin opening south, a
+# ridge on its west shore, hills to the north-west and north-east (terrain_mirror.py --map).
 CAMERAS = {
-    # still cameras (engine axes, y up, north = -z): a low pass over the land, and the reveal altitude for §11
-    "low": {"position": [-20.0, 9.0, 20.0], "target": [-10.0, 4.0, -120.0], "fov": 50.0},
-    "reveal": {"position": [60.0, 85.0, 0.0], "target": [-60.0, 0.0, -220.0], "fov": 36.0},
+    "low": {"position": [60.0, 4.0, -300.0], "target": [40.0, -6.0, -700.0], "fov": 50.0},          # over the bay
+    "reveal": {"position": [-900.0, 90.0, 300.0], "target": [-200.0, 0.0, -350.0], "fov": 36.0, "ground": True},
+    "land": {"position": [-120.0, 7.0, -640.0], "target": [-420.0, 0.0, -880.0], "fov": 40.0, "ground": True},
+    "bay": {"position": [60.0, 60.0, -250.0], "target": [-150.0, 0.0, -800.0], "fov": 40.0},
+    "topdown": {"position": [-60.0, 150.0, -640.0], "target": [-60.0, 0.0, -641.0], "fov": 40.0, "ground": True},
+    "overview": {"position": [0.0, 900.0, 0.5], "target": [0.0, 0.0, 0.0], "fov": 70.0},
 }
 
 
-def scene_doc(state, interim, geography, camera):
+def camera(name):
+    c = dict(CAMERAS[name])
+    if c.pop("ground", False):
+        import numpy as np
+        import terrain_mirror
+        for key in ("position", "target"):
+            x, y, z = c[key]
+            h = float(terrain_mirror.tile_sample(world.TILES, np.array([x]), np.array([z]))["height"][0])
+            c[key] = [x, round(h + y, 2), z]
+    return c
+
+
+def scene_doc(state, interim, camera_name):
+    camera_pose = camera(camera_name)
     s = look.STATES[state]
     env = {
         "intensity": s["amb_int"],
@@ -44,17 +62,22 @@ def scene_doc(state, interim, geography, camera):
         "dayNight": look.day_night(phase=s["phase"]),
     }
     env.update(look.fog_medium(state))
-    nodes = world.interim_nodes() if interim else []
+    if interim:
+        nodes, programs = world.interim_nodes(), [look.tile_program(state, 1.0, "mgTile")]
+    else:
+        prog = lambda cell: "mgTile%dx_%s" % (int(cell), state)   # noqa: E731
+        under = "mgUnder_%s" % state
+        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under)
+        programs = [look.tile_program(state, c) for c in (1.0, 2.0, 4.0)]
+        programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0))
     doc = {
         "format": "avgen-scene", "version": 1, "name": "musical-geography",
-        "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **CAMERAS[camera]),
+        "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **camera_pose),
         "environment": env,
         "nodes": nodes,
-        "lights": [look.sun_light(state)],
-        "materialPrograms": [look.tile_program(state)],
+        "lights": [look.sun_light(state), look.moon_light(state)],
+        "materialPrograms": programs,
     }
-    if geography:
-        doc["geography"] = world.GEOGRAPHY
     return doc
 
 
@@ -66,7 +89,7 @@ def project_doc(scene_rel, state):
         "format": "avgen-project", "version": 4,
         "assets": {"scene": {"kind": "composition", "path": scene_rel},
                    "audio": AUDIO},
-        "parameters": look.post(state),
+        "parameters": dict(look.post(state), **{"post/output/dither": 1.0}),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                    "path": "renders/musical-geography.mp4"},
     }
@@ -76,14 +99,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--state", default="day", choices=sorted(look.STATES))
     ap.add_argument("--interim", action="store_true")
-    ap.add_argument("--geography", action="store_true")
     ap.add_argument("--camera", default="low", choices=sorted(CAMERAS))
     ap.add_argument("--out", default=os.path.join(HERE, "scene"))
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     scene_path = os.path.join(a.out, "musical-geography.scene.json")
     with open(scene_path, "w") as f:
-        json.dump(scene_doc(a.state, a.interim, a.geography, a.camera), f, indent=1)
+        json.dump(scene_doc(a.state, a.interim, a.camera), f, indent=1)
     proj_dir = a.out   # look-development projects live beside the scene (gitignored) until the scene is approved
     proj_path = os.path.join(proj_dir, "musical-geography.json")
     with open(proj_path, "w") as f:

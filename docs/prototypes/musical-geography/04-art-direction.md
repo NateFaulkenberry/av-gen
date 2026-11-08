@@ -595,3 +595,71 @@ or audio. It becomes useful from CP-A on, with engine renders. The judgements he
   - The depressed slab under the scout is too subtle to see at this angle.
 - **Top-down (06).** Strong as a colour field: wave diamonds, flooded bands, the path. A dark stepped seam marks the
   shoreline, where the land steps up by more than a slab.
+
+---
+
+## 13. CP-A look pass on the engine (2026-11-08)
+
+The look is now data in `examples/musical-geography/`:
+- `look.py`: the states, the tile program, fog and post;
+- `world.py`: TileTerrainSpec and the rings;
+- `build.py`: assembles the scene and the project;
+- `terrain_mirror.py`: a numpy copy of `tileSample`, for placing cameras.
+
+The engine stills are in `02-terrain/cpa-*-art-look-r2.png`. The side-by-side comparison with the r2 mock-up is
+`cpa-10-art-r2-engine-vs-blender-mockup.png`.
+
+### Values changed to calibrate the engine (§3 and §4 stand otherwise)
+
+**The tile and the rings**
+- **Side shade:** 0.70 at the slab's underside, not 0.18. On engine hillsides, the sides facing the slope stippled
+  dark.
+- **Water roughness:** 0.42, not 0.16. At 0.16 the sea mirrored the pale sky over its whole surface.
+- **Underlay:** takes the land's own colour at 72%, not a fixed dark colour. The dark colour speckled through every
+  gap.
+- **Tile border:**
+  - The 1× ring has no painted border; its geometric gap draws the edge.
+  - The 2× and 4× rings paint the fine lattice with engineering's `tileBorder` at 0.62.
+- **Rings:** engineering's set-up. The coarse rings have no gap, and the underlay sits under the fine ring only.
+
+**Fog**
+- The fog colour is the sky's horizon colour in every state. So is the sky's ground colour, so the window's edge never
+  shows as a band.
+- The fog is surface-only (`volumeMaxDistance` 0), with `horizonDensity` 9 so the near ground stays clean.
+
+**The day/night curves**
+- The scene sets its own sky intensity, haze and IBL intensity per state. The engine's defaults dim the off-noon sky
+  to 0.16–0.46, which left night black and gave sunset an orange-only fill.
+
+**The states**
+- **Day:** sun 3.2, grade saturation 1.45, the path lit at 0.35.
+- **Sunset:**
+  - a rose horizon (`#E87A86`) and a violet zenith (`#4A22B0`);
+  - sun 2.0, at a paler `#FFB27A`;
+  - sky fill 1.7 and fog multiplier 3.5.
+  - Without these, sunset was one orange-brown mass.
+- **Night:** a moon light at 2.2, driven by DayNight's `moonLight`.
+
+**Cost.** Headless 1080p Ultra, GPU p50: day bay 26.9 ms, day reveal 28.0 ms, sunset reveal 28.1 ms. All are inside
+33.3 ms; the reveal was 34.3 ms before the fog went surface-only.
+
+### What the engine frames still miss against the mock-up
+
+**Engineering**
+- **Grazing-angle aliasing of the geometric gaps.**
+  - Concentric moiré rings on the 1× ring at 50–150 m in the low views.
+  - Horizontal streaks on the flat, glossy sea.
+  - The 1× ring has no painted line now, so this is the slab gaps themselves.
+- **Dark speckle on the day reveal's mid-ground hillside.** It looks like the coarse rings' side faces, lit as sky.
+
+**Phase 3, not yet built**
+- Crests and waves: the sea is flat.
+- Contour edges (request 1970), which the mock-up's night frame is built on.
+
+**Art, next pass**
+- **The river is gone.** Engineering's formation set has none; the owner's r2 had a valley. Ask the owner whether to
+  request a valley term.
+- **Composition.** The engine cameras were placed by map, not composed: too much sky, and the bay view is all sea and
+  low land. The flight (Phase 5) replaces them, but the CP-A stills need composed frames.
+- **Sunset.** It is no longer muddy, but it reads rose rather than the mock-up's magenta-to-coral with orange crowns.
+  The crowns are under 26 m here, so the orange stops never show.
