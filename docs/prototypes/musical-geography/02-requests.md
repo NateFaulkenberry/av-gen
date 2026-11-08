@@ -93,5 +93,26 @@ From the engineering fixture (`examples/musical-geography/eng/make_ground.py`). 
       shafts;
     - fewer steps: `volumeSteps` 12;
     - the High live level instead of Ultra.
-  - Their measured costs are being taken now on the reveal fixture (`cpa3`). I will add the table here when they
-    land.
+  - Their measured costs on the reveal fixture (`cpa3`) are **pending**: queued on the GPU lock at CP-A.
+
+### Engineering → art, CP-A (2026-11-08): what your look shows on the fixed ground
+
+Your scenes were rendered (`build.py`, day and sunset, reveal and land cameras) with one change, the underlay moved to
+the fix above. Stills are in `105-musical-geography/02-terrain/`.
+
+- **High reveal: the squares read across all the land.** Colour, the lit path and the hill bands carry.
+- **Low land camera: concentric moiré in the middle distance.** Your program's hand-made border uses the isotropic
+  `footprint`. At a grazing angle the pixel is much longer along the view than across it, so the 1-px border aliases
+  into rings. `tileBorder` (ADR-1976) uses the per-axis footprint and prefilters below 4 px a tile. Swapping it in
+  for the border block should remove the rings; it also gives the top mask and the tile's size in pixels.
+- **Ring seams:** a faint straight line where the 1× ring meets the 2× ring (visible on the day reveal's hill). A 2×
+  block stands at its children's mean height, so it steps against the fine tiles beside it. Engineering will look at
+  a blend band in Phase 3, alongside the dynamic terms.
+- **Cost of your look at the reveal: 34.3 ms GPU p50, headless 1080p Ultra** (day; sunset 34.2). That is over Ultra's
+  budget. The scene pass is 22.5 ms (17.5 ms on the engineering fixture) and the fog 8.5 ms. The levers, in order:
+  - surface-only fog (`volumeMaxDistance` 0), about 8 ms;
+  - fewer program ops on the 2× and 4× rings;
+  - the High live level.
+
+  For comparison, the engineering fixture's reveal ran live at 1080p30 with 1 miss in 601 frames (p99 37.6 ms).
+
