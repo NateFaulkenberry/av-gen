@@ -74,6 +74,12 @@ struct GeneratorSpec {
     float holeCellSize = 0.0f;
     float holeViewDistance = 0.0f;
     std::int32_t holeAlign = 1;
+    // A seam band (ADR-1976, amended at CP-A). Within `blendCells` cells of this ring's window edge, a cell's height and
+    // channels ease toward the mean of the `blendRatio` x `blendRatio` block of cells it belongs to -- which is exactly
+    // what the next coarser ring stands at -- reaching it on the edge cell. The rings then meet at one height instead of
+    // stepping in a straight line. 0 = off.
+    std::int32_t blendCells = 0;
+    std::int32_t blendRatio = 2;
 
     [[nodiscard]] bool isTiles() const;
 
@@ -149,6 +155,9 @@ struct GeneratorTileHole {
 [[nodiscard]] GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& cameraGen, float reach = 1.0f);
 // The tile in cell (ix, iz): the mean of the fine tiles it covers (one, for the finest ring), generator space.
 [[nodiscard]] TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz);
+// The tile as the kernel writes it in `window`: generatorTile, eased toward its coarser block in the seam band.
+[[nodiscard]] TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
+                                               const GeneratorWindow& window);
 
 // ---- the mirror's queries -----------------------------------------------------------------------
 

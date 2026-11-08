@@ -1238,6 +1238,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
     u.info = glm::uvec4(t.seed, points, static_cast<std::uint32_t>(scene::generatorTileChildren(g)),
                         hole.valid ? 1u : 0u);
     u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
+    u.blend = glm::ivec4(g.blendCells, g.blendRatio, 0, 0);
     for (std::uint32_t i = 0; i < points; ++i) {
         glm::vec4& lane = u.path[i / 2];
         if ((i & 1u) == 0u) {

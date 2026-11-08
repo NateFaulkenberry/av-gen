@@ -93,7 +93,18 @@ From the engineering fixture (`examples/musical-geography/eng/make_ground.py`). 
       shafts;
     - fewer steps: `volumeSteps` 12;
     - the High live level instead of Ultra.
-  - Their measured costs on the reveal fixture (`cpa3`) are **pending**: queued on the GPU lock at CP-A.
+  - **Measured** on the engineering fixture's high reveal (headless 1080p, 3 s, under the GPU lock, d7ae4cc9):
+
+    | Fog | Ultra: GPU p50 / the march | High: GPU p50 / the march |
+    |---|---|---|
+    | Volumetric, 32 steps (default) | 28.4 ms / 8.5 ms | 20.4 ms / 2.6 ms |
+    | Volumetric, `volumeSteps` 12 | 23.4 ms / 3.5 ms | 18.9 ms / 1.1 ms |
+    | Surface only (`volumeMaxDistance` 0) | 20.0 ms / — | 17.9 ms / — |
+    | None | 19.3 ms / — | 17.3 ms / — |
+
+  - Surface-only fog costs 0.6 ms more than none and saves 8.4 ms at Ultra. It is the same air in closed form, with
+    no light shafts. Twelve steps keep shafts for 3.5 ms. The High live level already marches at reduced resolution
+    and steps (2.6 ms). Stills of each are beside the numbers in the scratchpad (`cpa3/*/frame-*.png`).
 
 ### Engineering → art, CP-A (2026-11-08): what your look shows on the fixed ground
 
@@ -116,3 +127,26 @@ the fix above. Stills are in `105-musical-geography/02-terrain/`.
 
   For comparison, the engineering fixture's reveal ran live at 1080p30 with 1 miss in 601 frames (p99 37.6 ms).
 
+
+### Engineering → art, Phase 2 follow-up (2026-11-08)
+
+- **The ring seam is fixed in the engine** (ADR-1976 amended, d7ae4cc9). A ring takes
+  `"blend": {"cells": N, "ratio": 2}`. Within N cells of its window edge, a tile eases to its coarser block's mean
+  height, which is where the next ring stands, so the two rings meet at one height. The fixture uses 8 on the 1×
+  ring and 4 on the 2× ring. The ring's `align` must be a multiple of `ratio`, so 4 on the 1× ring and 2 on the 2×
+  ring, as you already have. The GPU parity test covers it.
+- **Where the reveal's scene pass goes.** Variants of the engineering reveal (scene pass at 1080p / 540p):
+
+  | Variant | Scene pass, 1080p / 540p |
+  |---|---|
+  | Everything | 17.5 / 12.2 ms |
+  | No material program, no fog | 13.8 / 11.1 ms |
+  | The fine ring only (1× to 160 m) | 1.5 / 3.0 ms |
+  | No shadows | 16.7 / 11.7 ms |
+  | The general (non-slab) path | 18.9 / 13.5 ms, plus 1.9 ms of depth |
+
+  - About 10 ms of the scene pass is **not per-pixel**, and it comes with the 2× and 4× rings. It is not the
+    program (about 3 ms), the fog, the shadows or the slab path.
+  - The root cause is not found yet. The next step is a Metal frame capture of the scene pass with the 4× ring alone.
+  - Until then, the reveal's lever on your side is fewer program ops on the 2× and 4× rings (`tile_program(cell=...)`
+    already takes the cell).

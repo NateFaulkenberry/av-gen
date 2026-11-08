@@ -28,9 +28,11 @@ GAP = 0.92
 fv = a.fine_view
 
 def ring(name, cell, view, align, fine_pitch=0.0, hole=None, thickness=0.18, color=(0.62, 0.66, 0.9), y=0.0,
-         shadow=True, rough=0.55, gap=GAP):
+         shadow=True, rough=0.55, gap=GAP, blend=0):
     gen = {"name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": align,
            "finePitch": fine_pitch, "tiles": TILES}
+    if blend:
+        gen["blend"] = {"cells": blend, "ratio": 2}  # the seam band toward the next ring (ADR-1976 amended)
     if hole:
         gen["hole"] = hole
     proc = {"source": {"kind": "box", "size": [cell * gap, thickness, cell * gap]},
@@ -45,11 +47,11 @@ def ring(name, cell, view, align, fine_pitch=0.0, hole=None, thickness=0.18, col
         proc["castsShadow"] = False
     return {"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": proc}
 
-nodes = [ring("ground-1x", 1.0, fv, 4)]
+nodes = [ring("ground-1x", 1.0, fv, 4, blend=8 if a.rings >= 2 else 0)]
 if a.rings >= 2:
     # Coarser rings close their geometric gaps; their blocks paint the fine lattice instead (tileBorder subdivisions).
     nodes.append(ring("ground-2x", 2.0, fv * 2.0, 2, 1.0, {"cellSize": 1.0, "viewDistance": fv, "align": 4},
-                      thickness=0.36, gap=1.0))
+                      thickness=0.36, gap=1.0, blend=4 if a.rings >= 3 else 0))
 if a.rings >= 3:
     nodes.append(ring("ground-4x", 4.0, fv * 4.0, 1, 1.0, {"cellSize": 2.0, "viewDistance": fv * 2.0, "align": 2},
                       thickness=0.72, shadow=False, gap=1.0))

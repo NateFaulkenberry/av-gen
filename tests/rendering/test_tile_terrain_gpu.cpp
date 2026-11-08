@@ -111,7 +111,7 @@ Parity compare(rendering::SceneRenderer& renderer, const scene::ProceduralGeomet
                 continue;
             }
             ++out.present;
-            const scene::TileSample t = scene::generatorTile(g, ix, iz);
+            const scene::TileSample t = scene::generatorTileInWindow(g, ix, iz, w);
             out.worstHeight = std::max(out.worstHeight, std::abs(r.position.y - t.height));
             out.worstXZ = std::max({out.worstXZ, std::abs(r.position.x - (static_cast<float>(ix) + 0.5f) * g.cellSize),
                                     std::abs(r.position.z - (static_cast<float>(iz) + 0.5f) * g.cellSize)});
@@ -149,7 +149,10 @@ TEST_CASE("A coarse tile ring leaves the fine window empty and stands at its chi
           "[gpu][generator][geography][adr1976]") {
     auto ctx = makeContext();
     Rig rig(*ctx);
-    const auto fine = tilesObject("fine", 1.0f, 24.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    auto fine = tilesObject("fine", 1.0f, 24.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    fine.distribution.generator.blendCells = 3; // the seam band, toward the 4 m blocks (ADR-1976 amended)
+    fine.distribution.generator.blendRatio = 4;
+    REQUIRE(fine.validate().has_value());
     const auto coarse = tilesObject("coarse", 4.0f, 96.0f, 1, 1.0f, 1.0f, 24.0f, 4);
     const glm::vec3 camera{13.7f, 35.0f, -21.2f};
     scene::Scene s;

@@ -3320,6 +3320,9 @@ json ProceduralGeometry::toJson() const {
                 gj["tiles"] = tileTerrainToJson(g.tiles);
                 gj["align"] = g.align;
                 gj["finePitch"] = g.finePitch;
+                if (g.blendCells > 0) {
+                    gj["blend"] = json{{"cells", g.blendCells}, {"ratio", g.blendRatio}};
+                }
                 if (g.holeCellSize > 0.0f) {
                     gj["hole"] = json{{"cellSize", g.holeCellSize},
                                       {"viewDistance", g.holeViewDistance},
@@ -3683,6 +3686,17 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                         return std::unexpected(tiles.error());
                     }
                     gs.tiles = std::move(*tiles);
+                }
+                if (j.contains("blend")) { // ADR-1976 (amended): the seam band
+                    const json& bj = j.at("blend");
+                    if (!bj.is_object() || !bj.contains("cells") || !bj.at("cells").is_number_integer() ||
+                        (bj.contains("ratio") && !bj.at("ratio").is_number_integer())) {
+                        return fail("'distribution.generator.blend' must be {cells, ratio} (integers)");
+                    }
+                    gs.blendCells = bj.at("cells").get<std::int32_t>();
+                    if (bj.contains("ratio")) {
+                        gs.blendRatio = bj.at("ratio").get<std::int32_t>();
+                    }
                 }
                 if (j.contains("hole")) { // ADR-1976
                     const json& h = j.at("hole");
