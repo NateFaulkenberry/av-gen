@@ -663,3 +663,29 @@ The engine stills are in `02-terrain/cpa-*-art-look-r2.png`. The side-by-side co
   low land. The flight (Phase 5) replaces them, but the CP-A stills need composed frames.
 - **Sunset.** It is no longer muddy, but it reads rose rather than the mock-up's magenta-to-coral with orange crowns.
   The crowns are under 26 m here, so the orange stops never show.
+
+### CP-A r3 (after engineering 5f4ecd42)
+
+**What changed in the land:**
+- **The river:** 16 points meandering north from the bay's north shore, 8 m wide, in a 240 m valley.
+- **heightScale 1.25:** the crowns reach about 31 m, so the top of the colour ramp shows.
+- **Neighbour steps:** p99 0.275 against the 0.30 slab (mirror measurement).
+
+**The composed cameras** (`build.py`): `revealC`, `coastC`, `valleyC` and `nightC`, composed with `frame_preview.py`.
+
+The stills are `02-terrain/cpa-11..16-*-r3.png`, and the comparison is `cpa-17-r3-engine-vs-blender-mockup.png`.
+
+**Still present in the engine frames** (reported, not worked around):
+- **Speckle:** dark blue dashes over the mid-ground land in the day reveal and the valley view, and horizontal streak
+  rows in the sunset foreground.
+- **Moiré:** concentric arcs in the coast view's flat foreground.
+- **Ring boundary:** a visible lighter rectangle where the 1× ring meets the 2× ring (reveal lower middle; night
+  mid-left).
+- **Cost:** the composed reveal is GPU p50 35.1 ms at 1080p Ultra, over 33.3. Pitching down fills the frame with the
+  fine ring.
+
+**Art, still open:**
+- The day lowlands dominate the reveal (violet and blue), so the warm crowns show mostly on the coast ridge.
+- The coast ridge's top reads olive.
+- Sunset reads magenta-rose with coral crowns. The mock-up's orange crowns are not yet reached.
+- No contours or crests yet (Phase 3).

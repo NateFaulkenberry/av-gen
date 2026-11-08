@@ -24,6 +24,11 @@ TILES = {
     "crownThreshold": 0.80, "crownFlatten": 0.85,
     "regionWavelength": 2400.0, "regionVariation": 0.25,
     "pathWidth": 2.0, "pathLift": 0.3,
+    # CP-A (r2's valley): a river meandering north from the bay's north shore, in a smooth valley with no walls
+    "river": [[270.0, -530], [311.3, -592], [324.5, -654], [300.7, -716], [255.9, -778], [220.8, -840], [219.1, -902], [252.0, -964], [297.2, -1026], [323.9, -1088], [313.9, -1150], [274.1, -1212], [231.5, -1274], [215.1, -1336], [236.0, -1398], [280.0, -1460]],
+    "riverWidth": 8.0, "valleyWidth": 240.0,
+    # taller land so the top of the colour ramp (orange, yellow; 20-30 m) shows on the crowns (04- §3)
+    "heightScale": 1.25,
     # from the bay's north shore up into the north-west hills (terrain_mirror.py --map shows the layout)
     "path": [[40, -610], [-40, -690], [-150, -745], [-260, -800], [-360, -880], [-470, -940], [-590, -975],
              [-720, -1010], [-830, -1090]],

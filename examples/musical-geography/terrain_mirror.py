@@ -89,10 +89,16 @@ def tile_sample(s, x, z):
     hn = fbm(seed ^ K_HILL, (x + wx) / hwl, (z + wz) / hwl, s["hillOctaves"])
     shaped = _sm(s["hillLow"], s["hillHigh"], hn)
     hill = shaped - np.maximum(shaped - s["crownThreshold"], 0) * s["crownFlatten"]
-    land_h = s["shoreRise"] + s["hillHeight"] * k * hill * inland
+    land_h = s["shoreRise"] + s["hillHeight"] * k * hill * inland * s.get("heightScale", 1.0)
+    channel = np.zeros_like(land_h)
+    if s.get("river"):
+        d = path_distance(s["river"], x, z)
+        v = 1 - _sm(0.5 * s["riverWidth"], 0.5 * s["valleyWidth"], d)
+        land_h = land_h + (-s["seaDepth"] - land_h) * v
+        channel = 1 - _sm(0.5 * s["riverWidth"] - 0.5, 0.5 * s["riverWidth"] + 0.5, d)
     lo = s["seaLevel"] - s["seaDepth"]
     h = lo + ((s["seaLevel"] + land_h) - lo) * land
-    out = {"water": 1 - land, "shore": 1 - _sm(0, 3 * sb, np.abs(c - lt)),
+    out = {"water": 1 - land + channel * land, "shore": 1 - _sm(0, 3 * sb, np.abs(c - lt)),
            "flat": _sm(s["crownThreshold"], s["crownThreshold"] + 0.06, shaped) * s["crownFlatten"] * inland * land}
     p = np.zeros_like(h)
     if s.get("path"):
