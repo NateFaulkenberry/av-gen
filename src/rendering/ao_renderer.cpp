@@ -258,7 +258,8 @@ void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::T
                         const wgpu::TextureView& prepassNormal,
                         const QualitySettings& quality, std::uint64_t frameIndex, std::uint32_t frameNonce,
                         float fovYRadians,
-                        float aspect, float nearPlane, float farPlane, float worldRadius, float strength) {
+                        float aspect, float nearPlane, float farPlane, float worldRadius, float strength,
+                        float fadeStart, float fadeEnd) {
     Impl& im = *impl_;
     collectTimings();
     im.activeThisFrame = false;
@@ -323,6 +324,7 @@ void AoRenderer::update(std::uint32_t width, std::uint32_t height, const wgpu::T
     u.temporal = glm::vec4(static_cast<float>(frameNonce % 64u), blend, im.hasHistory ? 1.0f : 0.0f,
                            std::max(worldRadius * 0.5f, 0.05f));
     u.projection = glm::vec4(tanHalf * aspect, tanHalf, nearPlane, farPlane);
+    u.fade = glm::vec4(fadeStart, fadeEnd, 0.0f, 0.0f);
     im.context.queue().WriteBuffer(im.uniforms, 0, &u, sizeof(u));
 
     im.activeThisFrame = true;
@@ -399,6 +401,14 @@ const wgpu::TextureView& AoRenderer::placeholder() const {
 
 bool AoRenderer::active() const {
     return impl_->activeThisFrame;
+}
+
+float aoDistanceFade(float depth, float start, float end) {
+    if (!(end > start)) {
+        return 0.0f;
+    }
+    const float t = std::clamp((depth - start) / (end - start), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
 }
 
 } // namespace avgen::rendering

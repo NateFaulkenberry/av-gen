@@ -38,15 +38,19 @@ struct AoStats {
     double aoMs = -1.0;        // GPU time of the AO + temporal passes (-1 = unavailable)
 };
 
-// Group 1 binding 0 of both AO passes (80 bytes). Mirrors `AoUniforms` in shaders/gtao.wgsl.
+// Group 1 binding 0 of both AO passes (96 bytes). Mirrors `AoUniforms` in shaders/gtao.wgsl.
 struct AoUniforms {
     glm::vec4 sizes;      // AO width, height, 1 / width, 1 / height
     glm::vec4 fullSize;   // scene width, height, 1 / width, 1 / height
     glm::vec4 params;     // world radius, strength, slice count, steps per slice
     glm::vec4 temporal;   // frame index, history blend, 1 when a history exists, thickness
     glm::vec4 projection; // tan(fovY/2) * aspect, tan(fovY/2), near, far
+    glm::vec4 fade;       // distance fade: start, end (view depth, metres; end <= start = off), 0, 0
 };
-static_assert(sizeof(AoUniforms) == 80);
+static_assert(sizeof(AoUniforms) == 96);
+// The AO distance fade's weight toward no occlusion at view depth `depth` (0 = full AO, 1 = none). The twin of the
+// fade in shaders/gtao.wgsl; `end <= start` is off (0 everywhere).
+[[nodiscard]] float aoDistanceFade(float depth, float start, float end);
 
 class AoRenderer {
 public:
@@ -65,7 +69,8 @@ public:
                 const wgpu::TextureView& prepassNormal,
                 const QualitySettings& quality, std::uint64_t frameIndex, std::uint32_t frameNonce,
                 float fovYRadians, float aspect,
-                float nearPlane, float farPlane, float worldRadius, float strength);
+                float nearPlane, float farPlane, float worldRadius, float strength, float fadeStart = 0.0f,
+                float fadeEnd = 0.0f);
     // Encodes the occlusion pass and the temporal pass. `frameBindGroup` must be the variant whose
     // AO binding is a placeholder.
     void encode(wgpu::CommandEncoder& encoder, const wgpu::BindGroup& frameBindGroup);

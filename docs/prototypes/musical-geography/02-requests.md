@@ -218,10 +218,59 @@ carries its own background tint as a canary. The stills are in `02-terrain/`.
   shadows, depth-prepass precision, the compiled-materials variant, holes, roughness and IBL.
 
 **What to try on your side:** `"ambientOcclusion": false` in the environment. Or keep AO near and accept the far
-crease shading; the engine has no AO distance fade today. The lighter 1×/2× rectangle is the same mechanism (the 1 m
+crease shading; since ADR-1951 there is an AO distance fade (below). The lighter 1×/2× rectangle is the same mechanism (the 1 m
 tiles have twice as many creases), and it weakens with AO off as well.
 
 **Diagnostic switches** (procedural node; not for production):
 - `"slabDebugFaces": true` colours each face: top red, x side green, z side blue, a flattened side toward yellow.
 - `"slabSidePixels"` sets the side threshold. The default is 2 × `slabFarPixels`; raising it did not change the
   dashes, because they are already flattened.
+
+### Open engine question (2026-11-08): sun shadow maps reach no visible pixel in revealC
+
+In your 3b7856e4 revealC (camera at 120 m, `shadowRange` 220), the frame with shadows on (2 casting lights, the
+1× and 2× rings as casters, 3 cascades, 6 draws, 1.63 ms) was bit-identical to the frame with both lights'
+`castsShadow` off. The shadow passes cost time and change no pixel. Two readings, not yet told apart:
+
+1. **Nothing is occluded.** The sun is at about 42° and the hills are gentle, so no tile top facing the sun would be
+   behind another tile. A riser's own shadow is about 1.3 × its step height, under one shadow texel at this range.
+2. **Procedural slabs don't receive, or the cascades miss them.** That would be an engine bug, and it may affect other
+   scenes.
+
+**Answer (the same day): it's reading 1, plus the range, and not an engine bug.** I rendered canaried arms with a low
+sun (`dayPhase` 0.29); the stills are in `02-terrain/`. Each count is ground pixels differing by more than 8 from
+shadows off:
+
+| Arm | Far rows | Mid rows | Near rows | Shadow cost |
+|---|---|---|---|---|
+| `shadowRange` 220 (`eng-r6-sunlow-shadows-range220.png`) | 357 | 2 | 1,544 | 2.14 ms |
+| `shadowRange` 1000 (`eng-r6-sunlow-shadows-range1000.png`) | 3,678 | 7,128 | 2,502 | 2.86 ms |
+
+The difference images are `eng-r6-shadow-diff-range220-x8.png` and `-range1000-x8.png`.
+
+- Procedural slabs do receive shadows. The shadows are riser specks, as expected.
+- At 120 m altitude the nearest visible ground is about 187 m away, so a 220 m range covers only the bottom strip of
+  the frame. At a 42° sun nothing in that strip is occluded.
+- The 4× ring has `castsShadow: false`, so it never casts.
+
+**For the art side:** at the reveal, the 1.63 ms of shadow passes buys no pixel at midday. Either drop
+`castsShadow` there, or keep it for a low sun and raise `shadowRange` if you want the far ground shadowed (+0.7 ms).
+
+### Engineering → art (2026-11-08): the AO distance fade (ADR-1951), what to switch on
+
+```json
+"environment": { "aoFadeStart": 200.0, "aoFadeEnd": 420.0 }
+```
+
+This is view depth in metres, smoothstepped. AO is full before `aoFadeStart` and gone after `aoFadeEnd`. The default
+is off. The near ground keeps its creases and the far slab risers stop reading as AO dashes. Set the band per shot:
+the values above suit revealC, where the nearest visible ground is about 187 m away. A low shot wants a nearer band,
+for example 40 to 120 m.
+
+Stills in `02-terrain/` (art revealC, canaried orange):
+
+- `eng-r6-revealC-ao-fade-200-420.png`: the whole frame.
+- `eng-r6-far-crop-ao-on-fade-off.png` and `eng-r6-near-crop-ao-on-fade-off.png`: AO on, faded, AO off, stacked top
+  to bottom. Far, the faded frame matches AO off; near, it matches AO on.
+
+The faint lit remainder of the dashes is in AO off too, so the fade doesn't remove it. That part is still open.

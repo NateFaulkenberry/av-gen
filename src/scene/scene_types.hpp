@@ -780,6 +780,12 @@ struct Environment {
     // keep, and a surface crossing between them pops in and out of shadow. A scene of tall relief under a low sun sets
     // this to about relief height / tan(sun elevation). 0 (the default) changes nothing.
     float shadowCasterReach = 0.0f;
+    // Musical Geography, CP-A r3: screen-space AO faded out with view depth (metres). GTAO rebuilds its normals from
+    // depth, so a field of small steps (a stepped tile landscape) reads as creases everywhere it is far enough that each
+    // step is a few pixels: speckle and dashes. Between `aoFadeStart` and `aoFadeEnd` the occlusion eases to none, so
+    // near creases keep their AO and far ones stop speckling. Both 0 (the default) = no fade, byte-identical.
+    float aoFadeStart = 0.0f;
+    float aoFadeEnd = 0.0f;
     // ADR-1867: the cascades' split scheme -- 0 uniform .. 1 logarithmic (Zhang's practical split). A negative value (the
     // default) keeps the engine's 0.85. A scene whose shadowed walls sit mid to far lowers it, moving texels out of
     // the first metres and into the walls.

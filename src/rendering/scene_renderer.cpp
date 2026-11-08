@@ -3761,9 +3761,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, prepassNormal_.view, aoQuality, time.frameIndex,
                     time.frameNonce(),
                     scene.camera.effectiveFovY(), aspect, scene.camera.nearPlane, scene.camera.farPlane,
-                    aoRadius, 1.0f);
+                    aoRadius, 1.0f, scene.environment.aoFadeStart, scene.environment.aoFadeEnd);
         stats_.ao = ao_->stats();
         const bool on = ao_->active();
+        frame.aoFade = glm::vec4(scene.environment.aoFadeStart, scene.environment.aoFadeEnd, 0.0f, 0.0f);
         frame.aoParams = glm::vec4(on ? 1.0f : 0.0f, on ? 1.0f : 0.0f,
                                    static_cast<float>(std::max(stats_.ao.width, 1u)),
                                    static_cast<float>(std::max(stats_.ao.height, 1u)));

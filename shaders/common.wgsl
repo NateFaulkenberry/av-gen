@@ -199,6 +199,7 @@ struct FrameUniforms {
     corruption7: vec4<f32>,
     corruption8: vec4<f32>,
     corruption9: vec4<f32>,
+    aoFade: vec4<f32>,     // ADR-1951: x = start, y = end (view depth, m; end <= start = off)
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 

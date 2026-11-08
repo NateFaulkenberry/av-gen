@@ -153,6 +153,13 @@ fn sampleAmbientOcclusion(screenUv: vec2<f32>, viewDepth: f32, normal: vec3<f32>
     if (dot(n, n) > 1e-6) {
         out.bentNormal = normalize(n);
     }
+    // ADR-1951: the distance fade takes the bend out with the occlusion. The pass's bent normal starts from the normal
+    // it rebuilds from depth, so even unoccluded it is the depth's facet (a slab riser's crease), not this surface's
+    // shading normal; faded, the shading normal is used. Off (end <= start) changes nothing.
+    if (frame.aoFade.y > frame.aoFade.x) {
+        let t = clamp((viewDepth - frame.aoFade.x) / (frame.aoFade.y - frame.aoFade.x), 0.0, 1.0);
+        out.bentNormal = normalize(mix(out.bentNormal, normal, t * t * (3.0 - 2.0 * t)));
+    }
     return out;
 }
 

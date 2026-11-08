@@ -10,10 +10,12 @@
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
 #include "gpu/shader_library.hpp"
+#include "rendering/ao_renderer.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/procedural.hpp"
 #include "scene/scene.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -204,5 +206,78 @@ TEST_CASE("The far-tile rule closes a ring's gaps below its pixel threshold", "[
     CAPTURE(openBlack, closedBlack);
     CHECK(openBlack > 5000);
     CHECK(closedBlack < openBlack / 10);
+    CHECK(ctx->errorCount() == 0);
+}
+
+namespace {
+
+scene::Scene steppedScene(bool ao, float fadeStart, float fadeEnd) {
+    scene::ProceduralGeometry pg;
+    pg.name = "steps";
+    pg.slabs = true;
+    pg.source.kind = scene::PrimitiveKind::Box;
+    pg.source.size = {1.0f, 0.3f, 1.0f};
+    pg.distribution.kind = scene::DistributionKind::Generator;
+    scene::GeneratorSpec& g = pg.distribution.generator;
+    g.name = scene::kGeneratorTiles;
+    g.cellSize = 1.0f;
+    g.viewDistance = 48.0f;
+    g.align = 4;
+    g.skirt = 3.0f;
+    g.tiles.landThreshold = 0.0f;  // all land
+    g.tiles.hillWavelength = 30.0f; // steep enough for many steps in view
+    g.tiles.hillHeight = 12.0f;
+    REQUIRE(pg.validate().has_value());
+    REQUIRE(pg.rebuild());
+    scene::Scene s;
+    s.environment.backgroundColor = {0.2f, 0.3f, 0.5f};
+    s.environment.showSkybox = false;
+    s.environment.ambientOcclusion = ao;
+    s.environment.aoFadeStart = fadeStart;
+    s.environment.aoFadeEnd = fadeEnd;
+    s.camera.position = {0.5f, 26.0f, 20.0f};
+    s.camera.target = {0.5f, 6.0f, -10.0f};
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.3f));
+    key.intensity = 3.0f;
+    s.addLight(key);
+    s.procedurals.push_back(pg);
+    return s;
+}
+
+double meanDifference(const gpu::Image8& a, const gpu::Image8& b) {
+    double sum = 0.0;
+    for (std::uint32_t y = 0; y < a.height; ++y) {
+        for (std::uint32_t x = 0; x < a.width; ++x) {
+            const auto* p = a.pixel(x, y);
+            const auto* q = b.pixel(x, y);
+            for (int c = 0; c < 3; ++c) {
+                sum += std::abs(static_cast<int>(p[c]) - static_cast<int>(q[c]));
+            }
+        }
+    }
+    return sum / (3.0 * a.width * a.height);
+}
+
+} // namespace
+
+TEST_CASE("The AO distance fade eases occlusion out with depth and is off by default", "[gpu][ao][geography]") {
+    // The CPU twin of the shader's fade.
+    CHECK(rendering::aoDistanceFade(50.0f, 0.0f, 0.0f) == 0.0f);    // off
+    CHECK(rendering::aoDistanceFade(5.0f, 10.0f, 30.0f) == 0.0f);   // before the band: full AO
+    CHECK(rendering::aoDistanceFade(40.0f, 10.0f, 30.0f) == 1.0f);  // past it: none
+    CHECK(rendering::aoDistanceFade(20.0f, 10.0f, 30.0f) == Catch::Approx(0.5f));
+    // On the GPU: a stepped slab field, whose risers GTAO reads as creases.
+    auto ctx = makeContext();
+    const auto off = render(*ctx, steppedScene(false, 0.0f, 0.0f));
+    const auto on = render(*ctx, steppedScene(true, 0.0f, 0.0f));
+    const auto onNoFade = render(*ctx, steppedScene(true, 50.0f, 40.0f)); // end <= start: off, as the default
+    const auto faded = render(*ctx, steppedScene(true, 0.0f, 0.01f));     // the whole frame past the band
+    const double aoEffect = meanDifference(on, off);
+    const double fadedResidue = meanDifference(faded, off);
+    CAPTURE(aoEffect, fadedResidue);
+    CHECK(aoEffect > 0.5);                                // AO does darken this field
+    CHECK(fadedResidue < aoEffect * 0.1);                 // fully faded, it is (almost) AO off
+    CHECK(gpu::hashImage(onNoFade) == gpu::hashImage(on)); // a disabled band changes nothing
     CHECK(ctx->errorCount() == 0);
 }

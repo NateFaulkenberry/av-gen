@@ -77,7 +77,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -9832,6 +9832,8 @@ void Composition::applyParameters() {
         env.shadowResolution = volumeSetting_.shadowResolution; // ADR-1867
         env.shadowRange = pick(shadowRange_, volumeSetting_.shadowRange);
         env.shadowCasterReach = volumeSetting_.shadowCasterReach; // ADR-1858
+        env.aoFadeStart = volumeSetting_.aoFadeStart; // CP-A r3: the AO distance fade
+        env.aoFadeEnd = volumeSetting_.aoFadeEnd;
         env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
         env.contactShadows = volumeSetting_.contactShadows;
@@ -10879,6 +10881,10 @@ nlohmann::json Composition::toJson() const {
         }
         if (volumeSetting_.shadowCasterReach > 0.0f) { // ADR-1858: written only when set
             environment["shadowCasterReach"] = volumeSetting_.shadowCasterReach;
+        }
+        if (volumeSetting_.aoFadeEnd > volumeSetting_.aoFadeStart) { // CP-A r3: written only when set
+            environment["aoFadeStart"] = volumeSetting_.aoFadeStart;
+            environment["aoFadeEnd"] = volumeSetting_.aoFadeEnd;
         }
         // ADR-1406: written only when the scene turned them off
         if (!volumeSetting_.ambientOcclusion) {
@@ -12238,6 +12244,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"volumeMaxDistance", &v.volumeMaxDistance},
                                       FloatKey{"shadowRange", &v.shadowRange},
                                       FloatKey{"shadowCasterReach", &v.shadowCasterReach},
+                                      FloatKey{"aoFadeStart", &v.aoFadeStart},
+                                      FloatKey{"aoFadeEnd", &v.aoFadeEnd},
                                       FloatKey{"shadowSplitLambda", &v.shadowSplitLambda}}) {
                 auto value = readFloat(e, fk.key, *fk.target);
                 if (!value) {

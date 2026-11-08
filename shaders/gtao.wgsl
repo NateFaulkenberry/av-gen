@@ -18,6 +18,7 @@ struct AoUniforms {
     params: vec4<f32>,     // world radius, strength, slice count, steps per slice
     temporal: vec4<f32>,   // frame index, history blend, 1 when a history exists, thickness
     projection: vec4<f32>, // tan(fovY/2) * aspect, tan(fovY/2), near, far
+    fade: vec4<f32>,       // distance fade: start, end (view depth, metres; end <= start = off)
 };
 
 @group(1) @binding(0) var<uniform> ao: AoUniforms;
@@ -224,6 +225,12 @@ fn fs_gtao(in: FsIn) -> @location(0) vec4<f32> {
         bent = bent + (v * cos(bentAngle) + tangent * sin(bentAngle)) * projLength;
     }
     visibility = clamp(visibility / f32(slices), 0.0, 1.0);
+    // The distance fade (rendering/ao_renderer.hpp aoDistanceFade): toward no occlusion with view depth, so a far field
+    // of small steps does not read as creases everywhere. Off (end <= start) leaves `visibility` untouched.
+    if (ao.fade.y > ao.fade.x) {
+        let t = clamp((depth - ao.fade.x) / (ao.fade.y - ao.fade.x), 0.0, 1.0);
+        visibility = mix(visibility, 1.0, t * t * (3.0 - 2.0 * t));
+    }
     // Each slice contributes the part of the normal that lies in its own plane, and every one of
     // those planes contains the view vector, so the sum systematically loses the part of the normal
     // perpendicular to the view: a bent normal built this way leans toward the camera even where
