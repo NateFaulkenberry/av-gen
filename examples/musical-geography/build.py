@@ -42,6 +42,10 @@ CAMERAS = {
 }
 
 
+# Ambient-occlusion fade band per view, metres (engineering's suggestion): the reveal's near ground starts 200 m out.
+AO_BANDS = {"revealC": (200.0, 420.0), "valleyC": (120.0, 300.0)}
+
+
 def camera(name):
     c = dict(CAMERAS[name])
     if c.pop("ground", False):
@@ -62,11 +66,13 @@ def scene_doc(state, interim, camera_name):
         "background": look.hexlin(s["sky_hor"]),
         "proceduralSkyBackground": True,
         "skybox": True,
-        "shadowRange": 220.0,
+        "shadowRange": 480.0,   # the low suns' long shadows reach the reveal's middle ground (+0.7 ms; 220 changed no pixel there)
         "depthPrepass": True,
-        # GTAO darkens every far step riser into dark dashes (engineering 97fe0568, canaried frames); off until its
-        # distance fade lands, then back on for the near ground
-        "ambientOcclusion": False,
+        # GTAO, faded out with distance (ADR-1951): it darkened every far step riser into dark dashes (97fe0568).
+        # The band is per view (AO_BANDS): near ground only.
+        "ambientOcclusion": True,
+        "aoFadeStart": AO_BANDS.get(camera_name, (40.0, 120.0))[0],
+        "aoFadeEnd": AO_BANDS.get(camera_name, (40.0, 120.0))[1],
         "sky": look.sky(state),
         "dayNight": look.day_night(phase=s["phase"]),
     }
