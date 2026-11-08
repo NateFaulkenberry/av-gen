@@ -771,3 +771,21 @@ Phase 3. Cut in this order:
    the near edge.
 3. **Violet fill:** fold it into the sky fill colour if the engine exposes one. This needs a request.
 4. **High live tier** for the reveal leg only.
+
+### CP-A r7 (2026-11-08, on engineering de9e8ce6)
+
+**Changes:**
+- **Contact shadows off.** They were the dark dashes.
+- **The 1× ring paints the same prefiltered tile grid as the 2× and 4× rings** (tileBorder 0.72). Before this, the 1×
+  ring painted no grid lines, which is why it read lighter and showed as a rectangle.
+- **The day pass from the r7 check** (magenta lowlands, gold hill masses).
+
+The stills are `02-terrain/cpa-51..56-*-r7.png`, with the comparison sheet `cpa-57`. The day reveal costs 23.2 ms GPU
+at p50.
+
+**Result:**
+- **Day reveal and valley:** the dashes and the rectangle are gone.
+- **Still showing:**
+  - **Night:** the 1×/2× rectangle is still visible, a lighter rectangle in the lower left.
+  - **Coast ridge:** a scatter of bright orange flecks on the sunlit risers.
+  - **Sunset valley:** light flecks in the foreground. These are risers catching the low sun, not dark dashes.
