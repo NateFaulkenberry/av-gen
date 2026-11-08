@@ -1802,6 +1802,8 @@ private:
         params::Parameter<float>* phaseOffset = nullptr;
         params::Parameter<float>* sunPeakElevation = nullptr;
         params::Parameter<float>* sunAzimuthAtDawn = nullptr;
+        params::Parameter<float>* sunAzimuthBias = nullptr;   // ADR-1961
+        params::Parameter<float>* sunElevationBias = nullptr;
         params::Parameter<float>* sunAzimuthSweep = nullptr;
         params::Parameter<float>* sunIntensityScale = nullptr;
         params::Parameter<float>* moonIntensityScale = nullptr;

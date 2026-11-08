@@ -96,6 +96,13 @@ struct DayNightSettings {
     float sunPeakElevation = 0.78f;   // radians at noon
     float sunAzimuthAtDawn = 1.62f;   // radians; +Z is 0
     float sunAzimuthSweep = 3.14159f; // radians swept from dawn to dusk
+    // ADR-1961: the sun placed per state or along the timeline, independent of the arc. Each is added to the arc's
+    // azimuth / elevation (radians): the curves keyed by phase (a palette state is a phase), the scalars for a timeline
+    // key or a modulation (the panel shows them in degrees). Empty curves and zero scalars leave the arc as it was.
+    std::vector<PhaseKey<float>> sunAzimuthOffset;
+    std::vector<PhaseKey<float>> sunElevationOffset;
+    float sunAzimuthBias = 0.0f;
+    float sunElevationBias = 0.0f;
 
     std::vector<PhaseKey<glm::vec3>> sunColor;
     std::vector<PhaseKey<float>> sunIntensity;

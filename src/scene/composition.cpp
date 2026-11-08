@@ -5044,6 +5044,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                                                        dn.sunAzimuthAtDawn * kRadToDeg, -360.0f, 360.0f, -180.0f, 180.0f));
             p.sunAzimuthSweep = &params.add(floatDesc(base + "sun/azimuthSweepDeg",
                                                       dn.sunAzimuthSweep * kRadToDeg, -360.0f, 360.0f, 0.0f, 360.0f));
+            // ADR-1961: the sun moved off its arc, keyable on the timeline (added to the per-state curves).
+            p.sunAzimuthBias = &params.add(floatDesc(base + "sun/azimuthOffsetDeg",
+                                                     dn.sunAzimuthBias * kRadToDeg, -360.0f, 360.0f, -180.0f, 180.0f));
+            p.sunElevationBias = &params.add(floatDesc(base + "sun/elevationOffsetDeg",
+                                                       dn.sunElevationBias * kRadToDeg, -90.0f, 90.0f, -45.0f, 45.0f));
             // The `*Scale` multipliers over the authored curves. These already existed as fields
             // and were simply unreachable, which is the whole of this defect in one line.
             p.sunIntensityScale =
@@ -8998,6 +9003,8 @@ void Composition::applyParameters() {
         if (p.sunPeakElevation != nullptr) dn.sunPeakElevation = p.sunPeakElevation->value() * kDegToRad;
         if (p.sunAzimuthAtDawn != nullptr) dn.sunAzimuthAtDawn = p.sunAzimuthAtDawn->value() * kDegToRad;
         if (p.sunAzimuthSweep != nullptr) dn.sunAzimuthSweep = p.sunAzimuthSweep->value() * kDegToRad;
+        if (p.sunAzimuthBias != nullptr) dn.sunAzimuthBias = p.sunAzimuthBias->value() * kDegToRad;
+        if (p.sunElevationBias != nullptr) dn.sunElevationBias = p.sunElevationBias->value() * kDegToRad;
         dn.sunIntensityScale = f(p.sunIntensityScale, dn.sunIntensityScale);
         dn.moonIntensityScale = f(p.moonIntensityScale, dn.moonIntensityScale);
         dn.starBrightnessScale = f(p.starBrightnessScale, dn.starBrightnessScale);
@@ -10790,6 +10797,8 @@ nlohmann::json Composition::toJson() const {
         if (dn.sunPeakElevation != def.sunPeakElevation) d["sunPeakElevation"] = dn.sunPeakElevation;
         if (dn.sunAzimuthAtDawn != def.sunAzimuthAtDawn) d["sunAzimuthAtDawn"] = dn.sunAzimuthAtDawn;
         if (dn.sunAzimuthSweep != def.sunAzimuthSweep) d["sunAzimuthSweep"] = dn.sunAzimuthSweep;
+        if (dn.sunAzimuthBias != def.sunAzimuthBias) d["sunAzimuthOffset"] = dn.sunAzimuthBias;       // ADR-1961
+        if (dn.sunElevationBias != def.sunElevationBias) d["sunElevationOffset"] = dn.sunElevationBias;
         if (dn.sunIntensityScale != def.sunIntensityScale) d["sunIntensityScale"] = dn.sunIntensityScale;
         if (dn.moonIntensityScale != def.moonIntensityScale) d["moonIntensityScale"] = dn.moonIntensityScale;
         if (dn.starBrightnessScale != def.starBrightnessScale) d["starBrightnessScale"] = dn.starBrightnessScale;
@@ -10827,6 +10836,8 @@ nlohmann::json Composition::toJson() const {
             writeVec3Curve("fogColor", dn.fogColor);
             writeVec3Curve("waterDeepColor", dn.waterDeepColor);
             writeFloatCurve("sunIntensity", dn.sunIntensity);
+            if (!dn.sunAzimuthOffset.empty()) writeFloatCurve("sunAzimuthOffsetCurve", dn.sunAzimuthOffset);     // ADR-1961
+            if (!dn.sunElevationOffset.empty()) writeFloatCurve("sunElevationOffsetCurve", dn.sunElevationOffset);
             writeFloatCurve("moonIntensity", dn.moonIntensity);
             writeFloatCurve("skyIntensity", dn.skyIntensity);
             writeFloatCurve("haze", dn.haze);
@@ -12028,6 +12039,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             rf("sunPeakElevation", dn.sunPeakElevation);
             rf("sunAzimuthAtDawn", dn.sunAzimuthAtDawn);
             rf("sunAzimuthSweep", dn.sunAzimuthSweep);
+            rf("sunAzimuthOffset", dn.sunAzimuthBias);     // ADR-1961
+            rf("sunElevationOffset", dn.sunElevationBias);
             rf("sunIntensityScale", dn.sunIntensityScale);
             rf("moonIntensityScale", dn.moonIntensityScale);
             rf("starBrightnessScale", dn.starBrightnessScale);
@@ -12081,6 +12094,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             readVec3Curve("fogColor", dn.fogColor);
             readVec3Curve("waterDeepColor", dn.waterDeepColor);
             readFloatCurve("sunIntensity", dn.sunIntensity);
+            readFloatCurve("sunAzimuthOffsetCurve", dn.sunAzimuthOffset);     // ADR-1961
+            readFloatCurve("sunElevationOffsetCurve", dn.sunElevationOffset);
             readFloatCurve("moonIntensity", dn.moonIntensity);
             readFloatCurve("skyIntensity", dn.skyIntensity);
             readFloatCurve("haze", dn.haze);
