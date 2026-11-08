@@ -153,6 +153,9 @@ regression. This file records what was done, in order. Media: `~/Desktop/av-gen-
 **Update 2026-11-06 (65- §2):** the exception stands, for good. The A-to-B rebuild of the Moon in 61- §3, 62- and 63-
 is withdrawn: the Moon flies its ea97208c path with the M3f gaze.
 
+**Final state (the wrap, 2026-11-08, 67-):** unchanged. The Moon flies the ea97208c path with the M3f gaze, the
+exception stands, and the portal crater's floor is cleared (ADR-1912, 66-).
+
 ## 7. The ocean, round 2 (owner: "the direction is right")
 
 **What changed (`build_ocean.py`):**

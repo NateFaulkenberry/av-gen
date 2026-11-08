@@ -416,7 +416,7 @@ def write_ocean(portal_flight):
                 "drag": 0.2, "turbulence": 0.2, "turbulenceScale": 0.05, "sizeStart": 0.09, "sizeEnd": 0.09,
                 "sizeVariance": 0.6, "colorStart": [0.7, 0.85, 0.85, 0.35], "colorEnd": [0.7, 0.85, 0.85, 0.35],
                 "emissive": 0.3, "blend": "additive"}},
-        ] + life_nodes() + fish_nodes() + creature_nodes() + octopus_nodes(),
+        ] + life_nodes() + fish_nodes() + creature_nodes(),
     }
     path = os.path.join(HERE, "strange-attractor-ocean.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
@@ -489,35 +489,6 @@ def life_nodes():
 
 # M3e: the bay frame's strips fail as the corruption reaches them -- a few stutters, then dark (seconds, emissiveBoost)
 STRIPS_DIE = [(133.6, 1.0), (134.1, 0.25), (134.3, 0.9), (134.9, 0.1), (135.1, 0.55), (135.8, 0.0)]
-
-
-# M3g (owner 54- §6: our octopus, octopus-v1; the hero agent's placement, hero-03-octopus.md §3, on the rebuilt floor):
-# a crawler on the floor under the path, one draped over the basalt rock life-37, a swimmer crossing ahead of the camera
-# about 10 m under its eye line. Glimpsed in passing (54- §1): no camera turn or slow-down for them.
-OCTO = "../../assets/strange-attractor/hero/octopus/octopus-v1.glb"
-OCTO_CRAWL = [(1590.0, -146.0, 121.0), (1581.0, -139.0, 148.0)]   # x, z, t (linear)
-OCTO_SWIM = [([1600.0, 52.0, -255.6], 121.0), ([1600.0, 56.0, -75.6], 136.0), ([1600.0, 58.0, 68.4], 148.0)]
-
-
-def octopus_nodes():
-    life = {n["name"]: n for n in life_nodes()}
-    rock = life["life-37"]["position"]
-    g = heights("strange-attractor-ocean.scene.json", [(OCTO_CRAWL[0][0], OCTO_CRAWL[0][1])])[0]
-    anim = lambda clip: {"state": clip, "cullDistance": 800.0, "speed": 1.0}
-    return [
-        {"name": "octo-crawl", "kind": "gltf", "asset": OCTO, "position": [OCTO_CRAWL[0][0], g + 0.05, OCTO_CRAWL[0][1]],
-         "rotation": [0, 120, 0], "scale": [5.0] * 3, "visible": True, "animation": anim("crawl")},
-        {"name": "octo-perch", "kind": "gltf", "asset": OCTO, "position": [rock[0], rock[1] + 0.8, rock[2]],
-         "rotation": [0, 200, 0], "scale": [5.0] * 3, "visible": True, "animation": anim("perch")},
-        {"name": "octo-swim", "kind": "gltf", "asset": OCTO, "position": OCTO_SWIM[0][0], "rotation": [0, 180, 0],
-         "scale": [8.0] * 3, "visible": True, "animation": anim("jet")},
-    ]
-
-
-def octopus_tracks():
-    g = heights("strange-attractor-ocean.scene.json", [(x, z) for x, z, _ in OCTO_CRAWL])
-    return [("octo-crawl", [(t, [x, gg + 0.05, z]) for (x, z, t), gg in zip(OCTO_CRAWL, g)]),
-            ("octo-swim", [(t, p) for p, t in OCTO_SWIM])]
 
 
 def creature_tracks():

@@ -16,6 +16,7 @@ import json, math, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from canyon_scale import GAZE, WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT, line_points  # noqa: E402  (ADR-1893)
+from canyon_scale import DUSK_AXIS, DUSK_EXIT as DUSK_EXIT_PT, DUSK_PORTAL  # noqa: E402
 
 
 def unit(v):
@@ -134,13 +135,9 @@ GOLD = [0.85, 0.75, 0.45]                 # the lunar scan's cooler gold
 # (portals-c2/00-exit-candidates): the east wall, 35 m up a 56-degree face over the river, facing down-canyon; 200 m of
 # open water straight ahead, the far walls in the last light. The portal turns the floor (axis down) onto that wall:
 # a camera dropping into the floor with its up pointing ahead (-z) leaves the wall level, its up the world's.
-# M3e (owner §7): the arrival moves down the river to the FAR bank, opposite the camp -- out of the far wall's face
-# (d 40, lat -53.5: its foot at lat -48, 2.7 m; its top at lat -64, 26.7 m; the face 12 m up here), facing across the
-# river and a little up-canyon, toward the camp
-_out = (-0.33 * O_UNIT[0] + 0.94 * L_UNIT[0], -0.33 * O_UNIT[1] + 0.94 * L_UNIT[1])
-_on = math.hypot(*_out)
-DUSK_OUT = [_out[0] / _on, 0.0, _out[1] / _on]
-DUSK_EXIT = [site(40.0, -53.5)[0], 12.0, site(40.0, -53.5)[1]]   # absolute (the root's exit y is absolute)
+# Pass 3 final (67- §3): the arrival moves down the river, to the far bank's face on the dusk line (canyon_scale)
+DUSK_OUT = [DUSK_AXIS[0], 0.0, DUSK_AXIS[1]]
+DUSK_EXIT = list(DUSK_EXIT_PT)   # absolute (the root's exit y is absolute)
 
 
 # M1b: the camp is on the low bank right of the exit, 16 m out and 16 m over (real metres; it was the M1 bank's
@@ -151,38 +148,21 @@ DUSK_EXIT = [site(40.0, -53.5)[0], 12.0, site(40.0, -53.5)[1]]   # absolute (the
 # scale) or, near the camp, real metres from it (canyon_scale.site, near, knot)
 CAMP = site(16.0, 16.0)
 CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 m at d 40, lat 40)
-# M3e (owner §7): one smooth, continuous path -- out of the far wall, across the river, BY the camp on its river side
-# (8-10 m from the fire, low; no circling, no lingering), then up over the benches to the outer cliff's portal. The
-# last two knots are the crossing's, as before (95 m absolute at the face). Times from a smooth speed profile.
-# M3g (54- §1): it leaves the exit at the dive's own speed (30 of the 46 m/s it arrives with), easing down, so the line
-# does not overshoot its first knot and swing (the arrival spiked 83 degrees between the look and the travel)
-# M3g (54- §1, the 50.2 s spike: a sharp corner low over the water at (19, 5), where the look led the turn by 28
-# degrees): a rounder arc through the same pass, a little higher
-_DUSK_PATH = [(36, -44, 9.0), (29, -27, 6.5), (23, -11, 5.0), (17, 1, 4.0), (11, 9, 3.6), (5, 16, 5.0), (0, 26, 12.0),
-              (-4, 42, 30.0), (-6, 58, 52.0), (-6, 72, 50.0), (-7, 82, 34.0)]
-_dk = [knot(d, lat, h, 0.0) for d, lat, h in _DUSK_PATH]
-# Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): one gentle curve from the exit to the outer cliff's portal,
-# bowed 30 m to the river's side so the gathering passes about 15 m off (it ran within 3 m on the straight chord),
-# low past the camp, then up over the benches early and high so the mound below the cliff stays under the frame
-# (it filled the frame at 52-62 s), at an even pace; the last two knots are the crossing's, as before
-_A, _B = (_dk[0][0], _dk[0][2]), (_dk[-1][0], _dk[-1][2])
-_mx, _mz = (_A[0] + _B[0]) / 2.0, (_A[1] + _B[1]) / 2.0
-_L = math.hypot(_B[0] - _A[0], _B[1] - _A[1])
-_C = (_mx - (_B[1] - _A[1]) / _L * 30.0, _mz + (_B[0] - _A[0]) / _L * 30.0)
-# (owner 2026-11-06: no tilt out of the portal: level at the exit's 12 m, a long shallow settle toward the camp)
-# heights as a smooth line in absolute terms (heights over the ground passed the benches' steps into the look's pitch)
-_dusk_xz = line_points(_A, _B, [(0.0, 0.0), (1.0, 0.0)], n=14, control=_C)
+# Pass 3 final (owner 2026-11-08, 67- §3): one straight line from the far bank's exit, level (12 m easing to 10 m),
+# past the camp 5 m to its right, into the portal on the bench face behind it; even pace, the arrival's 24 m/s eased
+# off over the first 4 s. The look stays on the line: no turn to the right out of the arrival, the gathering in the
+# middle of the frame as the camera comes to it. Knots in the first 14 m are left out (the spline overshoots them).
 from sample_ground import heights as _heights  # noqa: E402
-_dg = _heights("strange-attractor-flythrough.scene.json", [(p[0], p[2]) for p in _dusk_xz])
-# the highest ground under the pass, sampled finely (the bank's lip stands between the knots)
-_fine = line_points(_A, _B, [(0.0, 0.0), (1.0, 0.0)], n=70, control=_C)
-_gpass = max(_heights("strange-attractor-flythrough.scene.json", [(p[0], p[2]) for p in _fine[10:32]]))
-_ya = line_points((0.0, 0.0), (1.0, 0.0), [(0.0, 12.0), (0.35, _gpass + 4.5), (1.0, _dg[-1] + 34.0)], n=14)
-_dusk_abs = [(p[0], max(y[1], g + 3.0), p[2]) for p, y, g in zip(_dusk_xz, _ya, _dg)]
-DUSK_FLIGHT = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(pace([list(p) for p in _dusk_abs], 48.35, 68.0, 24.0, 9.0, ramp_in=0.08, ramp_out=0.1)[0], _dg)] + \
-    [knot(-8, 89, 21.2, 69.2), knot(-8, 96, -39.2, 70.4)]
+_T_X = 69.655 + 1.0 / 120.0
+_dl = math.dist((DUSK_EXIT[0], DUSK_EXIT[2]), (DUSK_PORTAL[0], DUSK_PORTAL[2]))
+_line = [(DUSK_EXIT[0] + DUSK_AXIS[0] * _dl * i / 40, DUSK_EXIT[1] + (DUSK_PORTAL[1] - DUSK_EXIT[1]) * (3 * (i / 40) ** 2 - 2 * (i / 40) ** 3),
+          DUSK_EXIT[2] + DUSK_AXIS[1] * _dl * i / 40) for i in range(41)]
+_line = [p for p in _line if math.dist((p[0], p[2]), (DUSK_EXIT[0], DUSK_EXIT[2])) > 14.0]
+_dk2 = pace([list(p) for p in _line], 48.35, _T_X, 24.0, 4.0, ramp_in=0.19, ramp_out=0.06)[0]   # 67-: the arrival eased over about 4 s
+_after = [DUSK_PORTAL[0] + DUSK_AXIS[0] * 3.2, DUSK_PORTAL[1], DUSK_PORTAL[2] + DUSK_AXIS[1] * 3.2, _T_X + 0.8]
+_dg = _heights("strange-attractor-flythrough.scene.json", [(k[0], k[2]) for k in _dk2] + [(_after[0], _after[2])])
+DUSK_FLIGHT = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(_dk2 + [_after], _dg)]
 EGLOW = [-c for c in direction(-6, 50)]
-CLIFF_PORTAL = site(-8.0, 91.8)
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)

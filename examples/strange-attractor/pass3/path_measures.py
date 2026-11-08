@@ -99,13 +99,11 @@ def characters(world):
     elif world == "ocean":
         s = load("strange-attractor-ocean.scene.json")
         for n in s["nodes"]:
-            if (n["name"] in ("ocean-base",) or n["name"].startswith("octo-")) and "position" in n:
+            if n["name"] == "ocean-base" and "position" in n:
                 out.append((n["name"], n["position"][0], n["position"][2]))
         p = load("strange-attractor.json")
         for tr in p["timeline"]["tracks"]:
             if tr["target"].startswith("ocean/nodes/sub-") and tr["target"].endswith("/position"):
-                v = tr["keys"][len(tr["keys"]) // 2]["value"]; out.append((tr["target"].split("/")[2], v[0], v[2]))
-            if tr["target"].startswith("ocean/nodes/octo") and tr["target"].endswith("/position"):
                 v = tr["keys"][len(tr["keys"]) // 2]["value"]; out.append((tr["target"].split("/")[2], v[0], v[2]))
     elif world == "moon":
         s = load("strange-attractor-moon.scene.json")

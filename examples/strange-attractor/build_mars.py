@@ -109,10 +109,9 @@ PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_G
 # front of it, facing out over the river and up-canyon; then level, 3.5-5 m up, along the river past the camp (the
 # figures glimpsed in passing), and on into the river portal's dive
 NIGHT_EXIT_DL = (68.0, 30.9)
-# Owner 2026-11-06 (65- §3, overriding "portals stay" for this leg): a new entrance, out of the far bank's rock face
-NIGHT_EXIT = [25.0, 5.0, 1205.0]
-# Pass 3 (61- §3): the exit faces along the straight night line (the position is kept), so the arrival does not swing
-OUT_OF_CLIFF = None
+# Owner 2026-11-08 (67- §5): the entrance off the rock (the camera came out through the far bank's face), out over the
+# water on the river's far half, so nothing of the bank is in the arrival's volume
+NIGHT_EXIT = [38.0, 3.5, 1212.0]
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
 CAMP_GROUND = 4.4 * WS
@@ -122,73 +121,63 @@ CAMP_GROUND = 4.4 * WS
 # into the riverbed portal (owner: the water portal felt like a step): a straight line at a constant speed, sloping
 # 25 degrees; the exit frame is tilted to match, so the crossing changes nothing in the motion (crossing 5 at 121.2 s).
 GATHER = [*near(CAMP_SITE, *GATHER_AT)[:1], CAMP_GROUND + 1.3, near(CAMP_SITE, *GATHER_AT)[1]]
-RIVER_PORTAL = [53.0, 1385.0]   # owner 2026-11-06: the same portal, moved down the river, beyond the camp
+RIVER_PORTAL = [28.0, 1418.0]   # owner 2026-11-08 (67- §5): centred in the river, beyond the camp
 RIVER_Y = -0.5 * R
-# the glide's heading (x, z). Pass 3: the night pass now comes at the portal from out over the river, heading in toward
-# the camp, so the glide turns down into the opening on that heading (down the river) rather than on the camp's line
-# out to it (M3b-M3g); the crossing is unchanged in the ocean, whose arrival is mapped from this heading (entryUp)
-_tw = [RIVER_PORTAL[0] - NIGHT_EXIT[0], RIVER_PORTAL[1] - NIGHT_EXIT[2]]   # Pass 3 (61-): the glide continues the straight night line
-_tn = math.hypot(*_tw)
-TOWARD_RIVER = (_tw[0] / _tn, _tw[1] / _tn)
-OUT_OF_CLIFF = [TOWARD_RIVER[0], 0.0, TOWARD_RIVER[1]]
-GLIDE_SLOPE = math.radians(25.0)
-GLIDE_SPEED = 6.0                      # m/s along the slope (owner 2026-11-05: 3.2 -> 6, a gentler start to the ocean)
+# 67- §5: one gentle curve from the entrance, bowed toward the camp's bank (the camp on the left, about 18 m off; in frame 13 s), then
+# a Moon-style rise and dive into the portal at the river's centre. NIGHT_CTRL is the curve's control point; the rise
+# starts at RISE_FROM of the way along, tops out at RISE_TOP m and dives into the opening on the curve's last heading
+NIGHT_CTRL = (82.0, 1362.0)
+RISE_FROM, RISE_PEAK, RISE_TOP = 0.66, 0.84, 16.0
+LEVEL_Y = 3.5
+
+
+def _night_xz(f):
+    (ax, az), (cx, cz), (bx, bz) = (NIGHT_EXIT[0], NIGHT_EXIT[2]), NIGHT_CTRL, RIVER_PORTAL
+    return ((1 - f) ** 2 * ax + 2 * (1 - f) * f * cx + f * f * bx, (1 - f) ** 2 * az + 2 * (1 - f) * f * cz + f * f * bz)
+
+
+def _night_y(f):
+    if f <= RISE_FROM:
+        return LEVEL_Y
+    if f <= RISE_PEAK:
+        u = (f - RISE_FROM) / (RISE_PEAK - RISE_FROM)
+        return LEVEL_Y + (RISE_TOP - LEVEL_Y) * u * u * (3 - 2 * u)
+    u = (f - RISE_PEAK) / (1.0 - RISE_PEAK)
+    return RISE_TOP - (RISE_TOP - RIVER_Y) * u * u     # eased in from the top, steepest into the opening
+
+
+_x0, _x1 = _night_xz(0.0), _night_xz(0.02)
+_on = math.hypot(_x1[0] - _x0[0], _x1[1] - _x0[1])
+OUT_OF_CLIFF = [(_x1[0] - _x0[0]) / _on, 0.0, (_x1[1] - _x0[1]) / _on]   # the exit faces along the curve's start
+_e0, _e1 = _night_xz(0.985), _night_xz(1.0)
+_tn = math.hypot(_e1[0] - _e0[0], _e1[1] - _e0[1])
+TOWARD_RIVER = ((_e1[0] - _e0[0]) / _tn, (_e1[1] - _e0[1]) / _tn)        # the dive's heading at the opening
+GLIDE_SLOPE = math.atan2(_night_y(0.985) - RIVER_Y, _tn)                  # the dive's slope at the opening
+GLIDE_SPEED = 6.0                      # m/s along the slope at the opening (the ocean's arrival speed)
 T_CROSS = 121.2 + 1.0 / 60.0   # M3d (ADR-1903): half a frame off the 30 fps grid, so no frame lands on the crossing
 
 
 def glide_point(s_back):
-    """The glide's point s_back metres (along the slope) before the portal: x, absolute y, z."""
+    """The point s_back metres (along the dive's slope at the opening) before the portal: x, absolute y, z."""
     h = s_back * math.cos(GLIDE_SLOPE)
     return [RIVER_PORTAL[0] - TOWARD_RIVER[0] * h, RIVER_Y + s_back * math.sin(GLIDE_SLOPE), RIVER_PORTAL[1] - TOWARD_RIVER[1] * h]
 
 
 def night_flight():
-    """The night pass (M3e §12, M3g §4 level, pass 3 lengthened): out of the bank's exit, level 3.7-4.4 m over the
-    ground, by the camp (no circling and no lingering), on into the glide down into the riverbed portal. The glide is
-    the M3b one (a straight line, 25 degrees down at 3.2 m/s; the exit frame tilted to match)."""
-    eye = CAMP_GROUND + 1.85
-    glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
-    # Owner 2026-11-06 (65- §3): one straight line down the river, from the far bank's new entrance to the river portal
-    # beyond the camp, 4 m over the water: 182 m in 27.8 s, a steady 6 m/s, the camp on the left about 27 m off (the
-    # river's east bank at z 1385 stops it passing nearer on a straight line), and into the same 25-degree glide
-    g0 = glide_point(glide_len)
-    line = line_points((NIGHT_EXIT[0], NIGHT_EXIT[2]), (g0[0], g0[2]), [(0.0, 4.0), (1.0, 4.0)], n=24)
-    # (no knot in the first 14 m: the arrival covers them in the first half second, and a nearer knot makes the spline
-    # overshoot and come back; none in the last 3 m, where the level line bends into the glide)
-    far = [list(p) for p in line[1:-1] if math.dist((p[0], p[2]), (NIGHT_EXIT[0], NIGHT_EXIT[2])) > 14.0
-           and math.dist((p[0], p[2]), (g0[0], g0[2])) > 3.0]
-    pts = []
-    gl = [tuple(glide_point(glide_len * f)) for f in (1.0, 0.5)]
-    pts_all = pts + gl
-    gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in gl] + [(x, z) for x, _, z in [tuple(glide_point(0.0))]])
-    gr = [0.0] * len(pts) + gr
-    # the approach and the pass, timed by a smooth speed profile that arrives at the glide's own speed
-    rel = [list(k) for k in far] + [list(p) for p in pts]
-    # M3f (owner: the pass clipped geometry): the knots' heights are over the ground AT the knots, so a bank between two
-    # knots stood above the line (a per-frame trace found the camera 2.7 m inside one at 109.8 s). Each span is split
-    # where the ground under its middle comes within 3 m of the line, twice over
-    for _ in range(2):
-        gk = heights(CANYON_SCENE, [(k[0], k[2]) for k in rel])
-        mids = [((a[0] + b[0]) / 2.0, (a[2] + b[2]) / 2.0) for a, b in zip(rel, rel[1:])]
-        gm = heights(CANYON_SCENE, mids)
-        out_ = [rel[0]]
-        for i, (a, b) in enumerate(zip(rel, rel[1:])):
-            y_line = 0.5 * ((gk[i] + a[1]) + (gk[i + 1] + b[1]))
-            if y_line < gm[i] + 3.0:
-                out_.append([mids[i][0], max(3.0, y_line - gm[i] + 3.0), mids[i][1]])
-            out_.append(b)
-        rel = out_
-    t_glide = T_CROSS - glide_len / GLIDE_SPEED
-    T = t_glide - (T_PYR + 1.0)
-    knots, _ = pace(rel + [[gl[0][0], gl[0][1] - gr[len(pts)], gl[0][2]]], T_PYR + 1.0, t_glide, 10.0, GLIDE_SPEED,
-                    ramp_in=1.0 / T, ramp_out=3.0 / T)
-    out = [list(k) for k in knots]
-    x, y, z = gl[1]
-    out.append([x, y - gr[len(pts) + 1], z, T_CROSS - glide_len * 0.5 / GLIDE_SPEED])
-    x, y, z = glide_point(0.0)
-    out.append([x, y - gr[-1], z, T_CROSS])
-    x, y, z = glide_point(-GLIDE_SPEED * 0.8)
-    out.append([x, y - gr[-1], z, T_CROSS + 0.8])
+    """The night pass (67- §5): out over the water, one gentle curve down the river past the camp (on the left), then
+    up and over into a dive into the river portal at the river's centre, like the Moon's. Knots are heights over the
+    ground; the whole line is over water."""
+    n = 60
+    pts = [(*_night_xz(i / n), _night_y(i / n)) for i in range(n + 1)]
+    pts = [[x, y, z] for x, z, y in pts]
+    # (no knot in the first 14 m: the arrival covers them in the first second, and a nearer knot makes the spline
+    # overshoot and come back)
+    keep = [pts[0]] + [p for p in pts[1:] if math.dist((p[0], p[2]), (NIGHT_EXIT[0], NIGHT_EXIT[2])) > 14.0]
+    knots, _ = pace(keep[1:], T_PYR + 1.0, T_CROSS, 10.0, GLIDE_SPEED, ramp_in=0.04, ramp_out=0.12)
+    after = glide_point(-GLIDE_SPEED * 0.8)
+    gr = heights(CANYON_SCENE, [(k[0], k[2]) for k in knots] + [(after[0], after[2])])
+    out = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(knots, gr)]
+    out.append([after[0], after[1] - gr[-1], after[2], T_CROSS + 0.8])
     return out
 
 
@@ -476,7 +465,9 @@ def write():
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [1.0, 0.82, 0.5], "shards": 0.3, "shardRate": 0.35},
-        "portal": {**GAZE, "world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF, "entryUp": [0.0, 1.0, 0.0],
+        # 67- §5: climbLook 0.4, so the rise before the dive is not a stare up at the sky
+        "portal": {**GAZE, "climbLook": 0.4, "world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF,
+                   "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": night_flight()},
         "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}-m3g.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],

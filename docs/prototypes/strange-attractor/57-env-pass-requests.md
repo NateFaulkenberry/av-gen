@@ -45,18 +45,26 @@ The 3 cm drop is too much for the animation's lowest frames. Suggest: the seat r
 flat top in Phase C, then SEAT_SIT re-fitted with check_contacts. SEAT_SIT stays in `build_journey.py` (shared file):
 request the value here and the SA agent sets it.
 
-### H-4: the night and dusk lines -- keep the clearing's geology out of their corridors (Phase C, if it resumes)
-Status: open, updated 2026-11-06 for round 2 of the paths (65-, 66-). The SA agent owns the paths.
-- **Night (93.5-121.2 s):** one straight line, 182 m, about 3.2 m over the water, down the river at about 6 m/s, from
-  the new entrance in the far bank's rock (25, 1205) to the moved river portal (53, 1385), in open water. The last
-  few metres are the same glide into the same portal.
-  - The camp passes 26.6 m off on the camera's left at 115.9 s. The bank stops the line going closer.
-  - Corridor: 4 m either side, 3 m under, along the whole line and around the portal.
-  - The gathering and the craft are in frame on the left until 108.5 s, readable from about 100 s.
-- **Dusk (47.9-69.7 s):** one gentle curve from the far bank's exit over the river, past the gathering about 15 m
-  on its river side, about 5 m up, then up over the benches to the outer cliff's portal.
-  - Corridor: 4 m either side, 3 m under.
-  - Knots: `strange-attractor-moon.scene.json`, `portal.flight`.
+### H-4: the night and dusk lines -- keep the clearing's geology out of their corridors
+Status: closed with the wrap (Phase C did not resume). Final lines, 2026-11-08 (67- §3, §5). The SA agent owns them.
+- **Dusk (47.9-69.7 s):** one straight line, about 124 m, from the far bank's face down the river from the camp
+  (-8.5, 12, 1416.1), across the water and 5 m to the right of the gathering, 12 m easing to 10 m up, into the Mars
+  portal on the bench face behind the camp (91.55, 10, 1343.21). Heading (0.808, -0.589). `canyon_scale.DUSK_*`.
+  - Corridor: 4 m either side, 3 m under. Knots: `strange-attractor-moon.scene.json`, `portal.flight`.
+- **Night (93.5-121.2 s):** one gentle curve over the water, from the entrance on the river's far half (38, 3.5,
+  1212), bowed toward the camp's bank (the camp on the left, about 18 m off, in frame 93.6-106.6 s), then a Moon-style rise to 16 m and a
+  dive (about 46 degrees at the opening) into the river portal at the river's centre (28, 1418).
+  `build_mars.NIGHT_*`, `RIVER_PORTAL`.
+  - Corridor: 4 m either side, 3 m under, and the rise's 16 m. Knots: `strange-attractor-mars.scene.json`, `portal.flight`.
+
+## The wrap (2026-11-08, 67-)
+
+- **H-1 and H-2 (Mars)** became 67- §4, which the hero agent does on its own branch from 1f88520c.
+- **H-3 (the seated Sasquatch)** is not done. It is parked with the wrap: SEAT_SIT stays 0.03.
+- **The hero agent's Phases C (the campfire clearing and nearby walls) and D (Mars) beyond 67- §4 are not done**, and
+  are parked with the wrap.
+- **Phase B (canyon day, `scene/sa-hero` a61ebfbf) was rejected by the owner** (61-) and is not merged.
+- The hero agent's A-1..A-4 requests (kept on its branch, not in this file) are parked with the wrap.
 
 ## From the hero agent to the SA agent
 

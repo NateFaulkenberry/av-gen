@@ -271,3 +271,12 @@ def line_points(a, b, profile, n=12, control=None):
                 break
         out.append((x, h, z))
     return out
+
+
+# Pass 3 final (owner 2026-11-08, 67- §3): the dusk leg is one straight line from the far bank, down the river from the
+# camp, across the water and past the camp (5 m to its right, the gathering near the centre of the frame), into a
+# portal to Mars on the bench face behind the camp. Measured on the canyon's ground: the far bank's face is 12 m high
+# at DUSK_EXIT (3 m in front of it), the bench face 10 m high at DUSK_PORTAL. DUSK_AXIS is the line's heading.
+DUSK_AXIS = (0.8083, -0.5888)
+DUSK_EXIT = (-8.5, 12.0, 1416.1)
+DUSK_PORTAL = (91.55, 10.0, 1343.21)

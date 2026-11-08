@@ -1965,61 +1965,6 @@
         ]
       },
       {
-        "target": "ocean/nodes/octo-crawl/position",
-        "keys": [
-          {
-            "time": 121.0,
-            "value": [
-              1590.0,
-              21.712412643432618,
-              -146.0
-            ],
-            "interp": "linear"
-          },
-          {
-            "time": 148.0,
-            "value": [
-              1581.0,
-              21.705891418457032,
-              -139.0
-            ],
-            "interp": "linear"
-          }
-        ]
-      },
-      {
-        "target": "ocean/nodes/octo-swim/position",
-        "keys": [
-          {
-            "time": 121.0,
-            "value": [
-              1600.0,
-              52.0,
-              -255.6
-            ],
-            "interp": "linear"
-          },
-          {
-            "time": 136.0,
-            "value": [
-              1600.0,
-              56.0,
-              -75.6
-            ],
-            "interp": "linear"
-          },
-          {
-            "time": 148.0,
-            "value": [
-              1600.0,
-              58.0,
-              68.4
-            ],
-            "interp": "linear"
-          }
-        ]
-      },
-      {
         "target": "ocean/nodes/cruiser-0/position",
         "keys": [
           {
@@ -2662,6 +2607,678 @@
           },
           {
             "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/grade/contrast",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              1.25
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              1.25
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              1.14
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              1.14
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              1.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              1.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              1.14
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              1.14
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/grade/saturation",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              1.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              1.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              1.2
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/bloom/intensity",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.09
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.09
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/halation/intensity",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.35
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.35
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.4
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.4
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.15
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/output/vignette",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.2
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.2
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/look/localContrast",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.15
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.15
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.1
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.1
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.15
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/grade/temperature",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              -0.06
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              -0.06
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
             "value": [
               0.0
             ],

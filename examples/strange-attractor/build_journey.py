@@ -88,6 +88,9 @@ scene["portal"]["world"] = "strange-attractor-moon.scene.json"
 for _k in GAZE:      # the M3f gaze: the portal defaults (ADR-1909), the owner's Moon exception (60- §6)
     scene["portal"].pop(_k, None)
 scene.setdefault("post", {})["tonemap"] = 1   # M3g (54- §2): AgX for the whole film (the frame's tone map is global)
+# Pass 3 final (67- §2): halation on for the film (its amount is a per-world track, GRADE below, zero where unwanted)
+scene["post"].update({"halationEnabled": True, "halationIntensity": 0.0, "halationThreshold": 1.5, "halationRadius": 2.0,
+                      "halationWarmth": 0.7})
 # M3g (54- §1): the canyon's own flythrough looks where it goes, not 2.5 s ahead and down at the river (ADR-1909)
 scene["attractorWorld"]["flightLookAhead"] = 0.6
 # Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): the gorge's bends smoothed into one long curve (ADR-1911,
@@ -374,8 +377,10 @@ dusk_portal = dict(dusk)
 dusk_portal.update({
     # M3c (owner: too long staring at a plain wall): the field reaches back to the camp, so the code gathers on the
     # cliff as the camera leaves the fire, and the tear starts 80 m out
-    "corruption/radius": 80.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 260.0, "corruption/openNear": 10.0,
-    "corruption/openFar": 100.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
+    # Pass 3 final (67- §3): the opening is on the bench face 20 m behind the camp, so the field is kept off the
+    # gathering (30 m round the opening) and the tear starts once the camera is 55 m out, before it reaches the camp
+    "corruption/radius": 30.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 160.0, "corruption/openNear": 8.0,
+    "corruption/openFar": 55.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
     "corruption/echoOffset": 0.35,
 })
 # night (crossing 3: the canyon behind the pyramid portal and home): dark, a cold moon, the fire down to embers
@@ -414,8 +419,10 @@ night_portal = dict(night)
 night_portal.update({
     # M3c (the owner: the entrance's animation was lost): the glide starts 25 m out, so the tear now opens during it
     # (from 14 m), seen whole, not already open when the camera turns to the river
-    "corruption/radius": 24.0, "corruption/fieldNear": 6.0, "corruption/fieldFar": 40.0, "corruption/openNear": 2.5,
-    "corruption/openFar": 14.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
+    # Pass 3 final (67- §5: start the opening sooner): the field from 110 m and the tear from 55 m, as the camera
+    # rises for the dive, so it opens whole in view
+    "corruption/radius": 24.0, "corruption/fieldNear": 6.0, "corruption/fieldFar": 110.0, "corruption/openNear": 2.5,
+    "corruption/openFar": 55.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
     "corruption/echoOffset": 0.35,
 })
 # dawn (M3b; from crossing 5, so the canyon seen through the launch bay is already the morning one): home through
@@ -446,14 +453,13 @@ for look in scene["looks"]:
         if f"corruption/{k_}" in look["params"]:
             look["params"][f"corruption/{k_}"] *= R
 
-# --- the second leg (ADR-1895): the outer cliff behind the camp opens onto Mars (build_mars.py)
+# --- the second leg (ADR-1895): Mars (build_mars.py). Pass 3 final (owner 2026-11-08, 67- §3): the opening is on the
+# bench face behind the camp, at the end of the dusk line (canyon_scale.DUSK_PORTAL), not up on the outer cliff
 _, mars_flight, mars_aims = build_mars.write()
-cliff = site(-8.0, 91.8)
-into = [site(0.0, 1.0)[i] - site(0.0, 0.0)[i] for i in (0, 1)]
-n_into = math.hypot(*into)
+from canyon_scale import DUSK_AXIS, DUSK_PORTAL  # noqa: E402
 scene["portals"] = [{**GAZE, "world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
                      "exitAxis": build_mars.EXIT_AXIS, "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0],
-                     "entry": [cliff[0], 95.0 * R, cliff[1]], "entryAxis": [into[0] / n_into, 0.0, into[1] / n_into],
+                     "entry": list(DUSK_PORTAL), "entryAxis": [DUSK_AXIS[0], 0.0, DUSK_AXIS[1]],
                      "flight": mars_flight, "aims": mars_aims}]
 # the third leg (M3; M3b: one smooth glide): the riverbed below the camp opens onto the deep ocean (build_ocean.py). The
 # opening lies in the river (its axis down); the camera glides into it on one straight line, 25 degrees down, at a
@@ -528,8 +534,6 @@ for node, pos, yaw in build_ocean.sub_tracks():
     tracks.append({"target": f"ocean/nodes/{node}/rotation", "keys": [{"time": t, "value": list(r), "interp": "smooth"} for t, r in yaw]})
     tracks.append({"target": f"ocean/lights/{node}-light/position",
                    "keys": [{"time": t, "value": [p[0], p[1] - 3.0, p[2]], "interp": "smooth"} for t, p in pos]})
-for n, pts in build_ocean.octopus_tracks():   # M3g: the octopi
-    tracks.append({"target": f"ocean/nodes/{n}/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pts]})
 # M3d: the ocean's animals cruise (their swim loops play on their own)
 for n, _, _, pts, _ in build_ocean.creature_tracks():
     tracks.append({"target": f"ocean/nodes/{n}/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pts]})
@@ -548,6 +552,31 @@ tracks.append({"target": "camera/exposure/compensation", "keys": [
     {"time": 0.0, "value": [0.0], "interp": "smooth"}, {"time": X_MARS - 1.0, "value": [0.0], "interp": "smooth"},
     {"time": X_MARS + 1.0, "value": [1.0], "interp": "smooth"}, {"time": X_OCEAN - 1.0, "value": [1.0], "interp": "smooth"},
     {"time": X_OCEAN + 1.0, "value": [0.0], "interp": "smooth"}]})
+# Pass 3 final (67- §1, §2): a grade per world inside AgX, eased over 2 s across each crossing (as the exposure is),
+# so no portal steps. Why the intro lost contrast: M3g §2 moved the whole film from ACES to AgX (9cee2700) for one tone
+# map, and AgX's softer shoulder and toe took out about a quarter of the canyon's luma spread (std 0.18 -> 0.13 at
+# 8 s) and some saturation. Contrast and saturation here are the grade's (log contrast about mid grey before the tone
+# map). The ocean keeps its look (E is closed): every value there is the film's old one.
+GRADE_KEYS = ("post/grade/contrast", "post/grade/saturation", "post/bloom/intensity", "post/halation/intensity",
+              "post/output/vignette", "post/look/localContrast", "post/grade/temperature")
+GRADE = {   # contrast, saturation, bloom, halation, vignette, local contrast, temperature
+    "canyon": (1.22, 1.22, 0.07, 0.0, 0.12, 0.18, 0.0),
+    "moon": (1.25, 1.08, 0.07, 0.0, 0.18, 0.15, -0.06),      # crisp and cold
+    "dusk": (1.14, 1.22, 0.08, 0.35, 0.2, 0.12, 0.0),        # the fire and the glyphs glow
+    "mars": (1.12, 1.18, 0.09, 0.0, 0.12, 0.1, 0.04),        # a soft warm veil
+    "night": (1.14, 1.18, 0.08, 0.4, 0.22, 0.12, 0.0),       # the fire, the craft, the glyphs glow
+    "ocean": (1.0, 1.0, 0.04, 0.0, 0.0, 0.0, 0.0),
+    "dawn": (1.18, 1.2, 0.07, 0.15, 0.12, 0.15, 0.0),
+}
+_LEGS = [("canyon", 0.0), ("moon", 32.025), ("dusk", 47.87), ("mars", 69.655), ("night", 93.46), ("ocean", 121.217),
+         ("dawn", 147.017)]
+for i, key in enumerate(GRADE_KEYS):
+    keys = [{"time": 0.0, "value": [GRADE["canyon"][i]], "interp": "smooth"}]
+    for (prev, _), (leg, tx) in zip(_LEGS, _LEGS[1:]):
+        keys.append({"time": tx - 1.0, "value": [GRADE[prev][i]], "interp": "smooth"})
+        keys.append({"time": tx + 1.0, "value": [GRADE[leg][i]], "interp": "smooth"})
+    tracks = [t for t in tracks if t["target"] != key]
+    tracks.append({"target": key, "keys": keys})
 tracks += build_mars.rover_tracks()
 project["timeline"] = {"enabled": True, "tracks": tracks, "cues": project.get("timeline", {}).get("cues", [])}
 json.dump(project, open(PROJECT, "w"), indent=2)
