@@ -1,6 +1,6 @@
 # Musical Geography -- Gate 1 look mock-up (Blender, headless, Eevee).
 # Not engine code: a cheap proof of the art direction in 04-art-direction.md.
-# usage: Blender -b --factory-startup --python gate1-mockup.py -- <shot> <out.png> [scale] [samples]
+# usage: Blender -b --factory-startup --python gate1-mockup.py -- <shot> <out.png> [scale] [samples]   (round 2: slabs, rolling hills)
 # Throwaway: the formation rules and palettes of 04-art-direction.md, for engineering to read, not to port line by line.
 import bpy, sys, math
 import numpy as np
@@ -9,6 +9,7 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 SHOT = argv[0]
 OUT = argv[1]
 RES_SCALE = float(argv[2]) if len(argv) > 2 else 1.0
+CONTOURS = argv[4] if len(argv) > 4 else "on"
 
 # ---------------------------------------------------------------- palettes
 def hexlin(h):
@@ -20,23 +21,23 @@ PAL = {
   "day": dict(
     drift_amt=0.14,
     drift="#8E9CF2",
-    sky_zen="#5C7EE0", sky_hor="#E6E0F4", fog="#D9D2EE", fog_sun="#FFF0D8",
-    sun="#FFF1DC", sun_str=3.9, sun_elev=40, sun_az=235, amb="#9EAAF0", amb_str=0.45,
-    water=["#1630A8", "#2448D0", "#3F70E8", "#8DB4F6"], shallow="#3FB0C8",
-    land=["#8088E6", "#A890E4", "#EBA290", "#EDB872", "#F0D480"],
+    sky_zen="#3C78FF", sky_hor="#D6E2FF", fog="#C8D6FA", fog_sun="#FFF2D6",
+    sun="#FFF4E0", sun_str=4.6, sun_elev=42, sun_az=235, amb="#A6B6FF", amb_str=0.6,
+    water=["#0B36D0", "#1C58F2", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2",
+    land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FFA64E", "#FFD84A"], under="#1A1E66",
     wall="#EE987C", strata=0.08, river="#3A62D6",
     edge="#FFF4C8", edge_str=0.0, crest_str=0.0,
     path="#FFF5E2", path_emit=0.0, beacon="#FF8FB4", beacon_str=0.0, river_emit=0.0,
-    fog_k=1.0, exposure=-0.4),
+    fog_k=1.7, exposure=-0.1, sat=1.3, look="AgX - Punchy"),
   "sunset": dict(
     drift_amt=0.28,
     drift="#6A3AA0",
     sky_zen="#33206E", sky_hor="#FF8A50", fog="#E07462", fog_sun="#FFB060",
     sun="#FF9A4A", sun_str=5.0, sun_elev=9, sun_az=262, amb="#5E46B8", amb_str=0.9,
     water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A",
-    land=["#4E2A7E", "#8A2C78", "#D0405A", "#F2785A", "#FFB45A"],
+    land=["#4E2A7E", "#8A2C78", "#D0405A", "#F2785A", "#FFB45A"], under="#1E0E2E",
     wall="#C8445E", strata=0.12, river="#5A2A8A",
-    edge="#FFC27A", edge_str=0.9, crest_str=0.6,
+    edge="#FFC27A", edge_str=2.0, crest_str=0.6,
     path="#FFD7A0", path_emit=0.6, beacon="#FFB070", beacon_str=0.0, river_emit=0.3,
     fog_k=1.35, exposure=-0.2),
   "night": dict(
@@ -45,7 +46,7 @@ PAL = {
     sky_zen="#080A2C", sky_hor="#33237A", fog="#2C1F66", fog_sun="#41308E",
     sun="#C8B4FF", sun_str=1.2, sun_elev=34, sun_az=200, amb="#5A38B0", amb_str=0.6,
     water=["#0E1452", "#18227A", "#2443B0", "#3F78FF"], shallow="#2A3AA0",
-    land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"],
+    land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"], under="#06061E",
     wall="#3A2C92", strata=0.12, river="#2E6BFF",
     edge="#5A86FF", edge_str=7.0, crest_str=5.0,
     path="#FF5FB0", path_emit=5.0, beacon="#FF4FA8", beacon_str=6.0, river_emit=0.45,
@@ -56,7 +57,7 @@ PAL = {
     sky_zen="#A6BCDC", sky_hor="#FFD9A4", fog="#F2DDB9", fog_sun="#FFE2A0",
     sun="#FFC874", sun_str=4.4, sun_elev=13, sun_az=80, amb="#B8C8D8", amb_str=0.55,
     water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8",
-    land=["#6FB57E", "#9CCC84", "#DCE08E", "#F4D68C", "#FBE9C4"],
+    land=["#6FB57E", "#9CCC84", "#DCE08E", "#F4D68C", "#FBE9C4"], under="#2A3A3A",
     wall="#E8A44A", strata=0.08, river="#7393BD",
     edge="#FFD27A", edge_str=0.5, crest_str=0.4,
     path="#F2A93B", path_emit=0.25, beacon="#FFC060", beacon_str=0.0, river_emit=0.0,
@@ -66,8 +67,10 @@ PAL = {
 def lerp_pal(a, b, t):
     out = {}
     for k, va in a.items():
-        vb = b[k]
-        if isinstance(va, str):
+        vb = b.get(k, va)
+        if isinstance(va, str) and not va.startswith("#"):
+            out[k] = va if t < 0.5 else vb
+        elif isinstance(va, str):
             out[k] = (1 - t) * hexlin(va) + t * hexlin(vb)
         elif isinstance(va, list):
             out[k] = [(1 - t) * hexlin(x) + t * hexlin(y) for x, y in zip(va, vb)]
@@ -81,14 +84,19 @@ def as_lin(p):
 # ---------------------------------------------------------------- shots
 # x east, y north, z up; one unit = one tile pitch.
 SHOTS = {
-  "01-day-low-pass-water":   dict(pal="day", cam=(-25, -165, 4.2), tgt=(10, 120, -14), f=24, R=620, t=3.0),
-  "02-day-high-reveal":      dict(pal="day", cam=(-70, 120, 90), tgt=(20, 270, 0), f=35, R=700, t=3.0),
-  "03-sunset-canyon":        dict(pal="sunset", cam=None, canyon_y=95, cam_z=27, look=70, f=28, R=650, t=5.0),
-  "04-night-edge-light":     dict(pal="night", cam=(95, -10, 62), tgt=(-5, 175, 6), f=35, R=750, t=7.0),
-  "05-dawn-terraces":        dict(pal="dawn", cam=(-125, -75, 26), tgt=(-30, 50, 3), f=35, R=650, t=2.0),
-  "06-dusk-wavefront":       dict(pal=("sunset", "night", 0.55), cam=(40, -150, 7), tgt=(-30, 40, 1), f=24, R=620, t=9.0),
-  "07-sunset-plateau-figures-scale": dict(pal="sunset", cam=None, plateau=True, f=50, R=500, t=5.0),
+  "01-day-low-pass-water":       dict(pal="day", cam=(-25, -165, 4.2), tgt=(10, 120, -14), f=24, R=620, t=3.0),
+  "02-day-high-reveal-hills":    dict(pal="day", cam=(60, 40, 85), tgt=(-120, 260, 0), f=35, R=750, t=3.0),
+  "03-sunset-contours-on":       dict(pal="sunset", cam=(-40, 60, 34), tgt=(30, 230, 8), f=28, R=650, t=5.0, bank=-3.0),
+  "04-night-contours-on":        dict(pal="night", cam=(95, -10, 62), tgt=(-5, 175, 6), f=35, R=750, t=7.0),
+  "05-day-aliens-scale":         dict(pal="day", cam=(-89.5, 141.0, 2.3), tgt=(-99.0, 163.0, 0.2), ground=True, f=40, R=420, t=3.0,
+                                      figs=[(None, 150, 0.0, "Running", 7, 160, "alien-scout.glb"),
+                                            (None, 152, 0.6, "Jump_running", 12, 175, "alien-pilot.glb")]),
+  "06-day-top-down":             dict(pal="day", cam=(-15, -25, 170), topdown=True, tgt=None, f=35, R=220, fogR=1100, t=3.0),
+  "07-dusk-wavefront":           dict(pal=("sunset", "night", 0.55), cam=(40, -150, 7), tgt=(-30, 40, 1), f=24, R=620, t=9.0),
 }
+if "contours-off" in SHOT:
+    CONTOURS = "off"
+SHOT = SHOT.replace("contours-off", "contours-on")
 S = SHOTS[SHOT]
 if isinstance(S["pal"], tuple):
     P = lerp_pal(PAL[S["pal"][0]], PAL[S["pal"][1]], S["pal"][2])
@@ -125,55 +133,42 @@ def sstep(e0, e1, x):
 def shore_y(x):
     return -38 + 34 * np.sin(x / 95.0 + 0.4) + 16 * np.sin(x / 41.0 + 1.7) + 9 * np.sin(x / 17.0 + 0.2)
 
-def canyon_x(y):
+def river_x(y):
     return 12 + 34 * np.sin(y / 62.0 + 0.3) + 13 * np.sin(y / 27.0 + 2.1)
 
 def path_x(y):
     return -95 + 38 * np.sin(y / 74.0 + 0.9) + 9 * np.sin(y / 31.0)
 
 def terrain(x, y, t):
-    """returns height, region id, extra fields."""
+    """rolling-hill world: height, region id, extra fields. No walls, no cliffs."""
     dsh = y - shore_y(x)
     land = sstep(-2, 22, dsh)
-    # rolling hills: domain-warped low-frequency fbm, broad swells not bumps
-    wx = x + 40 * (fbm(x / 210, y / 210, 2, 5) - 0.5)
-    wy = y + 40 * (fbm(x / 210 + 7, y / 210, 2, 6) - 0.5)
-    hills = fbm(wx / 150, wy / 150, 4, 1)
-    hills = 3.0 + 20.0 * sstep(0.22, 0.80, hills) + 3.0 * (fbm(wx / 45, wy / 45, 2, 9) - 0.5)
-    # coastal terraces (tidal flats / paddies): quantised rise near the shore
-    coast_h = np.minimum(dsh, 70) * 0.13 + 2.0 * (fbm(x / 30, y / 30, 2, 3) - 0.5)
-    tidx = np.floor(np.maximum(coast_h, 0) / 1.1)
-    terr = tidx * 1.1
-    coastw = 1 - sstep(15 + 25 * fbm(x / 70, y / 70, 1, 2), 60 + 30 * fbm(x / 70, y / 70, 1, 2), dsh)
+    wx = x + 50 * (fbm(x / 240, y / 240, 2, 5) - 0.5)
+    wy = y + 50 * (fbm(x / 240 + 7, y / 240, 2, 6) - 0.5)
+    rise = sstep(-10, 240, dsh)                       # the land swells as it goes inland
+    big = sstep(0.22, 0.82, fbm(wx / 260, wy / 260, 3, 1))
+    mid = fbm(wx / 85, wy / 85, 3, 9) - 0.5
+    hills = 1.5 + 30.0 * rise * big + 9.0 * mid * (0.35 + 0.65 * rise)
+    # coastal flats: shallow steps no taller than a slab, every third flooded
+    coast_h = np.minimum(dsh, 80) * 0.05 + 0.8 * (fbm(x / 30, y / 30, 2, 3) - 0.5)
+    tidx = np.floor(np.maximum(coast_h, 0) / 0.32)
+    terr = tidx * 0.32
+    cw = fbm(x / 70, y / 70, 1, 2)
+    coastw = 1 - sstep(15 + 25 * cw, 60 + 30 * cw, dsh)
     h = hills * (1 - coastw) + np.minimum(terr, hills) * coastw
-    # mesas: sharp-edged mask, flat tops at three levels, stepped cliffs
-    mm = fbm(x / 85 + 3.3, y / 85 - 1.1, 3, 11) + 0.0011 * np.clip(y - 60, -80, 220)
-    m = sstep(0.655, 0.685, mm)
-    lvl = np.floor(fbm(x / 160, y / 160, 2, 21) * 3.0)
-    top = 22.5 + 7 * lvl + 0.5 * (fbm(x / 25, y / 25, 1, 4) - 0.5)
-    mesa_h = np.maximum(h, top)
-    cliff = h + (mesa_h - h) * m
-    cliff = np.where((m > 0.02) & (m < 0.98), np.floor(cliff / 2.2) * 2.2, cliff)
-    h = cliff
-    region = np.where(m > 0.5, 3, np.where(coastw > 0.5, 1, 2))
-    # canyon: meandering, flat river floor, terraced walls
-    dc = np.abs(x - canyon_x(y))
-    floor = -0.6
-    wf, wr = 4.0, 4.0 + 7 + 0.3 * np.clip(h, 0, 40)
-    tt = np.clip((dc - wf) / (wr - wf), 0, 1)
-    prof = floor + (h - floor) * np.floor(tt ** 1.25 * 7) / 7
-    incanyon = (dc < wr) & (dsh > -4)
-    h = np.where(incanyon, np.minimum(h, prof), h)
-    river = (dc < wf) & (dsh > -4)
-    region = np.where(incanyon & ~river, 4, region)
-    region = np.where(river, 5, region)
+    region = np.where(coastw > 0.5, 1, 2)
+    # river valley: a smooth, wide U through the hills (no walls)
+    dc = np.abs(x - river_x(y))
+    vfloor = 0.1
+    v = sstep(3.5, 48.0, dc)
+    h = np.where(dsh > -4, vfloor + (h - vfloor) * v, h)
+    river = (dc < 3.5) & (dsh > -4)
     # path: a raised causeway following its own meander up the hills
     dp = np.abs(x - path_x(y))
-    onpath = (dp < 1.0) & (dsh > 6) & (y < 330) & ~incanyon
-    hs = hills * (1 - coastw) + np.maximum(coast_h, 0) * coastw
-    h = np.where(onpath, np.minimum(h, hs) + 0.35, h)
+    onpath = (dp < 1.0) & (dsh > 6) & (y < 330) & (dc > 6)
+    h = np.where(onpath, h + 0.3, h)
     region = np.where(onpath, 6, region)
-    # water: two crossing wave trains + a long swell (art-directed, not noise)
+    # water: two crossing wave trains + a long swell
     k1 = 2 * np.pi / 34.0; d1 = np.array([0.82, 0.57])
     k2 = 2 * np.pi / 21.0; d2 = np.array([-0.45, 0.89])
     k3 = 2 * np.pi / 95.0; d3 = np.array([0.2, 0.98])
@@ -183,10 +178,11 @@ def terrain(x, y, t):
     wv = 0.42 * w1 + 0.26 * w2 + 0.55 * w3
     wv += 0.08 * (fbm(x / 9 + 0.3 * t, y / 9, 1, 31) - 0.5)
     water_h = -0.4 + wv
-    crest = sstep(0.955, 0.998, w1) * (0.35 + 0.65 * sstep(-0.3, 0.9, w2))   # wavefront on one train, brightest where trains meet
+    crest = sstep(0.955, 0.998, w1) * (0.35 + 0.65 * sstep(-0.3, 0.9, w2))
     h = np.where(land > 0.5, h * land + (1 - land) * water_h, water_h)
     region = np.where(land > 0.5, region, 0)
-    h = np.where(river, -0.5 + 0.18 * w2, h)
+    h = np.where(river, -0.3 + 0.18 * w2, h)
+    region = np.where(river, 5, region)
     return h, region, dict(crest=crest * (region == 0), wv=wv, dsh=dsh, river=river, tidx=tidx)
 
 # ---------------------------------------------------------------- camera
@@ -196,36 +192,13 @@ def look_rot(cam, tgt):
     yaw = math.atan2(d[1], d[0]); pitch = math.asin(d[2])
     return (math.pi / 2 + pitch, 0.0, yaw - math.pi / 2)
 
-if S.get("cam") is None and "canyon_y" in S:
-    y0 = S["canyon_y"]; y1 = y0 + S["look"]
-    cam = (float(canyon_x(np.array(y0))), y0, S["cam_z"])
-    tgt = (float(canyon_x(np.array(y1))), y1, S["cam_z"] - 9)
-elif S.get("plateau"):
-    cam, tgt = None, None
-else:
-    cam, tgt = S["cam"], S["tgt"]
-
-# find a mesa for the plateau shot: highest flat area near (30,170)
-if S.get("plateau"):
-    gx, gy = np.meshgrid(np.arange(-150, 150, 2.0), np.arange(60, 320, 2.0))
-    hh, rr, _ = terrain(gx, gy, T)
-    score = np.where(rr == 3, hh, -1e9)
-    k = np.unravel_index(np.argmax(score), score.shape)
-    px, py, ph = gx[k], gy[k], hh[k]
-    angs = np.linspace(0, 2 * np.pi, 72, endpoint=False)
-    hd = [terrain(np.array([px + 30 * np.cos(a)]), np.array([py + 30 * np.sin(a)]), T)[0][0] for a in angs]
-    a = angs[int(np.argmin(hd))]
-    dvec = np.array([np.cos(a), np.sin(a)])
-    # walk toward the rim until the next tile drops
-    r = 0
-    while terrain(np.array([px + (r + 1) * dvec[0]]), np.array([py + (r + 1) * dvec[1]]), T)[0][0] > ph - 1.5 and r < 40:
-        r += 1
-    rx, ry = px + (r - 3) * dvec[0], py + (r - 3) * dvec[1]
-    PLATEAU = (rx, ry, ph)
-    PDIR = dvec
-    cam = (rx - 11 * dvec[0] + 3 * dvec[1], ry - 11 * dvec[1] - 3 * dvec[0], ph + 3.2)
-    tgt = (rx + 60 * dvec[0], ry + 60 * dvec[1], ph - 12)
-    print("plateau at", PLATEAU)
+cam, tgt = S["cam"], S["tgt"]
+if S.get("ground"):
+    gz = lambda p_: float(terrain(np.array([p_[0]]), np.array([p_[1]]), T)[0][0])
+    cam = (cam[0], cam[1], cam[2] + gz(cam)); tgt = (tgt[0], tgt[1], tgt[2] + gz(tgt))
+S["figs"] = [(int(round(float(path_x(np.array(f_[1]))))) if f_[0] is None else f_[0],) + tuple(f_[1:]) for f_ in S.get("figs", [])]
+if S.get("topdown"):
+    tgt = (cam[0], cam[1] + 0.02, cam[2] - 100)
 
 # ---------------------------------------------------------------- tile set (frustum-culled)
 R = S["R"]
@@ -242,18 +215,15 @@ hfov = math.atan(18.0 / S["f"])
 along = rel @ f2
 side = np.abs(rel @ np.array([-f2[1], f2[0]]))
 keep = (dist < R) & ((along > -12) & (side < along * math.tan(hfov) * 1.25 + 30))
+if S.get("topdown"):
+    keep = (np.abs(rel[:, 0]) < R) & (np.abs(rel[:, 1]) < R * 0.6)
 GX = GX[keep]; GY = GY[keep]
 H, REG, EX = terrain(GX, GY, T)
-if S.get("plateau"):
-    px, py, ph = PLATEAU
-    pd = np.array([-PDIR[1], PDIR[0]])
-    FIGS = []
-    for (a_, b_, j_) in [(0, 0, 0.0), (-3, 2.5, 1.0), (-1.5, -2.5, 0.0)]:
-        FIGS.append((round(px + a_ * PDIR[0] + b_ * pd[0]), round(py + a_ * PDIR[1] + b_ * pd[1]), j_))
-    # floating-platform response under figure 0 (just landed): depressed tile, smaller ring, faint ripple
-    lx, ly = FIGS[0][0], FIGS[0][1]
-    rr = np.hypot(GX - lx, GY - ly)
-    H = H - 0.32 * np.exp(-rr * rr / 0.5) + 0.07 * np.sin(rr * 1.9 - 1.0) * np.exp(-rr / 3.0) * (rr > 0.6)
+FIGS = S.get("figs", [])
+for (fx_, fy_, jump_, act_, fr_, yaw_, glb_) in FIGS:
+    if jump_ == 0.0:   # standing/landing: depressed slab + faint ripple (floating-platform response)
+        rr = np.hypot(GX - fx_, GY - fy_)
+        H = H - 0.22 * (rr < 0.5) + 0.05 * np.sin(rr * 1.9 - 1.0) * np.exp(-rr / 3.0) * (rr > 0.6)
 N = GX.size
 print("tiles", N)
 
@@ -267,7 +237,9 @@ land = REG > 0
 flags = np.stack([
     (np.floor(hN / CI) < c0), (np.floor(hE / CI) < c0),
     (np.floor(hS / CI) < c0), (np.floor(hW / CI) < c0)], 1).astype(float)
-flags *= (land & (H > 1.0))[:, None]
+flags *= (land & (H > 1.0) & (REG != 6))[:, None]
+if CONTOURS == "off":
+    flags[:] = 0.0
 crest = EX["crest"]
 crest = EX["crest"]
 cm = crest > 0.02
@@ -297,9 +269,6 @@ par = (EX["tidx"] % 2)[:, None] * 2 - 1
 col[coast] = col[coast] * (1 + 0.07 * par[coast])
 flood = coast & (EX["tidx"] % 3 == 1)
 col[flood] = P["water"][2] * 0.85 + P["shallow"] * 0.15
-wall = REG == 4
-band = (np.floor(H / 2.2) % 2) * 2 - 1
-col[wall] = (P["wall"] * (1 + P["strata"] * band[wall][:, None]))
 # water: colour by wave height, shallows near the shore
 wv = EX["wv"]
 wcol = ramp(P["water"], (wv + 1.1) / 2.2)
@@ -317,38 +286,35 @@ emit = np.zeros((N, 3))
 emit[REG == 6] = P["path"] * P["path_emit"]
 emit[REG == 5] = P["river"] * P["river_emit"]
 gi, gj = GX.astype(np.int64), GY.astype(np.int64)
-flat = (np.abs(hE - H) < 0.8) & (np.abs(hN - H) < 0.8) & (np.abs(hW - H) < 0.8) & (np.abs(hS - H) < 0.8)
-bea = (REG == 3) & flat & (hash2(gi // 5, gj // 5, 5) < 0.02) & (hash2(gi, gj, 6) < 0.8)
+flat = (np.abs(hE - H) < 0.25) & (np.abs(hN - H) < 0.25) & (np.abs(hW - H) < 0.25) & (np.abs(hS - H) < 0.25)
+bea = (REG == 2) & (H > 20) & flat & (hash2(gi // 5, gj // 5, 5) < 0.03) & (hash2(gi, gj, 6) < 0.8)
 emit[bea] = P["beacon"] * P["beacon_str"]
 emit += (P["water"][3] * P["crest_str"] * 0.06) * crest[:, None]
 rough = np.where(water | (REG == 5) | flood, 0.16, 0.62)
 
-# ---------------------------------------------------------------- mesh (12 verts / 9 faces per tile)
-GAP = 0.085; CH = 0.045
-half = 0.5 - GAP / 2; inn = half - CH
-floor_z = H.min() - 3.0
+# ---------------------------------------------------------------- mesh: thin sharp slabs (8 verts / 5 faces per tile)
+GAP = 0.085; TH = 0.3
+half = 0.5 - GAP / 2
 o = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]], float)
-V = np.zeros((N, 12, 3))
-V[:, 0:4, 0] = GX[:, None] + o[:, 0] * inn; V[:, 0:4, 1] = GY[:, None] + o[:, 1] * inn; V[:, 0:4, 2] = H[:, None]
-V[:, 4:8, 0] = GX[:, None] + o[:, 0] * half; V[:, 4:8, 1] = GY[:, None] + o[:, 1] * half; V[:, 4:8, 2] = H[:, None] - CH
-V[:, 8:12, 0] = V[:, 4:8, 0]; V[:, 8:12, 1] = V[:, 4:8, 1]
-V[:, 8:12, 2] = np.maximum(floor_z, H[:, None] - 60)
+V = np.zeros((N, 8, 3))
+for b0, dz in ((0, 0.0), (4, -TH)):
+    V[:, b0:b0 + 4, 0] = GX[:, None] + o[:, 0] * half
+    V[:, b0:b0 + 4, 1] = GY[:, None] + o[:, 1] * half
+    V[:, b0:b0 + 4, 2] = H[:, None] + dz
 faces = [(0, 1, 2, 3)]
 for k in range(4):
     a, b = k, (k + 1) % 4
-    faces.append((4 + a, 4 + b, b, a))            # chamfer
-for k in range(4):
-    a, b = k, (k + 1) % 4
-    faces.append((8 + a, 8 + b, 4 + b, 4 + a))    # side
+    faces.append((4 + a, 4 + b, b, a))    # side
+NF = len(faces)
 F = np.array(faces)
-LOOPV = (F[None, :, :] + 12 * np.arange(N)[:, None, None]).reshape(-1)
+LOOPV = (F[None, :, :] + 8 * np.arange(N)[:, None, None]).reshape(-1)
 me = bpy.data.meshes.new("tiles")
-me.vertices.add(N * 12)
+me.vertices.add(N * 8)
 me.vertices.foreach_set("co", V.reshape(-1).astype(np.float32))
-me.loops.add(N * 36)
+me.loops.add(N * NF * 4)
 me.loops.foreach_set("vertex_index", LOOPV.astype(np.int32))
-me.polygons.add(N * 9)
-me.polygons.foreach_set("loop_start", (np.arange(N * 9) * 4).astype(np.int32))
+me.polygons.add(N * NF)
+me.polygons.foreach_set("loop_start", (np.arange(N * NF) * 4).astype(np.int32))
 me.update(calc_edges=True)
 
 def face_attr(name, typ, data):
@@ -357,33 +323,50 @@ def face_attr(name, typ, data):
     a.data.foreach_set(key, data.reshape(-1).astype(np.float32))
 
 def rep9(a):
-    return np.repeat(a, 9, axis=0)
+    return np.repeat(a, NF, axis=0)
 c4 = np.concatenate([col, np.ones((N, 1))], 1)
 face_attr("tcol", 'FLOAT_COLOR', rep9(c4))
 e4 = np.concatenate([emit, np.ones((N, 1))], 1)
 face_attr("temit", 'FLOAT_COLOR', rep9(e4))
 face_attr("tedge", 'FLOAT_COLOR', rep9(flags))
 face_attr("trough", 'FLOAT', rep9(rough))
-# per-corner: top-ness (1 at top, 0 at bottom of side) and tile UV (-1 on sides)
 corner_v = np.array(faces).reshape(-1)
-ao = np.where(corner_v < 8, 1.0, 0.0)
-uvt = np.zeros((36, 2)) - 1.0
+ao = np.where(corner_v < 4, 1.0, 0.0)
+uvt = np.zeros((NF * 4, 2)) - 1.0
 pos01 = (o + 1) / 2
-inn01 = 0.5 + o * (inn / half) / 2
-for li, vi in enumerate(corner_v):
-    if li < 20:
-        uvt[li] = inn01[vi] if vi < 4 else pos01[vi - 4]
+for li, vi in enumerate(corner_v[:4]):
+    uvt[li] = pos01[vi]
 aoA = me.attributes.new("tao", 'FLOAT', 'CORNER')
 aoA.data.foreach_set("value", np.tile(ao, N).astype(np.float32))
 uv = me.uv_layers.new(name="tuv")
 uv.data.foreach_set("uv", np.tile(uvt.reshape(-1), N).astype(np.float32))
+
+# the under-surface seen through the gaps: one smooth dark sheet well below the slabs
+US = 2.0
+ux = np.arange(math.floor(GX.min()) - 2, math.ceil(GX.max()) + 3, US)
+uy = np.arange(math.floor(GY.min()) - 2, math.ceil(GY.max()) + 3, US)
+UX, UY = np.meshgrid(ux, uy)
+UH = terrain(UX.ravel(), UY.ravel(), T)[0].reshape(UX.shape)
+UH = np.minimum(UH, np.minimum(np.roll(UH, 1, 0), np.roll(UH, -1, 0)))
+UH = np.minimum(UH, np.minimum(np.roll(UH, 1, 1), np.roll(UH, -1, 1))) - 1.4
+ny_, nx_ = UX.shape
+UV_ = np.stack([UX.ravel(), UY.ravel(), UH.ravel()], 1)
+ii = np.arange(ny_ - 1)[:, None] * nx_ + np.arange(nx_ - 1)[None, :]
+UF = np.stack([ii, ii + 1, ii + 1 + nx_, ii + nx_], -1).reshape(-1, 4)
+ume = bpy.data.meshes.new("under")
+ume.vertices.add(len(UV_)); ume.vertices.foreach_set("co", UV_.reshape(-1).astype(np.float32))
+ume.loops.add(UF.size); ume.loops.foreach_set("vertex_index", UF.reshape(-1).astype(np.int32))
+ume.polygons.add(len(UF)); ume.polygons.foreach_set("loop_start", (np.arange(len(UF)) * 4).astype(np.int32))
+ume.update(calc_edges=True)
+uobj = bpy.data.objects.new("under", ume)
 obj = bpy.data.objects.new("tiles", me)
 
 # ---------------------------------------------------------------- scene
 for o_ in list(bpy.data.objects):
-    if o_ is not obj: bpy.data.objects.remove(o_)
+    if o_ is not obj and o_ is not uobj: bpy.data.objects.remove(o_)
 sc = bpy.context.scene
 sc.collection.objects.link(obj)
+sc.collection.objects.link(uobj)
 
 def sun_dir(el, az):
     el, az = math.radians(el), math.radians(az)
@@ -424,7 +407,7 @@ uvn = node("ShaderNodeUVMap"); uvn.uv_map = "tuv"
 sep = node("ShaderNodeSeparateXYZ"); L.new(uvn.outputs[0], sep.inputs[0])
 u, v = sep.outputs[0], sep.outputs[1]
 sepE = node("ShaderNodeSeparateColor"); L.new(tedge, sepE.inputs[0])
-W = 0.11
+W = 0.085
 def band(d):  # 1 at the tile boundary, 0 at W inside
     return math_('MAXIMUM', math_('SUBTRACT', 1.0, math_('DIVIDE', d, W)), 0.0)
 eN = math_('MULTIPLY', sepE.outputs[0], band(math_('SUBTRACT', 1.0, v)))
@@ -457,7 +440,7 @@ cd = node("ShaderNodeCameraData")
 geo = node("ShaderNodeNewGeometry")
 sepP = node("ShaderNodeSeparateXYZ"); L.new(geo.outputs["Position"], sepP.inputs[0])
 hfac = math_('ADD', 0.45, math_('MULTIPLY', 0.55, math_('EXPONENT', math_('MULTIPLY', math_('MAXIMUM', sepP.outputs[2], 0.0), -0.035))))
-k = 1.0 / (P["fog_k"] * 0.58 * R)
+k = 1.0 / (P["fog_k"] * 0.58 * S.get("fogR", R))
 dd = math_('MULTIPLY', math_('MULTIPLY', cd.outputs["View Distance"], k), hfac)
 fogf = math_('SUBTRACT', 1.0, math_('EXPONENT', math_('MULTIPLY', math_('MULTIPLY', dd, dd), -1.0)))
 dsun = node("ShaderNodeVectorMath"); dsun.operation = 'DOT_PRODUCT'
@@ -470,6 +453,16 @@ fogf = math_('MULTIPLY', fogf, lpm.outputs["Is Camera Ray"])
 mix = node("ShaderNodeMixShader"); L.new(fogf, mix.inputs[0]); L.new(bsdf.outputs[0], mix.inputs[1]); L.new(fogE.outputs[0], mix.inputs[2])
 out = node("ShaderNodeOutputMaterial"); L.new(mix.outputs[0], out.inputs[0])
 me.materials.append(mat)
+# under-surface: same fog, flat dark colour, no emission
+umat = mat.copy(); umat.name = "under"
+ub = [n for n in umat.node_tree.nodes if n.bl_idname == "ShaderNodeBsdfPrincipled"][0]
+for sock in ("Base Color", "Roughness", "Emission Color"):
+    for l in list(ub.inputs[sock].links):
+        umat.node_tree.links.remove(l)
+ub.inputs["Base Color"].default_value = (*P["under"], 1)
+ub.inputs["Roughness"].default_value = 0.9
+ub.inputs["Emission Color"].default_value = (0, 0, 0, 1)
+ume.materials.append(umat)
 
 # world: sky gradient for the camera, a flat ambient for lighting
 w = bpy.data.worlds.new("w"); sc.world = w; w.use_nodes = True
@@ -501,23 +494,53 @@ so.rotation_euler = Vector(tuple(-SD)).to_track_quat('-Z', 'Y').to_euler()
 camd = bpy.data.cameras.new("cam"); camd.lens = S["f"]; camd.sensor_width = 36; camd.clip_end = R * 2.5; camd.clip_start = 0.2
 co = bpy.data.objects.new("cam", camd); sc.collection.objects.link(co); sc.camera = co
 co.location = cam; co.rotation_euler = look_rot(cam, tgt)
-if "canyon_y" in S:
-    co.rotation_euler[1] = math.radians(-4)   # a few degrees of bank into the meander
+co.rotation_euler[1] = math.radians(S.get("bank", 0.0))
 co.rotation_mode = 'XYZ'
 
-# a few figure silhouettes for scale (plateau shot only): capsule body + head, ~0.85 tile tall
-if S.get("plateau"):
-    px, py, ph = PLATEAU
-    fig = bpy.data.materials.new("fig"); fig.use_nodes = True
-    fb = fig.node_tree.nodes["Principled BSDF"]
-    fb.inputs["Base Color"].default_value = (*hexlin("#FFF3E6"), 1); fb.inputs["Roughness"].default_value = 0.45
-    fb.inputs["Emission Color"].default_value = (*hexlin("#FFD2A8"), 1); fb.inputs["Emission Strength"].default_value = 0.15
-    for i, (gx_, gy_, jump) in enumerate(FIGS):
-        hz = float(H[(GX == gx_) & (GY == gy_)][0]) + jump
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.22, location=(gx_, gy_, hz + 0.38), segments=24, ring_count=12)
-        b = bpy.context.object; b.scale = (1, 0.85, 1.55); b.data.materials.append(fig)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.15, location=(gx_, gy_, hz + 0.86), segments=24, ring_count=12)
-        bpy.context.object.data.materials.append(fig)
+# characters: the Glowmere alien GLBs (commercial; read from assets/, never copied), ~1 tile tall
+ALIENS = "/Users/natefaulkenberry/Documents/GitHub/av-gen-geography-art/assets/aliens/"
+for (fx_, fy_, jump_, act_, fr_, yaw_, glb_) in FIGS:
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=ALIENS + glb_)
+    new = [o_ for o_ in bpy.data.objects if o_ not in before]
+    for o_ in new:
+        if o_.name.startswith("Icosphere"):
+            bpy.data.objects.remove(o_)
+    new = [o_ for o_ in bpy.data.objects if o_ not in before]
+    rig = [o_ for o_ in new if o_.type == 'ARMATURE'][0]
+    act = bpy.data.actions.get(act_)
+    rig.animation_data_create()
+    rig.animation_data.action = act
+    try:
+        if len(act.slots): rig.animation_data.action_slot = act.slots[0]
+    except Exception as e:
+        print("slot", e)
+    sc.frame_set(int(fr_))
+    bpy.context.view_layer.update()
+    dg = bpy.context.evaluated_depsgraph_get()
+    zs = []
+    for o_ in new:
+        if o_.type == 'MESH':
+            oe = o_.evaluated_get(dg)
+            zs += [(o_.matrix_world @ v.co).z for v in oe.data.vertices]
+    ht = max(zs) - min(zs); z0 = min(zs)
+    sca = 1.0 / ht if not jump_ else 1.0 / 1.55
+    hz = float(H[(GX == fx_) & (GY == fy_)][0])
+    rig.scale = (sca, sca, sca)
+    rig.location = (fx_, fy_, hz)
+    rig.rotation_euler = (0, 0, math.radians(yaw_))
+    bpy.context.view_layer.update(); dg = bpy.context.evaluated_depsgraph_get()
+    pts = []
+    for o_ in new:
+        if o_.type == 'MESH':
+            oe = o_.evaluated_get(dg)
+            mw = o_.matrix_world
+            pts += [tuple(mw @ v.co) for v in oe.data.vertices]
+    pts = np.array(pts)
+    cxy = (pts[:, :2].min(0) + pts[:, :2].max(0)) / 2
+    rig.location = (fx_ + (fx_ - cxy[0]), fy_ + (fy_ - cxy[1]), hz + jump_ + (hz - pts[:, 2].min()))
+    print("alien", glb_, "height", ht, "scale", sca)
+FRAME_KEEP = sc.frame_current
 
 # render settings
 sc.render.engine = 'CYCLES'   # CPU path tracing: keeps the shared GPU free
@@ -538,7 +561,7 @@ sc.eevee.taa_render_samples = 48
 sc.eevee.use_raytracing = True
 sc.eevee.use_shadows = True
 sc.view_settings.view_transform = 'AgX'
-sc.view_settings.look = 'AgX - Medium High Contrast'
+sc.view_settings.look = P.get("look", 'AgX - Medium High Contrast')
 sc.view_settings.exposure = P["exposure"]
 sc.render.film_transparent = False
 
@@ -551,11 +574,16 @@ gl.inputs["Threshold"].default_value = 1.0
 gl.inputs["Strength"].default_value = 0.6 if P["edge_str"] > 2 else 0.25
 gl.inputs["Size"].default_value = 0.6
 go = ng.nodes.new("NodeGroupOutput")
-ng.links.new(rl.outputs["Image"], gl.inputs["Image"]); ng.links.new(gl.outputs["Image"], go.inputs[0])
+hs = ng.nodes.new("CompositorNodeHueSat")
+print("huesat inputs", [i.name for i in hs.inputs])
+hs.inputs["Saturation"].default_value = P.get("sat", 1.0)
+ng.links.new(rl.outputs["Image"], gl.inputs["Image"]); ng.links.new(gl.outputs["Image"], hs.inputs["Image"])
+ng.links.new(hs.outputs[0], go.inputs[0])
 sc.compositing_node_group = ng
 sc.render.use_compositing = True
 
 sc.render.image_settings.file_format = 'PNG'
 sc.render.filepath = OUT
+sc.frame_set(FRAME_KEEP)
 bpy.ops.render.render(write_still=True)
 print("WROTE", OUT, "tiles", N)

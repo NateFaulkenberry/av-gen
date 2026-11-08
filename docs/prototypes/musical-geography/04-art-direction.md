@@ -4,10 +4,24 @@ Art agent, 2026-11-08, branch `scene/musical-geography-art`. This is the look th
 Gate 1. It is written against the engineering plan (`03-technical-plan.md` on `scene/musical-geography`), and every
 request at the end maps onto a system that plan already proposes.
 
-Gate 1 stills: `~/Desktop/av-gen-review/105-musical-geography/01-gate1/`. They are Blender mock-ups (Cycles on the
-CPU, so the shared GPU stayed free), not engine frames. The engine has no tile terrain yet. The mock-up uses the same
-model the plan proposes: one height per tile, flat tops, columns on a fixed lattice, colour by height. It is a proof
-of the look, not of performance.
+**Revision 2 (2026-11-08), after the owner's Gate 1 answers.**
+- All tiles are thin slabs with sharp edges.
+- Rolling hills are the main landform.
+- There are no canyon walls, mesa cliffs or buttes.
+- Daylight is brighter.
+- The characters are the Glowmere aliens.
+- A short top-down pass is allowed.
+
+The current stills are in `~/Desktop/av-gen-review/105-musical-geography/01-gate1/r2/`. The first-round stills are
+in the folder above it, kept for comparison only.
+
+All stills are Blender mock-ups rendered on the CPU, so the shared GPU stayed free. They are not engine frames: the
+engine has no tile terrain yet. The mock-up uses the model the plan proposes:
+- one height per tile;
+- flat tops;
+- a fixed lattice;
+- colour by height.
+It is a proof of the look, not of performance.
 
 ---
 
@@ -24,17 +38,17 @@ of the look, not of performance.
   - **contour lines** traced along the tile edges where the ground crosses a height interval;
   - the **wavefront** riding one wave train's crest;
   - the **path**;
-  - the **river** in the canyon floor;
-  - small **lit pads** on mesa tops.
+  - the **river** in its valley;
+  - small **lit pads** on the high hilltops.
   At night the contours become the drawing itself: a topographic map of light over a violet land.
 - **The tile is the unit.** A tile is always an object, not a pixel:
-  - a small dark gap;
-  - a thin 45° chamfer that catches light;
+  - a thin, sharp-edged slab;
+  - a small gap that shows a dark under-surface;
   - per-tile value jitter of ±2%.
   Formations are always made of many tiles (40 to 200 across), so you read the unit and the land at once, the way
   aerial photographs of salt pans and greenhouses read (Burtynsky, Bernhard Lang).
-- **The land is authored.** Each formation is a designed shape with its own rule: the meander, the mesas, the
-  terraces, the sea. Noise only roughens a formation; it never creates one.
+- **The land is authored.** Each formation is a designed shape with its own rule: the long uplands, the river
+  valley, the coastal flats, the path, the sea. Noise only warps or roughens a formation; it never creates one.
 
 The palette is rich across the day, not within a frame. Each state has:
 - one key hue family;
@@ -52,9 +66,9 @@ Hue variety inside a frame comes from height and from one slow world-space drift
 | Dot-squares in a wave | one wave read across many tiles; the colour travelling with the wave | the black void between the squares |
 | Rainbow wave-tiles with depth of field | colour bands that follow the landform; shallow focus at low altitude | the uncontrolled rainbow (here each palette has one family) |
 | Stepped colour landscape | colour by height; hills you read as land | the hard hue ramp of a data plot |
-| Smooth teal tile sheet | the chamfer and gap proportions; the calm of a smooth swell | the teal (cyan/teal is capped, §3) |
+| Smooth teal tile sheet | the thin-sheet read and the gap; the calm of a smooth swell | the teal (cyan/teal is capped, §3) |
 | Glass tiles with gold/blue edge outlines | the **edge** as the light carrier | outlining every tile (here only the edges that mean something) |
-| Platform-jumper and party-game references | buoyancy, rounded friendly silhouettes, the scale of a figure against a platform | any specific game's look, characters, props, trees, gems, clouds |
+| Platform-jumper and party-game references | buoyancy, the scale of a figure against a platform | any specific game's look, characters, props, trees, gems, clouds. The characters are AV Gen's own aliens (§8) |
 
 ---
 
@@ -63,7 +77,7 @@ Hue variety inside a frame comes from height and from one slow world-space drift
 - **Aerial geography.**
   - Low raking sun (10–30°) describes relief, and high sun describes pattern. A NASA photo-interpretation study found
     a sun elevation of about 30° gave the best mix of tone and shadow.
-  - So day uses a 40° sun, and sunset and dawn use 9–13° suns for long shadows across the columns.
+  - So day uses a 40° sun, and sunset and dawn use 9–13° suns for long shadows across the hillsides.
   - Burtynsky and Hegen use no horizon and soft light to turn land into colour fields. That is the model for the high
     passes over the terraces and the sea.
 - **Cartography.**
@@ -72,7 +86,7 @@ Hue variety inside a frame comes from height and from one slow world-space drift
   - Swiss relief shading: light sides warm, shadow sides blue.
   - Scott Reinhard's vertical exaggeration.
   - From all of these: the hypsometric ramp, contour lines as the edge-light language, warm key and cool shadow as a
-    fixed rule, and exaggeration only on the mesas and the canyon.
+    fixed rule, and vertical exaggeration on the uplands only.
 - **Kinetic grids** (MIT inFORM, ART+COM's Kinetic Rain, Ikeda, Universal Everything). What separates them from stock
   "cube wave" footage:
   - the grid depicts something;
@@ -91,7 +105,7 @@ Hue variety inside a frame comes from height and from one slow world-space drift
   - Pixar colour-script practice: plan the four states as a strip along the song before tuning.
 - **Atmosphere.**
   - Fog colour is the sky's horizon colour, tinted toward the sun when looking into it (Quilez), with a height falloff
-    so valleys and the sea fill with haze while mesa tops stay crisp.
+    so valleys and the sea fill with haze while the high tops stay crisp.
   - Night emission goes on lines, as in Vincent Laforet's night aerials, where light runs along the road networks.
 - **Drone cinematography.**
   - Slow reveals.
@@ -131,68 +145,75 @@ All values are sRGB hex.
 - **Land ramp:** five stops at absolute heights 0 / 5 / 12 / 20 / 30 tiles (cartographic, never renormalised per
   frame).
 - **Water ramp:** four stops over the wave height, trough to crest.
+- **Under-surface:** the dark sheet seen through the gaps (§4).
 - **Drift:** one slow world-space gradient (wavelength about 1,600 tiles) mixed in at up to 28%, so no two valleys
   share a tint.
   - **Rule:** the drift must be *analogous* to the colours it touches.
-  - In the mock-up, a periwinkle drift over the pale-yellow mesa tops turned them grey-khaki. Complementary mixing
-    desaturates.
-  - In daylight the drift is therefore held to the lowlands.
+  - In round 1, a periwinkle drift over pale-yellow highs turned them grey-khaki. Complementary mixing desaturates.
+  - In daylight the drift is therefore held to the lowlands, at most 14%.
 
 **Teal cap.** No state may use a hue between 165° and 195° anywhere but the daylight shallows. In the frame that band
 must stay under 5% of the pixels.
 
-### Daylight: "porcelain atlas" (soft, bright, cool lowlands under a warm sun)
+### Daylight: "bright atlas" (revised to the owner's "brighter")
+
+Saturated and luminous, close to the rainbow-tile references, but ordered by height: violet lowlands → orchid → coral
+→ orange → yellow uplands, over cobalt water. It is one warm-over-cool scheme, not a spectrum.
 
 | Role | Value |
 |---|---|
-| Sky zenith → horizon | `#5C7EE0` → `#E6E0F4` (lavender haze) |
-| Fog (= horizon) / looking into the sun | `#D9D2EE` / `#FFF0D8` |
-| Sun | `#FFF1DC`, 40° elevation, from the south-west, soft (1.5° disc) |
-| Ambient | `#9EAAF0`, low (0.45) |
-| Land ramp | `#8088E6` periwinkle, `#A890E4` lavender, `#EBA290` warm peach, `#EDB872` apricot, `#F0D480` pale yellow |
-| Water ramp | `#1630A8` deep cobalt, `#2448D0`, `#3F70E8`, `#8DB4F6` crest |
-| Shallows (the only turquoise) | `#3FB0C8`, within 9 tiles of the shore, mixed in at most 60% |
-| Canyon wall | `#EE987C`, ±8% strata banding every 2.2 tiles of height |
+| Sky zenith → horizon | `#3C78FF` → `#D6E2FF` |
+| Fog (= horizon) / into the sun | `#C8D6FA` / `#FFF2D6`, light (fog multiplier 1.7) |
+| Sun | `#FFF4E0`, 42° elevation, from the south-west, soft (1.5° disc), strength 4.6 |
+| Ambient | `#A6B6FF` (0.6) |
+| Land ramp | `#8A6CF2` violet, `#C26AE4` orchid, `#FF7A8C` coral, `#FFA64E` orange, `#FFD84A` yellow |
+| Water ramp | `#0B36D0` cobalt, `#1C58F2`, `#3A86FF`, `#8CC6FF` crest |
+| Shallows (the only turquoise) | `#2EC2D2`, within 9 tiles of the shore, mixed in at most 33% |
+| Under-surface | `#1A1E66` |
 | Path | `#FFF5E2` cream, unlit |
-| Drift | `#8E9CF2`, at most 14%, and only below 18 tiles of height (see the drift rule below) |
-| Edge light / emissive | off (0). Day is a colour field; light is the sun's |
-| Exposure | −0.4 EV against the others (the bright state must not clip into AgX white) |
+| Drift | `#8E9CF2`, at most 14%, lowlands only |
+| Edge light / emissive | off. Day is a colour field; its light is the sun's |
+| Grade | AgX **Punchy** look, +30% saturation, −0.1 EV. The first-round softer grade read milky, and the owner asked for brighter |
+
+The lowest land stop was cobalt-periwinkle in a first draft of this revision. From the top-down view it merged with
+the water, so it moved to violet: land and sea must never share a hue at the shoreline.
 
 ### Sunset: "ember map" (low and directional; violet shadows, coral light)
 
 | Role | Value |
 |---|---|
 | Sky zenith → horizon | `#33206E` → `#FF8A50` |
-| Fog / into the sun | `#E07462` / `#FFB060` (Gurney's reverse aerial perspective: the distance glows) |
-| Sun | `#FF9A4A`, 9° elevation, from the west; long shadows across whole columns |
+| Fog / into the sun | `#E07462` / `#FFB060` (Gurney's reverse aerial perspective: the distance glows), multiplier 1.35 |
+| Sun | `#FF9A4A`, 9° elevation, from the west; long shadows across whole hillsides |
 | Ambient | `#5E46B8`, strong (0.9): the shadow side is violet, never brown |
 | Land ramp | `#4E2A7E` deep violet, `#8A2C78` magenta, `#D0405A` crimson, `#F2785A` coral, `#FFB45A` orange |
 | Water ramp | `#24164F`, `#4A2380`, `#8A2F8C`, `#E2507A` crest |
-| Canyon wall | `#C8445E`, ±12% strata |
+| Under-surface | `#1E0E2E` |
 | Path | `#FFD7A0`, emissive 0.6 (the first lights come on) |
 | Drift | `#6A3AA0` |
-| Edge light | `#FFC27A`, 0.9 (contours appear as thin gold lines) |
+| Contour edge light | `#FFC27A`, 2.0 (raised from 0.9: on rolling hills the gold lines were too faint to judge) |
 | Crest light | 0.6 |
-| Fog multiplier / exposure | 1.35 (the haze lives in the sky and the far ring, not the canyon) / −0.2 EV |
+| Exposure | −0.2 EV |
 
 ### Night: "map of light" (vivid but not dark; the lines carry the chroma)
 
 | Role | Value |
 |---|---|
 | Sky zenith → horizon | `#080A2C` → `#33237A` |
-| Fog / toward the moon | `#2C1F66` / `#41308E` (fog is violet, so the blue lines separate from it); fog multiplier 0.85 (denser) |
+| Fog / toward the moon | `#2C1F66` / `#41308E`; multiplier 0.85 (denser). The fog is violet, so the blue lines separate from it |
 | Moon (key) | `#C8B4FF`, 34° elevation, weak (1.2), still casting shadows |
 | Ambient | `#5A38B0` (0.6). Mid-dark, never black: Gurney's "don't go too dark overall" |
 | Land ramp | `#221A6C` deep indigo, `#36228E`, `#52289E`, `#7430B0` violet, `#9C44C8` high violet |
 | Water ramp | `#0E1452`, `#18227A`, `#2443B0`, `#3F78FF` electric-blue crest |
+| Under-surface | `#06061E` |
 | River | `#2E6BFF`, emissive 0.45 (a lit vein, not a white bar) |
 | Contour edge light | `#5A86FF` electric blue, 7.0, with bloom |
 | Wavefront (crest) edges | water crest colour, 5.0 |
 | Path | `#FF5FB0` pink, emissive 5.0 |
-| Mesa-top pads | `#FF4FA8` pink, 6.0, in small clusters on flat mesa tops only, about 1 in 50 five-by-five blocks |
+| Hilltop pads | `#FF4FA8` pink, 6.0, in small clusters on flat tops above 20 tiles, about 1 in 33 five-by-five blocks |
 | Exposure | +0.6 EV |
 
-**Lit fraction target: 5–12% of the frame**, which is an artistic target to test, not a cited figure. More than 15%
+**Lit fraction target: 5–12% of the frame.** This is an artistic target to test, not a cited figure. More than 15%
 reads as a neon grid.
 
 ### Dawn: "first light" (clear, pale, green lowlands, gold edges)
@@ -200,25 +221,41 @@ reads as a neon grid.
 | Role | Value |
 |---|---|
 | Sky zenith → horizon | `#A6BCDC` → `#FFD9A4` |
-| Fog / into the sun | `#F2DDB9` / `#FFE2A0`, thinner than sunset (fog multiplier 1.35: clearer air) |
+| Fog / into the sun | `#F2DDB9` / `#FFE2A0`; multiplier 1.35 (clearer air than sunset) |
 | Sun | `#FFC874`, 13° elevation, from the east (the opposite azimuth to sunset) |
 | Ambient | `#B8C8D8`, cool (0.55) |
 | Land ramp | `#6FB57E` soft green, `#9CCC84`, `#DCE08E` pale yellow-green, `#F4D68C` golden, `#FBE9C4` warm cream |
 | Water ramp | `#3E5E98`, `#5A7EB8`, `#86A6D0`, `#F2DCA8` gold crest |
-| Canyon wall | `#E8A44A` amber, ±8% strata |
+| Under-surface | `#2A3A3A` |
 | Path | `#F2A93B` golden amber, 0.25 |
 | Edge light | `#FFD27A`, 0.5 |
 | Crest light | 0.4 |
 | Exposure | −0.2 EV |
 
+Dawn is not re-rendered in round 2. Its round-1 still (`../05-dawn-terraces.png`) shows the palette on the old
+geometry.
+
+### The colour arc across a song (the owner asked for my recommendation)
+
+**Recommendation: day → sunset → night → dawn.**
+
+Why, in one sentence: it puts the brightest colour field at the opening and the scene's most spectacular language,
+the night's lines of light, where songs usually peak, and it ends on dawn as a resolution that is visibly different
+from the opening.
+
+- The keys are spaced so night lands on the song's main climax (section markers from the beat clock's
+  `beat.section`).
+- Dawn takes the last 15–20%.
+- A short track compresses the arc. It does not drop states: sunset and dusk are where the lights switch on, and they
+  are the most musical transitions.
+
 ### Transitions
 
 Driven by `dayPhase` on the timeline and never by audio (brief §7).
-- The keys sit at four phases: dawn → day → sunset → night, then back to dawn.
 - Every colour above is a curve key. Interpolate in **OKLab**: sunset to night through linear RGB passes through a
   grey-brown.
-- The edge and emissive gains ramp on their own curves, so the contours "switch on" during dusk rather than
-  cross-fading. The order is: path lights first (sunset), contours (dusk), pads (night).
+- The edge and emissive gains ramp on their own curves, so the lights switch on rather than cross-fade. The order is:
+  path lights first (sunset), contours (dusk), pads (night).
 - Audio rides on top. It may:
   - warm the terrain (a hue push of at most ±8° toward the accent);
   - lift emissive gain (×0.6 to ×1.6);
@@ -227,40 +264,51 @@ Driven by `dayPhase` on the timeline and never by audio (brief §7).
 
 ---
 
-## 4. The tile language
+## 4. The tile language (revised: thin, sharp slabs)
 
 | Property | Value | Why |
 |---|---|---|
 | Pitch | 1 unit (= one nav cell) | Everything below is in pitches |
-| Top | 0.915 square (gap **8.5%**) | Reads as separate objects up close; the gap closes into a fine texture at mid distance |
-| Chamfer | **0.045** at 45°, one segment | Catches a 1–2 px highlight up close. Any wider and it is a building block or furniture |
-| Body | **Column** down to a floor, not a slab | Steps read as land. A slab field reads as floor tiles |
-| Side shading | Fades to 18% of the top colour at the column's foot | Gaps and cliff faces get depth without an AO pass |
+| Top | 0.915 square (gap **8.5%**) | Separate objects up close; a fine texture at mid distance. The gap still works with slabs |
+| Thickness | **0.30** | Thin enough to read as a floating plate (the owner's slabs). Thick enough that a side face shows where neighbours step, giving the hills a readable "stair" on the shadow side |
+| Edges | **Sharp**: no chamfer, no bevel, no rounded corners | The owner's call. The top's outline is now drawn only by the gap and by side-face shading |
+| Under-surface | One smooth dark sheet, 1.4 tiles below the lowest neighbouring slab, in the palette's under colour | What you see through the gaps. Without it the gaps show the sky and read as light grid lines: a neon grid by accident |
+| Side shading | The side face fades to 18% of the top colour at the slab's underside | The slab edge reads as a crisp lit lip over a dark gap |
 | Material, land | Roughness 0.62, specular 0.5, no texture | Matte, painted. The colour does the work |
-| Material, water and flooded terraces | Roughness 0.16 | Sky reflections and glints. The water is tiles that shine, not a water surface |
+| Material, water and flooded flats | Roughness 0.16 | Sky reflections and glints. The water is tiles that shine, not a water surface |
 | Per-tile variation | Value ±2.25%, hashed on the **lattice index** | Breaks the CG uniformity; must not change when the window recentres |
-| Tops | Flat, one height per tile (engineering's model) | The stepped geometric read; tile = cell |
-| Edge light | A band on the chamfer, 11% of the top's width, sharpened (power 1.6); **per side**, only on the sides that mean something (§6) | Thin lines, never full outlines |
-| Emission | **Top face only** (never the column sides) | Sides lit from inside read as neon bars. That was seen and rejected in the mock-up |
+| Tops | Flat, one height per tile (engineering's model) | Tile = cell |
+| Edge light | A band along the top's border, 8.5% of the width, sharpened (power 1.6); **per side**, only on sides that mean something (§6) | Thin lines, never full outlines |
+| Emission | **Top face only** (never the sides) | Sides lit from inside read as neon bars, which round 1 showed |
 
-**Distance behaviour.** Engineering flags aliasing at grazing angles as a risk, and the mock-up confirms the gap is
-what aliases: a 0.085 gap at 5 px per tile is a sub-pixel line. Ask: fade the gap darkening and the edge band by
-pixel footprint (an `fwidth` style fade), so far tiles average to their colour instead of moiré. LOD 1 (an unbevelled
-box) is fine visually beyond about 150 tiles.
+**Slope and the slab.**
+- On the rolling hills, the 95th-percentile step between neighbours is 0.29 tiles and the 99th is 0.43, against a
+  0.30 slab.
+- So on most slopes the slabs overlap in height and read as a continuous stepped sheet. Only the steepest flanks show
+  a sliver of the dark under-surface, which is the floating-platform hint without walls.
+- Rule for formation authoring: **keep the 95th-percentile neighbour step at or below the slab thickness.** Engineering's plan already tests a
+  per-formation step bound (§4.1); this is the number.
+
+**Distance behaviour.**
+- The 0.085 gap is a sub-pixel line beyond about 200 tiles, so it aliases. Fade the gap and the edge band by pixel
+  footprint (request 1976).
+- With sharp edges, LOD 1 is the same box, so the LOD saving is only in vertices. That is the plan's lever, not
+  mine.
 
 ---
 
-## 5. The formations and the map
+## 5. The formations and the map (revised: rolling hills first)
 
-The mock-up world is laid out like this. The engine version should keep the *relations*, not the coordinates.
+The owner: more rolling hill geometry than canyons, and no large pillar shapes or canyon walls. Everything high now
+rises as smooth land.
 
 ```
               N
-   mesas (3 levels, 22.5 / 29.5 / 36.5) with stepped cliffs,
-   buttes standing off them; the canyon cuts through them
-        |            ~~~ canyon (meander, river floor) ~~~
-   rolling hills (domain-warped, 3–23 tall), the lit path climbing them
-   coastal terraces: 1.1-tall steps, every third flooded (glossy, water-coloured)
+   long uplands (up to ~31 tall), broad swells on a 260-tile wavelength,
+   secondary hills on 85; high flat-ish tops carry the night pads
+        |      ~~~ the river valley: a wide, smooth U (no walls) ~~~
+   the land swells inland (gentle near the coast, high 200+ tiles in); the lit path climbs it
+   coastal flats: shallow steps no taller than a slab, every third flooded (glossy)
   ~~~~~~~~~~~~~~~~~~~~~~~ indented shoreline (bays) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    the sea: two crossing wave trains + a long swell, an illuminated wavefront
               S
@@ -268,27 +316,30 @@ The mock-up world is laid out like this. The engine version should keep the *rel
 
 | Formation | How it reads | Rule (mock-up values, in pitches) |
 |---|---|---|
-| **Water** | A broad, gently moving, glossy field. The colour climbs the water ramp with the wave, so crests are lighter, and the wavefront is a line of lit edges riding one train's crest | Trains of wavelength 34, 21 and 95 (amplitude 0.42, 0.26, 0.55), at about 70° to each other, so they interfere into diamonds. Crest light is brightest where two trains meet. Level −0.4. A shallows band within 9 of the shore |
-| **Coastal terraces** | Tidal flats and paddies. Stepped bands following the coast, alternating ±7% in value, every third flooded: the strongest "art-directed" read in the mock-up | `floor(rise / 1.1)`, rise = 0.13 × distance inland. The belt width varies from 15 to 90 |
-| **Rolling hills** | Broad swells and saddles, never bumps. The hypsometric ramp turns them into lavender-to-peach bands | Domain-warped fBm at wavelength 150 (warp 40), height 3–23, a small 45-wavelength roughening of ±1.5 |
-| **Mesas and buttes** | Landmarks. Flat tops at three levels, cliffs 1–3 tiles wide, stepped every 2.2 (strata), buttes left standing off the main tables | A sharp mask (transition 3%), levels 22.5 + 7k. The levels are offset from the contour interval, so flat tops never draw stray contour marks |
-| **Canyon** | The hero formation of the reveal. A meander with a river floor and terraced walls in the wall colour with strata | Centreline `12 + 34 sin(y/62) + 13 sin(y/27)`; floor half-width 4; rim half-width 11 + 0.3 × local height; 7 terraces in the profile; river emissive at night |
-| **Path** | A one-tile-wide causeway, raised 0.35, following its own meander from the shore up the hills. Cream by day, amber at dawn, pink and lit at night | Its own spline, independent of the canyon |
+| **Water** | A broad, gently moving, glossy field. The colour climbs the water ramp with the wave, so crests are lighter; at night the wavefront is a line of lit edges riding one train's crest | Trains of wavelength 34, 21 and 95 (amplitude 0.42, 0.26, 0.55), at about 70° to each other, interfering into diamonds. Crest light brightest where two trains meet. Level −0.4. Shallows band within 9 of the shore |
+| **Coastal flats** | Tidal flats and paddies: bands following the coast, alternating ±7% in value, every third flooded. Strongest from above (the top-down still) | `floor(rise / 0.32) × 0.32` (steps no taller than a slab), rise = 0.05 × distance inland. The belt width varies from 15 to 90 |
+| **Rolling hills (the main landform)** | Long uplands and saddles that swell inland. Never bumps, never walls. The height ramp turns them into colour bands; from the air they read as a hand-tinted relief | `1.5 + 30 × rise × big + 9 × mid`. `big` is a domain-warped fBm at wavelength 260 (warp 50), shaped by a smoothstep. `mid` is an fBm at 85. `rise` ramps from the coast to 240 tiles inland, so the land climbs as you fly in. Neighbour step p95 0.29, p99 0.43 |
+| **River valley** | A wide, soft U that the hills slope down into, with a glossy river on the floor. It replaces the canyon | Height eased to the floor over 3.5–48 tiles from the centreline (`12 + 34 sin(y/62) + 13 sin(y/27)`); river half-width 3.5; river emissive at night |
+| **Path** | A one-tile causeway, raised 0.3, following its own meander from the shore up into the hills. Cream by day, amber at dawn, pink and lit at night. The line characters run | Its own spline, independent of the river |
+| **Hilltop pads** | Small lit clusters on the flattest high tops (above 20 tiles). The gathering places, and the pink accents at night | Flatness: all four neighbour steps < 0.25 |
 
-**Coverage.** Over a typical window the mock-up gives water about 29%, terraces 6%, hills 38%, mesas 23%, canyon and
-river 3.5%, and path 0.2%. That ratio is about right. Mesas above 30% become one plateau with holes, which was seen
-and rejected.
+**Removed in revision 2:**
+- mesas;
+- stepped cliffs;
+- buttes;
+- the canyon and its terraced walls;
+- the strata banding.
 
-**Avoiding repetition at world scale.** The world is endless, so these formations recur as **biomes along the
-flight**. A slow region field picks which formation family dominates. Each family keeps its rule but varies its
-parameters by region, so a second canyon is not the first one again:
-- meander wavelength;
-- mesa levels;
+**Coverage** over a typical window: water about 29%, flats 6%, hills 64%, river 1%, path 0.2%.
+
+**Avoiding repetition at world scale.** The world is endless, so the formations recur as **biomes along the flight**.
+A slow region field varies each family's parameters:
+- upland height and wavelength;
+- valley width;
 - terrace step;
 - wave direction.
-
-This is the plan's "region noise", but the art asks that it be **route-aware**: the camera's route is authored
-through the biomes, not across random ones (§7).
+A second valley is not the first one again. The camera's route is authored through the biomes (§7), not across
+random ones.
 
 ---
 
@@ -296,27 +347,32 @@ through the biomes, not across random ones (§7).
 
 Five light carriers. Each one describes geography; none is decoration.
 
-1. **Contours.** The edge of a tile lights on a side where the neighbour across that side sits in a *lower* contour
-   band: `floor(h / interval)` differs. The interval is 3 tiles.
-   - The result is continuous isolines, drawn on tile edges, that slide when waves move the ground.
-   - This is the signature: the scene draws its own map.
-   - Edge gain by state: day 0, dawn 0.5, sunset 0.9, night 7.
+1. **Contours (to be decided by the owner; see the on/off pairs).** A tile's edge lights on any side where the
+   neighbour across it sits in a *lower* contour band: `floor(h / 3)` differs.
+   - On rolling hills this draws clean, nested isolines: rings around summits, lines following the valley.
+   - Edge gain: day 0, dawn 0.5, sunset 2.0, night 7.
 2. **The wavefront.** Edges on water tiles near one wave train's crest (sharpness 0.955–0.998), brightened where a
-   second train crests too. The lit lines travel and cross. This is the brief's "wavefront of illumination following
-   a crest".
-3. **The path.** Top emission along the causeway. It is the line the eye follows through the frame, and the line the
-   characters run.
-4. **The river.** A low emissive vein in the canyon floor.
-5. **Mesa pads.** Small clusters of lit tops on flat mesa tops only: the "gathering places" for characters, and the
-   pink accents at night.
+   second train crests too.
+3. **The path.** Top emission along the causeway: the line the eye follows, and the one the characters run.
+4. **The river.** A low emissive vein along the valley floor.
+5. **Hilltop pads.** Pink clusters at night.
+
+**Contours on and off.** "Off" keeps carriers 2–5. There are no rims any more, because the mesas went with revision 2.
+The pairs in `r2/` are the same frames with only the contour edges switched:
+- **Night, on.** The land draws itself as a map: summit rings and valley lines give the hills a shape you can read in
+  the dark.
+- **Night, off.** Two lit lines (path and river) and the pads over a dark blue field. Calmer and more graphic, but the
+  hills almost vanish: without the contours, night has no landform.
+- **Sunset.** The difference is smaller. The low sun already draws the hills, so the contours are a gold accent.
+
+**My recommendation** is contours on at night and dusk (they carry the landform when the sun cannot) and off or faint
+by day and at sunset. That is what the edge-gain curves above already do. The owner decides.
 
 **Audio on light** (routes, never hard-coded):
 - high band → edge gain (×0.6–1.6) and crest sharpness;
 - onsets → a ring of edge light expanding from a point ahead of the camera (the plan's event ring), not a full-field
   flash;
 - overall energy → emissive gain.
-
-Most of the frame is always unlit.
 
 ---
 
@@ -328,55 +384,56 @@ The camera follows the rule in `01-coordination.md`:
 - no orbits, hero shots or head turns at characters;
 - dives and climbs are allowed.
 
+The owner added **one exception: a short top-down pass.**
+
 The route is a loop through the biomes, so a long song never runs out of world. Section changes happen at musical
-section boundaries. A **pedestal climb or a dive is the "cut"**.
+section boundaries. A pedestal climb or a dive is the "cut".
 
 | Leg | Altitude (tiles) | Focal | Speed (tiles/s) | Pitch | Composition |
 |---|---|---|---|---|---|
-| 1. Over the sea | 3–6, terrain-following over the waves | 24 mm | 7–9 | −5 to −8° | Horizon in the upper third, formations rising in the haze ahead; wave trains cross under the lens. *Still 01* |
-| 2. The shore | climb 6 → 25 | 28 mm | 8 | −12° | Cross the flooded terraces diagonally, so the bands sweep through frame. *Still 05* |
-| 3. Into the canyon | dive to rim height − 8, then follow the meander | 24–28 mm | 9–11 | along the floor | Walls give lateral parallax; bank into each bend at most 6–8°, proportional to the turn rate. Long sunset shadows across the floor. *Still 03* |
-| 4. The reveal | pedestal climb out of the canyon to 70–100 | 35 mm, eased to 50 mm over 20 s | 15–25 (it reads slow) | −25 to −40° | The canyon, buttes and plateaus stacked. The big breath of the piece; the one held move. *Still 02* |
-| 5. Over the tables | descend to 4–6 above a mesa top, then off the rim | 35 mm | 8 | −10°, dipping with the rim drop | Characters gathered on a pad are passed, not looked at. The rim drop is a dive. *Still 07* |
-| 6. Hills and the path | terrain-following, 8–12 | 28 mm | 9 | −15° | Follow the lit path at night; contours flow toward the lens. *Still 04* |
-| 7. Back to the sea | descend to 4 | 24 mm | 8 | −6° | The wavefront crossing at night. *Still 06*; the loop closes |
+| 1. Over the sea | 3–6, terrain-following over the waves | 24 mm | 7–9 | −5 to −8° | Horizon in the upper third, hills rising in the haze ahead; wave trains cross under the lens. *r2/01* |
+| 2. **Top-down over the coast** (the exception) | climb to 150–170 | 35 mm | 10–14 | pitch eases from −40° to −90° over 6 s, holds 8–12 s, eases back | The coastline, flooded flats and wave diamonds as a pure colour field: Burtynsky and Hegen, no horizon. It ends by tilting back up toward the hills. *r2/06* |
+| 3. Up the valley | descend to 10–15 over the river | 24–28 mm | 9–11 | −10° | Hillsides slope away on both sides and give lateral parallax; bank into each bend at most 6–8°. *r2/03* |
+| 4. The reveal | pedestal climb to 70–100 | 35 mm, eased to 50 mm over 20 s | 15–25 (reads slow) | −20 to −30° | The uplands' colour bands stacked to the haze; the path and the valley as leading lines. The big breath; the one held move. *r2/02* |
+| 5. Along the path | terrain-following, 2–4 above the path | 35–40 mm | 6–8 | −5° | Fly up the path at the characters' height, passing them; never turning to look. *r2/05* |
+| 6. Over the high tops at night | 25–60 | 35 mm | 9 | −15° | Contours, pads, the pink path and the river vein. *r2/04* |
+| 7. Back to the sea | descend to 4 | 24 mm | 8 | −6° | The wavefront crossing at dusk or night. *r2/07*; the loop closes |
 
 **Rules.**
 - Focal length changes only during climbs and descents, and slowly: at most 1 mm/s.
 - Speed is near-constant within a leg and eases at the transitions.
 - Bank is at most 8°, and only from turn rate.
-- The aim is along the smoothed path ahead (the plan's 2.5 s look-ahead), with a per-leg downward pitch offset.
-- No top-down god's-eye pass is planned. It would break "looks where it travels" (see the open questions, §11).
+- The aim is along the smoothed path ahead (the plan's 2.5 s look-ahead), with a per-leg pitch offset.
+- The top-down pass is the only exception, and happens at most once per loop.
 
-**Depth of field.** Slight, and only at low altitude (legs 1 and 7): the foreground tiles soften, the reference's
-macro feel. Never at altitude. A tilt-shift at altitude makes the world a miniature, and this world must feel
-enormous.
+**Depth of field.** Slight, and only at low altitude (legs 1, 5 and 7). Never at altitude: a tilt-shift there would
+make the world a miniature, and this world must feel enormous.
 
 ---
 
-## 8. Characters
+## 8. Characters (revised: the Glowmere aliens)
 
 The environment is the protagonist. Characters are punctuation.
+- **Assets.** The owner's choice: the six Glowmere alien variants in `assets/aliens/` (scout, pilot, ranger, trooper,
+  diver, elder).
+  - They are **commercial**: read from `assets/`, never committed, cached or uploaded (`ATTRIBUTION.md`).
+  - Their clips cover everything the brief asks for: `Running`, `Jump_running`, `Jumping`, `Landing`, `Idle`,
+    `Floating`, `Walking_low_grav`.
+  - `Floating` and `Walking_low_grav` already carry the buoyant quality.
+- **Scale.** About **1.0 tile tall** (the mock-up scales the 1.54-unit GLB by 0.65).
+  - At that size an alien stands on one slab, and a jump between slabs reads clearly.
+  - From the high legs they are specks, which is correct.
+  - Note: in Glowmere the cast is scaled 1.94×. Here the scale is set by the tile, not by Glowmere.
 - **Count:** 3–6, never a crowd.
-- **Scale:** about **0.8 of a tile** tall, so a figure is smaller than the unit it stands on. From the high legs they
-  are specks, and that is correct.
-- **Silhouette:** soft, rounded, *buoyant* bodies:
-  - a tapered capsule torso;
-  - a separate head floating a small gap above it, with no neck. That gap is the "buoyant" signature, read at any
-    distance;
-  - short limbs, or none.
-  No hats, clothes, props or faces. Not a mannequin, and not any game's mascot.
-- **Material:** warm porcelain white (`#FFF3E6`), with a faint self-glow that follows the state's accent. At night
-  they are small lights moving on the map.
+- **Material.** Their own (the green body reads well against every palette but dawn's greens). For dawn, consider a
+  per-state tint. That is a Phase 6 decision.
 - **Motion:**
-  - idle float ±0.05 tile;
+  - idle `Floating` with a ±0.05-tile bob;
   - jumps with a long, slow apex (buoyant gravity scale);
-  - landing on a tile pushes it down 0.3, it rebounds and rings, and a faint ripple runs into the neighbours.
-- **Placement:** on mesa pads, the path, and terrace edges, where they explain the floating-platform idea.
+  - landing pushes the slab down about 0.22. It rebounds and rings, and a faint ripple runs into the neighbours.
+- **Placement:** on the path, the flooded flats, and the hilltop pads, where they explain the floating-platform idea.
 
-*Still 07* shows the scale and a sprung tile, with placeholder figures (two spheres). The real body is a Phase 6
-decision. If the existing Quaternius mannequin is reused, it gets the porcelain material and the floating-head
-treatment, or it is not used.
+*r2/05* shows two aliens on the path at scale: a scout running on a depressed slab, and a pilot mid-jump further up.
 
 ---
 
@@ -384,15 +441,15 @@ treatment, or it is not used.
 
 | Restriction | How it is avoided |
 |---|---|
-| Uniformly flat terrain | Six formation families with their own height rules, 0–36.5 tiles of relief, and coverage targets (§5) |
-| Noise as the only source of elevation | Every formation is a designed function (meander curve, terrace quantisation, mesa levels, wave trains). Noise only warps or roughens |
-| Generic neon grids | Emission is top-only, on meaningful edges only, at 5–12% lit area, over a lit (not black) ground. Day has no edge light at all |
-| Excessive cyan/teal | The hue band 165–195° is allowed only in the daylight shallows, under 5% of the frame. Night is indigo/violet with *electric blue* (about 220°) lines, not cyan |
-| Dark or muddy materials | Night ambient is a mid-dark violet with +0.6 EV. Palettes interpolate in OKLab. Shadow sides are coloured (violet, blue), never brown or black |
-| Minecraft-like block landscapes | Continuous heights (not block-quantised), gaps and chamfers, no textures, no grass-on-dirt sides, a column side shaded from its top colour, columns that read as land at 40–200 tiles per formation |
-| Repetitive procedural hills | Domain-warped long wavelengths; hills are one family among six; region parameters vary by biome; the route is authored |
+| Uniformly flat terrain | Hills up to about 31 tiles swelling inland, a valley, coastal steps, a moving sea; coverage targets in §5 |
+| Noise as the only source of elevation | The inland rise, the valley profile, the terrace quantisation, the path and the wave trains are designed functions. Noise only shapes the uplands' plan and roughens them |
+| Generic neon grids | Emission is top-only, on meaningful edges only, at 5–12% lit area, over a lit (not black) ground. Day has no edge light. The gaps show a dark under-surface, never the sky |
+| Excessive cyan/teal | The hue band 165–195° is allowed only in the daylight shallows, under 5% of the frame. Night lines are electric blue (about 220°), not cyan |
+| Dark or muddy materials | Night ambient is mid-dark violet at +0.6 EV. Palettes interpolate in OKLab. Shadow sides are coloured, never brown or black |
+| Minecraft-like block landscapes | Thin slabs, not blocks; continuous heights with neighbour steps around a third of a tile; gaps; no textures; no grass-on-dirt sides; no walls of stacked cubes (removed in revision 2) |
+| Repetitive procedural hills | Two authored scales (260 and 85) with a domain warp, an inland rise, a valley, and biome variation along an authored route; colour bands make every hill's shape legible rather than generic |
 | Conventional low-poly scenery | Nothing but tiles and the few characters |
-| Trees, buildings, rocks, decoration | None. Landmarks are formations (buttes, mesas, the meander) |
+| Trees, buildings, rocks, decoration | None. Landmarks are landforms (uplands, the valley, the coast) |
 | Excessive particles | None planned. If the owner wants air, use haze only |
 | Busy overlays, sci-fi HUD | None. The "map" is in the land itself |
 
@@ -400,99 +457,115 @@ treatment, or it is not used.
 
 ## 10. Requests for engineering (relay to `02-requests.md`)
 
-Numbered for the ADR range 1970–1979. Most fit inside systems the plan already proposes.
+Numbered in the ADR range 1970–1979. Most fit inside systems the plan already proposes. Revision 2 dropped everything
+that served walls and strata.
 
 1. **ADR-1970: contour edges as a per-instance channel.** In the effector pass, compute four per-side weights per
    tile, `side_k = [floor(h/interval) > floor(h_neighbour_k/interval)]`, from the same `heightAt` at the four
    neighbours.
-   - Store them where the material program can read them: four floats or a packed mask.
-   - Parameters: `contour/interval`, `contour/offset`.
-   - The material program then draws a chamfer band per lit side, from `localPosition`.
-   - The same mechanism takes a fractional **crest** weight on water tiles (request 2).
-   - Neighbour evaluation is four extra height calls per tile. It can be cut to the visible window, and its cost
-     should be measured.
+   - Store them where the material program can read them.
+   - Parameters: `contour/interval`, `contour/offset`, and a gain on the DayNight curve, so the owner's on/off choice
+     is a parameter, not a build.
+   - The same mechanism takes the fractional **crest** weight (request 2).
+   - Measure the cost of the four extra height calls per tile.
 2. **ADR-1971: a crest weight per tile.** As the plan's crest channel, but per wave set, with `crestSharpness`, and a
-   multiplier from a second set (the brightening where trains cross). It feeds the edge mask, not top emission.
+   multiplier from a second set (the brightening where trains cross). It feeds the edge mask, not the top emission.
 3. **ADR-1972: the terrain palette, a little wider than §4.4 proposes.** DayNight keys for:
    - a **5-stop land ramp** with its own height stops;
-   - a **4-stop water ramp** (by wave height);
+   - a **4-stop water ramp** by wave height;
    - shallows colour and distance;
-   - canyon wall colour and strata amplitude;
+   - the **under-surface colour**;
    - path, river and pad colours and gains;
-   - drift colour and amount;
-   - edge colour and gain;
-   - crest gain;
-   - fog multiplier;
-   - an exposure offset.
-   OKLab interpolation for all colours, as proposed. Colour is from **absolute** height, never renormalised.
-4. **ADR-1973: geography region channels the material program can read.** Water, shore distance, terrace index (for
-   parity and flooding), canyon wall (with height for strata), river, path, and plateau-flatness (for pads). Most are
-   in the plan's channel list; terrace index, shore distance and flatness are additions.
-5. **ADR-1974: per-instance roughness.** Water and flooded terraces at 0.16, land at 0.62, from a channel. If the
-   material program can already branch roughness on a field, this is only a check.
-6. **ADR-1975: top-only emission and side shading.** In the material program: emission masked to the top and chamfer
-   from `localPosition`, and the side colour fading to 18% toward the column's foot. This needs the column length
-   known to the material, or a normalised local height.
-7. **ADR-1976: a distance fade for the gap and the edge band** by pixel footprint, against the grazing-angle moiré.
-8. **ADR-1977: fog.** Confirm ADR-347's horizon-coloured fog supports:
-   - an **exponential-squared** distance curve, so near and mid ground stay clean and the far ring fades fully;
-   - a height falloff (factor 0.45–1.0, rate 0.035/tile);
-   - a sun-facing tint (power 6) with its own colour key.
-   Tie the window radius to the 0.98 distance, as the plan says.
+   - drift colour and amount (and a height ceiling for it);
+   - edge colour and gain, crest gain;
+   - fog multiplier, exposure offset, and a **grade saturation** key (day uses +30%).
+   OKLab interpolation for all of them. Colour is from **absolute** height.
+4. **ADR-1973: geography channels the material program can read:** water, shore distance, terrace index (parity and
+   flooding), river, path, and flatness (for pads). Canyon-wall height and strata are dropped.
+5. **ADR-1974: per-instance roughness.** Water and flooded flats at 0.16, land at 0.62, from a channel.
+6. **ADR-1975: slab mode, sharp.**
+   - `column` mode off, `thickness` 0.3, `bevel` 0. The plan lists these; this asks that they be the scene's
+     defaults.
+   - Top-only emission and the side fade to 18% at the underside in the material program, from `localPosition`.
+7. **ADR-1976: a distance fade for the gap and the edge band** by pixel footprint, against grazing-angle moiré.
+8. **ADR-1977: fog and the under-surface.**
+   - Fog: confirm ADR-347's horizon fog supports an exponential-squared curve, a height falloff (factor 0.45–1.0, rate
+     0.035/tile) and a sun-facing tint (power 6). Tie the window radius to the 0.98 distance.
+   - **The under-surface (new):** something dark must sit under the slabs so the gaps never show the sky. Two
+     options, engineering's choice:
+     - **(a)** a coarse heightfield mesh, two tiles per vertex, following `min(neighbour heights) − 1.4`, in the
+       palette's under colour, through the same fog. This is what the mock-up does;
+     - **(b)** an instanced second layer, or treating the slab's underside as the dark colour and lengthening the
+       sides.
+   - (a) is one cheap draw.
 9. **ADR-1978: world-lattice coordinates in material programs.** Drift and per-tile jitter hash on the lattice index
-   and world position, never the record index or camera-relative position. The plan already does this for randoms;
-   it must also hold for `worldPosition` in the material.
-10. **ADR-1979: flight route through named biomes.** `scene::Flight` control points that can name a formation target
-    (follow the canyon's spline; climb to N over a mesa), so the art can author the route of §7 against features, not
-    raw coordinates. Plus a per-leg pitch offset and a focal-length curve.
+   and world position, never the record index or camera-relative position.
+10. **ADR-1979: flight route through named features, plus the top-down exception.**
+    - `scene::Flight` control points can name a formation target (follow the river spline; follow the path at a given
+      height; climb to N).
+    - A per-leg pitch offset and a focal-length curve.
+    - **One allowed pitch override** that eases to −90° and back, for the owner-approved top-down pass. Its test should
+      still assert "looks where it travels" everywhere outside that window.
 
 **Smaller asks, no ADR:**
-- Plateau levels as a list (they are in the plan).
-- The canyon and path splines exposed for routing the camera and characters.
-- Tonemap: AgX with a medium-high-contrast look. The mock-up uses it, and base contrast was too milky in daylight.
-- Bloom thresholded at 1.0 and low by default (0.25), raised to 0.6 at night.
+- The river and path splines exposed for routing the camera and characters.
+- AgX tone mapping: Punchy by day, Medium High Contrast in the other states. This could be a look key per state.
+- Bloom thresholded at 1.0: 0.25 by default, 0.6 at night.
+- The aliens' clip names in the `hop` behaviour: `Jump_running` and `Landing` for jumps, `Floating` for idle.
+- Root motion: `Jump_running` carries root motion. The mock-up had to recentre the posed mesh onto its tile, so the
+  jump planner must own the trajectory, not the clip.
 
 ---
 
-## 11. Open questions for the owner
+## 11. Open questions for the owner (round 2)
 
-1. **The contour signature.** Is a topographic map drawn in light (still 04) the right signature, or too "data
-   visualisation"? The alternative is lighting only the wavefronts, the path and mesa rims.
-2. **Columns or floating slabs?** I chose columns because they read as land. The floating-platform physics might want
-   **slabs over the water only** (a thin tile with dark water beneath), so landings there visibly float. The two can
-   coexist: columns on land, slabs at sea.
-3. **Daylight saturation.** The day state is deliberately soft and pastel (porcelain, lavender, apricot). Does the
-   owner want it brighter and more saturated, closer to the rainbow-tile references?
-4. **Characters.** Abstract floating-head figures (proposed), or the existing mannequin re-skinned?
-5. **A god's-eye pass.** A slow top-down pass over the terraces or the sea is the most "geographic" shot, but it
-   looks down, not where it travels. Allowed as a short exception, or not?
-6. **Where the day starts.** The brief's §15 moment starts at sunset and runs to night. Should a song's arc be
-   sunset → night → dawn (ending on first light), or dawn → day → sunset → night?
+1. **Contours.** On or off, judged on the pairs in `r2/03-*` and `r2/04-*`. My recommendation is on at dusk and night,
+   off by day.
+2. **Daylight.** Is r2's bright, saturated day right, or has it gone too far toward a rainbow? Its saturation is one
+   grade key.
+3. **Alien tint.** Do the aliens keep their own green in every state, or take a per-state tint (most needed at dawn)?
+
+Resolved by the owner at Gate 1:
+- slabs everywhere;
+- rolling hills;
+- sharp edges;
+- brighter day;
+- the Glowmere aliens;
+- the top-down pass allowed.
+The colour arc is my recommendation (§3).
 
 ---
 
-## 12. Gate 1 stills
+## 12. Gate 1 stills, round 2
 
-`~/Desktop/av-gen-review/105-musical-geography/01-gate1/`, 1920×1080, Blender 5.2 Cycles (CPU), AgX Medium High
-Contrast, light bloom. The generator is `gate1-mockup.py` in this folder: a throwaway. It implements the formation
-rules of §5 and the palettes of §3 exactly as written, so engineering can read the numbers in context. It uses no
-third-party assets.
+`~/Desktop/av-gen-review/105-musical-geography/01-gate1/r2/`, 1920×1080, Blender 5.2 Cycles (CPU). The generator is
+`gate1-mockup.py` in this folder. It is a throwaway, but it holds the formation rules of §5 and the palettes of §3 as
+written. It uses no third-party assets except reading the aliens from `assets/aliens/` at render time.
 
-| File | What it proves |
+| File | What it shows |
 |---|---|
-| `01-day-low-pass-water.png` | The low pass over the sea at 24 mm: glossy cobalt tiles, crossing wave trains, formations in the haze |
-| `02-day-high-reveal.png` | The high reveal: the canyon meander with its river through mesas and a butte; hypsometric lavender-to-yellow |
-| `03-sunset-canyon.png` | Sunset inside the canyon: magenta lowlands, coral cliffs, violet shadows, gold contour lines, a slight bank |
-| `04-night-edge-light.png` | Night: electric-blue contours on violet land, the pink path, the river vein, pink pads on the tables |
-| `05-dawn-terraces.png` | Dawn: green and gold terraces, flooded paddies, the amber path, side light from a low eastern sun |
-| `06-dusk-wavefront.png` | Dusk (55% sunset → night): the illuminated wavefronts crossing the water, the path lights already on |
-| `07-sunset-plateau-figures-scale.png` | Tile proportions up close (gap, chamfer, column), figure scale at 0.8 tile, and a sprung landing tile |
+| `01-day-low-pass-water.png` | The low pass over the sea at 24 mm: glossy cobalt slabs, crossing wave trains, the hills rising in the haze |
+| `02-day-high-reveal-hills.png` | The reveal: rolling uplands in the bright day bands (violet → coral → orange → yellow), the path and the valley as leading lines |
+| `03-sunset-contours-on.png` / `03-sunset-contours-off.png` | Sunset over the hills and the valley, with and without gold contour edges |
+| `04-night-contours-on.png` / `04-night-contours-off.png` | Night with and without the electric-blue contours. The path, river, pads and crests are in both |
+| `05-day-aliens-scale.png` | Two Glowmere aliens at 1 tile tall on the path: a scout running on a depressed slab, a pilot mid-jump |
+| `06-day-top-down.png` | The allowed top-down pass over the coast: flats, flooded bands, the path's start, wave interference |
+| `07-dusk-wavefront.png` | Dusk (55% sunset → night) over the sea: the wavefront edges and the path lights |
 
-**What the stills do not show yet:**
-- In still 07 the floating-head gap on the placeholder figures is too small to read.
-- The sprung tile under the left figure is only 0.32 deep, so it barely reads at that angle.
-- Both are Phase 6 work.
+Round 1 (`01-gate1/*.png`) shows the superseded column, mesa and canyon geometry, and the dawn palette.
 
-**Creative Critic.** It was run on the seven stills (`critic submit --mode fast --images`, job
-`job_1a1bb87a0a703cad4`). It evaluated nothing, because with no scene, shots or audio no rule applies to loose
-stills. It becomes useful from CP-A on, with engine renders. The judgement above is by eye.
+**Creative Critic.** In round 1 it was run on the stills and evaluated nothing: loose stills give it no scene, shots
+or audio. It becomes useful from CP-A on, with engine renders. The judgements here are by eye.
+
+**What I see in the round-2 stills, by eye:**
+- **Rolling hills.** They read as land, with no walls anywhere. The day bands are bright and ordered.
+- **Contour pairs.** At night the difference is decisive: with contours off, the hills disappear. At sunset the
+  contours are a thin gold accent, and the hills read either way.
+- **Aliens (05).**
+  - The scale works: one alien to one slab.
+  - Where the path climbs steeply, the slabs' 0.3 sides stack into a staircase that reads close to blocks. The
+    formation step rule in §4 (p95 at or below the thickness) is what prevents this. The mock-up's path climbs faster
+    than the hills around it.
+  - The depressed slab under the scout is too subtle to see at this angle.
+- **Top-down (06).** Strong as a colour field: wave diamonds, flooded bands, the path. A dark stepped seam marks the
+  shoreline, where the land steps up by more than a slab.
