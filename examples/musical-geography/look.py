@@ -74,6 +74,7 @@ STATES = {
         drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=5.0,
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
+        sun_az_offset=-1.01,   # radians (ADR-1961)
         stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r8: the day treatment -- warm bands over whole hill masses
         side_px=0,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         fill=0.3, contrast=1.25,
@@ -129,6 +130,10 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
         # were back-lit and flat). Turning the arc puts the day sun in the south-west (side light from the camera's
         # left) and the sunset sun in the south.
         "sunAzimuthAtDawn": 3.24,
+        # ADR-1961: dawn alone turned -58 deg so its low sun comes from the north-east, side light for the north-west
+        # views (on the shared arc it sat straight ahead of them, back-lighting dawn into haze)
+        "sunAzimuthOffsetCurve": [{"phase": st["phase"], "value": st.get("sun_az_offset", 0.0)}
+                                  for _, st in ordered_states()],
         "zenithColor": col("sky_zen"),
         "horizonColor": col("sky_hor"),
         "groundColor": col("fog"),        # below the horizon the sky is the fog: no band where the window ends
