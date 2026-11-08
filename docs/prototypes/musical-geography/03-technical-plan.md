@@ -15,14 +15,22 @@ everything the scene needs:
 - a terrain-following, banking flight camera;
 - the live profiler and the Critic.
 
-What is new is small and specific:
+What is new is specific:
 1. **one tile-terrain model**, the same function on the CPU and in WGSL, that both rendering and walking read;
 2. **a camera-anchored lattice**, so the world never ends;
 3. **closed-form landing springs**;
 4. **a ground seam**, so navigation can stand on a moving surface;
-5. **a generic version of the Strange Attractor flight builder**.
+5. **a generic version of the Strange Attractor flight builder**;
+6. after the spike: **a tile fast path, a far field and an underlay** (§6.1).
 
-SPIKE_SUMMARY
+**The spike changes one assumption** (§6). On the existing generic procedural path, instancing *is* a risk:
+- each visible tile costs about **0.2 µs of GPU** for scene plus depth;
+- the shadow views draw every tile, culled or not.
+
+At 1080p, 65k slabs cost 27 ms of GPU with a shadowed sun, and 360k visible slabs cost 70 ms without one. So Phase 2
+opens with a measured **tile fast path** and a **far field** (§6.1), with a go/no-go number. The other risks are
+aliasing at grazing angles, the sky showing through the gaps between thin slabs, and keeping "looks like terrain"
+ahead of "looks like a grid".
 
 ## 0. The owner's art decisions of 2026-11-08, and what they change here
 
@@ -66,7 +74,7 @@ These came through the coordinator during Phase 1. They override the brief, and 
 
 | Area | What is there | Verdict |
 |---|---|---|
-| **Instancing** | `procedural` node, `distribution.grid` (`gridCount`, `gridSpacing`), beveled box source (`bevel`, `bevelSegments`). 96-byte `InstanceRecord`. GPU effector compute pass (`shaders/points.wgsl`, `docs/gpu-fields.md`): per-instance `positionOffset / scale / color / emission` driven by fields. GPU frustum/distance cull and LOD with indirect draws (`shaders/cull.wgsl`, ADR-029). RD Pins (`examples/rd-pins`) is the precedent: a 190x190 grid of boxes moved by fields. | **Reuse.** This is the tile renderer, and it is in the lit pass, so tiles get shadows, AO, SSR, fog and bloom for free. Extend it with the camera-anchored lattice and lattice-keyed randoms (§4.2). |
+| **Instancing** | `procedural` node, `distribution.grid` (`gridCount`, `gridSpacing`), beveled box source (`bevel`, `bevelSegments`). 96-byte `InstanceRecord`. GPU effector compute pass (`shaders/points.wgsl`, `docs/gpu-fields.md`): per-instance `positionOffset / scale / color / emission` driven by fields. GPU frustum/distance cull and LOD with indirect draws (`shaders/cull.wgsl`, ADR-029). RD Pins (`examples/rd-pins`) is the precedent: a 190x190 grid of boxes moved by fields. | **Reuse, with a fast path.** This is the tile renderer, and it is in the lit pass, so tiles get shadows, AO, SSR, fog and bloom for free. The spike measured its generic vertex path at about 0.2 µs per visible tile, so it needs a slim path for rigid slabs and the cull in the shadow views (§6). Extend it with the camera-anchored lattice and lattice-keyed randoms (§4.2). |
 | **Terrain query** | `world::TerrainQuery` (ADR-090) joins `WorldMap` and `ClearanceField`: `at(p)` gives height, slope, normal, water and the reject reason, under `WalkRules`. `Navigator` wraps it. `WorldMap` is an analytic noise world and has no time. | **Extend with a seam** (§4.6). TerrainQuery gets its ground from an interface, so the tile terrain can answer for a time `t`. Its rules and vocabulary stay. |
 | **GPU deformation / fields** | `FieldKind`: Noise, Voronoi, Wave (planar/spherical, travelling), Compound, Grid (simulated), **Spectrum** (per-element delayed band energy, ADR-1116), **Onset** (rings travelling outward from a point at `audioSpeed`), Resonance (ADR-1400). The CPU `spatial::sampleScalar` and the WGSL are held to 1e-4 by `test_fields_gpu`. The CPU reference for the whole effector stack is `spatial::applyEffectorsToRecords`. Limits: 16 fields per scene, 8 effectors per object. | **Reuse, and add one field kind** (`geography`, §4.1) for the formations. Wave interference, audio bands and transient rings are already expressible as fields today. |
 | **Characters / animation** | GPU skinning (ADR-086: 8 skinned characters for 2.03 ms GPU and 29 µs CPU). `Gait` / `locomotion` states Idle, Walk, Run, Jump, Fall, Land. `entity/airborne.hpp`: `JumpArc`, `planJump`, and `checkArc(arc, groundAt)`, which already takes a ground *function*. `explore` behaviour has an audio-triggered hop and a gap jump. Assets: Quaternius `Mannequin_F` with UAL1/UAL2 (CC0; `Jump_Start/Loop/Land`, `Walk_Loop`, idles, `NinjaJump_*`); six aliens with `Jumping / Landing / Fall_loop`. | **Reuse.** Add a tile-to-tile jump-target picker. A neutral mannequin is the likely body; the art agent decides the silhouette and material. |
@@ -344,7 +352,68 @@ The art agent asks for anything else in `02-requests.md`.
 
 ## 6. The spike: tile instancing at 1080p (throwaway)
 
-SPIKE_RESULTS
+**What it is.** A generated scene: an `N×N` grid of thin sharp slabs (0.9 × 0.15 × 0.9 at pitch 1) on the existing
+procedural path, with a noise hill, two crossing travelling `wave` fields and a colour gradient, all as GPU effectors.
+GPU cull is on, the camera is low and grazing toward the horizon (the worst case for this scene), and one
+directional key light with 3 cascades is either on or off. It was measured with
+`avgen --live-profile --size 1920x1080 --quality ultra` under `tools/gpu-lock.sh`, headless, on AC power on the M2
+Max, with 300 measured frames per arm. The scripts are kept in `docs/prototypes/musical-geography/spike/`; the scenes
+are not committed.
+
+| Grid | Visible / culled tiles | Triangles | GPU p50 | scene + depth | shadow | effectors | CPU work |
+|---|---|---|---|---|---|---|---|
+| 256² (65k), shadow | 40,266 / 25,270 | 0.48 M | **27.4 ms** | 8.0 + 3.1 | **15.1** | 0.18 | 1.4 ms |
+| 256², no shadow | 40,266 / 25,270 | 0.48 M | **12.0 ms** | 7.6 + 3.8 | — | 0.22 | 0.7 ms |
+| 512² (262k), shadow | 160,570 / 101,574 | 1.93 M | 66.0 ms | 18.8 + 12.6 | 33.1 | 0.46 | 1.2 ms |
+| 512², no shadow | 160,570 / 101,574 | 1.93 M | 32.9 ms | 18.0 + 13.9 | — | 0.51 | 0.9 ms |
+| 768² (590k), shadow | 360,880 / 228,946 | 4.33 M | 109.5 ms | 40.1 + 27.8 | 39.5 | 0.93 | 1.5 ms |
+| 768², no shadow | 360,880 / 228,946 | 4.33 M | 69.7 ms | 38.9 + 29.3 | — | 0.98 | 1.1 ms |
+
+**What it proves:**
+1. **GPU deformation is free.** The effector pass that sets every tile's height and colour costs 0.18–0.98 ms for
+   65k–590k tiles, and the CPU does nothing per tile (1–1.5 ms CPU work in total). The "deformation on the GPU"
+   architecture stands.
+2. **The draw is the cost, and it scales with visible tiles.** Scene plus depth is about **0.19–0.29 µs per visible
+   tile**, and the triangle count is not the limit: 4.3 M triangles is modest for this GPU. The tiles go through
+   the generic procedural vertex path, which carries the deformer chain, the previous-frame clip position and the
+   fiber hooks. A 12-triangle instance pays all of it. The depth prepass draws everything a second time (about 40% of
+   the geometry cost).
+3. **Shadows draw every tile, culled or not**, in all three cascades: 15 ms at 65k tiles. The GPU cull feeds the main
+   view only.
+4. **The current path's budget.** At about 20 ms for tiles inside a 33 ms frame, it affords about **70–90k visible
+   tiles without shadows**. That is enough for the near and mid field at pitch 1 (a 256² window), not for a
+   high-altitude reveal to the horizon.
+5. **What the frames show** (`01-gate1/eng-spike-*.png`):
+   - the gaps between thin slabs show **the sky through the ground**, everywhere: there is nothing under a slab;
+   - **moiré** appears in the mid distance;
+   - **the window's edge is plainly visible** where there is no fog. (The spike's fog key was a wrong name and was
+     ignored, which made this a fair test of the edge, if by accident.)
+
+   All three were predicted as risks. They are now seen.
+
+### 6.1 What the spike changes in the plan (Phase 2 opens with this)
+- **A tile fast path**, in the procedural renderer rather than as a new renderer. When an object is a lattice of
+  rigid slabs (no deformers, the `anchor: camera` grid), it draws with a slim vertex program:
+  - the record is read once;
+  - no deformer chain, and no previous-frame position unless motion blur needs it;
+  - only the three faces that can face the camera (the top and two sides), selected per instance;
+  - the visible list from the cull.
+
+  It goes through the same lit fragment path and material programs, so nothing changes for the art agent. Shadow
+  views get the cull too (frustum per cascade plus `shadowCasterReach`, which exists already).
+
+  **Go/no-go at the start of Phase 2:** ≤ 0.06 µs per visible tile for scene plus depth, and the 256² window under
+  12 ms of GPU with shadows, measured with this spike's scenes. If the fast path misses, the fallback is a coarser
+  pitch at the same screen density, plus the far field below.
+- **A far field.** Beyond the distance where the gap fades out (request 1976), tiles are sub-pixel and read as a
+  surface anyway. A continuous low-resolution mesh of the **same** `H(i,j,t)`, sampled per tile in the effector pass,
+  draws the far ring to the fog line at a fraction of the cost, and a cross-fade band hides the change. This is what
+  lets the high-altitude reveal reach the horizon. It is a mesh of the same function, so the "one surface" rule holds.
+- **An underlay for thin slabs.** The same far-field surface, offset below the slabs, closes the see-through gaps
+  with a dark, coloured shadow tone (the art agent chooses the colour) instead of the sky. Owner's slabs, without the
+  holes.
+- **The depth prepass for tiles** is measured on and off once the fast path exists. The fog and SSR need linear depth,
+  so it stays unless a cheaper source of depth for the tiles is proven.
 
 ## 7. Rendering and performance plan
 
@@ -352,10 +421,10 @@ SPIKE_RESULTS
 ≤ 5 misses per 900 frames, interval p99 ≤ 40 ms, ≥ 90% of frames at Medium or better, headless Ultra GPU p50
 ≤ 29.3 ms). The scene aims for GPU p50 ≤ 20 ms at Ultra, to leave room for post, characters and art.
 
-**Levers, in order:**
-1. tile count (pitch × window radius);
-2. GPU cull, which must run in the shadow view too;
-3. LOD 1 boxes far away;
+**Levers, in order** (from the spike):
+1. the tile fast path (§6.1);
+2. visible tile count: pitch × window radius, with the far field beyond it;
+3. GPU cull in the shadow views, and `shadowCasterReach`;
 4. shadow range and cascades (one directional, no other shadow casters);
 5. the slab's side faces (a top-quad-only LOD far away);
 6. render scale on the live ladder.
@@ -379,7 +448,7 @@ not built yet". It is reported as not available, and no numbers are invented for
 
 | Phase | Engineering builds | Art follows with | Checkpoint (owner) |
 |---|---|---|---|
-| 2 Terrain foundation | TileTerrain and the geography field (sea, shore, rolling hills, crowns, path; lattice; parity; the no-crack test), camera-anchored lattice, lattice randoms, region channels, roughness, top-only emission, the distance fade (1973–1976, 1978), a first material program, a static debug camera; perf of the static world | formation layout, first palette, materials on stills | **CP-A "the ground"**: 6–8 stills (close, mid, high) of the static landscape in two palettes, plus a perf line. `02-terrain/` |
+| 2 Terrain foundation | **First, the tile fast path and its go/no-go** (§6.1); then the far field and the underlay; TileTerrain and the geography field (sea, shore, rolling hills, crowns, path; lattice; parity; the no-crack test), camera-anchored lattice, lattice randoms, region channels, roughness, top-only emission, the distance fade (1973–1976, 1978), a first material program, a static debug camera; perf of the static world | formation layout, first palette, materials on stills | **CP-A "the ground"**: 6–8 stills (close, mid, high) of the static landscape in two palettes, plus a perf line. `02-terrain/` |
 | 3 Dynamic terrain | waves, interference, breathing, rolling, the event ring, the crest channel and contour sides (1970, 1971), spring infrastructure, audio parameters; seek = play | crest light, emission language | (no stop; clips go to `03-dynamic/` for the record) |
 | 4 Visual identity (art) | DayNight terrain palette curves and OKLab (1972), any fog gap (1977); any requests | the four palettes, edge light, selective illumination, post | |
 | 5 Camera | `scene::Flight`, the attractor refactor, clearance against the dynamic bound, named targets and the top-down leg (1979) | the route's composition and altitude story | **CP-B "the flight"**: one continuous 90–120 s render on Feline Footwear, dynamic terrain, a palette transition, no characters; plus live T1–T4. `05-camera/` |
@@ -404,7 +473,10 @@ of Phase 2, and the camera and characters build on whatever ground it approves.
 
 ## 10. Risks
 
-1. **The grid reading as a grid.** Distant tiles are a regular pattern smaller than a pixel. That gives moiré and
+1. **The instancing cost (the spike's finding, §6).** About 0.2 µs per visible tile on the generic path. The fast
+   path's go/no-go is the first measurement of Phase 2. The fallback is a coarser pitch plus the far field, which
+   costs density at the horizon, not the look up close.
+2. **The grid reading as a grid.** Distant tiles are a regular pattern smaller than a pixel. That gives moiré and
    shimmer, and the "generic grid visualisation" look the brief forbids. Mitigations:
    - fade the gap and edge mask with screen-space tile size, so far tiles merge into a surface;
    - fog and atmospheric perspective;
@@ -412,34 +484,35 @@ of Phase 2, and the camera and characters build on whatever ground it approves.
    - large-scale colour structure owned by the art agent.
 
    There is no TAA to lean on. CP-A must look at motion, not only stills.
-2. **"Noise hills."** The brief rules out random noise as the source of elevation, and repetitive hills. The
+3. **"Noise hills."** The brief rules out random noise as the source of elevation, and repetitive hills. The
    With rolling hills now the main landform (§0), this is the sharpest risk to the look: hills are exactly what noise
    makes. The defences are long, domain-warped wavelengths, the region field varying the hills along the route, the
    sea and shore as the contrast, the path and crowns as authored structure, and colour from absolute height. The art
    agent's layout decides it, and CP-A judges it.
-3. **The anchor window and the pop line.** If fog is too thin for the art's clarity, the window edge shows. Mitigation:
+4. **The anchor window and the pop line.** If fog is too thin for the art's clarity, the window edge shows. Mitigation:
    the window radius is a parameter, tied to the fog distance by a test. If a far reveal from the high-altitude camera
-   needs more than the window, a second, coarser far lattice is a fallback. It is not planned.
-4. **Shadows.** 100k+ instances in up to 4 cascades. The spike measures this. Fallback: fewer cascades, a shorter
-   range, and the cull running in the shadow views.
-5. **Characters on a moving floor.** Jitter and sinking when heights change under a planted foot. The single surface
+   needs more than the window, the far field (§6.1) carries the same surface to the fog line. The spike showed the edge
+   plainly with no fog.
+5. **Shadows.** Measured at 15 ms for 65k tiles in 3 cascades with no cull (§6). The cure is the cull in the shadow
+   views and a short caster reach. Fallback: fewer cascades, or the far field casting no shadow.
+6. **Characters on a moving floor.** Jitter and sinking when heights change under a planted foot. The single surface
    and the re-validated arcs address it. Known engine defects to step around: the alien `Landing` clip's root drop
    (ADR-337) and the heading-dependent slope lean.
-6. **The 16-field cap.** The geography channels, the audio fields and the art's own fields share 16 slots. If the art
+7. **The 16-field cap.** The geography channels, the audio fields and the art's own fields share 16 slots. If the art
    needs more, the channels can pack into a vector or colour field. To be watched, not fixed early.
-7. **Determinism with characters.** Behaviour state resets on seek (ADR-091), and the landing events derive from the
+8. **Determinism with characters.** Behaviour state resets on seek (ADR-091), and the landing events derive from the
    simulation. Seek equals play needs the existing checkpoint re-simulation, so an offline render is checked against
    a live play.
-8. **GPU contention.** Another agent renders on this GPU. Every measurement is taken under `tools/gpu-lock.sh`, and a
+9. **GPU contention.** Another agent renders on this GPU. Every measurement is taken under `tools/gpu-lock.sh`, and a
    number taken without it is not reported.
 
-9. **Cracks between thin slabs.** With no columns (§0), a neighbour step larger than `thickness` opens a gap under
+10. **Cracks between thin slabs.** With no columns (§0), a neighbour step larger than `thickness` opens a gap under
    the higher tile, and the sky or fog shows through it. Waves at full audio amplitude and a landing spring both
    enlarge steps. Defences: the generator's `maxStep` and slope ceiling, a test on the 99th-percentile step with the
    dynamic terms at their bound, and the hard ranges on the audio parameters. If the art agent wants thinner slabs
-   than rolling land allows, the slab's underside takes a dark colour, so a crack reads as a shadow rather than a
+   than rolling land allows, the underlay (§6.1) sits beneath them, so a crack reads as a shadow rather than a
    hole.
-10. **The aliens are commercial assets.** They must never be committed, cached in CI or uploaded (the repo is public;
+11. **The aliens are commercial assets.** They must never be committed, cached in CI or uploaded (the repo is public;
     `assets/aliens/ATTRIBUTION.md`). The scene references them by path only, and the tests use a synthetic skinned
     body, so CI does not need them. A clean checkout without the aliens must still load the scene, and does so with
     no characters and a warning.
@@ -455,7 +528,9 @@ Engineering 1950–1969. The planned ones:
 - 1955 the DayNight terrain palette and OKLab;
 - 1956 `scene::Flight` (named targets and the top-down leg);
 - 1957 the GroundSource seam;
-- 1958 TileNav and `hop` on the aliens.
+- 1958 TileNav and `hop` on the aliens;
+- 1959 the tile fast path and the shadow-view cull;
+- 1960 the far field and the underlay.
 
 The art agent's 1970–1979 are written by this agent when each request is built (§5.1), under the art agent's
 numbers.
