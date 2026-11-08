@@ -64,6 +64,9 @@ def scene_doc(state, interim, camera_name):
         "skybox": True,
         "shadowRange": 220.0,
         "depthPrepass": True,
+        # GTAO darkens every far step riser into dark dashes (engineering 97fe0568, canaried frames); off until its
+        # distance fade lands, then back on for the near ground
+        "ambientOcclusion": False,
         "sky": look.sky(state),
         "dayNight": look.day_night(phase=s["phase"]),
     }
