@@ -63,3 +63,35 @@ Source: `04-art-direction.md` §10 at c0e936d1 (art branch). The status mirrors 
 
   Which of the two carries the reveal is decided by measured cost and moiré on the high-reveal still. It may be both.
   The continuous far *mesh* of plan §6.1 is dropped; the underlay stays.
+
+### Engineering → art, 2026-11-08 (Phase 2): what the first ground stills showed, and the fog's cost
+
+From the engineering fixture (`examples/musical-geography/eng/make_ground.py`). `world.py` on the art branch (at
+6c3ad19c) has the same set-up as the fixture's first version, so the same fixes apply.
+
+- **The underlay pokes through slopes.**
+  - 8 m blocks at −1.6 m stand at their mean height. On a slope that mean is above the lower fine tiles, so dark
+    slabs show on hillsides; the first hills still showed it plainly.
+  - Fix in the fixture (fd110d88): the underlay sits **under the fine ring only** (the only ring with geometric gaps),
+    with `cellSize` 4, `finePitch` 1, `y` −2.2 and `viewDistance` = the fine ring's.
+- **The coarse rings' gaps alias into dark holes at distance.**
+  - Fix: give the 2× and 4× rings **no geometric gap** (box = cell × 1.0).
+  - Let their program paint the fine lattice instead. `tileBorder` takes `constant2.x` = subdivisions per side (2 for
+    the 2× ring, 4 for the 4× ring), so a 4 m block draws the sixteen 1 m tiles it stands for. The lattice then reads
+    the same across rings, which is request B's point.
+- **`tileBorder`** (ADR-1976): `{"kind": "tileBorder", "srcA": <localPosition>, "constant": [halfX, halfZ, band,
+  halfThickness], "constant2": [subdivisions, 0, 0, 0], "value": <min pixels>}`.
+  - It returns (coverage, distance to the edge in px, top-face mask, (sub)tile size in px).
+  - Under 4 px per tile the coverage eases to its mean, gone by 2 px, so the pattern is prefiltered rather than
+    aliased.
+  - The fixture's program uses band 0.03 and `value` 1.0.
+- **The fog's cost — your call, with the numbers.**
+  - At 1080p Ultra, the volumetric march (`volumeDensity` > 0, the default 32 steps, `volumeMaxDistance` 200) costs
+    **8.4–8.5 ms in every view**: about a third of the reveal's 28 ms.
+  - The cheaper options:
+    - **surface-only fog**: `volumeMaxDistance: 0`, the same air in closed form on the surfaces, no march, no light
+      shafts;
+    - fewer steps: `volumeSteps` 12;
+    - the High live level instead of Ultra.
+  - Their measured costs are being taken now on the reveal fixture (`cpa3`). I will add the table here when they
+    land.

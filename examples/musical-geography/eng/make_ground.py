@@ -19,6 +19,8 @@ ap.add_argument("--palette", default="day")
 ap.add_argument("--seed", type=int, default=3)
 ap.add_argument("--border-px", type=float, default=1.0)
 ap.add_argument("--no-program", action="store_true")
+ap.add_argument("--fog", default="march", help="march | surface (volumeMaxDistance 0: closed-form only) | none")
+ap.add_argument("--fog-steps", type=int, default=32)
 a = ap.parse_args()
 
 TILES = {"seed": a.seed, "path": [[-400, 120], [-150, 40], [0, -30], [140, -160], [380, -260]]}
@@ -92,7 +94,8 @@ tgt = [float(v) for v in a.target.split(",")]
 scene = {"format": "avgen-scene", "version": 1, "name": "geography-ground",
          "camera": {"mode": 1, "position": cam, "target": tgt, "fov": a.fov, "orbitSpeed": 0.0},
          "environment": {"intensity": 0.6, "background": pal["horizon"], "fogColor": pal["horizon"],
-                         "volumeDensity": 0.0009, "fogHeight": 30.0, "fogHeightFalloff": 0.03, "shadowRange": 160.0,
+                         "volumeDensity": 0.0 if a.fog == "none" else 0.0009, "fogHeight": 30.0, "fogHeightFalloff": 0.03,
+                         "volumeMaxDistance": 0.0 if a.fog == "surface" else 200.0, "volumeSteps": a.fog_steps, "shadowRange": 160.0,
                          "ambientOcclusion": False, "contactShadows": False, "depthPrepass": True,
                          "sky": {"enabled": True, "zenithColor": pal["sky"], "horizonColor": pal["horizon"],
                                  "groundColor": pal["horizon"], "haze": 1.0, "sunIntensity": 0.0, "intensity": 1.0,
