@@ -47,7 +47,7 @@ STATES = {
         sky_int=0.9, haze=0.6,
         moon_int=0.0, phase=0.72,
         sky_zen="#4A22B0", sky_hor="#E87A86", sky_ground="#E87A86", fog="#E87A86", fog_sun="#FFB060",
-        sun="#FFB27A", sun_int=2.0, amb="#5E46B8", amb_int=1.7,
+        sun="#FFA060", sun_int=3.2, amb="#5E46B8", amb_int=1.7,
         land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
         path="#FFD7A0", path_emit=0.6, pad="#FFB070", pad_emit=0.0,
