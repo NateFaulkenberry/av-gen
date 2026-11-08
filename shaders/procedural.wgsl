@@ -1005,6 +1005,93 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     return out;
 }
 
+// ---- ADR-1959: the slab fast path ---------------------------------------------------------------
+// A lattice of rigid boxes (`"slabs": true`: a box source, no deformer, no wind, no displacement) draws a mesh of three
+// quads, the +y, +x and +z faces of the box, and turns each one to the side of the box that faces the camera: a convex
+// box shows at most one face per axis, so three quads are the whole visible surface and the other three are never
+// shaded. The turn is a half rotation, never a mirror, so the winding stays CCW and back-face culling still holds:
+// a side quad goes about y (x, z negated), the top quad about x (y, z negated). Which quad a vertex belongs to is
+// its normal. No deformer chain, no wind, no fibre or point paths: what the slab needs, and nothing that makes a
+// 12-vertex instance pay for the general case.
+// `mode`: 0 the lit pass, 1 the depth prepass, 2 a shadow view. A shadow view turns the quads to the light: its frame
+// block carries the view's own `cameraRight` / `cameraUp` (shadow_renderer.cpp), and their cross product points back
+// along the view, toward the light; `cameraPos` there is still the camera's, which is the wrong side to choose by.
+fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
+    let depthOnly = mode != 0u;
+    var recordIndex = instanceIndex;
+    if (proc.fieldInfo.w > 0.5) { recordIndex = visibleIndices[instanceIndex]; }
+    let inst = instances[recordIndex];
+    var out: ProcVertexOut;
+    out.uv = in.uv;
+    out.instColor = inst.color;
+    var instEmissive = inst.emissive;
+    var variation = vec2<f32>(0.0, 1.0);
+    if (proc.chroma.w > 0.5) {
+        variation = emissionVariationOf(object.emissive.rgb, inst.emissive.rgb);
+    }
+    if (proc.chroma.x > 0.0) {
+        let chromaRoot = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+        let turns = livingChromaTurns(chromaRoot, proc.timeInfo.x, proc.chroma.x, proc.chroma.y, proc.chroma.z);
+        instEmissive = vec4<f32>(livingChromaMultiplier(object.emissive.rgb, instEmissive.rgb, turns), instEmissive.w);
+        variation.x = variation.x + turns;
+    }
+    out.instEmissive = instEmissive;
+    out.variation = variation;
+    out.instRandom = inst.random;
+    out.instIndex = inst.scale.w;
+
+    // The camera in the instance's own frame: which side of each axis it is on.
+    let centre = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
+    var toCam = frame.cameraPos.xyz - centre;
+    if (mode == 2u) {
+        toCam = cross(frame.cameraRight.xyz, frame.cameraUp.xyz);
+    }
+    let objectLinear = mat3x3<f32>(object.model[0].xyz, object.model[1].xyz, object.model[2].xyz);
+    let ax = objectLinear * quatRotate(inst.rotation, vec3<f32>(1.0, 0.0, 0.0));
+    let ay = objectLinear * quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0));
+    let az = objectLinear * quatRotate(inst.rotation, vec3<f32>(0.0, 0.0, 1.0));
+    var p = in.position;
+    var n = in.normal;
+    if (abs(in.normal.y) > 0.5) {
+        if (dot(toCam, ay) < 0.0) { p = vec3<f32>(p.x, -p.y, -p.z); n = vec3<f32>(n.x, -n.y, -n.z); }
+    } else if (abs(in.normal.x) > 0.5) {
+        if (dot(toCam, ax) < 0.0) { p = vec3<f32>(-p.x, p.y, -p.z); n = vec3<f32>(-n.x, n.y, -n.z); }
+    } else {
+        if (dot(toCam, az) < 0.0) { p = vec3<f32>(-p.x, p.y, -p.z); n = vec3<f32>(-n.x, n.y, -n.z); }
+    }
+    out.localPos = p;
+    let srcPos = (proc.sourceMatrix * vec4<f32>(p, 1.0)).xyz;
+    let srcNormal = (proc.sourceNormalMatrix * vec4<f32>(n, 0.0)).xyz;
+    let s = inst.scale.xyz;
+    let safeScale = select(s, vec3<f32>(1.0), abs(s) < vec3<f32>(1e-8));
+    let world = (object.model * vec4<f32>(instancePoint(inst, srcPos), 1.0)).xyz;
+    out.clip = frame.viewProj * vec4<f32>(world, 1.0);
+    out.worldPos = world;
+    out.normal = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, srcNormal / safeScale), 0.0)).xyz);
+    if (depthOnly || frame.styledGround.w > 0.5) {
+        out.prevClip = out.clip;
+        return out;
+    }
+    let prev = (object.prevModel * vec4<f32>(instancePoint(inst, srcPos), 1.0)).xyz;
+    out.prevClip = frame.prevViewProj * vec4<f32>(prev, 1.0);
+    return out;
+}
+
+@vertex
+fn vs_slab(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
+    return slabVertex(in, instanceIndex, 0u);
+}
+
+@vertex
+fn vs_slab_depth(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
+    return slabVertex(in, instanceIndex, 1u);
+}
+
+@vertex
+fn vs_slab_shadow(in: VertexIn, @builtin(instance_index) instanceIndex: u32) -> ProcVertexOut {
+    return slabVertex(in, instanceIndex, 2u);
+}
+
 @fragment
 fn fs_proc(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) -> SceneOut {
     return procShade(in, frontFacing);

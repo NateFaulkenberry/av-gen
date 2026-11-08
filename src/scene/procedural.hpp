@@ -208,6 +208,9 @@ struct SourceSpec {
 // Deterministic unit-tested primitive generators (positions, smooth or faceted normals as the
 // primitive dictates, uvs, CCW winding facing outwards, centred on the origin).
 [[nodiscard]] MeshData makeBox(glm::vec3 size, int subdivisions);
+// ADR-1959: the +x, +y and +z faces of a box of `size`, one quad each (12 vertices, 6 triangles, CCW from outside): the
+// slab fast path's mesh, which the vertex stage turns to the visible side of each axis.
+[[nodiscard]] MeshData makeSlabMesh(glm::vec3 size);
 // A box whose twelve edges are cylindrical fillets of radius `bevel` and whose eight corners are
 // spherical octants: the Minkowski sum of a smaller box with a sphere. Patch boundaries share
 // exact positions and normals, so the flat faces, the fillets and the corners meet without a seam.
@@ -702,6 +705,12 @@ struct ProceduralGeometry {
     // as a band crosses a rung boundary. Never structural; written only when false. An offline render is unaffected
     // (its tier demotes nothing).
     bool flatFarRungs = true;
+    // ADR-1959: draw this object as a lattice of rigid slabs -- a box source with no bevel, no enabled deformer, no wind
+    // and no effect-lane displacement -- through the slab fast path: a three-quad mesh turned per instance to the faces
+    // the camera (or, in a shadow view, the light) can see, and a vertex stage without the deformer chain. Anything else
+    // asking for it draws the general way. Never structural: it changes how the renderer draws the records, not the
+    // records. Written only when true.
+    bool slabs = false;
     Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.

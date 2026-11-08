@@ -339,8 +339,8 @@ The wall and strata items are dropped (§0). Everything else becomes part of a p
 | **1973** region channels for the material | **Accepted, reduced** to water, shore distance, flatness (pads), path. Terrace index, canyon wall and river are dropped with their formations | Phase 2 |
 | **1974** per-instance roughness (water 0.16, land 0.62) | **Accepted.** Check whether a program can already write roughness from a field; if so, it is only a test | Phase 2 |
 | **1975** top-only emission and side shading | **Accepted, for a slab**: emission masked to the top face; the side fades over the slab's normalised local height instead of a column's | Phase 2 |
-| **1976** distance fade of the gap and edge band by pixel footprint | **Accepted.** It is also risk 1's main mitigation | Phase 2 (in the first material) |
-| **1977** fog: an exp²-like curve, height falloff, a sun-facing tint | **Mostly there already.** The single medium (ADR-705) has `horizonDensity` (density grows with distance, so the near ground stays clean), `fogHeightFalloff` and `fogHeightCurve`, and anisotropic sun scattering. The window radius is tied to the 0.98 distance by a test. Any gap found is fixed in Phase 4 | Phase 2 check, Phase 4 fix |
+| **1976** distance fade of the gap and edge band by pixel footprint | **Rewritten by request B** (02-, owner-reviewed): a separation that survives distance (a ≥1 px footprint-aware border and/or a far ring of 2×/4× tiles), not a fade | Phase 2 |
+| **1977** fog: an exp²-like curve, height falloff, a sun-facing tint; plus output dither (request A) | **Mostly there already.** The single medium (ADR-705) has `horizonDensity` (density grows with distance, so the near ground stays clean), `fogHeightFalloff` and `fogHeightCurve`, and anisotropic sun scattering. The window radius is tied to the 0.98 distance by a test. Any gap found is fixed in Phase 4 | Phase 2 check, Phase 4 fix |
 | **1978** lattice coordinates in material programs | **Accepted**, with the lattice-keyed randoms (§4.2) | Phase 2 |
 | **1979** flight route through named features, per-leg pitch and focal curves | **Accepted**, plus the top-down leg | Phase 5 (§4.7) |
 
@@ -405,11 +405,15 @@ are not committed.
   **Go/no-go at the start of Phase 2:** ≤ 0.06 µs per visible tile for scene plus depth, and the 256² window under
   12 ms of GPU with shadows, measured with this spike's scenes. If the fast path misses, the fallback is a coarser
   pitch at the same screen density, plus the far field below.
-- **A far field.** Beyond the distance where the gap fades out (request 1976), tiles are sub-pixel and read as a
-  surface anyway. A continuous low-resolution mesh of the **same** `H(i,j,t)`, sampled per tile in the effector pass,
-  draws the far ring to the fog line at a fraction of the cost, and a cross-fade band hides the change. This is what
-  lets the high-altitude reveal reach the horizon. It is a mesh of the same function, so the "one surface" rule holds.
-- **An underlay for thin slabs.** The same far-field surface, offset below the slabs, closes the see-through gaps
+- **A far field that stays tiles** (request B, folded into ADR-1976; owner-reviewed, 2026-11-08). The squares must
+  read at reveal altitude: 70–100 tiles up, with a 35–50 mm lens, across all the land in frame. So the gap does
+  **not** fade with distance, and the continuous far mesh first proposed here is dropped. Instead:
+  - a footprint-aware dark border on each top, held at least about 1 px wide;
+  - and/or a far ring of 2× and 4× tiles, in whole lattice blocks, each the mean of its children's heights, drawn
+    through the same slab path, with fog over the seams.
+
+  Which of the two is chosen is decided by measured cost and moiré on the high-reveal still.
+- **An underlay for thin slabs.** A coarse continuous sheet of the same height function, offset below the slabs, closes the see-through gaps
   with a dark, coloured shadow tone (the art agent chooses the colour) instead of the sky. Owner's slabs, without the
   holes.
 - **The depth prepass for tiles** is measured on and off once the fast path exists. The fog and SSR need linear depth,
@@ -448,7 +452,7 @@ not built yet". It is reported as not available, and no numbers are invented for
 
 | Phase | Engineering builds | Art follows with | Checkpoint (owner) |
 |---|---|---|---|
-| 2 Terrain foundation | **First, the tile fast path and its go/no-go** (§6.1); then the far field and the underlay; TileTerrain and the geography field (sea, shore, rolling hills, crowns, path; lattice; parity; the no-crack test), camera-anchored lattice, lattice randoms, region channels, roughness, top-only emission, the distance fade (1973–1976, 1978), a first material program, a static debug camera; perf of the static world | formation layout, first palette, materials on stills | **CP-A "the ground"**: 6–8 stills (close, mid, high) of the static landscape in two palettes, plus a perf line. `02-terrain/` |
+| 2 Terrain foundation | **First, the tile fast path and its go/no-go** (§6.1); then the far field and the underlay; TileTerrain and the geography field (sea, shore, rolling hills, crowns, path; lattice; parity; the no-crack test), camera-anchored lattice, lattice randoms, region channels, roughness, top-only emission, the reveal-altitude tile separation (1976 as rewritten), output dither (1977 A), (1973–1975, 1978), a first material program, a static debug camera; perf of the static world | formation layout, first palette, materials on stills | **CP-A "the ground"**: 6–8 stills (close, mid, high) of the static landscape in two palettes, plus a perf line. `02-terrain/` |
 | 3 Dynamic terrain | waves, interference, breathing, rolling, the event ring, the crest channel and contour sides (1970, 1971), spring infrastructure, audio parameters; seek = play | crest light, emission language | (no stop; clips go to `03-dynamic/` for the record) |
 | 4 Visual identity (art) | DayNight terrain palette curves and OKLab (1972), any fog gap (1977); any requests | the four palettes, edge light, selective illumination, post | |
 | 5 Camera | `scene::Flight`, the attractor refactor, clearance against the dynamic bound, named targets and the top-down leg (1979) | the route's composition and altitude story | **CP-B "the flight"**: one continuous 90–120 s render on Feline Footwear, dynamic terrain, a palette transition, no characters; plus live T1–T4. `05-camera/` |

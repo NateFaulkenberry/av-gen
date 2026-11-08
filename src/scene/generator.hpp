@@ -23,11 +23,13 @@
 // and the object's world matrix is applied by the renderer as for every procedural. The camera is
 // brought into generator space to centre the window.
 //
-// There is ONE kernel, "cells". A registry of generators is deliberately not built: the trigger for one
-// is a second kernel (ADR-1117, "two use cases before a shared abstraction").
+// There are two kernels: "cells" (ADR-1117) and "tiles" (ADR-1950, Musical Geography's ground: every cell present, at
+// its centre, unrotated, at the height of scene/tile_terrain.hpp's one surface). They share the window, the record
+// layout, the bind group and the cull; the name picks the entry point. That is the whole "registry".
 
 #include "core/error.hpp"
 #include "scene/scene_types.hpp"
+#include "scene/tile_terrain.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -59,6 +61,21 @@ struct GeneratorSpec {
     float groundAmplitude = 0.0f;     // value-noise relief, metres (0 = flat)
     float groundFrequency = 0.02f;    // 1 / metres
     std::uint32_t groundSeed = 1;     // the ground's own seed: layers that share it stand on one ground
+    // ---- ADR-1950/1952/1976: the "tiles" kernel only ----
+    TileTerrainSpec tiles;            // the ground every tile stands on
+    // The window's origin and side snap to whole multiples of `align` cells, so a coarser ring's blocks line up
+    // with it exactly (1 = no snapping).
+    std::int32_t align = 1;
+    // The pitch of the finest tiles. A cell of a coarser ring (cellSize = 2x or 4x it) stands at the mean of the
+    // fine tiles it covers, so the ring is the same ground merged in whole lattice blocks. 0 = cellSize.
+    float finePitch = 0.0f;
+    // > 0: a ring. The finer ring's window (its cellSize, viewDistance and align, about the same camera) is a hole
+    // in this one: those cells are absent, so the two rings tile the ground without overlap.
+    float holeCellSize = 0.0f;
+    float holeViewDistance = 0.0f;
+    std::int32_t holeAlign = 1;
+
+    [[nodiscard]] bool isTiles() const;
 
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const; // what changes the buffer size: cell size, window, bounds
@@ -68,6 +85,8 @@ struct GeneratorSpec {
 // The kernels the scene may name. The validated list, not a registry.
 inline constexpr const char* kGeneratorCells = "cells";
 inline constexpr std::uint32_t kGeneratorCellsVersion = 1;
+inline constexpr const char* kGeneratorTiles = "tiles";
+inline constexpr std::uint32_t kGeneratorTilesVersion = 1;
 // A window may not hold more cells than this (records are 96 B: 4M cells = 384 MB). Refused at load.
 inline constexpr std::uint64_t kMaxGeneratorCells = 4ull * 1024ull * 1024ull;
 
@@ -117,6 +136,19 @@ struct GeneratorRegionCells {
 [[nodiscard]] GeneratorRegionCells generatorRegionCells(const GeneratorSpec& spec);
 // The ground at (x, z) in generator space (seeded by `spec.groundSeed`, not the element seed).
 [[nodiscard]] float generatorGroundHeight(const GeneratorSpec& spec, float x, float z);
+
+// ---- ADR-1950/1976: the "tiles" kernel's mirror -------------------------------------------------
+
+// How many fine tiles a cell spans per side (1 for the finest ring; 2 or 4 for a coarser one).
+[[nodiscard]] std::int32_t generatorTileChildren(const GeneratorSpec& spec);
+// The ring's hole for this camera, in this generator's cells (inclusive); `valid` false when there is none.
+struct GeneratorTileHole {
+    bool valid = false;
+    std::int32_t minX = 0, minZ = 0, maxX = -1, maxZ = -1;
+};
+[[nodiscard]] GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& cameraGen, float reach = 1.0f);
+// The tile in cell (ix, iz): the mean of the fine tiles it covers (one, for the finest ring), generator space.
+[[nodiscard]] TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz);
 
 // ---- the mirror's queries -----------------------------------------------------------------------
 

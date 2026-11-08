@@ -56,12 +56,40 @@ glm::quat axisAngle(const glm::vec3& axis, float angle) {
 
 } // namespace
 
+bool GeneratorSpec::isTiles() const { return name == kGeneratorTiles; }
+
 Result<void> GeneratorSpec::validate() const {
-    if (name != kGeneratorCells) {
-        return fail("generator '{}' is unknown; the only generator is '{}'", name, kGeneratorCells);
+    if (name != kGeneratorCells && name != kGeneratorTiles) {
+        return fail("generator '{}' is unknown; the generators are '{}' and '{}'", name, kGeneratorCells,
+                    kGeneratorTiles);
     }
-    if (version != kGeneratorCellsVersion) {
-        return fail("generator '{}' version {} is not this build's ({})", name, version, kGeneratorCellsVersion);
+    const std::uint32_t expected = isTiles() ? kGeneratorTilesVersion : kGeneratorCellsVersion;
+    if (version != expected) {
+        return fail("generator '{}' version {} is not this build's ({})", name, version, expected);
+    }
+    if (isTiles()) {
+        if (auto r = tiles.validate(); !r) {
+            return r;
+        }
+        if (align < 1 || align > 64 || holeAlign < 1 || holeAlign > 64) {
+            return fail("generator 'tiles': align and hole.align must be 1..64");
+        }
+        if (finePitch < 0.0f || (finePitch > 0.0f && generatorTileChildren(*this) > 8)) {
+            return fail("generator 'tiles': a cell may span at most 8 fine tiles per side");
+        }
+        if (finePitch > 0.0f &&
+            std::abs(static_cast<float>(generatorTileChildren(*this)) * finePitch - cellSize) > 1e-4f * cellSize) {
+            return fail("generator 'tiles': cellSize ({}) must be a whole multiple of finePitch ({})", cellSize,
+                        finePitch);
+        }
+        if (holeCellSize > 0.0f) {
+            const float ratio = cellSize / holeCellSize;
+            const auto r = static_cast<std::int32_t>(std::lround(ratio));
+            if (r < 1 || std::abs(static_cast<float>(r) - ratio) > 1e-4f || holeAlign % r != 0) {
+                return fail("generator 'tiles': cellSize must be a whole multiple of hole.cellSize, and hole.align a "
+                            "multiple of that ratio, so the hole is whole cells of this ring");
+            }
+        }
     }
     if (!(cellSize > 0.0f) || !(viewDistance > 0.0f)) {
         return fail("generator: cellSize and viewDistance must be > 0");
@@ -83,7 +111,8 @@ Result<void> GeneratorSpec::validate() const {
         return fail("generator: regionRadius and groundFrequency must be >= 0");
     }
     // The largest window must fit: it is what the GPU buffer is sized for.
-    const double side = 2.0 * std::ceil(static_cast<double>(viewDistance) / cellSize) + 1.0;
+    const double side = 2.0 * std::ceil(static_cast<double>(viewDistance) / cellSize) + 1.0 +
+                        (isTiles() ? 2.0 * align : 0.0);
     double cells = side * side;
     if (bounded) {
         const GeneratorRegionCells r = generatorRegionCells(*this);
@@ -105,6 +134,7 @@ std::uint64_t GeneratorSpec::structuralHash() const {
     h.f32(cellSize);
     h.f32(viewDistance);
     h.boolean(bounded);
+    h.u32(static_cast<std::uint32_t>(align));
     if (bounded) {
         h.v2(regionMin);
         h.v2(regionMax);
@@ -127,6 +157,13 @@ std::uint64_t GeneratorSpec::hash() const {
     h.f32(groundAmplitude);
     h.f32(groundFrequency);
     h.u32(groundSeed);
+    if (isTiles()) {
+        h.u64(tiles.hash());
+        h.f32(finePitch);
+        h.f32(holeCellSize);
+        h.f32(holeViewDistance);
+        h.u32(static_cast<std::uint32_t>(holeAlign));
+    }
     return h.value();
 }
 
@@ -203,6 +240,13 @@ GeneratorWindow generatorWindow(const GeneratorSpec& spec, const glm::vec3& came
     std::int32_t loZ = cz - n;
     std::int32_t hiX = cx + n;
     std::int32_t hiZ = cz + n;
+    if (spec.isTiles() && spec.align > 1) { // ADR-1976: whole blocks, so the rings line up
+        const std::int32_t a = spec.align;
+        loX = generatorFloorDiv(loX, a) * a;
+        loZ = generatorFloorDiv(loZ, a) * a;
+        hiX = (generatorFloorDiv(hiX, a) + 1) * a - 1;
+        hiZ = (generatorFloorDiv(hiZ, a) + 1) * a - 1;
+    }
     if (spec.bounded) {
         const GeneratorRegionCells r = generatorRegionCells(spec);
         loX = std::max(loX, r.minX);
@@ -217,9 +261,67 @@ GeneratorWindow generatorWindow(const GeneratorSpec& spec, const glm::vec3& came
     return w;
 }
 
+std::int32_t generatorTileChildren(const GeneratorSpec& spec) {
+    if (!(spec.finePitch > 0.0f)) {
+        return 1;
+    }
+    return std::max(1, static_cast<std::int32_t>(std::lround(spec.cellSize / spec.finePitch)));
+}
+
+GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& cameraGen, float reach) {
+    GeneratorTileHole hole;
+    if (!spec.isTiles() || !(spec.holeCellSize > 0.0f) || !(spec.holeViewDistance > 0.0f)) {
+        return hole;
+    }
+    GeneratorSpec finer;
+    finer.name = kGeneratorTiles;
+    finer.cellSize = spec.holeCellSize;
+    finer.viewDistance = spec.holeViewDistance;
+    finer.align = spec.holeAlign;
+    const GeneratorWindow w = generatorWindow(finer, cameraGen, reach);
+    const auto r = static_cast<std::int32_t>(std::lround(spec.cellSize / spec.holeCellSize));
+    // The finer window is whole blocks of `holeAlign` fine cells, and holeAlign is a multiple of r: exact division.
+    hole.valid = w.countX > 0 && w.countZ > 0;
+    hole.minX = generatorFloorDiv(w.originX, r);
+    hole.minZ = generatorFloorDiv(w.originZ, r);
+    hole.maxX = generatorFloorDiv(w.originX + w.countX, r) - 1;
+    hole.maxZ = generatorFloorDiv(w.originZ + w.countZ, r) - 1;
+    return hole;
+}
+
+TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz) {
+    const std::int32_t m = generatorTileChildren(spec);
+    if (m == 1) {
+        return tileSample(spec.tiles, (static_cast<float>(ix) + 0.5f) * spec.cellSize,
+                          (static_cast<float>(iz) + 0.5f) * spec.cellSize);
+    }
+    const float fine = spec.cellSize / static_cast<float>(m);
+    TileSample sum;
+    for (std::int32_t b = 0; b < m; ++b) {
+        for (std::int32_t a = 0; a < m; ++a) {
+            const float x = static_cast<float>(ix) * spec.cellSize + (static_cast<float>(a) + 0.5f) * fine;
+            const float z = static_cast<float>(iz) * spec.cellSize + (static_cast<float>(b) + 0.5f) * fine;
+            const TileSample t = tileSample(spec.tiles, x, z);
+            sum.height += t.height;
+            sum.water += t.water;
+            sum.shore += t.shore;
+            sum.flat += t.flat;
+            sum.path += t.path;
+        }
+    }
+    const float inv = 1.0f / static_cast<float>(m * m);
+    sum.height *= inv;
+    sum.water *= inv;
+    sum.shore *= inv;
+    sum.flat *= inv;
+    sum.path *= inv;
+    return sum;
+}
+
 GeneratorWindow generatorCapacity(const GeneratorSpec& spec) {
     GeneratorWindow w;
-    const auto side = 2 * static_cast<std::int32_t>(std::ceil(spec.viewDistance / spec.cellSize)) + 1;
+    const auto side = 2 * static_cast<std::int32_t>(std::ceil(spec.viewDistance / spec.cellSize)) + 1 +
+                      (spec.isTiles() ? 2 * spec.align : 0);
     w.countX = side;
     w.countZ = side;
     if (spec.bounded) {
@@ -232,6 +334,17 @@ GeneratorWindow generatorCapacity(const GeneratorSpec& spec) {
 
 std::optional<GeneratedElement> generatorElement(const GeneratorSpec& spec, std::uint32_t seed,
                                                 const GeneratorVariation& variation, std::int32_t ix, std::int32_t iz) {
+    if (spec.isTiles()) { // ADR-1950: every cell holds its tile (a ring's hole depends on the camera: not here)
+        const TileSample t = generatorTile(spec, ix, iz);
+        GeneratedElement e;
+        e.ix = ix;
+        e.iz = iz;
+        e.position = glm::vec3((static_cast<float>(ix) + 0.5f) * spec.cellSize, t.height,
+                               (static_cast<float>(iz) + 0.5f) * spec.cellSize);
+        e.random = glm::vec4(t.water, t.shore, t.flat, t.path);
+        static_cast<void>(variation);
+        return e;
+    }
     if (spec.bounded) {
         const GeneratorRegionCells r = generatorRegionCells(spec);
         if (ix < r.minX || ix > r.maxX || iz < r.minZ || iz > r.maxZ) {

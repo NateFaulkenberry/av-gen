@@ -300,6 +300,7 @@ struct ProceduralRenderer::Impl {
         // ADR-1117: a generator's kernel parameters and its group over `instances` (rebuilt when that
         // buffer is replaced), and the window it evaluated in `generatorFrame`.
         wgpu::Buffer generatorUniforms;
+        wgpu::Buffer generatorTileUniforms; // ADR-1950
         wgpu::BindGroup generatorGroup;
         wgpu::Buffer generatorGroupTarget;
         scene::GeneratorWindow generatorWindow;
@@ -346,6 +347,8 @@ struct ProceduralRenderer::Impl {
         bool unlitFast = false;
         // ADR-1073: the edge list this object's wire lines draw (null: no lines this frame).
         const WireMesh* wire = nullptr;
+        // ADR-1959: level 0 is the slab mesh and draws with the slab pipelines.
+        bool slab = false;
     };
     struct ComputeItem {
         const ObjectState* state;
@@ -359,6 +362,7 @@ struct ProceduralRenderer::Impl {
         const ObjectState* state;
         std::uint32_t countX;
         std::uint32_t countZ;
+        bool tiles = false; // ADR-1950: the "tiles" entry point
     };
     struct CullItem {
         const ObjectState* state;
@@ -402,7 +406,8 @@ struct ProceduralRenderer::Impl {
     Result<wgpu::RenderPipeline> createPipeline(const wgpu::ShaderModule& module, bool cull,
                                                 bool depthOnly = false, wgpu::RenderPipeline* startInto = nullptr,
                                                 const char* fragmentEntry = nullptr,
-                                                std::shared_ptr<gpu::BackgroundPipeline> background = nullptr);
+                                                std::shared_ptr<gpu::BackgroundPipeline> background = nullptr,
+                                                const char* vertexEntry = nullptr);
     // ADR-1805: the live editor compiles the on-demand pipelines (unlit fast path, refraction) in the background; the
     // surfaces draw their fallback until they land. Off (offline renders, tests): created where first needed.
     bool deferPipelines = false;
@@ -441,6 +446,8 @@ struct ProceduralRenderer::Impl {
                                               wgpu::ComputePipeline* startInto = nullptr);
     CachedMesh uploadMesh(const Result<scene::MeshData>& mesh, const std::string& name);
     const CachedMesh* ensureMesh(const scene::ProceduralGeometry& object);
+    // ADR-1959: the three-quad slab mesh of a box source, cached beside the source meshes.
+    const CachedMesh* ensureSlabMesh(const scene::ProceduralGeometry& object);
     const WireMesh* ensureWireMesh(const scene::ProceduralGeometry& object);
     // The mesh of one LOD level, cached under a key derived from the object's meshHash.
     const CachedMesh* ensureLodMesh(const scene::ProceduralGeometry& object, int level);
@@ -472,6 +479,10 @@ struct ProceduralRenderer::Impl {
     wgpu::PipelineLayout pipelineLayout;
     wgpu::RenderPipeline pipelineCull;
     wgpu::RenderPipeline pipelineDepth; // depth-only: the prepass and the shadow passes (ADR-034)
+    // ADR-1959: the slab fast path (vs_slab / vs_slab_depth / vs_slab_shadow; back-face culled in every pass).
+    wgpu::RenderPipeline pipelineSlab;
+    wgpu::RenderPipeline pipelineSlabDepth;
+    wgpu::RenderPipeline pipelineSlabShadow;
     wgpu::RenderPipeline pipelineNoCull;
     // ADR-1493: the lit pipelines of a compiled-materials variant, built on Dawn's workers.
     struct MaterialVariant {
@@ -480,6 +491,7 @@ struct ProceduralRenderer::Impl {
         wgpu::RenderPipeline noCull;
         wgpu::RenderPipeline unlitCull;   // ADR-1673
         wgpu::RenderPipeline unlitNoCull; // ADR-1673
+        wgpu::RenderPipeline slab;        // ADR-1959
         int pending = 0;
         bool failed = false;
         std::chrono::steady_clock::time_point started{};
@@ -511,6 +523,7 @@ struct ProceduralRenderer::Impl {
     wgpu::BindGroupLayout generatorLayout;          // ADR-1117
     wgpu::PipelineLayout generatorPipelineLayout;
     wgpu::ComputePipeline generatorPipeline;
+    wgpu::ComputePipeline generatorTilesPipeline; // ADR-1950
     wgpu::BindGroupLayout strandLayout;             // ADR-1181
     wgpu::PipelineLayout strandPipelineLayout;
     wgpu::ComputePipeline strandPipeline;
@@ -846,8 +859,9 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         return r;
     }
     {
-        // ADR-1117: the generator kernel. 0 = params, 1 = the object's record buffer (written).
-        std::array<wgpu::BindGroupLayoutEntry, 2> entries{};
+        // ADR-1117: the generator kernel. 0 = params, 1 = the object's record buffer (written), 2 = the "tiles"
+        // kernel's block (ADR-1950; zeros for "cells").
+        std::array<wgpu::BindGroupLayoutEntry, 3> entries{};
         entries[0].binding = 0;
         entries[0].visibility = wgpu::ShaderStage::Compute;
         entries[0].buffer.type = wgpu::BufferBindingType::Uniform;
@@ -856,6 +870,10 @@ Result<void> ProceduralRenderer::init(wgpu::TextureFormat colorFormat, wgpu::Tex
         entries[1].visibility = wgpu::ShaderStage::Compute;
         entries[1].buffer.type = wgpu::BufferBindingType::Storage;
         entries[1].buffer.minBindingSize = kInstanceStride;
+        entries[2].binding = 2;
+        entries[2].visibility = wgpu::ShaderStage::Compute;
+        entries[2].buffer.type = wgpu::BufferBindingType::Uniform;
+        entries[2].buffer.minBindingSize = sizeof(GeneratorTileUniforms);
         wgpu::BindGroupLayoutDescriptor desc{};
         desc.label = "procedural-generator-layout";
         desc.entryCount = entries.size();
@@ -1005,9 +1023,10 @@ void ProceduralRenderer::Impl::buildMaterialVariant(std::span<const scene::Mater
     desc.multisample.count = sampleCount;
     desc.multisample.mask = 0xFFFFFFFFu;
     desc.fragment = &fragment;
-    slot->pending = 4;
+    slot->pending = 5;
     const auto make = [&](wgpu::CullMode cull, const char* label, wgpu::RenderPipeline MaterialVariant::* member) {
         desc.label = label;
+        desc.vertex.entryPoint = member == &MaterialVariant::slab ? "vs_slab" : "vs_proc"; // ADR-1959
         // ADR-1673: the unlit fast path's pair is the same descriptor with the slim fragment entry
         fragment.entryPoint = (member == &MaterialVariant::unlitCull || member == &MaterialVariant::unlitNoCull)
                                   ? "fs_proc_unlit" : "fs_proc";
@@ -1034,6 +1053,7 @@ void ProceduralRenderer::Impl::buildMaterialVariant(std::span<const scene::Mater
     make(wgpu::CullMode::None, "procedural-opaque-twosided-compiled", &MaterialVariant::noCull);
     make(wgpu::CullMode::Back, "procedural-unlit-compiled", &MaterialVariant::unlitCull);
     make(wgpu::CullMode::None, "procedural-unlit-twosided-compiled", &MaterialVariant::unlitNoCull);
+    make(wgpu::CullMode::Back, "procedural-slab-compiled", &MaterialVariant::slab);
 }
 
 Result<void> ProceduralRenderer::reload() {
@@ -1136,6 +1156,11 @@ Result<void> ProceduralRenderer::Impl::createGeneratorPipeline(const wgpu::Shade
         return std::unexpected(pipeline.error());
     }
     generatorPipeline = *pipeline;
+    auto tiles = makeCompute(generatorPipelineLayout, module, "cs_generate_tiles", "procedural-generator-tiles");
+    if (!tiles) {
+        return std::unexpected(tiles.error());
+    }
+    generatorTilesPipeline = *tiles; // ADR-1950
     return {};
 }
 
@@ -1147,16 +1172,22 @@ void ProceduralRenderer::Impl::ensureGeneratorState(ObjectState& state) {
         desc.size = sizeof(GeneratorUniforms);
         desc.usage = wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
         state.generatorUniforms = device.CreateBuffer(&desc);
+        desc.label = "procedural-generator-tile-params";
+        desc.size = sizeof(GeneratorTileUniforms);
+        state.generatorTileUniforms = device.CreateBuffer(&desc);
         state.generatorGroup = nullptr;
     }
     if (!state.generatorGroup || state.generatorGroupTarget.Get() != state.instances.Get()) {
-        std::array<wgpu::BindGroupEntry, 2> entries{};
+        std::array<wgpu::BindGroupEntry, 3> entries{};
         entries[0].binding = 0;
         entries[0].buffer = state.generatorUniforms;
         entries[0].size = sizeof(GeneratorUniforms);
         entries[1].binding = 1;
         entries[1].buffer = state.instances;
         entries[1].size = state.instanceBytes;
+        entries[2].binding = 2;
+        entries[2].buffer = state.generatorTileUniforms;
+        entries[2].size = sizeof(GeneratorTileUniforms);
         wgpu::BindGroupDescriptor desc{};
         desc.label = "procedural-generator-group";
         desc.layout = generatorLayout;
@@ -1189,6 +1220,34 @@ GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const s
     u.ground = glm::vec4(g.groundHeight, g.groundAmplitude, g.groundFrequency, std::bit_cast<float>(g.groundSeed));
     u.disc = glm::vec4((g.regionMin.x + g.regionMax.x) * 0.5f, (g.regionMin.y + g.regionMax.y) * 0.5f, g.regionRadius,
                        0.0f);
+    return u;
+}
+
+GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,
+                                         float reach) {
+    const scene::GeneratorSpec& g = object.distribution.generator;
+    const scene::TileTerrainSpec& t = g.tiles;
+    GeneratorTileUniforms u{};
+    u.a = glm::vec4(t.continentWavelength, t.landThreshold, t.shoreBand, t.inlandBand);
+    u.b = glm::vec4(t.seaLevel, t.seaDepth, t.shoreRise, t.hillWavelength);
+    u.c = glm::vec4(t.hillHeight, static_cast<float>(t.hillOctaves), t.hillWarp, t.warpWavelength);
+    u.d = glm::vec4(t.hillLow, t.hillHigh, t.crownThreshold, t.crownFlatten);
+    u.e = glm::vec4(t.regionWavelength, t.regionVariation, t.pathWidth, t.pathLift);
+    const scene::GeneratorTileHole hole = scene::generatorTileHole(g, cameraGen, reach);
+    const auto points = static_cast<std::uint32_t>(std::min(t.path.size(), scene::kMaxTilePathPoints));
+    u.info = glm::uvec4(t.seed, points, static_cast<std::uint32_t>(scene::generatorTileChildren(g)),
+                        hole.valid ? 1u : 0u);
+    u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
+    for (std::uint32_t i = 0; i < points; ++i) {
+        glm::vec4& lane = u.path[i / 2];
+        if ((i & 1u) == 0u) {
+            lane.x = t.path[i].x;
+            lane.y = t.path[i].y;
+        } else {
+            lane.z = t.path[i].x;
+            lane.w = t.path[i].y;
+        }
+    }
     return u;
 }
 
@@ -1368,7 +1427,10 @@ Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule&
         // ADR-1562: the heaviest pipelines in the renderer; compiled in parallel with everything after them.
         for (auto r : {createPipeline(module, true, false, &pipelineCull), createPipeline(module, false, false, &pipelineNoCull),
                        createPipeline(module, false, true, &pipelineDepth), createWirePipeline(module, true, &pipelineWire),
-                       createWirePipeline(module, false, &pipelineWireXray)}) {
+                       createWirePipeline(module, false, &pipelineWireXray),
+                       createPipeline(module, true, false, &pipelineSlab, nullptr, nullptr, "vs_slab"),
+                       createPipeline(module, true, true, &pipelineSlabDepth, nullptr, nullptr, "vs_slab_depth"),
+                       createPipeline(module, true, true, &pipelineSlabShadow, nullptr, nullptr, "vs_slab_shadow")}) {
             if (!r) return std::unexpected(r.error());
         }
         return {};
@@ -1388,6 +1450,16 @@ Result<void> ProceduralRenderer::Impl::createPipelines(const wgpu::ShaderModule&
     if (!xray) return std::unexpected(xray.error());
     pipelineWire = *wire;
     pipelineWireXray = *xray;
+    // ADR-1959: the slab fast path's three
+    auto slab = createPipeline(module, true, false, nullptr, nullptr, nullptr, "vs_slab");
+    if (!slab) return std::unexpected(slab.error());
+    auto slabDepth = createPipeline(module, true, true, nullptr, nullptr, nullptr, "vs_slab_depth");
+    if (!slabDepth) return std::unexpected(slabDepth.error());
+    auto slabShadow = createPipeline(module, true, true, nullptr, nullptr, nullptr, "vs_slab_shadow");
+    if (!slabShadow) return std::unexpected(slabShadow.error());
+    pipelineSlab = *slab;
+    pipelineSlabDepth = *slabDepth;
+    pipelineSlabShadow = *slabShadow;
     return {};
 }
 
@@ -1536,7 +1608,8 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
                                                                       bool depthOnly,
                                                                       wgpu::RenderPipeline* startInto,
                                                                       const char* fragmentEntry,
-                                                                      std::shared_ptr<gpu::BackgroundPipeline> background) {
+                                                                      std::shared_ptr<gpu::BackgroundPipeline> background,
+                                                                      const char* vertexEntry) {
     VertexLayoutStorage vertex;
     std::array<wgpu::ColorTargetState, kSceneTargetCount> colorTargets{};
     fillSceneTargets(colorTargets, colorFormat, nullptr);
@@ -1551,7 +1624,8 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     depth.depthCompare = depthOnly ? wgpu::CompareFunction::Less : wgpu::CompareFunction::LessEqual;
 
     const bool unlitEntry = fragmentEntry != nullptr && std::string_view(fragmentEntry) == "fs_proc_unlit";
-    const char* label = unlitEntry ? (cull ? "procedural-unlit" : "procedural-unlit-twosided")
+    const char* label = vertexEntry != nullptr ? vertexEntry
+                        : unlitEntry ? (cull ? "procedural-unlit" : "procedural-unlit-twosided")
                         : fragmentEntry != nullptr ? (cull ? "procedural-refract" : "procedural-refract-twosided")
                         : depthOnly                ? "procedural-depth"
                         : (cull ? "procedural-opaque" : "procedural-opaque-twosided");
@@ -1560,7 +1634,7 @@ Result<wgpu::RenderPipeline> ProceduralRenderer::Impl::createPipeline(const wgpu
     desc.layout = pipelineLayout;
     desc.vertex.module = module;
     // ADR-1491: the depth prepass and shadow passes skip the normal's and the velocity's extra chain evaluations.
-    desc.vertex.entryPoint = depthOnly ? "vs_proc_depth" : "vs_proc";
+    desc.vertex.entryPoint = vertexEntry != nullptr ? vertexEntry : (depthOnly ? "vs_proc_depth" : "vs_proc");
     desc.vertex.bufferCount = 1;
     desc.vertex.buffers = &vertex.layout;
     desc.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
@@ -1639,6 +1713,20 @@ const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureMesh
                                            ? Result<scene::MeshData>(scene::makePointQuad(object.source.pointSize))
                                            : scene::makeSourceMesh(object.source);
         it = meshes.emplace(object.meshHash, uploadMesh(mesh, object.name)).first;
+    }
+    it->second.lastUsed = frame;
+    return it->second.indexCount > 0 ? &it->second : nullptr;
+}
+
+const ProceduralRenderer::Impl::CachedMesh* ProceduralRenderer::Impl::ensureSlabMesh(
+    const scene::ProceduralGeometry& object) {
+    // Keyed apart from the source meshes: the same box drawn the general way keeps its own six-face mesh.
+    const std::uint64_t key = (object.meshHash * 0x9E3779B97F4A7C15ull) ^ 0x51AB51AB51AB51ABull;
+    auto it = meshes.find(key);
+    if (it == meshes.end()) {
+        it = meshes.emplace(key, uploadMesh(Result<scene::MeshData>(scene::makeSlabMesh(object.source.size)),
+                                            object.name + "-slab"))
+                 .first;
     }
     it->second.lastUsed = frame;
     return it->second.indexCount > 0 ? &it->second : nullptr;
@@ -2706,8 +2794,14 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             const GeneratorUniforms gu = packGenerator(object, genWindow);
             im.ensureGeneratorState(state);
             queue.WriteBuffer(state.generatorUniforms, 0, &gu, sizeof(gu));
+            const bool tiles = object.distribution.generator.isTiles(); // ADR-1950
+            if (tiles) {
+                const GeneratorTileUniforms tu = packGeneratorTiles(
+                    object, generatorCameraSpace(object, objectModel, scene.camera.position), generatorReach);
+                queue.WriteBuffer(state.generatorTileUniforms, 0, &tu, sizeof(tu));
+            }
             im.generatorItems.push_back(Impl::GeneratorItem{&state, static_cast<std::uint32_t>(genWindow.countX),
-                                                            static_cast<std::uint32_t>(genWindow.countZ)});
+                                                            static_cast<std::uint32_t>(genWindow.countZ), tiles});
             state.generatorWindow = genWindow;
             state.generatorFrame = im.frame;
             ++stats_.generatorObjects;
@@ -2836,6 +2930,19 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         // With the defaults (no culling, one level) this is the single write it has always been.
         // The levels differ in one float, and their slots are contiguous, so they go up as one
         // write rather than as lodCount of them (four per object, forty-eight in a world frame).
+        // ADR-1959: the slab fast path, for what it provably draws the same -- a plain box (no bevel), nothing that bends
+        // a vertex (no enabled deformer, no wind, no effect lanes), not refractive. Level 0 becomes the slab mesh; any
+        // further LOD level keeps its own mesh and the general path.
+        bool slabDraw = false;
+        if (object.slabs && object.source.kind == scene::PrimitiveKind::Box && object.source.bevel <= 0.0f &&
+            enabled == 0 && !windActive && scene.entityFx.recordForProcedural(i) == 0 &&
+            !object.material.refraction.enabled() && im.pipelineSlab && im.pipelineSlabDepth &&
+            im.pipelineSlabShadow) {
+            if (const Impl::CachedMesh* slabMesh = im.ensureSlabMesh(object); slabMesh != nullptr) {
+                lodMeshes[0] = slabMesh;
+                slabDraw = true;
+            }
+        }
         im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);
         for (std::uint32_t level = 0; level < lodCount; ++level) {
             const bool billboard =
@@ -3016,6 +3123,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         if (object.material.wire.enabled() && !isPoint) {
             im.items.back().wire = im.ensureWireMesh(object); // ADR-1073
         }
+        im.items.back().slab = slabDraw;
         ++stats_.objects;
         stats_.sourceVertices += mesh->vertexCount;
         stats_.sourceTriangles += mesh->indexCount / 3;
@@ -3050,8 +3158,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
         desc.timestampWrites =
             im.timeline != nullptr ? im.timeline->mark("generators", gpu::FrameTimeline::PassKind::Compute) : nullptr;
         wgpu::ComputePassEncoder cp = encoder.BeginComputePass(&desc);
-        cp.SetPipeline(im.generatorPipeline);
         for (const auto& item : im.generatorItems) {
+            cp.SetPipeline(item.tiles ? im.generatorTilesPipeline : im.generatorPipeline);
             cp.SetBindGroup(0, item.state->generatorGroup);
             cp.DispatchWorkgroups((item.countX + 7) / 8, (item.countZ + 7) / 8);
             ++stats_.generatorDispatches;
@@ -3288,6 +3396,11 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
     unlitReady = unlitReady || (unlitPass && unlitVariant);
     const wgpu::RenderPipeline& unlitCull = unlitVariant ? variant->unlitCull : im.pipelineUnlitCull;
     const wgpu::RenderPipeline& unlitNoCull = unlitVariant ? variant->unlitNoCull : im.pipelineUnlitNoCull;
+    // ADR-1959: the slab pipeline of this pass (the compiled variant's in the lit pass when one is active).
+    const wgpu::RenderPipeline& slabPipeline =
+        shadowPass ? im.pipelineSlabShadow
+                   : (depthOnly || layDown ? im.pipelineSlabDepth
+                                           : (variant != nullptr && variant->slab ? variant->slab : im.pipelineSlab));
     const auto setPipeline = [&](const wgpu::RenderPipeline& p) {
         if (p.Get() != boundPipeline.Get()) {
             pass.SetPipeline(p);
@@ -3368,8 +3481,12 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             // the inert placeholder the vertex stage never reads, so the shadow pass draws the same
             // group the camera does. There is no second list here because there is no first one.
             const bool fast = unlitReady && item.unlitFast && im.unlitFastEnabled;
-            setPipeline(depthOnly ? im.pipelineDepth
-                                  : (fast ? (twoSided ? unlitNoCull : unlitCull) : (twoSided ? litNoCull : litCull)));
+            if (item.slab) {
+                setPipeline(slabPipeline);
+            } else {
+                setPipeline(depthOnly ? im.pipelineDepth
+                                      : (fast ? (twoSided ? unlitNoCull : unlitCull) : (twoSided ? litNoCull : litCull)));
+            }
             const auto& direct = item.state->usesLive ? item.state->groupsLive : item.state->groups;
             pass.SetBindGroup(1, direct[0], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
@@ -3409,8 +3526,13 @@ void ProceduralRenderer::drawImpl(wgpu::RenderPassEncoder& pass, const scene::Sc
             }
             const bool fast = unlitReady && item.unlitFast && im.unlitFastEnabled;
             const bool noCullLevel = twoSided || mesh->impostor;
-            setPipeline(depthOnly ? im.pipelineDepth
-                                  : (fast ? (noCullLevel ? unlitNoCull : unlitCull) : (noCullLevel ? litNoCull : litCull)));
+            if (item.slab && level == 0) {
+                setPipeline(slabPipeline);
+            } else {
+                setPipeline(depthOnly ? im.pipelineDepth
+                                      : (fast ? (noCullLevel ? unlitNoCull : unlitCull)
+                                              : (noCullLevel ? litNoCull : litCull)));
+            }
             pass.SetBindGroup(1, groups[level], 1, &item.offset);
             ++stats_.state.bindGroupBinds;
             setMaterial(materialGroup);

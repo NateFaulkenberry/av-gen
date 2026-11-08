@@ -14,8 +14,8 @@ Source: `04-art-direction.md` §10 at c0e936d1 (art branch). The status mirrors 
 | 1973 | Region channels for the material: water, shore distance, terrace index, canyon wall, river, path, plateau flatness | **Accepted, reduced** to water, shore distance, flatness (crowns/pads) and path | 2 | Terrace index, canyon wall and river are dropped with their formations |
 | 1974 | Per-instance roughness (water 0.16, land 0.62) | **Accepted** | 2 | A material-program check first; built only if a program cannot already write roughness from a field |
 | 1975 | Top-only emission and side shading | **Accepted, for a slab** | 2 | Emission masked to the top face; the side shade runs over the slab's normalised local height (no column) |
-| 1976 | Distance fade of the gap and edge band by pixel footprint | **Accepted** | 2 | Also the main defence against moiré |
-| 1977 | Fog: exp²-like distance curve, height falloff, sun-facing tint | **Mostly existing** | 2 check, 4 fix | The single medium (ADR-705): `horizonDensity`, `fogHeightFalloff`, `fogHeightCurve`, anisotropic sun scattering. The window radius is tied to the 0.98 fog distance by a test |
+| 1976 | Distance fade of the gap and edge band by pixel footprint | **Superseded by request B below** | 2 | The gap no longer fades; a separation that survives distance replaces it (B) |
+| 1977 | Fog: exp²-like distance curve, height falloff, sun-facing tint; **plus output dither (request A)** | **Mostly existing; dither new** | 2 check, 4 fix; dither in 2 | The single medium (ADR-705): `horizonDensity`, `fogHeightFalloff`, `fogHeightCurve`, anisotropic sun scattering. The window radius is tied to the 0.98 fog distance by a test |
 | 1978 | Lattice coordinates in material programs (never the record index or a camera-relative position) | **Accepted** | 2 | With the lattice-keyed randoms (plan §4.2) |
 | 1979 | Flight route through named features; per-leg pitch offset and focal curve | **Accepted, extended** | 5 | Plus the owner's top-down leg |
 
@@ -31,7 +31,7 @@ Source: `04-art-direction.md` §10 at c0e936d1 (art branch). The status mirrors 
 
 ### Art, 2026-11-08 (after Gate 1): two look requirements the owner's review made binding (04- §11)
 
-Coordinator, 2026-11-08: both are relayed to engineering, with no new numbers. **A folds into ADR-1977** (output dither; keep the grain stand-in until it lands). **B folds into ADR-1976** (the separation survives distance).
+(Merged from the art branch, bd223380. The coordinator folds A into 1977 and B into 1976.)
 
 - **A. Output dither, so the sky and fog never band.**
   - The sky gradients band visibly in the r2 mock-ups.
@@ -51,3 +51,15 @@ Coordinator, 2026-11-08: both are relayed to engineering, with no new numbers. *
   - Per-tile value jitter that grows with distance (±2% near, up to ±6% far) helps too, and art can do that in the
     program once 1978's lattice randoms exist.
   - The far *underlay* (the dark sheet under the slabs) is unaffected and still wanted.
+
+**Engineering, 2026-11-08:** both accepted.
+- **A** becomes part of ADR-1977: a triangular-PDF dither of ±1 LSB, after the tonemap and before quantisation, in the
+  output stage that both the swapchain and the encoder read.
+- **B** becomes ADR-1976, as rewritten:
+  1. A **footprint-aware border**. The material input carries the tile's border distance in pixels, so a program can
+     hold a darkened border at least 1 px wide at any distance.
+  2. A **far ring of coarser tiles**: whole 2× and 4× lattice blocks, each the mean of its children's heights, in the
+     same slab draw. The far field stays tiles.
+
+  Which of the two carries the reveal is decided by measured cost and moiré on the high-reveal still. It may be both.
+  The continuous far *mesh* of plan §6.1 is dropped; the underlay stays.
