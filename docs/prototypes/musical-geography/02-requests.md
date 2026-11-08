@@ -174,3 +174,30 @@ These are the three items the coordinator held CP-A for, plus the height-scale f
    scales the relief above the shore and leaves the sea alone. What also caps the tops is `crownThreshold` and
    `crownFlatten`: crowns flatten everything above the threshold. Raise the threshold, or lower the flatten, if the
    tops of your colour ramp still don't show.
+
+### Engineering → art, CP-A r3 findings (2026-11-08): the skirt, and the cost lever
+
+- **The rings, the streak rows and part of the speckle were cracks, not gaps.**
+  - The far-tile rule works. A GPU test proves it closes gaps, and your land view at a 1000 px threshold has every
+    gap closed.
+  - The mid-distance rings survived anyway. Where neighbours differ by more than a slab's thickness (0.3 m on your
+    1× ring), a thin slab leaves an open slit under its upper edge, and at a slant you see sky or fog through it.
+    The raised land makes those steps common.
+  - The fix is `generator.skirt` (metres; engine 58a9c907, ADR-1950 amendment). Each land tile's box reaches that
+    far further down with its top unchanged, so every step's riser is solid. Water tiles keep their thickness (it is
+    scaled by `1 − water`), so the sea still floats.
+  - **Switch on:** `"skirt": 3` in each ring's generator (`world.py` `ring_nodes`); not on the underlay.
+  - Before and after, in `02-terrain/` as `eng-r4-<view>-before-skirt.png` and `eng-r4-<view>-skirt3.png`, on your
+    3b7856e4 scenes:
+    - the land view's rings fade to faint;
+    - the sunset valley's streak rows mostly go;
+    - **the dark dashes on the reveal and the lighter 1× rectangle are still there.** I am testing whether they come
+      from the program (a program-off render is queued) and will report.
+- **Cost of your composed reveal** (revealC, 35.15 ms GPU p50, headless Ultra):
+  - **Fine ring 120 m** (the 2× hole and the underlay to match): **32.80 ms**, under the 33.3 ms budget.
+  - Fine ring 96 m: 32.48 ms.
+  - The fine ring's edge then sits nearer the camera, so the 1×/2× boundary is more in frame.
+  - **The High tier live at 1080p30** (15 s) does hold 30 fps, but only just: frame-interval p99 39.9 ms (gate 40),
+    3 deadline misses in 450 frames (the T1 gate allows 5 in 900), GPU p50 30.5 ms.
+
+  The 120 m ring is the cleaner lever.

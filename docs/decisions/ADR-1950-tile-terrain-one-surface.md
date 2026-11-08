@@ -60,3 +60,15 @@ without retuning the shapes. Both halves change together. Tests:
 - the CPU cases hold the channel at the bed and the land far from the river untouched;
 - heightScale doubles the relief above `shoreRise` and leaves the sea alone;
 - the GPU parity case runs with a river.
+
+## Amendment (2026-11-08, CP-A r3): the skirt
+
+Thin slabs crack at height steps. Where neighbours differ by more than a slab's thickness, an open slit lies under the
+upper slab's edge, and at a slant the sky shows through it as rings and streak rows. The raised land (heightScale and
+uncapped crowns) makes those steps common.
+
+`generator.skirt` (metres, default 0) extends each land tile's box that far downward, with its top unchanged. The
+kernel stretches the record's y scale and lowers its centre by half. Water tiles are scaled by `1 − water`, so the sea
+keeps its thin floating slabs.
+
+The GPU test holds the top in place and the stretch exact.

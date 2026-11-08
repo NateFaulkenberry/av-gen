@@ -208,6 +208,11 @@ struct SourceSpec {
 // Deterministic unit-tested primitive generators (positions, smooth or faceted normals as the
 // primitive dictates, uvs, CCW winding facing outwards, centred on the origin).
 [[nodiscard]] MeshData makeBox(glm::vec3 size, int subdivisions);
+// ADR-1959 (amended): the far-tile rule's lane for a slab draw (the renderer carries it in ProceduralUniforms::windPlant,
+// which a slab draw never uses for wind): x/z = the footprint's scale out to the lattice pitch (1 when the object is not
+// a "tiles" generator), y = slabFarPixels, w = 1.
+struct ProceduralGeometry;
+[[nodiscard]] glm::vec4 slabFarRule(const ProceduralGeometry& object);
 // ADR-1959: the +x, +y and +z faces of a box of `size`, one quad each (12 vertices, 6 triangles, CCW from outside): the
 // slab fast path's mesh, which the vertex stage turns to the visible side of each axis.
 [[nodiscard]] MeshData makeSlabMesh(glm::vec3 size);

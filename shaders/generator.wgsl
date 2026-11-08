@@ -210,6 +210,7 @@ struct TileParams {
     hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
     blend: vec4<i32>,      // seam band cells (0 = off), block ratio (ADR-1976 amended)
     river: vec4<f32>,      // river width, valley width, height scale, river points
+    skirt: vec4<f32>,      // skirt depth, the box's thickness
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
     rivers: array<vec4<f32>, 8>, // the river's points, two per lane
 };
@@ -440,10 +441,13 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
             t.path = t.path + (mp * inv - t.path) * w;
         }
     }
-    let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height, (f32(iz) + 0.5) * cellSize);
+    // The skirt: a land tile's box reaches `skirt` further down with its top where it was (the centre drops by half).
+    let k = tile.skirt.x * (1.0 - clamp(t.water, 0.0, 1.0));
+    let stretch = (tile.skirt.y + k) / tile.skirt.y;
+    let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height - 0.5 * k, (f32(iz) + 0.5) * cellSize);
     r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 1.0);
     r.rotation = gen.rotation;
-    r.scale = vec4<f32>(gen.scaleInfo.xyz, 0.0);
+    r.scale = vec4<f32>(gen.scaleInfo.x, gen.scaleInfo.y * stretch, gen.scaleInfo.z, 0.0);
     r.random = vec4<f32>(t.water, t.shore, t.flat, t.path);
     r.color = vec4<f32>(1.0, 1.0, 1.0, genUnit(genHash(ix, iz, gen.hashing.x, 21u)));
     r.emissive = vec4<f32>(1.0, 1.0, 1.0, 0.0);

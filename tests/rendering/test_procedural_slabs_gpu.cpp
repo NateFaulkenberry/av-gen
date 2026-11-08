@@ -146,3 +146,63 @@ TEST_CASE("The slab fast path draws the box lattice the general path draws", "[g
     }
     CHECK(ctx->errorCount() == 0);
 }
+
+namespace {
+
+scene::Scene ringScene(float farPixels) {
+    scene::ProceduralGeometry pg;
+    pg.name = "ring";
+    pg.slabs = true;
+    pg.slabFarPixels = farPixels;
+    pg.source.kind = scene::PrimitiveKind::Box;
+    pg.source.size = {0.8f, 0.2f, 0.8f}; // a wide gap: 20% of the pitch
+    pg.distribution.kind = scene::DistributionKind::Generator;
+    scene::GeneratorSpec& g = pg.distribution.generator;
+    g.name = scene::kGeneratorTiles;
+    g.cellSize = 1.0f;
+    g.viewDistance = 40.0f;
+    g.align = 4;
+    g.tiles.hillHeight = 0.0f; // flat: only the gaps differ between the two renders
+    g.tiles.shoreRise = 0.0f;
+    g.tiles.landThreshold = 0.0f;
+    REQUIRE(pg.validate().has_value());
+    REQUIRE(pg.rebuild());
+    scene::Scene s;
+    s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+    s.environment.showSkybox = false;
+    s.camera.position = {0.3f, 30.0f, 0.3f};
+    s.camera.target = {0.3f, 0.0f, -0.2f}; // looking down: every tile a few dozen pixels across
+    scene::PunctualLight key;
+    key.direction = glm::normalize(glm::vec3(-0.3f, -1.0f, -0.2f));
+    key.intensity = 3.0f;
+    s.addLight(key);
+    s.procedurals.push_back(pg);
+    return s;
+}
+
+int blackPixels(const gpu::Image8& img) {
+    int n = 0;
+    for (std::uint32_t y = 0; y < img.height; ++y) {
+        for (std::uint32_t x = 0; x < img.width; ++x) {
+            const auto* p = img.pixel(x, y);
+            n += (p[0] + p[1] + p[2]) <= 6 ? 1 : 0;
+        }
+    }
+    return n;
+}
+
+} // namespace
+
+TEST_CASE("The far-tile rule closes a ring's gaps below its pixel threshold", "[gpu][procedural][geography][adr1959]") {
+    // Tiles about 10 px across: with the rule off (0) the 20% gaps show the black background; with a threshold far
+    // above the tiles' size (1000 px) every footprint eases out to the pitch and the gaps close.
+    auto ctx = makeContext();
+    const auto open = render(*ctx, ringScene(0.0f));
+    const auto closed = render(*ctx, ringScene(1000.0f));
+    const int openBlack = blackPixels(open);
+    const int closedBlack = blackPixels(closed);
+    CAPTURE(openBlack, closedBlack);
+    CHECK(openBlack > 5000);
+    CHECK(closedBlack < openBlack / 10);
+    CHECK(ctx->errorCount() == 0);
+}
