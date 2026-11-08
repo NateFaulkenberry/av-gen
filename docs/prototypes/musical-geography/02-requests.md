@@ -63,3 +63,56 @@ Source: `04-art-direction.md` §10 at c0e936d1 (art branch). The status mirrors 
 
   Which of the two carries the reveal is decided by measured cost and moiré on the high-reveal still. It may be both.
   The continuous far *mesh* of plan §6.1 is dropped; the underlay stays.
+
+### Engineering → art, 2026-11-08 (Phase 2): what the first ground stills showed, and the fog's cost
+
+From the engineering fixture (`examples/musical-geography/eng/make_ground.py`). `world.py` on the art branch (at
+6c3ad19c) has the same set-up as the fixture's first version, so the same fixes apply.
+
+- **The underlay pokes through slopes.**
+  - 8 m blocks at −1.6 m stand at their mean height. On a slope that mean is above the lower fine tiles, so dark
+    slabs show on hillsides; the first hills still showed it plainly.
+  - Fix in the fixture (fd110d88): the underlay sits **under the fine ring only** (the only ring with geometric gaps),
+    with `cellSize` 4, `finePitch` 1, `y` −2.2 and `viewDistance` = the fine ring's.
+- **The coarse rings' gaps alias into dark holes at distance.**
+  - Fix: give the 2× and 4× rings **no geometric gap** (box = cell × 1.0).
+  - Let their program paint the fine lattice instead. `tileBorder` takes `constant2.x` = subdivisions per side (2 for
+    the 2× ring, 4 for the 4× ring), so a 4 m block draws the sixteen 1 m tiles it stands for. The lattice then reads
+    the same across rings, which is request B's point.
+- **`tileBorder`** (ADR-1976): `{"kind": "tileBorder", "srcA": <localPosition>, "constant": [halfX, halfZ, band,
+  halfThickness], "constant2": [subdivisions, 0, 0, 0], "value": <min pixels>}`.
+  - It returns (coverage, distance to the edge in px, top-face mask, (sub)tile size in px).
+  - Under 4 px per tile the coverage eases to its mean, gone by 2 px, so the pattern is prefiltered rather than
+    aliased.
+  - The fixture's program uses band 0.03 and `value` 1.0.
+- **The fog's cost — your call, with the numbers.**
+  - At 1080p Ultra, the volumetric march (`volumeDensity` > 0, the default 32 steps, `volumeMaxDistance` 200) costs
+    **8.4–8.5 ms in every view**: about a third of the reveal's 28 ms.
+  - The cheaper options:
+    - **surface-only fog**: `volumeMaxDistance: 0`, the same air in closed form on the surfaces, no march, no light
+      shafts;
+    - fewer steps: `volumeSteps` 12;
+    - the High live level instead of Ultra.
+  - Their measured costs on the reveal fixture (`cpa3`) are **pending**: queued on the GPU lock at CP-A.
+
+### Engineering → art, CP-A (2026-11-08): what your look shows on the fixed ground
+
+Your scenes were rendered (`build.py`, day and sunset, reveal and land cameras) with one change, the underlay moved to
+the fix above. Stills are in `105-musical-geography/02-terrain/`.
+
+- **High reveal: the squares read across all the land.** Colour, the lit path and the hill bands carry.
+- **Low land camera: concentric moiré in the middle distance.** Your program's hand-made border uses the isotropic
+  `footprint`. At a grazing angle the pixel is much longer along the view than across it, so the 1-px border aliases
+  into rings. `tileBorder` (ADR-1976) uses the per-axis footprint and prefilters below 4 px a tile. Swapping it in
+  for the border block should remove the rings; it also gives the top mask and the tile's size in pixels.
+- **Ring seams:** a faint straight line where the 1× ring meets the 2× ring (visible on the day reveal's hill). A 2×
+  block stands at its children's mean height, so it steps against the fine tiles beside it. Engineering will look at
+  a blend band in Phase 3, alongside the dynamic terms.
+- **Cost of your look at the reveal: 34.3 ms GPU p50, headless 1080p Ultra** (day; sunset 34.2). That is over Ultra's
+  budget. The scene pass is 22.5 ms (17.5 ms on the engineering fixture) and the fog 8.5 ms. The levers, in order:
+  - surface-only fog (`volumeMaxDistance` 0), about 8 ms;
+  - fewer program ops on the 2× and 4× rings;
+  - the High live level.
+
+  For comparison, the engineering fixture's reveal ran live at 1080p30 with 1 miss in 601 frames (p99 37.6 ms).
+

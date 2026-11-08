@@ -102,6 +102,7 @@ const MAT_OP_QUANTIZE: u32 = 32u;     // ADR-1162
 const MAT_OP_OKLAB_RAMP: u32 = 33u;   // ADR-1470
 const MAT_OP_TEXTURE_TRIPLANAR: u32 = 34u;        // ADR-1642
 const MAT_OP_TEXTURE_TRIPLANAR_NORMAL: u32 = 35u; // ADR-1642
+const MAT_OP_TILE_BORDER: u32 = 36u;              // ADR-1976
 const MAT_MAX_TEXTURE_OPS: i32 = 4;               // scene::kMaxMaterialTextureOps
 // ADR-1642: whether this pipeline samples program textures. False (the default, and every pipeline but the entity
 // pass's textured variants): the texture pre-pass is compiled out and texture ops read colour 1 and a flat normal.
@@ -174,6 +175,8 @@ struct MaterialContext {
     height: f32,
     normalVariance: f32,
     footprint: f32,
+    // ADR-1976: local units per pixel along local x and z (fwidth of the local position), for tileBorder; 0 = unknown.
+    localFootprint: vec2<f32>,
     materialId: f32,
     // ADR-904: the material's emission as this instance shows it with no program -- emissive colour
     // x intensity x the instance's multiplier (rgb), w = 1.
@@ -315,6 +318,7 @@ fn materialContextZero() -> MaterialContext {
     ctx.height = 0.0;
     ctx.normalVariance = 0.0;
     ctx.footprint = 0.0;
+    ctx.localFootprint = vec2<f32>(0.0);
     ctx.materialId = 0.0;
     ctx.materialEmission = vec4<f32>(0.0);
     ctx.tangent = vec3<f32>(0.0);
@@ -841,6 +845,37 @@ fn matKQuantize(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f3
     return vec4<f32>((cell + vec3<f32>(0.5) - k.xyz) / f, hash01(vec3<i32>(cell), matOpSeed(pi, oi)));
 }
 
+// ADR-1976: a tile's border that never thins below `value` pixels and is prefiltered under 4 pixels a (sub)tile
+// (material_program.hpp TileBorder). Returns (coverage, distance in pixels, (sub)tile size in pixels).
+fn matTileBorderAxis(half: f32, local: f32, fw: f32, band: f32, minPixels: f32, sub: f32) -> vec3<f32> {
+    let pixel = max(fw, 1e-6);
+    let cell = 2.0 * half / sub;
+    let h = 0.5 * cell;
+    var l = local;
+    if (sub > 1.0) {
+        l = (local + half) - floor((local + half) / cell) * cell - h;
+    }
+    let d = h - abs(l);
+    let width = max(band, minPixels * fw);
+    let t = clamp((d - (width - 0.5 * pixel)) / pixel, 0.0, 1.0);
+    let cover = 1.0 - t * t * (3.0 - 2.0 * t);
+    let size = cell / pixel;
+    let mean = min(2.0 * width / max(cell, 1e-6), 1.0);
+    let keep = smoothstep(2.0, 4.0, size);
+    return vec3<f32>(mean + (cover - mean) * keep, d / pixel, size);
+}
+
+fn matKTileBorder(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let k2 = materialPrograms.programs[pi].ops[oi].constant2;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let sub = max(k2.x, 1.0);
+    let bx = matTileBorderAxis(k.x, a.x, ctx.localFootprint.x, k.z, f, sub);
+    let bz = matTileBorderAxis(k.y, a.z, ctx.localFootprint.y, k.z, f, sub);
+    let top = select(0.0, 1.0, a.y >= k.w - 1e-3);
+    return vec4<f32>(1.0 - (1.0 - bx.x) * (1.0 - bz.x), min(bx.y, bz.y), top, min(bx.z, bz.z));
+}
+
 fn matKOklabRamp(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
     let k = materialPrograms.programs[pi].ops[oi].constant;
     let f = materialPrograms.programs[pi].ops[oi].value;
@@ -957,6 +992,9 @@ fn materialEvalOpKind(kind: u32, pi: u32, oi: u32, ctx: MaterialContext, a: vec4
     }
     if (kind == MAT_OP_TEXTURE_TRIPLANAR_NORMAL) {
         return matKTextureTriplanarNormal(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_TILE_BORDER) {
+        return matKTileBorder(pi, oi, ctx, a, b, c, fields);
     }
     return vec4<f32>(0.0);
 }

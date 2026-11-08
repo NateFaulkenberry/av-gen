@@ -74,7 +74,9 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1590-1599 | perf/rainbow-world-live (Rainbow World's late song holding High live: depth programs, rigid normals) |
 | 1700-1719 | eng/midi-mapping (MIDI performance mapping: Learn, scopes and defaults, the monitor, the MIDI panel) |
 | 1800-1849 | eng/qa-pass-2 (the second QA, debugging, refactoring and cleanup pass) |
-| 1930-1969 | scene/chronos (CHRONOS: temporal imaging and its canyon) |
+| 1930-1949 | scene/chronos (CHRONOS: temporal imaging and its canyon; narrowed from 1930-1969 on 2026-11-08, when the coordinator gave 1950-1979 to Musical Geography -- CHRONOS had used 1930-1937) |
+| 1950-1969 | scene/musical-geography (Musical Geography, engineering) |
+| 1970-1979 | scene/musical-geography (Musical Geography, the art agent's requests, built by engineering) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -984,3 +986,7 @@ confirm the citation you are about to change is your own.
 | [1935](ADR-1935-a-shader-layer-stage-after-the-temporal-stage.md) | A shader layer stage after the temporal stage (`late`): one image-layer loop serves Post and Late, so a warp can bend figures, their gated temporal trails and the background together while the history stays clean. scene/chronos | Accepted |
 | [1936](ADR-1936-rgb-temporal-displacement-per-slot.md) | RGB temporal displacement per gated slot: green reads `rgb` frames further back than red and blue twice that, each channel gated by its own moment, so only gated objects split. scene/chronos | Accepted |
 | [1937](ADR-1937-the-feedback-has-a-centre.md) | The feedback zooms and turns about a routable centre (default the frame's, byte-identical), so it can pour into a moving subject. Amends ADR-1066. scene/chronos | Accepted |
+| [1950](ADR-1950-tile-terrain-one-surface.md) | Musical Geography's ground is one surface written twice: a "tiles" generator kernel (every cell its tile, flat top, sea/shore/rolling hills/crowns/path, channels in the record) and its CPU mirror (`scene::tileSample`), parity-tested cell for cell. scene/musical-geography | Accepted |
+| [1959](ADR-1959-the-slab-fast-path.md) | A lattice of rigid slabs (`"slabs": true`) draws three quads turned to the camera (the light, in a shadow view) through a slim vertex stage: 256² shadowed 27.5 → 8.4 ms GPU, shadow 15.1 → 1.3 ms. scene/musical-geography | Accepted |
+| [1976](ADR-1976-tiles-read-at-reveal-altitude.md) | The squares read at reveal altitude: coarser tile rings in whole lattice blocks (the finer window a hole) and a `tileBorder` op that never thins below N pixels; replaces the gap fade and the smooth far mesh. scene/musical-geography | Accepted |
+| [1977](ADR-1977-output-dither.md) | Output dither (`post/output/dither`, triangular PDF in 8-bit steps after the encode; 0 = byte-identical) against sky and fog banding. scene/musical-geography | Accepted |

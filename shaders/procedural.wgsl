@@ -1072,6 +1072,17 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
         out.prevClip = out.clip;
         return out;
     }
+    // ADR-1959 (amended): a side face that is a line of a pixel or two -- a tile a few pixels across, seen at a slant --
+    // shades as a sliver of sun or shadow next to its top, and a slope of them strobes into bands of stripes. Under 8
+    // pixels a tile the side's normal eases toward the top's (fully by 3), so far sides shade as the land and the steps
+    // read by their outline, not by aliased slivers. The lit pass only; depth is untouched.
+    if (abs(in.normal.y) < 0.5) {
+        let half = max(abs(in.position.x), abs(in.position.z));
+        let across = normalize(ax);
+        let widthPx = pixelsPerMetreAt(world, across, half) * 2.0 * half * length(ax) * max(s.x, s.z);
+        let top = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0) / safeScale), 0.0)).xyz);
+        out.normal = normalize(mix(top, out.normal, smoothstep(3.0, 8.0, widthPx)));
+    }
     let prev = (object.prevModel * vec4<f32>(instancePoint(inst, srcPos), 1.0)).xyz;
     out.prevClip = frame.prevViewProj * vec4<f32>(prev, 1.0);
     return out;

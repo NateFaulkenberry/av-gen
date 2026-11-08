@@ -121,6 +121,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::OklabRamp, "oklabRamp"}, // ADR-1470
     {MaterialOpKind::TextureTriplanar, "textureTriplanar"},             // ADR-1642
     {MaterialOpKind::TextureTriplanarNormal, "textureTriplanarNormal"}, // ADR-1642
+    {MaterialOpKind::TileBorder, "tileBorder"},                         // ADR-1976
 };
 
 struct InputName {
@@ -764,6 +765,33 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
     }
     case MaterialOpKind::OklabRamp:
         return oklabRamp4(op.constant, op.constant2, op.constant3, op.constant4, a.x, f < 0.0f);
+    case MaterialOpKind::TileBorder: {
+        // ADR-1976: the band per axis, never under `f` pixels, prefiltered under 4 pixels; the twin of matKTileBorder.
+        const float sub = std::max(op.constant2.x, 1.0f);
+        const auto smooth = [](float e0, float e1, float x) {
+            const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+            return t * t * (3.0f - 2.0f * t);
+        };
+        // (coverage, distance in pixels, (sub)tile size in pixels)
+        const auto axis = [&](float half, float local, float fw) {
+            const float pixel = std::max(fw, 1e-6f);
+            const float cell = 2.0f * half / sub;
+            const float h = 0.5f * cell;
+            const float l = sub > 1.0f ? (local + half) - std::floor((local + half) / cell) * cell - h : local;
+            const float d = h - std::abs(l);
+            const float width = std::max(k.z, f * fw);
+            const float t = std::clamp((d - (width - 0.5f * pixel)) / pixel, 0.0f, 1.0f);
+            const float cover = 1.0f - t * t * (3.0f - 2.0f * t);
+            const float size = cell / pixel;
+            const float mean = std::min(2.0f * width / std::max(cell, 1e-6f), 1.0f);
+            const float keep = smooth(2.0f, 4.0f, size);
+            return glm::vec3(mean + (cover - mean) * keep, d / pixel, size);
+        };
+        const glm::vec3 bx = axis(k.x, a.x, ctx.localFootprint.x);
+        const glm::vec3 bz = axis(k.y, a.z, ctx.localFootprint.y);
+        const float top = a.y >= k.w - 1e-3f ? 1.0f : 0.0f;
+        return {1.0f - (1.0f - bx.x) * (1.0f - bz.x), std::min(bx.y, bz.y), top, std::min(bx.z, bz.z)};
+    }
     case MaterialOpKind::TextureTriplanar:
     case MaterialOpKind::TextureTriplanarNormal:
         return textureOpValue(op, ctx, program); // ADR-1642
@@ -913,6 +941,7 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::VoronoiEdge:
     case MaterialOpKind::Quantize:
     case MaterialOpKind::OklabRamp:
+    case MaterialOpKind::TileBorder:
         return {true, false, false};
     case MaterialOpKind::Multiply:
     case MaterialOpKind::Add:
@@ -974,7 +1003,7 @@ bool MaterialProgram::unlitFastEligible() const {
         case MaterialOpKind::MixBy: case MaterialOpKind::Power: case MaterialOpKind::Smoothstep:
         case MaterialOpKind::Threshold: case MaterialOpKind::HueShift: case MaterialOpKind::Saturate:
         case MaterialOpKind::Palette: case MaterialOpKind::Swizzle: case MaterialOpKind::VoronoiEdge:
-        case MaterialOpKind::Quantize: case MaterialOpKind::OklabRamp:
+        case MaterialOpKind::Quantize: case MaterialOpKind::OklabRamp: case MaterialOpKind::TileBorder:
             break;
         default:
             return false;

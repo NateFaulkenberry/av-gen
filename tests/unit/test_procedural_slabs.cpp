@@ -3,6 +3,7 @@
 // shape -- the three faces of makeBox that point along +x, +y and +z, wound counter-clockwise from outside, with
 // makeBox's own vertices, normals and uv, so the material inputs read the same on either path.
 
+#include "scene/material_program.hpp"
 #include "scene/procedural.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -77,4 +78,41 @@ TEST_CASE("the slab mesh is the +x, +y and +z faces of the box", "[procedural][g
         });
         CHECK(found);
     }
+}
+
+TEST_CASE("tileBorder holds the authored band near and never thins below its pixels far", "[material][geography][adr1976]") {
+    using scene::MaterialContext;
+    using scene::MaterialOp;
+    using scene::MaterialOpKind;
+    scene::MaterialProgram program;
+    program.name = "border";
+    MaterialOp in;
+    in.kind = MaterialOpKind::Input;
+    in.dst = 0;
+    in.input = scene::MaterialInput::LocalPosition;
+    MaterialOp border;
+    border.kind = MaterialOpKind::TileBorder;
+    border.dst = 1;
+    border.srcA = 0;
+    border.constant = {0.46f, 0.46f, 0.02f, 0.09f};
+    border.value = 1.0f;
+    program.ops = {in, border};
+    program.baseColorRegister = 1;
+    REQUIRE(program.validate().has_value());
+    const auto run = [&](glm::vec3 local, glm::vec2 fw) {
+        MaterialContext ctx;
+        ctx.localPosition = local;
+        ctx.localFootprint = fw;
+        return scene::evaluateMaterialProgram(program, ctx, scene::MaterialResult{}).baseColor;
+    };
+    // Near (a millimetre a pixel): the authored 2 cm band. Inside it is border; 5 cm in is not.
+    CHECK(run({0.45f, 0.09f, 0.0f}, {0.001f, 0.001f}).x == Catch::Approx(1.0f));
+    CHECK(run({0.41f, 0.09f, 0.0f}, {0.001f, 0.001f}).x == Catch::Approx(0.0f));
+    // Far (5 cm a pixel): the band is one pixel wide, not 2 cm, so 3 cm in is still border.
+    CHECK(run({0.43f, 0.09f, 0.0f}, {0.05f, 0.05f}).x > 0.5f);
+    CHECK(run({0.20f, 0.09f, 0.0f}, {0.05f, 0.05f}).x == Catch::Approx(0.0f));
+    // The top-face mask, and the distance to the edge in pixels.
+    CHECK(run({0.0f, 0.09f, 0.0f}, {0.01f, 0.01f}).z == Catch::Approx(1.0f));
+    CHECK(run({0.46f, 0.0f, 0.0f}, {0.01f, 0.01f}).z == Catch::Approx(0.0f));
+    CHECK(run({0.36f, 0.09f, 0.0f}, {0.01f, 0.01f}).y == Catch::Approx(10.0f).margin(1e-3));
 }
