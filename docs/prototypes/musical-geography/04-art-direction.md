@@ -734,3 +734,18 @@ p50.
   - The low sun puts a white glare on the sea in the reveal and coast views.
   - The coast ridge's top reads olive-green again under the blue fill.
 - **Unchanged:** the dashes and the 1×/2× rectangle (engineering).
+
+### CP-A r6 (2026-11-08, on engineering 7aa5ba43)
+
+**What r6 changed:**
+- **Sun:** the sun's arc is turned (`sunAzimuthAtDawn` 3.24). The day sun now lights the north-west views from the
+  south-west; the sunset sun is in the south.
+- **Fill light:** a shadowless violet fill from opposite the sun (day 2.2, sunset 0.6), so shaded slopes go violet
+  instead of brown.
+- **Ambient occlusion:** back on, faded by distance (ADR-1951). The fade bands are per view: reveal 200–420 m, valley
+  120–300 m, the others 40–120 m.
+- **Shadows:** shadow range 480 m, for the low suns' long shadows.
+- **Day:** manual exposure; fill 0.38, contrast 1.3; warmer gold crowns; the low end of the colour ramp cooler.
+
+The stills are `02-terrain/cpa-41..46-*-r6.png`, with the comparison sheet `cpa-47`. The day reveal is GPU p50
+30.7 ms, up from 23.5 ms; ambient occlusion, the longer shadows and the fill account for the difference.
