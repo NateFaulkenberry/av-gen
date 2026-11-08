@@ -74,6 +74,13 @@ Result<void> GeneratorSpec::validate() const {
         if (align < 1 || align > 64 || holeAlign < 1 || holeAlign > 64) {
             return fail("generator 'tiles': align and hole.align must be 1..64");
         }
+        if (blendCells < 0 || blendCells > 64 || blendRatio < 2 || blendRatio > 8) {
+            return fail("generator 'tiles': blend.cells must be 0..64 and blend.ratio 2..8");
+        }
+        if (blendCells > 0 && align % blendRatio != 0) {
+            return fail("generator 'tiles': with a seam band, align must be a multiple of blend.ratio, so the edge "
+                        "blocks are whole coarser cells");
+        }
         if (finePitch < 0.0f || (finePitch > 0.0f && generatorTileChildren(*this) > 8)) {
             return fail("generator 'tiles': a cell may span at most 8 fine tiles per side");
         }
@@ -163,6 +170,8 @@ std::uint64_t GeneratorSpec::hash() const {
         h.f32(holeCellSize);
         h.f32(holeViewDistance);
         h.u32(static_cast<std::uint32_t>(holeAlign));
+        h.u32(static_cast<std::uint32_t>(blendCells));
+        h.u32(static_cast<std::uint32_t>(blendRatio));
     }
     return h.value();
 }
@@ -316,6 +325,42 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
     sum.flat *= inv;
     sum.path *= inv;
     return sum;
+}
+
+TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
+                                  const GeneratorWindow& window) {
+    TileSample t = generatorTile(spec, ix, iz);
+    if (spec.blendCells <= 0 || spec.blendRatio < 2 || window.countX <= 0 || window.countZ <= 0) {
+        return t;
+    }
+    const std::int32_t d = std::min({ix - window.originX, window.originX + window.countX - 1 - ix, iz - window.originZ,
+                                     window.originZ + window.countZ - 1 - iz});
+    const float u = std::clamp(static_cast<float>(d) / static_cast<float>(spec.blendCells), 0.0f, 1.0f);
+    const float w = 1.0f - u * u * (3.0f - 2.0f * u);
+    if (!(w > 0.0f)) {
+        return t;
+    }
+    const std::int32_t r = spec.blendRatio;
+    const std::int32_t bx = generatorFloorDiv(ix, r) * r;
+    const std::int32_t bz = generatorFloorDiv(iz, r) * r;
+    TileSample m;
+    for (std::int32_t b = 0; b < r; ++b) {
+        for (std::int32_t a = 0; a < r; ++a) {
+            const TileSample c = generatorTile(spec, bx + a, bz + b);
+            m.height += c.height;
+            m.water += c.water;
+            m.shore += c.shore;
+            m.flat += c.flat;
+            m.path += c.path;
+        }
+    }
+    const float inv = 1.0f / static_cast<float>(r * r);
+    t.height += (m.height * inv - t.height) * w;
+    t.water += (m.water * inv - t.water) * w;
+    t.shore += (m.shore * inv - t.shore) * w;
+    t.flat += (m.flat * inv - t.flat) * w;
+    t.path += (m.path * inv - t.path) * w;
+    return t;
 }
 
 GeneratorWindow generatorCapacity(const GeneratorSpec& spec) {

@@ -208,6 +208,7 @@ struct TileParams {
     e: vec4<f32>,          // region wavelength, region variation, path width, path lift
     info: vec4<u32>,       // seed, path points, children per side, hole valid
     hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
+    blend: vec4<i32>,      // seam band cells (0 = off), block ratio (ADR-1976 amended)
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
 };
 
@@ -319,6 +320,39 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     return out;
 }
 
+// One cell of this ring: the tile at its centre, or the mean of the fine tiles it covers (generatorTile's twin).
+fn tileCell(ix: i32, iz: i32) -> TileOut {
+    let cellSize = gen.cell.x;
+    let m = max(tile.info.z, 1u);
+    if (m == 1u) {
+        return tileSample((f32(ix) + 0.5) * cellSize, (f32(iz) + 0.5) * cellSize);
+    }
+    let fine = cellSize / f32(m);
+    var t: TileOut;
+    t.height = 0.0;
+    t.water = 0.0;
+    t.shore = 0.0;
+    t.flat = 0.0;
+    t.path = 0.0;
+    for (var b = 0u; b < m; b = b + 1u) {
+        for (var a = 0u; a < m; a = a + 1u) {
+            let s = tileSample(f32(ix) * cellSize + (f32(a) + 0.5) * fine, f32(iz) * cellSize + (f32(b) + 0.5) * fine);
+            t.height = t.height + s.height;
+            t.water = t.water + s.water;
+            t.shore = t.shore + s.shore;
+            t.flat = t.flat + s.flat;
+            t.path = t.path + s.path;
+        }
+    }
+    let inv = 1.0 / f32(m * m);
+    t.height = t.height * inv;
+    t.water = t.water * inv;
+    t.shore = t.shore * inv;
+    t.flat = t.flat * inv;
+    t.path = t.path * inv;
+    return t;
+}
+
 @compute @workgroup_size(8, 8)
 fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
     let countX = u32(gen.window.z);
@@ -341,33 +375,40 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
         return;
     }
     let cellSize = gen.cell.x;
-    let m = max(tile.info.z, 1u);
-    var t: TileOut;
-    if (m == 1u) {
-        t = tileSample((f32(ix) + 0.5) * cellSize, (f32(iz) + 0.5) * cellSize);
-    } else {
-        let fine = cellSize / f32(m);
-        t.height = 0.0;
-        t.water = 0.0;
-        t.shore = 0.0;
-        t.flat = 0.0;
-        t.path = 0.0;
-        for (var b = 0u; b < m; b = b + 1u) {
-            for (var a = 0u; a < m; a = a + 1u) {
-                let s = tileSample(f32(ix) * cellSize + (f32(a) + 0.5) * fine, f32(iz) * cellSize + (f32(b) + 0.5) * fine);
-                t.height = t.height + s.height;
-                t.water = t.water + s.water;
-                t.shore = t.shore + s.shore;
-                t.flat = t.flat + s.flat;
-                t.path = t.path + s.path;
+    var t = tileCell(ix, iz);
+    // ADR-1976 (amended): the seam band -- near this ring's window edge, ease toward the coarser block's mean.
+    let band = tile.blend.x;
+    let ratio = tile.blend.y;
+    if (band > 0 && ratio >= 2) {
+        let d = min(min(ix - gen.window.x, gen.window.x + gen.window.z - 1 - ix),
+                    min(iz - gen.window.y, gen.window.y + gen.window.w - 1 - iz));
+        let u = clamp(f32(d) / f32(band), 0.0, 1.0);
+        let w = 1.0 - u * u * (3.0 - 2.0 * u);
+        if (w > 0.0) {
+            let bx = genFloorDiv(ix, ratio) * ratio;
+            let bz = genFloorDiv(iz, ratio) * ratio;
+            var mh = 0.0;
+            var mw = 0.0;
+            var ms = 0.0;
+            var mf = 0.0;
+            var mp = 0.0;
+            for (var b = 0; b < ratio; b = b + 1) {
+                for (var a = 0; a < ratio; a = a + 1) {
+                    let c = tileCell(bx + a, bz + b);
+                    mh = mh + c.height;
+                    mw = mw + c.water;
+                    ms = ms + c.shore;
+                    mf = mf + c.flat;
+                    mp = mp + c.path;
+                }
             }
+            let inv = 1.0 / f32(ratio * ratio);
+            t.height = t.height + (mh * inv - t.height) * w;
+            t.water = t.water + (mw * inv - t.water) * w;
+            t.shore = t.shore + (ms * inv - t.shore) * w;
+            t.flat = t.flat + (mf * inv - t.flat) * w;
+            t.path = t.path + (mp * inv - t.path) * w;
         }
-        let inv = 1.0 / f32(m * m);
-        t.height = t.height * inv;
-        t.water = t.water * inv;
-        t.shore = t.shore * inv;
-        t.flat = t.flat * inv;
-        t.path = t.path * inv;
     }
     let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height, (f32(iz) + 0.5) * cellSize);
     r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 1.0);

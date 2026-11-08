@@ -93,7 +93,9 @@ gpu::Image8 render(gpu::Context& ctx, const scene::Scene& s) {
     REQUIRE(renderer.init().has_value());
     FrameTime t{};
     t.renderTime = 1.0;
-    auto img = renderer.renderToImage(s, t, 320, 240);
+    // Large enough that every tile is well over 8 px wide: under that, the slab path deliberately shades a far side
+    // like its top (ADR-1959's amendment), and the two paths should differ there.
+    auto img = renderer.renderToImage(s, t, 960, 720);
     REQUIRE(img.has_value());
     return *img;
 }

@@ -223,3 +223,41 @@ TEST_CASE("tiles: the generator and its terrain read and round-trip as JSON", "[
     CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(R"({"canyonDepth": 4})")).has_value());
     CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(R"({"hillOctaves": 9})")).has_value());
 }
+
+TEST_CASE("tiles: the seam band meets the coarser ring at its height", "[geography][tiles][adr1976]") {
+    scene::GeneratorSpec fine;
+    fine.name = scene::kGeneratorTiles;
+    fine.tiles = withPath();
+    fine.cellSize = 1.0f;
+    fine.viewDistance = 40.0f;
+    fine.align = 4;
+    fine.blendCells = 6;
+    fine.blendRatio = 2;
+    REQUIRE(fine.validate().has_value());
+    scene::GeneratorSpec coarse = fine;
+    coarse.cellSize = 2.0f;
+    coarse.finePitch = 1.0f;
+    coarse.blendCells = 0;
+    const scene::GeneratorWindow w = scene::generatorWindow(fine, glm::vec3(-317.2f, 30.0f, 88.9f));
+    int edgeChecked = 0;
+    for (std::int32_t z = 0; z < w.countZ; ++z) {
+        for (std::int32_t x = 0; x < w.countX; ++x) {
+            const std::int32_t ix = w.originX + x;
+            const std::int32_t iz = w.originZ + z;
+            const scene::TileSample t = scene::generatorTileInWindow(fine, ix, iz, w);
+            const bool edge = x == 0 || z == 0 || x == w.countX - 1 || z == w.countZ - 1;
+            const bool deep = x >= 6 && z >= 6 && x < w.countX - 6 && z < w.countZ - 6;
+            if (edge) {
+                // On the edge cell the fine tile stands exactly where the 2 m block it belongs to stands.
+                const scene::TileSample block =
+                    scene::generatorTile(coarse, scene::generatorFloorDiv(ix, 2), scene::generatorFloorDiv(iz, 2));
+                CHECK(t.height == Catch::Approx(block.height).margin(1e-4));
+                ++edgeChecked;
+            }
+            if (deep) {
+                CHECK(t.height == scene::generatorTile(fine, ix, iz).height);
+            }
+        }
+    }
+    CHECK(edgeChecked > 100);
+}
