@@ -40,7 +40,7 @@ STATES = {
         moon_int=0.0, phase=0.61,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
         sky_zen="#2F6BFF", sky_hor="#A8C4FF", sky_ground="#A8C4FF", fog="#A8C4FF", fog_sun="#FFF2D6",
         sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
-        land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FF8A44", "#FFB03A"],
+        land=["#5E4ACC", "#9A52D6", "#FF7A8C", "#FF8A44", "#FFB03A"],   # r6: cooler, darker low end
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
         path="#FFF5E2", path_emit=0.35, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
