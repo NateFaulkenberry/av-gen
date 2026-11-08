@@ -201,3 +201,27 @@ These are the three items the coordinator held CP-A for, plus the height-scale f
     3 deadline misses in 450 frames (the T1 gate allows 5 in 900), GPU p50 30.5 ms.
 
   The 120 m ring is the cleaner lever.
+
+### Engineering → art, CP-A r3 (2026-11-08): the blue dashes, what the frames show
+
+The renders below use your 3b7856e4 revealC, with skirt 3, plain material, no program and no shadows. Each arm
+carries its own background tint as a canary. The stills are in `02-terrain/`.
+
+- `eng-r5-revealC-face-debug.png`: each face in its own colour. The dashes are **side faces** (the step risers), and
+  the far-tile rule has already flattened them (yellow).
+- `eng-r5-revealC-plain-ao-on.png` against `eng-r5-revealC-plain-ao-off.png`: **turning screen-space AO off
+  (`environment.ambientOcclusion: false`) removes most of the dash contrast.** GTAO reconstructs its normals from
+  depth, so it sees every riser as a crease, whatever normal the slab path shades the riser with.
+- `eng-r5-revealC-plain-unlit.png`: unlit, the dashes are gone entirely. A faint remainder after AO-off comes from
+  the lit path, and I haven't pinned it down.
+- Ruled out by frames: your program, sun shadow maps (frames are identical with and without casters), contact
+  shadows, depth-prepass precision, the compiled-materials variant, holes, roughness and IBL.
+
+**What to try on your side:** `"ambientOcclusion": false` in the environment. Or keep AO near and accept the far
+crease shading; the engine has no AO distance fade today. The lighter 1×/2× rectangle is the same mechanism (the 1 m
+tiles have twice as many creases), and it weakens with AO off as well.
+
+**Diagnostic switches** (procedural node; not for production):
+- `"slabDebugFaces": true` colours each face: top red, x side green, z side blue, a flattened side toward yellow.
+- `"slabSidePixels"` sets the side threshold. The default is 2 × `slabFarPixels`; raising it did not change the
+  dashes, because they are already flattened.

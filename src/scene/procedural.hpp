@@ -721,6 +721,14 @@ struct ProceduralGeometry {
     // too fine for the pixels does not alias into moire, streaks or speckle; the painted border (tileBorder) carries
     // the separation from there. 0 = never. Written only when changed.
     float slabFarPixels = 6.0f;
+    // CP-A r3: below this many pixels a tile (the smaller screen axis), a side face's normal and local height ease to
+    // the top's -- fully at half of it. A step's riser that faces away from the sun is lit by the sky alone, and at a
+    // distance where it is a few pixels tall a slope of them reads as blue dashes; this is how far out they are kept.
+    // 0 = 2 x slabFarPixels (the default rule). Written only when set.
+    float slabSidePixels = 0.0f;
+    // Diagnostic (CP-A r3): colour a slab by the face it draws -- top red, x side green, z side blue, a face the
+    // far-tile rule has flattened toward yellow -- through the instance colour. Never saved; for investigation only.
+    bool slabDebugFaces = false;
     Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.

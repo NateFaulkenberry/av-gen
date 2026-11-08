@@ -2956,6 +2956,10 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 lodMeshes[0] = slabMesh;
                 slabDraw = true;
                 u.windPlant = scene::slabFarRule(object); // ADR-1959 (amended): the far-tile rule
+                // CP-A r3: the side rule's threshold (windTiming is free on a slab draw too: no wind)
+                u.windTiming = glm::vec4(object.slabSidePixels > 0.0f ? object.slabSidePixels
+                                                                      : 2.0f * std::max(object.slabFarPixels, 0.0f),
+                                         object.slabDebugFaces ? 1.0f : 0.0f, 0.0f, 0.0f);
             }
         }
         im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);

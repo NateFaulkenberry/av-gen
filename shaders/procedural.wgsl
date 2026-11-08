@@ -1068,7 +1068,8 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     var sideKeep = smoothstep(3.0, 8.0, widthPx);
     if (proc.windPlant.w > 0.5 && farPx > 0.0) {
         close = 1.0 - smoothstep(0.5 * farPx, farPx, widthPx);
-        flatten = 1.0 - smoothstep(farPx, 2.0 * farPx, widthPx);
+        let sidePx = max(proc.windTiming.x, 1e-3); // CP-A r3: the side rule's threshold (2 x farPx unless set)
+        flatten = 1.0 - smoothstep(0.5 * sidePx, sidePx, widthPx);
         sideKeep = 1.0 - flatten;
     }
     if (abs(in.normal.y) > 0.5) {
@@ -1083,6 +1084,20 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     // The sides read as the top to a program (its local height): a far step's side is a sliver of the top's colour.
     let topY = abs(in.position.y);
     out.localPos = vec3<f32>(p.x, select(p.y, mix(p.y, topY, flatten), abs(in.normal.y) < 0.5), p.z);
+    // Diagnostic: the face this vertex belongs to, through the instance colour (top red, x green, z blue; a turned-down
+    // top magenta; flattened toward yellow).
+    if (proc.windTiming.y > 0.5) {
+        var dbg = vec3<f32>(0.0, 0.0, 1.0);
+        if (abs(in.normal.y) > 0.5) {
+            dbg = select(vec3<f32>(1.0, 0.0, 1.0), vec3<f32>(1.0, 0.0, 0.0), n.y > 0.0);
+        } else if (abs(in.normal.x) > 0.5) {
+            dbg = vec3<f32>(0.0, 1.0, 0.0);
+        }
+        if (abs(in.normal.y) < 0.5) {
+            dbg = mix(dbg, vec3<f32>(1.0, 1.0, 0.0), flatten);
+        }
+        out.instColor = vec4<f32>(dbg, out.instColor.a);
+    }
     let srcPos = (proc.sourceMatrix * vec4<f32>(p, 1.0)).xyz;
     let srcNormal = (proc.sourceNormalMatrix * vec4<f32>(n, 0.0)).xyz;
     let s = inst.scale.xyz;
@@ -1096,9 +1111,8 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
         return out;
     }
     // ADR-1959 (amended): a side face that is a line of a pixel or two -- a tile a few pixels across, seen at a slant --
-    // shades as a sliver of sun or shadow next to its top, and a slope of them strobes into bands of stripes. Under 8
-    // pixels a tile the side's normal eases toward the top's (fully by 3), so far sides shade as the land and the steps
-    // read by their outline, not by aliased slivers. The lit pass only; depth is untouched.
+    // shades as a sliver of sun or shadow next to its top, and a slope of them strobes into bands of stripes. Below the
+    // side threshold the side's normal eases toward the top's. The lit pass only; depth is untouched.
     if (abs(in.normal.y) < 0.5) {
         let top = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0) / safeScale), 0.0)).xyz);
         out.normal = normalize(mix(top, out.normal, sideKeep));
