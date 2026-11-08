@@ -44,3 +44,14 @@ the P95s are inflated; the medians are the comparison.
   the Phase 2 go/no-go of 0.06 µs per tile and of 12 ms for the 256² window with shadows.
 - The GPU test renders a turned, uneven lattice both ways, from above, from the side and from below, with a shadowed
   key and the prepass. Fewer than 0.5% of the pixels differ by more than 6 levels.
+
+## Amendment (2026-11-08, CP-A): far sides shade as the land
+
+The CP-A reveal stills showed bright and dark stripes banding across slopes in the middle distance. Each tile's side
+face is a one- or two-pixel sliver there, lit by the sun or in shadow, and a slope of them aliases.
+
+In the lit pass, a side face's normal now eases toward the top's normal:
+- fully at the side's own normal while the tile is at least 8 pixels across;
+- fully at the top's normal by 3 pixels.
+
+Far steps then read by their outline, not by aliased slivers of light. Depth and shadow passes are untouched.
