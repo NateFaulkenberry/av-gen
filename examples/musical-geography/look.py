@@ -34,26 +34,29 @@ def hexlin(h: str) -> list[float]:
 # 0.0 (=1.0) -> 0.27, always forward in time.
 STATES = {
     "day": dict(
+        fill=0.45, contrast=1.25,
         sky_int=1.0, haze=0.35,
-        moon_int=0.0, phase=0.50,
+        moon_int=0.0, phase=0.64,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
         sky_zen="#2F6BFF", sky_hor="#A8C4FF", sky_ground="#A8C4FF", fog="#A8C4FF", fog_sun="#FFF2D6",
-        sun="#FFF4E0", sun_int=3.2, amb="#A6B6FF", amb_int=0.4,
+        sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
         land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FF9E4A", "#FFC444"],
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
         path="#FFF5E2", path_emit=0.35, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
-        fog_mult=3.0, exposure=0.0, saturation=1.45, look="punchy", bloom=0.25),
+        fog_mult=4.5, exposure=-0.5, saturation=1.6, look="punchy", bloom=0.25),
     "sunset": dict(
+        fill=0.55, contrast=1.22,
         sky_int=0.9, haze=0.6,
         moon_int=0.0, phase=0.72,
-        sky_zen="#4A22B0", sky_hor="#E87A86", sky_ground="#E87A86", fog="#E87A86", fog_sun="#FFB060",
-        sun="#FFB848", sun_int=3.2, amb="#5E46B8", amb_int=1.7,
+        sky_zen="#4A22B0", sky_hor="#FF8A50", sky_ground="#FF8A50", fog="#FF8A50", fog_sun="#FFB060",
+        sun="#FFB848", sun_int=3.4, amb="#5E46B8", amb_int=1.0,
         land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
         path="#FFD7A0", path_emit=0.6, pad="#FFB070", pad_emit=0.0,
         drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.6, crest_gain=0.6,
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
+        fill=0.9, contrast=1.1,
         sky_int=0.9, haze=0.5,
         moon_int=2.2, phase=0.0,
         sky_zen="#080A2C", sky_hor="#33237A", sky_ground="#33237A", fog="#33237A", fog_sun="#41308E",
@@ -64,6 +67,7 @@ STATES = {
         drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=5.0,
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
+        fill=0.7, contrast=1.12,
         sky_int=1.0, haze=0.55,
         moon_int=0.0, phase=0.27,
         sky_zen="#A6BCDC", sky_hor="#FFD9A4", sky_ground="#FFD9A4", fog="#FFD9A4", fog_sun="#FFE2A0",
@@ -88,7 +92,7 @@ TILE = dict(spacing=1.0, tileSize=0.915, thickness=0.30, bevel=0.0)
 TOP_BAND = 0.085          # edge band width, fraction of the top (contour edges, 1970)
 SIDE_FOOT = 0.70          # side face fades to 70% of the top colour at the slab's underside (0.18 in the mock-up: in the
                           # engine the slope-facing sides became a dark stipple across every hillside)
-ROUGH_LAND, ROUGH_WATER = 0.62, 0.42   # water 0.16 in the mock-up; 0.28 in the engine (0.16 mirrored a pale sky over the whole sea)
+ROUGH_LAND, ROUGH_WATER = 0.8, 0.42   # land 0.62 -> 0.8 in r5: a low sun put a white glare over the land   # water 0.16 in the mock-up; 0.28 in the engine (0.16 mirrored a pale sky over the whole sea)
 
 
 def ordered_states():
@@ -123,7 +127,7 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
         "haze": _curve("haze"),
         # the sky's light on the land at full strength in every state: the fill is how the shadow side gets its
         # colour (violet at sunset, indigo at night); the engine's default dims it to 0.16-0.46 off-noon
-        "hdriIntensity": _curve("sky_int"),
+        "hdriIntensity": _curve("fill"),   # r5: separate from the visible sky -- a lower fill gives dark shaded sides
     }
 
 
@@ -285,7 +289,7 @@ def post(state):
         "post/bloom/threshold": 1.0,
         "camera/exposure/compensation": s["exposure"],
         "post/grade/saturation": s["saturation"],
-        "post/grade/contrast": 1.12 if s["look"] == "punchy" else 1.06,
+        "post/grade/contrast": s["contrast"],
         # §11 banding: film grain is the only dither the output has today (no output dither exists; asked for in
         # 02-requests.md). Kept just above the 8-bit step so slow sky gradients break up without visible noise.
         "post/output/grain": 0.035,
