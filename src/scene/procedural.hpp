@@ -711,6 +711,11 @@ struct ProceduralGeometry {
     // asking for it draws the general way. Never structural: it changes how the renderer draws the records, not the
     // records. Written only when true.
     bool slabs = false;
+    // ADR-1959 (amended at CP-A): below this many pixels a tile, a slab's gap closes -- its footprint eases out to the
+    // lattice pitch (a "tiles" generator's cellSize) -- and its sides read as its top, so a lattice of gaps and steps
+    // too fine for the pixels does not alias into moire, streaks or speckle; the painted border (tileBorder) carries
+    // the separation from there. 0 = never. Written only when changed.
+    float slabFarPixels = 6.0f;
     Grammar grammar;                     // placements when distribution.kind == Grammar (structural)
     // Structural outputs (filled by rebuild()); the renderer uploads them when the version
     // changes. `structureVersion` is bumped by rebuild() whenever the structural hash changed.

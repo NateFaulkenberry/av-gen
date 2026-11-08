@@ -181,9 +181,11 @@ struct GeneratorTileUniforms {
     glm::uvec4 info;      // seed, path points, children per side, hole valid
     glm::ivec4 hole;      // min x, min z, max x, max z (this ring's cells)
     glm::ivec4 blend;     // seam band cells (0 = off), block ratio, 0, 0 (ADR-1976 amended)
-    std::array<glm::vec4, 8> path; // two points per lane
+    glm::vec4 river;      // river width, valley width, height scale, river points (as f32)
+    std::array<glm::vec4, 8> path;  // two points per lane
+    std::array<glm::vec4, 8> rivers; // the river's points, two per lane
 };
-static_assert(sizeof(GeneratorTileUniforms) == 256);
+static_assert(sizeof(GeneratorTileUniforms) == 400);
 // Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,
                                                        float reach);
