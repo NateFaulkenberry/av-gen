@@ -789,3 +789,25 @@ at p50.
   - **Night:** the 1×/2× rectangle is still visible, a lighter rectangle in the lower left.
   - **Coast ridge:** a scatter of bright orange flecks on the sunlit risers.
   - **Sunset valley:** light flecks in the foreground. These are risers catching the low sun, not dark dashes.
+
+### After r7: night grid strength and the 1×/2× pairs (while the owner reviews CP-A)
+
+**Night grid:**
+- The 1× grid strength is now per state; night uses 0.5.
+- On the GPU check (`02-terrain/cpa-r7check-night-grid-0.5.png`), the night rectangle is quieter but still visible.
+- What remains is a texture difference, not a brightness one. The 1× ring shows real dark gap lines under the moon,
+  while the 2× ring has only painted ones. More grid strength won't remove it; engineering should look.
+
+**The other states' 1×/2× pairs:**
+- **Day and sunset:** no rectangle in r7.
+- **Dawn** (`cpa-r7check-dawn-reveal.png`): no rectangle either.
+- **Dawn has not been tuned on the engine yet.** It reads washed out and grey-green, the way day did before r5–r7.
+  It needs the same pass: side light, lower fill, manual exposure and its own height stops.
+
+**Kept for Phase 4: crisper tiles at mid distance.**
+- In the engine the tiles read softer at mid distance than in the mock-ups, which show a crisp square texture there.
+- Levers to try:
+  - a stronger `tileBorder` on the 2× ring;
+  - a slightly larger per-tile value jitter at distance;
+  - a sharpen in post (`post/output/sharpen`).
+- Judge each one against moiré.

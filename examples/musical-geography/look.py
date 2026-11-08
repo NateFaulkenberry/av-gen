@@ -59,6 +59,7 @@ STATES = {
         drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.6, crest_gain=0.6,
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
+        border_fine=0.5,   # r7: under the moon the 1x gaps darken less, so its painted grid must darken more
         fill=0.9, contrast=1.1,
         sky_int=0.9, haze=0.5,
         moon_int=2.2, phase=0.0,
@@ -287,7 +288,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None):
     add({"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3})
     # the tile border (tileBorder's coverage; it draws the fine lattice on the coarse rings)
     add({"kind": "swizzle", "dst": 3, "srcA": 1, "constant": B(0)})
-    bd = border if border is not None else (BORDER_DARK_FINE if cell == 1.0 else BORDER_DARK)
+    bd = border if border is not None else (s.get("border_fine", BORDER_DARK_FINE) if cell == 1.0 else BORDER_DARK)
     add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, shade, shade * bd], "value": 1.0})
     add({"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3})
     add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5})                              # emission: top only
