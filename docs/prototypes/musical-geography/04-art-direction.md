@@ -664,7 +664,8 @@ The engine stills are in `02-terrain/cpa-*-art-look-r2.png`. The side-by-side co
 - **Sunset.** It is no longer muddy, but it reads rose rather than the mock-up's magenta-to-coral with orange crowns.
   The crowns are under 26 m here, so the orange stops never show.
 
-### CP-A r3 (after engineering 5f4ecd42)
+### CP-A r3 (re-rendered on engineering 0c4277c2; crowns `crownThreshold` 0.88 / `crownFlatten` 0.7 so the raised land
+is not capped; the 1x ring has used `tileBorder` since the r2 pass, with no painted line)
 
 **What changed in the land:**
 - **The river:** 16 points meandering north from the bay's north shore, 8 m wide, in a 240 m valley.
@@ -678,10 +679,10 @@ The stills are `02-terrain/cpa-11..16-*-r3.png`, and the comparison is `cpa-17-r
 **Still present in the engine frames** (reported, not worked around):
 - **Speckle:** dark blue dashes over the mid-ground land in the day reveal and the valley view, and horizontal streak
   rows in the sunset foreground.
-- **Moiré:** concentric arcs in the coast view's flat foreground.
+- **Moiré:** gone from the coast view's flat foreground on 0c4277c2 (it was there on 5f4ecd42).
 - **Ring boundary:** a visible lighter rectangle where the 1× ring meets the 2× ring (reveal lower middle; night
   mid-left).
-- **Cost:** the composed reveal is GPU p50 35.1 ms at 1080p Ultra, over 33.3. Pitching down fills the frame with the
+- **Cost:** the composed reveal is GPU p50 35.2 ms at 1080p Ultra (p95 44, p99 65 on 0c4277c2), over 33.3. Pitching down fills the frame with the
   fine ring.
 
 **Art, still open:**

@@ -21,7 +21,7 @@ TILES = {
     "seaLevel": 0.0, "seaDepth": 0.25, "shoreRise": 0.5,
     "hillWavelength": 300.0, "hillHeight": 30.0, "hillOctaves": 2, "hillWarp": 70.0, "warpWavelength": 420.0,
     "hillLow": 0.22, "hillHigh": 0.82,
-    "crownThreshold": 0.80, "crownFlatten": 0.85,
+    "crownThreshold": 0.88, "crownFlatten": 0.7,
     "regionWavelength": 2400.0, "regionVariation": 0.25,
     "pathWidth": 2.0, "pathLift": 0.3,
     # CP-A (r2's valley): a river meandering north from the bay's north shore, in a smooth valley with no walls
