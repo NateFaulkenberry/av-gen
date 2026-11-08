@@ -84,7 +84,7 @@ def scene_doc(state, interim, camera_name):
         "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **camera_pose),
         "environment": env,
         "nodes": nodes,
-        "lights": [look.sun_light(state), look.moon_light(state)],
+        "lights": [look.sun_light(state), look.moon_light(state)] + ([look.fill_light(state)] if look.STATES[state].get("fill_int", 0) > 0 else []),
         "materialPrograms": programs,
     }
     return doc

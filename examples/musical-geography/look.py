@@ -34,6 +34,7 @@ def hexlin(h: str) -> list[float]:
 # 0.0 (=1.0) -> 0.27, always forward in time.
 STATES = {
     "day": dict(
+        fill_col="#9A6CFF", fill_int=2.2,
         fill=0.38, contrast=1.3,
         sky_int=1.0, haze=0.35,
         moon_int=0.0, phase=0.61,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
@@ -45,6 +46,7 @@ STATES = {
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
         fog_mult=4.5, exposure=-0.5, saturation=1.6, look="punchy", bloom=0.25),
     "sunset": dict(
+        fill_col="#6A40D0", fill_int=0.6,
         fill=0.55, contrast=1.22,
         sky_int=0.9, haze=0.6,
         moon_int=0.0, phase=0.72,
@@ -165,6 +167,15 @@ def moon_light(state):
             # only the night casts moon shadows: a second shadow map in daylight costs GPU time for nothing
             "castsShadow": STATES[state]["moon_int"] > 0.0,
             "softness": 0.35}
+
+
+def fill_light(state):
+    """A shadowless violet fill from opposite the sun (r6): the shaded side of orange land under a blue sky turned
+    brown -- the brief's "muddy" trap. A painter's coloured fill puts violet in the shadows instead (04- §3)."""
+    s = STATES[state]
+    return {"id": "fill", "name": "fill", "type": "directional", "direction": [-0.62, -0.3, 0.62],   # from the north-east, opposite the afternoon sun
+            "color": hexlin(s.get("fill_col", "#000000")), "intensity": s.get("fill_int", 0.0),
+            "castsShadow": False, "softness": 1.0}
 
 
 def sun_light(state):
