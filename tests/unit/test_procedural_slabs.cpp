@@ -176,3 +176,23 @@ TEST_CASE("a tiles ring's slabs and far-tile threshold reach the flattened scene
     }
     CHECK(seen == 2);
 }
+
+TEST_CASE("the AO fade band reads from a scene file and round-trips", "[composition][geography][ao]") {
+    const auto json = nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "fade",
+        "environment": {"ambientOcclusion": true, "aoFadeStart": 60.0, "aoFadeEnd": 140.0},
+        "nodes": []})");
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::fromJson(json, registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    params.resetFinals();
+    (*c)->update(FrameTime{});
+    CHECK((*c)->scene().environment.aoFadeStart == 60.0f);
+    CHECK((*c)->scene().environment.aoFadeEnd == 140.0f);
+    const auto saved = (*c)->toJson();
+    REQUIRE(saved.contains("environment"));
+    CHECK(saved.at("environment").at("aoFadeEnd") == 140.0f);
+}
