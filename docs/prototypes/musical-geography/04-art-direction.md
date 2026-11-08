@@ -836,3 +836,18 @@ The stills are `02-terrain/cpa-61..68-*-r8.png` (six frames plus two dawn), with
 
 **Cost:** the day reveal is GPU p50 23.9 ms, with p95 31.6 and p99 37.6 ms. The spikes appear in this run only; it is
 worth re-measuring when the GPU is quiet.
+
+### CP-A approved by the owner (2026-11-09)
+
+The approval covers the r7 and r8 stills.
+
+**Still to do from CP-A:** dawn gets re-lit from the side once engineering's per-state sun direction lands, and only
+cpa-67 and cpa-68 are re-rendered.
+
+**Phase 3, the art side:**
+- **Crest light on the wave trains**, from engineering's crest weight (request 1971).
+- **Contour edges** (request 1970):
+  - on at dusk and night (sunset gain 0.6, a dusk key at 4.0, night 7.0);
+  - faint or off by day, as the owner approved.
+- **Cost:** about 10 ms of headroom over the r7 reveal (23.2 ms of 33.3 ms).
+- **The end-of-Phase-3 clip** is made together with engineering.
