@@ -708,3 +708,29 @@ The composed day reveal costs 23.5 ms of GPU at p50 (1080p Ultra).
   - They are strongest in the day valley view's foreground, on the coast ridge's golden top, and at night.
 - **The 1×/2× ring rectangle.** It is clear at night and at the bottom centre of the day reveal.
 - **Sunset hilltops.** They read coral-red, with a slightly warmer far ridge; the mock-up's orange is not reached.
+
+### CP-A r5 (2026-11-08): the contrast pass
+
+**Day**
+- The sky's fill light is now a separate, lower curve: 0.45 by day, against the visible sky's 1.0.
+- Grade contrast rises per state: day 1.25, sunset 1.22.
+- Day uses a low afternoon sun from the south-west (phase 0.64), saturation 1.6, −0.5 EV and thinner fog.
+  - Noon had front-lit the north-west views flat.
+  - The slab rule caps the hill slopes, so grazing light is the only source of side shading.
+- Land roughness goes to 0.8 against glare.
+
+**Sunset**
+- The fog and sky are orange (`#FF8A50`) under a violet zenith.
+- Sky fill is 1.0, down from 1.7.
+
+**Result**
+
+The stills are `02-terrain/cpa-31..36-*-r5.png`, with the comparison sheet `cpa-37`. The day reveal costs 23.5 ms GPU
+p50.
+
+- **Sunset:** now warm orange-red, with orange crowns and deep red lowlands. It is the closest state to the mock-up.
+- **Day valley:** more saturated, with violet lowlands and orange crowns.
+- **Day haze:** still more than the mock-up.
+  - The low sun puts a white glare on the sea in the reveal and coast views.
+  - The coast ridge's top reads olive-green again under the blue fill.
+- **Unchanged:** the dashes and the 1×/2× rectangle (engineering).
