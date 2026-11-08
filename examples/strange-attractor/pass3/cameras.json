@@ -552,6 +552,82 @@
    ],
    "fov": 58,
    "note": "the owner's camp reference camera (M3e Phase 8)"
+  },
+  {
+   "set": "eval",
+   "kind": "fixed",
+   "world": "mars",
+   "distance": "hero",
+   "scene": "strange-attractor-mars.scene.json",
+   "look": "none",
+   "t": 80,
+   "fov": 50,
+   "id": "h2-mars-drift-west",
+   "pos": [
+    60,
+    37.2,
+    1700
+   ],
+   "tgt": [
+    250,
+    44,
+    1665
+   ],
+   "note": "67- \u00a74 (hero agent): pyramid-a windward drift toe meeting the plain, low, like the owner M3g screenshot"
+  },
+  {
+   "set": "eval",
+   "kind": "fixed",
+   "world": "mars",
+   "distance": "hero",
+   "scene": "strange-attractor-mars.scene.json",
+   "look": "none",
+   "t": 80,
+   "fov": 50,
+   "id": "h2-mars-drift-b",
+   "pos": [
+    722,
+    37.0,
+    1150
+   ],
+   "tgt": [
+    722,
+    48,
+    1362
+   ],
+   "note": "67- \u00a74 (hero agent): pyramid-b south drift and its toe, from the plain"
+  },
+  {
+   "id": "j-mars-070.50",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 70.5,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  },
+  {
+   "id": "j-mars-074.00",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 74.0,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  },
+  {
+   "id": "j-mars-082.00",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 82.0,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  },
+  {
+   "id": "j-mars-088.00",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 88.0,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
   }
  ]
 }
