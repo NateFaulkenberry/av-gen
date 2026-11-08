@@ -28,3 +28,26 @@ Source: `04-art-direction.md` §10 at c0e936d1 (art branch). The status mirrors 
 ## New requests
 
 (Append below; engineering answers inline.)
+
+### Art, 2026-11-08 (after Gate 1): two look requirements the owner's review made binding (04- §11)
+
+The ADR range 1970–1979 is used up. These need numbers from the coordinator, or they can fold into 1976 and 1977.
+
+- **A. Output dither, so the sky and fog never band.**
+  - The sky gradients band visibly in the r2 mock-ups.
+  - The engine has no output dither today. `post/output/grain` is the only stand-in, and look.py sets it to 0.035
+    meanwhile.
+  - Ask: a triangular-PDF dither of about ±1 LSB, applied after the tonemap and before 8-bit quantisation (the live
+    swapchain and the encoder both), or a higher-precision sky and fog.
+  - Check: a large-sky frame in each state, especially dusk and night.
+- **B. The tile has to read at reveal altitude. This changes 1976 and §6.1's far field.**
+  - Plan §6.1 makes the far ring "a continuous surface" beyond the gap fade, and 1976 fades the gap with distance.
+  - Both make the squares disappear exactly where the owner's review says they must still read: at 70–100 tiles up,
+    with a 35–50 mm lens, across all the land in the frame.
+  - Ask: keep a separation that survives distance instead of fading it. Two ways:
+    - a footprint-aware darkened border on each top that stays at least about 1 px wide;
+    - a far ring of tiles at 2× or 4× pitch, merged in whole lattice blocks with fog over the seam, so the far field
+      stays tiles rather than a smooth mesh.
+  - Per-tile value jitter that grows with distance (±2% near, up to ±6% far) helps too, and art can do that in the
+    program once 1978's lattice randoms exist.
+  - The far *underlay* (the dark sheet under the slabs) is unaffected and still wanted.

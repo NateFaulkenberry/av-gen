@@ -197,3 +197,7 @@ __pycache__/
 # NASA Blue Marble (public domain) and the LROC NAC DTM of Linne crater (NASA/GSFC/ASU; calibration only).
 /assets/space/
 /assets/strange-attractor/
+
+# Musical Geography: look-development scenes and projects (examples/musical-geography/build.py writes them)
+/examples/musical-geography/scene/
+/examples/musical-geography/__pycache__/
