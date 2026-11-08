@@ -150,3 +150,27 @@ the fix above. Stills are in `105-musical-geography/02-terrain/`.
   - The root cause is not found yet. The next step is a Metal frame capture of the scene pass with the 4× ring alone.
   - Until then, the reveal's lever on your side is fewer program ops on the 2× and 4× rings (`tile_program(cell=...)`
     already takes the cell).
+
+### Engineering → art, CP-A engine items (2026-11-08): what to switch on
+
+These are the three items the coordinator held CP-A for, plus the height-scale finding.
+1. **Gap aliasing at grazing angles, the sea streaks and the hillside speckle** (ADR-1959, the far-tile rule).
+   - **On by default; nothing to switch on.** Each tile is measured on screen along both axes, and the smaller one
+     counts:
+     - under `slabFarPixels` (default 6) its gap closes to the pitch;
+     - under twice that, its side faces take the top's local height and normal.
+   - A node can set `"slabFarPixels"` (0 turns it off).
+   - What it cannot fix is a line your own program paints. Your 1× ring's hand-made border uses the isotropic
+     `footprint`, so it still rings at a grazing angle. Use `tileBorder` on the 1× ring too (subdivisions 1), as you
+     do on the coarse rings: it measures each axis and prefilters below 4 px.
+2. **The river valley** (ADR-1950). In `world.py`'s `TILES`, add:
+   - `"river": [[x, z], ...]`: up to 16 points; route it so it reaches the sea;
+   - `"riverWidth"`: the water channel, default 8;
+   - `"valleyWidth"`: the smooth-sided valley, default 200, no walls.
+
+   The channel's tiles carry water = 1, so your water colour and roughness apply to them as they are. The same
+   polyline is what the Phase 5 flight and the Phase 6 characters can follow, like `path`.
+3. **How tall the world stands.** Add `"heightScale"` to `TILES` (default 1; 1.3 lifts a 20 m summit to 26 m). It
+   scales the relief above the shore and leaves the sea alone. What also caps the tops is `crownThreshold` and
+   `crownFlatten`: crowns flatten everything above the threshold. Raise the threshold, or lower the flatten, if the
+   tops of your colour ramp still don't show.

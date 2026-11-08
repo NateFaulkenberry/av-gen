@@ -1056,15 +1056,20 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     // prepass and the lit pass agree to the bit); below proc.windPlant.y pixels the gap closes (the footprint eases
     // out to the lattice pitch, windPlant.xz) and, further below, the sides read as the top (their local height and
     // normal become the top's). A shadow view measures the same way through its own matrices.
-    let halfW = max(abs(in.position.x), abs(in.position.z));
+    // The tile's size on screen along BOTH of its horizontal axes, and the smaller of the two: at a grazing angle a
+    // tile is wide across the view and only a pixel or two deep along it, and it is the depth that aliases.
     let s0 = inst.scale.xyz;
-    let widthPx = pixelsPerMetreAt(centre, normalize(ax), 0.5) * 2.0 * halfW * length(ax) * max(abs(s0.x), abs(s0.z));
+    let pxX = pixelsPerMetreAt(centre, normalize(ax), 0.5) * 2.0 * abs(in.position.x) * length(ax) * abs(s0.x);
+    let pxZ = pixelsPerMetreAt(centre, normalize(az), 0.5) * 2.0 * abs(in.position.z) * length(az) * abs(s0.z);
+    let widthPx = min(pxX, pxZ);
     let farPx = proc.windPlant.y;
     var close = 0.0;
     var flatten = 0.0;
+    var sideKeep = smoothstep(3.0, 8.0, widthPx);
     if (proc.windPlant.w > 0.5 && farPx > 0.0) {
         close = 1.0 - smoothstep(0.5 * farPx, farPx, widthPx);
-        flatten = 1.0 - smoothstep(0.25 * farPx, 0.5 * farPx, widthPx);
+        flatten = 1.0 - smoothstep(farPx, 2.0 * farPx, widthPx);
+        sideKeep = 1.0 - flatten;
     }
     if (abs(in.normal.y) > 0.5) {
         if (dot(toCam, ay) < 0.0) { p = vec3<f32>(p.x, -p.y, -p.z); n = vec3<f32>(n.x, -n.y, -n.z); }
@@ -1096,7 +1101,7 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     // read by their outline, not by aliased slivers. The lit pass only; depth is untouched.
     if (abs(in.normal.y) < 0.5) {
         let top = normalize((object.normalMatrix * vec4<f32>(quatRotate(inst.rotation, vec3<f32>(0.0, 1.0, 0.0) / safeScale), 0.0)).xyz);
-        out.normal = normalize(mix(top, out.normal, smoothstep(3.0, 8.0, widthPx)));
+        out.normal = normalize(mix(top, out.normal, sideKeep));
     }
     let prev = (object.prevModel * vec4<f32>(instancePoint(inst, srcPos), 1.0)).xyz;
     out.prevClip = frame.prevViewProj * vec4<f32>(prev, 1.0);
