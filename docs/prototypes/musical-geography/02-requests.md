@@ -274,3 +274,51 @@ Stills in `02-terrain/` (art revealC, canaried orange):
   to bottom. Far, the faded frame matches AO off; near, it matches AO on.
 
 The faint lit remainder of the dashes is in AO off too, so the fade doesn't remove it. That part is still open.
+
+### Engineering → art, CP-A r7 (2026-11-08): the dash remainder is contact shadows; the rectangle is the 1× program
+
+Tested on your 8ee329d8 revealC day (turned sun, AO fade 200–420 m, shadow range 480 m) with 13 canaried arms. The
+stills are in `02-terrain/eng-r7-*`.
+
+The dash metric is the high-frequency energy (mean |pixel − 7×7 box blur|) in the far, mid and near rows:
+
+| Arm | Far | Mid | Near | GPU |
+|---|---|---|---|---|
+| Your scene as is | 7.72 | 4.24 | 6.91 | 30.6 ms |
+| AO off | 7.39 | 3.77 | 6.69 | 29.3 ms |
+| AO off, `contactShadows: false` | 4.98 | 2.26 | 6.47 | 21.9 ms |
+| …and sun shadow maps off | 4.96 | 2.26 | 6.47 | 19.1 ms |
+| …and `slabSidePixels` 1000 | 4.99 | 2.23 | 6.44 | 19.1 ms |
+| Plain material, everything off (the floor) | 4.53 | 1.66 | 0.90 | 16.1 ms |
+| **Your scene, `contactShadows: false` only** | 5.15 | 2.58 | 6.67 | **23.2 ms** |
+
+**1. The dark dashes are screen-space contact shadows.** The contact march is about 5% of view depth long, so at
+reveal distance it runs across many sub-pixel steps. Under the side sun, every riser in its path occludes in blotches.
+`eng-r7-far-crop-art-vs-contact-off.png` shows your scene as it is on top and with contact shadows off underneath: the
+blotches go. The far field then sits within 0.6 of the plain-material floor, and that 0.6 is your program's own
+texture.
+
+It is also the frame's biggest cost lever: −7.4 ms. The sun's shadow map (range 480 m) still shades the hills. The
+earlier r5 "contact shadows ruled out" was a void arm: contact shadows only run on a light that casts shadows, and that
+arm had shadows off.
+
+**Switch on:** `"environment": { "contactShadows": false }`.
+
+If contact shadows are wanted near the ground later (characters' feet), the engine can give them a distance fade like
+ADR-1951's. Ask, and it's a small change.
+
+**2. The lighter 1×/2× rectangle is the program.** Give the 1× ring `mgTile2x_day` (otherwise the same as the
+contact-off arm) and the rectangle all but disappears. Only a faint edge is left:
+`eng-r7-rectangle-1x-own-program-vs-2x-program.png`, with the 1× ring on its own program on top and on the 2× program
+underneath. It isn't AO, because it shows with AO off. With plain material it's absent. So `mgTile1x_day` comes out
+lighter than `mgTile2x_day` for the same ground, and evening the two programs' mean is on your side.
+
+**3. What's left at the floor** (`eng-r7-plain-remainder-zoom-vs-face-debug.png`): with plain material and AO,
+contact shadows and shadow maps all off, the flattened risers (yellow in the face-debug view) read a few levels
+lighter than the tops, and a few sparse spots read darker.
+
+- It is not the underlay: painted pure green, it reached 0 pixels.
+- It is not the tile gaps: `slabFarPixels` 1000 leaves it unchanged.
+- It is not the side normals: `slabSidePixels` 1000 leaves it unchanged.
+
+It is faint next to the program's own texture, and I left it there.
