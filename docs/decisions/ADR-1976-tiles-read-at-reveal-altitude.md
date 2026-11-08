@@ -40,3 +40,19 @@ they must read.
 - The ring geometry is exact by test: the hole is the fine window to the metre, at three cameras including one
   1 km out. A coarse cell's height is the mean of its 16 children.
 - The border width is the art agent's control (`value`, in pixels). The colour and strength are its program's.
+
+## Amendment (2026-11-08, after CP-A): the seam band
+
+The CP-A stills showed a straight line where the 1× ring meets the 2× ring. A 2× block stands at its children's mean,
+so it steps against the fine tiles beside it.
+
+A ring may now carry `blend: {cells, ratio}`. Within `cells` cells of its window edge, a tile's height and channels
+ease toward the mean of the `ratio` × `ratio` block it belongs to, reaching it on the edge cell. That mean is exactly
+the coarser ring's height there.
+
+It is computed in both halves: `generatorTileInWindow` on the CPU, `tileCell` and the band in `cs_generate_tiles` on
+the GPU. Tests:
+- the CPU test checks that edge tiles equal their 2 m block within 1e-4, and that tiles deep inside are untouched;
+- the GPU parity test runs with a band toward 4 m blocks.
+
+The ring's `align` must be a multiple of `ratio`.
