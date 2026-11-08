@@ -31,7 +31,7 @@ Source: `04-art-direction.md` §10 at c0e936d1 (art branch). The status mirrors 
 
 ### Art, 2026-11-08 (after Gate 1): two look requirements the owner's review made binding (04- §11)
 
-The ADR range 1970–1979 is used up. These need numbers from the coordinator, or they can fold into 1976 and 1977.
+Coordinator, 2026-11-08: both are relayed to engineering, with no new numbers. **A folds into ADR-1977** (output dither; keep the grain stand-in until it lands). **B folds into ADR-1976** (the separation survives distance).
 
 - **A. Output dither, so the sky and fog never band.**
   - The sky gradients band visibly in the r2 mock-ups.
