@@ -34,6 +34,7 @@ def hexlin(h: str) -> list[float]:
 # 0.0 (=1.0) -> 0.27, always forward in time.
 STATES = {
     "day": dict(
+        side_px=18,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r7: day only -- gold over whole hill masses, magenta-orchid lowlands
         fill_col="#C060FF", fill_int=1.4,
         fill=0.25, contrast=1.3,
@@ -47,6 +48,7 @@ STATES = {
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
         fog_mult=4.5, exposure=-0.5, saturation=1.6, look="punchy", bloom=0.25),
     "sunset": dict(
+        side_px=26,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         fill_col="#6A40D0", fill_int=0.6,
         fill=0.55, contrast=1.22,
         sky_int=0.9, haze=0.6,
@@ -59,6 +61,7 @@ STATES = {
         drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.6, crest_gain=0.6,
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
+        side_px=12,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         border_fine=0.5,   # r7: under the moon the 1x gaps darken less, so its painted grid must darken more
         fill=0.9, contrast=1.1,
         sky_int=0.9, haze=0.5,
@@ -71,7 +74,9 @@ STATES = {
         drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=5.0,
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
-        fill=0.7, contrast=1.12,
+        stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r8: the day treatment -- warm bands over whole hill masses
+        side_px=18,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
+        fill=0.3, contrast=1.25,
         sky_int=1.0, haze=0.55,
         moon_int=0.0, phase=0.27,
         sky_zen="#A6BCDC", sky_hor="#FFD9A4", sky_ground="#FFD9A4", fog="#FFD9A4", fog_sun="#FFE2A0",
@@ -80,7 +85,7 @@ STATES = {
         water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8", under="#4A6A55",
         path="#F2A93B", path_emit=0.25, pad="#FFC060", pad_emit=0.0,
         drift="#F4C49A", drift_amt=0.28, edge="#FFD27A", edge_gain=0.5, crest_gain=0.4,
-        fog_mult=1.35, exposure=-0.2, saturation=1.0, look="medium-high", bloom=0.25),
+        fog_mult=3.0, exposure=-0.3, saturation=1.3, look="medium-high", bloom=0.25),
 }
 # Contour gains as approved by the owner (04- §11): on at dusk and night, faint or off by day. The sunset key is 0.6
 # (faint); the dusk key between sunset and night brings the lines in at full night strength.

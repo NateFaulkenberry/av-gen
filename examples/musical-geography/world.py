@@ -52,7 +52,7 @@ UNDERLAY = dict(cellSize=4.0, viewDistance=FINE_VIEW, y=-2.2, thickness=3.0)
 FLATS_WISH = {"step": 0.32, "rise": 0.05, "floodEvery": 3}
 
 
-def ring_nodes(program_for_cell, under_rgb, under_program=None):
+def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0):
     nodes = []
     for name, cell, view, align, hole, thick, shadow, gap in RINGS:
         gen = {"name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": align,
@@ -65,6 +65,8 @@ def ring_nodes(program_for_cell, under_rgb, under_program=None):
                 "material": {"baseColor": [1, 1, 1], "roughness": 0.62, "metallic": 0.0,
                              "program": program_for_cell(cell)},
                 "lod": {"cull": True}, "slabs": True}
+        if side_px:
+            proc["slabSidePixels"] = side_px
         if not shadow:
             proc["castsShadow"] = False
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": proc})

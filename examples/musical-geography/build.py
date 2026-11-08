@@ -85,7 +85,7 @@ def scene_doc(state, interim, camera_name):
     else:
         prog = lambda cell: "mgTile%dx_%s" % (int(cell), state)   # noqa: E731
         under = "mgUnder_%s" % state
-        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under)
+        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under, s.get("side_px", 0.0))
         programs = [look.tile_program(state, c) for c in (1.0, 2.0, 4.0)]
         programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0))
     doc = {
