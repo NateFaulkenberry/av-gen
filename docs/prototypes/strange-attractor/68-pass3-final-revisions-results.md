@@ -1,7 +1,7 @@
 # Pass 3: the final revisions, results (67-)
 
 Built on 163356db (67- as written). Media: `~/Desktop/av-gen-review/101-strange-attractor/pass3-env/15-final-revisions/`.
-The Mars sand (67- §4) is the hero agent's, on its own branch; it merges before the final render. Leg and crossing
+The Mars sand (67- §4) is the hero agent's (`hero-06-mars-sand.md`), merged from scene/sa-mars-sand 02319d1f. Leg and crossing
 times are unchanged.
 
 ## §1 Colour: why the intro lost contrast, and the grade
@@ -15,24 +15,32 @@ times are unchanged.
 
 | World | Contrast | Saturation | Bloom | Halation | Vignette | Local contrast | Temperature |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Canyon day | 1.38 (+0.25 EV) | 1.22 | 0.07 | 0 | 0.12 | 0.30 | 0 |
-| Moon (crisp, cold) | 1.15 | 1.08 | 0.015 | 0 | 0.18 | 0.08 | -0.06 |
+| Canyon day | 1.38 (+0.5 EV) | 1.22 | 0.07 | 0 | 0.12 | 0.30 | 0 |
+| Moon (crisp, cold) | 1.15 | 1.08 | 0.015 | 0 | 0.18 | 0 | -0.06 |
 | Dusk (fire, glyphs) | 1.14 | 1.22 | 0.08 | 0.35 | 0.20 | 0.12 | 0 |
 | Mars (warm veil) | 1.12 | 1.18 | 0.09 | 0 | 0.12 | 0.10 | 0.04 |
 | Night (fire, craft, glyphs) | 1.14 | 1.18 | 0.08 | 0.40 | 0.22 | 0.12 | 0 |
 | Ocean (unchanged) | 1.0 | 1.0 | 0.04 | 0 | 0 | 0 | 0 |
 | Dawn | 1.18 | 1.20 | 0.07 | 0.15 | 0.12 | 0.15 | 0 |
 
-**After the coordinator's review (2026-11-08):** the intro's luma std at 8 s was 0.120 on the first grade (14-:
-0.111; M3f: 0.178). The grade alone cannot reach 0.18 without crushing: contrast 1.5 with local contrast 0.4 gave
-0.136 with 2.6% of the frame near black. The canyon now takes contrast 1.38, local contrast 0.3 and a quarter stop
-more exposure (eased out across the Moon crossing). Contrast 1.35 with local contrast 0.3 measured 0.129 with no
-crush; the exposure is expected to lift it to about 0.15-0.16. **Not yet measured on a render** (the GPU is given to
-the Mars work); it is checked in the batch before the final render.
+**After the coordinator's review (2026-11-08):** the intro's luma std at 8 s, measured on 1280x720 stills:
 
-The Moon's domes: the magenta halo came from the grade's contrast amplifying the bloom's tail (the bloom is added
-before the grade), not from the bloom amount alone (0.03 still showed it). The Moon now takes bloom 0.015, contrast
-1.15 and local contrast 0.08. Also checked in that batch.
+| State | Luma std at 8 s | Mean | Near-black |
+| --- | --- | --- | --- |
+| M3f (ACES) | 0.178 | 0.230 | 0 |
+| 14- (AgX, no grade) | 0.111 | 0.246 | 0 |
+| First grade (contrast 1.22, local 0.18) | 0.120 | 0.197 | 0 |
+| Contrast 1.5, local 0.4 | 0.136 | 0.164 | 2.6% (crushed) |
+| Contrast 1.38, local 0.3, +0.25 EV | 0.137 | 0.200 | 0.1% |
+| **Kept: contrast 1.38, local 0.3, +0.5 EV** | **0.144** | **0.225** | **0** |
+
+The kept grade brings the intro's brightness back to M3f's and its spread to 0.144. The rest of the gap to 0.178 is
+AgX's shoulder: more contrast from the grade only crushes the shadows. The extra exposure eases out across the Moon
+crossing.
+
+**The Moon's domes:** the magenta halo was the look's local contrast (its low-pass), not the bloom: at local contrast 0
+the domes are crisp, and at bloom 0.015 with local contrast 0.08 the halo was still there. The Moon now takes no local
+contrast, bloom 0.015 and contrast 1.15.
 
 ## §2 Post
 
@@ -106,3 +114,16 @@ Run on a full-length preview of this state (640x360, 10 fps; the 1080p final ren
 | Night | 1.08 | 0 | 5.4 | 17.5 | 1.8 |
 
 The other five legs are unchanged from 66-.
+
+## The final render (67- §8 step 1)
+
+`~/Desktop/av-gen-review/101-strange-attractor/pass3-env/10-full/strange-attractor-final.mp4`, rendered from 5893190b
+plus the Mars merge (35bfdc8d): 1920x1080, 30 fps, supersample 2, 6316 frames, 210.53 s, AAC stereo (mean -11.1 dB,
+peak 0.0 dB), 345 MB, GPU errors 0, sequence hash 2db604e8f62aa978.
+
+- Contact sheet every 5 s: `strange-attractor-final-contact-sheet-every-5s.png`.
+- Crossings at ±0.5 and ±0.1 s: `strange-attractor-final-crossings-half-second.png`. All six are continuous, including
+  dusk to Mars and Mars to night with the merged sand.
+- Luma against the 14- full render and against this round's guard preview: 0 flagged half-seconds in both
+  (`luma-vs-14-full.txt`, `luma-vs-15-preview.txt`).
+- Not fixed and left by the coordinator's call: the cream patch on the plateau at 0 s (§7).
