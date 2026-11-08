@@ -690,3 +690,21 @@ The stills are `02-terrain/cpa-11..16-*-r3.png`, and the comparison is `cpa-17-r
 - The coast ridge's top reads olive.
 - Sunset reads magenta-rose with coral crowns. The mock-up's orange crowns are not yet reached.
 - No contours or crests yet (Phase 3).
+
+### CP-A r4 (2026-11-08, on engineering 97fe0568)
+
+**What r4 changed:**
+- **Land:** `skirt` 3 on the rings, and the fine ring at 120 m.
+- **Lights and AO:** moon shadows only at night, and ambient occlusion off until GTAO's distance fade lands.
+- **Day palette:** golden hilltops; the land stops lowered to 0 / 3.3 / 6.7 / 10 / 20.
+- **Sunset palette:** the key light is `#FFB848` at 3.2, and the fog multiplier is 5.
+
+The stills are `02-terrain/cpa-21..26-*-r4.png`, and the comparison sheet is `cpa-27-r4-engine-vs-blender-mockup.png`.
+The composed day reveal costs 23.5 ms of GPU at p50 (1080p Ultra).
+
+**Still visible in r4:**
+- **Dark dashes on the step risers.**
+  - Turning AO off reduced them but did not remove them.
+  - They are strongest in the day valley view's foreground, on the coast ridge's golden top, and at night.
+- **The 1×/2× ring rectangle.** It is clear at night and at the bottom centre of the day reveal.
+- **Sunset hilltops.** They read coral-red, with a slightly warmer far ridge; the mock-up's orange is not reached.
