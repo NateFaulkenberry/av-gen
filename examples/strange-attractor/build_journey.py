@@ -549,7 +549,10 @@ tracks = [t for t in tracks if not (t["target"].startswith("moon/nodes/laser") o
 X_MARS, X_OCEAN = 69.655, 121.217
 tracks = [t for t in tracks if t["target"] != "camera/exposure/compensation"]
 tracks.append({"target": "camera/exposure/compensation", "keys": [
-    {"time": 0.0, "value": [0.0], "interp": "smooth"}, {"time": X_MARS - 1.0, "value": [0.0], "interp": "smooth"},
+    # 67- review: the canyon intro a quarter stop up (with its contrast, back toward M3f's luma spread), eased out across
+    # the Moon crossing
+    {"time": 0.0, "value": [0.25], "interp": "smooth"}, {"time": 31.025, "value": [0.25], "interp": "smooth"},
+    {"time": 33.025, "value": [0.0], "interp": "smooth"}, {"time": X_MARS - 1.0, "value": [0.0], "interp": "smooth"},
     {"time": X_MARS + 1.0, "value": [1.0], "interp": "smooth"}, {"time": X_OCEAN - 1.0, "value": [1.0], "interp": "smooth"},
     {"time": X_OCEAN + 1.0, "value": [0.0], "interp": "smooth"}]})
 # Pass 3 final (67- §1, §2): a grade per world inside AgX, eased over 2 s across each crossing (as the exposure is),
@@ -560,8 +563,8 @@ tracks.append({"target": "camera/exposure/compensation", "keys": [
 GRADE_KEYS = ("post/grade/contrast", "post/grade/saturation", "post/bloom/intensity", "post/halation/intensity",
               "post/output/vignette", "post/look/localContrast", "post/grade/temperature")
 GRADE = {   # contrast, saturation, bloom, halation, vignette, local contrast, temperature
-    "canyon": (1.22, 1.22, 0.07, 0.0, 0.12, 0.18, 0.0),
-    "moon": (1.25, 1.08, 0.07, 0.0, 0.18, 0.15, -0.06),      # crisp and cold
+    "canyon": (1.38, 1.22, 0.07, 0.0, 0.12, 0.3, 0.0),      # 67- review: the intro back toward M3f's spread
+    "moon": (1.15, 1.08, 0.015, 0.0, 0.18, 0.08, -0.06),     # crisp and cold; the domes glow without a haze
     "dusk": (1.14, 1.22, 0.08, 0.35, 0.2, 0.12, 0.0),        # the fire and the glyphs glow
     "mars": (1.12, 1.18, 0.09, 0.0, 0.12, 0.1, 0.04),        # a soft warm veil
     "night": (1.14, 1.18, 0.08, 0.4, 0.22, 0.12, 0.0),       # the fire, the craft, the glyphs glow

@@ -2580,6 +2580,20 @@
           {
             "time": 0.0,
             "value": [
+              0.25
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.25
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
               0.0
             ],
             "interp": "smooth"
@@ -2620,28 +2634,28 @@
           {
             "time": 0.0,
             "value": [
-              1.22
+              1.38
             ],
             "interp": "smooth"
           },
           {
             "time": 31.025,
             "value": [
-              1.22
+              1.38
             ],
             "interp": "smooth"
           },
           {
             "time": 33.025,
             "value": [
-              1.25
+              1.15
             ],
             "interp": "smooth"
           },
           {
             "time": 46.87,
             "value": [
-              1.25
+              1.15
             ],
             "interp": "smooth"
           },
@@ -2826,14 +2840,14 @@
           {
             "time": 33.025,
             "value": [
-              0.07
+              0.015
             ],
             "interp": "smooth"
           },
           {
             "time": 46.87,
             "value": [
-              0.07
+              0.015
             ],
             "interp": "smooth"
           },
@@ -3100,28 +3114,28 @@
           {
             "time": 0.0,
             "value": [
-              0.18
+              0.3
             ],
             "interp": "smooth"
           },
           {
             "time": 31.025,
             "value": [
-              0.18
+              0.3
             ],
             "interp": "smooth"
           },
           {
             "time": 33.025,
             "value": [
-              0.15
+              0.08
             ],
             "interp": "smooth"
           },
           {
             "time": 46.87,
             "value": [
-              0.15
+              0.08
             ],
             "interp": "smooth"
           },

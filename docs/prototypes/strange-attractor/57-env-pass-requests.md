@@ -52,7 +52,7 @@ Status: closed with the wrap (Phase C did not resume). Final lines, 2026-11-08 (
   portal on the bench face behind the camp (91.55, 10, 1343.21). Heading (0.808, -0.589). `canyon_scale.DUSK_*`.
   - Corridor: 4 m either side, 3 m under. Knots: `strange-attractor-moon.scene.json`, `portal.flight`.
 - **Night (93.5-121.2 s):** one gentle curve over the water, from the entrance on the river's far half (38, 3.5,
-  1212), bowed toward the camp's bank (the camp on the left, about 18 m off, in frame 93.6-106.6 s), then a Moon-style rise to 16 m and a
+  1212), bowed toward the camp's bank (the camp on the left, about 20 m off, in frame 93.6-106.0 s), then a Moon-style rise to 16 m and a
   dive (about 46 degrees at the opening) into the river portal at the river's centre (28, 1418).
   `build_mars.NIGHT_*`, `RIVER_PORTAL`.
   - Corridor: 4 m either side, 3 m under, and the rise's 16 m. Knots: `strange-attractor-mars.scene.json`, `portal.flight`.

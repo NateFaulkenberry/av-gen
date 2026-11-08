@@ -123,10 +123,10 @@ CAMP_GROUND = 4.4 * WS
 GATHER = [*near(CAMP_SITE, *GATHER_AT)[:1], CAMP_GROUND + 1.3, near(CAMP_SITE, *GATHER_AT)[1]]
 RIVER_PORTAL = [28.0, 1418.0]   # owner 2026-11-08 (67- §5): centred in the river, beyond the camp
 RIVER_Y = -0.5 * R
-# 67- §5: one gentle curve from the entrance, bowed toward the camp's bank (the camp on the left, about 18 m off; in frame 13 s), then
+# 67- §5: one gentle curve from the entrance, bowed toward the camp's bank (the camp on the left, about 20 m off; in frame 12.4 s), then
 # a Moon-style rise and dive into the portal at the river's centre. NIGHT_CTRL is the curve's control point; the rise
 # starts at RISE_FROM of the way along, tops out at RISE_TOP m and dives into the opening on the curve's last heading
-NIGHT_CTRL = (82.0, 1362.0)
+NIGHT_CTRL = (76.0, 1372.0)
 RISE_FROM, RISE_PEAK, RISE_TOP = 0.66, 0.84, 16.0
 LEVEL_Y = 3.5
 
