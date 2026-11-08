@@ -89,10 +89,13 @@ scene::Scene latticeScene(bool slabs, glm::vec3 eye) {
     return s;
 }
 
-gpu::Image8 render(gpu::Context& ctx, const scene::Scene& s) {
+// `velocityOnDemand`: the live editor's and the live profile's mode, where a frame that nothing reads the velocity of
+// skips it (ADR-1492), and the slab vertex stage takes its early return on the lit pass too.
+gpu::Image8 render(gpu::Context& ctx, const scene::Scene& s, bool velocityOnDemand = false) {
     gpu::ShaderLibrary shaders(ctx, {std::filesystem::path(AVGEN_SHADER_SOURCE_DIR)});
     rendering::SceneRenderer renderer(ctx, shaders);
     REQUIRE(renderer.init().has_value());
+    renderer.setVelocityOnDemand(velocityOnDemand);
     FrameTime t{};
     t.renderTime = 1.0;
     // Large enough that every tile is well over 8 px wide: under that, the slab path deliberately shades a far side
@@ -279,5 +282,32 @@ TEST_CASE("The AO distance fade eases occlusion out with depth and is off by def
     CHECK(aoEffect > 0.5);                                // AO does darken this field
     CHECK(fadedResidue < aoEffect * 0.1);                 // fully faded, it is (almost) AO off
     CHECK(gpu::hashImage(onNoFade) == gpu::hashImage(on)); // a disabled band changes nothing
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("The side rule's normal ease reaches the lit pass", "[gpu][procedural][geography][adr1959]") {
+    // CP-A r8: the ease sat after the vertex stage's early return, which also takes the lit pass whenever nothing
+    // reads the velocity target, so a flattened side kept its own normal and lit like a riser under a low sun. Here a
+    // stepped field under a low side sun, with every side flattened (a threshold far above any tile) against none.
+    auto scene = [](float sidePixels) {
+        scene::Scene s = steppedScene(false, 0.0f, 0.0f);
+        s.procedurals[0].slabSidePixels = sidePixels;
+        s.procedurals[0].slabFarPixels = 0.001f; // the rule on, but no gap closing
+        s.lights.clear();
+        scene::PunctualLight sun;
+        sun.direction = glm::normalize(glm::vec3(0.0f, -0.12f, 1.0f)); // low, square onto the camera-facing risers
+        sun.intensity = 4.0f;
+        s.addLight(sun);
+        return s;
+    };
+    auto ctx = makeContext();
+    for (const bool onDemand : {false, true}) {
+        CAPTURE(onDemand);
+        const auto risers = render(*ctx, scene(0.002f), onDemand);
+        const auto flattened = render(*ctx, scene(100000.0f), onDemand);
+        const double change = meanDifference(risers, flattened);
+        CAPTURE(change);
+        CHECK(change > 0.5); // the flattened sides shade as the tops: the lit pass saw the ease
+    }
     CHECK(ctx->errorCount() == 0);
 }
