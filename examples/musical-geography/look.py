@@ -38,17 +38,17 @@ STATES = {
         moon_int=0.0, phase=0.50,
         sky_zen="#2F6BFF", sky_hor="#A8C4FF", sky_ground="#A8C4FF", fog="#A8C4FF", fog_sun="#FFF2D6",
         sun="#FFF4E0", sun_int=3.2, amb="#A6B6FF", amb_int=0.4,
-        land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FFA64E", "#FFD84A"],
+        land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FF9E4A", "#FFC444"],
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
         path="#FFF5E2", path_emit=0.35, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
-        fog_mult=2.2, exposure=0.0, saturation=1.45, look="punchy", bloom=0.25),
+        fog_mult=3.0, exposure=0.0, saturation=1.45, look="punchy", bloom=0.25),
     "sunset": dict(
         sky_int=0.9, haze=0.6,
         moon_int=0.0, phase=0.72,
         sky_zen="#4A22B0", sky_hor="#E87A86", sky_ground="#E87A86", fog="#E87A86", fog_sun="#FFB060",
         sun="#FFB27A", sun_int=2.0, amb="#5E46B8", amb_int=1.7,
-        land=["#4E2A7E", "#8A2C78", "#D0405A", "#F2785A", "#FFB45A"],
+        land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
         path="#FFD7A0", path_emit=0.6, pad="#FFB070", pad_emit=0.0,
         drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.6, crest_gain=0.6,
@@ -79,7 +79,8 @@ STATES = {
 DUSK = dict(phase=0.80, edge_gain=4.0)
 
 # Land ramp height stops, in tiles (absolute height, never renormalised; 04- §3).
-LAND_STOPS = [0.0, 5.0, 12.0, 20.0, 30.0]
+LAND_STOPS = [0.0, 10.0 / 3, 20.0 / 3, 10.0, 20.0]   # stops 0-3 evenly spaced (the oklabRamp op); lowered in CP-A r4 so the warm
+                                                       # bands cover about half the land, as in the r2 mock-up
 SEA_LEVEL = -0.4
 
 # ---- the tile (04- §4) ---------------------------------------------------------------------------------------------
