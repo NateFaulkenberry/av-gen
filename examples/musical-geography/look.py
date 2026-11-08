@@ -34,12 +34,12 @@ def hexlin(h: str) -> list[float]:
 # 0.0 (=1.0) -> 0.27, always forward in time.
 STATES = {
     "day": dict(
-        fill=0.45, contrast=1.25,
+        fill=0.38, contrast=1.3,
         sky_int=1.0, haze=0.35,
-        moon_int=0.0, phase=0.64,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
+        moon_int=0.0, phase=0.61,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
         sky_zen="#2F6BFF", sky_hor="#A8C4FF", sky_ground="#A8C4FF", fog="#A8C4FF", fog_sun="#FFF2D6",
         sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
-        land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FF9E4A", "#FFC444"],
+        land=["#8A6CF2", "#C26AE4", "#FF7A8C", "#FF8A44", "#FFB03A"],
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
         path="#FFF5E2", path_emit=0.35, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
@@ -92,7 +92,7 @@ TILE = dict(spacing=1.0, tileSize=0.915, thickness=0.30, bevel=0.0)
 TOP_BAND = 0.085          # edge band width, fraction of the top (contour edges, 1970)
 SIDE_FOOT = 0.70          # side face fades to 70% of the top colour at the slab's underside (0.18 in the mock-up: in the
                           # engine the slope-facing sides became a dark stipple across every hillside)
-ROUGH_LAND, ROUGH_WATER = 0.8, 0.42   # land 0.62 -> 0.8 in r5: a low sun put a white glare over the land   # water 0.16 in the mock-up; 0.28 in the engine (0.16 mirrored a pale sky over the whole sea)
+ROUGH_LAND, ROUGH_WATER = 0.8, 0.55   # land 0.62 -> 0.8 in r5: a low sun put a white glare over the land   # water 0.16 in the mock-up; 0.28 in the engine (0.16 mirrored a pale sky over the whole sea)
 
 
 def ordered_states():
@@ -288,6 +288,7 @@ def post(state):
         "post/bloom/intensity": s["bloom"],
         "post/bloom/threshold": 1.0,
         "camera/exposure/compensation": s["exposure"],
+        "camera/exposure/mode": 0,   # r6: manual -- automatic metering pulled every frame back to a flat middle grey
         "post/grade/saturation": s["saturation"],
         "post/grade/contrast": s["contrast"],
         # §11 banding: film grain is the only dither the output has today (no output dither exists; asked for in
