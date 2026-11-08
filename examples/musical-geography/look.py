@@ -195,8 +195,9 @@ def _c4(rgb, a=1.0):
 
 
 SHALLOW_AMT = 0.33       # shallows mixed in at most 33% (04- §3)
-BORDER_DARK_FINE = 1.0    # the 1x ring: its geometric gap already draws the edge; a dark painted line on top of it
-                          # beat into moire rings at grazing angles
+BORDER_DARK_FINE = 0.72  # r7: the 1x ring paints the same prefiltered lattice as the 2x/4x rings (tileBorder), a
+                          # little lighter because its real gap already darkens it -- the two rings' mean brightness
+                          # now match (the "lighter rectangle" of r3-r6 was the 1x program with no lattice at all)
 UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: the gaps read as shadow, not as a
                           # second, blue-black surface speckling through every hillside
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)

@@ -71,6 +71,9 @@ def scene_doc(state, interim, camera_name):
         # GTAO, faded out with distance (ADR-1951): it darkened every far step riser into dark dashes (97fe0568).
         # The band is per view (AO_BANDS): near ground only.
         "ambientOcclusion": True,
+        # the remaining dark dashes were screen-space contact shadows marching across far risers (engineering, CP-A r7,
+        # canaried): off. The sun's shadow map still shades the hills. Saves about 7.4 ms.
+        "contactShadows": False,
         "aoFadeStart": AO_BANDS.get(camera_name, (40.0, 120.0))[0],
         "aoFadeEnd": AO_BANDS.get(camera_name, (40.0, 120.0))[1],
         "sky": look.sky(state),
