@@ -1305,7 +1305,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         }
         ambient = ambient + bandSpec;
     }
-    ambient = ambient * ao;
+    ambient = ambient * ao * waterDownwelling(worldPos); // ADR-1910: the sky's light came down through the water
     if (LIT_SSR) {
         ssrSurface.weight = ssrSurface.weight * ao; // ADR-1820: the AO the ambient took
         ssrSurface.environment = ssrSurface.environment * ao;

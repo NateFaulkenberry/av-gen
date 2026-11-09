@@ -479,7 +479,7 @@ def mask_fur(path):
     js = _json.loads(b[20:20 + n])
     rest = b[20 + n:]
     for m in js.get("materials", []):
-        if m.get("name") == "sasquatch_fur":
+        if m.get("name", "").startswith("sasquatch_fur"):   # M3e: every fur material (b's is sasquatch_fur_grey)
             m["alphaMode"] = "MASK"
             m["alphaCutoff"] = 0.45
     enc = _json.dumps(js, separators=(",", ":")).encode()

@@ -20,7 +20,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, near, knot, O_UNIT, L_UNIT, CAMP_SITE, GATHER_AT, pace, line_points  # noqa: E402
 from sample_ground import heights  # noqa: E402
 CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
@@ -90,7 +90,10 @@ PYRAMID_GROUND = {name: curved(PAD_LEVEL[name], x, z) for name, x, z, _, _ in PY
 PYRAMID_SINK = 3.0
 
 # --- the arrival: out of the arrival mesa's north wall, heading -z (the exit's y is over the ground)
-EXIT = [OX, 47.6 + 9.0, -724.0 + OZ]  # M3d (owner): lower, near the ground (absolute: the talus is at 47.6 here)
+# M3e (owner: the arrival clipped a bulge): the old exit sat in the butte's talus apron (the slope at 61 m just ahead
+# of a 56.6 m exit). Now out of the butte's steep face itself, 4 m in front of it at 95 m (the apron below at 72-75 m),
+# then down over the apron, which a pad clears to the plain ahead (MARS_CORRIDOR)
+EXIT = [OX - 2.0, 95.0, -699.0 + OZ]  # absolute
 EXIT_AXIS = [0.0, 0.0, -1.0]
 
 # --- the pyramid portal: in pyramid-b's south face, where the casing has fallen, 30 m up (absolute y set by measure)
@@ -101,10 +104,14 @@ FOCUS_GROUND = 0.0     # M3d: over the canyon pipeline the focus's y is absolute
 PORTAL_FOCUS = [PB[1], PYRAMID_GROUND["pyramid-b"] - 3.0 + FACE_HEIGHT - FOCUS_GROUND,
                 PB[2] + PB[3] * 0.5 - FACE_HEIGHT / math.tan(math.radians(51.8))]
 
-# --- home: out of the canyon's outer cliff, at night (the cliff 66-116 m at d 46, lat 100), down to the camp
-NIGHT_EXIT_DL = (46.0, 99.0)
-NIGHT_EXIT = [*site(*NIGHT_EXIT_DL)[:1], 86.0 * R, site(*NIGHT_EXIT_DL)[1]]
-OUT_OF_CLIFF = unit([-L_UNIT[0], 0.0, -L_UNIT[1]])   # toward the river (-lat)
+# --- home, at night. M3g (owner 54- §4: not the high swoop down; a level pass-by): out of the low rock face of the camp's
+# own bank, well down-canyon (d 68, where the face climbs from 1.9 m at lat 31 to 8.4 m at lat 34), at 5 m, 1.5 m in
+# front of it, facing out over the river and up-canyon; then level, 3.5-5 m up, along the river past the camp (the
+# figures glimpsed in passing), and on into the river portal's dive
+NIGHT_EXIT_DL = (68.0, 30.9)
+# Owner 2026-11-08 (67- §5): the entrance off the rock (the camera came out through the far bank's face), out over the
+# water on the river's far half, so nothing of the bank is in the arrival's volume
+NIGHT_EXIT = [38.0, 3.5, 1212.0]
 CANYON_SCENE = "strange-attractor-flythrough.scene.json"
 CAMP = site(*CAMP_SITE)
 CAMP_GROUND = 4.4 * WS
@@ -114,61 +121,111 @@ CAMP_GROUND = 4.4 * WS
 # into the riverbed portal (owner: the water portal felt like a step): a straight line at a constant speed, sloping
 # 25 degrees; the exit frame is tilted to match, so the crossing changes nothing in the motion (crossing 5 at 121.2 s).
 GATHER = [*near(CAMP_SITE, *GATHER_AT)[:1], CAMP_GROUND + 1.3, near(CAMP_SITE, *GATHER_AT)[1]]
-RIVER_PORTAL = site(10.0, -12.0)
+RIVER_PORTAL = [28.0, 1418.0]   # owner 2026-11-08 (67- §5): centred in the river, beyond the camp
 RIVER_Y = -0.5 * R
-_tw = [RIVER_PORTAL[0] - CAMP[0], RIVER_PORTAL[1] - CAMP[1]]
-_tn = math.hypot(*_tw)
-TOWARD_RIVER = (_tw[0] / _tn, _tw[1] / _tn)
-GLIDE_SLOPE = math.radians(25.0)
-GLIDE_SPEED = 3.2                      # m/s along the slope
+# 67- §5: one gentle curve from the entrance, bowed toward the camp's bank (the camp on the left, about 20 m off; in frame 12.4 s), then
+# a Moon-style rise and dive into the portal at the river's centre. NIGHT_CTRL is the curve's control point; the rise
+# starts at RISE_FROM of the way along, tops out at RISE_TOP m and dives into the opening on the curve's last heading
+NIGHT_CTRL = (76.0, 1372.0)
+RISE_FROM, RISE_PEAK, RISE_TOP = 0.66, 0.84, 16.0
+LEVEL_Y = 3.5
+
+
+def _night_xz(f):
+    (ax, az), (cx, cz), (bx, bz) = (NIGHT_EXIT[0], NIGHT_EXIT[2]), NIGHT_CTRL, RIVER_PORTAL
+    return ((1 - f) ** 2 * ax + 2 * (1 - f) * f * cx + f * f * bx, (1 - f) ** 2 * az + 2 * (1 - f) * f * cz + f * f * bz)
+
+
+def _night_y(f):
+    if f <= RISE_FROM:
+        return LEVEL_Y
+    if f <= RISE_PEAK:
+        u = (f - RISE_FROM) / (RISE_PEAK - RISE_FROM)
+        return LEVEL_Y + (RISE_TOP - LEVEL_Y) * u * u * (3 - 2 * u)
+    u = (f - RISE_PEAK) / (1.0 - RISE_PEAK)
+    return RISE_TOP - (RISE_TOP - RIVER_Y) * u * u     # eased in from the top, steepest into the opening
+
+
+_x0, _x1 = _night_xz(0.0), _night_xz(0.02)
+_on = math.hypot(_x1[0] - _x0[0], _x1[1] - _x0[1])
+OUT_OF_CLIFF = [(_x1[0] - _x0[0]) / _on, 0.0, (_x1[1] - _x0[1]) / _on]   # the exit faces along the curve's start
+_e0, _e1 = _night_xz(0.985), _night_xz(1.0)
+_tn = math.hypot(_e1[0] - _e0[0], _e1[1] - _e0[1])
+TOWARD_RIVER = ((_e1[0] - _e0[0]) / _tn, (_e1[1] - _e0[1]) / _tn)        # the dive's heading at the opening
+GLIDE_SLOPE = math.atan2(_night_y(0.985) - RIVER_Y, _tn)                  # the dive's slope at the opening
+GLIDE_SPEED = 6.0                      # m/s along the slope at the opening (the ocean's arrival speed)
 T_CROSS = 121.2 + 1.0 / 60.0   # M3d (ADR-1903): half a frame off the 30 fps grid, so no frame lands on the crossing
 
 
 def glide_point(s_back):
-    """The glide's point s_back metres (along the slope) before the portal: x, absolute y, z."""
+    """The point s_back metres (along the dive's slope at the opening) before the portal: x, absolute y, z."""
     h = s_back * math.cos(GLIDE_SLOPE)
     return [RIVER_PORTAL[0] - TOWARD_RIVER[0] * h, RIVER_Y + s_back * math.sin(GLIDE_SLOPE), RIVER_PORTAL[1] - TOWARD_RIVER[1] * h]
 
 
 def night_flight():
-    # absolute heights near the camp (eye height over the camp's ground); the glide in absolute terms; both turned into
-    # heights over the sampled ground (the portal's flight is authored over the ground)
-    eye = CAMP_GROUND + 1.85
-    near_knots = [(-1.0, -9.5, eye + 0.9, 110.2), (-5.5, -7.5, eye + 0.2, 112.0), (-8.0, -3.5, eye, 113.8)]
-    glide_len = (eye + 0.3 - RIVER_Y) / math.sin(GLIDE_SLOPE)
-    pts = []
-    for dd, dl, y, t in near_knots:
-        x, z = near(CAMP_SITE, dd, dl)
-        pts.append((x, y, z, t))
-    for frac in (1.0, 0.66, 0.33):
-        sb = glide_len * frac
-        x, y, z = glide_point(sb)
-        pts.append((x, y, z, T_CROSS - sb / GLIDE_SPEED))
-    x, y, z = glide_point(0.0)
-    pts.append((x, y, z, T_CROSS))
-    x, y, z = glide_point(-GLIDE_SPEED * 0.8)
-    pts.append((x, y, z, T_CROSS + 0.8))
-    try:
-        gr = heights(CANYON_SCENE, [(p[0], p[2]) for p in pts])
-    except Exception:
-        gr = [CAMP_GROUND] * len(pts)
-    out = [knot(42.0, 80.0, 40.0, 103.6), knot(35.0, 56.0, 20.0, 106.4), knot(28.0, 34.0, 7.0, 108.4)]
-    out += [[x, y - g, z, t] for (x, y, z, t), g in zip(pts, gr)]
+    """The night pass (67- §5): out over the water, one gentle curve down the river past the camp (on the left), then
+    up and over into a dive into the river portal at the river's centre, like the Moon's. Knots are heights over the
+    ground; the whole line is over water."""
+    n = 60
+    pts = [(*_night_xz(i / n), _night_y(i / n)) for i in range(n + 1)]
+    pts = [[x, y, z] for x, z, y in pts]
+    # (no knot in the first 14 m: the arrival covers them in the first second, and a nearer knot makes the spline
+    # overshoot and come back)
+    keep = [pts[0]] + [p for p in pts[1:] if math.dist((p[0], p[2]), (NIGHT_EXIT[0], NIGHT_EXIT[2])) > 14.0]
+    knots, _ = pace(keep[1:], T_PYR + 1.0, T_CROSS, 10.0, GLIDE_SPEED, ramp_in=0.04, ramp_out=0.12)
+    after = glide_point(-GLIDE_SPEED * 0.8)
+    gr = heights(CANYON_SCENE, [(k[0], k[2]) for k in knots] + [(after[0], after[2])])
+    out = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(knots, gr)]
+    out.append([after[0], after[1] - gr[-1], after[2], T_CROSS + 0.8])
     return out
 
 
-NIGHT_AIMS = [[GATHER[0], GATHER[1], GATHER[2], 105.2, 116.4]]
 
 # --- the Mars flight (x, height over the ground, z, t): crossing 3 at 69.69 s (bar 36), crossing 4 at 101.4 s (bar 52)
 # M3d (owner): one continuous fly-over -- out of the wall low, over the rover as it drives (no orbit), straight on to
 # the pyramids and up the buried face into the portal. Times from a smooth speed profile (canyon_scale.pace).
-_MARS_PATH = [(2.0 + OX, 8.0, -750.0 + OZ), (16.0 + OX, 7.0, -840.0 + OZ), (34.0 + OX, 6.0, -925.0 + OZ),
+_MARS_PATH = [(2.0 + OX, 48.0, -750.0 + OZ), (16.0 + OX, 22.0, -840.0 + OZ), (34.0 + OX, 6.0, -925.0 + OZ),
               (52.0 + OX, 5.5, -985.0 + OZ), (64.0 + OX, 6.5, -1030.0 + OZ), (86.0 + OX, 14.0, -1140.0 + OZ),
               (110.0 + OX, 30.0, -1300.0 + OZ),
               (PORTAL_FOCUS[0] - 6.0, 50.0, PORTAL_FOCUS[2] + 150.0), (PORTAL_FOCUS[0], 66.0, PORTAL_FOCUS[2] + 55.0)]
-MARS_FLIGHT = [list(k) for k in pace(_MARS_PATH, 71.4, 99.6, 22.0, 18.0, ramp_in=0.15, ramp_out=0.2)[0]] + [
-    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], 101.4 + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
-    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, 102.2],
+# M3e (owner: a mound hid the pyramid, and the arrival clipped the apron): a corridor along the fly-over is eased to the
+# plain (ADR-1897 pads, 34 m apart, 58 m across each), from beyond the butte's apron to pyramid-b's own pad, so
+# no dune, yardang or drift stands between the camera and the pyramids or under the camera
+def _corridor():
+    # (from the second knot: the camera clears the butte's apron from above, and a pad there cut it into a flat slab)
+    pts = [(x, z) for x, _, z in _MARS_PATH[1:7]] + [(PORTAL_FOCUS[0] - 6.0, PB[2] + 330.0)]
+    pads = []
+    for (x0, z0), (x1, z1) in zip(pts, pts[1:]):
+        n = max(1, int(math.hypot(x1 - x0, z1 - z0) / 34.0))
+        for i in range(n):
+            t = i / n
+            pads.append({"x": round(x0 + (x1 - x0) * t, 2), "z": round(z0 + (z1 - z0) * t, 2), "radius": 58.0,
+                         "level": PLAIN})
+    return pads
+
+
+MARS_CORRIDOR = _corridor()
+# M3e (owner, reversing M3d's "sooner"): the pyramid's code starts only once the camera has passed the rover -- the field
+# reaches out to the camera's distance from the focus at the knot over the rover, less 15 m; the tear starts 200 m nearer
+# (M3d: 1700 m and 520 m)
+_over_rover = _MARS_PATH[3]
+PYR_FIELD_FAR = round(math.dist((_over_rover[0], PLAIN + _over_rover[1], _over_rover[2]), PORTAL_FOCUS) - 15.0, 1)
+PYR_OPEN_FAR = round(PYR_FIELD_FAR - 200.0, 1)
+# M3g (owner 54- §3: shorter or faster): four bars shorter -- the pyramid crossing moves from bar 52 (101.4 s) to bar
+# 48 (93.46 s; 120.97 bpm, a bar 1.984 s), so the same line is flown about a third faster; the night leg gains the 7.9 s
+T_PYR = 101.4 - 4 * 4 * 60.0 / 120.97
+# Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): the fly-over on one straight line from the exit's first knot
+# to the pyramid's face (the M3d path wandered 2% off it), its heights as before by distance along, at an even pace
+_mars_h = []
+_acc = [0.0]
+for _a, _b in zip(_MARS_PATH, _MARS_PATH[1:]):
+    _acc.append(_acc[-1] + math.hypot(_b[0] - _a[0], _b[2] - _a[2]))
+_MARS_LINE = line_points((_MARS_PATH[0][0], _MARS_PATH[0][2]), (_MARS_PATH[-1][0], _MARS_PATH[-1][2]),
+                         [(a / _acc[-1], p[1]) for a, p in zip(_acc, _MARS_PATH)], n=14)
+MARS_FLIGHT = [list(k) for k in pace([list(p) for p in _MARS_LINE], 71.4, T_PYR - 1.8, 24.0, 20.0, ramp_in=0.06, ramp_out=0.08)[0]] + [
+    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2], T_PYR + 1.0 / 60.0],   # the crossing, half a frame off the grid (ADR-1903)
+    [PORTAL_FOCUS[0], None, PORTAL_FOCUS[2] - 25.0, T_PYR + 0.8],
 ]
 
 # a dusty regolith: rust and ochre by the generator's albedo and a broad noise, grit up close; M3: strata banding on the
@@ -230,7 +287,7 @@ ROVER_DIR = (_rd[0], _rd[2])
 ROVER_YAW = math.degrees(math.atan2(ROVER_DIR[0], ROVER_DIR[1]))
 ROVER_LEVEL = 35.2                     # the mean ground around the pad (sampled without it)
 ROVER_SPEED = 0.4                      # m/s (faster than Curiosity's own: slow, but visibly moving up close)
-ROVER_T0, ROVER_T1 = 69.0, 102.0
+ROVER_T0, ROVER_T1 = 69.0, 94.0
 ROVER_MAST = (-0.418, 2.110, 0.466)    # the mast camera in the rover's frame (prepare_rover.py)
 ROVER_PAD = dict(x=ROVER_START[0] + ROVER_DIR[0] * -10.0, z=ROVER_START[1] + ROVER_DIR[1] * -10.0, radius=60.0, level=ROVER_LEVEL)
 
@@ -315,6 +372,10 @@ def mars_rock_program():
     f = json.load(open(os.path.join(HERE, "strange-attractor-flythrough.scene.json")))
     prog = json.loads(json.dumps([p for p in f["materialPrograms"] if p["name"] == "canyonRock"][0]))
     prog["ops"] = prog["ops"][:CANYON_ROCK_OPS]     # the canyon's own ops, without its close-up detail (M3d)
+    # Pass 3, 67- §4: without the wall glow's last 4 ops (the `glow` key is 0 on Mars and nothing routes it), for the
+    # op budget the sand below needs
+    assert [o["kind"] for o in prog["ops"][81:85]] == ["swizzle", "multiply", "multiply", "add"]
+    prog["ops"] = prog["ops"][:81]
     prog.pop("textures", None)
     prog["name"] = "marsRock"
     # M3d (owner: a proper sand with ripples, photoscanned close up): a rippled sand (Poly Haven `aerial_sand`, CC0;
@@ -322,18 +383,64 @@ def mars_rock_program():
     # out by 220 m, where the program's own strata and colour carry the wide shots
     prog["textures"] = [{"name": "sand", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"}]
     prog["ops"] += [
-        {"kind": "textureTriplanar", "dst": 0, "texture": "sand", "value": 0.2},
+        # M3e (owner: no visible tiling; ADR-1905): hex-tiled reads, a second larger layer, macro variation over 30 m
+        {"kind": "textureTriplanar", "dst": 0, "texture": "sand", "value": 0.2, "constant3": [1.0, 0.5, 6.0, 0.7]},
         {"kind": "constant", "dst": 1, "constant": [1.05, 0.6, 0.42, 1.0]},
         {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
         {"kind": "input", "dst": 3, "input": "normal"},
         {"kind": "swizzle", "dst": 3, "srcA": 3, "constant": [1, 1, 1, 1]},
-        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.7, 0.9, 0, 0]},
-        {"kind": "input", "dst": 5, "input": "depth"},
-        {"kind": "remap", "dst": 5, "srcA": 5, "constant": [40.0, 220.0, 0.85, 0.0], "value": 1},
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+        # Pass 3, 67- §4: the sand-to-rock line broken by a noise (9 m), not drawn along one slope contour
+        {"kind": "input", "dst": 1, "input": "worldPosition"},
+        {"kind": "noise", "dst": 1, "srcA": 1, "value": 1.0 / 9.0, "seed": 67},
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, -0.12, 0.12]},
+        {"kind": "add", "dst": 3, "srcA": 3, "srcB": 1},
+        # M3g (owner 54- §3: one sand family; the drifts, the plain and the dunes were three looks): the same sand as the
+        # drifts (marsDrift) on everything but the steep rock -- at every distance, not faded out by 220 m to the
+        # program's flat colour -- blended to the rock over a wide band of slopes (normal.y 0.45-0.75), so an apron or
+        # a dune's flank is sand, not a pale pink slab
+        # Pass 3, 67- §4 (the owner's screenshot: a pale, smooth slab beside the darker ground): sand up to much
+        # steeper slopes (normal.y 0.2-0.45, about 63-78 degrees, was 0.45-0.75), so dune flanks, the yardangs' sides
+        # and banks are the ground's sand and only cliffs and mesa walls take the rock palette
+        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.2, 0.45, 0, 0]},
         {"kind": "mixBy", "dst": 4, "srcA": 4, "srcB": 0, "srcC": 3},
+        # Pass 3, 67- §4 (owner: the piles and the ground are two surfaces): the sand's ripple normals and roughness
+        # where it is sand, exactly as the drifts (marsDrift) draw them, in place of the canyon's strata relief (the
+        # "scaly" dunes of the owner's screenshot); the rock keeps its own relief
+        SAND_NORMAL,
+        {"kind": "mixBy", "dst": 6, "srcA": 6, "srcB": 1, "srcC": 3},
+        SAND_ROUGHNESS,
     ]
+    prog["textures"].append(SAND_NORMAL_TEXTURE)
+    prog["roughness"] = 5
     return prog
+
+
+# Pass 3, 67- §4: one sand. The drifts and the plain share the photoscan, its tint, its hex tiling (ADR-1905), its
+# ripple normals and its roughness. The drift also takes the terrain's occlusion output: marsRock's occlusion register
+# (r0) carries the sand texture times its tint (the M3d ops write it there), so the plain's ambient has been scaled by
+# it since M3d; the drift had none, which made it the pale, flat slab of the owner's screenshot. Matching it keeps the
+# plain's approved brightness and makes the two lit alike.
+SAND_NORMAL_TEXTURE = {"name": "sandN", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
+                       "colorSpace": "linear"}
+SAND_NORMAL = {"kind": "textureTriplanarNormal", "dst": 1, "texture": "sandN", "value": 0.2, "constant3": [1.0, 0.0, 0.0, 0.0]}
+SAND_ROUGHNESS = {"kind": "constant", "dst": 5, "constant": [0.95, 0.95, 0.95, 1.0]}
+
+
+def mars_drift_program():
+    """M3e (owner: no visible tiling): the pyramids' sand drifts drawn through the plain's own sand (ADR-1572), so the
+    drift and the plain are one sand -- the same photoscan, tint and hex tiling (ADR-1905) -- with its ripple normals."""
+    return {"name": "marsDrift", "baseColor": 0, "metallic": -1, "roughness": 5, "emission": -1, "opacity": -1,
+            "normal": 2, "occlusion": 0,
+            "textures": [{"name": "sand", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_diff_2k.jpg"},
+                         {"name": "sandN", "path": "../../assets/strange-attractor/polyhaven/textures/aerial_sand/aerial_sand_nor_gl_2k.jpg",
+                          "colorSpace": "linear"}],
+            "ops": [
+                {"kind": "textureTriplanar", "dst": 0, "texture": "sand", "value": 0.2, "constant3": [1.0, 0.5, 6.0, 0.7]},
+                {"kind": "constant", "dst": 1, "constant": [1.05, 0.6, 0.42, 1.0]},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
+                {"kind": "textureTriplanarNormal", "dst": 2, "texture": "sandN", "value": 0.2, "constant3": [1.0, 0.0, 0.0, 0.0]},
+                SAND_ROUGHNESS,
+            ]}
 
 
 def write():
@@ -363,8 +470,8 @@ def write():
                                 "intensity": 1.0},
                         "shadowRange": 2400.0, "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 5000.0,
                         "contactShadows": False, "shadowSplitLambda": 0.9},
-        "post": {"bloomIntensity": 0.04, "tonemap": 0},
-        "materialPrograms": [mars_rock_program()],
+        "post": {"bloomIntensity": 0.04, "tonemap": 1},
+        "materialPrograms": [mars_rock_program(), mars_drift_program()],
         # M3d (owner; ADR-1902): the canyon's own terrain pipeline in its Mars style -- wind-eroded mesas and buttes in
         # layered sediment, yardangs, dune fields, the same erosion, strata and terraces -- and its rock program
         "attractorWorld": {"seed": 11, "resolution": 4096, "extent": 16000, "worldScale": 0.5, "camera": "scene",
@@ -374,10 +481,10 @@ def write():
                            "sunShadowBias": 1.6, "look": {"sunAzimuth": 128.0, "sunElevation": 14.0},
                            "mars": {"mesaCover": 0.45, "yardangs": 10.0, "wind": 30.0, "dunes": 8.0},
                            "pads": [{"x": x, "z": z, "radius": base * 1.2, "level": PAD_LEVEL[name]}
-                                    for name, x, z, base, _ in PYRAMIDS] + [ROVER_PAD]},
+                                    for name, x, z, base, _ in PYRAMIDS] + MARS_CORRIDOR + [ROVER_PAD]},
         # the pyramid portal: pyramid-b's south face cracks and opens, the same corruption as the canyon's, warmer
         "corruption": {"targets": ["pyramid-b"], "focus": PORTAL_FOCUS, "axis": [0.0, 0.0, -1.0], "amount": 1.0,
-                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": 1700.0, "openNear": 30.0, "openFar": 520.0,
+                       "radius": 120.0, "inner": 0.2, "fieldNear": 40.0, "fieldFar": PYR_FIELD_FAR, "openNear": 30.0, "openFar": PYR_OPEN_FAR,
                        "seam": 0.3, "width": 22.0, "height": 17.0, "depth": 12.0, "block": 4.0, "share": 0.22, "slip": 2.5,
                        "rate": 0.5, "strip": 3.5, "stripSlip": 1.5, "slide": 0.0, "pull": 6.0, "lift": 1.2, "fold": 0.8,
                        "lag": 0.7, "glyph": 5.5, "glyphSize": 1.6, "glow": 4.0, "echoes": 1, "echoOffset": 1.0,
@@ -390,11 +497,19 @@ def write():
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [1.0, 0.82, 0.5], "shards": 0.3, "shardRate": 0.35},
-        "portal": {"world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF, "entryUp": [0.0, 1.0, 0.0],
-                   "exitUp": [0.0, 1.0, 0.0], "flight": night_flight(), "aims": NIGHT_AIMS},
-        "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}.glb",
+        # 67- §5: climbLook 0.4, so the rise before the dive is not a stare up at the sky
+        "portal": {**GAZE, "climbLook": 0.4, "world": "@root", "exit": NIGHT_EXIT, "exitAxis": OUT_OF_CLIFF,
+                   "entryUp": [0.0, 1.0, 0.0],
+                   "exitUp": [0.0, 1.0, 0.0], "flight": night_flight()},
+        "nodes": [{"name": name, "kind": "gltf", "asset": A + f"{name}-m3g.glb",
                    "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
                    "visible": True} for name, x, z, _, yaw in PYRAMIDS] + [
+            # M3e: each pyramid's sand drift, drawn through the plain's sand (marsDrift; ADR-1572, ADR-1905)
+            # Pass 3, 67- §4: the drifts laid on the real ground (hero/build_mars_sand.py), meeting it at a thin, nearly
+            # tangent, noise-broken toe
+            {"name": f"{name}-sand", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/mars/" + f"{name}-sand-p3.glb",
+             "position": [x, PYRAMID_GROUND[name] - PYRAMID_SINK, z], "rotation": [0, yaw, 0], "scale": [1, 1, 1],
+             "visible": True, "program": "marsDrift"} for name, x, z, _, yaw in PYRAMIDS] + [
             {"name": "rover", "kind": "gltf", "asset": A + "rover.glb", "position": [*rover_at(ROVER_T0)[:1], ROVER_LEVEL, rover_at(ROVER_T0)[1]],
              "rotation": [0, ROVER_YAW, 0], "scale": [1, 1, 1], "visible": True},
             {"name": "rover-flash", "kind": "gltf", "asset": A + "flash.glb", "position": mast_world(ROVER_T0), "rotation": [0, 0, 0],
@@ -409,7 +524,9 @@ def write():
     }
     path = os.path.join(HERE, "strange-attractor-mars.scene.json")
     json.dump(scene, open(path, "w"), indent=2)
-    return path, flight, []    # M3d: no aim -- the fly-over looks ahead, to the pyramids
+    # M3e (owner §3: the pyramid reads over the rover for the whole fly-over): the eye held on pyramid-b's upper courses
+    # from the arrival until the climb to the portal, released 4 s before the crossing so the camera lines up with it
+    return path, flight, [[PB[1], PLAIN + 75.0, PB[2], 69.9, T_PYR - 4.0]]
 
 
 if __name__ == "__main__":

@@ -51,6 +51,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <optional>
 #include <string>
 #include <vector>
@@ -701,6 +702,9 @@ private:
     int inputDevice_ = 0;
     // ADR-1025: the Live panel's device lists, rescanned every few seconds.
     std::vector<audio::AudioDeviceInfo> liveAudioDevices_;
+    // ADR-1980: the audio rescan runs off the frame (it initialises a CoreAudio context: 3-9 ms on the UI thread every
+    // 3 s), and the list is swapped in when it lands. MIDI and displays stay on the frame (both under 0.1 ms).
+    std::future<std::vector<audio::AudioDeviceInfo>> liveAudioScan_;
     // ADR-1521: the Inputs table's label being typed, per device channel.
     std::vector<std::array<char, 48>> liveInputLabels_;
     void drawLiveInputs(app::Engine& engine);

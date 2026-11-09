@@ -198,8 +198,85 @@ def pace(points, t0, t1, v0, v1, ramp_in=0.25, ramp_out=0.25):
 # profile and three-quarter front as the camera turns; the craft stands behind the group on the opened bench.
 CAST = {
     "sasquatch-a": (-2.1, 1.7),    # standing
-    "sasquatch-b": (0.35, 1.95),   # crouching by the fire
+    "sasquatch-b": (0.45, 2.85),   # crouching by the fire (M3e, owner: no character in the fire -- 2.9 m out, not 2.0)
     "sasquatch-c": (-2.55, -0.45),  # sitting on a rock
     "gray": (2.6, -0.9),
 }
 GATHER_AT = (sum(v[0] for v in CAST.values()) / len(CAST), sum(v[1] for v in CAST.values()) / len(CAST))
+
+
+# M3g (owner, 54- §1, a standing rule: the camera looks where it is going): every portal flight's gaze follows the path
+# -- its look-ahead short (0.35 s, not 1.2 s, which led the curves by up to 60 degrees), barely below the line, and a
+# climb looked at in full (ADR-1909)
+GAZE = {"lookAhead": 0.35, "lookDown": 0.02, "climbLook": 1.0}
+
+
+# --- Pass 3 (61- §3, the owner's standing rule): each leg from its arrival A to its next portal B on a straight line,
+# or one gentle curve, at an even speed. `line_points` lays the points; `pace` times them.
+def pace_even(points, t0, t1, v0, v1, ramp_in_s, ramp_out_s, dt=1.0):
+    """Knots at even TIME steps along a polyline, a speed profile v0 -> cruise -> v1 with smoothstep ramps (seconds).
+    `pace` times fixed points, and a ramp over fixed points leaves the knots crowded at one end and sparse at the
+    other, which the spline turns into speed steps; even time steps do not. Returns [x, y, z, t] knots."""
+    seg = [math.dist(points[i], points[i + 1]) for i in range(len(points) - 1)]
+    total, T = sum(seg), t1 - t0
+    a, b = ramp_in_s, ramp_out_s
+    vm = (total - v0 * a / 2.0 - v1 * b / 2.0) / (T - a / 2.0 - b / 2.0)
+
+    def ss(x):
+        x = min(max(x, 0.0), 1.0)
+        return x * x * (3.0 - 2.0 * x)
+
+    def speed(t):
+        v = v0 + (vm - v0) * ss(t / a)
+        if t > T - b:
+            v = vm + (v1 - vm) * ss((t - (T - b)) / b)
+        return v
+    n = 4000
+    s = [0.0]
+    for i in range(1, n + 1):
+        s.append(s[-1] + 0.5 * (speed(T * (i - 1) / n) + speed(T * i / n)) * T / n)
+    scale = total / s[-1]
+    out = []
+    steps = max(1, round(T / dt))
+    for k in range(steps + 1):
+        d = s[round(n * k / steps)] * scale
+        acc, i = 0.0, 0
+        while i < len(seg) - 1 and acc + seg[i] < d:
+            acc += seg[i]
+            i += 1
+        u = (d - acc) / max(seg[i], 1e-9)
+        p = [points[i][c] + (points[i + 1][c] - points[i][c]) * u for c in range(3)]
+        out.append([p[0], p[1], p[2], t0 + T * k / steps])
+    return out, vm
+
+
+def line_points(a, b, profile, n=12, control=None):
+    """Points from a to b (x, z) -- straight, or one quadratic curve bowed toward `control` -- with the height (second
+    value) interpolated from `profile`, a list of (fraction along, height). Returns [(x, h, z)]."""
+    out = []
+    for i in range(n + 1):
+        f = i / n
+        if control is None:
+            x = a[0] + (b[0] - a[0]) * f
+            z = a[1] + (b[1] - a[1]) * f
+        else:
+            x = (1 - f) ** 2 * a[0] + 2 * (1 - f) * f * control[0] + f * f * b[0]
+            z = (1 - f) ** 2 * a[1] + 2 * (1 - f) * f * control[1] + f * f * b[1]
+        h = profile[-1][1]
+        for (f0, h0), (f1, h1) in zip(profile, profile[1:]):
+            if f0 <= f <= f1:
+                u = (f - f0) / max(f1 - f0, 1e-9)
+                u = u * u * (3 - 2 * u)
+                h = h0 + (h1 - h0) * u
+                break
+        out.append((x, h, z))
+    return out
+
+
+# Pass 3 final (owner 2026-11-08, 67- §3): the dusk leg is one straight line from the far bank, down the river from the
+# camp, across the water and past the camp (5 m to its right, the gathering near the centre of the frame), into a
+# portal to Mars on the bench face behind the camp. Measured on the canyon's ground: the far bank's face is 12 m high
+# at DUSK_EXIT (3 m in front of it), the bench face 10 m high at DUSK_PORTAL. DUSK_AXIS is the line's heading.
+DUSK_AXIS = (0.8083, -0.5888)
+DUSK_EXIT = (-8.5, 12.0, 1416.1)
+DUSK_PORTAL = (91.55, 10.0, 1343.21)

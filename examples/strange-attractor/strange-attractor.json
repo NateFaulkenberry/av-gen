@@ -697,7 +697,140 @@
     },
     {
       "source": "beat.pulse",
-      "target": "moon/nodes/earth-halo/emissiveBoost",
+      "target": "lights/ufo-glow/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.3,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-spill/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.3,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-0/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.3,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-1/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.3,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-2/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.3,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "lights/ufo-rim-3/intensity",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.3,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "nodes/ufo-parked/emissiveBoost",
+      "amount": 1.0,
+      "op": "multiply",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.35,
+        "remapOutMax": 4.5,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 30.0,
+        "decayMs": 600.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "moon/nodes/earth-aura/emissiveBoost",
       "amount": 1.0,
       "op": "add",
       "polarity": "unipolar",
@@ -715,8 +848,8 @@
       }
     },
     {
-      "source": "response.high",
-      "target": "moon/nodes/earth-halo-2/opacity",
+      "source": "beat.pulse",
+      "target": "moon/nodes/earth-aura-r/opacity",
       "amount": 1.0,
       "op": "replace",
       "polarity": "unipolar",
@@ -724,18 +857,56 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.15,
-        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.55,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
         "attackMs": 8.0,
-        "decayMs": 260.0
+        "decayMs": 240.0
+      }
+    },
+    {
+      "source": "beat.pulse",
+      "target": "moon/nodes/earth-aura-c/opacity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.55,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 8.0,
+        "decayMs": 240.0
+      }
+    },
+    {
+      "source": "response.transient",
+      "target": "moon/nodes/earth-aura-tear/opacity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.45,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.9,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 8.0,
+        "decayMs": 200.0
       }
     },
     {
       "source": "response.onsetLow",
-      "target": "moon/nodes/earth-halo-3/opacity",
+      "target": "moon/nodes/earth-aura-trail-1/opacity",
       "amount": 1.0,
       "op": "replace",
       "polarity": "unipolar",
@@ -743,13 +914,32 @@
         "remapEnabled": true,
         "remapInMin": 0.0,
         "remapInMax": 1.0,
-        "remapOutMin": 0.15,
-        "remapOutMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.45,
         "clampEnabled": true,
         "clampMin": 0.0,
         "clampMax": 1.0,
         "attackMs": 8.0,
-        "decayMs": 320.0
+        "decayMs": 480.0
+      }
+    },
+    {
+      "source": "response.onsetLow",
+      "target": "moon/nodes/earth-aura-trail-2/opacity",
+      "amount": 1.0,
+      "op": "replace",
+      "polarity": "unipolar",
+      "chain": {
+        "remapEnabled": true,
+        "remapInMin": 0.0,
+        "remapInMax": 1.0,
+        "remapOutMin": 0.0,
+        "remapOutMax": 0.28,
+        "clampEnabled": true,
+        "clampMin": 0.0,
+        "clampMax": 1.0,
+        "attackMs": 8.0,
+        "decayMs": 720.0
       }
     }
   ],
@@ -770,7 +960,7 @@
             "time": 118.0,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -779,7 +969,7 @@
             "time": 123.80000000000001,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -788,7 +978,7 @@
             "time": 124.4,
             "value": [
               886.0,
-              65.2,
+              57.2,
               -203.0
             ],
             "interp": "smooth"
@@ -797,7 +987,7 @@
             "time": 125.2,
             "value": [
               959.0,
-              72.7,
+              64.7,
               -191.0
             ],
             "interp": "smooth"
@@ -806,7 +996,7 @@
             "time": 126.10000000000001,
             "value": [
               1064.0,
-              94.7,
+              86.7,
               -163.0
             ],
             "interp": "smooth"
@@ -815,7 +1005,7 @@
             "time": 127.10000000000001,
             "value": [
               1194.0,
-              134.7,
+              126.7,
               -123.0
             ],
             "interp": "smooth"
@@ -824,7 +1014,7 @@
             "time": 128.4,
             "value": [
               1354.0,
-              199.7,
+              191.7,
               -73.0
             ],
             "interp": "smooth"
@@ -833,7 +1023,7 @@
             "time": 150.0,
             "value": [
               1354.0,
-              199.7,
+              191.7,
               -73.0
             ],
             "interp": "smooth"
@@ -906,7 +1096,7 @@
             "time": 118.0,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -915,7 +1105,7 @@
             "time": 123.80000000000001,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -924,7 +1114,7 @@
             "time": 124.4,
             "value": [
               886.0,
-              62.2,
+              54.2,
               -203.0
             ],
             "interp": "smooth"
@@ -933,7 +1123,7 @@
             "time": 125.2,
             "value": [
               959.0,
-              69.7,
+              61.7,
               -191.0
             ],
             "interp": "smooth"
@@ -942,7 +1132,7 @@
             "time": 126.10000000000001,
             "value": [
               1064.0,
-              91.7,
+              83.7,
               -163.0
             ],
             "interp": "smooth"
@@ -951,7 +1141,7 @@
             "time": 127.10000000000001,
             "value": [
               1194.0,
-              131.7,
+              123.7,
               -123.0
             ],
             "interp": "smooth"
@@ -960,7 +1150,7 @@
             "time": 128.4,
             "value": [
               1354.0,
-              196.7,
+              188.7,
               -73.0
             ],
             "interp": "smooth"
@@ -969,7 +1159,7 @@
             "time": 150.0,
             "value": [
               1354.0,
-              196.7,
+              188.7,
               -73.0
             ],
             "interp": "smooth"
@@ -983,7 +1173,7 @@
             "time": 118.0,
             "value": [
               1344.0,
-              194.7,
+              186.7,
               -343.0
             ],
             "interp": "smooth"
@@ -992,7 +1182,7 @@
             "time": 124.19999999999999,
             "value": [
               1344.0,
-              194.7,
+              186.7,
               -343.0
             ],
             "interp": "smooth"
@@ -1001,7 +1191,7 @@
             "time": 125.39999999999999,
             "value": [
               1184.0,
-              132.7,
+              124.7,
               -288.0
             ],
             "interp": "smooth"
@@ -1010,7 +1200,7 @@
             "time": 126.6,
             "value": [
               1044.0,
-              90.7,
+              82.7,
               -241.0
             ],
             "interp": "smooth"
@@ -1019,7 +1209,7 @@
             "time": 127.6,
             "value": [
               924.0,
-              68.7,
+              60.7,
               -211.0
             ],
             "interp": "smooth"
@@ -1028,7 +1218,7 @@
             "time": 128.2,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1037,7 +1227,7 @@
             "time": 150.0,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1101,7 +1291,7 @@
             "time": 118.0,
             "value": [
               1344.0,
-              191.7,
+              183.7,
               -343.0
             ],
             "interp": "smooth"
@@ -1110,7 +1300,7 @@
             "time": 124.19999999999999,
             "value": [
               1344.0,
-              191.7,
+              183.7,
               -343.0
             ],
             "interp": "smooth"
@@ -1119,7 +1309,7 @@
             "time": 125.39999999999999,
             "value": [
               1184.0,
-              129.7,
+              121.7,
               -288.0
             ],
             "interp": "smooth"
@@ -1128,7 +1318,7 @@
             "time": 126.6,
             "value": [
               1044.0,
-              87.7,
+              79.7,
               -241.0
             ],
             "interp": "smooth"
@@ -1137,7 +1327,7 @@
             "time": 127.6,
             "value": [
               924.0,
-              65.7,
+              57.7,
               -211.0
             ],
             "interp": "smooth"
@@ -1146,7 +1336,7 @@
             "time": 128.2,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1155,7 +1345,7 @@
             "time": 150.0,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1169,7 +1359,7 @@
             "time": 118.0,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1178,7 +1368,7 @@
             "time": 130.0,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1187,7 +1377,7 @@
             "time": 130.6,
             "value": [
               886.0,
-              65.2,
+              57.2,
               -203.0
             ],
             "interp": "smooth"
@@ -1196,7 +1386,7 @@
             "time": 131.4,
             "value": [
               959.0,
-              72.7,
+              64.7,
               -215.0
             ],
             "interp": "smooth"
@@ -1205,7 +1395,7 @@
             "time": 132.29999999999998,
             "value": [
               1064.0,
-              94.7,
+              86.7,
               -243.0
             ],
             "interp": "smooth"
@@ -1214,7 +1404,7 @@
             "time": 133.29999999999998,
             "value": [
               1194.0,
-              134.7,
+              126.7,
               -283.0
             ],
             "interp": "smooth"
@@ -1223,7 +1413,7 @@
             "time": 134.6,
             "value": [
               1354.0,
-              199.7,
+              191.7,
               -333.0
             ],
             "interp": "smooth"
@@ -1232,7 +1422,7 @@
             "time": 150.0,
             "value": [
               1354.0,
-              199.7,
+              191.7,
               -333.0
             ],
             "interp": "smooth"
@@ -1305,7 +1495,7 @@
             "time": 118.0,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1314,7 +1504,7 @@
             "time": 130.0,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1323,7 +1513,7 @@
             "time": 130.6,
             "value": [
               886.0,
-              62.2,
+              54.2,
               -203.0
             ],
             "interp": "smooth"
@@ -1332,7 +1522,7 @@
             "time": 131.4,
             "value": [
               959.0,
-              69.7,
+              61.7,
               -215.0
             ],
             "interp": "smooth"
@@ -1341,7 +1531,7 @@
             "time": 132.29999999999998,
             "value": [
               1064.0,
-              91.7,
+              83.7,
               -243.0
             ],
             "interp": "smooth"
@@ -1350,7 +1540,7 @@
             "time": 133.29999999999998,
             "value": [
               1194.0,
-              131.7,
+              123.7,
               -283.0
             ],
             "interp": "smooth"
@@ -1359,7 +1549,7 @@
             "time": 134.6,
             "value": [
               1354.0,
-              196.7,
+              188.7,
               -333.0
             ],
             "interp": "smooth"
@@ -1368,7 +1558,7 @@
             "time": 150.0,
             "value": [
               1354.0,
-              196.7,
+              188.7,
               -333.0
             ],
             "interp": "smooth"
@@ -1382,7 +1572,7 @@
             "time": 118.0,
             "value": [
               1344.0,
-              194.7,
+              186.7,
               -63.0
             ],
             "interp": "smooth"
@@ -1391,7 +1581,7 @@
             "time": 130.6,
             "value": [
               1344.0,
-              194.7,
+              186.7,
               -63.0
             ],
             "interp": "smooth"
@@ -1400,7 +1590,7 @@
             "time": 131.79999999999998,
             "value": [
               1184.0,
-              132.7,
+              124.7,
               -118.0
             ],
             "interp": "smooth"
@@ -1409,7 +1599,7 @@
             "time": 133.0,
             "value": [
               1044.0,
-              90.7,
+              82.7,
               -165.0
             ],
             "interp": "smooth"
@@ -1418,7 +1608,7 @@
             "time": 134.0,
             "value": [
               924.0,
-              68.7,
+              60.7,
               -195.0
             ],
             "interp": "smooth"
@@ -1427,7 +1617,7 @@
             "time": 134.6,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1436,7 +1626,7 @@
             "time": 150.0,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1500,7 +1690,7 @@
             "time": 118.0,
             "value": [
               1344.0,
-              191.7,
+              183.7,
               -63.0
             ],
             "interp": "smooth"
@@ -1509,7 +1699,7 @@
             "time": 130.6,
             "value": [
               1344.0,
-              191.7,
+              183.7,
               -63.0
             ],
             "interp": "smooth"
@@ -1518,7 +1708,7 @@
             "time": 131.79999999999998,
             "value": [
               1184.0,
-              129.7,
+              121.7,
               -118.0
             ],
             "interp": "smooth"
@@ -1527,7 +1717,7 @@
             "time": 133.0,
             "value": [
               1044.0,
-              87.7,
+              79.7,
               -165.0
             ],
             "interp": "smooth"
@@ -1536,7 +1726,7 @@
             "time": 134.0,
             "value": [
               924.0,
-              65.7,
+              57.7,
               -195.0
             ],
             "interp": "smooth"
@@ -1545,7 +1735,7 @@
             "time": 134.6,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1554,7 +1744,7 @@
             "time": 150.0,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1568,7 +1758,7 @@
             "time": 118.0,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1577,7 +1767,7 @@
             "time": 135.8,
             "value": [
               834.0,
-              64.7,
+              56.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1586,7 +1776,7 @@
             "time": 136.4,
             "value": [
               886.0,
-              65.2,
+              57.2,
               -203.0
             ],
             "interp": "smooth"
@@ -1595,7 +1785,7 @@
             "time": 137.20000000000002,
             "value": [
               959.0,
-              72.7,
+              64.7,
               -191.0
             ],
             "interp": "smooth"
@@ -1604,7 +1794,7 @@
             "time": 138.1,
             "value": [
               1064.0,
-              94.7,
+              86.7,
               -163.0
             ],
             "interp": "smooth"
@@ -1613,7 +1803,7 @@
             "time": 139.1,
             "value": [
               1194.0,
-              134.7,
+              126.7,
               -123.0
             ],
             "interp": "smooth"
@@ -1622,7 +1812,7 @@
             "time": 140.4,
             "value": [
               1354.0,
-              199.7,
+              191.7,
               -73.0
             ],
             "interp": "smooth"
@@ -1631,7 +1821,7 @@
             "time": 150.0,
             "value": [
               1354.0,
-              199.7,
+              191.7,
               -73.0
             ],
             "interp": "smooth"
@@ -1704,7 +1894,7 @@
             "time": 118.0,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1713,7 +1903,7 @@
             "time": 135.8,
             "value": [
               834.0,
-              61.7,
+              53.7,
               -203.0
             ],
             "interp": "smooth"
@@ -1722,7 +1912,7 @@
             "time": 136.4,
             "value": [
               886.0,
-              62.2,
+              54.2,
               -203.0
             ],
             "interp": "smooth"
@@ -1731,7 +1921,7 @@
             "time": 137.20000000000002,
             "value": [
               959.0,
-              69.7,
+              61.7,
               -191.0
             ],
             "interp": "smooth"
@@ -1740,7 +1930,7 @@
             "time": 138.1,
             "value": [
               1064.0,
-              91.7,
+              83.7,
               -163.0
             ],
             "interp": "smooth"
@@ -1749,7 +1939,7 @@
             "time": 139.1,
             "value": [
               1194.0,
-              131.7,
+              123.7,
               -123.0
             ],
             "interp": "smooth"
@@ -1758,7 +1948,7 @@
             "time": 140.4,
             "value": [
               1354.0,
-              196.7,
+              188.7,
               -73.0
             ],
             "interp": "smooth"
@@ -1767,7 +1957,7 @@
             "time": 150.0,
             "value": [
               1354.0,
-              196.7,
+              188.7,
               -73.0
             ],
             "interp": "smooth"
@@ -2350,352 +2540,761 @@
         ]
       },
       {
-        "target": "moon/nodes/earth-halo-2/scale",
+        "target": "ocean/nodes/bay-strips/emissiveBoost",
         "keys": [
           {
-            "time": 32.0,
+            "time": 133.6,
+            "value": 1.0,
+            "interp": "linear"
+          },
+          {
+            "time": 134.1,
+            "value": 0.25,
+            "interp": "linear"
+          },
+          {
+            "time": 134.3,
+            "value": 0.9,
+            "interp": "linear"
+          },
+          {
+            "time": 134.9,
+            "value": 0.1,
+            "interp": "linear"
+          },
+          {
+            "time": 135.1,
+            "value": 0.55,
+            "interp": "linear"
+          },
+          {
+            "time": 135.8,
+            "value": 0.0,
+            "interp": "linear"
+          }
+        ]
+      },
+      {
+        "target": "camera/exposure/compensation",
+        "keys": [
+          {
+            "time": 0.0,
             "value": [
-              88.35000000000001,
-              88.35000000000001,
-              88.35000000000001
+              0.5
             ],
             "interp": "smooth"
           },
           {
-            "time": 32.775,
+            "time": 31.025,
             "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
+              0.5
             ],
             "interp": "smooth"
           },
           {
-            "time": 33.55,
+            "time": 33.025,
             "value": [
-              88.35000000000005,
-              88.35000000000005,
-              88.35000000000005
+              0.0
             ],
             "interp": "smooth"
           },
           {
-            "time": 34.325,
+            "time": 68.655,
             "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
+              0.0
             ],
             "interp": "smooth"
           },
           {
-            "time": 35.1,
+            "time": 70.655,
             "value": [
-              88.34999999999994,
-              88.34999999999994,
-              88.34999999999994
+              1.0
             ],
             "interp": "smooth"
           },
           {
-            "time": 35.875,
+            "time": 120.217,
             "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
+              1.0
             ],
             "interp": "smooth"
           },
           {
-            "time": 36.65,
+            "time": 122.217,
             "value": [
-              88.35000000000012,
-              88.35000000000012,
-              88.35000000000012
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 37.425,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 38.2,
-            "value": [
-              88.34999999999987,
-              88.34999999999987,
-              88.34999999999987
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 38.975,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 39.75,
-            "value": [
-              88.35000000000018,
-              88.35000000000018,
-              88.35000000000018
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 40.525,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 41.3,
-            "value": [
-              88.34999999999978,
-              88.34999999999978,
-              88.34999999999978
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 42.075,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 42.85,
-            "value": [
-              88.35000000000028,
-              88.35000000000028,
-              88.35000000000028
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 43.625,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 44.4,
-            "value": [
-              88.34999999999971,
-              88.34999999999971,
-              88.34999999999971
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 45.175,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 45.95,
-            "value": [
-              88.35000000000034,
-              88.35000000000034,
-              88.35000000000034
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 46.725,
-            "value": [
-              82.16550000000001,
-              82.16550000000001,
-              82.16550000000001
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 47.5,
-            "value": [
-              88.34999999999964,
-              88.34999999999964,
-              88.34999999999964
-            ],
-            "interp": "smooth"
-          },
-          {
-            "time": 48.275,
-            "value": [
-              94.53450000000001,
-              94.53450000000001,
-              94.53450000000001
+              0.0
             ],
             "interp": "smooth"
           }
         ]
       },
       {
-        "target": "moon/nodes/earth-halo-3/scale",
+        "target": "post/grade/contrast",
         "keys": [
           {
-            "time": 32.0,
+            "time": 0.0,
             "value": [
-              110.73808237856473,
-              110.73808237856473,
-              110.73808237856473
+              1.38
             ],
             "interp": "smooth"
           },
           {
-            "time": 33.075,
+            "time": 31.025,
             "value": [
-              102.61607068309887,
-              102.61607068309887,
-              102.61607068309887
+              1.38
             ],
             "interp": "smooth"
           },
           {
-            "time": 34.15,
+            "time": 33.025,
             "value": [
-              96.3619176214353,
-              96.3619176214353,
-              96.3619176214353
+              1.15
             ],
             "interp": "smooth"
           },
           {
-            "time": 35.225,
+            "time": 46.87,
             "value": [
-              104.4839293169012,
-              104.4839293169012,
-              104.4839293169012
+              1.15
             ],
             "interp": "smooth"
           },
           {
-            "time": 36.3,
+            "time": 48.87,
             "value": [
-              110.73808237856471,
-              110.73808237856471,
-              110.73808237856471
+              1.14
             ],
             "interp": "smooth"
           },
           {
-            "time": 37.375,
+            "time": 68.655,
             "value": [
-              102.61607068309876,
-              102.61607068309876,
-              102.61607068309876
+              1.14
             ],
             "interp": "smooth"
           },
           {
-            "time": 38.45,
+            "time": 70.655,
             "value": [
-              96.36191762143531,
-              96.36191762143531,
-              96.36191762143531
+              1.12
             ],
             "interp": "smooth"
           },
           {
-            "time": 39.525,
+            "time": 92.46,
             "value": [
-              104.48392931690134,
-              104.48392931690134,
-              104.48392931690134
+              1.12
             ],
             "interp": "smooth"
           },
           {
-            "time": 40.6,
+            "time": 94.46,
             "value": [
-              110.73808237856471,
-              110.73808237856471,
-              110.73808237856471
+              1.14
             ],
             "interp": "smooth"
           },
           {
-            "time": 41.675,
+            "time": 120.217,
             "value": [
-              102.61607068309864,
-              102.61607068309864,
-              102.61607068309864
+              1.14
             ],
             "interp": "smooth"
           },
           {
-            "time": 42.75,
+            "time": 122.217,
             "value": [
-              96.36191762143532,
-              96.36191762143532,
-              96.36191762143532
+              1.0
             ],
             "interp": "smooth"
           },
           {
-            "time": 43.825,
+            "time": 146.017,
             "value": [
-              104.48392931690145,
-              104.48392931690145,
-              104.48392931690145
+              1.0
             ],
             "interp": "smooth"
           },
           {
-            "time": 44.9,
+            "time": 148.017,
             "value": [
-              110.73808237856468,
-              110.73808237856468,
-              110.73808237856468
+              1.18
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/grade/saturation",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              1.22
             ],
             "interp": "smooth"
           },
           {
-            "time": 45.975,
+            "time": 31.025,
             "value": [
-              102.61607068309851,
-              102.61607068309851,
-              102.61607068309851
+              1.22
             ],
             "interp": "smooth"
           },
           {
-            "time": 47.05,
+            "time": 33.025,
             "value": [
-              96.36191762143535,
-              96.36191762143535,
-              96.36191762143535
+              1.08
             ],
             "interp": "smooth"
           },
           {
-            "time": 48.125,
+            "time": 46.87,
             "value": [
-              104.48392931690155,
-              104.48392931690155,
-              104.48392931690155
+              1.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              1.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              1.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              1.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              1.2
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/bloom/intensity",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.015
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.015
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.09
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.09
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.08
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.07
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/halation/intensity",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.35
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.35
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.4
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.4
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.15
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/output/vignette",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.18
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.2
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.2
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.22
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/look/localContrast",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.3
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.3
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.1
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.1
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.12
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.15
+            ],
+            "interp": "smooth"
+          }
+        ]
+      },
+      {
+        "target": "post/grade/temperature",
+        "keys": [
+          {
+            "time": 0.0,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 31.025,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 33.025,
+            "value": [
+              -0.06
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 46.87,
+            "value": [
+              -0.06
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 48.87,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 68.655,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 70.655,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 92.46,
+            "value": [
+              0.04
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 94.46,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 120.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 122.217,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 146.017,
+            "value": [
+              0.0
+            ],
+            "interp": "smooth"
+          },
+          {
+            "time": 148.017,
+            "value": [
+              0.0
             ],
             "interp": "smooth"
           }
@@ -2714,11 +3313,11 @@
             "interp": "linear"
           },
           {
-            "time": 102.0,
+            "time": 94.0,
             "value": [
-              621.9303270443503,
+              621.4623689729926,
               35.2,
-              2038.9419052882188
+              2042.1075040062262
             ],
             "interp": "linear"
           }
@@ -2737,11 +3336,11 @@
             "interp": "linear"
           },
           {
-            "time": 102.0,
+            "time": 94.0,
             "value": [
-              622.4119797710315,
+              621.9440216996738,
               37.31,
-              2038.54204199798
+              2041.7076407159875
             ],
             "interp": "linear"
           }
@@ -2976,90 +3575,6 @@
           },
           {
             "time": 92.12049999999996,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.09999999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.10049999999995,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.21999999999996,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.22049999999996,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.19999999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.20049999999995,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.31999999999995,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.32049999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.29999999999994,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.30049999999994,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.41999999999994,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.42049999999995,
             "value": [
               0.0
             ],
@@ -3300,90 +3815,6 @@
               0.0
             ],
             "interp": "step"
-          },
-          {
-            "time": 95.09999999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.10049999999995,
-            "value": [
-              900.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.21999999999996,
-            "value": [
-              900.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 95.22049999999996,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.19999999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.20049999999995,
-            "value": [
-              900.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.31999999999995,
-            "value": [
-              900.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 98.32049999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.29999999999994,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.30049999999994,
-            "value": [
-              900.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.41999999999994,
-            "value": [
-              900.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.42049999999995,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
           }
         ]
       },
@@ -3400,11 +3831,11 @@
             "interp": "linear"
           },
           {
-            "time": 102.0,
+            "time": 94.0,
             "value": [
-              622.4119797710315,
+              621.9440216996738,
               37.31,
-              2038.54204199798
+              2041.7076407159875
             ],
             "interp": "linear"
           }
@@ -3593,63 +4024,6 @@
           },
           {
             "time": 94.0,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          }
-        ]
-      },
-      {
-        "target": "mars/nodes/track-new-10/visible",
-        "keys": [
-          {
-            "time": 0.0,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 96.5,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          }
-        ]
-      },
-      {
-        "target": "mars/nodes/track-new-11/visible",
-        "keys": [
-          {
-            "time": 0.0,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 99.0,
-            "value": [
-              1.0
-            ],
-            "interp": "step"
-          }
-        ]
-      },
-      {
-        "target": "mars/nodes/track-new-12/visible",
-        "keys": [
-          {
-            "time": 0.0,
-            "value": [
-              0.0
-            ],
-            "interp": "step"
-          },
-          {
-            "time": 101.5,
             "value": [
               1.0
             ],

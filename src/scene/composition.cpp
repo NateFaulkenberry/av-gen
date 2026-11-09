@@ -76,7 +76,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "fogSpectral", "waterSurface", "waterDownwelling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "aoRadius", "horizonFill", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -1385,6 +1385,10 @@ void Composition::updateAttractorWorld() {
         sun.direction = -attractorSunDirection(*live.world, live.live);
         sun.intensity = attractorWorld_.sunLux * live.live.sunIntensity;
         sun.color = attractorSunColor(live.live);
+        // ADR-1907: the key's shadow follows the look too
+        sun.shadowBias = live.live.sunShadowBias >= 0.0f ? live.live.sunShadowBias : attractorWorld_.sunShadowBias;
+        sun.contactShadow = live.live.sunContact > 0.5f;
+        sun.castsShadow = live.live.sunCasts > 0.5f;
     }
     // ADR-1862: the program's audio-reactive inputs ride on the chunks' material emission (the `materialEmission`
     // input): r contour, g glow. The program writes its own emission, so the carrier is never drawn as itself.
@@ -5332,6 +5336,13 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // BELOW the basin in valleys, which is the opposite of pooling.
     fogPooling_ = &params.add(floatDesc(prefix_ + "scene/fogPooling", volumeSetting_.fogPooling, 0.0f, 1.0f, 0.0f,
                                         1.0f));
+    // ADR-1908: the surface fog's extinction by colour (0 0 0 = the grey fog, unchanged)
+    fogSpectral_ = &params.add(vec3Desc(prefix_ + "scene/fogSpectral", volumeSetting_.fogSpectral, 0.0f, 20.0f, 0.0f, 4.0f));
+    // ADR-1910: the water column's surface (world y) and its absorption of light per metre, by channel (0 = off)
+    waterSurface_ = &params.add(floatDesc(prefix_ + "scene/waterSurface", volumeSetting_.waterSurface, -100000.0f,
+                                          100000.0f, -1000.0f, 1000.0f));
+    waterDownwelling_ = &params.add(vec3Desc(prefix_ + "scene/waterDownwelling", volumeSetting_.waterDownwelling, 0.0f,
+                                             2.0f, 0.0f, 0.2f));
     // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
     // march, the surface pass and the particle estimate from this one number. An ordinary
     // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
@@ -6572,6 +6583,9 @@ void Composition::detach() {
     fogHeightCurve_ = nullptr;
     fogGroundFollow_ = nullptr;
     fogPooling_ = nullptr;
+    fogSpectral_ = nullptr;
+    waterSurface_ = nullptr;
+    waterDownwelling_ = nullptr;
     horizonDensity_ = nullptr;
     bandParams_ = {}; // ADR-1151
     windEnabled_ = nullptr;
@@ -8253,7 +8267,10 @@ void Composition::rebuild() {
         sun.color = attractorSunColor(attractorWorld_.look);
         sun.intensity = attractorWorld_.sunLux * attractorWorld_.look.sunIntensity;
         sun.castsShadow = true;
-        sun.shadowBias = attractorWorld_.sunShadowBias; // a low sun over kilometres of rock: the default acnes
+        sun.shadowBias = attractorWorld_.look.sunShadowBias >= 0.0f ? attractorWorld_.look.sunShadowBias
+                                                                    : attractorWorld_.sunShadowBias; // ADR-1907
+        sun.contactShadow = attractorWorld_.look.sunContact > 0.5f;
+        sun.castsShadow = attractorWorld_.look.sunCasts > 0.5f;
         attractorSunLight_ = static_cast<int>(scene_.lights.size());
         scene_.addLight(std::move(sun));
     }
@@ -10006,6 +10023,9 @@ void Composition::applyParameters() {
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
         env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
         env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
+        env.fogSpectral = fogSpectral_ != nullptr ? fogSpectral_->value() : volumeSetting_.fogSpectral; // ADR-1908
+        env.waterSurface = pick(waterSurface_, volumeSetting_.waterSurface);                              // ADR-1910
+        env.waterDownwelling = waterDownwelling_ != nullptr ? waterDownwelling_->value() : volumeSetting_.waterDownwelling;
         env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.bands = volumeSetting_.bands; // ADR-1151
         scene::applyReflectionBandParameters(bandParams_, env.bands);
@@ -11275,6 +11295,17 @@ nlohmann::json Composition::toJson() const {
         if (pooling != 0.0f) {
             environment["fogPooling"] = pooling;
         }
+        // ADR-1908, by the same rule
+        const glm::vec3 spectral = fogSpectral_ != nullptr ? fogSpectral_->base() : volumeSetting_.fogSpectral;
+        if (spectral != glm::vec3(0.0f)) {
+            environment["fogSpectral"] = {spectral.x, spectral.y, spectral.z};
+        }
+        // ADR-1910, by the same rule: the column is written only when it absorbs
+        const glm::vec3 down = waterDownwelling_ != nullptr ? waterDownwelling_->base() : volumeSetting_.waterDownwelling;
+        if (down != glm::vec3(0.0f)) {
+            environment["waterDownwelling"] = {down.x, down.y, down.z};
+            environment["waterSurface"] = waterSurface_ != nullptr ? waterSurface_->base() : volumeSetting_.waterSurface;
+        }
     }
     // ADR-1151: written only when authored, with the parameters' base values, so a scene without bands
     // saves exactly the file it had.
@@ -11930,6 +11961,9 @@ nlohmann::json Composition::toJson() const {
             for (const glm::vec4& w : b.flight) flight.push_back({w.x, w.y, w.z, w.w});
             nlohmann::json pj = {{"world", b.world}, {"exit", {b.exit.x, b.exit.y, b.exit.z}}, {"exitYaw", b.exitYaw}, {"flight", flight}};
             if (b.join.z > 0.0f) pj["join"] = {b.join.x, b.join.y, b.join.z};
+            if (b.lookAhead != 1.2f) pj["lookAhead"] = b.lookAhead; // ADR-1909: written only when set
+            if (b.lookDown != 0.1f) pj["lookDown"] = b.lookDown;
+            if (b.climbLook != 0.25f) pj["climbLook"] = b.climbLook;
             if (!b.aims.empty()) {
                 nlohmann::json aims = nlohmann::json::array();
                 for (const auto& a : b.aims) aims.push_back({a[0], a[1], a[2], a[3], a[4]});
@@ -12466,6 +12500,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             comp->volumeSetting_.tileDynamics = std::move(*dyn);
             comp->tileDynamicsAuthored_ = true;
         }
+        if (e.contains("fogSpectral")) { // ADR-1908
+            auto value = readVec<3>(e, "fogSpectral", comp->volumeSetting_.fogSpectral);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogSpectral = *value;
+        }
+        if (e.contains("waterDownwelling")) { // ADR-1910
+            auto value = readVec<3>(e, "waterDownwelling", comp->volumeSetting_.waterDownwelling);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.waterDownwelling = glm::max(*value, glm::vec3(0.0f));
+        }
+        if (e.contains("waterSurface")) { // ADR-1910
+            auto value = readFloat(e, "waterSurface", comp->volumeSetting_.waterSurface);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.waterSurface = *value;
+        }
         {
             scene::Environment& v = comp->volumeSetting_;
             struct FloatKey {
@@ -12963,6 +13018,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                        a.at(4).get<float>()});
                 }
             }
+            pb.lookAhead = pj.value("lookAhead", pb.lookAhead); // ADR-1909
+            pb.lookDown = pj.value("lookDown", pb.lookDown);
+            pb.climbLook = pj.value("climbLook", pb.climbLook);
             vec3At("entryUp", pb.entryUp);
             vec3At("exitUp", pb.exitUp);
             if (pj.contains("entry")) { // ADR-1895
@@ -12977,7 +13035,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             for (auto it = pj.begin(); it != pj.end(); ++it) {
                 if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join" &&
                     it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp" && it.key() != "aims" &&
-                    it.key() != "entry" && it.key() != "entryAxis") {
+                    it.key() != "entry" && it.key() != "entryAxis" && it.key() != "lookAhead" && it.key() != "lookDown" &&
+                    it.key() != "climbLook") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }

@@ -261,7 +261,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
         raw[static_cast<std::size_t>(k)] = glm::mix(vista, river, b);
     }
     // smooth (the odd-reflected ends keep the vista's linear push exact at frame 0)
-    const std::vector<glm::vec3> path = smoothSamples(raw, 0.6f * rate);
+    const std::vector<glm::vec3> path = smoothSamples(raw, std::max(g.flightSmooth, 0.05f) * rate); // ADR-1911
     // Height (ADR-1854). The clearance is the highest ground within 22 m, plus a margin; it moves by metres from one
     // sample to the next as the path crosses metre-scale relief, so it must never reach the camera directly (Gate 2b
     // re-clamped to it after smoothing, and that noise -- magnified by the look-ahead -- was the jitter). So: lift by a
@@ -298,7 +298,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
     for (std::size_t i = 0; i < path.size(); ++i) eyes[i] = glm::vec3(path[i].x, ys[i], path[i].z);
     // Aim (ADR-1854): from the smooth eye path 2.5 s ahead (the tangent extended past the end), a little below it, the
     // pitch held softly between -28 and +8 degrees; then smoothed itself, so no clamp or sample can kink it.
-    const int ahead = static_cast<int>(2.5f * rate);
+    const int ahead = std::max(1, static_cast<int>(g.flightLookAhead * rate)); // ADR-1909
     const int last = static_cast<int>(eyes.size()) - 1;
     std::vector<glm::vec3> aim(eyes.size());
     for (int i = 0; i <= last; ++i) {
@@ -311,7 +311,7 @@ void buildFlight(AttractorWorld& w, const AttractorGen& g, float Lb, float L1) {
         }
         glm::vec3 d = target - eyes[static_cast<std::size_t>(i)];
         // looking a little down at the river; on the approach (ADR-1881), level at the aperture
-        d.y -= 0.12f * glm::length(d) * (onApproach[static_cast<std::size_t>(i)] ? 0.0f : 1.0f);
+        d.y -= g.flightLookDown * glm::length(d) * (onApproach[static_cast<std::size_t>(i)] ? 0.0f : 1.0f); // ADR-1909
         const float flat = std::max(glm::length(glm::vec2(d.x, d.z)), 1e-3f);
         const float raw = std::atan2(d.y, flat);
         // a soft clamp: -28..+8 degrees through tanh, so the limit is approached smoothly
@@ -620,6 +620,7 @@ Result<void> AttractorGen::validate() const {
         return fail("attractorWorld: mars needs mesaCover in [0, 1], yardangs in [0, 60] and dunes in [0, 40]");
     }
     if (!(flightSeconds >= 20.0f && flightSeconds <= 120.0f)) return fail("attractorWorld: flightSeconds must be in [20, 120]");
+    if (!(flightSmooth >= 0.05f && flightSmooth <= 20.0f)) return fail("attractorWorld: flightSmooth must be in [0.05, 20] seconds"); // ADR-1911
     if (!(meshSpacing >= 0.5f && meshSpacing <= 16.0f)) return fail("attractorWorld: meshSpacing must be in [0.5, 16] m");
     if (!(meshError > 0.0f && meshError <= 0.05f) || !(meshMinError > 0.0f && meshMinError <= 10.0f)) {
         return fail("attractorWorld: meshError must be in (0, 0.05] and meshMinError in (0, 10] m");
@@ -647,6 +648,13 @@ std::uint64_t AttractorGen::hash() const {
     if (worldScale != 1.0f) h = mixHashF(h ^ 0x1893ull, worldScale); // ADR-1893: absent, the hash is unchanged
     if (mars) { // ADR-1902: absent, the hash is unchanged
         for (float v : {mesaCover, yardangs, wind, dunes}) h = mixHashF(h ^ 0x1902ull, v);
+    }
+    if (flightLookAhead != 2.5f || flightLookDown != 0.12f) { // ADR-1909: hashed only when set (worlds keep their keys)
+        h = mixHashF(h ^ 0x1909ull, flightLookAhead);
+        h = mixHashF(h ^ 0x1909ull, flightLookDown);
+    }
+    if (flightSmooth != 0.6f) { // ADR-1911: hashed only when set
+        h = mixHashF(h ^ 0x1911ull, flightSmooth);
     }
     for (const Pad& p : pads) { // ADR-1897
         for (float v : {p.x, p.z, p.radius, p.level}) h = mixHashF(h ^ 0x1897ull, v);
@@ -1471,9 +1479,10 @@ constexpr std::pair<const char*, float WaterSettings::*> kAttractorWaterFloats[]
 constexpr std::string_view kKeys[] = {"enabled", "camera", "seed", "resolution", "extent", "terrainScale",
                                       "roughness", "ridgeStrength", "domainWarp", "terraces", "erosion", "strataFold",
                                       "branchingDensity", "flightSeconds", "meshSpacing", "meshError",
-                                      "meshMinError", "worldScale", "pads", "mars", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
+                                      "meshMinError", "worldScale", "pads", "mars", "flightLookAhead", "flightLookDown", "flightSmooth", "water", "terrainProgram", "sunLux", "sunShadowBias", "look",
                                       "approach"};
-constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth"};
+constexpr std::string_view kLookKeys[] = {"sunAzimuth", "sunElevation", "sunIntensity", "contour", "glow", "contourGain", "sunWarmth",
+                                          "sunShadowBias", "sunContact", "sunCasts"};
 
 } // namespace
 
@@ -1510,6 +1519,9 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
     g.meshError = j.value("meshError", g.meshError);
     g.meshMinError = j.value("meshMinError", g.meshMinError);
     g.worldScale = j.value("worldScale", g.worldScale); // ADR-1893
+    g.flightLookAhead = j.value("flightLookAhead", g.flightLookAhead); // ADR-1909
+    g.flightLookDown = j.value("flightLookDown", g.flightLookDown);
+    g.flightSmooth = j.value("flightSmooth", g.flightSmooth); // ADR-1911
     if (j.contains("mars")) { // ADR-1902
         const json& mj = j.at("mars");
         if (!mj.is_object()) return fail("attractorWorld: 'mars' must be an object");
@@ -1597,6 +1609,9 @@ Result<AttractorWorldBlock> attractorWorldFromJson(const json& j) try {
         k.glow = l.value("glow", k.glow);
         k.contourGain = l.value("contourGain", k.contourGain);
         k.sunWarmth = l.value("sunWarmth", k.sunWarmth);
+        k.sunShadowBias = l.value("sunShadowBias", k.sunShadowBias); // ADR-1907
+        k.sunContact = l.value("sunContact", k.sunContact);
+        k.sunCasts = l.value("sunCasts", k.sunCasts);
     }
     a.liveGen = a.gen;
     a.live = a.look;
@@ -1656,7 +1671,13 @@ json attractorWorldToJson(const AttractorWorldBlock& a) {
     if (g.mars) { // ADR-1902
         out["mars"] = {{"mesaCover", g.mesaCover}, {"yardangs", g.yardangs}, {"wind", g.wind}, {"dunes", g.dunes}};
     }
+    if (g.flightLookAhead != 2.5f) out["flightLookAhead"] = g.flightLookAhead; // ADR-1909
+    if (g.flightLookDown != 0.12f) out["flightLookDown"] = g.flightLookDown;
+    if (g.flightSmooth != 0.6f) out["flightSmooth"] = g.flightSmooth; // ADR-1911
     if (k.sunWarmth != 1.0f) out["look"]["sunWarmth"] = k.sunWarmth; // ADR-1900: absent, the warm sun
+    if (k.sunShadowBias >= 0.0f) out["look"]["sunShadowBias"] = k.sunShadowBias; // ADR-1907: absent, the block's
+    if (k.sunContact != 1.0f) out["look"]["sunContact"] = k.sunContact;
+    if (k.sunCasts != 1.0f) out["look"]["sunCasts"] = k.sunCasts;
     if (!g.pads.empty()) { // ADR-1897
         json pads = json::array();
         for (const AttractorGen::Pad& p : g.pads) pads.push_back({{"x", p.x}, {"z", p.z}, {"radius", p.radius}, {"level", p.level}});
@@ -1753,6 +1774,10 @@ AttractorWorldParameters registerAttractorWorldParameters(params::ParameterSet& 
     r.f("glow", "wall glow", "Materials and Atmosphere", k.glow, 0.0f, 4.0f);
     r.f("contourGain", "contour gain (a look's)", "Materials and Atmosphere", k.contourGain, 0.0f, 1.0f);
     r.f("sunWarmth", "key light warmth (1 sun, 0 moon)", "Materials and Atmosphere", k.sunWarmth, 0.0f, 1.0f);
+    // ADR-1907: the key's shadow, per look
+    r.f("sunShadowBias", "key shadow bias (m; < 0 the block's)", "Materials and Atmosphere", k.sunShadowBias, -1.0f, 10.0f);
+    r.f("sunContact", "key contact shadows (0/1)", "Materials and Atmosphere", k.sunContact, 0.0f, 1.0f);
+    r.f("sunCasts", "key casts shadows (0/1)", "Materials and Atmosphere", k.sunCasts, 0.0f, 1.0f);
     r.i("camera", "camera (0 the scene's, 1 the composed vista, 2 the flythrough)", "Animation and Camera",
         static_cast<int>(rest.camera), 0, 2);
     return p;
@@ -1780,6 +1805,9 @@ void applyAttractorWorldParameters(const AttractorWorldParameters& p, const Attr
     k.glow = fval(p, "glow", k.glow);
     k.contourGain = fval(p, "contourGain", k.contourGain);
     k.sunWarmth = fval(p, "sunWarmth", k.sunWarmth);
+    k.sunShadowBias = fval(p, "sunShadowBias", k.sunShadowBias); // ADR-1907
+    k.sunContact = fval(p, "sunContact", k.sunContact);
+    k.sunCasts = fval(p, "sunCasts", k.sunCasts);
     live.live = k;
     live.cameraMode = std::clamp(ival(p, "camera", static_cast<int>(rest.camera)), 0, 2);
 }

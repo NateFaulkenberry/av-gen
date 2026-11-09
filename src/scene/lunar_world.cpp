@@ -81,6 +81,37 @@ struct Field {
     [[nodiscard]] float x(int i) const { return -extent * 0.5f + static_cast<float>(i) * spacing; }
 };
 
+// ADR-1912: inside `clear` metres of a hero's centre, each texel becomes the mean of its ring round that centre, blended
+// back to the ground over the outer 30%: whatever overprinted the floor is gone, and the bowl's own shape stays.
+void clearHeroFloor(Field& f, const LunarCrater& c) {
+    const float dr = f.spacing;
+    const int bins = static_cast<int>(c.clear / dr) + 2;
+    std::vector<double> sum(static_cast<std::size_t>(bins), 0.0);
+    std::vector<int> count(static_cast<std::size_t>(bins), 0);
+    const int i0 = std::max(0, static_cast<int>((c.x - c.clear + f.extent * 0.5f) / f.spacing));
+    const int i1 = std::min(f.n - 1, static_cast<int>((c.x + c.clear + f.extent * 0.5f) / f.spacing) + 1);
+    const int j0 = std::max(0, static_cast<int>((c.z - c.clear + f.extent * 0.5f) / f.spacing));
+    const int j1 = std::min(f.n - 1, static_cast<int>((c.z + c.clear + f.extent * 0.5f) / f.spacing) + 1);
+    for (int pass = 0; pass < 2; ++pass) {
+        for (int j = j0; j <= j1; ++j) {
+            for (int i = i0; i <= i1; ++i) {
+                const float r = std::hypot(f.x(i) - c.x, f.x(j) - c.z);
+                if (r > c.clear) continue;
+                const int b = static_cast<int>(r / dr);
+                float& h = f.h[static_cast<std::size_t>(j) * f.n + i];
+                if (pass == 0) {
+                    sum[static_cast<std::size_t>(b)] += h;
+                    ++count[static_cast<std::size_t>(b)];
+                } else {
+                    const float mean = static_cast<float>(sum[static_cast<std::size_t>(b)] / std::max(count[static_cast<std::size_t>(b)], 1));
+                    const float t = std::clamp((c.clear - r) / (0.3f * c.clear), 0.0f, 1.0f);
+                    h += (mean - h) * t * t * (3.0f - 2.0f * t);
+                }
+            }
+        }
+    }
+}
+
 void applyCraters(Field& f, const std::vector<LunarCrater>& craters, std::uint32_t seed) {
     for (const LunarCrater& c : craters) {
         const float R = c.diameter * 0.5f;
@@ -405,6 +436,7 @@ std::uint64_t LunarGen::hash() const {
     if (curvature != 1737.4e3f) mix(curvature);
     for (const LunarCrater& c : heroes) {
         for (float v : {c.x, c.z, c.diameter, c.fresh}) mix(v);
+        if (c.clear != 0.0f) mix(c.clear); // ADR-1912: absent, the hash is the Moon's as before
     }
     // ADR-1896: absent, the hash is the Moon's as before
     for (const LunarMesa& m : mesas) {
@@ -443,6 +475,9 @@ std::shared_ptr<const LunarWorld> generateLunarWorld(const LunarGen& gen) {
     const auto small = population(gen, area, 2.5f * gen.spacing, 400.0f, rng);
     craters.insert(craters.end(), small.begin(), small.end());
     Field fine = buildField(gen, gen.extent, gen.spacing, craters);
+    for (const LunarCrater& c : gen.heroes) {
+        if (c.clear > 0.0f) clearHeroFloor(fine, c); // ADR-1912
+    }
     // the skirt: the big craters only, and many more out to the horizon, sunk under the tile
     std::vector<LunarCrater> big;
     for (const LunarCrater& c : craters) {
@@ -549,6 +584,7 @@ Result<LunarWorldBlock> lunarWorldFromJson(const json& j) try {
             c.z = h.value("z", 0.0f);
             c.diameter = h.value("diameter", 100.0f);
             c.fresh = h.value("fresh", 0.9f);
+            c.clear = h.value("clear", 0.0f); // ADR-1912
             g.heroes.push_back(c);
         }
     }
@@ -581,7 +617,11 @@ Result<LunarWorldBlock> lunarWorldFromJson(const json& j) try {
 json lunarWorldToJson(const LunarWorldBlock& b) {
     const LunarGen& g = b.gen;
     json heroes = json::array();
-    for (const LunarCrater& c : g.heroes) heroes.push_back({{"x", c.x}, {"z", c.z}, {"diameter", c.diameter}, {"fresh", c.fresh}});
+    for (const LunarCrater& c : g.heroes) {
+        json h = {{"x", c.x}, {"z", c.z}, {"diameter", c.diameter}, {"fresh", c.fresh}};
+        if (c.clear != 0.0f) h["clear"] = c.clear; // ADR-1912
+        heroes.push_back(std::move(h));
+    }
     json out{{"enabled", b.enabled}, {"seed", g.seed},       {"extent", g.extent},   {"spacing", g.spacing},
                 {"skirtExtent", g.skirtExtent}, {"skirtSpacing", g.skirtSpacing}, {"craters", g.craters},
                 {"rocks", g.rocks},     {"relief", g.relief},   {"heroes", heroes},     {"program", b.program},

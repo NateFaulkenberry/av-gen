@@ -696,10 +696,11 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
     let totalLights = u32(frame.lightCounts.y + 0.5);
     if (frame.clusterParams.w > 0.5) {
         // Directional lights reach every fragment, so they never enter the grid.
+        let down = waterDownwelling(ctx.worldPos); // ADR-1910: 1 unless the scene has a water column
         for (var i = 0u; i < directional; i = i + 1u) {
             let s = evaluateLightAny(i, ctx);
-            total.diffuse = total.diffuse + s.diffuse;
-            total.specular = total.specular + s.specular;
+            total.diffuse = total.diffuse + s.diffuse * down;
+            total.specular = total.specular + s.specular * down;
         }
         let cluster = clusterIndexFor(ctx.screenUv, ctx.viewDepth);
         let clusterCount = u32(frame.clusterParams.x * frame.clusterParams.y * frame.clusterParams.z);
@@ -714,8 +715,9 @@ fn directLighting(ctx: ShadeContext) -> LightSample {
                 continue;
             }
             let s = evaluateLightAny(index, ctx);
-            total.diffuse = total.diffuse + s.diffuse;
-            total.specular = total.specular + s.specular;
+            let path = waterPathFrom(sceneLights[index].positionType.xyz, ctx.worldPos); // ADR-1910
+            total.diffuse = total.diffuse + s.diffuse * path;
+            total.specular = total.specular + s.specular * path;
         }
     } else {
         // The pre-ADR-033 fallback tier: the eight lights of the uniform array, no clusters, no

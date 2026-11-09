@@ -1,0 +1,633 @@
+{
+ "_note": "Pass 3 shared cameras (56-): 'regression' = the film's own frames (4 per leg, every crossing +-0.5 s); 'eval' = fixed establishing/hero cameras per world. Traversal = the regression frames and the per-leg Critic clips. Add cameras; never change one once its baseline is rendered.",
+ "crossings": [
+  32.025,
+  47.87,
+  69.655,
+  93.46,
+  121.217,
+  147.017
+ ],
+ "cameras": [
+  {
+   "id": "r-canyon-006.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "canyon",
+   "t": 6
+  },
+  {
+   "id": "r-canyon-014.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "canyon",
+   "t": 14
+  },
+  {
+   "id": "r-canyon-022.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "canyon",
+   "t": 22
+  },
+  {
+   "id": "r-canyon-030.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "canyon",
+   "t": 30
+  },
+  {
+   "id": "r-moon-034.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "moon",
+   "t": 34
+  },
+  {
+   "id": "r-moon-038.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "moon",
+   "t": 38
+  },
+  {
+   "id": "r-moon-042.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "moon",
+   "t": 42
+  },
+  {
+   "id": "r-moon-046.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "moon",
+   "t": 46
+  },
+  {
+   "id": "r-dusk-050.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dusk",
+   "t": 50
+  },
+  {
+   "id": "r-dusk-056.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dusk",
+   "t": 56
+  },
+  {
+   "id": "r-dusk-062.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dusk",
+   "t": 62
+  },
+  {
+   "id": "r-dusk-068.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dusk",
+   "t": 68
+  },
+  {
+   "id": "r-mars-072.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "mars",
+   "t": 72
+  },
+  {
+   "id": "r-mars-078.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "mars",
+   "t": 78
+  },
+  {
+   "id": "r-mars-085.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "mars",
+   "t": 85
+  },
+  {
+   "id": "r-mars-091.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "mars",
+   "t": 91
+  },
+  {
+   "id": "r-night-096.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "night",
+   "t": 96
+  },
+  {
+   "id": "r-night-104.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "night",
+   "t": 104
+  },
+  {
+   "id": "r-night-112.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "night",
+   "t": 112
+  },
+  {
+   "id": "r-night-119.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "night",
+   "t": 119
+  },
+  {
+   "id": "r-ocean-124.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "ocean",
+   "t": 124
+  },
+  {
+   "id": "r-ocean-130.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "ocean",
+   "t": 130
+  },
+  {
+   "id": "r-ocean-137.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "ocean",
+   "t": 137
+  },
+  {
+   "id": "r-ocean-144.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "ocean",
+   "t": 144
+  },
+  {
+   "id": "r-dawn-150.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dawn",
+   "t": 150
+  },
+  {
+   "id": "r-dawn-165.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dawn",
+   "t": 165
+  },
+  {
+   "id": "r-dawn-185.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dawn",
+   "t": 185
+  },
+  {
+   "id": "r-dawn-205.00",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dawn",
+   "t": 205
+  },
+  {
+   "id": "x-canyon-moon-before-031.525",
+   "set": "regression",
+   "kind": "journey",
+   "world": "canyon-moon",
+   "t": 31.525
+  },
+  {
+   "id": "x-canyon-moon-after-032.525",
+   "set": "regression",
+   "kind": "journey",
+   "world": "canyon-moon",
+   "t": 32.525
+  },
+  {
+   "id": "x-moon-dusk-before-047.370",
+   "set": "regression",
+   "kind": "journey",
+   "world": "moon-dusk",
+   "t": 47.37
+  },
+  {
+   "id": "x-moon-dusk-after-048.370",
+   "set": "regression",
+   "kind": "journey",
+   "world": "moon-dusk",
+   "t": 48.37
+  },
+  {
+   "id": "x-dusk-mars-before-069.155",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dusk-mars",
+   "t": 69.155
+  },
+  {
+   "id": "x-dusk-mars-after-070.155",
+   "set": "regression",
+   "kind": "journey",
+   "world": "dusk-mars",
+   "t": 70.155
+  },
+  {
+   "id": "x-mars-night-before-092.960",
+   "set": "regression",
+   "kind": "journey",
+   "world": "mars-night",
+   "t": 92.96
+  },
+  {
+   "id": "x-mars-night-after-093.960",
+   "set": "regression",
+   "kind": "journey",
+   "world": "mars-night",
+   "t": 93.96
+  },
+  {
+   "id": "x-night-ocean-before-120.717",
+   "set": "regression",
+   "kind": "journey",
+   "world": "night-ocean",
+   "t": 120.717
+  },
+  {
+   "id": "x-night-ocean-after-121.717",
+   "set": "regression",
+   "kind": "journey",
+   "world": "night-ocean",
+   "t": 121.717
+  },
+  {
+   "id": "x-ocean-dawn-before-146.517",
+   "set": "regression",
+   "kind": "journey",
+   "world": "ocean-dawn",
+   "t": 146.517
+  },
+  {
+   "id": "x-ocean-dawn-after-147.517",
+   "set": "regression",
+   "kind": "journey",
+   "world": "ocean-dawn",
+   "t": 147.517
+  },
+  {
+   "id": "e-canyon-day",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "canyon-day",
+   "distance": "establishing",
+   "scene": "strange-attractor-flythrough.scene.json",
+   "look": "none",
+   "t": 30,
+   "pos": [
+    160.3,
+    240.0,
+    1570.0
+   ],
+   "tgt": [
+    -10.6,
+    10.0,
+    1230.4
+   ],
+   "fov": 55,
+   "note": "M3g wide-establishing sheet"
+  },
+  {
+   "id": "e-moon",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "moon",
+   "distance": "establishing",
+   "scene": "strange-attractor-moon.scene.json",
+   "look": "none",
+   "t": 40,
+   "pos": [
+    150,
+    160,
+    900
+   ],
+   "tgt": [
+    -350,
+    60,
+    -900
+   ],
+   "fov": 60,
+   "note": "M3g wide-establishing sheet"
+  },
+  {
+   "id": "e-mars",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "mars",
+   "distance": "establishing",
+   "scene": "strange-attractor-mars.scene.json",
+   "look": "none",
+   "t": 80,
+   "pos": [
+    560,
+    170,
+    2350
+   ],
+   "tgt": [
+    760,
+    35,
+    1300
+   ],
+   "fov": 55,
+   "note": "M3g wide-establishing sheet (the Mars exit)"
+  },
+  {
+   "id": "e-ocean",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "ocean",
+   "distance": "establishing",
+   "scene": "strange-attractor-ocean.scene.json",
+   "look": "none",
+   "t": 130,
+   "pos": [
+    1250,
+    130,
+    -150
+   ],
+   "tgt": [
+    800,
+    40,
+    -205
+   ],
+   "fov": 55,
+   "note": "M3g wide-establishing sheet"
+  },
+  {
+   "id": "e-dusk",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "dusk",
+   "distance": "establishing",
+   "scene": "strange-attractor-flythrough.scene.json",
+   "look": "dusk",
+   "t": 56,
+   "pos": [
+    45.6,
+    60.0,
+    1408.5
+   ],
+   "tgt": [
+    74.3,
+    2,
+    1349.6
+   ],
+   "fov": 55,
+   "note": "M3g wide-establishing sheet"
+  },
+  {
+   "id": "e-night",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "night",
+   "distance": "establishing",
+   "scene": "strange-attractor-flythrough.scene.json",
+   "look": "night",
+   "t": 112,
+   "pos": [
+    45.6,
+    60.0,
+    1408.5
+   ],
+   "tgt": [
+    74.3,
+    2,
+    1349.6
+   ],
+   "fov": 55,
+   "note": "M3g wide-establishing sheet"
+  },
+  {
+   "id": "h-canyon-day",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "canyon-day",
+   "distance": "hero",
+   "scene": "strange-attractor-flythrough.scene.json",
+   "look": "none",
+   "t": 30,
+   "pos": [
+    14,
+    1.6,
+    1530
+   ],
+   "tgt": [
+    60,
+    8,
+    1440
+   ],
+   "fov": 50,
+   "note": "the canyon floor by the river, along the opening flight"
+  },
+  {
+   "id": "h-moon",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "moon",
+   "distance": "hero",
+   "scene": "strange-attractor-moon.scene.json",
+   "look": "none",
+   "t": 40,
+   "pos": [
+    100,
+    -135.1,
+    -480
+   ],
+   "tgt": [
+    -320,
+    -90,
+    -480
+   ],
+   "fov": 45,
+   "note": "regolith at eye height on the dome crater's floor, the dome beyond"
+  },
+  {
+   "id": "h-mars",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "mars",
+   "distance": "hero",
+   "scene": "strange-attractor-mars.scene.json",
+   "look": "none",
+   "t": 80,
+   "pos": [
+    520,
+    36.6,
+    1800
+   ],
+   "tgt": [
+    430,
+    42,
+    1690
+   ],
+   "fov": 50,
+   "note": "the ground by pyramid-a's south-east corner"
+  },
+  {
+   "id": "h-ocean",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "ocean",
+   "distance": "hero",
+   "scene": "strange-attractor-ocean.scene.json",
+   "look": "none",
+   "t": 130,
+   "pos": [
+    905,
+    27.5,
+    -120
+   ],
+   "tgt": [
+    830,
+    34,
+    -190
+   ],
+   "fov": 50,
+   "note": "the seabed in front of the covert base"
+  },
+  {
+   "id": "h-dusk",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "dusk",
+   "distance": "hero",
+   "scene": "strange-attractor-flythrough.scene.json",
+   "look": "dusk",
+   "t": 56,
+   "pos": [
+    67.956,
+    4.16,
+    1356.186
+   ],
+   "tgt": [
+    74.965,
+    3.06,
+    1349.764
+   ],
+   "fov": 58,
+   "note": "the owner's camp reference camera (M3e Phase 8)"
+  },
+  {
+   "id": "h-night",
+   "set": "eval",
+   "kind": "fixed",
+   "world": "night",
+   "distance": "hero",
+   "scene": "strange-attractor-flythrough.scene.json",
+   "look": "night",
+   "t": 112,
+   "pos": [
+    67.956,
+    4.16,
+    1356.186
+   ],
+   "tgt": [
+    74.965,
+    3.06,
+    1349.764
+   ],
+   "fov": 58,
+   "note": "the owner's camp reference camera (M3e Phase 8)"
+  },
+  {
+   "set": "eval",
+   "kind": "fixed",
+   "world": "mars",
+   "distance": "hero",
+   "scene": "strange-attractor-mars.scene.json",
+   "look": "none",
+   "t": 80,
+   "fov": 50,
+   "id": "h2-mars-drift-west",
+   "pos": [
+    60,
+    37.2,
+    1700
+   ],
+   "tgt": [
+    250,
+    44,
+    1665
+   ],
+   "note": "67- \u00a74 (hero agent): pyramid-a windward drift toe meeting the plain, low, like the owner M3g screenshot"
+  },
+  {
+   "set": "eval",
+   "kind": "fixed",
+   "world": "mars",
+   "distance": "hero",
+   "scene": "strange-attractor-mars.scene.json",
+   "look": "none",
+   "t": 80,
+   "fov": 50,
+   "id": "h2-mars-drift-b",
+   "pos": [
+    722,
+    37.0,
+    1150
+   ],
+   "tgt": [
+    722,
+    48,
+    1362
+   ],
+   "note": "67- \u00a74 (hero agent): pyramid-b south drift and its toe, from the plain"
+  },
+  {
+   "id": "j-mars-070.50",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 70.5,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  },
+  {
+   "id": "j-mars-074.00",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 74.0,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  },
+  {
+   "id": "j-mars-082.00",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 82.0,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  },
+  {
+   "id": "j-mars-088.00",
+   "set": "eval",
+   "kind": "journey",
+   "world": "mars",
+   "t": 88.0,
+   "note": "67- \u00a74 (hero agent): a Mars path beat (70.5 s = the owner M3g screenshot time)"
+  }
+ ]
+}

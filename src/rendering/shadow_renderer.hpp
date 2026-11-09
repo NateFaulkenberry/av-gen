@@ -44,6 +44,8 @@ struct ShadowStats {
     std::uint32_t cascades = 0;   // of those, directional cascades
     std::uint32_t spots = 0;
     std::uint32_t points = 0;  // of those, lights given a six-face cube
+    std::uint32_t dropped = 0;          // ADR-1906: shadowed local lights that did not fit (each warned once)
+    std::uint32_t cascadesYielded = 0;  // ADR-1906: cascades given up so the local lights fit
     std::uint32_t resolution = 0; // one square map
     // ADR-112: how far the cascades reach, in view depth. Published because it is now derived
     // rather than fixed -- a test that asserts small objects cast shadows needs to be able to say
