@@ -517,3 +517,15 @@ Levers, in order of how much they change the frame:
 
 The engine could also blend horizon to ground below the horizon (a `groundHaze` width); it's not built. Ask if you
 want it.
+
+**The test flight and perf (2026-11-09).** The clip is `05-camera/eng-p5-test-flight-feline-30-60s.mp4`: Feline
+30–60 s, a 7-waypoint route from the bay across the sea, onto the land and up a climb, with the moving ground, the
+routes and `aoRadius` 0.6.
+
+Live, 1080p ultra at 30 fps, 600 frames:
+
+| GPU median | p95 | p99 | Frames on time | CPU work median | Scene update |
+|---|---|---|---|---|---|
+| 21.2 ms | 30.5 | 34.2 | 98.8% | 1.9 ms | 0.38 ms |
+
+A flight table is built once per change; it is a lookup each frame.
