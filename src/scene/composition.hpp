@@ -1817,6 +1817,36 @@ private:
         // knob, and a slider from 0 to 90 is not.
     };
     DayNightParams dayNightParams_;
+    // ADR-1953: the moving ground's knobs (env/tiles/...), registered when the scene authors `tileDynamics`, so a route
+    // (an audio band, a stem, a timeline key) can drive them; and the rings triggered while running.
+    struct TileDynamicsParams {
+        params::Parameter<float>* amplitude = nullptr;
+        std::array<params::Parameter<float>*, kMaxTileWaves> waveAmplitude{};
+        std::array<params::Parameter<float>*, kMaxTileWaves> waveSpeed{};
+        std::array<params::Parameter<float>*, kMaxTileWaves> waveWavelength{};
+        std::array<params::Parameter<float>*, kMaxTileWaves> waveDirection{};
+        std::array<params::Parameter<float>*, kMaxTileWaves> waveCrest{};
+        params::Parameter<float>* breathingAmplitude = nullptr;
+        params::Parameter<float>* breathingPeriod = nullptr;
+        params::Parameter<float>* rollingX = nullptr;
+        params::Parameter<float>* rollingZ = nullptr;
+        params::Parameter<float>* ringAmplitude = nullptr;
+        params::Parameter<float>* ringSpeed = nullptr;
+        params::Parameter<float>* ringDecay = nullptr;
+        params::Parameter<float>* ringTrigger = nullptr;  // a rising edge through 0.5 drops a ring
+        params::Parameter<float>* ringStrength = nullptr; // the strength a triggered ring carries
+        params::Parameter<float>* ringX = nullptr;        // where (world x, z; the tiles' own space)...
+        params::Parameter<float>* ringZ = nullptr;
+        params::Parameter<float>* ringAhead = nullptr;    // ...or, when > 0, this many metres ahead of the camera
+        params::Parameter<float>* contourInterval = nullptr; // ADR-1970
+        params::Parameter<float>* contourOffset = nullptr;
+    };
+    TileDynamicsParams tileDynamicsParams_;
+    bool tileDynamicsAuthored_ = false;
+    std::vector<TileEvent> tileLiveEvents_;
+    float tileTriggerPrevious_ = 0.0f;
+    double tileLastTime_ = -1.0;
+    void updateTileDynamics(const FrameTime& time); // ADR-1953: live rings; after the camera is final
     params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-350
     params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350
     params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-350

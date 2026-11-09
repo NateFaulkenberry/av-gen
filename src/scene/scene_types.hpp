@@ -11,6 +11,7 @@
 
 #include "core/wind.hpp"
 #include "scene/importance.hpp"
+#include "scene/tile_dynamics.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -786,6 +787,9 @@ struct Environment {
     // near creases keep their AO and far ones stop speckling. Both 0 (the default) = no fade, byte-identical.
     float aoFadeStart = 0.0f;
     float aoFadeEnd = 0.0f;
+    // ADR-1953: Musical Geography's moving ground -- waves, breathing, rolling and rings, one block every "tiles"
+    // generator in the scene follows (scene/tile_terrain.hpp). Inactive (the default) = the static ground, unchanged.
+    TileDynamics tileDynamics;
     // ADR-1867: the cascades' split scheme -- 0 uniform .. 1 logarithmic (Zhang's practical split). A negative value (the
     // default) keeps the engine's 0.85. A scene whose shadowed walls sit mid to far lowers it, moving texels out of
     // the first metres and into the walls.

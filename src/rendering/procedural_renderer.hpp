@@ -185,11 +185,23 @@ struct GeneratorTileUniforms {
     glm::vec4 skirt;      // skirt depth (m), the source box's thickness (m), 0, 0
     std::array<glm::vec4, 8> path;  // two points per lane
     std::array<glm::vec4, 8> rivers; // the river's points, two per lane
+    // ADR-1953: the moving ground (scene/tile_dynamics.hpp), the same for every tiles generator in the frame.
+    glm::vec4 dyn;        // t (s), amplitude, wave count, event count
+    glm::vec4 breath;     // amplitude, period, wavelength, 1 when anything moves
+    glm::vec4 roll;       // rolling x, z (m/s), 0, 0
+    glm::vec4 ring0;      // amplitude, speed, wavelength, width
+    glm::vec4 ring1;      // decay, crest, contour interval (0 = none, ADR-1970), contour offset
+    std::array<glm::vec4, 12> waves;  // per wave: (circular, amplitude, wavelength, speed),
+                                      // (cos heading | centre x, sin heading | centre z, sharpness, crest),
+                                      // (onLand, onWater, phase, 0)
+    std::array<glm::vec4, 16> events; // x, z, time, strength (the frame's visible events, newest first)
 };
-static_assert(sizeof(GeneratorTileUniforms) == 416);
-// Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied.
+static_assert(sizeof(GeneratorTileUniforms) == 944);
+// Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied, and (ADR-1953)
+// the scene's moving ground at time `t`.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,
-                                                       float reach);
+                                                       float reach, const scene::TileDynamics& dyn = {},
+                                                       float t = 0.0f);
 // Packs one generator object's kernel parameters for `window` (scene/generator.hpp).
 [[nodiscard]] GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const scene::GeneratorWindow& window);
 // The camera in a generator object's own lattice space: inverse(objectMatrix * distributionTransform).

@@ -23,6 +23,7 @@
 #include "scene/particle_io.hpp"
 #include "scene/scatter_anchors.hpp"
 #include "scene/sky.hpp"
+#include "scene/tile_terrain.hpp"
 #include "world/effects/effect_lights.hpp"
 #include "world/effects/effect_stack.hpp"
 #include "world/effects/effect_trigger.hpp"
@@ -77,7 +78,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -5064,6 +5065,42 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
             p.fogHorizonBlend =
                 &params.add(floatDesc(base + "fog/horizonBlend", dn.fogHorizonBlend, 0.0f, 1.0f, 0.0f, 1.0f));
         }
+        // ---- ADR-1953: the moving ground, as parameters (only when the scene authors it) ----
+        if (tileDynamicsAuthored_) {
+            const TileDynamics& d = volumeSetting_.tileDynamics;
+            TileDynamicsParams& p = tileDynamicsParams_;
+            const std::string base = prefix_ + "env/tiles/";
+            p.amplitude = &params.add(floatDesc(base + "amplitude", d.amplitude, -20.0f, 20.0f, 0.0f, 2.0f));
+            for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
+                const TileWave& w = d.waves[i];
+                const std::string wb = base + "wave" + std::to_string(i + 1) + "/";
+                p.waveAmplitude[i] = &params.add(floatDesc(wb + "amplitude", w.amplitude, -50.0f, 50.0f, 0.0f, 4.0f));
+                p.waveSpeed[i] = &params.add(floatDesc(wb + "speed", w.speed, -500.0f, 500.0f, -40.0f, 40.0f));
+                p.waveWavelength[i] =
+                    &params.add(floatDesc(wb + "wavelength", w.wavelength, 0.5f, 5000.0f, 2.0f, 400.0f));
+                p.waveDirection[i] = &params.add(floatDesc(wb + "direction", w.direction, -720.0f, 720.0f, 0.0f, 360.0f));
+                p.waveCrest[i] = &params.add(floatDesc(wb + "crest", w.crest, 0.0f, 8.0f, 0.0f, 2.0f));
+            }
+            p.breathingAmplitude =
+                &params.add(floatDesc(base + "breathing/amplitude", d.breathingAmplitude, -4.0f, 4.0f, 0.0f, 0.5f));
+            p.breathingPeriod =
+                &params.add(floatDesc(base + "breathing/period", d.breathingPeriod, 0.1f, 600.0f, 2.0f, 60.0f));
+            p.rollingX = &params.add(floatDesc(base + "rolling/x", d.rolling.x, -500.0f, 500.0f, -10.0f, 10.0f));
+            p.rollingZ = &params.add(floatDesc(base + "rolling/z", d.rolling.y, -500.0f, 500.0f, -10.0f, 10.0f));
+            p.ringAmplitude =
+                &params.add(floatDesc(base + "rings/amplitude", d.rings.amplitude, -50.0f, 50.0f, 0.0f, 4.0f));
+            p.ringSpeed = &params.add(floatDesc(base + "rings/speed", d.rings.speed, 0.0f, 1000.0f, 0.0f, 120.0f));
+            p.ringDecay = &params.add(floatDesc(base + "rings/decay", d.rings.decay, 0.05f, 60.0f, 0.2f, 8.0f));
+            p.ringTrigger = &params.add(floatDesc(base + "rings/trigger", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+            p.ringStrength = &params.add(floatDesc(base + "rings/strength", 1.0f, 0.0f, 20.0f, 0.0f, 2.0f));
+            p.ringX = &params.add(floatDesc(base + "rings/x", 0.0f, -1e6f, 1e6f, -500.0f, 500.0f));
+            p.ringZ = &params.add(floatDesc(base + "rings/z", 0.0f, -1e6f, 1e6f, -500.0f, 500.0f));
+            p.ringAhead = &params.add(floatDesc(base + "rings/ahead", 0.0f, 0.0f, 10000.0f, 0.0f, 400.0f));
+            p.contourInterval =
+                &params.add(floatDesc(base + "contour/interval", d.contourInterval, 0.0f, 1000.0f, 0.0f, 20.0f));
+            p.contourOffset =
+                &params.add(floatDesc(base + "contour/offset", d.contourOffset, -1000.0f, 1000.0f, -10.0f, 10.0f));
+        }
         // ADR-350, the rest of the sweep: four more environment settings that the scene file could
         // set and nothing else could reach. `skybox` and `proceduralSkyBackground` in particular
         // decide what is drawn behind the world, which is not a thing to have to edit JSON for.
@@ -8359,6 +8396,7 @@ void Composition::update(const FrameTime& time) {
     // ADR-1879: a portal's destination is placed by its source (its own camera logic ran above), before anything culls
     // against the camera; the destination world updates after this one's camera is final
     applyCameraOverride();
+    updateTileDynamics(time); // ADR-1953: after the camera is final (a ring can land ahead of it)
     cullEntityNodes();
     if (legs_.size() > 1) activateLeg(std::min(legForTime(currentTime_), static_cast<int>(legs_.size()) - 1)); // ADR-1895
     updateCorruption();
@@ -8976,6 +9014,47 @@ void Composition::observeCameraEvents(double seconds) {
     std::erase_if(cameraEvents_, [seconds](const CameraEventSpan& span) {
         return span.endSeconds > span.startSeconds && seconds > span.endSeconds + 30.0;
     });
+}
+
+// ADR-1953: the rings a route triggers while running. A rising edge of `env/tiles/rings/trigger` through 0.5 drops one at
+// `rings/x, z`, or `rings/ahead` metres ahead of the camera along its heading. Each carries its own time, so the ground
+// stays a function of the clock: a seek backwards drops the rings that had not happened yet, and one forwards keeps
+// what a play would have (a ring a route has not yet fired is not invented). Rings older than six decays are dropped.
+void Composition::updateTileDynamics(const FrameTime& time) {
+    if (!tileDynamicsAuthored_) {
+        return;
+    }
+    const TileDynamicsParams& p = tileDynamicsParams_;
+    const auto now = static_cast<float>(time.renderTime);
+    if (tileLastTime_ >= 0.0 && time.renderTime < tileLastTime_ - 1e-4) {
+        std::erase_if(tileLiveEvents_, [now](const TileEvent& e) { return e.time > now; });
+        tileTriggerPrevious_ = 0.0f;
+    }
+    tileLastTime_ = time.renderTime;
+    const float trigger = p.ringTrigger != nullptr ? p.ringTrigger->value() : 0.0f;
+    if (trigger >= 0.5f && tileTriggerPrevious_ < 0.5f) {
+        TileEvent e;
+        e.time = now;
+        e.strength = p.ringStrength != nullptr ? p.ringStrength->value() : 1.0f;
+        const float ahead = p.ringAhead != nullptr ? p.ringAhead->value() : 0.0f;
+        if (ahead > 0.0f) {
+            glm::vec2 heading(scene_.camera.target.x - scene_.camera.position.x,
+                              scene_.camera.target.z - scene_.camera.position.z);
+            heading = glm::dot(heading, heading) > 1e-8f ? glm::normalize(heading) : glm::vec2(0.0f, -1.0f);
+            e.position = glm::vec2(scene_.camera.position.x, scene_.camera.position.z) + heading * ahead;
+        } else {
+            e.position = {p.ringX != nullptr ? p.ringX->value() : 0.0f, p.ringZ != nullptr ? p.ringZ->value() : 0.0f};
+        }
+        tileLiveEvents_.push_back(e);
+    }
+    tileTriggerPrevious_ = trigger;
+    const float horizon = 6.0f * scene_.environment.tileDynamics.rings.decay;
+    std::erase_if(tileLiveEvents_, [now, horizon](const TileEvent& e) { return now - e.time > horizon; });
+    if (tileLiveEvents_.size() > 4 * kMaxTileEvents) {
+        tileLiveEvents_.erase(tileLiveEvents_.begin(),
+                              tileLiveEvents_.end() - static_cast<std::ptrdiff_t>(4 * kMaxTileEvents));
+    }
+    scene_.environment.tileDynamics.live = tileLiveEvents_;
 }
 
 void Composition::applyParameters() {
@@ -9841,6 +9920,31 @@ void Composition::applyParameters() {
         env.shadowCasterReach = volumeSetting_.shadowCasterReach; // ADR-1858
         env.aoFadeStart = volumeSetting_.aoFadeStart; // CP-A r3: the AO distance fade
         env.aoFadeEnd = volumeSetting_.aoFadeEnd;
+        env.tileDynamics = volumeSetting_.tileDynamics; // ADR-1953: the authored block, then its parameters
+        if (tileDynamicsAuthored_) {
+            const TileDynamicsParams& p = tileDynamicsParams_;
+            TileDynamics& d = env.tileDynamics;
+            const auto f = [](const params::Parameter<float>* q, float fallback) {
+                return q != nullptr ? q->value() : fallback;
+            };
+            d.amplitude = f(p.amplitude, d.amplitude);
+            for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
+                d.waves[i].amplitude = f(p.waveAmplitude[i], d.waves[i].amplitude);
+                d.waves[i].speed = f(p.waveSpeed[i], d.waves[i].speed);
+                d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
+                d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
+                d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+            }
+            d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
+            d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
+            d.rolling = {f(p.rollingX, d.rolling.x), f(p.rollingZ, d.rolling.y)};
+            d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
+            d.rings.speed = f(p.ringSpeed, d.rings.speed);
+            d.rings.decay = f(p.ringDecay, d.rings.decay);
+            d.contourInterval = f(p.contourInterval, d.contourInterval);
+            d.contourOffset = f(p.contourOffset, d.contourOffset);
+            d.live = tileLiveEvents_;
+        }
         env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
         env.contactShadows = volumeSetting_.contactShadows;
@@ -10892,6 +10996,9 @@ nlohmann::json Composition::toJson() const {
         }
         if (volumeSetting_.shadowCasterReach > 0.0f) { // ADR-1858: written only when set
             environment["shadowCasterReach"] = volumeSetting_.shadowCasterReach;
+        }
+        if (tileDynamicsAuthored_) { // ADR-1953
+            environment["tileDynamics"] = tileDynamicsToJson(volumeSetting_.tileDynamics);
         }
         if (volumeSetting_.aoFadeEnd > volumeSetting_.aoFadeStart) { // CP-A r3: written only when set
             environment["aoFadeStart"] = volumeSetting_.aoFadeStart;
@@ -12232,6 +12339,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(value.error());
             }
             comp->volumeSetting_.styledAmbientFloor = *value;
+        }
+        if (e.contains("tileDynamics")) { // ADR-1953
+            auto dyn = tileDynamicsFromJson(e.at("tileDynamics"));
+            if (!dyn) {
+                return std::unexpected(dyn.error());
+            }
+            comp->volumeSetting_.tileDynamics = std::move(*dyn);
+            comp->tileDynamicsAuthored_ = true;
         }
         {
             scene::Environment& v = comp->volumeSetting_;

@@ -28,6 +28,7 @@
 // vary a tile by its world identity, never by its record index (request 1978).
 
 #include "core/error.hpp"
+#include "scene/tile_dynamics.hpp"
 
 #include <glm/glm.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -91,10 +92,25 @@ struct TileSample {
     float shore = 0.0f;  // 1 = on the shoreline, falling to 0 a shore band away
     float flat = 0.0f;   // 1 = a crown (a flattened hill top)
     float path = 0.0f;   // 1 = on the path
+    float crest = 0.0f;  // ADR-1953: the crest channel, 0..1 (0 on a static ground)
 };
 
-// The tile at generator-space centre (x, z), in metres.
+// The tile at generator-space centre (x, z), in metres: the static ground.
 [[nodiscard]] TileSample tileSample(const TileTerrainSpec& spec, float x, float z);
+// ADR-1953: the base at time t, with the breathing and the rolling (no waves, no rings). With `dyn` inactive this is
+// tileSample(spec, x, z) exactly.
+[[nodiscard]] TileSample tileSample(const TileTerrainSpec& spec, float x, float z, float t, const TileDynamics& dyn);
+// ADR-1953: the waves and the rings at (x, z, t) on a tile of `water`, for a ring of `cellSize` metres (the aliasing
+// fade). Returns (height offset, crest). `events` is eventsAt(t), passed so a caller sampling many tiles finds it once.
+[[nodiscard]] glm::vec2 tileMotion(const TileDynamics& dyn, const std::vector<TileEvent>& events, float x, float z,
+                                   float t, float water, float cellSize);
+// ADR-1953: the whole ground at (x, z, t) for a ring of `cellSize`: the base plus the motion, the crest set.
+[[nodiscard]] TileSample tileSampleMoving(const TileTerrainSpec& spec, const TileDynamics& dyn, float x, float z,
+                                          float t, float cellSize);
+[[nodiscard]] Result<void> validateTileDynamics(const TileDynamics& dyn);
+// JSON: `environment.tileDynamics`. Every key optional; an unknown key is refused. `live` is never written.
+[[nodiscard]] nlohmann::json tileDynamicsToJson(const TileDynamics& dyn);
+[[nodiscard]] Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j);
 
 // The value noise and fBm the formations are built from, exposed for the parity tests. `n` is in [0, 1).
 [[nodiscard]] float tileValueNoise(std::uint32_t seed, float x, float z);
@@ -108,6 +124,9 @@ struct TileSample {
 [[nodiscard]] glm::vec2 tileCentre(float pitch, glm::ivec2 index);
 // The height of the ground under (x, z): the top of the tile that contains it.
 [[nodiscard]] float tileHeightAt(const TileTerrainSpec& spec, float pitch, float x, float z);
+// ADR-1953: the same on the moving ground at time t (the near ring: no aliasing fade below a 1 m pitch).
+[[nodiscard]] float tileHeightAt(const TileTerrainSpec& spec, const TileDynamics& dyn, float pitch, float x, float z,
+                                 float t);
 
 // JSON (the "tiles" object of a "tiles" generator). Every key is optional; an unknown key is refused.
 [[nodiscard]] nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec);

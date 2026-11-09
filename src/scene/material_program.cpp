@@ -122,6 +122,7 @@ constexpr OpKindName kOpKindNames[] = {
     {MaterialOpKind::TextureTriplanar, "textureTriplanar"},             // ADR-1642
     {MaterialOpKind::TextureTriplanarNormal, "textureTriplanarNormal"}, // ADR-1642
     {MaterialOpKind::TileBorder, "tileBorder"},                         // ADR-1976
+    {MaterialOpKind::TileContour, "tileContour"},                       // ADR-1970
 };
 
 struct InputName {
@@ -792,6 +793,35 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         const float top = a.y >= k.w - 1e-3f ? 1.0f : 0.0f;
         return {1.0f - (1.0f - bx.x) * (1.0f - bz.x), std::min(bx.y, bz.y), top, std::min(bx.z, bz.z)};
     }
+    case MaterialOpKind::TileContour: {
+        // ADR-1970: the twin of matKTileContour. b.w = crest + 2 * mask (bits +x, -x, +z, -z).
+        const float w = std::max(b.w, 0.0f);
+        const auto mask = static_cast<std::uint32_t>(std::floor(w * 0.5f));
+        const float crest = std::clamp(w - 2.0f * static_cast<float>(mask), 0.0f, 1.0f);
+        const auto side = [&](float half, float dist, float fw) {
+            const float pixel = std::max(fw, 1e-6f);
+            const float width = std::max(k.z, f * fw);
+            const float t = std::clamp((dist - (width - 0.5f * pixel)) / pixel, 0.0f, 1.0f);
+            const float cover = 1.0f - t * t * (3.0f - 2.0f * t);
+            const float size = 2.0f * half / pixel;
+            const float mean = std::min(width / std::max(2.0f * half, 1e-6f), 1.0f);
+            const float e = std::clamp((size - 2.0f) / 2.0f, 0.0f, 1.0f);
+            return mean + (cover - mean) * (e * e * (3.0f - 2.0f * e));
+        };
+        float keep = 1.0f;
+        int sides = 0;
+        const auto flagged = [&](std::uint32_t bit, float half, float dist, float fw) {
+            if ((mask & bit) != 0u) {
+                keep *= 1.0f - side(half, dist, fw);
+                ++sides;
+            }
+        };
+        flagged(1u, k.x, k.x - a.x, ctx.localFootprint.x);
+        flagged(2u, k.x, k.x + a.x, ctx.localFootprint.x);
+        flagged(4u, k.y, k.y - a.z, ctx.localFootprint.y);
+        flagged(8u, k.y, k.y + a.z, ctx.localFootprint.y);
+        return {1.0f - keep, crest, static_cast<float>(sides) * 0.25f, sides > 0 ? 1.0f : 0.0f};
+    }
     case MaterialOpKind::TextureTriplanar:
     case MaterialOpKind::TextureTriplanarNormal:
         return textureOpValue(op, ctx, program); // ADR-1642
@@ -948,6 +978,7 @@ OpReads opReads(MaterialOpKind kind) {
     case MaterialOpKind::Mix:
     case MaterialOpKind::HueShift:
     case MaterialOpKind::DetailNormal:
+    case MaterialOpKind::TileContour: // ADR-1970
         return {true, true, false};
     case MaterialOpKind::MixBy:
     case MaterialOpKind::HeightBlend:
@@ -1004,6 +1035,7 @@ bool MaterialProgram::unlitFastEligible() const {
         case MaterialOpKind::Threshold: case MaterialOpKind::HueShift: case MaterialOpKind::Saturate:
         case MaterialOpKind::Palette: case MaterialOpKind::Swizzle: case MaterialOpKind::VoronoiEdge:
         case MaterialOpKind::Quantize: case MaterialOpKind::OklabRamp: case MaterialOpKind::TileBorder:
+        case MaterialOpKind::TileContour:
             break;
         default:
             return false;

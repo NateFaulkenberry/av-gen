@@ -115,6 +115,11 @@ enum class MaterialOpKind : std::uint8_t {
     // 2 pixels), so a pattern finer than the pixels is prefiltered rather than aliased. out = (border coverage 0..1,
     // the distance to the nearest edge in pixels, top-face mask, the (sub)tile's size in pixels).
     TileBorder,
+    // ADR-1970: a "tiles" generator's contour edges and its crest (ADR-1953), decoded from the record. a = the local
+    // position, b = `instanceEmissive` (whose alpha carries the crest and the four sides a contour level drops across).
+    // constant = (half x, half z, band in local units, 0), value = the band's minimum in pixels -- tileBorder's band,
+    // drawn only on the flagged sides. out = (contour coverage 0..1, crest 0..1, flagged sides / 4, 1 if any side).
+    TileContour,
 };
 [[nodiscard]] const char* materialOpKindName(MaterialOpKind kind);
 [[nodiscard]] std::optional<MaterialOpKind> materialOpKindFromName(std::string_view name);

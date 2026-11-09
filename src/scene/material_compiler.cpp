@@ -10,7 +10,7 @@ namespace avgen::scene {
 namespace {
 
 // The WGSL function of each op kind, in MaterialOpKind order (the wire format, so the order is fixed).
-constexpr std::array<std::string_view, 37> kKindFunctions{
+constexpr std::array<std::string_view, 38> kKindFunctions{
     "matKInput",         "matKConstant",      "matKGradient",        "matKNoise",       "matKVoronoi",
     "matKFresnel",       "matKRamp",          "matKRemap",           "matKMultiply",    "matKAdd",
     "matKMix",           "matKMixby",         "matKPower",           "matKSmoothstep",  "matKThreshold",
@@ -20,8 +20,9 @@ constexpr std::array<std::string_view, 37> kKindFunctions{
     "matKSwizzle",       "matKVoronoiEdge",   "matKQuantize",        "matKOklabRamp",
     "matKTextureTriplanar", "matKTextureTriplanarNormal", // ADR-1642
     "matKTileBorder", // ADR-1976
+    "matKTileContour", // ADR-1970
 };
-static_assert(static_cast<std::size_t>(scene::MaterialOpKind::TileBorder) + 1 == kKindFunctions.size(),
+static_assert(static_cast<std::size_t>(scene::MaterialOpKind::TileContour) + 1 == kKindFunctions.size(),
               "a new op kind needs its matK function here and in shaders/material.wgsl");
 
 constexpr int kMaxOps = scene::kMaxMaterialOps;

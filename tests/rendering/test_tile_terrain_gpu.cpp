@@ -217,3 +217,130 @@ TEST_CASE("A skirt drops a land tile's box below its top and leaves the sea's sl
     CHECK(land > 100);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1953: the moving ground on the GPU is the CPU mirror's at the same time -- waves, interference, breathing,
+// rolling and a ring, the crest channel in the emissive's spare lane -- on the fine ring and on a coarse one.
+TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][generator][geography][dynamics]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    scene::TileDynamics d;
+    scene::TileWave a;
+    a.amplitude = 0.7f;
+    a.wavelength = 18.0f;
+    a.speed = 5.0f;
+    a.direction = 35.0f;
+    a.sharpness = 0.4f;
+    scene::TileWave b;
+    b.circular = true;
+    b.amplitude = 0.5f;
+    b.wavelength = 11.0f;
+    b.speed = -3.0f;
+    b.centre = {8.0f, -6.0f};
+    b.onLand = 0.3f;
+    d.waves = {a, b};
+    d.breathingAmplitude = 0.25f;
+    d.breathingPeriod = 9.0f;
+    d.breathingWavelength = 90.0f;
+    d.rolling = {1.2f, -0.7f};
+    d.rings.amplitude = 1.1f;
+    d.rings.speed = 12.0f;
+    d.rings.wavelength = 7.0f;
+    d.rings.width = 5.0f;
+    d.events = {{5.0f, {4.0f, 3.0f}, 1.0f}};
+    const float time = 7.25f;
+    for (const float cell : {1.0f, 2.0f}) {
+        const auto pg = tilesObject("moving", cell, 40.0f * cell, 4, cell > 1.0f ? 1.0f : 0.0f, 0.0f, 0.0f, 1);
+        const glm::vec3 camera(0.5f, 30.0f, 0.5f);
+        scene::Scene s;
+        s.procedurals.push_back(pg);
+        s.environment.tileDynamics = d;
+        s.camera.position = camera;
+        s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+        REQUIRE(rig.renderer.renderToImage(s, FrameTime{time, 1.0 / 30.0, 1}, 160, 90).has_value());
+        const scene::GeneratorSpec& g = pg.distribution.generator;
+        const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+        auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+        REQUIRE(records.has_value());
+        float worstHeight = 0.0f;
+        float worstCrest = 0.0f;
+        float moved = 0.0f;
+        float crestSeen = 0.0f;
+        for (std::int32_t z = 0; z < w.countZ; ++z) {
+            for (std::int32_t x = 0; x < w.countX; ++x) {
+                const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                           static_cast<std::size_t>(x)];
+                const std::int32_t ix = w.originX + x;
+                const std::int32_t iz = w.originZ + z;
+                const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
+                const scene::TileSample still = scene::generatorTileInWindow(g, ix, iz, w);
+                worstHeight = std::max(worstHeight, std::abs(r.position.y - moving.height));
+                worstCrest = std::max(worstCrest, std::abs(r.emissive.w - moving.crest));
+                moved = std::max(moved, std::abs(moving.height - still.height));
+                crestSeen = std::max(crestSeen, moving.crest);
+            }
+        }
+        CAPTURE(cell, worstHeight, worstCrest, moved, crestSeen);
+        CHECK(moved > 0.5f);       // the control: the ground really moved
+        CHECK(crestSeen > 0.5f);
+        CHECK(worstHeight <= 2e-3f); // GPU trig and pow against the CPU's
+        CHECK(worstCrest <= 2e-3f);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1970: the contour pass flags exactly the sides across which floor((top - offset) / interval) drops, computed here
+// from the CPU mirror's tops; and with no interval the lane is the crest alone.
+TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu][generator][geography][adr1970]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    const auto pg = tilesObject("contours", 1.0f, 40.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    const glm::vec3 camera(0.5f, 30.0f, 0.5f);
+    scene::Scene s;
+    s.procedurals.push_back(pg);
+    s.environment.tileDynamics.contourInterval = 0.5f;
+    s.environment.tileDynamics.contourOffset = 0.1f;
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const scene::GeneratorSpec& g = pg.distribution.generator;
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+    auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+    REQUIRE(records.has_value());
+    const auto level = [](float h) { return std::floor((h - 0.1f) / 0.5f); };
+    const auto top = [&](std::int32_t x, std::int32_t z) {
+        return scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w).height;
+    };
+    int edges = 0;
+    int wrong = 0;
+    int checked = 0;
+    for (std::int32_t z = 1; z + 1 < w.countZ; ++z) {
+        for (std::int32_t x = 1; x + 1 < w.countX; ++x) {
+            const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                       static_cast<std::size_t>(x)];
+            const float own = level(top(x, z));
+            // Skip tiles within float rounding of a level boundary (the GPU's top may land on the other side).
+            const auto near = [](float h) {
+                const float u = (h - 0.1f) / 0.5f;
+                return std::abs(u - std::round(u)) < 1e-3f;
+            };
+            if (near(top(x, z)) || near(top(x + 1, z)) || near(top(x - 1, z)) || near(top(x, z + 1)) ||
+                near(top(x, z - 1))) {
+                continue;
+            }
+            std::uint32_t expect = 0;
+            if (level(top(x + 1, z)) < own) expect |= 1u;
+            if (level(top(x - 1, z)) < own) expect |= 2u;
+            if (level(top(x, z + 1)) < own) expect |= 4u;
+            if (level(top(x, z - 1)) < own) expect |= 8u;
+            const auto got = static_cast<std::uint32_t>(std::floor(r.emissive.w * 0.5f));
+            ++checked;
+            edges += expect != 0u ? 1 : 0;
+            wrong += got != expect ? 1 : 0;
+        }
+    }
+    CAPTURE(checked, edges, wrong);
+    CHECK(checked > 5000);
+    CHECK(edges > 100); // the control: there are contours in this window
+    CHECK(wrong == 0);
+    CHECK(ctx->errorCount() == 0);
+}
