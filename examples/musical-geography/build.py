@@ -68,20 +68,21 @@ TILE_SCALE = 4.0   # owner, 2026-11-09: 4 m tiles (--tile-scale overrides)
 FLIGHT = {
     "ground": "mgTiles1", "startTime": 30.0, "duration": 90.0, "speed": 22.0, "fov": 46.0,
     "route": [
-        # CP-B r2 (owner: "nothing that makes the squares seem super tiny"): a 40 m ceiling (04- §13, the tile rule)
+        # CP-B r2 (owner): fly like a low plane -- forward horizon view, banked sweeping turns, smooth terrain-following
+        # rises and falls, never looking straight down, a 40 m ceiling so the tiles always read (04- §13)
         {"position": [60, -250], "altitude": 12},                              # the bay
         {"position": [60, -430], "altitude": 6},                               # low over the moving sea
-        {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 10},   # cross the shore
-        {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 12},       # along the lit path
-        {"position": [-250, -1000], "altitude": 30, "speed": 22},              # rise toward the top-down
-        {"position": [-300, -1060], "altitude": 40, "speed": 20, "nadir": 6},  # the top-down pass at 40 m: ~18 tiles wide
-        {"position": [100, -1000], "altitude": 25, "speed": 26},               # dive east toward the river
-        {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 12},     # up the valley on the river
-        {"position": [300, -1560], "altitude": 40, "speed": 22},               # the climb, capped at the ceiling
+        {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
+        {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 10},       # along the lit path
+        {"position": [-330, -1020], "altitude": 28, "speed": 24},              # rise over the crowns
+        {"position": [-180, -1180], "altitude": 22, "speed": 26},              # a banked sweep north-east
+        {"position": [120, -1060], "altitude": 18, "speed": 26},               # sweep back down toward the river
+        {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 10},     # up the valley on the river
+        {"position": [300, -1560], "altitude": 35, "speed": 24},               # a last rise, under the ceiling
     ],
     "minClearance": 4, "clearanceRadius": 10, "amplitudeHeadroom": 2,
-    "climbRate": 8, "fallRate": 18, "lookAhead": 3.0, "pitchBias": 0.22,
-    "pitchMin": -32, "pitchMax": 0, "bankLimit": 8, "bankGain": 1.4, "loop": False,
+    "climbRate": 6, "fallRate": 10, "lookAhead": 3.5, "pitchBias": 0.08,
+    "pitchMin": -14, "pitchMax": 0, "bankLimit": 16, "bankGain": 2.2, "loop": False,
 }
 FLY = False   # set by --flight
 
