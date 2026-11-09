@@ -62,6 +62,29 @@ def camera(name):
 TILE_SCALE = 1.0   # set by --tile-scale
 
 
+# ---- the CP-B flight (ADR-1956), in metres: bay -> low over the moving sea -> up the river valley -> climb to the reveal.
+# The camera looks where it travels (lookAhead), never above the horizon (pitchMax 0), a little down (pitchBias), so the
+# climb keeps the land in frame; banks only from the turns. Tile-scale independent.
+FLIGHT = {
+    "ground": "mgTiles1", "startTime": 30.0, "duration": 60.0, "speed": 20.0, "fov": 46.0,
+    "route": [
+        {"position": [60, -250], "altitude": 12},          # the bay
+        {"position": [140, -420], "altitude": 6},          # low over the moving sea
+        {"position": [268, -540], "altitude": 8},          # the river mouth
+        {"position": [318, -660], "altitude": 10},         # up the valley, on the river's own bends
+        {"position": [258, -780], "altitude": 11},
+        {"position": [222, -900], "altitude": 13},
+        {"position": [295, -1030], "altitude": 40, "speed": 24},   # the climb begins
+        {"position": [312, -1160], "altitude": 80, "speed": 26},   # the reveal
+        {"position": [240, -1300], "altitude": 95, "speed": 26},
+    ],
+    "minClearance": 4, "clearanceRadius": 10, "amplitudeHeadroom": 2,
+    "climbRate": 12, "fallRate": 25, "lookAhead": 3.0, "pitchBias": 0.22,
+    "pitchMin": -32, "pitchMax": 0, "bankLimit": 8, "bankGain": 1.4, "loop": False,
+}
+FLY = False   # set by --flight
+
+
 def scene_doc(state, interim, camera_name):
     camera_pose = camera(camera_name)
     s = look.STATES[state]
@@ -72,6 +95,7 @@ def scene_doc(state, interim, camera_name):
         "skybox": True,
         "shadowRange": 480.0,   # the low suns' long shadows reach the reveal's middle ground (+0.7 ms; 220 changed no pixel there)
         "depthPrepass": True,
+        "aoRadius": 0.6,   # Phase 5: the automatic radius (5% of the look-ahead distance) welled every tile gap
         # GTAO, faded out with distance (ADR-1951): it darkened every far step riser into dark dashes (97fe0568).
         # The band is per view (AO_BANDS): near ground only.
         "ambientOcclusion": True,
@@ -102,6 +126,8 @@ def scene_doc(state, interim, camera_name):
         "lights": [look.sun_light(state), look.moon_light(state)] + ([look.fill_light(state)] if look.STATES[state].get("fill_int", 0) > 0 else []),
         "materialPrograms": programs,
     }
+    if FLY:
+        doc["flight"] = FLIGHT
     return doc
 
 
@@ -127,9 +153,12 @@ def main():
     ap.add_argument("--camera", default="low", choices=sorted(CAMERAS))
     ap.add_argument("--out", default=os.path.join(HERE, "scene"))
     ap.add_argument("--tile-scale", type=float, default=1.0)
+    ap.add_argument("--flight", action="store_true")
     a = ap.parse_args()
     global TILE_SCALE
     TILE_SCALE = a.tile_scale
+    global FLY
+    FLY = a.flight
     os.makedirs(a.out, exist_ok=True)
     scene_path = os.path.join(a.out, "musical-geography.scene.json")
     with open(scene_path, "w") as f:

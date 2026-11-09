@@ -40,7 +40,7 @@ STATES = {
         fill=0.25, contrast=1.3,
         sky_int=1.0, haze=0.35,
         moon_int=0.0, phase=0.61,   # r5: a low afternoon sun (~25 deg) from the south-west -- gentle slab-limited slopes need grazing light to shade
-        sky_zen="#2F6BFF", sky_hor="#C4C4F4", sky_ground="#C4C4F4", fog="#C4C4F4", fog_sun="#FFF2D6",
+        sky_zen="#2F6BFF", sky_hor="#C4C4F4", sky_ground="#A890D8", fog="#C4C4F4", fog_sun="#FFF2D6",
         sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
         land=["#A848C8", "#DC56AE", "#FF7486", "#FF9442", "#FFC03A"],   # r7: magenta-orchid lowlands, gold hill masses
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
@@ -53,7 +53,7 @@ STATES = {
         fill=0.55, contrast=1.22,
         sky_int=0.9, haze=0.2,   # meant to steepen the sky gradient; the sky renders flat regardless (02-requests, art p3)
         moon_int=0.0, phase=0.72,
-        sky_zen="#5A2496", sky_hor="#FF8A50", sky_ground="#FF8A50", fog="#FF8A50", fog_sun="#FFB060",
+        sky_zen="#5A2496", sky_hor="#FF8A50", sky_ground="#B04868", fog="#FF8A50", fog_sun="#FFB060",
         sun="#FFB848", sun_int=3.4, amb="#5E46B8", amb_int=1.0,
         land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
@@ -66,7 +66,7 @@ STATES = {
         fill=0.9, contrast=1.1,
         sky_int=0.9, haze=0.5,
         moon_int=2.2, phase=0.0,
-        sky_zen="#080A2C", sky_hor="#33237A", sky_ground="#33237A", fog="#33237A", fog_sun="#41308E",
+        sky_zen="#080A2C", sky_hor="#33237A", sky_ground="#241A60", fog="#33237A", fog_sun="#41308E",
         sun="#C8B4FF", sun_int=0.0, amb="#5A38B0", amb_int=0.6,
         land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"],
         water=["#0E1452", "#18227A", "#2443B0", "#3F78FF"], shallow="#2A3AA0", under="#120E3A",
@@ -80,7 +80,7 @@ STATES = {
         fill=0.25, contrast=1.3,
         sky_int=0.95, haze=0.35,
         moon_int=0.0, phase=0.27,
-        sky_zen="#7FA6E8", sky_hor="#FFD8A8", sky_ground="#FFD8A8", fog="#FFD8A8", fog_sun="#FFE2A0",
+        sky_zen="#7FA6E8", sky_hor="#FFD8A8", sky_ground="#B8B888", fog="#FFD8A8", fog_sun="#FFE2A0",
         sun="#FFC874", sun_int=4.4, amb="#B8C8D8", amb_int=0.55,
         land=["#2E9C78", "#5CB86A", "#D8CC5A", "#F6AE48", "#FFDC98"],
         water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8", under="#4A6A55",
@@ -136,7 +136,8 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
                                   for _, st in ordered_states()],
         "zenithColor": col("sky_zen"),
         "horizonColor": col("sky_hor"),
-        "groundColor": col("fog"),        # below the horizon the sky is the fog: no band where the window ends
+        "groundColor": col("sky_ground"),  # the sky below the horizon (seen past the tiles' end, ~10 deg down at 120 m):
+                                           # a darker land-coloured band, not horizon orange (engineering, Phase 5)
         "sunColor": col("sun"),
         "fogColor": col("fog"),
         "sunIntensity": _curve("sun_int"),
