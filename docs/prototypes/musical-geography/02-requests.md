@@ -624,3 +624,68 @@ None of the suspects shows in any slow frame:
 - the contour pass (GPU only).
 
 The stalls belong to the app's shell (the event pump and a periodic UI rebuild). They're reported, not fixed here.
+
+### Engineering → art, Phase 6 / CP-C (2026-11-09): characters on the tiles (ADR-1954, 1955, 1957, 1958)
+
+**What's built:**
+
+- **Landing springs (ADR-1954).** A landing makes its tile dip, rebound and settle, and a smaller, later ripple
+  spreads to the tiles around it. The motion is a function of the clock, so a seek gives the same result as play.
+- **The ground seam (ADR-1955).** Bodies stand on the moving tiles as they are drawn: the waves, the breathing, the
+  audio-driven amplitude, the live rings and other bodies' springs.
+- **TileNav (ADR-1957).** Bodies walk steps of up to 0.6 m and never wade into the sea. They hop 1 to 3 tiles,
+  rising up to 3 m or dropping up to 8 m.
+- **The `hop` behaviour (ADR-1958).** A body pauses on its tile, picks a crown, sea slab or path tile 4 to 12 tiles
+  away, then walks and hops there. Each landing springs the ground.
+
+**Switch-on.** Each character needs a gltf node and an entity whose behaviour list is just `hop`. Leave out `ground`
+and `decide`: they read a WorldMap, and this scene has none. Also leave out the `foot` IK layers for the same reason.
+The clips map the hop's activities to the alien GLBs:
+
+```json
+{"name": "hopper0", "node": "hopper0", "seed": 7001, "tags": ["alien"],
+ "clips": {"idle": "Idle", "walk": "Walking", "run": "Running", "turn": "Idle_turn", "observe": "Idle",
+           "react": "Fight_idle", "jump": "Jumping", "fall": "Floating", "land": "Landing"},
+ "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
+ "behaviors": [{"kind": "hop", "hopChance": 0.45, "homeRadius": 28, "goalMin": 3, "goalMax": 7,
+                "pauseMin": 0.8, "pauseMax": 2.6, "airTime": 1.2, "apex": 2.4}]}
+```
+
+The node is the usual alien gltf: scale 1.94, y 0. The hop sets the height.
+
+The hop settings and their defaults:
+
+- `walkSpeed` 1.7, `runSpeed` 3.6
+- `airTime` 1.35 s, `apex` 2.2 m, `landTime` 0.4 s
+- `hopChance` 0.35: also hop a walkable step, for joy
+- `strength` 1: how hard a landing springs
+- `pauseMin` 1, `pauseMax` 3.5
+- `goalMin` 4, `goalMax` 12 (tiles)
+- `preferCrowns` 1, `preferWater` 0.6, `preferPath` 0.6
+- `homeRadius` 60 m
+- `stepHeight` 0.6, `jumpTiles` 3, `jumpRise` 3, `jumpDrop` 8
+
+`walkSpeed`, `runSpeed`, `airTime`, `apex`, `hopChance` and `strength` are live parameters under
+`<entity>/hop/...` and can be routed to audio. The springs go in `environment.tileDynamics.spring`:
+`{"depth": 0.6, "frequency": 1.6, "damping": 0.18, "rippleSpeed": 12, "rippleRadius": 5}`. CP-C used depth 0.7.
+The node chosen is the flight's `ground` (`mgTiles1`).
+
+**CP-C fixture.** Your CP-B r2 day build (`build.py --state day --flight`, unchanged) with six aliens placed beside
+the lit path, where the flight passes at 10 m. The aliens are scout, ranger, elder, pilot, diver and trooper, in
+`assets/aliens`, referenced and not copied. The camera rule holds: the flight is your r2 route, untouched. It looks
+where it travels and passes over the characters, with no framing, orbit or turn toward them. They read clearly at 10 m
+and are still visible from 28 m. In the stills they gather on the path (`preferPath`). Lower it if you want them on
+the crowns.
+
+**CP-C live perf** (1080p ultra, live mode, 30 fps target, Feline 40–76 s, 36 s measured, warm-up 4 s, same day route
+with and without the six aliens):
+
+| | Missed deadlines | GPU p50 / p95 / p99 | CPU work p50 / p99 |
+|---|---|---|---|
+| With the aliens | 1 / 1080 | 15.7 / 25.7 / 28.6 ms | 1.93 / 2.74 ms |
+| Without | 1 / 1080 | 16.4 / 26.5 / 28.7 ms | 1.41 / 1.95 ms |
+
+The six characters cost about 0.5 ms of CPU and no measurable GPU time. The one miss is in both arms (a 48 ms frame).
+
+**Clip:** `~/Desktop/av-gen-review/105-musical-geography/06-characters/cpc-hop-day-feline-40-78s.mp4`. The fixture
+script is `examples/musical-geography/eng/make_cpc.py`.

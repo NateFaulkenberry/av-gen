@@ -309,11 +309,12 @@ namespace {
 // ADR-1953: a fine sample of the moving ground (cs_generate_tiles's tileSampleMoving): the base at t, plus the waves
 // and rings at that point faded for the fine pitch. Every ring averages the same fine samples, so they agree in motion.
 TileSample sampleMoving(const GeneratorSpec& spec, float x, float z, float fine, const TileDynamics& d,
-                        const std::vector<TileEvent>& events, bool moving, float time) {
+                        const std::vector<TileEvent>& events, const std::vector<TileEvent>& springs, bool moving,
+                        float time) {
     TileSample s = tileSample(spec.tiles, x, z, time, d);
     if (moving) {
         const glm::vec2 m = tileMotion(d, events, x, z, time, s.water, fine);
-        s.height += m.x;
+        s.height += m.x + tileSpring(d.spring, springs, x, z, time); // ADR-1954
         s.crest = m.y;
     }
     return s;
@@ -327,10 +328,11 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
     const TileDynamics& d = dyn != nullptr ? *dyn : still;
     const bool moving = d.active();
     const std::vector<TileEvent> events = moving ? d.eventsAt(time) : std::vector<TileEvent>{};
+    const std::vector<TileEvent> springs = moving ? d.springsAt(time) : std::vector<TileEvent>{};
     const std::int32_t m = generatorTileChildren(spec);
     if (m == 1) {
         return sampleMoving(spec, (static_cast<float>(ix) + 0.5f) * spec.cellSize,
-                            (static_cast<float>(iz) + 0.5f) * spec.cellSize, spec.cellSize, d, events, moving, time);
+                            (static_cast<float>(iz) + 0.5f) * spec.cellSize, spec.cellSize, d, events, springs, moving, time);
     }
     const float fine = spec.cellSize / static_cast<float>(m);
     TileSample sum;
@@ -339,7 +341,7 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
         for (std::int32_t a = 0; a < m; ++a) {
             const float x = static_cast<float>(ix) * spec.cellSize + (static_cast<float>(a) + 0.5f) * fine;
             const float z = static_cast<float>(iz) * spec.cellSize + (static_cast<float>(b) + 0.5f) * fine;
-            const TileSample t = sampleMoving(spec, x, z, fine, d, events, moving, time);
+            const TileSample t = sampleMoving(spec, x, z, fine, d, events, springs, moving, time);
             lowest = std::min(lowest, t.height);
             sum.height += t.height;
             sum.water += t.water;

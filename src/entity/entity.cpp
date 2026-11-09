@@ -2095,6 +2095,7 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
         bc.dt = stepDt;
         bc.bus = bus;
         bc.nav = &nav_;
+        bc.ground = ground_; // ADR-1955
         bc.world = this;
         // Which body this is. Omitted here and present in `update`, so every character
         // separated from entity 0 instead of from itself (ADR-267 defect 1) -- which for the
@@ -2844,6 +2845,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
         bc.dt = dt;
         bc.bus = ctx.bus;
         bc.nav = &nav_;
+        bc.ground = ground_; // ADR-1955
         bc.world = this;
         bc.self = entityIndex;
         bc.rng = &entity.rng_;

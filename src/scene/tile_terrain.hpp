@@ -104,6 +104,9 @@ struct TileSample {
 // fade). Returns (height offset, crest). `events` is eventsAt(t), passed so a caller sampling many tiles finds it once.
 [[nodiscard]] glm::vec2 tileMotion(const TileDynamics& dyn, const std::vector<TileEvent>& events, float x, float z,
                                    float t, float water, float cellSize);
+// ADR-1954: the landing springs' height offset at (x, z, t) from `springs` (springsAt(t)).
+[[nodiscard]] float tileSpring(const TileSpringSpec& spec, const std::vector<TileEvent>& springs, float x, float z,
+                               float t);
 // ADR-1953: the whole ground at (x, z, t) for a ring of `cellSize`: the base plus the motion, the crest set.
 [[nodiscard]] TileSample tileSampleMoving(const TileTerrainSpec& spec, const TileDynamics& dyn, float x, float z,
                                           float t, float cellSize);

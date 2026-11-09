@@ -161,7 +161,10 @@ TEST_CASE("a checkpoint holds every member EntityWorld has, or the author was ma
     // A size is a crude fingerprint: two edits that cancel would pass it. It is the tripwire, not the
     // proof; the proof is the digest test in test_glowmere_scrub.cpp, which restores into a world
     // that has been somewhere else and compares everything.
-    constexpr std::size_t kEntityWorldSize = 2080; // ADR-833: landmarkTags_, configuration (setLandmarkTags bumps inputEpoch_)
+    // ADR-1955: ground_, configuration -- a pointer to the host's tiles ground, set before every step; the ground's own
+    // state (its landings) is in the host's half of the checkpoint (DirectorCheckpoint / HistoryCheckpoint::landings).
+    // (2080 before it: ADR-833, landmarkTags_, configuration -- setLandmarkTags bumps inputEpoch_.)
+    constexpr std::size_t kEntityWorldSize = 2088;
     INFO("sizeof(EntityWorld) = " << sizeof(entity::EntityWorld));
     CHECK(sizeof(entity::EntityWorld) == kEntityWorldSize);
 

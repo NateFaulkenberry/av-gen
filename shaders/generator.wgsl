@@ -221,6 +221,9 @@ struct TileParams {
     ring1: vec4<f32>,      // decay, crest
     waves: array<vec4<f32>, 12>,
     events: array<vec4<f32>, 16>,
+    spring0: vec4<f32>,    // ADR-1954: depth, frequency, damping, ripple speed
+    spring1: vec4<f32>,    // ripple radius, spring count
+    springs: array<vec4<f32>, 8>, // x, z, time, strength
 };
 
 @group(0) @binding(2) var<uniform> tile: TileParams;
@@ -419,6 +422,27 @@ fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec3<f32> {
     return vec3<f32>(tile.dyn.y * height, clamp(crest, 0.0, 1.0), abs(tile.dyn.y) * step);
 }
 
+// ADR-1954: the landing springs at (x, z) (tileSpring's twin).
+fn tileSpring(x: f32, z: f32) -> f32 {
+    let t = tile.dyn.x;
+    let w = TILE_TWO_PI * tile.spring0.y;
+    let zeta = clamp(tile.spring0.z, 0.0, 0.999);
+    let wd = w * sqrt(1.0 - zeta * zeta);
+    var h = 0.0;
+    let count = min(u32(tile.spring1.y + 0.5), 8u);
+    for (var i = 0u; i < count; i = i + 1u) {
+        let e = tile.springs[i];
+        let r = sqrt((x - e.x) * (x - e.x) + (z - e.y) * (z - e.y));
+        let a = t - e.z - r / tile.spring0.w;
+        if (a < 0.0) {
+            continue;
+        }
+        let amp = tile.spring0.x * e.w * exp(-r / tile.spring1.x);
+        h = h - amp * exp(-zeta * w * a) * sin(wd * a);
+    }
+    return h;
+}
+
 // ADR-1953: a fine sample of the moving ground -- the base plus the waves and rings at that point, faded for the fine
 // pitch. Every ring averages the same fine samples (and its seam band the same blocks), so the rings agree in motion
 // exactly as they do at rest.
@@ -426,9 +450,10 @@ fn tileSampleMoving(x: f32, z: f32, fine: f32) -> TileOut {
     var s = tileSample(x, z);
     if (tile.breath.w > 0.5) {
         let m = tileMotion(x, z, s.water, fine);
-        s.height = s.height + m.x;
+        let spring = tileSpring(x, z);
+        s.height = s.height + m.x + spring;
         s.crest = m.y;
-        s.step = m.z;
+        s.step = m.z + 2.0 * abs(spring); // a sprung tile steps against its neighbours too
     }
     return s;
 }

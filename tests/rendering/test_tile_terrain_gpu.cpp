@@ -288,6 +288,58 @@ TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][gener
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1954: the landing springs on the GPU are the CPU mirror's -- several landings at different ages, alone (so the
+// springs are the only motion) and on top of a wave.
+TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][generator][geography][springs]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    for (const bool withWave : {false, true}) {
+        scene::TileDynamics d;
+        if (withWave) {
+            scene::TileWave a;
+            a.amplitude = 0.6f;
+            a.wavelength = 20.0f;
+            a.speed = 4.0f;
+            d.waves = {a};
+        }
+        d.spring.depth = 1.2f;
+        d.springs = {{6.6f, {4.5f, 3.5f}, 1.0f}, {6.9f, {-6.5f, -2.5f}, 1.4f}, {5.8f, {1.5f, -8.5f}, 0.8f}};
+        const float time = 7.25f;
+        const auto pg = tilesObject("sprung", 1.0f, 40.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+        const glm::vec3 camera(0.5f, 30.0f, 0.5f);
+        scene::Scene s;
+        s.procedurals.push_back(pg);
+        s.environment.tileDynamics = d;
+        s.camera.position = camera;
+        s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+        REQUIRE(rig.renderer.renderToImage(s, FrameTime{time, 1.0 / 30.0, 1}, 160, 90).has_value());
+        const scene::GeneratorSpec& g = pg.distribution.generator;
+        const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+        auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+        REQUIRE(records.has_value());
+        scene::TileDynamics unsprung = d;
+        unsprung.springs.clear();
+        float worstHeight = 0.0f;
+        float sprung = 0.0f;
+        for (std::int32_t z = 0; z < w.countZ; ++z) {
+            for (std::int32_t x = 0; x < w.countX; ++x) {
+                const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                           static_cast<std::size_t>(x)];
+                const std::int32_t ix = w.originX + x;
+                const std::int32_t iz = w.originZ + z;
+                const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
+                const scene::TileSample plain = scene::generatorTileInWindow(g, ix, iz, w, &unsprung, time);
+                worstHeight = std::max(worstHeight, std::abs(r.position.y - moving.height));
+                sprung = std::max(sprung, std::abs(moving.height - plain.height));
+            }
+        }
+        CAPTURE(withWave, worstHeight, sprung);
+        CHECK(sprung > 0.3f); // the control: the springs really moved tiles
+        CHECK(worstHeight <= 2e-3f);
+    }
+    CHECK(ctx->errorCount() == 0);
+}
+
 // ADR-1970: the contour pass flags exactly the sides across which floor((top - offset) / interval) drops, computed here
 // from the CPU mirror's tops; and with no interval the lane is the crest alone.
 TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu][generator][geography][adr1970]") {

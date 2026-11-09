@@ -20,6 +20,7 @@
 #include "core/error.hpp"
 #include "graph/graph.hpp"
 #include "scene/flight.hpp"
+#include "scene/tile_ground.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
 #include "scene/lunar_world.hpp"
@@ -1853,6 +1854,14 @@ private:
     float tileTriggerPrevious_ = 0.0f;
     double tileLastTime_ = -1.0;
     void updateTileDynamics(const FrameTime& time); // ADR-1953: live rings; after the camera is final
+    // ADR-1953: the moving ground as the renderer will draw it: the authored block, then its parameters and live rings.
+    [[nodiscard]] TileDynamics liveTileDynamics() const;
+    // ADR-1955: the tiles ground the characters stand on (the flight's ground node, else the first tiles generator),
+    // refreshed before each entity step with the live dynamics, so a body rides what is drawn; its landings become the
+    // dynamics' springs (ADR-1954). `tileGroundOffset_` is the node's world translation.
+    TileGround tileGround_;
+    glm::vec3 tileGroundOffset_{0.0f};
+    void refreshTileGround();
     params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-350
     params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350
     params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-350

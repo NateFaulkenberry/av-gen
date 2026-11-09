@@ -3640,6 +3640,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     for (const auto& sink : animationSinks_) {
         sink->prepareChain();
     }
+    refreshTileGround(); // ADR-1955: the ground as it will be drawn, before the bodies stand on it
     entityWorld_.update(update, *params_);
 }
 
@@ -3770,6 +3771,7 @@ struct DirectorCheckpoint final : entity::HostCheckpoint {
     world::HistoryBank::Snapshot history; // ADR-703: empty when nothing subscribes to HIST
     std::shared_ptr<const entity::HostCheckpoint> signals; // ADR-870: null when the replay has no bus
     std::vector<params::ProcessorChain::State> reactions;  // ADR-870: the reaction routes' envelopes
+    std::vector<TileEvent> landings;                       // ADR-1954: the tiles ground's springs so far
     std::size_t measured = 0;
     [[nodiscard]] std::size_t bytes() const override { return measured; }
 };
@@ -3781,9 +3783,10 @@ struct HistoryCheckpoint final : entity::HostCheckpoint {
     world::HistoryBank::Snapshot history;
     std::shared_ptr<const entity::HostCheckpoint> signals;
     std::vector<params::ProcessorChain::State> reactions;
+    std::vector<TileEvent> landings; // ADR-1954: the tiles ground's springs so far
     [[nodiscard]] std::size_t bytes() const override {
         return history.bytes() + sizeof(HistoryCheckpoint) + (signals != nullptr ? signals->bytes() : 0) +
-               reactions.size() * sizeof(params::ProcessorChain::State);
+               reactions.size() * sizeof(params::ProcessorChain::State) + landings.size() * sizeof(TileEvent);
     }
 };
 
@@ -3972,9 +3975,10 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                 params.resetFinals();
             };
         }
-        if (history != nullptr || signals != nullptr) {
+        if (history != nullptr || signals != nullptr || tileGround_.valid()) {
             hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
                 auto c = std::make_shared<HistoryCheckpoint>();
+                c->landings = tileGround_.landings();
                 if (history != nullptr) {
                     c->history = history->snapshot();
                 }
@@ -3988,6 +3992,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
             };
             hooks.restore = [&](const entity::HostCheckpoint& host) {
                 const auto& c = static_cast<const HistoryCheckpoint&>(host);
+                tileGround_.restoreLandings(c.landings);
                 if (history != nullptr) {
                     history->restore(c.history);
                 }
@@ -3999,6 +4004,8 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                 }
             };
         }
+        tileGround_.forgetAfter(seconds); // ADR-1954: the landings that had not happened yet
+        refreshTileGround();
         entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
         return;
     }
@@ -4044,6 +4051,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         c->staging = staging_.checkpoint(params);
         c->placed = placement.placed();
         c->valid = placement.valid();
+        c->landings = tileGround_.landings();
         if (history != nullptr) {
             c->history = history->snapshot();
         }
@@ -4059,6 +4067,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     hooks.restore = [&](const entity::HostCheckpoint& host) {
         const auto& c = static_cast<const DirectorCheckpoint&>(host);
         staging_.restore(c.staging, params);
+        tileGround_.restoreLandings(c.landings);
         placement.set(c.placed, c.valid);
         if (history != nullptr) {
             history->restore(c.history);
@@ -4071,6 +4080,8 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         }
     };
     hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
+    tileGround_.forgetAfter(seconds); // ADR-1954: the landings that had not happened yet
+    refreshTileGround();
     entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
@@ -9176,6 +9187,55 @@ void Composition::updateTileDynamics(const FrameTime& time) {
     scene_.environment.tileDynamics.live = tileLiveEvents_;
 }
 
+TileDynamics Composition::liveTileDynamics() const {
+    TileDynamics out = volumeSetting_.tileDynamics;
+    if (tileDynamicsAuthored_) {
+        const TileDynamicsParams& p = tileDynamicsParams_;
+        TileDynamics& d = out;
+        const auto f = [](const params::Parameter<float>* q, float fallback) {
+            return q != nullptr ? q->value() : fallback;
+        };
+        d.amplitude = f(p.amplitude, d.amplitude);
+        for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
+            d.waves[i].amplitude = f(p.waveAmplitude[i], d.waves[i].amplitude);
+            d.waves[i].speed = f(p.waveSpeed[i], d.waves[i].speed);
+            d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
+            d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
+            d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+        }
+        d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
+        d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
+        d.rolling = {f(p.rollingX, d.rolling.x), f(p.rollingZ, d.rolling.y)};
+        d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
+        d.rings.speed = f(p.ringSpeed, d.rings.speed);
+        d.rings.decay = f(p.ringDecay, d.rings.decay);
+        d.contourInterval = f(p.contourInterval, d.contourInterval);
+        d.contourOffset = f(p.contourOffset, d.contourOffset);
+        d.live = tileLiveEvents_;
+    }
+    return out;
+}
+
+void Composition::refreshTileGround() {
+    const ProceduralGeometry* ground = nullptr;
+    for (const ProceduralGeometry& p : scene_.procedurals) {
+        if (p.distribution.generator.isTiles() &&
+            (flight_.ground.empty() || p.name == flight_.ground ||
+             (p.name.size() > flight_.ground.size() && p.name.ends_with(flight_.ground)))) {
+            ground = &p;
+            break;
+        }
+    }
+    if (ground == nullptr || entityWorld_.empty()) {
+        entityWorld_.setGround(nullptr);
+        return;
+    }
+    tileGroundOffset_ = glm::vec3(ground->distributionTransform.matrix()[3]);
+    tileGround_.set(ground->distribution.generator.tiles, liveTileDynamics(), ground->distribution.generator.cellSize,
+                    tileGroundOffset_);
+    entityWorld_.setGround(&tileGround_);
+}
+
 void Composition::applyParameters() {
     // ADR-343. Resolved first because the node loop below needs `glowScale` and `starBrightness`,
     // and written last (at the end of this function) because the sky and the lights it owns are
@@ -10049,30 +10109,13 @@ void Composition::applyParameters() {
         env.aoFadeEnd = volumeSetting_.aoFadeEnd;
         env.aoRadius = volumeSetting_.aoRadius; // Phase 5
         env.horizonFill = volumeSetting_.horizonFill; // Phase 5
-        env.tileDynamics = volumeSetting_.tileDynamics; // ADR-1953: the authored block, then its parameters
-        if (tileDynamicsAuthored_) {
-            const TileDynamicsParams& p = tileDynamicsParams_;
-            TileDynamics& d = env.tileDynamics;
-            const auto f = [](const params::Parameter<float>* q, float fallback) {
-                return q != nullptr ? q->value() : fallback;
-            };
-            d.amplitude = f(p.amplitude, d.amplitude);
-            for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
-                d.waves[i].amplitude = f(p.waveAmplitude[i], d.waves[i].amplitude);
-                d.waves[i].speed = f(p.waveSpeed[i], d.waves[i].speed);
-                d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
-                d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
-                d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+        env.tileDynamics = liveTileDynamics(); // ADR-1953: the authored block, then its parameters
+        env.tileDynamics.springs.clear(); // ADR-1954: the characters' landings, in the ground's generator space
+        if (tileGround_.valid()) {
+            for (const TileEvent& e : tileGround_.landings()) {
+                env.tileDynamics.springs.push_back(
+                    TileEvent{e.time, e.position - glm::vec2(tileGroundOffset_.x, tileGroundOffset_.z), e.strength});
             }
-            d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
-            d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
-            d.rolling = {f(p.rollingX, d.rolling.x), f(p.rollingZ, d.rolling.y)};
-            d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
-            d.rings.speed = f(p.ringSpeed, d.rings.speed);
-            d.rings.decay = f(p.ringDecay, d.rings.decay);
-            d.contourInterval = f(p.contourInterval, d.contourInterval);
-            d.contourOffset = f(p.contourOffset, d.contourOffset);
-            d.live = tileLiveEvents_;
         }
         env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406

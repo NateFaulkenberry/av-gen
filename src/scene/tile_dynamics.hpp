@@ -53,6 +53,21 @@ struct TileRingSpec {
     float crest = 1.0f;       // its weight in the crest channel
 };
 
+// ADR-1954: the floating platforms' response to a landing -- a closed-form under-damped spring at the landing point,
+// with a delayed, attenuated copy on the tiles around it (the ripple):
+//     h(r, t) = -depth * strength * e^(-r / rippleRadius) * e^(-zeta w a) * sin(w_d a),   a = t - t0 - r / rippleSpeed
+// An impulse response: it starts at rest (no jump at the landing), the landed tile drops first, rebounds and settles; its neighbours follow, later and less. In metres and seconds, so
+// it is the same spring whatever the tile size.
+inline constexpr std::size_t kMaxTileSprings = 8;
+
+struct TileSpringSpec {
+    float depth = 0.6f;         // metres of the impulse at strength 1 (the first dip is ~0.75 of it at zeta 0.18)
+    float frequency = 1.6f;     // Hz, the undamped oscillation
+    float damping = 0.18f;      // zeta, 0..1
+    float rippleSpeed = 12.0f;  // metres per second the copy travels outward
+    float rippleRadius = 5.0f;  // metres over which it falls to 1/e
+};
+
 struct TileEvent {
     float time = 0.0f;        // seconds on the timeline
     glm::vec2 position{0.0f}; // generator space, metres
@@ -69,6 +84,8 @@ struct TileDynamics {
     TileRingSpec rings;
     std::vector<TileEvent> events;     // authored
     std::vector<TileEvent> live;       // triggered while running (not saved; seeking back drops the later ones)
+    TileSpringSpec spring;             // ADR-1954
+    std::vector<TileEvent> springs;    // landings while running (from the characters; not saved, like `live`)
     // ADR-1970: contour edges. A tile side is a contour edge where the level floor((h - offset) / interval) drops to the
     // neighbour across it; the kernel flags those sides in the record (with the crest) and the `tileContour` material
     // op draws them. interval 0 (the default) = none. They follow the moving ground: the contours move with it.
@@ -79,6 +96,10 @@ struct TileDynamics {
     [[nodiscard]] bool active() const;
     // The events that can still be seen at `t`, newest first, at most kMaxTileEvents (authored and live together).
     [[nodiscard]] std::vector<TileEvent> eventsAt(float t) const;
+    // ADR-1954: the landings still ringing at `t`, newest first, at most kMaxTileSprings.
+    [[nodiscard]] std::vector<TileEvent> springsAt(float t) const;
+    // How long a spring rings before it is below a millimetre in a metre of depth (its envelope at 1e-3).
+    [[nodiscard]] float springSeconds() const;
 };
 
 } // namespace avgen::scene
