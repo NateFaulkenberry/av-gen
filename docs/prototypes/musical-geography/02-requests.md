@@ -371,3 +371,67 @@ Stills in `02-terrain/`, on revealC:
 - `eng-r10-dawn-arc-vs-turned.png`: the two stacked.
 
 The day frame with the curve is bit-identical to the day frame without it, because the 0 keys leave day alone.
+
+### Engineering → art, Phase 3 (2026-11-09): the moving ground (ADR-1953), contours (1970), crest (1971)
+
+One block in `environment`, which every tiles ring and the underlay follow:
+
+```json
+"tileDynamics": {
+  "amplitude": 0.55,
+  "waves": [
+    {"kind": "planar", "amplitude": 1.0, "wavelength": 44, "speed": 9, "direction": 200, "sharpness": 0.6,
+     "onLand": 0.3, "onWater": 1, "crest": 0.5},
+    {"kind": "planar", "amplitude": 0.7, "wavelength": 28, "speed": 7, "direction": 255, "sharpness": 0.4,
+     "onLand": 0.3, "onWater": 1, "crest": 0.5},
+    {"kind": "circular", "amplitude": 0.5, "wavelength": 34, "speed": 12, "centre": [-34.5, -497.5]}
+  ],
+  "breathing": {"amplitude": 0.15, "period": 14, "wavelength": 700},
+  "rolling": [0.8, 0.0],
+  "rings": {"amplitude": 2.5, "speed": 50, "wavelength": 14, "width": 12, "decay": 2.2, "crest": 1},
+  "events": [ {"time": 31.5, "position": [x, z], "strength": 1} ],
+  "contour": {"interval": 2.0, "offset": 0.0}
+}
+```
+
+What the terms do:
+- At most 4 waves and 16 visible events.
+- `direction` is in degrees, with 0 along +X and 90 along +Z.
+- `sharpness` runs from 0 (a sine) toward 1 (narrow crests, flat troughs).
+- `onLand` and `onWater` weight a train by the tile's water channel.
+- Every key is optional, and an unknown key is refused.
+
+**Audio** goes through routes onto the parameters, which are registered when the block is present:
+- `env/tiles/amplitude`;
+- `env/tiles/waveN/{amplitude,speed,wavelength,direction,crest}`;
+- `env/tiles/breathing/{amplitude,period}` and `env/tiles/rolling/{x,z}`;
+- `env/tiles/rings/{amplitude,speed,decay}`;
+- `env/tiles/contour/{interval,offset}`;
+- the trigger set: `env/tiles/rings/trigger`, which drops a ring on a rising edge through 0.5, at `rings/x,z`, or
+  `rings/ahead` metres ahead of the camera when that is above 0, with `rings/strength`.
+
+The clip's routes are `response.low` onto `env/tiles/amplitude` (add 0.9) and `response.onset` onto
+`env/tiles/rings/trigger`.
+
+**The underlay:** set `"childrenMin": true` on the underlay's generator. Its cells then stand at the lowest fine tile,
+so the moving sea's troughs never uncover it; without it, the troughs showed dark-blue specks.
+
+**A note on the look:** with a low camera, the 1 m tile gaps seen end-on near the camera read as dark lines down to the
+underlay. This is static and not motion; it is yours to judge (a lighter underlay, or a smaller gap near).
+
+**Material:**
+- **The crest.** With no contours, the crest is `instanceEmissive.w` (0..1). With contours on, use the op.
+- **The `tileContour` op.** It takes `srcA` = localPosition and `srcB` = instanceEmissive. Its constant is
+  `[halfX, halfZ, band, 0]` and its value is the minimum band in pixels, the same convention as tileBorder. It returns
+  `x` = contour coverage on the flagged sides only, `y` = crest, `z` = flagged sides / 4, `w` = any.
+- **`instanceIndex` on a tiles ring** now reads the tile's top height in metres.
+
+**Prove-it stills** are in `03-dynamic/` (`eng-p3-*`), each with its own background tint:
+- static;
+- waves ×5;
+- interference ×5, before and after the sea skirt;
+- breathing;
+- rolling;
+- a ring;
+- contours;
+- crest crossings.

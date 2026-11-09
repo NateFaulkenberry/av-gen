@@ -1245,7 +1245,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
     u.info = glm::uvec4(t.seed, points, static_cast<std::uint32_t>(scene::generatorTileChildren(g)),
                         hole.valid ? 1u : 0u);
     u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
-    u.blend = glm::ivec4(g.blendCells, g.blendRatio, 0, 0);
+    u.blend = glm::ivec4(g.blendCells, g.blendRatio, g.childrenMin ? 1 : 0, 0); // z: ADR-1953 children at the lowest
     u.skirt = glm::vec4(g.skirt, std::max(object.source.size.y * object.sourceTransform.scale.y, 1e-4f), 0.0f, 0.0f);
     const auto riverPoints = static_cast<std::uint32_t>(std::min(t.river.size(), scene::kMaxTilePathPoints));
     u.river = glm::vec4(t.riverWidth, t.valleyWidth, t.heightScale, static_cast<float>(riverPoints));

@@ -3,6 +3,7 @@
 #include "spatial/detail.hpp"
 
 #include <algorithm>
+#include <vector>
 #include <cmath>
 #include <limits>
 
@@ -175,6 +176,7 @@ std::uint64_t GeneratorSpec::hash() const {
         h.u32(static_cast<std::uint32_t>(holeAlign));
         h.u32(static_cast<std::uint32_t>(blendCells));
         h.f32(skirt);
+        h.u32(childrenMin ? 1u : 0u);
         h.u32(static_cast<std::uint32_t>(blendRatio));
     }
     return h.value();
@@ -302,27 +304,49 @@ GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& 
     return hole;
 }
 
+namespace {
+
+// ADR-1953: a fine sample of the moving ground (cs_generate_tiles's tileSampleMoving): the base at t, plus the waves
+// and rings at that point faded for the fine pitch. Every ring averages the same fine samples, so they agree in motion.
+TileSample sampleMoving(const GeneratorSpec& spec, float x, float z, float fine, const TileDynamics& d,
+                        const std::vector<TileEvent>& events, bool moving, float time) {
+    TileSample s = tileSample(spec.tiles, x, z, time, d);
+    if (moving) {
+        const glm::vec2 m = tileMotion(d, events, x, z, time, s.water, fine);
+        s.height += m.x;
+        s.crest = m.y;
+    }
+    return s;
+}
+
+} // namespace
+
 TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz, const TileDynamics* dyn,
                          float time) {
     const TileDynamics still;
     const TileDynamics& d = dyn != nullptr ? *dyn : still;
+    const bool moving = d.active();
+    const std::vector<TileEvent> events = moving ? d.eventsAt(time) : std::vector<TileEvent>{};
     const std::int32_t m = generatorTileChildren(spec);
     if (m == 1) {
-        return tileSample(spec.tiles, (static_cast<float>(ix) + 0.5f) * spec.cellSize,
-                          (static_cast<float>(iz) + 0.5f) * spec.cellSize, time, d);
+        return sampleMoving(spec, (static_cast<float>(ix) + 0.5f) * spec.cellSize,
+                            (static_cast<float>(iz) + 0.5f) * spec.cellSize, spec.cellSize, d, events, moving, time);
     }
     const float fine = spec.cellSize / static_cast<float>(m);
     TileSample sum;
+    float lowest = 3.0e38f;
     for (std::int32_t b = 0; b < m; ++b) {
         for (std::int32_t a = 0; a < m; ++a) {
             const float x = static_cast<float>(ix) * spec.cellSize + (static_cast<float>(a) + 0.5f) * fine;
             const float z = static_cast<float>(iz) * spec.cellSize + (static_cast<float>(b) + 0.5f) * fine;
-            const TileSample t = tileSample(spec.tiles, x, z, time, d);
+            const TileSample t = sampleMoving(spec, x, z, fine, d, events, moving, time);
+            lowest = std::min(lowest, t.height);
             sum.height += t.height;
             sum.water += t.water;
             sum.shore += t.shore;
             sum.flat += t.flat;
             sum.path += t.path;
+            sum.crest += t.crest;
         }
     }
     const float inv = 1.0f / static_cast<float>(m * m);
@@ -331,38 +355,25 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
     sum.shore *= inv;
     sum.flat *= inv;
     sum.path *= inv;
+    sum.crest *= inv;
+    if (spec.childrenMin) {
+        sum.height = lowest; // ADR-1953
+    }
     return sum;
 }
-
-namespace {
-
-// ADR-1953: the waves and the rings, once per cell at its centre (the kernel's order: after the seam band).
-TileSample withMotion(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz, TileSample t,
-                      const TileDynamics* dyn, float time) {
-    if (dyn == nullptr || !dyn->active()) {
-        return t;
-    }
-    const glm::vec2 m = tileMotion(*dyn, dyn->eventsAt(time), (static_cast<float>(ix) + 0.5f) * spec.cellSize,
-                                   (static_cast<float>(iz) + 0.5f) * spec.cellSize, time, t.water, spec.cellSize);
-    t.height += m.x;
-    t.crest = m.y;
-    return t;
-}
-
-} // namespace
 
 TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
                                   const GeneratorWindow& window, const TileDynamics* dyn, float time) {
     TileSample t = generatorTile(spec, ix, iz, dyn, time);
     if (spec.blendCells <= 0 || spec.blendRatio < 2 || window.countX <= 0 || window.countZ <= 0) {
-        return withMotion(spec, ix, iz, t, dyn, time);
+        return t;
     }
     const std::int32_t d = std::min({ix - window.originX, window.originX + window.countX - 1 - ix, iz - window.originZ,
                                      window.originZ + window.countZ - 1 - iz});
     const float u = std::clamp(static_cast<float>(d) / static_cast<float>(spec.blendCells), 0.0f, 1.0f);
     const float w = 1.0f - u * u * (3.0f - 2.0f * u);
     if (!(w > 0.0f)) {
-        return withMotion(spec, ix, iz, t, dyn, time);
+        return t;
     }
     const std::int32_t r = spec.blendRatio;
     const std::int32_t bx = generatorFloorDiv(ix, r) * r;
@@ -376,6 +387,7 @@ TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std
             m.shore += c.shore;
             m.flat += c.flat;
             m.path += c.path;
+            m.crest += c.crest;
         }
     }
     const float inv = 1.0f / static_cast<float>(r * r);
@@ -384,7 +396,8 @@ TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std
     t.shore += (m.shore * inv - t.shore) * w;
     t.flat += (m.flat * inv - t.flat) * w;
     t.path += (m.path * inv - t.path) * w;
-    return withMotion(spec, ix, iz, t, dyn, time);
+    t.crest += (m.crest * inv - t.crest) * w;
+    return t;
 }
 
 GeneratorWindow generatorCapacity(const GeneratorSpec& spec) {

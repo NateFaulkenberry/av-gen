@@ -86,6 +86,10 @@ struct GeneratorSpec {
     // step's riser is solid. Water tiles keep their thickness (scaled by 1 - water), so the sea's slabs still float.
     // The box's own thickness (`skirtThickness`) is the source box's y size; the renderer fills it. 0 = no skirt.
     float skirt = 0.0f;
+    // ADR-1953: a cell stands at the LOWEST of the fine tiles it covers instead of their mean. For an underlay: under a
+    // moving finer ring its averaged cell would rise into the fine troughs and show through; at the minimum it never
+    // does. Off (the mean) by default.
+    bool childrenMin = false;
 
     [[nodiscard]] bool isTiles() const;
 
@@ -160,12 +164,12 @@ struct GeneratorTileHole {
 };
 [[nodiscard]] GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& cameraGen, float reach = 1.0f);
 // The tile in cell (ix, iz): the mean of the fine tiles it covers (one, for the finest ring), generator space.
-// ADR-1953: with `dyn`, the base at time `t` (breathing and rolling; the waves and rings are added by
-// generatorTileInWindow, once per cell, as the kernel does).
+// ADR-1953: with `dyn`, the moving ground at time `t`: each fine sample is the base plus the waves and rings at that
+// point (faded for the fine pitch), and the cell is their mean, as the kernel does.
 [[nodiscard]] TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
                                        const TileDynamics* dyn = nullptr, float t = 0.0f);
-// The tile as the kernel writes it in `window`: generatorTile, eased toward its coarser block in the seam band, then
-// (ADR-1953, with `dyn`) the waves and rings at the cell's centre, the crest set.
+// The tile as the kernel writes it in `window`: generatorTile, eased toward its coarser block in the seam band (the
+// moving ground included, ADR-1953).
 [[nodiscard]] TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
                                                const GeneratorWindow& window, const TileDynamics* dyn = nullptr,
                                                float t = 0.0f);

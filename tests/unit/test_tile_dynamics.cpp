@@ -6,6 +6,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "scene/generator.hpp"
 #include "scene/material_program.hpp"
 #include "scene/tile_terrain.hpp"
 #include "support/temp_dir.hpp"
@@ -364,4 +365,31 @@ TEST_CASE("the tileContour op draws only the flagged sides and returns the crest
     CHECK(eval({0.0f, 0.0f, 0.0f}, all).y == Catch::Approx(1.0f));
     CHECK(eval({0.0f, 0.0f, 0.0f}, all).z == Catch::Approx(1.0f));
     CHECK(materialOpKindFromName("tileContour") == MaterialOpKind::TileContour);
+}
+
+TEST_CASE("an underlay ring with childrenMin stands at its lowest fine tile", "[tiles][dynamics][geography]") {
+    scene::GeneratorSpec g;
+    g.name = scene::kGeneratorTiles;
+    g.cellSize = 4.0f;
+    g.viewDistance = 40.0f;
+    g.finePitch = 1.0f;
+    g.childrenMin = true;
+    scene::GeneratorSpec fine = g;
+    fine.cellSize = 1.0f;
+    fine.childrenMin = false;
+    scene::TileDynamics d;
+    scene::TileWave w;
+    w.amplitude = 2.0f;
+    w.wavelength = 6.0f;
+    d.waves = {w};
+    for (std::int32_t i = -5; i < 5; ++i) {
+        const scene::TileSample cell = scene::generatorTile(g, i, 2, &d, 3.0f);
+        float lowest = 1e9f;
+        for (std::int32_t b = 0; b < 4; ++b) {
+            for (std::int32_t a = 0; a < 4; ++a) {
+                lowest = std::min(lowest, scene::generatorTile(fine, i * 4 + a, 8 + b, &d, 3.0f).height);
+            }
+        }
+        CHECK(cell.height == Catch::Approx(lowest).margin(1e-5));
+    }
 }

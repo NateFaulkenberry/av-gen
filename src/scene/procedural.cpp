@@ -3339,6 +3339,9 @@ json ProceduralGeometry::toJson() const {
                 if (g.skirt > 0.0f) {
                     gj["skirt"] = g.skirt;
                 }
+                if (g.childrenMin) {
+                    gj["childrenMin"] = true; // ADR-1953
+                }
                 if (g.blendCells > 0) {
                     gj["blend"] = json{{"cells", g.blendCells}, {"ratio", g.blendRatio}};
                 }
@@ -3710,6 +3713,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                     gs.tiles = std::move(*tiles);
                 }
                 AVGEN_PROC_READ(gs.skirt, "skirt", readFloat); // CP-A r3: the slab skirt
+                AVGEN_PROC_READ(gs.childrenMin, "childrenMin", readBool); // ADR-1953: an underlay's cells at the lowest
                 if (j.contains("blend")) { // ADR-1976 (amended): the seam band
                     const json& bj = j.at("blend");
                     if (!bj.is_object() || !bj.contains("cells") || !bj.at("cells").is_number_integer() ||
