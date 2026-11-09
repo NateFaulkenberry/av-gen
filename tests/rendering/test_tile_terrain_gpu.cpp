@@ -217,3 +217,73 @@ TEST_CASE("A skirt drops a land tile's box below its top and leaves the sea's sl
     CHECK(land > 100);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1953: the moving ground on the GPU is the CPU mirror's at the same time -- waves, interference, breathing,
+// rolling and a ring, the crest channel in the emissive's spare lane -- on the fine ring and on a coarse one.
+TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][generator][geography][dynamics]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    scene::TileDynamics d;
+    scene::TileWave a;
+    a.amplitude = 0.7f;
+    a.wavelength = 18.0f;
+    a.speed = 5.0f;
+    a.direction = 35.0f;
+    a.sharpness = 0.4f;
+    scene::TileWave b;
+    b.circular = true;
+    b.amplitude = 0.5f;
+    b.wavelength = 11.0f;
+    b.speed = -3.0f;
+    b.centre = {8.0f, -6.0f};
+    b.onLand = 0.3f;
+    d.waves = {a, b};
+    d.breathingAmplitude = 0.25f;
+    d.breathingPeriod = 9.0f;
+    d.breathingWavelength = 90.0f;
+    d.rolling = {1.2f, -0.7f};
+    d.rings.amplitude = 1.1f;
+    d.rings.speed = 12.0f;
+    d.rings.wavelength = 7.0f;
+    d.rings.width = 5.0f;
+    d.events = {{5.0f, {4.0f, 3.0f}, 1.0f}};
+    const float time = 7.25f;
+    for (const float cell : {1.0f, 2.0f}) {
+        const auto pg = tilesObject("moving", cell, 40.0f * cell, 4, cell > 1.0f ? 1.0f : 0.0f, 0.0f, 0.0f, 1);
+        const glm::vec3 camera(0.5f, 30.0f, 0.5f);
+        scene::Scene s;
+        s.procedurals.push_back(pg);
+        s.environment.tileDynamics = d;
+        s.camera.position = camera;
+        s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+        REQUIRE(rig.renderer.renderToImage(s, FrameTime{time, 1.0 / 30.0, 1}, 160, 90).has_value());
+        const scene::GeneratorSpec& g = pg.distribution.generator;
+        const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+        auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+        REQUIRE(records.has_value());
+        float worstHeight = 0.0f;
+        float worstCrest = 0.0f;
+        float moved = 0.0f;
+        float crestSeen = 0.0f;
+        for (std::int32_t z = 0; z < w.countZ; ++z) {
+            for (std::int32_t x = 0; x < w.countX; ++x) {
+                const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                           static_cast<std::size_t>(x)];
+                const std::int32_t ix = w.originX + x;
+                const std::int32_t iz = w.originZ + z;
+                const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
+                const scene::TileSample still = scene::generatorTileInWindow(g, ix, iz, w);
+                worstHeight = std::max(worstHeight, std::abs(r.position.y - moving.height));
+                worstCrest = std::max(worstCrest, std::abs(r.emissive.w - moving.crest));
+                moved = std::max(moved, std::abs(moving.height - still.height));
+                crestSeen = std::max(crestSeen, moving.crest);
+            }
+        }
+        CAPTURE(cell, worstHeight, worstCrest, moved, crestSeen);
+        CHECK(moved > 0.5f);       // the control: the ground really moved
+        CHECK(crestSeen > 0.5f);
+        CHECK(worstHeight <= 2e-3f); // GPU trig and pow against the CPU's
+        CHECK(worstCrest <= 2e-3f);
+    }
+    CHECK(ctx->errorCount() == 0);
+}

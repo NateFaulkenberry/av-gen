@@ -1224,7 +1224,7 @@ GeneratorUniforms packGenerator(const scene::ProceduralGeometry& object, const s
 }
 
 GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,
-                                         float reach) {
+                                         float reach, const scene::TileDynamics& dyn, float time) {
     const scene::GeneratorSpec& g = object.distribution.generator;
     const scene::TileTerrainSpec& t = g.tiles;
     GeneratorTileUniforms u{};
@@ -1260,6 +1260,27 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         } else {
             lane.z = t.path[i].x;
             lane.w = t.path[i].y;
+        }
+    }
+    // ADR-1953: the moving ground. Inactive, every lane stays 0 and the kernel skips it: the static ground.
+    if (dyn.active()) {
+        const std::size_t waveCount = std::min(dyn.waves.size(), scene::kMaxTileWaves);
+        const std::vector<scene::TileEvent> events = dyn.eventsAt(time);
+        u.dyn = glm::vec4(time, dyn.amplitude, static_cast<float>(waveCount), static_cast<float>(events.size()));
+        u.breath = glm::vec4(dyn.breathingAmplitude, dyn.breathingPeriod, dyn.breathingWavelength, 1.0f);
+        u.roll = glm::vec4(dyn.rolling.x, dyn.rolling.y, 0.0f, 0.0f);
+        u.ring0 = glm::vec4(dyn.rings.amplitude, dyn.rings.speed, dyn.rings.wavelength, dyn.rings.width);
+        u.ring1 = glm::vec4(dyn.rings.decay, dyn.rings.crest, 0.0f, 0.0f);
+        for (std::size_t i = 0; i < waveCount; ++i) {
+            const scene::TileWave& w = dyn.waves[i];
+            const float a = w.direction * (6.28318530717958647692f / 360.0f);
+            u.waves[i * 3] = glm::vec4(w.circular ? 1.0f : 0.0f, w.amplitude, w.wavelength, w.speed);
+            u.waves[i * 3 + 1] = w.circular ? glm::vec4(w.centre.x, w.centre.y, w.sharpness, w.crest)
+                                            : glm::vec4(std::cos(a), std::sin(a), w.sharpness, w.crest);
+            u.waves[i * 3 + 2] = glm::vec4(w.onLand, w.onWater, w.phase, 0.0f);
+        }
+        for (std::size_t i = 0; i < events.size(); ++i) {
+            u.events[i] = glm::vec4(events[i].position.x, events[i].position.y, events[i].time, events[i].strength);
         }
     }
     return u;
@@ -2811,7 +2832,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             const bool tiles = object.distribution.generator.isTiles(); // ADR-1950
             if (tiles) {
                 const GeneratorTileUniforms tu = packGeneratorTiles(
-                    object, generatorCameraSpace(object, objectModel, scene.camera.position), generatorReach);
+                    object, generatorCameraSpace(object, objectModel, scene.camera.position), generatorReach,
+                    scene.environment.tileDynamics, static_cast<float>(time.renderTime)); // ADR-1953
                 queue.WriteBuffer(state.generatorTileUniforms, 0, &tu, sizeof(tu));
             }
             im.generatorItems.push_back(Impl::GeneratorItem{&state, static_cast<std::uint32_t>(genWindow.countX),

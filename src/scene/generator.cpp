@@ -302,11 +302,14 @@ GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& 
     return hole;
 }
 
-TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz) {
+TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz, const TileDynamics* dyn,
+                         float time) {
+    const TileDynamics still;
+    const TileDynamics& d = dyn != nullptr ? *dyn : still;
     const std::int32_t m = generatorTileChildren(spec);
     if (m == 1) {
         return tileSample(spec.tiles, (static_cast<float>(ix) + 0.5f) * spec.cellSize,
-                          (static_cast<float>(iz) + 0.5f) * spec.cellSize);
+                          (static_cast<float>(iz) + 0.5f) * spec.cellSize, time, d);
     }
     const float fine = spec.cellSize / static_cast<float>(m);
     TileSample sum;
@@ -314,7 +317,7 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
         for (std::int32_t a = 0; a < m; ++a) {
             const float x = static_cast<float>(ix) * spec.cellSize + (static_cast<float>(a) + 0.5f) * fine;
             const float z = static_cast<float>(iz) * spec.cellSize + (static_cast<float>(b) + 0.5f) * fine;
-            const TileSample t = tileSample(spec.tiles, x, z);
+            const TileSample t = tileSample(spec.tiles, x, z, time, d);
             sum.height += t.height;
             sum.water += t.water;
             sum.shore += t.shore;
@@ -331,18 +334,35 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
     return sum;
 }
 
-TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
-                                  const GeneratorWindow& window) {
-    TileSample t = generatorTile(spec, ix, iz);
-    if (spec.blendCells <= 0 || spec.blendRatio < 2 || window.countX <= 0 || window.countZ <= 0) {
+namespace {
+
+// ADR-1953: the waves and the rings, once per cell at its centre (the kernel's order: after the seam band).
+TileSample withMotion(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz, TileSample t,
+                      const TileDynamics* dyn, float time) {
+    if (dyn == nullptr || !dyn->active()) {
         return t;
+    }
+    const glm::vec2 m = tileMotion(*dyn, dyn->eventsAt(time), (static_cast<float>(ix) + 0.5f) * spec.cellSize,
+                                   (static_cast<float>(iz) + 0.5f) * spec.cellSize, time, t.water, spec.cellSize);
+    t.height += m.x;
+    t.crest = m.y;
+    return t;
+}
+
+} // namespace
+
+TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
+                                  const GeneratorWindow& window, const TileDynamics* dyn, float time) {
+    TileSample t = generatorTile(spec, ix, iz, dyn, time);
+    if (spec.blendCells <= 0 || spec.blendRatio < 2 || window.countX <= 0 || window.countZ <= 0) {
+        return withMotion(spec, ix, iz, t, dyn, time);
     }
     const std::int32_t d = std::min({ix - window.originX, window.originX + window.countX - 1 - ix, iz - window.originZ,
                                      window.originZ + window.countZ - 1 - iz});
     const float u = std::clamp(static_cast<float>(d) / static_cast<float>(spec.blendCells), 0.0f, 1.0f);
     const float w = 1.0f - u * u * (3.0f - 2.0f * u);
     if (!(w > 0.0f)) {
-        return t;
+        return withMotion(spec, ix, iz, t, dyn, time);
     }
     const std::int32_t r = spec.blendRatio;
     const std::int32_t bx = generatorFloorDiv(ix, r) * r;
@@ -350,7 +370,7 @@ TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std
     TileSample m;
     for (std::int32_t b = 0; b < r; ++b) {
         for (std::int32_t a = 0; a < r; ++a) {
-            const TileSample c = generatorTile(spec, bx + a, bz + b);
+            const TileSample c = generatorTile(spec, bx + a, bz + b, dyn, time);
             m.height += c.height;
             m.water += c.water;
             m.shore += c.shore;
@@ -364,7 +384,7 @@ TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std
     t.shore += (m.shore * inv - t.shore) * w;
     t.flat += (m.flat * inv - t.flat) * w;
     t.path += (m.path * inv - t.path) * w;
-    return t;
+    return withMotion(spec, ix, iz, t, dyn, time);
 }
 
 GeneratorWindow generatorCapacity(const GeneratorSpec& spec) {

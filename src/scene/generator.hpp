@@ -160,10 +160,15 @@ struct GeneratorTileHole {
 };
 [[nodiscard]] GeneratorTileHole generatorTileHole(const GeneratorSpec& spec, const glm::vec3& cameraGen, float reach = 1.0f);
 // The tile in cell (ix, iz): the mean of the fine tiles it covers (one, for the finest ring), generator space.
-[[nodiscard]] TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz);
-// The tile as the kernel writes it in `window`: generatorTile, eased toward its coarser block in the seam band.
+// ADR-1953: with `dyn`, the base at time `t` (breathing and rolling; the waves and rings are added by
+// generatorTileInWindow, once per cell, as the kernel does).
+[[nodiscard]] TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
+                                       const TileDynamics* dyn = nullptr, float t = 0.0f);
+// The tile as the kernel writes it in `window`: generatorTile, eased toward its coarser block in the seam band, then
+// (ADR-1953, with `dyn`) the waves and rings at the cell's centre, the crest set.
 [[nodiscard]] TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
-                                               const GeneratorWindow& window);
+                                               const GeneratorWindow& window, const TileDynamics* dyn = nullptr,
+                                               float t = 0.0f);
 
 // ---- the mirror's queries -----------------------------------------------------------------------
 
