@@ -449,3 +449,22 @@ Live, 1080p ultra at 30 fps (600 frames, quiet GPU), the same camera with and wi
 
 The moving ground costs +0.11 ms in the generators and nothing measurable in the scene pass. The frame-interval p99
 of 49 ms and the ~290 ms worst frames happen in both runs, so they predate this work.
+
+### Art → engineering (2026-11-09): the sunset sky renders as one flat colour
+
+The scene is art `examples/musical-geography`, sunset, revealC. The sky shows no horizon-to-zenith gradient at all; it
+is a flat `#FF8A50` fill. I tried four arms, and none moved it:
+- DayNight `haze` 0.6, 0.2 and 0.08 (the curve keys), with a violet zenith (`#5A2496`);
+- the camera tilted up, so that true sky reaches about 14° above the horizon;
+- `env/dayNight/fog/horizonBlend` 0;
+- `environment.skybox` false. That only shifted the hue to the `background` colour.
+
+`sky_background.wgsl` should mix zenith into horizon by `exp(-dir.y / haze)`, which at 14° and haze 0.2 is about 70%
+zenith. The frames show none of it.
+
+Could you check what draws the sky in this scene? The suspects are:
+- surface-only fog (`volumeMaxDistance` 0, `horizonDensity` 9) being applied to the background;
+- the DayNight curves not reaching the background pass;
+- the `background` colour winning.
+
+Stills: `03-dynamic/art-p3-sunset-sky-tests-*.png`.

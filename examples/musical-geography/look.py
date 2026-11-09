@@ -51,14 +51,14 @@ STATES = {
         side_px=26,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         fill_col="#6A40D0", fill_int=0.6,
         fill=0.55, contrast=1.22,
-        sky_int=0.9, haze=0.6,
+        sky_int=0.9, haze=0.2,   # meant to steepen the sky gradient; the sky renders flat regardless (02-requests, art p3)
         moon_int=0.0, phase=0.72,
-        sky_zen="#4A22B0", sky_hor="#FF8A50", sky_ground="#FF8A50", fog="#FF8A50", fog_sun="#FFB060",
+        sky_zen="#5A2496", sky_hor="#FF8A50", sky_ground="#FF8A50", fog="#FF8A50", fog_sun="#FFB060",
         sun="#FFB848", sun_int=3.4, amb="#5E46B8", amb_int=1.0,
         land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
         path="#FFD7A0", path_emit=0.6, pad="#FFB070", pad_emit=0.0,
-        drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.45, crest_gain=0.35,
+        drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.45, crest_gain=0.0,   # crest cut at sunset: its peaks read as polka dots
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
         side_px=12,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
