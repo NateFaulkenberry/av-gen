@@ -74,9 +74,9 @@ FLIGHT = {
         {"position": [60, -430], "altitude": 6},                               # low over the moving sea
         {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
         {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 10},       # along the lit path
-        {"position": [-330, -1020], "altitude": 28, "speed": 24},              # rise over the crowns
-        {"position": [-180, -1180], "altitude": 22, "speed": 26},              # a banked sweep north-east
-        {"position": [120, -1060], "altitude": 18, "speed": 26},               # sweep back down toward the river
+        {"position": [-330, -1020], "altitude": 22, "speed": 24},              # rise over the crowns (r3: 28 -> 22)
+        {"position": [-180, -1180], "altitude": 17, "speed": 26},              # a banked sweep north-east (22 -> 17)
+        {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river (18 -> 14)
         {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 10},     # up the valley on the river
         {"position": [300, -1560], "altitude": 35, "speed": 24},               # a last rise, under the ceiling
     ],
@@ -91,14 +91,35 @@ FLY = False   # set by --flight
 # They are passed, never framed (the camera rule). Referenced from assets/aliens (commercial; never copied).
 ALIENS_DIR = os.path.join(HERE, "..", "..", "assets", "aliens")
 KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
-# (x, z, habitat): beside the flight line, 8-16 m off it so they cross the lower frame
+# (x, z, habitat): beside the flight line so they cross the lower frame. The sea and path legs (r2, approved): 8-16 m
+# off. CP-C r3: the hills, sweep and river legs (clip +43..+79 s) fly higher, so those aliens sit 6 m off the line
+# (11 m on the river, off the water) on the INSIDE of each turn -- the side the camera banks toward -- placed on a
+# numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
 CAST = [
     (78, -330, "sea"), (44, -395, "sea"), (72, -470, "sea"),             # low over the moving sea
     (28, -585, "path"), (-48, -700, "path"), (-170, -742, "path"),     # the shore and the lit path
-    (-268, -812, "path"), (-312, -1004, "crown"), (-348, -1040, "crown"),  # rising over the crowns
-    (-196, -1168, "crown"), (90, -1072, "crown"),                       # the banked sweep
-    (232, -1100, "bank"), (310, -1210, "bank"), (262, -1330, "bank"),   # the river banks
+    (-268, -812, "path"),
+    (-356, -945, "crown"), (-317, -1029, "crown"), (-266, -1112, "crown"),   # rising over the crowns (banking right)
+    (-202, -1167, "crown"), (-118, -1163, "crown"),                          # the banked sweep (right)
+    (98, -1075, "bank"), (196, -1051, "bank"), (267, -1045, "bank"),        # down toward the river (banking left)
+    (310, -1096, "bank"),                                                    # onto the river, its left bank
 ]
+HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 6.0, "bank": 6.0}
+# night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
+# the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
+# on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
+NIGHT_GLOW = 2.0
+NIGHT_HALO = {"color": "#FF4FA8", "intensity": 60.0, "range": 7.0, "height": 1.5}   # height in node units (x1.94 m)
+
+
+def cast_lights(state):
+    if state != "night":
+        return []
+    h = NIGHT_HALO
+    return [{"id": "halo%02d" % i, "name": "halo%02d" % i, "type": "point", "node": "alien%02d" % i,
+             "position": [0.0, h["height"], -0.3], "color": look.hexlin(h["color"]), "intensity": h["intensity"],
+             "range": h["range"], "castsShadow": False}
+            for i in range(len(CAST))]
 PREFS = {  # where each habitat's aliens like to hop (lower preferPath so they don't bunch on the path)
     "sea": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
     "path": {"preferWater": 0.2, "preferCrowns": 0.5, "preferPath": 0.3},
@@ -110,14 +131,14 @@ SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, 
 CHARACTERS = False   # set by --characters
 
 
-def cast_nodes():
+def cast_nodes(state="day"):
     nodes, ents = [], []
     for i, (x, z, hab) in enumerate(CAST):
         name = "alien%02d" % i
         nodes.append({"name": name, "kind": "gltf",
                       "asset": os.path.abspath(os.path.join(ALIENS_DIR, "alien-%s.glb" % KINDS[i % len(KINDS)])),
                       "position": [float(x), 0.0, float(z)], "rotation": [0.0, (i * 47) % 360 * 1.0, 0.0],
-                      "scale": [1.94, 1.94, 1.94],
+                      "scale": [1.94, 1.94, 1.94], "emissiveBoost": NIGHT_GLOW if state == "night" else 1.0,
                       "animation": {"state": "Idle", "blend": 0.25, "speed": 1.0, "updateHz": 30,
                                     "nearDistance": 40.0, "farHz": 20.0, "cullDistance": 600.0}})
         ents.append({"name": name, "node": name, "seed": 7001 + 97 * i, "tags": ["alien"],
@@ -125,7 +146,7 @@ def cast_nodes():
                                "observe": "Idle", "react": "Fight_idle", "jump": "Jumping", "fall": "Floating",
                                "land": "Landing"},
                      "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
-                     "behaviors": [dict({"kind": "hop", "hopChance": 0.5, "homeRadius": 30.0, "goalMin": 2,
+                     "behaviors": [dict({"kind": "hop", "hopChance": 0.5, "homeRadius": HOME_RADIUS[hab], "goalMin": 2,
                                          "goalMax": 5, "pauseMin": 0.6, "pauseMax": 2.2, "airTime": 1.3,
                                          "apex": 3.0, "strength": 1.2}, **PREFS[hab])]})
     return nodes, ents
@@ -178,9 +199,10 @@ def scene_doc(state, interim, camera_name):
     if FLY:
         doc["flight"] = FLIGHT
     if CHARACTERS:
-        n, e = cast_nodes()
+        n, e = cast_nodes(state)
         doc["nodes"] += n
         doc["entities"] = e
+        doc["lights"] += cast_lights(state)
         env["tileDynamics"]["spring"] = SPRING
     return doc
 

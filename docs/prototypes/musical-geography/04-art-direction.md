@@ -1070,3 +1070,46 @@ rings read at cruise height (the day sheet at +43 s).
   accent, would fix it (this is mine to do).
 - The river-bank and crown aliens are seen less often than the sea and path ones, because the flight is higher and
   turning there.
+
+### CP-C r3: night glow and closer hill aliens (2026-11-09, on c4159a48)
+
+The coordinator reviewed r2 and approved the sea, shore and path legs. This pass made the two proposed fixes.
+
+**Night.** The aliens' own emissive lamps are lifted (`emissiveBoost` 2 at night, 1 by day). On their own they lit only
+small yellow and cyan spots; the body stayed a silhouette. So each alien also carries a small shadowless point light,
+riding its node at 1.5 node units (about 2.9 m) above the feet: `NIGHT_HALO`, the night path pink `#FF4FA8`,
+intensity 60, range 7 m. It puts a pink rim on head and shoulders and a faint pink pool on the slabs around the
+feet, so each alien reads off the lit path and shows as a pink beacon on the dark hills. The intensity was chosen
+between probes at 40 (too faint on the hills) and 150 (the helmet blew out pink).
+
+**Hills, sweep and river** (clip +43 to +79 s). These legs fly higher and turn, so their aliens were specks.
+- **The aliens moved.** The nine aliens on these legs (two added, 16 in all) now sit 6 m off the flight line, or
+  11 m on the river leg so they stay off the water. They are on the inside of each turn, the side the camera banks
+  toward: right through the crowns and the sweep, left down to the river and onto it. Their positions come from a
+  numpy mirror of the flight table (Catmull-Rom path plus the Gaussian smoothing), in the scratch script `track.py`.
+- **They stay put.** `HOME_RADIUS` is 6 m for the crown and bank aliens (it was 30 m), so they cannot hop away from
+  the line.
+- **The flight is lower, with the same shape.** The three waypoint altitudes dropped: 28→22, 22→17 and 18→14 m.
+  No XZ position changed.
+
+**Result:**
+- An alien is in frame in almost every hills, sweep and river frame, near the centre, at roughly 60–100 px tall at
+  1080p, where r2 had specks of about 10 px.
+- The closest passes are at +71, +73 and +78 s, where the alien is clearly a figure.
+- On the hills (+43 to +55 s) they are smaller, because the camera still sees them 50–80 m ahead. The next lever, if
+  wanted, is lowering the crown waypoint further, to about 14 m.
+- One gap remains, around +60 to +66 s: the sweep's return leg has no alien in frame.
+
+**Renders:** `06-characters/cpc-r3-{day,night}-feline-30-120s.mp4`, with full-run sheets and the hills, sweep and
+river sheets (`cpc-r3-*-hills-sweep-river-sheet.png`).
+
+**Whole-route perf** (1080p Ultra, 88 s, 16 aliens; r2 in brackets):
+
+| | GPU p50 | GPU p95 | GPU p99 | CPU work p50 | Worst frame |
+|---|---|---|---|---|---|
+| Day | 15.1 ms (14.3) | 17.6 (16.8) | 19.2 (18.4) | 2.9 ms (2.1) | 36.5 ms (31.6) |
+| Night | 15.1 ms (14.7) | 17.7 (17.3) | 19.7 (19.0) | 3.1 ms (3.0) | 39.0 ms (33.0) |
+
+Day also grew by about 0.8 ms, and the day scene has no halo lights. So most of the growth comes from the lower legs,
+where there is more near ground in frame, and from the two extra skinned aliens. The 16 halos add about 0.4 ms at
+night.
