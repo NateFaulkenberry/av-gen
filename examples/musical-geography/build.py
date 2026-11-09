@@ -86,6 +86,50 @@ FLIGHT = {
 }
 FLY = False   # set by --flight
 
+# ---- the inhabitants (Phase 6, ADR-1954/1955/1957/1958): Glowmere aliens on the hop behaviour, spread along the whole
+# CP-B r2 route -- sea slabs, the shore and path, the crowns, the sweep, the river banks -- so every leg passes some.
+# They are passed, never framed (the camera rule). Referenced from assets/aliens (commercial; never copied).
+ALIENS_DIR = os.path.join(HERE, "..", "..", "assets", "aliens")
+KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
+# (x, z, habitat): beside the flight line, 8-16 m off it so they cross the lower frame
+CAST = [
+    (78, -330, "sea"), (44, -395, "sea"), (72, -470, "sea"),             # low over the moving sea
+    (28, -585, "path"), (-48, -700, "path"), (-170, -742, "path"),     # the shore and the lit path
+    (-268, -812, "path"), (-312, -1004, "crown"), (-348, -1040, "crown"),  # rising over the crowns
+    (-196, -1168, "crown"), (90, -1072, "crown"),                       # the banked sweep
+    (232, -1100, "bank"), (310, -1210, "bank"), (262, -1330, "bank"),   # the river banks
+]
+PREFS = {  # where each habitat's aliens like to hop (lower preferPath so they don't bunch on the path)
+    "sea": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
+    "path": {"preferWater": 0.2, "preferCrowns": 0.5, "preferPath": 0.3},
+    "crown": {"preferWater": 0.1, "preferCrowns": 1.0, "preferPath": 0.1},
+    "bank": {"preferWater": 0.6, "preferCrowns": 0.4, "preferPath": 0.1},
+}
+# the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
+SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, "rippleRadius": 14.0}
+CHARACTERS = False   # set by --characters
+
+
+def cast_nodes():
+    nodes, ents = [], []
+    for i, (x, z, hab) in enumerate(CAST):
+        name = "alien%02d" % i
+        nodes.append({"name": name, "kind": "gltf",
+                      "asset": os.path.abspath(os.path.join(ALIENS_DIR, "alien-%s.glb" % KINDS[i % len(KINDS)])),
+                      "position": [float(x), 0.0, float(z)], "rotation": [0.0, (i * 47) % 360 * 1.0, 0.0],
+                      "scale": [1.94, 1.94, 1.94],
+                      "animation": {"state": "Idle", "blend": 0.25, "speed": 1.0, "updateHz": 30,
+                                    "nearDistance": 40.0, "farHz": 20.0, "cullDistance": 600.0}})
+        ents.append({"name": name, "node": name, "seed": 7001 + 97 * i, "tags": ["alien"],
+                     "clips": {"idle": "Idle", "walk": "Walking", "run": "Running", "turn": "Idle_turn",
+                               "observe": "Idle", "react": "Fight_idle", "jump": "Jumping", "fall": "Floating",
+                               "land": "Landing"},
+                     "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
+                     "behaviors": [dict({"kind": "hop", "hopChance": 0.5, "homeRadius": 30.0, "goalMin": 2,
+                                         "goalMax": 5, "pauseMin": 0.6, "pauseMax": 2.2, "airTime": 1.3,
+                                         "apex": 3.0, "strength": 1.2}, **PREFS[hab])]})
+    return nodes, ents
+
 
 def scene_doc(state, interim, camera_name):
     camera_pose = camera(camera_name)
@@ -133,6 +177,11 @@ def scene_doc(state, interim, camera_name):
     doc["camera"]["far"] = 200000.0   # the 64 m far ring reaches 4.5 km
     if FLY:
         doc["flight"] = FLIGHT
+    if CHARACTERS:
+        n, e = cast_nodes()
+        doc["nodes"] += n
+        doc["entities"] = e
+        env["tileDynamics"]["spring"] = SPRING
     return doc
 
 
@@ -159,11 +208,14 @@ def main():
     ap.add_argument("--out", default=os.path.join(HERE, "scene"))
     ap.add_argument("--tile-scale", type=float, default=4.0)
     ap.add_argument("--flight", action="store_true")
+    ap.add_argument("--characters", action="store_true")
     a = ap.parse_args()
     global TILE_SCALE
     TILE_SCALE = a.tile_scale
     global FLY
     FLY = a.flight
+    global CHARACTERS
+    CHARACTERS = a.characters
     os.makedirs(a.out, exist_ok=True)
     scene_path = os.path.join(a.out, "musical-geography.scene.json")
     with open(scene_path, "w") as f:
