@@ -79,7 +79,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "aoRadius", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "aoRadius", "horizonFill", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -1402,6 +1402,7 @@ void Composition::updateAttractorWorld() {
 // when one of those changes -- never per frame. The pose is then a lookup at the timeline's time: seek equals play.
 void Composition::applyFlightCamera(float& fovDegrees) {
     flightRollDegrees_ = 0.0f;
+    flightActive_ = false;
     if (!flight_.enabled || flight_.route.size() < 2) {
         return;
     }
@@ -1456,19 +1457,40 @@ void Composition::applyFlightCamera(float& fovDegrees) {
     }
     key ^= ground->distribution.generator.tiles.hash();
     key *= 1099511628211ull;
+    for (const FlightWaypoint& w : flight_.route) {
+        for (const float v : {w.from, w.to, w.offset, w.snapRadius, w.nadir, static_cast<float>(w.follow.size()),
+                              static_cast<float>(w.snap.size()), w.follow.empty() ? 0.0f : static_cast<float>(w.follow[0]),
+                              w.snap.empty() ? 0.0f : static_cast<float>(w.snap[0])}) {
+            mix(v);
+        }
+    }
     if (key != flightKey_ || !flightTable_.valid()) {
+        // named features (request 1979): resolved in the ground's own space, then back to the world
+        FlightSpec local = flight_;
+        for (FlightWaypoint& w : local.route) w.position -= glm::vec2(offset.x, offset.z);
+        auto resolved = resolveFlightRoute(local, ground->distribution.generator.tiles);
+        if (!resolved) {
+            log::warn("flight: {}", resolved.error().message);
+            flightKey_ = key;
+            flightTable_ = {};
+            return;
+        }
+        for (FlightWaypoint& w : resolved->route) w.position += glm::vec2(offset.x, offset.z);
+        flightResolved_ = std::move(*resolved);
         const FlightGround tiles = tileFlightGround(ground->distribution.generator.tiles, dyn,
                                                     ground->distribution.generator.cellSize, flight_.amplitudeHeadroom);
         // world <-> the ground's generator space: a translation (the tiles' transform is never rotated or scaled)
         const FlightGround world = [tiles, offset](float x, float z, float t) {
             return tiles(x - offset.x, z - offset.z, t) + offset.y;
         };
-        flightTable_ = buildFlightTable(flight_, world, flightLiveMargin(dyn, flight_.amplitudeHeadroom));
+        flightTable_ = buildFlightTable(flightResolved_, world, flightLiveMargin(dyn, flight_.amplitudeHeadroom));
         flightKey_ = key;
     }
     const FlightPose pose = flightPoseAt(flight_, flightTable_, currentTime_);
     scene_.camera.position = pose.eye;
     scene_.camera.target = pose.target;
+    flightUp_ = pose.up;
+    flightActive_ = true;
     scene_.camera.farPlane = std::max(scene_.camera.farPlane, 4000.0f);
     if (flight_.fov > 0.0f) {
         fovDegrees = flight_.fov;
@@ -9879,6 +9901,9 @@ void Composition::applyParameters() {
         roll += attractorRollDegrees_; // ADR-1853: the flythrough banks through the bends
         roll += flightRollDegrees_; // ADR-1956
         glm::vec3 up = splineCameraUp(); // ADR-1541: the world's up unless the spline's frame is asked for
+        if (flightActive_) {
+            up = flightUp_; // ADR-1956: the flight's own up, the travel direction on a top-down leg
+        }
         const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
         if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {
             up = glm::angleAxis(glm::radians(roll), glm::normalize(forward)) * up;
@@ -10003,6 +10028,7 @@ void Composition::applyParameters() {
         env.aoFadeStart = volumeSetting_.aoFadeStart; // CP-A r3: the AO distance fade
         env.aoFadeEnd = volumeSetting_.aoFadeEnd;
         env.aoRadius = volumeSetting_.aoRadius; // Phase 5
+        env.horizonFill = volumeSetting_.horizonFill; // Phase 5
         env.tileDynamics = volumeSetting_.tileDynamics; // ADR-1953: the authored block, then its parameters
         if (tileDynamicsAuthored_) {
             const TileDynamicsParams& p = tileDynamicsParams_;
@@ -11085,6 +11111,9 @@ nlohmann::json Composition::toJson() const {
         }
         if (volumeSetting_.aoRadius > 0.0f) { // Phase 5: written only when set
             environment["aoRadius"] = volumeSetting_.aoRadius;
+        }
+        if (volumeSetting_.horizonFill > 0.0f) { // Phase 5: written only when set
+            environment["horizonFill"] = volumeSetting_.horizonFill;
         }
         if (volumeSetting_.aoFadeEnd > volumeSetting_.aoFadeStart) { // CP-A r3: written only when set
             environment["aoFadeStart"] = volumeSetting_.aoFadeStart;
@@ -12466,6 +12495,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"aoFadeStart", &v.aoFadeStart},
                                       FloatKey{"aoFadeEnd", &v.aoFadeEnd},
                                       FloatKey{"aoRadius", &v.aoRadius},
+                                      FloatKey{"horizonFill", &v.horizonFill},
                                       FloatKey{"shadowSplitLambda", &v.shadowSplitLambda}}) {
                 auto value = readFloat(e, fk.key, *fk.target);
                 if (!value) {

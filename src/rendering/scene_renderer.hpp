@@ -402,7 +402,8 @@ struct FrameUniforms {
     glm::vec4 corruption7{0.0f};
     glm::vec4 corruption8{0.0f};
     glm::vec4 corruption9{0.0f}; // Moon polish: x = the floor (world y) below which nothing is displaced, y = front reach
-    glm::vec4 aoFade{0.0f};      // ADR-1951: x = start, y = end of the AO distance fade (end <= start = off)
+    glm::vec4 aoFade{0.0f};      // ADR-1951: x = start, y = end of the AO distance fade (end <= start = off); z = the
+                                 // horizon fill (Environment::horizonFill)
     glm::vec4 portalClip{0.0f};  // Gate C 2: scene::Scene::portalClip (last: the shadow views zero it)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle

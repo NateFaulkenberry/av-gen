@@ -113,6 +113,7 @@ TEST_CASE("the flight looks where it travels", "[flight][geography]") {
     float worstPitch = -90.0f;
     float lowestPitch = 90.0f;
     for (std::size_t i = 1; i + 1 < table.eye.size(); ++i) {
+        if (table.nadir[i] > 0.0f) continue; // the top-down leg is the one exception
         const glm::vec3 travel = glm::vec3(table.eye[i + 1]) - glm::vec3(table.eye[i - 1]);
         const glm::vec3 a = table.aim[i];
         worst = std::max(worst, angleDeg({a.x, a.z}, {travel.x, travel.z}));
@@ -240,4 +241,100 @@ TEST_CASE("the flight reads from JSON and refuses what it does not know", "[flig
     CHECK_FALSE(scene::flightFromJson(nlohmann::json::parse(R"({"route": [ {"position": [0, 0]} ]})")).has_value());
     CHECK_FALSE(scene::flightFromJson(nlohmann::json::parse(
                     R"({"route": [ {"position": [0, 0]}, {"position": [1, 0]} ], "spede": 3})")).has_value());
+}
+
+TEST_CASE("a waypoint can follow the path or the river and snap to the shore or a crown", "[flight][geography]") {
+    scene::TileTerrainSpec tiles = hills();
+    tiles.path = {{0.0f, 0.0f}, {100.0f, -40.0f}, {220.0f, -30.0f}, {300.0f, 60.0f}};
+    tiles.river = {{-50.0f, 200.0f}, {150.0f, 260.0f}};
+    scene::FlightSpec f;
+    f.enabled = true;
+    scene::FlightWaypoint along;
+    along.follow = "path";
+    along.from = 0.25f;
+    along.to = 0.9f;
+    along.offset = 6.0f;
+    along.altitude = 9.0f;
+    // a hint 120 m off a real shoreline (found by a scan, so the test does not depend on where the coast falls)
+    glm::vec2 coast(0.0f);
+    bool found = false;
+    for (float x = 0.0f; x < 20000.0f && !found; x += 4.0f) {
+        if (scene::tileSample(tiles, x, 37.0f).shore > 0.95f) {
+            coast = {x, 37.0f};
+            found = true;
+        }
+    }
+    REQUIRE(found);
+    scene::FlightWaypoint shore;
+    shore.snap = "shore";
+    shore.position = coast + glm::vec2(90.0f, 80.0f);
+    shore.snapRadius = 300.0f;
+    f.route = {along, shore};
+    auto r = scene::resolveFlightRoute(f, tiles);
+    REQUIRE(r.has_value());
+    REQUIRE(r->route.size() > 5);
+    // every follow point is 6 m from the path (to its right), and none of them follows anything any more
+    std::vector<float> arc(tiles.path.size(), 0.0f);
+    for (std::size_t i = 1; i < arc.size(); ++i) arc[i] = arc[i - 1] + glm::length(tiles.path[i] - tiles.path[i - 1]);
+    const auto distToPath = [&](glm::vec2 p) {
+        float best = 1e9f;
+        for (std::size_t i = 0; i + 1 < tiles.path.size(); ++i) {
+            const glm::vec2 a = tiles.path[i];
+            const glm::vec2 ab = tiles.path[i + 1] - a;
+            const float t = std::clamp(glm::dot(p - a, ab) / glm::dot(ab, ab), 0.0f, 1.0f);
+            best = std::min(best, glm::length(p - (a + ab * t)));
+        }
+        return best;
+    };
+    for (std::size_t i = 0; i + 1 < r->route.size(); ++i) {
+        CHECK(r->route[i].follow.empty());
+        CHECK(distToPath(r->route[i].position) == Catch::Approx(6.0f).margin(1.0f)); // nearer at the corners
+        CHECK(r->route[i].altitude == 9.0f);
+    }
+    // the snapped waypoint sits on the shoreline
+    const scene::FlightWaypoint& s = r->route.back();
+    CHECK(s.snap.empty());
+    CHECK(scene::tileSample(tiles, s.position.x, s.position.y).shore > 0.9f);
+    // a follow leg on a ground with no river is refused
+    scene::TileTerrainSpec dry = tiles;
+    dry.river.clear();
+    scene::FlightSpec g = f;
+    g.route[0].follow = "river";
+    CHECK_FALSE(scene::resolveFlightRoute(g, dry).has_value());
+}
+
+TEST_CASE("the top-down leg looks straight down with no flip, then looks ahead again", "[flight][geography]") {
+    auto f = route();
+    f.route[2].nadir = 4.0f;
+    const auto g = scene::tileFlightGround(hills(), {}, 1.0f, 1.0f);
+    const scene::FlightTable table = scene::buildFlightTable(f, g, 0.0f);
+    REQUIRE(table.valid());
+    // the deepest sample of the leg looks straight down
+    std::size_t deepest = 0;
+    for (std::size_t i = 0; i < table.nadir.size(); ++i) {
+        if (table.nadir[i] > table.nadir[deepest]) deepest = i;
+    }
+    CHECK(table.nadir[deepest] == Catch::Approx(1.0f));
+    CHECK(table.aim[deepest].y == Catch::Approx(-1.0f).margin(1e-4));
+    // the leg lasts its 4 s (the eased part included) and nothing else is touched
+    int inLeg = 0;
+    for (const float w : table.nadir) inLeg += w > 0.0f ? 1 : 0;
+    CHECK(inLeg <= static_cast<int>(4.0f * scene::kFlightRate) + 1);
+    CHECK(inLeg >= static_cast<int>(3.0f * scene::kFlightRate));
+    // screen-up is continuous through it (no flip at -90 degrees), and at the nadir it is the travel direction
+    scene::FlightPose prev = scene::flightPoseAt(f, table, 0.0);
+    float worst = 1.0f;
+    for (int k = 1; k < static_cast<int>(table.eye.size()); ++k) {
+        const scene::FlightPose p = scene::flightPoseAt(f, table, k / scene::kFlightRate);
+        worst = std::min(worst, glm::dot(p.up, prev.up));
+        CHECK(std::abs(glm::dot(p.up, glm::normalize(p.target - p.eye))) < 1e-3f); // up is perpendicular to the aim
+        prev = p;
+    }
+    CAPTURE(worst);
+    CHECK(worst > 0.99f);
+    const scene::FlightPose down = scene::flightPoseAt(f, table, deepest / scene::kFlightRate);
+    const glm::vec2 travel = glm::normalize(glm::vec2(table.eye[deepest + 1].x - table.eye[deepest - 1].x,
+                                                      table.eye[deepest + 1].z - table.eye[deepest - 1].z));
+    CHECK(glm::dot(glm::vec2(down.up.x, down.up.z), travel) > 0.9f);
+    CHECK(std::abs(table.eye[deepest].w) < 1e-4f); // no bank at the nadir
 }

@@ -529,3 +529,48 @@ Live, 1080p ultra at 30 fps, 600 frames:
 | 21.2 ms | 30.5 | 34.2 | 98.8% | 1.9 ms | 0.38 ms |
 
 A flight table is built once per change; it is a lookup each frame.
+
+### Engineering → art, Phase 5 (2026-11-09): ground to the horizon (ADR-1962), feature waypoints and the top-down leg
+
+**Ground to the horizon:** two switches together.
+1. `"environment": {"horizonFill": 1.0}`. Below the horizon the sky becomes the fog's colour at infinite distance,
+   which is what a ground that went on forever would look like. It costs nothing.
+2. **One far ring** past your coarsest: 64 m cells out to about 4.5 km, where the fog is opaque, so its edge melts. A
+   plain material (no program) is enough, because it is all fog out there.
+
+   ```json
+   {"name": "mgTiles64", "kind": "procedural", "procedural": {
+     "source": {"kind": "box", "size": [64, 6, 64]}, "slabs": true, "castsShadow": false, "lod": {"cull": true},
+     "material": {"baseColor": [0.6, 0.45, 0.7], "roughness": 0.8},
+     "distribution": {"kind": "generator", "generator": {"name": "tiles", "version": 1, "cellSize": 64,
+       "viewDistance": 4480, "align": 4, "finePitch": 16, "skirt": 40,
+       "hole": {"cellSize": 16, "viewDistance": 1120, "align": 4}, "tiles": { ...the same tiles block... }}}}}
+   ```
+
+   - The ring's `hole` must name your 16 m ring's cellSize, viewDistance and align.
+   - The 16 m ring's `align` must be a multiple of 64 / 16 = 4.
+   - The camera's `far` must reach it (`"camera": {"far": 200000}`).
+   - Cost: +2.8 ms GPU at 120 m.
+
+The canaries show the sky's ground colour painted magenta. Before: 309,446 pixels (120 m) and 467,277 (180 m). After:
+0 and 0. Stills are in `05-camera/eng-p5-horizon-*`.
+
+**Feature waypoints** in `flight.route`:
+- `{"follow": "path", "from": 0.0, "to": 0.55, "offset": 0, "altitude": 12}` flies along the path; `"river"` works the
+  same way. `from` and `to` are fractions of the polyline's length, and `offset` is metres to the right.
+- `{"snap": "shore", "position": [20, -470], "snapRadius": 250, "altitude": 10}` crosses the shore at the nearest
+  shoreline point to the hint. `"crown"` snaps to the nearest crown top.
+
+**The top-down leg:** `"nadir": 5` on a waypoint (a follow leg puts it at the leg's middle). The camera eases to
+straight down over 5 s and back, with screen-up the direction of travel and no flip.
+
+**At 4 m tiles,** use `"aoRadius": 1.0` (the gaps are 0.34 m).
+
+The feature test flight is `05-camera/eng-p5b-feature-flight-4m-tiles-feline-30-70s.mp4`: 4 m tiles, the horizon fill,
+a plain 64 m far ring, `aoRadius` 1.0, a shore snap, a path follow with a 5 s top-down leg, and a climb.
+
+Live, 1080p ultra at 30 fps:
+
+| GPU median | p95 | p99 | Frames on time |
+|---|---|---|---|
+| 17.2 ms | 31.3 | 36.2 | 98.6% |

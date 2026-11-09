@@ -2549,9 +2549,13 @@ private:
     FlightSpec flight_;
     FlightTable flightTable_;
     std::uint64_t flightKey_ = 0;
+    FlightSpec flightResolved_; // the route with its named features resolved (the table is built from this)
+    glm::vec3 flightUp_{0.0f, 1.0f, 0.0f};
+    bool flightActive_ = false;
 public:
     [[nodiscard]] const FlightSpec& flight() const { return flight_; }
     [[nodiscard]] const FlightTable& flightTable() const { return flightTable_; }
+    [[nodiscard]] const FlightSpec& flightResolved() const { return flightResolved_; }
 private:
     int attractorSunLight_ = -1;        // ADR-1857: the key light's index in scene_.lights, or -1
     std::vector<std::size_t> attractorChunks_; // ADR-1862: the terrain chunks' indices in scene_.entities
