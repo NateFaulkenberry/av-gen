@@ -435,3 +435,17 @@ underlay. This is static and not motion; it is yours to judge (a lighter underla
 - a ring;
 - contours;
 - crest crossings.
+
+**The clip and perf (2026-11-09).** The clip is `03-dynamic/eng-p3-clip-feline-30-45s.mp4`: Feline Footwear 30–45 s,
+the bay at 22 m, the routes above, two authored rings at 33 s and 39 s, onset rings 150 m ahead, and the crest added
+to your programs' emission as a stand-in (yours to replace).
+
+Live, 1080p ultra at 30 fps (600 frames, quiet GPU), the same camera with and without the moving ground:
+
+| | GPU median | p95 | p99 | Frames on time | Generators |
+|---|---|---|---|---|---|
+| Moving | 24.9 ms | 31.2 | 33.5 | 98.9% | 0.88 ms |
+| Static | 26.7 ms | 31.1 | 33.1 | 98.9% | 0.77 ms |
+
+The moving ground costs +0.11 ms in the generators and nothing measurable in the scene pass. The frame-interval p99
+of 49 ms and the ~290 ms worst frames happen in both runs, so they predate this work.
