@@ -540,3 +540,106 @@ The art agent's 1970–1979 are written by this agent when each request is built
 numbers.
 
 None is written yet: an ADR is written when its decision lands in code.
+
+## 12. Phase 6 plan, revised 2026-11-09 (after CP-A, Phase 3 and Phase 5; not built until the owner reviews CP-B)
+
+What changed since §4.5–4.6:
+- **4 m tiles.** The aliens (about 1.8–2.2 m) now stand on a tile about two body-heights wide. A "hop" is a jump of
+  one to three tiles (4–12 m), not 2–5 small tiles. This is buoyant, low-gravity jumping, so `JumpSettings::gravity`
+  is cut to about 6 m/s² for a 1.2–1.8 s arc. The scale question is now settled by the tile, not by a 0.8 ratio.
+- **The ground moves** (ADR-1953). Everything that stands on it must read the moving surface at its own time. That
+  means `tileHeightAt(spec, dyn, pitch, x, z, t)`, which already exists and is parity-tested against the GPU.
+- **The camera flies past, never at** (the owner's rule, ADR-1956). There is no hero framing. Characters are placed
+  where the flight's route passes: on the path legs, on crowns under a top-down leg, and on sea slabs beside a shore
+  crossing.
+
+### 12.1 The ground seam (`world::GroundSource`)
+
+`world::TerrainQuery` and `entity::Navigator` are built on `WorldMap` (height, normal, water and bounds from baked
+chunks). The seam is a small interface with two implementations:
+- one over `WorldMap`, with no behaviour change, proved by the existing navigation and character suites;
+- `TileGround`: the height of the tile under a point at time t (`tileHeightAt` with the scene's dynamics, the live
+  rings included), water from the tile's water channel, the normal flat (a tile is level), and bounds unbounded (the
+  lattice is endless).
+
+`TerrainQuery::at` takes slope from the normal. On tiles, slope is always 0, and the step between neighbours replaces
+it in the navigator (§12.2). Without that change, a 2 m riser would read as walkable flat ground.
+
+### 12.2 `TileNav`
+
+NavGrid's A*, at one cell per tile, over a window of about 64 × 64 tiles that recentres on the characters. The flags
+are the existing ones plus edge kinds:
+- **walk** where |Δh| ≤ `stepHeight`, about 0.6 m;
+- **jump** where the rise or drop sits within the jump envelope and `checkArc` clears it against the ground at the
+  predicted landing time;
+- **blocked** otherwise.
+
+Costs use base heights plus a margin for the dynamic amplitude, the same bound the flight uses. The replan is local,
+and the arc is re-validated at take-off. On rolling land almost every edge is a walk, so a jump is a choice the
+behaviour makes.
+
+### 12.3 The `hop` behaviour on the Glowmere aliens
+
+Targets are tile centres:
+- gathering on crowns (the flat channel);
+- running the path (the path channel);
+- crossing sea slabs (the water channel) where the waves are high;
+- pausing to look.
+
+The clips are the ones in the GLBs: `Walking_low_grav`, `Running`, `Jump_running`, then `Fall_loop`, then `Landing`,
+then `Idle` or `Floating`.
+
+The landing is triggered on `Landing` state entry, at the moment the feet reach the tile top, which is the moment the
+spring is applied (§12.4). At rest, a small `Floating` bob is added to the grounded height.
+
+There are 3–6 characters, with per-character cost taken from ADR-086's numbers. The aliens are commercial assets:
+never committed, cached or uploaded. Tests use a stub skeleton.
+
+### 12.4 The floating-platform response (landing springs)
+
+A landing is an event in the moving ground: a new event kind beside the rings, `(tile centre, t0, strength)`. Its
+response is the closed-form under-damped spring of §4.5, with a delayed, attenuated copy on the neighbours (the
+ripple):
+
+    h(t) = −A · e^(−ζω(t−t0)) · cos(ω_d (t−t0))
+
+It is evaluated by the same `tileMotion` on the CPU and GPU, so a character standing on a sprung tile rides it.
+
+Spring events come from characters, not from routes. They are recorded with their time like live rings, so seeking
+drops the ones that haven't happened yet. A render plays forward, so it reproduces them; a scrub replays the
+characters' deterministic behaviour.
+
+The crest channel can take a spring's glow, so a landing lights the tile.
+
+**Parameters:** `env/tiles/spring/{depth, frequency, damping, ripple, rippleSpeed}`, with `depth` the art agent's
+call (§4.5).
+
+### 12.5 Tests (TDD, `[geography]` and `[characters]`)
+
+- **Springs:** the response settles below ε by a computed time; the first extremum is downward; the neighbour's
+  amplitude is below the source's; energy is non-increasing after the first period; CPU/GPU parity.
+- **Ground seam:**
+  - the `WorldMap` adapter changes nothing (the existing suites, bit-identical);
+  - `TileGround` agrees with the rendered records at time t.
+- **TileNav:** a reachable crown is found; a jump over the envelope is rejected; landing tiles are valid at the landing
+  time; a riser over `stepHeight` is never walked.
+- **Characters:** grounding is stable on a sprung and waving tile (no penetration, no jitter beyond ε); seek equals
+  play for positions over a 30 s scrub.
+
+### 12.6 Order and CP-C
+
+1. the seam, with the `WorldMap` adapter and its regression run;
+2. `TileGround`, and springs in the moving ground (CPU, GPU, parity);
+3. `TileNav`;
+4. `hop`, with clips and landing events;
+5. the characters placed along the flight's route;
+6. **CP-C:** a 30–45 s clip of aliens running, hopping across sea slabs and landing on crowns, with the slab spring
+   visible, plus a perf line with 3–6 characters.
+
+**Budget:** the flight at 4 m tiles with the horizon fill and the far ring is 17–23 ms GPU median today. Characters
+add skinning plus their shadows. The p99 tail is §5's work, in hand.
+
+**Risks:**
+- grounding jitter on fast waves (mitigated by sampling at the character's own time with a 2-frame-smoothed height);
+- clips that don't match buoyant arcs (time-scale the fall loop);
+- the camera passing too far from the characters to read them (route authoring).

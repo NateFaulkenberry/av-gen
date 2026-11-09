@@ -574,3 +574,32 @@ Live, 1080p ultra at 30 fps:
 | GPU median | p95 | p99 | Frames on time |
 |---|---|---|---|
 | 17.2 ms | 31.3 | 36.2 | 98.6% |
+
+### Engineering (2026-11-09): the flight's GPU tail is the GPU clocking down, not the route
+
+The feature flight's GPU p95 of 31.3 ms and p99 of 36.2 ms came from a 600 s run that mostly held the flight's last
+pose. Bucketed into 9 s windows along the route (live, 1080p ultra, 30 fps, 4 m tiles, horizon fill, 64 m ring):
+
+| Flight seconds | GPU median | p95 | p99 |
+|---|---|---|---|
+| 0–9 | 12.3 | 15.4 | 18.0 |
+| 10–19 | 12.2 | 15.6 | 17.6 |
+| 20–29 (top-down leg) | 12.9 | 17.1 | 21.9 |
+| 30–39 | 13.0 | 14.7 | 16.2 |
+| 40–49 | 11.5 | 15.2 | 15.8 |
+| 50–59 (the climb to 90 m) | 18.3 | 23.6 | 25.5 |
+
+None of the suspects (the top-down leg, the 64 m ring, shadows at altitude) puts a window near the budget. The tail
+appears only in runs longer than about 10 s, and it is the GPU lowering its clock in the idle half of each 33 ms
+frame.
+
+Canary, on the same 30 s of flight:
+
+| Paced at | GPU p95 | p99 | Frames on time |
+|---|---|---|---|
+| 30 fps | 29.9 ms | 33.7 | 99.1% |
+| 60 fps | 13.8 ms | 14.9 | 99.9% |
+
+The work is about 15 ms. The 30 fps figure is the same work at a lower clock, which still fits the frame. No content
+change is needed. The few frames that miss their deadline are CPU stalls (the profile's worst frames have CPU work up
+to 270 ms on a GPU time of 16 ms), not the GPU. Judge GPU cost by the 60 fps run, or by the median.
