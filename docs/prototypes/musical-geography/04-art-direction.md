@@ -851,3 +851,44 @@ cpa-67 and cpa-68 are re-rendered.
   - faint or off by day, as the owner approved.
 - **Cost:** about 10 ms of headroom over the r7 reveal (23.2 ms of 33.3 ms).
 - **The end-of-Phase-3 clip** is made together with engineering.
+
+### Tile-scale test (2026-11-09; owner: "the squares read way too small")
+
+**What the test held fixed:** the tile scaled 4× and 8× (pitch, size, thickness, gap ratio, skirt, underlay), with the
+camera heights, the land and the ring distances unchanged in metres. Also one frame flown lower (about 25 m) at 1×.
+`build.py --tile-scale S` reproduces it.
+
+The stills are `02-terrain/tilescale-*.png`, with the sheet at `tilescale-sheet.png`.
+
+**GPU p50 at 1080p Ultra:**
+
+| | Reveal | Valley |
+|---|---|---|
+| 1× | 23.5 ms | 23.0 ms |
+| 4× | 12.3 ms | 13.9 ms |
+| 8× | 12.7 ms | 14.0 ms |
+| 1× flown at about 25 m | 20.5 ms | |
+
+**What the frames show:**
+- At 4× and 8× the squares read clearly from the reveal and valley heights. This is the reference feel the owner is
+  asking for.
+- Flying lower at 1× doesn't fix the problem: past the foreground the tiles still collapse into texture.
+- At 8× the hills read as large stairs. The block-world risk is real there.
+- 4× keeps the land rolling, with visible steps that stay readable.
+
+**What breaks at a larger tile:**
+- **The coarse rings.**
+  - The 2× and 4× rings are 2× and 4× the *tile*, so at 4× they become 8 m and 16 m blocks.
+  - With painted 4 m sub-squares inside, they read as "blocks of tiles" with big steps on the hills.
+  - This is not an engine assumption. The ring distances are mine and are set in metres, so they should scale with
+    the tile.
+  - **Fix (art):** push the fine ring out, to about 240–300 m at 4×, so the coarse rings sit in the haze. The cost will
+    rise from 12 ms toward the old figure.
+- **River and path:**
+  - At 8 m wide, the river is only 1–2 tiles. It needs about 16 m at 4×.
+  - The path is already scaled (1.5 tiles).
+- **Engine:** nothing found hard-coded to 1 m cells. tileBorder, the skirt, the underlay and the rings all followed
+  the scale.
+
+**Recommendation:** 4 m tiles (4×). Set the fine ring to about 240–300 m, the river to about 16 m, and keep the camera
+heights. Not 8×, which looks stair-stepped and blocky. Not flying lower, which doesn't fix the reveal.

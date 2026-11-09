@@ -38,6 +38,7 @@ CAMERAS = {
     "revealC": {"position": [60.0, 120.0, -430.0], "target": [-118.0, 0.0, -668.0], "fov": 36.0},
     "coastC": {"position": [-380.0, 22.0, 120.0], "target": [-700.0, -40.0, -260.0], "fov": 40.0},
     "valleyC": {"position": [190.0, 95.0, -400.0], "target": [300.0, -40.0, -800.0], "fov": 36.0},
+    "lowC": {"position": [-60.0, 25.0, -600.0], "target": [-330.0, -8.0, -860.0], "fov": 40.0, "ground": True},  # ~25 m up
     "nightC": {"position": [-60.0, 45.0, -560.0], "target": [-330.0, -30.0, -870.0], "fov": 40.0},
 }
 
@@ -56,6 +57,9 @@ def camera(name):
             h = float(terrain_mirror.tile_sample(world.TILES, np.array([x]), np.array([z]))["height"][0])
             c[key] = [x, round(h + y, 2), z]
     return c
+
+
+TILE_SCALE = 1.0   # set by --tile-scale
 
 
 def scene_doc(state, interim, camera_name):
@@ -85,9 +89,10 @@ def scene_doc(state, interim, camera_name):
     else:
         prog = lambda cell: "mgTile%dx_%s" % (int(cell), state)   # noqa: E731
         under = "mgUnder_%s" % state
-        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under, s.get("side_px", 0.0))
-        programs = [look.tile_program(state, c) for c in (1.0, 2.0, 4.0)]
-        programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0))
+        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under, s.get("side_px", 0.0), TILE_SCALE)
+        programs = [look.tile_program(state, c, scale=TILE_SCALE) for c in (1.0, 2.0, 4.0)]
+        programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0,
+                                          scale=TILE_SCALE))
     doc = {
         "format": "avgen-scene", "version": 1, "name": "musical-geography",
         "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **camera_pose),
@@ -119,7 +124,10 @@ def main():
     ap.add_argument("--interim", action="store_true")
     ap.add_argument("--camera", default="low", choices=sorted(CAMERAS))
     ap.add_argument("--out", default=os.path.join(HERE, "scene"))
+    ap.add_argument("--tile-scale", type=float, default=1.0)
     a = ap.parse_args()
+    global TILE_SCALE
+    TILE_SCALE = a.tile_scale
     os.makedirs(a.out, exist_ok=True)
     scene_path = os.path.join(a.out, "musical-geography.scene.json")
     with open(scene_path, "w") as f:

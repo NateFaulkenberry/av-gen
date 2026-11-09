@@ -52,15 +52,18 @@ UNDERLAY = dict(cellSize=4.0, viewDistance=FINE_VIEW, y=-2.2, thickness=3.0)
 FLATS_WISH = {"step": 0.32, "rise": 0.05, "floodEvery": 3}
 
 
-def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0):
+def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0, scale=1.0):
+    """`scale` multiplies the tile (pitch, size, thickness, skirt) -- the land and the ring distances stay in metres."""
+    S = scale
     nodes = []
     for name, cell, view, align, hole, thick, shadow, gap in RINGS:
-        gen = {"name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": align,
-               "finePitch": 1.0 if cell > 1.0 else 0.0, "tiles": TILES,
-               "skirt": 3}   # 32a7e743: closes the cracks under thin slabs at height steps (rings, streaks)
+        tiles = dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S))
+        gen = {"name": "tiles", "version": 1, "cellSize": cell * S, "viewDistance": view, "align": align,
+               "finePitch": S if cell > 1.0 else 0.0, "tiles": tiles,
+               "skirt": 3 * S}   # 32a7e743: closes the cracks under thin slabs at height steps (rings, streaks)
         if hole:
-            gen["hole"] = hole
-        proc = {"source": {"kind": "box", "size": [cell * gap, thick, cell * gap]},
+            gen["hole"] = dict(hole, cellSize=hole["cellSize"] * S)
+        proc = {"source": {"kind": "box", "size": [cell * S * gap, thick * S, cell * S * gap]},
                 "distribution": {"kind": "generator", "generator": gen},
                 "material": {"baseColor": [1, 1, 1], "roughness": 0.62, "metallic": 0.0,
                              "program": program_for_cell(cell)},
@@ -71,12 +74,12 @@ def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0):
             proc["castsShadow"] = False
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": proc})
     u = UNDERLAY
-    gen = {"name": "tiles", "version": 1, "cellSize": u["cellSize"], "viewDistance": u["viewDistance"], "align": 1,
-           "finePitch": 1.0, "tiles": TILES}
+    gen = {"name": "tiles", "version": 1, "cellSize": u["cellSize"] * S, "viewDistance": u["viewDistance"], "align": 1,
+           "finePitch": S, "tiles": dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S))}
     nodes.append({"name": "mgUnderlay", "kind": "procedural", "position": [0, 0, 0], "procedural": {
-        "source": {"kind": "box", "size": [u["cellSize"], u["thickness"], u["cellSize"]]},
+        "source": {"kind": "box", "size": [u["cellSize"] * S, u["thickness"] * S, u["cellSize"] * S]},
         "distribution": {"kind": "generator", "generator": gen},
-        "distributionTransform": {"position": [0, u["y"], 0]},
+        "distributionTransform": {"position": [0, u["y"] * S, 0]},
         "material": dict({"baseColor": list(under_rgb), "roughness": 0.9, "metallic": 0.0},
                          **({"program": under_program} if under_program else {})),
         "lod": {"cull": True}, "slabs": True, "castsShadow": False}})

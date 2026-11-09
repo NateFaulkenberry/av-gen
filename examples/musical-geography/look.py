@@ -220,7 +220,7 @@ PAD_HEIGHT = (17.0, 20.0)              # crowns light only up here (04- §6)
 PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 
 
-def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None):
+def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0):
     """The slab's whole look, for one palette state and one ring.
 
     Reads: localPosition through engineering's tileBorder (ADR-1976: the border's coverage, prefiltered per axis below
@@ -239,8 +239,8 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None):
     land = [hexlin(c) for c in s["land"]]
     LS = s.get("stops", LAND_STOPS)
     gap = TILE["tileSize"] if cell == 1.0 else 1.0
-    half = cell * gap / 2.0
-    thick = RING_THICKNESS.get(cell, 0.3)
+    half = cell * scale * gap / 2.0
+    thick = RING_THICKNESS.get(cell, 0.3) * scale
     sub = int(cell)
     B = lambda k: [float(k)] * 4   # noqa: E731
     o = []
@@ -259,7 +259,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None):
     add({"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 6, "srcC": 7})
     if not far:   # pads: crown x high x a 5-tile block picked by its hash (before r3/r4 are reused)
         add({"kind": "smoothstep", "dst": 7, "srcA": 3, "constant": [PAD_HEIGHT[0], PAD_HEIGHT[1], 0, 0]})
-        add({"kind": "quantize", "dst": 6, "srcA": 4, "value": PAD_CLUSTER[0]})
+        add({"kind": "quantize", "dst": 6, "srcA": 4, "value": PAD_CLUSTER[0] / scale})
         add({"kind": "swizzle", "dst": 6, "srcA": 6, "constant": B(3)})
         add({"kind": "threshold", "dst": 6, "srcA": 6, "value": PAD_CLUSTER[1]})
         add({"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 6})                         # r7 = pad site
