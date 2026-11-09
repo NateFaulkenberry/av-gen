@@ -97,6 +97,7 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `AVGEN_FRAME_COUNTERS` | log the submission split every thirtieth frame |
 | `AVGEN_CPU_STAGES` | log the CPU stage split every thirtieth frame |
 | `AVGEN_SLOW_PHASE_MS` | log what was being written on any frame slower than this |
+| `AVGEN_SLOW_FRAME_MS` | log every phase over 1 ms of any frame whose interval passes this many ms (ADR-1980) |
 | `AVGEN_SLIDER_FILTER` | restrict the `sliders` script arm to a path prefix |
 | `AVGEN_UI_SELFTEST` | log SDL and ImGui input routing every thirtieth frame |
 | `AVGEN_VIEWPORT_PROBE`, `AVGEN_VIEWPORT_DRAG` | synthesise a viewport click or drag |
