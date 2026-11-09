@@ -962,3 +962,39 @@ window.
   Engineering is extending the ground to the horizon.
 - The top-down leg waits for engineering's leg type.
 - The path isn't on this route. A later leg can follow it.
+
+### CP-B (2026-11-09, on engineering daeb4d0a)
+
+**Switched on:**
+- `horizonFill` 1;
+- the 64 m far ring to 4.5 km (`world.ring_nodes`; the 16 m ring's `align` is now 4; camera far 200 km);
+- `aoRadius` 1.0.
+
+**The route** (`build.FLIGHT`, 90 s from 30 s):
+1. the bay at 12 m;
+2. low over the sea at 6 m;
+3. a shore snap (radius 40 m);
+4. `follow: "path"` 0–0.5 at 12 m;
+5. a climb to the top-down pass at 150 m, about 37 tiles wide in frame;
+6. a dive east;
+7. `follow: "river"` 0.55–0.9 at 12 m;
+8. the climb to the reveal at 90 m.
+
+**Night crest cut:** on 4 m tiles it lit whole tiles as white blocks on the sea. The crest is now off in every state;
+the contours and the path carry the light.
+
+**The renders** are in `05-camera/`:
+- `cpb-day-feline-30-120s.mp4`;
+- `cpb-night-feline-30-120s.mp4`;
+- contact sheets `cpb-*-contact-sheet.png`.
+
+**Live perf over the whole route** (1080p Ultra, headless, 88 s, 5,280 frames):
+
+| | GPU p50 | p95 | p99 | Frame p99 (serial) | Worst |
+|---|---|---|---|---|---|
+| Day | 14.1 ms | 21.4 | 23.9 | 30.4 | 51.1 ms |
+| Night | 13.7 ms | 20.5 | 23.3 | 25.3 | 31.9 ms |
+
+- **Day:** 5 serial frames go over 33 ms, at about 14–33 s into the route, which is the path leg and the climb into
+  the top-down pass. GPU p99 is 23.9 ms everywhere.
+- **Night:** nothing goes over 33 ms.

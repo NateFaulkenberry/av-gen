@@ -71,7 +71,7 @@ STATES = {
         land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"],
         water=["#0E1452", "#18227A", "#2443B0", "#3F78FF"], shallow="#2A3AA0", under="#120E3A",
         path="#FF5FB0", path_emit=5.0, pad="#FF4FA8", pad_emit=6.0,
-        drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=1.4,
+        drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=0.0,   # CP-B: on 4 m tiles the crest lit whole tiles as white blocks on the sea
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
         sun_az_offset=-1.01,   # radians (ADR-1961)
