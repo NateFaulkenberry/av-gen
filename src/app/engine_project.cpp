@@ -25,6 +25,7 @@
 #include <string_view>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <set>
 
 #include "assets/image.hpp"
@@ -111,6 +112,39 @@ std::optional<AssetRef> readAssetRef(const nlohmann::json& j) {
     return ref;
 }
 
+// ADR-1981: an asset's hash, kept for as long as the file's size and modification time stay the same. The project
+// document is built for every dirty-check sample (ADR-440), and when the transport is idle that is every few hundred
+// milliseconds; hashing a 40 MB song each time was 230-260 ms of the UI thread every ~2.5 s, a dropped frame each.
+std::optional<std::string> cachedSha256(const std::filesystem::path& file, std::uintmax_t size) {
+    struct Entry {
+        std::uintmax_t size = 0;
+        std::filesystem::file_time_type written{};
+        std::string sha256;
+    };
+    static std::mutex mutex;
+    static std::map<std::string, Entry> cache;
+    std::error_code ec;
+    const auto written = std::filesystem::last_write_time(file, ec);
+    if (ec) {
+        auto hash = sha256File(file);
+        return hash ? std::optional<std::string>(*hash) : std::nullopt;
+    }
+    const std::string key = file.lexically_normal().string();
+    {
+        const std::lock_guard lock(mutex);
+        if (const auto it = cache.find(key); it != cache.end() && it->second.size == size && it->second.written == written) {
+            return it->second.sha256;
+        }
+    }
+    auto hash = sha256File(file);
+    if (!hash) {
+        return std::nullopt;
+    }
+    const std::lock_guard lock(mutex);
+    cache[key] = Entry{size, written, *hash};
+    return *hash;
+}
+
 // Writes { "path": relative, "size", "sha256" } for a file (size/hash omitted when unreadable).
 nlohmann::json assetRefJson(const std::filesystem::path& file, const std::filesystem::path& baseDir) {
     nlohmann::json j = nlohmann::json::object();
@@ -119,7 +153,7 @@ nlohmann::json assetRefJson(const std::filesystem::path& file, const std::filesy
     const auto size = std::filesystem::file_size(file, ec);
     if (!ec) {
         j["size"] = size;
-        if (auto hash = sha256File(file)) {
+        if (auto hash = cachedSha256(file, size)) {
             j["sha256"] = *hash;
         }
     }

@@ -986,6 +986,10 @@ public:
     void setBindings(std::vector<NodeBinding> bindings);
     [[nodiscard]] const NodeBinding* binding(const std::string& node) const;
 
+    // ADR-1955: the ground the `hop` behaviour stands on (a tiles ground), or null. The host owns it.
+    void setGround(world::GroundSource* ground) { ground_ = ground; }
+    [[nodiscard]] world::GroundSource* ground() const { return ground_; }
+
     void setNavigator(Navigator nav) {
         ++inputEpoch_;
         nav_ = std::move(nav);
@@ -1440,6 +1444,7 @@ private:
     std::vector<std::unique_ptr<Entity>> entities_;
     std::vector<NodeBinding> bindings_;
     Navigator nav_{};
+    world::GroundSource* ground_ = nullptr; // ADR-1955
     NavigatorPath navPath_{&nav_};
     const IPathProvider* path_ = nullptr;
     std::vector<ActionEvent> actionEvents_;

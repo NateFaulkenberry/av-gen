@@ -807,6 +807,108 @@ TEST_CASE("a look's warmth turns the canyon's key from the warm sun to a cold mo
     CHECK_FALSE(scene::attractorWorldToJson(plain).at("look").contains("sunWarmth")); // saved only when set
 }
 
+TEST_CASE("a look sets the key light's shadow bias, contact march and casting", "[attractor-world][pass2][adr1907]") {
+    const scene::AttractorLook day;
+    CHECK(day.sunShadowBias < 0.0f); // the block's own bias
+    CHECK(day.sunContact == 1.0f);   // as the key always was
+    CHECK(day.sunCasts == 1.0f);
+    nlohmann::json j = nlohmann::json::parse(
+        R"({"enabled": true, "sunShadowBias": 3.2, "look": {"sunShadowBias": 0.2, "sunContact": 0, "sunCasts": 1}})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->sunShadowBias == Approx(3.2f));
+    CHECK(block->look.sunShadowBias == Approx(0.2f));
+    CHECK(block->look.sunContact == 0.0f);
+    const nlohmann::json back = scene::attractorWorldToJson(*block).at("look");
+    CHECK(back.value("sunShadowBias", -1.0) == Approx(0.2));
+    CHECK(back.value("sunContact", 1.0) == 0.0);
+    CHECK_FALSE(back.contains("sunCasts")); // the default is not written
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    const nlohmann::json plainLook = scene::attractorWorldToJson(plain).at("look");
+    CHECK_FALSE(plainLook.contains("sunShadowBias"));
+    CHECK_FALSE(plainLook.contains("sunContact"));
+}
+
+TEST_CASE("the flythrough's gaze is authored: a shorter look-ahead keeps the aim on the travel", "[attractor-world][pass2][adr1909]") {
+    scene::AttractorGen lead;
+    lead.resolution = 256;
+    lead.meshSpacing = 16.0f;
+    lead.meshMinError = 4.0f;
+    scene::AttractorGen follow = lead;
+    follow.flightLookAhead = 0.4f;
+    follow.flightLookDown = 0.02f;
+    CHECK(follow.validate().has_value());
+    CHECK(follow.hash() != lead.hash());
+    scene::AttractorGen same = lead;
+    same.flightLookAhead = 2.5f; // the defaults hash as they always did
+    CHECK(same.hash() == lead.hash());
+    // the worst angle between the aim and the direction of travel
+    const auto worst = [](const scene::AttractorWorld& w) {
+        float out = 0.0f;
+        for (std::size_t i = 1; i + 1 < w.flight.size(); ++i) {
+            const glm::vec3 v = glm::vec3(w.flight[i + 1]) - glm::vec3(w.flight[i - 1]);
+            if (glm::length(v) < 1e-3f) continue;
+            const float c = glm::dot(glm::normalize(v), glm::normalize(glm::vec3(w.flightAim[i])));
+            out = std::max(out, glm::degrees(std::acos(std::clamp(c, -1.0f, 1.0f))));
+        }
+        return out;
+    };
+    const auto a = scene::generateAttractorWorld(lead);
+    const auto b = scene::generateAttractorWorld(follow);
+    REQUIRE(a->flight.size() == b->flight.size());
+    INFO("worst aim-to-travel angle: look-ahead 2.5 s " << worst(*a) << ", 0.4 s " << worst(*b));
+    CHECK(worst(*b) < worst(*a));
+    // round trip, and absent when default
+    nlohmann::json j = nlohmann::json::parse(R"({"enabled": true, "flightLookAhead": 0.6, "flightLookDown": 0.03})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->gen.flightLookAhead == Approx(0.6f));
+    const nlohmann::json back = scene::attractorWorldToJson(*block);
+    CHECK(back.value("flightLookDown", 0.0) == Approx(0.03));
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    CHECK_FALSE(scene::attractorWorldToJson(plain).contains("flightLookAhead"));
+}
+
+TEST_CASE("the flythrough's path smoothing is authored: a longer window turns the gorge's bends into one curve",
+          "[attractor-world][pass3][adr1911]") {
+    scene::AttractorGen bends;
+    bends.resolution = 256;
+    bends.meshSpacing = 16.0f;
+    bends.meshMinError = 4.0f;
+    scene::AttractorGen curve = bends;
+    curve.flightSmooth = 4.0f;
+    CHECK(curve.validate().has_value());
+    CHECK(curve.hash() != bends.hash());
+    scene::AttractorGen bad = bends;
+    bad.flightSmooth = 0.0f;
+    CHECK_FALSE(bad.validate().has_value());
+    // the path's total horizontal turning (degrees), a measure of how much it snakes
+    const auto turning = [](const scene::AttractorWorld& w) {
+        float out = 0.0f;
+        for (std::size_t i = 2; i < w.flight.size(); ++i) {
+            const glm::vec2 a(w.flight[i - 1].x - w.flight[i - 2].x, w.flight[i - 1].z - w.flight[i - 2].z);
+            const glm::vec2 b(w.flight[i].x - w.flight[i - 1].x, w.flight[i].z - w.flight[i - 1].z);
+            if (glm::length(a) < 1e-3f || glm::length(b) < 1e-3f) continue;
+            out += glm::degrees(std::abs(std::atan2(a.x * b.y - a.y * b.x, glm::dot(a, b))));
+        }
+        return out;
+    };
+    const auto a = scene::generateAttractorWorld(bends);
+    const auto b = scene::generateAttractorWorld(curve);
+    INFO("total turning: smooth 0.6 s " << turning(*a) << ", 4 s " << turning(*b));
+    CHECK(turning(*b) < turning(*a));
+    nlohmann::json j = nlohmann::json::parse(R"({"enabled": true, "flightSmooth": 4.0})");
+    auto block = scene::attractorWorldFromJson(j);
+    REQUIRE(block.has_value());
+    CHECK(block->gen.flightSmooth == Approx(4.0f));
+    CHECK(scene::attractorWorldToJson(*block).value("flightSmooth", 0.0) == Approx(4.0));
+    scene::AttractorWorldBlock plain;
+    plain.enabled = true;
+    CHECK_FALSE(scene::attractorWorldToJson(plain).contains("flightSmooth"));
+}
+
 TEST_CASE("the Mars style: mesas over an open floor, no gorge, wind forms, and only when asked", "[attractor-world][pass2][adr1902]") {
     scene::AttractorGen canyon;
     canyon.resolution = 256;

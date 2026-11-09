@@ -76,7 +76,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "proceduralSkyBackground",
     "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
-    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
+    "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "fogSpectral", "waterSurface", "waterDownwelling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
     "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "aoRadius", "horizonFill", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
@@ -1385,6 +1385,10 @@ void Composition::updateAttractorWorld() {
         sun.direction = -attractorSunDirection(*live.world, live.live);
         sun.intensity = attractorWorld_.sunLux * live.live.sunIntensity;
         sun.color = attractorSunColor(live.live);
+        // ADR-1907: the key's shadow follows the look too
+        sun.shadowBias = live.live.sunShadowBias >= 0.0f ? live.live.sunShadowBias : attractorWorld_.sunShadowBias;
+        sun.contactShadow = live.live.sunContact > 0.5f;
+        sun.castsShadow = live.live.sunCasts > 0.5f;
     }
     // ADR-1862: the program's audio-reactive inputs ride on the chunks' material emission (the `materialEmission`
     // input): r contour, g glow. The program writes its own emission, so the carrier is never drawn as itself.
@@ -3636,6 +3640,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     for (const auto& sink : animationSinks_) {
         sink->prepareChain();
     }
+    refreshTileGround(); // ADR-1955: the ground as it will be drawn, before the bodies stand on it
     entityWorld_.update(update, *params_);
 }
 
@@ -3766,6 +3771,7 @@ struct DirectorCheckpoint final : entity::HostCheckpoint {
     world::HistoryBank::Snapshot history; // ADR-703: empty when nothing subscribes to HIST
     std::shared_ptr<const entity::HostCheckpoint> signals; // ADR-870: null when the replay has no bus
     std::vector<params::ProcessorChain::State> reactions;  // ADR-870: the reaction routes' envelopes
+    std::vector<TileEvent> landings;                       // ADR-1954: the tiles ground's springs so far
     std::size_t measured = 0;
     [[nodiscard]] std::size_t bytes() const override { return measured; }
 };
@@ -3777,9 +3783,10 @@ struct HistoryCheckpoint final : entity::HostCheckpoint {
     world::HistoryBank::Snapshot history;
     std::shared_ptr<const entity::HostCheckpoint> signals;
     std::vector<params::ProcessorChain::State> reactions;
+    std::vector<TileEvent> landings; // ADR-1954: the tiles ground's springs so far
     [[nodiscard]] std::size_t bytes() const override {
         return history.bytes() + sizeof(HistoryCheckpoint) + (signals != nullptr ? signals->bytes() : 0) +
-               reactions.size() * sizeof(params::ProcessorChain::State);
+               reactions.size() * sizeof(params::ProcessorChain::State) + landings.size() * sizeof(TileEvent);
     }
 };
 
@@ -3968,9 +3975,10 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                 params.resetFinals();
             };
         }
-        if (history != nullptr || signals != nullptr) {
+        if (history != nullptr || signals != nullptr || tileGround_.valid()) {
             hooks.capture = [&]() -> std::shared_ptr<const entity::HostCheckpoint> {
                 auto c = std::make_shared<HistoryCheckpoint>();
+                c->landings = tileGround_.landings();
                 if (history != nullptr) {
                     c->history = history->snapshot();
                 }
@@ -3984,6 +3992,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
             };
             hooks.restore = [&](const entity::HostCheckpoint& host) {
                 const auto& c = static_cast<const HistoryCheckpoint&>(host);
+                tileGround_.restoreLandings(c.landings);
                 if (history != nullptr) {
                     history->restore(c.history);
                 }
@@ -3995,6 +4004,8 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
                 }
             };
         }
+        tileGround_.forgetAfter(seconds); // ADR-1954: the landings that had not happened yet
+        refreshTileGround();
         entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
         return;
     }
@@ -4040,6 +4051,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         c->staging = staging_.checkpoint(params);
         c->placed = placement.placed();
         c->valid = placement.valid();
+        c->landings = tileGround_.landings();
         if (history != nullptr) {
             c->history = history->snapshot();
         }
@@ -4055,6 +4067,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     hooks.restore = [&](const entity::HostCheckpoint& host) {
         const auto& c = static_cast<const DirectorCheckpoint&>(host);
         staging_.restore(c.staging, params);
+        tileGround_.restoreLandings(c.landings);
         placement.set(c.placed, c.valid);
         if (history != nullptr) {
             history->restore(c.history);
@@ -4067,6 +4080,8 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
         }
     };
     hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
+    tileGround_.forgetAfter(seconds); // ADR-1954: the landings that had not happened yet
+    refreshTileGround();
     entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
@@ -5332,6 +5347,13 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     // BELOW the basin in valleys, which is the opposite of pooling.
     fogPooling_ = &params.add(floatDesc(prefix_ + "scene/fogPooling", volumeSetting_.fogPooling, 0.0f, 1.0f, 0.0f,
                                         1.0f));
+    // ADR-1908: the surface fog's extinction by colour (0 0 0 = the grey fog, unchanged)
+    fogSpectral_ = &params.add(vec3Desc(prefix_ + "scene/fogSpectral", volumeSetting_.fogSpectral, 0.0f, 20.0f, 0.0f, 4.0f));
+    // ADR-1910: the water column's surface (world y) and its absorption of light per metre, by channel (0 = off)
+    waterSurface_ = &params.add(floatDesc(prefix_ + "scene/waterSurface", volumeSetting_.waterSurface, -100000.0f,
+                                          100000.0f, -1000.0f, 1000.0f));
+    waterDownwelling_ = &params.add(vec3Desc(prefix_ + "scene/waterDownwelling", volumeSetting_.waterDownwelling, 0.0f,
+                                             2.0f, 0.0f, 0.2f));
     // ADR-705 (§7's Horizon Density): the air grows denser with distance from the eye, read by the
     // march, the surface pass and the particle estimate from this one number. An ordinary
     // parameter, so audio, the timeline and presets drive it like any other. Soft range 0..2 is
@@ -6572,6 +6594,9 @@ void Composition::detach() {
     fogHeightCurve_ = nullptr;
     fogGroundFollow_ = nullptr;
     fogPooling_ = nullptr;
+    fogSpectral_ = nullptr;
+    waterSurface_ = nullptr;
+    waterDownwelling_ = nullptr;
     horizonDensity_ = nullptr;
     bandParams_ = {}; // ADR-1151
     windEnabled_ = nullptr;
@@ -8253,7 +8278,10 @@ void Composition::rebuild() {
         sun.color = attractorSunColor(attractorWorld_.look);
         sun.intensity = attractorWorld_.sunLux * attractorWorld_.look.sunIntensity;
         sun.castsShadow = true;
-        sun.shadowBias = attractorWorld_.sunShadowBias; // a low sun over kilometres of rock: the default acnes
+        sun.shadowBias = attractorWorld_.look.sunShadowBias >= 0.0f ? attractorWorld_.look.sunShadowBias
+                                                                    : attractorWorld_.sunShadowBias; // ADR-1907
+        sun.contactShadow = attractorWorld_.look.sunContact > 0.5f;
+        sun.castsShadow = attractorWorld_.look.sunCasts > 0.5f;
         attractorSunLight_ = static_cast<int>(scene_.lights.size());
         scene_.addLight(std::move(sun));
     }
@@ -9159,6 +9187,55 @@ void Composition::updateTileDynamics(const FrameTime& time) {
     scene_.environment.tileDynamics.live = tileLiveEvents_;
 }
 
+TileDynamics Composition::liveTileDynamics() const {
+    TileDynamics out = volumeSetting_.tileDynamics;
+    if (tileDynamicsAuthored_) {
+        const TileDynamicsParams& p = tileDynamicsParams_;
+        TileDynamics& d = out;
+        const auto f = [](const params::Parameter<float>* q, float fallback) {
+            return q != nullptr ? q->value() : fallback;
+        };
+        d.amplitude = f(p.amplitude, d.amplitude);
+        for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
+            d.waves[i].amplitude = f(p.waveAmplitude[i], d.waves[i].amplitude);
+            d.waves[i].speed = f(p.waveSpeed[i], d.waves[i].speed);
+            d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
+            d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
+            d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+        }
+        d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
+        d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
+        d.rolling = {f(p.rollingX, d.rolling.x), f(p.rollingZ, d.rolling.y)};
+        d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
+        d.rings.speed = f(p.ringSpeed, d.rings.speed);
+        d.rings.decay = f(p.ringDecay, d.rings.decay);
+        d.contourInterval = f(p.contourInterval, d.contourInterval);
+        d.contourOffset = f(p.contourOffset, d.contourOffset);
+        d.live = tileLiveEvents_;
+    }
+    return out;
+}
+
+void Composition::refreshTileGround() {
+    const ProceduralGeometry* ground = nullptr;
+    for (const ProceduralGeometry& p : scene_.procedurals) {
+        if (p.distribution.generator.isTiles() &&
+            (flight_.ground.empty() || p.name == flight_.ground ||
+             (p.name.size() > flight_.ground.size() && p.name.ends_with(flight_.ground)))) {
+            ground = &p;
+            break;
+        }
+    }
+    if (ground == nullptr || entityWorld_.empty()) {
+        entityWorld_.setGround(nullptr);
+        return;
+    }
+    tileGroundOffset_ = glm::vec3(ground->distributionTransform.matrix()[3]);
+    tileGround_.set(ground->distribution.generator.tiles, liveTileDynamics(), ground->distribution.generator.cellSize,
+                    tileGroundOffset_);
+    entityWorld_.setGround(&tileGround_);
+}
+
 void Composition::applyParameters() {
     // ADR-343. Resolved first because the node loop below needs `glowScale` and `starBrightness`,
     // and written last (at the end of this function) because the sky and the lights it owns are
@@ -10006,6 +10083,9 @@ void Composition::applyParameters() {
         env.fogHeightCurve = pick(fogHeightCurve_, volumeSetting_.fogHeightCurve);
         env.fogGroundFollow = pick(fogGroundFollow_, volumeSetting_.fogGroundFollow);
         env.fogPooling = pick(fogPooling_, volumeSetting_.fogPooling);
+        env.fogSpectral = fogSpectral_ != nullptr ? fogSpectral_->value() : volumeSetting_.fogSpectral; // ADR-1908
+        env.waterSurface = pick(waterSurface_, volumeSetting_.waterSurface);                              // ADR-1910
+        env.waterDownwelling = waterDownwelling_ != nullptr ? waterDownwelling_->value() : volumeSetting_.waterDownwelling;
         env.horizonDensity = pick(horizonDensity_, volumeSetting_.horizonDensity);
         env.bands = volumeSetting_.bands; // ADR-1151
         scene::applyReflectionBandParameters(bandParams_, env.bands);
@@ -10029,30 +10109,13 @@ void Composition::applyParameters() {
         env.aoFadeEnd = volumeSetting_.aoFadeEnd;
         env.aoRadius = volumeSetting_.aoRadius; // Phase 5
         env.horizonFill = volumeSetting_.horizonFill; // Phase 5
-        env.tileDynamics = volumeSetting_.tileDynamics; // ADR-1953: the authored block, then its parameters
-        if (tileDynamicsAuthored_) {
-            const TileDynamicsParams& p = tileDynamicsParams_;
-            TileDynamics& d = env.tileDynamics;
-            const auto f = [](const params::Parameter<float>* q, float fallback) {
-                return q != nullptr ? q->value() : fallback;
-            };
-            d.amplitude = f(p.amplitude, d.amplitude);
-            for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
-                d.waves[i].amplitude = f(p.waveAmplitude[i], d.waves[i].amplitude);
-                d.waves[i].speed = f(p.waveSpeed[i], d.waves[i].speed);
-                d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
-                d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
-                d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+        env.tileDynamics = liveTileDynamics(); // ADR-1953: the authored block, then its parameters
+        env.tileDynamics.springs.clear(); // ADR-1954: the characters' landings, in the ground's generator space
+        if (tileGround_.valid()) {
+            for (const TileEvent& e : tileGround_.landings()) {
+                env.tileDynamics.springs.push_back(
+                    TileEvent{e.time, e.position - glm::vec2(tileGroundOffset_.x, tileGroundOffset_.z), e.strength});
             }
-            d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
-            d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
-            d.rolling = {f(p.rollingX, d.rolling.x), f(p.rollingZ, d.rolling.y)};
-            d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
-            d.rings.speed = f(p.ringSpeed, d.rings.speed);
-            d.rings.decay = f(p.ringDecay, d.rings.decay);
-            d.contourInterval = f(p.contourInterval, d.contourInterval);
-            d.contourOffset = f(p.contourOffset, d.contourOffset);
-            d.live = tileLiveEvents_;
         }
         env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867
         env.ambientOcclusion = volumeSetting_.ambientOcclusion; // ADR-1406
@@ -11275,6 +11338,17 @@ nlohmann::json Composition::toJson() const {
         if (pooling != 0.0f) {
             environment["fogPooling"] = pooling;
         }
+        // ADR-1908, by the same rule
+        const glm::vec3 spectral = fogSpectral_ != nullptr ? fogSpectral_->base() : volumeSetting_.fogSpectral;
+        if (spectral != glm::vec3(0.0f)) {
+            environment["fogSpectral"] = {spectral.x, spectral.y, spectral.z};
+        }
+        // ADR-1910, by the same rule: the column is written only when it absorbs
+        const glm::vec3 down = waterDownwelling_ != nullptr ? waterDownwelling_->base() : volumeSetting_.waterDownwelling;
+        if (down != glm::vec3(0.0f)) {
+            environment["waterDownwelling"] = {down.x, down.y, down.z};
+            environment["waterSurface"] = waterSurface_ != nullptr ? waterSurface_->base() : volumeSetting_.waterSurface;
+        }
     }
     // ADR-1151: written only when authored, with the parameters' base values, so a scene without bands
     // saves exactly the file it had.
@@ -11930,6 +12004,9 @@ nlohmann::json Composition::toJson() const {
             for (const glm::vec4& w : b.flight) flight.push_back({w.x, w.y, w.z, w.w});
             nlohmann::json pj = {{"world", b.world}, {"exit", {b.exit.x, b.exit.y, b.exit.z}}, {"exitYaw", b.exitYaw}, {"flight", flight}};
             if (b.join.z > 0.0f) pj["join"] = {b.join.x, b.join.y, b.join.z};
+            if (b.lookAhead != 1.2f) pj["lookAhead"] = b.lookAhead; // ADR-1909: written only when set
+            if (b.lookDown != 0.1f) pj["lookDown"] = b.lookDown;
+            if (b.climbLook != 0.25f) pj["climbLook"] = b.climbLook;
             if (!b.aims.empty()) {
                 nlohmann::json aims = nlohmann::json::array();
                 for (const auto& a : b.aims) aims.push_back({a[0], a[1], a[2], a[3], a[4]});
@@ -12466,6 +12543,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             comp->volumeSetting_.tileDynamics = std::move(*dyn);
             comp->tileDynamicsAuthored_ = true;
         }
+        if (e.contains("fogSpectral")) { // ADR-1908
+            auto value = readVec<3>(e, "fogSpectral", comp->volumeSetting_.fogSpectral);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogSpectral = *value;
+        }
+        if (e.contains("waterDownwelling")) { // ADR-1910
+            auto value = readVec<3>(e, "waterDownwelling", comp->volumeSetting_.waterDownwelling);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.waterDownwelling = glm::max(*value, glm::vec3(0.0f));
+        }
+        if (e.contains("waterSurface")) { // ADR-1910
+            auto value = readFloat(e, "waterSurface", comp->volumeSetting_.waterSurface);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.waterSurface = *value;
+        }
         {
             scene::Environment& v = comp->volumeSetting_;
             struct FloatKey {
@@ -12963,6 +13061,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                        a.at(4).get<float>()});
                 }
             }
+            pb.lookAhead = pj.value("lookAhead", pb.lookAhead); // ADR-1909
+            pb.lookDown = pj.value("lookDown", pb.lookDown);
+            pb.climbLook = pj.value("climbLook", pb.climbLook);
             vec3At("entryUp", pb.entryUp);
             vec3At("exitUp", pb.exitUp);
             if (pj.contains("entry")) { // ADR-1895
@@ -12977,7 +13078,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             for (auto it = pj.begin(); it != pj.end(); ++it) {
                 if (it.key() != "world" && it.key() != "exit" && it.key() != "exitYaw" && it.key() != "flight" && it.key() != "join" &&
                     it.key() != "exitAxis" && it.key() != "entryUp" && it.key() != "exitUp" && it.key() != "aims" &&
-                    it.key() != "entry" && it.key() != "entryAxis") {
+                    it.key() != "entry" && it.key() != "entryAxis" && it.key() != "lookAhead" && it.key() != "lookDown" &&
+                    it.key() != "climbLook") {
                     return fail("scene file '{}': portal has no key '{}'", scenePath.string(), it.key());
                 }
             }

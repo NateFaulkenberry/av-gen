@@ -452,11 +452,12 @@ std::optional<Composition::PortalPose> Composition::legCameraAt(int k, double se
         return hermite(q[i], m[i] * h, q[i + 1], m[i + 1] * h, std::clamp((t - qt[i]) / h, 0.0f, 1.0f));
     };
     const glm::vec3 p = at(s);
-    glm::vec3 ahead = at(s + 1.2f) - p;
+    // ADR-1909: how far ahead, how far down and how much of a climb the gaze takes are the portal block's
+    glm::vec3 ahead = at(s + std::max(block.lookAhead, 0.02f)) - p;
     // a climb is not looked up at (a quarter of it): rising over a crater rim to hover above a portal, the view stays
     // on the ground ahead instead of tipping into the black sky; a descent is looked down at in full
-    if (ahead.y > 0.0f) ahead.y *= 0.25f;
-    glm::vec3 look = glm::length(ahead) > 1e-4f ? glm::normalize(ahead + glm::vec3(0.0f, -0.1f, 0.0f) * glm::length(ahead)) : arriveAim;
+    if (ahead.y > 0.0f) ahead.y *= block.climbLook;
+    glm::vec3 look = glm::length(ahead) > 1e-4f ? glm::normalize(ahead + glm::vec3(0.0f, -block.lookDown, 0.0f) * glm::length(ahead)) : arriveAim;
     glm::vec3 up{0.0f, 1.0f, 0.0f};
     if (joined) {
         // into the destination's own view (its aim and bank) over the 3 s before the join, eased at both ends

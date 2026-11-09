@@ -57,6 +57,12 @@
 //                           world axes and added to the surface normal (UDN), returned as the tangent-space normal
 //                           the shader applies (in the fragment's own tangent frame) -> (xyz, 1)
 //   For both, k2 = (blend sharpness (0 = 4), green sign (< 0: a DirectX map), mip bias, normal strength (0 = 1)).
+//   ADR-1905, k3 = (hex, macro, macro scale, layer), all 0 by default (the plain repeating read):
+//     hex   0..1: hex-tile stochastic blending (Mikkelsen 2022) -- each cell of a triangle grid (~0.67 tiles) reads the
+//           image shifted by a hash and turned by up to +-180 x hex degrees, blended across narrow seams; a normal
+//           map's x/y are turned back, so it stays consistent
+//     macro 0..1: the colour scaled by 1 +- 0.8 x macro x a world-space fBm over `macro scale` tiles (0 = 8)
+//     layer 0..1: a second read of the same image 4.3x larger, turned 40 degrees, mixed in at 0.4 x layer (colour)
 //   They read no register: the shader samples them once, before the interpreter loop (as Field ops, ADR-050),
 //   at most kMaxMaterialTextureOps of them per program.
 // Outputs: baseColor (rgb), metallic (x), roughness (x), emission (rgb x emissionIntensity),

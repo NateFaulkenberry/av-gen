@@ -301,6 +301,15 @@ fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u
     let r1 = mwRestPosition(mwIndices[tri * 3u + 1u]);
     let r2 = mwRestPosition(mwIndices[tri * 3u + 2u]);
     let cR = (r0 + r1 + r2) / 3.0;
+    // ADR-1904: no projectile shards. A sliver (its longest edge over six times its height on that edge) never breaks
+    // off, and a shard's longest edge is capped at a share of the opening's half-width, so a large source triangle (a
+    // sand drift's, a hull's box face) becomes a shard of the storm's own size, not a rod across the frame.
+    let longest = max(length(r1 - r0), max(length(r2 - r1), length(r0 - r2)));
+    let area2 = length(cross(r1 - r0, r2 - r0));
+    if (area2 <= 1e-6 || longest * longest > 6.0 * area2) {
+        return out;
+    }
+    let sizeCap = min(1.0, max(1.0, 0.15 * frame.corruption3.x) / longest);
     let b = crBasis();
     let ap = crAperture(cR, b);
     if (ap.e < 0.95 || ap.e > 2.4 || abs(ap.w) > 15.0 || ap.openT <= 0.0) {
@@ -325,7 +334,7 @@ fn vs_mesh_shard(@builtin(vertex_index) vi: u32, @builtin(instance_index) tri: u
     let axis = normalize(vec3<f32>(crHash(vec4<u32>(tri, 3u, seed, 34u)) - 0.5, crHash(vec4<u32>(tri, 4u, seed, 35u)) - 0.5,
                                    crHash(vec4<u32>(tri, 5u, seed, 36u)) - 0.5) + vec3<f32>(1e-3, 0.0, 0.0));
     let angle = ph * 3.1415927 * (1.0 + 2.0 * crHash(vec4<u32>(tri, 6u, seed, 37u)));
-    let scale = (1.0 - smoothstep(0.55, 1.0, ph)) * 0.92;
+    let scale = (1.0 - smoothstep(0.55, 1.0, ph)) * 0.92 * sizeCap;
     var corners = array<vec3<f32>, 3>(r0, r1, r2);
     var barys = array<vec3<f32>, 3>(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(0.0, 0.0, 1.0));
     let k = vi % 3u;

@@ -574,3 +574,118 @@ Live, 1080p ultra at 30 fps:
 | GPU median | p95 | p99 | Frames on time |
 |---|---|---|---|
 | 17.2 ms | 31.3 | 36.2 | 98.6% |
+
+### Engineering (2026-11-09): the flight's GPU tail is the GPU clocking down, not the route
+
+The feature flight's GPU p95 of 31.3 ms and p99 of 36.2 ms came from a 600 s run that mostly held the flight's last
+pose. Bucketed into 9 s windows along the route (live, 1080p ultra, 30 fps, 4 m tiles, horizon fill, 64 m ring):
+
+| Flight seconds | GPU median | p95 | p99 |
+|---|---|---|---|
+| 0–9 | 12.3 | 15.4 | 18.0 |
+| 10–19 | 12.2 | 15.6 | 17.6 |
+| 20–29 (top-down leg) | 12.9 | 17.1 | 21.9 |
+| 30–39 | 13.0 | 14.7 | 16.2 |
+| 40–49 | 11.5 | 15.2 | 15.8 |
+| 50–59 (the climb to 90 m) | 18.3 | 23.6 | 25.5 |
+
+None of the suspects (the top-down leg, the 64 m ring, shadows at altitude) puts a window near the budget. The tail
+appears only in runs longer than about 10 s, and it is the GPU lowering its clock in the idle half of each 33 ms
+frame.
+
+Canary, on the same 30 s of flight:
+
+| Paced at | GPU p95 | p99 | Frames on time |
+|---|---|---|---|
+| 30 fps | 29.9 ms | 33.7 | 99.1% |
+| 60 fps | 13.8 ms | 14.9 | 99.9% |
+
+The work is about 15 ms. The 30 fps figure is the same work at a lower clock, which still fits the frame. No content
+change is needed. The few frames that miss their deadline are CPU stalls (the profile's worst frames have CPU work up
+to 270 ms on a GPU time of 16 ms), not the GPU. Judge GPU cost by the 60 fps run, or by the median.
+
+### Engineering (2026-11-09): the live CPU stalls are the app shell, not the scene
+
+New diagnostic: `AVGEN_SLOW_FRAME_MS=<ms>` logs, for every frame over the threshold, each phase that took over 1 ms.
+
+On 60 s of the feature flight (live, 30 fps, Feline):
+- The one long frame (62–70 ms, at the same place every run, about 13 s after the profile starts) is `events.poll` at
+  26–30 ms: the OS event pump (SDL and Cocoa), in which `engine.update` and `render.record` take under 2 ms.
+- The rest of the 38–41 ms frames are a `ui.build` of 5–9 ms every ~90 frames (3 s), arriving on top of a slow GPU
+  frame (the clock-down above).
+
+Control: the same project with an empty scene (GPU 1.5 ms) has the same `events.poll` stall at ~13 s (26.5 ms), the
+same 3 s `ui.build` spikes, and the same 99.1% of frames on time.
+
+None of the suspects shows in any slow frame:
+- the flight table (built once, before measurement);
+- ring re-centring and uploads (`rr.uploads` is 0 after the first frame);
+- pipeline compiles (no compile in the log, and `compiledMaterials` stays steady);
+- the contour pass (GPU only).
+
+The stalls belong to the app's shell (the event pump and a periodic UI rebuild). They're reported, not fixed here.
+
+### Engineering → art, Phase 6 / CP-C (2026-11-09): characters on the tiles (ADR-1954, 1955, 1957, 1958)
+
+**What's built:**
+
+- **Landing springs (ADR-1954).** A landing makes its tile dip, rebound and settle, and a smaller, later ripple
+  spreads to the tiles around it. The motion is a function of the clock, so a seek gives the same result as play.
+- **The ground seam (ADR-1955).** Bodies stand on the moving tiles as they are drawn: the waves, the breathing, the
+  audio-driven amplitude, the live rings and other bodies' springs.
+- **TileNav (ADR-1957).** Bodies walk steps of up to 0.6 m and never wade into the sea. They hop 1 to 3 tiles,
+  rising up to 3 m or dropping up to 8 m.
+- **The `hop` behaviour (ADR-1958).** A body pauses on its tile, picks a crown, sea slab or path tile 4 to 12 tiles
+  away, then walks and hops there. Each landing springs the ground.
+
+**Switch-on.** Each character needs a gltf node and an entity whose behaviour list is just `hop`. Leave out `ground`
+and `decide`: they read a WorldMap, and this scene has none. Also leave out the `foot` IK layers for the same reason.
+The clips map the hop's activities to the alien GLBs:
+
+```json
+{"name": "hopper0", "node": "hopper0", "seed": 7001, "tags": ["alien"],
+ "clips": {"idle": "Idle", "walk": "Walking", "run": "Running", "turn": "Idle_turn", "observe": "Idle",
+           "react": "Fight_idle", "jump": "Jumping", "fall": "Floating", "land": "Landing"},
+ "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
+ "behaviors": [{"kind": "hop", "hopChance": 0.45, "homeRadius": 28, "goalMin": 3, "goalMax": 7,
+                "pauseMin": 0.8, "pauseMax": 2.6, "airTime": 1.2, "apex": 2.4}]}
+```
+
+The node is the usual alien gltf: scale 1.94, y 0. The hop sets the height.
+
+The hop settings and their defaults:
+
+- `walkSpeed` 1.7, `runSpeed` 3.6
+- `airTime` 1.35 s, `apex` 2.2 m, `landTime` 0.4 s
+- `hopChance` 0.35: also hop a walkable step, for joy
+- `strength` 1: how hard a landing springs
+- `pauseMin` 1, `pauseMax` 3.5
+- `goalMin` 4, `goalMax` 12 (tiles)
+- `preferCrowns` 1, `preferWater` 0.6, `preferPath` 0.6
+- `homeRadius` 60 m
+- `stepHeight` 0.6, `jumpTiles` 3, `jumpRise` 3, `jumpDrop` 8
+
+`walkSpeed`, `runSpeed`, `airTime`, `apex`, `hopChance` and `strength` are live parameters under
+`<entity>/hop/...` and can be routed to audio. The springs go in `environment.tileDynamics.spring`:
+`{"depth": 0.6, "frequency": 1.6, "damping": 0.18, "rippleSpeed": 12, "rippleRadius": 5}`. CP-C used depth 0.7.
+The node chosen is the flight's `ground` (`mgTiles1`).
+
+**CP-C fixture.** Your CP-B r2 day build (`build.py --state day --flight`, unchanged) with six aliens placed beside
+the lit path, where the flight passes at 10 m. The aliens are scout, ranger, elder, pilot, diver and trooper, in
+`assets/aliens`, referenced and not copied. The camera rule holds: the flight is your r2 route, untouched. It looks
+where it travels and passes over the characters, with no framing, orbit or turn toward them. They read clearly at 10 m
+and are still visible from 28 m. In the stills they gather on the path (`preferPath`). Lower it if you want them on
+the crowns.
+
+**CP-C live perf** (1080p ultra, live mode, 30 fps target, Feline 40–76 s, 36 s measured, warm-up 4 s, same day route
+with and without the six aliens):
+
+| | Missed deadlines | GPU p50 / p95 / p99 | CPU work p50 / p99 |
+|---|---|---|---|
+| With the aliens | 1 / 1080 | 15.7 / 25.7 / 28.6 ms | 1.93 / 2.74 ms |
+| Without | 1 / 1080 | 16.4 / 26.5 / 28.7 ms | 1.41 / 1.95 ms |
+
+The six characters cost about 0.5 ms of CPU and no measurable GPU time. The one miss is in both arms (a 48 ms frame).
+
+**Clip:** `~/Desktop/av-gen-review/105-musical-geography/06-characters/cpc-hop-day-feline-40-78s.mp4`. The fixture
+script is `examples/musical-geography/eng/make_cpc.py`.

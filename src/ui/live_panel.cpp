@@ -18,6 +18,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -285,8 +286,14 @@ void ControlPanel::drawLive(app::Engine& engine) {
         return;
     }
     const double now = ImGui::GetTime();
+    // ADR-1980: the audio rescan lands when it is ready, never on the frame that asked for it.
+    if (liveAudioScan_.valid() && liveAudioScan_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        liveAudioDevices_ = liveAudioScan_.get();
+    }
     if (now - liveLastScan_ > 3.0) {
-        liveAudioDevices_ = audio::listCaptureDevices();
+        if (!liveAudioScan_.valid()) {
+            liveAudioScan_ = std::async(std::launch::async, [] { return audio::listCaptureDevices(); });
+        }
         liveMidiDevices_ = control::listMidiInputs();
         liveDisplays_ = connectedDisplays();
         liveLastScan_ = now;

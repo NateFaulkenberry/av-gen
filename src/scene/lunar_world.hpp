@@ -35,6 +35,9 @@ namespace avgen::scene {
 
 struct LunarCrater {
     float x = 0.0f, z = 0.0f, diameter = 100.0f, fresh = 0.5f;
+    // ADR-1912: on a hero, the radius (m) inside which the ground is replaced by its own ring average once every crater
+    // is stamped: the small population overprints the heroes, and a rim that lands on a portal's floor is a blob.
+    float clear = 0.0f;
 };
 
 // ADR-1896: a mesa -- a flat-topped, terraced stamp with an eroded outline and a talus apron (Cydonia's mesas and

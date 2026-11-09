@@ -15,7 +15,8 @@ import json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import WORLD_SCALE as WS, R, canyon_frame, site, knot  # noqa: E402  (ADR-1893)
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, canyon_frame, site, knot, pace, O_UNIT, L_UNIT, line_points  # noqa: E402  (ADR-1893)
+from canyon_scale import DUSK_AXIS, DUSK_EXIT as DUSK_EXIT_PT, DUSK_PORTAL  # noqa: E402
 
 
 def unit(v):
@@ -41,7 +42,6 @@ EXIT = [0.0, 0.0, 1500.0]
 CURVATURE = 25000.0
 # 3.2 degrees across, 9 km out (a node's position is capped at 10 km and its scale at 100: make_earth.py's sphere is 100 m)
 EARTH_DISTANCE, EARTH_RADIUS = 9000.0, 950.0  # M3b: 12 degrees across (owner: bigger, brighter, noticed first)
-HALO = os.environ.get("SA_EARTH_HALO", "c")    # M3c: the Earth's glow, option a, b or c (c: the pick)
 RAVE_GROUPS = ("m", "c", "g", "a", "v")
 EARTH_FILE_RADIUS = 100.0  # make_earth.py's sphere (a node's scale is capped at 100: the Gate B 'far cut' was that cap)
 
@@ -135,8 +135,9 @@ GOLD = [0.85, 0.75, 0.45]                 # the lunar scan's cooler gold
 # (portals-c2/00-exit-candidates): the east wall, 35 m up a 56-degree face over the river, facing down-canyon; 200 m of
 # open water straight ahead, the far walls in the last light. The portal turns the floor (axis down) onto that wall:
 # a camera dropping into the floor with its up pointing ahead (-z) leaves the wall level, its up the world's.
-DUSK_OUT = [-0.426, 0.0, -0.905]          # out of the wall (the wall's downhill normal)
-DUSK_EXIT = [*canyon_frame(0, 0)[:1], 46.0 * WS, canyon_frame(0, 0)[1]]  # the Gate C 2 site, scaled (ADR-1893)
+# Pass 3 final (67- §3): the arrival moves down the river, to the far bank's face on the dusk line (canyon_scale)
+DUSK_OUT = [DUSK_AXIS[0], 0.0, DUSK_AXIS[1]]
+DUSK_EXIT = list(DUSK_EXIT_PT)   # absolute (the root's exit y is absolute)
 
 
 # M1b: the camp is on the low bank right of the exit, 16 m out and 16 m over (real metres; it was the M1 bank's
@@ -147,24 +148,32 @@ DUSK_EXIT = [*canyon_frame(0, 0)[:1], 46.0 * WS, canyon_frame(0, 0)[1]]  # the G
 # scale) or, near the camp, real metres from it (canyon_scale.site, near, knot)
 CAMP = site(16.0, 16.0)
 CAMP_GROUND = 4.4 * WS                    # measured on the bank (generator 4.4 m at d 40, lat 40)
-DUSK_FLIGHT = [knot(d, lat, h, t) for d, lat, h, t in
-               ((6, 2, 11, 49.4), (10, 6, 5, 51.2), (12, 9, 2.1, 53.0), (13.5, 11, 1.8, 55.4), (17.5, 10.5, 1.9, 57.8),
-                # M2: away from the fire, up and across the benches to the sheer outer cliff behind the camp, where
-                # the canyon's second portal opens (its face 80-122 m between lat 91 and 93: the crossing at lat 91.8,
-                # 69.69 s, bar 36). Heights over the ground; the last two hold 95 m absolute (73.8 and 134.2 below).
-                # up first, almost straight up from the bank, then across at the portal's height to the face
-                (17.5, 11.5, 9.0, 59.7), (19, 24, 15.0, 61.0), (19, 31, 36.0, 62.3), (14, 44, 43.0, 63.6), (8, 58, 65.0, 65.2), (2, 70, 56.0, 66.8),
-                (-4, 80, 38.0, 68.0), (-8, 89, 21.2, 69.2), (-8, 96, -39.2, 70.4))]
+# Pass 3 final (owner 2026-11-08, 67- §3): one straight line from the far bank's exit, level (12 m easing to 10 m),
+# past the camp 5 m to its right, into the portal on the bench face behind it; even pace, the arrival's 24 m/s eased
+# off over the first 4 s. The look stays on the line: no turn to the right out of the arrival, the gathering in the
+# middle of the frame as the camera comes to it. Knots in the first 14 m are left out (the spline overshoots them).
+from sample_ground import heights as _heights  # noqa: E402
+_T_X = 69.655 + 1.0 / 120.0
+_dl = math.dist((DUSK_EXIT[0], DUSK_EXIT[2]), (DUSK_PORTAL[0], DUSK_PORTAL[2]))
+_line = [(DUSK_EXIT[0] + DUSK_AXIS[0] * _dl * i / 40, DUSK_EXIT[1] + (DUSK_PORTAL[1] - DUSK_EXIT[1]) * (3 * (i / 40) ** 2 - 2 * (i / 40) ** 3),
+          DUSK_EXIT[2] + DUSK_AXIS[1] * _dl * i / 40) for i in range(41)]
+_line = [p for p in _line if math.dist((p[0], p[2]), (DUSK_EXIT[0], DUSK_EXIT[2])) > 14.0]
+_dk2 = pace([list(p) for p in _line], 48.35, _T_X, 24.0, 4.0, ramp_in=0.19, ramp_out=0.06)[0]   # 67-: the arrival eased over about 4 s
+_after = [DUSK_PORTAL[0] + DUSK_AXIS[0] * 3.2, DUSK_PORTAL[1], DUSK_PORTAL[2] + DUSK_AXIS[1] * 3.2, _T_X + 0.8]
+_dg = _heights("strange-attractor-flythrough.scene.json", [(k[0], k[2]) for k in _dk2] + [(_after[0], _after[2])])
+DUSK_FLIGHT = [[k[0], k[1] - g, k[2], k[3]] for k, g in zip(_dk2 + [_after], _dg)]
 EGLOW = [-c for c in direction(-6, 50)]
-CLIFF_PORTAL = site(-8.0, 91.8)
-DUSK_AIMS = [[CAMP[0], CAMP_GROUND + 1.5, CAMP[1], 49.0, 59.5],
-             [CLIFF_PORTAL[0], 95.0 * R, CLIFF_PORTAL[1], 58.9, 69.3]]   # M2: the eye on the cliff as the tear opens
 bounce = unit([S[0], 0.3, S[2]])
 for (cx, cz, _), _, _ in DOMES:
     DOME_FLOOR.setdefault((cx, cz), 0.0)
 earth = [EXIT[0] + E[0] * EARTH_DISTANCE, 40.0 + E[1] * EARTH_DISTANCE, EXIT[2] + E[2] * EARTH_DISTANCE]
 ECHO_SIDE = unit([-E[2], 0.0, E[0]])        # sideways across the line of sight (the echoes' offset)
 # the halo's plane faces back along the line of sight: its +y (the glb's face) turned onto -E (x first, then y)
+# M3e: a card set d Earth radii behind the planet is seen smaller (farther); scaled back so its 1.0 R is the limb as seen
+def AURA_K(d):
+    return EARTH_RADIUS / 10.0 * (EARTH_DISTANCE + d * EARTH_RADIUS) / EARTH_DISTANCE
+
+
 HALO_ROT = [math.degrees(math.acos(-E[1])), math.degrees(math.atan2(-E[0], -E[2])), 0.0]
 scene = {
     "format": "avgen-scene", "version": 1, "name": "the-strange-attractor-moon",
@@ -195,14 +204,15 @@ scene = {
     "environment": {"intensity": 0.0, "skyIntensity": 0.0, "fallbackAmbient": False, "background": [0.0, 0.0, 0.0], "fogColor": [0, 0, 0],
                     "volumeDensity": 0.0, "skybox": False, "sky": {"enabled": False}, "shadowRange": 2500.0,
                     "shadowCascades": 4, "ambientOcclusion": False, "shadowCasterReach": 6000.0, "contactShadows": False, "shadowSplitLambda": 0.92},
-    "post": {"bloomIntensity": 0.04, "tonemap": 0},
+    "post": {"bloomIntensity": 0.04, "tonemap": 1},
     "materialPrograms": [{"name": "regolith", "ops": ops, "baseColor": 6, "metallic": 0, "roughness": 1}],
     "lunarWorld": {"seed": 3, "extent": 4000, "spacing": 2.5, "skirtExtent": 32000, "skirtSpacing": 32, "craters": 3.0,
                    "rocks": 0.02, "relief": 60, "program": "regolith", "curvature": CURVATURE,
                    # M1: a fresh crater beside the first glide (B); the great old basin whose near rim casts the night
                    # over it; the portal crater P inside it; the dome craters
                    "heroes": [{"x": BASIN[0], "z": BASIN[1], "diameter": BASIN[2], "fresh": 0.12},
-                              {"x": PORTAL[0], "z": PORTAL[2], "diameter": 260, "fresh": 0.75}] +
+                              {"x": PORTAL[0], "z": PORTAL[2], "diameter": 260, "fresh": 0.75,
+                               "clear": 125.0}] +   # owner 2026-11-06 (ADR-1912): no blob where the portal opens
                              [{"x": c[0], "z": c[1], "diameter": c[2], "fresh": 0.45} for c, _, _ in DOMES]},
     # Gate C (ADR-1883): the crater-floor portal. The floor of P cracks and opens under the diving camera onto the
     # canyon at dusk, far below; the same corruption as the canyon's wall (focus y is a height above the ground here),
@@ -219,8 +229,9 @@ scene = {
                  "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                  "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.95, 0.88, 0.62], "shards": 0.25, "shardRate": 0.35},
     # ADR-1885: back to the root -- the canyon, at dusk (its look from crossing 1)
-    "portal": {"world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
-               "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT, "aims": DUSK_AIMS},
+    "portal": {**GAZE, "climbLook": 0.35,   # 65- §1: no pitch swing out of the arrival; the climb to the outer cliff is not looked at in full
+               "world": "@root", "exit": DUSK_EXIT, "exitAxis": DUSK_OUT,
+               "entryUp": [1.0, 0.0, 0.0], "exitUp": [0.0, 1.0, 0.0], "flight": DUSK_FLIGHT},
     "nodes": [{"name": "earth", "kind": "gltf", "asset": "../../assets/space/earth.glb", "position": earth,
                "rotation": [0, 200, 23], "scale": [EARTH_RADIUS / EARTH_FILE_RADIUS] * 3, "visible": True,
                "emissiveBoost": 2.0}] +
@@ -230,18 +241,27 @@ scene = {
                "position": [earth[i] + off * ECHO_SIDE[i] for i in range(3)], "rotation": [0, 200 + rot, 23],
                "scale": [EARTH_RADIUS * 1.015 / EARTH_FILE_RADIUS] * 3, "visible": True, "tint": tint,
                "emissiveBoost": 3.0} for c, off, rot, tint in (("r", 70.0, 4.0, [1.0, 0.15, 0.3]), ("c", -70.0, -4.0, [0.2, 0.9, 1.0]))] +
-             # M3c (owner: a much more stylised, cool glow): one of three halos (pass2/build_earth_halo.py) set just
-             # behind the planet, facing the arrival; its emissive pulsed on the beat (routed)
-             [{"name": "earth-halo", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
+             # M3e (owner §6: the ring of white pixel blocks replaced): a glowing aura (pass2/build_earth_aura.py) set
+             # just behind the planet, facing the arrival -- soft, hugging the limb, falling off smoothly -- its
+             # emissive pulsed on the beat (routed, as the M3c halo's was); and its glitch and datamosh, each layer at 0
+             # between beats and with audio off (the project's routes): an RGB split (two tinted copies a step either
+             # side), a torn copy (scanline tears and displaced blocks, on the highs) and mosh trails (two larger,
+             # fainter copies smeared sideways, on the low onsets, decaying slowly)
+             [{"name": "earth-aura", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura.glb",
                "position": [earth[i] + E[i] * EARTH_RADIUS * 1.2 for i in range(3)], "rotation": HALO_ROT,
-               "scale": [EARTH_RADIUS / 10.0] * 3, "visible": True, "emissiveBoost": 1.0}] +
-             # M3d (owner: the corona must be animated): two more layers of the same blocks, scaled so
-             # their blocks fall at other radii (scaled), breathing in scale out of phase (the timeline) so the blocks drift in and
-             # out, and flickering in on their own beat sources (the project's routes)
-             [{"name": f"earth-halo-{k}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/earth-halo-{HALO}.glb",
-               "position": [earth[i] + E[i] * EARTH_RADIUS * (1.2 + 0.02 * k) for i in range(3)],
-               "rotation": HALO_ROT, "scale": [EARTH_RADIUS / 10.0 * (0.93 if k == 2 else 1.09)] * 3,
-               "visible": True, "emissiveBoost": 0.8, "opacity": 0.5} for k in (2, 3)] +
+               "scale": [AURA_K(1.2)] * 3, "visible": True, "emissiveBoost": 1.3}] +
+             [{"name": f"earth-aura-{c}", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * 1.22 + off * ECHO_SIDE[i] for i in range(3)],
+               "rotation": HALO_ROT, "scale": [AURA_K(1.22) * 1.01] * 3, "visible": True, "tint": tint,
+               "emissiveBoost": 1.4, "opacity": 0.0}
+              for c, off, tint in (("r", 55.0, [1.0, 0.2, 0.6]), ("c", -55.0, [0.2, 0.9, 1.0]))] +
+             [{"name": "earth-aura-tear", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura-tear.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * 1.18 for i in range(3)], "rotation": HALO_ROT,
+               "scale": [AURA_K(1.18)] * 3, "visible": True, "emissiveBoost": 1.6, "opacity": 0.0}] +
+             [{"name": f"earth-aura-trail-{k}", "kind": "gltf", "asset": "../../assets/strange-attractor/build/earth-aura.glb",
+               "position": [earth[i] + E[i] * EARTH_RADIUS * (1.24 + 0.02 * k) + off * ECHO_SIDE[i] for i in range(3)],
+               "rotation": HALO_ROT, "scale": [AURA_K(1.24 + 0.02 * k) * sc] * 3, "visible": True, "emissiveBoost": 0.9,
+               "opacity": 0.0} for k, off, sc in ((1, 120.0, 1.06), (2, 260.0, 1.13))] +
              # M3c (owner: no beams into the sky): the rave is inside the domes -- their glass lit in five colours in
              # bands that wind round them, each band on its own beat source (routed), a steady glow with audio off
              [{"name": f"dome{k}-rave-{g}", "kind": "gltf", "asset": f"../../assets/strange-attractor/build/dome-rave-{g}.glb",

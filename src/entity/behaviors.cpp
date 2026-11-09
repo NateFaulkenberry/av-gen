@@ -1,4 +1,5 @@
 #include "entity/behavior.hpp"
+#include "entity/tile_nav.hpp"
 
 #include "core/log.hpp"
 #include "core/noise.hpp"
@@ -3586,6 +3587,287 @@ private:
     float angle_ = 0.0f;
 };
 
+
+// ---- hop (ADR-1958) ---------------------------------------------------------------------------
+//
+// A body on a tiles ground (ADR-1955). It picks a tile to go to -- a crown to gather on, the path, a run of sea slabs --
+// plans there over the lattice (TileNav, ADR-1957), walks the small steps and hops the rest. A hop is a buoyant arc
+// from tile centre to tile centre: horizontally at constant speed, vertically a parabola over `apex` metres, aimed at
+// the landing tile's height AT THE LANDING TIME (the ground moves). It lands on the tile's top as it is then, tells the
+// ground (which springs, ADR-1954) and recovers. Standing, it rides its tile -- waves, breathing, a neighbour's landing
+// -- because it reads the moving surface every step. With no ground in the context it stands still.
+class Hop final : public CheckpointedBehavior<Hop> {
+public:
+    explicit Hop(const nlohmann::json* s)
+        : walkDefault_(readFloat(s, "walkSpeed", 1.7f)),
+          runDefault_(readFloat(s, "runSpeed", 3.6f)),
+          airDefault_(readFloat(s, "airTime", 1.35f)),
+          apexDefault_(readFloat(s, "apex", 2.2f)),
+          landDefault_(readFloat(s, "landTime", 0.4f)),
+          hopChanceDefault_(readFloat(s, "hopChance", 0.35f)),
+          strengthDefault_(readFloat(s, "strength", 1.0f)),
+          pauseMin_(readFloat(s, "pauseMin", 1.0f)),
+          pauseMax_(readFloat(s, "pauseMax", 3.5f)),
+          goalMin_(static_cast<int>(readFloat(s, "goalMin", 4.0f))),
+          goalMax_(static_cast<int>(readFloat(s, "goalMax", 12.0f))),
+          wantFlat_(readFloat(s, "preferCrowns", 1.0f)),
+          wantWater_(readFloat(s, "preferWater", 0.6f)),
+          wantPath_(readFloat(s, "preferPath", 0.6f)),
+          home_(readFloat(s, "homeRadius", 60.0f)) {
+        rules_.stepHeight = readFloat(s, "stepHeight", 0.6f);
+        rules_.jumpTiles = static_cast<int>(readFloat(s, "jumpTiles", 3.0f));
+        rules_.jumpRise = readFloat(s, "jumpRise", 3.0f);
+        rules_.jumpDrop = readFloat(s, "jumpDrop", 8.0f);
+    }
+
+    [[nodiscard]] std::string_view kind() const override { return "hop"; }
+
+    void registerParameters(params::ParameterSet& params, const std::string& prefix) override {
+        walk_ = &params.add(floatDesc(prefix + "walkSpeed", walkDefault_, 0.0f, 20.0f));
+        run_ = &params.add(floatDesc(prefix + "runSpeed", runDefault_, 0.0f, 40.0f));
+        air_ = &params.add(floatDesc(prefix + "airTime", airDefault_, 0.2f, 6.0f));
+        apex_ = &params.add(floatDesc(prefix + "apex", apexDefault_, 0.0f, 30.0f));
+        hopChance_ = &params.add(floatDesc(prefix + "hopChance", hopChanceDefault_, 0.0f, 1.0f));
+        strength_ = &params.add(floatDesc(prefix + "strength", strengthDefault_, 0.0f, 10.0f));
+        paths_ = {prefix + "walkSpeed", prefix + "runSpeed", prefix + "airTime", prefix + "apex",
+                  prefix + "hopChance", prefix + "strength"};
+    }
+    void collectParameterPaths(std::vector<std::string>& out) const override {
+        out.insert(out.end(), paths_.begin(), paths_.end());
+    }
+    void reset(Rng&) override {
+        primed_ = false;
+        phase_ = Phase::Pause;
+        steps_.clear();
+        wantsHop_.clear();
+        leg_ = 0;
+        timer_ = 0.0f;
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
+        world::GroundSource* ground = ctx.ground;
+        if (ground == nullptr || ground->pitch() <= 0.0f) {
+            return; // no tiles to stand on: stand where the scene put it
+        }
+        const double t = ctx.time;
+        const auto dt = static_cast<float>(ctx.dt);
+        const float pitch = ground->pitch();
+        const auto value = [](const params::Parameter<float>* p, float d) { return p != nullptr ? p->value() : d; };
+        if (!primed_) {
+            const glm::vec3 here = state.position();
+            c00_ = ground->cellCentre(0.0f, 0.0f);
+            origin_ = ground->cellCentre(here.x, here.z);
+            pos_ = origin_;
+            y_ = ground->at(pos_.x, pos_.y, t).height;
+            yaw_ = state.yaw;
+            phase_ = Phase::Pause;
+            timer_ = ctx.rng != nullptr ? ctx.rng->range(pauseMin_, pauseMax_) : pauseMin_;
+            primed_ = true;
+        }
+        float speed = 0.0f;
+        Activity activity = Activity::Idle;
+        bool airborne = false;
+        switch (phase_) {
+        case Phase::Pause: {
+            y_ = ground->at(pos_.x, pos_.y, t).height; // riding the tile
+            timer_ -= dt;
+            if (timer_ <= 0.0f) {
+                plan(*ground, ctx, t);
+            }
+            break;
+        }
+        case Phase::Move: {
+            if (leg_ >= steps_.size()) {
+                pause(ctx);
+                break;
+            }
+            const TileStep step = steps_[leg_];
+            const glm::vec2 target = tileCentreOf(step.tile, pitch);
+            const bool hopByChoice = step.edge == TileEdge::Walk && leg_ < wantsHop_.size() && wantsHop_[leg_];
+            if (step.edge == TileEdge::Jump || hopByChoice) {
+                launch(*ground, target, t, value(air_, airDefault_));
+                activity = Activity::Jump;
+                airborne = true;
+                break;
+            }
+            const float walk = running_ ? value(run_, runDefault_) : value(walk_, walkDefault_);
+            const glm::vec2 to = target - pos_;
+            const float dist = glm::length(to);
+            const float stepLen = walk * dt;
+            if (dist <= stepLen || dist < 1e-4f) {
+                pos_ = target;
+                ++leg_;
+            } else {
+                pos_ += to / dist * stepLen;
+                face(to, dt);
+            }
+            // up a step at once (never inside the tile), down it over a few frames
+            const float under = ground->at(pos_.x, pos_.y, t).height;
+            y_ = under >= y_ ? under : y_ + (under - y_) * std::min(1.0f, dt / 0.08f);
+            speed = walk;
+            activity = running_ ? Activity::Run : Activity::Walk;
+            break;
+        }
+        case Phase::Air: {
+            const auto s = static_cast<float>((t - air0_) / std::max(airT_, 1e-3f));
+            if (s >= 1.0f) {
+                pos_ = airTo_;
+                y_ = ground->at(pos_.x, pos_.y, t).height;
+                ground->landed(pos_, t, value(strength_, strengthDefault_));
+                phase_ = Phase::Land;
+                timer_ = landDefault_;
+                activity = Activity::Land;
+                ++leg_;
+                break;
+            }
+            const float landH = ground->at(airTo_.x, airTo_.y, t).height; // the landing tile as it is now
+            pos_ = glm::mix(airFrom_, airTo_, s);
+            y_ = airH0_ + (landH - airH0_) * s + 4.0f * airApex_ * s * (1.0f - s);
+            face(airTo_ - airFrom_, dt);
+            speed = glm::length(airTo_ - airFrom_) / std::max(airT_, 1e-3f);
+            activity = s < 0.5f ? Activity::Jump : Activity::Fall;
+            airborne = true;
+            break;
+        }
+        case Phase::Land: {
+            y_ = ground->at(pos_.x, pos_.y, t).height;
+            timer_ -= dt;
+            activity = Activity::Land;
+            if (timer_ <= 0.0f) {
+                if (leg_ < steps_.size()) {
+                    phase_ = Phase::Move;
+                } else {
+                    pause(ctx);
+                }
+            }
+            break;
+        }
+        }
+        if (activity == Activity::Idle || activity == Activity::Land) {
+            y_ = ground->at(pos_.x, pos_.y, t).height; // standing (including the frame a walk ends): on the tile's top
+        }
+        state.travel = glm::vec3(pos_.x, y_, pos_.y) - state.anchor;
+        state.yaw = yaw_;
+        state.speed = speed;
+        state.activity = activity;
+        state.airborne = airborne;
+    }
+
+private:
+    enum class Phase : std::uint8_t { Pause, Move, Air, Land };
+
+    // The lattice in the ground's own cells (its origin need not be a multiple of the pitch): tile (0, 0) is the cell
+    // under the world origin.
+    [[nodiscard]] glm::vec2 tileCentreOf(glm::ivec2 tile, float pitch) const { return c00_ + glm::vec2(tile) * pitch; }
+    [[nodiscard]] glm::ivec2 tileOf(glm::vec2 p, float pitch) const {
+        return glm::ivec2(glm::round((p - c00_) / pitch));
+    }
+
+    void face(glm::vec2 dir, float dt) {
+        if (glm::dot(dir, dir) < 1e-10f) return;
+        const float want = std::atan2(dir.x, dir.y);
+        float d = want - yaw_;
+        while (d > kPi) d -= kTwoPi;
+        while (d < -kPi) d += kTwoPi;
+        yaw_ += d * std::min(1.0f, dt * 8.0f);
+    }
+
+    void pause(const BehaviorContext& ctx) {
+        phase_ = Phase::Pause;
+        steps_.clear();
+        wantsHop_.clear();
+        leg_ = 0;
+        timer_ = ctx.rng != nullptr ? ctx.rng->range(pauseMin_, pauseMax_) : pauseMin_;
+    }
+
+    void launch(world::GroundSource& ground, glm::vec2 to, double t, float airTime) {
+        airFrom_ = pos_;
+        airTo_ = to;
+        air0_ = t;
+        airT_ = airTime;
+        airH0_ = y_;
+        const float landH = ground.at(to.x, to.y, t + airTime).height; // aimed at the landing tile as it will be
+        const float apex = apex_ != nullptr ? apex_->value() : apexDefault_;
+        airApex_ = apex + 0.5f * std::max(0.0f, landH - y_);
+        phase_ = Phase::Air;
+    }
+
+    // Picks a tile to go to and plans there: candidates in a ring of goalMin..goalMax tiles, scored by what the
+    // character likes (crowns, sea slabs, the path), kept within `homeRadius` of where it started.
+    void plan(world::GroundSource& ground, const BehaviorContext& ctx, double t) {
+        const float pitch = ground.pitch();
+        const glm::ivec2 here = tileOf(pos_, pitch);
+        glm::ivec2 best = here;
+        float bestScore = -1e9f;
+        for (int k = 0; k < 16; ++k) {
+            const float ang = ctx.rng != nullptr ? ctx.rng->range(0.0f, kTwoPi) : static_cast<float>(k);
+            const float r = ctx.rng != nullptr
+                                ? ctx.rng->range(static_cast<float>(goalMin_), static_cast<float>(goalMax_))
+                                : static_cast<float>(goalMin_);
+            const glm::ivec2 c = here + glm::ivec2(glm::round(glm::vec2(std::cos(ang), std::sin(ang)) * r));
+            const glm::vec2 centre = tileCentreOf(c, pitch);
+            if (glm::length(centre - origin_) > home_ || c == here) continue;
+            const world::GroundSample g = ground.at(centre.x, centre.y, t);
+            const float score = wantFlat_ * g.flat + wantWater_ * g.water + wantPath_ * g.path +
+                                (ctx.rng != nullptr ? 0.4f * ctx.rng->nextFloat() : 0.0f);
+            if (score > bestScore) {
+                bestScore = score;
+                best = c;
+            }
+        }
+        const auto query = [&](glm::ivec2 tile) {
+            const glm::vec2 c = tileCentreOf(tile, pitch);
+            return ground.at(c.x, c.y, t);
+        };
+        TilePath path = planTiles(query, here, best, rules_);
+        if (!path.found || path.steps.empty()) {
+            timer_ = 1.0f;
+            return;
+        }
+        steps_ = std::move(path.steps);
+        const float chance = hopChance_ != nullptr ? hopChance_->value() : hopChanceDefault_;
+        wantsHop_.assign(steps_.size(), false);
+        for (std::size_t i = 0; i < steps_.size(); ++i) {
+            wantsHop_[i] = ctx.rng != nullptr && ctx.rng->nextFloat() < chance;
+        }
+        running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < 0.4f;
+        leg_ = 0;
+        phase_ = Phase::Move;
+    }
+
+    float walkDefault_, runDefault_, airDefault_, apexDefault_, landDefault_, hopChanceDefault_, strengthDefault_;
+    float pauseMin_, pauseMax_;
+    int goalMin_, goalMax_;
+    float wantFlat_, wantWater_, wantPath_, home_;
+    TileNavRules rules_;
+    params::Parameter<float>* walk_ = nullptr;
+    params::Parameter<float>* run_ = nullptr;
+    params::Parameter<float>* air_ = nullptr;
+    params::Parameter<float>* apex_ = nullptr;
+    params::Parameter<float>* hopChance_ = nullptr;
+    params::Parameter<float>* strength_ = nullptr;
+    std::vector<std::string> paths_;
+
+    bool primed_ = false;
+    Phase phase_ = Phase::Pause;
+    glm::vec2 c00_{0.0f};
+    glm::vec2 origin_{0.0f};
+    glm::vec2 pos_{0.0f};
+    float y_ = 0.0f;
+    float yaw_ = 0.0f;
+    float timer_ = 0.0f;
+    bool running_ = false;
+    std::vector<TileStep> steps_;
+    std::vector<bool> wantsHop_;
+    std::size_t leg_ = 0;
+    glm::vec2 airFrom_{0.0f};
+    glm::vec2 airTo_{0.0f};
+    double air0_ = 0.0;
+    float airT_ = 1.0f;
+    float airH0_ = 0.0f;
+    float airApex_ = 0.0f;
+};
+
 } // namespace
 
 float BehaviorContext::signal(std::string_view name) const {
@@ -3606,7 +3888,7 @@ bool BehaviorContext::event(std::string_view name) const {
 
 std::vector<std::string_view> behaviorKinds() {
     return {"hover",  "drift",  "bank",     "spin",  "wander",
-            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide"};
+            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide", "hop"};
 }
 
 
@@ -3736,6 +4018,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "explore") {
         return std::make_unique<Explore>(settings);
+    }
+    if (kind == "hop") {
+        return std::make_unique<Hop>(settings); // ADR-1958
     }
     if (kind == "ground") {
         return std::make_unique<Ground>(settings);

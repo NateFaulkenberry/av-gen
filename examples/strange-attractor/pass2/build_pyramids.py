@@ -189,7 +189,7 @@ def build(name, base, st):
     obj.select_set(True)
     bpy.ops.object.modifier_apply(modifier="decimate")
     tris = sum(len(p.vertices) - 2 for p in obj.data.polygons)
-    path = f"{out_dir}/{name}.glb"
+    path = f"{out_dir}/{name}-m3g.glb"
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_apply=True)
@@ -383,7 +383,10 @@ def build_blocks(name, base, st):
         if mi in (1, 2, 3, 4, 5):
             c = f.calc_center_median()
             sline = sand(c.x, c.y)
-            if f.normal.z > 0.7 and (c.z < sline + 7.0 * ch or wrnd.random() < 0.35):
+            # M3g (owner 54- §3: stone and sand interpenetrate): sand fills the courses higher above the drift line
+            # and more often, so the base is buried into the sand rather than meeting it at a line
+            if f.normal.z > 0.7 and (c.z < sline + 11.0 * ch or (c.z < sline + 22.0 * ch and wrnd.random() < 0.55)
+                                     or wrnd.random() < 0.3):
                 f.material_index = 8          # sand spilled into the courses, dust on the treads
             elif c.z < sline + 3.0 * ch and wrnd.random() < 0.6:
                 f.material_index = 9          # sand-scoured, rust-stained low courses
@@ -409,7 +412,24 @@ def build_blocks(name, base, st):
     bm.to_mesh(me)
     bm.free()
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
-    path = f"{out_dir}/{name}.glb"
+    # M3e (owner: no visible tiling): the drift is its own glb, <name>-sand.glb, so the scene can draw it through the
+    # plain's own sand program (ADR-1572, ADR-1905) instead of this UV-mapped tile
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    obj.active_material_index = 7
+    bpy.ops.object.material_slot_select()
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    drift = [o for o in bpy.context.selected_objects if o is not obj][0]
+    drift.name = f"{name}-sand"
+    bpy.ops.object.select_all(action="DESELECT")
+    drift.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=f"{out_dir}/{name}-sand-m3g.glb", use_selection=True, export_apply=True)
+    drift.hide_set(True)
+    path = f"{out_dir}/{name}-m3g.glb"
     bpy.ops.object.select_all(action="DESELECT")
     obj.select_set(True)
     bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_apply=True)

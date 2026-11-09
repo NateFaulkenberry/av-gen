@@ -20,8 +20,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from canyon_scale import (WORLD_SCALE as WS, R, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
-                          rescale)  # (ADR-1893)
+from canyon_scale import (GAZE, WORLD_SCALE as WS, R, CAMP_SITE, O_UNIT, L_UNIT, site, near,  # noqa: E402
+                          rescale, pace, line_points)  # (ADR-1893)
 from sample_ground import heights  # noqa: E402
 
 SRC = os.path.join(HERE, "strange-attractor-flythrough.scene.json")
@@ -46,7 +46,8 @@ _rock = [p for p in scene["materialPrograms"] if p["name"] == "canyonRock"][0]
 _rock["ops"] = _rock["ops"][:85]
 _rock["textures"] = [{"name": "ground", "path": "../../assets/strange-attractor/polyhaven/textures/dry_ground_rocks/dry_ground_rocks_diff_2k.jpg"}]
 _rock["ops"] += [
-    {"kind": "textureTriplanar", "dst": 0, "texture": "ground", "value": 0.4},
+    # M3e (owner: no visible tiling; ADR-1905): hex-tiled reads, a second larger layer, macro variation over 20 m
+    {"kind": "textureTriplanar", "dst": 0, "texture": "ground", "value": 0.4, "constant3": [1.0, 0.45, 8.0, 0.6]},
     {"kind": "constant", "dst": 1, "constant": [2.1, 2.1, 2.1, 1.0]},
     {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 1},
     {"kind": "constant", "dst": 1, "constant": [1.0, 1.0, 1.0, 1.0]},
@@ -66,6 +67,7 @@ def canyon(d, lat):
 # plain, the Earth ahead; rising over the near rim of the great basin, the domes glimpsed far across its night; the
 # dive into the portal crater on the plain (Gate C 2's near-vertical drop along +x). Crossing 1 at 32.025 s (bar 17),
 # crossing 2 at 47.87 s (bar 25).
+# Owner 2026-11-06 (65- §2): the original Moon camera path, kept for good. The Moon is out of the A-to-B rule (61- §3).
 scene["portal"]["flight"] = [
     [0, 5, 1445, 34.2],        # low over the plain, the Earth ahead (the domes are below the far rim's line)
     [-14, 8, 1395, 37.4],
@@ -79,6 +81,24 @@ scene["portal"].pop("aims", None)
 # the Moon's exit: its y is a height over the Moon's ground (8 m: the arrival settles to 5 m by 34.2 s)
 scene["portal"]["exit"] = [0.0, 8.0, 1500.0]
 scene["portal"]["world"] = "strange-attractor-moon.scene.json"
+# Pass 3 Phase F (owner 2026-11-04: "the moon camera path we had before"): the Moon keeps M3f's gaze (the portal
+# defaults, ADR-1909: look 1.2 s ahead, a little down, a quarter of the climb's pitch), not M3g's GAZE, which followed
+# the 8 -> 158 m climb (37.4-43.2 s) up into the empty sky for 5.5 s. The Moon-only exception to 54- §1 is the
+# owner's: its forward-vs-velocity overshoots 25 deg on the climb (60- §6)
+for _k in GAZE:      # the M3f gaze: the portal defaults (ADR-1909), the owner's Moon exception (60- §6)
+    scene["portal"].pop(_k, None)
+scene.setdefault("post", {})["tonemap"] = 1   # M3g (54- §2): AgX for the whole film (the frame's tone map is global)
+# Pass 3 final (67- §2): halation on for the film (its amount is a per-world track, GRADE below, zero where unwanted)
+scene["post"].update({"halationEnabled": True, "halationIntensity": 0.0, "halationThreshold": 1.5, "halationRadius": 2.0,
+                      "halationWarmth": 0.7})
+# M3g (54- §1): the canyon's own flythrough looks where it goes, not 2.5 s ahead and down at the river (ADR-1909)
+scene["attractorWorld"]["flightLookAhead"] = 0.6
+# Pass 3 (61- §3, the A-to-B rule; owner OK 2026-11-05): the gorge's bends smoothed into one long curve (ADR-1911,
+# 4 s; the clearance lift keeps it off the walls), and a shorter, quicker slowing into the portal (13.2 m/s from
+# 20.5 s over 4.5 s; it crawled at 8.8 m/s for 6 s), timed so the crossing stays on its frame (32.0-32.033 s)
+scene["attractorWorld"]["flightSmooth"] = 4.0
+scene["attractorWorld"]["approach"].update({"speed": 13.2, "slowFrom": 20.5, "slowFor": 4.5})
+scene["attractorWorld"]["flightLookDown"] = 0.03
 
 # --- the camp (M3b): the gathering's places, the ground under them (sampled; the builder runs twice, as the pads change
 # the ground), the opened bench (ADR-1897), the props
@@ -90,7 +110,12 @@ CAMP_Y = 4.4 * WS             # measured on the bank (generator 4.4 m)
 GRAY_SCALE = 0.68             # the downloaded Gray read as tall as a Sasquatch at its own scale: about 1.5 m here
 UFO_SCALE = 0.018             # the model is 666 x 238 units (load log): a 12 m disc, 4.3 m tall
 UFO_LIFT = 1.9                # its underside (-119 units) just above the ground: resting on its keel
-UFO_AT = (-11.0, 11.0)         # behind the group (seen past it from the night arc), on the opened bench, clear of the descent
+# M3f (owner §2): the craft is the Gray's, beside him -- down-canyon of him on the river's side of the group, not behind
+# the Sasquatches. Owner, after 01-craft-move: and inside the owner's camp camera (which looks from the water's edge
+# toward the bank, so the shore itself is behind it): 10 m down-canyon, 5 m bankward of the fire, 9.5 m from the Gray,
+# 27 degrees left of that camera's axis (its frame reaches 44.5), on a pad at the camp's level
+UFO_AT = (10.0, 5.0)
+UFO_SHORE = CAMP_Y
 
 
 def at(dd, dl):
@@ -108,7 +133,8 @@ def ground(points):
 # craft eased to one footing (generator units are the world's: the pad is in world metres)
 PAD_C = at(-3.0, 5.0)
 PORTAL1_XZ = site(37.2, 27.2)          # portal 1's focus on the ground (REF metres)
-scene["attractorWorld"]["pads"] = [{"x": PAD_C[0], "z": PAD_C[1], "radius": 15.0, "level": CAMP_Y}]
+scene["attractorWorld"]["pads"] = [{"x": PAD_C[0], "z": PAD_C[1], "radius": 15.0, "level": CAMP_Y},
+                                   {"x": at(*UFO_AT)[0], "z": at(*UFO_AT)[1], "radius": 9.0, "level": UFO_SHORE}]
 
 lights = [l for l in scene["lights"] if l["name"] in ("canyon-bounce", "floor-bounce")]
 UFO_PARK = at(*UFO_AT)
@@ -121,18 +147,56 @@ lights += [
     {"name": "moon-rim", "type": "directional", "role": "fill", "direction": [0.55, -0.45, 0.7], "color": [0.55, 0.65, 1.0],
      "intensity": 0.0, "castsShadow": False, "shadowStrength": 0.0},
     # M3b: the fire is the night's key -- it casts the gathering's shadows across the bench
-    {"name": "campfire", "type": "point", "position": [CAMP[0], CAMP_Y + 0.9, CAMP[1]], "color": [1.0, 0.52, 0.22],
-     "intensity": 0.0, "range": 30.0, "castsShadow": True, "shadowStrength": 1.0, "flicker": 0.3, "flickerRate": 2.6,
-     "volumetric": 0.2},
+    # M3e (48-night-lighting-research.md F1/F3, ADR-1906): the fire's cube now fits beside the moon's cascades and is
+    # biased in its own depth, so it casts; its contact march grounds feet, rocks and the pit; it lights the haze
+    # M3f (hero H4): raised above the new flames' tips (the light inside the flame sheets lit them from within)
+    {"name": "campfire", "type": "point", "position": [CAMP[0], CAMP_Y + 1.35, CAMP[1]], "color": [1.0, 0.52, 0.22],
+     "intensity": 0.0, "range": 30.0, "castsShadow": True, "shadowStrength": 1.0, "contactShadow": True, "softness": 0.45,
+     "flicker": 0.3, "flickerRate": 2.6, "volumetric": 0.6},
+    # M3e (research A4): the fire's bounce -- a broad, soft, unshadowed warm wrap low at the pit, the light the ground
+    # and the bank throw back onto the figures' undersides and the shrubs
+    {"name": "fire-bounce", "type": "point", "position": [CAMP[0], CAMP_Y + 0.3, CAMP[1]], "color": [1.0, 0.62, 0.38],
+     "intensity": 0.0, "range": 24.0, "castsShadow": False, "contactShadow": False, "flicker": 0.15, "flickerRate": 1.5,
+     "volumetric": 0.0},
     # M3b: the craft lit by its own lights -- the underside's glow and its spill on the ground, the rim's lamps
-    {"name": "ufo-glow", "type": "point", "position": [UFO_PARK[0], CAMP_Y + 0.9, UFO_PARK[1]],
-     "color": [0.45, 0.85, 1.0], "intensity": 0.0, "range": 18.0, "castsShadow": False, "volumetric": 0.0},
+    # M3e (owner §9: a white spill on the bank behind the craft with no source): the underside's glow is a spot straight
+    # down from the hull's belly, so it pools on the ground under the craft and nowhere else
+    {"name": "ufo-glow", "type": "spot", "position": [UFO_PARK[0], UFO_SHORE + UFO_LIFT - 0.2, UFO_PARK[1]],
+     "direction": [0.0, -1.0, 0.0], "innerCone": 35.0, "outerCone": 62.0,
+     "color": [0.35, 0.75, 1.0], "intensity": 0.0, "range": 7.0, "castsShadow": False, "contactShadow": False,
+     "volumetric": 0.0},
 ] + [{"name": f"ufo-rim-{k}", "type": "point",
-      "position": [UFO_PARK[0] + 6.3 * math.cos(a_), CAMP_Y + UFO_LIFT + 0.4, UFO_PARK[1] + 6.3 * math.sin(a_)],
-      "color": c, "intensity": 0.0, "range": 7.5, "castsShadow": False, "volumetric": 0.0}
+      "position": [UFO_PARK[0] + 6.3 * math.cos(a_), UFO_SHORE + UFO_LIFT + 0.4, UFO_PARK[1] + 6.3 * math.sin(a_)],
+      # M3e (owner §9: an unmotivated white spill behind the craft): the rim lamps light the hull, not the bank behind;
+      # M3f: back on at night, a 2 m reach, pulsing with the beat
+      "color": c, "intensity": 0.0, "range": 2.0, "castsShadow": False, "volumetric": 0.0}
      for k, (a_, c) in enumerate(((0.3, [1.0, 0.55, 0.2]), (1.9, [0.4, 0.9, 1.0]), (3.5, [1.0, 0.25, 0.2]),
                                    (5.1, [0.4, 0.9, 1.0])))]
+for l_ in lights:   # M3e: only the fire marches contact shadows (the scene's switch is on, ADR-1907 turns the moon's off)
+    l_.setdefault("contactShadow", False)
+# M3f (owner §2): the craft's window band spills toward the Gray beside it -- a soft, unshadowed cyan from the hull's rim
+# on his side, falling on him and the shore between them (it pulses with the craft's lights)
+_g = at(*CAST["gray"])
+_d = (_g[0] - UFO_PARK[0], _g[1] - UFO_PARK[1])
+_dn = math.hypot(*_d)
+lights.append({"name": "ufo-spill", "type": "point",
+               "position": [UFO_PARK[0] + _d[0] / _dn * 6.8, UFO_SHORE + UFO_LIFT + 1.2, UFO_PARK[1] + _d[1] / _dn * 6.8],
+               "color": [0.4, 0.78, 1.0], "intensity": 0.0, "range": 9.0, "castsShadow": False, "contactShadow": False,
+               "volumetric": 0.0})
 scene["lights"] = lights
+scene["environment"]["contactShadows"] = True
+scene["attractorWorld"]["look"]["sunContact"] = 0.0
+# M3e (research §3, the river): physical-ish water at every hour -- a dark body that reflects at grazing angles (f0 0.06,
+# not 0.35), rough enough for a moon path and streaks, glints in the colour of what it reflects, a little transmission
+# M3f (owner §2a: white streak bands and vertical streaks on the night river): `streak` spreads the surface normal along
+# the view, so EVERY reflection -- the moonlit far bank, the sky -- was drawn out into vertical streaks, and the six
+# reflection rays and glints re-lit them; meant for the fire's streaks, but the water takes no local lights (48- F7).
+# Off; the chop gentler (ripple 0.48 -> 0.3, roughness 0.085 -> 0.06), so the moon path stays but the bands go.
+scene["attractorWorld"]["water"].update({"fresnel": 0.06, "reflection": 1.0, "roughness": 0.06, "ripple": 0.3,
+                                         "rippleScale": 0.35, "sparkle": 0.15, "specular": 1.5, "skyMirror": 0.35,
+                                         "transmission": 0.5})
+for _k in ("streak", "reflectionRays", "glints"):
+    scene["attractorWorld"]["water"].pop(_k, None)
 
 # --- the encounter: three Sasquatches round the fire, the Gray facing them (night), the craft, the fire (particles)
 nodes = [n for n in scene.get("nodes", []) if not n["name"].startswith(
@@ -141,6 +205,10 @@ A = "../../assets/strange-attractor/build/"
 cast_xz = {k: at(*v) for k, v in CAST.items()}
 cast_g = dict(zip(cast_xz, ground(cast_xz.values())))
 gray_xz = cast_xz["gray"]
+# M3g (owner 54- §4: he still looks levitating -- the seat was 3 cm over the stone's top, which reads as a gap from the
+# passing camera): Sasquatch C lowered 3 cm onto the stone (check_contacts: no body or card vertex inside the stone;
+# the stone cannot come further forward under the thighs -- 6 cm forward already meets them)
+SEAT_SIT = 0.03
 
 
 def yaw_to(src, dst):
@@ -154,24 +222,34 @@ faces = {"sasquatch-a": [0.5 * (CAMP[0] + gray_xz[0]), 0.5 * (CAMP[1] + gray_xz[
          "sasquatch-b": CAMP, "sasquatch-c": CAMP}
 for name in ("sasquatch-a", "sasquatch-b", "sasquatch-c"):
     x, z = cast_xz[name]
-    nodes.append({"name": name, "kind": "gltf", "asset": A + f"{name}.glb", "position": [x, cast_g[name], z],
+    # M3f (hero H3, the hero agent's v1 Sasquatches; assets/strange-attractor/hero, never committed): B lifted 1.3 cm
+    # (its fur shells dipped into the ground at the toes)
+    asset = "../../assets/strange-attractor/hero/sasquatch/" + f"{name}-v1.glb"
+    lift = 0.013 if name == "sasquatch-b" else (-SEAT_SIT if name == "sasquatch-c" else 0.0)
+    nodes.append({"name": name, "kind": "gltf", "asset": asset, "position": [x, cast_g[name] + lift, z],
                   "rotation": [0, yaw_to((x, z), faces[name]), 0], "scale": [1, 1, 1], "visible": False,
                   "animation": {"state": "idle", "cullDistance": 800.0, "speed": 1.0}})
-# Sasquatch C sits: the rock under it, 0.36 m behind its feet (its hips' offset in the sitting pose)
+# Sasquatch C sits (hero H3: the v1 seat is 0.48 m up and spans 0.42-0.79 m behind the feet). M3f (owner, not the
+# hero agent's stool-sized stone): a broad boulder it visibly sits on -- its long axis across (1.0 m, wider than the
+# hips), 0.56 m deep, its top about 0.46 m up, its front face about 0.30 m behind the feet (checked with
+# hero/check_contacts.py over the whole loop: SEAT_BACK and SEAT_SY are the values that check passed with)
+SEAT_BACK, SEAT_SY = 0.68, 0.88
 cx, cz = cast_xz["sasquatch-c"]
 cyaw = math.radians(yaw_to((cx, cz), CAMP))
-seat = [cx - 0.36 * math.sin(cyaw), cz - 0.36 * math.cos(cyaw)]
-# M3d (owner: no toy "burger" rocks): a photoscanned boulder (Poly Haven, CC0), 0.54 m high, sunk a few cm
+seat = [cx - SEAT_BACK * math.sin(cyaw), cz - SEAT_BACK * math.cos(cyaw)]
 nodes.append({"name": "seat-rock", "kind": "gltf", "asset": A + "ph-namaqualand_boulder_05.glb",
-              "position": [seat[0], cast_g["sasquatch-c"] - 0.05, seat[1]], "rotation": [0, math.degrees(cyaw) + 90.0, 0],
-              "scale": [0.85, 0.95, 0.85], "visible": True})
+              "position": [seat[0], cast_g["sasquatch-c"] - 0.05, seat[1]], "rotation": [0, math.degrees(cyaw), 0],
+              "scale": [0.75, SEAT_SY, 0.75], "visible": True})
 # the Gray: across the fire from the three, facing them, fully in frame (night only)
-nodes.append({"name": "gray", "kind": "gltf", "asset": "../../assets/strange-attractor/sketchfab/gray/grey-alien-idle/grey_alien_idle.glb",
+# M3e (the hero agent's audit): the Gray matte -- metallic 0, no emission (a patched copy, pass2/patch_glb_materials.py)
+# M3f (hero H2): the grey alien rigged by the hero agent, talking and gesturing across the fire ("talk", 8 s loop)
+nodes.append({"name": "gray", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/alien-grey-h2.glb",
               "position": [gray_xz[0], cast_g["gray"], gray_xz[1]], "rotation": [0, yaw_to(gray_xz, group_c), 0],
               "scale": [GRAY_SCALE] * 3, "visible": False,
-              "animation": {"state": "mixamo.com", "cullDistance": 800.0, "speed": 0.8}})
-nodes.append({"name": "ufo-parked", "kind": "gltf", "asset": A + "ufo-craft.glb",
-              "position": [UFO_PARK[0], CAMP_Y + UFO_LIFT, UFO_PARK[1]], "rotation": [0, 33, 0],
+              "animation": {"state": "talk", "cullDistance": 800.0, "speed": 1.0}})
+# M3f (hero H5): the reworked craft, the same frame and units (rougher panels, lifted occlusion, warm window band)
+nodes.append({"name": "ufo-parked", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/ufo/ufo-v1.glb",
+              "position": [UFO_PARK[0], UFO_SHORE + UFO_LIFT, UFO_PARK[1]], "rotation": [0, 33, 0],
               "scale": [UFO_SCALE] * 3, "visible": False, "emissiveBoost": 4.0})
 
 # scrub and rocks across the bench and the banks round it (seeded), kept off the camera's low paths, the gathering,
@@ -193,7 +271,7 @@ def build_ocean_home_path():
 
 keep_paths = [[at(-4.0, -7.0), at(-2.5, -5.0), at(1.5, -5.5), at(1.5, -4.5)],              # the dusk arrival
               [at(-1.0, -9.5), at(-5.5, -7.5), at(-8.0, -3.5),
-               [build_mars.RIVER_PORTAL[0], build_mars.RIVER_PORTAL[1]]],                # the night arc and glide
+               site(10.0, -12.0)],                                                       # the old night arc (the scatter is kept as it was)
               [site(d, l) for d, l, _ in build_ocean_home_path()]]                       # home at dawn
 rng = random.Random(1897)
 cands = []
@@ -240,8 +318,11 @@ nodes += [
     # (Poly Haven, CC0: stone_fire_pit, dead_tree_trunk via pass2/build_teepee.py)
     {"name": "campfire-logs", "kind": "gltf", "asset": A + "ph-stone_fire_pit.glb", "position": [CAMP[0], CAMP_Y - 0.08, CAMP[1]],
      "rotation": [0, 20, 0], "scale": [0.85, 0.85, 0.85], "visible": False},
-    {"name": "campfire-teepee", "kind": "gltf", "asset": A + "ph-teepee.glb", "position": [CAMP[0], CAMP_Y - 0.02, CAMP[1]],
-     "rotation": [0, 20, 0], "scale": [0.9, 0.9, 0.9], "visible": False},
+    # M3f (hero H4): the hero agent's fire -- logs charred and cracked, an ash bed with coals, animated flame sheets
+    # ("burn", a seamless 4 s loop) -- in the pit's own frame; the flame particles retired, the core kept dim
+    {"name": "campfire-teepee", "kind": "gltf", "asset": "../../assets/strange-attractor/hero/campfire/campfire-v1.glb",
+     "position": [CAMP[0], CAMP_Y - 0.08, CAMP[1]], "rotation": [0, 20, 0], "scale": [0.85, 0.85, 0.85], "visible": False,
+     "animation": {"state": "burn", "cullDistance": 800.0, "speed": 1.0}},
     # flames: tongues rising out of the teepee, licking up and thinning, in two layers (a hot core, a softer outer)
     {"name": "campfire-flames", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 2400, "seed": 31, "shape": "sphere", "position": [fire[0], fire[1] + 0.15, fire[2]],
@@ -255,7 +336,7 @@ nodes += [
         "extent": [0.16, 0.04, 0.16], "direction": [0, 1, 0], "spawnRate": 160.0, "lifetimeMin": 0.2, "lifetimeMax": 0.45,
         "spread": 0.08, "speedMin": 0.9, "speedMax": 1.7, "gravity": [0.0, 2.0, 0], "drag": 0.8, "turbulence": 0.9,
         "turbulenceScale": 0.35, "sizeStart": 0.14, "sizeEnd": 0.03, "sizeVariance": 0.3,
-        "colorStart": [1.0, 0.72, 0.28, 0.7], "colorEnd": [1.0, 0.3, 0.03, 0.0], "emissive": 3.0, "blend": "additive",
+        "colorStart": [1.0, 0.72, 0.28, 0.35], "colorEnd": [1.0, 0.3, 0.03, 0.0], "emissive": 1.2, "blend": "additive",
         "velocityStretch": 0.8, "stretchMax": 1.4}},
     {"name": "campfire-embers", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 600, "seed": 37, "shape": "sphere", "position": [fire[0], fire[1] + 0.3, fire[2]],
@@ -265,9 +346,10 @@ nodes += [
         "colorEnd": [1.0, 0.15, 0.0, 0.0], "emissive": 16.0, "blend": "additive"}},
     {"name": "campfire-smoke", "kind": "particles", "visible": False, "particles": {
         "enabled": True, "capacity": 700, "seed": 41, "shape": "sphere", "position": [fire[0], fire[1] + 1.1, fire[2]],
-        "extent": [0.25, 0.15, 0.25], "direction": [0, 1, 0], "spawnRate": 24.0, "lifetimeMin": 5.0, "lifetimeMax": 8.0,
-        "spread": 0.2, "speedMin": 0.5, "speedMax": 0.9, "gravity": [0.25, 0.3, 0.08], "drag": 0.6, "turbulence": 0.5,
-        "turbulenceScale": 0.3, "sizeStart": 0.4, "sizeEnd": 1.9, "colorStart": [0.9, 0.62, 0.42, 0.045],
+        # M3e (owner: a thin column, not a haze cone): a narrow source, little spread and drift, small puffs
+        "extent": [0.08, 0.1, 0.08], "direction": [0, 1, 0], "spawnRate": 30.0, "lifetimeMin": 5.0, "lifetimeMax": 8.0,
+        "spread": 0.06, "speedMin": 0.6, "speedMax": 0.9, "gravity": [0.1, 0.3, 0.04], "drag": 0.6, "turbulence": 0.25,
+        "turbulenceScale": 0.4, "sizeStart": 0.12, "sizeEnd": 0.75, "colorStart": [0.9, 0.62, 0.42, 0.07],
         "colorEnd": [0.45, 0.42, 0.48, 0.0], "emissive": 0.35, "blend": "alpha"}},
 ]
 scene["nodes"] = nodes
@@ -282,11 +364,11 @@ dusk = {
     "scene/fogColor": [0.10, 0.075, 0.22],
     "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.55, 0.38, 0.62],
     "lights/floor-bounce/intensity": 0.25, "lights/dusk-sky/intensity": 0.6, "lights/dusk-bounce/intensity": 0.3,
-    "lights/campfire/intensity": 30.0,
+    "lights/campfire/intensity": 30.0, "lights/fire-bounce/intensity": 4.0,
     # the contour lines off at dusk and night (M1b quieted them, M2 removes them: the encounter owns the frame; ADR-1894)
     "attractorWorld/contourGain": 0.0,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
-    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-flames/visible": True, "nodes/campfire-core/visible": True,
+    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-core/visible": True,
     "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
 }
 # home from the Moon (crossing 2): still dusk, and the second portal's corruption tuned to the outer cliff -- a small
@@ -295,8 +377,10 @@ dusk_portal = dict(dusk)
 dusk_portal.update({
     # M3c (owner: too long staring at a plain wall): the field reaches back to the camp, so the code gathers on the
     # cliff as the camera leaves the fire, and the tear starts 80 m out
-    "corruption/radius": 80.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 260.0, "corruption/openNear": 10.0,
-    "corruption/openFar": 100.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
+    # Pass 3 final (67- §3): the opening is on the bench face 20 m behind the camp, so the field is kept off the
+    # gathering (30 m round the opening) and the tear starts once the camera is 55 m out, before it reaches the camp
+    "corruption/radius": 30.0, "corruption/fieldNear": 12.0, "corruption/fieldFar": 160.0, "corruption/openNear": 8.0,
+    "corruption/openFar": 55.0, "corruption/width": 15.0, "corruption/height": 13.0, "corruption/depth": 6.0,
     "corruption/echoOffset": 0.35,
 })
 # night (crossing 3: the canyon behind the pyramid portal and home): dark, a cold moon, the fire down to embers
@@ -308,20 +392,26 @@ night = {
     # darkness frames the group; the fire the warm key with a short, strong reach
     "attractorWorld/sunAzimuth": 150.0, "attractorWorld/sunElevation": 24.0, "attractorWorld/sunIntensity": 0.3, "attractorWorld/sunWarmth": 0.0,
     "attractorWorld/contourGain": 0.0,
-    "env/intensity": 0.012,
+    "env/intensity": 0.035,
     "env/sky/zenithColor": [0.004, 0.007, 0.028], "env/sky/horizonColor": [0.035, 0.05, 0.12],
     "env/sky/groundColor": [0.003, 0.003, 0.01], "env/sky/haze": 0.1, "env/sky/sunColor": [0.62, 0.72, 1.0],
     "env/sky/sunIntensity": 0.6, "env/sky/sunSize": 0.03, "env/sky/sunGlow": 0.2,
     "scene/fogColor": [0.008, 0.01, 0.03],
     "lights/canyon-bounce/intensity": 0.0, "lights/floor-bounce/color": [0.35, 0.42, 0.7],
     "lights/floor-bounce/intensity": 0.012, "lights/dusk-sky/intensity": 0.02, "lights/dusk-bounce/intensity": 0.0,
-    "lights/moon-rim/intensity": 0.32, "lights/ufo-glow/intensity": 90.0,
-    "lights/ufo-rim-0/intensity": 30.0, "lights/ufo-rim-1/intensity": 30.0, "lights/ufo-rim-2/intensity": 30.0,
-    "lights/ufo-rim-3/intensity": 30.0,
+    # M3e (48-night-lighting-research.md §2 A1-A6; owner §9): AgX and a stop up (ACES's toe crushed the night to black);
+    # more moon fill and rim so shadows hold detail; the craft's spill tamed and kept under the hull; the fire's bounce;
+    # a little haze the fire lights; the moon's shadow over a short range (finer texels), a small bias (the 3.2 m day
+    # offset smeared the figures into the bank's "capsule"; ADR-1907) and no moon contact march
+    "attractorWorld/sunShadowBias": 0.2, "attractorWorld/sunContact": 0.0,
+    "scene/shadowRange": 200.0, "scene/volumeDensity": 0.0007, "scene/volumeLocalLights": 1.0,
+    "lights/moon-rim/intensity": 0.5, "lights/ufo-glow/intensity": 30.0, "lights/fire-bounce/intensity": 5.0,
+    "lights/ufo-rim-0/intensity": 4.0, "lights/ufo-rim-1/intensity": 4.0, "lights/ufo-rim-2/intensity": 4.0,
+    "lights/ufo-rim-3/intensity": 4.0, "lights/ufo-spill/intensity": 9.0,
     "lights/campfire/intensity": 34.0, "lights/campfire/color": [1.0, 0.46, 0.15], "lights/campfire/range": 17.0,
     "nodes/gray/visible": True, "nodes/ufo-parked/visible": True,
     "nodes/sasquatch-a/visible": True, "nodes/sasquatch-b/visible": True, "nodes/sasquatch-c/visible": True,
-    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-flames/visible": True, "nodes/campfire-core/visible": True,
+    "nodes/campfire-logs/visible": True, "nodes/campfire-teepee/visible": True, "nodes/campfire-core/visible": True,
     "nodes/campfire-embers/visible": True, "nodes/campfire-smoke/visible": True,
 }
 # home from Mars (crossing 4): night, and the riverbed portal's corruption: small, gathering as the camera leaves the camp
@@ -329,8 +419,10 @@ night_portal = dict(night)
 night_portal.update({
     # M3c (the owner: the entrance's animation was lost): the glide starts 25 m out, so the tear now opens during it
     # (from 14 m), seen whole, not already open when the camera turns to the river
-    "corruption/radius": 24.0, "corruption/fieldNear": 6.0, "corruption/fieldFar": 40.0, "corruption/openNear": 2.5,
-    "corruption/openFar": 14.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
+    # Pass 3 final (67- §5: start the opening sooner): the field from 110 m and the tear from 55 m, as the camera
+    # rises for the dive, so it opens whole in view
+    "corruption/radius": 24.0, "corruption/fieldNear": 6.0, "corruption/fieldFar": 110.0, "corruption/openNear": 2.5,
+    "corruption/openFar": 55.0, "corruption/width": 8.0, "corruption/height": 8.0, "corruption/depth": 4.0,
     "corruption/echoOffset": 0.35,
 })
 # dawn (M3b; from crossing 5, so the canyon seen through the launch bay is already the morning one): home through
@@ -361,14 +453,13 @@ for look in scene["looks"]:
         if f"corruption/{k_}" in look["params"]:
             look["params"][f"corruption/{k_}"] *= R
 
-# --- the second leg (ADR-1895): the outer cliff behind the camp opens onto Mars (build_mars.py)
+# --- the second leg (ADR-1895): Mars (build_mars.py). Pass 3 final (owner 2026-11-08, 67- §3): the opening is on the
+# bench face behind the camp, at the end of the dusk line (canyon_scale.DUSK_PORTAL), not up on the outer cliff
 _, mars_flight, mars_aims = build_mars.write()
-cliff = site(-8.0, 91.8)
-into = [site(0.0, 1.0)[i] - site(0.0, 0.0)[i] for i in (0, 1)]
-n_into = math.hypot(*into)
-scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
+from canyon_scale import DUSK_AXIS, DUSK_PORTAL  # noqa: E402
+scene["portals"] = [{**GAZE, "world": "strange-attractor-mars.scene.json", "exit": build_mars.EXIT, "exitYaw": 0.0,
                      "exitAxis": build_mars.EXIT_AXIS, "entryUp": [0.0, 1.0, 0.0], "exitUp": [0.0, 1.0, 0.0],
-                     "entry": [cliff[0], 95.0 * R, cliff[1]], "entryAxis": [into[0] / n_into, 0.0, into[1] / n_into],
+                     "entry": list(DUSK_PORTAL), "entryAxis": [DUSK_AXIS[0], 0.0, DUSK_AXIS[1]],
                      "flight": mars_flight, "aims": mars_aims}]
 # the third leg (M3; M3b: one smooth glide): the riverbed below the camp opens onto the deep ocean (build_ocean.py). The
 # opening lies in the river (its axis down); the camera glides into it on one straight line, 25 degrees down, at a
@@ -377,7 +468,7 @@ scene["portals"] = [{"world": "strange-attractor-mars.scene.json", "exit": build
 import build_ocean  # noqa: E402
 _, ocean_flight = build_ocean.write()
 sl = build_mars.GLIDE_SLOPE
-scene["portals"].append({"world": "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
+scene["portals"].append({**GAZE, "world": "strange-attractor-ocean.scene.json", "exit": build_ocean.EXIT, "exitYaw": 0.0,
                          "exitAxis": [-math.sin(sl), -math.cos(sl), 0.0], "exitUp": [-math.cos(sl), math.sin(sl), 0.0],   # heading -x (M3d)
                          "entryUp": [build_mars.TOWARD_RIVER[0], 0.0, build_mars.TOWARD_RIVER[1]],
                          "entry": [build_mars.RIVER_PORTAL[0], build_mars.RIVER_Y, build_mars.RIVER_PORTAL[1]],
@@ -396,6 +487,8 @@ routes.append({"source": "response.bass", "target": "moon/nodes/earth/emissiveBo
 # quarter-second, so a strobe is a deliberate flash, not a shimmer; with audio off the sources rest at 0)
 routes = [r for r in routes if not (r["target"].startswith("moon/lights/rave") or r["target"].startswith("moon/nodes/laser")
                                     or "-rave-" in r["target"] or r["target"].startswith("moon/nodes/earth-halo")
+                                    or r["target"].startswith("moon/nodes/earth-aura")
+                                    or r["target"].startswith(("lights/ufo-", "nodes/ufo-parked"))
                                     or r["target"].startswith("moon/nodes/earth-echo"))]
 
 
@@ -417,10 +510,22 @@ for k in range(3):
 for c in ("r", "c"):
     routes.append(beat_route("beat.pulse", f"moon/nodes/earth-echo-{c}/opacity", 0.0, 0.55, decay=220.0, op="replace"))
 routes.append(beat_route("beat.pulse", "moon/nodes/earth/emissiveBoost", 0.0, 1.2, decay=400.0))
-routes.append(beat_route("beat.pulse", "moon/nodes/earth-halo/emissiveBoost", 0.0, 1.6, decay=360.0))
-# M3d: the corona's other layers flicker in on the highs and the low onsets
-routes.append(beat_route("response.high", "moon/nodes/earth-halo-2/opacity", 0.15, 1.0, decay=260.0, op="replace"))
-routes.append(beat_route("response.onsetLow", "moon/nodes/earth-halo-3/opacity", 0.15, 1.0, decay=320.0, op="replace"))
+# M3f (owner §2): the craft's lights breathe with the beat -- multiplied (a look's 0 by day stays 0), from 0.8 between
+# beats to 4.5x on one, falling over 0.6 s: a pulse, not a strobe (0.8-1.5 measured a 1.5% swing, 0.5-3 about 5%: the
+# owner asked for it clearly readable); the hull's emissive 0.35-4.5x
+for _l in ("ufo-glow", "ufo-spill", "ufo-rim-0", "ufo-rim-1", "ufo-rim-2", "ufo-rim-3"):
+    routes.append(beat_route("beat.pulse", f"lights/{_l}/intensity", 0.3, 4.5, attack=30.0, decay=600.0, op="multiply"))
+routes.append(beat_route("beat.pulse", "nodes/ufo-parked/emissiveBoost", 0.35, 4.5, attack=30.0, decay=600.0,
+                         op="multiply"))
+# M3e (owner §6): the aura keeps the halo's beat pulse; its glitch and datamosh are deliberate hits, 0 between them
+routes.append(beat_route("beat.pulse", "moon/nodes/earth-aura/emissiveBoost", 0.0, 1.6, decay=360.0))
+for c in ("r", "c"):   # the RGB split, on the beat
+    routes.append(beat_route("beat.pulse", f"moon/nodes/earth-aura-{c}/opacity", 0.0, 0.55, decay=240.0, op="replace"))
+_tear = beat_route("response.transient", "moon/nodes/earth-aura-tear/opacity", 0.0, 0.9, decay=200.0, op="replace")
+_tear["chain"]["remapInMin"] = 0.45   # the tear only on the strong transients: deliberate hits, not a constant shimmer
+routes.append(_tear)
+routes.append(beat_route("response.onsetLow", "moon/nodes/earth-aura-trail-1/opacity", 0.0, 0.45, decay=480.0, op="replace"))
+routes.append(beat_route("response.onsetLow", "moon/nodes/earth-aura-trail-2/opacity", 0.0, 0.28, decay=720.0, op="replace"))
 project["routes"] = routes
 # M3: the submersibles' paths and their lights, keyed in the timeline (seconds, smooth)
 tracks = [t for t in project.get("timeline", {}).get("tracks", []) if not t["target"].startswith("ocean/")]
@@ -432,21 +537,49 @@ for node, pos, yaw in build_ocean.sub_tracks():
 # M3d: the ocean's animals cruise (their swim loops play on their own)
 for n, _, _, pts, _ in build_ocean.creature_tracks():
     tracks.append({"target": f"ocean/nodes/{n}/position", "keys": [{"time": t, "value": p, "interp": "linear"} for t, p in pts]})
+tracks.append({"target": "ocean/nodes/bay-strips/emissiveBoost",
+               "keys": [{"time": t, "value": v, "interp": "linear"} for t, v in build_ocean.STRIPS_DIE]})
 # M3b: the rover drives, its tracks appear, its camera flashes (M3c: the lasers are gone)
 tracks = [t for t in tracks if not (t["target"].startswith("moon/nodes/laser") or t["target"].startswith("mars/")
                                     or t["target"].startswith("moon/nodes/earth-halo"))]
-# M3d: the corona's layers breathe in scale out of phase (blocks drifting outward and back), the Moon leg only
-import build_moon as _bm  # noqa: E402
-for k, period, phase in ((2, 3.1, 0.0), (3, 4.3, 1.7)):
-    base = _bm.EARTH_RADIUS / 10.0 * (0.93 if k == 2 else 1.09)
-    sx = (1.0, 1.0, 1.0)
-    keys = []
-    t = 32.0
-    while t <= 48.5:
-        f = 1.0 + 0.07 * math.sin(2 * math.pi * (t - 32.0) / period + phase)
-        keys.append({"time": round(t, 3), "value": [base * f * c for c in sx], "interp": "smooth"})
-        t += period / 4.0
-    tracks.append({"target": f"moon/nodes/earth-halo-{k}/scale", "keys": keys})
+# M3g (owner 54- §2: contrast steps at the Mars and ocean crossings): the cause was the night look -- from crossing 3,
+# the step INTO Mars -- switching the frame's tone map (ACES -> AgX) and exposure (+1 EV), and the dawn look switching
+# them back at crossing 5, the step into the ocean. The whole film is AgX now (the scene's post), and the exposure
+# is a timeline track that eases across each of those crossings over 2 s instead of stepping on one frame
+X_MARS, X_OCEAN = 69.655, 121.217
+tracks = [t for t in tracks if t["target"] != "camera/exposure/compensation"]
+tracks.append({"target": "camera/exposure/compensation", "keys": [
+    # 67- review: the canyon intro half a stop up (with its contrast, back toward M3f's luma spread), eased out across
+    # the Moon crossing
+    {"time": 0.0, "value": [0.5], "interp": "smooth"}, {"time": 31.025, "value": [0.5], "interp": "smooth"},
+    {"time": 33.025, "value": [0.0], "interp": "smooth"}, {"time": X_MARS - 1.0, "value": [0.0], "interp": "smooth"},
+    {"time": X_MARS + 1.0, "value": [1.0], "interp": "smooth"}, {"time": X_OCEAN - 1.0, "value": [1.0], "interp": "smooth"},
+    {"time": X_OCEAN + 1.0, "value": [0.0], "interp": "smooth"}]})
+# Pass 3 final (67- §1, §2): a grade per world inside AgX, eased over 2 s across each crossing (as the exposure is),
+# so no portal steps. Why the intro lost contrast: M3g §2 moved the whole film from ACES to AgX (9cee2700) for one tone
+# map, and AgX's softer shoulder and toe took out about a quarter of the canyon's luma spread (std 0.18 -> 0.13 at
+# 8 s) and some saturation. Contrast and saturation here are the grade's (log contrast about mid grey before the tone
+# map). The ocean keeps its look (E is closed): every value there is the film's old one.
+GRADE_KEYS = ("post/grade/contrast", "post/grade/saturation", "post/bloom/intensity", "post/halation/intensity",
+              "post/output/vignette", "post/look/localContrast", "post/grade/temperature")
+GRADE = {   # contrast, saturation, bloom, halation, vignette, local contrast, temperature
+    "canyon": (1.38, 1.22, 0.07, 0.0, 0.12, 0.3, 0.0),      # 67- review: the intro back toward M3f's spread
+    "moon": (1.15, 1.08, 0.015, 0.0, 0.18, 0.0, -0.06),      # crisp and cold; no local contrast (its low-pass haloed the domes)
+    "dusk": (1.14, 1.22, 0.08, 0.35, 0.2, 0.12, 0.0),        # the fire and the glyphs glow
+    "mars": (1.12, 1.18, 0.09, 0.0, 0.12, 0.1, 0.04),        # a soft warm veil
+    "night": (1.14, 1.18, 0.08, 0.4, 0.22, 0.12, 0.0),       # the fire, the craft, the glyphs glow
+    "ocean": (1.0, 1.0, 0.04, 0.0, 0.0, 0.0, 0.0),
+    "dawn": (1.18, 1.2, 0.07, 0.15, 0.12, 0.15, 0.0),
+}
+_LEGS = [("canyon", 0.0), ("moon", 32.025), ("dusk", 47.87), ("mars", 69.655), ("night", 93.46), ("ocean", 121.217),
+         ("dawn", 147.017)]
+for i, key in enumerate(GRADE_KEYS):
+    keys = [{"time": 0.0, "value": [GRADE["canyon"][i]], "interp": "smooth"}]
+    for (prev, _), (leg, tx) in zip(_LEGS, _LEGS[1:]):
+        keys.append({"time": tx - 1.0, "value": [GRADE[prev][i]], "interp": "smooth"})
+        keys.append({"time": tx + 1.0, "value": [GRADE[leg][i]], "interp": "smooth"})
+    tracks = [t for t in tracks if t["target"] != key]
+    tracks.append({"target": key, "keys": keys})
 tracks += build_mars.rover_tracks()
 project["timeline"] = {"enabled": True, "tracks": tracks, "cues": project.get("timeline", {}).get("cues", [])}
 json.dump(project, open(PROJECT, "w"), indent=2)

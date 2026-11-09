@@ -592,6 +592,12 @@
     },
     {
       "category": "Showcase",
+      "name": "Strange Attractor (demo)",
+      "project": "strange-attractor/strange-attractor.json",
+      "description": "Strange Attractor, a music video on Feline Footwear: a flight down a desert canyon at day whose wall tears open into the Moon, then back at dusk past a campfire gathering, through a pyramid on Mars, home along the river at night, down through the riverbed into a deep ocean and out again at dawn. Every world is entered and left through a portal that corrupts the ground into glyphs. Its song, stems and the third-party models and textures are gitignored (assets/audio/feline-footwear.wav, assets/audio/stems/, assets/strange-attractor/); without them it opens with placeholder geometry and no audio. See docs/prototypes/strange-attractor/."
+    },
+    {
+      "category": "Showcase",
       "name": "Biovalley - Macro",
       "project": "biovalley/shots/macro_audio.json",
       "generate": "python3 examples/biovalley/valley.py   (after a build; needs the Blender-built examples/biovalley/meshes/hero and meshes/env: hero_assets/build.py and colorways.py)",

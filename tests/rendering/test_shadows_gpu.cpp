@@ -825,3 +825,99 @@ TEST_CASE("the PCSS blocker search takes the tap count the tier asked it for",
     WARN("High tier, blocker search 20 -> 16 taps: " << tierMove.differing << "/" << tierMove.total
                                                      << " pixels differ, worst " << tierMove.worst);
 }
+
+namespace {
+
+// ADR-1906: a directional key with four cascades and a shadowed point lamp, as the night camp has (the moon and the
+// campfire); `lampIntensity` 0 is the day, when the look turns the fire off.
+scene::Scene moonAndFire(float lampIntensity) {
+    scene::Scene s = shadowScene(true);
+    scene::PunctualLight lamp;
+    lamp.name = "fire";
+    lamp.type = scene::PunctualLight::Type::Point;
+    lamp.position = {0.0f, 11.0f, -3.0f};
+    lamp.color = glm::vec3(1.0f);
+    lamp.intensity = lampIntensity;
+    lamp.range = 60.0f;
+    lamp.castsShadow = true;
+    lamp.contactShadow = false;
+    lamp.softness = 0.3f;
+    s.addLight(lamp);
+    return s;
+}
+
+// The pixel a world point lands on, through the test scenes' camera (square frame).
+glm::uvec2 pixelOf(const scene::Scene& s, glm::vec3 p) {
+    const glm::mat4 view = glm::lookAt(s.camera.position, s.camera.target, glm::vec3(0.0f, 1.0f, 0.0f));
+    const glm::mat4 proj = glm::perspective(s.camera.fovYRadians, 1.0f, s.camera.nearPlane, s.camera.farPlane);
+    const glm::vec4 c = proj * view * glm::vec4(p, 1.0f);
+    const glm::vec2 ndc = glm::vec2(c) / c.w;
+    return {static_cast<std::uint32_t>((ndc.x * 0.5f + 0.5f) * kSize),
+            static_cast<std::uint32_t>((0.5f - ndc.y * 0.5f) * kSize)};
+}
+
+} // namespace
+
+TEST_CASE("the shadow budget: an unlit light takes none, and the cascades yield to a shadowed lamp (ADR-1906)",
+          "[gpu][shadows][point][adr1906]") {
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+
+    // the day: the fire at zero intensity casts nothing and costs nothing
+    auto day = renderer->renderToImage(moonAndFire(0.0f), frameAt(3), kSize, kSize);
+    REQUIRE(day.has_value());
+    CHECK(renderer->stats().shadows.points == 0);
+    CHECK(renderer->stats().shadows.cascadesYielded == 0);
+    CHECK(renderer->stats().shadows.views == renderer->stats().shadows.cascades);
+
+    // the night: the lamp's six faces fit because the cascades drop to two; nothing is dropped
+    auto night = renderer->renderToImage(moonAndFire(900.0f), frameAt(3), kSize, kSize);
+    REQUIRE(night.has_value());
+    const auto& st = renderer->stats().shadows;
+    CHECK(st.points == 1);
+    CHECK(st.dropped == 0);
+    CHECK(st.cascades + 6 <= 8);
+    CHECK(st.cascades >= 2);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("a point light's shadow keeps a low caster's contact far from the lamp (ADR-1906)",
+          "[gpu][shadows][point][adr1906]") {
+    // A thin slab 0.3 m over the floor, 11 m under the lamp. A constant bias in hyperbolic depth is about
+    // (2 texels + 5 mm) x z^2 / (f n) in metres there -- over a metre -- which lifted the lookup past the slab and lost
+    // its shadow. Converted per fragment, it is a few centimetres.
+    auto ctx = makeContext();
+    auto shaders = makeShaders(*ctx);
+    auto renderer = makeRenderer(*ctx, shaders);
+    const auto build = [](bool slab) {
+        scene::Scene s = pointShadowScene(true);
+        s.entities[1].visible = false; // the high box out of the way
+        s.lights[0].position = {0.0f, 11.0f, -3.0f};
+        // a low camera beside the slab, looking under it at the floor it shades
+        s.camera.position = {6.0f, 0.2f, -3.0f};
+        s.camera.target = {0.0f, 0.0f, -3.0f};
+        s.camera.nearPlane = 0.1f;
+        if (slab) {
+            const auto mesh = s.addMesh(boxMesh({1.5f, 0.1f, 0.3f}));
+            auto& e = s.addEntity("slab", mesh);
+            e.transform.position = {0.0f, 0.4f, -3.0f};
+            e.material.baseColor = glm::vec3(0.8f);
+            e.material.roughness = 0.9f;
+        }
+        return s;
+    };
+    const scene::Scene with = build(true);
+    auto open = renderer->renderToImage(build(false), frameAt(3), kSize, kSize);
+    auto shaded = renderer->renderToImage(with, frameAt(3), kSize, kSize);
+    REQUIRE(open.has_value());
+    REQUIRE(shaded.has_value());
+    // the floor directly under the slab (the lamp is overhead), seen through the gap
+    const glm::uvec2 px = pixelOf(with, {0.6f, 0.0f, -3.0f});
+    const float lit = luminanceAt(*open, px.x, px.y);
+    const float under = luminanceAt(*shaded, px.x, px.y);
+    INFO("floor under the slab: " << lit << " -> " << under << " at pixel " << px.x << "," << px.y);
+    REQUIRE(lit > 0.05f);
+    CHECK(under < lit * 0.6f);
+    CHECK(ctx->errorCount() == 0);
+}

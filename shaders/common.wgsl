@@ -154,7 +154,7 @@ struct FrameUniforms {
     // catches the two drifting apart.
     terrainMap0: vec4<f32>,         // world origin xz, 1 / spacing xz
     terrainMap1: vec4<f32>,         // height scale, height offset, fade metres, 1 when there is a terrain
-    // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain), yzw = 0.
+    // ADR-717: the layer pools in the basins. x = fogPooling (0 without a terrain); ADR-1908: yzw = fogSpectral.
     // Appended last, mirroring FrameUniforms; the static_assert's sum catches the two drifting apart.
     fogPool: vec4<f32>,
     // Effect Library Wave 2: the Stars effect (world/effects/star_field.hpp). starsA.x = 0 keeps the
@@ -200,6 +200,7 @@ struct FrameUniforms {
     corruption8: vec4<f32>,
     corruption9: vec4<f32>,
     aoFade: vec4<f32>,     // ADR-1951: x = start, y = end (view depth, m; end <= start = off); z = horizon fill
+    waterColumn: vec4<f32>, // ADR-1910: x = the water surface (world y), yzw = downwelling absorption per metre
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 
@@ -931,6 +932,36 @@ fn fogSkyRadiance(dir: vec3<f32>) -> vec3<f32> {
     return textureSampleLevel(fogSkyTex, fogSkySampler, fogSkyUv(dir), 0.0).rgb;
 }
 
+// ADR-1910: the water column. Light that reaches a point under the water from above (the sun, the sky, the ambient)
+// has crossed the water between the surface and the point; light from a lamp in the water has crossed the water
+// between the lamp and the point. Each channel keeps exp(-k * metres). All-zero k (every scene but a water column's)
+// returns 1 before reading anything else.
+fn waterDownwelling(p: vec3<f32>) -> vec3<f32> {
+    let k = frame.waterColumn.yzw;
+    if (!any(k > vec3<f32>(0.0))) {
+        return vec3<f32>(1.0);
+    }
+    return exp(-k * max(frame.waterColumn.x - p.y, 0.0));
+}
+
+fn waterPathFrom(lightPos: vec3<f32>, p: vec3<f32>) -> vec3<f32> {
+    let k = frame.waterColumn.yzw;
+    if (!any(k > vec3<f32>(0.0))) {
+        return vec3<f32>(1.0);
+    }
+    // the share of the lamp-to-point segment that lies under the surface
+    let s = frame.waterColumn.x;
+    let a = lightPos.y;
+    let b = p.y;
+    var under = 1.0;
+    if (a > s && b > s) {
+        under = 0.0;
+    } else if (a > s || b > s) {
+        under = clamp((s - min(a, b)) / max(abs(a - b), 1e-4), 0.0, 1.0);
+    }
+    return exp(-k * distance(lightPos, p) * under);
+}
+
 fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     let extinction = frame.fogParams.w;
     if (extinction <= 0.0) {
@@ -985,6 +1016,18 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     let horizon = frame.fogShape.w; // z is ADR-715's ground follow
     if (horizon > 0.0) {
         depth = depth * (1.0 + horizon * (start + dist) * 0.0005);
+    }
+    // ADR-1908: extinction by colour -- each channel's optical depth scaled by its weight (fogPool.yzw), so a medium
+    // like water loses red first with distance; all three 0 is the grey fog it always was
+    let spectral = frame.fogPool.yzw;
+    if (any(spectral > vec3<f32>(0.0))) {
+        let fs = exp(-depth * spectral);
+        var fogColourS = frame.fogParams.rgb;
+        if (frame.fogSky.x > 0.0) {
+            let towardsSkyS = smoothstep(0.0, frame.fogSky.z, dist);
+            fogColourS = mix(fogColourS, fogSkyRadiance(worldPos - frame.cameraPos.xyz), frame.fogSky.x * towardsSkyS);
+        }
+        return mix(fogColourS, color, fs);
     }
     let f = exp(-depth);
     // ADR-918: aerial perspective. The colour the air fades towards becomes the sky's own radiance in

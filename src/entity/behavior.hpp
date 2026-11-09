@@ -17,6 +17,7 @@
 #include "entity/locomotion.hpp"
 #include "entity/nav_grid.hpp"
 #include "entity/navigation.hpp"
+#include "world/ground_source.hpp"
 #include "params/parameter_set.hpp"
 #include "signals/signal_bus.hpp"
 
@@ -173,6 +174,8 @@ struct BehaviorContext {
     double dt = 0.0;     // seconds since this entity was last updated (not necessarily the frame's)
     const signals::SignalBus* bus = nullptr;
     const Navigator* nav = nullptr;
+    // ADR-1955: a ground that is not the WorldMap (a tiles ground), or null. Read by the behaviours that stand on it.
+    world::GroundSource* ground = nullptr;
     const EntityWorld* world = nullptr;
     // Which entity this is, as an index into `EntityWorld::entities()`. What lets a behaviour ask
     // the crowd field to push it away from everyone *except itself* without a name comparison.

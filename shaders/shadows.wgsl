@@ -301,7 +301,23 @@ fn shadowVisibility(view: u32, light: GpuLight, worldPos: vec3<f32>, normal: vec
         return 1.0;
     }
     let nDotL = clamp(dot(normal, toLight), 0.0, 1.0);
-    let texelWorld = shadowBlock.views[view].params.x;
+    var texelWorld = shadowBlock.views[view].params.x;
+    // ADR-1906: a perspective view (a spot, a cube face) stores hyperbolic depth, and its texel grows with distance.
+    // The receiver's own light-space distance sets both: the texel there (not at the far plane), and the world bias
+    // converted into that depth's slope, d(ndc)/dz = f n / ((f - n) z^2), instead of a constant over the range.
+    let perspective = shadowBlock.views[view].params.z < 0.0;
+    var biasScale = 1.0;
+    if (perspective) {
+        let n = -shadowBlock.views[view].params.z;
+        let f = shadowBlock.views[view].params.w;
+        // a perspective projection's clip w is the view-space depth
+        let zr = clamp((shadowBlock.views[view].viewProj * vec4<f32>(worldPos, 1.0)).w, n, f);
+        texelWorld = texelWorld * zr / f;
+        // the uniform's bias is worldBias / (f - n) with the far texel; rescale it to the receiver's texel and the
+        // depth's local slope
+        let worldBias = texelWorld * 2.0 + 0.005;
+        biasScale = (worldBias * f * n / ((f - n) * zr * zr)) / max(shadowBlock.views[view].params.y, 1e-12);
+    }
     // Normal offset: push the sample point off the surface by a texel, more at grazing angles,
     // plus whatever the light asked for in world units (`PunctualLight::shadowBias`).
     let offset = normal * (texelWorld * (1.0 + 2.0 * (1.0 - nDotL)) * 1.4 + light.extra.w);
@@ -311,7 +327,7 @@ fn shadowVisibility(view: u32, light: GpuLight, worldPos: vec3<f32>, normal: vec
     }
     // Slope-scaled constant bias on top.
     let slope = clamp(tan(acos(clamp(nDotL, 0.02, 1.0))), 0.0, 4.0);
-    let depth = lookup.depth - shadowBlock.views[view].params.y * (1.0 + slope);
+    let depth = lookup.depth - shadowBlock.views[view].params.y * biasScale * (1.0 + slope);
     if (shadowBlock.info.w > 0.5 && cascaded) {
         return pcss(view, lookup.uv, depth, max(light.sizeSoft.w, 0.05), taps, shadowBlockerTaps(),
                     rotation);

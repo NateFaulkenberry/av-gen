@@ -7,6 +7,7 @@
 #include "world/world_recipe.hpp"
 #include "assets/image.hpp"
 #include "audio/audio_file.hpp"
+#include "core/hash.hpp"
 #include "core/time.hpp"
 #include "support/gltf_fixture.hpp"
 #include "support/synth.hpp"
@@ -18,6 +19,8 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <chrono>
+#include <iterator>
 #include <cmath>
 #include <filesystem>
 #include <unistd.h>
@@ -1398,4 +1401,37 @@ TEST_CASE("A project's live.targetFps is not read, and says so", "[integration][
     CHECK(named);
     std::filesystem::remove_all(dir);
 #endif
+}
+
+// ADR-1981: the project document's asset hashes come from a cache keyed on the file's size and modification time, so
+// the idle dirty check does not re-hash the song every sample -- and a file that changes still gets its new hash.
+TEST_CASE("Asset hashes in the project document follow the file's contents", "[integration][project]") {
+    Fixture f;
+    app::Engine engine(app::EngineMode::Offline);
+    REQUIRE(engine.loadAudio(f.wav).has_value());
+    REQUIRE(engine.addShaderLayer(f.shader, shaders::LayerStage::Background).has_value());
+    const auto project = f.dir / "show.json";
+    const auto first = engine.projectDocument(project);
+    const auto again = engine.projectDocument(project);
+    CHECK(first["assets"]["audio"]["sha256"] == again["assets"]["audio"]["sha256"]);
+    CHECK(first["shaders"][0]["sha256"] == again["shaders"][0]["sha256"]);
+    // Rewrite the shader with different text of the SAME length (only the modification time and contents change).
+    std::string text;
+    {
+        std::ifstream in(f.shader);
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const auto pos = text.find("0.5");
+    REQUIRE(pos != std::string::npos);
+    text.replace(pos, 3, "0.7");
+    const auto before = fs::last_write_time(f.shader);
+    {
+        std::ofstream out(f.shader, std::ios::binary | std::ios::trunc);
+        out << text;
+    }
+    fs::last_write_time(f.shader, before + std::chrono::seconds(2)); // a new modification time, whatever the clock
+    const auto changed = engine.projectDocument(project);
+    CHECK(changed["shaders"][0]["sha256"] != first["shaders"][0]["sha256"]);
+    CHECK(changed["shaders"][0]["sha256"].get<std::string>() == sha256Hex(std::string_view(text)));
+    CHECK(changed["assets"]["audio"]["sha256"] == first["assets"]["audio"]["sha256"]);
 }

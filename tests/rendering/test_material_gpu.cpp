@@ -1637,7 +1637,7 @@ private:
 
 } // namespace
 
-TEST_CASE("texture ops match the CPU interpreter (ADR-1642)", "[material][gpu][adr1642]") {
+TEST_CASE("texture ops match the CPU interpreter (ADR-1642, ADR-1905)", "[material][gpu][adr1642][adr1905]") {
     auto ctx = makeContext();
     MaterialHarness harness(*ctx);
     const scene::TextureData colour = smoothImage(false);
@@ -1679,7 +1679,15 @@ TEST_CASE("texture ops match the CPU interpreter (ADR-1642)", "[material][gpu][a
     missingProgram.textures[0].name = "missing";
     missingProgram.ops[0].texture = "missing";
 
-    const std::vector<MaterialProgram> programs = {colourProgram, normalProgram, missingProgram};
+    // ADR-1905: the same ops with their tiling broken -- hex tiling, macro variation and the second layer
+    MaterialProgram colourHex = colourProgram;
+    colourHex.name = "colour-hex";
+    colourHex.ops[0].constant3 = {1.0f, 0.6f, 3.0f, 0.8f};
+    MaterialProgram normalHex = normalProgram;
+    normalHex.name = "normal-hex";
+    normalHex.ops[0].constant3 = {0.7f, 0.0f, 0.0f, 0.0f};
+
+    const std::vector<MaterialProgram> programs = {colourProgram, normalProgram, missingProgram, colourHex, normalHex};
     const ImageSampler sampler(colour, normal);
     std::vector<Case> cases;
     for (std::size_t p = 0; p < programs.size(); ++p) {

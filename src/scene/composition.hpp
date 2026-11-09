@@ -20,6 +20,7 @@
 #include "core/error.hpp"
 #include "graph/graph.hpp"
 #include "scene/flight.hpp"
+#include "scene/tile_ground.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
 #include "scene/lunar_world.hpp"
@@ -1479,6 +1480,11 @@ public:
         glm::vec3 entryUp{0.0f, 1.0f, 0.0f};     // with it, the entry's up (the corruption's axis is its forward)
         glm::vec3 exitUp{0.0f, 1.0f, 0.0f};      // and the exit's up
         std::vector<std::array<float, 5>> aims;  // Art Pass 2: [x, y, z, from, to] -- the view turns toward a point
+        // ADR-1909: the gaze along the flight: it looks at where the path will be `lookAhead` seconds on (1.2 s led the
+        // curves by up to 60 degrees), `lookDown` of that distance below it, and a climb looked up at by `climbLook`
+        float lookAhead = 1.2f;
+        float lookDown = 0.1f;
+        float climbLook = 0.25f;
                                                  // in the destination (eased in and out over 1.2 s), then back
         glm::vec3 join{0.0f};                    // Gate C: [from, at, rate] -- at `at` seconds the camera joins the
                                                  // destination's own flythrough at its second `from`, run at `rate`
@@ -1848,6 +1854,14 @@ private:
     float tileTriggerPrevious_ = 0.0f;
     double tileLastTime_ = -1.0;
     void updateTileDynamics(const FrameTime& time); // ADR-1953: live rings; after the camera is final
+    // ADR-1953: the moving ground as the renderer will draw it: the authored block, then its parameters and live rings.
+    [[nodiscard]] TileDynamics liveTileDynamics() const;
+    // ADR-1955: the tiles ground the characters stand on (the flight's ground node, else the first tiles generator),
+    // refreshed before each entity step with the live dynamics, so a body rides what is drawn; its landings become the
+    // dynamics' springs (ADR-1954). `tileGroundOffset_` is the node's world translation.
+    TileGround tileGround_;
+    glm::vec3 tileGroundOffset_{0.0f};
+    void refreshTileGround();
     params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-350
     params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350
     params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-350
@@ -1880,6 +1894,9 @@ private:
     params::Parameter<float>* fogHeightCurve_ = nullptr;
     params::Parameter<float>* fogGroundFollow_ = nullptr; // ADR-715
     params::Parameter<float>* fogPooling_ = nullptr;      // ADR-717
+    params::Parameter<glm::vec3>* fogSpectral_ = nullptr; // ADR-1908
+    params::Parameter<float>* waterSurface_ = nullptr;            // ADR-1910
+    params::Parameter<glm::vec3>* waterDownwelling_ = nullptr;    // ADR-1910
     params::Parameter<float>* horizonDensity_ = nullptr; // ADR-705 (§7)
     scene::ReflectionBandParameters bandParams_;         // ADR-1151 (empty unless the scene has bands)
     // ADR-055/ADR-360: the whole field, live. Two of these existed; the other twelve were authored

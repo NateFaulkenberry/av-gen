@@ -172,7 +172,50 @@ bool TileDynamics::active() const {
             return true;
         }
     }
+    if (!springs.empty() && spring.depth != 0.0f) {
+        return true;
+    }
     return (rings.amplitude != 0.0f || rings.crest != 0.0f) && (!events.empty() || !live.empty());
+}
+
+float TileDynamics::springSeconds() const {
+    // e^(-zeta w a) = 1e-3, plus the time the ripple takes to cross three ripple radii
+    const float w = kTwoPi * std::max(spring.frequency, 1e-3f);
+    const float decay = 6.9078f / std::max(spring.damping * w, 1e-3f);
+    return decay + 3.0f * spring.rippleRadius / std::max(spring.rippleSpeed, 1e-3f);
+}
+
+std::vector<TileEvent> TileDynamics::springsAt(float t) const {
+    std::vector<TileEvent> out;
+    const float horizon = springSeconds();
+    for (const TileEvent& e : springs) {
+        const float age = t - e.time;
+        if (age >= 0.0f && age <= horizon) {
+            out.push_back(e);
+        }
+    }
+    std::stable_sort(out.begin(), out.end(), [](const TileEvent& a, const TileEvent& b) { return a.time > b.time; });
+    if (out.size() > kMaxTileSprings) {
+        out.resize(kMaxTileSprings);
+    }
+    return out;
+}
+
+float tileSpring(const TileSpringSpec& s, const std::vector<TileEvent>& springs, float x, float z, float t) {
+    float h = 0.0f;
+    const float w = kTwoPi * s.frequency;
+    const float zeta = std::clamp(s.damping, 0.0f, 0.999f);
+    const float wd = w * std::sqrt(1.0f - zeta * zeta);
+    for (const TileEvent& e : springs) {
+        const float r = std::sqrt((x - e.position.x) * (x - e.position.x) + (z - e.position.y) * (z - e.position.y));
+        const float a = t - e.time - r / s.rippleSpeed;
+        if (a < 0.0f) {
+            continue;
+        }
+        const float amp = s.depth * e.strength * std::exp(-r / s.rippleRadius);
+        h -= amp * std::exp(-zeta * w * a) * std::sin(wd * a); // an impulse: starts at rest, first goes down
+    }
+    return h;
 }
 
 std::vector<TileEvent> TileDynamics::eventsAt(float t) const {
@@ -235,7 +278,7 @@ TileSample tileSampleMoving(const TileTerrainSpec& spec, const TileDynamics& dyn
                             float cellSize) {
     TileSample out = tileSample(spec, x, z, t, dyn);
     const glm::vec2 m = tileMotion(dyn, dyn.eventsAt(t), x, z, t, out.water, cellSize);
-    out.height += m.x;
+    out.height += m.x + tileSpring(dyn.spring, dyn.springsAt(t), x, z, t); // ADR-1954
     out.crest = m.y;
     return out;
 }
@@ -457,6 +500,14 @@ Result<void> validateTileDynamics(const TileDynamics& d) {
         std::abs(d.breathingAmplitude) > 4.0f) {
         return fail("tileDynamics: breathing needs a positive period and wavelength and an amplitude within 4");
     }
+    {
+        const TileSpringSpec& s = d.spring;
+        if (!finite(s.depth) || !(s.frequency > 0.0f) || !(s.damping > 0.0f) || !(s.damping < 1.0f) ||
+            !(s.rippleSpeed > 0.0f) || !(s.rippleRadius > 0.0f)) {
+            return fail("tileDynamics: a spring needs a finite depth, a positive frequency, damping in (0, 1) and a "
+                        "positive ripple speed and radius");
+        }
+    }
     if (!(d.contourInterval >= 0.0f) || !finite(d.contourInterval) || !finite(d.contourOffset)) {
         return fail("tileDynamics: the contour interval is >= 0 and the offset finite");
     }
@@ -554,6 +605,18 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
                           {"wavelength", d.breathingWavelength}};
     }
     if (d.rolling != def.rolling) j["rolling"] = nlohmann::json::array({d.rolling.x, d.rolling.y});
+    {
+        const TileSpringSpec& s = d.spring;
+        const TileSpringSpec ds;
+        if (s.depth != ds.depth || s.frequency != ds.frequency || s.damping != ds.damping ||
+            s.rippleSpeed != ds.rippleSpeed || s.rippleRadius != ds.rippleRadius) {
+            j["spring"] = {{"depth", s.depth},
+                           {"frequency", s.frequency},
+                           {"damping", s.damping},
+                           {"rippleSpeed", s.rippleSpeed},
+                           {"rippleRadius", s.rippleRadius}};
+        }
+    }
     if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset) {
         j["contour"] = {{"interval", d.contourInterval}, {"offset", d.contourOffset}};
     }
@@ -598,6 +661,17 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
             d.breathingAmplitude = b.amplitude;
             d.breathingPeriod = b.period;
             d.breathingWavelength = b.wavelength;
+        } else if (key == "spring") {
+            if (auto r = readFields<TileSpringSpec>(value, where,
+                                                    {{"depth", &TileSpringSpec::depth},
+                                                     {"frequency", &TileSpringSpec::frequency},
+                                                     {"damping", &TileSpringSpec::damping},
+                                                     {"rippleSpeed", &TileSpringSpec::rippleSpeed},
+                                                     {"rippleRadius", &TileSpringSpec::rippleRadius}},
+                                                    d.spring);
+                !r) {
+                return std::unexpected(r.error());
+            }
         } else if (key == "contour") {
             struct C {
                 float interval, offset;

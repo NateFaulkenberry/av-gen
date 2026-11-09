@@ -6177,6 +6177,24 @@ int Application::runLive() {
                 liveProfileDone = !noteLiveProfileFrame(f);
             }
         }
+        // AVGEN_SLOW_FRAME_MS=<ms>: a frame whose interval passes this logs every phase it spent over 1 ms on -- the
+        // per-frame breakdown a median cannot give, for finding what a single dropped frame was doing.
+        {
+            static const double slowFrame = [] {
+                const char* env = std::getenv("AVGEN_SLOW_FRAME_MS");
+                return env != nullptr ? std::atof(env) : 0.0;
+            }();
+            if (slowFrame > 0.0 && stats.frameIntervalMs > slowFrame) {
+                std::string phases;
+                for (std::size_t i = 0; i < prof.names().size(); ++i) {
+                    const double ms = prof.current(static_cast<int>(i));
+                    if (ms >= 1.0 && prof.names()[i].find("alloc") == std::string::npos) {
+                        phases += fmt::format("{}={:.1f} ", prof.names()[i], ms);
+                    }
+                }
+                log::warn("slow frame {:.1f} ms at frame {}: {}", stats.frameIntervalMs, framesRendered, phases);
+            }
+        }
         prof.endFrame(stats.frameIntervalMs);
         ++fpsFrames;
         fpsAccum = std::chrono::duration<double>(frameEnd - fpsStart).count();

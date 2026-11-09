@@ -44,6 +44,13 @@ STRIP = material("base_strip", (0.2, 0.2, 0.2), 0.3, 0.0, (0.75, 0.92, 1.0), 14.
 BAYGLOW = material("base_bay_glow", (0.3, 0.28, 0.25), 0.4, 0.0, (1.0, 0.82, 0.6), 2.5)
 BEACON = material("base_beacon", (0.3, 0.1, 0.1), 0.3, 0.0, (1.0, 0.25, 0.15), 18.0)
 MEMBRANE = material("bay_membrane", (0.05, 0.12, 0.16), 0.2, 0.0, (0.25, 0.55, 0.7), 0.2)
+# M3g (owner 54- §5: covert, built into the ledge, weathered): the hull's concrete-and-metal weathered toward the
+# water's greens, sediment settled on its up-facing surfaces, marine growth crusting its lower faces, and the shelf's
+# own rock heaped over its roof
+HULL = material("base_hull_weathered", (0.085, 0.09, 0.08), 0.8, 0.25)
+SEDIMENT = material("base_sediment", (0.2, 0.19, 0.16), 0.95, 0.0)
+GROWTH = material("base_growth", (0.05, 0.075, 0.05), 0.9, 0.0)
+OVERBURDEN = material("base_overburden", (0.09, 0.085, 0.075), 0.95, 0.0)
 
 parts = []
 
@@ -82,8 +89,10 @@ def cyl(name, center, r, depth, mat, rot=(0.0, 0.0, 0.0), verts=16):
 # The bay's opening is centred at (0, -70, 32), 60 m wide and 30 m tall, 70 m deep into the hull.
 # the main hull: three stepped tiers out of the cliff
 box("hull_low", (0, -45, 22), (240, 90, 44), HULL, noise=0.6)
-box("hull_mid", (10, -30, 58), (190, 60, 30), HULL, noise=0.5)
-box("hull_top", (25, -18, 82), (120, 36, 20), HULL, noise=0.4)
+# M3g: no top tier; the mid tier low and set back, a narrow band of windows under a rock overburden
+box("hull_mid", (10, -22, 52), (190, 44, 16), HULL, noise=0.5)
+for k, (x, w, h) in enumerate(((-90, 90, 22), (-10, 110, 30), (80, 100, 26), (5, 200, 16))):
+    box(f"overburden{k}", (x, -12 - 6 * (k % 2), 60 + h / 2), (w, 50, h), OVERBURDEN, noise=4.5)
 # the bay: carve by building it as a frame around a recessed hall (the hall's back wall glows)
 box("bay_back", (0, -6, 32), (58, 4, 28), BAYGLOW)
 box("bay_floor", (0, -45, 16.5), (60, 80, 3), HULL_DARK)
@@ -115,15 +124,12 @@ box("hull_low_sill", (0, -45, 7.5), (72, 90, 15), HULL, noise=0.5)
 # buttresses down to the seabed and into the cliff
 for x in (-118, -60, 60, 118):
     box(f"buttress{x}", (x, -88, 18), (10, 18, 36), HULL_DARK, noise=0.4)
-# towers with windows and beacons
-for x, h in ((-70, 34), (70, 28), (40, 22)):
-    cyl(f"tower{x}", (x, -40, 73 + h / 2), 9.0, h, HULL, verts=12)
-    cyl(f"tower_cap{x}", (x, -40, 73 + h + 1.5), 6.0, 3.0, BEACON, verts=12)
+# M3g (owner: not a manufacturing plant): no towers, no beacons
 # windows: rows on the tiers' fronts
 for tier_y, tier_z, xs in ((-90.3, 34, list(range(-114, -44, 7)) + list(range(46, 116, 7))),
-                           (-60.3, 62, list(range(-80, 100, 8))), (-36.3, 85, list(range(-25, 80, 9)))):
+                           (-44.3, 52, list(range(-80, 100, 8)))):
     for x in xs:
-        if random.random() < 0.82:
+        if random.random() < 0.45:   # M3g: a few lit openings, not rows of them
             box(f"win{tier_z}_{x}", (x, tier_y, tier_z), (3.2, 0.5, 1.6), WINDOW)
 # pipe runs down the face to the seabed
 for x in (-100, -95, 92, 97):
@@ -131,6 +137,20 @@ for x in (-100, -95, 92, 97):
 # stains below the openings: dark plates
 for x in (-36, 36):
     box(f"stain{x}", (x, -91.0, 4), (8, 0.3, 8), HULL_DARK)
+
+# M3e (owner: the sea portal must not read as confined to the bay's glowing frame): the frame's four light strips are
+# their own glb, bay-strips.glb, so the scene can kill their light as the corruption takes the base
+strips = [o for o in parts if o.name.startswith(("strip_h", "strip_v"))]
+for o in bpy.context.scene.objects:
+    o.select_set(o in strips)
+bpy.context.view_layer.objects.active = strips[0]
+bpy.ops.object.join()
+bpy.context.object.name = "bay-strips"
+bpy.ops.export_scene.gltf(filepath=f"{out_dir}/bay-strips-m3g.glb", use_selection=True, export_apply=True)
+print("STRIPS", f"{out_dir}/bay-strips-m3g.glb")
+bpy.context.object.hide_set(True)
+bpy.context.object.select_set(False)
+parts = [o for o in parts if o not in strips]
 
 # join and export the structure (Blender z-up -> glTF y-up: the front (-y) becomes +z)
 for o in bpy.context.scene.objects:
@@ -140,8 +160,23 @@ bpy.ops.object.join()
 base = bpy.context.object
 base.name = "ocean-base"
 bpy.ops.object.shade_flat()
-bpy.ops.export_scene.gltf(filepath=f"{out_dir}/ocean-base.glb", use_selection=True, export_apply=True)
-print("BASE", f"{out_dir}/ocean-base.glb", sum(len(p.vertices) - 2 for p in base.data.polygons), "triangles")
+# M3g: sediment on whatever faces up (hull, rock, ledges), marine growth on the low faces near the seabed
+mats = [m.name for m in base.data.materials]
+for m_ in (SEDIMENT, GROWTH):
+    if m_.name not in mats:
+        base.data.materials.append(m_)
+        mats.append(m_.name)
+i_sed, i_grow = mats.index(SEDIMENT.name), mats.index(GROWTH.name)
+weatherable = {mats.index(n) for n in mats if n.startswith(("base_hull", "base_overburden"))}
+for f in base.data.polygons:
+    if f.material_index not in weatherable:
+        continue
+    if f.normal.z > 0.65:
+        f.material_index = i_sed
+    elif f.center.z < 12.0 and abs(f.normal.z) < 0.5:
+        f.material_index = i_grow
+bpy.ops.export_scene.gltf(filepath=f"{out_dir}/ocean-base-covert.glb", use_selection=True, export_apply=True)
+print("BASE", f"{out_dir}/ocean-base-covert.glb", sum(len(p.vertices) - 2 for p in base.data.polygons), "triangles")
 base.hide_set(True)
 base.select_set(False)
 
@@ -154,5 +189,5 @@ bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
 mem.data.materials.append(MEMBRANE)
 mem.select_set(True)
 bpy.context.view_layer.objects.active = mem
-bpy.ops.export_scene.gltf(filepath=f"{out_dir}/bay-membrane.glb", use_selection=True, export_apply=True)
-print("MEMBRANE", f"{out_dir}/bay-membrane.glb")
+bpy.ops.export_scene.gltf(filepath=f"{out_dir}/bay-membrane-m3g.glb", use_selection=True, export_apply=True)
+print("MEMBRANE", f"{out_dir}/bay-membrane-m3g.glb")

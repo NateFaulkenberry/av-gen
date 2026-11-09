@@ -21,15 +21,15 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from canyon_scale import WORLD_SCALE as WS, R, site, pace, L_UNIT  # noqa: E402
+from canyon_scale import GAZE, WORLD_SCALE as WS, R, site, pace, pace_even, L_UNIT, line_points  # noqa: E402
 from sample_ground import heights  # noqa: E402
-CANYON_ROCK_OPS = 85   # the canyon rock program's length before build_journey adds its close-up detail (M3d)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 A = "../../assets/strange-attractor/build/"
 
 WATER = [0.012, 0.075, 0.095]       # the fog: the water's own colour
 DEEP = [0.004, 0.022, 0.035]        # the background beyond the fog
+WATER_FAR = [0.006, 0.05, 0.075]    # M3g: the colour distance fades to (red gone, a deeper blue-green)
 LIGHT_DOWN = [0.12, -1.0, 0.18]
 
 # the shelf: a giant mesa whose east wall (x about -100) faces the camera's route
@@ -46,7 +46,7 @@ OX, OZ = 809.0, 677.0
 PLAIN = 32.7                        # the floor's level in front of the wall (sampled)
 # the base at the reef wall's foot, its front (+z in the glb) turned to face +x (yaw 90), on a pad at the floor's level
 BASE_XZ = (-25.0 + OX, -880.0 + OZ)
-BASE_GROUND = PLAIN
+BASE_GROUND = PLAIN - 8.0   # M3g (owner 54- §5): sunk 8 m into the ledge (the bay floor still 7 m clear)
 # the seabed under the bay approach, measured: (x, z) -> metres
 GROUND = {(365.0, -785.0): -3.0, (215.0, -870.0): 6.4, (125.0, -880.0): 30.0, (65.0, -880.0): 44.0, (40.0, -880.0): 48.0,
           (300.0, -700.0): 0.0}
@@ -72,9 +72,9 @@ _bx, _bz = BASE_XZ
 # camera +-7 degrees in pitch): one smooth line now, level at first, its lateral offset easing in as a cosine (no
 # kink), its height rising 3 m over the whole run
 def _ocean_path():
-    pts = [(_bx + 1050.0 - 7.0, None, _bz + 60.0)]
-    for d in (1020.0, 960.0, 860.0, 730.0, 580.0, 420.0, 260.0, 150.0):
-        u = (1043.0 - d) / (1043.0 - 150.0)
+    pts = [(_bx + 1050.0 - 13.2, None, _bz + 60.0)]   # Pass 3: 2.2 s out at the glide's 6 m/s
+    for d in [1020.0 - 40.0 * i for i in range(22)] + [150.0]:   # Pass 3: dense, so the spline follows the pace
+        u = (1036.8 - d) / (1036.8 - 150.0)
         pts.append((_bx + d, PLAIN + 30.0 + 2.0 * u, _bz + 60.0 * math.cos(0.5 * math.pi * u)))
     return pts + [(BAY[0], BAY[1], BAY[2]), (BAY[0] - 20.0, BAY[1], BAY[2])]
 
@@ -85,16 +85,14 @@ T_EXIT, T_BAY = 121.2 + 1.0 / 60.0, 147.0 + 1.0 / 60.0   # half a frame off the 
 
 # the ocean flight (x, height over the seabed, z, t): crossing 5 at 121.2 s (bar 62), crossing 6 at 147.0 s (bar 75)
 def flight(bay_rel_y=None):
-    try:
-        ground = heights("strange-attractor-ocean.scene.json", [(x, z) for x, _, z in OCEAN_PATH])
-    except Exception:
-        ground = [0.0] * len(OCEAN_PATH)
-    pts = []
-    for (x, y, z), g in zip(OCEAN_PATH, ground):
-        pts.append((x, (EXIT[1] if y is None else y), z))
-    # the first knot is 2.2 s out at the glide speed; the bay knot is the crossing (147.0), one more knot beyond it
-    knots, _ = pace(pts[:-1], T_EXIT + 2.2, T_BAY, 3.4, 9.0, ramp_in=0.3, ramp_out=0.3)
+    pts = [(x, (EXIT[1] if y is None else y), z) for x, y, z in OCEAN_PATH]
+    # Pass 3 (61- §3, 65- §4): out of the glide at its 6 m/s, up to the cruise over 7 s, held, and eased into the bay over
+    # the last 3 s, with knots at even times (fixed knots on a ramp gave the 24-34 m/s step at 127.5 s). 950 m in 23.6 s
+    # is 40 m/s on average, so the cruise cannot be 37: it holds about 49 m/s with these ramps
+    knots, cruise = pace_even([list(p) for p in pts[:-1]], T_EXIT + 2.2, T_BAY, 6.0, 9.0, 7.0, 3.0, dt=1.2)
+    print(f"ocean flight: cruise {cruise:.1f} m/s")
     knots.append([pts[-1][0], pts[-1][1], pts[-1][2], T_BAY + 2.2])
+    ground = heights("strange-attractor-ocean.scene.json", [(k[0], k[2]) for k in knots])
     return [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground)]
 
 
@@ -144,16 +142,135 @@ def sub_tracks():
 
 
 def reef_program():
-    """M3d: the canyon's rock program (its strata and ledges carry the reef's sediment layers), cooled to the deep's
-    blue-greens and darkened."""
-    f = json.load(open(os.path.join(HERE, "strange-attractor-flythrough.scene.json")))
-    prog = json.loads(json.dumps([p for p in f["materialPrograms"] if p["name"] == "canyonRock"][0]))
-    prog["ops"] = prog["ops"][:CANYON_ROCK_OPS]     # the canyon's own ops, without its close-up detail (M3d)
-    prog.pop("textures", None)
-    prog["name"] = "reefRock"
-    prog["ops"] += [{"kind": "constant", "dst": 0, "constant": [0.42, 0.62, 0.62, 1.0]},
-                    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 0}]
-    return prog
+    """M3e (owner: better texturing; the black streaks): the reef's own program, replacing M3d's cooled copy of the
+    canyon's (whose strata bands, laid by world height, ran down the steep reef faces as dark streaks). Photoscanned rock
+    and sand (Poly Haven, CC0; never committed), triplanar in world space with the anti-tiling (ADR-1905); sand settles
+    on the flats in drifts; algae greens the tops and coral pinks patches; the deep's blue-green; caustics drift across
+    the up-facing rock."""
+    T = "../../assets/strange-attractor/polyhaven/textures/"
+    hexed = [1.0, 0.6, 5.0, 0.7]
+    return {"name": "reefRock", "baseColor": 0, "metallic": -1, "roughness": -1, "emission": -1, "opacity": -1,
+            "normal": 7, "occlusion": -1,
+            "textures": [{"name": "rock", "path": T + "rock_boulder_cracked/rock_boulder_cracked_diff_2k.jpg"},
+                         {"name": "sand", "path": T + "coast_sand_rocks_02/coast_sand_rocks_02_diff_2k.jpg"},
+                         {"name": "rockN", "path": T + "rock_boulder_cracked/rock_boulder_cracked_nor_gl_2k.jpg",
+                          "colorSpace": "linear"}],
+            "ops": [
+                {"kind": "textureTriplanar", "dst": 0, "texture": "rock", "value": 0.1, "constant2": [6.0, 0, 0, 0],
+                 "constant3": hexed},
+                {"kind": "textureTriplanar", "dst": 1, "texture": "sand", "value": 0.25, "constant3": [1.0, 0.5, 6.0, 0.6]},
+                {"kind": "constant", "dst": 2, "constant": [0.7, 0.75, 0.75, 1.0]},   # E round 2: sand nearer the rock's value     # the sand darker: deep water
+                {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
+                # M3g: the rock lifted toward the sand, so the floor is not dark blotches on pale sand
+                {"kind": "constant", "dst": 2, "constant": [1.25, 1.25, 1.25, 1.0]},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
+                # sand on the flats, in drifts (a broad noise thins it)
+                {"kind": "input", "dst": 2, "input": "normal"},
+                {"kind": "swizzle", "dst": 2, "srcA": 2, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.45, 0.7, 0, 0]},   # M3g: sediment drapes the floor
+                {"kind": "input", "dst": 3, "input": "worldPosition"},
+                {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.04, "seed": 3},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.02, 0.8, 0, 0]},     # E round 2: drifts that fade, not blotches
+                {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 4},
+                {"kind": "mixBy", "dst": 0, "srcA": 0, "srcB": 1, "srcC": 2},
+                # algae on the broad patches
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.52, 0.7, 0, 0]},
+                {"kind": "constant", "dst": 5, "constant": [0.82, 0.95, 0.75, 1.0]},   # M3g: quieter algae
+                {"kind": "constant", "dst": 6, "constant": [1.0, 1.0, 1.0, 1.0]},
+                {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # coral tint in smaller patches
+                {"kind": "input", "dst": 3, "input": "worldPosition"},
+                {"kind": "noise", "dst": 3, "srcA": 3, "value": 0.12, "seed": 11},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [0.6, 0.74, 0, 0]},
+                {"kind": "constant", "dst": 5, "constant": [1.04, 0.95, 0.88, 1.0]},   # M3g: encrusting tint, not coral red
+                {"kind": "mixBy", "dst": 5, "srcA": 6, "srcB": 5, "srcC": 4},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # the deep's colour
+                {"kind": "constant", "dst": 5, "constant": [0.84, 0.92, 0.92, 1.0]},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # caustics: a cell pattern drifting with time, brightest at the cells' centres, on up-facing surfaces
+                {"kind": "input", "dst": 3, "input": "time"},
+                # M3f (owner §2b: the ocean "wobble" -- the camera is smooth; the whole floor's caustics drifting at
+                # 0.7 m/s read as the frame swimming): a slow drift and half the brightness
+                {"kind": "constant", "dst": 5, "constant": [0.12, 0.0, 0.08, 0.0]},
+                {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 5},
+                {"kind": "input", "dst": 5, "input": "worldPosition"},
+                {"kind": "add", "dst": 5, "srcA": 5, "srcB": 3},
+                {"kind": "voronoi", "dst": 5, "srcA": 5, "value": 0.2, "seed": 5},
+                {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.5, 0.0, 0, 0]},     # M3g: soft-edged
+                {"kind": "input", "dst": 4, "input": "normal"},
+                {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.3, 0.9, 0, 0]},
+                {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
+                {"kind": "constant", "dst": 4, "constant": [0.09, 0.12, 0.13, 0.0]},          # E round 2: half again
+                {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 4},
+                {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 5},
+                # Pass 3 E round 2 (brief §6.4; the owner's shelf "flat across the frame"): the shelf tops lifted --
+                # brighter with height over the floor (they are shallower and catch more of the light from above) --
+                # and broad patches of lighter and darker sediment across them, so no two stretches read the same
+                # E round 3: the walls' faces darker than their tops (the light comes from above; a face sees less of it)
+                {"kind": "input", "dst": 4, "input": "normal"},
+                {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [0.25, 0.75, 0, 0]},
+                {"kind": "constant", "dst": 2, "constant": [0.4, 0.42, 0.45, 1.0]},
+                {"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 6, "srcC": 4},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
+                {"kind": "input", "dst": 3, "input": "worldPosition"},
+                {"kind": "swizzle", "dst": 3, "srcA": 3, "constant": [1, 1, 1, 1]},
+                {"kind": "smoothstep", "dst": 4, "srcA": 3, "constant": [PLAIN + 8.0, PLAIN + 55.0, 0, 0]},
+                {"kind": "constant", "dst": 2, "constant": [1.32, 1.3, 1.26, 1.0]},
+                {"kind": "mixBy", "dst": 2, "srcA": 6, "srcB": 2, "srcC": 4},
+                {"kind": "input", "dst": 5, "input": "worldPosition"},
+                {"kind": "noise", "dst": 5, "srcA": 5, "value": 0.006, "seed": 41},
+                {"kind": "remap", "dst": 5, "srcA": 5, "constant": [0.25, 0.75, 0.78, 1.18], "value": 1.0},
+                {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 5},
+                {"kind": "multiply", "dst": 0, "srcA": 0, "srcB": 2},
+                {"kind": "textureTriplanarNormal", "dst": 7, "texture": "rockN", "value": 0.1, "constant2": [6.0, 0, 0, 0],
+                 "constant3": [1.0, 0.0, 0.0, 0.0]},
+            ]}
+
+
+# Pass 3 Phase E (ADR-1910): the surface over the floor, and the column's absorption per metre (red, green, blue)
+WATER_SURFACE = PLAIN + 160.0
+WATER_DOWN = [0.0150, 0.0072, 0.0052]   # final: less red lost than round 3 (0.021) -- the floor's colour halfway back toward the baseline's grey-green, the same falloff in value (round 3: +30% for depth from the light's falloff)
+# the light that comes down is brighter at the surface to arrive at about the M3g level on the floor
+WATER_UP = [0.002, 0.014, 0.022]        # toward the surface (E round 3: darker overhead)
+WATER_DOWN_COLOR = [0.002, 0.008, 0.013]  # toward the deep
+WATER_HORIZON = [0.001, 0.009, 0.016]
+WATER_FOG = [0.002, 0.018, 0.030]        # E round 3: the distance falls off into a darker water (WATER_FAR was 0.006 0.05 0.075)     # level: a little darker than the fog's own colour
+SURFACE_GAIN = 2.5 * 1.0 / (sum(math.exp(-k * 160.0) for k in WATER_DOWN) / 3.0) ** 0.5
+
+
+def base_silt_program():
+    """Pass 3 Phase E (brief §6.4, the structure belongs under water): a layer over the base's own materials -- silt
+    settled on everything facing up, thickest low down (the 8 m it is sunk into the ledge and the first 10 m above),
+    a darker stain band at the foot, and a mottle so it is not a paint line. Emission untouched (its lamps stay)."""
+    return {"name": "baseSilt", "baseColor": -1, "metallic": -1, "roughness": -1, "emission": -1, "opacity": -1,
+            "normal": -1, "occlusion": -1, "ops": [], "layers": [{
+                "name": "silt", "ops": [
+                    {"kind": "input", "dst": 0, "input": "normal"},
+                    {"kind": "swizzle", "dst": 0, "srcA": 0, "constant": [1, 1, 1, 1]},
+                    {"kind": "smoothstep", "dst": 0, "srcA": 0, "constant": [0.35, 0.8, 0, 0]},      # up-facing
+                    {"kind": "input", "dst": 1, "input": "worldPosition"},
+                    {"kind": "swizzle", "dst": 1, "srcA": 1, "constant": [1, 1, 1, 1]},
+                    {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [PLAIN + 22.0, PLAIN - 4.0, 0, 0]},  # low
+                    {"kind": "input", "dst": 2, "input": "worldPosition"},
+                    {"kind": "noise", "dst": 2, "srcA": 2, "value": 0.15, "seed": 23},
+                    {"kind": "smoothstep", "dst": 2, "srcA": 2, "constant": [0.3, 0.7, 0, 0]},
+                    {"kind": "multiply", "dst": 3, "srcA": 1, "srcB": 2},
+                    {"kind": "add", "dst": 3, "srcA": 3, "srcB": 1},
+                    {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 0},
+                    {"kind": "multiply", "dst": 4, "srcA": 1, "srcB": 1},
+                    {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 2},
+                    {"kind": "add", "dst": 3, "srcA": 3, "srcB": 4},                                   # + the foot's stain
+                    {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0.0, 1.0, 0.0, 1.0], "value": 1.0},
+                    {"kind": "constant", "dst": 5, "constant": [0.20, 0.22, 0.19, 1.0]},              # silt
+                    {"kind": "constant", "dst": 6, "constant": [0.07, 0.08, 0.07, 1.0]},              # the stain
+                    {"kind": "mixBy", "dst": 5, "srcA": 5, "srcB": 6, "srcC": 4},
+                    {"kind": "constant", "dst": 6, "constant": [1.0, 1.0, 1.0, 1.0]}],
+                "mask": 3, "baseColor": 5, "roughness": 6}]}
 
 
 def write_ocean(portal_flight):
@@ -164,24 +281,59 @@ def write_ocean(portal_flight):
                  "riverbed portal (ADR-1895), left by the launch bay's portal into the UFO.",
         "camera": {"mode": 1, "position": [250, 60, 300], "target": [0, 30, -900], "fov": 44.0, "orbitSpeed": 0.0, "far": 6000.0},
         "lights": [
-            {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.55, 0.85, 1.0],
-             "intensity": 1.1, "castsShadow": True, "shadowStrength": 0.8, "softness": 0.6},
-            {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, 0.2, 0.5], "color": [0.2, 0.55, 0.65],
-             "intensity": 0.25, "castsShadow": False, "shadowStrength": 0.0},
+            {"name": "surface-light", "type": "directional", "role": "key", "direction": LIGHT_DOWN, "color": [0.7, 0.88, 0.95],
+             # Pass 3 E round 2 (the blotchy light patches): the light from above is diffuse in water -- the shadow
+             # pattern on the floor softened and lifted (0.8 -> 0.45, softness 0.6 -> 1.0)
+             "intensity": round(1.1 * SURFACE_GAIN, 3), "castsShadow": True, "shadowStrength": 0.45, "softness": 1.0},
+            # M3g: the fill from above (the bright water overhead), not from below; the floor's underside stays dark
+            {"name": "water-fill", "type": "directional", "role": "fill", "direction": [-0.3, -0.85, 0.4], "color": [0.2, 0.55, 0.65],
+             "intensity": round(0.25 * SURFACE_GAIN, 3), "castsShadow": False, "shadowStrength": 0.0},
             # the bay's light into the water, the base's floods
+            # M3f (owner §2b, the white-out before the sea exit): ROOT CAUSE -- this 2600 cd lamp stands 10 m inside the
+            # bay, right behind the opening the camera flies through, and it scattered in the ocean's fog at full
+            # strength: within a few metres of it the in-scatter (falling as 1/d^2) filled the frame white for the last
+            # 0.4 s (with the fog off there is no white-out; the corruption's light and glow and the bloom made no
+            # difference). Its scattering is off (6% still left a glow and a disc for 3 frames); the floods' cut to 25%.
+            # Both still light the bay, the hull and the water round them
             {"name": "bay-light", "type": "point", "position": base_world((0.0, 32.0, 100.0)), "color": [1.0, 0.85, 0.65],
-             "intensity": 2600.0, "range": 220.0, "castsShadow": False},
+             "intensity": 2600.0, "range": 220.0, "castsShadow": False, "volumetric": 0.0},
             {"name": "flood-l", "type": "point", "position": base_world((-80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],
-             "intensity": 3000.0, "range": 160.0, "castsShadow": False},
+             "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
             {"name": "flood-r", "type": "point", "position": base_world((80.0, 50.0, 110.0)), "color": [0.6, 0.85, 1.0],
-             "intensity": 3000.0, "range": 160.0, "castsShadow": False},
+             "intensity": 3000.0, "range": 160.0, "castsShadow": False, "volumetric": 0.25},
+            # Pass 3 Phase E (brief §6.4: localized light at the structure, subtle warm accents): two sodium work lamps at the
+            # foot of the base's front, low and short; the water takes their red within ~30 m (ADR-1910), so they pool
+            {"name": "foot-lamp-l", "type": "point", "position": base_world((-60.0, 12.0, 92.0)), "color": [1.0, 0.55, 0.25],
+             "intensity": 520.0, "range": 45.0, "castsShadow": False, "volumetric": 0.0},
+            {"name": "foot-lamp-r", "type": "point", "position": base_world((60.0, 12.0, 92.0)), "color": [1.0, 0.55, 0.25],
+             "intensity": 520.0, "range": 45.0, "castsShadow": False, "volumetric": 0.0},
         ] + [{"name": f"{name}-light", "type": "point", "position": [0.0, -500.0, 0.0], "color": [0.55, 0.9, 1.0],
               "intensity": 900.0, "range": 60.0, "castsShadow": False} for name, _ in SUBS],
-        "environment": {"intensity": 0.18, "background": DEEP, "fogColor": WATER, "volumeDensity": 0.0024, "skybox": False,
-                        "sky": {"enabled": False}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
-                        "ambientOcclusion": False, "shadowCasterReach": 1500.0, "contactShadows": False},
-        "post": {"bloomIntensity": 0.06, "tonemap": 0},
-        "materialPrograms": [reef_program(), {"name": "seabed", "ops": [
+        # M3g (owner §2c: real water, not CG; 53-pass2-m3g-plan.md): the distance fog loses red first, then green
+        # (ADR-1908, Jerlov-like weights), toward a deeper blue-green; the march only covers the near water, where its
+        # forward-scattering haze and the local lights' cones live; grounding by AO and contact shadows; AgX
+        "environment": {"intensity": 0.14, "background": DEEP, "fogColor": WATER_FOG, "volumeDensity": 0.0012, "skybox": True,
+                        "sky": {"enabled": True, "background": True, "useKeyLight": False, "zenithColor": WATER_UP,
+                                "horizonColor": WATER_HORIZON, "groundColor": WATER_DOWN_COLOR, "haze": 0.25,
+                                "sunIntensity": 0.0, "sunSize": 0.0, "sunGlow": 0.0, "intensity": 1.0}, "fallbackAmbient": False, "shadowRange": 900.0, "shadowCascades": 3,
+                        "ambientOcclusion": True, "shadowCasterReach": 1500.0, "contactShadows": True,
+                        "fogSpectral": [2.6, 1.0, 0.62], "volumeMaxDistance": 45.0, "volumeAnisotropy": 0.75,
+                        "volumeLocalLights": 0.0,   # local lights in the murk: not yet -- the portal's own light at the
+                                                    # bay's opening scatters into a white-out at the crossing (M3f §2b)
+                        # Pass 3 Phase E (ADR-1910): the water column. The surface 160 m over the floor; the light coming
+                        # down loses red first, so the floor sits in a bluer, darker layer than the shelf and the base's
+                        # roof, and a lamp's warm light dies within tens of metres
+                        "waterSurface": WATER_SURFACE, "waterDownwelling": WATER_DOWN,
+                        # Pass 3 Phase E (brief §6.4: the water as a medium, not a backdrop): the water's own light is
+                        # brighter toward the surface and falls to near black below -- the procedural sky drawn as
+                        # the water (no sun disc), lighting the ambient from above -- and the distance fog fades each
+                        # surface toward the water's colour in ITS direction (ADR-918), so the shelf's top lifts out
+                        # against the brighter water above and the far floor sinks into the dark below.
+                        # (A 140 m shadowed march for shafts was tried first: a grey veil, no shafts -- the light
+                        # comes from straight above and nothing overhangs the open floor; reverted)
+                        "fogSky": 0.5, "fogSkyDistance": 420.0},   # E round 2: half the fade (the walls keep their edge)
+        "post": {"bloomIntensity": 0.06, "tonemap": 1},
+        "materialPrograms": [reef_program(), base_silt_program(), {"name": "seabed", "ops": [
             {"kind": "input", "dst": 0, "input": "uv"},
             {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": [0, 0, 0, 0]},
             {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.07, 0.2, 0.6, 1.3], "value": 1.0},
@@ -205,35 +357,54 @@ def write_ocean(portal_flight):
         ], "baseColor": 5, "metallic": 0, "roughness": 1}],
         # M3d (owner; ADR-1902): the seafloor on the canyon's pipeline, its Mars style turned to a reef -- eroded
         # outcrops and ledges (no terraces to speak of), sediment drifts between them, the floor falling away
+        # M3e (owner: rounded, eroded rock, not crumpled spikes): softer relief (roughness 1 -> 0.4, ridges 1 -> 0.3),
+        # less warp and terracing, and a finer mesh where the silhouettes were jagged (error 0.003 -> 0.0015)
         "attractorWorld": {"seed": 9, "resolution": 4096, "extent": 16000, "worldScale": 0.35, "camera": "scene",
-                           "terrainScale": 1.0, "roughness": 1.0, "ridgeStrength": 1.0, "domainWarp": 0.7, "terraces": 0.15,
-                           "erosion": 1.0, "strataFold": 0.3, "branchingDensity": 0.0, "meshSpacing": 1.0,
-                           "meshError": 0.003, "meshMinError": 0.2, "terrainProgram": "reefRock", "sunLux": 2.5,
+                           # M3g (owner 54- §5): the shelf top varied -- terraces and gullies cutting its edge -- and the
+                           # floor rounder and sediment-draped (softer ridges, more erosion, a finer mesh)
+                           "terrainScale": 1.0, "roughness": 0.2, "ridgeStrength": 0.05, "domainWarp": 0.7, "terraces": 0.05,   # E round 2: the strata steps that cut the mounds into facets
+                           
+                           # E round 2: the gullies on every steep face were the mounds' sawtooth -- erosion 1.0 -> 0.3
+                           "erosion": 0.3, "strataFold": 0.0, "branchingDensity": 0.0, "meshSpacing": 1.0,
+                           "meshError": 0.001, "meshMinError": 0.08, "terrainProgram": "reefRock", "sunLux": 2.5,
                            "sunShadowBias": 1.6, "look": {"sunAzimuth": 20.0, "sunElevation": 70.0, "sunWarmth": 0.0},
-                           "mars": {"mesaCover": 0.42, "yardangs": 0.0, "wind": 70.0, "dunes": 3.0},
+                           # Pass 3 E round 2 (owner: the floor's mounds spiky and faceted, a
+                           # sawtooth): they are the mesas' last remnants on the floor -- fewer of them (mesaCover 0.42 ->
+                           # 0.39; 0.25 also took the shelf's walls, 0.36 most of the left one), no strata steps cutting
+                           # them into facets (terraces 0.05, no fold), softer gullies; yardangs a third, dunes low
+                           "mars": {"mesaCover": 0.42, "yardangs": 1.6, "wind": 70.0, "dunes": 2.2},
                            "pads": [{"x": BASE_XZ[0], "z": BASE_XZ[1], "radius": 170.0, "level": PLAIN}]},
         # the bay portal: the membrane across the launch bay tears open (the corruption's focus y is over the seabed)
-        "corruption": {"targets": ["bay-membrane"], "focus": [BAY[0], bay_y, BAY[2]], "axis": [-1.0, 0.0, 0.0],
-                       "amount": 1.0, "radius": 45.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 260.0, "openNear": 20.0,
-                       "openFar": 130.0, "seam": 0.3, "width": 22.0, "height": 11.0, "depth": 8.0, "block": 2.5,
+        # M3e (owner: not confined to the bay): the base, its rock and the seafloor are targets too, the field reaches
+        # well past the bay's frame, and the opening is wider and taller than the bay, so the tear breaks out over the hull.
+        # M3e (owner: sooner): the code reaches out from 770 m (about 130 s; M3d 260 m, 139 s) and the tear starts at 360 m
+        # (about 137.5 s, after the last sortie at 136.4 s; M3d 130 m, 141.6 s)
+        "corruption": {"targets": ["bay-membrane", "bay-strips", "ocean-base", "attractor.terrain"], "focus": [BAY[0], bay_y, BAY[2]],
+                       "axis": [-1.0, 0.0, 0.0],
+                       "amount": 1.0, "radius": 150.0, "inner": 0.2, "fieldNear": 25.0, "fieldFar": 770.0, "openNear": 20.0,
+                       "openFar": 360.0, "seam": 0.3, "width": 36.0, "height": 21.0, "depth": 8.0, "block": 2.5,
                        "share": 0.25, "slip": 1.5, "rate": 0.6, "strip": 2.5, "stripSlip": 1.0, "slide": 0.0, "pull": 4.0,
                        "lift": 0.8, "fold": 0.6, "lag": 0.7, "glyph": 6.0, "glyphSize": 1.0, "glow": 4.0, "echoes": 1,
-                       "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 1500.0},
+                       "echoOffset": 0.6, "glowColor": [0.55, 0.9, 1.0], "light": 500.0},
         # M3b (owner: cut the UFO interior): the bay's portal leads home -- out of the canyon wall where the journey
         # began (portal 1, reversed), at dawn
         # M3d (owner: the Moon portal is the reference look): the mesh wire on the portal's own surface -- its
         # scan, its rim, and the shards that break off the lips and fly into the opening (the pyramid had none)
-        "meshWire": {"targets": ["bay-membrane"], "color": [0.45, 0.85, 1.0], "intensity": 0.0, "width": 1.0, "creaseLow": 2.0,
+        "meshWire": {"targets": ["bay-membrane", "bay-strips", "ocean-base", "attractor.terrain"], "color": [0.45, 0.85, 1.0], "intensity": 0.0, "width": 1.0, "creaseLow": 2.0,
                      "creaseHigh": 12.0, "reveal": 1.0, "fadeNear": 60.0, "fadeFar": 900.0, "minPixels": 14.0, "wave": 0.0,
                      "waveRadius": 300.0, "waveWidth": 40.0, "waveGain": 1.6, "waveAhead": 200.0, "clipBelow": -1000.0,
                      "fromFocus": 1.0, "pulse": 1.2, "pulseSpacing": 60.0, "pulseSpeed": 40.0, "pulseWidth": 6.0,
                      "focusGain": 0.5, "rimGain": 6.0, "frontColor": [0.75, 0.95, 1.0], "shards": 0.3, "shardRate": 0.35},
-        "portal": {"world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
+        "portal": {**GAZE, "climbLook": 0.2, "lookDown": 0.04,   # Pass 3: the outro keeps the canyon in frame (no 25 s of sky)
+                   "world": "@root", "exit": HOME_EXIT, "exitAxis": HOME_AXIS, "entryUp": [0.0, 1.0, 0.0],
                    "exitUp": [0.0, 1.0, 0.0], "flight": HOME_FLIGHT},
         "nodes": [
-            {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
-             "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
-            {"name": "bay-membrane", "kind": "gltf", "asset": A + "bay-membrane.glb",
+            {"name": "ocean-base", "kind": "gltf", "asset": A + "ocean-base-covert.glb", "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]],
+             "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True, "program": "baseSilt"},
+            {"name": "bay-membrane", "kind": "gltf", "asset": A + "bay-membrane-m3g.glb",
+             "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
+            # M3e: the bay frame's light strips, apart, so their light dies as the corruption takes the base (the timeline)
+            {"name": "bay-strips", "kind": "gltf", "asset": A + "bay-strips-m3g.glb",
              "position": [BASE_XZ[0], BASE_GROUND, BASE_XZ[1]], "rotation": [0, 90, 0], "scale": [1, 1, 1], "visible": True},
         ] + [{"name": name, "kind": "gltf", "asset": A + "ufo-craft.glb",
               "position": [0.0, -500.0, 0.0], "rotation": [0, 0, 0], "scale": [s, s, s], "visible": True} for name, s in SUBS] + [
@@ -273,9 +444,17 @@ def _home():
     exit_ = [pts[0][0], pts[0][1], pts[0][2]]          # the root's exit height is absolute
     clear = min(pt[1] - g for pt, g in zip(pts[1:], ground[1:]))
     print(f"home flight: lowest knot {clear:.1f} m over the ground")
-    # out of the wall at the bay's speed, easing to a slow, held climb as the music ends
-    knots, _ = pace(pts[1:], T_HOME + 1.4, T_END, 7.0, 0.6, ramp_in=0.2, ramp_out=0.35)
-    return exit_, [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, ground[1:])]
+    # Pass 3 (61- §3, the A-to-B rule; 65-): one gentle curve from the first knot out of the wall to the last, down
+    # over the river side of the beach with the camp low in the frame on the way in, then up the river, rising to 58 m
+    # so the canyon's rim stays in the frame to the end. The exit is 86 m up and only 75 m from the camp, so the camp
+    # can only be seen looking down at it. A line over the bench puts that look on the hillside (65- Dawn); this one
+    # puts it on the water.
+    A, B = (pts[1][0], pts[1][2]), (pts[-1][0], pts[-1][2])
+    line = line_points(A, B, [(0.0, pts[1][1]), (0.36, 22.0), (1.0, 58.0)], n=30, control=(14.0, 1372.0))
+    lg = heights(CANYON_SCENE, [(p[0], p[2]) for p in line])
+    print(f"home flight: lowest point {min(p[1] - g for p, g in zip(line, lg)):.1f} m over the ground")
+    knots, _ = pace([list(p) for p in line], T_HOME + 1.4, T_END, 7.0, 3.0, ramp_in=0.04, ramp_out=0.06)
+    return exit_, [[x, y - g, z, t] for (x, y, z, t), g in zip(knots, lg)]
 
 
 HOME_EXIT, HOME_FLIGHT = _home()
@@ -306,6 +485,10 @@ def life_nodes():
                       "rotation": [0, yaw, 0], "scale": [sc * (2.5 if kind.startswith(("rock", "basalt")) else 1.0)] * 3,
                       "visible": True})
     return items
+
+
+# M3e: the bay frame's strips fail as the corruption reaches them -- a few stutters, then dark (seconds, emissiveBoost)
+STRIPS_DIE = [(133.6, 1.0), (134.1, 0.25), (134.3, 0.9), (134.9, 0.1), (135.1, 0.55), (135.8, 0.0)]
 
 
 def creature_tracks():

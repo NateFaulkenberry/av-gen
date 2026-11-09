@@ -69,6 +69,15 @@ struct AttractorGen {
     float yardangs = 6.0f;    // metres
     float wind = 30.0f;       // degrees: the wind's direction (x toward z)
     float dunes = 4.0f;       // metres
+    // ADR-1909: the flythrough's gaze. The eye looks at where it will be `flightLookAhead` seconds on (the default 2.5
+    // s leads every turn and dive by up to 40 degrees) and `flightLookDown` of the distance below it (0.12, toward
+    // the river). A film whose camera "looks where it is going" shortens both.
+    float flightLookAhead = 2.5f; // seconds
+    float flightLookDown = 0.12f; // fraction of the look distance
+    // ADR-1911: the flight's horizontal path is smoothed over this many seconds before it is lifted clear of the
+    // terrain. 0.6 follows every bend of the gorge; a few seconds turn the bends into one long curve (Pass 3, the
+    // owner's A-to-B rule: no S-bends). The clearance lift that follows keeps it off the walls either way.
+    float flightSmooth = 0.6f;    // seconds
     // ADR-1881 (dimensional portals, Gate A): the flight's approach to a portal in the rock. Enabled, the flight
     // leaves the gorge at `departArc` metres along its centreline and flies straight at `site` (world; y is the
     // aperture's centre height), slowing from the river speed to `speed` m/s over `slowFor` seconds from
@@ -100,6 +109,12 @@ struct AttractorLook {
     // that wants the lines quieter scales them here instead of fighting the route
     float contourGain = 1.0f;
     float sunWarmth = 1.0f;  // ADR-1900: the key light's colour, 1 the warm sun, 0 a cold moon
+    // ADR-1907: the key light's shadow, per look. A night that keeps the day's kilometre-scale normal offset smears
+    // every caster across the ground beside it; a look sets its own (metres; < 0 keeps the block's `sunShadowBias`),
+    // and turns the key's contact march and its shadow on or off (1 on, 0 off).
+    float sunShadowBias = -1.0f;
+    float sunContact = 1.0f;
+    float sunCasts = 1.0f;
 };
 
 inline constexpr int kAttractorMaxBranches = 48; // side-canyon polylines

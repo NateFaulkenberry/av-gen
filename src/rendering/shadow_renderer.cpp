@@ -166,7 +166,34 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
         shadowFar = std::clamp(rangeOverride, near * 4.0f, std::max(cameraFar, near * 4.0f));
     }
     stats_.range = shadowFar;
-    const std::uint32_t cascades = std::clamp(quality.cascadeCount, 1u, kMaxCascades);
+    // ADR-1906: a light that gives no light (intensity 0, as a look turns the day's campfire off) takes no shadow
+    // views, and the cascades yield to local lights: when the shadowed points and spots would not fit beside the
+    // directional light's cascades, the cascades drop (to no fewer than two) so they do, rather than the local light
+    // silently casting nothing (the night camp's fire beside the moon's four cascades).
+    const auto castsNow = [](const scene::PunctualLight& l) {
+        return l.enabled && l.castsShadow && l.shadowStrength > 0.0f && l.intensity > 0.0f;
+    };
+    std::uint32_t localViews = 0;
+    bool anyDirectional = false;
+    for (const scene::PunctualLight* l : lights) {
+        if (!castsNow(*l)) continue;
+        if (l->type == scene::PunctualLight::Type::Directional) {
+            anyDirectional = true;
+        } else {
+            localViews += l->type == scene::PunctualLight::Type::Spot ? 1u : kPointShadowFaces;
+        }
+    }
+    const std::uint32_t asked = std::clamp(quality.cascadeCount, 1u, kMaxCascades);
+    std::uint32_t cascades = asked;
+    if (anyDirectional && localViews > 0 && asked + localViews > kMaxShadowViews) {
+        const std::uint32_t room = kMaxShadowViews > localViews ? kMaxShadowViews - localViews : 0u;
+        cascades = std::clamp(room, std::min(2u, asked), asked);
+        if (cascades < asked && shadowWarned_.insert("#cascades-yield").second) {
+            log::info("shadows: the directional cascades drop from {} to {} so {} local shadow view(s) fit (ADR-1906)",
+                      asked, cascades, localViews);
+        }
+    }
+    stats_.cascadesYielded = asked - cascades;
     // ADR-1867: a scene's split scheme, when it has one; the engine's otherwise.
     const std::vector<float> splits = splitLambda >= 0.0f
                                           ? cascadeSplits(cameraNear, shadowFar, cascades, std::min(splitLambda, 1.0f))
@@ -185,7 +212,7 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
     bool directionalDone = false;
     for (std::uint32_t i = 0; i < lights.size(); ++i) {
         const scene::PunctualLight& light = *lights[i];
-        if (!light.enabled || !light.castsShadow || light.shadowStrength <= 0.0f) {
+        if (!castsNow(light)) { // ADR-1906: a light at zero intensity takes no budget
             continue;
         }
         if (light.type == scene::PunctualLight::Type::Directional) {
@@ -251,6 +278,11 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
             stats_.lightDirection = light.direction;
         } else if (light.type == scene::PunctualLight::Type::Spot) {
             if (views_.size() >= kMaxShadowViews) {
+                if (shadowWarned_.insert(light.name).second) { // ADR-1906: never silent
+                    log::warn("shadows: spot light '{}' casts no shadow -- the {} shadow views are taken", light.name,
+                              kMaxShadowViews);
+                }
+                ++stats_.dropped;
                 continue;
             }
             const float range = light.range > 0.0f ? light.range : std::max(sceneRadius * 2.0f, 1.0f);
@@ -274,6 +306,13 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
                 views_.push_back(view);
             }
             ++stats_.points;
+        } else {
+            if (shadowWarned_.insert(light.name).second) { // ADR-1906: never silent
+                log::warn("shadows: light '{}' casts no shadow -- its six cube faces do not fit the {} shadow views "
+                          "left after the cascades",
+                          light.name, kMaxShadowViews - static_cast<std::uint32_t>(views_.size()));
+            }
+            ++stats_.dropped;
         }
     }
     stats_.views = static_cast<std::uint32_t>(views_.size());
@@ -286,8 +325,11 @@ std::uint32_t ShadowRenderer::update(const std::vector<const scene::PunctualLigh
         // diagnostic prints cannot drift from the bias the shader subtracts (§37).
         const ShadowViewReport report = reportView(views_[v], static_cast<std::uint32_t>(v));
         stats_.view[v] = report;
+        // ADR-1906: z is 1 for a cascade, and minus the near distance for a perspective (spot or cube) view, whose
+        // bias the shader converts per fragment into its hyperbolic depth (shadows.wgsl)
         im.block.views[v].params = glm::vec4(views_[v].texelWorldSize, report.depthBias,
-                                             views_[v].cascade ? 1.0f : 0.0f, views_[v].farDistance);
+                                             views_[v].cascade ? 1.0f : -std::max(views_[v].nearDistance, 1e-4f),
+                                             views_[v].farDistance);
     }
     im.block.info = glm::vec4(static_cast<float>(im.resolution), static_cast<float>(cascades),
                               static_cast<float>(quality.shadowPcfTaps), quality.softShadows ? 1.0f : 0.0f);
