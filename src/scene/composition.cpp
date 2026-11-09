@@ -33,6 +33,7 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <future>
 #include <optional>
 #include <array>
@@ -66,7 +67,7 @@ constexpr std::string_view kSceneKeys[] = {
     "wind",       "post",           "environment",    "composition",   "heroes",
     "effects", "entityProfiles", "entities", "fields",
     "staging",    "graph",          "grids",          "materialPrograms", "nodes",
-    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "meshWire", "corruption", "lunarWorld", "portal", "portals", "looks"};
+    "worldEvents", "ecosystem", "astral", "clouds", "attractorWorld", "flight", "meshWire", "corruption", "lunarWorld", "portal", "portals", "looks"};
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
@@ -78,7 +79,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
     "volumeNoiseScale", "volumeNoiseSpeed", "volumeEmission", "volumeMaxDistance",
-    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
+    "shadowCascades", "shadowResolution", "shadowRange", "shadowCasterReach", "shadowSplitLambda", "aoFadeStart", "aoFadeEnd", "aoRadius", "tileDynamics", "ambientOcclusion", "contactShadows", "depthPrepass", "glossyReflections", "volumeSteps", "volumeJitter", "volumeDensityField",
     "volumeShadowSteps", "volumeShadowStrength",
     "volumeColorField", "sky",
     "vortex", "bands"};
@@ -1394,6 +1395,85 @@ void Composition::updateAttractorWorld() {
             m.emissiveIntensity = 1.0f;
         }
     }
+}
+
+// ADR-1956: the flight. The table is built from the ground node's own tiles spec and pitch and the scene's moving
+// ground (its authored terms; a route's extra amplitude is the spec's headroom, live rings its margin), and rebuilt only
+// when one of those changes -- never per frame. The pose is then a lookup at the timeline's time: seek equals play.
+void Composition::applyFlightCamera(float& fovDegrees) {
+    flightRollDegrees_ = 0.0f;
+    if (!flight_.enabled || flight_.route.size() < 2) {
+        return;
+    }
+    const ProceduralGeometry* ground = nullptr;
+    for (const ProceduralGeometry& p : scene_.procedurals) {
+        if (p.distribution.generator.isTiles() &&
+            (flight_.ground.empty() || p.name == flight_.ground ||
+             (p.name.size() > flight_.ground.size() && p.name.ends_with(flight_.ground)))) {
+            ground = &p;
+            break;
+        }
+    }
+    if (ground == nullptr) {
+        return;
+    }
+    const TileDynamics& dyn = volumeSetting_.tileDynamics;
+    const glm::vec3 offset(ground->distributionTransform.matrix()[3]);
+    // The key is cheap (no JSON per frame): the flight's and the moving ground's numbers, the tiles' own hash, the
+    // pitch and the offset.
+    std::uint64_t key = 1469598103934665603ull;
+    const auto mix = [&key](float v) {
+        key ^= std::bit_cast<std::uint32_t>(v);
+        key *= 1099511628211ull;
+    };
+    for (const float v : {flight_.startTime, flight_.duration, flight_.speed, flight_.minClearance,
+                          flight_.clearanceRadius, flight_.amplitudeHeadroom, flight_.climbRate, flight_.fallRate,
+                          flight_.smoothing, flight_.groundSmoothing, flight_.lookAhead, flight_.pitchBias,
+                          flight_.pitchMin, flight_.pitchMax, flight_.bankLimit, flight_.bankGain,
+                          flight_.loop ? 1.0f : 0.0f, ground->distribution.generator.cellSize, offset.x, offset.y,
+                          offset.z, dyn.amplitude, dyn.breathingAmplitude, dyn.breathingPeriod,
+                          dyn.breathingWavelength, dyn.rolling.x, dyn.rolling.y, dyn.rings.amplitude, dyn.rings.speed,
+                          dyn.rings.wavelength, dyn.rings.width, dyn.rings.decay}) {
+        mix(v);
+    }
+    for (const FlightWaypoint& w : flight_.route) {
+        mix(w.position.x);
+        mix(w.position.y);
+        mix(w.altitude);
+        mix(w.speed);
+    }
+    for (const TileWave& w : dyn.waves) {
+        for (const float v : {w.circular ? 1.0f : 0.0f, w.amplitude, w.wavelength, w.speed, w.direction, w.centre.x,
+                              w.centre.y, w.sharpness, w.onLand, w.onWater, w.phase}) {
+            mix(v);
+        }
+    }
+    for (const TileEvent& e : dyn.events) {
+        mix(e.time);
+        mix(e.position.x);
+        mix(e.position.y);
+        mix(e.strength);
+    }
+    key ^= ground->distribution.generator.tiles.hash();
+    key *= 1099511628211ull;
+    if (key != flightKey_ || !flightTable_.valid()) {
+        const FlightGround tiles = tileFlightGround(ground->distribution.generator.tiles, dyn,
+                                                    ground->distribution.generator.cellSize, flight_.amplitudeHeadroom);
+        // world <-> the ground's generator space: a translation (the tiles' transform is never rotated or scaled)
+        const FlightGround world = [tiles, offset](float x, float z, float t) {
+            return tiles(x - offset.x, z - offset.z, t) + offset.y;
+        };
+        flightTable_ = buildFlightTable(flight_, world, flightLiveMargin(dyn, flight_.amplitudeHeadroom));
+        flightKey_ = key;
+    }
+    const FlightPose pose = flightPoseAt(flight_, flightTable_, currentTime_);
+    scene_.camera.position = pose.eye;
+    scene_.camera.target = pose.target;
+    scene_.camera.farPlane = std::max(scene_.camera.farPlane, 4000.0f);
+    if (flight_.fov > 0.0f) {
+        fovDegrees = flight_.fov;
+    }
+    flightRollDegrees_ = pose.rollDegrees;
 }
 
 void Composition::applyAttractorCamera(float& fovDegrees) {
@@ -9765,6 +9845,7 @@ void Composition::applyParameters() {
     }
     applyAstralCamera(fov); // ADR-1221: the conductor places the camera, and shake and breath still compose with it
     applyAttractorCamera(fov); // ADR-1850: the generated composition places it, likewise
+    applyFlightCamera(fov); // ADR-1956: the flight over a tiles ground, likewise
     // Shake last, and in every mode: it is an offset applied to whatever placed the camera, which
     // is what makes it compose with an orbit, a spline ride and a baked cinematic move alike
     // instead of being a fourth way to position a camera (ADR-098, brief section 14).
@@ -9796,6 +9877,7 @@ void Composition::applyParameters() {
         float roll = cameraRoll_ != nullptr ? cameraRoll_->value() : 0.0f;
         roll += splineBankDegrees(); // ADR-1166
         roll += attractorRollDegrees_; // ADR-1853: the flythrough banks through the bends
+        roll += flightRollDegrees_; // ADR-1956
         glm::vec3 up = splineCameraUp(); // ADR-1541: the world's up unless the spline's frame is asked for
         const glm::vec3 forward = scene_.camera.target - scene_.camera.position;
         if (roll != 0.0f && glm::dot(forward, forward) > 1e-12f) {
@@ -9920,6 +10002,7 @@ void Composition::applyParameters() {
         env.shadowCasterReach = volumeSetting_.shadowCasterReach; // ADR-1858
         env.aoFadeStart = volumeSetting_.aoFadeStart; // CP-A r3: the AO distance fade
         env.aoFadeEnd = volumeSetting_.aoFadeEnd;
+        env.aoRadius = volumeSetting_.aoRadius; // Phase 5
         env.tileDynamics = volumeSetting_.tileDynamics; // ADR-1953: the authored block, then its parameters
         if (tileDynamicsAuthored_) {
             const TileDynamicsParams& p = tileDynamicsParams_;
@@ -11000,6 +11083,9 @@ nlohmann::json Composition::toJson() const {
         if (tileDynamicsAuthored_) { // ADR-1953
             environment["tileDynamics"] = tileDynamicsToJson(volumeSetting_.tileDynamics);
         }
+        if (volumeSetting_.aoRadius > 0.0f) { // Phase 5: written only when set
+            environment["aoRadius"] = volumeSetting_.aoRadius;
+        }
         if (volumeSetting_.aoFadeEnd > volumeSetting_.aoFadeStart) { // CP-A r3: written only when set
             environment["aoFadeStart"] = volumeSetting_.aoFadeStart;
             environment["aoFadeEnd"] = volumeSetting_.aoFadeEnd;
@@ -11844,6 +11930,9 @@ nlohmann::json Composition::toJson() const {
     if (attractorWorld_.enabled) {
         j["attractorWorld"] = attractorWorldToJson(attractorWorld_); // ADR-1850
     }
+    if (!flight_.route.empty()) {
+        j["flight"] = flightToJson(flight_); // ADR-1956
+    }
     if (!materialPrograms_.empty()) {
         json programs = json::array();
         for (const MaterialProgram& mp : materialPrograms_) {
@@ -12376,6 +12465,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                                       FloatKey{"shadowCasterReach", &v.shadowCasterReach},
                                       FloatKey{"aoFadeStart", &v.aoFadeStart},
                                       FloatKey{"aoFadeEnd", &v.aoFadeEnd},
+                                      FloatKey{"aoRadius", &v.aoRadius},
                                       FloatKey{"shadowSplitLambda", &v.shadowSplitLambda}}) {
                 auto value = readFloat(e, fk.key, *fk.target);
                 if (!value) {
@@ -12789,6 +12879,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return fail("scene file '{}': {}", scenePath.string(), added.error().message);
             }
         }
+    }
+    if (j.contains("flight")) { // ADR-1956
+        auto f = flightFromJson(j.at("flight"));
+        if (!f) {
+            return fail("scene file '{}': {}", scenePath.string(), f.error().message);
+        }
+        comp->flight_ = std::move(*f);
     }
     if (j.contains("meshWire")) { // ADR-1862
         auto wire = meshWireFromJson(j.at("meshWire"));

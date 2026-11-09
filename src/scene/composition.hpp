@@ -19,6 +19,7 @@
 #include "assets/asset_registry.hpp"
 #include "core/error.hpp"
 #include "graph/graph.hpp"
+#include "scene/flight.hpp"
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
 #include "scene/lunar_world.hpp"
@@ -2542,6 +2543,16 @@ private:
     void updateAttractorWorld(); // the finals, and a regeneration when a structural one changed
     void applyAttractorCamera(float& fovDegrees); // the composed camera, when it drives
     float attractorRollDegrees_ = 0.0f; // ADR-1853: the flythrough's bank this frame
+    // ADR-1956: the flight over a tiles ground (scene file "flight"), built into a table when its spec or ground changes.
+    void applyFlightCamera(float& fovDegrees);
+    float flightRollDegrees_ = 0.0f;
+    FlightSpec flight_;
+    FlightTable flightTable_;
+    std::uint64_t flightKey_ = 0;
+public:
+    [[nodiscard]] const FlightSpec& flight() const { return flight_; }
+    [[nodiscard]] const FlightTable& flightTable() const { return flightTable_; }
+private:
     int attractorSunLight_ = -1;        // ADR-1857: the key light's index in scene_.lights, or -1
     std::vector<std::size_t> attractorChunks_; // ADR-1862: the terrain chunks' indices in scene_.entities
     std::optional<AstralParameters> astralParams_; // its live knobs, while attached

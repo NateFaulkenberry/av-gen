@@ -3754,8 +3754,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     }
     // ---- ambient occlusion (ADR-034): sized here so the frame block can carry its resolution ----
     {
-        const float aoRadius = std::clamp(glm::length(scene.camera.target - scene.camera.position) * 0.05f,
-                                          0.15f, 4.0f);
+        // Musical Geography, Phase 5: an authored radius wins (metres); 0 keeps the automatic one.
+        const float aoRadius = scene.environment.aoRadius > 0.0f
+                                   ? std::clamp(scene.environment.aoRadius, 0.05f, 16.0f)
+                                   : std::clamp(glm::length(scene.camera.target - scene.camera.position) * 0.05f,
+                                                0.15f, 4.0f);
         QualitySettings aoQuality = qualitySettings_;
         aoQuality.ambientOcclusion = aoQuality.ambientOcclusion && toggles_.ao && scene.environment.ambientOcclusion;
         ao_->update(hdr_.width(), hdr_.height(), linearDepth_.view, prepassNormal_.view, aoQuality, time.frameIndex,
