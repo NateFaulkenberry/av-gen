@@ -1038,3 +1038,35 @@ lit vein. The sea glows with it.
 |---|---|---|---|---|---|
 | Day | 15.5 ms | 18.5 | 20.6 | 43.0 | 74.8 ms |
 | Night | 12.3 ms | 15.3 | 16.5 | 21.0 | 32.6 ms |
+
+### CP-C r2: the inhabitants (2026-11-09, on engineering 3a8df7cf)
+
+**The cast:** `build.py --characters` (`CAST`, `PREFS`, `SPRING`) places 14 Glowmere aliens along the whole r2 route,
+each with its own hopping habit:
+- 3 on sea slabs, preferring water;
+- 4 on the shore and the path (`preferPath` lowered to 0.3);
+- 4 on the hills and the sweep, preferring crowns;
+- 3 on the river banks.
+
+Each sits 8–16 m off the flight line, so it crosses the lower frame. The camera rule is unchanged: they are passed,
+never framed.
+
+**Hop:** chance 0.5, home radius 30 m, goals 2–5 tiles, apex 3 m, landing strength 1.2.
+
+**The landing spring at 4 m tiles:** depth 1.1 m, frequency 1.4, damping 0.16, ripple 16 m/s over 14 m. The ripple
+rings read at cruise height (the day sheet at +43 s).
+
+**Renders:** `06-characters/cpc-r2-{day,night}-feline-30-120s.mp4`, with contact sheets.
+
+**Whole-route perf** (1080p Ultra, 88 s):
+
+| | GPU p50 | GPU p95 | GPU p99 | CPU work p50 | Worst frame |
+|---|---|---|---|---|---|
+| Day | 14.3 ms | 16.8 | 18.4 | 2.1 ms | 31.6 ms |
+| Night | 14.7 ms | 17.3 | 19.0 | 3.0 ms | 33.0 ms |
+
+**Open:**
+- At night the aliens are dark silhouettes and hard to read off the path. A faint self-glow or rim, in the night
+  accent, would fix it (this is mine to do).
+- The river-bank and crown aliens are seen less often than the sea and path ones, because the flight is higher and
+  turning there.
