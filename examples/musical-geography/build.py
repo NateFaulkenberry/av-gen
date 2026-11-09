@@ -66,17 +66,16 @@ TILE_SCALE = 4.0   # owner, 2026-11-09: 4 m tiles (--tile-scale overrides)
 # The camera looks where it travels (lookAhead), never above the horizon (pitchMax 0), a little down (pitchBias), so the
 # climb keeps the land in frame; banks only from the turns. Tile-scale independent.
 FLIGHT = {
-    "ground": "mgTiles1", "startTime": 30.0, "duration": 60.0, "speed": 20.0, "fov": 46.0,
+    "ground": "mgTiles1", "startTime": 30.0, "duration": 90.0, "speed": 22.0, "fov": 46.0,
     "route": [
-        {"position": [60, -250], "altitude": 12},          # the bay
-        {"position": [140, -420], "altitude": 6},          # low over the moving sea
-        {"position": [268, -540], "altitude": 8},          # the river mouth
-        {"position": [318, -660], "altitude": 10},         # up the valley, on the river's own bends
-        {"position": [258, -780], "altitude": 11},
-        {"position": [222, -900], "altitude": 13},
-        {"position": [295, -1030], "altitude": 40, "speed": 24},   # the climb begins
-        {"position": [312, -1160], "altitude": 80, "speed": 26},   # the reveal
-        {"position": [240, -1300], "altitude": 95, "speed": 26},
+        {"position": [60, -250], "altitude": 12},                              # the bay
+        {"position": [60, -430], "altitude": 6},                               # low over the moving sea
+        {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 10},   # cross the shore
+        {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 12},       # along the lit path
+        {"position": [-300, -1050], "altitude": 150, "speed": 30, "nadir": 6},  # the top-down pass, ~37 tiles wide
+        {"position": [100, -1000], "altitude": 60, "speed": 30},               # dive east toward the river
+        {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 12},     # up the valley on the river
+        {"position": [300, -1560], "altitude": 90, "speed": 26},               # the climb to the reveal
     ],
     "minClearance": 4, "clearanceRadius": 10, "amplitudeHeadroom": 2,
     "climbRate": 12, "fallRate": 25, "lookAhead": 3.0, "pitchBias": 0.22,
@@ -95,7 +94,8 @@ def scene_doc(state, interim, camera_name):
         "skybox": True,
         "shadowRange": 480.0,   # the low suns' long shadows reach the reveal's middle ground (+0.7 ms; 220 changed no pixel there)
         "depthPrepass": True,
-        "aoRadius": 1.2,   # 4 m tiles (0.6 at 1 m); Phase 5: the automatic radius (5% of the look-ahead distance) welled every tile gap
+        "horizonFill": 1.0,   # ADR-1962: below the horizon the sky is the fog at infinity -- no band past the tiles
+        "aoRadius": 1.0,   # 4 m tiles (engineering: the gaps are 0.34 m; 0.6 at 1 m); Phase 5: the automatic radius (5% of the look-ahead distance) welled every tile gap
         # GTAO, faded out with distance (ADR-1951): it darkened every far step riser into dark dashes (97fe0568).
         # The band is per view (AO_BANDS): near ground only.
         "ambientOcclusion": True,
@@ -114,7 +114,8 @@ def scene_doc(state, interim, camera_name):
     else:
         prog = lambda cell: "mgTile%dx_%s" % (int(cell), state)   # noqa: E731
         under = "mgUnder_%s" % state
-        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under, s.get("side_px", 0.0), TILE_SCALE)
+        nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under, s.get("side_px", 0.0), TILE_SCALE,
+                                 look.hexlin(s["land"][1]))
         programs = [look.tile_program(state, c, scale=TILE_SCALE) for c in (1.0, 2.0, 4.0)]
         programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0,
                                           scale=TILE_SCALE, contour=False))
@@ -126,6 +127,7 @@ def scene_doc(state, interim, camera_name):
         "lights": [look.sun_light(state), look.moon_light(state)] + ([look.fill_light(state)] if look.STATES[state].get("fill_int", 0) > 0 else []),
         "materialPrograms": programs,
     }
+    doc["camera"]["far"] = 200000.0   # the 64 m far ring reaches 4.5 km
     if FLY:
         doc["flight"] = FLIGHT
     return doc

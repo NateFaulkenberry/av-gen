@@ -43,7 +43,7 @@ RINGS = [
     # name, cellSize, viewDistance, align, hole (finer ring), thickness, castsShadow, gap (tileSize / cell)
     ("mgTiles1", 1.0, FINE_VIEW, 4, None, 0.30, True, 0.915),
     ("mgTiles2", 2.0, FINE_VIEW * 2, 2, {"cellSize": 1.0, "viewDistance": FINE_VIEW, "align": 4}, 0.36, True, 1.0),
-    ("mgTiles4", 4.0, FINE_VIEW * 4, 1, {"cellSize": 2.0, "viewDistance": FINE_VIEW * 2, "align": 2}, 0.72, False, 1.0),
+    ("mgTiles4", 4.0, FINE_VIEW * 4, 4, {"cellSize": 2.0, "viewDistance": FINE_VIEW * 2, "align": 2}, 0.72, False, 1.0),
 ]
 UNDERLAY = dict(cellSize=4.0, viewDistance=FINE_VIEW, y=-2.2, thickness=3.0)
 
@@ -52,7 +52,7 @@ UNDERLAY = dict(cellSize=4.0, viewDistance=FINE_VIEW, y=-2.2, thickness=3.0)
 FLATS_WISH = {"step": 0.32, "rise": 0.05, "floodEvery": 3}
 
 
-def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0, scale=1.0):
+def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0, scale=1.0, far_rgb=(0.6, 0.45, 0.7)):
     """`scale` multiplies the tile (pitch, size, thickness, skirt) -- the land and the ring distances stay in metres."""
     S = scale
     nodes = []
@@ -73,6 +73,17 @@ def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0, sca
         if not shadow:
             proc["castsShadow"] = False
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": proc})
+    # ADR-1962: one far ring of 64 m cells out to 4.5 km, where the fog is opaque, so the ground reaches the horizon.
+    # Plain material (it is all fog out there); its hole is the coarsest ring's window.
+    far_cell, coarse = 64.0, RINGS[-1]
+    nodes.append({"name": "mgTiles64", "kind": "procedural", "position": [0, 0, 0], "procedural": {
+        "source": {"kind": "box", "size": [far_cell, 6.0, far_cell]}, "slabs": True, "castsShadow": False,
+        "lod": {"cull": True}, "material": {"baseColor": list(far_rgb), "roughness": 0.8},
+        "distribution": {"kind": "generator", "generator": {
+            "name": "tiles", "version": 1, "cellSize": far_cell, "viewDistance": 4480.0, "align": 4,
+            "finePitch": coarse[1] * S, "skirt": 40.0,
+            "hole": {"cellSize": coarse[1] * S, "viewDistance": coarse[2], "align": coarse[3]},
+            "tiles": dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S))}}}})
     u = UNDERLAY
     gen = {"name": "tiles", "version": 1, "cellSize": u["cellSize"] * S, "viewDistance": u["viewDistance"], "align": 1,
            "finePitch": S, "tiles": dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S)),
