@@ -58,7 +58,7 @@ STATES = {
         land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
         path="#FFD7A0", path_emit=0.6, pad="#FFB070", pad_emit=0.0,
-        drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.6, crest_gain=0.6,
+        drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.45, crest_gain=0.35,
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
         side_px=12,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
@@ -71,7 +71,7 @@ STATES = {
         land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"],
         water=["#0E1452", "#18227A", "#2443B0", "#3F78FF"], shallow="#2A3AA0", under="#120E3A",
         path="#FF5FB0", path_emit=5.0, pad="#FF4FA8", pad_emit=6.0,
-        drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=5.0,
+        drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=1.4,
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
         sun_az_offset=-1.01,   # radians (ADR-1961)
@@ -149,6 +149,37 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
     }
 
 
+# ---- the moving ground (ADR-1953), authored for restraint: the sea moves, the land breathes, the music adds -------------
+CONTOUR_INTERVAL = 3.0   # metres between contour lines (04- §6)
+
+
+def tile_dynamics():
+    """Two crossing wave trains on the water (the land barely feels them), a slow regional breath, a drift, and rings
+    that onsets drop ahead of the camera. Quiet audio leaves a calm sea, not a constant swell (04- §6, brief §10)."""
+    return {
+        "amplitude": 0.35,                     # response.low adds up to +0.6 (routes)
+        "waves": [
+            {"kind": "planar", "amplitude": 1.0, "wavelength": 46, "speed": 6, "direction": 205, "sharpness": 0.55,
+             "onLand": 0.08, "onWater": 1, "crest": 0.6},
+            {"kind": "planar", "amplitude": 0.6, "wavelength": 29, "speed": 4.5, "direction": 265, "sharpness": 0.35,
+             "onLand": 0.08, "onWater": 1, "crest": 0.6},
+        ],
+        "breathing": {"amplitude": 0.12, "period": 18, "wavelength": 800},
+        "rolling": [0.4, 0.0],
+        "rings": {"amplitude": 1.6, "speed": 45, "wavelength": 14, "width": 12, "decay": 2.4, "crest": 1},
+        "contour": {"interval": CONTOUR_INTERVAL, "offset": 0.0},
+    }
+
+
+def audio_routes():
+    """Feline Footwear (and any song): lows lift the waves, onsets drop a ring 150 m ahead. Nothing else is driven."""
+    return [
+        {"source": "response.low", "target": "env/tiles/amplitude", "amount": 0.6, "op": "add", "polarity": "unipolar"},
+        {"source": "response.onset", "target": "env/tiles/rings/trigger", "amount": 1.0, "op": "add",
+         "polarity": "unipolar"},
+    ]
+
+
 def fog_medium(state):
     """The single fog medium (ADR-705). Density grows with distance (horizonDensity) so near and mid ground stay
     clean and the far ring fades fully (request 1977, 04- §4). Thinner by day, denser at night: fog_mult."""
@@ -212,6 +243,8 @@ BORDER_DARK_FINE = 0.72  # r7: the 1x ring paints the same prefiltered lattice a
 UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: the gaps read as shadow, not as a
                           # second, blue-black surface speckling through every hillside
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
+CREST_EDGE = (0.72, 0.98)  # crest light only near the peaks: a broad crest lit the crossing trains as a diamond grid
+CONTOUR_BAND = 0.06       # the contour line's width on the top's border, fraction of the half-size
 BORDER_BAND = 0.03       # tileBorder's band (engineering's fixture value)
 RING_THICKNESS = {1.0: 0.30, 2.0: 0.36, 4.0: 0.72}
 JITTER = 0.04            # per-tile value jitter (04- §4 had 0.0225; raised for the far rings, §11; the op budget
@@ -220,7 +253,7 @@ PAD_HEIGHT = (17.0, 20.0)              # crowns light only up here (04- §6)
 PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 
 
-def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0):
+def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0, contour=True):
     """The slab's whole look, for one palette state and one ring.
 
     Reads: localPosition through engineering's tileBorder (ADR-1976: the border's coverage, prefiltered per axis below
@@ -301,6 +334,25 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     bd = border if border is not None else (s.get("border_fine", BORDER_DARK_FINE) if cell == 1.0 else BORDER_DARK)
     add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, shade, shade * bd], "value": 1.0})
     add({"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3})
+    # Phase 3: contour lines on the flagged sides (ADR-1970) and the crest light (ADR-1971), from tileContour
+    eg, cg = s.get("edge_gain", 0.0), s.get("crest_gain", 0.0)
+    if contour and (eg > 0 or cg > 0):
+        add({"kind": "input", "input": "instanceEmissive", "dst": 1})
+        add({"kind": "tileContour", "dst": 3, "srcA": 0, "srcB": 1, "constant": [half, half, CONTOUR_BAND, 0],
+             "value": 1.0})
+        add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(0)})                     # contour coverage
+        add({"kind": "input", "input": "instanceRandom", "dst": 7})                          # land only: the sea's
+        add({"kind": "remap", "dst": 7, "srcA": 7, "constant": [0, 1, 1, 0], "value": 1.0})   # waves crossing 0 m
+        add({"kind": "swizzle", "dst": 7, "srcA": 7, "constant": B(0)})                     # drew closed blobs
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        add({"kind": "constant", "dst": 7, "constant": _c4([v * eg for v in hexlin(s["edge"])])})
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
+        add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(1)})                     # crest
+        add({"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [CREST_EDGE[0], CREST_EDGE[1], 0, 0]})  # peaks only
+        add({"kind": "constant", "dst": 7, "constant": _c4([v * cg for v in hexlin(s["water"][3])])})
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
     add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5})                              # emission: top only
     return {"name": name, "ops": o, "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4,
             "emissionIntensity": 1.0, "opacity": -1}

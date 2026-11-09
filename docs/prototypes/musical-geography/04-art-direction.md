@@ -892,3 +892,37 @@ The stills are `02-terrain/tilescale-*.png`, with the sheet at `tilescale-sheet.
 
 **Recommendation:** 4 m tiles (4×). Set the fine ring to about 240–300 m, the river to about 16 m, and keep the camera
 heights. Not 8×, which looks stair-stepped and blocky. Not flying lower, which doesn't fix the reveal.
+
+### Phase 3 look (2026-11-09, on engineering aa751fdf)
+
+**The moving ground, authored for restraint** (`look.tile_dynamics`):
+- **Waves:** two crossing wave trains on the water.
+  - Wavelengths 46 m and 29 m, speeds 6 and 4.5 m/s, 60° apart.
+  - The land takes 8% of them.
+- **Breathing:** amplitude 0.12 m, period 18 s.
+- **Drift:** a slow roll (0.4).
+- **Rings:** amplitude 1.6, speed 45 m/s, decay 2.4.
+- **Overall amplitude:** 0.35, with `response.low` adding up to +0.6.
+- **Onsets:** `response.onset` drops a ring 150 m ahead (`env/tiles/rings/ahead`).
+- **The underlay:** `childrenMin`.
+
+**Light, through `tileContour`** (my programs; engineering's stand-in crest is not used):
+- **Contour lines:**
+  - Every 3 m, on land only. The sea's waves crossing 0 m had drawn closed blobs, so the water channel masks them out.
+  - Gains by state: day 0, dawn 0.5, sunset 0.45, night 7.
+- **Crest light:**
+  - Peaks only (smoothstep 0.72–0.98). A broad crest lit the two crossing trains as a pink diamond grid on the sea:
+    the neon-grid trap (`03-dynamic/art-p3-sunset-reveal-REJECTED-crest-grid.png`).
+  - Gains: sunset 0.35, night 1.4.
+
+**Cost:** the sunset reveal is GPU p50 25.1 ms (1080p Ultra), inside budget.
+
+**Media** in `03-dynamic/`:
+- stills: `art-p3-*.png`;
+- clips: `art-p3-clip-sunset-reveal-feline-30-40s.mp4` and `art-p3-clip-night-feline-30-40s.mp4`.
+
+**Open:**
+- In the sunset frame the crest peaks read as scattered pink spots on the sea. That is acceptable, but a sharper or
+  thinner crest may read better as moving lines.
+- The rings are hard to see from these cameras: the clip's onsets land 150 m ahead and are faint at that height.
+- The tile scale is still pending the owner's answer. Nothing here depends on it.

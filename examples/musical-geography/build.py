@@ -82,6 +82,7 @@ def scene_doc(state, interim, camera_name):
         "aoFadeEnd": AO_BANDS.get(camera_name, (40.0, 120.0))[1],
         "sky": look.sky(state),
         "dayNight": look.day_night(phase=s["phase"]),
+        "tileDynamics": look.tile_dynamics(),
     }
     env.update(look.fog_medium(state))
     if interim:
@@ -92,7 +93,7 @@ def scene_doc(state, interim, camera_name):
         nodes = world.ring_nodes(prog, look.hexlin(s["under"]), under, s.get("side_px", 0.0), TILE_SCALE)
         programs = [look.tile_program(state, c, scale=TILE_SCALE) for c in (1.0, 2.0, 4.0)]
         programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0,
-                                          scale=TILE_SCALE))
+                                          scale=TILE_SCALE, contour=False))
     doc = {
         "format": "avgen-scene", "version": 1, "name": "musical-geography",
         "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **camera_pose),
@@ -112,7 +113,8 @@ def project_doc(scene_rel, state):
         "format": "avgen-project", "version": 4,
         "assets": {"scene": {"kind": "composition", "path": scene_rel},
                    "audio": AUDIO},
-        "parameters": dict(look.post(state), **{"post/output/dither": 1.0}),
+        "parameters": dict(look.post(state), **{"post/output/dither": 1.0, "env/tiles/rings/ahead": 150.0}),
+        "routes": look.audio_routes(),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                    "path": "renders/musical-geography.mp4"},
     }

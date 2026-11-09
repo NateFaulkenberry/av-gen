@@ -75,7 +75,8 @@ def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0, sca
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": proc})
     u = UNDERLAY
     gen = {"name": "tiles", "version": 1, "cellSize": u["cellSize"] * S, "viewDistance": u["viewDistance"], "align": 1,
-           "finePitch": S, "tiles": dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S))}
+           "finePitch": S, "tiles": dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S)),
+           "childrenMin": True}   # ADR-1953: stands at the lowest fine tile, so moving troughs never uncover it
     nodes.append({"name": "mgUnderlay", "kind": "procedural", "position": [0, 0, 0], "procedural": {
         "source": {"kind": "box", "size": [u["cellSize"] * S, u["thickness"] * S, u["cellSize"] * S]},
         "distribution": {"kind": "generator", "generator": gen},
