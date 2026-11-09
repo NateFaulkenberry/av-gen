@@ -77,16 +77,16 @@ STATES = {
         sun_az_offset=-1.01,   # radians (ADR-1961)
         stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r8: the day treatment -- warm bands over whole hill masses
         side_px=0,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
-        fill=0.3, contrast=1.25,
-        sky_int=1.0, haze=0.55,
+        fill=0.25, contrast=1.3,
+        sky_int=0.95, haze=0.35,
         moon_int=0.0, phase=0.27,
-        sky_zen="#8FB0E8", sky_hor="#FFD3A0", sky_ground="#FFD3A0", fog="#FFD3A0", fog_sun="#FFE2A0",
+        sky_zen="#7FA6E8", sky_hor="#FFD8A8", sky_ground="#FFD8A8", fog="#FFD8A8", fog_sun="#FFE2A0",
         sun="#FFC874", sun_int=4.4, amb="#B8C8D8", amb_int=0.55,
-        land=["#4FA88A", "#7EC48A", "#E0D47A", "#F6B85A", "#FFE2A8"],
+        land=["#2E9C78", "#5CB86A", "#D8CC5A", "#F6AE48", "#FFDC98"],
         water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8", under="#4A6A55",
         path="#F2A93B", path_emit=0.25, pad="#FFC060", pad_emit=0.0,
         drift="#F4C49A", drift_amt=0.28, edge="#FFD27A", edge_gain=0.5, crest_gain=0.4,
-        fog_mult=6.0, exposure=-0.3, saturation=1.3, look="medium-high", bloom=0.25),
+        fog_mult=8.0, exposure=-0.3, saturation=1.5, look="medium-high", bloom=0.25),
 }
 # Contour gains as approved by the owner (04- §11): on at dusk and night, faint or off by day. The sunset key is 0.6
 # (faint); the dusk key between sunset and night brings the lines in at full night strength.
