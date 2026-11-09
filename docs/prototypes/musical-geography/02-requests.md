@@ -603,3 +603,24 @@ Canary, on the same 30 s of flight:
 The work is about 15 ms. The 30 fps figure is the same work at a lower clock, which still fits the frame. No content
 change is needed. The few frames that miss their deadline are CPU stalls (the profile's worst frames have CPU work up
 to 270 ms on a GPU time of 16 ms), not the GPU. Judge GPU cost by the 60 fps run, or by the median.
+
+### Engineering (2026-11-09): the live CPU stalls are the app shell, not the scene
+
+New diagnostic: `AVGEN_SLOW_FRAME_MS=<ms>` logs, for every frame over the threshold, each phase that took over 1 ms.
+
+On 60 s of the feature flight (live, 30 fps, Feline):
+- The one long frame (62–70 ms, at the same place every run, about 13 s after the profile starts) is `events.poll` at
+  26–30 ms: the OS event pump (SDL and Cocoa), in which `engine.update` and `render.record` take under 2 ms.
+- The rest of the 38–41 ms frames are a `ui.build` of 5–9 ms every ~90 frames (3 s), arriving on top of a slow GPU
+  frame (the clock-down above).
+
+Control: the same project with an empty scene (GPU 1.5 ms) has the same `events.poll` stall at ~13 s (26.5 ms), the
+same 3 s `ui.build` spikes, and the same 99.1% of frames on time.
+
+None of the suspects shows in any slow frame:
+- the flight table (built once, before measurement);
+- ring re-centring and uploads (`rr.uploads` is 0 after the first frame);
+- pipeline compiles (no compile in the log, and `compiledMaterials` stays steady);
+- the contour pass (GPU only).
+
+The stalls belong to the app's shell (the event pump and a periodic UI rebuild). They're reported, not fixed here.
