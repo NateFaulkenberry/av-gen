@@ -998,3 +998,43 @@ the contours and the path carry the light.
 - **Day:** 5 serial frames go over 33 ms, at about 14–33 s into the route, which is the path leg and the climb into
   the top-down pass. GPU p99 is 23.9 ms everywhere.
 - **Night:** nothing goes over 33 ms.
+
+### The camera rule for this scene (owner, CP-B, 2026-11-09). It is binding.
+
+Owner, on CP-B: *"the camera ends up soaring too high in the sky… I don't want anything that makes the squares seem
+super tiny"*, and *"prevent doing those camera movements where it looks straight down at the ground, try to keep
+things soaring, plane-like, low to the ground."*
+
+1. **Tiles always read as tiles.**
+   - **Ceiling: 40 m** above the ground. Cruise is 6–12 m; rises go to 20–35 m.
+   - **Minimum on-screen tile size, at 1080p with 4 m tiles:** at least 16 px at the frame centre, even at the
+     ceiling. Cruise gives 40–60 px at the centre, and 100 px and more in the lower third.
+2. **Fly like a low plane, not a drone.**
+   - **No top-down or straight-down looks, anywhere.** The nadir leg is removed.
+   - **Pitch** stays between −14° and 0°: a forward horizon view with a gentle downward look at most (`pitchBias`
+     0.08, `pitchMax` 0).
+   - **Banked, sweeping turns:** bank up to 16° (`bankGain` 2.2).
+   - **Smooth terrain-following rises and falls:** `climbRate` 6, `fallRate` 10.
+3. **Already standing:** the camera looks where it travels, with no orbits, hero shots or head turns.
+
+**CP-B r2 route:**
+1. the bay at 12 m;
+2. the sea at 6 m;
+3. the shore at 9 m;
+4. along the path at 10 m;
+5. a rise over the crowns at 28 m;
+6. a banked sweep at 22 m and 18 m;
+7. up the river at 10 m;
+8. a last rise to 35 m.
+
+**Night river glow:** the night water glows faintly in its crest colour (`water_emit` 0.35), so the river reads as a
+lit vein. The sea glows with it.
+
+**Renders:** `05-camera/cpb-r2-{day,night}-feline-30-120s.mp4`, with contact sheets.
+
+**Whole-route perf** (1080p Ultra, 88 s):
+
+| | GPU p50 | GPU p95 | GPU p99 | Frame p99 (serial) | Worst frame |
+|---|---|---|---|---|---|
+| Day | 15.5 ms | 18.5 | 20.6 | 43.0 | 74.8 ms |
+| Night | 12.3 ms | 15.3 | 16.5 | 21.0 | 32.6 ms |
