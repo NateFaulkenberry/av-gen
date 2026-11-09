@@ -926,3 +926,39 @@ heights. Not 8×, which looks stair-stepped and blocky. Not flying lower, which 
   thinner crest may read better as moving lines.
 - The rings are hard to see from these cameras: the clip's onsets land 150 m ahead and are faint at that height.
 - The tile scale is still pending the owner's answer. Nothing here depends on it.
+
+### 4 m tiles (owner, 2026-11-09) and the CP-B route (Phase 5)
+
+**The baseline is now 4 m tiles** (`build.py` defaults to `--tile-scale 4`):
+- the fine ring at 270 m;
+- the river 16 m wide;
+- contours every 4 m;
+- longer waves (64 m and 44 m) and rings (24 m);
+- `aoRadius` 1.2;
+- crests cut at dawn as well as sunset;
+- the skirt and `childrenMin` scale with the tile.
+
+Four-state stills are `02-terrain/cpa-4m-*.png`. The day reveal is GPU p50 20.1 ms.
+
+**The CP-B route** (`build.FLIGHT`, in metres):
+1. the bay at 12 m;
+2. low over the moving sea at 6 m;
+3. the river mouth;
+4. up the valley on the river's own bends, at 10–13 m;
+5. the climb to the reveal, at 80–95 m.
+
+Camera settings:
+- `pitchMax` 0: it never looks above the horizon, so the climb keeps the land in frame.
+- `pitchBias` 0.22 and `lookAhead` 3 s.
+- Bank at most 8°.
+- No orbits and no hero shots.
+
+**The review flight:** `05-camera/art-p5-flight-day-4m-feline-30-90s.mp4` (day, Feline 30–90 s). The 1,800-frame
+offline render ran at 40 fps. Live profile: GPU p50 13.7 ms (1080p Ultra), measured in the profiler's default
+window.
+
+**Open:**
+- At the top of the climb, the tiles end before the horizon. A pale band of sky-ground sits above the land's edge.
+  Engineering is extending the ground to the horizon.
+- The top-down leg waits for engineering's leg type.
+- The path isn't on this route. A later leg can follow it.
