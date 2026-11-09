@@ -51,3 +51,26 @@ block changes. It is never rebuilt per frame.
   - the JSON format.
 - **Not yet built:** named targets (request 1979) and the top-down leg, both CP-B material. Strange Attractor keeps its
   own builder, so the refactor onto this module is deferred and its camera is untouched.
+
+## Amendment (2026-11-09): named features and the top-down leg (request 1979)
+
+`resolveFlightRoute` expands a route against the ground's tiles before the build:
+- **`follow`**: `"follow": "path" | "river"` makes the waypoint a leg along that polyline, from `from` to `to`
+  (fractions of its length, either direction), `offset` metres to the right of the direction flown.
+- **`snap`**: `"snap": "shore" | "crown"` moves the waypoint's `position` (a hint) to the strongest shoreline or crown
+  top within `snapRadius`. The search maximises the tile's shore channel, or its flat channel then height.
+
+**The top-down leg:** `"nadir": seconds` on a waypoint. As the flight passes it, the pitch eases to −90° and back:
+30% easing in, 40% held, 30% easing out. Screen-up follows the heading and turns to the travel direction itself on the
+leg, so there is no flip at the nadir. The bank fades out on the leg. The flight's pose now carries its up vector, and
+the scene camera uses it.
+
+Tests (`[flight]`):
+- follow points lie at the offset from the path;
+- the snapped point sits on the shoreline;
+- following a missing river is refused;
+- the leg reaches straight down, lasts its span, and keeps screen-up continuous (consecutive dot product > 0.99) and
+  perpendicular to the aim;
+- screen-up at the nadir is the travel direction;
+- there is no bank at the nadir;
+- the look-where-it-travels test excludes the leg.

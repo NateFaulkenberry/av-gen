@@ -132,13 +132,24 @@ AlongOut along(const Dense& d, bool loop, float s) {
 } // namespace
 
 Result<void> validateFlight(const FlightSpec& f) {
-    if (f.route.size() < 2) {
-        return fail("flight: the route needs at least two waypoints");
+    const bool follows = std::any_of(f.route.begin(), f.route.end(), [](const FlightWaypoint& w) { return !w.follow.empty(); });
+    if (f.route.size() < 2 && !follows) {
+        return fail("flight: the route needs at least two waypoints (or a leg that follows a feature)");
     }
     for (const FlightWaypoint& w : f.route) {
         if (!std::isfinite(w.position.x) || !std::isfinite(w.position.y) || !std::isfinite(w.altitude) ||
             !std::isfinite(w.speed)) {
             return fail("flight: a waypoint's position, altitude and speed must be finite");
+        }
+        if (!w.follow.empty() && w.follow != "path" && w.follow != "river") {
+            return fail("flight: a waypoint follows \"path\" or \"river\" (got \"{}\")", w.follow);
+        }
+        if (!w.snap.empty() && w.snap != "shore" && w.snap != "crown") {
+            return fail("flight: a waypoint snaps to \"shore\" or \"crown\" (got \"{}\")", w.snap);
+        }
+        if (!(w.from >= 0.0f && w.from <= 1.0f) || !(w.to >= 0.0f && w.to <= 1.0f) || !std::isfinite(w.offset) ||
+            !(w.snapRadius > 0.0f) || !(w.nadir >= 0.0f) || w.nadir > 60.0f) {
+            return fail("flight: from and to are 0..1, snapRadius positive, nadir 0..60 s");
         }
     }
     const auto positive = [](float v) { return std::isfinite(v) && v > 0.0f; };
@@ -170,6 +181,77 @@ float flightLiveMargin(const TileDynamics& dyn, float amplitudeHeadroom) {
     return std::abs(dyn.rings.amplitude * dyn.amplitude) * std::max(amplitudeHeadroom, 1.0f);
 }
 
+namespace {
+
+// A polyline's point and unit direction at arc length s (clamped).
+std::pair<glm::vec2, glm::vec2> polylineAt(const std::vector<glm::vec2>& line, const std::vector<float>& arc, float s) {
+    s = std::clamp(s, 0.0f, arc.back());
+    std::size_t i = 1;
+    while (i + 1 < arc.size() && arc[i] < s) ++i;
+    const glm::vec2 seg = line[i] - line[i - 1];
+    const float len = arc[i] - arc[i - 1];
+    const float t = len > 1e-6f ? (s - arc[i - 1]) / len : 0.0f;
+    const glm::vec2 dir = glm::dot(seg, seg) > 1e-12f ? glm::normalize(seg) : glm::vec2(1.0f, 0.0f);
+    return {glm::mix(line[i - 1], line[i], t), dir};
+}
+
+} // namespace
+
+Result<FlightSpec> resolveFlightRoute(const FlightSpec& spec, const TileTerrainSpec& tiles) {
+    FlightSpec out = spec;
+    out.route.clear();
+    for (const FlightWaypoint& w : spec.route) {
+        if (!w.follow.empty()) {
+            const std::vector<glm::vec2>& line = w.follow == "path" ? tiles.path : tiles.river;
+            if (line.size() < 2) {
+                return fail("flight: a waypoint follows the {}, and the ground has none", w.follow);
+            }
+            std::vector<float> arc(line.size(), 0.0f);
+            for (std::size_t i = 1; i < line.size(); ++i) arc[i] = arc[i - 1] + glm::length(line[i] - line[i - 1]);
+            const float a = w.from * arc.back();
+            const float b = w.to * arc.back();
+            const int steps = std::max(1, static_cast<int>(std::abs(b - a) / 20.0f));
+            for (int k = 0; k <= steps; ++k) {
+                const float s = a + (b - a) * static_cast<float>(k) / static_cast<float>(steps);
+                auto [p, d] = polylineAt(line, arc, s);
+                if (b < a) d = -d;
+                FlightWaypoint q = w;
+                q.follow.clear();
+                q.position = p + glm::vec2(-d.y, d.x) * w.offset; // `offset` to the right of the direction flown
+                q.nadir = k == steps / 2 ? w.nadir : 0.0f;          // a top-down leg on a follow leg: at its middle
+                out.route.push_back(q);
+            }
+            continue;
+        }
+        FlightWaypoint q = w;
+        if (!w.snap.empty()) {
+            // the best point near the hint: the shoreline (the shore channel's peak) or a crown's top (the flat channel,
+            // then height), searched on a grid within snapRadius; ties go to the nearest
+            const float step = std::max(2.0f, w.snapRadius / 60.0f);
+            float best = -1.0f;
+            float bestDist = 1e30f;
+            for (float dz = -w.snapRadius; dz <= w.snapRadius; dz += step) {
+                for (float dx = -w.snapRadius; dx <= w.snapRadius; dx += step) {
+                    const float dist = std::sqrt(dx * dx + dz * dz);
+                    if (dist > w.snapRadius) continue;
+                    const glm::vec2 p = w.position + glm::vec2(dx, dz);
+                    const TileSample t = tileSample(tiles, p.x, p.y);
+                    const float score = w.snap == "shore" ? t.shore : t.flat + 1e-3f * t.height;
+                    if (score > best + 1e-6f || (std::abs(score - best) <= 1e-6f && dist < bestDist)) {
+                        best = score;
+                        bestDist = dist;
+                        q.position = p;
+                    }
+                }
+            }
+            q.snap.clear();
+        }
+        out.route.push_back(q);
+    }
+    if (auto r = validateFlight(out); !r) return std::unexpected(r.error());
+    return out;
+}
+
 FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground, float liveMargin) {
     FlightTable out;
     if (!validateFlight(spec) || !ground) {
@@ -181,11 +263,17 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
     // 1. the route by time: arc length advances at the local speed
     std::vector<glm::vec2> xz(static_cast<std::size_t>(n));
     std::vector<float> altitude(static_cast<std::size_t>(n));
+    // the sample at which the flight first passes each waypoint (the dense route has 64 points per leg)
+    std::vector<int> passed(spec.route.size(), -1);
     float s = 0.0f;
     for (int k = 0; k < n; ++k) {
         const AlongOut a = along(dense, spec.loop, s);
         xz[static_cast<std::size_t>(k)] = a.xz;
         altitude[static_cast<std::size_t>(k)] = a.altitude;
+        for (std::size_t j = 0; j < spec.route.size(); ++j) {
+            const std::size_t at = std::min(j * 64, dense.arc.size() - 1);
+            if (passed[j] < 0 && s >= dense.arc[at]) passed[j] = k;
+        }
         s += a.speed / rate;
     }
     xz = smoothSamples(xz, spec.smoothing * rate);
@@ -261,12 +349,52 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
         const std::vector<glm::vec3> sm = smoothSamples(aim, 0.5f * rate);
         for (std::size_t i = 0; i < aim.size(); ++i) aim[i] = glm::normalize(sm[i]);
     }
+    // The heading: the aim's own horizontal direction (the travel's, looked along). Kept apart, so the top-down leg
+    // has a screen-up when the aim itself has no horizontal part.
+    std::vector<glm::vec2> heading(aim.size());
+    for (std::size_t i = 0; i < aim.size(); ++i) {
+        const glm::vec2 h(aim[i].x, aim[i].z);
+        heading[i] = glm::dot(h, h) > 1e-12f ? glm::normalize(h) : (i > 0 ? heading[i - 1] : glm::vec2(1.0f, 0.0f));
+    }
+    // The top-down leg: the pitch eases to -90 degrees and back over `nadir` seconds centred on the waypoint
+    // (30% in, 40% held, 30% out), the heading kept, so screen-up is the travel direction through the nadir.
+    std::vector<float> nadir(aim.size(), 0.0f);
+    for (std::size_t j = 0; j < spec.route.size(); ++j) {
+        const float span = spec.route[j].nadir;
+        if (!(span > 0.0f) || passed[j] < 0) continue;
+        for (std::size_t i = 0; i < aim.size(); ++i) {
+            const float u = (static_cast<float>(i) - static_cast<float>(passed[j])) / (span * rate) + 0.5f;
+            const auto ease = [](float e0, float e1, float x) {
+                const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+                return t * t * (3.0f - 2.0f * t);
+            };
+            nadir[i] = std::max(nadir[i], ease(0.0f, 0.3f, u) * (1.0f - ease(0.7f, 1.0f, u)));
+        }
+    }
+    // On the leg, screen-up turns from the look-ahead heading to the direction of travel itself (the eye's own
+    // velocity), so straight down the picture runs up the screen the way the drone is going.
+    for (std::size_t i = 0; i < aim.size(); ++i) {
+        if (!(nadir[i] > 0.0f)) continue;
+        const std::size_t a = i > 0 ? i - 1 : i;
+        const std::size_t b = i + 1 < eyes.size() ? i + 1 : i;
+        glm::vec2 travel(eyes[b].x - eyes[a].x, eyes[b].z - eyes[a].z);
+        if (glm::dot(travel, travel) > 1e-12f) {
+            const glm::vec2 h = glm::mix(heading[i], glm::normalize(travel), nadir[i]);
+            if (glm::dot(h, h) > 1e-12f) heading[i] = glm::normalize(h);
+        }
+    }
+    for (std::size_t i = 0; i < aim.size(); ++i) {
+        if (!(nadir[i] > 0.0f)) continue;
+        const float pitch = std::asin(std::clamp(aim[i].y, -1.0f, 1.0f));
+        const float p = pitch + (-0.5f * kPi - pitch) * nadir[i];
+        aim[i] = glm::vec3(heading[i].x * std::cos(p), std::sin(p), heading[i].y * std::cos(p));
+    }
     // 5. bank toward the turn, from the turn rate, through a tanh limit
-    std::vector<float> heading(aim.size());
-    for (std::size_t i = 0; i < aim.size(); ++i) heading[i] = std::atan2(aim[i].z, aim[i].x);
+    std::vector<float> yaw(aim.size());
+    for (std::size_t i = 0; i < aim.size(); ++i) yaw[i] = std::atan2(heading[i].y, heading[i].x);
     std::vector<float> turn(aim.size(), 0.0f);
     for (std::size_t i = 1; i + 1 < aim.size(); ++i) {
-        float dh = heading[i + 1] - heading[i - 1];
+        float dh = yaw[i + 1] - yaw[i - 1];
         while (dh > kPi) dh -= 2.0f * kPi;
         while (dh < -kPi) dh += 2.0f * kPi;
         turn[i] = dh * rate * 0.5f; // radians per second
@@ -275,11 +403,13 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
     const float limit = glm::radians(spec.bankLimit);
     out.eye.resize(eyes.size());
     out.aim = aim;
+    out.heading = heading;
+    out.nadir = nadir;
     out.clearance = clear;
     for (std::size_t i = 0; i < eyes.size(); ++i) {
-        // degrees of bank per degree/second of turn = bankGain, so radians/radians the same ratio
+        // degrees of bank per degree/second of turn = bankGain, so radians/radians the same ratio; none at the nadir
         const float roll = limit > 0.0f ? limit * std::tanh(-spec.bankGain * turn[i] / limit) : 0.0f;
-        out.eye[i] = glm::vec4(eyes[i], roll);
+        out.eye[i] = glm::vec4(eyes[i], roll * (1.0f - nadir[i]));
     }
     return out;
 }
@@ -297,6 +427,14 @@ FlightPose flightPoseAt(const FlightSpec& spec, const FlightTable& table, double
     pose.eye = glm::vec3(e);
     pose.target = pose.eye + 100.0f * d;
     pose.rollDegrees = glm::degrees(e.w);
+    // screen-up: in the plane of the aim and the heading, perpendicular to the aim -- the world's up when level, the
+    // heading at the nadir, continuous between
+    glm::vec2 h = table.heading.size() == table.eye.size()
+                      ? glm::mix(table.heading[static_cast<std::size_t>(i)], table.heading[static_cast<std::size_t>(i) + 1], a)
+                      : glm::vec2(d.x, d.z);
+    h = glm::dot(h, h) > 1e-12f ? glm::normalize(h) : glm::vec2(1.0f, 0.0f);
+    const float pitch = std::asin(std::clamp(d.y, -1.0f, 1.0f));
+    pose.up = glm::normalize(glm::vec3(-h.x * std::sin(pitch), std::cos(pitch), -h.y * std::sin(pitch)));
     return pose;
 }
 
@@ -328,6 +466,17 @@ nlohmann::json flightToJson(const FlightSpec& f) {
     for (const FlightWaypoint& w : f.route) {
         nlohmann::json o = {{"position", nlohmann::json::array({w.position.x, w.position.y})}, {"altitude", w.altitude}};
         if (w.speed > 0.0f) o["speed"] = w.speed;
+        if (!w.follow.empty()) {
+            o["follow"] = w.follow;
+            o["from"] = w.from;
+            o["to"] = w.to;
+            if (w.offset != 0.0f) o["offset"] = w.offset;
+        }
+        if (!w.snap.empty()) {
+            o["snap"] = w.snap;
+            o["snapRadius"] = w.snapRadius;
+        }
+        if (w.nadir > 0.0f) o["nadir"] = w.nadir;
         route.push_back(std::move(o));
     }
     j["route"] = std::move(route);
@@ -360,9 +509,20 @@ Result<FlightSpec> flightFromJson(const nlohmann::json& j) {
                             return fail("'flight.route[].position' must be [x, z]");
                         }
                         p.position = {wv[0].get<float>(), wv[1].get<float>()};
-                    } else if (wk == "altitude" || wk == "speed") {
+                    } else if (wk == "altitude" || wk == "speed" || wk == "from" || wk == "to" || wk == "offset" ||
+                               wk == "snapRadius" || wk == "nadir") {
                         if (!wv.is_number()) return fail("'flight.route[].{}' must be a number", wk);
-                        (wk == "altitude" ? p.altitude : p.speed) = wv.get<float>();
+                        const float v = wv.get<float>();
+                        if (wk == "altitude") p.altitude = v;
+                        else if (wk == "speed") p.speed = v;
+                        else if (wk == "from") p.from = v;
+                        else if (wk == "to") p.to = v;
+                        else if (wk == "offset") p.offset = v;
+                        else if (wk == "snapRadius") p.snapRadius = v;
+                        else p.nadir = v;
+                    } else if (wk == "follow" || wk == "snap") {
+                        if (!wv.is_string()) return fail("'flight.route[].{}' must be a name", wk);
+                        (wk == "follow" ? p.follow : p.snap) = wv.get<std::string>();
                     } else {
                         return fail("'flight.route[].{}' is not a key this build reads", wk);
                     }

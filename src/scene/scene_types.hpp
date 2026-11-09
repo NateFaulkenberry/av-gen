@@ -791,6 +791,11 @@ struct Environment {
     // the distance to the camera's target, 0.15..4 m -- which a flight (whose target is a look-ahead point far out)
     // drives to 4 m, so every 8 cm tile gap becomes a well and reads as a black line from a low camera.
     float aoRadius = 0.0f;
+    // Musical Geography, Phase 5: the horizon fill, 0..1. A world of finite extent ends some way below the horizon,
+    // and between its edge and the horizon the sky's flat ground colour shows: a band. A ground that went on would be
+    // pure fog out there, so below the horizon the visible sky eases to exactly what the surface fog fades a distant
+    // surface toward (its colour, or the sky's radiance where the fog takes the sky's colour). 0 (the default) = off.
+    float horizonFill = 0.0f;
     // ADR-1953: Musical Geography's moving ground -- waves, breathing, rolling and rings, one block every "tiles"
     // generator in the scene follows (scene/tile_terrain.hpp). Inactive (the default) = the static ground, unchanged.
     TileDynamics tileDynamics;

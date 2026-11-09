@@ -39,6 +39,20 @@ struct FlightWaypoint {
     glm::vec2 position{0.0f}; // x, z (metres, the ground's generator space)
     float altitude = 20.0f;   // metres above the (smoothed) ground
     float speed = -1.0f;      // metres per second from here; < 0 = the flight's speed
+    // Named features (request 1979), resolved against the ground's tiles before the build (resolveFlightRoute):
+    //   follow "path" | "river": this waypoint becomes a leg along that polyline, from `from` to `to` (fractions of
+    //     its length, 0..1, either way round), `offset` metres to the right of it, at this altitude and speed;
+    //   snap "shore" | "crown": `position` is a hint, moved to the nearest shoreline / crown top within `snapRadius`.
+    std::string follow;
+    float from = 0.0f;
+    float to = 1.0f;
+    float offset = 0.0f;
+    std::string snap;
+    float snapRadius = 300.0f;
+    // The top-down leg (the owner's one exception to "look where it travels"): as the flight passes this waypoint the
+    // aim eases to straight down and back over `nadir` seconds, screen-up the direction of travel, so there is no
+    // flip at -90 degrees. 0 = none.
+    float nadir = 0.0f;
 };
 
 struct FlightSpec {
@@ -73,6 +87,8 @@ using FlightGround = std::function<float(float x, float z, float t)>;
 struct FlightTable {
     std::vector<glm::vec4> eye; // xyz, w = bank (radians)
     std::vector<glm::vec3> aim; // unit view direction
+    std::vector<glm::vec2> heading; // unit, the horizontal direction of travel (screen-up on the top-down leg)
+    std::vector<float> nadir;       // 0..1, how far into a top-down leg each sample is
     std::vector<float> clearance; // the ground bound the eye was lifted over (metres), per sample
     [[nodiscard]] bool valid() const { return eye.size() >= 2 && aim.size() == eye.size(); }
 };
@@ -80,10 +96,14 @@ struct FlightTable {
 struct FlightPose {
     glm::vec3 eye{0.0f};
     glm::vec3 target{0.0f, 0.0f, -1.0f};
+    glm::vec3 up{0.0f, 1.0f, 0.0f}; // perpendicular to the aim, the travel direction at the nadir (no roll applied)
     float rollDegrees = 0.0f;
 };
 
 [[nodiscard]] Result<void> validateFlight(const FlightSpec& spec);
+// The route with its named features resolved against the ground (generator space): every `follow` leg expanded into
+// waypoints along the polyline, every `snap` moved onto its feature. Pure; plain waypoints pass through.
+[[nodiscard]] Result<FlightSpec> resolveFlightRoute(const FlightSpec& spec, const TileTerrainSpec& tiles);
 // The table. `ground` is the moving surface; `liveMargin` is added to the clearance for what cannot be known ahead
 // (live-triggered rings). Pure: the same spec and ground give the same table.
 [[nodiscard]] FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground, float liveMargin);

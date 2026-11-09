@@ -3767,7 +3767,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                     aoRadius, 1.0f, scene.environment.aoFadeStart, scene.environment.aoFadeEnd);
         stats_.ao = ao_->stats();
         const bool on = ao_->active();
-        frame.aoFade = glm::vec4(scene.environment.aoFadeStart, scene.environment.aoFadeEnd, 0.0f, 0.0f);
+        frame.aoFade = glm::vec4(scene.environment.aoFadeStart, scene.environment.aoFadeEnd,
+                                 std::clamp(scene.environment.horizonFill, 0.0f, 1.0f), 0.0f); // z: Phase 5 horizon fill
         frame.aoParams = glm::vec4(on ? 1.0f : 0.0f, on ? 1.0f : 0.0f,
                                    static_cast<float>(std::max(stats_.ao.width, 1u)),
                                    static_cast<float>(std::max(stats_.ao.height, 1u)));

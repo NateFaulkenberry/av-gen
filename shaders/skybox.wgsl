@@ -108,6 +108,17 @@ fn fs_sky(in: SkyOut) -> SceneOut {
     let skyLod = min(max(skyEquirectLod(skyUv, vec2<f32>(textureDimensions(skyEquirect, 0))),
                          frame.skyParams.w * skyLevels), skyLevels);
     var color = skyBackgroundAt(dir, skyLod, 0.0);
+    // Musical Geography, Phase 5: the horizon fill. Below the horizon a world that went on would be pure fog: what
+    // applyFog fades a surface at infinite distance toward. So the visible sky there eases to that, over the sky's own
+    // ground band, and a finite world's edge meets the horizon with no flat band. 0 = off (the frame is unchanged).
+    if (frame.aoFade.z > 0.0 && frame.fogParams.w > 0.0) {
+        var fogColour = frame.fogParams.rgb;
+        if (frame.fogSky.x > 0.0) {
+            fogColour = mix(fogColour, fogSkyRadiance(dir), frame.fogSky.x);
+        }
+        let below = 1.0 - smoothstep(-0.03, 0.03, dir.y);
+        color = mix(color, fogColour, below * frame.aoFade.z);
+    }
     let isSky = skyBackgroundIsSky();
     if (frame.lightCounts.z > 0.5 && frame.skyExtra.x > 0.5 && isSky) {
         // Where the *sky* says its sun or moon is, not where the first light in the scene happens
