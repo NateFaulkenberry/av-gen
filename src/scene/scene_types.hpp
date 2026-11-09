@@ -787,6 +787,10 @@ struct Environment {
     // near creases keep their AO and far ones stop speckling. Both 0 (the default) = no fade, byte-identical.
     float aoFadeStart = 0.0f;
     float aoFadeEnd = 0.0f;
+    // Musical Geography, Phase 5: the AO's world radius in metres. 0 (the default) keeps the automatic radius -- 5% of
+    // the distance to the camera's target, 0.15..4 m -- which a flight (whose target is a look-ahead point far out)
+    // drives to 4 m, so every 8 cm tile gap becomes a well and reads as a black line from a low camera.
+    float aoRadius = 0.0f;
     // ADR-1953: Musical Geography's moving ground -- waves, breathing, rolling and rings, one block every "tiles"
     // generator in the scene follows (scene/tile_terrain.hpp). Inactive (the default) = the static ground, unchanged.
     TileDynamics tileDynamics;

@@ -449,3 +449,71 @@ Live, 1080p ultra at 30 fps (600 frames, quiet GPU), the same camera with and wi
 
 The moving ground costs +0.11 ms in the generators and nothing measurable in the scene pass. The frame-interval p99
 of 49 ms and the ~290 ms worst frames happen in both runs, so they predate this work.
+
+### Engineering → art, Phase 5 (2026-11-09): the flight (ADR-1956), the dark gap lines, and the "flat" sunset sky
+
+**The flight.** Add a top-level `"flight"` block to the scene. It drives the camera; no other camera block is needed.
+
+```json
+"flight": {
+  "ground": "mgTiles1",          // the tiles node it follows (its own tile pitch, so 1 m or 4 m tiles both work)
+  "startTime": 30.0,             // timeline seconds at the first waypoint
+  "duration": 120.0,             // seconds the table covers
+  "speed": 22.0,                 // m/s (a waypoint's own "speed" overrides from there)
+  "fov": 50.0,                   // 0 = the scene's own
+  "route": [
+    {"position": [60, -250], "altitude": 14},
+    {"position": [10, -440], "altitude": 7},
+    {"position": [-330, -840], "altitude": 70, "speed": 30},
+    {"position": [-540, -940], "altitude": 20}
+  ],
+  "minClearance": 4, "clearanceRadius": 10, "amplitudeHeadroom": 2,
+  "climbRate": 18, "fallRate": 30, "lookAhead": 2.5, "pitchBias": 0.12,
+  "pitchMin": -28, "pitchMax": 8, "bankLimit": 11.5, "bankGain": 1.6, "loop": false
+}
+```
+
+How it flies:
+- **Altitude** is metres above the smoothed ground. It is the same rule for hugging flight (5–10) and reveals (60+).
+- **Clearance** is checked against the moving ground at each moment: your waves, at `amplitudeHeadroom` × their
+  authored amplitude, plus the rings. Climbs and dives are limited by `climbRate` and `fallRate`, then smoothed.
+- **Aim and bank:** the camera looks `lookAhead` seconds along its own path, a little down, and banks into turns.
+  There are no orbits and no head turns.
+- **Continuity:** past the last waypoint it flies straight on, or `"loop": true` comes round. There are no cuts.
+
+Not built yet: named targets (follow the path, cross the shore) and the top-down leg. Both are for CP-B.
+
+**The dark lines down the ground** (low camera, along the columns): the cause is the AO radius, not the underlay.
+- The underlay is ruled out by a canary: painted magenta, it reached 4 pixels.
+- The AO's automatic radius is 5% of the distance to the camera's target, capped at 4 m. A flight's target is a
+  look-ahead point far out, so the radius runs at 4 m and every 8 cm gap becomes a well.
+- **New:** `environment.aoRadius` (metres; 0 = automatic).
+
+Measured on the same frame, near-black pixels in the lower half:
+
+| Arm | Near-black pixels |
+|---|---|
+| Automatic radius | 976 |
+| `aoRadius` 1.2 | 161 |
+| `aoRadius` 0.6 | 1 |
+| AO off | 0 |
+
+**Switch on `"aoRadius": 0.6` for the flight.** The fainter lines left are the sun's shadow in the gaps.
+
+**The flat sunset sky:** this is not an engine fault, and the gradient is drawn.
+- **The sky renders.** A canary zenith of pure green shows clearly, and the original violet does too once the frame
+  holds sky above the horizon (`03-dynamic/eng-p5-sky-*.png`). Fog has no effect on it: the frame is identical with
+  `horizonDensity` 0 and `volumeDensity` 0.
+- **What reads as flat sky is the sky *below* the horizon.** From 120 m the tiles end about 10° below the horizon (the
+  4× ring stops at 480–640 m). Between there and the horizon you see the sky's ground fill, which is flat by design
+  and is your `groundColor` curve, set to the horizon orange.
+- **Your tilted arm** probably held only a few degrees of real sky.
+
+Levers, in order of how much they change the frame:
+1. Fly lower, or frame more sky. The flight's `pitchMax` lets it look up on climbs.
+2. Give the DayNight `groundColor` curve its own value: a darker or more violet tone reads as a distant ground band
+   under the fog.
+3. Reach further: a wider 4× ring, or another ring, under the horizon fog.
+
+The engine could also blend horizon to ground below the horizon (a `groundHaze` width); it's not built. Ask if you
+want it.
