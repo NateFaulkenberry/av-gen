@@ -103,6 +103,7 @@ const MAT_OP_OKLAB_RAMP: u32 = 33u;   // ADR-1470
 const MAT_OP_TEXTURE_TRIPLANAR: u32 = 34u;        // ADR-1642
 const MAT_OP_TEXTURE_TRIPLANAR_NORMAL: u32 = 35u; // ADR-1642
 const MAT_OP_TILE_BORDER: u32 = 36u;              // ADR-1976
+const MAT_OP_TILE_CONTOUR: u32 = 37u;             // ADR-1970
 const MAT_MAX_TEXTURE_OPS: i32 = 4;               // scene::kMaxMaterialTextureOps
 // ADR-1642: whether this pipeline samples program textures. False (the default, and every pipeline but the entity
 // pass's textured variants): the texture pre-pass is compiled out and texture ops read colour 1 and a flat normal.
@@ -876,6 +877,33 @@ fn matKTileBorder(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<
     return vec4<f32>(1.0 - (1.0 - bx.x) * (1.0 - bz.x), min(bx.y, bz.y), top, min(bx.z, bz.z));
 }
 
+// ADR-1970: one side's band, the one-sided twin of matTileBorderAxis (material_program.cpp TileContour).
+fn matTileContourSide(half: f32, dist: f32, fw: f32, band: f32, minPixels: f32) -> f32 {
+    let pixel = max(fw, 1e-6);
+    let width = max(band, minPixels * fw);
+    let t = clamp((dist - (width - 0.5 * pixel)) / pixel, 0.0, 1.0);
+    let cover = 1.0 - t * t * (3.0 - 2.0 * t);
+    let size = 2.0 * half / pixel;
+    let mean = min(width / max(2.0 * half, 1e-6), 1.0);
+    let e = clamp((size - 2.0) / 2.0, 0.0, 1.0);
+    return mean + (cover - mean) * (e * e * (3.0 - 2.0 * e));
+}
+
+fn matKTileContour(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
+    let k = materialPrograms.programs[pi].ops[oi].constant;
+    let f = materialPrograms.programs[pi].ops[oi].value;
+    let w = max(b.w, 0.0);
+    let mask = u32(floor(w * 0.5));
+    let crest = clamp(w - 2.0 * f32(mask), 0.0, 1.0);
+    var keep = 1.0;
+    var sides = 0.0;
+    if ((mask & 1u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x - a.x, ctx.localFootprint.x, k.z, f)); sides = sides + 1.0; }
+    if ((mask & 2u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x + a.x, ctx.localFootprint.x, k.z, f)); sides = sides + 1.0; }
+    if ((mask & 4u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y - a.z, ctx.localFootprint.y, k.z, f)); sides = sides + 1.0; }
+    if ((mask & 8u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y + a.z, ctx.localFootprint.y, k.z, f)); sides = sides + 1.0; }
+    return vec4<f32>(1.0 - keep, crest, sides * 0.25, select(0.0, 1.0, sides > 0.0));
+}
+
 fn matKOklabRamp(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
     let k = materialPrograms.programs[pi].ops[oi].constant;
     let f = materialPrograms.programs[pi].ops[oi].value;
@@ -995,6 +1023,9 @@ fn materialEvalOpKind(kind: u32, pi: u32, oi: u32, ctx: MaterialContext, a: vec4
     }
     if (kind == MAT_OP_TILE_BORDER) {
         return matKTileBorder(pi, oi, ctx, a, b, c, fields);
+    }
+    if (kind == MAT_OP_TILE_CONTOUR) {
+        return matKTileContour(pi, oi, ctx, a, b, c, fields);
     }
     return vec4<f32>(0.0);
 }

@@ -371,11 +371,12 @@ fn tileSample(x: f32, z: f32) -> TileOut {
 }
 
 // ADR-1953: the waves and the rings at (x, z) on a tile of `water`, for a ring of `cellSize` (tileMotion's twin).
-// Returns (height offset, crest).
-fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec2<f32> {
+// Returns (height offset, crest, a bound on the step to a neighbour the motion can open -- the sea's skirt).
+fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec3<f32> {
     let t = tile.dyn.x;
     var height = 0.0;
     var crest = 0.0;
+    var step = 0.0;
     let waveCount = min(u32(tile.dyn.z + 0.5), 4u);
     for (var i = 0u; i < waveCount; i = i + 1u) {
         let w0 = tile.waves[i * 3u];
@@ -393,6 +394,7 @@ fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec2<f32> {
         let mask = (w2.x + (w2.y - w2.x) * water) * tileSmooth(2.0 * cellSize, 4.0 * cellSize, w0.z);
         height = height + w0.y * (2.0 * c - 1.0) * mask;
         crest = crest + w1.w * c * mask;
+        step = step + 2.0 * abs(w0.y * mask) * min(1.0, TILE_TWO_PI * cellSize / w0.z * (1.0 + 7.0 * w1.z));
     }
     let ringFade = tileSmooth(2.0 * cellSize, 4.0 * cellSize, min(tile.ring0.z, tile.ring0.w));
     let eventCount = min(u32(tile.dyn.w + 0.5), 16u);
@@ -408,8 +410,9 @@ fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec2<f32> {
         let env = exp(-age / tile.ring1.x) * exp(-g * g) * e.w * ringFade;
         height = height + tile.ring0.x * env * cos(TILE_TWO_PI * off / tile.ring0.z);
         crest = crest + tile.ring1.y * env;
+        step = step + 2.0 * abs(tile.ring0.x * env);
     }
-    return vec2<f32>(tile.dyn.y * height, clamp(crest, 0.0, 1.0));
+    return vec3<f32>(tile.dyn.y * height, clamp(crest, 0.0, 1.0), abs(tile.dyn.y) * step);
 }
 
 // One cell of this ring: the tile at its centre, or the mean of the fine tiles it covers (generatorTile's twin).
@@ -504,20 +507,68 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
     // ADR-1953: the waves and the rings, once at the cell's centre, after the seam band (generatorTileInWindow's order).
     var crest = 0.0;
+    var seaSkirt = 0.0;
     if (tile.breath.w > 0.5) {
         let m = tileMotion((f32(ix) + 0.5) * cellSize, (f32(iz) + 0.5) * cellSize, t.water, cellSize);
         t.height = t.height + m.x;
         crest = m.y;
+        // A moving sea opens steps between its slabs, which the static sea never has: it gets as much skirt as its
+        // motion can step (never more than the land's), so no gap shows through the swell.
+        seaSkirt = min(m.z, tile.skirt.x);
     }
     // The skirt: a land tile's box reaches `skirt` further down with its top where it was (the centre drops by half).
-    let k = tile.skirt.x * (1.0 - clamp(t.water, 0.0, 1.0));
+    let wet = clamp(t.water, 0.0, 1.0);
+    let k = tile.skirt.x * (1.0 - wet) + seaSkirt * wet;
     let stretch = (tile.skirt.y + k) / tile.skirt.y;
     let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height - 0.5 * k, (f32(iz) + 0.5) * cellSize);
     r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 1.0);
     r.rotation = gen.rotation;
-    r.scale = vec4<f32>(gen.scaleInfo.x, gen.scaleInfo.y * stretch, gen.scaleInfo.z, 0.0);
+    // scale.w (a program's `instanceIndex`, meaningless for a window that moves): the tile's top, generator metres. The
+    // contour pass reads its neighbours' from here (ADR-1970).
+    r.scale = vec4<f32>(gen.scaleInfo.x, gen.scaleInfo.y * stretch, gen.scaleInfo.z, t.height);
     r.random = vec4<f32>(t.water, t.shore, t.flat, t.path);
     r.color = vec4<f32>(1.0, 1.0, 1.0, genUnit(genHash(ix, iz, gen.hashing.x, 21u)));
     r.emissive = vec4<f32>(1.0, 1.0, 1.0, crest); // ADR-1953: the crest channel in the emissive's spare lane
     records[index] = r;
+}
+
+// ADR-1970: the contour pass, after cs_generate_tiles. A side is a contour edge where the level
+// floor((top - offset) / interval) drops to the neighbour across it (bits +x 1, -x 2, +z 4, -z 8, in the generator's
+// axes); the mask joins the crest in the emissive's spare lane as crest + 2 * mask, which the `tileContour` material op
+// decodes. A neighbour outside the window or in the ring's hole is no edge (the ring there is another object's).
+fn tileLevel(top: f32) -> f32 {
+    return floor((top - tile.ring1.w) / tile.ring1.z);
+}
+
+@compute @workgroup_size(8, 8)
+fn cs_tile_contours(@builtin(global_invocation_id) gid: vec3<u32>) {
+    let countX = u32(gen.window.z);
+    let countZ = u32(gen.window.w);
+    if (gid.x >= countX || gid.y >= countZ || !(tile.ring1.z > 0.0)) {
+        return;
+    }
+    let index = gid.y * countX + gid.x;
+    let own = records[index].scale;
+    if (own.x <= 0.0) {
+        return;
+    }
+    let level = tileLevel(own.w);
+    var mask = 0u;
+    if (gid.x + 1u < countX) {
+        let n = records[index + 1u].scale; // the scale alone: the emissive is being written
+        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 1u; }
+    }
+    if (gid.x > 0u) {
+        let n = records[index - 1u].scale; // the scale alone: the emissive is being written
+        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 2u; }
+    }
+    if (gid.y + 1u < countZ) {
+        let n = records[index + countX].scale; // the scale alone: the emissive is being written
+        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 4u; }
+    }
+    if (gid.y > 0u) {
+        let n = records[index - countX].scale; // the scale alone: the emissive is being written
+        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 8u; }
+    }
+    records[index].emissive.w = records[index].emissive.w + 2.0 * f32(mask);
 }

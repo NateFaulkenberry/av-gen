@@ -190,7 +190,7 @@ struct GeneratorTileUniforms {
     glm::vec4 breath;     // amplitude, period, wavelength, 1 when anything moves
     glm::vec4 roll;       // rolling x, z (m/s), 0, 0
     glm::vec4 ring0;      // amplitude, speed, wavelength, width
-    glm::vec4 ring1;      // decay, crest, 0, 0
+    glm::vec4 ring1;      // decay, crest, contour interval (0 = none, ADR-1970), contour offset
     std::array<glm::vec4, 12> waves;  // per wave: (circular, amplitude, wavelength, speed),
                                       // (cos heading | centre x, sin heading | centre z, sharpness, crest),
                                       // (onLand, onWater, phase, 0)

@@ -457,6 +457,9 @@ Result<void> validateTileDynamics(const TileDynamics& d) {
         std::abs(d.breathingAmplitude) > 4.0f) {
         return fail("tileDynamics: breathing needs a positive period and wavelength and an amplitude within 4");
     }
+    if (!(d.contourInterval >= 0.0f) || !finite(d.contourInterval) || !finite(d.contourOffset)) {
+        return fail("tileDynamics: the contour interval is >= 0 and the offset finite");
+    }
     if (!finite(d.rolling.x) || !finite(d.rolling.y) || !finite(d.amplitude)) {
         return fail("tileDynamics: rolling and amplitude must be finite");
     }
@@ -551,6 +554,9 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
                           {"wavelength", d.breathingWavelength}};
     }
     if (d.rolling != def.rolling) j["rolling"] = nlohmann::json::array({d.rolling.x, d.rolling.y});
+    if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset) {
+        j["contour"] = {{"interval", d.contourInterval}, {"offset", d.contourOffset}};
+    }
     const TileRingSpec& r = d.rings;
     j["rings"] = {{"amplitude", r.amplitude}, {"speed", r.speed},   {"wavelength", r.wavelength},
                   {"width", r.width},         {"decay", r.decay},   {"crest", r.crest}};
@@ -592,6 +598,15 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
             d.breathingAmplitude = b.amplitude;
             d.breathingPeriod = b.period;
             d.breathingWavelength = b.wavelength;
+        } else if (key == "contour") {
+            struct C {
+                float interval, offset;
+            } c{d.contourInterval, d.contourOffset};
+            if (auto r = readFields<C>(value, where, {{"interval", &C::interval}, {"offset", &C::offset}}, c); !r) {
+                return std::unexpected(r.error());
+            }
+            d.contourInterval = c.interval;
+            d.contourOffset = c.offset;
         } else if (key == "rings") {
             if (auto r = readFields<TileRingSpec>(value, where,
                                                   {{"amplitude", &TileRingSpec::amplitude},

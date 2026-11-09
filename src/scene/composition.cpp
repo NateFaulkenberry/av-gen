@@ -5096,6 +5096,10 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
             p.ringX = &params.add(floatDesc(base + "rings/x", 0.0f, -1e6f, 1e6f, -500.0f, 500.0f));
             p.ringZ = &params.add(floatDesc(base + "rings/z", 0.0f, -1e6f, 1e6f, -500.0f, 500.0f));
             p.ringAhead = &params.add(floatDesc(base + "rings/ahead", 0.0f, 0.0f, 10000.0f, 0.0f, 400.0f));
+            p.contourInterval =
+                &params.add(floatDesc(base + "contour/interval", d.contourInterval, 0.0f, 1000.0f, 0.0f, 20.0f));
+            p.contourOffset =
+                &params.add(floatDesc(base + "contour/offset", d.contourOffset, -1000.0f, 1000.0f, -10.0f, 10.0f));
         }
         // ADR-350, the rest of the sweep: four more environment settings that the scene file could
         // set and nothing else could reach. `skybox` and `proceduralSkyBackground` in particular
@@ -9937,6 +9941,8 @@ void Composition::applyParameters() {
             d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
             d.rings.speed = f(p.ringSpeed, d.rings.speed);
             d.rings.decay = f(p.ringDecay, d.rings.decay);
+            d.contourInterval = f(p.contourInterval, d.contourInterval);
+            d.contourOffset = f(p.contourOffset, d.contourOffset);
             d.live = tileLiveEvents_;
         }
         env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867

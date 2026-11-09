@@ -69,6 +69,11 @@ struct TileDynamics {
     TileRingSpec rings;
     std::vector<TileEvent> events;     // authored
     std::vector<TileEvent> live;       // triggered while running (not saved; seeking back drops the later ones)
+    // ADR-1970: contour edges. A tile side is a contour edge where the level floor((h - offset) / interval) drops to the
+    // neighbour across it; the kernel flags those sides in the record (with the crest) and the `tileContour` material
+    // op draws them. interval 0 (the default) = none. They follow the moving ground: the contours move with it.
+    float contourInterval = 0.0f;      // metres
+    float contourOffset = 0.0f;        // metres
 
     // True when anything moves: false is the static ground, exactly as before.
     [[nodiscard]] bool active() const;

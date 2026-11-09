@@ -363,6 +363,7 @@ struct ProceduralRenderer::Impl {
         std::uint32_t countX;
         std::uint32_t countZ;
         bool tiles = false; // ADR-1950: the "tiles" entry point
+        bool contours = false; // ADR-1970: then the contour pass
     };
     struct CullItem {
         const ObjectState* state;
@@ -524,6 +525,7 @@ struct ProceduralRenderer::Impl {
     wgpu::PipelineLayout generatorPipelineLayout;
     wgpu::ComputePipeline generatorPipeline;
     wgpu::ComputePipeline generatorTilesPipeline; // ADR-1950
+    wgpu::ComputePipeline generatorContourPipeline; // ADR-1970: the second tiles pass (contour sides)
     wgpu::BindGroupLayout strandLayout;             // ADR-1181
     wgpu::PipelineLayout strandPipelineLayout;
     wgpu::ComputePipeline strandPipeline;
@@ -1161,6 +1163,11 @@ Result<void> ProceduralRenderer::Impl::createGeneratorPipeline(const wgpu::Shade
         return std::unexpected(tiles.error());
     }
     generatorTilesPipeline = *tiles; // ADR-1950
+    auto contours = makeCompute(generatorPipelineLayout, module, "cs_tile_contours", "procedural-generator-contours");
+    if (!contours) {
+        return std::unexpected(contours.error());
+    }
+    generatorContourPipeline = *contours; // ADR-1970
     return {};
 }
 
@@ -1262,6 +1269,9 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
             lane.w = t.path[i].y;
         }
     }
+    // ADR-1970: the contour edges (the second kernel runs when the interval is above 0).
+    u.ring1.z = dyn.contourInterval;
+    u.ring1.w = dyn.contourOffset;
     // ADR-1953: the moving ground. Inactive, every lane stays 0 and the kernel skips it: the static ground.
     if (dyn.active()) {
         const std::size_t waveCount = std::min(dyn.waves.size(), scene::kMaxTileWaves);
@@ -1270,7 +1280,8 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         u.breath = glm::vec4(dyn.breathingAmplitude, dyn.breathingPeriod, dyn.breathingWavelength, 1.0f);
         u.roll = glm::vec4(dyn.rolling.x, dyn.rolling.y, 0.0f, 0.0f);
         u.ring0 = glm::vec4(dyn.rings.amplitude, dyn.rings.speed, dyn.rings.wavelength, dyn.rings.width);
-        u.ring1 = glm::vec4(dyn.rings.decay, dyn.rings.crest, 0.0f, 0.0f);
+        u.ring1.x = dyn.rings.decay;
+        u.ring1.y = dyn.rings.crest;
         for (std::size_t i = 0; i < waveCount; ++i) {
             const scene::TileWave& w = dyn.waves[i];
             const float a = w.direction * (6.28318530717958647692f / 360.0f);
@@ -2837,7 +2848,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 queue.WriteBuffer(state.generatorTileUniforms, 0, &tu, sizeof(tu));
             }
             im.generatorItems.push_back(Impl::GeneratorItem{&state, static_cast<std::uint32_t>(genWindow.countX),
-                                                            static_cast<std::uint32_t>(genWindow.countZ), tiles});
+                                                            static_cast<std::uint32_t>(genWindow.countZ), tiles,
+                                                            tiles && scene.environment.tileDynamics.contourInterval > 0.0f});
             state.generatorWindow = genWindow;
             state.generatorFrame = im.frame;
             ++stats_.generatorObjects;
@@ -3204,6 +3216,11 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             cp.SetBindGroup(0, item.state->generatorGroup);
             cp.DispatchWorkgroups((item.countX + 7) / 8, (item.countZ + 7) / 8);
             ++stats_.generatorDispatches;
+            if (item.contours) { // ADR-1970: reads the heights the dispatch above wrote (WebGPU orders the two)
+                cp.SetPipeline(im.generatorContourPipeline);
+                cp.DispatchWorkgroups((item.countX + 7) / 8, (item.countZ + 7) / 8);
+                ++stats_.generatorDispatches;
+            }
         }
         cp.End();
     }

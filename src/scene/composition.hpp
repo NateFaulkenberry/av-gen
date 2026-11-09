@@ -1838,6 +1838,8 @@ private:
         params::Parameter<float>* ringX = nullptr;        // where (world x, z; the tiles' own space)...
         params::Parameter<float>* ringZ = nullptr;
         params::Parameter<float>* ringAhead = nullptr;    // ...or, when > 0, this many metres ahead of the camera
+        params::Parameter<float>* contourInterval = nullptr; // ADR-1970
+        params::Parameter<float>* contourOffset = nullptr;
     };
     TileDynamicsParams tileDynamicsParams_;
     bool tileDynamicsAuthored_ = false;

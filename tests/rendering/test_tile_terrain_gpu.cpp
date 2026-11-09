@@ -287,3 +287,60 @@ TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][gener
     }
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1970: the contour pass flags exactly the sides across which floor((top - offset) / interval) drops, computed here
+// from the CPU mirror's tops; and with no interval the lane is the crest alone.
+TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu][generator][geography][adr1970]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    const auto pg = tilesObject("contours", 1.0f, 40.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    const glm::vec3 camera(0.5f, 30.0f, 0.5f);
+    scene::Scene s;
+    s.procedurals.push_back(pg);
+    s.environment.tileDynamics.contourInterval = 0.5f;
+    s.environment.tileDynamics.contourOffset = 0.1f;
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const scene::GeneratorSpec& g = pg.distribution.generator;
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+    auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+    REQUIRE(records.has_value());
+    const auto level = [](float h) { return std::floor((h - 0.1f) / 0.5f); };
+    const auto top = [&](std::int32_t x, std::int32_t z) {
+        return scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w).height;
+    };
+    int edges = 0;
+    int wrong = 0;
+    int checked = 0;
+    for (std::int32_t z = 1; z + 1 < w.countZ; ++z) {
+        for (std::int32_t x = 1; x + 1 < w.countX; ++x) {
+            const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                       static_cast<std::size_t>(x)];
+            const float own = level(top(x, z));
+            // Skip tiles within float rounding of a level boundary (the GPU's top may land on the other side).
+            const auto near = [](float h) {
+                const float u = (h - 0.1f) / 0.5f;
+                return std::abs(u - std::round(u)) < 1e-3f;
+            };
+            if (near(top(x, z)) || near(top(x + 1, z)) || near(top(x - 1, z)) || near(top(x, z + 1)) ||
+                near(top(x, z - 1))) {
+                continue;
+            }
+            std::uint32_t expect = 0;
+            if (level(top(x + 1, z)) < own) expect |= 1u;
+            if (level(top(x - 1, z)) < own) expect |= 2u;
+            if (level(top(x, z + 1)) < own) expect |= 4u;
+            if (level(top(x, z - 1)) < own) expect |= 8u;
+            const auto got = static_cast<std::uint32_t>(std::floor(r.emissive.w * 0.5f));
+            ++checked;
+            edges += expect != 0u ? 1 : 0;
+            wrong += got != expect ? 1 : 0;
+        }
+    }
+    CAPTURE(checked, edges, wrong);
+    CHECK(checked > 5000);
+    CHECK(edges > 100); // the control: there are contours in this window
+    CHECK(wrong == 0);
+    CHECK(ctx->errorCount() == 0);
+}

@@ -6,6 +6,7 @@
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
 #include "scene/composition.hpp"
+#include "scene/material_program.hpp"
 #include "scene/tile_terrain.hpp"
 #include "support/temp_dir.hpp"
 
@@ -316,4 +317,51 @@ TEST_CASE("the moving ground is a set of parameters and rings fire on a rising e
     REQUIRE(saved.at("environment").contains("tileDynamics"));
     CHECK(saved.at("environment").at("tileDynamics").at("waves").size() == 1);
     CHECK_FALSE(saved.at("environment").at("tileDynamics").contains("live"));
+}
+
+TEST_CASE("the tileContour op draws only the flagged sides and returns the crest", "[tiles][dynamics][geography][adr1970]") {
+    using namespace avgen::scene;
+    MaterialProgram program;
+    MaterialOp local;
+    local.kind = MaterialOpKind::Input;
+    local.dst = 0;
+    local.input = MaterialInput::LocalPosition;
+    MaterialOp lane;
+    lane.kind = MaterialOpKind::Input;
+    lane.dst = 1;
+    lane.input = MaterialInput::InstanceEmissive;
+    MaterialOp contour;
+    contour.kind = MaterialOpKind::TileContour;
+    contour.dst = 2;
+    contour.srcA = 0;
+    contour.srcB = 1;
+    contour.constant = glm::vec4(0.5f, 0.5f, 0.05f, 0.0f);
+    contour.value = 0.0f;
+    program.ops = {local, lane, contour};
+    program.baseColorRegister = 2;
+    REQUIRE(program.validate().has_value());
+    const auto eval = [&](glm::vec3 p, float w) {
+        MaterialContext ctx;
+        ctx.localPosition = p;
+        ctx.localFootprint = glm::vec2(0.01f); // 100 px tiles: no prefilter
+        ctx.instanceEmissive = glm::vec4(1.0f, 1.0f, 1.0f, w);
+        return evaluateMaterialProgram(program, ctx, MaterialResult{}).baseColor;
+    };
+    // mask 1 (+x), crest 0.25: the +x edge is lit; the -x edge, a z edge and the middle are not.
+    const float w = 0.25f + 2.0f * 1.0f;
+    CHECK(eval({0.49f, 0.0f, 0.0f}, w).x > 0.9f);
+    CHECK(eval({-0.49f, 0.0f, 0.0f}, w).x < 0.01f);
+    CHECK(eval({0.0f, 0.0f, 0.49f}, w).x < 0.01f);
+    CHECK(eval({0.0f, 0.0f, 0.0f}, w).x < 0.01f);
+    CHECK(eval({0.0f, 0.0f, 0.0f}, w).y == Catch::Approx(0.25f));
+    CHECK(eval({0.0f, 0.0f, 0.0f}, w).z == Catch::Approx(0.25f));
+    // mask 0: nothing, and the crest alone comes back.
+    CHECK(eval({0.49f, 0.0f, 0.0f}, 0.75f).x == 0.0f);
+    CHECK(eval({0.49f, 0.0f, 0.0f}, 0.75f).y == Catch::Approx(0.75f));
+    // All four sides (15) with a full crest.
+    const float all = 1.0f + 2.0f * 15.0f;
+    CHECK(eval({0.0f, 0.0f, -0.49f}, all).x > 0.9f);
+    CHECK(eval({0.0f, 0.0f, 0.0f}, all).y == Catch::Approx(1.0f));
+    CHECK(eval({0.0f, 0.0f, 0.0f}, all).z == Catch::Approx(1.0f));
+    CHECK(materialOpKindFromName("tileContour") == MaterialOpKind::TileContour);
 }
