@@ -61,6 +61,7 @@ STATES = {
         drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.45, crest_gain=0.0,   # crest cut at sunset: its peaks read as polka dots
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
+        water_emit=0.35,   # CP-B r2: the river (and the sea) glow faintly, river colour
         side_px=12,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         border_fine=0.5,   # r7: under the moon the 1x gaps darken less, so its painted grid must darken more
         fill=0.9, contrast=1.1,
@@ -309,6 +310,10 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     add({"kind": "remap", "dst": 6, "srcA": 3, "constant": [0, 1, ROUGH_LAND, ROUGH_WATER], "value": 1.0})
     add({"kind": "constant", "dst": 7, "constant": _c4(hexlin(s["water"][0]))})
     add({"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 7, "srcC": 3})
+    if s.get("water_emit", 0.0) > 0:   # CP-B r2: a faint glow on the water at night, so the river reads
+        add({"kind": "constant", "dst": 7, "constant": _c4([v * s["water_emit"] for v in hexlin(s["water"][3])])})
+        add({"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 3})
+        add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 7})
     add({"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(1)})                        # shore -> shallows
     add({"kind": "constant", "dst": 7, "constant": _c4(hexlin(s["shallow"]))})
     add({"kind": "mix", "dst": 7, "srcA": 2, "srcB": 7, "value": SHALLOW_AMT})
@@ -349,11 +354,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "constant", "dst": 7, "constant": _c4([v * eg for v in hexlin(s["edge"])])})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
-        add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(1)})                     # crest
-        add({"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [CREST_EDGE[0], CREST_EDGE[1], 0, 0]})  # peaks only
-        add({"kind": "constant", "dst": 7, "constant": _c4([v * cg for v in hexlin(s["water"][3])])})
-        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
-        add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
+        if cg > 0:
+            add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(1)})                 # crest
+            add({"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [CREST_EDGE[0], CREST_EDGE[1], 0, 0]})
+            add({"kind": "constant", "dst": 7, "constant": _c4([v * cg for v in hexlin(s["water"][3])])})
+            add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+            add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
     add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5})                              # emission: top only
     return {"name": name, "ops": o, "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4,
             "emissionIntensity": 1.0, "opacity": -1}
