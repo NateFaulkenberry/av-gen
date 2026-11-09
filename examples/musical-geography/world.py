@@ -26,7 +26,7 @@ TILES = {
     "pathWidth": 2.0, "pathLift": 0.3,
     # CP-A (r2's valley): a river meandering north from the bay's north shore, in a smooth valley with no walls
     "river": [[270.0, -530], [311.3, -592], [324.5, -654], [300.7, -716], [255.9, -778], [220.8, -840], [219.1, -902], [252.0, -964], [297.2, -1026], [323.9, -1088], [313.9, -1150], [274.1, -1212], [231.5, -1274], [215.1, -1336], [236.0, -1398], [280.0, -1460]],
-    "riverWidth": 8.0, "valleyWidth": 240.0,
+    "riverWidth": 16.0, "valleyWidth": 240.0,
     # taller land so the top of the colour ramp (orange, yellow; 20-30 m) shows on the crowns (04- §3)
     "heightScale": 1.25,
     # from the bay's north shore up into the north-west hills (terrain_mirror.py --map shows the layout)
@@ -38,7 +38,7 @@ TILES = {
 # gap near; 2x and 4x blocks beyond with NO geometric gap (box = cell), each the mean of its children, painting the fine
 # lattice with tileBorder's subdivisions (look.tile_program); the dark underlay under the fine ring only, 4 m blocks
 # 2.2 below, so a block's mean never pokes through a slope.
-FINE_VIEW = 120.0   # 160 -> 120 (engineering, CP-A r4): the composed reveal fits 33.3 ms
+FINE_VIEW = 270.0   # 4 m tiles (owner, 2026-11-09): the fine ring reaches 270 m so the 8/16 m rings sit in the haze
 RINGS = [
     # name, cellSize, viewDistance, align, hole (finer ring), thickness, castsShadow, gap (tileSize / cell)
     ("mgTiles1", 1.0, FINE_VIEW, 4, None, 0.30, True, 0.915),

@@ -59,7 +59,7 @@ def camera(name):
     return c
 
 
-TILE_SCALE = 1.0   # set by --tile-scale
+TILE_SCALE = 4.0   # owner, 2026-11-09: 4 m tiles (--tile-scale overrides)
 
 
 # ---- the CP-B flight (ADR-1956), in metres: bay -> low over the moving sea -> up the river valley -> climb to the reveal.
@@ -95,7 +95,7 @@ def scene_doc(state, interim, camera_name):
         "skybox": True,
         "shadowRange": 480.0,   # the low suns' long shadows reach the reveal's middle ground (+0.7 ms; 220 changed no pixel there)
         "depthPrepass": True,
-        "aoRadius": 0.6,   # Phase 5: the automatic radius (5% of the look-ahead distance) welled every tile gap
+        "aoRadius": 1.2,   # 4 m tiles (0.6 at 1 m); Phase 5: the automatic radius (5% of the look-ahead distance) welled every tile gap
         # GTAO, faded out with distance (ADR-1951): it darkened every far step riser into dark dashes (97fe0568).
         # The band is per view (AO_BANDS): near ground only.
         "ambientOcclusion": True,
@@ -152,7 +152,7 @@ def main():
     ap.add_argument("--interim", action="store_true")
     ap.add_argument("--camera", default="low", choices=sorted(CAMERAS))
     ap.add_argument("--out", default=os.path.join(HERE, "scene"))
-    ap.add_argument("--tile-scale", type=float, default=1.0)
+    ap.add_argument("--tile-scale", type=float, default=4.0)
     ap.add_argument("--flight", action="store_true")
     a = ap.parse_args()
     global TILE_SCALE

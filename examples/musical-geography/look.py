@@ -85,7 +85,7 @@ STATES = {
         land=["#2E9C78", "#5CB86A", "#D8CC5A", "#F6AE48", "#FFDC98"],
         water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8", under="#4A6A55",
         path="#F2A93B", path_emit=0.25, pad="#FFC060", pad_emit=0.0,
-        drift="#F4C49A", drift_amt=0.28, edge="#FFD27A", edge_gain=0.5, crest_gain=0.4,
+        drift="#F4C49A", drift_amt=0.28, edge="#FFD27A", edge_gain=0.5, crest_gain=0.0,   # crest cut: its peaks read as polka dots (as sunset)
         fog_mult=8.0, exposure=-0.3, saturation=1.5, look="medium-high", bloom=0.25),
 }
 # Contour gains as approved by the owner (04- §11): on at dusk and night, faint or off by day. The sunset key is 0.6
@@ -151,7 +151,7 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
 
 
 # ---- the moving ground (ADR-1953), authored for restraint: the sea moves, the land breathes, the music adds -------------
-CONTOUR_INTERVAL = 3.0   # metres between contour lines (04- §6)
+CONTOUR_INTERVAL = 4.0   # metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
 def tile_dynamics():
@@ -160,14 +160,14 @@ def tile_dynamics():
     return {
         "amplitude": 0.35,                     # response.low adds up to +0.6 (routes)
         "waves": [
-            {"kind": "planar", "amplitude": 1.0, "wavelength": 46, "speed": 6, "direction": 205, "sharpness": 0.55,
+            {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
              "onLand": 0.08, "onWater": 1, "crest": 0.6},
-            {"kind": "planar", "amplitude": 0.6, "wavelength": 29, "speed": 4.5, "direction": 265, "sharpness": 0.35,
+            {"kind": "planar", "amplitude": 0.6, "wavelength": 44, "speed": 5.5, "direction": 265, "sharpness": 0.35,
              "onLand": 0.08, "onWater": 1, "crest": 0.6},
         ],
         "breathing": {"amplitude": 0.12, "period": 18, "wavelength": 800},
         "rolling": [0.4, 0.0],
-        "rings": {"amplitude": 1.6, "speed": 45, "wavelength": 14, "width": 12, "decay": 2.4, "crest": 1},
+        "rings": {"amplitude": 1.6, "speed": 45, "wavelength": 24, "width": 20, "decay": 2.4, "crest": 1},
         "contour": {"interval": CONTOUR_INTERVAL, "offset": 0.0},
     }
 
