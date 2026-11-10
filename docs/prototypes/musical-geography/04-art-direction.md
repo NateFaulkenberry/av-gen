@@ -1625,3 +1625,32 @@ Also changed: the coarse rings carry 0.25 of the contour gain, the interval is 9
 
 The day costs more than eng's +0.65 ms. This build has the lining's ops on every cloud pixel and more cover over this
 window, and I have not split the two.
+
+### CP-D r2 land3: ridges, rises and islands (2026-11-10, ADR-1992)
+
+**What I placed** (`world.TILES`): 8 ridges (26 points) and 6 rises.
+
+| Where | Landform |
+|---|---|
+| The bay's mouth | headlands `westHead` and `eastHead`, 45 m |
+| Inside the bay | a spit and a north-shore ridge |
+| Beside the 30–50 s sea legs | islands `bayIsle` (46 m), `southIsle`, `pairIsle`, `stack`, `westIsle` |
+| North of the sweep | `sweepNorth` |
+| Behind the tarn | `tarnRidge`, whose core makes a seaward headland along the night coast |
+| Down both sides of the dawn peninsula | ridgelines `capeEast` (48 m) and `capeWest` |
+| The inlet | an island, `inletIsle` |
+
+**Enclosure** (`cpd-r2-land3-enclosure-v1-v2.txt`). The coordinator asked me to tighten the metric, because 30 s had
+scored 0.95 while the still showed a low strip.
+
+| Version | Rule | land2 | land3 |
+|---|---|---|---|
+| v1 | ≥ 1.5° within 2 km | mean 0.86 | mean 0.99, all 16 legs ≥ 0.6 |
+| v2 | ≥ 3° within 1 km | mean 0.60, 6 of 16 legs ≥ 0.6 | mean 0.86, all 16 legs ≥ 0.6 |
+
+The weakest legs on v2 are the inlet (167 s) at 0.68 and the bay (35 s) at 0.70. The bay now reads as enclosed in
+the stills and in `cpd-r2-land3-clip-bay-30-50s.mp4`.
+
+**Open: islands and headlands stand on a cliff.** A raised core becomes land at half its profile, so the islands read
+as domes on stilts, with ramp bands up the cliff. Filed as CPD-R3b. Their coast also still has no beach or shallows;
+the coordinator has asked eng for that.

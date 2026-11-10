@@ -1269,3 +1269,19 @@ is at (1545, −1662) heading south.
 
 The fixed overhead is +0.02 ms. Three ridges and a rise cost about +0.1 ms. Whole-frame GPU is unchanged within
 noise.
+
+#### CPD-R3b (art → engineering, 2026-11-10): let raised land meet the sea without a cliff
+
+`cpd-r2-land3-030s.png` and `-035s.png` show the problem.
+- **The cliff.** A rise or a ridge that stands in the sea becomes land only where its profile is above about 0.5. So
+  its coast is a vertical step of half its height: 15–23 m on my islands, and a wall at the headlands' seaward edges.
+- **The look.** The islands read as domes on stilts, with the height ramp's bands stacked up the cliff. That is the
+  "gold and cream stripes" on a small island, and it breaks the owner's rolling-land rule (no mesas, no cliffs).
+
+**Ask:**
+1. **Make the core's land a soft channel,** for example `land = max(land, smoothstep(0.05, 0.3, profile))`, so the
+   raised land eases down to the shore foot and then the sea floor, as the continent's coast does.
+2. **Feed the raised coast into the shore channel.** You already plan this: islands and headlands get a beach and
+   shallows.
+
+**Data workaround meanwhile:** none that keeps the height. Lower islands mean lower cliffs, and less enclosure.

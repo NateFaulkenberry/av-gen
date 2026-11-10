@@ -90,6 +90,18 @@ def tile_sample(s, x, z):
     shaped = _sm(s["hillLow"], s["hillHigh"], hn)
     hill = shaped - np.maximum(shaped - s["crownThreshold"], 0) * s["crownFlatten"]
     land_h = s["shoreRise"] + s["hillHeight"] * k * hill * inland * s.get("heightScale", 1.0)
+    # ADR-1992 (approximate): ridges and rises add metres (unscaled) to the land; under a core (profile > 0.5) it is land
+    raise_ = np.zeros_like(land_h); core = np.zeros_like(land_h, dtype=bool)
+    for rd in s.get("ridges") or []:
+        d = path_distance(rd["points"], x, z)
+        prof = 1 - _sm(0.0, rd["width"] / 2, d)
+        raise_ = raise_ + rd["height"] * prof; core |= prof > 0.5
+    for ri in s.get("rises") or []:
+        d = np.hypot(x - ri["centre"][0], z - ri["centre"][1])
+        prof = 1 - _sm(ri["radius"], ri["radius"] + ri["edge"], d)
+        raise_ = raise_ + ri["height"] * prof; core |= (prof > 0.5) & (ri["height"] > 0)
+    land = np.where(core, 1.0, land)
+    land_h = np.where(core, np.maximum(land_h, s["shoreRise"]), land_h) + raise_
     channel = np.zeros_like(land_h)
     # ADR-1965 (approximate, for planning maps): rivers carve to the sea floor (the CP-A rule; a bedDepth >= 0 bed is
     # drawn at the floor too, so a stream's valley reads but its level is not mirrored), dry valleys lower the land by
