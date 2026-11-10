@@ -417,7 +417,7 @@ struct HopScene {
             "format": "avgen-scene", "version": 1, "name": "hops",
             "camera": {"position": [0, 30, 40], "target": [0, 0, 0]},
             "environment": {"tileDynamics": {
-                "waves": [ {"amplitude": 0.4, "wavelength": 36, "speed": 5} ],
+                "waves": [ {"amplitude": 0.4, "wavelength": 36, "speed": 5, "onLand": 1} ],
                 "spring": {"depth": 0.8}
             }},
             "nodes": [
@@ -637,6 +637,12 @@ TEST_CASE("the tile glow gains are parameters that reach the drawn scene, and si
     modulator.addRoute(toPath);
     modulator.addRoute(toAmp);
     signals::SignalBus bus;
+    const signals::SignalId mid = bus.declare("response.mid");
+    (void)bus.declare("response.low");
+    (void)modulator.bind(bus, params); // the composition's default routes read signals this bus lacks
+    for (const params::ModRoute& r : modulator.routes()) {
+        if (r.source == "response.mid" || r.source == "response.low") REQUIRE(r.targetParam != nullptr);
+    }
     const auto frame = [&](double t) {
         params.resetFinals();
         modulator.applyRoutes(bus, params, 1.0 / 60.0);
@@ -648,10 +654,75 @@ TEST_CASE("the tile glow gains are parameters that reach the drawn scene, and si
     const scene::TileDynamics silent = frame(0.5);
     CHECK(silent.glow == glm::vec4(1.5f, 0.5f, 1.0f, 1.0f));
     CHECK(silent.amplitude == 1.0f);
+    // a sound moves it, through the route
+    bus.set(mid, 0.5f);
+    CHECK(frame(0.75).glow.x == Catch::Approx(1.5f + 2.0f * 0.5f));
+    bus.set(mid, 0.0f);
     // the base moves it (the same path a route's output takes)
     params.find("env/tiles/glow/contour")->setBaseComponent(0, 2.0f);
     CHECK(frame(1.0).glow.y == 2.0f);
     // and a save keeps the authored glow
     const auto saved = (*c)->toJson();
     CHECK(saved.at("environment").at("tileDynamics").at("glow").at("path") == 1.5f);
+}
+
+TEST_CASE("a seek that lands mid-hop puts the body where a play does, with a route moving the ground",
+          "[tiles][hop][geography][composition][seek][audio]") {
+    // A real project route swells the ground (as response.low does in make_audio.py); a seek's replay does not re-run project routes,
+    // so the replay's ground differs from the play's. The arc must not remember it.
+    const auto swell = [](double t) { return static_cast<float>(0.6 + 0.4 * std::sin(t * 1.3)); };
+    const auto wire = [](HopScene& h) {
+        const signals::SignalId id = h.bus.declare("test.swell");
+        params::ModRoute r;
+        r.source = "test.swell";
+        r.target = "env/tiles/amplitude"; // the swell (this scene's waves move the land too)
+        r.amount = 2.0f;
+        h.modulator.addRoute(r);
+        (void)h.modulator.bind(h.bus, h.params); // the composition's own default routes read signals this bus lacks
+        REQUIRE(h.modulator.routes().back().targetParam != nullptr);
+        return id;
+    };
+    HopScene played;
+    const signals::SignalId s1 = wire(played);
+    std::vector<std::pair<long long, std::size_t>> airborne;
+    for (long long f = 0; f <= 60 * 16; ++f) {
+        const double t = static_cast<double>(f) / 60.0;
+        played.bus.set(s1, swell(t));
+        played.tick(t, f == 0 ? 0.0 : 1.0 / 60.0, static_cast<std::uint64_t>(f));
+        if (f > 60 * 6) {
+            const auto& es = played.comp->entityWorld().entities();
+            for (std::size_t i = 0; i < es.size(); ++i) {
+                if (es[i]->state().airborne) airborne.emplace_back(f, i);
+            }
+        }
+    }
+    REQUIRE_FALSE(airborne.empty());
+    const std::size_t who = airborne.front().second;
+    const long long first = airborne.front().first;
+    long long last = first;
+    for (const auto& [f, i] : airborne) {
+        if (i == who && f == last + 1) last = f;
+    }
+    const long long mid = (first + last) / 2;
+    const double T = static_cast<double>(mid) / 60.0;
+    CAPTURE(first, last, mid);
+    HopScene again; // the play, to exactly that frame
+    const signals::SignalId s2 = wire(again);
+    for (long long f = 0; f <= mid; ++f) {
+        const double t = static_cast<double>(f) / 60.0;
+        again.bus.set(s2, swell(t));
+        again.tick(t, f == 0 ? 0.0 : 1.0 / 60.0, static_cast<std::uint64_t>(f));
+    }
+    const entity::EntityState& play = again.comp->entityWorld().entities()[who]->state();
+    REQUIRE(play.airborne);
+    const glm::vec3 want = play.position();
+    HopScene sought; // a cold seek there, then the frame it lands on with that instant's routes
+    const signals::SignalId s3 = wire(sought);
+    sought.seek(T);
+    sought.bus.set(s3, swell(T));
+    sought.tick(T, 0.0, static_cast<std::uint64_t>(mid));
+    const entity::EntityState& got = sought.comp->entityWorld().entities()[who]->state();
+    CAPTURE(want.x, want.y, want.z, got.position().x, got.position().y, got.position().z);
+    CHECK(got.airborne);
+    CHECK(glm::length(got.position() - want) < 1e-3f);
 }

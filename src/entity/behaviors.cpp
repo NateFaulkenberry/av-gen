@@ -3736,9 +3736,13 @@ public:
                 ++leg_;
                 break;
             }
-            const float landH = ground->at(airTo_.x, airTo_.y, t).height; // the landing tile as it is now
+            // ADR-1964: the arc is a function of NOW -- both ends on the drawn ground at this instant, the rise from the
+            // planning surface at launch -- so a seek that lands mid-hop puts the body where a play does (no launch
+            // height remembered from a ground the replay drew without the routes).
+            const float fromH = ground->at(airFrom_.x, airFrom_.y, t).height; // the tile it left, as it is now
+            const float landH = ground->at(airTo_.x, airTo_.y, t).height;     // the landing tile as it is now
             pos_ = glm::mix(airFrom_, airTo_, s);
-            y_ = airH0_ + (landH - airH0_) * s + 4.0f * airApex_ * s * (1.0f - s);
+            y_ = fromH + (landH - fromH) * s + 4.0f * airApex_ * s * (1.0f - s);
             face(airTo_ - airFrom_, dt);
             speed = glm::length(airTo_ - airFrom_) / std::max(airT_, 1e-3f);
             activity = s < 0.5f ? Activity::Jump : Activity::Fall;
@@ -3801,10 +3805,10 @@ private:
         airTo_ = to;
         air0_ = t;
         airT_ = airTime;
-        airH0_ = y_;
-        const float landH = ground.at(to.x, to.y, t + airTime).height; // aimed at the landing tile as it will be
+        // the extra rise over a step up, from the planning surface (what a seek replays identically)
+        const float rise = ground.planned(to.x, to.y, t + airTime).height - ground.planned(pos_.x, pos_.y, t).height;
         const float apex = apex_ != nullptr ? apex_->value() : apexDefault_;
-        airApex_ = apex + 0.5f * std::max(0.0f, landH - y_);
+        airApex_ = apex + 0.5f * std::max(0.0f, rise);
         phase_ = Phase::Air;
     }
 
@@ -3887,7 +3891,6 @@ private:
     glm::vec2 airTo_{0.0f};
     double air0_ = 0.0;
     float airT_ = 1.0f;
-    float airH0_ = 0.0f;
     float airApex_ = 0.0f;
 };
 

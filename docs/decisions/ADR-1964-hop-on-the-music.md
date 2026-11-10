@@ -32,5 +32,11 @@ the ground. Only its height rides the music.
 - Tests:
   - a 30 s rest ends on the cue's frame with a hop;
   - two runs whose drawn grounds differ by a tripled amplitude take the same xz path (to within 1e-4 m over 30 s).
-- A hop that is mid-air when a seek lands can differ in height from the play until it lands, because its launch
-  height came from the drawn ground.
+- **A seek that lands mid-hop** puts the body at the height a play does. The arc is a function of the current
+  instant: both ends are read on the drawn ground now, and the extra rise over a step up comes from the planning
+  surface at launch. Nothing is remembered from a ground that the replay drew without the routes.
+  - Test: a real route swells the ground. A cold seek into the middle of a hop, compared with a play to the same
+    frame, agrees to within 1e-3 m.
+  - Canary: the old arc, which remembered its launch height, was 0.17 m off in the same test.
+- A walk's 80 ms ease down a step still remembers the last frame's height. A seek landing inside that ease can
+  differ from the play for those 80 ms.
