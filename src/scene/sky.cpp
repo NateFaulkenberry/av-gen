@@ -136,6 +136,32 @@ const PunctualLight* skyKeyLight(const std::vector<PunctualLight>& lights) {
     return firstDirectional;
 }
 
+KeyLight frameKeyLight(const std::vector<PunctualLight>& lights) {
+    KeyLight out;
+    float best = 0.0f;
+    bool bestCasts = false;
+    for (const PunctualLight& light : lights) {
+        if (!light.enabled || light.type != PunctualLight::Type::Directional || !(light.intensity > 0.0f)) {
+            continue;
+        }
+        const glm::vec3 toLight = safeNormalize(-light.direction, glm::vec3(0.0f, 1.0f, 0.0f));
+        if (toLight.y <= 0.0f) {
+            continue; // below the horizon
+        }
+        const glm::vec3 radiance = light.color * colorTemperatureToRgb(light.temperature, light.tint) * light.intensity;
+        const float power = 0.2126f * radiance.r + 0.7152f * radiance.g + 0.0722f * radiance.b;
+        const bool casts = light.castsShadow;
+        if ((casts && !bestCasts) || (casts == bestCasts && power > best)) {
+            best = power;
+            bestCasts = casts;
+            out.toLight = toLight;
+            out.radiance = radiance;
+            out.valid = true;
+        }
+    }
+    return out;
+}
+
 SkyRuntime resolveSky(const SkySettings& settings, const std::vector<PunctualLight>& lights) {
     SkyRuntime sky;
     sky.zenithColor = glm::max(settings.zenithColor, glm::vec3(0.0f));

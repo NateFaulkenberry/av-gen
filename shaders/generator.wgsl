@@ -210,7 +210,7 @@ struct TileParams {
     hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
     blend: vec4<i32>,      // seam band cells (0 = off), block ratio (ADR-1976 amended), children at the lowest (ADR-1953)
     water0: vec4<f32>,     // ADR-1965: river count, pond count, valley count, height scale
-    skirt: vec4<f32>,      // skirt depth, the box's thickness
+    skirt: vec4<f32>,      // skirt depth, the box's thickness, ADR-1966 omit water (1), omit below (m; <= -1e4 off)
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
     riverInfo: array<vec4<f32>, 4>,   // ADR-1965: first point (pool index), point count, width, valley width
     riverLevel: array<vec4<f32>, 4>,  // source level, mouth level, length, 0
@@ -755,6 +755,17 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
             t.river = t.river + (mr * inv - t.river) * w;
             t.pond = t.pond + (mo * inv - t.pond) * w;
         }
+    }
+    // ADR-1966: a layer that omits water emits an empty record for a wet cell (the cull pass rejects it, like a hole)
+    if ((tile.skirt.z > 0.5 && t.water >= 0.5) || (tile.skirt.w > -10000.0 && t.height < tile.skirt.w)) {
+        r.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+        r.rotation = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+        r.scale = vec4<f32>(0.0);
+        r.random = vec4<f32>(0.0);
+        r.color = vec4<f32>(0.0);
+        r.emissive = vec4<f32>(0.0);
+        records[index] = r;
+        return;
     }
     // ADR-1953: a moving sea opens steps between its slabs, which the static sea never has: it gets as much skirt as
     // its motion can step (never more than the land's), so no gap shows through the swell. 0 at rest.

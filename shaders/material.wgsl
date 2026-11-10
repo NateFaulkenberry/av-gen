@@ -147,6 +147,9 @@ const MAT_IN_MATERIAL_EMISSION: u32 = 28u; // ADR-904
 const MAT_IN_TILE_GLOW: u32 = 29u; // ADR-1963
 const MAT_IN_LANDING_GLOW: u32 = 30u; // ADR-1960
 const MAT_IN_WATER_BODY: u32 = 31u;   // ADR-1965
+const MAT_IN_KEY_LIGHT_DIRECTION: u32 = 32u; // ADR-1967
+const MAT_IN_KEY_LIGHT_COLOR: u32 = 33u;
+const MAT_IN_SKY_AMBIENT: u32 = 34u;
 
 // ADR-904: the bits of MaterialProgramGpu.flags.x (scene::kMaterialWritesEmission and
 // scene::kMaterialEmissionReadsInstance).
@@ -171,6 +174,9 @@ struct MaterialContext {
     beat: vec4<f32>,
     tileGlow: vec4<f32>, // ADR-1963
     landingGlow: vec4<f32>, // ADR-1960
+    keyLightDirection: vec4<f32>, // ADR-1967
+    keyLightColor: vec4<f32>,
+    skyAmbient: vec4<f32>,
     viewDirection: vec3<f32>,
     depth: f32,
     // ADR-036 geometric inputs; the caller derives these from screen-space derivatives and the
@@ -318,6 +324,9 @@ fn materialContextZero() -> MaterialContext {
     ctx.beat = vec4<f32>(0.0);
     ctx.tileGlow = vec4<f32>(1.0);
     ctx.landingGlow = vec4<f32>(0.0);
+    ctx.keyLightDirection = vec4<f32>(0.0, 1.0, 0.0, 0.0); // ADR-1967
+    ctx.keyLightColor = vec4<f32>(0.0);
+    ctx.skyAmbient = vec4<f32>(0.0);
     ctx.viewDirection = vec3<f32>(0.0, 0.0, 1.0);
     ctx.depth = 0.0;
     ctx.curvature = 0.0;
@@ -543,6 +552,15 @@ fn materialInputValue(input: u32, ctx: MaterialContext) -> vec4<f32> {
     }
     if (input == MAT_IN_LANDING_GLOW) {
         return ctx.landingGlow;
+    }
+    if (input == MAT_IN_KEY_LIGHT_DIRECTION) { // ADR-1967
+        return ctx.keyLightDirection;
+    }
+    if (input == MAT_IN_KEY_LIGHT_COLOR) {
+        return ctx.keyLightColor;
+    }
+    if (input == MAT_IN_SKY_AMBIENT) {
+        return ctx.skyAmbient;
     }
     if (input == MAT_IN_WATER_BODY) {
         let cls = floor(max(ctx.instanceEmissive.w, 0.0) / 8192.0); // scene::kTileClassStride

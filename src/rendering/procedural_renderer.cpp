@@ -1246,7 +1246,8 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
                         hole.valid ? 1u : 0u);
     u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
     u.blend = glm::ivec4(g.blendCells, g.blendRatio, g.childrenMin ? 1 : 0, 0); // z: ADR-1953 children at the lowest
-    u.skirt = glm::vec4(g.skirt, std::max(object.source.size.y * object.sourceTransform.scale.y, 1e-4f), 0.0f, 0.0f);
+    u.skirt = glm::vec4(g.skirt, std::max(object.source.size.y * object.sourceTransform.scale.y, 1e-4f),
+                        g.omitWater ? 1.0f : 0.0f, g.omitBelow); // zw: ADR-1966 omit water cells, omit below
     // ADR-1965: the rivers, ponds and dry valleys. The spec is validated against these caps; the min()s only guard.
     const auto put = [](auto& pool, std::uint32_t i, glm::vec2 p) {
         glm::vec4& lane = pool[i / 2];
@@ -1315,7 +1316,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         }
     }
     // ADR-1970: the contour edges (the second kernel runs when the interval is above 0).
-    u.ring1.z = dyn.contourInterval;
+    u.ring1.z = g.contours ? dyn.contourInterval : 0.0f; // ADR-1966: a layer's opt-out
     u.ring1.w = dyn.contourOffset;
     // ADR-1953: the moving ground. Inactive, every lane stays 0 and the kernel skips it: the static ground.
     if (dyn.active()) {
@@ -2896,14 +2897,18 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
             queue.WriteBuffer(state.generatorUniforms, 0, &gu, sizeof(gu));
             const bool tiles = object.distribution.generator.isTiles(); // ADR-1950
             if (tiles) {
+                const scene::GeneratorSpec& gs = object.distribution.generator;
+                static const scene::TileDynamics kStill{};
                 const GeneratorTileUniforms tu = packGeneratorTiles(
                     object, generatorCameraSpace(object, objectModel, scene.camera.position), generatorReach,
-                    scene.environment.tileDynamics, static_cast<float>(time.renderTime)); // ADR-1953
+                    gs.dynamics ? scene.environment.tileDynamics : kStill, // ADR-1966: a layer may opt out
+                    static_cast<float>(time.renderTime)); // ADR-1953
                 queue.WriteBuffer(state.generatorTileUniforms, 0, &tu, sizeof(tu));
             }
             im.generatorItems.push_back(Impl::GeneratorItem{&state, static_cast<std::uint32_t>(genWindow.countX),
                                                             static_cast<std::uint32_t>(genWindow.countZ), tiles,
-                                                            tiles && scene.environment.tileDynamics.contourInterval > 0.0f});
+                                                            tiles && object.distribution.generator.contours &&
+                                                                scene.environment.tileDynamics.contourInterval > 0.0f});
             state.generatorWindow = genWindow;
             state.generatorFrame = im.frame;
             ++stats_.generatorObjects;

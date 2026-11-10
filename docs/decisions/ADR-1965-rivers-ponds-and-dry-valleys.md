@@ -44,9 +44,10 @@ Applied in order on the land part, before the shore mix:
 or modulated ground never moves a pond's or a river's level. The kernel is packed with the resolved values; it never
 recomputes them.
 
-**`river` reads as `rivers[0]`.** The scene file's `river`, `riverWidth` and `valleyWidth` (the CP-A single river) are
-read as `rivers[0]`, as the art agent asked. A file is written with `rivers`. `river` and `rivers` together is
-refused.
+**No `river` alias (amended in R2, ADR-441).** R1 shipped the scene file's `river`, `riverWidth` and `valleyWidth` (the
+CP-A single river) as an alias for `rivers[0]`, at the art agent's request, while the scene moved over. Once the art
+scene wrote only `rivers` (e3f6383f), the alias was removed: those keys are refused like any unknown key. The CP-A
+river is `rivers[0]` with the default `bedDepth` (< 0, the sea floor).
 
 **The water body's class.**
 - The sample carries `river` and `pond`, the shares of `water`; the sea's share is the rest.
@@ -66,7 +67,7 @@ not there is refused when the route is resolved.
 
 ## Consequences
 
-- The shipped scene's single river loads unchanged as `rivers[0]` at the sea floor.
+- The art scene writes its CP-A river as `rivers[0]`, which keeps the sea-floor bed by default.
 - The kernel's uniform block grows by 79 lanes (1.26 KB). The loops are bounded by the counts, and each river and
   valley is skipped outside its bounding box (widened by half its valley).
 - Characters do not follow polylines today; a river is ground to them like any other water.

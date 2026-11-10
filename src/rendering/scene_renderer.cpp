@@ -3664,6 +3664,15 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // ADR-1910: the water column (all zero = off, the frame every scene had before)
     frame.waterColumn = glm::vec4(scene.environment.waterSurface, glm::max(scene.environment.waterDownwelling, glm::vec3(0.0f)));
     frame.tileGlow = scene.environment.tileDynamics.glow; // ADR-1963
+    { // ADR-1967: the key light and the sky's ambient, for material programs
+        const scene::KeyLight key = scene::frameKeyLight(scene.lights);
+        frame.keyLightDirection = glm::vec4(key.toLight, key.valid ? 1.0f : 0.0f);
+        const float lum = 0.2126f * key.radiance.r + 0.7152f * key.radiance.g + 0.0722f * key.radiance.b;
+        frame.keyLightColor = glm::vec4(key.radiance, lum);
+        const scene::SkyRuntime sky = scene::resolveSky(scene.environment.sky, scene.lights);
+        frame.skyAmbient = glm::vec4(0.5f * (sky.zenithColor + sky.horizonColor) * sky.intensity,
+                                     scene.environment.sky.enabled ? 1.0f : 0.0f);
+    }
     {
         const auto& td = scene.environment.tileDynamics;
         frame.landingGlow = glm::vec4(td.landingColor * td.landingGain, td.landingGain); // ADR-1960

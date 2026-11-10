@@ -58,6 +58,17 @@ struct SkyRuntime {
 // the first enabled directional light, else null.
 [[nodiscard]] const PunctualLight* skyKeyLight(const std::vector<PunctualLight>& lights);
 
+// ADR-1967: the frame's key light for material programs -- the sun by day, the moon by night. Of the enabled
+// directional lights above the horizon (travelling downward), the strongest shadow caster by luminous intensity (colour x
+// temperature x intensity); with no caster up, the strongest of any. `toLight` points at it; `radiance` is its colour x
+// intensity. `valid` is false when no directional light is up.
+struct KeyLight {
+    glm::vec3 toLight{0.0f, 1.0f, 0.0f};
+    glm::vec3 radiance{0.0f};
+    bool valid = false;
+};
+[[nodiscard]] KeyLight frameKeyLight(const std::vector<PunctualLight>& lights);
+
 // Resolves `settings` against the scene's lights. With `useKeyLight` and a key light present the
 // sun direction is -normalize(light.direction) and the sun colour is tinted by the light's colour
 // (normalised to luminance 1, so a light's intensity never doubles as sky brightness).

@@ -407,6 +407,9 @@ struct FrameUniforms {
     glm::vec4 waterColumn{0.0f}; // ADR-1910: x = the water surface (world y), yzw = downwelling absorption per metre
     glm::vec4 tileGlow{1.0f};    // ADR-1963: environment.tileDynamics.glow, the `tileGlow` material input
     glm::vec4 landingGlow{0.0f}; // ADR-1960: the landing glow's colour x gain (rgb) and gain (w)
+    glm::vec4 keyLightDirection{0.0f, 1.0f, 0.0f, 0.0f}; // ADR-1967: xyz towards the key light, w = 1 when one is up
+    glm::vec4 keyLightColor{0.0f};                        // rgb = its colour x intensity, w = its luminance
+    glm::vec4 skyAmbient{0.0f}; // rgb = the analytic sky's mean of zenith and horizon x intensity, w = 1 when drawn
     glm::vec4 portalClip{0.0f};  // Gate C 2: scene::Scene::portalClip (last: the shadow views zero it)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
@@ -431,6 +434,7 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        16 + // ADR-1910: one vec4 of water column
                                        16 + // ADR-1963: the tile glow gains
                                        16 + // ADR-1960: the landing glow
+                                       48 + // ADR-1967: the key light (direction, colour) and the sky ambient
                                        16); // Gate C 2: the portal clip plane, last
 static_assert(offsetof(FrameUniforms, portalClip) == sizeof(FrameUniforms) - 16); // ShadowRenderer zeroes it
 static_assert(offsetof(FrameUniforms, viewProj) == 0);
