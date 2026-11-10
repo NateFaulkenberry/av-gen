@@ -967,7 +967,7 @@ All 128 tracks are live in `--audit-routes`. Stills: `10-full/cpd-r2-sky-night-v
 
 - **The landing tail.** At most 8 landings used to be drawn. Draft3 had up to 104 ringing at once, so a landed tile
   was dropped about 0.6 s after it landed and snapped flat. Now every landing still ringing is drawn, up to 256. The
-  plot is `06-characters/cpd-r2-landing-displacement-before-after.png`. Nothing for you to switch on.
+  plot is `11-pass-cpd-r2/cpd-r2-landing-displacement-before-after.png`. Nothing for you to switch on.
 - **Your spring now rings all the way out,** so its settings show for the first time. Draft3's spring is 1.4 Hz with
   ζ 0.16: bouncy, ringing about 5 s. A gentler setting, frequency 0.7 and damping 0.35 (depth unchanged), gives one
   slow dip, one small rebound and a smooth settle. It is the third arm of the clip. The choice is yours.
@@ -1021,3 +1021,46 @@ route. For B (the swell reaching the land) and E (choreographed hops), please gi
   it.
 - **Hop triggers:** at most one every couple of seconds per alien. Today the beat sets off every resting alien on every
   beat (`hop/trigger` steps the full range).
+
+### Engineering → art, CP-D r2 (2026-11-10): feet, route keys, B and E (ADR-1990)
+
+**Feet.** The bodies stand on the drawn tile top. A new GPU readback test holds it to 1 mm in every frame of every
+landing (`test_tile_feet_gpu`).
+
+The clipping the owner saw came from draft3's 8-spring cap, already fixed by ADR-1952. Each body rode every landing
+still ringing, but the GPU drew only the newest 8 and snapped an evicted tile back up past the feet. You can see it in
+`11-pass-cpd-r2/cpd-r2-feet-trace-before-after.png`; the close clip is `cpd-r2-feet-close-landings-50-60s.mp4`. Your
+merge of the landing work fixed it. The original spring stays.
+
+**Route keys.** A processor-chain key written on the route itself is now refused, naming the key. Any other unknown
+key is warned about. Your da5fa4eb chains, nested, load clean.
+
+**B: the swell on the land.** Each wave's land reach is now the parameter `env/tiles/waveN/onLand`, which you can key
+per state or route.
+- Author the base value in `look.tile_dynamics`, because the flight's clearance reads the authored waves. The demo
+  used 0.5 on both trains, up from 0.08.
+- Your `response.low → amplitude` route, with its 600/2500 ms chain and spring, measures 0.015 of its range per frame
+  at p99. That is inside the 0.05 spec.
+
+**E: choreographed hops.** The new hop settings:
+
+| Setting | Demo value | What it does |
+|---|---|---|
+| `cueOnly` | 1 | Rest until a cue. Each answered cue is exactly one hop. |
+| `maxWait` | 10 s | So silence is not frozen. |
+| `cueEvery` | 4 | Each alien answers every 4th beat, at its own place in the cycle, so they go in turns. |
+| `cueGap` | 2.5 s, live | The least time between two of one alien's hops. |
+| `airBeats` | 2, live | A hop lasts two beats, launching on a beat and landing on one. |
+| `hopChance` | 0 | No extra walking hops. |
+
+Keep your `beat.pulse → hop/trigger` reaction. With the values above, each alien hops at most once every 2.5 s
+(guaranteed, and tested), against 2 cues a second on Feline.
+
+**Measured in the demo, p99 step per frame as a share of the range:**
+- `hop/apex` from `response.level`: 0.055, just over the spec. It is only read at take-off, but slowing its chain to
+  about 300/1200 ms brings it under.
+- `breathing/amplitude` from `audio.energy`, which has no chain: p99 0.018, but there is one 0.97 jump. A chain of
+  about 400/2000 ms removes it.
+
+**Day edges.** A steady day level is your data, not an engine change: the day state's edge gain, or a key on
+`env/tiles/glow/contour`. No beat flash was built.

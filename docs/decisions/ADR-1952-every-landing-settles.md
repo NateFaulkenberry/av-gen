@@ -14,7 +14,7 @@ The owner, on CP-D draft3: *"the block animation when the aliens land ends too a
 A canary traced one landed tile's height, comparing the springs the GPU drew with every landing still ringing. Draft3's
 cast hops on every beat, and up to 104 landings were ringing at once. With a cap of 8, a landing left the drawn set
 about 0.6 s after it happened, once 8 newer landings had happened anywhere, and the tile snapped flat in mid-swing.
-The jump was up to 0.70 m in one frame (`06-characters/cpd-r2-landing-displacement-before-after.png`).
+The jump was up to 0.70 m in one frame (`11-pass-cpd-r2/cpd-r2-landing-displacement-before-after.png`).
 
 ## Decision
 
@@ -33,7 +33,7 @@ The CPU mirror computes the same terms, with the same reach and the same newest-
 - The before/after canary: the drawn and every-ringing curves are identical (largest difference 0.0). The largest
   per-frame change is the landing's own first dip (0.31 m per frame at draft3's spring), not a cutoff.
 - The tail is the spring's own. Draft3's spring (1.4 Hz, ζ 0.16) is bouncy and rings about 5 s. Gentler settings
-  (0.7 Hz, ζ 0.35) are shown as the third arm of `06-characters/cpd-r2-landing-before-after-soft-50-70s.mp4`; they are
+  (0.7 Hz, ζ 0.35) are shown as the third arm of `11-pass-cpd-r2/cpd-r2-landing-before-after-soft-50-70s.mp4`; they are
   art's choice.
 - Tests:
   - a landed tile's displacement while 80 other landings arrive steps no more than the spring alone, and is still

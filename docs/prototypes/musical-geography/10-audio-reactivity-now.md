@@ -67,8 +67,8 @@ sea, which is where the swell lives, draft3 moves the ground 8 cm. A 4 m tile 30
 whole cast. They already hop on their own every 0.6–2.2 s, so the beat cue only adds about 12% more hops, scattered
 across the field. It does not read as "they jump on the beat".
 
-**Frame differences, music against silence at the same instant:** `07-audio/cpd-r2-reactivity-music-vs-silent-draft3.png`
-and `07-audio/cpd-r2-reactivity-with-sonic-block-vs-silent.png`. Each row is a timestamp (30, 60, 90, 150, 200 s in
+**Frame differences, music against silence at the same instant:** `11-pass-cpd-r2/cpd-r2-reactivity-music-vs-silent-draft3.png`
+and `11-pass-cpd-r2/cpd-r2-reactivity-with-sonic-block-vs-silent.png`. Each row is a timestamp (30, 60, 90, 150, 200 s in
 the first; 30, 60, 150 s in the second). The columns are the music arm, the silent arm, and the difference ×2.
 
 | Time | Draft3: average change, % of pixels changed | With the analysis on |
@@ -183,7 +183,7 @@ the night lines move with the kick and the beat. Judge a clip of those before F.
 
 ## Evidence
 
-All under `~/Desktop/av-gen-review/105-musical-geography/07-audio/`:
+All under `~/Desktop/av-gen-review/105-musical-geography/11-pass-cpd-r2/`:
 
 - `cpd-r2-reactivity-music-vs-silent-draft3.png`: draft3 as shipped against silence, 5 timestamps, with the difference
   ×2.
