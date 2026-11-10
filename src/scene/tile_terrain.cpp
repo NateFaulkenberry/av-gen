@@ -167,6 +167,22 @@ LandPart landPart(const TileTerrainSpec& s, float x, float z, float t, float rol
         breath = 1.0f + breathAmp * std::sin(kTwoPi * (t / breathPeriod + n));
     }
     out.height = s.shoreRise + s.hillHeight * k * hill * out.inland * s.heightScale * breath;
+    // ADR-1992: the raised land. Each adds height * its profile; where the profile passes about a half, the land
+    // channel is lifted to 1 (a ridge across the sea is a causeway of land, a rise an island).
+    for (const TileRidge& r : s.ridges) {
+        const float d = polylineNearest(r.points.data(), std::min(r.points.size(), kMaxTileRidgePoints), x, z).x;
+        const float w = 1.0f - smooth01(0.0f, 0.5f * r.width, d);
+        if (w <= 0.0f) continue;
+        out.height += r.height * w;
+        out.land = std::max(out.land, smooth01(0.35f, 0.65f, w));
+    }
+    for (const TileRise& r : s.rises) {
+        const float d = glm::length(glm::vec2(x, z) - r.centre);
+        const float w = 1.0f - smooth01(r.radius, r.radius + r.edge, d);
+        if (w <= 0.0f) continue;
+        out.height += r.height * w;
+        out.land = std::max(out.land, smooth01(0.35f, 0.65f, w));
+    }
     return out;
 }
 
@@ -560,6 +576,28 @@ Result<void> TileTerrainSpec::validate() const {
         return fail("tiles: heightScale must be 0..8");
     }
     // ADR-1965
+    // ADR-1992
+    if (ridges.size() > kMaxTileRidges || rises.size() > kMaxTileRises) {
+        return fail("tiles: at most {} ridges and {} rises", kMaxTileRidges, kMaxTileRises);
+    }
+    std::size_t ridgePool = 0;
+    for (const TileRidge& r : ridges) {
+        if (r.points.size() < 2 || r.points.size() > kMaxTileRidgePoints || !(r.width > 0.0f) ||
+            !std::isfinite(r.height) || !std::isfinite(r.width)) {
+            return fail("tiles: ridge '{}': 2..{} points, a positive width and a finite height", r.name,
+                        kMaxTileRidgePoints);
+        }
+        ridgePool += r.points.size();
+    }
+    if (ridgePool > kMaxTileRidgePool) {
+        return fail("tiles: the ridges have at most {} points together (got {})", kMaxTileRidgePool, ridgePool);
+    }
+    for (const TileRise& r : rises) {
+        if (!(r.radius >= 0.0f) || !(r.edge > 0.0f) || !std::isfinite(r.height) || !std::isfinite(r.centre.x) ||
+            !std::isfinite(r.centre.y) || !std::isfinite(r.radius) || !std::isfinite(r.edge)) {
+            return fail("tiles: rise '{}': radius >= 0, a positive edge, finite centre and height", r.name);
+        }
+    }
     if (rivers.size() > kMaxTileRivers || ponds.size() > kMaxTilePonds || valleys.size() > kMaxTileValleys) {
         return fail("tiles: at most {} rivers, {} ponds and {} valleys", kMaxTileRivers, kMaxTilePonds, kMaxTileValleys);
     }
@@ -642,6 +680,19 @@ std::uint64_t TileTerrainSpec::hash() const {
             f(p.y);
         }
         for (const float w : {v.valleyWidth, v.depth, v.depthFraction}) f(w);
+    }
+    for (const TileRidge& r : ridges) { // ADR-1992
+        mix(0x52494447u); // "RIDG"
+        for (const glm::vec2& p : r.points) {
+            f(p.x);
+            f(p.y);
+        }
+        f(r.height);
+        f(r.width);
+    }
+    for (const TileRise& r : rises) {
+        mix(0x52495345u); // "RISE"
+        for (const float v : {r.centre.x, r.centre.y, r.radius, r.height, r.edge}) f(v);
     }
     mix(static_cast<std::uint64_t>(hillOctaves));
     for (const glm::vec2& p : path) {
@@ -733,6 +784,27 @@ nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec) {
         }
         j["valleys"] = std::move(valleys);
     }
+    if (!spec.ridges.empty()) { // ADR-1992
+        nlohmann::json ridges = nlohmann::json::array();
+        for (const TileRidge& r : spec.ridges) {
+            nlohmann::json o = {{"points", line(r.points)}, {"height", r.height}, {"width", r.width}};
+            if (!r.name.empty()) o["name"] = r.name;
+            ridges.push_back(std::move(o));
+        }
+        j["ridges"] = std::move(ridges);
+    }
+    if (!spec.rises.empty()) {
+        nlohmann::json rises = nlohmann::json::array();
+        for (const TileRise& r : spec.rises) {
+            nlohmann::json o = {{"centre", nlohmann::json::array({r.centre.x, r.centre.y})},
+                                {"radius", r.radius},
+                                {"height", r.height},
+                                {"edge", r.edge}};
+            if (!r.name.empty()) o["name"] = r.name;
+            rises.push_back(std::move(o));
+        }
+        j["rises"] = std::move(rises);
+    }
     return j;
 }
 
@@ -823,6 +895,51 @@ Result<TilePond> readPond(const nlohmann::json& o, const std::string& where) {
     return p;
 }
 
+Result<TileRidge> readRidge(const nlohmann::json& o, const std::string& where) { // ADR-1992
+    if (!o.is_object()) return fail("'{}' must be an object", where);
+    TileRidge r;
+    for (const auto& [k, val] : o.items()) {
+        const std::string at = where + "." + k;
+        if (k == "name" && val.is_string()) {
+            r.name = val.get<std::string>();
+        } else if (k == "points") {
+            auto l = readLine(val, at);
+            if (!l) return std::unexpected(l.error());
+            r.points = std::move(*l);
+        } else if (k == "height" || k == "width") {
+            auto n = readNum(val, at);
+            if (!n) return std::unexpected(n.error());
+            (k == "height" ? r.height : r.width) = *n;
+        } else {
+            return fail("'{}' is not a key this build reads", at);
+        }
+    }
+    return r;
+}
+
+Result<TileRise> readRise(const nlohmann::json& o, const std::string& where) { // ADR-1992
+    if (!o.is_object()) return fail("'{}' must be an object", where);
+    TileRise r;
+    for (const auto& [k, val] : o.items()) {
+        const std::string at = where + "." + k;
+        if (k == "name" && val.is_string()) {
+            r.name = val.get<std::string>();
+        } else if (k == "centre") {
+            if (!val.is_array() || val.size() != 2 || !val[0].is_number() || !val[1].is_number()) {
+                return fail("'{}' must be [x, z]", at);
+            }
+            r.centre = {val[0].get<float>(), val[1].get<float>()};
+        } else if (k == "radius" || k == "height" || k == "edge") {
+            auto n = readNum(val, at);
+            if (!n) return std::unexpected(n.error());
+            (k == "radius" ? r.radius : k == "height" ? r.height : r.edge) = *n;
+        } else {
+            return fail("'{}' is not a key this build reads", at);
+        }
+    }
+    return r;
+}
+
 Result<TileValley> readValley(const nlohmann::json& o, const std::string& where) {
     if (!o.is_object()) return fail("'{}' must be an object", where);
     TileValley v;
@@ -853,6 +970,22 @@ Result<TileTerrainSpec> tileTerrainFromJson(const nlohmann::json& j) {
     }
     TileTerrainSpec spec;
     for (const auto& [key, value] : j.items()) {
+        if (key == "ridges" || key == "rises") { // ADR-1992
+            if (!value.is_array()) return fail("'tiles.{}' must be an array", key);
+            for (std::size_t i = 0; i < value.size(); ++i) {
+                const std::string where = fmt::format("tiles.{}[{}]", key, i);
+                if (key == "ridges") {
+                    auto r = readRidge(value[i], where);
+                    if (!r) return std::unexpected(r.error());
+                    spec.ridges.push_back(std::move(*r));
+                } else {
+                    auto r = readRise(value[i], where);
+                    if (!r) return std::unexpected(r.error());
+                    spec.rises.push_back(std::move(*r));
+                }
+            }
+            continue;
+        }
         if (key == "rivers" || key == "ponds" || key == "valleys") {
             if (!value.is_array()) return fail("'tiles.{}' must be an array", key);
             for (std::size_t i = 0; i < value.size(); ++i) {

@@ -1298,13 +1298,33 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         if (pool + n > scene::kMaxTileValleyPool) break;
         u.valleyInfo[i] = glm::vec4(static_cast<float>(pool), static_cast<float>(n), v.valleyWidth, v.depth);
         u.valleyB[i] = widened(v.points, 0.5f * v.valleyWidth + 1.0f);
-        u.valleyFrac[static_cast<glm::length_t>(i)] = v.depthFraction;
+        u.valleyFrac[i / 4][static_cast<glm::length_t>(i % 4)] = v.depthFraction;
         for (std::uint32_t k = 0; k < n; ++k) put(u.valleyPts, pool + k, v.points[k]);
         pool += n;
         valleyCount = i + 1;
     }
     u.water0 = glm::vec4(static_cast<float>(riverCount), static_cast<float>(ponds), static_cast<float>(valleyCount),
                          t.heightScale);
+    // ADR-1992: the ridges and rises
+    pool = 0;
+    std::size_t ridgeCount = 0;
+    for (std::size_t i = 0; i < std::min(t.ridges.size(), scene::kMaxTileRidges); ++i) {
+        const scene::TileRidge& r = t.ridges[i];
+        const auto n = static_cast<std::uint32_t>(std::min(r.points.size(), scene::kMaxTileRidgePoints));
+        if (pool + n > scene::kMaxTileRidgePool) break;
+        u.ridgeInfo[i] = glm::vec4(static_cast<float>(pool), static_cast<float>(n), r.width, r.height);
+        u.ridgeB[i] = widened(r.points, 0.5f * r.width + 1.0f);
+        for (std::uint32_t k = 0; k < n; ++k) put(u.ridgePts, pool + k, r.points[k]);
+        pool += n;
+        ridgeCount = i + 1;
+    }
+    const std::size_t rises = std::min(t.rises.size(), scene::kMaxTileRises);
+    for (std::size_t i = 0; i < rises; ++i) {
+        const scene::TileRise& r = t.rises[i];
+        u.rises[i] = glm::vec4(r.centre.x, r.centre.y, r.radius, r.edge);
+        u.riseH[i / 4][static_cast<glm::length_t>(i % 4)] = r.height;
+    }
+    u.land0 = glm::vec4(static_cast<float>(ridgeCount), static_cast<float>(rises), 0.0f, 0.0f);
     for (std::uint32_t i = 0; i < points; ++i) {
         glm::vec4& lane = u.path[i / 2];
         if ((i & 1u) == 0u) {

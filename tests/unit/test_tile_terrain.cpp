@@ -545,3 +545,133 @@ TEST_CASE("tiles: the waves weigh each water body, and a river drifts downstream
     CHECK_FALSE(scene::tileDynamicsFromJson(nlohmann::json::parse(R"({"water": {"riverWaves": 1, "drift": 2}})"))
                     .has_value());
 }
+
+// ---- ADR-1992: ridges and rises, the raised land ----------------------------------------------------------------
+
+namespace {
+
+// The open-sea point nearest the origin (a 4 m scan): water, off the shore band.
+glm::vec2 openSea(const TileTerrainSpec& s) {
+    glm::vec2 best(1e9f);
+    for (float z = -400.0f; z <= 400.0f; z += 4.0f) {
+        for (float x = -400.0f; x <= 400.0f; x += 4.0f) {
+            const TileSample t = scene::tileSample(s, x, z);
+            if (!(t.water > 0.999f && t.shore < 0.01f && glm::length(glm::vec2(x, z)) < glm::length(best))) continue;
+            bool open = true; // the whole 40 m around it is sea too
+            for (int k = 0; k < 16 && open; ++k) {
+                const float a = 6.2831853f * static_cast<float>(k) / 16.0f;
+                for (const float r : {20.0f, 40.0f}) {
+                    open = open && scene::tileSample(s, x + r * std::cos(a), z + r * std::sin(a)).water > 0.999f;
+                }
+            }
+            if (open) best = {x, z};
+        }
+    }
+    return best;
+}
+
+} // namespace
+
+TEST_CASE("tiles: a rise in the sea is an island, its height added to the land, its edge soft",
+          "[geography][tiles][adr1992]") {
+    TileTerrainSpec s = landWorld();
+    const glm::vec2 sea = openSea(s);
+    REQUIRE(scene::tileSample(s, sea.x, sea.y).water > 0.999f);
+    TileTerrainSpec isle = s;
+    isle.rises = {scene::TileRise{.name = "isle", .centre = sea, .radius = 12.0f, .height = 18.0f, .edge = 20.0f}};
+    REQUIRE(isle.validate().has_value());
+    const TileSample top = scene::tileSample(isle, sea.x, sea.y);
+    CHECK(top.water < 1e-3f); // land
+    CHECK(top.height > s.seaLevel + 15.0f);
+    // the edge eases down, never up, and with no wall: the steepest metre (where the coast lifts out of the sea, as
+    // any shore does) is well under the rise's height
+    float worst = 0.0f;
+    bool falls = true;
+    for (float r = 0.0f; r + 1.0f <= 12.0f + 20.0f; r += 1.0f) { // out to radius + edge
+        const float step = scene::tileSample(isle, sea.x + r + 1.0f, sea.y).height -
+                           scene::tileSample(isle, sea.x + r, sea.y).height;
+        // what the rise adds over the ground beneath it only ever falls outward
+        const float added0 = scene::tileSample(isle, sea.x + r, sea.y).height - scene::tileSample(s, sea.x + r, sea.y).height;
+        const float added1 = scene::tileSample(isle, sea.x + r + 1.0f, sea.y).height -
+                             scene::tileSample(s, sea.x + r + 1.0f, sea.y).height;
+        falls = falls && added1 <= added0 + 1e-4f;
+        worst = std::max(worst, -step);
+    }
+    CAPTURE(worst);
+    CHECK(falls);
+    CHECK(worst < 18.0f / 3.0f);
+    // beyond radius + edge the world is untouched
+    const glm::vec2 far = sea + glm::vec2(33.0f, 0.0f);
+    CHECK(scene::tileSample(isle, far.x, far.y).height == scene::tileSample(s, far.x, far.y).height);
+    CHECK(scene::tileSample(isle, far.x, far.y).water == scene::tileSample(s, far.x, far.y).water);
+}
+
+TEST_CASE("tiles: a ridge raises land along its line and makes land across the sea under its core",
+          "[geography][tiles][adr1992]") {
+    TileTerrainSpec s = landWorld();
+    const auto [p, top] = highLand(s);
+    const glm::vec2 sea = openSea(s);
+    TileTerrainSpec r = s;
+    r.ridges = {scene::TileRidge{.name = "spine", .points = {p, sea}, .height = 25.0f, .width = 40.0f}};
+    REQUIRE(r.validate().has_value());
+    // on land: the height adds, the water does not change
+    const TileSample on = scene::tileSample(r, p.x, p.y);
+    CHECK(on.height == Catch::Approx(top + 25.0f).margin(1e-3));
+    // in the sea under the core: land
+    const TileSample out = scene::tileSample(r, sea.x, sea.y);
+    CHECK(out.water < 1e-3f);
+    CHECK(out.height > s.seaLevel + 20.0f);
+    // 21 m off the line (beyond half its width) nothing changes
+    const glm::vec2 dir = glm::normalize(sea - p);
+    const glm::vec2 side = 0.5f * (p + sea) + glm::vec2(-dir.y, dir.x) * 21.0f;
+    CHECK(scene::tileSample(r, side.x, side.y).height == scene::tileSample(s, side.x, side.y).height);
+}
+
+TEST_CASE("tiles: raised land comes before the carving -- a valley cuts a ridge, a pond's auto level reads it",
+          "[geography][tiles][adr1992]") {
+    TileTerrainSpec s = landWorld();
+    const auto [p, top] = highLand(s);
+    s.ridges = {scene::TileRidge{.points = {p + glm::vec2(-60.0f, 0.0f), p + glm::vec2(60.0f, 0.0f)}, .height = 30.0f,
+                                 .width = 60.0f}};
+    TileTerrainSpec cut = s;
+    cut.valleys = {scene::TileValley{.points = {p + glm::vec2(0.0f, -40.0f), p + glm::vec2(0.0f, 40.0f)},
+                                     .valleyWidth = 16.0f, .depth = 10.0f}};
+    CHECK(scene::tileSample(cut, p.x, p.y).height ==
+          Catch::Approx(scene::tileSample(s, p.x, p.y).height - 10.0f).margin(1e-3));
+    TileTerrainSpec tarn = s;
+    tarn.ponds = {scene::TilePond{.centre = p, .radius = 6.0f, .basinWidth = 6.0f}};
+    tarn.resolveWater();
+    CHECK(scene::tilePondLevel(tarn, 0) > top + 10.0f); // up on the ridge, not on the land beneath it
+}
+
+TEST_CASE("tiles: ridges, rises and the larger valley budget read, write and refuse", "[geography][tiles][adr1992]") {
+    auto spec = scene::tileTerrainFromJson(nlohmann::json::parse(R"({
+        "ridges": [{"name": "spine", "points": [[0, 0], [100, 20], [180, 90]], "height": 30, "width": 80}],
+        "rises": [{"name": "isle", "centre": [-300, 40], "radius": 25, "height": 14, "edge": 30}]})"));
+    REQUIRE(spec.has_value());
+    auto again = scene::tileTerrainFromJson(scene::tileTerrainToJson(*spec));
+    REQUIRE(again.has_value());
+    CHECK(scene::tileTerrainToJson(*again) == scene::tileTerrainToJson(*spec));
+    CHECK(again->hash() == spec->hash());
+    TileTerrainSpec moved = *spec;
+    moved.rises[0].height = 15.0f;
+    CHECK(moved.hash() != spec->hash());
+    CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(R"({"rises": [{"centre": [0, 0], "hight": 3}]})"))
+                    .has_value());
+    // 8 valleys of 8 points (64) are allowed now; 9 valleys, or 65 points, are not
+    TileTerrainSpec v;
+    for (int i = 0; i < 8; ++i) {
+        v.valleys.push_back({});
+        for (int k = 0; k < 8; ++k) v.valleys.back().points.push_back({10.0f * k, 30.0f * i});
+    }
+    CHECK(v.validate().has_value());
+    v.valleys.back().points.push_back({90.0f, 0.0f});
+    CHECK_FALSE(v.validate().has_value());
+    v.valleys.back().points.pop_back();
+    v.valleys.push_back({.points = {{0.0f, 0.0f}, {1.0f, 0.0f}}});
+    CHECK_FALSE(v.validate().has_value());
+    // 9 ridges or rises are refused
+    TileTerrainSpec many;
+    for (int i = 0; i < 9; ++i) many.rises.push_back({});
+    CHECK_FALSE(many.validate().has_value());
+}

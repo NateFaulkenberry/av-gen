@@ -218,10 +218,16 @@ struct TileParams {
     riverPts: array<vec4<f32>, 32>,   // the rivers' points, pooled, two per lane
     ponds: array<vec4<f32>, 8>,       // centre x, centre z, radius, basin width
     pondB: array<vec4<f32>, 8>,       // level, shore noise, 0, 0
-    valleyInfo: array<vec4<f32>, 4>,  // first point, point count, valley width, depth
-    valleyB: array<vec4<f32>, 4>,     // min x, min z, max x, max z (widened)
-    valleyFrac: vec4<f32>,            // each valley's depth fraction (x..w)
-    valleyPts: array<vec4<f32>, 16>,  // the valleys' points, pooled
+    valleyInfo: array<vec4<f32>, 8>,  // first point, point count, valley width, depth (ADR-1992: 8 valleys)
+    valleyB: array<vec4<f32>, 8>,     // min x, min z, max x, max z (widened)
+    valleyFrac: array<vec4<f32>, 2>,  // each valley's depth fraction, four per lane
+    valleyPts: array<vec4<f32>, 32>,  // the valleys' points, pooled (ADR-1992: 64)
+    land0: vec4<f32>,                 // ADR-1992: ridge count, rise count, 0, 0
+    ridgeInfo: array<vec4<f32>, 8>,   // first point, point count, width, height
+    ridgeB: array<vec4<f32>, 8>,      // min x, min z, max x, max z (widened by half the width)
+    ridgePts: array<vec4<f32>, 32>,   // the ridges' points, pooled
+    rises: array<vec4<f32>, 8>,       // centre x, centre z, radius, edge
+    riseH: array<vec4<f32>, 2>,       // each rise's height, four per lane
     // ADR-1953: the moving ground (procedural_renderer.hpp GeneratorTileUniforms).
     dyn: vec4<f32>,        // t, amplitude, wave count, event count
     breath: vec4<f32>,     // amplitude, period, wavelength, 1 when anything moves
@@ -304,21 +310,37 @@ fn tileValleyPt(i: u32) -> vec2<f32> {
     return select(lane.xy, lane.zw, (i & 1u) == 1u);
 }
 
+fn tileRidgePt(i: u32) -> vec2<f32> { // ADR-1992
+    let lane = tile.ridgePts[i / 2u];
+    return select(lane.xy, lane.zw, (i & 1u) == 1u);
+}
+
+// ADR-1992: a pooled point of pool `which` (0 the rivers, 1 the valleys, 2 the ridges).
+fn tilePoolPt(which: u32, i: u32) -> vec2<f32> {
+    if (which == 1u) {
+        return tileValleyPt(i);
+    }
+    if (which == 2u) {
+        return tileRidgePt(i);
+    }
+    return tileRiverPt(i);
+}
+
 // The distance to a pooled polyline and the arc length to its nearest point (polylineNearest's twin).
-fn tileNearest(x: f32, z: f32, first: u32, count: u32, valley: bool) -> vec2<f32> {
+fn tileNearest(x: f32, z: f32, first: u32, count: u32, which: u32) -> vec2<f32> {
     var best = 1e9;
     var along = 0.0;
     if (count == 0u) {
         return vec2<f32>(best, 0.0);
     }
     if (count == 1u) {
-        let p0 = select(tileRiverPt(first), tileValleyPt(first), valley);
+        let p0 = tilePoolPt(which, first);
         return vec2<f32>(length(vec2<f32>(x, z) - p0), 0.0);
     }
     var walked = 0.0;
     for (var i = 0u; i + 1u < count; i = i + 1u) {
-        let a = select(tileRiverPt(first + i), tileValleyPt(first + i), valley);
-        let b = select(tileRiverPt(first + i + 1u), tileValleyPt(first + i + 1u), valley);
+        let a = tilePoolPt(which, first + i);
+        let b = tilePoolPt(which, first + i + 1u);
         let ab = b - a;
         let ap = vec2<f32>(x, z) - a;
         let len2 = max(dot(ab, ab), 1e-6);
@@ -374,7 +396,7 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     let region = tileValueNoise(seed ^ TILE_REGION_SEED, x / tile.e.x, z / tile.e.x);
     let k = 1.0 + tile.e.y * (2.0 * region - 1.0);
     let c = tileFbm(seed ^ TILE_CONTINENT_SEED, x / tile.a.x, z / tile.a.x, 3);
-    let land = tileSmooth(tile.a.y - tile.a.z, tile.a.y + tile.a.z, c);
+    var land = tileSmooth(tile.a.y - tile.a.z, tile.a.y + tile.a.z, c);
     let inland = tileSmooth(tile.a.y, tile.a.y + tile.a.w, c);
     // ADR-1953: the rolling formations (the hills' domain drifts; all 0 on a static ground: hx is x).
     let hx = x - tile.roll.x * tile.dyn.x;
@@ -393,20 +415,46 @@ fn tileSample(x: f32, z: f32) -> TileOut {
         breath = 1.0 + tile.breath.x * sin(TILE_TWO_PI * (tile.dyn.x / tile.breath.y + n));
     }
     var landHeight = tile.b.z + tile.c.x * k * hill * inland * tile.water0.w * breath;
+    // ADR-1992: the raised land (landPart's twin): height x profile, the core lifted to land
+    let ridgeCount = min(u32(tile.land0.x + 0.5), 8u);
+    for (var i = 0u; i < ridgeCount; i = i + 1u) {
+        let ri = tile.ridgeInfo[i];
+        if (!tileInBounds(x, z, tile.ridgeB[i])) {
+            continue;
+        }
+        let d = tileNearest(x, z, u32(ri.x + 0.5), u32(ri.y + 0.5), 2u).x;
+        let w = 1.0 - tileSmooth(0.0, 0.5 * ri.z, d);
+        if (w <= 0.0) {
+            continue;
+        }
+        landHeight = landHeight + ri.w * w;
+        land = max(land, tileSmooth(0.35, 0.65, w));
+    }
+    let riseCount = min(u32(tile.land0.y + 0.5), 8u);
+    for (var i = 0u; i < riseCount; i = i + 1u) {
+        let rs = tile.rises[i];
+        let d = length(vec2<f32>(x, z) - rs.xy);
+        let w = 1.0 - tileSmooth(rs.z, rs.z + rs.w, d);
+        if (w <= 0.0) {
+            continue;
+        }
+        landHeight = landHeight + tile.riseH[i / 4u][i % 4u] * w;
+        land = max(land, tileSmooth(0.35, 0.65, w));
+    }
     // ADR-1965: the dry valleys, then the rivers, then the ponds (applyFeatures' twin)
-    let valleyCount = min(u32(tile.water0.z + 0.5), 4u);
+    let valleyCount = min(u32(tile.water0.z + 0.5), 8u);
     for (var i = 0u; i < valleyCount; i = i + 1u) {
         let vi = tile.valleyInfo[i];
         if (!tileInBounds(x, z, tile.valleyB[i])) {
             continue;
         }
-        let d = tileNearest(x, z, u32(vi.x + 0.5), u32(vi.y + 0.5), true).x;
+        let d = tileNearest(x, z, u32(vi.x + 0.5), u32(vi.y + 0.5), 1u).x;
         let w = 1.0 - tileSmooth(0.0, 0.5 * vi.z, d);
         if (w <= 0.0) {
             continue;
         }
         let relief = max(landHeight - tile.b.z, 0.0);
-        let frac = tile.valleyFrac[i];
+        let frac = tile.valleyFrac[i / 4u][i % 4u];
         let depth = select(vi.w, frac * relief, frac > 0.0);
         landHeight = max(landHeight - depth * w, min(landHeight, tile.b.z));
     }
@@ -419,7 +467,7 @@ fn tileSample(x: f32, z: f32) -> TileOut {
         if (!tileInBounds(x, z, tile.riverBounds[i])) {
             continue;
         }
-        let near = tileNearest(x, z, u32(ri.x + 0.5), u32(ri.y + 0.5), false);
+        let near = tileNearest(x, z, u32(ri.x + 0.5), u32(ri.y + 0.5), 0u);
         let d = near.x;
         if (d >= 0.5 * ri.w) {
             continue;

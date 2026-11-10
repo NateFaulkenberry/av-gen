@@ -535,3 +535,84 @@ TEST_CASE("The tiles kernel draws the CPU's rivers, ponds and dry valleys", "[gp
     CHECK(pondMoved < 0.6f * 0.1f + 1e-3f);   // a tenth of the wave, no drift
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-1992: ridges, rises and 8 valleys -- the kernel raises (and lands) what the CPU does, still and moving.
+TEST_CASE("The tiles kernel raises the CPU's ridges and rises, with 8 valleys", "[gpu][generator][geography][adr1992]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    auto pg = tilesObject("raised", 1.0f, 48.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    scene::TileTerrainSpec& t = pg.distribution.generator.tiles;
+    // a world with sea and land in the window: find both near the origin
+    glm::vec2 sea(1e9f);
+    glm::vec2 land(1e9f);
+    for (float z = -40.0f; z <= 40.0f; z += 2.0f) {
+        for (float x = -40.0f; x <= 40.0f; x += 2.0f) {
+            const scene::TileSample s = scene::tileSample(t, x, z);
+            if (s.water > 0.999f && glm::length(glm::vec2(x, z)) < glm::length(sea)) sea = {x, z};
+            if (s.water < 0.001f && glm::length(glm::vec2(x, z)) < glm::length(land)) land = {x, z};
+        }
+    }
+    REQUIRE(sea.x < 1e8f);
+    REQUIRE(land.x < 1e8f);
+    t.ridges = {scene::TileRidge{.name = "spine", .points = {land, sea, sea + glm::vec2(10.0f, -12.0f)}, .height = 9.0f,
+                                 .width = 10.0f}};
+    t.rises = {scene::TileRise{.name = "isle", .centre = sea + glm::vec2(-8.0f, 6.0f), .radius = 3.0f, .height = 6.0f,
+                               .edge = 4.0f},
+               scene::TileRise{.centre = land + glm::vec2(6.0f, 6.0f), .radius = 2.0f, .height = -3.0f, .edge = 3.0f}};
+    for (int i = 0; i < 8; ++i) {
+        const float z = -28.0f + 8.0f * static_cast<float>(i);
+        scene::TileValley v{.points = {}, .valleyWidth = 6.0f, .depth = 1.5f};
+        for (int k = 0; k < 8; ++k) v.points.push_back({-28.0f + 8.0f * static_cast<float>(k), z + (k % 2 ? 2.0f : 0.0f)});
+        if (i % 2) v.depthFraction = 0.4f;
+        t.valleys.push_back(std::move(v));
+    }
+    REQUIRE(t.validate().has_value());
+    t.resolveWater();
+    REQUIRE(pg.validate().has_value());
+    const glm::vec3 camera(0.5f, 30.0f, 0.5f);
+    {
+        scene::Scene s;
+        s.procedurals.push_back(pg);
+        s.camera.position = camera;
+        s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+        REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
+        const Parity par = compare(rig.renderer, pg, camera);
+        CAPTURE(par.present, par.worstHeight, par.worstChannel, par.classWrong);
+        CHECK(par.identity == 0);
+        CHECK(par.worstHeight <= 1e-3f);
+        CHECK(par.worstChannel <= 1e-4f);
+        CHECK(par.classWrong == 0);
+    }
+    // moving: the raised land under the scene's waves and breathing
+    scene::TileDynamics d;
+    scene::TileWave a;
+    a.amplitude = 0.6f;
+    a.wavelength = 18.0f;
+    a.speed = 4.0f;
+    a.onLand = 0.5f;
+    d.waves = {a};
+    d.breathingAmplitude = 0.2f;
+    const float time = 2.6f;
+    scene::Scene s;
+    s.procedurals.push_back(pg);
+    s.environment.tileDynamics = d;
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{time, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const scene::GeneratorSpec& g = pg.distribution.generator;
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+    auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+    REQUIRE(records.has_value());
+    float worst = 0.0f;
+    for (std::int32_t z = 0; z < w.countZ; ++z) {
+        for (std::int32_t x = 0; x < w.countX; ++x) {
+            const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                       static_cast<std::size_t>(x)];
+            const scene::TileSample m = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w, &d, time);
+            worst = std::max(worst, std::abs(drawnTop(pg, r) - m.height));
+        }
+    }
+    CAPTURE(worst);
+    CHECK(worst <= 1e-3f);
+    CHECK(ctx->errorCount() == 0);
+}

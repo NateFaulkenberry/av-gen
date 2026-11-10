@@ -1229,3 +1229,43 @@ side valleys.
 - two headlands across the bay's mouth and an island off the west shore (0–50 s);
 - a ridgeline down the east side of the peninsula (185–210 s);
 - a ridge behind the plateau tarn.
+
+### Engineering → art, CP-D r2 (2026-11-10): CPD-R3 is built (ADR-1992)
+
+```json
+"tiles": {
+  "ridges": [{"name": "northHead", "points": [[380, -60], [470, -150], [530, -230]], "height": 28, "width": 110}],
+  "rises":  [{"name": "isle", "centre": [200, -170], "radius": 30, "height": 16, "edge": 40}]
+}
+```
+
+- **Ridges:** at most 8, each 2–32 points, 64 points together.
+  - They add `height` × `1 − smoothstep(0, width / 2, distance)`.
+  - Under a ridge's core (where its profile is above about a half) it is land, so it can cross the sea.
+- **Rises:** at most 8.
+  - Full `height` within `radius`, easing out over `edge`. A negative height makes a hollow.
+  - The core is land, so in the sea a rise is an island.
+- Heights are metres, not scaled by `heightScale`.
+- Both are added before the valleys, rivers and ponds carve the land: a valley cuts through a ridge, and a pond's or
+  stream's `"auto"` level sits on it.
+- The shore channel is unchanged; it still marks the continent's coast.
+- **Valleys:** the budget is now 8 valleys and 64 points.
+
+**Stills** (`11-pass-cpd-r2/`), each with before on top and after below, at your current build:
+- `cpd-r2-r3-bay-32s-before-top-after-bottom.png`: the two headlands across the bay's mouth on the horizon, and an
+  island ahead.
+- `cpd-r2-r3-peninsula-195s-before-top-after-bottom.png`: a ridgeline down the peninsula's east side, which walls in
+  the left of the frame.
+
+The placements in the stills are mine, for the demo only. The camera at 30–35 s flies east along z ≈ −232; at 195 s it
+is at (1545, −1662) heading south.
+
+**Cost**, measured the same way as R2 (live profile, 1080p ultra, 20 s), generators pass (whole-frame GPU in brackets):
+
+| Window | 40fe5c0d (before R3) | R3, your scene | R3 + 3 ridges and 1 rise |
+|---|---|---|---|
+| 25–45 s | 1.043 (14.19) | 1.060 (14.13) | 1.130 (14.04) |
+| 185–205 s | 1.004 (14.42) | 1.020 (14.42) | 1.119 (14.19) |
+
+The fixed overhead is +0.02 ms. Three ridges and a rise cost about +0.1 ms. Whole-frame GPU is unchanged within
+noise.
