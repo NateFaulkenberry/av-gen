@@ -22,6 +22,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import look   # noqa: E402
 import world  # noqa: E402
+import arc    # noqa: E402
 
 # Still cameras for look development (engine axes, y up, north = -z). The camera's y and the target's y are ABOVE THE
 # GROUND there (terrain_mirror) when "ground" is set. The seed-3 world: a deep bay at the origin opening south, a
@@ -85,6 +86,34 @@ FLIGHT = {
     "pitchMin": -14, "pitchMax": 0, "bankLimit": 16, "bankGain": 2.2, "loop": False,
 }
 FLY = False   # set by --flight
+FULL = False  # set by --full (CP-D: the whole song, the arc on the timeline)
+
+# ---- CP-D: the whole song as ONE flight (owner approved CP-C r3 "for now"). The approved CP-B/C legs keep their
+# shape and their song time (30 -> ~120 s); the crown leg flies at 14 m (it was 22: the aliens there were small) and the
+# sweep at 15. New: an intro run north up the open bay (0-30 s, day), and after the river the night climax and the dawn
+# outro: east along the north coast and across the inlet's moving sea (the lift into night), up onto the eastern ridge
+# ... no: the ridge is 1.5 km past the river and out of the song's reach. The climax is the north coast's hills,
+# the inlet's sea and the far shore under the night lines; the outro banks north down the low peninsula and out over
+# the northern sea as the sun comes up. Song times from the scratch flight mirror (04- §13 CP-D).
+FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
+    {"position": [-60, 380], "altitude": 14, "speed": 20},                # out in the open bay, the song's intro
+    {"position": [-20, 90], "altitude": 10, "speed": 21},                 # a long easy S north over the moving sea
+    {"position": [60, -250], "altitude": 12},                              # the bay (the approved route from here)
+    {"position": [60, -430], "altitude": 6},                               # low over the moving sea
+    {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
+    {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 10},       # along the lit path
+    {"position": [-330, -1020], "altitude": 14, "speed": 24},              # over the crowns (CP-D: 22 -> 14)
+    {"position": [-180, -1180], "altitude": 15, "speed": 26},              # the banked sweep north-east (17 -> 15)
+    {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river
+    {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 10},     # up the valley on the river
+    {"position": [300, -1560], "altitude": 30, "speed": 26},               # rise out of the valley at dusk
+    {"position": [660, -1650], "altitude": 14, "speed": 27},               # east along the north coast
+    {"position": [1060, -1580], "altitude": 8, "speed": 27},               # low across the inlet's moving sea: night
+    {"position": [1400, -1480], "altitude": 14, "speed": 27},              # the far shore's low hills, the peak
+    {"position": [1560, -1720], "altitude": 12, "speed": 26},              # bank north along the east shore: dawn
+    {"position": [1500, -2020], "altitude": 10, "speed": 24},              # down the peninsula
+    {"position": [1420, -2320], "altitude": 8, "speed": 22},               # out low over the northern sea; the fade
+])
 
 # ---- the inhabitants (Phase 6, ADR-1954/1955/1957/1958): Glowmere aliens on the hop behaviour, spread along the whole
 # CP-B r2 route -- sea slabs, the shore and path, the crowns, the sweep, the river banks -- so every leg passes some.
@@ -104,7 +133,17 @@ CAST = [
     (98, -1075, "bank"), (196, -1051, "bank"), (267, -1045, "bank"),        # down toward the river (banking left)
     (310, -1096, "bank"),                                                    # onto the river, its left bank
 ]
-HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 6.0, "bank": 6.0}
+HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 6.0, "bank": 6.0, "inlet": 8.0}
+# CP-D (the full song): the intro's sea, the sweep's return leg (the CP-C r3 gap at clip +60..66 s), and the night and
+# dawn legs -- each 7 m off the flight line on the inside of its turn (the flight mirror), at its song time
+CAST_FULL = [
+    (-33, 220, "sea"), (14, -26, "sea"),                                    # 8 s, 20 s: the bay intro
+    (-38, -1126, "crown"),                                                  # 92 s: the sweep's return leg
+    (414, -1601, "crown"), (648, -1642, "bank"), (887, -1614, "bank"),     # 137-155 s: the north coast at night
+    (1121, -1554, "inlet"), (1352, -1485, "bank"),                          # 164-173 s: the inlet, the far shore
+    (1509, -1596, "bank"), (1553, -1792, "crown"),                          # 181-189 s: banking north at dawn
+    (1516, -1986, "bank"), (1455, -2166, "crown"),                          # 197-205 s: the peninsula
+]
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
@@ -113,27 +152,32 @@ NIGHT_HALO = {"color": "#FF4FA8", "intensity": 60.0, "range": 7.0, "height": 1.5
 
 
 def cast_lights(state):
-    if state != "night":
+    if state != "night" and not FULL:
         return []
     h = NIGHT_HALO
     return [{"id": "halo%02d" % i, "name": "halo%02d" % i, "type": "point", "node": "alien%02d" % i,
-             "position": [0.0, h["height"], -0.3], "color": look.hexlin(h["color"]), "intensity": h["intensity"],
+             "position": [0.0, h["height"], -0.3], "color": look.hexlin(h["color"]), "intensity": h["intensity"] if state == "night" else 0.0,
              "range": h["range"], "castsShadow": False}
-            for i in range(len(CAST))]
+            for i in range(len(cast()))]
 PREFS = {  # where each habitat's aliens like to hop (lower preferPath so they don't bunch on the path)
     "sea": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
     "path": {"preferWater": 0.2, "preferCrowns": 0.5, "preferPath": 0.3},
     "crown": {"preferWater": 0.1, "preferCrowns": 1.0, "preferPath": 0.1},
     "bank": {"preferWater": 0.6, "preferCrowns": 0.4, "preferPath": 0.1},
+    "inlet": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
 }
 # the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
 SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, "rippleRadius": 14.0}
 CHARACTERS = False   # set by --characters
 
 
+def cast():
+    return CAST + (CAST_FULL if FULL else [])
+
+
 def cast_nodes(state="day"):
     nodes, ents = [], []
-    for i, (x, z, hab) in enumerate(CAST):
+    for i, (x, z, hab) in enumerate(cast()):
         name = "alien%02d" % i
         nodes.append({"name": name, "kind": "gltf",
                       "asset": os.path.abspath(os.path.join(ALIENS_DIR, "alien-%s.glb" % KINDS[i % len(KINDS)])),
@@ -179,6 +223,11 @@ def scene_doc(state, interim, camera_name):
     env.update(look.fog_medium(state))
     if interim:
         nodes, programs = world.interim_nodes(), [look.tile_program(state, 1.0, "mgTile")]
+    elif FULL:
+        # one program per ring for the whole song: every optional op kept, its constants keyed through the arc
+        nodes = world.ring_nodes(lambda cell: arc_program_name(cell), look.hexlin(s["under"]), arc_program_name(0),
+                                 ARC_SIDE_PX, TILE_SCALE, look.hexlin(s["land"][1]))
+        programs = arc_programs(arc.full_state(state))
     else:
         prog = lambda cell: "mgTile%dx_%s" % (int(cell), state)   # noqa: E731
         under = "mgUnder_%s" % state
@@ -192,11 +241,14 @@ def scene_doc(state, interim, camera_name):
         "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **camera_pose),
         "environment": env,
         "nodes": nodes,
-        "lights": [look.sun_light(state), look.moon_light(state)] + ([look.fill_light(state)] if look.STATES[state].get("fill_int", 0) > 0 else []),
+        "lights": [look.sun_light(state), look.moon_light(state)] + ([look.fill_light(state)] if look.STATES[state].get("fill_int", 0) > 0 or FULL else []),
         "materialPrograms": programs,
     }
     doc["camera"]["far"] = 200000.0   # the 64 m far ring reaches 4.5 km
-    if FLY:
+    if FULL:
+        doc["lights"][1]["castsShadow"] = True   # the moon's shadows at night (a light's shadow is not keyable)
+        doc["flight"] = FLIGHT_FULL
+    elif FLY:
         doc["flight"] = FLIGHT
     if CHARACTERS:
         n, e = cast_nodes(state)
@@ -209,6 +261,59 @@ def scene_doc(state, interim, camera_name):
 
 AUDIO = os.path.join(HERE, "..", "..", "assets", "audio", "feline-footwear.wav")
 
+# ---- CP-D: the arc on the timeline (arc.py) ----------------------------------------------------------------------
+ARC_SIDE_PX = 12   # slabSidePixels is structural (not keyable): the night's 12 for the whole song (day 0, sunset 26)
+
+
+def arc_program_name(cell):
+    return "mgUnder_arc" if cell == 0 else "mgTile%dx_arc" % int(cell)
+
+
+def arc_programs(S):
+    progs = [look.tile_program(S, c, name=arc_program_name(c), scale=TILE_SCALE, always=True) for c in (1.0, 2.0, 4.0)]
+    progs.append(look.tile_program(S, 4.0, arc_program_name(0), far=True, shade=look.UNDER_SHADE, border=1.0,
+                                   scale=TILE_SCALE, contour=False, always=True))
+    return progs
+
+
+def arc_timeline():
+    """Every parameter the arc moves, sampled through each transition (arc.sample_times) and keyed linearly."""
+    times = arc.sample_times(1.0)
+    samples = {}
+
+    def put(target, t, v):
+        samples.setdefault(target, []).append((t, v))
+
+    structure = None
+    for t in times:
+        _, S = arc.at(t)
+        progs = arc_programs(S)
+        shape = [[op["kind"] for op in p["ops"]] for p in progs]
+        if structure is None:
+            structure = shape
+        assert shape == structure, "the arc's programs changed structure at %.1f s" % t
+        for p in progs:
+            assert len(p["ops"]) <= 64, (p["name"], len(p["ops"]))
+            for i, op in enumerate(p["ops"], 1):
+                for field in ("constant", "constant2", "constant3", "constant4", "value"):
+                    if field in op:
+                        v = op[field]
+                        v = [round(x, 6) for x in v] if isinstance(v, list) else round(float(v), 6)
+                        put("material/%s/op/%d/%s/%s" % (p["name"], i, op["kind"], field), t, v)
+        for k, v in look.post(S).items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "camera/exposure/mode":
+                put(k, t, round(float(v), 6))
+        put("env/intensity", t, round(S["amb_int"], 6))
+        put("lights/fill/intensity", t, round(S["fill_int"], 6))
+        put("lights/fill/color", t, look.hexlin(S["fill_col"]))
+        put("procedural/mgTiles64/material/baseColor", t, look.hexlin(S["land"][1]))
+        for i in range(len(cast())):
+            put("nodes/alien%02d/emissiveBoost" % i, t, round(1.0 + (NIGHT_GLOW - 1.0) * S["glow"], 6))
+            put("lights/halo%02d/intensity" % i, t, round(NIGHT_HALO["intensity"] * S["glow"], 6))
+    tracks = [arc.track("env/dayNight/dayPhase", arc.phase_track())]
+    tracks += [arc.keyed(k, v) for k, v in sorted(samples.items()) if not arc.is_static(v)]
+    return {"enabled": True, "cues": [], "tracks": tracks}
+
 
 def project_doc(scene_rel, state):
     return {
@@ -217,6 +322,7 @@ def project_doc(scene_rel, state):
                    "audio": AUDIO},
         "parameters": dict(look.post(state), **{"post/output/dither": 1.0, "env/tiles/rings/ahead": 150.0}),
         "routes": look.audio_routes(),
+        **({"timeline": arc_timeline()} if FULL else {}),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                    "path": "renders/musical-geography.mp4"},
     }
@@ -231,7 +337,12 @@ def main():
     ap.add_argument("--tile-scale", type=float, default=4.0)
     ap.add_argument("--flight", action="store_true")
     ap.add_argument("--characters", action="store_true")
+    ap.add_argument("--full", action="store_true", help="CP-D: the whole song, one flight, the arc on the timeline")
     a = ap.parse_args()
+    global FULL
+    FULL = a.full
+    if FULL:
+        a.state = arc.ARC[0][1]
     global TILE_SCALE
     TILE_SCALE = a.tile_scale
     global FLY

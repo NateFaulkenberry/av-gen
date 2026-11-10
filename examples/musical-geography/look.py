@@ -218,10 +218,10 @@ def moon_light(state):
             "softness": 0.35}
 
 
-def fill_light(state):
+def fill_light(state):  # noqa: E302
     """A shadowless violet fill from opposite the sun (r6): the shaded side of orange land under a blue sky turned
     brown -- the brief's "muddy" trap. A painter's coloured fill puts violet in the shadows instead (04- §3)."""
-    s = STATES[state]
+    s = STATES[state] if isinstance(state, str) else state
     return {"id": "fill", "name": "fill", "type": "directional", "direction": [-0.62, -0.3, 0.62],   # travels south-west: from the north-east, opposite the turned day sun
             "color": hexlin(s.get("fill_col", "#000000")), "intensity": s.get("fill_int", 0.0),
             "castsShadow": False, "softness": 1.0}
@@ -255,7 +255,7 @@ PAD_HEIGHT = (17.0, 20.0)              # crowns light only up here (04- §6)
 PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 
 
-def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0, contour=True):
+def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0, contour=True, always=False):
     """The slab's whole look, for one palette state and one ring.
 
     Reads: localPosition through engineering's tileBorder (ADR-1976: the border's coverage, prefiltered per axis below
@@ -267,8 +267,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     crest light (1971) are added when their channels exist (Phase 3).
 
     Registers: r0 localPosition, r1 tileBorder (coverage, px, top, tile px), r2 colour, r3/r7 scratch,
-    r4 worldPosition, r5 random, r6 roughness, then r4 emission."""
-    s = STATES[state]
+    r4 worldPosition, r5 random, r6 roughness, then r4 emission.
+
+    `state` is a state's name or a state dict (arc.py's blends). `always` (CP-D, the full piece) keeps every optional
+    op (the night water glow, the contour band) even at gain 0, so one program serves every state and the timeline
+    keys its constants through the arc."""
+    s = STATES[state] if isinstance(state, str) else state
     far = cell > 1.0 if far is None else far
     name = name or "mgTile%dx_%s" % (int(cell), state)
     land = [hexlin(c) for c in s["land"]]
@@ -310,8 +314,8 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     add({"kind": "remap", "dst": 6, "srcA": 3, "constant": [0, 1, ROUGH_LAND, ROUGH_WATER], "value": 1.0})
     add({"kind": "constant", "dst": 7, "constant": _c4(hexlin(s["water"][0]))})
     add({"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 7, "srcC": 3})
-    if s.get("water_emit", 0.0) > 0:   # CP-B r2: a faint glow on the water at night, so the river reads
-        add({"kind": "constant", "dst": 7, "constant": _c4([v * s["water_emit"] for v in hexlin(s["water"][3])])})
+    if always or (s.get("water_emit") or 0.0) > 0:   # CP-B r2: a faint glow on the water at night, so the river reads
+        add({"kind": "constant", "dst": 7, "constant": _c4([v * (s.get("water_emit") or 0.0) for v in hexlin(s["water"][3])])})
         add({"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 3})
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 7})
     add({"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(1)})                        # shore -> shallows
@@ -342,7 +346,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     add({"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3})
     # Phase 3: contour lines on the flagged sides (ADR-1970) and the crest light (ADR-1971), from tileContour
     eg, cg = s.get("edge_gain", 0.0), s.get("crest_gain", 0.0)
-    if contour and (eg > 0 or cg > 0):
+    if contour and (always or eg > 0 or cg > 0):
         add({"kind": "input", "input": "instanceEmissive", "dst": 1})
         add({"kind": "tileContour", "dst": 3, "srcA": 0, "srcB": 1, "constant": [half, half, CONTOUR_BAND, 0],
              "value": 1.0})
@@ -370,7 +374,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
 
 
 def post(state):
-    s = STATES[state]
+    s = STATES[state] if isinstance(state, str) else state
     return {
         "post/bloom/enabled": True,
         "post/bloom/intensity": s["bloom"],

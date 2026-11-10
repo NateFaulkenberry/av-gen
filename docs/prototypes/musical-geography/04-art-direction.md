@@ -1113,3 +1113,104 @@ river sheets (`cpc-r3-*-hills-sweep-river-sheet.png`).
 Day also grew by about 0.8 ms, and the day scene has no halo lights. So most of the growth comes from the lower legs,
 where there is more near ground in frame, and from the two extra skinned aliens. The 16 halos add about 0.4 ms at
 night.
+
+### CP-D groundwork: the whole song as one flight, through the arc (2026-11-09)
+
+The owner approved CP-C r3 "for now". This is the first draft of the full piece:
+- the whole of Feline Footwear (210.5 s) as one continuous flight, with no cuts;
+- the Gate 1 colour arc (day → sunset → night → dawn) changing in flight.
+
+The audio reaction is left alone for now, because engineering is wiring Phase 7.
+
+Build it with `build.py --full --characters`. The arc is defined in `arc.py`.
+
+**Sections** (measured from the audio's energy bands, because the beat clock's sections are not available to a
+script):
+
+| Time | Section |
+|---|---|
+| 0–8 s | intro |
+| 8–28 s | build |
+| 28–112 s | main |
+| 112–130 s | the lift (highs rise) |
+| 130–184 s | the climax (the highs peak) |
+| 184–202 s | outro (highs, then lows, drop away) |
+| 202–210.5 s | fade |
+
+**The arc on the timeline** (`arc.ARC`). Night lands on the climax, and dawn takes the outro (§3).
+
+| Time | State |
+|---|---|
+| 0–66 s | day |
+| 66–100 s | day → sunset |
+| 100–108 s | sunset |
+| 108–128 s | sunset → night, through dusk |
+| 128–180 s | night |
+| 180–196 s | night → dawn |
+| 196 s to the end | dawn |
+
+**How the arc is driven.** There is no engine change. 1972's terrain curves were never built, so everything is
+timeline tracks: 118 tracks, all "live" in `--audit-routes`.
+- **`env/dayNight/dayPhase`:** this moves the sun and every DayNight curve. Its keys run forward only: 0.61, then
+  0.72, then 1.0, which is the same as 0.0, then 0.27. The ring seam is crossed with a one-frame `step` key, and
+  both sides of the seam are night.
+- **One program per ring for the whole song:** `mgTile{1,2,4}x_arc` and `mgUnder_arc`, built with
+  `look.tile_program(always=True)`. The night water glow and the contour band are always present, at gain 0 when
+  off, so the structure never changes (this is asserted). The timeline keys each op's constants:
+  `material/<prog>/op/<i>/<kind>/<field>`.
+- **Everything else DayNight does not own is keyed too:**
+  - the post grade (exposure, saturation, contrast, bloom);
+  - the ambient (`env/intensity`);
+  - the violet fill light, now present all song with its intensity keyed;
+  - the far ring's colour;
+  - the aliens' `emissiveBoost` and their night halos.
+- **Blending:**
+  - Colours mix in **OKLab**, at the DayNight curves' own smoothstep, so the land turns with the sky.
+  - The lights switch on rather than cross-fade. Toward night, the path lights come first (0–50% of the transition),
+    then the contours (30–75%), then the pads and halos (55–100%). Toward dawn they go off in the reverse order.
+- **Keys:** the arc is sampled every 1 s through each transition. Holds are two keys.
+- **Fixed for the whole song:** `slabSidePixels` is structural, so it is 12 throughout (the night's value; day was
+  0 and sunset 26). The moon light casts shadows all song, because a light's shadow flag is not keyable.
+
+**The route** (`FLIGHT_FULL`, starting at 0 s and running 210.5 s).
+- **The approved CP-B/C legs keep their shape and their song time** (30 s to about 128 s), with two changes:
+  - The crown waypoint is lowered 22 → 14 m, and the sweep 17 → 15 m (the coordinator's weak spot 1).
+  - There is a new alien on the sweep's return leg at 92 s (weak spot 2).
+- **New legs:**
+  - **0–30 s (intro, day):** a long, easy S north up the open bay over the moving sea, from (−60, 380).
+  - **About 128–184 s (night, the climax):** out of the river valley, east along the north coast's low hills under
+    the contour lines, low across the inlet's moving sea, and onto the far shore.
+  - **184–210 s (dawn):** bank north along the east shore, down the low peninsula, and out over the northern sea.
+- **The eastern ridge was dropped.** It is 1.5 km past the river end and out of the song's reach at plane speed.
+- **Altitudes** stay at 8–30 m, under the 40 m ceiling. There is no nadir, and the camera looks where it travels.
+- **Aliens:** 28 in all. The 16 from CP-C r3 are kept, and 12 are added: 2 on the bay intro, 1 on the sweep's
+  return, and 9 on the night and dawn legs. Each sits 7 m off the line, on the inside of its turn.
+
+**Render:** `10-full/cpd-draft-feline-full-1080p.mp4`, the whole song with audio, plus `cpd-draft-sheet.png` (a frame
+every 8 s).
+
+**Whole-song perf** (1080p Ultra, 208 s, measured on its own run):
+
+| GPU p50 | GPU p95 | GPU p99 | CPU work p50 | Worst GPU frame |
+|---|---|---|---|---|
+| 15.1 ms | 17.5 ms | 19.4 ms | 3.3 ms | 28.7 ms |
+
+88.7% of frames are within 16.7 ms.
+
+The first profile, which ran straight after the 5-minute render, read p50 15.5 and p99 46.9, with p90 at 40 ms. It
+did not reproduce in separate 10 s windows across the whole song (p99 18–20 ms in every window), in a 120 s run, or
+in the repeat 208 s run. I read it as a thermal or contention artefact of running right after the render, not the
+scene.
+
+**Findings and open points:**
+- **The per-state fog density has never applied (a silent no-op).** `look.fog_medium`'s `volumeDensity` (`fog_mult`)
+  is overwritten by DayNight. Our `day_night()` sets no `volumeDensity` curve, so `applyDefaults` fills it with the
+  Tree of Life defaults: noon 0.000158, sunset 0.000341, midnight 0.000225. `applyDayNight` then writes that over
+  `env.volumeDensity` every frame. Every approved look (CP-A to CP-C) was made under those default densities, so I
+  have left it alone. If we ever want `fog_mult`, it belongs in a `volumeDensity` curve.
+- **Dawn reads flatter than the other states:** an olive-gold haze, from the approved dawn palette under the low
+  north-east sun. It may want its own pass once the owner has seen it in sequence.
+- **Underlay cracks:** a thin teal line is visible in the 200 s dawn frame. It looks like the underlay showing
+  through a crack between slab rows, and the dawn underlay colour makes it visible.
+- **The intro is 30 s of open sea.** It is quiet on purpose, under the intro and build, but the owner may want land
+  sooner.
