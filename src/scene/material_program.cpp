@@ -159,6 +159,7 @@ constexpr InputName kInputNames[] = {
     {MaterialInput::MaterialId, "materialId"},
     {MaterialInput::Footprint, "footprint"},
     {MaterialInput::MaterialEmission, "materialEmission"},
+    {MaterialInput::TileGlow, "tileGlow"}, // ADR-1963
 };
 
 // ---- structural hashing (FNV-1a over the bit patterns, as in procedural.cpp) ----------------------
@@ -541,6 +542,8 @@ glm::vec4 inputValue(MaterialInput input, const MaterialContext& ctx) {
         return glm::vec4(ctx.footprint);
     case MaterialInput::MaterialEmission:
         return ctx.materialEmission;
+    case MaterialInput::TileGlow:
+        return ctx.tileGlow;
     }
     return glm::vec4(0.0f);
 }

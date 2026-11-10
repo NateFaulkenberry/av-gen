@@ -91,6 +91,10 @@ struct TileDynamics {
     // op draws them. interval 0 (the default) = none. They follow the moving ground: the contours move with it.
     float contourInterval = 0.0f;      // metres
     float contourOffset = 0.0f;        // metres
+    // ADR-1963: four gains a material program reads as its `tileGlow` input (x path, y contour, z crest, w pads), 1 =
+    // as authored. Not used by the ground itself: they exist so a route (an audio band, a beat) can reach every tile
+    // program's emission terms through one parameter each (env/tiles/glow/*) instead of an op index per program.
+    glm::vec4 glow{1.0f};
 
     // True when anything moves: false is the static ground, exactly as before.
     [[nodiscard]] bool active() const;

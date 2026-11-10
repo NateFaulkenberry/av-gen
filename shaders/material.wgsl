@@ -144,6 +144,7 @@ const MAT_IN_CAMERA_DISTANCE: u32 = 25u;
 const MAT_IN_MATERIAL_ID: u32 = 26u;
 const MAT_IN_FOOTPRINT: u32 = 27u;
 const MAT_IN_MATERIAL_EMISSION: u32 = 28u; // ADR-904
+const MAT_IN_TILE_GLOW: u32 = 29u; // ADR-1963
 
 // ADR-904: the bits of MaterialProgramGpu.flags.x (scene::kMaterialWritesEmission and
 // scene::kMaterialEmissionReadsInstance).
@@ -166,6 +167,7 @@ struct MaterialContext {
     audio: vec4<f32>,
     audioBands: vec4<f32>,
     beat: vec4<f32>,
+    tileGlow: vec4<f32>, // ADR-1963
     viewDirection: vec3<f32>,
     depth: f32,
     // ADR-036 geometric inputs; the caller derives these from screen-space derivatives and the
@@ -311,6 +313,7 @@ fn materialContextZero() -> MaterialContext {
     ctx.audio = vec4<f32>(0.0);
     ctx.audioBands = vec4<f32>(0.0);
     ctx.beat = vec4<f32>(0.0);
+    ctx.tileGlow = vec4<f32>(1.0);
     ctx.viewDirection = vec3<f32>(0.0, 0.0, 1.0);
     ctx.depth = 0.0;
     ctx.curvature = 0.0;
@@ -530,6 +533,9 @@ fn materialInputValue(input: u32, ctx: MaterialContext) -> vec4<f32> {
     }
     if (input == MAT_IN_MATERIAL_EMISSION) {
         return ctx.materialEmission;
+    }
+    if (input == MAT_IN_TILE_GLOW) {
+        return ctx.tileGlow;
     }
     return vec4<f32>(0.0);
 }

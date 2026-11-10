@@ -1847,6 +1847,7 @@ private:
         params::Parameter<float>* ringAhead = nullptr;    // ...or, when > 0, this many metres ahead of the camera
         params::Parameter<float>* contourInterval = nullptr; // ADR-1970
         params::Parameter<float>* contourOffset = nullptr;
+        std::array<params::Parameter<float>*, 4> glow{}; // ADR-1963: path, contour, crest, pads
     };
     TileDynamicsParams tileDynamicsParams_;
     bool tileDynamicsAuthored_ = false;
@@ -1856,6 +1857,9 @@ private:
     void updateTileDynamics(const FrameTime& time); // ADR-1953: live rings; after the camera is final
     // ADR-1953: the moving ground as the renderer will draw it: the authored block, then its parameters and live rings.
     [[nodiscard]] TileDynamics liveTileDynamics() const;
+    // ADR-1964: the same block from the parameters' BASES and without live rings -- what no route moves, so what a
+    // body plans on (a seek does not replay the routes).
+    [[nodiscard]] TileDynamics baseTileDynamics() const;
     // ADR-1955: the tiles ground the characters stand on (the flight's ground node, else the first tiles generator),
     // refreshed before each entity step with the live dynamics, so a body rides what is drawn; its landings become the
     // dynamics' springs (ADR-1954). `tileGroundOffset_` is the node's world translation.

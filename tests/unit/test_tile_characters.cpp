@@ -513,3 +513,145 @@ TEST_CASE("characters hop on the drawn tiles, spring them, and a seek lands wher
         CHECK(glm::length(a[i] - b[i]) < 1e-3f);
     }
 }
+
+// ---- Phase 7: what the music reaches (ADR-1963, ADR-1964) ---------------------------------------------------------
+
+TEST_CASE("a hop cue sets a resting body off with a hop, on the edge only", "[tiles][hop][geography][audio]") {
+    const scene::TileTerrainSpec spec;
+    scene::TileGround g;
+    g.set(spec, movingGround(), 4.0f, glm::vec3(0.0f));
+    nlohmann::json settings = {{"pauseMin", 30.0}, {"pauseMax", 30.0}, {"hopChance", 0.0}};
+    auto hop = entity::makeBehavior("hop", &settings);
+    params::ParameterSet params;
+    hop->registerParameters(params, "e/hop/");
+    auto* cue = params.find("e/hop/trigger");
+    REQUIRE(cue != nullptr);
+    Rng rng(4);
+    hop->reset(rng);
+    entity::EntityState state;
+    state.anchor = glm::vec3(6.0f, 0.0f, -10.0f);
+    entity::MotionOffset offset;
+    glm::vec3 rest{0.0f};
+    bool jumped = false;
+    int jumpFrame = -1;
+    for (int f = 0; f < 600; ++f) {
+        const double t = f / 60.0;
+        params.resetFinals();
+        cue->setBaseComponent(0, (f >= 300 && f < 306) ? 1.0f : 0.0f); // one pulse at 5 s
+        entity::BehaviorContext ctx;
+        ctx.time = t;
+        ctx.dt = 1.0 / 60.0;
+        ctx.rng = &rng;
+        ctx.ground = &g;
+        hop->update(ctx, state, offset);
+        if (f == 299) {
+            rest = state.position();
+        }
+        if (f < 300) {
+            CHECK(state.activity == entity::Activity::Idle); // a 30 s rest: nothing before the cue
+        }
+        if (f >= 300 && state.activity == entity::Activity::Jump && !jumped) {
+            jumped = true;
+            jumpFrame = f;
+        }
+    }
+    CAPTURE(jumpFrame);
+    CHECK(jumped);
+    CHECK(jumpFrame >= 300);
+    CHECK(jumpFrame <= 302); // it sets off with a hop on the cue's frame (or the next)
+    CHECK(glm::length(glm::vec2(state.position().x - rest.x, state.position().z - rest.z)) > 1.0f);
+}
+
+TEST_CASE("where a body goes does not depend on what the routes do to the ground", "[tiles][hop][geography][audio]") {
+    // ADR-1964: the plan reads the planning surface (the parameters' bases), the stance the drawn one. Two runs whose
+    // drawn grounds differ by a tripled, audio-sized amplitude go the same way over the lattice.
+    const scene::TileTerrainSpec spec;
+    const scene::TileDynamics base = movingGround();
+    scene::TileDynamics loud = base;
+    loud.amplitude = 3.0f;
+    const auto run = [&](const scene::TileDynamics& drawn) {
+        scene::TileGround g;
+        nlohmann::json settings = {{"hopChance", 0.4}};
+        auto hop = entity::makeBehavior("hop", &settings);
+        params::ParameterSet params;
+        hop->registerParameters(params, "e/hop/");
+        Rng rng(21);
+        hop->reset(rng);
+        entity::EntityState state;
+        state.anchor = glm::vec3(-6.0f, 0.0f, 14.0f);
+        entity::MotionOffset offset;
+        std::vector<glm::vec2> xz;
+        for (int f = 0; f < 1800; ++f) {
+            g.set(spec, drawn, base, 4.0f, glm::vec3(0.0f));
+            entity::BehaviorContext ctx;
+            ctx.time = f / 60.0;
+            ctx.dt = 1.0 / 60.0;
+            ctx.rng = &rng;
+            ctx.ground = &g;
+            hop->update(ctx, state, offset);
+            xz.emplace_back(state.position().x, state.position().z);
+        }
+        return xz;
+    };
+    const auto quiet = run(base);
+    const auto noisy = run(loud);
+    float worst = 0.0f;
+    float travelled = 0.0f;
+    for (std::size_t i = 0; i < quiet.size(); ++i) {
+        worst = std::max(worst, glm::length(quiet[i] - noisy[i]));
+        if (i > 0) travelled += glm::length(quiet[i] - quiet[i - 1]);
+    }
+    CAPTURE(worst, travelled);
+    CHECK(travelled > 10.0f);
+    CHECK(worst < 1e-4f);
+}
+
+TEST_CASE("the tile glow gains are parameters that reach the drawn scene, and silence leaves them as authored",
+          "[tiles][dynamics][geography][audio][composition]") {
+    const auto json = nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "glow",
+        "camera": {"position": [0, 50, 0], "target": [0, 0, -100]},
+        "environment": {"tileDynamics": {
+            "waves": [ {"amplitude": 0.5, "wavelength": 30, "speed": 4} ],
+            "glow": {"path": 1.5, "contour": 0.5}
+        }},
+        "nodes": []})");
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::fromJson(json, registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    for (const char* name : {"path", "contour", "crest", "pads"}) {
+        CHECK(params.find(std::string("env/tiles/glow/") + name) != nullptr);
+    }
+    // A route from a band onto the path glow and the amplitude; the bus is silent: what is drawn is what is authored.
+    params::ModRoute toPath;
+    toPath.source = "response.mid";
+    toPath.target = "env/tiles/glow/path";
+    toPath.amount = 2.0f;
+    params::ModRoute toAmp;
+    toAmp.source = "response.low";
+    toAmp.target = "env/tiles/amplitude";
+    toAmp.amount = 0.6f;
+    modulator.addRoute(toPath);
+    modulator.addRoute(toAmp);
+    signals::SignalBus bus;
+    const auto frame = [&](double t) {
+        params.resetFinals();
+        modulator.applyRoutes(bus, params, 1.0 / 60.0);
+        FrameTime ft{};
+        ft.renderTime = t;
+        (*c)->update(ft);
+        return (*c)->scene().environment.tileDynamics;
+    };
+    const scene::TileDynamics silent = frame(0.5);
+    CHECK(silent.glow == glm::vec4(1.5f, 0.5f, 1.0f, 1.0f));
+    CHECK(silent.amplitude == 1.0f);
+    // the base moves it (the same path a route's output takes)
+    params.find("env/tiles/glow/contour")->setBaseComponent(0, 2.0f);
+    CHECK(frame(1.0).glow.y == 2.0f);
+    // and a save keeps the authored glow
+    const auto saved = (*c)->toJson();
+    CHECK(saved.at("environment").at("tileDynamics").at("glow").at("path") == 1.5f);
+}

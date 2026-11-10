@@ -689,3 +689,93 @@ The six characters cost about 0.5 ms of CPU and no measurable GPU time. The one 
 
 **Clip:** `~/Desktop/av-gen-review/105-musical-geography/06-characters/cpc-hop-day-feline-40-78s.mp4`. The fixture
 script is `examples/musical-geography/eng/make_cpc.py`.
+
+### Engineering → art, Phase 7 (2026-11-09): the audio wiring (ADR-1963, ADR-1964)
+
+Everything goes through the existing modulation: project routes, the response bus, the beat clock, the levels, entity
+reactions on the aliens, and the stems as feeds. Nothing is hardcoded, and there is no drum classifier. Every target
+is a registered parameter, so it can be routed, keyed on the timeline, MIDI-mapped or saved in a preset.
+
+**New engine pieces:**
+
+- **`env/tiles/glow/{path,contour,crest,pads}` (ADR-1963).** Four emission gains, 1 = as authored. A tile program
+  reads them through the new material input `tileGlow` (x path, y contour, z crest, w pads). A rest value can be set in
+  the scene as `environment.tileDynamics.glow {"path", "contour", "crest", "pads"}`.
+
+  To use them, add this to `look.tile_program` (11 ops at most; the programs stay under 96):
+
+  ```python
+  def glow(reg, lane, tmp):   # after `add = o.append`
+      add({"kind": "input", "input": "tileGlow", "dst": tmp})
+      add({"kind": "swizzle", "dst": tmp, "srcA": tmp, "constant": B(lane)})
+      add({"kind": "multiply", "dst": reg, "srcA": reg, "srcB": tmp})
+  ```
+
+  Then call it in four places:
+  - `glow(4, 3, 6)` after the pads' `r4 = emission`;
+  - `glow(3, 0, 7)` after the path's `multiply dst 3` and before its `add`;
+  - `glow(1, 1, 7)` after the contour's `multiply` by the edge colour and before its `add`;
+  - `glow(1, 2, 7)` likewise for the crest.
+
+  These are exactly the edits the 07-audio clips used.
+- **`<alien>/hop/trigger` (ADR-1964).** A rising edge sets a resting alien off with a hop, or turns a walking alien's
+  next step into a hop. Drive it with an entity **reaction**, not a project route: a seek replays reactions, so a
+  scrub hops the way a play does. `hop/apex` and `hop/strength` (the landing spring) can be reaction targets the same
+  way.
+- **The aliens plan where to go on the ground without the audio-driven terms (ADR-1964),** so a route on
+  `env/tiles/*` never changes where they go, only how they ride the ground.
+
+**The mapping the 07-audio clips use** (`examples/musical-geography/eng/make_audio.py`; take it as a starting point,
+and the amounts and choices are yours):
+
+| Source | Target | Amount | Shape | Reads as |
+|---|---|---|---|---|
+| `response.low` | `env/tiles/amplitude` | +0.6 | | the swell rises with kicks and bass notes |
+| `response.onset` | `env/tiles/rings/trigger` | 1 | | a ring 150 m ahead on each attack |
+| `audio.energy` | `env/tiles/breathing/amplitude` | +0.25 | already 1 s smooth | dense passages breathe deeper |
+| `beat.bar` | `env/tiles/contour/offset` | +4 m (the interval) | | contours climb the hills one interval per bar (seamless wrap) |
+| `beat.pulse` | `env/tiles/glow/contour` | +1.5 | peak hold, falls 4/s | contours flash on every beat |
+| `response.mid` | `env/tiles/glow/path` | +1.6 | 30 ms attack / 250 ms decay | the path breathes with the melodic register |
+| `response.high` | `env/tiles/glow/pads` | +1.0 | 20 / 300 ms | the crown pads with the highs |
+| reaction `beat.pulse` | `hop/trigger` | 1 | | aliens hop on the beat |
+| reaction `response.level` | `hop/apex` and `hop/strength` | +1.6 / +0.8 | 80 / 400 ms | louder means higher hops and harder landings |
+
+**Silence is calm.** Every route adds to a rest value and is unipolar, so silence shows the rest. Rest glow in the
+clips: path 0.4, contour 0.5, crest 1, pads 0.5. The waves, breathing and rolling have no audio factor, so a quiet
+passage still moves.
+
+**Stems.** On Feline the project loads all three stems. The feeds are `beat` and `hits` from `stem.drums` and
+`levels` from `stem.bass`; the log reports "the beat clock follows stem 'drums': 120.97 bpm". Every route above keeps
+working unchanged. Per-part routes can read `role.bass.level`, `role.synth.onset` and so on.
+
+**MIDI.** All the new targets are ordinary parameters, so they can be MIDI-learned like any other.
+
+**Clips** (`~/Desktop/av-gen-review/105-musical-geography/07-audio/`): your night state, flight and 14-alien cast,
+with the tileGlow edit and the mapping above. `p7-night-feline-footwear-silent-45-65s.mp4` is the same flight on the
+same timeline with digital silence.
+
+How strongly each clip's contour flashes lock to its track's tempo, measured from the frames as the strength of the
+contour-pixel signal at the beat frequency, against the silent clip:
+
+| Clip | Track | At 1× tempo | At 2× tempo |
+|---|---|---|---|
+| `p7-night-feline-footwear-45-65s.mp4` | Feline Footwear: dense, 121 BPM, stems | 342 vs 16 | 355 vs 9 |
+| `p7-night-night-shift-55-80s.mp4` | Night Shift: sparse, quiet, 96 BPM, verse into the break | 222 vs 46 | 413 vs 40 |
+| `p7-night-glowmere-valley-45-65s.mp4` | Glowmere Valley score: slow, 72 BPM | 88 vs 35 | 620 vs 311 |
+| `p7-night-feline-footwear-silent-45-65s.mp4` | silence | n/a | n/a |
+
+Frame-to-frame brightness flicker is 0.49 in silence and 1.3–1.7 with music.
+
+**One art note:** at night `path_emit` 5 saturates the path. Even at a rest gain of 0.4 it clips, so the path route
+barely shows in the night clips. Lowering `path_emit` and letting `glow/path` carry the variation would make the path
+visibly move with the mids.
+
+**Phase 7 live perf** (1080p ultra, live mode, 30 fps target; night state, 14 aliens, Feline 40–76 s, 36 s measured):
+
+| | Missed deadlines | GPU p50 / p95 / p99 | CPU work p50 / p99 |
+|---|---|---|---|
+| Wired (3 stems, feeds, 7 routes, 48 reactions) | 1 / 1081 | 22.5 / 30.6 / 31.6 ms | 5.1 / 10.6 ms |
+| Silence | 1 / 1081 | 23.3 / 30.9 / 31.7 ms | 3.6 / 8.0 ms |
+
+The wiring costs about 1.5 ms of CPU, which covers the stem analysis, the routes and the rings, and no GPU time. The
+single miss is in both arms.
