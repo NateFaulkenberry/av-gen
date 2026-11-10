@@ -48,12 +48,15 @@ TILES = {
          "sourceLevel": "auto"},
     ],
     "ponds": [
-        {"name": "low1", "centre": [-264, -1012], "radius": 36, "basinWidth": 40, "level": "auto", "shoreNoise": 0.35},
-        {"name": "low2", "centre": [-308, -1164], "radius": 28, "basinWidth": 34, "level": "auto", "shoreNoise": 0.4},
-        {"name": "tarn", "centre": [368, -1535], "radius": 24, "basinWidth": 26, "level": "auto", "shoreNoise": 0.3},
-        {"name": "coast1", "centre": [442, -1681], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.35},
-        {"name": "coast2", "centre": [602, -1583], "radius": 32, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35},
-        {"name": "coast3", "centre": [754, -1703], "radius": 24, "basinWidth": 28, "level": "auto", "shoreNoise": 0.4},
+        # clouds2: every pond sits on its valley's FLOOR, on the flight line. Auto-levelled on a valley wall (land2 put
+        # them there), a pond's flat water stood up the slope as one glowing slab -- the "white block" at 148 s was a
+        # coast pond, not contour bunching (measured: gone with the ponds removed, cpd-r2-clouds2-148s-*).
+        {"name": "low1", "centre": [-316, -1043], "radius": 30, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35},
+        {"name": "low2", "centre": [-218, -1166], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.4},
+        {"name": "tarn", "centre": [320, -1571], "radius": 20, "basinWidth": 24, "level": "auto", "shoreNoise": 0.3},
+        {"name": "coast1", "centre": [422, -1611], "radius": 22, "basinWidth": 26, "level": "auto", "shoreNoise": 0.35},
+        {"name": "coast2", "centre": [531, -1636], "radius": 26, "basinWidth": 28, "level": "auto", "shoreNoise": 0.35},
+        {"name": "coast3", "centre": [643, -1649], "radius": 22, "basinWidth": 26, "level": "auto", "shoreNoise": 0.4},
     ],
     # land2: the flight runs DOWN valleys, so their walls frame it and cut the horizon (cpd-r2-land2-*): a dale under
     # the path, the sweep (now from the lowland ponds through to the river), a vale along the night coast, and the

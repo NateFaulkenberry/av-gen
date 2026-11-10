@@ -76,7 +76,7 @@ STATES = {
         land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"],
         water=["#0E1452", "#18227A", "#2443B0", "#3F78FF"], shallow="#2A3AA0", under="#120E3A",
         path="#FF5FB0", path_emit=2.0, pad="#FF4FA8", pad_emit=6.0,
-        drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=0.0,   # CP-B: on 4 m tiles the crest lit whole tiles as white blocks on the sea
+        drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=5.0, crest_gain=0.0,   # CP-B: on 4 m tiles the crest lit whole tiles as white blocks on the sea
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
         sun_az_offset=-1.01,   # radians (ADR-1961)
@@ -181,7 +181,7 @@ def fog_density_default(phase):
 
 
 # ---- the moving ground (ADR-1953), authored for restraint: the sea moves, the land breathes, the music adds -------------
-CONTOUR_INTERVAL = 6.0   # land2: 4 -> 6 m with the taller relief; metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
+CONTOUR_INTERVAL = 9.0   # clouds2: 6 -> 9 m (the steep night hills bunched into white blocks at 148 s); land2: 4 -> 6 m with the taller relief; metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
 # B (ADR-1990): the swell reaches the land. Authored here (the flight's clearance reads the authored waves), keyable per
@@ -355,7 +355,9 @@ UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: 
                           # second, blue-black surface speckling through every hillside
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
 CREST_EDGE = (0.72, 0.98)  # crest light only near the peaks: a broad crest lit the crossing trains as a diamond grid
-CONTOUR_FADE = (250.0, 800.0, 0.15)   # metres, and the gain left beyond (CP-D draft2: the night glare strip)
+GRAZE = (0.03, 0.15)   # the view's y (toward the camera) over which a top's contour band fades in (clouds2)
+COARSE_CONTOUR = 0.25   # the coarse rings' share of the contour gain (clouds2)
+CONTOUR_FADE = (150.0, 500.0, 0.1)   # metres, and the gain left beyond (CP-D draft2: the night glare strip)
 LANDING_BAND = 0.075   # the landing outline's band, local metres per S (eng's clip: 0.3 at 4 m tiles)
 CONTOUR_BAND = 0.06       # the contour line's width on the top's border, fraction of the half-size
 BORDER_BAND = 0.03       # tileBorder's band (engineering's fixture value)
@@ -507,13 +509,23 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "remap", "dst": 7, "srcA": 7, "constant": [0, 1, 1, 0], "value": 1.0})   # waves crossing 0 m
         add({"kind": "swizzle", "dst": 7, "srcA": 7, "constant": B(0)})                     # drew closed blobs
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
-        add({"kind": "constant", "dst": 7, "constant": _c4([v * eg for v in hexlin(s["edge"])])})
+        # clouds2: the coarse rings (8 m and 16 m cells, past ~270 m) paint their sub-tiles' contours; on the land2
+        # walls every sub-tile crosses an interval, so a far steep flank lit solid (148 s; measured: gone at edge gain 0)
+        egr = eg * (1.0 if cell == 1.0 else COARSE_CONTOUR)
+        add({"kind": "constant", "dst": 7, "constant": _c4([v * egr for v in hexlin(s["edge"])])})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         # CP-D draft2: fade the lines with distance -- on a far hill (the 4x ring, 4 m tiles a few pixels wide) the
         # bands covered whole tiles and bunched into one glare strip (night, 148-164 s)
         add({"kind": "input", "input": "cameraDistance", "dst": 7})
         add({"kind": "remap", "dst": 7, "srcA": 7, "constant": [CONTOUR_FADE[0], CONTOUR_FADE[1], 1.0,
                                                                  CONTOUR_FADE[2]], "value": 1.0})
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        # clouds2: fade the band where a top is seen edge-on. On land2's steep walls the camera sees the tops at a
+        # grazing angle from just below their level, where the border band covers the whole visible sliver of each top
+        # and a wall lit solid (148-150 s; measured: gone at edge gain 0, unchanged by the coarse-ring and distance cuts)
+        add({"kind": "input", "input": "viewDirection", "dst": 7})
+        add({"kind": "swizzle", "dst": 7, "srcA": 7, "constant": B(1)})
+        add({"kind": "smoothstep", "dst": 7, "srcA": 7, "constant": [GRAZE[0], GRAZE[1], 0, 0]})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         glow(1, 1, 7)                                                                     # x the contours' glow
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
@@ -587,33 +599,29 @@ CLOUD_SHADE = 0.45   # an underside, of a top (a cheap self-shadow: the sun neve
 #   bounce               a faint cool self-light (the ambient bounce), lifting every face a little.
 CLOUD_STATE = {
     "day": dict(cloud_color="#FFFFFF", cloud_under=0.45, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
-                cloud_bounce_gain=0.0),
+                cloud_bounce_gain=0.0, cloud_lining=0.08, cloud_lining_tint="#FFF2D8"),
     "sunset": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
-                   cloud_bounce_gain=0.0),
+                   cloud_bounce_gain=0.0, cloud_lining=0.14, cloud_lining_tint="#FFD0A0"),
     "night": dict(cloud_color="#E4E8FF", cloud_under=0.85, cloud_side=0.55, cloud_core=0.55, cloud_bounce="#6A74D8",
-                  cloud_bounce_gain=0.10),
+                  cloud_bounce_gain=0.10, cloud_lining=0.5, cloud_lining_tint="#D8E0FF"),
     "dawn": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
-                 cloud_bounce_gain=0.0),
+                 cloud_bounce_gain=0.0, cloud_lining=0.1, cloud_lining_tint="#FFE0C0"),
 }
 
 
+def cloud_omit_below(S, thick, relief):
+    """ADR-1966's per-cell "cores only" cut (keyed through the arc): eng's conversion of the v2 opacity cut,
+    (1.5 core - 0.5) relief + 3 + thick/2, less 2 m so the day (core 0) keeps every cell. Night: 7.25 m / 48.75 m."""
+    return (1.5 * S["cloud_core"] - 0.5) * relief + 3.0 + thick / 2.0 - 2.0
+
+
 def cloud_program(name, thick, alt, relief, state="day"):
+    """The cloud slab (opaque since ADR-1966: the empty cells are never drawn). Tops lit, undersides and sides held
+    (the approved v2 night: undersides 0.85, sides 0.55), a cool bounce, and (ADR-1967) a silver lining: the faces and
+    edges toward the key light (the sun, or the moon at night) catch its colour, n.L built from multiply/swizzle/add."""
     S = dict(CLOUD_STATE[state]) if isinstance(state, str) else state
     B = lambda k: [float(k)] * 4   # noqa: E731
-    core = alt + (1.5 * S["cloud_core"] - 0.5) * relief   # 0: below every slab (all kept); linear, so the arc can blend it
     return {"name": name, "ops": [
-        {"kind": "input", "input": "instanceRandom", "dst": 5},
-        {"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(0)},                            # water = no cloud
-        {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1, 0], "value": 1.0},         # cover
-        {"kind": "input", "input": "worldPosition", "dst": 4},
-        {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": B(1)},
-        {"kind": "input", "input": "localPosition", "dst": 0},
-        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},
-        {"kind": "constant", "dst": 7, "constant": B(-1.0)},
-        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7},
-        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 1},                                        # the slab's centre y
-        {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [core, core + 6.0, 0, 0]},      # the night's cores
-        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},                                   # opacity
         {"kind": "constant", "dst": 2, "constant": _c4(hexlin(S["cloud_color"]))},
         {"kind": "input", "input": "normal", "dst": 0},
         {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},
@@ -623,21 +631,42 @@ def cloud_program(name, thick, alt, relief, state="day"):
         {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, S["cloud_side"], 1.0], "value": 1.0},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},                                   # the sides held down
         {"kind": "constant", "dst": 4, "constant": _c4([v * S["cloud_bounce_gain"] for v in hexlin(S["cloud_bounce"])])},
+        # the silver lining: n.L (no dot op), eased, x the key light's colour x a keyed gain, into the emission
+        {"kind": "input", "input": "keyLightDirection", "dst": 3},
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 0},
+        # horizontal n.L only (x and z): from under the deck the tops are never seen, so the lining is the EDGES and
+        # sides that face the key light, the rim a viewer below actually sees
+        {"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(0)},
+        {"kind": "swizzle", "dst": 7, "srcA": 3, "constant": B(2)},
+        {"kind": "add", "dst": 1, "srcA": 1, "srcB": 7},
+        {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [LINING_EDGE[0], LINING_EDGE[1], 0, 0]},
+        {"kind": "input", "input": "keyLightColor", "dst": 7},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7},
+        {"kind": "constant", "dst": 7, "constant": _c4([S["cloud_lining"] * c for c in hexlin(S["cloud_lining_tint"])])},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7},
+        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 1},
         {"kind": "constant", "dst": 6, "constant": B(1.0)},
-    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": 3}
+    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": -1}
+
+
+LINING_EDGE = (0.05, 0.6)   # horizontal n.L where the lining starts and is full
 
 
 def cloud_nodes(state="day"):
     nodes, programs = [], []
+    S_ = dict(CLOUD_STATE[state]) if isinstance(state, str) else state
     for name, cell, thick, alt, view, cover in CLOUD_LAYERS:
         tiles = dict(CLOUD_BASE, **cover)
         programs.append(cloud_program(name + "Prog", thick, alt, cover["hillHeight"], state))
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": {
             "source": {"kind": "box", "size": [cell, thick, cell]},
             "distribution": {"kind": "generator", "generator": {
-                "name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": 1, "tiles": tiles}},
+                "name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": 1, "tiles": tiles,
+                # ADR-1966: the empty ("water") cells are never emitted, the night's cores-only cut is per cell
+                # (keyed through the arc), and the deck stands still (no waves, rolling or contours from the ground)
+                "omit": "water", "omitBelow": round(cloud_omit_below(S_, thick, cover["hillHeight"]), 3),
+                "dynamics": False, "contours": False}},
             "distributionTransform": {"position": [0, alt, 0]},
             "castsShadow": False, "lod": {"cull": True},
-            "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog",
-                         "alphaMode": "mask", "alphaCutoff": 0.5}}})
+            "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog"}}})
     return nodes, programs

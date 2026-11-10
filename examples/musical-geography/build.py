@@ -323,6 +323,10 @@ def arc_timeline():
             if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "camera/exposure/mode":
                 put(k, t, round(float(v), 6))
         put("env/intensity", t, round(S["amb_int"], 6))
+        if CLOUDS:   # ADR-1966: the night's cores-only cut, per cell, keyed through the arc
+            for name, cell, thick, alt, view, cover in look.CLOUD_LAYERS:
+                put("procedural/%s/distribution/generator/omitBelow" % name, t,
+                    round(look.cloud_omit_below(S, thick, cover["hillHeight"]), 4))
         lg, lc = look.landing_glow(S)
         put("env/tiles/glow/landing", t, round(lg, 6))
         put("env/tiles/glow/landingColor", t, [round(v, 6) for v in lc])

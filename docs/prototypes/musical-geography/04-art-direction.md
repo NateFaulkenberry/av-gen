@@ -1589,3 +1589,39 @@ stills at 0.6 or above.
 Both need land the generator cannot place, so I asked for it as request CPD-R3 (ridges and rises, islands).
 
 **Smoothness:** no route changed, and the flight's clearance follows the carved ground.
+
+### CP-D r2 clouds2: the cheap clouds, the silver lining, and the 148 s "bunching" (2026-11-10, ADR-1966/1967)
+
+**Clouds.** Both layers are now opaque with `"omit": "water"`, and `dynamics` and `contours` are off. The program's
+opacity and the material's mask are gone. The night's cores-only cut is now the per-cell `omitBelow`, keyed through
+the arc: night 7.25 m on the low layer and 48.75 m on the mid layer, which is eng's conversion less 2 m so the day
+keeps every cell (`look.cloud_omit_below`). The approved v2 look is kept: undersides 0.85, sides 0.55, and the cool
+bounce.
+
+**The silver lining** (`keyLightDirection`, `keyLightColor`):
+- **What it lights:** horizontal n·L, from x and z only. The tops are never seen from under the deck, so the lining
+  is the edges and sides that face the key light.
+- **Shape:** smoothstep 0.05–0.6, × the key light's colour × a keyed gain.
+- **Gain by state:** day 0.08, sunset 0.14, night 0.5 (silver `#D8E0FF`), dawn 0.10.
+- **The night result:** the moon-facing edges of the decks catch a cold rim; the faces and undersides are unchanged
+  (`cpd-r2-clouds2-night-lining-off-on.png`).
+
+**148 s.** I measured instead of guessing, and it was two things:
+- **A coast pond auto-levelled on a valley wall** (land2 put it there). Its flat water stood up the slope as one slab.
+  **Fix:** all six ponds now sit on their valley floors, on the flight line.
+- **The steep walls' contour band seen edge-on.** It was gone with the edge gain at 0, and unchanged by the
+  coarse-ring and distance cuts. **Fix:** the band fades with `viewDirection.y` over 0.03–0.15 (`GRAZE`, +4 ops; the
+  1× ring is at 82 of 96).
+
+Also changed: the coarse rings carry 0.25 of the contour gain, the interval is 9 m (it was 6), the night edge gain is
+5 (it was 7), and `CONTOUR_FADE` runs 150 → 500 m.
+
+**GPU** (1080p Ultra, live profile, 20 s windows, run twice):
+
+| | Clouds on, p50 | Clouds off, p50 | Clouds cost |
+|---|---|---|---|
+| Day, 40–60 s | 16.54 / 16.49 ms | 14.10 / 14.09 ms | +2.4 ms |
+| Night, 140–160 s | 14.78 / 14.75 ms | 13.93 / 13.96 ms | +0.8 ms |
+
+The day costs more than eng's +0.65 ms. This build has the lining's ops on every cloud pixel and more cover over this
+window, and I have not split the two.
