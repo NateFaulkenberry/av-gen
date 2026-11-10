@@ -62,23 +62,29 @@ TILES = {
     # needs a far side -- headlands across the bay's mouth, a spit and a north-shore ridge inside the bay, islands
     # beside the 30-50 s sea legs, a ridge north of the sweep, a ridge behind the plateau tarn (its core makes a
     # seaward headland), ridgelines down both sides of the dawn peninsula, an island in the inlet. Metres, unscaled.
-    "ridges": [
-        {"name": "westHead", "points": [[-470, 120], [-330, 260], [-180, 330]], "height": 45, "width": 160},
-        {"name": "eastHead", "points": [[620, 80], [480, 240], [320, 330]], "height": 45, "width": 160},
-        {"name": "northShore", "points": [[-330, -560], [-200, -600], [-90, -610]], "height": 30, "width": 120},
-        {"name": "baySpit", "points": [[-470, -420], [-330, -445], [-200, -430]], "height": 34, "width": 110},
-        {"name": "sweepNorth", "points": [[-360, -1210], [-220, -1280], [-70, -1260]], "height": 40, "width": 150},
-        {"name": "tarnRidge", "points": [[250, -1690], [420, -1720], [560, -1720], [700, -1730]], "height": 38, "width": 140},
-        {"name": "capeEast", "points": [[1640, -1550], [1680, -1750], [1660, -1950], [1620, -2150]], "height": 48, "width": 150},
-        {"name": "capeWest", "points": [[1430, -1700], [1440, -1900], [1420, -2080]], "height": 32, "width": 120},
+    "ridges": [   # land4: noise 0.5 on every ridge (ADR-1994: the hills' own fBm); the spit and the north shore 42 m
+        {"name": "westHead", "points": [[-470, 120], [-330, 260], [-180, 330]], "height": 45, "width": 160, "noise": 0.5},
+        {"name": "eastHead", "points": [[620, 80], [480, 240], [320, 330]], "height": 45, "width": 160, "noise": 0.5},
+        {"name": "northShore", "points": [[-330, -560], [-200, -600], [-90, -610]], "height": 42, "width": 120, "noise": 0.5},
+        {"name": "baySpit", "points": [[-470, -420], [-330, -445], [-200, -430], [-90, -395]], "height": 42, "width": 110, "noise": 0.5},
+        {"name": "sweepNorth", "points": [[-360, -1210], [-220, -1280], [-70, -1260]], "height": 40, "width": 150, "noise": 0.5},
+        {"name": "tarnRidge", "points": [[250, -1690], [420, -1720], [560, -1720], [700, -1730]], "height": 38, "width": 140, "noise": 0.5},
+        {"name": "capeEast", "points": [[1640, -1550], [1680, -1750], [1660, -1950], [1620, -2150]], "height": 48, "width": 150, "noise": 0.5},
+        {"name": "capeWest", "points": [[1430, -1700], [1440, -1900], [1420, -2080]], "height": 32, "width": 120, "noise": 0.5},
     ],
+    # land4 (owner: "some of these lumps look odd"): each island composed of overlapping rises -- a peak, a saddle and a
+    # long low tail, elongated across the 30-35 s view, a steep short-edged side and a gentle wide one -- lower and
+    # wider, sizes varied (a big three-part island, a knoll with a shoulder, a small stack, a broad low north isle, the
+    # inlet's long island), all with the hills' own noise (ADR-1994) and the soft coast (ADR-1993)
     "rises": [
-        {"name": "bayIsle", "centre": [240, -160], "radius": 40, "height": 46, "edge": 55},
-        {"name": "stack", "centre": [-20, -330], "radius": 26, "height": 30, "edge": 34},
-        {"name": "southIsle", "centre": [110, -60], "radius": 34, "height": 36, "edge": 45},
-        {"name": "pairIsle", "centre": [235, -330], "radius": 30, "height": 32, "edge": 40},
-        {"name": "westIsle", "centre": [-150, -470], "radius": 32, "height": 18, "edge": 45},
-        {"name": "inletIsle", "centre": [1160, -1610], "radius": 50, "height": 22, "edge": 60},
+        {"name": "bayPeak", "centre": [205, -130], "radius": 30, "height": 38, "edge": 46, "noise": 0.6},
+        {"name": "baySaddle", "centre": [228, -200], "radius": 36, "height": 28, "edge": 70, "noise": 0.6},
+        {"name": "bayTail", "centre": [262, -268], "radius": 32, "height": 17, "edge": 85, "noise": 0.6},
+        {"name": "southKnoll", "centre": [100, -62], "radius": 26, "height": 31, "edge": 44, "noise": 0.6},
+        {"name": "southShoulder", "centre": [70, 0], "radius": 36, "height": 19, "edge": 80, "noise": 0.6},
+        {"name": "stack", "centre": [-20, -330], "radius": 14, "height": 20, "edge": 26, "noise": 0.4},
+        {"name": "northIsle", "centre": [160, -450], "radius": 40, "height": 32, "edge": 65, "noise": 0.6},
+        {"name": "inletIsle", "centre": [1160, -1610], "radius": 46, "height": 18, "edge": 80, "noise": 0.6},
     ],
     # land2: the flight runs DOWN valleys, so their walls frame it and cut the horizon (cpd-r2-land2-*): a dale under
     # the path, the sweep (now from the lowland ponds through to the river), a vale along the night coast, and the

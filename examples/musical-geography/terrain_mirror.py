@@ -95,11 +95,11 @@ def tile_sample(s, x, z):
     for rd in s.get("ridges") or []:
         d = path_distance(rd["points"], x, z)
         prof = 1 - _sm(0.0, rd["width"] / 2, d)
-        raise_ = raise_ + rd["height"] * prof; core |= prof > 0.5
+        raise_ = raise_ + rd["height"] * prof; core |= prof > 0.08   # ADR-1993: the core is land low on the profile
     for ri in s.get("rises") or []:
         d = np.hypot(x - ri["centre"][0], z - ri["centre"][1])
         prof = 1 - _sm(ri["radius"], ri["radius"] + ri["edge"], d)
-        raise_ = raise_ + ri["height"] * prof; core |= (prof > 0.5) & (ri["height"] > 0)
+        raise_ = raise_ + ri["height"] * prof; core |= (prof > 0.08) & (ri["height"] > 0)
     land = np.where(core, 1.0, land)
     land_h = np.where(core, np.maximum(land_h, s["shoreRise"]), land_h) + raise_
     channel = np.zeros_like(land_h)

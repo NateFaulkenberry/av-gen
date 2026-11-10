@@ -1654,3 +1654,22 @@ the stills and in `cpd-r2-land3-clip-bay-30-50s.mp4`.
 **Open: islands and headlands stand on a cliff.** A raised core becomes land at half its profile, so the islands read
 as domes on stilts, with ramp bands up the cliff. Filed as CPD-R3b. Their coast also still has no beach or shallows;
 the coordinator has asked eng for that.
+
+### CP-D r2 land4: the bay islands reshaped (2026-11-10, on ADR-1993 soft coast and ADR-1994 noise)
+
+The owner said "some of these lumps look odd". Each island is now built from overlapping rises, all with noise 0.6:
+
+| Island | Parts | Character |
+|---|---|---|
+| The bay island | peak 38 m, saddle 28 m, tail 17 m | elongated north–south across the 30–35 s view; a steep, short-edged north end and a long, gentle tail |
+| The south island | a 31 m knoll and a 19 m shoulder (edge 80) | |
+| `stack` | 20 m, radius 14 | small and steep |
+| `northIsle` | 32 m, radius 40, edge 65 | broad and low, in the bay's north-east |
+| The inlet's island | 18 m, edge 80 | long and low |
+
+- **Ridges:** every ridge now carries noise 0.5. The spit and the north-shore ridge are raised to 42 m, and the spit
+  reaches further east.
+- **Rises:** `westIsle` and `pairIsle` were dropped. All 8 rises are used.
+- **Enclosure** (`cpd-r2-land4-enclosure.txt`), v2: 30 s goes from 0.78 to 0.70 and 35 s from 0.70 to 0.65. Both stay
+  at 0.6 or above.
+- **Popping:** I saw none in the 30–50 s clip at 2 fps (eng is investigating it).
