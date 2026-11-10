@@ -934,3 +934,30 @@ never emitted. Then only the cloud cells raster, and the alpha mask goes away.
   about 900 heads.
 - **The `cells` kernel:** it skips cells, but every element gets a random yaw (`generator.wgsl` line 175), so the slabs
   scatter like confetti, and its cluster fertility is a density dither rather than a mass with an edge.
+
+#### CPD-R2, addendum (2026-11-10): the night clouds (owner: "too much like a mirror reflection of the ground")
+
+**Done in data, with no engine change.** The cloud program's constants are keyed through the arc, like the terrain's
+(`look.CLOUD_STATE`, `arc.full_state`). At night:
+- **Undersides:** lifted from 0.45 to 0.85 of the tops.
+- **Side faces:** held down to 0.55 (through the normal's y squared). These were the stray bright streaks: the moon
+  caught them at grazing angles.
+- **Cores only:** a cell is kept only where its billow rises above about a third of the layer's relief, by a
+  smoothstep on the slab's centre height. The night sky becomes separate, broken masses with clear sky between,
+  instead of a deck that mirrors the tile ground.
+- **Bounce:** a faint cool self-light (`#6A74D8` × 0.1).
+
+All 128 tracks are live in `--audit-routes`. Stills: `10-full/cpd-r2-sky-night-v2-*`.
+
+**What data cannot do, and the ask:**
+1. **A key-light direction input for material programs** (`keyLightDirection`: the sun's direction, or the moon's when
+   the sun is down; plus its colour × intensity). With it, a program can give the cloud slabs a silver lining. That
+   means brightening the edges and faces that look toward the moon (`dot(normal, L)`), plus forward scatter where
+   the view runs toward it (`dot(viewDirection, L)`).
+
+   Today the only way an edge catches the moon is the moon light itself, which is also what lit the side faces into
+   streaks. The tops are rarely seen from under the clouds, so the rim is what reads.
+2. **(Optional) the sky's ambient colour as a material input,** so the undersides take the sky's own tint at every
+   phase rather than a keyed constant.
+3. **Cell size:** nothing needed. The cloud layers' 16 m and 48 m cells against the ground's 4 m tiles, with the
+   cores-only night, already break the reflection rhythm.

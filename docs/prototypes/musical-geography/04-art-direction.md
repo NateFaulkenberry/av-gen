@@ -1393,3 +1393,17 @@ The 1× ring is now 71 ops and the 2× and 4× rings 56, all under `kMaxMaterial
   The same layers drawn opaque cost +7.6 ms. Request CPD-R2 asks the `tiles` kernel to omit water cells, with a
   target of at most 2 ms.
 - **The build:** `--clouds` (off by default). Nothing in the approved build changes.
+
+**CP-D r2 sky, night v2** (the owner picked the slab clouds; note: at night "too much like a mirror reflection of the
+ground ... too dark on the bottom"). `look.CLOUD_STATE` is keyed through the arc:
+
+| Setting | Day | Night |
+|---|---|---|
+| Undersides (of the tops) | 0.45 | 0.85 |
+| Side faces (normal y²) | 1.0 | 0.55, which removes the moonlit streaks |
+| Cores only | off | cells with billows above about a third of the relief |
+| Cool bounce | none | `#6A74D8` × 0.1 |
+
+The result is sparser, broken masses at night, a little lighter than the sky. They no longer read as a flipped ground
+(`10-full/cpd-r2-sky-night-v2-sheet-before-after.png`, and `-streaks-before-after.png`). A silver lining on the
+moon-facing edges needs a key-light-direction input, requested as the CPD-R2 addendum. The day frames are unchanged.

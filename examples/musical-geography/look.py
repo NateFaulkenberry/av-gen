@@ -502,26 +502,60 @@ CLOUD_COLOR = "#FFFFFF"
 CLOUD_SHADE = 0.45   # an underside, of a top (a cheap self-shadow: the sun never reaches a slab's underside)
 
 
-def cloud_program(name, thick):
+# The clouds per state (CP-D r2 v2, owner: at night "they look too much like a mirror reflection of the ground ... too
+# dark on the bottom"). Keyed through the arc like the terrain (arc.full_state). By night:
+#   under  0.45 -> 0.85  the undersides lifted (moon and sky fill), so the deck is not a dark flipped ground;
+#   side   1.0 -> 0.55   the side faces held down: the moon caught them at grazing angles as stray bright streaks;
+#   core   0 -> 0.55     only cells whose billow rises above (1.5 core - 0.5) of of the layer's relief stay: a sparser,
+#                        broken night sky of separate masses with clear sky between, a rhythm the ground does not have;
+#   bounce               a faint cool self-light (the ambient bounce), lifting every face a little.
+CLOUD_STATE = {
+    "day": dict(cloud_color="#FFFFFF", cloud_under=0.45, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                cloud_bounce_gain=0.0),
+    "sunset": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                   cloud_bounce_gain=0.0),
+    "night": dict(cloud_color="#E4E8FF", cloud_under=0.85, cloud_side=0.55, cloud_core=0.55, cloud_bounce="#6A74D8",
+                  cloud_bounce_gain=0.10),
+    "dawn": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                 cloud_bounce_gain=0.0),
+}
+
+
+def cloud_program(name, thick, alt, relief, state="day"):
+    S = dict(CLOUD_STATE[state]) if isinstance(state, str) else state
     B = lambda k: [float(k)] * 4   # noqa: E731
+    core = alt + (1.5 * S["cloud_core"] - 0.5) * relief   # 0: below every slab (all kept); linear, so the arc can blend it
     return {"name": name, "ops": [
         {"kind": "input", "input": "instanceRandom", "dst": 5},
         {"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(0)},                            # water = no cloud
-        {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1, 0], "value": 1.0},         # opacity
-        {"kind": "constant", "dst": 2, "constant": _c4(hexlin(CLOUD_COLOR))},
-        {"kind": "input", "input": "normal", "dst": 0},                                           # tops lit, sides
-        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},                               # mid, undersides
-        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [-1.0, 1.0, CLOUD_SHADE, 1.0], "value": 1.0},  # dark
-        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},
+        {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1, 0], "value": 1.0},         # cover
+        {"kind": "input", "input": "worldPosition", "dst": 4},
+        {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": B(1)},
+        {"kind": "input", "input": "localPosition", "dst": 0},
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},
+        {"kind": "constant", "dst": 7, "constant": B(-1.0)},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7},
+        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 1},                                        # the slab's centre y
+        {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [core, core + 6.0, 0, 0]},      # the night's cores
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},                                   # opacity
+        {"kind": "constant", "dst": 2, "constant": _c4(hexlin(S["cloud_color"]))},
+        {"kind": "input", "input": "normal", "dst": 0},
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},
+        {"kind": "remap", "dst": 7, "srcA": 1, "constant": [-1.0, 1.0, S["cloud_under"], 1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 7},                                   # tops lit, undersides
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 1},                                   # n.y^2: 0 on a side
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, S["cloud_side"], 1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},                                   # the sides held down
+        {"kind": "constant", "dst": 4, "constant": _c4([v * S["cloud_bounce_gain"] for v in hexlin(S["cloud_bounce"])])},
         {"kind": "constant", "dst": 6, "constant": B(1.0)},
-    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": -1, "emissionIntensity": 1.0, "opacity": 3}
+    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": 3}
 
 
-def cloud_nodes():
+def cloud_nodes(state="day"):
     nodes, programs = [], []
     for name, cell, thick, alt, view, cover in CLOUD_LAYERS:
         tiles = dict(CLOUD_BASE, **cover)
-        programs.append(cloud_program(name + "Prog", thick))
+        programs.append(cloud_program(name + "Prog", thick, alt, cover["hillHeight"], state))
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": {
             "source": {"kind": "box", "size": [cell, thick, cell]},
             "distribution": {"kind": "generator", "generator": {

@@ -251,9 +251,10 @@ def scene_doc(state, interim, camera_name):
     }
     doc["camera"]["far"] = 200000.0   # the 64 m far ring reaches 4.5 km
     if CLOUDS:
-        cn, cp = look.cloud_nodes()
+        cn, cp = look.cloud_nodes(arc.full_state(state) if FULL else state)
         doc["nodes"] += cn
-        doc["materialPrograms"] += cp
+        if not FULL:   # the full build's programs come from arc_programs (keyed through the arc)
+            doc["materialPrograms"] += cp
     if FULL:
         doc["lights"][1]["castsShadow"] = True   # the moon's shadows at night (a light's shadow is not keyable)
         doc["flight"] = FLIGHT_FULL
@@ -279,11 +280,13 @@ def arc_program_name(cell):
     return "mgUnder_arc" if cell == 0 else "mgTile%dx_arc" % int(cell)
 
 
-def arc_programs(S):
+def arc_programs(S):  # noqa: C901
     progs = [look.tile_program(S, c, name=arc_program_name(c), scale=TILE_SCALE, always=True) for c in (1.0, 2.0, 4.0)]
     progs.append(look.tile_program(S, 4.0, arc_program_name(0), far=True, shade=look.UNDER_SHADE, border=1.0,
                                    scale=TILE_SCALE, contour=False, always=True,
                                    ramp_offset=look.UNDER_RAMP * TILE_SCALE))
+    if CLOUDS:
+        progs += look.cloud_nodes(S)[1]
     return progs
 
 
