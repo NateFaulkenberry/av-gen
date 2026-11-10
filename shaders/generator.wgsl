@@ -228,6 +228,8 @@ struct TileParams {
     ridgePts: array<vec4<f32>, 32>,   // the ridges' points, pooled
     rises: array<vec4<f32>, 8>,       // centre x, centre z, radius, edge
     riseH: array<vec4<f32>, 2>,       // each rise's height, four per lane
+    ridgeNoise: array<vec4<f32>, 2>,  // ADR-1994: each ridge's noise, four per lane
+    riseNoise: array<vec4<f32>, 2>,   // each rise's noise
     // ADR-1953: the moving ground (procedural_renderer.hpp GeneratorTileUniforms).
     dyn: vec4<f32>,        // t, amplitude, wave count, event count
     breath: vec4<f32>,     // amplitude, period, wavelength, 1 when anything moves
@@ -398,6 +400,45 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     let c = tileFbm(seed ^ TILE_CONTINENT_SEED, x / tile.a.x, z / tile.a.x, 3);
     var land = tileSmooth(tile.a.y - tile.a.z, tile.a.y + tile.a.z, c);
     let inland = tileSmooth(tile.a.y, tile.a.y + tile.a.w, c);
+    // ADR-1993: the coast follows the final land edge (landPart's twin): the raised land's coast coordinate
+    // u = (w - 0.08) / 0.07 against the continent's (c - threshold) / shoreBand; where it leads, the land
+    // (smoothstep(0.01, 0.15, w)) and the shore are the raised land's.
+    var raisedU = -1e9;
+    var raisedHeight = 0.0;
+    var raisedNoise = 0.0; // ADR-1994
+    let ridgeCount = min(u32(tile.land0.x + 0.5), 8u);
+    for (var i = 0u; i < ridgeCount; i = i + 1u) {
+        let ri = tile.ridgeInfo[i];
+        if (!tileInBounds(x, z, tile.ridgeB[i])) {
+            continue;
+        }
+        let d = tileNearest(x, z, u32(ri.x + 0.5), u32(ri.y + 0.5), 2u).x;
+        let w = 1.0 - tileSmooth(0.0, 0.5 * ri.z, d);
+        if (w <= 0.0) {
+            continue;
+        }
+        raisedHeight = raisedHeight + ri.w * w;
+        raisedNoise = raisedNoise + tile.ridgeNoise[i / 4u][i % 4u] * w;
+        raisedU = max(raisedU, (w - 0.08) / 0.07);
+    }
+    let riseCount = min(u32(tile.land0.y + 0.5), 8u);
+    for (var i = 0u; i < riseCount; i = i + 1u) {
+        let rs = tile.rises[i];
+        let d = length(vec2<f32>(x, z) - rs.xy);
+        let w = 1.0 - tileSmooth(rs.z, rs.z + rs.w, d);
+        if (w <= 0.0) {
+            continue;
+        }
+        raisedHeight = raisedHeight + tile.riseH[i / 4u][i % 4u] * w;
+        raisedNoise = raisedNoise + tile.riseNoise[i / 4u][i % 4u] * w;
+        raisedU = max(raisedU, (w - 0.08) / 0.07);
+    }
+    let continentU = (c - tile.a.y) / tile.a.z;
+    var shore = 1.0 - tileSmooth(0.0, 3.0 * tile.a.z, abs(c - tile.a.y));
+    if (raisedU > continentU) {
+        land = max(land, tileSmooth(-1.0, 1.0, raisedU)); // = smoothstep(0.01, 0.15, w)
+        shore = 1.0 - tileSmooth(0.0, 3.0, abs(raisedU));
+    }
     // ADR-1953: the rolling formations (the hills' domain drifts; all 0 on a static ground: hx is x).
     let hx = x - tile.roll.x * tile.dyn.x;
     let hz = z - tile.roll.y * tile.dyn.x;
@@ -415,31 +456,9 @@ fn tileSample(x: f32, z: f32) -> TileOut {
         breath = 1.0 + tile.breath.x * sin(TILE_TWO_PI * (tile.dyn.x / tile.breath.y + n));
     }
     var landHeight = tile.b.z + tile.c.x * k * hill * inland * tile.water0.w * breath;
-    // ADR-1992: the raised land (landPart's twin): height x profile, the core lifted to land
-    let ridgeCount = min(u32(tile.land0.x + 0.5), 8u);
-    for (var i = 0u; i < ridgeCount; i = i + 1u) {
-        let ri = tile.ridgeInfo[i];
-        if (!tileInBounds(x, z, tile.ridgeB[i])) {
-            continue;
-        }
-        let d = tileNearest(x, z, u32(ri.x + 0.5), u32(ri.y + 0.5), 2u).x;
-        let w = 1.0 - tileSmooth(0.0, 0.5 * ri.z, d);
-        if (w <= 0.0) {
-            continue;
-        }
-        landHeight = landHeight + ri.w * w;
-        land = max(land, tileSmooth(0.35, 0.65, w));
-    }
-    let riseCount = min(u32(tile.land0.y + 0.5), 8u);
-    for (var i = 0u; i < riseCount; i = i + 1u) {
-        let rs = tile.rises[i];
-        let d = length(vec2<f32>(x, z) - rs.xy);
-        let w = 1.0 - tileSmooth(rs.z, rs.z + rs.w, d);
-        if (w <= 0.0) {
-            continue;
-        }
-        landHeight = landHeight + tile.riseH[i / 4u][i % 4u] * w;
-        land = max(land, tileSmooth(0.35, 0.65, w));
+    landHeight = landHeight + raisedHeight; // ADR-1992: the raised land, after the hills
+    if (raisedNoise != 0.0) { // ADR-1994: the hills' own relief on the raised surface
+        landHeight = landHeight + raisedNoise * tile.c.x * k * tile.water0.w * (hill - 0.5);
     }
     // ADR-1965: the dry valleys, then the rivers, then the ponds (applyFeatures' twin)
     let valleyCount = min(u32(tile.water0.z + 0.5), 8u);
@@ -512,7 +531,7 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     out.river = river * land;
     out.pond = pond * land * (1.0 - river);
     out.riverS = riverS;
-    out.shore = 1.0 - tileSmooth(0.0, 3.0 * tile.a.z, abs(c - tile.a.y));
+    out.shore = shore; // ADR-1993: the final coast
     out.flat = tileSmooth(tile.d.z, tile.d.z + 0.06, shaped) * tile.d.w * inland * land;
     out.path = 0.0;
     out.crest = 0.0;

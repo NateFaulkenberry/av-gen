@@ -555,9 +555,9 @@ TEST_CASE("The tiles kernel raises the CPU's ridges and rises, with 8 valleys", 
     REQUIRE(sea.x < 1e8f);
     REQUIRE(land.x < 1e8f);
     t.ridges = {scene::TileRidge{.name = "spine", .points = {land, sea, sea + glm::vec2(10.0f, -12.0f)}, .height = 9.0f,
-                                 .width = 10.0f}};
+                                 .width = 10.0f, .noise = 0.4f}};
     t.rises = {scene::TileRise{.name = "isle", .centre = sea + glm::vec2(-8.0f, 6.0f), .radius = 3.0f, .height = 6.0f,
-                               .edge = 4.0f},
+                               .edge = 4.0f, .noise = 0.7f}, // ADR-1994
                scene::TileRise{.centre = land + glm::vec2(6.0f, 6.0f), .radius = 2.0f, .height = -3.0f, .edge = 3.0f}};
     for (int i = 0; i < 8; ++i) {
         const float z = -28.0f + 8.0f * static_cast<float>(i);

@@ -1313,6 +1313,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         const auto n = static_cast<std::uint32_t>(std::min(r.points.size(), scene::kMaxTileRidgePoints));
         if (pool + n > scene::kMaxTileRidgePool) break;
         u.ridgeInfo[i] = glm::vec4(static_cast<float>(pool), static_cast<float>(n), r.width, r.height);
+        u.ridgeNoise[i / 4][static_cast<glm::length_t>(i % 4)] = r.noise; // ADR-1994
         u.ridgeB[i] = widened(r.points, 0.5f * r.width + 1.0f);
         for (std::uint32_t k = 0; k < n; ++k) put(u.ridgePts, pool + k, r.points[k]);
         pool += n;
@@ -1323,6 +1324,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         const scene::TileRise& r = t.rises[i];
         u.rises[i] = glm::vec4(r.centre.x, r.centre.y, r.radius, r.edge);
         u.riseH[i / 4][static_cast<glm::length_t>(i % 4)] = r.height;
+        u.riseNoise[i / 4][static_cast<glm::length_t>(i % 4)] = r.noise; // ADR-1994
     }
     u.land0 = glm::vec4(static_cast<float>(ridgeCount), static_cast<float>(rises), 0.0f, 0.0f);
     for (std::uint32_t i = 0; i < points; ++i) {

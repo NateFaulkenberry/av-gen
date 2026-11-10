@@ -1,6 +1,7 @@
 // ADR-1950: Musical Geography's ground. The deterministic properties the brief's §13 asks of the terrain, on the CPU
 // half of the one rule (scene/tile_terrain.cpp); test_tile_terrain_gpu holds the GPU half to it.
 
+#include "scene/flight.hpp"
 #include "scene/generator.hpp"
 #include "scene/procedural.hpp"
 #include "scene/tile_terrain.hpp"
@@ -583,23 +584,9 @@ TEST_CASE("tiles: a rise in the sea is an island, its height added to the land, 
     const TileSample top = scene::tileSample(isle, sea.x, sea.y);
     CHECK(top.water < 1e-3f); // land
     CHECK(top.height > s.seaLevel + 15.0f);
-    // the edge eases down, never up, and with no wall: the steepest metre (where the coast lifts out of the sea, as
-    // any shore does) is well under the rise's height
-    float worst = 0.0f;
-    bool falls = true;
-    for (float r = 0.0f; r + 1.0f <= 12.0f + 20.0f; r += 1.0f) { // out to radius + edge
-        const float step = scene::tileSample(isle, sea.x + r + 1.0f, sea.y).height -
-                           scene::tileSample(isle, sea.x + r, sea.y).height;
-        // what the rise adds over the ground beneath it only ever falls outward
-        const float added0 = scene::tileSample(isle, sea.x + r, sea.y).height - scene::tileSample(s, sea.x + r, sea.y).height;
-        const float added1 = scene::tileSample(isle, sea.x + r + 1.0f, sea.y).height -
-                             scene::tileSample(s, sea.x + r + 1.0f, sea.y).height;
-        falls = falls && added1 <= added0 + 1e-4f;
-        worst = std::max(worst, -step);
-    }
-    CAPTURE(worst);
-    CHECK(falls);
-    CHECK(worst < 18.0f / 3.0f);
+    // ADR-1993: the island is land with a coast of its own, so the continent's hills stand on it too (its inland); the
+    // rise's own profile still eases out to nothing at radius + edge
+    CHECK(top.height >= scene::tileSample(s, sea.x, sea.y).height + 18.0f - 1e-3f);
     // beyond radius + edge the world is untouched
     const glm::vec2 far = sea + glm::vec2(33.0f, 0.0f);
     CHECK(scene::tileSample(isle, far.x, far.y).height == scene::tileSample(s, far.x, far.y).height);
@@ -674,4 +661,97 @@ TEST_CASE("tiles: ridges, rises and the larger valley budget read, write and ref
     TileTerrainSpec many;
     for (int i = 0; i < 9; ++i) many.rises.push_back({});
     CHECK_FALSE(many.validate().has_value());
+}
+
+// ADR-1993: the coast follows the final land edge -- an island and a headland get a shore, inland and hills.
+TEST_CASE("tiles: an island and a headland have a shore, and the flight snaps to it", "[geography][tiles][adr1993]") {
+    TileTerrainSpec s = landWorld();
+    const glm::vec2 sea = openSea(s);
+    TileTerrainSpec isle = s;
+    isle.rises = {scene::TileRise{.name = "isle", .centre = sea, .radius = 12.0f, .height = 18.0f, .edge = 20.0f}};
+    // the coast is where the land ramp (smoothstep(0.01, 0.15, profile)) centres: profile 0.08, which is
+    // radius + 0.81 x edge out from the centre
+    const float coastR = 12.0f + 0.81f * 20.0f;
+    CHECK(scene::tileSample(isle, sea.x + coastR, sea.y).shore > 0.95f);
+    CHECK(scene::tileSample(isle, sea.x, sea.y).shore < 0.05f);       // the island's heart is no shore
+    CHECK(scene::tileSample(s, sea.x + coastR, sea.y).shore < 0.3f);   // and little there before (open sea)
+    // CPD-R3b: no cliff -- the steepest 1 m out to the sea floor is the profile's own slope (1.5 x height / edge),
+    // within a margin for the land ramp at its foot, not the half-height wall R3 had
+    float steepest = 0.0f;
+    for (float r = 0.0f; r < 12.0f + 20.0f; r += 1.0f) {
+        steepest = std::max(steepest, std::abs(scene::tileSample(isle, sea.x + r + 1.0f, sea.y).height -
+                                               scene::tileSample(isle, sea.x + r, sea.y).height));
+    }
+    CAPTURE(steepest);
+    CHECK(steepest < 1.25f * 1.5f * 18.0f / 20.0f);
+    // the flight's shore snap finds the island's coast from a hint over its middle
+    scene::FlightSpec f;
+    f.enabled = true;
+    scene::FlightWaypoint a;
+    a.position = sea + glm::vec2(-200.0f, 0.0f);
+    scene::FlightWaypoint snap;
+    snap.snap = "shore";
+    snap.position = sea + glm::vec2(3.0f, 0.0f);
+    snap.snapRadius = 40.0f;
+    f.route = {a, snap};
+    auto r = scene::resolveFlightRoute(f, isle);
+    REQUIRE(r.has_value());
+    const glm::vec2 got = r->route.back().position;
+    CAPTURE(got.x - sea.x, got.y - sea.y);
+    CHECK(scene::tileSample(isle, got.x, got.y).shore > 0.9f);
+    CHECK(std::abs(glm::length(got - sea) - coastR) < 6.0f);
+    // a headland: a ridge out into the sea has a shore down both its flanks
+    const auto [p, top] = highLand(s);
+    TileTerrainSpec head = s;
+    head.ridges = {scene::TileRidge{.points = {p, sea}, .height = 20.0f, .width = 40.0f}};
+    const glm::vec2 dir = glm::normalize(sea - p);
+    const glm::vec2 flank = sea - dir * 5.0f + glm::vec2(-dir.y, dir.x) * 16.2f; // profile 0.08 out from the spine
+    CHECK(scene::tileSample(head, flank.x, flank.y).shore > 0.9f);
+}
+
+// ADR-1994 (CPD-R3c): a ridge's or rise's `noise` lays the hills' own shaped fBm on its surface.
+TEST_CASE("tiles: noise on raised land is the hills' own relief, under the profile", "[geography][tiles][adr1994]") {
+    TileTerrainSpec s = landWorld();
+    const glm::vec2 sea = openSea(s);
+    TileTerrainSpec smooth = s;
+    smooth.rises = {scene::TileRise{.centre = sea, .radius = 30.0f, .height = 20.0f, .edge = 20.0f}};
+    TileTerrainSpec rough = smooth;
+    rough.rises[0].noise = 0.8f;
+    REQUIRE(rough.validate().has_value());
+    // inside the radius the smooth top is flat; the rough one varies by about noise x hillHeight x heightScale / 2
+    float lo = 1e9f;
+    float hi = -1e9f;
+    float sum = 0.0f;
+    int n = 0;
+    for (float z = -20.0f; z <= 20.0f; z += 4.0f) {
+        for (float x = -20.0f; x <= 20.0f; x += 4.0f) {
+            const float d = scene::tileSample(rough, sea.x + x, sea.y + z).height -
+                            scene::tileSample(smooth, sea.x + x, sea.y + z).height;
+            lo = std::min(lo, d);
+            hi = std::max(hi, d);
+            sum += d;
+            ++n;
+        }
+    }
+    CAPTURE(lo, hi, sum / static_cast<float>(n));
+    CHECK(hi - lo > 1.0f);
+    CHECK(hi - lo < 0.8f * s.hillHeight * s.heightScale * 1.5f + 1e-3f);
+    // beyond radius + edge, nothing; noise 0 is exactly the smooth rise
+    const glm::vec2 far = sea + glm::vec2(51.0f, 0.0f);
+    CHECK(scene::tileSample(rough, far.x, far.y).height == scene::tileSample(smooth, far.x, far.y).height);
+    rough.rises[0].noise = 0.0f;
+    CHECK(scene::tileSample(rough, sea.x + 3.0f, sea.y).height == scene::tileSample(smooth, sea.x + 3.0f, sea.y).height);
+    // read and written, refused out of 0..1
+    auto spec = scene::tileTerrainFromJson(nlohmann::json::parse(R"({
+        "ridges": [{"points": [[0, 0], [50, 0]], "height": 10, "width": 30, "noise": 0.5}],
+        "rises": [{"centre": [9, 9], "radius": 5, "height": 4, "edge": 6, "noise": 0.25}]})"));
+    REQUIRE(spec.has_value());
+    CHECK(spec->ridges[0].noise == 0.5f);
+    CHECK(spec->rises[0].noise == 0.25f);
+    auto again = scene::tileTerrainFromJson(scene::tileTerrainToJson(*spec));
+    REQUIRE(again.has_value());
+    CHECK(again->hash() == spec->hash());
+    CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(
+                    R"({"rises": [{"centre": [0, 0], "radius": 5, "height": 4, "edge": 6, "noise": 1.5}]})"))
+                    .has_value());
 }
