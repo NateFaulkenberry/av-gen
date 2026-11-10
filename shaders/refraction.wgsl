@@ -19,7 +19,7 @@ fn dispersionWeights(lambda: f32) -> vec3<f32> {
 fn refractSurface(shaded: vec3<f32>, normal: vec3<f32>, frontFacing: bool, worldPos: vec3<f32>,
                   clipXY: vec2<f32>) -> vec3<f32> {
     let strength = object.refraction0.x;
-    let opacity = object.refraction0.y;
+    let opacity = object.refraction0.y * shadeOpacity; // ADR-1996: per pixel, by the program's opacity output
     let maxThickness = object.refraction0.z;
     let n = normalize(select(-normal, normal, frontFacing));
     let toEye = frame.cameraPos.xyz - worldPos;

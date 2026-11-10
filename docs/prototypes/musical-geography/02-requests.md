@@ -1368,3 +1368,28 @@ they were). Evidence: `11-pass-cpd-r2/cpd-r2-pop-*`.
 | + the lattice far-tile rule (the engine as committed) | 11 | 127 | 170 | 97 | 0 | 1106 |
 | Canary: all rings one flat colour, everything above | 0 | 0 | 0 | 0 | 0 | 798 |
 | Canary: one 4 m ring to 1080 m (no swaps at all) | 0 | 0 | 0 | 0 | 0 | 551 |
+
+### Engineering → art, CP-D r2 (2026-11-10): CPD-R2b is built (ADR-1996)
+
+1. **Opacity 1 draws opaque.** A refraction material at opacity 1 (strength any) now draws in the opaque pass, so your
+   night key of 1.0 costs what opaque clouds do. Nothing to change in the scene.
+2. **Per-pixel opacity.** In the refraction phase the material's refraction opacity is multiplied per pixel by the
+   program's `opacity` output (set the program's `"opacity"` register; without one it is 1). The constant stays the
+   gate: at 1 the clouds are opaque whatever the program says. So keep keying the constant (day 0.55 … night 1.0) and
+   let the program raise the opacity toward 1 away from overhead. The demo in
+   `cpd-r2-r2b-clouds-day-40s-constant-top-perpixel-demo-bottom.png` appends 3 ops to each cloud program:
+   `viewDirection` → swizzle y → `remap` [-0.6, -0.2] → [0.3, 1.0] (clamped), as `"opacity": 7`. The horizon's clouds
+   stay solid and only those overhead thin. The numbers are mine, for the demo; the look is yours.
+3. **Not built:** the plain translucent mode. Hypothesis: the day cost is mostly the clouds drawn on the general path
+   after the frame copy, which such a mode would pay too.
+
+**Measured** (your clouds3 build at ffcd5a41, `--full --characters --clouds`, live profile, 1080p ultra, 20 s, GPU
+median, two runs each):
+
+| Window | Opaque clouds | Translucent (as keyed) | + per-pixel demo |
+|---|---|---|---|
+| Day, 40–60 s | 18.38 / 17.06 | 20.88 / 20.27 | 20.19 / 20.22 |
+| Night, 140–160 s | 16.03 / 15.81 | 16.08 / 16.07 | 16.07 / 16.03 |
+
+The night's +1.6 ms is gone (now within about 0.1–0.25 ms, noise). The day still costs about +2.5–3 ms; the per-pixel
+opacity itself costs nothing measurable.

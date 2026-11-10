@@ -125,6 +125,9 @@ var<private> entityFxLanes: EntityFxLanes;
 // by the dissolve shadow test, whose frame went black). Only the includers that fill the lanes
 // (pbr.wgsl, procedural.wgsl) read it; for any other it stays false.
 var<private> fxClipDiscard: bool;
+// ADR-1996: the material program's opacity output at this fragment (1 without a program). The refraction phase scales
+// the material's refraction opacity by it, so a program thins a surface per pixel.
+var<private> shadeOpacity: f32 = 1.0;
 
 // The extension record (world::EntityFxExtLane), read only when `kFxExt` is set.
 struct EntityFxExtLanes {
@@ -810,6 +813,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         let program = evaluateMaterialProgramFast(programIndex, ctx, base); // ADR-1493
         // The program's emission is a finished radiance, so the intensity lane becomes 1.
         matColor = vec4<f32>(program.baseColor, program.opacity);
+        shadeOpacity = clamp(program.opacity, 0.0, 1.0); // ADR-1996
         matEmissive = vec4<f32>(program.emission, 1.0);
         matRoughMetal = vec2<f32>(program.roughness, program.metallic);
         programNormal = program.normal;

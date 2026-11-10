@@ -7976,7 +7976,7 @@ void Composition::rebuild() {
                         }
                         // ADR-1603: and the author's optics -- refraction, thin film, anisotropy -- which a GLB cannot
                         // carry; dropping them here made a refractive crystal mesh draw opaque.
-                        if (authored.refraction.enabled()) {
+                        if (authored.refraction.authored()) { // ADR-1996: at any opacity (it may be keyed below 1)
                             resolved.refraction = authored.refraction;
                         }
                         if (authored.thinFilm.enabled()) {

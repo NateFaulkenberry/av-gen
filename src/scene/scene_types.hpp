@@ -274,7 +274,12 @@ struct Refraction {
     // with a volume it bends the view by `ior` across `thickness` (Filament's solid-sphere model, ADR-1819).
     float transmission = 0.0f;
     float ior = 1.5f; // ADR-1819: the glass's index of refraction (read only while transmission > 0)
-    [[nodiscard]] bool enabled() const { return strength > 0.0f || transmission > 0.0f; }
+    // The author asked for it (a strength or a transmission), whatever its opacity this frame.
+    [[nodiscard]] bool authored() const { return strength > 0.0f || transmission > 0.0f; }
+    // ADR-1996: it draws in the refraction phase. A surface at opacity 1 shows only its own shaded colour
+    // (refractSurface's mix is exactly `shaded`), so it draws in the opaque pass instead -- the slab path included --
+    // and an opacity keyed to 1 costs what an opaque material does.
+    [[nodiscard]] bool enabled() const { return transmission > 0.0f || (strength > 0.0f && opacity < 1.0f); }
 };
 
 // ADR-1152: a guilloche engraving -- line fields cut into the surface, after THE ASTRAL FORGE prototype's
