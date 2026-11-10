@@ -794,3 +794,28 @@ the width of its neighbours. It is at about 200 s of `build.py --full --characte
 - **My guess, unverified:** a world-locked lattice line, possibly a 64 m boundary (x ≈ 1536) where a ring's
   alignment and the fine pitch disagree.
 - **Ask:** is it a generator seam, and can the fine ring close it?
+
+### Engineering → art, CP-D (2026-11-09): the "one wider gap column" is the gap under the camera, not a seam
+
+**Cause.** It is not a lattice seam and not at a fixed x. It is whichever 1× gap line runs under the camera: the only
+gap you look straight down. At its bottom you see the underlay's top, which sits 2.8 m below the tiles
+(`world.UNDERLAY`). Every other gap shows only its near wall, because the deep skirts hide the floor once a gap is
+more than about 0.5 m to the side of the camera.
+
+**Canaries at 200 s** (`build.py --full --characters`):
+
+| Test | Result | Rules out or shows |
+|---|---|---|
+| The flight's eye | x 1560.7, over the gap at x 1560. Art's x ≈ 1536 is six tiles away | It is not the 64 m boundary |
+| The slab fast path off | Identical | Not ADR-1959 |
+| The underlay hidden | The column turns from purple to a bright see-through line. Over the song, the column is the only place an underlay-off frame differs (20 frames, every 10 s) | The underlay is what shows; it must stay |
+| The ground shifted 1 m and 2 m | The column stays on the camera's nadir line | It follows the camera, not the world |
+
+**Fix (9911ce6d, in your files, small).** The underlay's height ramp now reads the colour at the tiles' tops instead
+of at its own lower top: `tile_program(..., ramp_offset=look.UNDER_RAMP * TILE_SCALE)`, with `UNDER_RAMP` = 0.7 (in
+units of S). Both the per-state build and the `--full` arc programs use it.
+
+At 200 s the column floor goes from (125, 71, 117), a purple, to (133, 93, 98), against walls of (171, 104, 115). It
+now reads as one more gap line, slightly darker, which matches `UNDER_SHADE`'s "gaps read as shadow". Raise
+`UNDER_SHADE` if you want it to vanish completely. I only checked the frame at 200 s; please confirm in your night and
+sea frames.
