@@ -819,3 +819,38 @@ At 200 s the column floor goes from (125, 71, 117), a purple, to (133, 93, 98), 
 now reads as one more gap line, slightly darker, which matches `UNDER_SHADE`'s "gaps read as shadow". Raise
 `UNDER_SHADE` if you want it to vanish completely. I only checked the frame at 200 s; please confirm in your night and
 sea frames.
+
+### Engineering (2026-11-09): the whole-song GPU tail is the GPU clocking down at 30 fps, not the song
+
+**Runs.** Draft3 (`build.py --full --characters`), the whole song. Feline 0–204 s, 1080p ultra, live, warm-up 4 s.
+Two arms back to back: a 30 fps target with `AVGEN_SLOW_FRAME_MS=45`, and a 60 fps target with
+`AVGEN_SLOW_FRAME_MS=25`.
+
+**Quiet GPU.** No other avgen or GPU-lock job ran during either arm: `ps` before and after, and samples every 5 s.
+One other process was busy: av-agent's pytest, CPU only, at more than 15% CPU in 78 of 83 samples.
+
+| Arm | Missed deadlines | GPU p50 / p95 / p99 / max | Worst frame after warm-up |
+|---|---|---|---|
+| 30 fps | 1 / 6122 | 27.0 / 31.0 / 31.6 / 39.1 ms | 46.5 ms |
+| 60 fps | 1 / 12241 | 13.3 / 14.9 / 15.8 / 22.5 ms | 32.8 ms |
+
+**By song time, in 10 s buckets:**
+- The 30 fps arm's GPU p50 sits at about 16 ms until 110 s, then steps to about 30 ms and stays there to the end of
+  the song, through night and dawn.
+- The 60 fps arm, on the same content, is flat at 12.7–14.9 ms in every bucket, including 110–210 s.
+
+The same frames take half the time when the GPU is kept busy. So the 30 fps tail is the GPU dropping its clock: it
+idles between frames and stretches each frame toward the budget. This is the clock-down already measured on the flight.
+
+**What the tail is not:**
+- **A hotspot by song time:** the 60 fps arm is flat.
+- **Contention:** the GPU was quiet. Art's 43–45 ms p99 does not reproduce on a quiet GPU: 31.6 ms here.
+- **A stall:** after warm-up, the only frames over the thresholds are 46.5 ms (30 fps arm, at about 15 s) and
+  32.8 ms (60 fps arm, at about 15 s), both `events.poll`, which is the app shell.
+
+The 277 ms frame at 157–158 s in draft2 does not reproduce. The largest frame anywhere near that time is 20 ms. The
+only frames over 100 ms are the two warm-up frames: frame 0, the load, at 485 ms, and frame 11 of the 60 fps arm,
+pipelines, at 180 ms.
+
+**For CP-D's perf line, use the 60 fps arm's GPU numbers** (p99 15.8 ms over the whole song) as the cost. At a
+30 fps target the GPU time is stretched by the clock. It still meets the deadline: 1 miss in 6122 frames.
