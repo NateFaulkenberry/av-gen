@@ -1564,3 +1564,28 @@ with no audio term. Within the smoothness spec by construction.
 flattened the middle legs.
 
 **The camera rules hold.** The route is unchanged, and the clearance follows the carved ground.
+
+### CP-D r2 land2: enclosure ("I don't wanna see long endless horizons"), 2026-11-10
+
+**The metric** (`11-pass-cpd-r2/cpd-r2-land2-enclosure-before-after.txt`): the share of the frame's 74° horizontal
+view cut by land standing at least 1.5° above the eye line within 2 km. It uses the planning mirror on the flight
+line, with the eye 12 m above the ground. Over the 11 stills it goes from a mean of 0.22 to 0.85, and from 2 to 10
+stills at 0.6 or above.
+
+**What changed:**
+- **Relief.** `heightScale` 1.25 → 2.2 (hills to about 65 m). `inlandBand` 0.15 → 0.07, so the land stands up just
+  behind the shore and the coasts become headlands. `hillLow` 0.22 → 0.12. The colour stops and the contour interval
+  scale with the relief: `RELIEF` 1.76 on every stop, and the contour interval goes from 4 to 6 m.
+- **Valleys the flight runs down.** Four dry valleys follow the flight line, 150 m wall to wall, at `depthFraction`
+  0.85: the path's dale, the sweep (run on into the river valley, after it left the flight climbing a 60 m flank
+  head-on), the coast vale and the cape vale. That uses the whole 32-point budget.
+- **Ponds about 1.6× larger.** The sunset pond colour is now plum `#C8407E`, in place of a pale peach that read as a
+  patch.
+
+**Still weak:**
+- The open-sea legs (30–50 s) still show a far, low coast strip.
+- The dawn peninsula is 0.41.
+
+Both need land the generator cannot place, so I asked for it as request CPD-R3 (ridges and rises, islands).
+
+**Smoothness:** no route changed, and the flight's clearance follows the carved ground.

@@ -1113,3 +1113,39 @@ Their spec is in the scratch demo, not in your scene.
 - "Auto" levels are worked out once, on the static ground, when the scene loads.
 - The tile field draws 0.6 m lower since ADR-1991 (the box's top is now the height), so a `worldPosition.y` ramp
   shifts by that much.
+
+#### CPD-R3 (art → engineering, 2026-11-10): raised land where the route needs a wall, and islands
+
+The owner asked for no "long endless horizons": land should rise to meet or cut the horizon in most frames.
+
+**What data did** (`cpd-r2-land2-*`):
+- `heightScale` 1.25 → 2.2;
+- `inlandBand` 0.15 → 0.07, so the land rises sooner from the shore;
+- `hillLow` 0.22 → 0.12;
+- four dry valleys that follow the flight line, so it flies down them between walls.
+
+By my enclosure metric, that takes the mean from 0.22 to 0.85, and the legs at 0.6 or above from 2 to 10 of 11.
+
+**What data cannot place:**
+- **Over the open sea** (the bay at 30–50 s), the far shore stays a low strip, because the hills only rise inland of
+  the continent field's shore.
+- **The dawn peninsula** (185–210 s, enclosure 0.41) is low land between two seas. The hills cannot stand up there
+  without raising the whole world.
+- **The valley budget** (4 valleys, 32 points) is spent.
+
+**The ask: two additive terms on TileTerrain's land height, applied before the river, valley and pond carving:**
+1. **`ridges`:** polylines with a `height` (metres), a `width` (metres, wall to wall) and a smoothstep cross-profile.
+   They raise land along a line, for example a ridgeline beside the route or a headland running out into the bay.
+   Where a ridge crosses the sea it makes land: the continent's land channel is lifted to 1 under its core.
+2. **`rises`:** discs, with `centre`, `radius`, `height` and a soft edge. They raise land, and in the sea they make an
+   island.
+
+At most 8 of each would be plenty.
+
+**Also wanted, if cheap:** a larger valley budget (8 valleys, 64 points), so the coast and the cape can have their own
+side valleys.
+
+**First uses:**
+- two headlands across the bay's mouth and an island off the west shore (0–50 s);
+- a ridgeline down the east side of the peninsula (185–210 s);
+- a ridge behind the plateau tarn.

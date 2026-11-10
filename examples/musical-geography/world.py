@@ -17,10 +17,10 @@ from __future__ import annotations
 # low pass has sea in front and hills behind (see CAMERAS in build.py).
 TILES = {
     "seed": 3,
-    "continentWavelength": 1100.0, "landThreshold": 0.45, "shoreBand": 0.035, "inlandBand": 0.15,
+    "continentWavelength": 1100.0, "landThreshold": 0.45, "shoreBand": 0.035, "inlandBand": 0.07,   # land2: 0.15
     "seaLevel": 0.0, "seaDepth": 0.25, "shoreRise": 0.5,
     "hillWavelength": 300.0, "hillHeight": 30.0, "hillOctaves": 2, "hillWarp": 70.0, "warpWavelength": 420.0,
-    "hillLow": 0.22, "hillHigh": 0.82,
+    "hillLow": 0.12, "hillHigh": 0.82,   # land2: 0.22 (more of the land stands up)
     "crownThreshold": 0.88, "crownFlatten": 0.7,
     "regionWavelength": 2400.0, "regionVariation": 0.25,
     "pathWidth": 2.0, "pathLift": 0.3,
@@ -48,19 +48,29 @@ TILES = {
          "sourceLevel": "auto"},
     ],
     "ponds": [
-        {"name": "low1", "centre": [-264, -1012], "radius": 22, "basinWidth": 30, "level": "auto", "shoreNoise": 0.35},
-        {"name": "low2", "centre": [-308, -1164], "radius": 17, "basinWidth": 26, "level": "auto", "shoreNoise": 0.4},
-        {"name": "tarn", "centre": [368, -1535], "radius": 14, "basinWidth": 18, "level": "auto", "shoreNoise": 0.3},
-        {"name": "coast1", "centre": [442, -1681], "radius": 16, "basinWidth": 24, "level": "auto", "shoreNoise": 0.35},
-        {"name": "coast2", "centre": [602, -1583], "radius": 20, "basinWidth": 26, "level": "auto", "shoreNoise": 0.35},
-        {"name": "coast3", "centre": [754, -1703], "radius": 14, "basinWidth": 22, "level": "auto", "shoreNoise": 0.4},
+        {"name": "low1", "centre": [-264, -1012], "radius": 36, "basinWidth": 40, "level": "auto", "shoreNoise": 0.35},
+        {"name": "low2", "centre": [-308, -1164], "radius": 28, "basinWidth": 34, "level": "auto", "shoreNoise": 0.4},
+        {"name": "tarn", "centre": [368, -1535], "radius": 24, "basinWidth": 26, "level": "auto", "shoreNoise": 0.3},
+        {"name": "coast1", "centre": [442, -1681], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.35},
+        {"name": "coast2", "centre": [602, -1583], "radius": 32, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35},
+        {"name": "coast3", "centre": [754, -1703], "radius": 24, "basinWidth": 28, "level": "auto", "shoreNoise": 0.4},
     ],
+    # land2: the flight runs DOWN valleys, so their walls frame it and cut the horizon (cpd-r2-land2-*): a dale under
+    # the path, the sweep (now from the lowland ponds through to the river), a vale along the night coast, and the
+    # cape's vale the dawn stream runs in. The sweep runs on into the river's valley: ending at (13, -1108), it left the
+    # flight climbing a 60 m flank head-on (a wall filling the frame, 104-106 s). Each follows the flight line (the scratch mirror's track), 150 m wall to wall.
     "valleys": [
-        {"name": "sweep", "points": [[-190, -1177], [-126, -1171], [-66, -1148], [-8, -1119], [50, -1089], [110, -1064]],
-         "valleyWidth": 90.0, "depthFraction": 0.7},
+        {"name": "pathVale", "points": [[35, -615], [-30, -680], [-114, -727], [-200, -770], [-284, -819], [-360, -876]],
+         "valleyWidth": 150.0, "depthFraction": 0.85},
+        {"name": "sweep", "points": [[-372, -905], [-352, -975], [-316, -1043], [-275, -1109], [-218, -1166], [-139, -1175], [-61, -1145], [13, -1108], [74, -1078], [150, -1062], [235, -1072]],
+         "valleyWidth": 150.0, "depthFraction": 0.85},
+        {"name": "coastVale", "points": [[221, -1313], [232, -1396], [251, -1493], [320, -1571], [422, -1611], [531, -1636], [643, -1649]],
+         "valleyWidth": 150.0, "depthFraction": 0.85},
+        {"name": "capeVale", "points": [[1290, -1493], [1396, -1480], [1481, -1541], [1533, -1633], [1561, -1733], [1553, -1835], [1526, -1930], [1499, -2023]],
+         "valleyWidth": 150.0, "depthFraction": 0.85},
     ],
     # taller land so the top of the colour ramp (orange, yellow; 20-30 m) shows on the crowns (04- §3)
-    "heightScale": 1.25,
+    "heightScale": 2.2,   # land2 (owner: "no long endless horizons"): 1.25 -> 2.2, hills to ~65 m
     # from the bay's north shore up into the north-west hills (terrain_mirror.py --map shows the layout)
     "path": [[40, -610], [-40, -690], [-150, -745], [-260, -800], [-360, -880], [-470, -940], [-590, -975],
              [-720, -1010], [-830, -1090]],

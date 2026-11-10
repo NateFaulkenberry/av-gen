@@ -32,10 +32,14 @@ def hexlin(h: str) -> list[float]:
 # ---- the four states (04- §3). `phase` is DayNight's: 0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset. ----------
 # The song arc (04- §3, owner-approved recommendation): day -> sunset -> night -> dawn, i.e. phase 0.5 -> 0.72 ->
 # 0.0 (=1.0) -> 0.27, always forward in time.
+# land2: the height ramp's stops scale with the relief (world.TILES heightScale 1.25 -> 2.2), so the colour bands keep
+# their share of the land
+RELIEF = 2.2 / 1.25
+
 STATES = {
     "day": dict(
         side_px=0,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
-        stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r7: day only -- gold over whole hill masses, magenta-orchid lowlands
+        stops=[v * RELIEF for v in (0.0, 2.0, 4.0, 6.0, 12.0)],   # r7: day only -- gold over whole hill masses, magenta-orchid lowlands
         fill_col="#C060FF", fill_int=1.4,
         fill=0.25, contrast=1.3,
         sky_int=1.0, haze=0.35,
@@ -76,7 +80,7 @@ STATES = {
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
         sun_az_offset=-1.01,   # radians (ADR-1961)
-        stops=[0.0, 2.0, 4.0, 6.0, 12.0],   # r8: the day treatment -- warm bands over whole hill masses
+        stops=[v * RELIEF for v in (0.0, 2.0, 4.0, 6.0, 12.0)],   # r8: the day treatment -- warm bands over whole hill masses
         side_px=0,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
         fill=0.25, contrast=1.3,
         sky_int=0.95, haze=0.35,
@@ -98,7 +102,7 @@ STATES = {
 DUSK = dict(phase=0.80, edge_gain=4.0)
 
 # Land ramp height stops, in tiles (absolute height, never renormalised; 04- §3).
-LAND_STOPS = [0.0, 10.0 / 3, 20.0 / 3, 10.0, 20.0]   # stops 0-3 evenly spaced (the oklabRamp op); lowered in CP-A r4 so the warm
+LAND_STOPS = [v * RELIEF for v in (0.0, 10.0 / 3, 20.0 / 3, 10.0, 20.0)]   # stops 0-3 evenly spaced (the oklabRamp op); lowered in CP-A r4 so the warm
                                                        # bands cover about half the land, as in the r2 mock-up
 SEA_LEVEL = -0.4
 
@@ -177,7 +181,7 @@ def fog_density_default(phase):
 
 
 # ---- the moving ground (ADR-1953), authored for restraint: the sea moves, the land breathes, the music adds -------------
-CONTOUR_INTERVAL = 4.0   # metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
+CONTOUR_INTERVAL = 6.0   # land2: 4 -> 6 m with the taller relief; metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
 # B (ADR-1990): the swell reaches the land. Authored here (the flight's clearance reads the authored waves), keyable per
@@ -366,7 +370,7 @@ PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 # and a night glow (river blue, ponds violet) so each body reads apart from the sea.
 WATER_BODIES = {
     "day": dict(river_col="#1FC6F2", pond_col="#3EE4D2", river_emit=0.0, pond_emit=0.0),
-    "sunset": dict(river_col="#F08AC4", pond_col="#FFB08C", river_emit=0.08, pond_emit=0.15),
+    "sunset": dict(river_col="#F08AC4", pond_col="#C8407E", river_emit=0.08, pond_emit=0.15),
     "night": dict(river_col="#3A6CFF", pond_col="#B060FF", river_emit=0.6, pond_emit=1.1),
     "dawn": dict(river_col="#9CB8FF", pond_col="#FFC4D4", river_emit=0.0, pond_emit=0.0),
 }
