@@ -96,8 +96,11 @@ FULL = False  # set by --full (CP-D: the whole song, the arc on the timeline)
 # the inlet's sea and the far shore under the night lines; the outro banks north down the low peninsula and out over
 # the northern sea as the sun comes up. Song times from the scratch flight mirror (04- §13 CP-D).
 FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
-    {"position": [-60, 380], "altitude": 14, "speed": 20},                # out in the open bay, the song's intro
-    {"position": [-20, 90], "altitude": 10, "speed": 21},                 # a long easy S north over the moving sea
+    # draft2 (coordinator: 0-36 s was the same open sea in every frame): the bay opens the piece for ~10 s, then the
+    # flight banks onto the bay's west shore and runs along its hills before swinging east to the approved route
+    {"position": [-190, 200], "altitude": 12, "speed": 24},               # the open bay: the intro
+    {"position": [-445, 10], "altitude": 10, "speed": 26},                # onto the west shore by ~11 s
+    {"position": [-380, -210], "altitude": 12, "speed": 28},              # along its hills, the bay on the right
     {"position": [60, -250], "altitude": 12},                              # the bay (the approved route from here)
     {"position": [60, -430], "altitude": 6},                               # low over the moving sea
     {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
@@ -134,15 +137,15 @@ CAST = [
     (310, -1096, "bank"),                                                    # onto the river, its left bank
 ]
 HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 6.0, "bank": 6.0, "inlet": 8.0}
-# CP-D (the full song): the intro's sea, the sweep's return leg (the CP-C r3 gap at clip +60..66 s), and the night and
+# CP-D (the full song; draft2 positions for the new intro, which runs ~10 s longer): the intro's sea, the sweep's return leg (the CP-C r3 gap at clip +60..66 s), and the night and
 # dawn legs -- each 7 m off the flight line on the inside of its turn (the flight mirror), at its song time
 CAST_FULL = [
-    (-33, 220, "sea"), (14, -26, "sea"),                                    # 8 s, 20 s: the bay intro
+    (-309, 116, "sea"), (-447, -19, "bank"), (-382, -200, "sea"),          # 6, 14, 22 s: the bay, its west shore
     (-38, -1126, "crown"),                                                  # 92 s: the sweep's return leg
     (414, -1601, "crown"), (648, -1642, "bank"), (887, -1614, "bank"),     # 137-155 s: the north coast at night
     (1121, -1554, "inlet"), (1352, -1485, "bank"),                          # 164-173 s: the inlet, the far shore
     (1509, -1596, "bank"), (1553, -1792, "crown"),                          # 181-189 s: banking north at dawn
-    (1516, -1986, "bank"), (1455, -2166, "crown"),                          # 197-205 s: the peninsula
+    (1533, -1881, "bank"),                                                  # ~203 s: the peninsula (draft2 timing)
 ]
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool

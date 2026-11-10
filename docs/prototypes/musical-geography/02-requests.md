@@ -689,3 +689,19 @@ The six characters cost about 0.5 ms of CPU and no measurable GPU time. The one 
 
 **Clip:** `~/Desktop/av-gen-review/105-musical-geography/06-characters/cpc-hop-day-feline-40-78s.mp4`. The fixture
 script is `examples/musical-geography/eng/make_cpc.py`.
+
+### Art → engineering, CP-D draft2 (2026-11-09): one tile-gap column wider than the rest (please look)
+
+In the full flight there is one gap column between 1× tiles, running straight along the view, that reads about twice
+the width of its neighbours. It is at about 200 s of `build.py --full --characters`; the camera is near
+(1490, −2000) heading north, and the seam is a little right of centre.
+
+- **It is not the underlay.** With `nodes/mgUnderlay/visible` false it is unchanged.
+- **It is not the state.** It is the same width in the dawn colours and with the timeline off (day colours):
+  `10-full/cpd-draft2-seam-dawn-vs-day-200s.png`, dawn on the left, day on the right.
+- **What we see down it** is the slab sides and skirt. The program colours those from the bottom of the land ramp, so
+  draft1's green dawn (`land[0]` `#2E9C78`) lit it teal, and the coordinator saw it.
+- **Status:** draft2's rose dawn hides the colour, but the geometry is unchanged.
+- **My guess, unverified:** a world-locked lattice line, possibly a 64 m boundary (x ≈ 1536) where a ring's
+  alignment and the fine pitch disagree.
+- **Ask:** is it a generator seam, and can the fine ring close it?

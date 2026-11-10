@@ -1214,3 +1214,73 @@ scene.
   through a crack between slab rows, and the dawn underlay colour makes it visible.
 - **The intro is 30 s of open sea.** It is quiet on purpose, under the intro and build, but the owner may want land
   sooner.
+
+### CP-D draft2: the coordinator's four notes on a036ac93 (2026-11-09)
+
+**1. The intro.** 0–36 s had been the same open sea in every frame.
+- **The new intro:** the bay opens the piece, then the flight banks onto the bay's **west shore**, reaching it by
+  about 11 s, and runs along its hills with the bay on the right (12–20 s). It then swings east across the bay to the
+  approved route.
+- **The approved legs** keep their shape. They now run about 10 s later: the bay waypoint is reached at 40 s instead
+  of 30.
+- **The arc stays on the song's sections, not the route,** so a state now lands about 10 s further along the ground:
+  - sunset falls on the crowns and the sweep;
+  - night falls on the river (whose water glows at night);
+  - the climax runs from the valley exit across the north coast and the inlet;
+  - dawn comes in on the far shore, and the piece ends on the low peninsula.
+- **The aliens:** the intro's three moved onto the new line (6, 14 and 22 s), and the dawn end one moved to about
+  203 s.
+- **Still sea:** 28–52 s is still sea, which is the approved bay and low-sea legs.
+
+**2. Dawn: "pale gold and rose, clean, never green."**
+- **What made it muddy:** the old dawn palette's green ramp, teal shallows, olive sky floor (`#B8B888`) and green
+  underside, under the densest fog of the arc. Our curve was empty, so the Tree of Life default applied: sunrise
+  0.00035.
+- **New palette:**
+
+  | Part | New value |
+  |---|---|
+  | Land | `#C07A9A` → `#E694A6` → `#F6B49A` → `#FAD08A` → `#FFE8B8` (mauve-rose, rose, peach, pale gold, cream) |
+  | Water | lavender `#4E5AA0`, `#6C78BC`, `#A09CD6`, with a rose crest `#FFD8C8` |
+  | Shallows | rose `#F0B8C0` |
+  | Underside | mauve `#6A4A70` |
+  | Sky | floor `#D8A8B0`; horizon and fog peach-rose `#FFD6BC` / `#FFD4C0` |
+  | Sun | pale gold `#FFD08A` |
+  | Path | `#F8C060` |
+  | Grade | saturation 1.5 → 1.3, exposure −0.3 → −0.2 |
+- **The fog, which is what I changed in DayNight:** `day_night()` now writes its own `volumeDensity` curve.
+  - Day, sunset and night keep exactly the Tree of Life default they were approved under. `look.fog_density_default`
+    samples that curve at their phases.
+  - Dawn alone gets its own key, `fog_density` 0.00019, in place of 0.00035.
+  - This also ends the silent no-op logged in CP-D groundwork. The curve is now ours, and `fog_mult` is still unused.
+- **Result:** rose and peach land under a pale gold and lavender sky, clean, with no green.
+
+**3. The teal crack.**
+- **The underlay is ruled out:** hiding `mgUnderlay` changed nothing.
+- **The column is in every state:** it is one gap column, wider than its neighbours, and it shows in the day colours
+  too.
+- **Why it read teal:** draft1's green dawn coloured the slab sides and skirt seen down it, from the bottom of the
+  land ramp.
+- **Status:** the rose dawn removes the teal. The wider gap itself looks like geometry, so I filed it with engineering
+  (02-requests, "one tile-gap column wider than the rest") instead of hiding it in data.
+
+**4. The night glare strip** (148–164 s).
+- **Cause:** a far hill in the 4× ring, 600–1000 m out, where 4 m tiles are a few pixels wide. There the contour band
+  covered whole tiles and fused into one blown-out strip.
+- **Fix:** the contour emission now fades with distance: `cameraDistance` remapped over 250 m → 800 m, down to 0.15.
+  That adds 3 ops (the 1× ring is at 62).
+- **Result:** the 148–164 s horizon now reads as faint lines.
+- **Still bright:** a steep near hill at 172–180 s, about 150–300 m out, still stacks bright white lines. They read as
+  separate contours, not a stripe, but they are hot. Phase 7's rest contour glow of 0.5 halves them in draft3.
+
+**Renders:** `10-full/cpd-draft2-feline-full-1080p.mp4` and `cpd-draft2-sheet.png`.
+
+**Whole-song perf** (1080p Ultra, 208 s, profiled before the render):
+
+| GPU p50 | GPU p95 | GPU p99 | CPU work p50 | Frames within 16.7 ms |
+|---|---|---|---|---|
+| 13.9 ms | 19.6 ms | 25.9 ms | 1.8 ms | 91.9% |
+
+The worst frames are one hitch cluster at 157–158 s, with a single 277 ms frame. It did not show in draft1's runs. The
+wider tail is in line with engineering's finding that the flight's GPU tail is the GPU clocking down (02-requests),
+which I have not separated here.

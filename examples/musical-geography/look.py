@@ -81,13 +81,17 @@ STATES = {
         fill=0.25, contrast=1.3,
         sky_int=0.95, haze=0.35,
         moon_int=0.0, phase=0.27,
-        sky_zen="#7FA6E8", sky_hor="#FFD8A8", sky_ground="#B8B888", fog="#FFD8A8", fog_sun="#FFE2A0",
-        sun="#FFC874", sun_int=4.4, amb="#B8C8D8", amb_int=0.55,
-        land=["#2E9C78", "#5CB86A", "#D8CC5A", "#F6AE48", "#FFDC98"],
-        water=["#3E5E98", "#5A7EB8", "#86A6D0", "#F2DCA8"], shallow="#8CBFA8", under="#4A6A55",
-        path="#F2A93B", path_emit=0.25, pad="#FFC060", pad_emit=0.0,
-        drift="#F4C49A", drift_amt=0.28, edge="#FFD27A", edge_gain=0.5, crest_gain=0.0,   # crest cut: its peaks read as polka dots (as sunset)
-        fog_mult=8.0, exposure=-0.3, saturation=1.5, look="medium-high", bloom=0.25),
+        # CP-D draft2 (coordinator: dawn read olive-green and muddy in sequence -- "pale gold and rose, clean, never
+        # green"): the green ramp, teal shallows, olive sky floor and green-grey underside are gone; a rose-to-gold
+        # land under a peach-rose horizon, lavender water with a rose crest, a cleaner grade (04- §13 CP-D draft2)
+        sky_zen="#8FA8E8", sky_hor="#FFD6BC", sky_ground="#D8A8B0", fog="#FFD4C0", fog_sun="#FFE6B8",
+        sun="#FFD08A", sun_int=4.4, amb="#E0C8D8", amb_int=0.55,
+        land=["#C07A9A", "#E694A6", "#F6B49A", "#FAD08A", "#FFE8B8"],
+        water=["#4E5AA0", "#6C78BC", "#A09CD6", "#FFD8C8"], shallow="#F0B8C0", under="#6A4A70",
+        path="#F8C060", path_emit=0.25, pad="#FFC8A0", pad_emit=0.0,
+        drift="#F8C8B0", drift_amt=0.28, edge="#FFD8A0", edge_gain=0.5, crest_gain=0.0,   # crest cut: its peaks read as polka dots (as sunset)
+        fog_mult=8.0, exposure=-0.2, saturation=1.3, look="medium-high", bloom=0.25,
+        fog_density=0.00019),   # the DayNight curve's own key (draft2): the default sunrise fog (0.00035) was the haze
 }
 # Contour gains as approved by the owner (04- §11): on at dusk and night, faint or off by day. The sunset key is 0.6
 # (faint); the dusk key between sunset and night brings the lines in at full night strength.
@@ -148,7 +152,28 @@ def day_night(cycle_seconds=600.0, paused=True, phase=0.5):
         # the sky's light on the land at full strength in every state: the fill is how the shadow side gets its
         # colour (violet at sunset, indigo at night); the engine's default dims it to 0.16-0.46 off-noon
         "hdriIntensity": _curve("fill"),   # r5: separate from the visible sky -- a lower fill gives dark shaded sides
+        # CP-D draft2: the fog's ONE density (ADR-705) as our own curve. Until now we set none, so applyDefaults filled
+        # it with the Tree of Life defaults, and they overwrote fog_medium's density every frame (fog_mult never
+        # applied). Day, sunset and night keep exactly the default they were approved under (fog_density_default);
+        # dawn alone gets its own, thinner key.
+        "volumeDensity": [{"phase": st["phase"], "value": st.get("fog_density", fog_density_default(st["phase"]))}
+                          for _, st in ordered_states()],
     }
+
+
+# The Tree of Life default fog density curve (day_night.cpp applyDefaults, ADR-705), smoothstep between its keys
+_TOL_DENSITY = [(0.0, 0.000225), (0.25, 0.000358), (0.50, 0.000158), (0.75, 0.000341), (0.82, 0.000275),
+                (0.90, 0.000233)]
+
+
+def fog_density_default(phase):
+    keys = _TOL_DENSITY + [(1.0, _TOL_DENSITY[0][1])]
+    for (p0, v0), (p1, v1) in zip(keys[:-1], keys[1:]):
+        if p0 <= phase <= p1:
+            t = (phase - p0) / (p1 - p0)
+            t = t * t * (3 - 2 * t)
+            return round(v0 + (v1 - v0) * t, 7)
+    return keys[0][1]
 
 
 # ---- the moving ground (ADR-1953), authored for restraint: the sea moves, the land breathes, the music adds -------------
@@ -246,6 +271,7 @@ UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: 
                           # second, blue-black surface speckling through every hillside
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
 CREST_EDGE = (0.72, 0.98)  # crest light only near the peaks: a broad crest lit the crossing trains as a diamond grid
+CONTOUR_FADE = (250.0, 800.0, 0.15)   # metres, and the gain left beyond (CP-D draft2: the night glare strip)
 CONTOUR_BAND = 0.06       # the contour line's width on the top's border, fraction of the half-size
 BORDER_BAND = 0.03       # tileBorder's band (engineering's fixture value)
 RING_THICKNESS = {1.0: 0.30, 2.0: 0.36, 4.0: 0.72}
@@ -356,6 +382,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "swizzle", "dst": 7, "srcA": 7, "constant": B(0)})                     # drew closed blobs
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         add({"kind": "constant", "dst": 7, "constant": _c4([v * eg for v in hexlin(s["edge"])])})
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        # CP-D draft2: fade the lines with distance -- on a far hill (the 4x ring, 4 m tiles a few pixels wide) the
+        # bands covered whole tiles and bunched into one glare strip (night, 148-164 s)
+        add({"kind": "input", "input": "cameraDistance", "dst": 7})
+        add({"kind": "remap", "dst": 7, "srcA": 7, "constant": [CONTOUR_FADE[0], CONTOUR_FADE[1], 1.0,
+                                                                 CONTOUR_FADE[2]], "value": 1.0})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
         if cg > 0:
