@@ -23,6 +23,7 @@ public:
 
     [[nodiscard]] world::GroundSample at(float x, float z, double t) const override;
     [[nodiscard]] world::GroundSample planned(float x, float z, double t) const override;
+    [[nodiscard]] world::GroundSample landscape(float x, float z, double t) const override; // ADR-1997
     [[nodiscard]] float pitch() const override { return pitch_; }
     [[nodiscard]] glm::vec2 cellCentre(float x, float z) const override;
     void landed(glm::vec2 xz, double t, float strength) override;
@@ -38,6 +39,7 @@ private:
     TileTerrainSpec tiles_;
     TileDynamics dyn_;
     TileDynamics plan_;
+    TileDynamics still_; // ADR-1997: plan_ without the springs
     [[nodiscard]] world::GroundSample sample(const TileDynamics& d, float x, float z, double t) const;
     float pitch_ = 0.0f;
     glm::vec3 offset_{0.0f};

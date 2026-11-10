@@ -14,6 +14,8 @@ void TileGround::set(const TileTerrainSpec& tiles, const TileDynamics& dyn, cons
     tiles_ = tiles;
     dyn_ = dyn;
     plan_ = plan;
+    still_ = plan;
+    still_.springs.clear();
     pitch_ = pitch;
     offset_ = offset;
     // The springs the ground answers with are its own landings, in the generator's space (on both surfaces: a landing
@@ -42,6 +44,8 @@ world::GroundSample TileGround::sample(const TileDynamics& d, float x, float z, 
 world::GroundSample TileGround::at(float x, float z, double t) const { return sample(dyn_, x, z, t); }
 
 world::GroundSample TileGround::planned(float x, float z, double t) const { return sample(plan_, x, z, t); }
+
+world::GroundSample TileGround::landscape(float x, float z, double t) const { return sample(still_, x, z, t); }
 
 glm::vec2 TileGround::cellCentre(float x, float z) const {
     const float gx = x - offset_.x;

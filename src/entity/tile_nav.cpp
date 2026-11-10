@@ -23,6 +23,9 @@ bool tileJumpAllowed(const world::GroundSample& from, const world::GroundSample&
     if (tiles < 1 || tiles > r.jumpTiles) {
         return false;
     }
+    if (!r.landOnWater && to.water >= r.waterThreshold) {
+        return false; // ADR-1997
+    }
     const float dh = to.height - from.height;
     return dh <= r.jumpRise && -dh <= r.jumpDrop;
 }

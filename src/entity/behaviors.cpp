@@ -3596,6 +3596,11 @@ private:
 // the landing tile's height AT THE LANDING TIME (the ground moves). It lands on the tile's top as it is then, tells the
 // ground (which springs, ADR-1954) and recovers. Standing, it rides its tile -- waves, breathing, a neighbour's landing
 // -- because it reads the moving surface every step. With no ground in the context it stands still.
+// ADR-1997: the hop behaviour runs on a fixed 60 Hz step anchored on the timeline (tick k at k / 60 s), whatever the
+// caller's frame rate, so a 30 fps render, a 60 fps live frame and a seek's replay make the same decisions at the same
+// instants; positions in the air are closed forms of the render time.
+constexpr double kHopRate = 60.0;
+
 class Hop final : public CheckpointedBehavior<Hop> {
 public:
     explicit Hop(const nlohmann::json* s)
@@ -3606,23 +3611,24 @@ public:
           landDefault_(readFloat(s, "landTime", 0.4f)),
           hopChanceDefault_(readFloat(s, "hopChance", 0.35f)),
           strengthDefault_(readFloat(s, "strength", 1.0f)),
+          runChance_(readFloat(s, "runChance", 0.4f)),
           pauseMin_(readFloat(s, "pauseMin", 1.0f)),
           pauseMax_(readFloat(s, "pauseMax", 3.5f)),
           goalMin_(static_cast<int>(readFloat(s, "goalMin", 4.0f))),
           goalMax_(static_cast<int>(readFloat(s, "goalMax", 12.0f))),
           wantFlat_(readFloat(s, "preferCrowns", 1.0f)),
-          wantWater_(readFloat(s, "preferWater", 0.6f)),
           wantPath_(readFloat(s, "preferPath", 0.6f)),
           home_(readFloat(s, "homeRadius", 60.0f)),
-          cueOnly_(readFloat(s, "cueOnly", 0.0f) >= 0.5f),
-          maxWait_(readFloat(s, "maxWait", 12.0f)),
-          cueEvery_(std::max(1, static_cast<int>(readFloat(s, "cueEvery", 1.0f)))),
-          cueGapDefault_(readFloat(s, "cueGap", 0.0f)),
-          airBeatsDefault_(readFloat(s, "airBeats", 0.0f)) {
+          tossThresholdDefault_(readFloat(s, "tossThreshold", 0.0f)),
+          tossGainDefault_(readFloat(s, "tossGain", 8.0f)),
+          tossCooldownDefault_(readFloat(s, "tossCooldown", 3.0f)),
+          tossMax_(readFloat(s, "tossMax", 9.0f)),
+          gravity_(readFloat(s, "gravity", 9.81f)) {
         rules_.stepHeight = readFloat(s, "stepHeight", 0.6f);
         rules_.jumpTiles = static_cast<int>(readFloat(s, "jumpTiles", 3.0f));
         rules_.jumpRise = readFloat(s, "jumpRise", 3.0f);
         rules_.jumpDrop = readFloat(s, "jumpDrop", 8.0f);
+        rules_.landOnWater = false; // ADR-1997: never on water (a sea slab, a river, a pond)
     }
 
     [[nodiscard]] std::string_view kind() const override { return "hop"; }
@@ -3634,32 +3640,29 @@ public:
         apex_ = &params.add(floatDesc(prefix + "apex", apexDefault_, 0.0f, 30.0f));
         hopChance_ = &params.add(floatDesc(prefix + "hopChance", hopChanceDefault_, 0.0f, 1.0f));
         strength_ = &params.add(floatDesc(prefix + "strength", strengthDefault_, 0.0f, 10.0f));
-        // ADR-1964: a rising edge through 0.5 is a cue to hop -- a resting body sets off now, a walking one hops its
-        // next step. What a route on the beat or an onset drives (an entity reaction, so a seek replays it).
-        trigger_ = &params.add(floatDesc(prefix + "trigger", 0.0f, 0.0f, 1.0f));
-        // CP-D r2 (E): a hop that lasts this many beats of the beat clock (0 = airTime), so a cue on the beat lands on one
-        airBeats_ = &params.add(floatDesc(prefix + "airBeats", airBeatsDefault_, 0.0f, 8.0f));
-        // CP-D r2 (E): the least time between two cues this body answers (seconds), so a beat cannot make it twitch
-        cueGap_ = &params.add(floatDesc(prefix + "cueGap", cueGapDefault_, 0.0f, 30.0f));
-        paths_ = {prefix + "walkSpeed", prefix + "runSpeed", prefix + "airTime", prefix + "apex",
-                  prefix + "hopChance", prefix + "strength", prefix + "trigger", prefix + "airBeats", prefix + "cueGap"};
+        // ADR-1997: the crest toss. A crest whose upward speed under the body passes `tossThreshold` (m/s; 0 = off)
+        // throws it at `tossGain` x the crest's peak speed, at most once per `tossCooldown` seconds.
+        tossThreshold_ = &params.add(floatDesc(prefix + "tossThreshold", tossThresholdDefault_, 0.0f, 20.0f));
+        tossGain_ = &params.add(floatDesc(prefix + "tossGain", tossGainDefault_, 0.0f, 100.0f));
+        tossCooldown_ = &params.add(floatDesc(prefix + "tossCooldown", tossCooldownDefault_, 0.0f, 60.0f));
+        paths_ = {prefix + "walkSpeed", prefix + "runSpeed",      prefix + "airTime",  prefix + "apex",
+                  prefix + "hopChance", prefix + "strength",      prefix + "tossThreshold", prefix + "tossGain",
+                  prefix + "tossCooldown"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
     }
-    void reset(Rng& rng) override {
-        cuePhase_ = cueEvery_ > 1 ? static_cast<int>(rng.nextFloat() * static_cast<float>(cueEvery_)) % cueEvery_ : 0;
-        cueCount_ = 0;
-        waited_ = 0.0f;
-        lastAnswer_ = -1e9;
+    void reset(Rng&) override {
         primed_ = false;
         phase_ = Phase::Pause;
         steps_.clear();
         wantsHop_.clear();
         leg_ = 0;
         timer_ = 0.0f;
-        triggerPrevious_ = 0.0f;
-        cued_ = false;
+        lastToss_ = -1e9;
+        armed_ = false;
+        peak_ = 0.0f;
+        tosses_ = 0;
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
@@ -3668,55 +3671,135 @@ public:
             return; // no tiles to stand on: stand where the scene put it
         }
         const double t = ctx.time;
-        const auto dt = static_cast<float>(ctx.dt);
-        const float pitch = ground->pitch();
-        const auto value = [](const params::Parameter<float>* p, float d) { return p != nullptr ? p->value() : d; };
         if (!primed_) {
-            const glm::vec3 here = state.position();
-            c00_ = ground->cellCentre(0.0f, 0.0f);
-            origin_ = ground->cellCentre(here.x, here.z);
-            pos_ = origin_;
-            y_ = ground->at(pos_.x, pos_.y, t).height;
-            yaw_ = state.yaw;
-            phase_ = Phase::Pause;
-            timer_ = ctx.rng != nullptr ? ctx.rng->range(pauseMin_, pauseMax_) : pauseMin_;
-            primed_ = true;
+            prime(*ground, ctx, state, t);
         }
-        // ADR-1964: the cue, on its rising edge
-        const float cue = trigger_ != nullptr ? trigger_->value() : 0.0f;
-        // CP-D r2 (E): with `cueEvery` N, a body answers every Nth cue, at its own place in the cycle (so a cast
-        // answers in turns, not all at once)
-        bool answered = false;
-        if (cue >= 0.5f && triggerPrevious_ < 0.5f) {
-            const float gap = cueGap_ != nullptr ? cueGap_->value() : cueGapDefault_;
-            answered = (cueCount_ + cuePhase_) % cueEvery_ == 0 && t - lastAnswer_ >= static_cast<double>(gap);
-            ++cueCount_;
-            if (answered) {
-                lastAnswer_ = t;
+        // the fixed steps up to now (a seek backwards re-primes: reset)
+        const auto target = static_cast<long long>(std::floor(t * kHopRate + 1e-6));
+        while (tick_ < target) {
+            ++tick_;
+            step(*ground, ctx, static_cast<double>(tick_) / kHopRate, static_cast<float>(1.0 / kHopRate));
+        }
+        // where it is at the render time: on the tile's drawn top, or on its arc
+        glm::vec2 xz = pos_;
+        float y = ground->at(pos_.x, pos_.y, t).height;
+        if (phase_ == Phase::Move) {
+            y = y_; // the walk's step-down ease, from the last step
+        } else if (phase_ == Phase::Air) {
+            arcAt(*ground, t, xz, y);
+        } else if (phase_ == Phase::Toss) {
+            tossAt(*ground, t, xz, y);
+        }
+        state.travel = glm::vec3(xz.x, y, xz.y) - state.anchor;
+        state.yaw = yaw_;
+        state.speed = speed_;
+        state.activity = activity_;
+        state.airborne = phase_ == Phase::Air || phase_ == Phase::Toss;
+    }
+
+private:
+    enum class Phase : std::uint8_t { Pause, Move, Air, Land, Toss };
+
+    [[nodiscard]] static float value(const params::Parameter<float>* p, float d) { return p != nullptr ? p->value() : d; }
+
+    // The lattice in the ground's own cells (its origin need not be a multiple of the pitch): tile (0, 0) is the cell
+    // under the world origin.
+    [[nodiscard]] glm::vec2 tileCentreOf(glm::ivec2 tile, float pitch) const { return c00_ + glm::vec2(tile) * pitch; }
+    [[nodiscard]] glm::ivec2 tileOf(glm::vec2 p, float pitch) const {
+        return glm::ivec2(glm::round((p - c00_) / pitch));
+    }
+    [[nodiscard]] bool wet(const world::GroundSource& g, glm::vec2 p, double t) const {
+        return g.planned(p.x, p.y, t).water >= rules_.waterThreshold;
+    }
+    // The nearest dry tile centre to `p`, within `reach` tiles (rings outward, in a fixed order); `p`'s own tile if none.
+    [[nodiscard]] glm::vec2 nearestDry(const world::GroundSource& g, glm::vec2 p, double t, int reach) const {
+        const float pitch = g.pitch();
+        const glm::ivec2 c = tileOf(p, pitch);
+        for (int r = 0; r <= reach; ++r) {
+            float best = 1e30f;
+            glm::vec2 found{0.0f};
+            bool any = false;
+            for (int dz = -r; dz <= r; ++dz) {
+                for (int dx = -r; dx <= r; ++dx) {
+                    if (std::max(std::abs(dx), std::abs(dz)) != r) continue;
+                    const glm::vec2 q = tileCentreOf(c + glm::ivec2(dx, dz), pitch);
+                    if (wet(g, q, t)) continue;
+                    const float d = glm::length(q - p);
+                    if (d < best) {
+                        best = d;
+                        found = q;
+                        any = true;
+                    }
+                }
             }
+            if (any) return found;
         }
-        if (answered) {
-            if (phase_ == Phase::Pause) {
-                timer_ = 0.0f; // set off now, with a hop
-                cued_ = true;
-            } else if (phase_ == Phase::Move && leg_ < wantsHop_.size()) {
-                wantsHop_[leg_] = true; // hop the next step
+        return tileCentreOf(c, pitch);
+    }
+
+    void prime(world::GroundSource& ground, const BehaviorContext& ctx, const EntityState& state, double t) {
+        const glm::vec3 here = state.position();
+        c00_ = ground.cellCentre(0.0f, 0.0f);
+        // ADR-1997: a body placed on water starts on the nearest dry tile (12 tiles at most)
+        origin_ = nearestDry(ground, ground.cellCentre(here.x, here.z), t, 12);
+        pos_ = origin_;
+        y_ = ground.at(pos_.x, pos_.y, t).height;
+        yaw_ = state.yaw;
+        phase_ = Phase::Pause;
+        timer_ = ctx.rng != nullptr ? ctx.rng->range(pauseMin_, pauseMax_) : pauseMin_;
+        tick_ = static_cast<long long>(std::floor(t * kHopRate + 1e-6));
+        activity_ = Activity::Idle;
+        speed_ = 0.0f;
+        primed_ = true;
+    }
+
+    // ADR-1997: the landscape's upward speed under the body (m/s), a central difference over one step on the surface
+    // without the bodies' own landings -- a pure function of where and when.
+    [[nodiscard]] float groundRise(const world::GroundSource& g, glm::vec2 p, double t) const {
+        const double h = 0.5 / kHopRate;
+        return static_cast<float>((g.landscape(p.x, p.y, t + h).height - g.landscape(p.x, p.y, t - h).height) /
+                                  (2.0 * h));
+    }
+
+    // One fixed step at time `t`.
+    void step(world::GroundSource& ground, const BehaviorContext& ctx, double t, float dt) {
+        const float pitch = ground.pitch();
+        speed_ = 0.0f;
+        activity_ = Activity::Idle;
+        // ADR-1997: a crest passing under a body on its feet throws it. The rise arms the toss above the threshold;
+        // the throw comes once the rise has passed its peak (10% under the best seen) or fallen under the threshold, at
+        // the peak speed, so a bigger crest throws higher. The cooldown runs from the last throw.
+        if (phase_ == Phase::Pause || phase_ == Phase::Move) {
+            const float threshold = value(tossThreshold_, tossThresholdDefault_);
+            const float rise = groundRise(ground, pos_, t);
+            if (threshold > 0.0f && t - lastToss_ >= static_cast<double>(value(tossCooldown_, tossCooldownDefault_))) {
+                if (rise >= threshold) {
+                    // past the crest's peak: 10% under the best rise seen (a walk onto the next tile steps the rise
+                    // a little, which must not count as the peak)
+                    if (armed_ && rise < 0.9f * peak_) {
+                        toss(ground, t, peak_);
+                        armed_ = false;
+                        return;
+                    }
+                    armed_ = true;
+                    peak_ = std::max(peak_, rise);
+                } else if (armed_) {
+                    toss(ground, t, peak_); // it fell back under the threshold within one step: throw at the peak seen
+                    armed_ = false;
+                    return;
+                }
+            } else {
+                armed_ = false;
+                peak_ = 0.0f;
             }
+            if (!armed_) peak_ = 0.0f;
         }
-        triggerPrevious_ = cue;
-        float speed = 0.0f;
-        Activity activity = Activity::Idle;
-        bool airborne = false;
         switch (phase_) {
         case Phase::Pause: {
-            y_ = ground->at(pos_.x, pos_.y, t).height; // riding the tile
+            y_ = ground.at(pos_.x, pos_.y, t).height; // riding the tile
             timer_ -= dt;
-            waited_ += dt;
-            // CP-D r2 (E): a cue-only body rests until a cue sets it off (or `maxWait` passes, so silence is not frozen)
-            const bool go = cueOnly_ ? (cued_ || waited_ >= maxWait_) : timer_ <= 0.0f;
-            if (go) {
-                waited_ = 0.0f;
-                plan(*ground, ctx, t);
+            if (timer_ <= 0.0f) {
+                plan(ground, ctx, t);
             }
             break;
         }
@@ -3725,20 +3808,12 @@ public:
                 pause(ctx);
                 break;
             }
-            const TileStep step = steps_[leg_];
-            const glm::vec2 target = tileCentreOf(step.tile, pitch);
-            const bool hopByChoice = step.edge == TileEdge::Walk && leg_ < wantsHop_.size() && wantsHop_[leg_];
-            if (step.edge == TileEdge::Jump || hopByChoice) {
-                // CP-D r2 (E): a hop of `airBeats` beats at the beat clock's tempo, when set and the clock runs
-                float airTime = value(air_, airDefault_);
-                const float beats = value(airBeats_, airBeatsDefault_);
-                const float bpm = ctx.signal("beat.bpm");
-                if (beats > 0.0f && bpm >= 30.0f && bpm <= 300.0f) {
-                    airTime = std::clamp(beats * 60.0f / bpm, 0.3f, 3.0f);
-                }
-                launch(*ground, target, t, airTime);
-                activity = Activity::Jump;
-                airborne = true;
+            const TileStep st = steps_[leg_];
+            const glm::vec2 target = tileCentreOf(st.tile, pitch);
+            const bool hopByChoice = st.edge == TileEdge::Walk && leg_ < wantsHop_.size() && wantsHop_[leg_];
+            if (st.edge == TileEdge::Jump || hopByChoice) {
+                launch(ground, target, t, value(air_, airDefault_));
+                activity_ = Activity::Jump;
                 break;
             }
             const float walk = running_ ? value(run_, runDefault_) : value(walk_, walkDefault_);
@@ -3752,42 +3827,43 @@ public:
                 pos_ += to / dist * stepLen;
                 face(to, dt);
             }
-            // up a step at once (never inside the tile), down it over a few frames
-            const float under = ground->at(pos_.x, pos_.y, t).height;
+            // up a step at once (never inside the tile), down it over a few steps
+            const float under = ground.at(pos_.x, pos_.y, t).height;
             y_ = under >= y_ ? under : y_ + (under - y_) * std::min(1.0f, dt / 0.08f);
-            speed = walk;
-            activity = running_ ? Activity::Run : Activity::Walk;
+            speed_ = walk;
+            activity_ = running_ ? Activity::Run : Activity::Walk;
             break;
         }
         case Phase::Air: {
             const auto s = static_cast<float>((t - air0_) / std::max(airT_, 1e-3f));
-            if (s >= 1.0f) {
-                pos_ = airTo_;
-                y_ = ground->at(pos_.x, pos_.y, t).height;
-                ground->landed(pos_, t, value(strength_, strengthDefault_));
-                phase_ = Phase::Land;
-                timer_ = landDefault_;
-                activity = Activity::Land;
+            if (s >= 1.0f - 1e-5f) {
+                land(ground, airTo_, t);
                 ++leg_;
                 break;
             }
-            // ADR-1964: the arc is a function of NOW -- both ends on the drawn ground at this instant, the rise from the
-            // planning surface at launch -- so a seek that lands mid-hop puts the body where a play does (no launch
-            // height remembered from a ground the replay drew without the routes).
-            const float fromH = ground->at(airFrom_.x, airFrom_.y, t).height; // the tile it left, as it is now
-            const float landH = ground->at(airTo_.x, airTo_.y, t).height;     // the landing tile as it is now
-            pos_ = glm::mix(airFrom_, airTo_, s);
-            y_ = fromH + (landH - fromH) * s + 4.0f * airApex_ * s * (1.0f - s);
             face(airTo_ - airFrom_, dt);
-            speed = glm::length(airTo_ - airFrom_) / std::max(airT_, 1e-3f);
-            activity = s < 0.5f ? Activity::Jump : Activity::Fall;
-            airborne = true;
+            speed_ = glm::length(airTo_ - airFrom_) / std::max(airT_, 1e-3f);
+            activity_ = s < 0.5f ? Activity::Jump : Activity::Fall;
+            break;
+        }
+        case Phase::Toss: {
+            const auto tau = static_cast<float>(t - toss0_);
+            if (tau >= tossT_ - 1e-5f) {
+                land(ground, tossTo_, t);
+                steps_.clear(); // a throw ends the walk it interrupted: rest, then plan afresh
+                wantsHop_.clear();
+                leg_ = 0;
+                break;
+            }
+            if (glm::dot(tossTo_ - tossFrom_, tossTo_ - tossFrom_) > 1e-6f) face(tossTo_ - tossFrom_, dt);
+            speed_ = glm::length(tossTo_ - tossFrom_) / std::max(tossT_, 1e-3f);
+            activity_ = tossV0_ - gravity_ * tau > 0.0f ? Activity::Jump : Activity::Fall;
             break;
         }
         case Phase::Land: {
-            y_ = ground->at(pos_.x, pos_.y, t).height;
+            y_ = ground.at(pos_.x, pos_.y, t).height;
             timer_ -= dt;
-            activity = Activity::Land;
+            activity_ = Activity::Land;
             if (timer_ <= 0.0f) {
                 if (leg_ < steps_.size()) {
                     phase_ = Phase::Move;
@@ -3798,24 +3874,84 @@ public:
             break;
         }
         }
-        if (activity == Activity::Idle || activity == Activity::Land) {
-            y_ = ground->at(pos_.x, pos_.y, t).height; // standing (including the frame a walk ends): on the tile's top
-        }
-        state.travel = glm::vec3(pos_.x, y_, pos_.y) - state.anchor;
-        state.yaw = yaw_;
-        state.speed = speed;
-        state.activity = activity;
-        state.airborne = airborne;
     }
 
-private:
-    enum class Phase : std::uint8_t { Pause, Move, Air, Land };
+    void land(world::GroundSource& ground, glm::vec2 at, double t) {
+        pos_ = at;
+        y_ = ground.at(pos_.x, pos_.y, t).height;
+        ground.landed(pos_, t, value(strength_, strengthDefault_));
+        phase_ = Phase::Land;
+        timer_ = landDefault_;
+        activity_ = Activity::Land;
+    }
 
-    // The lattice in the ground's own cells (its origin need not be a multiple of the pitch): tile (0, 0) is the cell
-    // under the world origin.
-    [[nodiscard]] glm::vec2 tileCentreOf(glm::ivec2 tile, float pitch) const { return c00_ + glm::vec2(tile) * pitch; }
-    [[nodiscard]] glm::ivec2 tileOf(glm::vec2 p, float pitch) const {
-        return glm::ivec2(glm::round((p - c00_) / pitch));
+    // ADR-1997: the throw. Straight up at gain x the crest's speed (at most tossMax), on along the walk it was making
+    // (a resting body goes up and down where it stands), and down on a dry tile -- steered to the nearest one when the
+    // course would end on water. The flight is solved now, on the planning surface, step by step, so where and when it
+    // lands is what a seek replays; the drawn arc meets the drawn top at the landing (tossAt).
+    void toss(world::GroundSource& ground, double t, float crest) {
+        const float v0 = std::min(value(tossGain_, tossGainDefault_) * crest, tossMax_);
+        tossFrom_ = pos_;
+        const float flat = 2.0f * v0 / std::max(gravity_, 1e-3f); // the time aloft over level ground
+        glm::vec2 to = pos_;
+        if (phase_ == Phase::Move && leg_ < steps_.size()) {
+            const glm::vec2 dir = tileCentreOf(steps_[leg_].tile, ground.pitch()) - pos_;
+            if (glm::dot(dir, dir) > 1e-8f) {
+                to = pos_ + glm::normalize(dir) * (running_ ? value(run_, runDefault_) : value(walk_, walkDefault_)) * flat;
+            }
+        }
+        if (wet(ground, to, t + flat)) {
+            to = nearestDry(ground, to, t + flat, 3);
+        }
+        tossTo_ = to;
+        tossH_ = flat;
+        toss0_ = t;
+        tossV0_ = v0;
+        tossY0_ = ground.planned(pos_.x, pos_.y, t).height;
+        // land at the first step where the ballistic height meets the planning surface under the course
+        const double dt = 1.0 / kHopRate;
+        double T = dt;
+        for (int k = 1; k < static_cast<int>(8.0 * kHopRate); ++k) {
+            const double tau = k * dt;
+            const glm::vec2 p = glm::mix(tossFrom_, tossTo_, std::min(1.0f, static_cast<float>(tau / tossH_)));
+            const float yb = tossY0_ + v0 * static_cast<float>(tau) - 0.5f * gravity_ * static_cast<float>(tau * tau);
+            T = tau;
+            if (tau > 0.5 * tossH_ && yb <= ground.planned(p.x, p.y, t + tau).height) break;
+        }
+        tossT_ = static_cast<float>(T);
+        const glm::vec2 end = glm::mix(tossFrom_, tossTo_, std::min(1.0f, static_cast<float>(T / tossH_)));
+        tossTo_ = end;
+        tossH_ = static_cast<float>(T);
+        tossMiss_ = ground.planned(end.x, end.y, t + T).height -
+                    (tossY0_ + v0 * tossT_ - 0.5f * gravity_ * tossT_ * tossT_);
+        lastToss_ = t;
+        peak_ = 0.0f;
+        ++tosses_;
+        phase_ = Phase::Toss;
+        activity_ = Activity::Jump;
+    }
+
+    // The thrown body at render time t: the ballistic height over the planning surface, carried onto the drawn one
+    // (both ends' drawn-minus-planned, blended along the flight), and the step's rounding at the landing spread over
+    // it -- so it leaves the drawn top and comes down on it exactly.
+    void tossAt(const world::GroundSource& g, double t, glm::vec2& xz, float& y) const {
+        const float tau = std::clamp(static_cast<float>(t - toss0_), 0.0f, tossT_);
+        const float u = tau / std::max(tossT_, 1e-4f);
+        xz = glm::mix(tossFrom_, tossTo_, u);
+        const float yb = tossY0_ + tossV0_ * tau - 0.5f * gravity_ * tau * tau + tossMiss_ * u;
+        const float from = g.at(tossFrom_.x, tossFrom_.y, t).height - g.planned(tossFrom_.x, tossFrom_.y, t).height;
+        const float to = g.at(tossTo_.x, tossTo_.y, t).height - g.planned(tossTo_.x, tossTo_.y, t).height;
+        y = yb + from * (1.0f - u) + to * u;
+    }
+
+    // ADR-1964: the hop's arc is a function of NOW -- both ends on the drawn ground at this instant, the rise from the
+    // planning surface at launch -- so a seek that lands mid-hop puts the body where a play does.
+    void arcAt(const world::GroundSource& g, double t, glm::vec2& xz, float& y) const {
+        const float s = std::clamp(static_cast<float>((t - air0_) / std::max(airT_, 1e-3f)), 0.0f, 1.0f);
+        const float fromH = g.at(airFrom_.x, airFrom_.y, t).height;
+        const float landH = g.at(airTo_.x, airTo_.y, t).height;
+        xz = glm::mix(airFrom_, airTo_, s);
+        y = fromH + (landH - fromH) * s + 4.0f * airApex_ * s * (1.0f - s);
     }
 
     void face(glm::vec2 dir, float dt) {
@@ -3842,13 +3978,12 @@ private:
         airT_ = airTime;
         // the extra rise over a step up, from the planning surface (what a seek replays identically)
         const float rise = ground.planned(to.x, to.y, t + airTime).height - ground.planned(pos_.x, pos_.y, t).height;
-        const float apex = apex_ != nullptr ? apex_->value() : apexDefault_;
-        airApex_ = apex + 0.5f * std::max(0.0f, rise);
+        airApex_ = value(apex_, apexDefault_) + 0.5f * std::max(0.0f, rise);
         phase_ = Phase::Air;
     }
 
     // Picks a tile to go to and plans there: candidates in a ring of goalMin..goalMax tiles, scored by what the
-    // character likes (crowns, sea slabs, the path), kept within `homeRadius` of where it started.
+    // character likes (crowns, the path), kept within `homeRadius` of where it started, never on water (ADR-1997).
     void plan(world::GroundSource& ground, const BehaviorContext& ctx, double t) {
         const float pitch = ground.pitch();
         const glm::ivec2 here = tileOf(pos_, pitch);
@@ -3859,12 +3994,13 @@ private:
             const float r = ctx.rng != nullptr
                                 ? ctx.rng->range(static_cast<float>(goalMin_), static_cast<float>(goalMax_))
                                 : static_cast<float>(goalMin_);
+            const float noise = ctx.rng != nullptr ? 0.4f * ctx.rng->nextFloat() : 0.0f;
             const glm::ivec2 c = here + glm::ivec2(glm::round(glm::vec2(std::cos(ang), std::sin(ang)) * r));
             const glm::vec2 centre = tileCentreOf(c, pitch);
             if (glm::length(centre - origin_) > home_ || c == here) continue;
             const world::GroundSample g = ground.planned(centre.x, centre.y, t);
-            const float score = wantFlat_ * g.flat + wantWater_ * g.water + wantPath_ * g.path +
-                                (ctx.rng != nullptr ? 0.4f * ctx.rng->nextFloat() : 0.0f);
+            if (g.water >= rules_.waterThreshold) continue;
+            const float score = wantFlat_ * g.flat + wantPath_ * g.path + noise;
             if (score > bestScore) {
                 bestScore = score;
                 best = c;
@@ -3876,35 +4012,26 @@ private:
         };
         TilePath path = planTiles(query, here, best, rules_);
         if (!path.found || path.steps.empty()) {
-            timer_ = 1.0f;
-            cued_ = false; // nowhere to go: wait for the next cue
+            timer_ = 1.0f; // nowhere to go: rest a little and try again
             return;
         }
         steps_ = std::move(path.steps);
-        const float chance = hopChance_ != nullptr ? hopChance_->value() : hopChanceDefault_;
+        const float chance = value(hopChance_, hopChanceDefault_);
         wantsHop_.assign(steps_.size(), false);
         for (std::size_t i = 0; i < steps_.size(); ++i) {
             wantsHop_[i] = ctx.rng != nullptr && ctx.rng->nextFloat() < chance;
         }
-        running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < 0.4f;
-        if (cueOnly_) {
-            // CP-D r2 (E): a cue-only body moves one hop per answered cue -- the first step, hopped -- so the cast's
-            // motion is the cues' rhythm and nothing else
-            steps_.resize(1);
-            wantsHop_.assign(1, true);
-        }
-        if (cued_) {
-            wantsHop_[0] = true;
-            cued_ = false;
-        }
+        running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < runChance_;
         leg_ = 0;
         phase_ = Phase::Move;
     }
 
     float walkDefault_, runDefault_, airDefault_, apexDefault_, landDefault_, hopChanceDefault_, strengthDefault_;
+    float runChance_;
     float pauseMin_, pauseMax_;
     int goalMin_, goalMax_;
-    float wantFlat_, wantWater_, wantPath_, home_;
+    float wantFlat_, wantPath_, home_;
+    float tossThresholdDefault_, tossGainDefault_, tossCooldownDefault_, tossMax_, gravity_;
     TileNavRules rules_;
     params::Parameter<float>* walk_ = nullptr;
     params::Parameter<float>* run_ = nullptr;
@@ -3912,30 +4039,22 @@ private:
     params::Parameter<float>* apex_ = nullptr;
     params::Parameter<float>* hopChance_ = nullptr;
     params::Parameter<float>* strength_ = nullptr;
-    params::Parameter<float>* trigger_ = nullptr;
-    params::Parameter<float>* airBeats_ = nullptr;
-    params::Parameter<float>* cueGap_ = nullptr;
-    bool cueOnly_ = false;
-    float maxWait_ = 12.0f;
-    int cueEvery_ = 1;
-    float cueGapDefault_ = 0.0f;
-    float airBeatsDefault_ = 0.0f;
-    double lastAnswer_ = -1e9;
-    int cuePhase_ = 0;
-    int cueCount_ = 0;
-    float waited_ = 0.0f;
+    params::Parameter<float>* tossThreshold_ = nullptr;
+    params::Parameter<float>* tossGain_ = nullptr;
+    params::Parameter<float>* tossCooldown_ = nullptr;
     std::vector<std::string> paths_;
 
     bool primed_ = false;
+    long long tick_ = 0;
     Phase phase_ = Phase::Pause;
+    Activity activity_ = Activity::Idle;
+    float speed_ = 0.0f;
     glm::vec2 c00_{0.0f};
     glm::vec2 origin_{0.0f};
     glm::vec2 pos_{0.0f};
     float y_ = 0.0f;
     float yaw_ = 0.0f;
     float timer_ = 0.0f;
-    float triggerPrevious_ = 0.0f;
-    bool cued_ = false;
     bool running_ = false;
     std::vector<TileStep> steps_;
     std::vector<bool> wantsHop_;
@@ -3945,6 +4064,19 @@ private:
     double air0_ = 0.0;
     float airT_ = 1.0f;
     float airApex_ = 0.0f;
+    // ADR-1997: the toss
+    double lastToss_ = -1e9;
+    bool armed_ = false;
+    float peak_ = 0.0f;
+    int tosses_ = 0;
+    glm::vec2 tossFrom_{0.0f};
+    glm::vec2 tossTo_{0.0f};
+    double toss0_ = 0.0;
+    float tossT_ = 1.0f;
+    float tossH_ = 1.0f;
+    float tossV0_ = 0.0f;
+    float tossY0_ = 0.0f;
+    float tossMiss_ = 0.0f;
 };
 
 } // namespace

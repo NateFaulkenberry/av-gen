@@ -1393,3 +1393,53 @@ median, two runs each):
 
 The night's +1.6 ms is gone (now within about 0.1–0.25 ms, noise). The day still costs about +2.5–3 ms; the per-pixel
 opacity itself costs nothing measurable.
+
+### Engineering → art, CP-D r3 (2026-11-10): walking, crest throws, off the water (ADR-1997)
+
+**What changed in the engine:**
+- **The cue hops are gone** (ADR-441). The hop behaviour no longer reads `cueOnly`, `cueEvery`, `cueGap`, `airBeats`,
+  `maxWait` or `preferWater`, and has no `hop/trigger` parameter. Nothing else used them. Please remove:
+  - those keys from the cast's `behaviors` (they are now ignored);
+  - the `beat.pulse → hop/trigger` reaction (it has no target now).
+
+  `hop/apex` and `hop/strength` still exist: apex sizes the walking hops, strength the landing spring.
+- **The crest throw.** These are new behaviour settings, and each is also a live parameter `hop/<name>`:
+  - `tossThreshold`: m/s of the landscape's upward speed under the alien; 0 = off.
+  - `tossGain`: the launch speed is the gain × the crest's peak speed.
+  - `tossCooldown`: seconds between one alien's throws.
+
+  Also new, settings only: `tossMax` (default 9 m/s) and `runChance` (default 0.4).
+  The landing clip, spring and glow are the hop's own.
+- **The throw reads the planning surface** (the swell parameters' bases), not the audio routes. That is what keeps it
+  deterministic under a seek. So `response.low` on `env/tiles/amplitude` does not change the throws.
+  Hypothesis, not checked: keying the swell's amplitude through the arc would.
+- **Off the water:**
+  - no walk, hop or throw ends on water (sea, river, pond);
+  - goals on water are never chosen;
+  - an alien placed on water starts on the nearest dry tile within 12 tiles (48 m).
+- **A fixed 60 Hz step:** 30 and 60 fps now agree to the millimetre.
+
+**Values I used for the clips** (`12-pass-cpd-r3/`), a starting point:
+```json
+{"kind": "hop", "hopChance": 0.05, "tossThreshold": 0.2, "tossGain": 16, "tossCooldown": 3,
+ "goalMin": 2, "goalMax": 6, "pauseMin": 0.8, "pauseMax": 3.0, "homeRadius": 14+}
+```
+- The land's crests under the base swell rise at 0.15–0.45 m/s.
+- At 0.2 and 16, each alien is thrown about every 7–10 s, 0.5–1.5 m high.
+
+**Placement:** by the terrain mirror, these cast positions stand on water:
+
+| Alien | Position | Habitat |
+|---|---|---|
+| alien00 | (78, -330) | sea |
+| alien01 | (44, -395) | sea |
+| alien16 | (-309, 116) | sea |
+| alien18 | (-382, -200) | sea |
+| alien03 | (28, -585) | the shore, 0.93 water |
+| alien08 | (-317, -1029) | the low1 pond |
+| alien10 | (-202, -1167) | the low2 pond |
+| alien17 | (-447, -19) | 0.61 water |
+| alien23 | (1121, -1554) | the inlet |
+
+- Those within 48 m of land move ashore by themselves.
+- The bay's sea aliens (00, 01, 16, 18) may be further out than that. Please put them on the islands or the shore.
