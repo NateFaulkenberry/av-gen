@@ -180,12 +180,12 @@ def fog_density_default(phase):
 CONTOUR_INTERVAL = 4.0   # metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
-def tile_dynamics():  # noqa: E302
+def tile_dynamics(state="day"):  # noqa: E302
     """Two crossing wave trains on the water (the land barely feels them), a slow regional breath, a drift, and rings
     that onsets drop ahead of the camera. Quiet audio leaves a calm sea, not a constant swell (04- §6, brief §10)."""
     return {
         "amplitude": 0.35,                     # response.low adds up to +0.6 (routes)
-        "glow": dict(GLOW_REST),               # Phase 7 (ADR-1963): the emission lanes' rest gains (audio adds)
+        "glow": dict(GLOW_REST, landing=landing_glow(state)[0], landingColor=landing_glow(state)[1]),   # Phase 7
         "waves": [
             {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
              "onLand": 0.08, "onWater": 1, "crest": 0.6},
@@ -205,6 +205,19 @@ def tile_dynamics():  # noqa: E302
 # sit at their rest glow. The glow lanes multiply each state's own emission, so the touch scales with the arc: the day
 # (path 0.35-0.875, no contours, no pads) moves lightly, the night strongly.
 GLOW_REST = {"path": 0.4, "contour": 0.7, "crest": 1.0, "pads": 0.6}
+
+# The landing glow per state (ADR-1960, keyed through the arc): bright and warm by day so it reads on a lit ground
+# (eng: gain 12 reads in daylight), far lower at night where the ground is dark and the contours already glow.
+LANDING_GLOW = {"day": (12.0, "#FFD99A"), "sunset": (8.0, "#FFC070"), "night": (2.5, "#FF6FC0"),
+                "dawn": (10.0, "#FFD8B0")}
+
+
+def landing_glow(S):
+    """(gain, linear colour) for a state name or an arc blend (which carries `landing_gain`/`landing_color`)."""
+    if isinstance(S, str):
+        g, c = LANDING_GLOW[S]
+        return g, hexlin(c)
+    return S["landing_gain"], hexlin(S["landing_color"])
 
 
 def audio_routes():
@@ -244,7 +257,10 @@ ALIEN_REACTIONS = [
 FELINE_STEMS = [{"key": "drums", "label": "Drums", "role": "drums", "file": "stems/feline-footwear (Drums).wav"},
                 {"key": "bass", "label": "Bass", "role": "bass", "file": "stems/feline-footwear (Bass).wav"},
                 {"key": "synth", "label": "Synth", "role": "synth", "file": "stems/feline-footwear (Synth).wav"}]
-FELINE_FEEDS = {"beat": "stem.drums", "hits": "stem.drums", "levels": "stem.bass"}
+# CP-D r2: the levels come from the MIX, not the bass stem. Canaried with --sonic-trace over the whole song: with
+# "levels": "stem.bass", response.high is 0 everywhere (the bass has no highs) and the crown pads never move; from the
+# mix it averages 0.43 (p90 0.93), and response.mid 0.57 (was 0.27).
+FELINE_FEEDS = {"beat": "stem.drums", "hits": "stem.drums"}
 
 
 def fog_medium(state):
@@ -316,6 +332,7 @@ UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: 
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
 CREST_EDGE = (0.72, 0.98)  # crest light only near the peaks: a broad crest lit the crossing trains as a diamond grid
 CONTOUR_FADE = (250.0, 800.0, 0.15)   # metres, and the gain left beyond (CP-D draft2: the night glare strip)
+LANDING_BAND = 0.075   # the landing outline's band, local metres per S (eng's clip: 0.3 at 4 m tiles)
 CONTOUR_BAND = 0.06       # the contour line's width on the top's border, fraction of the half-size
 BORDER_BAND = 0.03       # tileBorder's band (engineering's fixture value)
 RING_THICKNESS = {1.0: 0.30, 2.0: 0.36, 4.0: 0.72}
@@ -430,7 +447,8 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     eg, cg = s.get("edge_gain", 0.0), s.get("crest_gain", 0.0)
     if contour and (always or eg > 0 or cg > 0):
         add({"kind": "input", "input": "instanceEmissive", "dst": 1})
-        add({"kind": "tileContour", "dst": 3, "srcA": 0, "srcB": 1, "constant": [half, half, CONTOUR_BAND, 0],
+        add({"kind": "tileContour", "dst": 3, "srcA": 0, "srcB": 1, "constant": [half, half, CONTOUR_BAND,
+                                                                                  LANDING_BAND * scale],
              "value": 1.0})
         add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(0)})                     # contour coverage
         add({"kind": "input", "input": "instanceRandom", "dst": 7})                          # land only: the sea's
@@ -446,6 +464,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
                                                                  CONTOUR_FADE[2]], "value": 1.0})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         glow(1, 1, 7)                                                                     # x the contours' glow
+        add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
+        # CP-D r2 (owner: "an edge glow on the tiles affected when a character lands"; ADR-1960): the landed tiles'
+        # outline (tileContour z) x landingGlow (the arc-keyed colour x gain: env/tiles/glow/landing, landingColor)
+        add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(2)})
+        add({"kind": "input", "input": "landingGlow", "dst": 7})
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
         if cg > 0:
             add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(1)})                 # crest

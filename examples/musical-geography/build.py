@@ -171,7 +171,9 @@ PREFS = {  # where each habitat's aliens like to hop (lower preferPath so they d
     "inlet": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
 }
 # the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
-SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, "rippleRadius": 14.0}
+# the landing spring: the original (owner, CP-D r2: eng's soft 0.7 Hz / 0.35 arm rejected -- "the other bounces look much
+# better"). glowRadius (ADR-1960): the landing glow stays near the tile it lit.
+SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, "rippleRadius": 14.0, "glowRadius": 3.0}
 CHARACTERS = False   # set by --characters
 
 
@@ -223,7 +225,7 @@ def scene_doc(state, interim, camera_name):
         "aoFadeEnd": AO_BANDS.get(camera_name, (40.0, 120.0))[1],
         "sky": look.sky(state),
         "dayNight": look.day_night(phase=s["phase"]),
-        "tileDynamics": look.tile_dynamics(),
+        "tileDynamics": look.tile_dynamics(state),
     }
     env.update(look.fog_medium(state))
     if interim:
@@ -318,6 +320,9 @@ def arc_timeline():
             if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "camera/exposure/mode":
                 put(k, t, round(float(v), 6))
         put("env/intensity", t, round(S["amb_int"], 6))
+        lg, lc = look.landing_glow(S)
+        put("env/tiles/glow/landing", t, round(lg, 6))
+        put("env/tiles/glow/landingColor", t, [round(v, 6) for v in lc])
         put("lights/fill/intensity", t, round(S["fill_int"], 6))
         put("lights/fill/color", t, look.hexlin(S["fill_col"]))
         put("procedural/mgTiles64/material/baseColor", t, look.hexlin(S["land"][1]))
@@ -337,6 +342,9 @@ def project_doc(scene_rel, state):
                    "stems": [dict(st, file=os.path.join(AUDIO_DIR, st["file"])) for st in look.FELINE_STEMS]},
         "parameters": dict(look.post(state), **{"post/output/dither": 1.0, "env/tiles/rings/ahead": 150.0}),
         "routes": look.audio_routes(),
+        # the response bus (response.low/mid/high/onset/level) publishes only with a sonic block: without it four of the
+        # seven terrain routes and the loudness hops were dead in draft3 (eng, 10-audio-reactivity-now.md)
+        "sonic": {"live": True},
         # Phase 7: Feline's stems as feeds (the beat clock follows the drums, the levels the bass)
         "feeds": dict(look.FELINE_FEEDS),
         **({"timeline": arc_timeline()} if FULL else {}),

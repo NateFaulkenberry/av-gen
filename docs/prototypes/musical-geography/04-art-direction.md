@@ -1407,3 +1407,37 @@ ground ... too dark on the bottom"). `look.CLOUD_STATE` is keyed through the arc
 The result is sparser, broken masses at night, a little lighter than the sky. They no longer read as a flipped ground
 (`10-full/cpd-r2-sky-night-v2-sheet-before-after.png`, and `-streaks-before-after.png`). A silver lining on the
 moon-facing edges needs a key-light-direction input, requested as the CPD-R2 addendum. The day frames are unchanged.
+
+### CP-D r2: the music actually on, the landing glow, the crown-pad canary (2026-11-10)
+
+I merged eng's ddc129ca and 67ca7d4e (ADR-1952, the landing tail; ADR-1960, the landing glow) and rebuilt.
+
+- **The sonic block.** `project_doc` now writes `"sonic": {"live": true}`. Without it, `response.*` never published,
+  so in draft3 four of the seven terrain routes and the loudness hops were dead (eng's `10-audio-reactivity-now.md`).
+  `--audit-routes` now passes: 91 routes and 130 tracks, all live.
+- **The crown pads were flat: the cause is proven, and fixed.** I ran `--sonic-trace` over the whole song, twice:
+
+  | Levels fed from | `response.high` mean / p90 / max | `response.mid` mean |
+  |---|---|---|
+  | The bass stem (`"levels": "stem.bass"`) | 0 / 0 / 0 | 0.27 |
+  | The mix | 0.43 / 0.93 / 1.0 | 0.57 |
+
+  The bass stem has no highs, so the route that lights the pads on the highs never moved. `look.FELINE_FEEDS` now
+  takes the levels from the mix. The beat clock and the hits still follow the drum stem.
+- **The landing glow.** I added eng's 4 ops after the contour lines' `add`. The outline band is
+  `LANDING_BAND` 0.075 per S (0.3 m at 4 m tiles), the spread is `spring.glowRadius` 3 m, and the glow is keyed
+  through the arc (`look.LANDING_GLOW` → `env/tiles/glow/landing` and `landingColor`):
+
+  | State | Gain | Colour | Why |
+  |---|---|---|---|
+  | Day | 12 | `#FFD99A` warm white | reads on the lit ground |
+  | Sunset | 8 | `#FFC070` | |
+  | Night | 2.5 | `#FF6FC0`, the night accent | |
+  | Dawn | 10 | `#FFD8B0` | |
+- **The spring is the original:** 1.4 Hz, damping 0.16. The owner rejected eng's soft arm ("the other bounces look much
+  better").
+
+Clips are in `11-pass-cpd-r2/`:
+- `cpd-r2-react-{day,night}-{music,silent}-*.mp4`;
+- music over silence in one frame: `cpd-r2-react-*-music-over-silent-*.mp4`;
+- the strip and the day landing-glow frames (1 fps).
