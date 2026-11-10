@@ -239,7 +239,7 @@ def scene_doc(state, interim, camera_name):
                                  look.hexlin(s["land"][1]))
         programs = [look.tile_program(state, c, scale=TILE_SCALE) for c in (1.0, 2.0, 4.0)]
         programs.append(look.tile_program(state, 4.0, under, far=True, shade=look.UNDER_SHADE, border=1.0,
-                                          scale=TILE_SCALE, contour=False))
+                                          scale=TILE_SCALE, contour=False, ramp_offset=look.UNDER_RAMP * TILE_SCALE))
     doc = {
         "format": "avgen-scene", "version": 1, "name": "musical-geography",
         "camera": dict({"mode": 1, "orbitSpeed": 0.0}, **camera_pose),
@@ -277,7 +277,8 @@ def arc_program_name(cell):
 def arc_programs(S):
     progs = [look.tile_program(S, c, name=arc_program_name(c), scale=TILE_SCALE, always=True) for c in (1.0, 2.0, 4.0)]
     progs.append(look.tile_program(S, 4.0, arc_program_name(0), far=True, shade=look.UNDER_SHADE, border=1.0,
-                                   scale=TILE_SCALE, contour=False, always=True))
+                                   scale=TILE_SCALE, contour=False, always=True,
+                                   ramp_offset=look.UNDER_RAMP * TILE_SCALE))
     return progs
 
 

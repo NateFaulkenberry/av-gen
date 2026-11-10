@@ -307,6 +307,10 @@ SHALLOW_AMT = 0.33       # shallows mixed in at most 33% (04- §3)
 BORDER_DARK_FINE = 0.72  # r7: the 1x ring paints the same prefiltered lattice as the 2x/4x rings (tileBorder), a
                           # little lighter because its real gap already darkens it -- the two rings' mean brightness
                           # now match (the "lighter rectangle" of r3-r6 was the 1x program with no lattice at all)
+# Engineering (CP-D gap column): the one wide, purple gap is the gap line under the camera, the only one you look
+# straight down; what you see at its bottom is the underlay's top, 2.8 m below the tiles (world.UNDERLAY), so it took
+# the height ramp's lower, bluer colour. Read at the tiles' height it is the walls' hue. (UNDER_RAMP, in metres per S.)
+UNDER_RAMP = 0.7
 UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: the gaps read as shadow, not as a
                           # second, blue-black surface speckling through every hillside
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
@@ -321,7 +325,8 @@ PAD_HEIGHT = (17.0, 20.0)              # crowns light only up here (04- §6)
 PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 
 
-def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0, contour=True, always=False):
+def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0, contour=True, always=False,
+                 ramp_offset=0.0):
     """The slab's whole look, for one palette state and one ring.
 
     Reads: localPosition through engineering's tileBorder (ADR-1976: the border's coverage, prefiltered per axis below
@@ -361,6 +366,9 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
          "constant2": [sub, 0, 0, 0], "value": 1.0})
     add({"kind": "input", "input": "worldPosition", "dst": 4})
     add({"kind": "swizzle", "dst": 3, "srcA": 4, "constant": B(1)})                       # y
+    if ramp_offset:   # the underlay: read the ramp at the tiles' tops, not at its own (lower) top -- see UNDER_RAMP
+        add({"kind": "constant", "dst": 7, "constant": B(ramp_offset)})
+        add({"kind": "add", "dst": 3, "srcA": 3, "srcB": 7})
     # the height ramp, blended in OKLab: stops 0-3 over 0..LS[3] (evenly spaced, ADR-1470), then the top stop
     add({"kind": "remap", "dst": 7, "srcA": 3, "constant": [0, LS[3], 0, 1], "value": 1.0})
     add({"kind": "oklabRamp", "dst": 2, "srcA": 7, "value": 1.0, "constant": _c4(land[0]),
