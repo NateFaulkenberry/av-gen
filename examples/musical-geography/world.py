@@ -78,9 +78,11 @@ TILES = {
         {"name": "bayTail", "centre": [262, -268], "radius": 32, "height": 17, "edge": 85, "noise": 0.6},
         {"name": "southKnoll", "centre": [100, -62], "radius": 26, "height": 31, "edge": 44, "noise": 0.6},
         {"name": "southShoulder", "centre": [70, 0], "radius": 36, "height": 19, "edge": 80, "noise": 0.6},
-        {"name": "stack", "centre": [-20, -330], "radius": 14, "height": 20, "edge": 26, "noise": 0.4},
         {"name": "northIsle", "centre": [160, -450], "radius": 40, "height": 32, "edge": 65, "noise": 0.6},
-        {"name": "inletIsle", "centre": [1160, -1610], "radius": 46, "height": 18, "edge": 80, "noise": 0.6},
+        # cpd-r3 (owner: the inlet island at 160-165 s, "move it aside a bit and lower it"): off the flight line to
+        # the left (north) of the view as the vale opens, lower, a peak and a shoulder with the hills' noise
+        {"name": "inletPeak", "centre": [1185, -1735], "radius": 26, "height": 13, "edge": 60, "noise": 0.8},
+        {"name": "inletShoulder", "centre": [1255, -1770], "radius": 30, "height": 7, "edge": 75, "noise": 0.8},
     ],
     # land2: the flight runs DOWN valleys, so their walls frame it and cut the horizon (cpd-r2-land2-*): a dale under
     # the path, the sweep (now from the lowland ponds through to the river), a vale along the night coast, and the

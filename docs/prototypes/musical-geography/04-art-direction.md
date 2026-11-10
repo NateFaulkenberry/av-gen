@@ -1760,3 +1760,11 @@ Raising the low layer, or thinning it over high ground, is an option.
   smudge was a cloud in front of the west hills. It is gone. What is left there is the hill's own colour ramp into
   the haze; the same frame is identical with the clouds opaque or off (`cpd-r3-04s-veil-is-terrain-not-cloud.png`).
 - **The 140 s corner** is clear now.
+
+**The inlet island** (owner: "move it aside a bit and lower it"):
+- **Where and how tall:** it now sits about 120 m off the flight line, on the left (north) as the vale opens. It is
+  lower (13 m and 7 m, where it was 18 m) and built as a peak plus a shoulder, with noise 0.8.
+- **The rise slot** came from dropping the bay's small `stack`. The bay's v2 enclosure is unchanged: 0.70 / 0.65 at
+  30 / 35 s.
+- **v2 at 156 / 160 / 165 s:** 0.35 / 0.16 / 0.65, the same as before. The exit is now open in the frame.
+- **Stills:** `cpd-r3-inlet-*`.
