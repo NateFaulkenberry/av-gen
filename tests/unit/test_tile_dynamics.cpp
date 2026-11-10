@@ -97,9 +97,9 @@ TEST_CASE("wave trains and rings add", "[tiles][dynamics][geography]") {
         const float x = 3.1f * static_cast<float>(i) - 150.0f;
         const float z = -2.3f * static_cast<float>(i) + 40.0f;
         const float t = 3.0f + 0.07f * static_cast<float>(i);
-        const float ha = scene::tileMotion(a, a.eventsAt(t), x, z, t, 0.0f, 1.0f).x;
-        const float hb = scene::tileMotion(b, b.eventsAt(t), x, z, t, 0.0f, 1.0f).x;
-        const float hab = scene::tileMotion(both, both.eventsAt(t), x, z, t, 0.0f, 1.0f).x;
+        const float ha = scene::tileMotion(a, a.eventsAt(t), x, z, t, scene::TileSample{}, 1.0f).x;
+        const float hb = scene::tileMotion(b, b.eventsAt(t), x, z, t, scene::TileSample{}, 1.0f).x;
+        const float hab = scene::tileMotion(both, both.eventsAt(t), x, z, t, scene::TileSample{}, 1.0f).x;
         CHECK(hab == Approx(ha + hb).margin(1e-5));
     }
 }
@@ -111,13 +111,13 @@ TEST_CASE("a ring fades below epsilon and is gone after six decays", "[tiles][dy
     d.events = {{1.0f, {0.0f, 0.0f}, 1.0f}};
     float peak = 0.0f;
     for (float x = 0.0f; x < 400.0f; x += 0.25f) {
-        peak = std::max(peak, std::abs(scene::tileMotion(d, d.eventsAt(1.5f), x, 0.0f, 1.5f, 0.0f, 1.0f).x));
+        peak = std::max(peak, std::abs(scene::tileMotion(d, d.eventsAt(1.5f), x, 0.0f, 1.5f, scene::TileSample{}, 1.0f).x));
     }
     CHECK(peak > 1.0f); // early on, it is there
     const float late = 1.0f + 5.0f * d.rings.decay;
     float tail = 0.0f;
     for (float x = 0.0f; x < 600.0f; x += 0.25f) {
-        tail = std::max(tail, std::abs(scene::tileMotion(d, d.eventsAt(late), x, 0.0f, late, 0.0f, 1.0f).x));
+        tail = std::max(tail, std::abs(scene::tileMotion(d, d.eventsAt(late), x, 0.0f, late, scene::TileSample{}, 1.0f).x));
     }
     CHECK(tail < 3.0f * std::exp(-5.0f) + 1e-6f);
     CHECK(d.eventsAt(1.0f + 6.01f * d.rings.decay).empty());
@@ -161,8 +161,8 @@ TEST_CASE("a coarse ring fades out a wave shorter than two of its cells", "[tile
     float fine = 0.0f;
     float coarse = 0.0f;
     for (float x = 0.0f; x < 12.0f; x += 0.1f) {
-        fine = std::max(fine, std::abs(scene::tileMotion(d, {}, x, 0.0f, 0.0f, 0.0f, 1.0f).x));
-        coarse = std::max(coarse, std::abs(scene::tileMotion(d, {}, x, 0.0f, 0.0f, 0.0f, 4.0f).x));
+        fine = std::max(fine, std::abs(scene::tileMotion(d, {}, x, 0.0f, 0.0f, scene::TileSample{}, 1.0f).x));
+        coarse = std::max(coarse, std::abs(scene::tileMotion(d, {}, x, 0.0f, 0.0f, scene::TileSample{}, 4.0f).x));
     }
     CHECK(fine == Approx(1.0f).margin(0.01));
     CHECK(coarse == 0.0f);
@@ -176,13 +176,13 @@ TEST_CASE("the crest channel is 0..1 and follows the crests", "[tiles][dynamics]
     w.sharpness = 1.0f;
     d.waves = {w, w};
     for (float x = 0.0f; x < 40.0f; x += 0.5f) {
-        const glm::vec2 m = scene::tileMotion(d, {}, x, 0.0f, 0.0f, 0.0f, 1.0f);
+        const glm::vec2 m = scene::tileMotion(d, {}, x, 0.0f, 0.0f, scene::TileSample{}, 1.0f);
         CHECK(m.y >= 0.0f);
         CHECK(m.y <= 1.0f);
     }
     // At a crest (sin = 1: x = wavelength / 4) the crest is full; at a trough it is 0.
-    CHECK(scene::tileMotion(d, {}, 5.0f, 0.0f, 0.0f, 0.0f, 1.0f).y == Approx(1.0f));
-    CHECK(scene::tileMotion(d, {}, 15.0f, 0.0f, 0.0f, 0.0f, 1.0f).y == Approx(0.0f).margin(1e-6));
+    CHECK(scene::tileMotion(d, {}, 5.0f, 0.0f, 0.0f, scene::TileSample{}, 1.0f).y == Approx(1.0f));
+    CHECK(scene::tileMotion(d, {}, 15.0f, 0.0f, 0.0f, scene::TileSample{}, 1.0f).y == Approx(0.0f).margin(1e-6));
 }
 
 TEST_CASE("no NaN at the extremes the validation allows", "[tiles][dynamics][geography]") {

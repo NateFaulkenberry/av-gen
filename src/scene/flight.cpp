@@ -141,9 +141,8 @@ Result<void> validateFlight(const FlightSpec& f) {
             !std::isfinite(w.speed)) {
             return fail("flight: a waypoint's position, altitude and speed must be finite");
         }
-        if (!w.follow.empty() && w.follow != "path" && w.follow != "river") {
-            return fail("flight: a waypoint follows \"path\" or \"river\" (got \"{}\")", w.follow);
-        }
+        // `follow`: "path", or a river -- "river" (the first), "river1", an index, or its name (ADR-1965); a river that
+        // is not there is refused when the route is resolved against the ground
         if (!w.snap.empty() && w.snap != "shore" && w.snap != "crown") {
             return fail("flight: a waypoint snaps to \"shore\" or \"crown\" (got \"{}\")", w.snap);
         }
@@ -202,7 +201,12 @@ Result<FlightSpec> resolveFlightRoute(const FlightSpec& spec, const TileTerrainS
     out.route.clear();
     for (const FlightWaypoint& w : spec.route) {
         if (!w.follow.empty()) {
-            const std::vector<glm::vec2>& line = w.follow == "path" ? tiles.path : tiles.river;
+            const int river = w.follow == "path" ? -1 : tiles.riverIndex(w.follow);
+            if (w.follow != "path" && river < 0) {
+                return fail("flight: a waypoint follows \"{}\", and the ground has no such river", w.follow);
+            }
+            const std::vector<glm::vec2>& line =
+                river < 0 ? tiles.path : tiles.rivers[static_cast<std::size_t>(river)].points;
             if (line.size() < 2) {
                 return fail("flight: a waypoint follows the {}, and the ground has none", w.follow);
             }

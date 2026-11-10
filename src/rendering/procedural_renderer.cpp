@@ -1247,18 +1247,63 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
     u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
     u.blend = glm::ivec4(g.blendCells, g.blendRatio, g.childrenMin ? 1 : 0, 0); // z: ADR-1953 children at the lowest
     u.skirt = glm::vec4(g.skirt, std::max(object.source.size.y * object.sourceTransform.scale.y, 1e-4f), 0.0f, 0.0f);
-    const auto riverPoints = static_cast<std::uint32_t>(std::min(t.river.size(), scene::kMaxTilePathPoints));
-    u.river = glm::vec4(t.riverWidth, t.valleyWidth, t.heightScale, static_cast<float>(riverPoints));
-    for (std::uint32_t i = 0; i < riverPoints; ++i) {
-        glm::vec4& lane = u.rivers[i / 2];
+    // ADR-1965: the rivers, ponds and dry valleys. The spec is validated against these caps; the min()s only guard.
+    const auto put = [](auto& pool, std::uint32_t i, glm::vec2 p) {
+        glm::vec4& lane = pool[i / 2];
         if ((i & 1u) == 0u) {
-            lane.x = t.river[i].x;
-            lane.y = t.river[i].y;
+            lane.x = p.x;
+            lane.y = p.y;
         } else {
-            lane.z = t.river[i].x;
-            lane.w = t.river[i].y;
+            lane.z = p.x;
+            lane.w = p.y;
         }
+    };
+    const auto widened = [](const std::vector<glm::vec2>& line, float half) {
+        glm::vec2 lo(1e30f);
+        glm::vec2 hi(-1e30f);
+        for (const glm::vec2& p : line) {
+            lo = glm::min(lo, p);
+            hi = glm::max(hi, p);
+        }
+        return glm::vec4(lo.x - half, lo.y - half, hi.x + half, hi.y + half);
+    };
+    const std::size_t rivers = std::min(t.rivers.size(), scene::kMaxTileRivers);
+    std::uint32_t pool = 0;
+    std::size_t riverCount = 0;
+    for (std::size_t i = 0; i < rivers; ++i) {
+        const scene::TileRiver& r = t.rivers[i];
+        const auto n = static_cast<std::uint32_t>(std::min(r.points.size(), scene::kMaxTileRiverPoints));
+        if (pool + n > scene::kMaxTileRiverPool) break;
+        u.riverInfo[i] = glm::vec4(static_cast<float>(pool), static_cast<float>(n), r.width, r.valleyWidth);
+        u.riverLevel[i] = glm::vec4(scene::tileRiverSourceLevel(t, i), scene::tileRiverMouthLevel(t),
+                                    scene::tileRiverLength(t, i), 0.0f);
+        u.riverBounds[i] = widened(r.points, 0.5f * r.valleyWidth + 1.0f);
+        for (std::uint32_t k = 0; k < n; ++k) put(u.riverPts, pool + k, r.points[k]);
+        pool += n;
+        riverCount = i + 1;
     }
+    const std::size_t ponds = std::min(t.ponds.size(), scene::kMaxTilePonds);
+    for (std::size_t i = 0; i < ponds; ++i) {
+        const scene::TilePond& p = t.ponds[i];
+        u.ponds[i] = glm::vec4(p.centre.x, p.centre.y, p.radius, p.basinWidth);
+        u.pondB[i] = glm::vec4(scene::tilePondLevel(t, i), p.shoreNoise, 0.0f, 0.0f);
+    }
+    const std::size_t valleys = std::min(t.valleys.size(), scene::kMaxTileValleys);
+    pool = 0;
+    std::size_t valleyCount = 0;
+    for (std::size_t i = 0; i < valleys; ++i) {
+        const scene::TileValley& v = t.valleys[i];
+        const auto n = static_cast<std::uint32_t>(v.points.size());
+        if (pool + n > scene::kMaxTileValleyPool) break;
+        u.valleyInfo[i] = glm::vec4(static_cast<float>(pool), static_cast<float>(n), v.valleyWidth, v.depth);
+        u.valleyB[i] = widened(v.points, 0.5f * v.valleyWidth + 1.0f);
+        u.valleyFrac[static_cast<glm::length_t>(i)] = v.depthFraction;
+        for (std::uint32_t k = 0; k < n; ++k) put(u.valleyPts, pool + k, v.points[k]);
+        pool += n;
+        valleyCount = i + 1;
+    }
+    u.water0 = glm::vec4(static_cast<float>(riverCount), static_cast<float>(ponds), static_cast<float>(valleyCount),
+                         t.heightScale);
     for (std::uint32_t i = 0; i < points; ++i) {
         glm::vec4& lane = u.path[i / 2];
         if ((i & 1u) == 0u) {
@@ -1282,6 +1327,8 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         u.ring0 = glm::vec4(dyn.rings.amplitude, dyn.rings.speed, dyn.rings.wavelength, dyn.rings.width);
         u.ring1.x = dyn.rings.decay;
         u.ring1.y = dyn.rings.crest;
+        u.waterMotion = glm::vec4(dyn.riverWaves, dyn.pondWaves, dyn.riverDriftAmplitude, dyn.riverDriftWavelength);
+        u.waterMotion2 = glm::vec4(dyn.riverDriftSpeed, 0.0f, 0.0f, 0.0f); // ADR-1965
         for (std::size_t i = 0; i < waveCount; ++i) {
             const scene::TileWave& w = dyn.waves[i];
             const float a = w.direction * (6.28318530717958647692f / 360.0f);

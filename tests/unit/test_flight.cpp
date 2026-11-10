@@ -246,7 +246,7 @@ TEST_CASE("the flight reads from JSON and refuses what it does not know", "[flig
 TEST_CASE("a waypoint can follow the path or the river and snap to the shore or a crown", "[flight][geography]") {
     scene::TileTerrainSpec tiles = hills();
     tiles.path = {{0.0f, 0.0f}, {100.0f, -40.0f}, {220.0f, -30.0f}, {300.0f, 60.0f}};
-    tiles.river = {{-50.0f, 200.0f}, {150.0f, 260.0f}};
+    tiles.rivers = {scene::TileRiver{.name = "brook", .points = {{-50.0f, 200.0f}, {150.0f, 260.0f}}}};
     scene::FlightSpec f;
     f.enabled = true;
     scene::FlightWaypoint along;
@@ -297,10 +297,17 @@ TEST_CASE("a waypoint can follow the path or the river and snap to the shore or 
     CHECK(scene::tileSample(tiles, s.position.x, s.position.y).shore > 0.9f);
     // a follow leg on a ground with no river is refused
     scene::TileTerrainSpec dry = tiles;
-    dry.river.clear();
+    dry.rivers.clear();
     scene::FlightSpec g = f;
     g.route[0].follow = "river";
     CHECK_FALSE(scene::resolveFlightRoute(g, dry).has_value());
+    // ADR-1965: a river by name or index; a river that is not there is refused
+    g.route[0].follow = "brook";
+    CHECK(scene::resolveFlightRoute(g, tiles).has_value());
+    g.route[0].follow = "river0";
+    CHECK(scene::resolveFlightRoute(g, tiles).has_value());
+    g.route[0].follow = "river2";
+    CHECK_FALSE(scene::resolveFlightRoute(g, tiles).has_value());
 }
 
 TEST_CASE("the top-down leg looks straight down with no flip, then looks ahead again", "[flight][geography]") {

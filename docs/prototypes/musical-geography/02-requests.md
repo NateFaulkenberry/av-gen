@@ -1064,3 +1064,52 @@ Keep your `beat.pulse → hop/trigger` reaction. With the values above, each ali
 
 **Day edges.** A steady day level is your data, not an engine change: the day state's edge gain, or a key on
 `env/tiles/glow/contour`. No beat flash was built.
+
+### Engineering → art, CP-D r2 (2026-11-10): CPD-R1 is built (ADR-1965)
+
+All of it lives in `tiles` (every tiles node carries the same spec) and in `tileDynamics.water`. Stills, in
+`11-pass-cpd-r2/`:
+- `cpd-r2-r1-pond.png`: a pond with an auto level on the plateau east of the bay;
+- `cpd-r2-r1-dry-valley-without-with.png`: a dry valley across the ridge;
+- `cpd-r2-r1-upland-stream.png`: a stream from the high ground to the sea.
+
+Their spec is in the scratch demo, not in your scene.
+
+```json
+"tiles": {
+  "rivers": [
+    {"name": "river", "points": [[270, -530], ...], "width": 16, "valleyWidth": 240},
+    {"name": "stream", "points": [[820, -600], [740, -540], [660, -500], [580, -470], [500, -445], [440, -430]],
+     "width": 10, "valleyWidth": 36, "bedDepth": 1.5, "sourceLevel": "auto"}],
+  "ponds": [{"name": "tarn", "centre": [680, -300], "radius": 18, "basinWidth": 22, "level": "auto", "shoreNoise": 0.35}],
+  "valleys": [{"name": "dale", "points": [[590, -170], [700, -150], [800, -110]], "valleyWidth": 70, "depthFraction": 0.6}]
+},
+"tileDynamics": {"water": {"riverWaves": 0.25, "pondWaves": 0.1, "driftAmplitude": 0.35, "driftWavelength": 24,
+                           "driftSpeed": 3}}
+```
+
+**Rivers**
+- At most 4 rivers, each 2–32 points, 64 points together.
+- `bedDepth` < 0 (the default) keeps the CP-A behaviour: the bed sits at the sea floor all along.
+- With `bedDepth` ≥ 0, the source is `sourceLevel` (metres) or `"auto"` (the land at the first point, less
+  `bedDepth`). The level eases down to the sea floor at the last point.
+- Your `river`, `riverWidth` and `valleyWidth` still read as `rivers[0]`. Writing both `river` and `rivers` is refused.
+
+**Ponds and valleys**
+- At most 8 ponds. `level` is in metres or `"auto"`: the basin rim's lowest land, less 1 m.
+- At most 4 dry valleys, 32 points together.
+- A valley's `depth` is in metres; `depthFraction` (0–1), when set, is a share of the relief above the shore instead.
+  A valley never goes below the shore and never holds water.
+
+**The water body**
+- The material reads the `waterBody` input: (sea, river, pond) one-hot, and w = the class (0, 1, 2).
+- `tileContour` ignores it.
+- `riverWaves` and `pondWaves` multiply each wave's `onWater` on that body; the sea's weight is 1.
+- The drift is a ripple travelling downstream along each river.
+- Onset rings still reach every body.
+
+**Other notes**
+- The flight's `follow` takes a river's name, `"riverN"` or an index.
+- "Auto" levels are worked out once, on the static ground, when the scene loads.
+- The tile field draws 0.6 m lower since ADR-1991 (the box's top is now the height), so a `worldPosition.y` ramp
+  shifts by that much.

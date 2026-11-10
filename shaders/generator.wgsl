@@ -209,16 +209,27 @@ struct TileParams {
     info: vec4<u32>,       // seed, path points, children per side, hole valid
     hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
     blend: vec4<i32>,      // seam band cells (0 = off), block ratio (ADR-1976 amended), children at the lowest (ADR-1953)
-    river: vec4<f32>,      // river width, valley width, height scale, river points
+    water0: vec4<f32>,     // ADR-1965: river count, pond count, valley count, height scale
     skirt: vec4<f32>,      // skirt depth, the box's thickness
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
-    rivers: array<vec4<f32>, 8>, // the river's points, two per lane
+    riverInfo: array<vec4<f32>, 4>,   // ADR-1965: first point (pool index), point count, width, valley width
+    riverLevel: array<vec4<f32>, 4>,  // source level, mouth level, length, 0
+    riverBounds: array<vec4<f32>, 4>, // min x, min z, max x, max z, widened by half the valley
+    riverPts: array<vec4<f32>, 32>,   // the rivers' points, pooled, two per lane
+    ponds: array<vec4<f32>, 8>,       // centre x, centre z, radius, basin width
+    pondB: array<vec4<f32>, 8>,       // level, shore noise, 0, 0
+    valleyInfo: array<vec4<f32>, 4>,  // first point, point count, valley width, depth
+    valleyB: array<vec4<f32>, 4>,     // min x, min z, max x, max z (widened)
+    valleyFrac: vec4<f32>,            // each valley's depth fraction (x..w)
+    valleyPts: array<vec4<f32>, 16>,  // the valleys' points, pooled
     // ADR-1953: the moving ground (procedural_renderer.hpp GeneratorTileUniforms).
     dyn: vec4<f32>,        // t, amplitude, wave count, event count
     breath: vec4<f32>,     // amplitude, period, wavelength, 1 when anything moves
     roll: vec4<f32>,       // rolling x, z (m/s)
     ring0: vec4<f32>,      // amplitude, speed, wavelength, width
     ring1: vec4<f32>,      // decay, crest
+    waterMotion: vec4<f32>, // ADR-1965: river waves, pond waves, river drift amplitude, drift wavelength
+    waterMotion2: vec4<f32>, // drift speed
     waves: array<vec4<f32>, 12>,
     events: array<vec4<f32>, 16>,
     spring0: vec4<f32>,    // ADR-1954: depth, frequency, damping, ripple speed
@@ -234,6 +245,7 @@ const TILE_WARPX_SEED: u32 = 0x01234567u;
 const TILE_WARPZ_SEED: u32 = 0x07654321u;
 const TILE_HILL_SEED: u32 = 0x0000BEEFu;
 const TILE_BREATH_SEED: u32 = 0x00B4EA7Bu; // ADR-1953
+const TILE_POND_SEED: u32 = 0x00B0D1E5u;   // ADR-1965
 const TILE_TWO_PI: f32 = 6.28318530717958647692;
 
 fn tileSmooth(e0: f32, e1: f32, x: f32) -> f32 {
@@ -281,25 +293,49 @@ fn tilePathPoint(i: u32) -> vec2<f32> {
     return select(lane.xy, lane.zw, (i & 1u) == 1u);
 }
 
-fn tileRiverPoint(i: u32) -> vec2<f32> {
-    let lane = tile.rivers[i / 2u];
+// ADR-1965: a pooled river or valley point.
+fn tileRiverPt(i: u32) -> vec2<f32> {
+    let lane = tile.riverPts[i / 2u];
     return select(lane.xy, lane.zw, (i & 1u) == 1u);
 }
 
-fn tileRiverDistance(x: f32, z: f32) -> f32 {
+fn tileValleyPt(i: u32) -> vec2<f32> {
+    let lane = tile.valleyPts[i / 2u];
+    return select(lane.xy, lane.zw, (i & 1u) == 1u);
+}
+
+// The distance to a pooled polyline and the arc length to its nearest point (polylineNearest's twin).
+fn tileNearest(x: f32, z: f32, first: u32, count: u32, valley: bool) -> vec2<f32> {
     var best = 1e9;
-    let n = min(u32(tile.river.w + 0.5), 16u);
-    if (n == 1u) {
-        return length(vec2<f32>(x, z) - tileRiverPoint(0u));
+    var along = 0.0;
+    if (count == 0u) {
+        return vec2<f32>(best, 0.0);
     }
-    for (var i = 0u; i + 1u < n; i = i + 1u) {
-        let a = tileRiverPoint(i);
-        let ab = tileRiverPoint(i + 1u) - a;
+    if (count == 1u) {
+        let p0 = select(tileRiverPt(first), tileValleyPt(first), valley);
+        return vec2<f32>(length(vec2<f32>(x, z) - p0), 0.0);
+    }
+    var walked = 0.0;
+    for (var i = 0u; i + 1u < count; i = i + 1u) {
+        let a = select(tileRiverPt(first + i), tileValleyPt(first + i), valley);
+        let b = select(tileRiverPt(first + i + 1u), tileValleyPt(first + i + 1u), valley);
+        let ab = b - a;
         let ap = vec2<f32>(x, z) - a;
-        let t = clamp(dot(ap, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
-        best = min(best, length(ap - ab * t));
+        let len2 = max(dot(ab, ab), 1e-6);
+        let t = clamp(dot(ap, ab) / len2, 0.0, 1.0);
+        let d = length(ap - ab * t);
+        let len = sqrt(len2);
+        if (d < best) {
+            best = d;
+            along = walked + t * len;
+        }
+        walked = walked + len;
     }
-    return best;
+    return vec2<f32>(best, along);
+}
+
+fn tileInBounds(x: f32, z: f32, b: vec4<f32>) -> bool {
+    return x >= b.x && z >= b.y && x <= b.z && z <= b.w;
 }
 
 fn tilePathDistance(x: f32, z: f32) -> f32 {
@@ -328,6 +364,9 @@ struct TileOut {
     crest: f32, // ADR-1953
     step: f32,  // ADR-1953: the step the motion can open to a neighbour (the moving sea's skirt)
     landing: f32, // ADR-1960: the landing glow, 0..1
+    river: f32,   // ADR-1965: the river and pond shares of `water`, and the distance downstream
+    pond: f32,
+    riverS: f32,
 };
 
 fn tileSample(x: f32, z: f32) -> TileOut {
@@ -353,17 +392,78 @@ fn tileSample(x: f32, z: f32) -> TileOut {
         let n = tileValueNoise(seed ^ TILE_BREATH_SEED, x / tile.breath.z, z / tile.breath.z);
         breath = 1.0 + tile.breath.x * sin(TILE_TWO_PI * (tile.dyn.x / tile.breath.y + n));
     }
-    var landHeight = tile.b.z + tile.c.x * k * hill * inland * tile.river.z * breath;
-    var channel = 0.0;
-    if (tile.river.w > 0.5) {
-        let dr = tileRiverDistance(x, z);
-        let v = 1.0 - tileSmooth(0.5 * tile.river.x, 0.5 * tile.river.y, dr);
-        landHeight = landHeight + (-tile.b.y - landHeight) * v;
-        channel = 1.0 - tileSmooth(0.5 * tile.river.x - 0.5, 0.5 * tile.river.x + 0.5, dr);
+    var landHeight = tile.b.z + tile.c.x * k * hill * inland * tile.water0.w * breath;
+    // ADR-1965: the dry valleys, then the rivers, then the ponds (applyFeatures' twin)
+    let valleyCount = min(u32(tile.water0.z + 0.5), 4u);
+    for (var i = 0u; i < valleyCount; i = i + 1u) {
+        let vi = tile.valleyInfo[i];
+        if (!tileInBounds(x, z, tile.valleyB[i])) {
+            continue;
+        }
+        let d = tileNearest(x, z, u32(vi.x + 0.5), u32(vi.y + 0.5), true).x;
+        let w = 1.0 - tileSmooth(0.0, 0.5 * vi.z, d);
+        if (w <= 0.0) {
+            continue;
+        }
+        let relief = max(landHeight - tile.b.z, 0.0);
+        let frac = tile.valleyFrac[i];
+        let depth = select(vi.w, frac * relief, frac > 0.0);
+        landHeight = max(landHeight - depth * w, min(landHeight, tile.b.z));
+    }
+    var river = 0.0;
+    var riverS = 0.0;
+    var bestRiver = 1e9;
+    let riverCount = min(u32(tile.water0.x + 0.5), 4u);
+    for (var i = 0u; i < riverCount; i = i + 1u) {
+        let ri = tile.riverInfo[i];
+        if (!tileInBounds(x, z, tile.riverBounds[i])) {
+            continue;
+        }
+        let near = tileNearest(x, z, u32(ri.x + 0.5), u32(ri.y + 0.5), false);
+        let d = near.x;
+        if (d >= 0.5 * ri.w) {
+            continue;
+        }
+        let rl = tile.riverLevel[i];
+        let u = select(0.0, clamp(near.y / rl.z, 0.0, 1.0), rl.z > 1e-3);
+        let ease = u * u * (3.0 - 2.0 * u);
+        let level = rl.x + (rl.y - rl.x) * ease - tile.b.x;
+        let v = 1.0 - tileSmooth(0.5 * ri.z, 0.5 * ri.w, d);
+        landHeight = landHeight + (level - landHeight) * v;
+        let channel = 1.0 - tileSmooth(0.5 * ri.z - 0.5, 0.5 * ri.z + 0.5, d);
+        if (channel > river || (channel == river && d < bestRiver)) {
+            river = channel;
+            riverS = near.y;
+            bestRiver = d;
+        }
+    }
+    var pond = 0.0;
+    let pondCount = min(u32(tile.water0.y + 0.5), 8u);
+    for (var i = 0u; i < pondCount; i = i + 1u) {
+        let pd = tile.ponds[i];
+        let pb = tile.pondB[i];
+        let d = length(vec2<f32>(x, z) - pd.xy);
+        if (d >= pd.z * 1.5 + pd.w) {
+            continue;
+        }
+        var shore = pd.z;
+        if (pb.y > 0.0) {
+            let scale = max(pd.z * 0.6, 1.0);
+            let n = tileValueNoise((seed ^ TILE_POND_SEED) + i * 7919u, x / scale, z / scale);
+            shore = pd.z * (1.0 + pb.y * 0.5 * (2.0 * n - 1.0));
+        }
+        let level = pb.x - tile.b.x;
+        let v = 1.0 - tileSmooth(shore, shore + pd.w, d);
+        landHeight = landHeight + (level - landHeight) * v;
+        pond = max(pond, 1.0 - tileSmooth(shore - 0.5, shore + 0.5, d));
     }
     var out: TileOut;
     out.height = (tile.b.x - tile.b.y) + ((tile.b.x + landHeight) - (tile.b.x - tile.b.y)) * land;
-    out.water = 1.0 - land + channel * land;
+    let inlandWater = max(river, pond);
+    out.water = 1.0 - land + inlandWater * land;
+    out.river = river * land;
+    out.pond = pond * land * (1.0 - river);
+    out.riverS = riverS;
     out.shore = 1.0 - tileSmooth(0.0, 3.0 * tile.a.z, abs(c - tile.a.y));
     out.flat = tileSmooth(tile.d.z, tile.d.z + 0.06, shaped) * tile.d.w * inland * land;
     out.path = 0.0;
@@ -381,8 +481,11 @@ fn tileSample(x: f32, z: f32) -> TileOut {
 
 // ADR-1953: the waves and the rings at (x, z) on a tile of `water`, for a ring of `cellSize` (tileMotion's twin).
 // Returns (height offset, crest, a bound on the step to a neighbour the motion can open -- the sea's skirt).
-fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec3<f32> {
+fn tileMotion(x: f32, z: f32, s: TileOut, cellSize: f32) -> vec3<f32> {
     let t = tile.dyn.x;
+    let water = s.water;
+    let sea = max(water - s.river - s.pond, 0.0);
+    let waveWater = sea + s.river * tile.waterMotion.x + s.pond * tile.waterMotion.y; // ADR-1965
     var height = 0.0;
     var crest = 0.0;
     var step = 0.0;
@@ -400,7 +503,7 @@ fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec3<f32> {
         let theta = TILE_TWO_PI * ((d - w0.w * t) / w0.z + w2.z);
         let u = 0.5 + 0.5 * sin(theta);
         let c = pow(u, 1.0 + 7.0 * w1.z);
-        let mask = (w2.x + (w2.y - w2.x) * water) * tileSmooth(2.0 * cellSize, 4.0 * cellSize, w0.z);
+        let mask = (w2.x * (1.0 - water) + w2.y * waveWater) * tileSmooth(2.0 * cellSize, 4.0 * cellSize, w0.z);
         height = height + w0.y * (2.0 * c - 1.0) * mask;
         crest = crest + w1.w * c * mask;
         step = step + 2.0 * abs(w0.y * mask) * min(1.0, TILE_TWO_PI * cellSize / w0.z * (1.0 + 7.0 * w1.z));
@@ -420,6 +523,14 @@ fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec3<f32> {
         height = height + tile.ring0.x * env * cos(TILE_TWO_PI * off / tile.ring0.z);
         crest = crest + tile.ring1.y * env;
         step = step + 2.0 * abs(tile.ring0.x * env);
+    }
+    // ADR-1965: the river's drift downstream
+    if (tile.waterMotion.z != 0.0 && s.river > 0.0) {
+        let fade = tileSmooth(2.0 * cellSize, 4.0 * cellSize, tile.waterMotion.w);
+        let dh = tile.waterMotion.z * s.river * fade *
+                 sin(TILE_TWO_PI * (s.riverS - tile.waterMotion2.x * t) / max(tile.waterMotion.w, 0.5));
+        height = height + dh;
+        step = step + 2.0 * abs(tile.waterMotion.z * s.river * fade);
     }
     return vec3<f32>(tile.dyn.y * height, clamp(crest, 0.0, 1.0), abs(tile.dyn.y) * step);
 }
@@ -507,7 +618,7 @@ fn tileSpring(x: f32, z: f32) -> vec2<f32> {
 fn tileSampleMoving(x: f32, z: f32, fine: f32) -> TileOut {
     var s = tileSample(x, z);
     if (tile.breath.w > 0.5) {
-        let m = tileMotion(x, z, s.water, fine);
+        let m = tileMotion(x, z, s, fine);
         let spring = tileSpring(x, z);
         s.height = s.height + m.x + spring.x;
         s.crest = m.y;
@@ -534,6 +645,9 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
     t.crest = 0.0;
     t.step = 0.0;
     t.landing = 0.0;
+    t.river = 0.0;
+    t.pond = 0.0;
+    t.riverS = 0.0;
     var lowest = 3.0e38;
     for (var b = 0u; b < m; b = b + 1u) {
         for (var a = 0u; a < m; a = a + 1u) {
@@ -547,6 +661,9 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
             t.path = t.path + s.path;
             t.crest = t.crest + s.crest;
             t.landing = t.landing + s.landing;
+            t.river = t.river + s.river;
+            t.pond = t.pond + s.pond;
+            t.riverS = t.riverS + s.riverS;
             t.step = max(t.step, s.step);
         }
     }
@@ -558,6 +675,9 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
     t.path = t.path * inv;
     t.crest = t.crest * inv;
     t.landing = t.landing * inv;
+    t.river = t.river * inv;
+    t.pond = t.pond * inv;
+    t.riverS = t.riverS * inv;
     if (tile.blend.z != 0) {
         t.height = lowest; // ADR-1953: an underlay's cell at its lowest fine tile
     }
@@ -607,6 +727,8 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
             var mp = 0.0;
             var mc = 0.0;
             var ml = 0.0;
+            var mr = 0.0;
+            var mo = 0.0;
             for (var b = 0; b < ratio; b = b + 1) {
                 for (var a = 0; a < ratio; a = a + 1) {
                     let c = tileCell(bx + a, bz + b);
@@ -617,6 +739,8 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
                     mp = mp + c.path;
                     mc = mc + c.crest;
                     ml = ml + c.landing;
+                    mr = mr + c.river;
+                    mo = mo + c.pond;
                     t.step = max(t.step, c.step);
                 }
             }
@@ -628,6 +752,8 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
             t.path = t.path + (mp * inv - t.path) * w;
             t.crest = t.crest + (mc * inv - t.crest) * w;
             t.landing = t.landing + (ml * inv - t.landing) * w;
+            t.river = t.river + (mr * inv - t.river) * w;
+            t.pond = t.pond + (mo * inv - t.pond) * w;
         }
     }
     // ADR-1953: a moving sea opens steps between its slabs, which the static sea never has: it gets as much skirt as
@@ -651,7 +777,15 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
     r.color = vec4<f32>(1.0, 1.0, 1.0, genUnit(genHash(ix, iz, gen.hashing.x, 21u)));
     // ADR-1953: the crest channel in the emissive's spare lane; ADR-1960: the landing glow above it, in 255ths x 32
     // (the contour pass adds 2 x its side mask between them; scene::tilePackedEmissiveW)
-    r.emissive = vec4<f32>(1.0, 1.0, 1.0, clamp(crest, 0.0, 1.0) + 32.0 * round(clamp(t.landing, 0.0, 1.0) * 255.0));
+    // ADR-1965: and the water body's class above them (scene::tileWaterClass: the larger share), x 8192
+    var waterClass = 0.0;
+    if (t.river >= 0.5 * t.water && t.river > t.pond && t.river > 0.0) {
+        waterClass = 1.0;
+    } else if (t.pond >= 0.5 * t.water && t.pond > 0.0) {
+        waterClass = 2.0;
+    }
+    r.emissive = vec4<f32>(1.0, 1.0, 1.0, clamp(crest, 0.0, 1.0) + 32.0 * round(clamp(t.landing, 0.0, 1.0) * 255.0) +
+                           8192.0 * waterClass);
     records[index] = r;
 }
 

@@ -40,7 +40,7 @@ struct FlightWaypoint {
     float altitude = 20.0f;   // metres above the (smoothed) ground
     float speed = -1.0f;      // metres per second from here; < 0 = the flight's speed
     // Named features (request 1979), resolved against the ground's tiles before the build (resolveFlightRoute):
-    //   follow "path" | "river": this waypoint becomes a leg along that polyline, from `from` to `to` (fractions of
+    //   follow "path" | a river ("river", "river1", an index or its name; ADR-1965): this waypoint becomes a leg along that polyline, from `from` to `to` (fractions of
     //     its length, 0..1, either way round), `offset` metres to the right of it, at this altitude and speed;
     //   snap "shore" | "crown": `position` is a hint, moved to the nearest shoreline / crown top within `snapRadius`.
     std::string follow;

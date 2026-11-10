@@ -22,7 +22,8 @@ namespace {
 TileTerrainSpec withPath() {
     TileTerrainSpec s;
     s.path = {{-200.0f, -40.0f}, {-60.0f, 10.0f}, {80.0f, -15.0f}, {220.0f, 60.0f}};
-    s.river = {{-300.0f, 260.0f}, {-120.0f, 160.0f}, {40.0f, 200.0f}, {260.0f, 120.0f}};
+    s.rivers = {scene::TileRiver{.name = "river", .points = {{-300.0f, 260.0f}, {-120.0f, 160.0f}, {40.0f, 200.0f},
+                                                      {260.0f, 120.0f}}}};
     return s;
 }
 
@@ -268,11 +269,11 @@ TEST_CASE("tiles: the river valley -- water on the line, smooth banks, no walls"
     int onLand = 0;
     for (int i = 0; i <= 100; ++i) {
         // along the river's second segment
-        const glm::vec2 a = s.river[1];
-        const glm::vec2 b = s.river[2];
+        const glm::vec2 a = s.rivers[0].points[1];
+        const glm::vec2 b = s.rivers[0].points[2];
         const glm::vec2 p = a + (b - a) * (static_cast<float>(i) / 100.0f);
         TileTerrainSpec dry = s;
-        dry.river.clear();
+        dry.rivers.clear();
         const TileSample without = scene::tileSample(dry, p.x, p.y);
         if (without.water > 0.01f) {
             continue; // the sea is already water
@@ -285,7 +286,7 @@ TEST_CASE("tiles: the river valley -- water on the line, smooth banks, no walls"
     CHECK(onLand > 20);
     // Far from the river the land is untouched.
     TileTerrainSpec dry = s;
-    dry.river.clear();
+    dry.rivers.clear();
     CHECK(scene::tileSample(s, 600.5f, -700.5f).height == scene::tileSample(dry, 600.5f, -700.5f).height);
 }
 
@@ -308,4 +309,246 @@ TEST_CASE("tiles: heightScale scales the land's relief, not the sea", "[geograph
         }
     }
     CHECK(checked > 20);
+}
+
+// ---- ADR-1965: rivers, ponds, dry valleys and the water body's class ------------------------------------------------
+
+namespace {
+
+// The highest land point within 160 m of the origin (a 4 m scan), and its height.
+std::pair<glm::vec2, float> highLand(const TileTerrainSpec& s) {
+    glm::vec2 p(0.0f);
+    float best = -1e9f;
+    for (float z = -160.0f; z <= 160.0f; z += 4.0f) {
+        for (float x = -160.0f; x <= 160.0f; x += 4.0f) {
+            const TileSample t = scene::tileSample(s, x, z);
+            if (t.water < 0.01f && t.height > best) {
+                best = t.height;
+                p = {x, z};
+            }
+        }
+    }
+    return {p, best};
+}
+
+TileTerrainSpec landWorld() {
+    TileTerrainSpec s;
+    s.seed = 11;
+    s.continentWavelength = 260.0f;
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("tiles: an upland stream runs at its own level, easing from the source down to the sea floor at its mouth",
+          "[geography][tiles][adr1965]") {
+    TileTerrainSpec s = landWorld();
+    const auto [p, top] = highLand(s);
+    REQUIRE(top > s.seaLevel + s.shoreRise + 2.0f);
+    // from the high ground out, 200 m, and on to wherever it ends (its mouth level is the sea floor's, whatever the
+    // land there is: the eased bed cuts through)
+    const glm::vec2 a = p;
+    const glm::vec2 b = p + glm::vec2(120.0f, 40.0f);
+    const glm::vec2 c = p + glm::vec2(220.0f, 120.0f);
+    s.rivers = {scene::TileRiver{.name = "stream", .points = {a, b, c}, .width = 4.0f, .valleyWidth = 20.0f,
+                                 .bedDepth = 1.5f}};
+    REQUIRE(s.validate().has_value());
+    s.resolveWater();
+    TileTerrainSpec dry = s;
+    dry.rivers.clear();
+    // the source: the land there (without the river) less the bed depth -- "auto"
+    const float source = scene::tileSample(dry, a.x, a.y).height - 1.5f;
+    CHECK(scene::tileRiverSourceLevel(s, 0) == Catch::Approx(source).margin(1e-4));
+    CHECK(scene::tileRiverMouthLevel(s) == s.seaLevel - s.seaDepth);
+    const TileSample atSource = scene::tileSample(s, a.x, a.y);
+    CHECK(atSource.river > 0.99f);
+    CHECK(atSource.height == Catch::Approx(source).margin(1e-3));
+    CHECK(scene::tileWaterClass(atSource) == 1);
+    // down the line the water's level falls monotonically (where the stream is on land)
+    float last = 1e9f;
+    int checked = 0;
+    for (int i = 0; i <= 50; ++i) {
+        const glm::vec2 q = a + (b - a) * (static_cast<float>(i) / 50.0f);
+        const TileSample t = scene::tileSample(s, q.x, q.y);
+        if (t.river < 0.99f) continue; // out in the sea
+        CHECK(t.height <= last + 1e-4f);
+        last = t.height;
+        ++checked;
+    }
+    CHECK(checked > 8);
+    // a set source level is honoured
+    s.rivers[0].sourceLevel = top + 5.0f;
+    s.resolveWater();
+    CHECK(scene::tileSample(s, a.x, a.y).height == Catch::Approx(top + 5.0f).margin(1e-3));
+    // the default (bedDepth < 0) is the CP-A river: at the sea floor all along
+    s.rivers[0].bedDepth = -1.0f;
+    s.rivers[0].sourceLevel.reset();
+    s.resolveWater();
+    CHECK(scene::tileSample(s, a.x, a.y).height == Catch::Approx(s.seaLevel - s.seaDepth).margin(1e-3));
+}
+
+TEST_CASE("tiles: a pond sits in a basin at its level -- auto is the rim's lowest land less a metre",
+          "[geography][tiles][adr1965]") {
+    TileTerrainSpec s = landWorld();
+    const auto [p, top] = highLand(s);
+    s.ponds = {scene::TilePond{.name = "tarn", .centre = p, .radius = 6.0f, .basinWidth = 8.0f}};
+    REQUIRE(s.validate().has_value());
+    s.resolveWater();
+    TileTerrainSpec dry = s;
+    dry.ponds.clear();
+    float rim = 1e9f;
+    for (int k = 0; k < 32; ++k) {
+        const float ang = 6.28318530718f * static_cast<float>(k) / 32.0f;
+        rim = std::min(rim, scene::tileSample(dry, p.x + 14.0f * std::cos(ang), p.y + 14.0f * std::sin(ang)).height);
+    }
+    CHECK(scene::tilePondLevel(s, 0) == Catch::Approx(rim - 1.0f).margin(1e-3));
+    CHECK(scene::tilePondLevel(s, 0) > s.seaLevel); // up on the land, above the sea
+    const TileSample centre = scene::tileSample(s, p.x, p.y);
+    CHECK(centre.pond > 0.99f);
+    CHECK(centre.water > 0.99f);
+    CHECK(scene::tileWaterClass(centre) == 2);
+    CHECK(centre.height == Catch::Approx(rim - 1.0f).margin(1e-3));
+    // beyond the basin the land is untouched; within it, it eases (no wall: a 1 m step bounds the slope)
+    const glm::vec2 far = p + glm::vec2(6.0f + 8.0f + 1.0f, 0.0f);
+    CHECK(scene::tileSample(s, far.x, far.y).height == scene::tileSample(dry, far.x, far.y).height);
+    float worstStep = 0.0f;
+    for (float r = 0.0f; r < 16.0f; r += 0.5f) {
+        const float h0 = scene::tileSample(s, p.x + r, p.y).height;
+        const float h1 = scene::tileSample(s, p.x + r + 0.5f, p.y).height;
+        worstStep = std::max(worstStep, std::abs(h1 - h0));
+    }
+    CAPTURE(worstStep);
+    CHECK(worstStep < 1.5f);
+    // a set level, and a noisy shore that still makes water at the centre
+    s.ponds[0].level = top - 3.0f;
+    s.ponds[0].shoreNoise = 0.6f;
+    s.resolveWater();
+    CHECK(scene::tileSample(s, p.x, p.y).height == Catch::Approx(top - 3.0f).margin(1e-3));
+}
+
+TEST_CASE("tiles: a dry valley sinks the land along its line, by depth or a fraction of the relief, with no water",
+          "[geography][tiles][adr1965]") {
+    TileTerrainSpec s = landWorld();
+    const auto [p, top] = highLand(s);
+    const glm::vec2 a = p + glm::vec2(-30.0f, 0.0f);
+    const glm::vec2 b = p + glm::vec2(30.0f, 0.0f);
+    s.valleys = {scene::TileValley{.name = "dale", .points = {a, b}, .valleyWidth = 20.0f, .depth = 2.0f}};
+    REQUIRE(s.validate().has_value());
+    TileTerrainSpec dry = s;
+    dry.valleys.clear();
+    const TileSample on = scene::tileSample(s, p.x, p.y);
+    const TileSample was = scene::tileSample(dry, p.x, p.y);
+    CHECK(on.height == Catch::Approx(was.height - 2.0f).margin(1e-3));
+    CHECK(on.water == was.water); // dry
+    CHECK(on.river == 0.0f);
+    CHECK(on.pond == 0.0f);
+    // half the relief above the shore
+    s.valleys[0].depthFraction = 0.5f;
+    const float relief = was.height - (s.seaLevel + s.shoreRise);
+    CHECK(scene::tileSample(s, p.x, p.y).height == Catch::Approx(was.height - 0.5f * relief).margin(1e-3));
+    // never below the shore's top, however deep
+    s.valleys[0].depthFraction = 0.0f;
+    s.valleys[0].depth = 500.0f;
+    CHECK(scene::tileSample(s, p.x, p.y).height >= s.seaLevel + s.shoreRise - 1e-3f);
+    // 11 m off the line (beyond half its width) the land is untouched
+    CHECK(scene::tileSample(s, p.x, p.y + 11.0f).height == scene::tileSample(dry, p.x, p.y + 11.0f).height);
+}
+
+TEST_CASE("tiles: water bodies read, write and refuse", "[geography][tiles][adr1965]") {
+    // the CP-A single river is read as rivers[0], at the sea floor
+    auto legacy = scene::tileTerrainFromJson(nlohmann::json::parse(
+        R"({"river": [[0, 0], [50, 10], [90, 40]], "riverWidth": 6, "valleyWidth": 80})"));
+    REQUIRE(legacy.has_value());
+    REQUIRE(legacy->rivers.size() == 1);
+    CHECK(legacy->rivers[0].width == 6.0f);
+    CHECK(legacy->rivers[0].valleyWidth == 80.0f);
+    CHECK(legacy->rivers[0].bedDepth < 0.0f);
+    CHECK(legacy->riverIndex("river") == 0);
+    CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(
+                    R"({"river": [[0, 0], [5, 5]], "rivers": [{"points": [[0, 0], [9, 9]]}]})")).has_value());
+    // a round trip
+    auto spec = scene::tileTerrainFromJson(nlohmann::json::parse(R"({
+        "rivers": [{"name": "brook", "points": [[0, 0], [40, 10]], "width": 3, "valleyWidth": 14, "bedDepth": 1,
+                    "sourceLevel": "auto"},
+                   {"points": [[100, 0], [140, 30], [160, 90]], "sourceLevel": 12, "bedDepth": 0.5}],
+        "ponds": [{"name": "tarn", "centre": [20, -40], "radius": 6, "basinWidth": 9, "level": "auto",
+                   "shoreNoise": 0.3},
+                  {"centre": [-60, 10], "radius": 4, "basinWidth": 5, "level": 3.5}],
+        "valleys": [{"name": "dale", "points": [[-10, -80], [60, -100]], "valleyWidth": 30, "depthFraction": 0.4},
+                    {"points": [[0, 90], [30, 120]], "valleyWidth": 12, "depth": 3}]})"));
+    REQUIRE(spec.has_value());
+    CHECK(spec->riverIndex("brook") == 0);
+    CHECK(spec->riverIndex("river1") == 1);
+    CHECK(spec->riverIndex("1") == 1);
+    CHECK(spec->riverIndex("river2") == -1);
+    CHECK(spec->riverIndex("river99999999999") == -1);
+    CHECK_FALSE(spec->rivers[0].sourceLevel.has_value());
+    CHECK(spec->rivers[1].sourceLevel == 12.0f);
+    CHECK_FALSE(spec->ponds[0].level.has_value());
+    CHECK(spec->ponds[1].level == 3.5f);
+    auto again = scene::tileTerrainFromJson(scene::tileTerrainToJson(*spec));
+    REQUIRE(again.has_value());
+    CHECK(scene::tileTerrainToJson(*again) == scene::tileTerrainToJson(*spec));
+    CHECK(again->hash() == spec->hash());
+    for (const glm::vec2 q : {glm::vec2(10.5f, 2.5f), glm::vec2(20.5f, -40.5f), glm::vec2(20.5f, -90.5f)}) {
+        CHECK(scene::tileSample(*again, q.x, q.y).height == scene::tileSample(*spec, q.x, q.y).height);
+    }
+    // the caps
+    TileTerrainSpec many;
+    for (int i = 0; i < 5; ++i) many.rivers.push_back({.points = {{0.0f, 0.0f}, {10.0f, 0.0f}}});
+    CHECK_FALSE(many.validate().has_value());
+    TileTerrainSpec longRiver;
+    longRiver.rivers.push_back({});
+    for (int i = 0; i < 33; ++i) longRiver.rivers[0].points.push_back({static_cast<float>(i), 0.0f});
+    CHECK_FALSE(longRiver.validate().has_value());
+    TileTerrainSpec pool;
+    for (int r = 0; r < 3; ++r) {
+        pool.rivers.push_back({});
+        for (int i = 0; i < 30; ++i) pool.rivers.back().points.push_back({static_cast<float>(i), 10.0f * r});
+    }
+    CHECK_FALSE(pool.validate().has_value()); // 90 points against a pool of 64
+}
+
+TEST_CASE("tiles: the waves weigh each water body, and a river drifts downstream", "[geography][tiles][adr1965]") {
+    scene::TileDynamics d;
+    scene::TileWave w;
+    w.amplitude = 1.0f;
+    w.wavelength = 40.0f;
+    w.speed = 0.0f;
+    w.onLand = 0.0f;
+    w.onWater = 1.0f;
+    d.waves = {w};
+    d.riverWaves = 0.25f;
+    d.pondWaves = 0.5f;
+    TileSample sea;
+    sea.water = 1.0f;
+    TileSample river = sea;
+    river.river = 1.0f;
+    TileSample pond = sea;
+    pond.pond = 1.0f;
+    for (const float x : {3.0f, 9.0f, 17.0f}) {
+        const float hs = scene::tileMotion(d, {}, x, 0.0f, 0.0f, sea, 1.0f).x;
+        CHECK(scene::tileMotion(d, {}, x, 0.0f, 0.0f, river, 1.0f).x == Catch::Approx(0.25f * hs).margin(1e-5));
+        CHECK(scene::tileMotion(d, {}, x, 0.0f, 0.0f, pond, 1.0f).x == Catch::Approx(0.5f * hs).margin(1e-5));
+    }
+    // the drift: a travelling ripple along the river's arc length, only on river water
+    scene::TileDynamics drift;
+    drift.riverDriftAmplitude = 0.3f;
+    drift.riverDriftWavelength = 10.0f;
+    drift.riverDriftSpeed = 2.0f;
+    CHECK(drift.active());
+    REQUIRE(scene::validateTileDynamics(drift).has_value());
+    river.riverS = 4.0f;
+    TileSample downstream = river;
+    downstream.riverS = 4.0f + 2.0f * 1.5f; // where the same crest is 1.5 s later
+    CHECK(scene::tileMotion(drift, {}, 0.0f, 0.0f, 1.5f, downstream, 1.0f).x ==
+          Catch::Approx(scene::tileMotion(drift, {}, 0.0f, 0.0f, 0.0f, river, 1.0f).x).margin(1e-5));
+    CHECK(scene::tileMotion(drift, {}, 0.0f, 0.0f, 0.7f, sea, 1.0f).x == 0.0f);
+    // and it round-trips
+    auto again = scene::tileDynamicsFromJson(scene::tileDynamicsToJson(drift));
+    REQUIRE(again.has_value());
+    CHECK(again->riverDriftAmplitude == 0.3f);
+    CHECK(again->riverDriftSpeed == 2.0f);
+    CHECK_FALSE(scene::tileDynamicsFromJson(nlohmann::json::parse(R"({"water": {"riverWaves": 1, "drift": 2}})"))
+                    .has_value());
 }

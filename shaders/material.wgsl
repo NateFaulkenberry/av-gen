@@ -146,6 +146,7 @@ const MAT_IN_FOOTPRINT: u32 = 27u;
 const MAT_IN_MATERIAL_EMISSION: u32 = 28u; // ADR-904
 const MAT_IN_TILE_GLOW: u32 = 29u; // ADR-1963
 const MAT_IN_LANDING_GLOW: u32 = 30u; // ADR-1960
+const MAT_IN_WATER_BODY: u32 = 31u;   // ADR-1965
 
 // ADR-904: the bits of MaterialProgramGpu.flags.x (scene::kMaterialWritesEmission and
 // scene::kMaterialEmissionReadsInstance).
@@ -543,6 +544,11 @@ fn materialInputValue(input: u32, ctx: MaterialContext) -> vec4<f32> {
     if (input == MAT_IN_LANDING_GLOW) {
         return ctx.landingGlow;
     }
+    if (input == MAT_IN_WATER_BODY) {
+        let cls = floor(max(ctx.instanceEmissive.w, 0.0) / 8192.0); // scene::kTileClassStride
+        return vec4<f32>(select(0.0, 1.0, cls < 0.5), select(0.0, 1.0, abs(cls - 1.0) < 0.5),
+                         select(0.0, 1.0, abs(cls - 2.0) < 0.5), cls);
+    }
     return vec4<f32>(0.0);
 }
 
@@ -904,7 +910,9 @@ fn matTileContourSide(half: f32, dist: f32, fw: f32, band: f32, minPixels: f32) 
 fn matKTileContour(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
     let k = materialPrograms.programs[pi].ops[oi].constant;
     let f = materialPrograms.programs[pi].ops[oi].value;
-    let packed = max(b.w, 0.0);
+    let packedAll = max(b.w, 0.0);
+    let classQ = floor(packedAll / 8192.0); // ADR-1965: the water body, above everything (scene::kTileClassStride)
+    let packed = packedAll - 8192.0 * classQ;
     let landingQ = floor(packed / 32.0); // ADR-1960: the landing glow in 255ths, above the crest and the mask
     let w = packed - 32.0 * landingQ;
     let landing = clamp(landingQ / 255.0, 0.0, 1.0);

@@ -92,6 +92,13 @@ struct TileDynamics {
     TileRingSpec rings;
     std::vector<TileEvent> events;     // authored
     std::vector<TileEvent> live;       // triggered while running (not saved; seeking back drops the later ones)
+    // ADR-1965: the waves by water body -- a wave's onWater weight times these on river and pond water (the sea's is 1),
+    // and a slow ripple drifting downstream along each river (metres; metres; metres per second).
+    float riverWaves = 1.0f;
+    float pondWaves = 1.0f;
+    float riverDriftAmplitude = 0.0f;
+    float riverDriftWavelength = 16.0f;
+    float riverDriftSpeed = 1.5f;
     TileSpringSpec spring;             // ADR-1954
     std::vector<TileEvent> springs;    // landings while running (from the characters; not saved, like `live`)
     // ADR-1970: contour edges. A tile side is a contour edge where the level floor((h - offset) / interval) drops to the
