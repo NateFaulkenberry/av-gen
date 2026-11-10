@@ -9,6 +9,7 @@
 #include "entity/tile_nav.hpp"
 #include "params/modulation.hpp"
 #include "params/parameter_set.hpp"
+#include "params/serialization.hpp"
 #include "scene/composition.hpp"
 #include "signals/signal_bus.hpp"
 #include "scene/tile_ground.hpp"
@@ -865,4 +866,23 @@ TEST_CASE("the landing glow round-trips with its gain and colour, and they are p
     CHECK((*c)->scene().environment.tileDynamics.landingGain == 5.0f);
     const auto saved = (*c)->toJson();
     CHECK(saved.at("environment").at("tileDynamics").at("glow").at("landing") == 3.0f);
+}
+
+TEST_CASE("a route refuses a processor-chain key written on the route itself", "[params][routes][geography]") {
+    // CP-D r2: draft3 wrote attackMs/decayMs next to source/target; the reader dropped them and no smoothing ran.
+    const auto flat = nlohmann::json::parse(
+        R"({"source": "response.mid", "target": "env/tiles/glow/path", "amount": 1.0, "attackMs": 300.0})");
+    const auto bad = params::routeFromJson(flat);
+    REQUIRE_FALSE(bad.has_value());
+    CHECK(bad.error().message.find("attackMs") != std::string::npos);
+    CHECK(bad.error().message.find("chain") != std::string::npos);
+    const auto nested = nlohmann::json::parse(
+        R"({"source": "response.mid", "target": "env/tiles/glow/path", "amount": 1.0, "chain": {"attackMs": 300.0}})");
+    const auto good = params::routeFromJson(nested);
+    REQUIRE(good.has_value());
+    CHECK(good->chain.attackMs == 300.0f);
+    // an unknown non-chain key is warned about, not refused (ADR-278); a leading underscore is a comment
+    const auto odd = nlohmann::json::parse(
+        R"({"source": "a", "target": "b", "_note": "x", "colour": 1})");
+    CHECK(params::routeFromJson(odd).has_value());
 }

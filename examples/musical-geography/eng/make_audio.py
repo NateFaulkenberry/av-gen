@@ -64,7 +64,8 @@ STEMS = {
 def route(r):
     out = {k: r[k] for k in ("source", "target", "amount", "op", "polarity")}
     chain = {k: r[k] for k in ("attackMs", "decayMs", "envelope", "envelopeFallPerSecond") if k in r}
-    out.update(chain)
+    if chain:
+        out["chain"] = chain  # nested: the route reader refuses a chain key written on the route itself (CP-D r2)
     return out
 
 

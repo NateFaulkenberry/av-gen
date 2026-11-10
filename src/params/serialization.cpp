@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "core/json_keys.hpp"
 #include "core/log.hpp"
 
 #include <array>
@@ -363,6 +364,23 @@ json routeToJson(const ModRoute& route) {
     return j;
 }
 
+namespace {
+
+// The keys a route reads (routeToJson writes them), and the processor chain's -- which belong under "chain".
+constexpr std::array<std::string_view, 13> kRouteKeys{"source",   "target",    "component",    "amount", "op",
+                                                       "polarity", "enabled",   "chain",        "depthSource",
+                                                       "depthMin", "depthMax",  "depthDefault", "optional"};
+constexpr std::array<std::string_view, 33> kChainKeys{
+    "attackMs",       "clampEnabled",     "clampMax",          "clampMin",        "curve",
+    "curveAmount",    "decayMs",          "delayMs",           "envelope",        "envelopeFallPerSecond",
+    "envelopeHoldMs", "envelopeRearm",    "envelopeRefractoryMs", "gain",         "integrate",
+    "integrateMax",   "integrateMin",     "normalizeFloor",    "normalizeSeconds", "normalizeSmoothMs",
+    "offset",         "remapEnabled",     "remapInMax",        "remapInMin",      "remapOutMax",
+    "remapOutMin",    "springDamping",    "springHz",          "threshold",       "thresholdLevel",
+    "trendFastMs",    "trendFloor",       "trendSeconds"};
+
+} // namespace
+
 Result<ModRoute> routeFromJson(const json& j) {
     if (!j.is_object()) {
         return fail("route must be a JSON object");
@@ -374,6 +392,18 @@ Result<ModRoute> routeFromJson(const json& j) {
     if (auto r = readString(j, "target", route.target); !r) {
         return fail("route: {}", r.error().message);
     }
+    // CP-D r2 (ADR-278's rule for routes): a processor-chain key written on the route itself was read as nothing --
+    // draft3's smoothing never ran -- so it is refused, by name; any other unknown key is warned about.
+    std::vector<std::string_view> known(kRouteKeys.begin(), kRouteKeys.end());
+    known.push_back("planItem");
+    for (const auto& [key, value] : j.items()) {
+        (void)value;
+        if (std::find(kChainKeys.begin(), kChainKeys.end(), key) != kChainKeys.end()) {
+            return fail("route {} -> {}: '{}' is a processor-chain key; write it inside \"chain\": {{...}}",
+                        route.source, route.target, key);
+        }
+    }
+    json_keys::warnUnknownKeys(j, known, fmt::format("route {} -> {}", route.source, route.target));
     std::array<Result<void>, 7> results{
         readInt(j, "component", route.component),
         readFloat(j, "amount", route.amount),
