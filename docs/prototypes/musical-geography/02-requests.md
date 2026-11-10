@@ -1285,3 +1285,24 @@ noise.
    shallows.
 
 **Data workaround meanwhile:** none that keeps the height. Lower islands mean lower cliffs, and less enclosure.
+
+#### CPD-R3c (art → engineering, 2026-11-10): give raised land the hills' own detail (a per-feature `noise`)
+
+The owner, on land3: "some of these lumps look odd". There are two problems:
+- the cliff base, which is R3b;
+- the shapes themselves: smooth, symmetric domes and loaves that read as artificial next to the noise-driven hills.
+
+I will break the silhouettes in data once R3b lands: each island built from 2–3 overlapping rises and short ridges of
+different heights, elongated, asymmetric, and lower and wider.
+
+What data cannot do is give the raised surface the land's small-scale undulation. In `tileSample` the hills are
+multiplied by `inland` (`tile_terrain.cpp`: `shoreRise + hillHeight · k · hill · inland · heightScale`). In the sea
+`inland` is 0, so a rise or ridge there adds a perfectly smooth profile.
+
+**Ask:** a per-feature `noise` (0–1, default 0) on ridges and rises. It adds the hills' own shaped fBm (the same `hill`
+term, the same warp and region) under the feature's profile:
+`height += noise · hillHeight · k · heightScale · (hill − 0.5) · profile`.
+
+With it, an island carries the same bumps, saddles and crowns as the mainland, and a ridge's crest line undulates
+instead of being a clean extruded profile. The crown flattening (`crownThreshold`) can come along with it, so islands
+get the odd flat top that the pads use.
