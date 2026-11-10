@@ -886,3 +886,83 @@ TEST_CASE("a route refuses a processor-chain key written on the route itself", "
         R"({"source": "a", "target": "b", "_note": "x", "colour": 1})");
     CHECK(params::routeFromJson(odd).has_value());
 }
+
+// ---- CP-D r2 (E): choreographed hops -----------------------------------------------------------------------------
+
+namespace {
+
+struct CueRun {
+    int launches = 0;
+    float minGap = 1e9f;
+    std::vector<float> airTimes;
+};
+
+// A body under a cue that fires on every beat at `bpm` for `seconds`; counts its launches and the gaps between them.
+CueRun runCues(const nlohmann::json& settings, float bpm, double seconds, std::uint64_t seed) {
+    const scene::TileTerrainSpec spec;
+    scene::TileGround g;
+    g.set(spec, scene::TileDynamics{}, 4.0f, glm::vec3(0.0f));
+    auto hop = entity::makeBehavior("hop", &settings);
+    params::ParameterSet params;
+    hop->registerParameters(params, "e/hop/");
+    auto* cue = params.find("e/hop/trigger");
+    signals::SignalBus bus;
+    const signals::SignalId bpmId = bus.declare("beat.bpm", 0.0f, 300.0f);
+    bus.set(bpmId, bpm);
+    Rng rng(seed);
+    hop->reset(rng);
+    entity::EntityState state;
+    state.anchor = glm::vec3(6.0f, 0.0f, -10.0f);
+    entity::MotionOffset offset;
+    CueRun out;
+    bool wasAir = false;
+    double airStart = 0.0;
+    double last = -1e9;
+    const double beat = 60.0 / bpm;
+    for (int f = 0; f * (1.0 / 60.0) < seconds; ++f) {
+        const double t = f / 60.0;
+        params.resetFinals();
+        cue->setBaseComponent(0, f > 0 && std::fmod(t, beat) < 1.0 / 60.0 ? 1.0f : 0.0f); // a one-frame pulse a beat
+        entity::BehaviorContext ctx;
+        ctx.time = t;
+        ctx.dt = 1.0 / 60.0;
+        ctx.rng = &rng;
+        ctx.ground = &g;
+        ctx.bus = &bus;
+        hop->update(ctx, state, offset);
+        if (state.airborne && !wasAir) {
+            ++out.launches;
+            out.minGap = std::min(out.minGap, static_cast<float>(t - last));
+            last = t;
+            airStart = t;
+        }
+        if (!state.airborne && wasAir) {
+            out.airTimes.push_back(static_cast<float>(t - airStart));
+        }
+        wasAir = state.airborne;
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("cue-only hops answer in turns, never faster than the gap, and last whole beats", "[tiles][hop][geography][audio]") {
+    // 120 BPM, a cue every 0.5 s for 60 s. Cue-only, every 4th cue (each body at its own place), at least 2 s apart, a
+    // two-beat hop; walking hops off, so every launch is an answered cue.
+    const nlohmann::json settings = {{"cueOnly", 1.0}, {"cueEvery", 4.0}, {"cueGap", 2.0}, {"airBeats", 2.0},
+                                     {"hopChance", 0.0}, {"maxWait", 60.0}, {"goalMin", 1.0}, {"goalMax", 2.0},
+                                     {"jumpTiles", 1.0}};
+    const CueRun r = runCues(settings, 120.0f, 60.0, 17);
+    CAPTURE(r.launches, r.minGap);
+    CHECK(r.launches >= 8);            // it does answer
+    CHECK(r.launches <= 31);           // at most one every couple of seconds (60 s / 2 s + 1)
+    CHECK(r.minGap >= 2.0f - 1e-3f);   // never two answers closer than the gap
+    REQUIRE_FALSE(r.airTimes.empty());
+    for (const float a : r.airTimes) {
+        CHECK(a == Approx(1.0f).margin(1.0f / 60.0f + 1e-4f)); // two beats at 120 BPM
+    }
+    // and with no cue at all a cue-only body rests until maxWait
+    const nlohmann::json patient = {{"cueOnly", 1.0}, {"maxWait", 5.0}, {"hopChance", 0.0}};
+    const CueRun none = runCues(patient, 0.001f, 4.5, 3); // bpm ~0: the cue never pulses within 4.5 s
+    CHECK(none.launches == 0);
+}

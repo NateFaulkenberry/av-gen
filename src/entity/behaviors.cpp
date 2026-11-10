@@ -3613,7 +3613,12 @@ public:
           wantFlat_(readFloat(s, "preferCrowns", 1.0f)),
           wantWater_(readFloat(s, "preferWater", 0.6f)),
           wantPath_(readFloat(s, "preferPath", 0.6f)),
-          home_(readFloat(s, "homeRadius", 60.0f)) {
+          home_(readFloat(s, "homeRadius", 60.0f)),
+          cueOnly_(readFloat(s, "cueOnly", 0.0f) >= 0.5f),
+          maxWait_(readFloat(s, "maxWait", 12.0f)),
+          cueEvery_(std::max(1, static_cast<int>(readFloat(s, "cueEvery", 1.0f)))),
+          cueGapDefault_(readFloat(s, "cueGap", 0.0f)),
+          airBeatsDefault_(readFloat(s, "airBeats", 0.0f)) {
         rules_.stepHeight = readFloat(s, "stepHeight", 0.6f);
         rules_.jumpTiles = static_cast<int>(readFloat(s, "jumpTiles", 3.0f));
         rules_.jumpRise = readFloat(s, "jumpRise", 3.0f);
@@ -3632,13 +3637,21 @@ public:
         // ADR-1964: a rising edge through 0.5 is a cue to hop -- a resting body sets off now, a walking one hops its
         // next step. What a route on the beat or an onset drives (an entity reaction, so a seek replays it).
         trigger_ = &params.add(floatDesc(prefix + "trigger", 0.0f, 0.0f, 1.0f));
+        // CP-D r2 (E): a hop that lasts this many beats of the beat clock (0 = airTime), so a cue on the beat lands on one
+        airBeats_ = &params.add(floatDesc(prefix + "airBeats", airBeatsDefault_, 0.0f, 8.0f));
+        // CP-D r2 (E): the least time between two cues this body answers (seconds), so a beat cannot make it twitch
+        cueGap_ = &params.add(floatDesc(prefix + "cueGap", cueGapDefault_, 0.0f, 30.0f));
         paths_ = {prefix + "walkSpeed", prefix + "runSpeed", prefix + "airTime", prefix + "apex",
-                  prefix + "hopChance", prefix + "strength", prefix + "trigger"};
+                  prefix + "hopChance", prefix + "strength", prefix + "trigger", prefix + "airBeats", prefix + "cueGap"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
     }
-    void reset(Rng&) override {
+    void reset(Rng& rng) override {
+        cuePhase_ = cueEvery_ > 1 ? static_cast<int>(rng.nextFloat() * static_cast<float>(cueEvery_)) % cueEvery_ : 0;
+        cueCount_ = 0;
+        waited_ = 0.0f;
+        lastAnswer_ = -1e9;
         primed_ = false;
         phase_ = Phase::Pause;
         steps_.clear();
@@ -3671,7 +3684,18 @@ public:
         }
         // ADR-1964: the cue, on its rising edge
         const float cue = trigger_ != nullptr ? trigger_->value() : 0.0f;
+        // CP-D r2 (E): with `cueEvery` N, a body answers every Nth cue, at its own place in the cycle (so a cast
+        // answers in turns, not all at once)
+        bool answered = false;
         if (cue >= 0.5f && triggerPrevious_ < 0.5f) {
+            const float gap = cueGap_ != nullptr ? cueGap_->value() : cueGapDefault_;
+            answered = (cueCount_ + cuePhase_) % cueEvery_ == 0 && t - lastAnswer_ >= static_cast<double>(gap);
+            ++cueCount_;
+            if (answered) {
+                lastAnswer_ = t;
+            }
+        }
+        if (answered) {
             if (phase_ == Phase::Pause) {
                 timer_ = 0.0f; // set off now, with a hop
                 cued_ = true;
@@ -3687,7 +3711,11 @@ public:
         case Phase::Pause: {
             y_ = ground->at(pos_.x, pos_.y, t).height; // riding the tile
             timer_ -= dt;
-            if (timer_ <= 0.0f) {
+            waited_ += dt;
+            // CP-D r2 (E): a cue-only body rests until a cue sets it off (or `maxWait` passes, so silence is not frozen)
+            const bool go = cueOnly_ ? (cued_ || waited_ >= maxWait_) : timer_ <= 0.0f;
+            if (go) {
+                waited_ = 0.0f;
                 plan(*ground, ctx, t);
             }
             break;
@@ -3701,7 +3729,14 @@ public:
             const glm::vec2 target = tileCentreOf(step.tile, pitch);
             const bool hopByChoice = step.edge == TileEdge::Walk && leg_ < wantsHop_.size() && wantsHop_[leg_];
             if (step.edge == TileEdge::Jump || hopByChoice) {
-                launch(*ground, target, t, value(air_, airDefault_));
+                // CP-D r2 (E): a hop of `airBeats` beats at the beat clock's tempo, when set and the clock runs
+                float airTime = value(air_, airDefault_);
+                const float beats = value(airBeats_, airBeatsDefault_);
+                const float bpm = ctx.signal("beat.bpm");
+                if (beats > 0.0f && bpm >= 30.0f && bpm <= 300.0f) {
+                    airTime = std::clamp(beats * 60.0f / bpm, 0.3f, 3.0f);
+                }
+                launch(*ground, target, t, airTime);
                 activity = Activity::Jump;
                 airborne = true;
                 break;
@@ -3842,6 +3877,7 @@ private:
         TilePath path = planTiles(query, here, best, rules_);
         if (!path.found || path.steps.empty()) {
             timer_ = 1.0f;
+            cued_ = false; // nowhere to go: wait for the next cue
             return;
         }
         steps_ = std::move(path.steps);
@@ -3851,6 +3887,12 @@ private:
             wantsHop_[i] = ctx.rng != nullptr && ctx.rng->nextFloat() < chance;
         }
         running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < 0.4f;
+        if (cueOnly_) {
+            // CP-D r2 (E): a cue-only body moves one hop per answered cue -- the first step, hopped -- so the cast's
+            // motion is the cues' rhythm and nothing else
+            steps_.resize(1);
+            wantsHop_.assign(1, true);
+        }
         if (cued_) {
             wantsHop_[0] = true;
             cued_ = false;
@@ -3871,6 +3913,17 @@ private:
     params::Parameter<float>* hopChance_ = nullptr;
     params::Parameter<float>* strength_ = nullptr;
     params::Parameter<float>* trigger_ = nullptr;
+    params::Parameter<float>* airBeats_ = nullptr;
+    params::Parameter<float>* cueGap_ = nullptr;
+    bool cueOnly_ = false;
+    float maxWait_ = 12.0f;
+    int cueEvery_ = 1;
+    float cueGapDefault_ = 0.0f;
+    float airBeatsDefault_ = 0.0f;
+    double lastAnswer_ = -1e9;
+    int cuePhase_ = 0;
+    int cueCount_ = 0;
+    float waited_ = 0.0f;
     std::vector<std::string> paths_;
 
     bool primed_ = false;

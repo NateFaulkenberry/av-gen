@@ -1833,6 +1833,7 @@ private:
         std::array<params::Parameter<float>*, kMaxTileWaves> waveWavelength{};
         std::array<params::Parameter<float>*, kMaxTileWaves> waveDirection{};
         std::array<params::Parameter<float>*, kMaxTileWaves> waveCrest{};
+        std::array<params::Parameter<float>*, kMaxTileWaves> waveOnLand{}; // CP-D r2 (B): how far a train reaches the land
         params::Parameter<float>* breathingAmplitude = nullptr;
         params::Parameter<float>* breathingPeriod = nullptr;
         params::Parameter<float>* rollingX = nullptr;

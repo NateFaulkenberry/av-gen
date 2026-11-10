@@ -5197,6 +5197,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                     &params.add(floatDesc(wb + "wavelength", w.wavelength, 0.5f, 5000.0f, 2.0f, 400.0f));
                 p.waveDirection[i] = &params.add(floatDesc(wb + "direction", w.direction, -720.0f, 720.0f, 0.0f, 360.0f));
                 p.waveCrest[i] = &params.add(floatDesc(wb + "crest", w.crest, 0.0f, 8.0f, 0.0f, 2.0f));
+                p.waveOnLand[i] = &params.add(floatDesc(wb + "onLand", w.onLand, 0.0f, 4.0f, 0.0f, 1.0f)); // CP-D r2 (B)
             }
             p.breathingAmplitude =
                 &params.add(floatDesc(base + "breathing/amplitude", d.breathingAmplitude, -4.0f, 4.0f, 0.0f, 0.5f));
@@ -9215,6 +9216,7 @@ TileDynamics Composition::liveTileDynamics() const {
             d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
             d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
             d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+            d.waves[i].onLand = f(p.waveOnLand[i], d.waves[i].onLand);
         }
         d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
         d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
@@ -9251,6 +9253,7 @@ TileDynamics Composition::baseTileDynamics() const {
             d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
             d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
             d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+            d.waves[i].onLand = f(p.waveOnLand[i], d.waves[i].onLand);
         }
         d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
         d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
