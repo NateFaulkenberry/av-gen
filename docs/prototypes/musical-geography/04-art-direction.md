@@ -1284,3 +1284,67 @@ scene.
 The worst frames are one hitch cluster at 157–158 s, with a single 277 ms frame. It did not show in draft1's runs. The
 wider tail is in line with engineering's finding that the flight's GPU tail is the GPU clocking down (02-requests),
 which I have not separated here.
+
+### CP-D draft3: the music switched on across the whole arc (2026-11-09, Phase 7 merged)
+
+**The merge.** I merged `scene/musical-geography` f028d0c0 (ADR-1963 tile glow gains, ADR-1964 hop on the music) and
+rebuilt. 02-requests.md conflicted only at its end, and both sections are kept.
+
+**The programs.** `look.tile_program` now has a `glow(reg, lane, tmp)` helper, called in engineering's four places:
+- the pads after `r4 = emission`;
+- the path before its `add`;
+- the contours after the distance fade and before their `add`;
+- the crest.
+
+The 1× ring is now 71 ops and the 2× and 4× rings 56, all under `kMaxMaterialOps` 96.
+
+**The mapping** (`look.audio_routes`, `look.ALIEN_REACTIONS`, `look.GLOW_REST`): engineering's mapping, tuned.
+
+**Rest glow** (what silence shows): path 0.4, contour **0.7** (engineering had 0.5), crest 1, pads **0.6** (was 0.5).
+
+| Source | Target | Amount | Shape |
+|---|---|---|---|
+| `response.low` | `env/tiles/amplitude` | +0.6 | as before |
+| `response.onset` | `env/tiles/rings/trigger` | 1 | as before |
+| `audio.energy` | `env/tiles/breathing/amplitude` | +0.25 | |
+| `beat.bar` | `env/tiles/contour/offset` | +4 m | one interval per bar, so the lines climb |
+| `beat.pulse` | `env/tiles/glow/contour` | **+0.8** (eng +1.5) | peak hold, falls **3/s** (eng 4) |
+| `response.mid` | `env/tiles/glow/path` | **+1.2** (eng +1.6) | 30 / 250 ms |
+| `response.high` | `env/tiles/glow/pads` | **+0.8** (eng +1.0) | 20 / 300 ms |
+
+- **Aliens:** reactions as engineering set them. `beat.pulse` drives `hop/trigger`, and `response.level` drives
+  `hop/apex` and `hop/strength`.
+- **Stems and feeds:** Feline's three stems are loaded. The beat clock and the hits follow the drums, and the levels
+  follow the bass. The log reads "the beat clock follows stem 'drums': 120.97 bpm".
+- **Audit:** 91 routes and 118 timeline tracks, all live.
+
+**Why these amounts:**
+- **The contour flash.** Engineering's +1.5 over a rest of 0.5 tripled the night lines on every beat. At 121 BPM
+  that reads as a strobe. +0.8 over 0.7 with a 3/s fall makes each beat a swell. The rest lines stay visible between
+  beats, and they climb one interval per bar (strip: `10-full/cpd-draft3-night-145s-beat-strip.png`, 145–146.5 s at
+  10 fps; the beats are at 146.0 and 146.5).
+- **Night `path_emit` 5 → 2.** At rest the night path is now 0.8 in place of a clipped 2.0, and on the mids it
+  reaches 3.2. The other states' `path_emit` is raised by 1/0.4, so their path looks exactly as approved at the rest
+  glow: day 0.875, sunset 1.5, dawn 0.625.
+- **A lighter day.** The glow lanes multiply each state's own emission. The day has a faint path and no contours or
+  pads, so its touch is light by construction: the swell, the rings and the hops. The night carries the most
+  movement.
+- **Silence is calm.** Every route is unipolar and adds to a rest value. The intro (0–8 s) and the fade
+  (202–210.5 s) show the rest: waves and breath, with no flashes.
+
+**Renders:** `10-full/cpd-draft3-feline-full-1080p-audio.mp4` (the whole song, audio reactive) and
+`cpd-draft3-sheet.png`.
+
+**Whole-song perf.** Read this with care:
+- **Two 208 s runs** read GPU p50 15.0 / 15.4 ms, but with a heavy tail: p90 36–37, p99 43–45 ms.
+- **Back-to-back A/B of draft2 against draft3** over the night climax (130–160 s, 30 s each, run twice) shows no
+  difference:
+
+  | | GPU p50 | GPU p90 | GPU p99 |
+  |---|---|---|---|
+  | draft2 | 15.3 / 15.2 ms | 17.0 / 16.9 ms | 19.3 / 18.9 ms |
+  | draft3 | 15.3 / 15.2 ms | 17.5 / 16.8 ms | 20.0 / 19.5 ms |
+
+- **So the wiring costs no GPU,** as engineering measured. The long runs' tail is environmental: `gpu-lock` waited
+  60 s for another session's GPU job during this pass, and it matches engineering's GPU-clocking finding.
+- **CPU work p50 is 2.5–3.2 ms** (2.2–3.3 ms before), which is the stems and the routes.

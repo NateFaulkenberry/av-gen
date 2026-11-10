@@ -195,7 +195,8 @@ def cast_nodes(state="day"):
                      "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
                      "behaviors": [dict({"kind": "hop", "hopChance": 0.5, "homeRadius": HOME_RADIUS[hab], "goalMin": 2,
                                          "goalMax": 5, "pauseMin": 0.6, "pauseMax": 2.2, "airTime": 1.3,
-                                         "apex": 3.0, "strength": 1.2}, **PREFS[hab])]})
+                                         "apex": 3.0, "strength": 1.2}, **PREFS[hab])],
+                     "reactions": [dict(r) for r in look.ALIEN_REACTIONS]})   # Phase 7: hop on the beat
     return nodes, ents
 
 
@@ -262,6 +263,7 @@ def scene_doc(state, interim, camera_name):
     return doc
 
 
+AUDIO_DIR = os.path.abspath(os.path.join(HERE, "..", "..", "assets", "audio"))
 AUDIO = os.path.join(HERE, "..", "..", "assets", "audio", "feline-footwear.wav")
 
 # ---- CP-D: the arc on the timeline (arc.py) ----------------------------------------------------------------------
@@ -296,7 +298,7 @@ def arc_timeline():
             structure = shape
         assert shape == structure, "the arc's programs changed structure at %.1f s" % t
         for p in progs:
-            assert len(p["ops"]) <= 64, (p["name"], len(p["ops"]))
+            assert len(p["ops"]) <= 96, (p["name"], len(p["ops"]))   # kMaxMaterialOps (ADR-1863)
             for i, op in enumerate(p["ops"], 1):
                 for field in ("constant", "constant2", "constant3", "constant4", "value"):
                     if field in op:
@@ -322,9 +324,12 @@ def project_doc(scene_rel, state):
     return {
         "format": "avgen-project", "version": 4,
         "assets": {"scene": {"kind": "composition", "path": scene_rel},
-                   "audio": AUDIO},
+                   "audio": AUDIO,
+                   "stems": [dict(st, file=os.path.join(AUDIO_DIR, st["file"])) for st in look.FELINE_STEMS]},
         "parameters": dict(look.post(state), **{"post/output/dither": 1.0, "env/tiles/rings/ahead": 150.0}),
         "routes": look.audio_routes(),
+        # Phase 7: Feline's stems as feeds (the beat clock follows the drums, the levels the bass)
+        "feeds": dict(look.FELINE_FEEDS),
         **({"timeline": arc_timeline()} if FULL else {}),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                    "path": "renders/musical-geography.mp4"},

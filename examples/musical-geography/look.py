@@ -44,7 +44,7 @@ STATES = {
         sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
         land=["#A848C8", "#DC56AE", "#FF7486", "#FF9442", "#FFC03A"],   # r7: magenta-orchid lowlands, gold hill masses
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
-        path="#FFF5E2", path_emit=0.35, pad="#FF8FB4", pad_emit=0.0,
+        path="#FFF5E2", path_emit=0.875, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
         fog_mult=4.5, exposure=-0.5, saturation=1.6, look="punchy", bloom=0.25),
     "sunset": dict(
@@ -57,7 +57,7 @@ STATES = {
         sun="#FFB848", sun_int=3.4, amb="#5E46B8", amb_int=1.0,
         land=["#4E2A7E", "#8A2C78", "#D0405A", "#FF7448", "#FFA032"],
         water=["#24164F", "#4A2380", "#8A2F8C", "#E2507A"], shallow="#9A3A9A", under="#3A1A4E",
-        path="#FFD7A0", path_emit=0.6, pad="#FFB070", pad_emit=0.0,
+        path="#FFD7A0", path_emit=1.5, pad="#FFB070", pad_emit=0.0,
         drift="#6A3AA0", drift_amt=0.28, edge="#FFC27A", edge_gain=0.45, crest_gain=0.0,   # crest cut at sunset: its peaks read as polka dots
         fog_mult=5.0, exposure=-0.1, saturation=1.2, look="medium-high", bloom=0.25),
     "night": dict(
@@ -71,7 +71,7 @@ STATES = {
         sun="#C8B4FF", sun_int=0.0, amb="#5A38B0", amb_int=0.6,
         land=["#221A6C", "#36228E", "#52289E", "#7430B0", "#9C44C8"],
         water=["#0E1452", "#18227A", "#2443B0", "#3F78FF"], shallow="#2A3AA0", under="#120E3A",
-        path="#FF5FB0", path_emit=5.0, pad="#FF4FA8", pad_emit=6.0,
+        path="#FF5FB0", path_emit=2.0, pad="#FF4FA8", pad_emit=6.0,
         drift="#5A2CB4", drift_amt=0.28, edge="#5A86FF", edge_gain=7.0, crest_gain=0.0,   # CP-B: on 4 m tiles the crest lit whole tiles as white blocks on the sea
         fog_mult=0.85, exposure=0.6, saturation=1.0, look="medium-high", bloom=0.6),
     "dawn": dict(
@@ -88,7 +88,7 @@ STATES = {
         sun="#FFD08A", sun_int=4.4, amb="#E0C8D8", amb_int=0.55,
         land=["#C07A9A", "#E694A6", "#F6B49A", "#FAD08A", "#FFE8B8"],
         water=["#4E5AA0", "#6C78BC", "#A09CD6", "#FFD8C8"], shallow="#F0B8C0", under="#6A4A70",
-        path="#F8C060", path_emit=0.25, pad="#FFC8A0", pad_emit=0.0,
+        path="#F8C060", path_emit=0.625, pad="#FFC8A0", pad_emit=0.0,
         drift="#F8C8B0", drift_amt=0.28, edge="#FFD8A0", edge_gain=0.5, crest_gain=0.0,   # crest cut: its peaks read as polka dots (as sunset)
         fog_mult=8.0, exposure=-0.2, saturation=1.3, look="medium-high", bloom=0.25,
         fog_density=0.00019),   # the DayNight curve's own key (draft2): the default sunrise fog (0.00035) was the haze
@@ -180,11 +180,12 @@ def fog_density_default(phase):
 CONTOUR_INTERVAL = 4.0   # metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
-def tile_dynamics():
+def tile_dynamics():  # noqa: E302
     """Two crossing wave trains on the water (the land barely feels them), a slow regional breath, a drift, and rings
     that onsets drop ahead of the camera. Quiet audio leaves a calm sea, not a constant swell (04- §6, brief §10)."""
     return {
         "amplitude": 0.35,                     # response.low adds up to +0.6 (routes)
+        "glow": dict(GLOW_REST),               # Phase 7 (ADR-1963): the emission lanes' rest gains (audio adds)
         "waves": [
             {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
              "onLand": 0.08, "onWater": 1, "crest": 0.6},
@@ -198,13 +199,52 @@ def tile_dynamics():
     }
 
 
+# ---- the music (Phase 7, ADR-1963/1964; CP-D draft3) -------------------------------------------------------------
+# Engineering's starting mapping (02-requests, Phase 7), tuned by eye and ear on Feline across the whole arc. Every
+# route ADDS to a rest value and is unipolar, so silence shows the rest: the land still waves and breathes, the lights
+# sit at their rest glow. The glow lanes multiply each state's own emission, so the touch scales with the arc: the day
+# (path 0.35-0.875, no contours, no pads) moves lightly, the night strongly.
+GLOW_REST = {"path": 0.4, "contour": 0.7, "crest": 1.0, "pads": 0.6}
+
+
 def audio_routes():
-    """Feline Footwear (and any song): lows lift the waves, onsets drop a ring 150 m ahead. Nothing else is driven."""
     return [
+        # the swell: low attacks (kick and bass) lift every wave train (as CP-B/C)
         {"source": "response.low", "target": "env/tiles/amplitude", "amount": 0.6, "op": "add", "polarity": "unipolar"},
+        # a ring dropped 150 m ahead on each onset (as CP-B/C)
         {"source": "response.onset", "target": "env/tiles/rings/trigger", "amount": 1.0, "op": "add",
          "polarity": "unipolar"},
+        # dense passages breathe deeper (audio.energy is already smoothed over 1 s)
+        {"source": "audio.energy", "target": "env/tiles/breathing/amplitude", "amount": 0.25, "op": "add",
+         "polarity": "unipolar"},
+        # the contour lines climb the hills one interval per bar (the offset wraps seamlessly at the interval)
+        {"source": "beat.bar", "target": "env/tiles/contour/offset", "amount": CONTOUR_INTERVAL, "op": "add",
+         "polarity": "unipolar"},
+        # ...and swell on each beat: +0.8 over a rest of 0.7 (eng's +1.5 over 0.5 tripled the night lines on every
+        # beat -- a strobe at 121 BPM), falling at 3/s so a beat breathes rather than blinks
+        {"source": "beat.pulse", "target": "env/tiles/glow/contour", "amount": 0.8, "op": "add", "polarity": "unipolar",
+         "envelope": "peakhold", "envelopeFallPerSecond": 3.0},
+        # the path with the mids (the melodic register); night path_emit lowered 5 -> 2 so it no longer clips
+        {"source": "response.mid", "target": "env/tiles/glow/path", "amount": 1.2, "op": "add", "polarity": "unipolar",
+         "attackMs": 30.0, "decayMs": 250.0},
+        # the crown pads with the highs
+        {"source": "response.high", "target": "env/tiles/glow/pads", "amount": 0.8, "op": "add", "polarity": "unipolar",
+         "attackMs": 20.0, "decayMs": 300.0},
     ]
+
+
+# the aliens (entity reactions: a seek replays them, so a scrub hops the way a play does)
+ALIEN_REACTIONS = [
+    {"signal": "beat.pulse", "target": "hop/trigger", "depth": 1.0},
+    {"signal": "response.level", "target": "hop/apex", "depth": 1.6, "chain": {"attackMs": 80.0, "decayMs": 400.0}},
+    {"signal": "response.level", "target": "hop/strength", "depth": 0.8, "chain": {"attackMs": 80.0, "decayMs": 400.0}},
+]
+
+# Feline's stems: the beat clock and the hits from the drums, the levels from the bass (docs/help/audio-input.md)
+FELINE_STEMS = [{"key": "drums", "label": "Drums", "role": "drums", "file": "stems/feline-footwear (Drums).wav"},
+                {"key": "bass", "label": "Bass", "role": "bass", "file": "stems/feline-footwear (Bass).wav"},
+                {"key": "synth", "label": "Synth", "role": "synth", "file": "stems/feline-footwear (Synth).wav"}]
+FELINE_FEEDS = {"beat": "stem.drums", "hits": "stem.drums", "levels": "stem.bass"}
 
 
 def fog_medium(state):
@@ -310,6 +350,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     B = lambda k: [float(k)] * 4   # noqa: E731
     o = []
     add = o.append
+
+    def glow(reg, lane, tmp):   # Phase 7 (ADR-1963): an emission lane times its live gain (tileGlow x path, y contour,
+        add({"kind": "input", "input": "tileGlow", "dst": tmp})          # z crest, w pads; 1 = as authored)
+        add({"kind": "swizzle", "dst": tmp, "srcA": tmp, "constant": B(lane)})
+        add({"kind": "multiply", "dst": reg, "srcA": reg, "srcB": tmp})
+
     add({"kind": "input", "input": "localPosition", "dst": 0})
     add({"kind": "tileBorder", "dst": 1, "srcA": 0, "constant": [half, half, BORDER_BAND, thick / 2],
          "constant2": [sub, 0, 0, 0], "value": 1.0})
@@ -334,6 +380,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 6})                         # x crown
         add({"kind": "constant", "dst": 4, "constant": _c4([v * s["pad_emit"] for v in hexlin(s["pad"])])})
         add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 7})                         # r4 = emission
+        glow(4, 3, 6)                                                                     # x the pads' glow
     else:
         add({"kind": "constant", "dst": 4, "constant": [0, 0, 0, 1]})
     add({"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(0)})                        # water
@@ -353,6 +400,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     add({"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 7, "srcC": 3})
     add({"kind": "constant", "dst": 7, "constant": _c4([v * s["path_emit"] for v in hexlin(s["path"])])})
     add({"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 7})
+    glow(3, 0, 7)                                                                         # x the path's glow
     add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 3})
     if not far:   # per-tile value jitter on the lattice hash (request 1978)
         add({"kind": "input", "input": "instanceColor", "dst": 3})
@@ -389,12 +437,14 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "remap", "dst": 7, "srcA": 7, "constant": [CONTOUR_FADE[0], CONTOUR_FADE[1], 1.0,
                                                                  CONTOUR_FADE[2]], "value": 1.0})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        glow(1, 1, 7)                                                                     # x the contours' glow
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
         if cg > 0:
             add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(1)})                 # crest
             add({"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [CREST_EDGE[0], CREST_EDGE[1], 0, 0]})
             add({"kind": "constant", "dst": 7, "constant": _c4([v * cg for v in hexlin(s["water"][3])])})
             add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+            glow(1, 2, 7)                                                                 # x the crest's glow
             add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
     add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5})                              # emission: top only
     return {"name": name, "ops": o, "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4,
