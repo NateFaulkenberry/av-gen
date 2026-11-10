@@ -47,8 +47,13 @@ inline constexpr std::size_t kMaxTileRivers = 4;
 inline constexpr std::size_t kMaxTileRiverPoints = 32;   // per river
 inline constexpr std::size_t kMaxTileRiverPool = 64;     // all the rivers' points together (the GPU block)
 inline constexpr std::size_t kMaxTilePonds = 8;
-inline constexpr std::size_t kMaxTileValleys = 4;
-inline constexpr std::size_t kMaxTileValleyPool = 32;    // all the valleys' points together
+inline constexpr std::size_t kMaxTileValleys = 8;       // ADR-1992 (CPD-R3): 4 -> 8
+inline constexpr std::size_t kMaxTileValleyPool = 64;    // all the valleys' points together (ADR-1992: 32 -> 64)
+// ADR-1992: the raised land -- ridges and rises -- added to the land before any carving.
+inline constexpr std::size_t kMaxTileRidges = 8;
+inline constexpr std::size_t kMaxTileRidgePoints = 32;   // per ridge
+inline constexpr std::size_t kMaxTileRidgePool = 64;     // all the ridges' points together
+inline constexpr std::size_t kMaxTileRises = 8;
 
 // A river: a polyline from its source (first point) to its mouth (last). Within `valleyWidth / 2` the land eases to the
 // water's level with the smoothstep profile (no walls); within `width / 2` the tiles are river water. The level eases
@@ -83,6 +88,24 @@ struct TileValley {
     float valleyWidth = 120.0f;
     float depth = 6.0f;
     float depthFraction = 0.0f;
+};
+
+// ADR-1992: a ridge -- land raised by `height` metres along a polyline, falling to nothing at `width / 2` from it with
+// the smoothstep profile. Where its profile is above about half (its core) it is land, even over the sea.
+struct TileRidge {
+    std::string name;
+    std::vector<glm::vec2> points;
+    float height = 20.0f;
+    float width = 120.0f;
+};
+// ADR-1992: a rise -- land raised by `height` within `radius` of `centre`, easing to nothing over `edge` metres beyond
+// it. Its core is land: in the sea, an island.
+struct TileRise {
+    std::string name;
+    glm::vec2 centre{0.0f};
+    float radius = 40.0f;
+    float height = 20.0f;
+    float edge = 40.0f;
 };
 
 struct TileTerrainSpec {
@@ -121,6 +144,10 @@ struct TileTerrainSpec {
     std::vector<TileRiver> rivers;
     std::vector<TilePond> ponds;
     std::vector<TileValley> valleys;
+    // ADR-1992: ridges and rises, added to the land's height (metres, not scaled by heightScale) before the valleys,
+    // rivers and ponds cut it; their cores make land in the sea.
+    std::vector<TileRidge> ridges;
+    std::vector<TileRise> rises;
     // Resolved by resolveWater() (not authored, not saved, not hashed): each river's source level and length, each
     // pond's level. tileSample computes any it is missing, slowly, so an unresolved spec is still right.
     struct Resolved {
