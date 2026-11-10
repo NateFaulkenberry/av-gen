@@ -634,11 +634,14 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
     // its motion can step (never more than the land's), so no gap shows through the swell. 0 at rest.
     let crest = t.crest;
     let seaSkirt = min(t.step, tile.skirt.x);
-    // The skirt: a land tile's box reaches `skirt` further down with its top where it was (the centre drops by half).
+    // The skirt: a land tile's box reaches `skirt` further down with its top where it was.
+    // ADR-1991: the top IS t.height -- the surface bodies stand on, flight clears and the contour pass reads from
+    // scale.w. The centred box (thickness tile.skirt.y) sits half its stretched height below it. It used to sit centred
+    // on t.height, its top half a thickness above everything that reads the ground (0.6 m on 4 m tiles): feet sank.
     let wet = clamp(t.water, 0.0, 1.0);
     let k = tile.skirt.x * (1.0 - wet) + seaSkirt * wet;
     let stretch = (tile.skirt.y + k) / tile.skirt.y;
-    let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height - 0.5 * k, (f32(iz) + 0.5) * cellSize);
+    let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height - 0.5 * (tile.skirt.y + k), (f32(iz) + 0.5) * cellSize);
     r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 1.0);
     r.rotation = gen.rotation;
     // scale.w (a program's `instanceIndex`, meaningless for a window that moves): the tile's top, generator metres. The

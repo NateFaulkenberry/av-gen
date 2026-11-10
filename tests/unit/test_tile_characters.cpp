@@ -21,6 +21,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cmath>
+#include <filesystem>
 #include <map>
 
 using namespace avgen;
@@ -965,4 +966,102 @@ TEST_CASE("cue-only hops answer in turns, never faster than the gap, and last wh
     const nlohmann::json patient = {{"cueOnly", 1.0}, {"maxWait", 5.0}, {"hopChance", 0.0}};
     const CueRun none = runCues(patient, 0.001f, 4.5, 3); // bpm ~0: the cue never pulses within 4.5 s
     CHECK(none.launches == 0);
+}
+
+// ---- ADR-1991: no skinned mesh sinks into a tile ------------------------------------------------------------------
+
+TEST_CASE("a hopping alien's mesh never sinks into the tile under any of its vertices", "[tiles][hop][geography][feet]") {
+    // The owner's regression: 06-characters/cpd-r2-feet-close-landings at 2.0 s -- the landing crouch kneels below the
+    // root's plane, feet and shins inside the landed tile. Every vertex of the drawn (skinned, lifted) mesh is checked
+    // against the drawn top of the tile under THAT vertex, every frame through several landings.
+    const std::filesystem::path aliens = std::filesystem::path(AVGEN_SOURCE_DIR) / "assets" / "aliens";
+    if (!std::filesystem::exists(aliens / "alien-scout.glb")) {
+        SKIP("assets/aliens is not present (commercial assets, never committed)");
+    }
+    nlohmann::json json = nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "sink",
+        "camera": {"position": [0, 6, 14], "target": [0, 0, 0]},
+        "environment": {"tileDynamics": {
+            "waves": [ {"amplitude": 0.5, "wavelength": 36, "speed": 5, "onLand": 0.5} ],
+            "spring": {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16, "rippleRadius": 14}
+        }},
+        "nodes": [
+            {"name": "ground", "kind": "procedural", "position": [0, 0, 0],
+             "procedural": {"source": {"kind": "box", "size": [3.66, 1.2, 3.66]},
+                "distribution": {"kind": "generator", "generator": {"name": "tiles", "version": 1,
+                    "cellSize": 4.0, "viewDistance": 60.0, "tiles": {"seed": 3, "landThreshold": 0.2}}},
+                "slabs": true}},
+            {"name": "alien", "kind": "gltf", "position": [2, 0, 2], "scale": [1.94, 1.94, 1.94],
+             "animation": {"state": "Idle", "blend": 0.25, "speed": 1.0}}
+        ],
+        "entities": [
+            {"name": "alien", "node": "alien", "seed": 5,
+             "clips": {"idle": "Idle", "walk": "Walking", "run": "Running", "jump": "Jumping", "fall": "Floating",
+                       "land": "Landing"},
+             "behaviors": [{"kind": "hop", "hopChance": 0.8, "pauseMin": 0.3, "pauseMax": 0.8, "airTime": 1.2,
+                            "apex": 2.4, "strength": 1.2, "homeRadius": 14, "goalMin": 1, "goalMax": 3}]}
+        ]})");
+    json["nodes"][1]["asset"] = (aliens / "alien-scout.glb").string();
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::fromJson(json, registry);
+    REQUIRE(c.has_value());
+    scene::Composition& comp = **c;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    comp.attach(params, modulator);
+    float worst = 0.0f;
+    float worstAt = 0.0f;
+    float liftMax = 0.0f;
+    int landings = 0;
+    for (int f = 0; f <= 30 * 14; ++f) {
+        FrameTime t{};
+        t.renderTime = f / 30.0;
+        t.deltaTime = f == 0 ? 0.0 : 1.0 / 30.0;
+        t.frameIndex = static_cast<std::uint64_t>(f);
+        params.resetFinals();
+        comp.updateFields(t, bus, modulator);
+        modulator.applyRoutes(bus, params, t.deltaTime);
+        comp.updateBehaviour(t, bus);
+        comp.update(t);
+        if (f < 30) continue;
+        liftMax = std::max(liftMax, comp.lastCharacterLift());
+        const scene::Scene& s = comp.scene();
+        landings = static_cast<int>(s.environment.tileDynamics.springs.size());
+        const scene::ProceduralGeometry* g = nullptr;
+        for (const auto& p : s.procedurals) {
+            if (p.distribution.generator.isTiles()) g = &p;
+        }
+        REQUIRE(g != nullptr);
+        const float pitch = g->distribution.generator.cellSize;
+        for (const scene::Entity& e : s.entities) {
+            if (e.rig == scene::kInvalidRig || e.mesh >= s.meshes.size() || !s.meshes[e.mesh].skinned()) continue;
+            const scene::MeshData& mesh = s.meshes[e.mesh];
+            const scene::SkinnedRig& rig = s.rigs[e.rig];
+            const glm::mat4 m = e.transform.matrix();
+            for (std::size_t v = 0; v < mesh.vertices.size(); ++v) { // every vertex, not the pass's subset
+                glm::vec3 p(0.0f);
+                for (int k = 0; k < 4; ++k) {
+                    const float w = mesh.skin[v].weights[k];
+                    if (w > 0.0f && mesh.skin[v].joints[k] < rig.palette.size()) {
+                        p += glm::vec3(rig.palette[mesh.skin[v].joints[k]] * glm::vec4(mesh.vertices[v].position, 1.0f)) * w;
+                    }
+                }
+                const glm::vec3 world = glm::vec3(m * glm::vec4(p, 1.0f));
+                const glm::vec2 cc = scene::tileCentre(pitch, scene::tileIndexAt(pitch, world.x, world.z));
+                const float top = scene::tileSampleMoving(g->distribution.generator.tiles, s.environment.tileDynamics,
+                                                          cc.x, cc.y, static_cast<float>(t.renderTime), pitch).height;
+                if (top - world.y > worst) {
+                    worst = top - world.y;
+                    worstAt = static_cast<float>(t.renderTime);
+                }
+            }
+        }
+    }
+    CAPTURE(worst, worstAt, liftMax, landings);
+    WARN("ADR-1991: deepest pose below its tile before the lift " << liftMax * 100.0f << " cm; after, any vertex "
+                                                                  << worst * 100.0f << " cm");
+    CHECK(landings > 0);
+    CHECK(liftMax > 0.05f);   // the canary: without the pass the pose does sink (a landing crouch, a ringing tile)
+    CHECK(worst <= 0.02f);    // with it, no vertex is more than 2 cm inside the tile under it (the subset's margin)
 }
