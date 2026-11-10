@@ -160,6 +160,7 @@ constexpr InputName kInputNames[] = {
     {MaterialInput::Footprint, "footprint"},
     {MaterialInput::MaterialEmission, "materialEmission"},
     {MaterialInput::TileGlow, "tileGlow"}, // ADR-1963
+    {MaterialInput::LandingGlow, "landingGlow"}, // ADR-1960
 };
 
 // ---- structural hashing (FNV-1a over the bit patterns, as in procedural.cpp) ----------------------
@@ -544,6 +545,8 @@ glm::vec4 inputValue(MaterialInput input, const MaterialContext& ctx) {
         return ctx.materialEmission;
     case MaterialInput::TileGlow:
         return ctx.tileGlow;
+    case MaterialInput::LandingGlow:
+        return ctx.landingGlow;
     }
     return glm::vec4(0.0f);
 }
@@ -862,13 +865,17 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         return {1.0f - (1.0f - bx.x) * (1.0f - bz.x), std::min(bx.y, bz.y), top, std::min(bx.z, bz.z)};
     }
     case MaterialOpKind::TileContour: {
-        // ADR-1970: the twin of matKTileContour. b.w = crest + 2 * mask (bits +x, -x, +z, -z).
-        const float w = std::max(b.w, 0.0f);
+        // ADR-1970: the twin of matKTileContour. b.w = crest + 2 * mask (bits +x, -x, +z, -z) + 32 * the landing glow in
+        // 255ths (ADR-1960, scene::tilePackedEmissiveW).
+        const float packed = std::max(b.w, 0.0f);
+        const float landingQ = std::floor(packed / 32.0f);
+        const float w = packed - 32.0f * landingQ;
+        const float landing = std::clamp(landingQ / 255.0f, 0.0f, 1.0f);
         const auto mask = static_cast<std::uint32_t>(std::floor(w * 0.5f));
         const float crest = std::clamp(w - 2.0f * static_cast<float>(mask), 0.0f, 1.0f);
-        const auto side = [&](float half, float dist, float fw) {
+        const auto sideBand = [&](float half, float dist, float fw, float band) {
             const float pixel = std::max(fw, 1e-6f);
-            const float width = std::max(k.z, f * fw);
+            const float width = std::max(band, f * fw);
             const float t = std::clamp((dist - (width - 0.5f * pixel)) / pixel, 0.0f, 1.0f);
             const float cover = 1.0f - t * t * (3.0f - 2.0f * t);
             const float size = 2.0f * half / pixel;
@@ -876,19 +883,29 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
             const float e = std::clamp((size - 2.0f) / 2.0f, 0.0f, 1.0f);
             return mean + (cover - mean) * (e * e * (3.0f - 2.0f * e));
         };
+        const auto side = [&](float half, float dist, float fw) { return sideBand(half, dist, fw, k.z); };
+        // ADR-1960: the landing outline's own band (constant.w), the contour's when 0
+        const float landingBand = k.w > 0.0f ? k.w : k.z;
         float keep = 1.0f;
-        int sides = 0;
         const auto flagged = [&](std::uint32_t bit, float half, float dist, float fw) {
             if ((mask & bit) != 0u) {
                 keep *= 1.0f - side(half, dist, fw);
-                ++sides;
             }
         };
         flagged(1u, k.x, k.x - a.x, ctx.localFootprint.x);
         flagged(2u, k.x, k.x + a.x, ctx.localFootprint.x);
         flagged(4u, k.y, k.y - a.z, ctx.localFootprint.y);
         flagged(8u, k.y, k.y + a.z, ctx.localFootprint.y);
-        return {1.0f - keep, crest, static_cast<float>(sides) * 0.25f, sides > 0 ? 1.0f : 0.0f};
+        // ADR-1960: z = the landing outline -- all four sides, the contour's own band -- times the landing glow; w = the
+        // glow itself (was: the flagged side count and "any side")
+        float ring = 1.0f;
+        if (landing > 0.0f) {
+            ring *= 1.0f - sideBand(k.x, k.x - a.x, ctx.localFootprint.x, landingBand);
+            ring *= 1.0f - sideBand(k.x, k.x + a.x, ctx.localFootprint.x, landingBand);
+            ring *= 1.0f - sideBand(k.y, k.y - a.z, ctx.localFootprint.y, landingBand);
+            ring *= 1.0f - sideBand(k.y, k.y + a.z, ctx.localFootprint.y, landingBand);
+        }
+        return {1.0f - keep, crest, (1.0f - ring) * landing, landing};
     }
     case MaterialOpKind::TextureTriplanar:
     case MaterialOpKind::TextureTriplanarNormal:

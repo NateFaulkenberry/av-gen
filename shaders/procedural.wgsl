@@ -1195,6 +1195,7 @@ fn fs_proc_unlit(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) ->
         ctx.audioBands = frame.audioBands;
         ctx.beat = frame.beat;
         ctx.tileGlow = frame.tileGlow; // ADR-1963
+        ctx.landingGlow = frame.landingGlow; // ADR-1960
         ctx.viewDirection = normalize(frame.cameraPos.xyz - worldPos);
         ctx.depth = distance(frame.cameraPos.xyz, worldPos);
         ctx.occlusion = 1.0;
@@ -1328,6 +1329,7 @@ fn fs_proc_depth(in: ProcVertexOut) {
             ctx.audioBands = frame.audioBands;
             ctx.beat = frame.beat;
             ctx.tileGlow = frame.tileGlow; // ADR-1963
+            ctx.landingGlow = frame.landingGlow; // ADR-1960
             ctx.viewDirection = normalize(frame.cameraPos.xyz - in.worldPos);
             ctx.depth = distance(frame.cameraPos.xyz, in.worldPos);
             ctx.materialEmission = vec4<f32>(object.emissive.rgb * in.instEmissive.rgb * object.emissive.w, 1.0);

@@ -197,10 +197,10 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, 16> events; // x, z, time, strength (the frame's visible events, newest first)
     // ADR-1954: the landing springs.
     glm::vec4 spring0;    // depth, frequency (Hz), damping, ripple speed
-    glm::vec4 spring1;    // ripple radius, spring count, 0, 0
-    std::array<glm::vec4, 8> springs; // x, z, time, strength
+    glm::vec4 spring1;    // ripple radius, spring count, ADR-1960 glow radius, 0
+    std::array<glm::vec4, scene::kMaxTileSprings> springs; // x, z, time, strength (CP-D r2: 256)
 };
-static_assert(sizeof(GeneratorTileUniforms) == 1104);
+static_assert(sizeof(GeneratorTileUniforms) == 1104 - 8 * 16 + scene::kMaxTileSprings * 16);
 // Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied, and (ADR-1953)
 // the scene's moving ground at time `t`.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,

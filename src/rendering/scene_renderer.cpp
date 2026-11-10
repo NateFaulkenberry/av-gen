@@ -3665,6 +3665,10 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.waterColumn = glm::vec4(scene.environment.waterSurface, glm::max(scene.environment.waterDownwelling, glm::vec3(0.0f)));
     frame.tileGlow = scene.environment.tileDynamics.glow; // ADR-1963
     {
+        const auto& td = scene.environment.tileDynamics;
+        frame.landingGlow = glm::vec4(td.landingColor * td.landingGain, td.landingGain); // ADR-1960
+    }
+    {
         // ADR-1151: the reflection-only bands; all zero (the gate closed) unless the scene authored them.
         const scene::ReflectionBandLanes lanes = scene::packReflectionBands(scene.environment.bands);
         frame.bandsInfo = lanes.info;

@@ -961,3 +961,42 @@ All 128 tracks are live in `--audit-routes`. Stills: `10-full/cpd-r2-sky-night-v
    phase rather than a keyed constant.
 3. **Cell size:** nothing needed. The cloud layers' 16 m and 48 m cells against the ground's 4 m tiles, with the
    cores-only night, already break the reflection rhythm.
+### Engineering → art, CP-D r2 (2026-11-10): the landing tail (ADR-1952) and the landing glow (ADR-1960)
+
+**What I changed:**
+
+- **The landing tail.** At most 8 landings used to be drawn. Draft3 had up to 104 ringing at once, so a landed tile
+  was dropped about 0.6 s after it landed and snapped flat. Now every landing still ringing is drawn, up to 256. The
+  plot is `06-characters/cpd-r2-landing-displacement-before-after.png`. Nothing for you to switch on.
+- **Your spring now rings all the way out,** so its settings show for the first time. Draft3's spring is 1.4 Hz with
+  ζ 0.16: bouncy, ringing about 5 s. A gentler setting, frequency 0.7 and damping 0.35 (depth unchanged), gives one
+  slow dip, one small rebound and a smooth settle. It is the third arm of the clip. The choice is yours.
+
+**The landing glow, switch-on (4 ops in `tile_program`).** The glow outlines the tiles a landing pushes down and fades
+with them. It is off until you add the ops below. Add them after the contour lines' `add` into r4; r3 still holds
+`tileContour`'s result there:
+
+```python
+add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(2)})       # the landed tiles' outline x their glow
+add({"kind": "input", "input": "landingGlow", "dst": 7})               # colour x gain
+add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
+```
+
+**Its width and strength:**
+- **Width:** `tileContour`'s `constant.w` is the outline's band in local metres; 0 uses the contour lines' band.
+  The clip uses `[half, half, CONTOUR_BAND, 0.3]`.
+- **Gain and colour:** `environment.tileDynamics.glow.landing` (gain) and `glow.landingColor` (`[r, g, b]`). As
+  parameters they are `env/tiles/glow/landing` and `env/tiles/glow/landingColor`, so you can key them per arc state
+  like the other gains.
+- **Spread:** `spring.glowRadius` (default 3 m) is how far the glow spreads around the impact. Keep it near a tile.
+  The ripple's 14 m lit the whole field, because about 100 landings ring at once.
+- **The clip's values:** gain 12, colour `[1.0, 0.85, 0.6]`, chosen to read in daylight. Night will want much less.
+- **Clips** (`06-characters/`):
+  - `cpd-r2-landing-before-vs-after-glow-50-70s.mp4`: top is draft3, bottom is the fix plus the glow;
+  - `cpd-r2-landing-before-after-soft-50-70s.mp4`: draft3, then the fix, then the fix with the softer spring.
+
+**One more thing, which the reactivity explainer covers in full (`10-audio-reactivity-now.md`):** the project needs
+`"sonic": {"live": true}`. Without it, `response.low`, `response.onset`, `response.mid`, `response.high` and
+`response.level` never publish, so four of the seven terrain routes and two hop reactions are dead in draft3. I have
+not changed `build.py`; this is one line in `project_doc`.

@@ -304,6 +304,11 @@ TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][g
         }
         d.spring.depth = 1.2f;
         d.springs = {{6.6f, {4.5f, 3.5f}, 1.0f}, {6.9f, {-6.5f, -2.5f}, 1.4f}, {5.8f, {1.5f, -8.5f}, 0.8f}};
+        for (int i = 0; i < 40; ++i) { // CP-D r2: well past the old cap of 8, every one still ringing
+            const float ang = 0.9f * static_cast<float>(i);
+            d.springs.push_back({3.0f + 0.1f * static_cast<float>(i), {14.0f * std::cos(ang), 14.0f * std::sin(ang)},
+                                 0.5f + 0.02f * static_cast<float>(i)});
+        }
         const float time = 7.25f;
         const auto pg = tilesObject("sprung", 1.0f, 40.0f, 4, 0.0f, 0.0f, 0.0f, 1);
         const glm::vec3 camera(0.5f, 30.0f, 0.5f);
@@ -321,6 +326,8 @@ TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][g
         unsprung.springs.clear();
         float worstHeight = 0.0f;
         float sprung = 0.0f;
+        float worstLanding = 0.0f;
+        float litMax = 0.0f;
         for (std::int32_t z = 0; z < w.countZ; ++z) {
             for (std::int32_t x = 0; x < w.countX; ++x) {
                 const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
@@ -331,11 +338,17 @@ TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][g
                 const scene::TileSample plain = scene::generatorTileInWindow(g, ix, iz, w, &unsprung, time);
                 worstHeight = std::max(worstHeight, std::abs(r.position.y - moving.height));
                 sprung = std::max(sprung, std::abs(moving.height - plain.height));
+                // ADR-1960: the landing glow packed above the crest, as the CPU twin computes it
+                const float gpuLanding = std::floor(r.emissive.w / 32.0f) / 255.0f;
+                worstLanding = std::max(worstLanding, std::abs(gpuLanding - std::round(moving.landing * 255.0f) / 255.0f));
+                litMax = std::max(litMax, moving.landing);
             }
         }
-        CAPTURE(withWave, worstHeight, sprung);
+        CAPTURE(withWave, worstHeight, sprung, worstLanding, litMax);
         CHECK(sprung > 0.3f); // the control: the springs really moved tiles
         CHECK(worstHeight <= 2e-3f);
+        CHECK(litMax > 0.3f);
+        CHECK(worstLanding <= 1.5f / 255.0f); // one quantisation step either way
     }
     CHECK(ctx->errorCount() == 0);
 }

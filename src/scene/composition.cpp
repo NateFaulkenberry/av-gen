@@ -5223,6 +5223,13 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                 p.glow[static_cast<std::size_t>(i)] =
                     &params.add(floatDesc(base + "glow/" + glowNames[i], d.glow[i], 0.0f, 64.0f, 0.0f, 4.0f));
             }
+            // ADR-1960: the landing glow's gain and colour (keyable per arc state like any parameter)
+            p.landingGain = &params.add(floatDesc(base + "glow/landing", d.landingGain, 0.0f, 256.0f, 0.0f, 16.0f));
+            {
+                params::ParamDesc<glm::vec3> c = vec3Desc(base + "glow/landingColor", d.landingColor, 0.0f, 32.0f, 0.0f, 2.0f);
+                c.isColor = true;
+                p.landingColor = &params.add(c);
+            }
         }
         // ADR-350, the rest of the sweep: four more environment settings that the scene file could
         // set and nothing else could reach. `skybox` and `proceduralSkyBackground` in particular
@@ -9219,6 +9226,10 @@ TileDynamics Composition::liveTileDynamics() const {
         d.contourOffset = f(p.contourOffset, d.contourOffset);
         for (int i = 0; i < 4; ++i) {
             d.glow[i] = f(p.glow[static_cast<std::size_t>(i)], d.glow[i]);
+        }
+        d.landingGain = f(p.landingGain, d.landingGain); // ADR-1960
+        if (p.landingColor != nullptr) {
+            d.landingColor = p.landingColor->value();
         }
         d.live = tileLiveEvents_;
     }

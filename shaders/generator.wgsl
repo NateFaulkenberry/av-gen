@@ -222,8 +222,8 @@ struct TileParams {
     waves: array<vec4<f32>, 12>,
     events: array<vec4<f32>, 16>,
     spring0: vec4<f32>,    // ADR-1954: depth, frequency, damping, ripple speed
-    spring1: vec4<f32>,    // ripple radius, spring count
-    springs: array<vec4<f32>, 8>, // x, z, time, strength
+    spring1: vec4<f32>,    // ripple radius, spring count, ADR-1960 glow radius
+    springs: array<vec4<f32>, 256>, // x, z, time, strength (scene::kMaxTileSprings)
 };
 
 @group(0) @binding(2) var<uniform> tile: TileParams;
@@ -327,6 +327,7 @@ struct TileOut {
     path: f32,
     crest: f32, // ADR-1953
     step: f32,  // ADR-1953: the step the motion can open to a neighbour (the moving sea's skirt)
+    landing: f32, // ADR-1960: the landing glow, 0..1
 };
 
 fn tileSample(x: f32, z: f32) -> TileOut {
@@ -368,6 +369,7 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     out.path = 0.0;
     out.crest = 0.0;
     out.step = 0.0;
+    out.landing = 0.0;
     if (tile.info.y > 0u) {
         let d = tilePathDistance(x, z);
         let p = (1.0 - tileSmooth(0.5 * tile.e.z, 0.5 * tile.e.z + 0.75, d)) * land;
@@ -422,25 +424,81 @@ fn tileMotion(x: f32, z: f32, water: f32, cellSize: f32) -> vec3<f32> {
     return vec3<f32>(tile.dyn.y * height, clamp(crest, 0.0, 1.0), abs(tile.dyn.y) * step);
 }
 
-// ADR-1954: the landing springs at (x, z) (tileSpring's twin).
-fn tileSpring(x: f32, z: f32) -> f32 {
+// ADR-1954: the landing springs at (x, z) (tileSpring's twin), and ADR-1960 the landing glow (tileLanding's twin).
+// CP-D r2: a workgroup first gathers the springs that can reach its 8x8 cells (plus the seam band's blocks), in index
+// order (deterministic), so a sample loops over the few nearby landings rather than every one still ringing.
+const TILE_SPRING_CAP: u32 = 256u; // scene::kTileSprings
+var<workgroup> wgSpringHit: array<u32, 256>;
+var<workgroup> wgSprings: array<u32, 256>;
+var<workgroup> wgSpringCount: u32;
+
+fn tileGatherSprings(lid: u32, wg: vec2<u32>) {
+    let count = min(u32(tile.spring1.y + 0.5), TILE_SPRING_CAP);
+    let cellSize = gen.cell.x;
+    let ratio = f32(max(tile.blend.y, 1));
+    // the cells this workgroup writes, widened by a coarser block (the seam band reads it) and the springs' reach
+    let x0 = (f32(gen.window.x) + f32(wg.x * 8u) - ratio) * cellSize;
+    let z0 = (f32(gen.window.y) + f32(wg.y * 8u) - ratio) * cellSize;
+    let x1 = (f32(gen.window.x) + f32(wg.x * 8u + 8u) + ratio) * cellSize;
+    let z1 = (f32(gen.window.y) + f32(wg.y * 8u + 8u) + ratio) * cellSize;
+    let reach = 6.0 * max(tile.spring1.x, 1e-3); // kTileSpringReach ripple radii
+    for (var i = lid; i < TILE_SPRING_CAP; i = i + 64u) {
+        var hit = 0u;
+        if (i < count) {
+            let e = tile.springs[i];
+            let dx = max(max(x0 - e.x, e.x - x1), 0.0);
+            let dz = max(max(z0 - e.y, e.y - z1), 0.0);
+            if (dx * dx + dz * dz < reach * reach) {
+                hit = 1u;
+            }
+        }
+        wgSpringHit[i] = hit;
+    }
+    workgroupBarrier();
+    if (lid == 0u) {
+        var n = 0u;
+        for (var i = 0u; i < count; i = i + 1u) {
+            if (wgSpringHit[i] != 0u) {
+                wgSprings[n] = i;
+                n = n + 1u;
+            }
+        }
+        wgSpringCount = n;
+    }
+    workgroupBarrier();
+}
+
+// x: the springs' height offset; y: the landing glow (0..1, clamped by the caller after averaging)
+fn tileSpring(x: f32, z: f32) -> vec2<f32> {
     let t = tile.dyn.x;
     let w = TILE_TWO_PI * tile.spring0.y;
     let zeta = clamp(tile.spring0.z, 0.0, 0.999);
     let wd = w * sqrt(1.0 - zeta * zeta);
     var h = 0.0;
-    let count = min(u32(tile.spring1.y + 0.5), 8u);
-    for (var i = 0u; i < count; i = i + 1u) {
-        let e = tile.springs[i];
+    var l = 0.0;
+    let n = wgSpringCount;
+    for (var j = 0u; j < n; j = j + 1u) {
+        let e = tile.springs[wgSprings[j]];
         let r = sqrt((x - e.x) * (x - e.x) + (z - e.y) * (z - e.y));
+        let reach = r / max(tile.spring1.x, 1e-3);
+        if (reach >= 6.0) {
+            continue; // kTileSpringReach
+        }
         let a = t - e.z - r / tile.spring0.w;
         if (a < 0.0) {
             continue;
         }
-        let amp = tile.spring0.x * e.w * exp(-r / tile.spring1.x);
-        h = h - amp * exp(-zeta * w * a) * sin(wd * a);
+        let k = clamp((reach - 5.0) / (6.0 - 5.0), 0.0, 1.0); // kTileSpringReachStart .. kTileSpringReach
+        let window = 1.0 - k * k * (3.0 - 2.0 * k);
+        let env = exp(-zeta * w * a);
+        h = h - tile.spring0.x * e.w * exp(-r / tile.spring1.x) * window * env * sin(wd * a);
+        // ADR-1960: the glow on its own, tighter falloff (glowRadius <= rippleRadius), eased out by 6 of its radii
+        let gr = r / tile.spring1.z;
+        let gk = clamp(gr - 5.0, 0.0, 1.0);
+        let gw = 1.0 - gk * gk * (3.0 - 2.0 * gk);
+        l = l + e.w * exp(-gr) * gw * env * (1.0 - exp(-a / 0.06));
     }
-    return h;
+    return vec2<f32>(h, clamp(l, 0.0, 1.0));
 }
 
 // ADR-1953: a fine sample of the moving ground -- the base plus the waves and rings at that point, faded for the fine
@@ -451,9 +509,10 @@ fn tileSampleMoving(x: f32, z: f32, fine: f32) -> TileOut {
     if (tile.breath.w > 0.5) {
         let m = tileMotion(x, z, s.water, fine);
         let spring = tileSpring(x, z);
-        s.height = s.height + m.x + spring;
+        s.height = s.height + m.x + spring.x;
         s.crest = m.y;
-        s.step = m.z + 2.0 * abs(spring); // a sprung tile steps against its neighbours too
+        s.landing = spring.y; // ADR-1960
+        s.step = m.z + 2.0 * abs(spring.x); // a sprung tile steps against its neighbours too
     }
     return s;
 }
@@ -474,6 +533,7 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
     t.path = 0.0;
     t.crest = 0.0;
     t.step = 0.0;
+    t.landing = 0.0;
     var lowest = 3.0e38;
     for (var b = 0u; b < m; b = b + 1u) {
         for (var a = 0u; a < m; a = a + 1u) {
@@ -486,6 +546,7 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
             t.flat = t.flat + s.flat;
             t.path = t.path + s.path;
             t.crest = t.crest + s.crest;
+            t.landing = t.landing + s.landing;
             t.step = max(t.step, s.step);
         }
     }
@@ -496,6 +557,7 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
     t.flat = t.flat * inv;
     t.path = t.path * inv;
     t.crest = t.crest * inv;
+    t.landing = t.landing * inv;
     if (tile.blend.z != 0) {
         t.height = lowest; // ADR-1953: an underlay's cell at its lowest fine tile
     }
@@ -503,7 +565,9 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
 }
 
 @compute @workgroup_size(8, 8)
-fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
+fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_index) lid: u32,
+                     @builtin(workgroup_id) wg: vec3<u32>) {
+    tileGatherSprings(lid, wg.xy); // before any thread leaves: it has barriers
     let countX = u32(gen.window.z);
     let countZ = u32(gen.window.w);
     if (gid.x >= countX || gid.y >= countZ) {
@@ -542,6 +606,7 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
             var mf = 0.0;
             var mp = 0.0;
             var mc = 0.0;
+            var ml = 0.0;
             for (var b = 0; b < ratio; b = b + 1) {
                 for (var a = 0; a < ratio; a = a + 1) {
                     let c = tileCell(bx + a, bz + b);
@@ -551,6 +616,7 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
                     mf = mf + c.flat;
                     mp = mp + c.path;
                     mc = mc + c.crest;
+                    ml = ml + c.landing;
                     t.step = max(t.step, c.step);
                 }
             }
@@ -561,6 +627,7 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
             t.flat = t.flat + (mf * inv - t.flat) * w;
             t.path = t.path + (mp * inv - t.path) * w;
             t.crest = t.crest + (mc * inv - t.crest) * w;
+            t.landing = t.landing + (ml * inv - t.landing) * w;
         }
     }
     // ADR-1953: a moving sea opens steps between its slabs, which the static sea never has: it gets as much skirt as
@@ -579,7 +646,9 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>) {
     r.scale = vec4<f32>(gen.scaleInfo.x, gen.scaleInfo.y * stretch, gen.scaleInfo.z, t.height);
     r.random = vec4<f32>(t.water, t.shore, t.flat, t.path);
     r.color = vec4<f32>(1.0, 1.0, 1.0, genUnit(genHash(ix, iz, gen.hashing.x, 21u)));
-    r.emissive = vec4<f32>(1.0, 1.0, 1.0, crest); // ADR-1953: the crest channel in the emissive's spare lane
+    // ADR-1953: the crest channel in the emissive's spare lane; ADR-1960: the landing glow above it, in 255ths x 32
+    // (the contour pass adds 2 x its side mask between them; scene::tilePackedEmissiveW)
+    r.emissive = vec4<f32>(1.0, 1.0, 1.0, clamp(crest, 0.0, 1.0) + 32.0 * round(clamp(t.landing, 0.0, 1.0) * 255.0));
     records[index] = r;
 }
 
