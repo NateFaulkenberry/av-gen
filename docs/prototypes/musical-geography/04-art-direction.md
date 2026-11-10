@@ -1737,3 +1737,26 @@ tiles.
 **Noted in it:** at 4 s and 12 s a near translucent low cloud (170 m) passes in front of the now much taller west
 hills, and reads as a soft lavender smudge on the hill face. That is possible since land2 (relief to about 110 m).
 Raising the low layer, or thinning it over high ground, is an option.
+
+### CP-D r3 (pass 12): the night vale opened, banks requested, the low clouds raised (2026-11-10)
+
+**The night vale** (137–165 s; the owner: "too claustrophobic … ends with a giant mound … the pond-like features
+… don't look great"):
+- **The valley:** `coastVale` is wider (150 → 190 m) and runs on out onto the inlet (three more points), instead of
+  ending against the hill.
+- **The ridge:** `tarnRidge` is set back about 15 m.
+- **The ponds:** the four night ponds (`tarn`, `coast1`–`coast3`) are removed.
+- **v2 enclosure:** 1.0 at every point before; now 0.73 / 0.68 / 0.57 at 143 / 148 / 152 s. It then opens out: 0.35
+  at 156 s and 0.16 at 160 s, onto the inlet with its island far off. 137–140 s is still the river valley's exit at
+  1.0.
+
+**Water banks:**
+- **Checked:** the shore channel covers the sea's and raised land's coasts only, not ponds or rivers. Requested as
+  CPD-R4: an inland shore channel, `bankWidth`, a `lip` and a `step`.
+- **Meanwhile:** more motion on inland water (river waves 0.4, pond waves 0.3, drift 0.6 m).
+
+**Clouds:**
+- **The low layer** goes from 170 to 260 m, above the tallest land (about 155 m with the ridges). The 4 s and 12 s
+  smudge was a cloud in front of the west hills. It is gone. What is left there is the hill's own colour ramp into
+  the haze; the same frame is identical with the clouds opaque or off (`cpd-r3-04s-veil-is-terrain-not-cloud.png`).
+- **The 140 s corner** is clear now.

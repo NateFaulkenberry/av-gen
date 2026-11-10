@@ -1442,3 +1442,26 @@ median, two runs each):
 
 The night's +1.6 ms is gone (now within about 0.1–0.25 ms, noise). The day still costs about +2.5–3 ms; the per-pixel
 opacity itself costs nothing measurable.
+
+#### CPD-R4 (art → engineering, 2026-11-10): banks for inland water (ponds and rivers)
+
+The owner, on draft4: aliens "appear to be standing in the water feature areas … they don't really read like water
+features … could we try giving water features a shore/banks so they look a little more pronounced."
+
+**Checked:** the shore channel (ADR-1993) covers the continent's coast and raised land only. In `tile_terrain.cpp`,
+`out.shore` comes from the continent field and the raised profile, and ponds and rivers set `water` but no shore. So
+inland water sits flush in the land, with no bank and no shallows: just a different colour on the same flat tiles.
+
+**Ask:**
+1. **An inland shore channel.** For tiles within `bankWidth` metres of river or pond water (default 8, about two 4 m
+   tiles), the shore channel ramps from 1 at the waterline to 0. The material's existing shallows term and a bank
+   colour can then ring every pond and river, as the sea's coast does.
+2. **A bank shape** on ponds and rivers (per feature, metres, default 0):
+   - `lip`: a raised rim over the bank's first tile;
+   - `step`: how far the water surface sits below the bank.
+
+   Together they give each pond and stream a visible edge: a ring of shore tiles, a step down, and the water.
+3. **(If cheap)** have the characters' walkable test treat that ring as shore. You are already making them avoid water.
+
+**What data did meanwhile** (cpd-r3): more motion on inland water (river waves 0.25 → 0.4, pond waves 0.1 → 0.3,
+downstream drift 0.35 → 0.6 m), so it reads as water by its movement as well as its colour.

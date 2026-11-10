@@ -197,8 +197,8 @@ def tile_dynamics(state="day"):  # noqa: E302
         "glow": dict(GLOW_REST, landing=landing_glow(state)[0], landingColor=landing_glow(state)[1]),   # Phase 7
         # ADR-1965: rivers ripple downstream (a slow drift, no audio term) and carry a quarter of the sea's swell; the
         # ponds lie nearly still (a tenth), so they read as calm water set into the land, apart from the open sea
-        "water": {"riverWaves": 0.25, "pondWaves": 0.1, "driftAmplitude": 0.35, "driftWavelength": 24.0,
-                  "driftSpeed": 3.0},
+        "water": {"riverWaves": 0.4, "pondWaves": 0.3, "driftAmplitude": 0.6, "driftWavelength": 24.0,
+                  "driftSpeed": 3.0},   # cpd-r3: more motion so inland water reads as water (was 0.25 / 0.1 / 0.35)
         "waves": [
             {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
              "onLand": LAND_SWELL, "onWater": 1, "crest": 0.6},
@@ -601,7 +601,7 @@ def post(state):
 # 18-26 ms, ADR-1864).
 # (name, cell m, slab thickness m, altitude m, viewDistance m, the cover's TileTerrain overrides)
 CLOUD_LAYERS = [
-    ("mgCloudLow", 16.0, 3.0, 170.0, 1800.0,      # low scud: the scale cue well above the 40 m ceiling (sparse)
+    ("mgCloudLow", 16.0, 3.0, 260.0, 1800.0,      # low scud: the scale cue well above the 40 m ceiling (sparse)
      dict(seed=21, continentWavelength=260.0, landThreshold=0.70, inlandBand=0.1, hillHeight=10.0,
           hillWavelength=90.0)),
     ("mgCloudMid", 48.0, 24.0, 650.0, 5000.0,     # the cumulus masses: stepped towers, clear sky between

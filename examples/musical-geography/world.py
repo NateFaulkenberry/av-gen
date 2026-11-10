@@ -53,10 +53,6 @@ TILES = {
         # coast pond, not contour bunching (measured: gone with the ponds removed, cpd-r2-clouds2-148s-*).
         {"name": "low1", "centre": [-316, -1043], "radius": 30, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35},
         {"name": "low2", "centre": [-218, -1166], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.4},
-        {"name": "tarn", "centre": [320, -1571], "radius": 20, "basinWidth": 24, "level": "auto", "shoreNoise": 0.3},
-        {"name": "coast1", "centre": [422, -1611], "radius": 22, "basinWidth": 26, "level": "auto", "shoreNoise": 0.35},
-        {"name": "coast2", "centre": [531, -1636], "radius": 26, "basinWidth": 28, "level": "auto", "shoreNoise": 0.35},
-        {"name": "coast3", "centre": [643, -1649], "radius": 22, "basinWidth": 26, "level": "auto", "shoreNoise": 0.4},
     ],
     # land3 (ADR-1992; the owner: "no long endless horizons"): raised land where the route needs a wall or the sea
     # needs a far side -- headlands across the bay's mouth, a spit and a north-shore ridge inside the bay, islands
@@ -68,7 +64,7 @@ TILES = {
         {"name": "northShore", "points": [[-330, -560], [-200, -600], [-90, -610]], "height": 42, "width": 120, "noise": 0.5},
         {"name": "baySpit", "points": [[-470, -420], [-330, -445], [-200, -430], [-90, -395]], "height": 42, "width": 110, "noise": 0.5},
         {"name": "sweepNorth", "points": [[-360, -1210], [-220, -1280], [-70, -1260]], "height": 40, "width": 150, "noise": 0.5},
-        {"name": "tarnRidge", "points": [[250, -1690], [420, -1720], [560, -1720], [700, -1730]], "height": 38, "width": 140, "noise": 0.5},
+        {"name": "tarnRidge", "points": [[250, -1700], [420, -1740], [560, -1745], [700, -1755]], "height": 36, "width": 120, "noise": 0.5},
         {"name": "capeEast", "points": [[1640, -1550], [1680, -1750], [1660, -1950], [1620, -2150]], "height": 48, "width": 150, "noise": 0.5},
         {"name": "capeWest", "points": [[1430, -1700], [1440, -1900], [1420, -2080]], "height": 32, "width": 120, "noise": 0.5},
     ],
@@ -95,8 +91,11 @@ TILES = {
          "valleyWidth": 150.0, "depthFraction": 0.85},
         {"name": "sweep", "points": [[-372, -905], [-352, -975], [-316, -1043], [-275, -1109], [-218, -1166], [-139, -1175], [-61, -1145], [13, -1108], [74, -1078], [150, -1062], [235, -1072]],
          "valleyWidth": 150.0, "depthFraction": 0.85},
-        {"name": "coastVale", "points": [[221, -1313], [232, -1396], [251, -1493], [320, -1571], [422, -1611], [531, -1636], [643, -1649]],
-         "valleyWidth": 150.0, "depthFraction": 0.85},
+        # cpd-r3 (owner: the night vale "feels too claustrophobic ... just ends with a giant mound"): a wider floor
+        # (150 -> 190 m), the tarn ridge lowered 38 -> 36 and set back, and it runs on out onto the inlet instead of ending against the hill (v2 target 0.6-0.75)
+        {"name": "coastVale", "points": [[221, -1313], [232, -1396], [251, -1493], [320, -1571], [422, -1611], [531, -1636],
+                                         [643, -1649], [760, -1640], [880, -1620], [990, -1605]],
+         "valleyWidth": 190.0, "depthFraction": 0.85},
         {"name": "capeVale", "points": [[1290, -1493], [1396, -1480], [1481, -1541], [1533, -1633], [1561, -1733], [1553, -1835], [1526, -1930], [1499, -2023]],
          "valleyWidth": 150.0, "depthFraction": 0.85},
     ],
