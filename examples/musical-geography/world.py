@@ -118,6 +118,8 @@ RINGS = [
     ("mgTiles2", 2.0, FINE_VIEW * 2, 2, {"cellSize": 1.0, "viewDistance": FINE_VIEW, "align": 4}, 0.36, True, 1.0),
     ("mgTiles4", 4.0, FINE_VIEW * 4, 4, {"cellSize": 2.0, "viewDistance": FINE_VIEW * 2, "align": 2}, 0.72, False, 1.0),
 ]
+RING_MORPH = {"mgTiles1": {"width": 64, "ratio": 2}, "mgTiles2": {"width": 128, "ratio": 2},
+              "mgTiles4": {"width": 256, "ratio": 4, "pitch": 16}}   # eng's values (02-requests, ADR-1995)
 UNDERLAY = dict(cellSize=4.0, viewDistance=FINE_VIEW, y=-2.2, thickness=3.0)
 
 # Kept for reference: the flats of the mock-up (04- §5). Engineering's set has no terrace term; ask only if CP-A
@@ -132,6 +134,8 @@ def ring_nodes(program_for_cell, under_rgb, under_program=None, side_px=0.0, sca
     for name, cell, view, align, hole, thick, shadow, gap in RINGS:
         tiles = dict(TILES, pathWidth=max(TILES["pathWidth"], 1.5 * S))
         gen = {"name": "tiles", "version": 1, "cellSize": cell * S, "viewDistance": view, "align": align,
+               # ADR-1995: over each ring's last quarter its tiles ease into the next ring's cells (no swap pop)
+               "morph": dict(RING_MORPH[name]),
                "finePitch": S if cell > 1.0 else 0.0, "tiles": tiles,
                "skirt": 3 * S}   # 32a7e743: closes the cracks under thin slabs at height steps (rings, streaks)
         if hole:

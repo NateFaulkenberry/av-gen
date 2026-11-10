@@ -327,7 +327,7 @@ def arc_timeline():
             for name, cell, thick, alt, view, cover in look.CLOUD_LAYERS:
                 put("procedural/%s/distribution/generator/omitBelow" % name, t,
                     round(look.cloud_omit_below(S, thick, cover["hillHeight"]), 4))
-                put("procedural/%s/material/refraction/opacity" % name, t, round(S["cloud_opacity"], 4))
+                put("procedural/%s/material/refraction/opacity" % name, t, look.cloud_gate(S))
         lg, lc = look.landing_glow(S)
         put("env/tiles/glow/landing", t, round(lg, 6))
         put("env/tiles/glow/landingColor", t, [round(v, 6) for v in lc])

@@ -1694,3 +1694,46 @@ night v2 is unchanged in look. **Cost:** +3.0 ms day and +1.6 ms night against t
 
 **Side effect:** the horizon's clouds are also a little thinner. Asked for a per-pixel opacity so only the overhead
 clouds thin, as request CPD-R2b.
+
+### CP-D r2: the pop fix applied, and draft4 (2026-11-10, ADR-1995/1996)
+
+**What changed:**
+- **The ring morph**, eng's values (`world.RING_MORPH`):
+
+  | Ring | Width | Ratio | Pitch |
+  |---|---|---|---|
+  | `mgTiles1` | 64 | 2 | |
+  | `mgTiles2` | 128 | 2 | |
+  | `mgTiles4` | 256 | 4 | 16 |
+
+- **The 1× ring hands over to the 2× ring's look** over `cameraDistance` 200 → 270 m (`HANDOVER`; 13 ops, so the 1×
+  ring is at 95 of 96):
+  - the tile jitter eases out;
+  - the pads fade;
+  - the contour share falls to `COARSE_CONTOUR`;
+  - the border's darkness goes to `BORDER_DARK`.
+
+  I did not split these four term by term; together they are the hypothesis eng named.
+- **Contour fade:** 0.15, eng's default, with the edge gain × 1.15 (`CONTOUR_FADE_COMP`). I did not pick 0.35, which
+  eng's still shows breaking the lines into dashes, and I did not compare fade values by eye at 111–114 s.
+- **Clouds, per pixel (R2b):** opacity = remap(`viewDirection.y`, −0.6 → −0.2, `cloud_opacity` → 1). The material
+  gate is 0.99 by day and 1.0 at night, which is the opaque path.
+
+**Checked at the owner's moment** (`cpd-r2-pop-final-bay-30-37s.mp4`). I counted the pixels in the islands' band that
+change by more than 40 levels between frames:
+
+| Moment | Changed pixels | Neighbouring frames |
+|---|---|---|
+| 31.2 s | 335 | 364 / 363 |
+| 31.87 s | 338 | 338 / 347 |
+| 32.5 s | 382 | 321 / 341 |
+| 33.17 s | 629 | 529 / 607 |
+
+None of them stands out from its neighbours. Frame by frame, 33.07–33.17 s shows no visible change in the islands'
+tiles.
+
+**Draft4:** `11-pass-cpd-r2/cpd-draft4-feline-full-1080p-audio.mp4` and `cpd-draft4-sheet.png`.
+
+**Noted in it:** at 4 s and 12 s a near translucent low cloud (170 m) passes in front of the now much taller west
+hills, and reads as a soft lavender smudge on the hill face. That is possible since land2 (relief to about 110 m).
+Raising the low layer, or thinning it over high ground, is an option.

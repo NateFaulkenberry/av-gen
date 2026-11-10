@@ -208,7 +208,7 @@ def tile_dynamics(state="day"):  # noqa: E302
         "breathing": {"amplitude": 0.12, "period": 18, "wavelength": 800},
         "rolling": [0.4, 0.0],
         "rings": {"amplitude": 1.6, "speed": 45, "wavelength": 24, "width": 20, "decay": 2.4, "crest": 1},
-        "contour": {"interval": CONTOUR_INTERVAL, "offset": 0.0},
+        "contour": {"interval": CONTOUR_INTERVAL, "offset": 0.0, "fade": CONTOUR_EASE},
     }
 
 
@@ -355,8 +355,11 @@ UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: 
                           # second, blue-black surface speckling through every hillside
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
 CREST_EDGE = (0.72, 0.98)  # crest light only near the peaks: a broad crest lit the crossing trains as a diamond grid
+HANDOVER = (200.0, 270.0)   # metres: the 1x ring's look eases into the 2x ring's before the swap (ADR-1995)
 GRAZE = (0.03, 0.15)   # the view's y (toward the camera) over which a top's contour band fades in (clouds2)
-COARSE_CONTOUR = 0.25   # the coarse rings' share of the contour gain (clouds2)
+COARSE_CONTOUR = 0.25
+CONTOUR_EASE = 0.15   # ADR-1995: contour edges ease in and out over this share of a step (0.35 dashes the lines)
+CONTOUR_FADE_COMP = 1.15   # ADR-1995's contour ease (fade 0.15) takes ~15% of the lines' mean strength: given back
 CONTOUR_FADE = (150.0, 500.0, 0.1)   # metres, and the gain left beyond (CP-D draft2: the night glare strip)
 LANDING_BAND = 0.075   # the landing outline's band, local metres per S (eng's clip: 0.3 at 4 m tiles)
 CONTOUR_BAND = 0.06       # the contour line's width on the top's border, fraction of the half-size
@@ -419,6 +422,11 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     o = []
     add = o.append
 
+    def near_far(reg, near, far_v):   # ADR-1995 handover: near -> far_v over HANDOVER (the 1x ring meets the 2x)
+        add({"kind": "input", "input": "cameraDistance", "dst": reg})
+        add({"kind": "remap", "dst": reg, "srcA": reg, "constant": [HANDOVER[0], HANDOVER[1], near, far_v],
+             "value": 1.0})
+
     def glow(reg, lane, tmp):   # Phase 7 (ADR-1963): an emission lane times its live gain (tileGlow x path, y contour,
         add({"kind": "input", "input": "tileGlow", "dst": tmp})          # z crest, w pads; 1 = as authored)
         add({"kind": "swizzle", "dst": tmp, "srcA": tmp, "constant": B(lane)})
@@ -451,6 +459,9 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 6})                         # x crown
         add({"kind": "constant", "dst": 4, "constant": _c4([v * s["pad_emit"] for v in hexlin(s["pad"])])})
         add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 7})                         # r4 = emission
+        if cell == 1.0:   # ADR-1995 handover: the coarse rings have no pads, so the 1x ring's fade out before the swap
+            near_far(6, 1.0, 0.0)
+            add({"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 6})
         glow(4, 3, 6)                                                                     # x the pads' glow
     else:
         add({"kind": "constant", "dst": 4, "constant": [0, 0, 0, 1]})
@@ -484,7 +495,13 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     if not far:   # per-tile value jitter on the lattice hash (request 1978)
         add({"kind": "input", "input": "instanceColor", "dst": 3})
         add({"kind": "swizzle", "dst": 3, "srcA": 3, "constant": B(3)})
-        add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1 - JITTER, 1 + JITTER], "value": 1.0})
+        if cell == 1.0:   # the jitter eases out over the handover (the 2x ring draws none)
+            add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, -JITTER, JITTER], "value": 1.0})
+            near_far(7, 1.0, 0.0)
+            add({"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 7})
+            add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1, 2], "value": 0.0})   # + 1, unclamped
+        else:
+            add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1 - JITTER, 1 + JITTER], "value": 1.0})
         add({"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3})
     # the side shade over the slab's local height (top face: 1)
     add({"kind": "swizzle", "dst": 5, "srcA": 1, "constant": B(2)})                        # top mask
@@ -495,7 +512,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     # the tile border (tileBorder's coverage; it draws the fine lattice on the coarse rings)
     add({"kind": "swizzle", "dst": 3, "srcA": 1, "constant": B(0)})
     bd = border if border is not None else (s.get("border_fine", BORDER_DARK_FINE) if cell == 1.0 else BORDER_DARK)
-    add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, shade, shade * bd], "value": 1.0})
+    if cell == 1.0 and not far:   # the border's darkness meets the coarse rings' BORDER_DARK over the handover
+        near_far(7, 1.0 - bd, 1.0 - BORDER_DARK)
+        add({"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 7})
+        add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, shade, 0.0], "value": 0.0})   # shade (1 - d)
+    else:
+        add({"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, shade, shade * bd], "value": 1.0})
     add({"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3})
     # Phase 3: contour lines on the flagged sides (ADR-1970) and the crest light (ADR-1971), from tileContour
     eg, cg = s.get("edge_gain", 0.0), s.get("crest_gain", 0.0)
@@ -511,7 +533,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         # clouds2: the coarse rings (8 m and 16 m cells, past ~270 m) paint their sub-tiles' contours; on the land2
         # walls every sub-tile crosses an interval, so a far steep flank lit solid (148 s; measured: gone at edge gain 0)
-        egr = eg * (1.0 if cell == 1.0 else COARSE_CONTOUR)
+        egr = eg * CONTOUR_FADE_COMP * (1.0 if cell == 1.0 else COARSE_CONTOUR)
         add({"kind": "constant", "dst": 7, "constant": _c4([v * egr for v in hexlin(s["edge"])])})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         # CP-D draft2: fade the lines with distance -- on a far hill (the 4x ring, 4 m tiles a few pixels wide) the
@@ -520,6 +542,9 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
         add({"kind": "remap", "dst": 7, "srcA": 7, "constant": [CONTOUR_FADE[0], CONTOUR_FADE[1], 1.0,
                                                                  CONTOUR_FADE[2]], "value": 1.0})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+        if cell == 1.0:   # the coarse rings carry COARSE_CONTOUR of the gain: meet it over the handover
+            near_far(7, 1.0, COARSE_CONTOUR)
+            add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         # clouds2: fade the band where a top is seen edge-on. On land2's steep walls the camera sees the tops at a
         # grazing angle from just below their level, where the border band covers the whole visible sliver of each top
         # and a wall lit solid (148-150 s; measured: gone at edge gain 0, unchanged by the coarse-ring and distance cuts)
@@ -658,11 +683,21 @@ def cloud_program(name, thick, alt, relief, state="day"):
         {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7},
         {"kind": "add", "dst": 4, "srcA": 4, "srcB": 1},
         {"kind": "constant", "dst": 6, "constant": B(1.0)},
-    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": -1}
+        # ADR-1996: per-pixel opacity -- the overhead clouds thin to cloud_opacity, the horizon's stay solid
+        {"kind": "input", "input": "viewDirection", "dst": 5},
+        {"kind": "swizzle", "dst": 5, "srcA": 5, "constant": B(1)},
+        {"kind": "remap", "dst": 5, "srcA": 5, "constant": [-0.6, -0.2, S["cloud_opacity"], 1.0], "value": 1.0},
+    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": 5}
 
 
 OVERHEAD = (0.25, 0.85)   # -viewDirection.y over which a cloud counts as overhead (clouds3)
 LINING_EDGE = (0.05, 0.6)   # horizontal n.L where the lining starts and is full
+
+
+def cloud_gate(S):
+    """ADR-1996: the material's opacity is the gate (1 = the opaque path); the program sets the per-pixel share.
+    Solid at night (the approved v2), else 0.99 so the program's overhead thinning applies."""
+    return 1.0 if S["cloud_opacity"] >= 0.999 else 0.99
 
 
 def cloud_nodes(state="day"):
@@ -685,6 +720,6 @@ def cloud_nodes(state="day"):
             # (ADR-1603) with no offset, so a share of what lies behind shows through -- keyed through the arc
             # (cloud_opacity: day 0.55 .. night 1.0, the approved v2 night stays solid)
             "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog",
-                         "refraction": {"strength": 0.0005, "opacity": round(S_["cloud_opacity"], 4),
+                         "refraction": {"strength": 0.0005, "opacity": cloud_gate(S_),
                                         "thickness": 0.0}}}})
     return nodes, programs
