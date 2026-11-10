@@ -37,6 +37,13 @@ std::unique_ptr<gpu::Context> makeContext() {
     return std::move(*ctx);
 }
 
+// ADR-1991: a record's drawn top -- the centred box's centre plus half its stretched thickness. It is the tile's
+// height: the surface bodies stand on and flight clears.
+template <class Record>
+float drawnTop(const scene::ProceduralGeometry& pg, const Record& r) {
+    return r.position.y + 0.5f * pg.source.size.y * pg.sourceTransform.scale.y * r.scale.y;
+}
+
 scene::ProceduralGeometry tilesObject(const std::string& name, float cell, float view, int align, float finePitch,
                                       float holeCell, float holeView, int holeAlign) {
     scene::ProceduralGeometry pg;
@@ -114,7 +121,7 @@ Parity compare(rendering::SceneRenderer& renderer, const scene::ProceduralGeomet
             }
             ++out.present;
             const scene::TileSample t = scene::generatorTileInWindow(g, ix, iz, w);
-            out.worstHeight = std::max(out.worstHeight, std::abs(r.position.y - t.height));
+            out.worstHeight = std::max(out.worstHeight, std::abs(drawnTop(pg, r) - t.height));
             out.worstXZ = std::max({out.worstXZ, std::abs(r.position.x - (static_cast<float>(ix) + 0.5f) * g.cellSize),
                                     std::abs(r.position.z - (static_cast<float>(iz) + 0.5f) * g.cellSize)});
             out.worstChannel = std::max({out.worstChannel, std::abs(r.random.x - t.water), std::abs(r.random.y - t.shore),
@@ -203,10 +210,9 @@ TEST_CASE("A skirt drops a land tile's box below its top and leaves the sea's sl
                                        static_cast<std::size_t>(x)];
             const scene::TileSample t = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w);
             const float k = 2.0f * (1.0f - std::clamp(t.water, 0.0f, 1.0f));
-            // The box's top (centre + half the stretched thickness) stays at the tile's height + half the thickness.
+            // ADR-1991: the box's top (centre + half the stretched thickness) is the tile's height, skirt or none.
             const float thickness = pg.source.size.y;
-            const float top = r.position.y + 0.5f * thickness * r.scale.y;
-            worst = std::max(worst, std::abs(top - (t.height + 0.5f * thickness)));
+            worst = std::max(worst, std::abs(drawnTop(pg, r) - t.height));
             worst = std::max(worst, std::abs(r.scale.y - (thickness + k) / thickness));
             land += t.water < 0.01f;
             sea += t.water > 0.99f;
@@ -273,7 +279,7 @@ TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][gener
                 const std::int32_t iz = w.originZ + z;
                 const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
                 const scene::TileSample still = scene::generatorTileInWindow(g, ix, iz, w);
-                worstHeight = std::max(worstHeight, std::abs(r.position.y - moving.height));
+                worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
                 worstCrest = std::max(worstCrest, std::abs(r.emissive.w - moving.crest));
                 moved = std::max(moved, std::abs(moving.height - still.height));
                 crestSeen = std::max(crestSeen, moving.crest);
@@ -336,7 +342,7 @@ TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][g
                 const std::int32_t iz = w.originZ + z;
                 const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
                 const scene::TileSample plain = scene::generatorTileInWindow(g, ix, iz, w, &unsprung, time);
-                worstHeight = std::max(worstHeight, std::abs(r.position.y - moving.height));
+                worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
                 sprung = std::max(sprung, std::abs(moving.height - plain.height));
                 // ADR-1960: the landing glow packed above the crest, as the CPU twin computes it
                 const float gpuLanding = std::floor(r.emissive.w / 32.0f) / 255.0f;

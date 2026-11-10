@@ -2275,6 +2275,18 @@ entity::Navigator Composition::buildNavigator() const {
 
 GroundSample Composition::TerrainGroundQuery::sampleAt(const glm::vec3& worldPoint) const {
     GroundSample out;
+    // CP-D r2 (feet): on a tiles ground the feet plant on the tile tops as drawn (ADR-1955's TileGround, the same
+    // surface the bodies stand on): the foot layers' "ground" drive lifts a pose's foot out of a tile. A tile's top is
+    // flat, so the normal is up.
+    if (owner_.tileGround_.valid()) {
+        const float top = owner_.tileGround_.at(worldPoint.x, worldPoint.z, owner_.currentTime_).height;
+        out.point = glm::vec3(worldPoint.x, top, worldPoint.z);
+        out.normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        out.distance = worldPoint.y - top;
+        out.category = GroundCategory::Terrain;
+        out.valid = true;
+        return out;
+    }
     const world::TerrainQuery terrain = owner_.terrainQuery();
     if (!terrain.valid()) {
         return out; // no terrain in this scene: no answer, which is not the same as flat ground
@@ -8533,6 +8545,7 @@ void Composition::update(const FrameTime& time) {
     // frame's -- a raft that has moved out of frame must be culled on where it is now.
     updateFloaters(time.renderTime);
     updateCharacters(time);
+    groundCharactersOnTiles(); // ADR-1991: after the rigs are posed, before anything culls or draws them
     // ADR-912: after the rigs are posed, so a cut's frame draws no joint motion across it either.
     if (cameraCutThisFrame_) {
         holdRigsForCut();
@@ -8582,6 +8595,82 @@ void Composition::update(const FrameTime& time) {
 // ADR-086. Two things, in order: push each node's authored animation request into its rigs (only
 // when the request changed, so a behaviour driving a player directly is left alone), then pose
 // every rig in the scene against this frame's timeline second.
+// ADR-1991. The body stands on its tile (ADR-1955); its POSE does not: a landing crouch kneels below the root's plane,
+// a foot strides over a neighbour that rings higher. So after the rigs are posed, every skinned character near the
+// camera is lifted by the deepest of its low vertices below the top of the tile under that vertex, and only that much
+// -- drawn, not simulated, a pure function of the pose and the ground at this instant (seek equals play).
+// "Low" vertices: those within 0.45 of the mesh's foot (feet, shins, knees) and those well to the side (the hands,
+// which reach the ground in a crouch): about a third of a mesh, skinned on the CPU only for characters within 150 m.
+void Composition::groundCharactersOnTiles() {
+    lastCharacterLift_ = 0.0f;
+    if (!tileGround_.valid() || scene_.rigs.empty()) {
+        return;
+    }
+    std::unordered_map<RigId, std::vector<std::size_t>> byRig;
+    for (std::size_t i = 0; i < scene_.entities.size(); ++i) {
+        const Entity& e = scene_.entities[i];
+        if (e.rig == kInvalidRig || e.rig >= scene_.rigs.size() || e.mesh >= scene_.meshes.size() ||
+            !scene_.meshes[e.mesh].skinned()) {
+            continue;
+        }
+        byRig[e.rig].push_back(i);
+    }
+    const glm::vec3 eye = scene_.camera.position;
+    std::vector<RigId> order;
+    order.reserve(byRig.size());
+    for (const auto& [rig, list] : byRig) order.push_back(rig);
+    std::sort(order.begin(), order.end()); // deterministic
+    std::unordered_map<std::uint64_t, float> tops; // tile top by cell, this frame
+    for (const RigId rigId : order) {
+        const std::vector<std::size_t>& list = byRig[rigId];
+        const SkinnedRig& rig = scene_.rigs[rigId];
+        if (rig.palette.empty()) continue;
+        if (glm::length(scene_.entities[list.front()].transform.position - eye) > 150.0f) continue;
+        float lift = 0.0f;
+        for (const std::size_t idx : list) {
+            const Entity& e = scene_.entities[idx];
+            const MeshData& mesh = scene_.meshes[e.mesh];
+            LowVertices& low = lowVertices_[e.mesh];
+            if (low.vertexCount != mesh.vertices.size()) {
+                low.vertexCount = mesh.vertices.size();
+                low.indices.clear();
+                const auto [lo, hi] = mesh.bounds();
+                const float floorY = lo.y + 0.45f;
+                const float side = 0.7f * std::max(std::abs(lo.x), std::abs(hi.x));
+                for (std::uint32_t v = 0; v < mesh.vertices.size(); ++v) {
+                    const glm::vec3 p = mesh.vertices[v].position;
+                    if (p.y < floorY || std::abs(p.x) > side) low.indices.push_back(v);
+                }
+            }
+            const glm::mat4 m = e.transform.matrix();
+            for (const std::uint32_t v : low.indices) {
+                const SkinInfluence& inf = mesh.skin[v];
+                glm::vec3 p(0.0f);
+                for (int k = 0; k < 4; ++k) {
+                    const float w = inf.weights[k];
+                    if (w <= 0.0f || inf.joints[k] >= rig.palette.size()) continue;
+                    p += glm::vec3(rig.palette[inf.joints[k]] * glm::vec4(mesh.vertices[v].position, 1.0f)) * w;
+                }
+                const glm::vec3 world = glm::vec3(m * glm::vec4(p, 1.0f));
+                const glm::vec2 c = tileGround_.cellCentre(world.x, world.z);
+                const auto key = (static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(c.x)) << 32) |
+                                 std::bit_cast<std::uint32_t>(c.y);
+                auto it = tops.find(key);
+                if (it == tops.end()) {
+                    it = tops.emplace(key, tileGround_.at(c.x, c.y, currentTime_).height).first;
+                }
+                lift = std::max(lift, it->second - world.y);
+            }
+        }
+        if (lift > 0.0f) {
+            for (const std::size_t idx : list) {
+                scene_.entities[idx].transform.position.y += lift;
+            }
+            lastCharacterLift_ = std::max(lastCharacterLift_, lift);
+        }
+    }
+}
+
 void Composition::updateCharacters(const FrameTime& time) {
     if (scene_.rigs.empty()) {
         rigStats_ = RigStats{};

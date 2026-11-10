@@ -21,6 +21,7 @@
 #include "graph/graph.hpp"
 #include "scene/flight.hpp"
 #include "scene/tile_ground.hpp"
+#include <unordered_map>
 #include "scene/astral_forge.hpp"
 #include "scene/attractor_world.hpp"
 #include "scene/lunar_world.hpp"
@@ -1869,6 +1870,19 @@ private:
     TileGround tileGround_;
     glm::vec3 tileGroundOffset_{0.0f};
     void refreshTileGround();
+    // ADR-1991: no skinned mesh sinks into a tile. After the rigs are posed, each character near the camera is lifted
+    // (drawn only; the simulation is untouched) by the deepest of its low vertices (feet, shins, hands) below the top
+    // of the tile under THAT vertex -- a landing crouch, a neighbouring tile ringing higher, a stride over a step.
+    void groundCharactersOnTiles();
+    struct LowVertices {
+        std::size_t vertexCount = 0;
+        std::vector<std::uint32_t> indices;
+    };
+    std::unordered_map<MeshId, LowVertices> lowVertices_;
+    float lastCharacterLift_ = 0.0f; // the largest lift this frame (diagnostic, read by tests)
+public:
+    [[nodiscard]] float lastCharacterLift() const { return lastCharacterLift_; }
+private:
     params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-350
     params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350
     params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-350

@@ -74,6 +74,7 @@ TEST_CASE("Hopping bodies stand on the tile the kernel draws, through every land
 
     float worst = 0.0f;
     float worstAt = 0.0f;
+    float worstLabel = 0.0f; // the drawn top vs the record's own top (scale.w)
     int standing = 0;
     int landings = 0;
     for (int f = 0; f <= 30 * 12; ++f) {
@@ -113,7 +114,11 @@ TEST_CASE("Hopping bodies stand on the tile the kernel draws, through every land
             if (lx < 0 || lz < 0 || lx >= w.countX || lz >= w.countZ) continue;
             const auto& r = (*records)[static_cast<std::size_t>(lz) * static_cast<std::size_t>(w.countX) +
                                        static_cast<std::size_t>(lx)];
-            const float top = r.scale.w; // the tile's top, generator metres (ADR-1970)
+            // ADR-1991: the DRAWN top -- the centred box's centre plus half its stretched thickness -- not the height
+            // the record carries in scale.w (they once differed by half a thickness, and feet sank by exactly that).
+            const float thickness = g->source.size.y * g->sourceTransform.scale.y;
+            const float top = r.position.y + 0.5f * thickness * r.scale.y;
+            worstLabel = std::max(worstLabel, std::abs(top - r.scale.w));
             ++standing;
             if (std::abs(p.y - top) > worst) {
                 worst = std::abs(p.y - top);
@@ -121,8 +126,9 @@ TEST_CASE("Hopping bodies stand on the tile the kernel draws, through every land
             }
         }
     }
-    CAPTURE(worst, worstAt, standing, landings);
+    CAPTURE(worst, worstAt, worstLabel, standing, landings);
     CHECK(standing > 100);
     CHECK(landings > 0);
     CHECK(worst < 1e-3f); // the body stands on the drawn top, in every frame of every landing
+    CHECK(worstLabel < 1e-3f);
 }
