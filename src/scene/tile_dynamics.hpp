@@ -58,7 +58,14 @@ struct TileRingSpec {
 //     h(r, t) = -depth * strength * e^(-r / rippleRadius) * e^(-zeta w a) * sin(w_d a),   a = t - t0 - r / rippleSpeed
 // An impulse response: it starts at rest (no jump at the landing), the landed tile drops first, rebounds and settles; its neighbours follow, later and less. In metres and seconds, so
 // it is the same spring whatever the tile size.
-inline constexpr std::size_t kMaxTileSprings = 8;
+// CP-D r2: 256, from 8. Draft3's cast had 104 landings ringing at once; with 8, a landing was dropped from the drawn set
+// 0.6 s after it happened (8 newer ones elsewhere) and its tile snapped flat mid-swing -- the abrupt end the owner saw.
+// A spring now leaves only when its envelope is below 1e-3 (springSeconds), and its reach ends smoothly (kTileSpringReach).
+inline constexpr std::size_t kMaxTileSprings = 256;
+// A spring's reach, in ripple radii: full to 5, eased to 0 at 6 (e^-6 of the depth is left there), so a tile far from
+// a landing can skip it on the GPU without a step.
+inline constexpr float kTileSpringReachStart = 5.0f;
+inline constexpr float kTileSpringReach = 6.0f;
 
 struct TileSpringSpec {
     float depth = 0.6f;         // metres of the impulse at strength 1 (the first dip is ~0.75 of it at zeta 0.18)
@@ -95,12 +102,16 @@ struct TileDynamics {
     // as authored. Not used by the ground itself: they exist so a route (an audio band, a beat) can reach every tile
     // program's emission terms through one parameter each (env/tiles/glow/*) instead of an op index per program.
     glm::vec4 glow{1.0f};
+    // ADR-1960: the landing glow's colour and gain, the `landingGlow` material input (rgb = colour x gain, w = gain). 0 =
+    // off. A program adds tileContour's z (the landed tiles' outline x their glow) times this to its emission.
+    float landingGain = 0.0f;
+    glm::vec3 landingColor{1.0f};
 
     // True when anything moves: false is the static ground, exactly as before.
     [[nodiscard]] bool active() const;
     // The events that can still be seen at `t`, newest first, at most kMaxTileEvents (authored and live together).
     [[nodiscard]] std::vector<TileEvent> eventsAt(float t) const;
-    // ADR-1954: the landings still ringing at `t`, newest first, at most kMaxTileSprings.
+    // ADR-1954: the landings still ringing at `t` (in list order), at most kMaxTileSprings -- the newest when there are more.
     [[nodiscard]] std::vector<TileEvent> springsAt(float t) const;
     // How long a spring rings before it is below a millimetre in a metre of depth (its envelope at 1e-3).
     [[nodiscard]] float springSeconds() const;

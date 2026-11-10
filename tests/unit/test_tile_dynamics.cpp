@@ -348,6 +348,23 @@ TEST_CASE("the tileContour op draws only the flagged sides and returns the crest
         ctx.instanceEmissive = glm::vec4(1.0f, 1.0f, 1.0f, w);
         return evaluateMaterialProgram(program, ctx, MaterialResult{}).baseColor;
     };
+    // the op's w lane (ADR-1960: the landing glow), through a swizzle into a second program's base colour
+    MaterialProgram wLane = program;
+    MaterialOp toW;
+    toW.kind = MaterialOpKind::Swizzle;
+    toW.dst = 3;
+    toW.srcA = 2;
+    toW.constant = glm::vec4(3.0f);
+    wLane.ops.push_back(toW);
+    wLane.baseColorRegister = 3;
+    REQUIRE(wLane.validate().has_value());
+    const auto evalW = [&](glm::vec3 p, float w) {
+        MaterialContext ctx;
+        ctx.localPosition = p;
+        ctx.localFootprint = glm::vec2(0.01f);
+        ctx.instanceEmissive = glm::vec4(1.0f, 1.0f, 1.0f, w);
+        return evaluateMaterialProgram(wLane, ctx, MaterialResult{}).baseColor.x;
+    };
     // mask 1 (+x), crest 0.25: the +x edge is lit; the -x edge, a z edge and the middle are not.
     const float w = 0.25f + 2.0f * 1.0f;
     CHECK(eval({0.49f, 0.0f, 0.0f}, w).x > 0.9f);
@@ -355,7 +372,8 @@ TEST_CASE("the tileContour op draws only the flagged sides and returns the crest
     CHECK(eval({0.0f, 0.0f, 0.49f}, w).x < 0.01f);
     CHECK(eval({0.0f, 0.0f, 0.0f}, w).x < 0.01f);
     CHECK(eval({0.0f, 0.0f, 0.0f}, w).y == Catch::Approx(0.25f));
-    CHECK(eval({0.0f, 0.0f, 0.0f}, w).z == Catch::Approx(0.25f));
+    CHECK(eval({0.0f, 0.0f, 0.0f}, w).z == 0.0f); // no landing glow
+    CHECK(evalW({0.0f, 0.0f, 0.0f}, w) == 0.0f);
     // mask 0: nothing, and the crest alone comes back.
     CHECK(eval({0.49f, 0.0f, 0.0f}, 0.75f).x == 0.0f);
     CHECK(eval({0.49f, 0.0f, 0.0f}, 0.75f).y == Catch::Approx(0.75f));
@@ -363,7 +381,17 @@ TEST_CASE("the tileContour op draws only the flagged sides and returns the crest
     const float all = 1.0f + 2.0f * 15.0f;
     CHECK(eval({0.0f, 0.0f, -0.49f}, all).x > 0.9f);
     CHECK(eval({0.0f, 0.0f, 0.0f}, all).y == Catch::Approx(1.0f));
-    CHECK(eval({0.0f, 0.0f, 0.0f}, all).z == Catch::Approx(1.0f));
+    CHECK(eval({0.0f, 0.0f, 0.0f}, all).z == 0.0f);
+    // ADR-1960: a landing glow of ~0.5 packed above them: the mask and crest decode unchanged; z is the outline on every
+    // side (here -x and +z too, which mask 1 does not flag) times the glow, 0 in the middle; w the glow.
+    const float lit = scene::tilePackedEmissiveW(0.25f, 1u, 0.5f);
+    CHECK(eval({0.49f, 0.0f, 0.0f}, lit).x > 0.9f);
+    CHECK(eval({-0.49f, 0.0f, 0.0f}, lit).x < 0.01f);
+    CHECK(eval({0.0f, 0.0f, 0.0f}, lit).y == Catch::Approx(0.25f).margin(1e-3));
+    CHECK(evalW({0.0f, 0.0f, 0.0f}, lit) == Catch::Approx(128.0f / 255.0f));
+    CHECK(eval({-0.49f, 0.0f, 0.0f}, lit).z == Catch::Approx(128.0f / 255.0f).margin(0.02));
+    CHECK(eval({0.0f, 0.0f, 0.49f}, lit).z == Catch::Approx(128.0f / 255.0f).margin(0.02));
+    CHECK(eval({0.0f, 0.0f, 0.0f}, lit).z < 0.01f);
     CHECK(materialOpKindFromName("tileContour") == MaterialOpKind::TileContour);
 }
 

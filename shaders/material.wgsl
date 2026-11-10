@@ -145,6 +145,7 @@ const MAT_IN_MATERIAL_ID: u32 = 26u;
 const MAT_IN_FOOTPRINT: u32 = 27u;
 const MAT_IN_MATERIAL_EMISSION: u32 = 28u; // ADR-904
 const MAT_IN_TILE_GLOW: u32 = 29u; // ADR-1963
+const MAT_IN_LANDING_GLOW: u32 = 30u; // ADR-1960
 
 // ADR-904: the bits of MaterialProgramGpu.flags.x (scene::kMaterialWritesEmission and
 // scene::kMaterialEmissionReadsInstance).
@@ -168,6 +169,7 @@ struct MaterialContext {
     audioBands: vec4<f32>,
     beat: vec4<f32>,
     tileGlow: vec4<f32>, // ADR-1963
+    landingGlow: vec4<f32>, // ADR-1960
     viewDirection: vec3<f32>,
     depth: f32,
     // ADR-036 geometric inputs; the caller derives these from screen-space derivatives and the
@@ -314,6 +316,7 @@ fn materialContextZero() -> MaterialContext {
     ctx.audioBands = vec4<f32>(0.0);
     ctx.beat = vec4<f32>(0.0);
     ctx.tileGlow = vec4<f32>(1.0);
+    ctx.landingGlow = vec4<f32>(0.0);
     ctx.viewDirection = vec3<f32>(0.0, 0.0, 1.0);
     ctx.depth = 0.0;
     ctx.curvature = 0.0;
@@ -536,6 +539,9 @@ fn materialInputValue(input: u32, ctx: MaterialContext) -> vec4<f32> {
     }
     if (input == MAT_IN_TILE_GLOW) {
         return ctx.tileGlow;
+    }
+    if (input == MAT_IN_LANDING_GLOW) {
+        return ctx.landingGlow;
     }
     return vec4<f32>(0.0);
 }
@@ -898,16 +904,27 @@ fn matTileContourSide(half: f32, dist: f32, fw: f32, band: f32, minPixels: f32) 
 fn matKTileContour(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {
     let k = materialPrograms.programs[pi].ops[oi].constant;
     let f = materialPrograms.programs[pi].ops[oi].value;
-    let w = max(b.w, 0.0);
+    let packed = max(b.w, 0.0);
+    let landingQ = floor(packed / 32.0); // ADR-1960: the landing glow in 255ths, above the crest and the mask
+    let w = packed - 32.0 * landingQ;
+    let landing = clamp(landingQ / 255.0, 0.0, 1.0);
     let mask = u32(floor(w * 0.5));
     let crest = clamp(w - 2.0 * f32(mask), 0.0, 1.0);
     var keep = 1.0;
-    var sides = 0.0;
-    if ((mask & 1u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x - a.x, ctx.localFootprint.x, k.z, f)); sides = sides + 1.0; }
-    if ((mask & 2u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x + a.x, ctx.localFootprint.x, k.z, f)); sides = sides + 1.0; }
-    if ((mask & 4u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y - a.z, ctx.localFootprint.y, k.z, f)); sides = sides + 1.0; }
-    if ((mask & 8u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y + a.z, ctx.localFootprint.y, k.z, f)); sides = sides + 1.0; }
-    return vec4<f32>(1.0 - keep, crest, sides * 0.25, select(0.0, 1.0, sides > 0.0));
+    if ((mask & 1u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x - a.x, ctx.localFootprint.x, k.z, f)); }
+    if ((mask & 2u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x + a.x, ctx.localFootprint.x, k.z, f)); }
+    if ((mask & 4u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y - a.z, ctx.localFootprint.y, k.z, f)); }
+    if ((mask & 8u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y + a.z, ctx.localFootprint.y, k.z, f)); }
+    // ADR-1960: z = the landing outline (all four sides, the contour's band) times the glow; w = the glow
+    var ring = 1.0;
+    if (landing > 0.0) {
+        let lb = select(k.z, k.w, k.w > 0.0); // the landing outline's own band (constant.w), the contour's when 0
+        ring = ring * (1.0 - matTileContourSide(k.x, k.x - a.x, ctx.localFootprint.x, lb, f));
+        ring = ring * (1.0 - matTileContourSide(k.x, k.x + a.x, ctx.localFootprint.x, lb, f));
+        ring = ring * (1.0 - matTileContourSide(k.y, k.y - a.z, ctx.localFootprint.y, lb, f));
+        ring = ring * (1.0 - matTileContourSide(k.y, k.y + a.z, ctx.localFootprint.y, lb, f));
+    }
+    return vec4<f32>(1.0 - keep, crest, (1.0 - ring) * landing, landing);
 }
 
 fn matKOklabRamp(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4<f32>, c: vec4<f32>, fields: MatFields) -> vec4<f32> {

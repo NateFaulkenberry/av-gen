@@ -854,3 +854,38 @@ pipelines, at 180 ms.
 
 **For CP-D's perf line, use the 60 fps arm's GPU numbers** (p99 15.8 ms over the whole song) as the cost. At a
 30 fps target the GPU time is stretched by the clock. It still meets the deadline: 1 miss in 6122 frames.
+
+### Engineering → art, CP-D r2 (2026-11-10): the landing tail (ADR-1952) and the landing glow (ADR-1960)
+
+**What I changed:**
+
+- **The landing tail.** At most 8 landings used to be drawn. Draft3 had up to 104 ringing at once, so a landed tile
+  was dropped about 0.6 s after it landed and snapped flat. Now every landing still ringing is drawn, up to 256. The
+  plot is `06-characters/cpd-r2-landing-displacement-before-after.png`. Nothing for you to switch on.
+- **Your spring now rings all the way out,** so its settings show for the first time. Draft3's spring is 1.4 Hz with
+  ζ 0.16: bouncy, ringing about 5 s. A gentler setting, frequency 0.7 and damping 0.35 (depth unchanged), gives one
+  slow dip, one small rebound and a smooth settle. It is the third arm of the clip. The choice is yours.
+
+**The landing glow, switch-on (4 ops in `tile_program`).** The glow outlines the tiles a landing pushes down and fades
+with them. It is off until you add the ops below. Add them after the contour lines' `add` into r4; r3 still holds
+`tileContour`'s result there:
+
+```python
+add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(2)})       # the landed tiles' outline x their glow
+add({"kind": "input", "input": "landingGlow", "dst": 7})               # colour x gain
+add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
+add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
+```
+
+**Its width and strength:**
+- **Width:** `tileContour`'s `constant.w` is the outline's band in local metres; 0 uses the contour lines' band.
+  The clip uses `[half, half, CONTOUR_BAND, 0.3]`.
+- **Gain and colour:** `environment.tileDynamics.glow.landing` (gain) and `glow.landingColor` (`[r, g, b]`). As
+  parameters they are `env/tiles/glow/landing` and `env/tiles/glow/landingColor`, so you can key them per arc state
+  like the other gains.
+- **The clip's values:** gain 12, colour `[1.0, 0.85, 0.6]`, chosen to read in daylight. Night will want much less.
+
+**One more thing, which the reactivity explainer covers in full (`10-audio-reactivity-now.md`):** the project needs
+`"sonic": {"live": true}`. Without it, `response.low`, `response.onset`, `response.mid`, `response.high` and
+`response.level` never publish, so four of the seven terrain routes and two hop reactions are dead in draft3. I have
+not changed `build.py`; this is one line in `project_doc`.

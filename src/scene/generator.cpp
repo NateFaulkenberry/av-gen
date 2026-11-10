@@ -316,6 +316,7 @@ TileSample sampleMoving(const GeneratorSpec& spec, float x, float z, float fine,
         const glm::vec2 m = tileMotion(d, events, x, z, time, s.water, fine);
         s.height += m.x + tileSpring(d.spring, springs, x, z, time); // ADR-1954
         s.crest = m.y;
+        s.landing = tileLanding(d.spring, springs, x, z, time); // ADR-1960
     }
     return s;
 }
@@ -349,6 +350,7 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
             sum.flat += t.flat;
             sum.path += t.path;
             sum.crest += t.crest;
+            sum.landing += t.landing;
         }
     }
     const float inv = 1.0f / static_cast<float>(m * m);
@@ -358,6 +360,7 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
     sum.flat *= inv;
     sum.path *= inv;
     sum.crest *= inv;
+    sum.landing *= inv;
     if (spec.childrenMin) {
         sum.height = lowest; // ADR-1953
     }
@@ -390,6 +393,7 @@ TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std
             m.flat += c.flat;
             m.path += c.path;
             m.crest += c.crest;
+            m.landing += c.landing;
         }
     }
     const float inv = 1.0f / static_cast<float>(r * r);
@@ -399,6 +403,7 @@ TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std
     t.flat += (m.flat * inv - t.flat) * w;
     t.path += (m.path * inv - t.path) * w;
     t.crest += (m.crest * inv - t.crest) * w;
+    t.landing += (m.landing * inv - t.landing) * w;
     return t;
 }
 

@@ -1848,6 +1848,8 @@ private:
         params::Parameter<float>* contourInterval = nullptr; // ADR-1970
         params::Parameter<float>* contourOffset = nullptr;
         std::array<params::Parameter<float>*, 4> glow{}; // ADR-1963: path, contour, crest, pads
+        params::Parameter<float>* landingGain = nullptr;        // ADR-1960
+        params::Parameter<glm::vec3>* landingColor = nullptr;
     };
     TileDynamicsParams tileDynamicsParams_;
     bool tileDynamicsAuthored_ = false;

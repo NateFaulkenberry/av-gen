@@ -34,6 +34,8 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <cstdint>
+#include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace avgen::scene {
@@ -93,6 +95,7 @@ struct TileSample {
     float flat = 0.0f;   // 1 = a crown (a flattened hill top)
     float path = 0.0f;   // 1 = on the path
     float crest = 0.0f;  // ADR-1953: the crest channel, 0..1 (0 on a static ground)
+    float landing = 0.0f; // ADR-1960: how lit a tile is by a nearby landing, 0..1 (the springs' envelope, not their swing)
 };
 
 // The tile at generator-space centre (x, z), in metres: the static ground.
@@ -104,6 +107,16 @@ struct TileSample {
 // fade). Returns (height offset, crest). `events` is eventsAt(t), passed so a caller sampling many tiles finds it once.
 [[nodiscard]] glm::vec2 tileMotion(const TileDynamics& dyn, const std::vector<TileEvent>& events, float x, float z,
                                    float t, float water, float cellSize);
+// ADR-1960: a tile record's emissive.w, as the kernel and the contour pass pack it: crest (0..1) + 2 * the contour side
+// mask (ADR-1970, 0..15) + 32 * the landing glow in 255ths. The `tileContour` op decodes it.
+[[nodiscard]] inline float tilePackedEmissiveW(float crest, unsigned mask, float landing) {
+    const float l = std::round(std::clamp(landing, 0.0f, 1.0f) * 255.0f);
+    return std::clamp(crest, 0.0f, 1.0f) + 2.0f * static_cast<float>(mask) + 32.0f * l;
+}
+// ADR-1960: the landing glow at (x, z, t): each ringing landing's envelope -- the same reach, falloff and decay as its
+// spring, without the swing, after a 60 ms rise -- summed and clamped to 0..1. It settles exactly as the tile does.
+[[nodiscard]] float tileLanding(const TileSpringSpec& spec, const std::vector<TileEvent>& springs, float x, float z,
+                                float t);
 // ADR-1954: the landing springs' height offset at (x, z, t) from `springs` (springsAt(t)).
 [[nodiscard]] float tileSpring(const TileSpringSpec& spec, const std::vector<TileEvent>& springs, float x, float z,
                                float t);

@@ -194,8 +194,8 @@ std::vector<TileEvent> TileDynamics::springsAt(float t) const {
             out.push_back(e);
         }
     }
-    std::stable_sort(out.begin(), out.end(), [](const TileEvent& a, const TileEvent& b) { return a.time > b.time; });
-    if (out.size() > kMaxTileSprings) {
+    if (out.size() > kMaxTileSprings) { // only then is an order needed: the newest are kept
+        std::stable_sort(out.begin(), out.end(), [](const TileEvent& a, const TileEvent& b) { return a.time > b.time; });
         out.resize(kMaxTileSprings);
     }
     return out;
@@ -208,14 +208,41 @@ float tileSpring(const TileSpringSpec& s, const std::vector<TileEvent>& springs,
     const float wd = w * std::sqrt(1.0f - zeta * zeta);
     for (const TileEvent& e : springs) {
         const float r = std::sqrt((x - e.position.x) * (x - e.position.x) + (z - e.position.y) * (z - e.position.y));
+        const float reach = r / std::max(s.rippleRadius, 1e-3f);
+        if (reach >= kTileSpringReach) {
+            continue;
+        }
         const float a = t - e.time - r / s.rippleSpeed;
         if (a < 0.0f) {
             continue;
         }
-        const float amp = s.depth * e.strength * std::exp(-r / s.rippleRadius);
+        const float k = std::clamp((reach - kTileSpringReachStart) / (kTileSpringReach - kTileSpringReachStart), 0.0f, 1.0f);
+        const float window = 1.0f - k * k * (3.0f - 2.0f * k); // CP-D r2: the reach eases out, no edge
+        const float amp = s.depth * e.strength * std::exp(-r / s.rippleRadius) * window;
         h -= amp * std::exp(-zeta * w * a) * std::sin(wd * a); // an impulse: starts at rest, first goes down
     }
     return h;
+}
+
+float tileLanding(const TileSpringSpec& s, const std::vector<TileEvent>& springs, float x, float z, float t) {
+    float l = 0.0f;
+    const float w = kTwoPi * s.frequency;
+    const float zeta = std::clamp(s.damping, 0.0f, 0.999f);
+    for (const TileEvent& e : springs) {
+        const float r = std::sqrt((x - e.position.x) * (x - e.position.x) + (z - e.position.y) * (z - e.position.y));
+        const float reach = r / std::max(s.rippleRadius, 1e-3f);
+        if (reach >= kTileSpringReach) {
+            continue;
+        }
+        const float a = t - e.time - r / s.rippleSpeed;
+        if (a < 0.0f) {
+            continue;
+        }
+        const float k = std::clamp((reach - kTileSpringReachStart) / (kTileSpringReach - kTileSpringReachStart), 0.0f, 1.0f);
+        const float window = 1.0f - k * k * (3.0f - 2.0f * k);
+        l += e.strength * std::exp(-r / s.rippleRadius) * window * std::exp(-zeta * w * a) * (1.0f - std::exp(-a / 0.06f));
+    }
+    return std::clamp(l, 0.0f, 1.0f);
 }
 
 std::vector<TileEvent> TileDynamics::eventsAt(float t) const {
@@ -278,8 +305,10 @@ TileSample tileSampleMoving(const TileTerrainSpec& spec, const TileDynamics& dyn
                             float cellSize) {
     TileSample out = tileSample(spec, x, z, t, dyn);
     const glm::vec2 m = tileMotion(dyn, dyn.eventsAt(t), x, z, t, out.water, cellSize);
-    out.height += m.x + tileSpring(dyn.spring, dyn.springsAt(t), x, z, t); // ADR-1954
+    const std::vector<TileEvent> springs = dyn.springsAt(t);
+    out.height += m.x + tileSpring(dyn.spring, springs, x, z, t); // ADR-1954
     out.crest = m.y;
+    out.landing = tileLanding(dyn.spring, springs, x, z, t); // ADR-1960
     return out;
 }
 
@@ -620,8 +649,10 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
     if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset) {
         j["contour"] = {{"interval", d.contourInterval}, {"offset", d.contourOffset}};
     }
-    if (d.glow != def.glow) {
-        j["glow"] = {{"path", d.glow.x}, {"contour", d.glow.y}, {"crest", d.glow.z}, {"pads", d.glow.w}};
+    if (d.glow != def.glow || d.landingGain != def.landingGain || d.landingColor != def.landingColor) {
+        j["glow"] = {{"path", d.glow.x},       {"contour", d.glow.y}, {"crest", d.glow.z},
+                     {"pads", d.glow.w},       {"landing", d.landingGain},
+                     {"landingColor", nlohmann::json::array({d.landingColor.x, d.landingColor.y, d.landingColor.z})}};
     }
     const TileRingSpec& r = d.rings;
     j["rings"] = {{"amplitude", r.amplitude}, {"speed", r.speed},   {"wavelength", r.wavelength},
@@ -677,16 +708,24 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
             }
         } else if (key == "glow") { // ADR-1963
             struct G {
-                float path, contour, crest, pads;
-            } g{d.glow.x, d.glow.y, d.glow.z, d.glow.w};
+                float path, contour, crest, pads, landing;
+            } g{d.glow.x, d.glow.y, d.glow.z, d.glow.w, d.landingGain};
             if (auto r = readFields<G>(value, where,
                                        {{"path", &G::path}, {"contour", &G::contour}, {"crest", &G::crest},
-                                        {"pads", &G::pads}},
-                                       g);
+                                        {"pads", &G::pads}, {"landing", &G::landing}},
+                                       g, {"landingColor"});
                 !r) {
                 return std::unexpected(r.error());
             }
             d.glow = {g.path, g.contour, g.crest, g.pads};
+            d.landingGain = g.landing; // ADR-1960
+            if (value.contains("landingColor")) {
+                const auto& c = value["landingColor"];
+                if (!c.is_array() || c.size() != 3 || !c[0].is_number() || !c[1].is_number() || !c[2].is_number()) {
+                    return fail("'{}.landingColor' must be [r, g, b]", where);
+                }
+                d.landingColor = {c[0].get<float>(), c[1].get<float>(), c[2].get<float>()};
+            }
         } else if (key == "contour") {
             struct C {
                 float interval, offset;

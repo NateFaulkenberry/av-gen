@@ -85,7 +85,7 @@ constexpr const char* kKernel = R"(
 @group(0) @binding(17) var programTexturesLinear: texture_2d_array<f32>;
 @group(0) @binding(18) var programTextureSampler: sampler;
 
-const CTX_STRIDE: u32 = 17u;
+const CTX_STRIDE: u32 = 18u;
 
 @compute @workgroup_size(64)
 fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -121,6 +121,7 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     ctx.tangent = contexts[b + 14u].xyz;       // ADR-1642
     ctx.bitangent = contexts[b + 15u].xyz;
     ctx.tileGlow = contexts[b + 16u]; // ADR-1963
+    ctx.landingGlow = contexts[b + 17u]; // ADR-1960
 
     var base = materialResultZero();
     base.baseColor = vec3<f32>(0.8, 0.7, 0.6);
@@ -229,10 +230,10 @@ public:
         rendering::MaterialPrograms block(ctx_);
         block.update(programs, &fieldBlock, tex.layerOf);
 
-        std::vector<glm::vec4> packed(cases.size() * 17, glm::vec4(0.0f));
+        std::vector<glm::vec4> packed(cases.size() * 18, glm::vec4(0.0f));
         for (std::size_t i = 0; i < cases.size(); ++i) {
             const scene::MaterialContext& c = cases[i].ctx;
-            glm::vec4* p = packed.data() + i * 17;
+            glm::vec4* p = packed.data() + i * 18;
             p[0] = glm::vec4(c.worldPosition, c.objectId);
             p[1] = glm::vec4(c.localPosition, c.instanceIndex);
             p[2] = glm::vec4(c.normal, c.instanceId);
@@ -250,6 +251,7 @@ public:
             p[14] = glm::vec4(c.tangent, 0.0f);   // ADR-1642
             p[15] = glm::vec4(c.bitangent, 0.0f);
             p[16] = c.tileGlow; // ADR-1963
+            p[17] = c.landingGlow; // ADR-1960
         }
 
         const auto& device = ctx_.device();
@@ -425,6 +427,7 @@ std::vector<scene::MaterialContext> makeContexts() {
         c.materialId = std::fmod(t, 4.0f);
         c.materialEmission = {0.35f + t * 0.02f, 0.1f + t * 0.05f, 0.9f - t * 0.03f, 1.0f}; // ADR-904
         c.tileGlow = {0.5f + t * 0.1f, 2.0f - t * 0.07f, 0.25f, 3.0f};                     // ADR-1963
+        c.landingGlow = {1.5f - t * 0.05f, 0.4f, 0.9f + t * 0.02f, 2.5f};                  // ADR-1960
         out.push_back(c);
     }
     return out;
@@ -579,6 +582,7 @@ TEST_CASE("material program inputs match the CPU interpreter", "[material][gpu]"
     // ADR-904: the material's own emission as the instance shows it.
     checkParity(harness, {build("materialEmission", MaterialInput::MaterialEmission)}, noFields, 0.0);
     checkParity(harness, {build("tileGlow", MaterialInput::TileGlow)}, noFields, 0.0); // ADR-1963
+    checkParity(harness, {build("landingGlow", MaterialInput::LandingGlow)}, noFields, 0.0); // ADR-1960
     CHECK(ctx->errorCount() == 0);
 }
 

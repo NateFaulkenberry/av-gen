@@ -120,15 +120,25 @@ TEST_CASE("a landing spring's envelope never grows and its neighbours move less"
     CHECK(neighbour > 0.0f); // the ripple reaches it
 }
 
-TEST_CASE("the springs keep only the newest eight that are still ringing", "[tiles][springs][geography]") {
+TEST_CASE("the springs keep every landing still ringing, up to the cap, newest first beyond it",
+          "[tiles][springs][geography]") {
     scene::TileDynamics d;
-    for (int i = 0; i < 12; ++i) {
-        d.springs.push_back({0.1f * static_cast<float>(i), {static_cast<float>(i), 0.0f}, 1.0f});
+    const std::size_t n = scene::kMaxTileSprings + 40;
+    for (std::size_t i = 0; i < n; ++i) {
+        d.springs.push_back({0.001f * static_cast<float>(i), {static_cast<float>(i), 0.0f}, 1.0f});
     }
-    const auto now = d.springsAt(1.15f);
-    REQUIRE(now.size() == scene::kMaxTileSprings);
-    CHECK(now.front().time == Approx(1.1f));
-    CHECK(d.springsAt(0.05f).size() == 1);
+    const float now = 0.001f * static_cast<float>(n);
+    const auto kept = d.springsAt(now);
+    REQUIRE(kept.size() == scene::kMaxTileSprings);
+    CHECK(kept.front().time == Approx(0.001f * static_cast<float>(n - 1)));
+    // under the cap, nothing still ringing is dropped (CP-D r2: 104 at once in draft3)
+    scene::TileDynamics few;
+    for (int i = 0; i < 120; ++i) {
+        few.springs.push_back({0.04f * static_cast<float>(i), {4.0f * static_cast<float>(i % 11), 0.0f}, 1.0f});
+    }
+    REQUIRE(few.springSeconds() > 4.8f);
+    CHECK(few.springsAt(4.8f).size() == 120);
+    CHECK(few.springsAt(0.025f).size() == 1);
 }
 
 // ---- TileGround (ADR-1955) -----------------------------------------------------------------------------------------
@@ -725,4 +735,134 @@ TEST_CASE("a seek that lands mid-hop puts the body where a play does, with a rou
     CAPTURE(want.x, want.y, want.z, got.position().x, got.position().y, got.position().z);
     CHECK(got.airborne);
     CHECK(glm::length(got.position() - want) < 1e-3f);
+}
+
+TEST_CASE("a landed tile settles smoothly while many other landings arrive (no early cutoff)",
+          "[tiles][springs][geography]") {
+    // CP-D r2 canary as a test: draft3 had ~100 landings ringing at once. One tile lands at t = 1; then a landing every
+    // 0.1 s elsewhere (14-30 m away). The tile's displacement over time must be the whole damped tail -- no frame-to-
+    // frame jump bigger than the spring's own motion, and still ringing after 2 s (with 8 springs it went flat at once).
+    scene::TileDynamics d;
+    d.spring = {1.1f, 1.4f, 0.16f, 16.0f, 14.0f}; // draft3's spring
+    d.springs.push_back({1.0f, {0.0f, 0.0f}, 1.0f});
+    for (int i = 1; i <= 80; ++i) {
+        const float ang = 0.7f * static_cast<float>(i);
+        const float rad = 60.0f + 5.0f * static_cast<float>(i % 7); // beyond the reach of the tracked tile
+        d.springs.push_back({1.0f + 0.1f * static_cast<float>(i), {rad * std::cos(ang), rad * std::sin(ang)}, 1.0f});
+    }
+    float worstStep = 0.0f;
+    float late = 0.0f;
+    float prev = 0.0f;
+    for (float t = 1.0f; t < 1.0f + d.springSeconds(); t += 1.0f / 60.0f) {
+        const float h = scene::tileSpring(d.spring, d.springsAt(t), 0.0f, 0.0f, t);
+        worstStep = std::max(worstStep, std::abs(h - prev));
+        if (t > 3.0f && t < 3.5f) late = std::max(late, std::abs(h));
+        prev = h;
+    }
+    // the spring alone, for the bound on a frame's step
+    const scene::TileDynamics alone = [] {
+        scene::TileDynamics a;
+        a.spring = {1.1f, 1.4f, 0.16f, 16.0f, 14.0f};
+        a.springs.push_back({1.0f, {0.0f, 0.0f}, 1.0f});
+        return a;
+    }();
+    float aloneStep = 0.0f;
+    prev = 0.0f;
+    for (float t = 1.0f; t < 1.0f + alone.springSeconds(); t += 1.0f / 60.0f) {
+        const float h = scene::tileSpring(alone.spring, alone.springsAt(t), 0.0f, 0.0f, t);
+        aloneStep = std::max(aloneStep, std::abs(h - prev));
+        prev = h;
+    }
+    CAPTURE(worstStep, aloneStep, late);
+    CHECK(worstStep <= aloneStep + 1e-4f);
+    CHECK(late > 0.02f); // still settling two seconds on
+}
+
+TEST_CASE("a spring's reach ends smoothly", "[tiles][springs][geography]") {
+    scene::TileDynamics d;
+    d.springs.push_back({0.0f, {0.0f, 0.0f}, 1.0f});
+    const float rr = d.spring.rippleRadius;
+    float worst = 0.0f;
+    const float x0 = (scene::kTileSpringReachStart - 0.5f) * rr;
+    const float t0 = 0.4f + x0 / d.spring.rippleSpeed;
+    float prev = scene::tileSpring(d.spring, d.springsAt(t0), x0, 0.0f, t0);
+    for (float x = (scene::kTileSpringReachStart - 0.5f) * rr; x < (scene::kTileSpringReach + 0.5f) * rr; x += 0.01f) {
+        const float t = 0.4f + x / d.spring.rippleSpeed; // ride the ripple's front so the term is at its largest
+        const float h = scene::tileSpring(d.spring, d.springsAt(t), x, 0.0f, t);
+        worst = std::max(worst, std::abs(h - prev));
+        prev = h;
+    }
+    CHECK(worst < 1e-4f);
+    CHECK(scene::tileSpring(d.spring, d.springsAt(2.0f), scene::kTileSpringReach * rr + 0.1f, 0.0f, 2.0f) == 0.0f);
+}
+
+// ---- ADR-1960: the landing glow -----------------------------------------------------------------------------------
+
+TEST_CASE("a landing lights its tiles from the centre out and fades with the spring's own envelope",
+          "[tiles][springs][geography][adr1960]") {
+    scene::TileDynamics d;
+    d.spring = {1.1f, 1.4f, 0.16f, 16.0f, 14.0f};
+    d.springs.push_back({1.0f, {0.0f, 0.0f}, 1.0f});
+    const auto glowAt = [&](float x, float t) { return scene::tileLanding(d.spring, d.springsAt(t), x, 0.0f, t); };
+    CHECK(glowAt(0.0f, 0.99f) == 0.0f);   // nothing before
+    CHECK(glowAt(0.0f, 1.0f) == 0.0f);    // starts at 0 (a 60 ms rise, no pop)
+    CHECK(glowAt(0.0f, 1.25f) > 0.5f);    // lit
+    // smooth falloff from the impact outward, at a fixed time after each tile's ripple arrives
+    float prev = 2.0f;
+    for (float x = 0.0f; x < 6.0f * d.spring.rippleRadius; x += 4.0f) {
+        const float g = glowAt(x, 1.25f + x / d.spring.rippleSpeed);
+        CHECK(g <= prev + 1e-6f);
+        prev = g;
+    }
+    // it fades with the envelope, without a frame-to-frame step, to nothing by springSeconds
+    float worst = 0.0f;
+    float last = glowAt(0.0f, 1.0f);
+    for (float t = 1.0f; t < 1.0f + d.springSeconds() + 0.5f; t += 1.0f / 60.0f) {
+        const float g = glowAt(0.0f, t);
+        worst = std::max(worst, std::abs(g - last));
+        last = g;
+    }
+    CAPTURE(worst);
+    CHECK(worst < 0.25f);                  // the rise (60 ms) is the fastest change
+    CHECK(glowAt(0.0f, 3.0f) > 0.02f);     // still visible two seconds on
+    CHECK(glowAt(0.0f, 1.0f + d.springSeconds() + 0.1f) == 0.0f);
+    // the moving sample carries it, and the record packs it the way the op decodes it
+    const scene::TileTerrainSpec spec;
+    CHECK(scene::tileSampleMoving(spec, d, 0.0f, 0.0f, 1.4f, 4.0f).landing == Approx(glowAt(0.0f, 1.4f)));
+    const float w = scene::tilePackedEmissiveW(0.4f, 5u, 0.3f);
+    CHECK(std::floor(w / 32.0f) == std::round(0.3f * 255.0f));
+}
+
+TEST_CASE("the landing glow round-trips with its gain and colour, and they are parameters", "[tiles][geography][adr1960][composition]") {
+    const auto json = nlohmann::json::parse(R"({
+        "format": "avgen-scene", "version": 1, "name": "lglow",
+        "camera": {"position": [0, 50, 0], "target": [0, 0, -100]},
+        "environment": {"tileDynamics": {
+            "waves": [ {"amplitude": 0.5, "wavelength": 30, "speed": 4} ],
+            "glow": {"landing": 3.0, "landingColor": [1.0, 0.5, 0.25]}
+        }},
+        "nodes": []})");
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::fromJson(json, registry);
+    REQUIRE(c.has_value());
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*c)->attach(params, modulator);
+    auto* gain = params.find("env/tiles/glow/landing");
+    auto* colour = params.find("env/tiles/glow/landingColor");
+    REQUIRE(gain != nullptr);
+    REQUIRE(colour != nullptr);
+    params.resetFinals();
+    FrameTime ft{};
+    ft.renderTime = 0.5;
+    (*c)->update(ft);
+    CHECK((*c)->scene().environment.tileDynamics.landingGain == 3.0f);
+    CHECK((*c)->scene().environment.tileDynamics.landingColor == glm::vec3(1.0f, 0.5f, 0.25f));
+    gain->setBaseComponent(0, 5.0f);
+    params.resetFinals();
+    ft.renderTime = 0.6;
+    (*c)->update(ft);
+    CHECK((*c)->scene().environment.tileDynamics.landingGain == 5.0f);
+    const auto saved = (*c)->toJson();
+    CHECK(saved.at("environment").at("tileDynamics").at("glow").at("landing") == 3.0f);
 }
