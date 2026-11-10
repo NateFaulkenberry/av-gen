@@ -143,6 +143,7 @@ enum class MaterialInput : std::uint8_t {
     MaterialEmission,
     TileGlow, // ADR-1963: environment.tileDynamics.glow (path, contour, crest, pads), 1 = as authored
     LandingGlow, // ADR-1960: rgb = the landing glow's colour x gain, w = its gain (environment.tileDynamics)
+    WaterBody,   // ADR-1965: a tiles record's water body, one-hot (sea, river, pond) and the class, from instanceEmissive.w
 };
 [[nodiscard]] const char* materialInputName(MaterialInput input);
 [[nodiscard]] std::optional<MaterialInput> materialInputFromName(std::string_view name);

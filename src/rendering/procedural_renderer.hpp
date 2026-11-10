@@ -181,16 +181,28 @@ struct GeneratorTileUniforms {
     glm::uvec4 info;      // seed, path points, children per side, hole valid
     glm::ivec4 hole;      // min x, min z, max x, max z (this ring's cells)
     glm::ivec4 blend;     // seam band cells (0 = off), block ratio, 0, 0 (ADR-1976 amended)
-    glm::vec4 river;      // river width, valley width, height scale, river points (as f32)
+    glm::vec4 water0;     // ADR-1965: river count, pond count, valley count, height scale
     glm::vec4 skirt;      // skirt depth (m), the source box's thickness (m), 0, 0
     std::array<glm::vec4, 8> path;  // two points per lane
-    std::array<glm::vec4, 8> rivers; // the river's points, two per lane
+    // ADR-1965: the rivers, ponds and dry valleys (scene/tile_terrain.hpp), points pooled two per lane
+    std::array<glm::vec4, scene::kMaxTileRivers> riverInfo;   // first point, point count, width, valley width
+    std::array<glm::vec4, scene::kMaxTileRivers> riverLevel;  // source level, mouth level, length, 0 (metres)
+    std::array<glm::vec4, scene::kMaxTileRivers> riverBounds; // min x, min z, max x, max z, widened by half the valley
+    std::array<glm::vec4, scene::kMaxTileRiverPool / 2> riverPts;
+    std::array<glm::vec4, scene::kMaxTilePonds> ponds;        // centre x, centre z, radius, basin width
+    std::array<glm::vec4, scene::kMaxTilePonds> pondB;        // level, shore noise, 0, 0
+    std::array<glm::vec4, scene::kMaxTileValleys> valleyInfo; // first point, point count, valley width, depth
+    std::array<glm::vec4, scene::kMaxTileValleys> valleyB;    // min x, min z, max x, max z (widened)
+    glm::vec4 valleyFrac;                                     // each valley's depth fraction
+    std::array<glm::vec4, scene::kMaxTileValleyPool / 2> valleyPts;
     // ADR-1953: the moving ground (scene/tile_dynamics.hpp), the same for every tiles generator in the frame.
     glm::vec4 dyn;        // t (s), amplitude, wave count, event count
     glm::vec4 breath;     // amplitude, period, wavelength, 1 when anything moves
     glm::vec4 roll;       // rolling x, z (m/s), 0, 0
     glm::vec4 ring0;      // amplitude, speed, wavelength, width
     glm::vec4 ring1;      // decay, crest, contour interval (0 = none, ADR-1970), contour offset
+    glm::vec4 waterMotion;  // ADR-1965: river waves, pond waves, river drift amplitude, drift wavelength
+    glm::vec4 waterMotion2; // drift speed, 0, 0, 0
     std::array<glm::vec4, 12> waves;  // per wave: (circular, amplitude, wavelength, speed),
                                       // (cos heading | centre x, sin heading | centre z, sharpness, crest),
                                       // (onLand, onWater, phase, 0)
@@ -200,7 +212,7 @@ struct GeneratorTileUniforms {
     glm::vec4 spring1;    // ripple radius, spring count, ADR-1960 glow radius, 0
     std::array<glm::vec4, scene::kMaxTileSprings> springs; // x, z, time, strength (CP-D r2: 256)
 };
-static_assert(sizeof(GeneratorTileUniforms) == 1104 - 8 * 16 + scene::kMaxTileSprings * 16);
+static_assert(sizeof(GeneratorTileUniforms) == 140 * 16 + scene::kMaxTileSprings * 16); // ADR-1965: 79 lanes more
 // Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied, and (ADR-1953)
 // the scene's moving ground at time `t`.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,

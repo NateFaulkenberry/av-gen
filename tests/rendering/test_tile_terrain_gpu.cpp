@@ -16,6 +16,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <memory>
@@ -35,6 +36,14 @@ std::unique_ptr<gpu::Context> makeContext() {
         SKIP("no GPU adapter available: " << ctx.error().message);
     }
     return std::move(*ctx);
+}
+
+// ADR-1965: a record's emissive.w without the water body's class above it, and the class.
+float belowClass(float w) {
+    return w - scene::kTileClassStride * std::floor(w / scene::kTileClassStride);
+}
+int recordClass(float w) {
+    return static_cast<int>(std::floor(w / scene::kTileClassStride));
 }
 
 // ADR-1991: a record's drawn top -- the centred box's centre plus half its stretched thickness. It is the tile's
@@ -64,8 +73,8 @@ scene::ProceduralGeometry tilesObject(const std::string& name, float cell, float
     g.tiles.seed = 11;
     g.tiles.continentWavelength = 260.0f; // sea and land inside a small window
     g.tiles.path = {{-30.0f, -10.0f}, {0.0f, 5.0f}, {40.0f, -12.0f}};
-    g.tiles.river = {{-60.0f, 30.0f}, {-10.0f, 20.0f}, {50.0f, 35.0f}};
-    g.tiles.valleyWidth = 60.0f;
+    g.tiles.rivers = {scene::TileRiver{
+        .name = "river", .points = {{-60.0f, 30.0f}, {-10.0f, 20.0f}, {50.0f, 35.0f}}, .valleyWidth = 60.0f}};
     pg.variation.seed = 5;
     REQUIRE(pg.validate().has_value());
     REQUIRE(pg.rebuild());
@@ -88,6 +97,8 @@ struct Parity {
     float worstHeight = 0.0f;
     float worstChannel = 0.0f;
     float worstXZ = 0.0f;
+    std::uint64_t classWrong = 0; // ADR-1965: records whose water body is not the CPU's
+    std::array<std::uint64_t, 3> classes{};
 };
 
 Parity compare(rendering::SceneRenderer& renderer, const scene::ProceduralGeometry& pg, const glm::vec3& camera) {
@@ -126,6 +137,9 @@ Parity compare(rendering::SceneRenderer& renderer, const scene::ProceduralGeomet
                                     std::abs(r.position.z - (static_cast<float>(iz) + 0.5f) * g.cellSize)});
             out.worstChannel = std::max({out.worstChannel, std::abs(r.random.x - t.water), std::abs(r.random.y - t.shore),
                                          std::abs(r.random.z - t.flat), std::abs(r.random.w - t.path)});
+            const int cls = recordClass(r.emissive.w);
+            out.classWrong += cls != scene::tileWaterClass(t) ? 1u : 0u;
+            if (cls >= 0 && cls < 3) ++out.classes[static_cast<std::size_t>(cls)];
         }
     }
     return out;
@@ -150,6 +164,7 @@ TEST_CASE("The tiles kernel writes the ground the CPU mirror computes", "[gpu][g
         CHECK(p.worstXZ <= 1e-3f);
         CHECK(p.worstHeight <= 1e-3f);  // metres: float rounding through the same operations
         CHECK(p.worstChannel <= 1e-4f);
+        CHECK(p.classWrong == 0);
     }
     CHECK(ctx->errorCount() == 0);
 }
@@ -280,7 +295,7 @@ TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][gener
                 const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
                 const scene::TileSample still = scene::generatorTileInWindow(g, ix, iz, w);
                 worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
-                worstCrest = std::max(worstCrest, std::abs(r.emissive.w - moving.crest));
+                worstCrest = std::max(worstCrest, std::abs(belowClass(r.emissive.w) - moving.crest));
                 moved = std::max(moved, std::abs(moving.height - still.height));
                 crestSeen = std::max(crestSeen, moving.crest);
             }
@@ -345,7 +360,7 @@ TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][g
                 worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
                 sprung = std::max(sprung, std::abs(moving.height - plain.height));
                 // ADR-1960: the landing glow packed above the crest, as the CPU twin computes it
-                const float gpuLanding = std::floor(r.emissive.w / 32.0f) / 255.0f;
+                const float gpuLanding = std::floor(belowClass(r.emissive.w) / 32.0f) / 255.0f;
                 worstLanding = std::max(worstLanding, std::abs(gpuLanding - std::round(moving.landing * 255.0f) / 255.0f));
                 litMax = std::max(litMax, moving.landing);
             }
@@ -403,7 +418,7 @@ TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu
             if (level(top(x - 1, z)) < own) expect |= 2u;
             if (level(top(x, z + 1)) < own) expect |= 4u;
             if (level(top(x, z - 1)) < own) expect |= 8u;
-            const auto got = static_cast<std::uint32_t>(std::floor(r.emissive.w * 0.5f));
+            const auto got = static_cast<std::uint32_t>(std::floor(belowClass(r.emissive.w) * 0.5f));
             ++checked;
             edges += expect != 0u ? 1 : 0;
             wrong += got != expect ? 1 : 0;
@@ -413,5 +428,110 @@ TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu
     CHECK(checked > 5000);
     CHECK(edges > 100); // the control: there are contours in this window
     CHECK(wrong == 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1965: rivers (an upland stream at its own level), ponds (an auto level and a set one, an irregular shore) and dry
+// valleys (by depth and by a fraction of the relief) -- the kernel writes the ground, the channels and the water body's
+// class the CPU computes, still and moving (the waves weighted by body, the river's drift).
+TEST_CASE("The tiles kernel draws the CPU's rivers, ponds and dry valleys", "[gpu][generator][geography][adr1965]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    auto pg = tilesObject("water", 1.0f, 48.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    scene::TileTerrainSpec& t = pg.distribution.generator.tiles;
+    t.rivers.clear();
+    // the highest land near the origin, so the features sit in the land
+    glm::vec2 p(0.0f);
+    float best = -1e9f;
+    for (float z = -160.0f; z <= 160.0f; z += 4.0f) {
+        for (float x = -160.0f; x <= 160.0f; x += 4.0f) {
+            const scene::TileSample s = scene::tileSample(t, x, z);
+            if (s.water < 0.01f && s.height > best) {
+                best = s.height;
+                p = {x, z};
+            }
+        }
+    }
+    REQUIRE(best > t.seaLevel + t.shoreRise + 1.0f);
+    t.rivers = {scene::TileRiver{.name = "stream",
+                                 .points = {p + glm::vec2(-24.0f, -18.0f), p + glm::vec2(-4.0f, 2.0f),
+                                            p + glm::vec2(22.0f, 10.0f)},
+                                 .width = 3.0f,
+                                 .valleyWidth = 12.0f,
+                                 .bedDepth = 1.0f}};
+    t.ponds = {scene::TilePond{.name = "auto", .centre = p + glm::vec2(10.0f, -14.0f), .radius = 5.0f,
+                               .basinWidth = 6.0f, .shoreNoise = 0.4f},
+               scene::TilePond{.name = "set", .centre = p + glm::vec2(-16.0f, 16.0f), .radius = 4.0f,
+                               .basinWidth = 5.0f, .level = best - 2.0f}};
+    t.valleys = {scene::TileValley{.name = "deep", .points = {p + glm::vec2(18.0f, -24.0f), p + glm::vec2(-22.0f, -30.0f)},
+                                   .valleyWidth = 14.0f, .depthFraction = 0.5f},
+                 scene::TileValley{.name = "shallow", .points = {p + glm::vec2(24.0f, 18.0f), p + glm::vec2(30.0f, -6.0f)},
+                                   .valleyWidth = 10.0f, .depth = 2.0f}};
+    REQUIRE(t.validate().has_value());
+    t.resolveWater();
+    REQUIRE(pg.validate().has_value());
+    const glm::vec3 camera(p.x, best + 30.0f, p.y);
+    {
+        scene::Scene s;
+        s.procedurals.push_back(pg);
+        s.camera.position = camera;
+        s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+        REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
+        const Parity par = compare(rig.renderer, pg, camera);
+        CAPTURE(par.present, par.worstHeight, par.worstChannel, par.classWrong, par.classes[0], par.classes[1],
+                par.classes[2]);
+        CHECK(par.identity == 0);
+        CHECK(par.worstHeight <= 1e-3f);
+        CHECK(par.worstChannel <= 1e-4f);
+        CHECK(par.classWrong == 0);
+        CHECK(par.classes[1] > 20); // the stream
+        CHECK(par.classes[2] > 20); // the ponds
+    }
+    // moving: river and pond waves at their own weights, and the stream's drift
+    scene::TileDynamics d;
+    scene::TileWave a;
+    a.amplitude = 0.6f;
+    a.wavelength = 18.0f;
+    a.speed = 4.0f;
+    a.direction = 20.0f;
+    a.onLand = 0.0f;
+    a.onWater = 1.0f;
+    d.waves = {a};
+    d.riverWaves = 0.3f;
+    d.pondWaves = 0.1f;
+    d.riverDriftAmplitude = 0.25f;
+    d.riverDriftWavelength = 9.0f;
+    d.riverDriftSpeed = 1.5f;
+    REQUIRE(scene::validateTileDynamics(d).has_value());
+    const float time = 3.4f;
+    scene::Scene s;
+    s.procedurals.push_back(pg);
+    s.environment.tileDynamics = d;
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{time, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const scene::GeneratorSpec& g = pg.distribution.generator;
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+    auto records = rig.renderer.procedurals().readInstanceRecords(pg.name);
+    REQUIRE(records.has_value());
+    float worstHeight = 0.0f;
+    float riverMoved = 0.0f;
+    float pondMoved = 0.0f;
+    for (std::int32_t z = 0; z < w.countZ; ++z) {
+        for (std::int32_t x = 0; x < w.countX; ++x) {
+            const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                       static_cast<std::size_t>(x)];
+            const scene::TileSample moving = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w, &d, time);
+            const scene::TileSample still = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w);
+            worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
+            if (still.river > 0.99f) riverMoved = std::max(riverMoved, std::abs(moving.height - still.height));
+            if (still.pond > 0.99f) pondMoved = std::max(pondMoved, std::abs(moving.height - still.height));
+        }
+    }
+    CAPTURE(worstHeight, riverMoved, pondMoved);
+    CHECK(worstHeight <= 1e-3f);
+    CHECK(riverMoved > 0.2f);                 // drift + 0.3 of the wave
+    CHECK(pondMoved > 0.0f);
+    CHECK(pondMoved < 0.6f * 0.1f + 1e-3f);   // a tenth of the wave, no drift
     CHECK(ctx->errorCount() == 0);
 }

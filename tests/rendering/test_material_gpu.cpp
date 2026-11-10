@@ -18,6 +18,7 @@
 #include "rendering/material_programs.hpp"
 #include "rendering/scene_renderer.hpp"
 #include "scene/material_program.hpp"
+#include "scene/tile_terrain.hpp"
 #include "scene/mesh_generators.hpp"
 #include "scene/scene.hpp"
 #include "spatial/field.hpp"
@@ -409,7 +410,9 @@ std::vector<scene::MaterialContext> makeContexts() {
         c.instanceRandom = {std::fmod(t * 0.31f, 1.0f), std::fmod(t * 0.57f, 1.0f), std::fmod(t * 0.79f, 1.0f),
                             std::fmod(t * 0.13f, 1.0f)};
         c.instanceColor = {0.9f - t * 0.05f, 0.3f + t * 0.04f, 0.5f, 1.0f};
-        c.instanceEmissive = {0.2f, 0.4f + t * 0.03f, 0.8f, 0.0f};
+        // w: a tiles record's packed lane, the water body's class (0..2) above a crest, mask and landing (ADR-1965)
+        c.instanceEmissive = {0.2f, 0.4f + t * 0.03f, 0.8f,
+                              scene::kTileClassStride * std::floor(std::fmod(t, 3.0f)) + 37.5f + t};
         c.time = t * 0.4f;
         c.audio = {0.3f + t * 0.05f, 0.7f, 0.2f, 0.55f};
         c.audioBands = {0.11f, 0.44f, 0.66f, 0.22f};
@@ -583,6 +586,7 @@ TEST_CASE("material program inputs match the CPU interpreter", "[material][gpu]"
     checkParity(harness, {build("materialEmission", MaterialInput::MaterialEmission)}, noFields, 0.0);
     checkParity(harness, {build("tileGlow", MaterialInput::TileGlow)}, noFields, 0.0); // ADR-1963
     checkParity(harness, {build("landingGlow", MaterialInput::LandingGlow)}, noFields, 0.0); // ADR-1960
+    checkParity(harness, {build("waterBody", MaterialInput::WaterBody)}, noFields, 0.0);     // ADR-1965
     CHECK(ctx->errorCount() == 0);
 }
 

@@ -28,6 +28,7 @@
 //   height becomes mix(runningHeight, layerHeight, t).
 
 #include "scene/material_program.hpp"
+#include "scene/tile_terrain.hpp"
 
 #include "core/color.hpp"
 #include "core/noise.hpp"
@@ -161,6 +162,7 @@ constexpr InputName kInputNames[] = {
     {MaterialInput::MaterialEmission, "materialEmission"},
     {MaterialInput::TileGlow, "tileGlow"}, // ADR-1963
     {MaterialInput::LandingGlow, "landingGlow"}, // ADR-1960
+    {MaterialInput::WaterBody, "waterBody"},     // ADR-1965
 };
 
 // ---- structural hashing (FNV-1a over the bit patterns, as in procedural.cpp) ----------------------
@@ -547,6 +549,11 @@ glm::vec4 inputValue(MaterialInput input, const MaterialContext& ctx) {
         return ctx.tileGlow;
     case MaterialInput::LandingGlow:
         return ctx.landingGlow;
+    case MaterialInput::WaterBody: { // ADR-1965: the tile's water body, one-hot (sea, river, pond), and its class
+        const float cls = std::floor(std::max(ctx.instanceEmissive.w, 0.0f) / kTileClassStride);
+        return {cls < 0.5f ? 1.0f : 0.0f, std::abs(cls - 1.0f) < 0.5f ? 1.0f : 0.0f,
+                std::abs(cls - 2.0f) < 0.5f ? 1.0f : 0.0f, cls};
+    }
     }
     return glm::vec4(0.0f);
 }
@@ -867,7 +874,9 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
     case MaterialOpKind::TileContour: {
         // ADR-1970: the twin of matKTileContour. b.w = crest + 2 * mask (bits +x, -x, +z, -z) + 32 * the landing glow in
         // 255ths (ADR-1960, scene::tilePackedEmissiveW).
-        const float packed = std::max(b.w, 0.0f);
+        const float packedAll = std::max(b.w, 0.0f);
+        const float classQ = std::floor(packedAll / kTileClassStride); // ADR-1965: the water body above everything
+        const float packed = packedAll - kTileClassStride * classQ;
         const float landingQ = std::floor(packed / 32.0f);
         const float w = packed - 32.0f * landingQ;
         const float landing = std::clamp(landingQ / 255.0f, 0.0f, 1.0f);
