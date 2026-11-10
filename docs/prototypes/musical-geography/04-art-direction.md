@@ -1507,3 +1507,22 @@ and the silent drop is filed with engineering.
   - **Not seen:** feet through a tile top.
 - **Jitter:** `11-pass-cpd-r2/cpd-r2-final-route-jitter.txt`, comparing draft3-react, the approved smooth pass and
   this pass.
+
+### CP-D r2: the tile field drawn 0.6 m lower (eng ADR-1991, the real feet fix), re-checked (2026-11-10)
+
+**My earlier feet call was wrong.** I read the r2-final feet as the landing pit, with the neighbours hiding the feet.
+In fact they were 0.6 m inside their own tile: the kernel centred each box on the height, so the top was drawn half
+a box above the surface the bodies stand on. I called it from a look, not a measurement.
+
+**What I checked after merging 18bced09 and rebuilding,** before and after at 40, 100, 145 and 200 s
+(`11-pass-cpd-r2/cpd-r2-feetshift-*`):
+- **Overall brightness:** the mean frame luminance moves by at most 1 of 255. The differences that remain are
+  motion: rings, hops and cloud timing.
+- **The ramp:** the `worldPosition.y` ramp is now read 0.6 m lower, about 5% of a day stop. There is no visible
+  colour shift, and `UNDER_RAMP` and `UNDER_SHADE` need nothing.
+- **The horizon:** no new band at the fill or the ring seam.
+- **The flight:** clearance over the swelling land holds; no frame cuts into a tile.
+- **The clouds:** they are tiles too, now 3–7 m lower, which cannot be seen at 170 m and 650 m.
+- **The feet:** the aliens stand on the tile tops at 100 and 200 s.
+
+Nothing needed retuning.
