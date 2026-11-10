@@ -204,7 +204,7 @@ def tile_dynamics(state="day"):  # noqa: E302
 # route ADDS to a rest value and is unipolar, so silence shows the rest: the land still waves and breathes, the lights
 # sit at their rest glow. The glow lanes multiply each state's own emission, so the touch scales with the arc: the day
 # (path 0.35-0.875, no contours, no pads) moves lightly, the night strongly.
-GLOW_REST = {"path": 0.4, "contour": 0.7, "crest": 1.0, "pads": 0.6}
+GLOW_REST = {"path": 0.3, "contour": 0.35, "crest": 1.0, "pads": 0.3}
 
 # The landing glow per state (ADR-1960, keyed through the arc): bright and warm by day so it reads on a lit ground
 # (eng: gain 12 reads in daylight), far lower at night where the ground is dark and the contours already glow.
@@ -220,29 +220,39 @@ def landing_glow(S):
     return S["landing_gain"], hexlin(S["landing_color"])
 
 
+# CP-D r2 smooth (owner: "quite twitchy ... smooth these animations ... not so sure about beat pulsing any of the edge
+# glow"; then: "make glowing edges drift in according to the music intensity"). Measured first, per route, as the 99th
+# percentile frame-to-frame step over the route's own range, night 140-160 s at 30 fps (1.0 = a full-range jump in one
+# frame): the swell 0.99, the contour flash 1.00, the contour climb 0.99 (its per-bar wrap), the rings 108 triggers in
+# 20 s, the pads 0.70, the path 0.26, the breathing 0.05. So:
+#   * no beat or onset term on any edge glow; the path, contours and pads drift with the SONG'S ENERGY (audio.energy,
+#     which carries the sections: 0.31 in the intro, 0.67 in the climax, where response.level is normalised flat),
+#     remapped 0.30-0.68 -> 0-1, slewed 1.5 s up / 4.5 s down and eased by a 0.25 Hz critically damped spring;
+#   * the swell integrates the lows (0.6 s attack, 2.5 s release, 0.4 Hz spring) instead of jumping on each kick;
+#   * a ring at most every 2.5 s (a latching envelope on the onsets) instead of 5 a second;
+#   * the contours drift one interval per PHRASE, not per bar.
+EDGE_ENERGY = {"remapEnabled": True, "remapInMin": 0.30, "remapInMax": 0.68, "remapOutMin": 0.0, "remapOutMax": 1.0,
+               "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0, "attackMs": 1500.0, "decayMs": 4500.0,
+               "springHz": 0.25, "springDamping": 1.0}
+
+
 def audio_routes():
+    def r(source, target, amount, **chain):
+        # the processor chain goes under "chain" (params/serialization.cpp): flat keys are ignored without a warning --
+        # which is how draft3's attack/decay and the contour flash's peak hold never applied
+        out = {"source": source, "target": target, "amount": amount, "op": "add", "polarity": "unipolar"}
+        if chain:
+            out["chain"] = chain
+        return out
     return [
-        # the swell: low attacks (kick and bass) lift every wave train (as CP-B/C)
-        {"source": "response.low", "target": "env/tiles/amplitude", "amount": 0.6, "op": "add", "polarity": "unipolar"},
-        # a ring dropped 150 m ahead on each onset (as CP-B/C)
-        {"source": "response.onset", "target": "env/tiles/rings/trigger", "amount": 1.0, "op": "add",
-         "polarity": "unipolar"},
-        # dense passages breathe deeper (audio.energy is already smoothed over 1 s)
-        {"source": "audio.energy", "target": "env/tiles/breathing/amplitude", "amount": 0.25, "op": "add",
-         "polarity": "unipolar"},
-        # the contour lines climb the hills one interval per bar (the offset wraps seamlessly at the interval)
-        {"source": "beat.bar", "target": "env/tiles/contour/offset", "amount": CONTOUR_INTERVAL, "op": "add",
-         "polarity": "unipolar"},
-        # ...and swell on each beat: +0.8 over a rest of 0.7 (eng's +1.5 over 0.5 tripled the night lines on every
-        # beat -- a strobe at 121 BPM), falling at 3/s so a beat breathes rather than blinks
-        {"source": "beat.pulse", "target": "env/tiles/glow/contour", "amount": 0.8, "op": "add", "polarity": "unipolar",
-         "envelope": "peakhold", "envelopeFallPerSecond": 3.0},
-        # the path with the mids (the melodic register); night path_emit lowered 5 -> 2 so it no longer clips
-        {"source": "response.mid", "target": "env/tiles/glow/path", "amount": 1.2, "op": "add", "polarity": "unipolar",
-         "attackMs": 30.0, "decayMs": 250.0},
-        # the crown pads with the highs
-        {"source": "response.high", "target": "env/tiles/glow/pads", "amount": 0.8, "op": "add", "polarity": "unipolar",
-         "attackMs": 20.0, "decayMs": 300.0},
+        r("response.low", "env/tiles/amplitude", 1.0, attackMs=600.0, decayMs=2500.0, springHz=0.4, springDamping=1.0),
+        r("response.onset", "env/tiles/rings/trigger", 1.0, envelope="peakhold", envelopeHoldMs=0.0,
+          envelopeFallPerSecond=20.0, envelopeRefractoryMs=2500.0),
+        r("audio.energy", "env/tiles/breathing/amplitude", 0.25),
+        r("beat.phrase", "env/tiles/contour/offset", CONTOUR_INTERVAL),
+        r("audio.energy", "env/tiles/glow/contour", 0.9, **EDGE_ENERGY),
+        r("audio.energy", "env/tiles/glow/path", 0.9, **EDGE_ENERGY),
+        r("audio.energy", "env/tiles/glow/pads", 0.9, **EDGE_ENERGY),
     ]
 
 

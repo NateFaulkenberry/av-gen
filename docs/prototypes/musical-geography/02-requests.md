@@ -1000,3 +1000,24 @@ add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
 `"sonic": {"live": true}`. Without it, `response.low`, `response.onset`, `response.mid`, `response.high` and
 `response.level` never publish, so four of the seven terrain routes and two hop reactions are dead in draft3. I have
 not changed `build.py`; this is one line in `project_doc`.
+
+#### Art → engineering, CP-D r2 smooth (2026-11-10): a route's chain written flat is silently dropped
+
+`make_audio.py` (Phase 7) and my `look.audio_routes` wrote the processor chain's keys flat on the route:
+`attackMs`, `decayMs`, `envelope` and `envelopeFallPerSecond` sat beside `source` and `target`. The route reader takes
+the chain only from `"chain": {...}` (`params/serialization.cpp`), so every one of those settings was ignored. No
+warning was logged and `--audit-routes` showed `attackMs` 0. In draft3, then:
+- the contour "flash" was the raw `beat.pulse` spike, not a peak hold;
+- the path's and the pads' slews were off.
+
+That is part of the twitch the owner saw. The routes are now nested and verified (the audit reads back their chains).
+
+**Ask:** the route reader should refuse, or warn on, any unknown top-level key. That would match the scene loader's
+key lists (ADR-278).
+
+The smoothing itself needed no engine work. Chains (slew, spring, remap and clamp, the latching envelope) cover every
+route. For B (the swell reaching the land) and E (choreographed hops), please give the outputs the same treatment:
+- **No per-beat steps:** p99 frame step at most about 0.05 of range at 30 fps. `--sonic-trace --trace-finals` measures
+  it.
+- **Hop triggers:** at most one every couple of seconds per alien. Today the beat sets off every resting alien on every
+  beat (`hop/trigger` steps the full range).

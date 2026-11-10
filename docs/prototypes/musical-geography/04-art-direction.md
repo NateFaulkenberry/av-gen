@@ -1441,3 +1441,45 @@ Clips are in `11-pass-cpd-r2/`:
 - `cpd-r2-react-{day,night}-{music,silent}-*.mp4`;
 - music over silence in one frame: `cpd-r2-react-*-music-over-silent-*.mp4`;
 - the strip and the day landing-glow frames (1 fps).
+
+### CP-D r2 smooth: no beat pulses on the edges; motion that flows with the song (2026-11-10)
+
+The owner's verdict on the react clips was "quite twitchy ... not so sure about beat pulsing any of the edge glow".
+Then: "make glowing edges drift in according to the music intensity". I measured first, then changed the routes.
+
+**How it was measured.** `--sonic-trace --trace-finals`, giving the 99th-percentile frame-to-frame step at 30 fps as a
+fraction of each target's range. The full table, before and after for both windows, is
+`11-pass-cpd-r2/cpd-r2-smooth-route-jitter-before-after.txt`. Night, 140–160 s:
+
+| Route | Before | After |
+|---|---|---|
+| Swell (`response.low` → amplitude) | 0.99 | 0.03 |
+| Contour flash (`beat.pulse`) | 1.00 | removed; the edges now drift with energy, 0.01 |
+| Contour climb (per bar) | 0.99 | 0.004 (per phrase) |
+| Pads | 0.70 | 0.01 |
+| Path | 0.26 | 0.01 |
+| Rings | 108 triggers in 20 s | 6 |
+| Breathing | 0.05 | 0.05 (unchanged) |
+
+**A root cause that was not the mapping.** Every route's chain had been written flat, so every attack, decay and peak
+hold was silently ignored. Draft3's contour "flash" was raw beat spikes. The chains are now nested under `"chain"`,
+and the silent drop is filed with engineering.
+
+**The new mapping** (`look.audio_routes`):
+
+| Target | Source and shaping |
+|---|---|
+| Edge glow (path, contours, pads; crest gains are 0) | `audio.energy` remapped 0.30–0.68 → 0–1, slewed 1.5 s up and 4.5 s down, eased by a 0.25 Hz critically damped spring; rests 0.3 / 0.35 / 0.3, plus up to 0.9 |
+| Swell | `response.low`, 0.6 s attack, 2.5 s release, 0.4 Hz spring, amount 1.0 |
+| Rings | a latching envelope on onsets: at most one every 2.5 s |
+| Contour offset | one interval per phrase |
+| Landing glow | unchanged |
+| Hops | unchanged, until eng's E lands |
+
+- **Why `audio.energy`:** it carries the sections, about 0.3 in the build and 0.67 in the climax. `response.level` is
+  normalised nearly flat.
+- **Day and night:** the glow lanes multiply each state's own emission, so the day stays light (a faint path, no
+  contours) and the night floor still shows the contours (0.35 × 7).
+- **Plot:** `cpd-r2-smooth-edge-glow-vs-loudness-whole-song.png`. The glow dims through the build, rises through the
+  main section into the climax and eases down at the outro.
+- **Clips:** `cpd-r2-smooth-{day,night}-music-over-silent-*.mp4`.
