@@ -86,7 +86,8 @@ FLIGHT = {
     "pitchMin": -14, "pitchMax": 0, "bankLimit": 16, "bankGain": 2.2, "loop": False,
 }
 FLY = False   # set by --flight
-FULL = False  # set by --full (CP-D: the whole song, the arc on the timeline)
+FULL = False  # set by --full
+CLOUDS = False  # set by --clouds (CP-D r2) (CP-D: the whole song, the arc on the timeline)
 
 # ---- CP-D: the whole song as ONE flight (owner approved CP-C r3 "for now"). The approved CP-B/C legs keep their
 # shape and their song time (30 -> ~120 s); the crown leg flies at 14 m (it was 22: the aliens there were small) and the
@@ -170,7 +171,9 @@ PREFS = {  # where each habitat's aliens like to hop (lower preferPath so they d
     "inlet": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
 }
 # the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
-SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, "rippleRadius": 14.0}
+# the landing spring: the original (owner, CP-D r2: eng's soft 0.7 Hz / 0.35 arm rejected -- "the other bounces look much
+# better"). glowRadius (ADR-1960): the landing glow stays near the tile it lit.
+SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, "rippleRadius": 14.0, "glowRadius": 3.0}
 CHARACTERS = False   # set by --characters
 
 
@@ -222,7 +225,7 @@ def scene_doc(state, interim, camera_name):
         "aoFadeEnd": AO_BANDS.get(camera_name, (40.0, 120.0))[1],
         "sky": look.sky(state),
         "dayNight": look.day_night(phase=s["phase"]),
-        "tileDynamics": look.tile_dynamics(),
+        "tileDynamics": look.tile_dynamics(state),
     }
     env.update(look.fog_medium(state))
     if interim:
@@ -249,6 +252,11 @@ def scene_doc(state, interim, camera_name):
         "materialPrograms": programs,
     }
     doc["camera"]["far"] = 200000.0   # the 64 m far ring reaches 4.5 km
+    if CLOUDS:
+        cn, cp = look.cloud_nodes(arc.full_state(state) if FULL else state)
+        doc["nodes"] += cn
+        if not FULL:   # the full build's programs come from arc_programs (keyed through the arc)
+            doc["materialPrograms"] += cp
     if FULL:
         doc["lights"][1]["castsShadow"] = True   # the moon's shadows at night (a light's shadow is not keyable)
         doc["flight"] = FLIGHT_FULL
@@ -274,11 +282,13 @@ def arc_program_name(cell):
     return "mgUnder_arc" if cell == 0 else "mgTile%dx_arc" % int(cell)
 
 
-def arc_programs(S):
+def arc_programs(S):  # noqa: C901
     progs = [look.tile_program(S, c, name=arc_program_name(c), scale=TILE_SCALE, always=True) for c in (1.0, 2.0, 4.0)]
     progs.append(look.tile_program(S, 4.0, arc_program_name(0), far=True, shade=look.UNDER_SHADE, border=1.0,
                                    scale=TILE_SCALE, contour=False, always=True,
                                    ramp_offset=look.UNDER_RAMP * TILE_SCALE))
+    if CLOUDS:
+        progs += look.cloud_nodes(S)[1]
     return progs
 
 
@@ -310,6 +320,9 @@ def arc_timeline():
             if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "camera/exposure/mode":
                 put(k, t, round(float(v), 6))
         put("env/intensity", t, round(S["amb_int"], 6))
+        lg, lc = look.landing_glow(S)
+        put("env/tiles/glow/landing", t, round(lg, 6))
+        put("env/tiles/glow/landingColor", t, [round(v, 6) for v in lc])
         put("lights/fill/intensity", t, round(S["fill_int"], 6))
         put("lights/fill/color", t, look.hexlin(S["fill_col"]))
         put("procedural/mgTiles64/material/baseColor", t, look.hexlin(S["land"][1]))
@@ -329,6 +342,9 @@ def project_doc(scene_rel, state):
                    "stems": [dict(st, file=os.path.join(AUDIO_DIR, st["file"])) for st in look.FELINE_STEMS]},
         "parameters": dict(look.post(state), **{"post/output/dither": 1.0, "env/tiles/rings/ahead": 150.0}),
         "routes": look.audio_routes(),
+        # the response bus (response.low/mid/high/onset/level) publishes only with a sonic block: without it four of the
+        # seven terrain routes and the loudness hops were dead in draft3 (eng, 10-audio-reactivity-now.md)
+        "sonic": {"live": True},
         # Phase 7: Feline's stems as feeds (the beat clock follows the drums, the levels the bass)
         "feeds": dict(look.FELINE_FEEDS),
         **({"timeline": arc_timeline()} if FULL else {}),
@@ -347,7 +363,13 @@ def main():
     ap.add_argument("--flight", action="store_true")
     ap.add_argument("--characters", action="store_true")
     ap.add_argument("--full", action="store_true", help="CP-D: the whole song, one flight, the arc on the timeline")
+    ap.add_argument("--clouds", action="store_true", help="CP-D r2: the slab clouds (look.CLOUD_LAYERS)")
+    ap.add_argument("--tiles", default=None, help="CP-D r2: JSON overrides for world.TILES (terrain variants)")
     a = ap.parse_args()
+    global CLOUDS
+    CLOUDS = a.clouds
+    if a.tiles:
+        world.TILES.update(json.loads(a.tiles))
     global FULL
     FULL = a.full
     if FULL:

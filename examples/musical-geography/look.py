@@ -180,12 +180,12 @@ def fog_density_default(phase):
 CONTOUR_INTERVAL = 4.0   # metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
-def tile_dynamics():  # noqa: E302
+def tile_dynamics(state="day"):  # noqa: E302
     """Two crossing wave trains on the water (the land barely feels them), a slow regional breath, a drift, and rings
     that onsets drop ahead of the camera. Quiet audio leaves a calm sea, not a constant swell (04- §6, brief §10)."""
     return {
         "amplitude": 0.35,                     # response.low adds up to +0.6 (routes)
-        "glow": dict(GLOW_REST),               # Phase 7 (ADR-1963): the emission lanes' rest gains (audio adds)
+        "glow": dict(GLOW_REST, landing=landing_glow(state)[0], landingColor=landing_glow(state)[1]),   # Phase 7
         "waves": [
             {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
              "onLand": 0.08, "onWater": 1, "crest": 0.6},
@@ -204,32 +204,55 @@ def tile_dynamics():  # noqa: E302
 # route ADDS to a rest value and is unipolar, so silence shows the rest: the land still waves and breathes, the lights
 # sit at their rest glow. The glow lanes multiply each state's own emission, so the touch scales with the arc: the day
 # (path 0.35-0.875, no contours, no pads) moves lightly, the night strongly.
-GLOW_REST = {"path": 0.4, "contour": 0.7, "crest": 1.0, "pads": 0.6}
+GLOW_REST = {"path": 0.3, "contour": 0.35, "crest": 1.0, "pads": 0.3}
+
+# The landing glow per state (ADR-1960, keyed through the arc): bright and warm by day so it reads on a lit ground
+# (eng: gain 12 reads in daylight), far lower at night where the ground is dark and the contours already glow.
+LANDING_GLOW = {"day": (12.0, "#FFD99A"), "sunset": (8.0, "#FFC070"), "night": (2.5, "#FF6FC0"),
+                "dawn": (10.0, "#FFD8B0")}
+
+
+def landing_glow(S):
+    """(gain, linear colour) for a state name or an arc blend (which carries `landing_gain`/`landing_color`)."""
+    if isinstance(S, str):
+        g, c = LANDING_GLOW[S]
+        return g, hexlin(c)
+    return S["landing_gain"], hexlin(S["landing_color"])
+
+
+# CP-D r2 smooth (owner: "quite twitchy ... smooth these animations ... not so sure about beat pulsing any of the edge
+# glow"; then: "make glowing edges drift in according to the music intensity"). Measured first, per route, as the 99th
+# percentile frame-to-frame step over the route's own range, night 140-160 s at 30 fps (1.0 = a full-range jump in one
+# frame): the swell 0.99, the contour flash 1.00, the contour climb 0.99 (its per-bar wrap), the rings 108 triggers in
+# 20 s, the pads 0.70, the path 0.26, the breathing 0.05. So:
+#   * no beat or onset term on any edge glow; the path, contours and pads drift with the SONG'S ENERGY (audio.energy,
+#     which carries the sections: 0.31 in the intro, 0.67 in the climax, where response.level is normalised flat),
+#     remapped 0.30-0.68 -> 0-1, slewed 1.5 s up / 4.5 s down and eased by a 0.25 Hz critically damped spring;
+#   * the swell integrates the lows (0.6 s attack, 2.5 s release, 0.4 Hz spring) instead of jumping on each kick;
+#   * a ring at most every 2.5 s (a latching envelope on the onsets) instead of 5 a second;
+#   * the contours drift one interval per PHRASE, not per bar.
+EDGE_ENERGY = {"remapEnabled": True, "remapInMin": 0.30, "remapInMax": 0.68, "remapOutMin": 0.0, "remapOutMax": 1.0,
+               "clampEnabled": True, "clampMin": 0.0, "clampMax": 1.0, "attackMs": 1500.0, "decayMs": 4500.0,
+               "springHz": 0.25, "springDamping": 1.0}
 
 
 def audio_routes():
+    def r(source, target, amount, **chain):
+        # the processor chain goes under "chain" (params/serialization.cpp): flat keys are ignored without a warning --
+        # which is how draft3's attack/decay and the contour flash's peak hold never applied
+        out = {"source": source, "target": target, "amount": amount, "op": "add", "polarity": "unipolar"}
+        if chain:
+            out["chain"] = chain
+        return out
     return [
-        # the swell: low attacks (kick and bass) lift every wave train (as CP-B/C)
-        {"source": "response.low", "target": "env/tiles/amplitude", "amount": 0.6, "op": "add", "polarity": "unipolar"},
-        # a ring dropped 150 m ahead on each onset (as CP-B/C)
-        {"source": "response.onset", "target": "env/tiles/rings/trigger", "amount": 1.0, "op": "add",
-         "polarity": "unipolar"},
-        # dense passages breathe deeper (audio.energy is already smoothed over 1 s)
-        {"source": "audio.energy", "target": "env/tiles/breathing/amplitude", "amount": 0.25, "op": "add",
-         "polarity": "unipolar"},
-        # the contour lines climb the hills one interval per bar (the offset wraps seamlessly at the interval)
-        {"source": "beat.bar", "target": "env/tiles/contour/offset", "amount": CONTOUR_INTERVAL, "op": "add",
-         "polarity": "unipolar"},
-        # ...and swell on each beat: +0.8 over a rest of 0.7 (eng's +1.5 over 0.5 tripled the night lines on every
-        # beat -- a strobe at 121 BPM), falling at 3/s so a beat breathes rather than blinks
-        {"source": "beat.pulse", "target": "env/tiles/glow/contour", "amount": 0.8, "op": "add", "polarity": "unipolar",
-         "envelope": "peakhold", "envelopeFallPerSecond": 3.0},
-        # the path with the mids (the melodic register); night path_emit lowered 5 -> 2 so it no longer clips
-        {"source": "response.mid", "target": "env/tiles/glow/path", "amount": 1.2, "op": "add", "polarity": "unipolar",
-         "attackMs": 30.0, "decayMs": 250.0},
-        # the crown pads with the highs
-        {"source": "response.high", "target": "env/tiles/glow/pads", "amount": 0.8, "op": "add", "polarity": "unipolar",
-         "attackMs": 20.0, "decayMs": 300.0},
+        r("response.low", "env/tiles/amplitude", 1.0, attackMs=600.0, decayMs=2500.0, springHz=0.4, springDamping=1.0),
+        r("response.onset", "env/tiles/rings/trigger", 1.0, envelope="peakhold", envelopeHoldMs=0.0,
+          envelopeFallPerSecond=20.0, envelopeRefractoryMs=2500.0),
+        r("audio.energy", "env/tiles/breathing/amplitude", 0.25),
+        r("beat.phrase", "env/tiles/contour/offset", CONTOUR_INTERVAL),
+        r("audio.energy", "env/tiles/glow/contour", 0.9, **EDGE_ENERGY),
+        r("audio.energy", "env/tiles/glow/path", 0.9, **EDGE_ENERGY),
+        r("audio.energy", "env/tiles/glow/pads", 0.9, **EDGE_ENERGY),
     ]
 
 
@@ -244,7 +267,10 @@ ALIEN_REACTIONS = [
 FELINE_STEMS = [{"key": "drums", "label": "Drums", "role": "drums", "file": "stems/feline-footwear (Drums).wav"},
                 {"key": "bass", "label": "Bass", "role": "bass", "file": "stems/feline-footwear (Bass).wav"},
                 {"key": "synth", "label": "Synth", "role": "synth", "file": "stems/feline-footwear (Synth).wav"}]
-FELINE_FEEDS = {"beat": "stem.drums", "hits": "stem.drums", "levels": "stem.bass"}
+# CP-D r2: the levels come from the MIX, not the bass stem. Canaried with --sonic-trace over the whole song: with
+# "levels": "stem.bass", response.high is 0 everywhere (the bass has no highs) and the crown pads never move; from the
+# mix it averages 0.43 (p90 0.93), and response.mid 0.57 (was 0.27).
+FELINE_FEEDS = {"beat": "stem.drums", "hits": "stem.drums"}
 
 
 def fog_medium(state):
@@ -316,6 +342,7 @@ UNDER_SHADE = 0.72        # the underlay takes the land's own colour, darkened: 
 BORDER_DARK = 0.62       # the 1-px border's darkening (ADR-1976 B: the tile reads at any distance)
 CREST_EDGE = (0.72, 0.98)  # crest light only near the peaks: a broad crest lit the crossing trains as a diamond grid
 CONTOUR_FADE = (250.0, 800.0, 0.15)   # metres, and the gain left beyond (CP-D draft2: the night glare strip)
+LANDING_BAND = 0.075   # the landing outline's band, local metres per S (eng's clip: 0.3 at 4 m tiles)
 CONTOUR_BAND = 0.06       # the contour line's width on the top's border, fraction of the half-size
 BORDER_BAND = 0.03       # tileBorder's band (engineering's fixture value)
 RING_THICKNESS = {1.0: 0.30, 2.0: 0.36, 4.0: 0.72}
@@ -430,7 +457,8 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     eg, cg = s.get("edge_gain", 0.0), s.get("crest_gain", 0.0)
     if contour and (always or eg > 0 or cg > 0):
         add({"kind": "input", "input": "instanceEmissive", "dst": 1})
-        add({"kind": "tileContour", "dst": 3, "srcA": 0, "srcB": 1, "constant": [half, half, CONTOUR_BAND, 0],
+        add({"kind": "tileContour", "dst": 3, "srcA": 0, "srcB": 1, "constant": [half, half, CONTOUR_BAND,
+                                                                                  LANDING_BAND * scale],
              "value": 1.0})
         add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(0)})                     # contour coverage
         add({"kind": "input", "input": "instanceRandom", "dst": 7})                          # land only: the sea's
@@ -446,6 +474,12 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
                                                                  CONTOUR_FADE[2]], "value": 1.0})
         add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         glow(1, 1, 7)                                                                     # x the contours' glow
+        add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
+        # CP-D r2 (owner: "an edge glow on the tiles affected when a character lands"; ADR-1960): the landed tiles'
+        # outline (tileContour z) x landingGlow (the arc-keyed colour x gain: env/tiles/glow/landing, landingColor)
+        add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(2)})
+        add({"kind": "input", "input": "landingGlow", "dst": 7})
+        add({"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7})
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
         if cg > 0:
             add({"kind": "swizzle", "dst": 1, "srcA": 3, "constant": B(1)})                 # crest
@@ -477,3 +511,91 @@ def post(state):
         # 02-requests.md). Kept just above the 8-bit step so slow sky gradients break up without visible noise.
         "post/output/grain": 0.035,
     }
+
+
+# ---- the sky's clouds (CP-D r2, owner: "the sky reads too plain, add cinematic clouds") ------------------------------
+# Clouds in the tile world's own language: each layer is a second "tiles" ground (ADR-1950) lifted to altitude, on a
+# lattice of square slabs. Its own continent field is the cover (the "sea" cells are cut away: the program writes
+# opacity = 1 - water, alphaMode mask) and its own hills are the billows, so a cloud's top and underside step like the
+# land below. Lit by the scene's sun, moon, fill and sky (they carry the arc for free) and veiled by the same fog, so the
+# layers recede. Live: GPU-generated per frame and culled like the ground; no volume march (ADR-1289's lobes cost
+# 18-26 ms, ADR-1864).
+# (name, cell m, slab thickness m, altitude m, viewDistance m, the cover's TileTerrain overrides)
+CLOUD_LAYERS = [
+    ("mgCloudLow", 16.0, 6.0, 170.0, 1800.0,      # low scud: the scale cue well above the 40 m ceiling (sparse)
+     dict(seed=21, continentWavelength=260.0, landThreshold=0.70, inlandBand=0.1, hillHeight=10.0,
+          hillWavelength=90.0)),
+    ("mgCloudMid", 48.0, 24.0, 650.0, 5000.0,     # the cumulus masses: stepped towers, clear sky between
+     dict(seed=33, continentWavelength=1100.0, landThreshold=0.63, inlandBand=0.12, hillHeight=110.0,
+          hillWavelength=300.0)),
+]
+CLOUD_BASE = dict(shoreBand=0.02, seaLevel=0.0, seaDepth=0.0, shoreRise=1.0, hillOctaves=2, hillWarp=40.0,
+                  warpWavelength=300.0, hillLow=0.2, hillHigh=0.85, crownThreshold=1.0, crownFlatten=0.0,
+                  regionWavelength=3000.0, regionVariation=0.2, path=[], river=[], heightScale=1.0)
+CLOUD_COLOR = "#FFFFFF"
+CLOUD_SHADE = 0.45   # an underside, of a top (a cheap self-shadow: the sun never reaches a slab's underside)
+
+
+# The clouds per state (CP-D r2 v2, owner: at night "they look too much like a mirror reflection of the ground ... too
+# dark on the bottom"). Keyed through the arc like the terrain (arc.full_state). By night:
+#   under  0.45 -> 0.85  the undersides lifted (moon and sky fill), so the deck is not a dark flipped ground;
+#   side   1.0 -> 0.55   the side faces held down: the moon caught them at grazing angles as stray bright streaks;
+#   core   0 -> 0.55     only cells whose billow rises above (1.5 core - 0.5) of of the layer's relief stay: a sparser,
+#                        broken night sky of separate masses with clear sky between, a rhythm the ground does not have;
+#   bounce               a faint cool self-light (the ambient bounce), lifting every face a little.
+CLOUD_STATE = {
+    "day": dict(cloud_color="#FFFFFF", cloud_under=0.45, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                cloud_bounce_gain=0.0),
+    "sunset": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                   cloud_bounce_gain=0.0),
+    "night": dict(cloud_color="#E4E8FF", cloud_under=0.85, cloud_side=0.55, cloud_core=0.55, cloud_bounce="#6A74D8",
+                  cloud_bounce_gain=0.10),
+    "dawn": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                 cloud_bounce_gain=0.0),
+}
+
+
+def cloud_program(name, thick, alt, relief, state="day"):
+    S = dict(CLOUD_STATE[state]) if isinstance(state, str) else state
+    B = lambda k: [float(k)] * 4   # noqa: E731
+    core = alt + (1.5 * S["cloud_core"] - 0.5) * relief   # 0: below every slab (all kept); linear, so the arc can blend it
+    return {"name": name, "ops": [
+        {"kind": "input", "input": "instanceRandom", "dst": 5},
+        {"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(0)},                            # water = no cloud
+        {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1, 0], "value": 1.0},         # cover
+        {"kind": "input", "input": "worldPosition", "dst": 4},
+        {"kind": "swizzle", "dst": 4, "srcA": 4, "constant": B(1)},
+        {"kind": "input", "input": "localPosition", "dst": 0},
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},
+        {"kind": "constant", "dst": 7, "constant": B(-1.0)},
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 7},
+        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 1},                                        # the slab's centre y
+        {"kind": "smoothstep", "dst": 4, "srcA": 4, "constant": [core, core + 6.0, 0, 0]},      # the night's cores
+        {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 4},                                   # opacity
+        {"kind": "constant", "dst": 2, "constant": _c4(hexlin(S["cloud_color"]))},
+        {"kind": "input", "input": "normal", "dst": 0},
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},
+        {"kind": "remap", "dst": 7, "srcA": 1, "constant": [-1.0, 1.0, S["cloud_under"], 1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 7},                                   # tops lit, undersides
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 1},                                   # n.y^2: 0 on a side
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, S["cloud_side"], 1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},                                   # the sides held down
+        {"kind": "constant", "dst": 4, "constant": _c4([v * S["cloud_bounce_gain"] for v in hexlin(S["cloud_bounce"])])},
+        {"kind": "constant", "dst": 6, "constant": B(1.0)},
+    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": 3}
+
+
+def cloud_nodes(state="day"):
+    nodes, programs = [], []
+    for name, cell, thick, alt, view, cover in CLOUD_LAYERS:
+        tiles = dict(CLOUD_BASE, **cover)
+        programs.append(cloud_program(name + "Prog", thick, alt, cover["hillHeight"], state))
+        nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": {
+            "source": {"kind": "box", "size": [cell, thick, cell]},
+            "distribution": {"kind": "generator", "generator": {
+                "name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": 1, "tiles": tiles}},
+            "distributionTransform": {"position": [0, alt, 0]},
+            "castsShadow": False, "lod": {"cull": True},
+            "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog",
+                         "alphaMode": "mask", "alphaCutoff": 0.5}}})
+    return nodes, programs

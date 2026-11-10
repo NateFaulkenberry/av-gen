@@ -855,6 +855,112 @@ pipelines, at 180 ms.
 **For CP-D's perf line, use the 60 fps arm's GPU numbers** (p99 15.8 ms over the whole song) as the cost. At a
 30 fps target the GPU time is stretched by the clock. It still meets the deadline: 1 miss in 6122 frames.
 
+### Art → engineering, CP-D r2 (2026-11-10): terrain variety and tile clouds (owner's CP-D notes 1 and 3)
+
+The owner said of draft3: "pretty good start", but "terrain needs more variety: hills, valleys, rivers and ponds", and
+"the sky reads too plain, add cinematic clouds". Stills are in
+`~/Desktop/av-gen-review/105-musical-geography/10-full/cpd-r2-terrain-*` and `cpd-r2-sky-*`. ADR numbers are
+yours to assign; the art range 1970–1979 is used up.
+
+#### CPD-R1. Water bodies and valleys in TileTerrain
+
+Today TileTerrain has one `river` (at most 16 points) that carves its valley down to the sea floor, and `water` is a
+single class. The stills fake each feature with that one polyline:
+- a pond is a short, wide capsule: `riverWidth` 80, `valleyWidth` 190;
+- a dry valley is a 1 m channel.
+
+Both read well, with contour rings around the basin at night. What I need is several features at once, at their own
+levels:
+
+1. **`rivers`: several polylines.** Each has `points` (up to 32), `width`, `valleyWidth` and `bedDepth`.
+   - `bedDepth` is in metres below the land on either side. Today the bed always goes down to the sea floor.
+   - The bed should ease down from the source to the mouth (sea level), so an upland stream runs at its own height.
+   - `river` stays as `rivers[0]`.
+   - The flight's `follow` and the characters take a river's index or name.
+2. **`ponds`: small lakes set into the land.** Each has `centre`, `radius`, `basinWidth`, `level` and `shoreNoise`.
+   - `level` is in metres, or `"auto"`: the basin rim's lowest point minus 1 m, so a pond can sit up on a plateau.
+   - `shoreNoise` (0–1) makes the shoreline irregular.
+   - Tiles within the radius are water at `level`. The basin eases the land down over `basinWidth` with the river's
+     smoothstep profile: rolling, with no walls.
+3. **`valleys`: dry valleys.** These are polylines with a valley and no water. Each has `valleyWidth` and a `depth`
+   (in metres, or a fraction of the local relief), so the valley does not cut down to sea level.
+4. **A water-body channel.** The material and the motion need to know which body a water tile belongs to: sea 0,
+   river 1, pond 2. That could be `instanceColor.r` or a fifth lane. It would let the material colour ponds apart
+   from the sea, with their own glow at night. The ADR-1953 waves need a weight per class:
+   - the sea keeps its swell;
+   - a river gets a slow drift downstream along its polyline;
+   - a pond stays still, with rings on onsets.
+
+**Data-side today:** the hills can vary more by region (`regionVariation` 0.45 over a 1400 m `regionWavelength`).
+That gives broad low plains and taller ranges (`cpd-r2-terrain-maps-now-A-B-C.png`). The real variety, though, comes
+from ponds, more rivers and valleys, and that needs R1.
+
+#### CPD-R2. Tile clouds: let the `tiles` kernel omit water cells
+
+**The look is proven.** Each cloud layer is a second `tiles` ground lifted to altitude through `distributionTransform`.
+- Its continent field is the cloud cover and its hills are the billows.
+- A program cuts the "sea" cells (`opacity = 1 − water`, `alphaMode` mask).
+- The result is stepped square-slab clouds in the world's own language. The scene's sun, moon and fill light them,
+  so they carry the arc, and the fog layers them.
+- There are two layers: low scud at 170 m (16 m cells), a scale cue above the 40 m ceiling, and cumulus at 650 m
+  (48 m cells, stepped towers up to 110 m).
+- Stills: `cpd-r2-sky-{day,dusk,night,dawn}.png`.
+
+**The cost is the problem.** Measured at 1080p ultra on the full-song build, 40–60 s:
+
+| Variant | GPU p50 | Change | Where |
+|---|---|---|---|
+| No clouds | 12.8 ms | | |
+| Masked clouds | 57–61 ms | +44 ms | depth prepass 28 ms, scene 21 ms |
+| The same layers drawn opaque | 20.4 ms | +7.6 ms | |
+
+Every cell rasterises, and the empty half of the lattice runs the masked program in the prepass and then discards.
+
+**The ask:** a generator flag, for example `"omit": "water"` on the `tiles` kernel, so cells whose `water` ≥ 0.5 are
+never emitted. Then only the cloud cells raster, and the alpha mask goes away.
+- **Target:** at most 2 ms for the two layers. Please measure it.
+- **Also wanted, if cheap:**
+  - a layer can opt out of `tileDynamics` and the contour neighbours (clouds need neither);
+  - confirm that a generator window stays centred on the camera when the node's transform is keyed (wind drift on the
+    timeline).
+- **Nice to have:** cheap cloud shadows on the ground. That could be the cloud layer's cover field evaluated
+  analytically along the sun direction at shading time, with no shadow-map cascade.
+
+**Alternatives I looked at first:**
+- **ADR-1289 volumetric lobes:** 18–26 ms for streaks, and authored, static masses.
+- **ADR-1864 analytic cirrus:** cheap, but only a high streak layer, and its lit and shade colours are fixed rather
+  than following the arc.
+- **Rainbow World's mesh clouds (ADR-1590/1591):** smooth billowed meshes, a different language from the tiles, with
+  about 900 heads.
+- **The `cells` kernel:** it skips cells, but every element gets a random yaw (`generator.wgsl` line 175), so the slabs
+  scatter like confetti, and its cluster fertility is a density dither rather than a mass with an edge.
+
+#### CPD-R2, addendum (2026-11-10): the night clouds (owner: "too much like a mirror reflection of the ground")
+
+**Done in data, with no engine change.** The cloud program's constants are keyed through the arc, like the terrain's
+(`look.CLOUD_STATE`, `arc.full_state`). At night:
+- **Undersides:** lifted from 0.45 to 0.85 of the tops.
+- **Side faces:** held down to 0.55 (through the normal's y squared). These were the stray bright streaks: the moon
+  caught them at grazing angles.
+- **Cores only:** a cell is kept only where its billow rises above about a third of the layer's relief, by a
+  smoothstep on the slab's centre height. The night sky becomes separate, broken masses with clear sky between,
+  instead of a deck that mirrors the tile ground.
+- **Bounce:** a faint cool self-light (`#6A74D8` × 0.1).
+
+All 128 tracks are live in `--audit-routes`. Stills: `10-full/cpd-r2-sky-night-v2-*`.
+
+**What data cannot do, and the ask:**
+1. **A key-light direction input for material programs** (`keyLightDirection`: the sun's direction, or the moon's when
+   the sun is down; plus its colour × intensity). With it, a program can give the cloud slabs a silver lining. That
+   means brightening the edges and faces that look toward the moon (`dot(normal, L)`), plus forward scatter where
+   the view runs toward it (`dot(viewDirection, L)`).
+
+   Today the only way an edge catches the moon is the moon light itself, which is also what lit the side faces into
+   streaks. The tops are rarely seen from under the clouds, so the rim is what reads.
+2. **(Optional) the sky's ambient colour as a material input,** so the undersides take the sky's own tint at every
+   phase rather than a keyed constant.
+3. **Cell size:** nothing needed. The cloud layers' 16 m and 48 m cells against the ground's 4 m tiles, with the
+   cores-only night, already break the reflection rhythm.
 ### Engineering → art, CP-D r2 (2026-11-10): the landing tail (ADR-1952) and the landing glow (ADR-1960)
 
 **What I changed:**
@@ -894,3 +1000,24 @@ add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
 `"sonic": {"live": true}`. Without it, `response.low`, `response.onset`, `response.mid`, `response.high` and
 `response.level` never publish, so four of the seven terrain routes and two hop reactions are dead in draft3. I have
 not changed `build.py`; this is one line in `project_doc`.
+
+#### Art → engineering, CP-D r2 smooth (2026-11-10): a route's chain written flat is silently dropped
+
+`make_audio.py` (Phase 7) and my `look.audio_routes` wrote the processor chain's keys flat on the route:
+`attackMs`, `decayMs`, `envelope` and `envelopeFallPerSecond` sat beside `source` and `target`. The route reader takes
+the chain only from `"chain": {...}` (`params/serialization.cpp`), so every one of those settings was ignored. No
+warning was logged and `--audit-routes` showed `attackMs` 0. In draft3, then:
+- the contour "flash" was the raw `beat.pulse` spike, not a peak hold;
+- the path's and the pads' slews were off.
+
+That is part of the twitch the owner saw. The routes are now nested and verified (the audit reads back their chains).
+
+**Ask:** the route reader should refuse, or warn on, any unknown top-level key. That would match the scene loader's
+key lists (ADR-278).
+
+The smoothing itself needed no engine work. Chains (slew, spring, remap and clamp, the latching envelope) cover every
+route. For B (the swell reaching the land) and E (choreographed hops), please give the outputs the same treatment:
+- **No per-beat steps:** p99 frame step at most about 0.05 of range at 30 fps. `--sonic-trace --trace-finals` measures
+  it.
+- **Hop triggers:** at most one every couple of seconds per alien. Today the beat sets off every resting alien on every
+  beat (`hop/trigger` steps the full range).

@@ -1348,3 +1348,138 @@ The 1× ring is now 71 ops and the 2× and 4× rings 56, all under `kMaxMaterial
 - **So the wiring costs no GPU,** as engineering measured. The long runs' tail is environmental: `gpu-lock` waited
   60 s for another session's GPU job during this pass, and it matches engineering's GPU-clocking finding.
 - **CPU work p50 is 2.5–3.2 ms** (2.2–3.3 ms before), which is the stems and the routes.
+
+### CP-D r2, stills only: terrain variety and clouds (2026-11-10; owner's draft3 notes 1 and 3)
+
+**Terrain** (`cpd-r2-terrain-sheet.png`, plus the single stills and the maps).
+- **What the data can do now:** more regional variety in the hills (`--tiles '{"regionVariation":0.45,
+  "regionWavelength":1400}'`). That gives broad low plains against taller ranges.
+  - Stronger variants (more octaves, warp) streak into swirls on the map, so I rejected them.
+  - On its own, the variety tweak reads only a little different in flight.
+- **What the generator cannot do, so I prototyped it on the one river polyline:**
+  - **A pond:** a short capsule 80 m wide in a 190 m basin. The low water tiles sit in rolling land, and at night the
+    contours ring the basin.
+  - **A dry valley:** a 1 m channel in a 170 m valley, which carves a clear trough that the contours follow.
+  - **The real river's winding valley.**
+- **Request CPD-R1 in 02-requests asks for:**
+  - several rivers with their own bed depth;
+  - ponds at their own level;
+  - dry valleys;
+  - a water-body channel for colour and motion.
+- **The plan, once R1 lands:** a distinct landform on every leg of the flight:
+  - the bay and the west-shore hills;
+  - the lit path through rolling hills;
+  - a pond plateau on the crowns;
+  - the river valley;
+  - a dry valley through the sweep;
+  - the night coast with a chain of ponds;
+  - the inlet;
+  - a stream down the peninsula at dawn.
+
+**Sky** (`cpd-r2-sky-sheet.png`; day 50 s, dusk 118 s, night 150 s, dawn 200 s).
+- **The approach:** tile clouds. Each layer is a second `tiles` ground at altitude: its continent field is the cover
+  and its hills are the billows, with the "sea" cells cut away by `look.cloud_program` (opacity = 1 − water, mask).
+  Stepped square-slab cumulus, in the world's own language.
+- **Layers:**
+  - low scud at 170 m, a sparse scale cue above the 40 m ceiling;
+  - cumulus masses at 650 m, stepping up to about 110 m.
+- **Light:** normal-shaded (undersides at 0.45), and lit by the scene's own sun, moon, fill and sky.
+- **Across the arc:**
+  - day: white masses on blue;
+  - dusk: pink-gold-lit decks;
+  - night: dark violet silhouettes, with moonlit side edges that streak a little;
+  - dawn: peach-gold tops.
+- **Cost:** the masked stopgap costs about +44 ms of GPU (the empty cells raster and discard), so it is not shippable.
+  The same layers drawn opaque cost +7.6 ms. Request CPD-R2 asks the `tiles` kernel to omit water cells, with a
+  target of at most 2 ms.
+- **The build:** `--clouds` (off by default). Nothing in the approved build changes.
+
+**CP-D r2 sky, night v2** (the owner picked the slab clouds; note: at night "too much like a mirror reflection of the
+ground ... too dark on the bottom"). `look.CLOUD_STATE` is keyed through the arc:
+
+| Setting | Day | Night |
+|---|---|---|
+| Undersides (of the tops) | 0.45 | 0.85 |
+| Side faces (normal y²) | 1.0 | 0.55, which removes the moonlit streaks |
+| Cores only | off | cells with billows above about a third of the relief |
+| Cool bounce | none | `#6A74D8` × 0.1 |
+
+The result is sparser, broken masses at night, a little lighter than the sky. They no longer read as a flipped ground
+(`10-full/cpd-r2-sky-night-v2-sheet-before-after.png`, and `-streaks-before-after.png`). A silver lining on the
+moon-facing edges needs a key-light-direction input, requested as the CPD-R2 addendum. The day frames are unchanged.
+
+### CP-D r2: the music actually on, the landing glow, the crown-pad canary (2026-11-10)
+
+I merged eng's ddc129ca and 67ca7d4e (ADR-1952, the landing tail; ADR-1960, the landing glow) and rebuilt.
+
+- **The sonic block.** `project_doc` now writes `"sonic": {"live": true}`. Without it, `response.*` never published,
+  so in draft3 four of the seven terrain routes and the loudness hops were dead (eng's `10-audio-reactivity-now.md`).
+  `--audit-routes` now passes: 91 routes and 130 tracks, all live.
+- **The crown pads were flat: the cause is proven, and fixed.** I ran `--sonic-trace` over the whole song, twice:
+
+  | Levels fed from | `response.high` mean / p90 / max | `response.mid` mean |
+  |---|---|---|
+  | The bass stem (`"levels": "stem.bass"`) | 0 / 0 / 0 | 0.27 |
+  | The mix | 0.43 / 0.93 / 1.0 | 0.57 |
+
+  The bass stem has no highs, so the route that lights the pads on the highs never moved. `look.FELINE_FEEDS` now
+  takes the levels from the mix. The beat clock and the hits still follow the drum stem.
+- **The landing glow.** I added eng's 4 ops after the contour lines' `add`. The outline band is
+  `LANDING_BAND` 0.075 per S (0.3 m at 4 m tiles), the spread is `spring.glowRadius` 3 m, and the glow is keyed
+  through the arc (`look.LANDING_GLOW` → `env/tiles/glow/landing` and `landingColor`):
+
+  | State | Gain | Colour | Why |
+  |---|---|---|---|
+  | Day | 12 | `#FFD99A` warm white | reads on the lit ground |
+  | Sunset | 8 | `#FFC070` | |
+  | Night | 2.5 | `#FF6FC0`, the night accent | |
+  | Dawn | 10 | `#FFD8B0` | |
+- **The spring is the original:** 1.4 Hz, damping 0.16. The owner rejected eng's soft arm ("the other bounces look much
+  better").
+
+Clips are in `11-pass-cpd-r2/`:
+- `cpd-r2-react-{day,night}-{music,silent}-*.mp4`;
+- music over silence in one frame: `cpd-r2-react-*-music-over-silent-*.mp4`;
+- the strip and the day landing-glow frames (1 fps).
+
+### CP-D r2 smooth: no beat pulses on the edges; motion that flows with the song (2026-11-10)
+
+The owner's verdict on the react clips was "quite twitchy ... not so sure about beat pulsing any of the edge glow".
+Then: "make glowing edges drift in according to the music intensity". I measured first, then changed the routes.
+
+**How it was measured.** `--sonic-trace --trace-finals`, giving the 99th-percentile frame-to-frame step at 30 fps as a
+fraction of each target's range. The full table, before and after for both windows, is
+`11-pass-cpd-r2/cpd-r2-smooth-route-jitter-before-after.txt`. Night, 140–160 s:
+
+| Route | Before | After |
+|---|---|---|
+| Swell (`response.low` → amplitude) | 0.99 | 0.03 |
+| Contour flash (`beat.pulse`) | 1.00 | removed; the edges now drift with energy, 0.01 |
+| Contour climb (per bar) | 0.99 | 0.004 (per phrase) |
+| Pads | 0.70 | 0.01 |
+| Path | 0.26 | 0.01 |
+| Rings | 108 triggers in 20 s | 6 |
+| Breathing | 0.05 | 0.05 (unchanged) |
+
+**A root cause that was not the mapping.** Every route's chain had been written flat, so every attack, decay and peak
+hold was silently ignored. Draft3's contour "flash" was raw beat spikes. The chains are now nested under `"chain"`,
+and the silent drop is filed with engineering.
+
+**The new mapping** (`look.audio_routes`):
+
+| Target | Source and shaping |
+|---|---|
+| Edge glow (path, contours, pads; crest gains are 0) | `audio.energy` remapped 0.30–0.68 → 0–1, slewed 1.5 s up and 4.5 s down, eased by a 0.25 Hz critically damped spring; rests 0.3 / 0.35 / 0.3, plus up to 0.9 |
+| Swell | `response.low`, 0.6 s attack, 2.5 s release, 0.4 Hz spring, amount 1.0 |
+| Rings | a latching envelope on onsets: at most one every 2.5 s |
+| Contour offset | one interval per phrase |
+| Landing glow | unchanged |
+| Hops | unchanged, until eng's E lands |
+
+- **Why `audio.energy`:** it carries the sections, about 0.3 in the build and 0.67 in the climax. `response.level` is
+  normalised nearly flat.
+- **Day and night:** the glow lanes multiply each state's own emission, so the day stays light (a faint path, no
+  contours) and the night floor still shows the contours (0.35 × 7).
+- **Plot:** `cpd-r2-smooth-edge-glow-vs-loudness-whole-song.png`. The glow dims through the build, rises through the
+  main section into the climax and eases down at the outro.
+- **Clips:** `cpd-r2-smooth-{day,night}-music-over-silent-*.mp4`.
