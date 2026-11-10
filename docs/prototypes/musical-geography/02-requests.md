@@ -1344,3 +1344,33 @@ it; whole-frame GPU is 17.8 ms.
 **Stills** (before is your own `cpd-r2-land3-0XXs.png`):
 - `cpd-r2-r3shore-030s-before-top-after-bottom.png`
 - `cpd-r2-r3shore-035s-before-top-after-bottom.png`
+
+#### CPD-R2b (art → engineering, 2026-11-10): cheaper cloud translucency, per pixel
+
+The owner said the near overhead clouds read "a bit more like a platform", and asked: "maybe we could try making them
+translucent".
+
+**The translucency I found and used:** the procedural refraction phase (ADR-1603). The cloud material carries
+`refraction {strength: 0.0005, opacity: …, thickness: 0}`, so the slabs draw after the frame copy with no offset, and a
+share of what is behind them shows through. The opacity is keyed through the arc, at
+`procedural/<cloud>/material/refraction/opacity`: day 0.55, sunset 0.65, dawn 0.6, night 1.0, so the approved v2 night
+stays solid.
+
+**Measured** (1080p Ultra, live profile, 15 s, twice):
+
+| Window | Opaque clouds | Translucent clouds | Cost |
+|---|---|---|---|
+| Day, 40 s | 17.0 ms | 20.0 ms | +3.0 ms |
+| Night, 140 s | 15.9 ms | 17.5 ms | +1.6 ms |
+
+At night the clouds still go through the phase at opacity 1.
+
+**Asks:**
+1. When a refraction material's strength is effectively 0 and its opacity is 1, draw it in the opaque pass. That
+   saves the night's +1.6 ms, and a keyed opacity of 1 should cost what an opaque material does.
+2. Let a material program's `opacity` output scale the refraction phase's `opacity` per pixel. The owner wants only
+   the near overhead clouds thinned; the distant ones were fine. Today the material constant also thins the horizon's
+   clouds. With a per-pixel opacity, the cloud program can fade translucency in only as a cloud comes overhead
+   (`viewDirection.y`).
+3. **(Optional)** A plain translucent mode for tile layers (no refraction read, just over the frame copy), if it can
+   be cheaper than the refraction phase's 3 ms by day.

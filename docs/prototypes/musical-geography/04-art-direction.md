@@ -1673,3 +1673,24 @@ The owner said "some of these lumps look odd". Each island is now built from ove
 - **Enclosure** (`cpd-r2-land4-enclosure.txt`), v2: 30 s goes from 0.78 to 0.70 and 35 s from 0.70 to 0.65. Both stay
   at 0.6 or above.
 - **Popping:** I saw none in the 30–50 s clip at 2 fps (eng is investigating it).
+
+### CP-D r2 clouds3: the overhead "platform" undersides (2026-11-10)
+
+The owner said the near overhead clouds' dark flat undersides "read a bit more like a platform"; the distant clouds
+were fine. I tried four options at 30 s and 35 s, plus a dusk (118 s) and a night (150 s) check
+(`11-pass-cpd-r2/cpd-r2-clouds3-options-*`):
+
+| Option | What it is | Result |
+|---|---|---|
+| v1 | Data only: an "overhead" sky fill, low slabs 6 → 3 m, day undersides 0.45 → 0.75 | Lighter, but still an opaque plate |
+| v2 | v1 plus translucency (refraction phase at opacity 0.55) | The undersides take the sky through them and stop reading as a platform. Best. |
+| v3 | Translucency with the 6 m slabs | Close to v2 |
+
+**v1 in detail.** The sky fill uses `viewDirection.y` over 0.25–0.85: an overhead cloud gives up albedo for
+`skyAmbient` emission, `cloud_sky_mix` day 0.75 and night 0.
+
+**Adopted:** v2, with the opacity keyed through the arc (day 0.55, sunset 0.65, dawn 0.6, night 1.0), so the approved
+night v2 is unchanged in look. **Cost:** +3.0 ms day and +1.6 ms night against the opaque clouds.
+
+**Side effect:** the horizon's clouds are also a little thinner. Asked for a per-pixel opacity so only the overhead
+clouds thin, as request CPD-R2b.

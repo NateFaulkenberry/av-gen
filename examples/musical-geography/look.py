@@ -576,7 +576,7 @@ def post(state):
 # 18-26 ms, ADR-1864).
 # (name, cell m, slab thickness m, altitude m, viewDistance m, the cover's TileTerrain overrides)
 CLOUD_LAYERS = [
-    ("mgCloudLow", 16.0, 6.0, 170.0, 1800.0,      # low scud: the scale cue well above the 40 m ceiling (sparse)
+    ("mgCloudLow", 16.0, 3.0, 170.0, 1800.0,      # low scud: the scale cue well above the 40 m ceiling (sparse)
      dict(seed=21, continentWavelength=260.0, landThreshold=0.70, inlandBand=0.1, hillHeight=10.0,
           hillWavelength=90.0)),
     ("mgCloudMid", 48.0, 24.0, 650.0, 5000.0,     # the cumulus masses: stepped towers, clear sky between
@@ -598,14 +598,14 @@ CLOUD_SHADE = 0.45   # an underside, of a top (a cheap self-shadow: the sun neve
 #                        broken night sky of separate masses with clear sky between, a rhythm the ground does not have;
 #   bounce               a faint cool self-light (the ambient bounce), lifting every face a little.
 CLOUD_STATE = {
-    "day": dict(cloud_color="#FFFFFF", cloud_under=0.45, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
-                cloud_bounce_gain=0.0, cloud_lining=0.08, cloud_lining_tint="#FFF2D8"),
-    "sunset": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
-                   cloud_bounce_gain=0.0, cloud_lining=0.14, cloud_lining_tint="#FFD0A0"),
+    "day": dict(cloud_color="#FFFFFF", cloud_under=0.75, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                cloud_bounce_gain=0.0, cloud_lining=0.08, cloud_lining_tint="#FFF2D8", cloud_sky_mix=0.75, cloud_opacity=0.55),
+    "sunset": dict(cloud_color="#FFFFFF", cloud_under=0.7, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                   cloud_bounce_gain=0.0, cloud_lining=0.14, cloud_lining_tint="#FFD0A0", cloud_sky_mix=0.55, cloud_opacity=0.65),
     "night": dict(cloud_color="#E4E8FF", cloud_under=0.85, cloud_side=0.55, cloud_core=0.55, cloud_bounce="#6A74D8",
-                  cloud_bounce_gain=0.10, cloud_lining=0.5, cloud_lining_tint="#D8E0FF"),
-    "dawn": dict(cloud_color="#FFFFFF", cloud_under=0.5, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
-                 cloud_bounce_gain=0.0, cloud_lining=0.1, cloud_lining_tint="#FFE0C0"),
+                  cloud_bounce_gain=0.10, cloud_lining=0.5, cloud_lining_tint="#D8E0FF", cloud_sky_mix=0.0, cloud_opacity=1.0),
+    "dawn": dict(cloud_color="#FFFFFF", cloud_under=0.7, cloud_side=1.0, cloud_core=0.0, cloud_bounce="#000000",
+                 cloud_bounce_gain=0.0, cloud_lining=0.1, cloud_lining_tint="#FFE0C0", cloud_sky_mix=0.65, cloud_opacity=0.6),
 }
 
 
@@ -631,6 +631,18 @@ def cloud_program(name, thick, alt, relief, state="day"):
         {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, S["cloud_side"], 1.0], "value": 1.0},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},                                   # the sides held down
         {"kind": "constant", "dst": 4, "constant": _c4([v * S["cloud_bounce_gain"] for v in hexlin(S["cloud_bounce"])])},
+        # clouds3 (owner: near overhead clouds' dark flat undersides "read a bit more like a platform"): the more a
+        # cloud is overhead, the more its surface gives way to the sky's own colour (skyAmbient, as emission) and its
+        # albedo thins -- a seen-through underside, without a blend pass; the horizon's clouds are untouched
+        {"kind": "input", "input": "viewDirection", "dst": 1},
+        {"kind": "swizzle", "dst": 1, "srcA": 1, "constant": B(1)},
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [-OVERHEAD[0], -OVERHEAD[1], 0.0, S["cloud_sky_mix"]],
+         "value": 1.0},
+        {"kind": "input", "input": "skyAmbient", "dst": 5},
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 1},
+        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [0.0, 1.0, 1.0, 0.0], "value": 1.0},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},
         # the silver lining: n.L (no dot op), eased, x the key light's colour x a keyed gain, into the emission
         {"kind": "input", "input": "keyLightDirection", "dst": 3},
         {"kind": "multiply", "dst": 3, "srcA": 3, "srcB": 0},
@@ -649,6 +661,7 @@ def cloud_program(name, thick, alt, relief, state="day"):
     ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": 4, "emissionIntensity": 1.0, "opacity": -1}
 
 
+OVERHEAD = (0.25, 0.85)   # -viewDirection.y over which a cloud counts as overhead (clouds3)
 LINING_EDGE = (0.05, 0.6)   # horizontal n.L where the lining starts and is full
 
 
@@ -668,5 +681,10 @@ def cloud_nodes(state="day"):
                 "dynamics": False, "contours": False}},
             "distributionTransform": {"position": [0, alt, 0]},
             "castsShadow": False, "lod": {"cull": True},
-            "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog"}}})
+            # clouds3 (owner: "maybe we could try making them translucent"): the slabs draw in the refraction phase
+            # (ADR-1603) with no offset, so a share of what lies behind shows through -- keyed through the arc
+            # (cloud_opacity: day 0.55 .. night 1.0, the approved v2 night stays solid)
+            "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog",
+                         "refraction": {"strength": 0.0005, "opacity": round(S_["cloud_opacity"], 4),
+                                        "thickness": 0.0}}}})
     return nodes, programs
