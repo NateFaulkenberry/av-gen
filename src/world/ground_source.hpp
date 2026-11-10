@@ -24,6 +24,10 @@ public:
     virtual ~GroundSource() = default;
     // The surface under (x, z) at timeline second t. Pure: the same question gives the same answer.
     [[nodiscard]] virtual GroundSample at(float x, float z, double t) const = 0;
+    // ADR-1964: the surface a body PLANS on -- the same surface without the terms an audio route moves (a route's
+    // modulation is not replayed by a seek, so a plan that read it would land a scrub somewhere a play did not go).
+    // Where the body stands is `at`; where it decides to go is `planned`. A surface with no such terms: `at`.
+    [[nodiscard]] virtual GroundSample planned(float x, float z, double t) const { return at(x, z, t); }
     // The cell a point belongs to and its centre, for a surface made of cells; `pitch` 0 for a continuous one.
     [[nodiscard]] virtual float pitch() const = 0;
     [[nodiscard]] virtual glm::vec2 cellCentre(float x, float z) const = 0;

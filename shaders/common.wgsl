@@ -201,6 +201,7 @@ struct FrameUniforms {
     corruption9: vec4<f32>,
     aoFade: vec4<f32>,     // ADR-1951: x = start, y = end (view depth, m; end <= start = off); z = horizon fill
     waterColumn: vec4<f32>, // ADR-1910: x = the water surface (world y), yzw = downwelling absorption per metre
+    tileGlow: vec4<f32>,   // ADR-1963: environment.tileDynamics.glow, the `tileGlow` material input
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 

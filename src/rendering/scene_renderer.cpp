@@ -3663,6 +3663,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     frame.fogPool = glm::vec4(scene.terrainGround.poolingLane(scene.environment.fogPooling), scene.environment.fogSpectral);
     // ADR-1910: the water column (all zero = off, the frame every scene had before)
     frame.waterColumn = glm::vec4(scene.environment.waterSurface, glm::max(scene.environment.waterDownwelling, glm::vec3(0.0f)));
+    frame.tileGlow = scene.environment.tileDynamics.glow; // ADR-1963
     {
         // ADR-1151: the reflection-only bands; all zero (the gate closed) unless the scene authored them.
         const scene::ReflectionBandLanes lanes = scene::packReflectionBands(scene.environment.bands);

@@ -3629,8 +3629,11 @@ public:
         apex_ = &params.add(floatDesc(prefix + "apex", apexDefault_, 0.0f, 30.0f));
         hopChance_ = &params.add(floatDesc(prefix + "hopChance", hopChanceDefault_, 0.0f, 1.0f));
         strength_ = &params.add(floatDesc(prefix + "strength", strengthDefault_, 0.0f, 10.0f));
+        // ADR-1964: a rising edge through 0.5 is a cue to hop -- a resting body sets off now, a walking one hops its
+        // next step. What a route on the beat or an onset drives (an entity reaction, so a seek replays it).
+        trigger_ = &params.add(floatDesc(prefix + "trigger", 0.0f, 0.0f, 1.0f));
         paths_ = {prefix + "walkSpeed", prefix + "runSpeed", prefix + "airTime", prefix + "apex",
-                  prefix + "hopChance", prefix + "strength"};
+                  prefix + "hopChance", prefix + "strength", prefix + "trigger"};
     }
     void collectParameterPaths(std::vector<std::string>& out) const override {
         out.insert(out.end(), paths_.begin(), paths_.end());
@@ -3642,6 +3645,8 @@ public:
         wantsHop_.clear();
         leg_ = 0;
         timer_ = 0.0f;
+        triggerPrevious_ = 0.0f;
+        cued_ = false;
     }
 
     void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
@@ -3664,6 +3669,17 @@ public:
             timer_ = ctx.rng != nullptr ? ctx.rng->range(pauseMin_, pauseMax_) : pauseMin_;
             primed_ = true;
         }
+        // ADR-1964: the cue, on its rising edge
+        const float cue = trigger_ != nullptr ? trigger_->value() : 0.0f;
+        if (cue >= 0.5f && triggerPrevious_ < 0.5f) {
+            if (phase_ == Phase::Pause) {
+                timer_ = 0.0f; // set off now, with a hop
+                cued_ = true;
+            } else if (phase_ == Phase::Move && leg_ < wantsHop_.size()) {
+                wantsHop_[leg_] = true; // hop the next step
+            }
+        }
+        triggerPrevious_ = cue;
         float speed = 0.0f;
         Activity activity = Activity::Idle;
         bool airborne = false;
@@ -3720,9 +3736,13 @@ public:
                 ++leg_;
                 break;
             }
-            const float landH = ground->at(airTo_.x, airTo_.y, t).height; // the landing tile as it is now
+            // ADR-1964: the arc is a function of NOW -- both ends on the drawn ground at this instant, the rise from the
+            // planning surface at launch -- so a seek that lands mid-hop puts the body where a play does (no launch
+            // height remembered from a ground the replay drew without the routes).
+            const float fromH = ground->at(airFrom_.x, airFrom_.y, t).height; // the tile it left, as it is now
+            const float landH = ground->at(airTo_.x, airTo_.y, t).height;     // the landing tile as it is now
             pos_ = glm::mix(airFrom_, airTo_, s);
-            y_ = airH0_ + (landH - airH0_) * s + 4.0f * airApex_ * s * (1.0f - s);
+            y_ = fromH + (landH - fromH) * s + 4.0f * airApex_ * s * (1.0f - s);
             face(airTo_ - airFrom_, dt);
             speed = glm::length(airTo_ - airFrom_) / std::max(airT_, 1e-3f);
             activity = s < 0.5f ? Activity::Jump : Activity::Fall;
@@ -3785,10 +3805,10 @@ private:
         airTo_ = to;
         air0_ = t;
         airT_ = airTime;
-        airH0_ = y_;
-        const float landH = ground.at(to.x, to.y, t + airTime).height; // aimed at the landing tile as it will be
+        // the extra rise over a step up, from the planning surface (what a seek replays identically)
+        const float rise = ground.planned(to.x, to.y, t + airTime).height - ground.planned(pos_.x, pos_.y, t).height;
         const float apex = apex_ != nullptr ? apex_->value() : apexDefault_;
-        airApex_ = apex + 0.5f * std::max(0.0f, landH - y_);
+        airApex_ = apex + 0.5f * std::max(0.0f, rise);
         phase_ = Phase::Air;
     }
 
@@ -3807,7 +3827,7 @@ private:
             const glm::ivec2 c = here + glm::ivec2(glm::round(glm::vec2(std::cos(ang), std::sin(ang)) * r));
             const glm::vec2 centre = tileCentreOf(c, pitch);
             if (glm::length(centre - origin_) > home_ || c == here) continue;
-            const world::GroundSample g = ground.at(centre.x, centre.y, t);
+            const world::GroundSample g = ground.planned(centre.x, centre.y, t);
             const float score = wantFlat_ * g.flat + wantWater_ * g.water + wantPath_ * g.path +
                                 (ctx.rng != nullptr ? 0.4f * ctx.rng->nextFloat() : 0.0f);
             if (score > bestScore) {
@@ -3817,7 +3837,7 @@ private:
         }
         const auto query = [&](glm::ivec2 tile) {
             const glm::vec2 c = tileCentreOf(tile, pitch);
-            return ground.at(c.x, c.y, t);
+            return ground.planned(c.x, c.y, t); // ADR-1964: what no route moves
         };
         TilePath path = planTiles(query, here, best, rules_);
         if (!path.found || path.steps.empty()) {
@@ -3831,6 +3851,10 @@ private:
             wantsHop_[i] = ctx.rng != nullptr && ctx.rng->nextFloat() < chance;
         }
         running_ = ctx.rng != nullptr && ctx.rng->nextFloat() < 0.4f;
+        if (cued_) {
+            wantsHop_[0] = true;
+            cued_ = false;
+        }
         leg_ = 0;
         phase_ = Phase::Move;
     }
@@ -3846,6 +3870,7 @@ private:
     params::Parameter<float>* apex_ = nullptr;
     params::Parameter<float>* hopChance_ = nullptr;
     params::Parameter<float>* strength_ = nullptr;
+    params::Parameter<float>* trigger_ = nullptr;
     std::vector<std::string> paths_;
 
     bool primed_ = false;
@@ -3856,6 +3881,8 @@ private:
     float y_ = 0.0f;
     float yaw_ = 0.0f;
     float timer_ = 0.0f;
+    float triggerPrevious_ = 0.0f;
+    bool cued_ = false;
     bool running_ = false;
     std::vector<TileStep> steps_;
     std::vector<bool> wantsHop_;
@@ -3864,7 +3891,6 @@ private:
     glm::vec2 airTo_{0.0f};
     double air0_ = 0.0;
     float airT_ = 1.0f;
-    float airH0_ = 0.0f;
     float airApex_ = 0.0f;
 };
 

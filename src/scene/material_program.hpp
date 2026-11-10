@@ -141,6 +141,7 @@ enum class MaterialInput : std::uint8_t {
     // emissive colour x intensity x the instance's variation (rgb), w = 1. With it a program can shape
     // the material's emission -- a mask, a ramp -- instead of asserting a colour of its own.
     MaterialEmission,
+    TileGlow, // ADR-1963: environment.tileDynamics.glow (path, contour, crest, pads), 1 = as authored
 };
 [[nodiscard]] const char* materialInputName(MaterialInput input);
 [[nodiscard]] std::optional<MaterialInput> materialInputFromName(std::string_view name);
@@ -333,6 +334,7 @@ struct MaterialContext {
     float materialId = 0.0f;
     // ADR-904: the material's emission with the instance's variation applied (rgb), w = 1.
     glm::vec4 materialEmission{0.0f};
+    glm::vec4 tileGlow{1.0f}; // ADR-1963
     // Field samples by name are resolved through this callback (null = zeros).
     const struct MaterialFieldSampler* fields = nullptr;
     // ADR-1642: the first two columns of the tangent frame the shader applies a program's tangent-space normal in (the

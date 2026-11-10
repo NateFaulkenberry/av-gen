@@ -1024,3 +1024,69 @@ TEST_CASE("Through a composition: a layer's lanes, the ecology light and a ring 
         CHECK(laterDistance > earlyDistance * 1.4); // the ring has travelled outward
     }
 }
+
+// ADR-1963: `environment.tileDynamics.glow` reaches a program's `tileGlow` input on both lit paths -- a procedural
+// row (procedural.wgsl) and an entity mesh (pbr_shade.wgsl). The program multiplies its emission by the lane x; a gain
+// of 3 is three times the emission, and 1 (the default) is the frame without the input.
+TEST_CASE("The tile glow gains reach a program's tileGlow input on the procedural and mesh paths",
+          "[gpu][emission][geography][adr1963]") {
+    Harness h;
+    const auto glowing = [](const std::string& name) {
+        scene::MaterialProgram p = tissue(name, false);
+        scene::MaterialOp in;
+        in.kind = scene::MaterialOpKind::Input;
+        in.dst = 5;
+        in.input = scene::MaterialInput::TileGlow;
+        scene::MaterialOp x;
+        x.kind = scene::MaterialOpKind::Swizzle;
+        x.dst = 5;
+        x.srcA = 5;
+        x.constant = glm::vec4(0.0f); // every lane from x
+        scene::MaterialOp mul;
+        mul.kind = scene::MaterialOpKind::Multiply;
+        mul.dst = 4;
+        mul.srcA = 4;
+        mul.srcB = 5;
+        p.ops.push_back(in);
+        p.ops.push_back(x);
+        p.ops.push_back(mul);
+        return p;
+    };
+    const auto procedural = [&](float gain) {
+        scene::Scene s = darkStage();
+        s.environment.tileDynamics.glow = glm::vec4(gain, 1.0f, 1.0f, 1.0f);
+        s.materialPrograms.push_back(glowing("tile"));
+        const std::array<Variation, 1> one{{{0.0f, 1.0f}}};
+        scene::ProceduralGeometry row = boxRow("tiles", 0.0f, one, kPurple);
+        row.material.program = "tile";
+        s.procedurals.push_back(std::move(row));
+        return std::pair{h.emission(s, 2.0f), s};
+    };
+    // a third and 1, so the brighter arm stays below the 8-bit target's ceiling
+    const auto [p1, s1] = procedural(1.0f / 3.0f);
+    const auto [p3, s3] = procedural(1.0f);
+    const glm::vec2 at = project(s1.camera, glm::vec3(s1.procedurals[0].instances[0].position) + glm::vec3(0, 0, 0.7f));
+    const double a = total(windowMean(p1, at, 3));
+    const double b = total(windowMean(p3, at, 3));
+    INFO("procedural: glow 1/3 " << a << ", glow 1 " << b << " (x" << b / a << ")");
+    REQUIRE(a > 15.0);
+    CHECK(b / a > 2.85);
+    CHECK(b / a < 3.15);
+
+    const auto mesh = [&](float gain) {
+        scene::Scene s = twoOrbs(1.0f);
+        s.environment.tileDynamics.glow = glm::vec4(gain, 1.0f, 1.0f, 1.0f);
+        scene::MaterialProgram p = glowing("glow");
+        p.emissionIntensity = 0.15f; // a third of it is the lane test's 0.05, above the mask's floor
+        s.materialPrograms.push_back(p);
+        s.entities[0].material.program = "glow";
+        return h.emission(s, 2.0f);
+    };
+    const gpu::Image8 m1 = mesh(1.0f / 3.0f);
+    const gpu::Image8 m3 = mesh(1.0f);
+    const double c = total(maskedMean(m1, m1, 0, kWidth / 2));
+    const double d = total(maskedMean(m3, m1, 0, kWidth / 2));
+    INFO("mesh: glow 1/3 " << c << ", glow 1 " << d << " (x" << d / c << ")");
+    CHECK(d / c > 2.85);
+    CHECK(d / c < 3.15);
+}

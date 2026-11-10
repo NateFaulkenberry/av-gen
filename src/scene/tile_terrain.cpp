@@ -620,6 +620,9 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
     if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset) {
         j["contour"] = {{"interval", d.contourInterval}, {"offset", d.contourOffset}};
     }
+    if (d.glow != def.glow) {
+        j["glow"] = {{"path", d.glow.x}, {"contour", d.glow.y}, {"crest", d.glow.z}, {"pads", d.glow.w}};
+    }
     const TileRingSpec& r = d.rings;
     j["rings"] = {{"amplitude", r.amplitude}, {"speed", r.speed},   {"wavelength", r.wavelength},
                   {"width", r.width},         {"decay", r.decay},   {"crest", r.crest}};
@@ -672,6 +675,18 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
                 !r) {
                 return std::unexpected(r.error());
             }
+        } else if (key == "glow") { // ADR-1963
+            struct G {
+                float path, contour, crest, pads;
+            } g{d.glow.x, d.glow.y, d.glow.z, d.glow.w};
+            if (auto r = readFields<G>(value, where,
+                                       {{"path", &G::path}, {"contour", &G::contour}, {"crest", &G::crest},
+                                        {"pads", &G::pads}},
+                                       g);
+                !r) {
+                return std::unexpected(r.error());
+            }
+            d.glow = {g.path, g.contour, g.crest, g.pads};
         } else if (key == "contour") {
             struct C {
                 float interval, offset;

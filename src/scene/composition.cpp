@@ -5217,6 +5217,12 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                 &params.add(floatDesc(base + "contour/interval", d.contourInterval, 0.0f, 1000.0f, 0.0f, 20.0f));
             p.contourOffset =
                 &params.add(floatDesc(base + "contour/offset", d.contourOffset, -1000.0f, 1000.0f, -10.0f, 10.0f));
+            // ADR-1963: the tile programs' emission gains (the `tileGlow` material input), 1 = as authored
+            const char* glowNames[4] = {"path", "contour", "crest", "pads"};
+            for (int i = 0; i < 4; ++i) {
+                p.glow[static_cast<std::size_t>(i)] =
+                    &params.add(floatDesc(base + "glow/" + glowNames[i], d.glow[i], 0.0f, 64.0f, 0.0f, 4.0f));
+            }
         }
         // ADR-350, the rest of the sweep: four more environment settings that the scene file could
         // set and nothing else could reach. `skybox` and `proceduralSkyBackground` in particular
@@ -9211,7 +9217,41 @@ TileDynamics Composition::liveTileDynamics() const {
         d.rings.decay = f(p.ringDecay, d.rings.decay);
         d.contourInterval = f(p.contourInterval, d.contourInterval);
         d.contourOffset = f(p.contourOffset, d.contourOffset);
+        for (int i = 0; i < 4; ++i) {
+            d.glow[i] = f(p.glow[static_cast<std::size_t>(i)], d.glow[i]);
+        }
         d.live = tileLiveEvents_;
+    }
+    return out;
+}
+
+TileDynamics Composition::baseTileDynamics() const {
+    TileDynamics out = volumeSetting_.tileDynamics;
+    if (tileDynamicsAuthored_) {
+        const TileDynamicsParams& p = tileDynamicsParams_;
+        TileDynamics& d = out;
+        const auto f = [](const params::Parameter<float>* q, float fallback) {
+            return q != nullptr ? q->baseComponent(0) : fallback;
+        };
+        d.amplitude = f(p.amplitude, d.amplitude);
+        for (std::size_t i = 0; i < std::min(d.waves.size(), kMaxTileWaves); ++i) {
+            d.waves[i].amplitude = f(p.waveAmplitude[i], d.waves[i].amplitude);
+            d.waves[i].speed = f(p.waveSpeed[i], d.waves[i].speed);
+            d.waves[i].wavelength = f(p.waveWavelength[i], d.waves[i].wavelength);
+            d.waves[i].direction = f(p.waveDirection[i], d.waves[i].direction);
+            d.waves[i].crest = f(p.waveCrest[i], d.waves[i].crest);
+        }
+        d.breathingAmplitude = f(p.breathingAmplitude, d.breathingAmplitude);
+        d.breathingPeriod = f(p.breathingPeriod, d.breathingPeriod);
+        d.rolling = {f(p.rollingX, d.rolling.x), f(p.rollingZ, d.rolling.y)};
+        d.rings.amplitude = f(p.ringAmplitude, d.rings.amplitude);
+        d.rings.speed = f(p.ringSpeed, d.rings.speed);
+        d.rings.decay = f(p.ringDecay, d.rings.decay);
+        d.contourInterval = f(p.contourInterval, d.contourInterval);
+        d.contourOffset = f(p.contourOffset, d.contourOffset);
+        for (int i = 0; i < 4; ++i) {
+            d.glow[i] = f(p.glow[static_cast<std::size_t>(i)], d.glow[i]);
+        }
     }
     return out;
 }
@@ -9231,8 +9271,8 @@ void Composition::refreshTileGround() {
         return;
     }
     tileGroundOffset_ = glm::vec3(ground->distributionTransform.matrix()[3]);
-    tileGround_.set(ground->distribution.generator.tiles, liveTileDynamics(), ground->distribution.generator.cellSize,
-                    tileGroundOffset_);
+    tileGround_.set(ground->distribution.generator.tiles, liveTileDynamics(), baseTileDynamics(),
+                    ground->distribution.generator.cellSize, tileGroundOffset_);
     entityWorld_.setGround(&tileGround_);
 }
 

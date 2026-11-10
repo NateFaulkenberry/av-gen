@@ -779,6 +779,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ctx.audio = frame.audio;
         ctx.audioBands = frame.audioBands;
         ctx.beat = frame.beat;
+        ctx.tileGlow = frame.tileGlow; // ADR-1963
         ctx.viewDirection = v;
         ctx.depth = distance(frame.cameraPos.xyz, worldPos);
         ctx.curvature = geometry.x;
