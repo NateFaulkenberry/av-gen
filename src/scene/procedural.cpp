@@ -1198,6 +1198,15 @@ glm::vec4 slabFarRule(const ProceduralGeometry& object) {
     return {close.x, std::max(object.slabFarPixels, 0.0f), close.y, 1.0f};
 }
 
+float slabRuleScale(const ProceduralGeometry& object) {
+    if (!object.isGenerator() || !object.distribution.generator.isTiles()) {
+        return 1.0f;
+    }
+    const scene::GeneratorSpec& g = object.distribution.generator;
+    const float lattice = g.finePitch > 0.0f ? g.finePitch : g.cellSize;
+    return lattice / std::max(object.source.size.x, 1e-4f);
+}
+
 MeshData makeSlabMesh(glm::vec3 size) {
     // The three faces of makeBox whose normals point along +x, +y and +z, with makeBox's own u/v so the material inputs
     // (uv, localPosition) read exactly as they do on the full box.
@@ -3354,8 +3363,11 @@ json ProceduralGeometry::toJson() const {
                 if (g.omitBelow > -10000.0f) {
                     gj["omitBelow"] = g.omitBelow;
                 }
-                if (g.blendCells > 0) {
-                    gj["blend"] = json{{"cells", g.blendCells}, {"ratio", g.blendRatio}};
+                if (g.morphWidth > 0.0f) { // ADR-1995
+                    gj["morph"] = json{{"width", g.morphWidth}, {"ratio", g.morphRatio}};
+                    if (g.morphPitch > 0.0f) {
+                        gj["morph"]["pitch"] = g.morphPitch;
+                    }
                 }
                 if (g.holeCellSize > 0.0f) {
                     gj["hole"] = json{{"cellSize", g.holeCellSize},
@@ -3736,15 +3748,29 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                     }
                     gs.omitWater = o.get<std::string>() == "water";
                 }
-                if (j.contains("blend")) { // ADR-1976 (amended): the seam band
-                    const json& bj = j.at("blend");
-                    if (!bj.is_object() || !bj.contains("cells") || !bj.at("cells").is_number_integer() ||
-                        (bj.contains("ratio") && !bj.at("ratio").is_number_integer())) {
-                        return fail("'distribution.generator.blend' must be {cells, ratio} (integers)");
+                if (j.contains("blend")) { // ADR-441: gone, refused rather than ignored
+                    return fail("'distribution.generator.blend' (the seam band) was replaced by 'morph': {width (m), "
+                                "ratio, pitch} (ADR-1995)");
+                }
+                if (j.contains("morph")) { // ADR-1995: the ring's morph toward the coarser ring
+                    const json& mj = j.at("morph");
+                    if (!mj.is_object() || !mj.contains("width") || !mj.at("width").is_number() ||
+                        (mj.contains("ratio") && !mj.at("ratio").is_number_integer()) ||
+                        (mj.contains("pitch") && !mj.at("pitch").is_number())) {
+                        return fail("'distribution.generator.morph' must be {width (metres), ratio (integer), pitch "
+                                    "(metres)}");
                     }
-                    gs.blendCells = bj.at("cells").get<std::int32_t>();
-                    if (bj.contains("ratio")) {
-                        gs.blendRatio = bj.at("ratio").get<std::int32_t>();
+                    for (const auto& [key, value] : mj.items()) {
+                        if (key != "width" && key != "ratio" && key != "pitch") {
+                            return fail("'distribution.generator.morph' has no '{}' (width, ratio, pitch)", key);
+                        }
+                    }
+                    gs.morphWidth = mj.at("width").get<float>();
+                    if (mj.contains("ratio")) {
+                        gs.morphRatio = mj.at("ratio").get<std::int32_t>();
+                    }
+                    if (mj.contains("pitch")) {
+                        gs.morphPitch = mj.at("pitch").get<float>();
                     }
                 }
                 if (j.contains("hole")) { // ADR-1976

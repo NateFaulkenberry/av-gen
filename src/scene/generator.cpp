@@ -78,12 +78,33 @@ Result<void> GeneratorSpec::validate() const {
         if (!(skirt >= 0.0f) || skirt > 100.0f) {
             return fail("generator 'tiles': skirt must be 0..100 metres");
         }
-        if (blendCells < 0 || blendCells > 64 || blendRatio < 2 || blendRatio > 8) {
-            return fail("generator 'tiles': blend.cells must be 0..64 and blend.ratio 2..8");
+        if (!(morphWidth >= 0.0f) || !std::isfinite(morphWidth) || !(morphPitch >= 0.0f) || !std::isfinite(morphPitch)) {
+            return fail("generator 'tiles': morph.width and morph.pitch must be >= 0 metres");
         }
-        if (blendCells > 0 && align % blendRatio != 0) {
-            return fail("generator 'tiles': with a seam band, align must be a multiple of blend.ratio, so the edge "
-                        "blocks are whole coarser cells");
+        if (morphWidth > 0.0f) { // ADR-1995
+            if (morphRatio != 2 && morphRatio != 4 && morphRatio != 8) {
+                return fail("generator 'tiles': morph.ratio must be 2, 4 or 8 (a block is whole in the kernel's 8 x 8 "
+                            "workgroup)");
+            }
+            if (align % morphRatio != 0) {
+                return fail("generator 'tiles': with a morph, align must be a multiple of morph.ratio, so the window "
+                            "holds whole blocks");
+            }
+            if (childrenMin) {
+                return fail("generator 'tiles': an underlay (childrenMin) cannot morph");
+            }
+            if (morphWidth > viewDistance) {
+                return fail("generator 'tiles': morph.width ({} m) is wider than viewDistance ({} m)", morphWidth,
+                            viewDistance);
+            }
+            if (morphPitch > 0.0f) {
+                const float k = cellSize / morphPitch;
+                const auto ki = static_cast<std::int32_t>(std::lround(k));
+                if (ki < 1 || ki > 8 || std::abs(static_cast<float>(ki) - k) > 1e-4f * k) {
+                    return fail("generator 'tiles': cellSize ({}) must be 1..8 whole multiples of morph.pitch ({})",
+                                cellSize, morphPitch);
+                }
+            }
         }
         if (finePitch < 0.0f || (finePitch > 0.0f && generatorTileChildren(*this) > 8)) {
             return fail("generator 'tiles': a cell may span at most 8 fine tiles per side");
@@ -174,12 +195,13 @@ std::uint64_t GeneratorSpec::hash() const {
         h.f32(holeCellSize);
         h.f32(holeViewDistance);
         h.u32(static_cast<std::uint32_t>(holeAlign));
-        h.u32(static_cast<std::uint32_t>(blendCells));
+        h.f32(morphWidth); // ADR-1995
+        h.f32(morphPitch);
         h.f32(skirt);
         h.u32(childrenMin ? 1u : 0u);
         h.u32((omitWater ? 1u : 0u) | (dynamics ? 2u : 0u) | (contours ? 4u : 0u)); // ADR-1966
         h.f32(omitBelow);
-        h.u32(static_cast<std::uint32_t>(blendRatio));
+        h.u32(static_cast<std::uint32_t>(morphRatio));
     }
     return h.value();
 }
@@ -375,26 +397,40 @@ TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_
     return sum;
 }
 
-TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
-                                  const GeneratorWindow& window, const TileDynamics* dyn, float time) {
-    TileSample t = generatorTile(spec, ix, iz, dyn, time);
-    if (spec.blendCells <= 0 || spec.blendRatio < 2 || window.countX <= 0 || window.countZ <= 0) {
-        return t;
+float generatorTileMorph(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz, const glm::vec3& cameraGen,
+                         float reach) {
+    if (!(spec.morphWidth > 0.0f)) {
+        return 0.0f;
     }
-    const std::int32_t d = std::min({ix - window.originX, window.originX + window.countX - 1 - ix, iz - window.originZ,
-                                     window.originZ + window.countZ - 1 - iz});
-    const float u = std::clamp(static_cast<float>(d) / static_cast<float>(spec.blendCells), 0.0f, 1.0f);
-    const float w = 1.0f - u * u * (3.0f - 2.0f * u);
+    const float half = spec.viewDistance * std::clamp(reach, 0.0f, 1.0f);
+    const auto n = static_cast<float>(std::ceil(half / spec.cellSize)); // generatorWindow's n
+    const float r1 = (n - 0.5f) * spec.cellSize;
+    const float r0 = r1 - spec.morphWidth;
+    const float dx = std::abs((static_cast<float>(ix) + 0.5f) * spec.cellSize - cameraGen.x);
+    const float dz = std::abs((static_cast<float>(iz) + 0.5f) * spec.cellSize - cameraGen.z);
+    const float u = std::clamp((std::max(dx, dz) - r0) / std::max(r1 - r0, 1e-6f), 0.0f, 1.0f);
+    return u * u * (3.0f - 2.0f * u);
+}
+
+TileSample generatorTileMorphed(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz, const glm::vec3& cameraGen,
+                                float reach, const TileDynamics* dyn, float time) {
+    TileSample t = generatorTile(spec, ix, iz, dyn, time);
+    const float w = generatorTileMorph(spec, ix, iz, cameraGen, reach);
     if (!(w > 0.0f)) {
         return t;
     }
-    const std::int32_t r = spec.blendRatio;
+    // Each tile of the block at the coarser ring's pitch: k x k samples there (its own tile when that is its own pitch).
+    GeneratorSpec coarse = spec;
+    if (spec.morphPitch > 0.0f) {
+        coarse.finePitch = spec.morphPitch;
+    }
+    const std::int32_t r = spec.morphRatio;
     const std::int32_t bx = generatorFloorDiv(ix, r) * r;
     const std::int32_t bz = generatorFloorDiv(iz, r) * r;
     TileSample m;
     for (std::int32_t b = 0; b < r; ++b) {
         for (std::int32_t a = 0; a < r; ++a) {
-            const TileSample c = generatorTile(spec, bx + a, bz + b, dyn, time);
+            const TileSample c = generatorTile(coarse, bx + a, bz + b, dyn, time);
             m.height += c.height;
             m.water += c.water;
             m.shore += c.shore;

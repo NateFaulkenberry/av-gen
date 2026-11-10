@@ -180,9 +180,12 @@ struct GeneratorTileUniforms {
     glm::vec4 e;          // region wavelength, region variation, path width, path lift
     glm::uvec4 info;      // seed, path points, children per side, hole valid
     glm::ivec4 hole;      // min x, min z, max x, max z (this ring's cells)
-    glm::ivec4 blend;     // seam band cells (0 = off), block ratio, 0, 0 (ADR-1976 amended)
+    glm::ivec4 morph;     // ADR-1995: block ratio (0 = off), samples per side at the morph pitch (0 = the tile's own),
+                          // z: ADR-1953 children at the lowest, 0
     glm::vec4 water0;     // ADR-1965: river count, pond count, valley count, height scale
     glm::vec4 skirt;      // skirt depth (m), the source box's thickness (m), 0, 0
+    glm::vec4 morphBand;  // ADR-1995: start, end (Chebyshev metres from the camera), camera x, z (generator space)
+    glm::vec4 morph2;     // ADR-1995: the coarser ring's sample pitch (m), the contour fade (fraction of a step), 0, 0
     std::array<glm::vec4, 8> path;  // two points per lane
     // ADR-1965: the rivers, ponds and dry valleys (scene/tile_terrain.hpp), points pooled two per lane
     std::array<glm::vec4, scene::kMaxTileRivers> riverInfo;   // first point, point count, width, valley width
@@ -222,7 +225,7 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, scene::kMaxTileSprings> springs; // x, z, time, strength (CP-D r2: 256)
 };
 // ADR-1965: 79 lanes more than before; ADR-1992: valleys +4 info +4 bounds +1 frac +16 points, raised land +59
-static_assert(sizeof(GeneratorTileUniforms) == (140 + 25 + 59 + 4) * 16 + scene::kMaxTileSprings * 16); // ADR-1994: +4
+static_assert(sizeof(GeneratorTileUniforms) == (140 + 25 + 59 + 4 + 2) * 16 + scene::kMaxTileSprings * 16); // ADR-1995: +2
 // Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied, and (ADR-1953)
 // the scene's moving ground at time `t`.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,

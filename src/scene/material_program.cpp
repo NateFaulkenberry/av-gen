@@ -905,15 +905,22 @@ glm::vec4 evaluateOp(const MaterialOp& op, const MaterialContext& ctx,
         // ADR-1960: the landing outline's own band (constant.w), the contour's when 0
         const float landingBand = k.w > 0.0f ? k.w : k.z;
         float keep = 1.0f;
-        const auto flagged = [&](std::uint32_t bit, float half, float dist, float fw) {
+        // ADR-1995: each flagged side at its strength (1 - its dimming in 63rds, 6 bits a side)
+        const float sides = std::max(ctx.tileSides, 0.0f);
+        const auto strength = [&](int i) {
+            const float place = std::ldexp(1.0f, 6 * i);
+            const float q = std::floor(sides / place) - 64.0f * std::floor(sides / (64.0f * place));
+            return 1.0f - q / 63.0f;
+        };
+        const auto flagged = [&](std::uint32_t bit, int i, float half, float dist, float fw) {
             if ((mask & bit) != 0u) {
-                keep *= 1.0f - side(half, dist, fw);
+                keep *= 1.0f - strength(i) * side(half, dist, fw);
             }
         };
-        flagged(1u, k.x, k.x - a.x, ctx.localFootprint.x);
-        flagged(2u, k.x, k.x + a.x, ctx.localFootprint.x);
-        flagged(4u, k.y, k.y - a.z, ctx.localFootprint.y);
-        flagged(8u, k.y, k.y + a.z, ctx.localFootprint.y);
+        flagged(1u, 0, k.x, k.x - a.x, ctx.localFootprint.x);
+        flagged(2u, 1, k.x, k.x + a.x, ctx.localFootprint.x);
+        flagged(4u, 2, k.y, k.y - a.z, ctx.localFootprint.y);
+        flagged(8u, 3, k.y, k.y + a.z, ctx.localFootprint.y);
         // ADR-1960: z = the landing outline -- all four sides, the contour's own band -- times the landing glow; w = the
         // glow itself (was: the flagged side count and "any side")
         float ring = 1.0f;

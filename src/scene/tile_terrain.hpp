@@ -35,6 +35,7 @@
 
 #include <cstdint>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -220,6 +221,21 @@ inline constexpr float kTileClassStride = 8192.0f;
     const float l = std::round(std::clamp(landing, 0.0f, 1.0f) * 255.0f);
     return std::clamp(crest, 0.0f, 1.0f) + 2.0f * static_cast<float>(mask) + 32.0f * l +
            kTileClassStride * static_cast<float>(waterClass);
+}
+// ADR-1995: a contour side's strength (0..1) between a tile whose top is `own` and a neighbour at `n` below it, for
+// levels offset + k * interval: the level nearest the middle of the step lies a fraction q (0..0.5) of the step from
+// its nearer end, and the side is smoothstep(0, fade, q) strong (1 when fade is 0, or no level when q is 0). The twin
+// of cs_tile_contours's tileContourStrength.
+[[nodiscard]] float tileContourStrength(float own, float n, float interval, float offset, float fade);
+// ADR-1995: the contour pass's position.w: each side's dimming round((1 - strength) * 63) x 64^i (i = +x, -x, +z, -z).
+[[nodiscard]] inline float tilePackedSides(const std::array<float, 4>& strength) {
+    float out = 0.0f;
+    float place = 1.0f;
+    for (const float s : strength) {
+        out += place * std::nearbyint((1.0f - std::clamp(s, 0.0f, 1.0f)) * 63.0f);
+        place *= 64.0f;
+    }
+    return out;
 }
 // ADR-1960: the landing glow at (x, z, t): each ringing landing's envelope -- its spring's decay without the swing,
 // after a 60 ms rise, over the tighter glowRadius -- summed and clamped to 0..1. It settles exactly as the tile does.

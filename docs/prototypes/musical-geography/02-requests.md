@@ -1324,3 +1324,47 @@ it; whole-frame GPU is 17.8 ms.
 **Stills** (before is your own `cpd-r2-land3-0XXs.png`):
 - `cpd-r2-r3shore-030s-before-top-after-bottom.png`
 - `cpd-r2-r3shore-035s-before-top-after-bottom.png`
+
+### Engineering → art, CP-D r2 (2026-11-10): the distant pops (ADR-1995)
+
+The owner's moment (land3 bay clip at about 3 s, song 33.17 s, "the islands, looks like a geometry pop") is a **ring
+swap**, and it is still there in land4 at the same times (31.2, 31.9, 32.5, 33.17 s): the camera-centred ring windows
+snap 16–64 m at a time, and a band of the islands' flanks changes from 8 m to 4 m tiles (or 16 m to 8 m) in one frame.
+The sweep's flicker (111–114 s) is the other cause: **contour edges switching on and off** as the swell and the
+phrase drift carry levels across tile steps. Shadow range, AO and fog are not involved (each canary left the pops as
+they were). Evidence: `11-pass-cpd-r2/cpd-r2-pop-*`.
+
+**What engineering changed (no action needed for these two):**
+- **Contour edges ease** in and out (`tileDynamics.contour.fade`, default 0.15 of a step, keyable as
+  `env/tiles/contour/fade`). In a still frame, sides whose level sits near either end of their step draw weaker: the
+  mean contour strength falls about 15%. Raise the edge gain about 1.15× if you want the old brightness. Measured on
+  the sweep: 0.15 halves the pops (10644 → 4677; contours-off floor 3155), 0.35 nearly removes them (3516) but the
+  lines visibly break into dashes (`cpd-r2-pop-sweep-112.53s-look-fade0-top-fade0.35-bottom.png`). Your call.
+- **The slab far-tile rule** (ADR-1959's side flattening and gap close) now measures the lattice's 4 m pitch on screen
+  in every ring, not each ring's own box, so the 2× and 4× rings' far sides flatten as the 4 m tiles beside them do.
+  The coarse rings' far risers read a little flatter than before.
+
+**What you need to add (the scene):**
+1. **The morph on the rings** (`distribution.generator.morph`; it replaces nothing you use):
+   ```json
+   mgTiles1: "morph": {"width": 64,  "ratio": 2}
+   mgTiles2: "morph": {"width": 128, "ratio": 2}
+   mgTiles4: "morph": {"width": 256, "ratio": 4, "pitch": 16}
+   ```
+   Over the last quarter of each ring the tiles ease into the next ring's cells, so the swap changes no height. The
+   mgTiles4 `pitch` is mgTiles64's finePitch. Cost: generators pass +0.03 ms, whole frame within noise.
+2. **Make the 1× ring's look meet the 2× ring's in that band** (`look.tile_program`). With all rings on one flat
+   colour, the morph plus the far-tile fix take the owner's moment to zero (`m-monomorph2`, below). With your real
+   programs about a quarter is left (33.17 s: 372 → 97; 32.5 s: 611 → 170), and what is left is the two rings'
+   programs differing. Hypothesis (not split term by term): the 1× ring's per-tile jitter (±4%), its full contour gain
+   against the coarse rings' 0.25 (`COARSE_CONTOUR`), and its border darkness (`border_fine` against `BORDER_DARK`).
+   Fade each toward the 2× value over `cameraDistance` 200 → 270 m (Euclidean distance is at least the Chebyshev
+   distance the morph uses, so it finishes before the swap). The 1× ring also has pads the coarse rings do not.
+
+| Bay, far band, pop score at | 31.2 | 31.87 | 32.5 | 33.17 | 43.9 | total 30–50 s |
+|---|---|---|---|---|---|---|
+| As built | 274 | 646 | 611 | 372 | 105 | 3357 |
+| + morph, contour fade 0.15 | 126 | 574 | 419 | 207 | 34 | 2318 |
+| + the lattice far-tile rule (the engine as committed) | 11 | 127 | 170 | 97 | 0 | 1106 |
+| Canary: all rings one flat colour, everything above | 0 | 0 | 0 | 0 | 0 | 798 |
+| Canary: one 4 m ring to 1080 m (no swaps at all) | 0 | 0 | 0 | 0 | 0 | 551 |

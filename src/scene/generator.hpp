@@ -74,12 +74,17 @@ struct GeneratorSpec {
     float holeCellSize = 0.0f;
     float holeViewDistance = 0.0f;
     std::int32_t holeAlign = 1;
-    // A seam band (ADR-1976, amended at CP-A). Within `blendCells` cells of this ring's window edge, a cell's height and
-    // channels ease toward the mean of the `blendRatio` x `blendRatio` block of cells it belongs to -- which is exactly
-    // what the next coarser ring stands at -- reaching it on the edge cell. The rings then meet at one height instead of
-    // stepping in a straight line. 0 = off.
-    std::int32_t blendCells = 0;
-    std::int32_t blendRatio = 2;
+    // ADR-1995: the ring's morph toward the next coarser ring, by the camera's distance (it replaced ADR-1976's seam
+    // band, which counted cells from the window's snapped edge and so jumped whenever the window snapped). Within
+    // `morphWidth` metres of the distance this ring is always drawn to (the Chebyshev distance from the camera,
+    // generatorTileMorph), a tile's height and channels ease toward the mean of the `morphRatio` x `morphRatio` block of
+    // tiles it belongs to, and reach it before the edge -- so where the coarser ring takes over, it takes over at
+    // exactly the ground the fine tiles already stood at, and the swap as the window snaps changes nothing.
+    // `morphPitch` is the coarser ring's finePitch (each of this ring's tiles averages its samples taken at that
+    // pitch, so the block mean IS the coarser cell); 0 = this ring's own sampling pitch. morphWidth 0 = off.
+    float morphWidth = 0.0f;
+    std::int32_t morphRatio = 2;
+    float morphPitch = 0.0f;
     // The skirt (CP-A r3): a thin slab on a slope opens a see-through crack under its upper edge wherever a step is
     // taller than the slab, and seen at a slant those cracks read as rings, streak rows and a lighter patch of ground.
     // With `skirt` > 0 metres each land tile's box reaches that far further down -- its top stays where it was -- so a
@@ -179,11 +184,17 @@ struct GeneratorTileHole {
 // point (faded for the fine pitch), and the cell is their mean, as the kernel does.
 [[nodiscard]] TileSample generatorTile(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
                                        const TileDynamics* dyn = nullptr, float t = 0.0f);
-// The tile as the kernel writes it in `window`: generatorTile, eased toward its coarser block in the seam band (the
-// moving ground included, ADR-1953).
-[[nodiscard]] TileSample generatorTileInWindow(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
-                                               const GeneratorWindow& window, const TileDynamics* dyn = nullptr,
-                                               float t = 0.0f);
+// ADR-1995: the morph weight (0 = this ring's own tile, 1 = the coarser block's) of cell (ix, iz) for a camera at
+// `cameraGen` (generator space; `reach` the live draw-distance lever): smoothstep over the last `morphWidth` metres
+// before (n - 1/2) cells, n = ceil(viewDistance * reach / cellSize) -- the Chebyshev distance every window this camera
+// can snap to still covers. A function of the camera, not of the window, so it never jumps. 0 when the morph is off.
+[[nodiscard]] float generatorTileMorph(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
+                                       const glm::vec3& cameraGen, float reach = 1.0f);
+// The tile as the kernel writes it for a camera at `cameraGen`: generatorTile, eased by generatorTileMorph toward the
+// mean of its morph block (each tile of the block sampled at `morphPitch`) -- the next coarser ring's cell there.
+[[nodiscard]] TileSample generatorTileMorphed(const GeneratorSpec& spec, std::int32_t ix, std::int32_t iz,
+                                              const glm::vec3& cameraGen, float reach = 1.0f,
+                                              const TileDynamics* dyn = nullptr, float t = 0.0f);
 
 // ---- the mirror's queries -----------------------------------------------------------------------
 

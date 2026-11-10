@@ -595,6 +595,7 @@ struct MaterialInstanceInfo {
     instanceRandom: vec4<f32>,
     instanceColor: vec4<f32>,
     instanceEmissive: vec4<f32>,
+    tileSides: f32, // ADR-1995: a tile record's contour side dimming (see MaterialContext.tileSides)
     // ADR-904: the instance's emission variation as (hue turns, gain), read back in the vertex stage
     // for a program that writes emission and leaves the variation to the engine; (0, 1) otherwise.
     variation: vec2<f32>,
@@ -612,6 +613,7 @@ fn materialInstanceZero(localPosition: vec3<f32>) -> MaterialInstanceInfo {
     info.instanceRandom = vec4<f32>(0.0);
     info.instanceColor = vec4<f32>(1.0);
     info.instanceEmissive = vec4<f32>(1.0);
+    info.tileSides = 0.0;
     info.variation = vec2<f32>(0.0, 1.0);
     info.emissionField = 1.0;
     return info;
@@ -775,6 +777,7 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ctx.instanceRandom = info.instanceRandom;
         ctx.instanceColor = info.instanceColor;
         ctx.instanceEmissive = info.instanceEmissive;
+        ctx.tileSides = info.tileSides; // ADR-1995
         ctx.time = frame.params.x;
         ctx.audio = frame.audio;
         ctx.audioBands = frame.audioBands;
