@@ -131,7 +131,7 @@ Parity compare(rendering::SceneRenderer& renderer, const scene::ProceduralGeomet
                 continue;
             }
             ++out.present;
-            const scene::TileSample t = scene::generatorTileInWindow(g, ix, iz, w);
+            const scene::TileSample t = scene::generatorTileMorphed(g, ix, iz, camGen); // ADR-1995
             out.worstHeight = std::max(out.worstHeight, std::abs(drawnTop(pg, r) - t.height));
             out.worstXZ = std::max({out.worstXZ, std::abs(r.position.x - (static_cast<float>(ix) + 0.5f) * g.cellSize),
                                     std::abs(r.position.z - (static_cast<float>(iz) + 0.5f) * g.cellSize)});
@@ -174,8 +174,8 @@ TEST_CASE("A coarse tile ring leaves the fine window empty and stands at its chi
     auto ctx = makeContext();
     Rig rig(*ctx);
     auto fine = tilesObject("fine", 1.0f, 24.0f, 4, 0.0f, 0.0f, 0.0f, 1);
-    fine.distribution.generator.blendCells = 3; // the seam band, toward the 4 m blocks (ADR-1976 amended)
-    fine.distribution.generator.blendRatio = 4;
+    fine.distribution.generator.morphWidth = 10.0f; // ADR-1995: toward the 4 m blocks over its last 10 m
+    fine.distribution.generator.morphRatio = 4;
     REQUIRE(fine.validate().has_value());
     const auto coarse = tilesObject("coarse", 4.0f, 96.0f, 1, 1.0f, 1.0f, 24.0f, 4);
     const glm::vec3 camera{13.7f, 35.0f, -21.2f};
@@ -195,6 +195,76 @@ TEST_CASE("A coarse tile ring leaves the fine window empty and stands at its chi
     CHECK(pc.holes * 16 == fw.cells());
     CHECK(pc.worstHeight <= 1e-3f);
     CHECK(pc.worstChannel <= 1e-4f);
+    // ADR-1995: the morphing fine ring is the CPU's, tile for tile
+    CHECK(pf.worstHeight <= 1e-3f);
+    CHECK(pf.worstChannel <= 1e-4f);
+    CHECK(ctx->errorCount() == 0);
+}
+
+// ADR-1995: a ring's morph at the coarser ring's own pitch (here a 4 m ring sampled at 1 m, toward 16 m cells sampled at
+// 4 m -- the scene's 16 m -> 64 m pair, scaled down), on the moving ground: the kernel is the CPU mirror, and the tiles
+// on the window's edge stand exactly where the coarser ring's cells do.
+TEST_CASE("A tile ring morphs into the coarser ring at that ring's pitch, moving ground included",
+          "[gpu][generator][geography][adr1995]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    auto mid = tilesObject("mid", 4.0f, 64.0f, 4, 1.0f, 0.0f, 0.0f, 1);
+    scene::GeneratorSpec& g = mid.distribution.generator;
+    g.morphWidth = 24.0f;
+    g.morphRatio = 4;
+    g.morphPitch = 4.0f;
+    REQUIRE(mid.validate().has_value());
+    scene::GeneratorSpec coarse = g; // the next ring: 16 m cells of 4 m samples
+    coarse.cellSize = 16.0f;
+    coarse.finePitch = 4.0f;
+    coarse.morphWidth = 0.0f;
+    scene::TileDynamics d;
+    d.waves.push_back(scene::TileWave{.amplitude = 0.8f, .wavelength = 30.0f, .speed = 5.0f, .direction = 30.0f});
+    REQUIRE(scene::validateTileDynamics(d).has_value());
+    const float time = 2.5f;
+    const glm::vec3 camera{-37.3f, 40.0f, 21.9f};
+    scene::Scene s;
+    s.procedurals.push_back(mid);
+    s.environment.tileDynamics = d;
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{time, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const glm::vec3 camGen = rendering::generatorCameraSpace(mid, glm::mat4(1.0f), camera);
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(mid.name);
+    auto records = rig.renderer.procedurals().readInstanceRecords(mid.name);
+    REQUIRE(records.has_value());
+    REQUIRE(records->size() == w.cells());
+    float worst = 0.0f;
+    float worstEdge = 0.0f;
+    int edge = 0;
+    int morphing = 0;
+    int untouched = 0;
+    for (std::int32_t z = 0; z < w.countZ; ++z) {
+        for (std::int32_t x = 0; x < w.countX; ++x) {
+            const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
+                                       static_cast<std::size_t>(x)];
+            const std::int32_t ix = w.originX + x;
+            const std::int32_t iz = w.originZ + z;
+            const scene::TileSample t = scene::generatorTileMorphed(g, ix, iz, camGen, 1.0f, &d, time);
+            worst = std::max(worst, std::abs(drawnTop(mid, r) - t.height));
+            const float m = scene::generatorTileMorph(g, ix, iz, camGen);
+            morphing += m > 0.0f && m < 1.0f ? 1 : 0;
+            untouched += m == 0.0f ? 1 : 0;
+            if (x == 0 || z == 0 || x == w.countX - 1 || z == w.countZ - 1) {
+                CHECK(m == 1.0f); // every tile the coarser ring can meet is fully its cell
+                const scene::TileSample c = scene::generatorTile(coarse, scene::generatorFloorDiv(ix, 4),
+                                                                 scene::generatorFloorDiv(iz, 4), &d, time);
+                worstEdge = std::max(worstEdge, std::abs(drawnTop(mid, r) - c.height));
+                ++edge;
+            }
+        }
+    }
+    CAPTURE(worst, worstEdge, edge, morphing, untouched);
+    CHECK(worst <= 1e-3f);
+    CHECK(worstEdge <= 1e-3f);
+    CHECK(edge > 100);
+    CHECK(morphing > 100); // the control: a band is easing
+    CHECK(untouched > 100);
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -223,7 +293,7 @@ TEST_CASE("A skirt drops a land tile's box below its top and leaves the sea's sl
         for (std::int32_t x = 0; x < w.countX; ++x) {
             const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
                                        static_cast<std::size_t>(x)];
-            const scene::TileSample t = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w);
+            const scene::TileSample t = scene::generatorTile(g, w.originX + x, w.originZ + z);
             const float k = 2.0f * (1.0f - std::clamp(t.water, 0.0f, 1.0f));
             // ADR-1991: the box's top (centre + half the stretched thickness) is the tile's height, skirt or none.
             const float thickness = pg.source.size.y;
@@ -292,8 +362,8 @@ TEST_CASE("The tiles kernel moves the ground the CPU mirror moves", "[gpu][gener
                                            static_cast<std::size_t>(x)];
                 const std::int32_t ix = w.originX + x;
                 const std::int32_t iz = w.originZ + z;
-                const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
-                const scene::TileSample still = scene::generatorTileInWindow(g, ix, iz, w);
+                const scene::TileSample moving = scene::generatorTile(g, ix, iz, &d, time);
+                const scene::TileSample still = scene::generatorTile(g, ix, iz);
                 worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
                 worstCrest = std::max(worstCrest, std::abs(belowClass(r.emissive.w) - moving.crest));
                 moved = std::max(moved, std::abs(moving.height - still.height));
@@ -355,8 +425,8 @@ TEST_CASE("The tiles kernel springs the ground the CPU mirror springs", "[gpu][g
                                            static_cast<std::size_t>(x)];
                 const std::int32_t ix = w.originX + x;
                 const std::int32_t iz = w.originZ + z;
-                const scene::TileSample moving = scene::generatorTileInWindow(g, ix, iz, w, &d, time);
-                const scene::TileSample plain = scene::generatorTileInWindow(g, ix, iz, w, &unsprung, time);
+                const scene::TileSample moving = scene::generatorTile(g, ix, iz, &d, time);
+                const scene::TileSample plain = scene::generatorTile(g, ix, iz, &unsprung, time);
                 worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
                 sprung = std::max(sprung, std::abs(moving.height - plain.height));
                 // ADR-1960: the landing glow packed above the crest, as the CPU twin computes it
@@ -385,6 +455,7 @@ TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu
     s.procedurals.push_back(pg);
     s.environment.tileDynamics.contourInterval = 0.5f;
     s.environment.tileDynamics.contourOffset = 0.1f;
+    s.environment.tileDynamics.contourFade = 0.25f; // ADR-1995
     s.camera.position = camera;
     s.camera.target = camera + glm::vec3(0.0f, -0.5f, -1.0f);
     REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
@@ -394,11 +465,13 @@ TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu
     REQUIRE(records.has_value());
     const auto level = [](float h) { return std::floor((h - 0.1f) / 0.5f); };
     const auto top = [&](std::int32_t x, std::int32_t z) {
-        return scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w).height;
+        return scene::generatorTile(g, w.originX + x, w.originZ + z).height;
     };
     int edges = 0;
     int wrong = 0;
     int checked = 0;
+    int partial = 0;
+    float worstDim = 0.0f;
     for (std::int32_t z = 1; z + 1 < w.countZ; ++z) {
         for (std::int32_t x = 1; x + 1 < w.countX; ++x) {
             const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
@@ -422,12 +495,31 @@ TEST_CASE("The contour pass flags the sides a contour level drops across", "[gpu
             ++checked;
             edges += expect != 0u ? 1 : 0;
             wrong += got != expect ? 1 : 0;
+            // ADR-1995: each flagged side's strength, as its dimming in 63rds (6 bits a side) in position.w
+            const float own_ = top(x, z);
+            const std::array<float, 4> n{top(x + 1, z), top(x - 1, z), top(x, z + 1), top(x, z - 1)};
+            std::array<float, 4> strength{1.0f, 1.0f, 1.0f, 1.0f};
+            for (std::size_t i = 0; i < 4; ++i) {
+                if ((expect & (1u << i)) != 0u) {
+                    strength[i] = scene::tileContourStrength(own_, n[i], 0.5f, 0.1f, 0.25f);
+                    partial += strength[i] < 0.99f ? 1 : 0;
+                }
+            }
+            const float want = scene::tilePackedSides(strength);
+            for (int i = 0; i < 4; ++i) {
+                const float place = std::ldexp(1.0f, 6 * i);
+                const float a = std::floor(r.position.w / place) - 64.0f * std::floor(r.position.w / (64.0f * place));
+                const float b = std::floor(want / place) - 64.0f * std::floor(want / (64.0f * place));
+                worstDim = std::max(worstDim, std::abs(a - b));
+            }
         }
     }
-    CAPTURE(checked, edges, wrong);
+    CAPTURE(checked, edges, wrong, partial, worstDim);
     CHECK(checked > 5000);
     CHECK(edges > 100); // the control: there are contours in this window
     CHECK(wrong == 0);
+    CHECK(partial > 20);    // the control: some sides are easing
+    CHECK(worstDim <= 1.0f); // 63rds: float rounding at a quantisation step may move one
     CHECK(ctx->errorCount() == 0);
 }
 
@@ -521,8 +613,8 @@ TEST_CASE("The tiles kernel draws the CPU's rivers, ponds and dry valleys", "[gp
         for (std::int32_t x = 0; x < w.countX; ++x) {
             const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
                                        static_cast<std::size_t>(x)];
-            const scene::TileSample moving = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w, &d, time);
-            const scene::TileSample still = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w);
+            const scene::TileSample moving = scene::generatorTile(g, w.originX + x, w.originZ + z, &d, time);
+            const scene::TileSample still = scene::generatorTile(g, w.originX + x, w.originZ + z);
             worstHeight = std::max(worstHeight, std::abs(drawnTop(pg, r) - moving.height));
             if (still.river > 0.99f) riverMoved = std::max(riverMoved, std::abs(moving.height - still.height));
             if (still.pond > 0.99f) pondMoved = std::max(pondMoved, std::abs(moving.height - still.height));
@@ -608,7 +700,7 @@ TEST_CASE("The tiles kernel raises the CPU's ridges and rises, with 8 valleys", 
         for (std::int32_t x = 0; x < w.countX; ++x) {
             const auto& r = (*records)[static_cast<std::size_t>(z) * static_cast<std::size_t>(w.countX) +
                                        static_cast<std::size_t>(x)];
-            const scene::TileSample m = scene::generatorTileInWindow(g, w.originX + x, w.originZ + z, w, &d, time);
+            const scene::TileSample m = scene::generatorTile(g, w.originX + x, w.originZ + z, &d, time);
             worst = std::max(worst, std::abs(drawnTop(pg, r) - m.height));
         }
     }

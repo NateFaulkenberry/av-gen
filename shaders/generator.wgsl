@@ -208,9 +208,12 @@ struct TileParams {
     e: vec4<f32>,          // region wavelength, region variation, path width, path lift
     info: vec4<u32>,       // seed, path points, children per side, hole valid
     hole: vec4<i32>,       // min x, min z, max x, max z (inclusive, this ring's cells)
-    blend: vec4<i32>,      // seam band cells (0 = off), block ratio (ADR-1976 amended), children at the lowest (ADR-1953)
+    morph: vec4<i32>,      // ADR-1995: block ratio (0 = off), samples per side at the morph pitch (0 = the tile's own),
+                           // children at the lowest (ADR-1953)
     water0: vec4<f32>,     // ADR-1965: river count, pond count, valley count, height scale
     skirt: vec4<f32>,      // skirt depth, the box's thickness, ADR-1966 omit water (1), omit below (m; <= -1e4 off)
+    morphBand: vec4<f32>,  // ADR-1995: start, end (Chebyshev metres from the camera), camera x, z
+    morph2: vec4<f32>,     // ADR-1995: the coarser ring's sample pitch (m), the contour fade (fraction of a step)
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
     riverInfo: array<vec4<f32>, 4>,   // ADR-1965: first point (pool index), point count, width, valley width
     riverLevel: array<vec4<f32>, 4>,  // source level, mouth level, length, 0
@@ -613,7 +616,7 @@ var<workgroup> wgSpringCount: u32;
 fn tileGatherSprings(lid: u32, wg: vec2<u32>) {
     let count = min(u32(tile.spring1.y + 0.5), TILE_SPRING_CAP);
     let cellSize = gen.cell.x;
-    let ratio = f32(max(tile.blend.y, 1));
+    let ratio = 1.0; // a cell's own samples (ADR-1995's morph block is this workgroup's: it reads no other cell)
     // the cells this workgroup writes, widened by a coarser block (the seam band reads it) and the springs' reach
     let x0 = (f32(gen.window.x) + f32(wg.x * 8u) - ratio) * cellSize;
     let z0 = (f32(gen.window.y) + f32(wg.y * 8u) - ratio) * cellSize;
@@ -695,6 +698,45 @@ fn tileSampleMoving(x: f32, z: f32, fine: f32) -> TileOut {
     return s;
 }
 
+// ADR-1995: cell (ix, iz) sampled at the coarser ring's pitch: the mean of k x k samples at pitch p (generatorTile of
+// the spec with finePitch = p). The block mean of these over a morph block is the coarser ring's cell exactly.
+fn tileCellAt(ix: i32, iz: i32, k: u32, p: f32) -> TileOut {
+    let cellSize = gen.cell.x;
+    var t: TileOut;
+    for (var b = 0u; b < k; b = b + 1u) {
+        for (var a = 0u; a < k; a = a + 1u) {
+            let s = tileSampleMoving(f32(ix) * cellSize + (f32(a) + 0.5) * p, f32(iz) * cellSize + (f32(b) + 0.5) * p, p);
+            t.height = t.height + s.height;
+            t.water = t.water + s.water;
+            t.shore = t.shore + s.shore;
+            t.flat = t.flat + s.flat;
+            t.path = t.path + s.path;
+            t.crest = t.crest + s.crest;
+            t.landing = t.landing + s.landing;
+            t.river = t.river + s.river;
+            t.pond = t.pond + s.pond;
+            t.step = max(t.step, s.step);
+        }
+    }
+    let inv = 1.0 / f32(k * k);
+    t.height = t.height * inv;
+    t.water = t.water * inv;
+    t.shore = t.shore * inv;
+    t.flat = t.flat * inv;
+    t.path = t.path * inv;
+    t.crest = t.crest * inv;
+    t.landing = t.landing * inv;
+    t.river = t.river * inv;
+    t.pond = t.pond * inv;
+    return t;
+}
+
+// ADR-1995: the morph block's members, shared through the workgroup (a block is ratio x ratio cells of one 8 x 8
+// workgroup: the window's origin is a multiple of align, align of the ratio, and 8 of the ratio).
+var<workgroup> wgMorphA: array<vec4<f32>, 64>; // height, water, shore, flat
+var<workgroup> wgMorphB: array<vec4<f32>, 64>; // path, crest, landing, river
+var<workgroup> wgMorphC: array<vec2<f32>, 64>; // pond, step
+
 // One cell of this ring: the tile at its centre, or the mean of the fine tiles it covers (generatorTile's twin).
 fn tileCell(ix: i32, iz: i32) -> TileOut {
     let cellSize = gen.cell.x;
@@ -745,7 +787,7 @@ fn tileCell(ix: i32, iz: i32) -> TileOut {
     t.river = t.river * inv;
     t.pond = t.pond * inv;
     t.riverS = t.riverS * inv;
-    if (tile.blend.z != 0) {
+    if (tile.morph.z != 0) {
         t.height = lowest; // ADR-1953: an underlay's cell at its lowest fine tile
     }
     return t;
@@ -757,14 +799,75 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
     tileGatherSprings(lid, wg.xy); // before any thread leaves: it has barriers
     let countX = u32(gen.window.z);
     let countZ = u32(gen.window.w);
-    if (gid.x >= countX || gid.y >= countZ) {
-        return;
-    }
+    let inRange = gid.x < countX && gid.y < countZ;
     let index = gid.y * countX + gid.x;
     let ix = gen.window.x + i32(gid.x);
     let iz = gen.window.y + i32(gid.y);
+    let inHole = tile.info.w != 0u && ix >= tile.hole.x && ix <= tile.hole.z && iz >= tile.hole.y && iz <= tile.hole.w;
+    let cellSize = gen.cell.x;
+    var t: TileOut;
+    if (inRange && !inHole) {
+        t = tileCell(ix, iz);
+    }
+    // ADR-1995: the morph toward the coarser ring, by the camera's Chebyshev distance (generatorTileMorph): a function of
+    // the camera, not of the snapped window, so a tile eases continuously and is the coarser cell before the coarser ring
+    // replaces it. Every thread reaches the barrier (the branch is on a uniform).
+    let ratio = tile.morph.x;
+    if (ratio >= 2) {
+        let dist = max(abs((f32(ix) + 0.5) * cellSize - tile.morphBand.z), abs((f32(iz) + 0.5) * cellSize - tile.morphBand.w));
+        let u = clamp((dist - tile.morphBand.x) / max(tile.morphBand.y - tile.morphBand.x, 1e-6), 0.0, 1.0);
+        let w = u * u * (3.0 - 2.0 * u);
+        // a cell gives its share when any cell of its block can morph (the block spans (ratio - 1) cells)
+        var c: TileOut;
+        if (inRange && dist > tile.morphBand.x - f32(ratio) * cellSize) {
+            if (tile.morph.y > 0) {
+                c = tileCellAt(ix, iz, u32(tile.morph.y), tile.morph2.x);
+            } else if (inHole) {
+                c = tileCell(ix, iz);
+            } else {
+                c = t;
+            }
+        }
+        wgMorphA[lid] = vec4<f32>(c.height, c.water, c.shore, c.flat);
+        wgMorphB[lid] = vec4<f32>(c.path, c.crest, c.landing, c.river);
+        wgMorphC[lid] = vec2<f32>(c.pond, c.step);
+        workgroupBarrier();
+        if (inRange && !inHole && w > 0.0) {
+            let r = u32(ratio);
+            let lx = lid % 8u;
+            let lz = lid / 8u;
+            let b0 = (lz - lz % r) * 8u + (lx - lx % r);
+            var ma = vec4<f32>(0.0);
+            var mb = vec4<f32>(0.0);
+            var mc = vec2<f32>(0.0);
+            for (var b = 0u; b < r; b = b + 1u) {
+                for (var a = 0u; a < r; a = a + 1u) {
+                    let j = b0 + b * 8u + a;
+                    ma = ma + wgMorphA[j];
+                    mb = mb + wgMorphB[j];
+                    mc = vec2<f32>(mc.x + wgMorphC[j].x, max(mc.y, wgMorphC[j].y));
+                }
+            }
+            let inv = 1.0 / f32(r * r);
+            ma = ma * inv;
+            mb = mb * inv;
+            t.height = t.height + (ma.x - t.height) * w;
+            t.water = t.water + (ma.y - t.water) * w;
+            t.shore = t.shore + (ma.z - t.shore) * w;
+            t.flat = t.flat + (ma.w - t.flat) * w;
+            t.path = t.path + (mb.x - t.path) * w;
+            t.crest = t.crest + (mb.y - t.crest) * w;
+            t.landing = t.landing + (mb.z - t.landing) * w;
+            t.river = t.river + (mb.w - t.river) * w;
+            t.pond = t.pond + (mc.x * inv - t.pond) * w;
+            t.step = max(t.step, mc.y);
+        }
+    }
+    if (!inRange) {
+        return;
+    }
     var r: InstanceRecord;
-    if (tile.info.w != 0u && ix >= tile.hole.x && ix <= tile.hole.z && iz >= tile.hole.y && iz <= tile.hole.w) {
+    if (inHole) {
         r.position = vec4<f32>(0.0, 0.0, 0.0, 0.0);
         r.rotation = vec4<f32>(0.0, 0.0, 0.0, 1.0);
         r.scale = vec4<f32>(0.0);
@@ -773,55 +876,6 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
         r.emissive = vec4<f32>(0.0);
         records[index] = r;
         return;
-    }
-    let cellSize = gen.cell.x;
-    var t = tileCell(ix, iz);
-    // ADR-1976 (amended): the seam band -- near this ring's window edge, ease toward the coarser block's mean.
-    let band = tile.blend.x;
-    let ratio = tile.blend.y;
-    if (band > 0 && ratio >= 2) {
-        let d = min(min(ix - gen.window.x, gen.window.x + gen.window.z - 1 - ix),
-                    min(iz - gen.window.y, gen.window.y + gen.window.w - 1 - iz));
-        let u = clamp(f32(d) / f32(band), 0.0, 1.0);
-        let w = 1.0 - u * u * (3.0 - 2.0 * u);
-        if (w > 0.0) {
-            let bx = genFloorDiv(ix, ratio) * ratio;
-            let bz = genFloorDiv(iz, ratio) * ratio;
-            var mh = 0.0;
-            var mw = 0.0;
-            var ms = 0.0;
-            var mf = 0.0;
-            var mp = 0.0;
-            var mc = 0.0;
-            var ml = 0.0;
-            var mr = 0.0;
-            var mo = 0.0;
-            for (var b = 0; b < ratio; b = b + 1) {
-                for (var a = 0; a < ratio; a = a + 1) {
-                    let c = tileCell(bx + a, bz + b);
-                    mh = mh + c.height;
-                    mw = mw + c.water;
-                    ms = ms + c.shore;
-                    mf = mf + c.flat;
-                    mp = mp + c.path;
-                    mc = mc + c.crest;
-                    ml = ml + c.landing;
-                    mr = mr + c.river;
-                    mo = mo + c.pond;
-                    t.step = max(t.step, c.step);
-                }
-            }
-            let inv = 1.0 / f32(ratio * ratio);
-            t.height = t.height + (mh * inv - t.height) * w;
-            t.water = t.water + (mw * inv - t.water) * w;
-            t.shore = t.shore + (ms * inv - t.shore) * w;
-            t.flat = t.flat + (mf * inv - t.flat) * w;
-            t.path = t.path + (mp * inv - t.path) * w;
-            t.crest = t.crest + (mc * inv - t.crest) * w;
-            t.landing = t.landing + (ml * inv - t.landing) * w;
-            t.river = t.river + (mr * inv - t.river) * w;
-            t.pond = t.pond + (mo * inv - t.pond) * w;
-        }
     }
     // ADR-1966: a layer that omits water emits an empty record for a wet cell (the cull pass rejects it, like a hole)
     if ((tile.skirt.z > 0.5 && t.water >= 0.5) || (tile.skirt.w > -10000.0 && t.height < tile.skirt.w)) {
@@ -846,7 +900,8 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
     let k = tile.skirt.x * (1.0 - wet) + seaSkirt * wet;
     let stretch = (tile.skirt.y + k) / tile.skirt.y;
     let p = vec3<f32>((f32(ix) + 0.5) * cellSize, t.height - 0.5 * (tile.skirt.y + k), (f32(iz) + 0.5) * cellSize);
-    r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 1.0);
+    // position.w: ADR-1995's contour side dimming (0 = none; the contour pass writes it)
+    r.position = vec4<f32>((gen.genToObject * vec4<f32>(p, 1.0)).xyz, 0.0);
     r.rotation = gen.rotation;
     // scale.w (a program's `instanceIndex`, meaningless for a window that moves): the tile's top, generator metres. The
     // contour pass reads its neighbours' from here (ADR-1970).
@@ -869,10 +924,27 @@ fn cs_generate_tiles(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(loc
 
 // ADR-1970: the contour pass, after cs_generate_tiles. A side is a contour edge where the level
 // floor((top - offset) / interval) drops to the neighbour across it (bits +x 1, -x 2, +z 4, -z 8, in the generator's
-// axes); the mask joins the crest in the emissive's spare lane as crest + 2 * mask, which the `tileContour` material op
-// decodes. A neighbour outside the window or in the ring's hole is no edge (the ring there is another object's).
+// axes); the mask joins the crest in the emissive's spare lane as crest + 2 * mask, which the `tileContour` material
+// op decodes. A neighbour outside the window or in the ring's hole is no edge (the ring there is another object's).
+// ADR-1995: and each flagged side's strength, written as its dimming in 63rds into position.w (side i x 64^i, an
+// integer below 2^24, exact in a float): the level nearest the middle of the step sits a fraction q of the step from
+// its nearer end, and the side is smoothstep(0, fade, q) strong. A level crossing either end of a step -- the ground
+// moving, the offset drifting -- then eases the side in and out instead of switching it in one frame
+// (scene::tileContourSide is the CPU twin).
 fn tileLevel(top: f32) -> f32 {
     return floor((top - tile.ring1.w) / tile.ring1.z);
+}
+
+fn tileContourStrength(own: f32, n: f32) -> f32 {
+    let fade = tile.morph2.y;
+    if (!(fade > 0.0)) {
+        return 1.0;
+    }
+    let step = max(own - n, 1e-6);
+    let level = tile.ring1.w + tile.ring1.z * round((0.5 * (own + n) - tile.ring1.w) / tile.ring1.z);
+    let q = clamp(min(own - level, level - n) / step, 0.0, 0.5);
+    let u = clamp(q / fade, 0.0, 1.0);
+    return u * u * (3.0 - 2.0 * u);
 }
 
 @compute @workgroup_size(8, 8)
@@ -889,21 +961,23 @@ fn cs_tile_contours(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
     let level = tileLevel(own.w);
     var mask = 0u;
-    if (gid.x + 1u < countX) {
-        let n = records[index + 1u].scale; // the scale alone: the emissive is being written
-        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 1u; }
-    }
-    if (gid.x > 0u) {
-        let n = records[index - 1u].scale; // the scale alone: the emissive is being written
-        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 2u; }
-    }
-    if (gid.y + 1u < countZ) {
-        let n = records[index + countX].scale; // the scale alone: the emissive is being written
-        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 4u; }
-    }
-    if (gid.y > 0u) {
-        let n = records[index - countX].scale; // the scale alone: the emissive is being written
-        if (n.x > 0.0 && tileLevel(n.w) < level) { mask = mask | 8u; }
+    var dim = 0.0;
+    var nb = array<i32, 4>(-1, -1, -1, -1);
+    if (gid.x + 1u < countX) { nb[0] = i32(index + 1u); }
+    if (gid.x > 0u) { nb[1] = i32(index - 1u); }
+    if (gid.y + 1u < countZ) { nb[2] = i32(index + countX); }
+    if (gid.y > 0u) { nb[3] = i32(index - countX); }
+    var place = 1.0;
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        if (nb[i] >= 0) {
+            let n = records[u32(nb[i])].scale; // the scale alone: the emissive and position are being written
+            if (n.x > 0.0 && tileLevel(n.w) < level) {
+                mask = mask | (1u << i);
+                dim = dim + place * round((1.0 - tileContourStrength(own.w, n.w)) * 63.0);
+            }
+        }
+        place = place * 64.0;
     }
     records[index].emissive.w = records[index].emissive.w + 2.0 * f32(mask);
+    records[index].position.w = dim;
 }

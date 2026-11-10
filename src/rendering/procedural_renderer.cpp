@@ -1245,7 +1245,23 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
     u.info = glm::uvec4(t.seed, points, static_cast<std::uint32_t>(scene::generatorTileChildren(g)),
                         hole.valid ? 1u : 0u);
     u.hole = glm::ivec4(hole.minX, hole.minZ, hole.maxX, hole.maxZ);
-    u.blend = glm::ivec4(g.blendCells, g.blendRatio, g.childrenMin ? 1 : 0, 0); // z: ADR-1953 children at the lowest
+    // ADR-1995: the morph toward the coarser ring, by the camera's distance (generatorTileMorph). The samples per side
+    // at the morph pitch are 0 when that pitch is the tile's own sampling pitch (the tile itself is its contribution).
+    std::int32_t morphRatio = 0;
+    std::int32_t morphSamples = 0;
+    if (g.morphWidth > 0.0f) {
+        morphRatio = g.morphRatio;
+        const std::int32_t own = scene::generatorTileChildren(g);
+        const float ownPitch = g.cellSize / static_cast<float>(own);
+        if (g.morphPitch > 0.0f && std::abs(g.morphPitch - ownPitch) > 1e-4f * ownPitch) {
+            morphSamples = static_cast<std::int32_t>(std::lround(g.cellSize / g.morphPitch));
+        }
+        const float half = g.viewDistance * std::clamp(reach, 0.0f, 1.0f);
+        const float r1 = (std::ceil(half / g.cellSize) - 0.5f) * g.cellSize;
+        u.morphBand = glm::vec4(r1 - g.morphWidth, r1, cameraGen.x, cameraGen.z);
+        u.morph2.x = g.morphPitch > 0.0f ? g.morphPitch : ownPitch;
+    }
+    u.morph = glm::ivec4(morphRatio, morphSamples, g.childrenMin ? 1 : 0, 0); // z: ADR-1953 children at the lowest
     u.skirt = glm::vec4(g.skirt, std::max(object.source.size.y * object.sourceTransform.scale.y, 1e-4f),
                         g.omitWater ? 1.0f : 0.0f, g.omitBelow); // zw: ADR-1966 omit water cells, omit below
     // ADR-1965: the rivers, ponds and dry valleys. The spec is validated against these caps; the min()s only guard.
@@ -1340,6 +1356,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
     // ADR-1970: the contour edges (the second kernel runs when the interval is above 0).
     u.ring1.z = g.contours ? dyn.contourInterval : 0.0f; // ADR-1966: a layer's opt-out
     u.ring1.w = dyn.contourOffset;
+    u.morph2.y = dyn.contourFade; // ADR-1995
     // ADR-1953: the moving ground. Inactive, every lane stays 0 and the kernel skips it: the static ground.
     if (dyn.active()) {
         const std::size_t waveCount = std::min(dyn.waves.size(), scene::kMaxTileWaves);
@@ -3074,7 +3091,7 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 // CP-A r3: the side rule's threshold (windTiming is free on a slab draw too: no wind)
                 u.windTiming = glm::vec4(object.slabSidePixels > 0.0f ? object.slabSidePixels
                                                                       : 2.0f * std::max(object.slabFarPixels, 0.0f),
-                                         object.slabDebugFaces ? 1.0f : 0.0f, 0.0f, 0.0f);
+                                         object.slabDebugFaces ? 1.0f : 0.0f, scene::slabRuleScale(object), 0.0f);
             }
         }
         im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);

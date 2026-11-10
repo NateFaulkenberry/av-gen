@@ -213,6 +213,10 @@ struct SourceSpec {
 // a "tiles" generator), y = slabFarPixels, w = 1.
 struct ProceduralGeometry;
 [[nodiscard]] glm::vec4 slabFarRule(const ProceduralGeometry& object);
+// ADR-1995: the far-tile rule's measure for a slab draw: a "tiles" ring measures its LATTICE's pitch on screen (the
+// finest pitch, finePitch or cellSize, over the box's width), so every ring of one ground decides the rule alike and a
+// ring swap does not change how a side shades; 1 for anything else.
+[[nodiscard]] float slabRuleScale(const ProceduralGeometry& object);
 // ADR-1959: the +x, +y and +z faces of a box of `size`, one quad each (12 vertices, 6 triangles, CCW from outside): the
 // slab fast path's mesh, which the vertex stage turns to the visible side of each axis.
 [[nodiscard]] MeshData makeSlabMesh(glm::vec3 size);

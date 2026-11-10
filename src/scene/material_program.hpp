@@ -319,6 +319,9 @@ struct MaterialContext {
     glm::vec4 instanceRandom{0.0f};
     glm::vec4 instanceColor{1.0f};
     glm::vec4 instanceEmissive{0.0f};
+    // ADR-1995: a "tiles" record's contour side dimming (position.w): side i (+x, -x, +z, -z) in 63rds x 64^i, 0 = full
+    // strength (scene::tilePackedSides). The tileContour op draws each flagged side that much weaker.
+    float tileSides = 0.0f;
     float time = 0.0f;
     glm::vec4 audio{0.0f};
     glm::vec4 audioBands{0.0f};

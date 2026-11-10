@@ -106,6 +106,10 @@ struct TileDynamics {
     // op draws them. interval 0 (the default) = none. They follow the moving ground: the contours move with it.
     float contourInterval = 0.0f;      // metres
     float contourOffset = 0.0f;        // metres
+    // ADR-1995: a side's edge fades in and out as a level nears either end of the step it crosses, over this fraction
+    // of the step (0 = the binary edge of ADR-1970). The moving ground and the drifting offset carry levels across
+    // steps continuously, so a far hill's edges ease on and off instead of flicking a whole tile in one frame.
+    float contourFade = 0.15f;
     // ADR-1963: four gains a material program reads as its `tileGlow` input (x path, y contour, z crest, w pads), 1 =
     // as authored. Not used by the ground itself: they exist so a route (an audio band, a beat) can reach every tile
     // program's emission terms through one parameter each (env/tiles/glow/*) instead of an op index per program.

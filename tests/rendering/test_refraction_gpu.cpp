@@ -397,6 +397,48 @@ TEST_CASE("A scene with no refractive surface pays nothing for the refraction ph
     CHECK(rig.ctx->errorCount() == 0);
 }
 
+// ADR-1996: a refractive material at opacity 1 shows only its own shaded colour, so it draws in the opaque pass (no
+// phase, no extra pass, the same pixels as no refraction at all); below 1 a material program's opacity output scales
+// the refraction opacity per pixel.
+TEST_CASE("Refraction at opacity 1 draws opaque, and a program's opacity scales it per pixel",
+          "[gpu][procedural][refraction][adr1996]") {
+    Rig rig;
+    const auto plain = rig.render(crystalScene(false), true);
+    const auto plainPasses = rig.renderer.stats().state.renderPasses;
+    scene::Scene s = crystalScene(true);
+    s.procedurals[1].material.refraction.opacity = 1.0f;
+    CHECK(s.procedurals[1].material.refraction.authored());
+    CHECK_FALSE(s.procedurals[1].material.refraction.enabled());
+    const auto solid = rig.render(s, true);
+    CHECK(rig.renderer.stats().procedural.refractiveObjects == 0);
+    CHECK(rig.renderer.stats().procedural.refractiveDraws == 0);
+    CHECK(rig.renderer.stats().state.renderPasses == plainPasses);
+    CHECK(gpu::hashImage(solid) == gpu::hashImage(plain));
+
+    // Per pixel: refraction opacity 0.9, and a program whose opacity output is 0 (see through) or 1 (its own blue).
+    const auto withProgram = [&](float programOpacity) {
+        scene::Scene t = crystalScene(true);
+        t.procedurals[1].material.refraction.opacity = 0.9f;
+        scene::MaterialProgram p;
+        p.name = "thin";
+        scene::MaterialOp op;
+        op.kind = scene::MaterialOpKind::Constant;
+        op.dst = 0;
+        op.constant = glm::vec4(programOpacity);
+        p.ops.push_back(op);
+        p.opacityRegister = 0;
+        t.materialPrograms.push_back(p);
+        t.procedurals[1].material.program = "thin";
+        return centre(rig.render(t, true));
+    };
+    const Rgb seeThrough = withProgram(0.0f);
+    const Rgb own = withProgram(1.0f);
+    INFO("program opacity 0: " << seeThrough.r << " " << seeThrough.b << "; 1: " << own.r << " " << own.b);
+    CHECK(seeThrough.r > seeThrough.b + 60); // the red backdrop through it
+    CHECK(own.b > own.r + 60);               // 0.9 of its own blue
+    CHECK(rig.ctx->errorCount() == 0);
+}
+
 TEST_CASE("The water SSR lever scales the cinematic steps and rays, and turns the SSR off at 0 (ADR-1603)",
           "[gpu][water][refraction][adr1603]") {
     rendering::WaterUniforms u{};

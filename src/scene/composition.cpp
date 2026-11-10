@@ -5230,6 +5230,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
                 &params.add(floatDesc(base + "contour/interval", d.contourInterval, 0.0f, 1000.0f, 0.0f, 20.0f));
             p.contourOffset =
                 &params.add(floatDesc(base + "contour/offset", d.contourOffset, -1000.0f, 1000.0f, -10.0f, 10.0f));
+            p.contourFade = &params.add(floatDesc(base + "contour/fade", d.contourFade, 0.0f, 0.5f, 0.0f, 0.5f)); // ADR-1995
             // ADR-1963: the tile programs' emission gains (the `tileGlow` material input), 1 = as authored
             const char* glowNames[4] = {"path", "contour", "crest", "pads"};
             for (int i = 0; i < 4; ++i) {
@@ -7975,7 +7976,7 @@ void Composition::rebuild() {
                         }
                         // ADR-1603: and the author's optics -- refraction, thin film, anisotropy -- which a GLB cannot
                         // carry; dropping them here made a refractive crystal mesh draw opaque.
-                        if (authored.refraction.enabled()) {
+                        if (authored.refraction.authored()) { // ADR-1996: at any opacity (it may be keyed below 1)
                             resolved.refraction = authored.refraction;
                         }
                         if (authored.thinFilm.enabled()) {
@@ -9315,6 +9316,7 @@ TileDynamics Composition::liveTileDynamics() const {
         d.rings.decay = f(p.ringDecay, d.rings.decay);
         d.contourInterval = f(p.contourInterval, d.contourInterval);
         d.contourOffset = f(p.contourOffset, d.contourOffset);
+        d.contourFade = f(p.contourFade, d.contourFade); // ADR-1995
         for (int i = 0; i < 4; ++i) {
             d.glow[i] = f(p.glow[static_cast<std::size_t>(i)], d.glow[i]);
         }
@@ -9352,6 +9354,7 @@ TileDynamics Composition::baseTileDynamics() const {
         d.rings.decay = f(p.ringDecay, d.rings.decay);
         d.contourInterval = f(p.contourInterval, d.contourInterval);
         d.contourOffset = f(p.contourOffset, d.contourOffset);
+        d.contourFade = f(p.contourFade, d.contourFade); // ADR-1995
         for (int i = 0; i < 4; ++i) {
             d.glow[i] = f(p.glow[static_cast<std::size_t>(i)], d.glow[i]);
         }

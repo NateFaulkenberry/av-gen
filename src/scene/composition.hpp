@@ -1849,6 +1849,7 @@ private:
         params::Parameter<float>* ringAhead = nullptr;    // ...or, when > 0, this many metres ahead of the camera
         params::Parameter<float>* contourInterval = nullptr; // ADR-1970
         params::Parameter<float>* contourOffset = nullptr;
+        params::Parameter<float>* contourFade = nullptr; // ADR-1995
         std::array<params::Parameter<float>*, 4> glow{}; // ADR-1963: path, contour, crest, pads
         params::Parameter<float>* landingGain = nullptr;        // ADR-1960
         params::Parameter<glm::vec3>* landingColor = nullptr;

@@ -737,6 +737,8 @@ struct ProcVertexOut {
     @location(8) prevClip: vec4<f32>,     // last frame's clip position, for the velocity target
     // ADR-904: the instance's emission variation as (hue turns, gain), constant across an instance.
     @location(9) @interpolate(flat) variation: vec2<f32>,
+    // ADR-1995: a tile record's contour side dimming (position.w; flat, so the packed integer arrives exact).
+    @location(10) @interpolate(flat) instSides: f32,
 };
 
 // ADR-1491: one vertex stage, two entries. `vs_proc` (the lit pass) and `vs_proc_depth` (the depth prepass and the
@@ -786,6 +788,7 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     out.localPos = in.position;
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
+    out.instSides = inst.position.w; // ADR-1995
 
     // ADR-1180 fibers, points and meshes share one evaluation of the deformer chain (ADR-1561: deformRun, and the
     // field evaluator inside it, is compiled once per pipeline). Each path sets up its points, the one loop below
@@ -1039,6 +1042,7 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     out.variation = variation;
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
+    out.instSides = inst.position.w; // ADR-1995
 
     // The camera in the instance's own frame: which side of each axis it is on.
     let centre = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
@@ -1061,7 +1065,9 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     let s0 = inst.scale.xyz;
     let pxX = pixelsPerMetreAt(centre, normalize(ax), 0.5) * 2.0 * abs(in.position.x) * length(ax) * abs(s0.x);
     let pxZ = pixelsPerMetreAt(centre, normalize(az), 0.5) * 2.0 * abs(in.position.z) * length(az) * abs(s0.z);
-    let widthPx = min(pxX, pxZ);
+    // ADR-1995: a "tiles" ring measures the LATTICE's pitch on screen (windTiming.z: the finest pitch over this box's
+    // width), not its own box, so every ring decides the rule alike where two rings meet and a ring swap changes nothing.
+    let widthPx = min(pxX, pxZ) * select(1.0, proc.windTiming.z, proc.windTiming.z > 0.0);
     let farPx = proc.windPlant.y;
     var close = 0.0;
     var flatten = 0.0;
@@ -1190,6 +1196,7 @@ fn fs_proc_unlit(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) ->
         ctx.instanceRandom = in.instRandom;
         ctx.instanceColor = in.instColor;
         ctx.instanceEmissive = in.instEmissive;
+        ctx.tileSides = in.instSides; // ADR-1995
         ctx.time = frame.params.x;
         ctx.audio = frame.audio;
         ctx.audioBands = frame.audioBands;
@@ -1264,6 +1271,7 @@ fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
     info.instanceRandom = in.instRandom;
     info.instanceColor = in.instColor;
     info.instanceEmissive = in.instEmissive;
+    info.tileSides = in.instSides; // ADR-1995
     let screenUv = in.clip.xy * frame.targetSize.zw;
     // ADR-703: this object's effect lanes; uniform per draw, and zero for every object no lane
     // effect touches, which leaves `shadeSurface` exactly as it was.
@@ -1327,6 +1335,7 @@ fn fs_proc_depth(in: ProcVertexOut) {
             ctx.instanceRandom = in.instRandom;
             ctx.instanceColor = in.instColor;
             ctx.instanceEmissive = in.instEmissive;
+            ctx.tileSides = in.instSides; // ADR-1995
             ctx.time = frame.params.x;
             ctx.audio = frame.audio;
             ctx.audioBands = frame.audioBands;

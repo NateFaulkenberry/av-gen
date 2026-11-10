@@ -542,6 +542,17 @@ glm::vec2 tileMotion(const TileDynamics& dyn, const std::vector<TileEvent>& even
     return {dyn.amplitude * height, std::clamp(crest, 0.0f, 1.0f)};
 }
 
+float tileContourStrength(float own, float n, float interval, float offset, float fade) {
+    if (!(fade > 0.0f)) {
+        return 1.0f;
+    }
+    const float step = std::max(own - n, 1e-6f);
+    const float level = offset + interval * std::nearbyint((0.5f * (own + n) - offset) / interval);
+    const float q = std::clamp(std::min(own - level, level - n) / step, 0.0f, 0.5f);
+    const float u = std::clamp(q / fade, 0.0f, 1.0f);
+    return u * u * (3.0f - 2.0f * u);
+}
+
 TileSample tileSampleMoving(const TileTerrainSpec& spec, const TileDynamics& dyn, float x, float z, float t,
                             float cellSize) {
     TileSample out = tileSample(spec, x, z, t, dyn);
@@ -1144,6 +1155,9 @@ Result<void> validateTileDynamics(const TileDynamics& d) {
     if (!(d.contourInterval >= 0.0f) || !finite(d.contourInterval) || !finite(d.contourOffset)) {
         return fail("tileDynamics: the contour interval is >= 0 and the offset finite");
     }
+    if (!(d.contourFade >= 0.0f) || d.contourFade > 0.5f) {
+        return fail("tileDynamics: the contour fade is 0..0.5 of a step (ADR-1995)");
+    }
     if (!finite(d.riverWaves) || !finite(d.pondWaves) || !finite(d.riverDriftAmplitude) ||
         !(d.riverDriftWavelength > 0.0f) || !finite(d.riverDriftWavelength) || !finite(d.riverDriftSpeed)) {
         return fail("tileDynamics: water's wave weights, drift amplitude and speed must be finite, its drift wavelength "
@@ -1265,8 +1279,9 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
                            {"glowRadius", s.glowRadius}};
         }
     }
-    if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset) {
-        j["contour"] = {{"interval", d.contourInterval}, {"offset", d.contourOffset}};
+    if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset ||
+        d.contourFade != def.contourFade) {
+        j["contour"] = {{"interval", d.contourInterval}, {"offset", d.contourOffset}, {"fade", d.contourFade}};
     }
     if (d.glow != def.glow || d.landingGain != def.landingGain || d.landingColor != def.landingColor) {
         j["glow"] = {{"path", d.glow.x},       {"contour", d.glow.y}, {"crest", d.glow.z},
@@ -1365,13 +1380,16 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
             }
         } else if (key == "contour") {
             struct C {
-                float interval, offset;
-            } c{d.contourInterval, d.contourOffset};
-            if (auto r = readFields<C>(value, where, {{"interval", &C::interval}, {"offset", &C::offset}}, c); !r) {
+                float interval, offset, fade;
+            } c{d.contourInterval, d.contourOffset, d.contourFade};
+            if (auto r = readFields<C>(value, where,
+                                       {{"interval", &C::interval}, {"offset", &C::offset}, {"fade", &C::fade}}, c);
+                !r) {
                 return std::unexpected(r.error());
             }
             d.contourInterval = c.interval;
             d.contourOffset = c.offset;
+            d.contourFade = c.fade; // ADR-1995
         } else if (key == "rings") {
             if (auto r = readFields<TileRingSpec>(value, where,
                                                   {{"amplitude", &TileRingSpec::amplitude},

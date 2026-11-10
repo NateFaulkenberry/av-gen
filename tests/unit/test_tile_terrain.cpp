@@ -227,42 +227,149 @@ TEST_CASE("tiles: the generator and its terrain read and round-trip as JSON", "[
     CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(R"({"hillOctaves": 9})")).has_value());
 }
 
-TEST_CASE("tiles: the seam band meets the coarser ring at its height", "[geography][tiles][adr1976]") {
+// ADR-1995: the morph replaced the seam band (ADR-1976 amended), which counted cells from the snapped window edge, so a
+// tile's weight jumped each time the window snapped. The morph is a function of the camera.
+TEST_CASE("tiles: a ring morphs into its coarser ring by the camera's distance, never by the window",
+          "[geography][tiles][adr1995]") {
     scene::GeneratorSpec fine;
     fine.name = scene::kGeneratorTiles;
     fine.tiles = withPath();
     fine.cellSize = 1.0f;
     fine.viewDistance = 40.0f;
     fine.align = 4;
-    fine.blendCells = 6;
-    fine.blendRatio = 2;
+    fine.morphWidth = 8.0f;
+    fine.morphRatio = 2;
     REQUIRE(fine.validate().has_value());
     scene::GeneratorSpec coarse = fine;
     coarse.cellSize = 2.0f;
     coarse.finePitch = 1.0f;
-    coarse.blendCells = 0;
-    const scene::GeneratorWindow w = scene::generatorWindow(fine, glm::vec3(-317.2f, 30.0f, 88.9f));
-    int edgeChecked = 0;
-    for (std::int32_t z = 0; z < w.countZ; ++z) {
-        for (std::int32_t x = 0; x < w.countX; ++x) {
-            const std::int32_t ix = w.originX + x;
-            const std::int32_t iz = w.originZ + z;
-            const scene::TileSample t = scene::generatorTileInWindow(fine, ix, iz, w);
-            const bool edge = x == 0 || z == 0 || x == w.countX - 1 || z == w.countZ - 1;
-            const bool deep = x >= 6 && z >= 6 && x < w.countX - 6 && z < w.countZ - 6;
-            if (edge) {
-                // On the edge cell the fine tile stands exactly where the 2 m block it belongs to stands.
-                const scene::TileSample block =
-                    scene::generatorTile(coarse, scene::generatorFloorDiv(ix, 2), scene::generatorFloorDiv(iz, 2));
-                CHECK(t.height == Catch::Approx(block.height).margin(1e-4));
-                ++edgeChecked;
-            }
-            if (deep) {
-                CHECK(t.height == scene::generatorTile(fine, ix, iz).height);
+    coarse.morphWidth = 0.0f;
+    // Every window the camera snaps to: its edge tiles are fully the coarser cell, its deep tiles untouched.
+    for (const glm::vec3 cam : {glm::vec3(-317.2f, 30.0f, 88.9f), glm::vec3(0.0f), glm::vec3(12.99f, 5.0f, -3.01f)}) {
+        const scene::GeneratorWindow w = scene::generatorWindow(fine, cam);
+        int edgeChecked = 0;
+        for (std::int32_t z = 0; z < w.countZ; ++z) {
+            for (std::int32_t x = 0; x < w.countX; ++x) {
+                const std::int32_t ix = w.originX + x;
+                const std::int32_t iz = w.originZ + z;
+                const scene::TileSample t = scene::generatorTileMorphed(fine, ix, iz, cam);
+                if (x == 0 || z == 0 || x == w.countX - 1 || z == w.countZ - 1) {
+                    CHECK(scene::generatorTileMorph(fine, ix, iz, cam) == 1.0f);
+                    const scene::TileSample block =
+                        scene::generatorTile(coarse, scene::generatorFloorDiv(ix, 2), scene::generatorFloorDiv(iz, 2));
+                    CHECK(t.height == Catch::Approx(block.height).margin(1e-4));
+                    CHECK(t.water == Catch::Approx(block.water).margin(1e-5));
+                    ++edgeChecked;
+                }
+                const float cx = (static_cast<float>(ix) + 0.5f) - cam.x;
+                const float cz = (static_cast<float>(iz) + 0.5f) - cam.z;
+                if (std::max(std::abs(cx), std::abs(cz)) < 40.0f - 0.5f - 8.0f) {
+                    CHECK(t.height == scene::generatorTile(fine, ix, iz).height);
+                }
             }
         }
+        CHECK(edgeChecked > 100);
     }
-    CHECK(edgeChecked > 100);
+    // Continuity: a tile followed while the camera slides 20 m in 2 cm steps (its window snaps five times) never
+    // moves more than the ground's own slope over the slide allows -- no step at a snap.
+    const std::int32_t ix = 50; // 50.5 m out: the slide takes it from 50.5 to 30.5 m, through the 31.5..39.5 m band
+    const std::int32_t iz = -6;
+    float worstStep = 0.0f;
+    float lo = 1e9f;
+    float hi = -1e9f;
+    float prev = scene::generatorTileMorphed(fine, ix, iz, glm::vec3(0.0f, 10.0f, 0.0f)).height;
+    for (int i = 1; i <= 1000; ++i) {
+        const glm::vec3 cam(0.02f * static_cast<float>(i), 10.0f, 0.0f);
+        const float h = scene::generatorTileMorphed(fine, ix, iz, cam).height;
+        worstStep = std::max(worstStep, std::abs(h - prev));
+        lo = std::min(lo, scene::generatorTileMorph(fine, ix, iz, cam));
+        hi = std::max(hi, scene::generatorTileMorph(fine, ix, iz, cam));
+        prev = h;
+    }
+    const float span = std::abs(scene::generatorTile(fine, ix, iz).height -
+                                scene::generatorTile(coarse, scene::generatorFloorDiv(ix, 2),
+                                                     scene::generatorFloorDiv(iz, 2)).height);
+    CAPTURE(worstStep, lo, hi, span);
+    CHECK(lo == 0.0f); // the control: the slide carries the tile through the whole band
+    CHECK(hi == 1.0f);
+    CHECK(worstStep <= 0.01f * std::max(span, 0.05f)); // 2 cm of an 8 m band: ~0.4% of the span at the steepest
+}
+
+TEST_CASE("tiles: the morph reads and writes as JSON, and the seam band is refused", "[geography][tiles][json][adr1995]") {
+    const auto parse = [](const char* gen) {
+        const std::string text = std::string(R"({"name": "ground", "slabs": true,
+            "source": {"kind": "box", "size": [0.92, 0.18, 0.92]},
+            "distribution": {"kind": "generator", "generator": {"name": "tiles", "version": 1, "cellSize": 4.0,
+                "viewDistance": 300.0, "align": 4, "finePitch": 1.0, )") + gen + "}}}";
+        return scene::ProceduralGeometry::fromJson(nlohmann::json::parse(text));
+    };
+    auto g = parse(R"("morph": {"width": 64, "ratio": 4, "pitch": 4})");
+    REQUIRE(g.has_value());
+    const scene::GeneratorSpec& gs = g->distribution.generator;
+    CHECK(gs.morphWidth == 64.0f);
+    CHECK(gs.morphRatio == 4);
+    CHECK(gs.morphPitch == 4.0f);
+    auto back = scene::ProceduralGeometry::fromJson(g->toJson());
+    REQUIRE(back.has_value());
+    CHECK(back->distribution.generator.hash() == gs.hash());
+    CHECK_FALSE(parse(R"("blend": {"cells": 4, "ratio": 2})").has_value());     // ADR-441: gone, not ignored
+    CHECK_FALSE(parse(R"("morph": {"width": 64, "ratio": 3})").has_value());    // a block must fit the workgroup
+    CHECK_FALSE(parse(R"("morph": {"width": 64, "ratio": 8})").has_value());    // align 4 is not a multiple of 8
+    CHECK_FALSE(parse(R"("morph": {"width": 64, "pitch": 3})").has_value());    // 4 m is not whole 3 m samples
+    CHECK_FALSE(parse(R"("morph": {"width": 400})").has_value());               // wider than the ring
+    CHECK_FALSE(parse(R"("morph": {"width": 64, "cells": 2})").has_value());    // an unknown key
+    CHECK_FALSE(parse(R"("morph": {"width": 64}, "childrenMin": true)").has_value()); // an underlay does not morph
+}
+
+// ADR-1995: every ring of one ground measures the far-tile rule at the lattice's pitch, so a swap shades alike.
+TEST_CASE("tiles: the slab far-tile rule measures the lattice pitch in every ring", "[geography][tiles][adr1995]") {
+    scene::ProceduralGeometry fine;
+    fine.distribution.kind = scene::DistributionKind::Generator;
+    fine.distribution.generator.name = scene::kGeneratorTiles;
+    fine.distribution.generator.cellSize = 4.0f;
+    fine.source.size = {3.66f, 1.2f, 3.66f};
+    scene::ProceduralGeometry coarse = fine;
+    coarse.distribution.generator.cellSize = 8.0f;
+    coarse.distribution.generator.finePitch = 4.0f;
+    coarse.source.size = {8.0f, 1.44f, 8.0f};
+    // a 4 m span measured in both: the fine box x 4/3.66, the 8 m box x 1/2
+    CHECK(scene::slabRuleScale(fine) * 3.66f == Catch::Approx(4.0f));
+    CHECK(scene::slabRuleScale(coarse) * 8.0f == Catch::Approx(4.0f));
+    scene::ProceduralGeometry other;
+    CHECK(scene::slabRuleScale(other) == 1.0f);
+}
+
+// ADR-1995: a contour side eases in and out as a level crosses either end of the step, instead of switching.
+TEST_CASE("tiles: a contour side's strength is continuous as a level crosses the step", "[geography][tiles][adr1995]") {
+    // A 2 m step (own 5, neighbour 3), interval 4: a level sweeping up through it by its offset.
+    float prev = scene::tileContourStrength(5.0f, 3.0f, 4.0f, 2.9f, 0.15f);
+    float worst = 0.0f;
+    float peak = 0.0f;
+    for (int i = 1; i <= 2200; ++i) {
+        const float offset = 2.9f + 0.001f * static_cast<float>(i); // 2.9 .. 5.1: the level enters, crosses, leaves
+        const float s = scene::tileContourStrength(5.0f, 3.0f, 4.0f, offset, 0.15f);
+        // the strength only matters where the level is inside the step (the binary mask's edge); there it is smooth
+        const bool inside = offset > 3.0f && offset <= 5.0f;
+        if (inside) {
+            worst = std::max(worst, std::abs(s - prev));
+            peak = std::max(peak, s);
+        }
+        prev = s;
+    }
+    CAPTURE(worst, peak);
+    CHECK(peak == 1.0f);
+    CHECK(worst < 0.02f); // 1 mm of level per step: no switch
+    // at the step's ends it is 0, in the middle 1; fade 0 is the old binary edge
+    CHECK(scene::tileContourStrength(5.0f, 3.0f, 4.0f, 3.0f + 1e-4f, 0.15f) < 0.01f);
+    CHECK(scene::tileContourStrength(5.0f, 3.0f, 4.0f, 5.0f, 0.15f) == 0.0f);
+    CHECK(scene::tileContourStrength(5.0f, 3.0f, 4.0f, 4.0f, 0.15f) == 1.0f);
+    CHECK(scene::tileContourStrength(5.0f, 3.0f, 4.0f, 3.01f, 0.0f) == 1.0f);
+    // a step spanning several levels keeps the one nearest its middle: full strength
+    CHECK(scene::tileContourStrength(20.0f, 3.0f, 4.0f, 0.0f, 0.15f) == 1.0f);
+    // the packing: 6 bits a side, dimming in 63rds, exact in a float
+    CHECK(scene::tilePackedSides({1.0f, 1.0f, 1.0f, 1.0f}) == 0.0f);
+    CHECK(scene::tilePackedSides({0.0f, 0.0f, 0.0f, 0.0f}) == 16777215.0f);
+    CHECK(scene::tilePackedSides({1.0f, 0.0f, 1.0f, 1.0f}) == 63.0f * 64.0f);
 }
 
 TEST_CASE("tiles: the river valley -- water on the line, smooth banks, no walls", "[geography][tiles][adr1950]") {

@@ -128,7 +128,7 @@ TEST_CASE("A cloud deck leaves its water cells out, opts out of the dynamics and
         for (std::int32_t z = 0; z < w.countZ; ++z) {
             for (std::int32_t x = 0; x < w.countX; ++x) {
                 const auto& r = (*records)[static_cast<std::size_t>(z * w.countX + x)];
-                const scene::TileSample still = scene::generatorTileInWindow(gs, w.originX + x, w.originZ + z, w);
+                const scene::TileSample still = scene::generatorTile(gs, w.originX + x, w.originZ + z);
                 const bool present = r.scale.x > 0.0f;
                 (still.water >= 0.5f ? wet : dry) += 1;
                 if (cloud) {
@@ -145,7 +145,7 @@ TEST_CASE("A cloud deck leaves its water cells out, opts out of the dynamics and
                 } else {
                     wrong += present ? 0 : 1;
                     const scene::TileSample moving =
-                        scene::generatorTileInWindow(gs, w.originX + x, w.originZ + z, w, &dyn, 4.0f);
+                        scene::generatorTile(gs, w.originX + x, w.originZ + z, &dyn, 4.0f);
                     worstStill = std::max(worstStill, std::abs(moving.height - still.height)); // it does move
                     const float packed = r.emissive.w - scene::kTileClassStride *
                                                             std::floor(r.emissive.w / scene::kTileClassStride);
@@ -232,7 +232,7 @@ TEST_CASE("A keyed omitBelow cuts a cloud deck to its cores, per cell", "[gpu][g
             for (std::int32_t x = 0; x < w.countX; ++x) {
                 const auto& r = (*records)[static_cast<std::size_t>(z * w.countX + x)];
                 const scene::TileSample still =
-                    scene::generatorTileInWindow(pg.distribution.generator, w.originX + x, w.originZ + z, w);
+                    scene::generatorTile(pg.distribution.generator, w.originX + x, w.originZ + z);
                 const bool expect = still.water < 0.5f && still.height >= cut;
                 const bool got = r.scale.x > 0.0f;
                 present += got ? 1 : 0;

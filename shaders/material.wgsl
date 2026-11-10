@@ -168,6 +168,9 @@ struct MaterialContext {
     instanceRandom: vec4<f32>,
     instanceColor: vec4<f32>,
     instanceEmissive: vec4<f32>,
+    // ADR-1995: a "tiles" record's contour side dimming, side i (+x, -x, +z, -z) in 63rds x 64^i (0 = full strength);
+    // the tileContour op draws a flagged side that much weaker.
+    tileSides: f32,
     time: f32,
     audio: vec4<f32>,
     audioBands: vec4<f32>,
@@ -318,6 +321,7 @@ fn materialContextZero() -> MaterialContext {
     ctx.instanceRandom = vec4<f32>(0.0);
     ctx.instanceColor = vec4<f32>(1.0);
     ctx.instanceEmissive = vec4<f32>(0.0);
+    ctx.tileSides = 0.0;
     ctx.time = 0.0;
     ctx.audio = vec4<f32>(0.0);
     ctx.audioBands = vec4<f32>(0.0);
@@ -936,11 +940,17 @@ fn matKTileContour(pi: u32, oi: u32, ctx: MaterialContext, a: vec4<f32>, b: vec4
     let landing = clamp(landingQ / 255.0, 0.0, 1.0);
     let mask = u32(floor(w * 0.5));
     let crest = clamp(w - 2.0 * f32(mask), 0.0, 1.0);
+    // ADR-1995: each flagged side at its strength (1 - its dimming in 63rds, packed 6 bits a side)
+    let sides = max(ctx.tileSides, 0.0);
+    let s0 = 1.0 - (sides - 64.0 * floor(sides / 64.0)) / 63.0;
+    let s1 = 1.0 - (floor(sides / 64.0) - 64.0 * floor(sides / 4096.0)) / 63.0;
+    let s2 = 1.0 - (floor(sides / 4096.0) - 64.0 * floor(sides / 262144.0)) / 63.0;
+    let s3 = 1.0 - floor(sides / 262144.0) / 63.0;
     var keep = 1.0;
-    if ((mask & 1u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x - a.x, ctx.localFootprint.x, k.z, f)); }
-    if ((mask & 2u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.x, k.x + a.x, ctx.localFootprint.x, k.z, f)); }
-    if ((mask & 4u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y - a.z, ctx.localFootprint.y, k.z, f)); }
-    if ((mask & 8u) != 0u) { keep = keep * (1.0 - matTileContourSide(k.y, k.y + a.z, ctx.localFootprint.y, k.z, f)); }
+    if ((mask & 1u) != 0u) { keep = keep * (1.0 - s0 * matTileContourSide(k.x, k.x - a.x, ctx.localFootprint.x, k.z, f)); }
+    if ((mask & 2u) != 0u) { keep = keep * (1.0 - s1 * matTileContourSide(k.x, k.x + a.x, ctx.localFootprint.x, k.z, f)); }
+    if ((mask & 4u) != 0u) { keep = keep * (1.0 - s2 * matTileContourSide(k.y, k.y - a.z, ctx.localFootprint.y, k.z, f)); }
+    if ((mask & 8u) != 0u) { keep = keep * (1.0 - s3 * matTileContourSide(k.y, k.y + a.z, ctx.localFootprint.y, k.z, f)); }
     // ADR-1960: z = the landing outline (all four sides, the contour's band) times the glow; w = the glow
     var ring = 1.0;
     if (landing > 0.0) {
