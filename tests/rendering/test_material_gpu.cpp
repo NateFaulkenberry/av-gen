@@ -86,7 +86,7 @@ constexpr const char* kKernel = R"(
 @group(0) @binding(17) var programTexturesLinear: texture_2d_array<f32>;
 @group(0) @binding(18) var programTextureSampler: sampler;
 
-const CTX_STRIDE: u32 = 18u;
+const CTX_STRIDE: u32 = 21u;
 
 @compute @workgroup_size(64)
 fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
@@ -123,6 +123,9 @@ fn cs_material(@builtin(global_invocation_id) gid: vec3<u32>) {
     ctx.bitangent = contexts[b + 15u].xyz;
     ctx.tileGlow = contexts[b + 16u]; // ADR-1963
     ctx.landingGlow = contexts[b + 17u]; // ADR-1960
+    ctx.keyLightDirection = contexts[b + 18u]; // ADR-1967
+    ctx.keyLightColor = contexts[b + 19u];
+    ctx.skyAmbient = contexts[b + 20u];
 
     var base = materialResultZero();
     base.baseColor = vec3<f32>(0.8, 0.7, 0.6);
@@ -231,10 +234,10 @@ public:
         rendering::MaterialPrograms block(ctx_);
         block.update(programs, &fieldBlock, tex.layerOf);
 
-        std::vector<glm::vec4> packed(cases.size() * 18, glm::vec4(0.0f));
+        std::vector<glm::vec4> packed(cases.size() * 21, glm::vec4(0.0f));
         for (std::size_t i = 0; i < cases.size(); ++i) {
             const scene::MaterialContext& c = cases[i].ctx;
-            glm::vec4* p = packed.data() + i * 18;
+            glm::vec4* p = packed.data() + i * 21;
             p[0] = glm::vec4(c.worldPosition, c.objectId);
             p[1] = glm::vec4(c.localPosition, c.instanceIndex);
             p[2] = glm::vec4(c.normal, c.instanceId);
@@ -253,6 +256,9 @@ public:
             p[15] = glm::vec4(c.bitangent, 0.0f);
             p[16] = c.tileGlow; // ADR-1963
             p[17] = c.landingGlow; // ADR-1960
+            p[18] = c.keyLightDirection; // ADR-1967
+            p[19] = c.keyLightColor;
+            p[20] = c.skyAmbient;
         }
 
         const auto& device = ctx_.device();
@@ -431,6 +437,9 @@ std::vector<scene::MaterialContext> makeContexts() {
         c.materialEmission = {0.35f + t * 0.02f, 0.1f + t * 0.05f, 0.9f - t * 0.03f, 1.0f}; // ADR-904
         c.tileGlow = {0.5f + t * 0.1f, 2.0f - t * 0.07f, 0.25f, 3.0f};                     // ADR-1963
         c.landingGlow = {1.5f - t * 0.05f, 0.4f, 0.9f + t * 0.02f, 2.5f};                  // ADR-1960
+        c.keyLightDirection = {glm::normalize(glm::vec3(0.3f, 0.5f + t * 0.03f, -0.4f)), 1.0f}; // ADR-1967
+        c.keyLightColor = {0.4f + t * 0.1f, 0.35f, 0.9f, 0.5f};
+        c.skyAmbient = {0.1f, 0.12f + t * 0.01f, 0.3f, 1.0f};
         out.push_back(c);
     }
     return out;
@@ -587,6 +596,10 @@ TEST_CASE("material program inputs match the CPU interpreter", "[material][gpu]"
     checkParity(harness, {build("tileGlow", MaterialInput::TileGlow)}, noFields, 0.0); // ADR-1963
     checkParity(harness, {build("landingGlow", MaterialInput::LandingGlow)}, noFields, 0.0); // ADR-1960
     checkParity(harness, {build("waterBody", MaterialInput::WaterBody)}, noFields, 0.0);     // ADR-1965
+    checkParity(harness,
+                {build("keyLightDirection", MaterialInput::KeyLightDirection),
+                 build("keyLightColor", MaterialInput::KeyLightColor), build("skyAmbient", MaterialInput::SkyAmbient)},
+                noFields, 0.0); // ADR-1967
     CHECK(ctx->errorCount() == 0);
 }
 

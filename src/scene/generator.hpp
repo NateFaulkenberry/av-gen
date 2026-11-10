@@ -90,6 +90,17 @@ struct GeneratorSpec {
     // moving finer ring its averaged cell would rise into the fine troughs and show through; at the minimum it never
     // does. Off (the mean) by default.
     bool childrenMin = false;
+    // ADR-1966 (CPD-R2, tile clouds): `omit: "water"` -- a cell whose water channel is >= 0.5 is not emitted (an empty
+    // record the cull pass rejects, like a ring's hole), so a cloud layer's "sea" costs no raster at all.
+    bool omitWater = false;
+    // ADR-1966: a layer can opt out of the scene's tileDynamics (waves, breathing, rolling, rings, springs: it stands on
+    // the static ground) and of the contour pass. Both default on.
+    bool dynamics = true;
+    bool contours = true;
+    // ADR-1966: a cell whose top (generator metres) is below `omitBelow` is not emitted either -- a cloud layer's
+    // "cores only", per cell instead of per pixel, so it costs nothing either. Keyable
+    // (procedural/<node>/distribution/generator/omitBelow); at or below -10000 (the default) it is off.
+    float omitBelow = -10000.0f;
 
     [[nodiscard]] bool isTiles() const;
 

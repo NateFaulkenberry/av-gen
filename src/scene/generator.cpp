@@ -177,6 +177,8 @@ std::uint64_t GeneratorSpec::hash() const {
         h.u32(static_cast<std::uint32_t>(blendCells));
         h.f32(skirt);
         h.u32(childrenMin ? 1u : 0u);
+        h.u32((omitWater ? 1u : 0u) | (dynamics ? 2u : 0u) | (contours ? 4u : 0u)); // ADR-1966
+        h.f32(omitBelow);
         h.u32(static_cast<std::uint32_t>(blendRatio));
     }
     return h.value();

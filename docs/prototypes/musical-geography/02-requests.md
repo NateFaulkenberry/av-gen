@@ -1093,7 +1093,7 @@ Their spec is in the scratch demo, not in your scene.
 - `bedDepth` < 0 (the default) keeps the CP-A behaviour: the bed sits at the sea floor all along.
 - With `bedDepth` ≥ 0, the source is `sourceLevel` (metres) or `"auto"` (the land at the first point, less
   `bedDepth`). The level eases down to the sea floor at the last point.
-- Your `river`, `riverWidth` and `valleyWidth` still read as `rivers[0]`. Writing both `river` and `rivers` is refused.
+- (R2: the `river`, `riverWidth` and `valleyWidth` keys are gone, ADR-441; write `rivers`.)
 
 **Ponds and valleys**
 - At most 8 ponds. `level` is in metres or `"auto"`: the basin rim's lowest land, less 1 m.
@@ -1114,6 +1114,86 @@ Their spec is in the scratch demo, not in your scene.
 - The tile field draws 0.6 m lower since ADR-1991 (the box's top is now the height), so a `worldPosition.y` ramp
   shifts by that much.
 
+### Engineering → art, CP-D r2 (2026-11-10): CPD-R2 is built (ADR-1966, ADR-1967), and the `river` key is gone
+
+**Cloud layers** (ADR-1966): three new generator keys, set on each cloud node's `distribution.generator`.
+- `"omit": "water"` writes every cell with water ≥ 0.5 as an empty record that the cull pass rejects. Those cells
+  cost no raster at all.
+- Drop the program's `opacity` and the material's `alphaMode` / `alphaCutoff`; the deck draws opaque.
+- `"dynamics": false` stands the layer on the still ground: no waves, breathing, rolling, rings or springs.
+- `"contours": false` skips its contour pass.
+
+A keyed node position (the wind) carries the deck, and the window stays centred on the camera (tested at 0, 137 and
+941 m of drift).
+
+**Measured.** Live profile, 1080p ultra, 30 fps target, song 40–60 s of your current full build (`--full
+--characters`, e3f6383f), 20 s each, on a quiet GPU. Medians, in ms:
+
+| Variant | GPU p50 | Δ vs no clouds | depth prepass | scene | generators |
+|---|---|---|---|---|---|
+| No clouds | 16.48 | | 0.40 | 12.07 | 1.24 |
+| Two layers, masked (as today) | 119.1 | +102.7 | 93.4 | 22.4 | 1.15 |
+| Two layers, `omit: "water"`, opaque | 17.13 | **+0.65** | 0.91 | 12.65 | 1.14 |
+| The same, `dynamics` and `contours` left on | 17.17 | +0.69 | 0.90 | 12.60 | 1.16 |
+
+**Night (song 140–160 s, the same way):**
+
+| Variant | GPU p50 | Δ vs no clouds | depth prepass |
+|---|---|---|---|
+| No clouds | 15.30 | | 0.29 |
+| Masked (as today, with the night cores cut by opacity) | 93.57 | +78.3 | 65.7 |
+| `omit: "water"` + the opacity cores cut kept (alpha mask on the remaining cells) | 31.88 | +16.6 | 14.5 |
+| `omit: "water"`, opaque, no cores cut | 17.58 | +2.3 | 0.80 |
+| `omit: "water"` + **`omitBelow`** (the cores cut per cell), opaque | **15.40** | **+0.11** | 0.32 |
+
+- Two layers are under the 2 ms target, provided the night's "cores only" cut moves off the alpha mask. A masked
+  prepass is what costs, even on only the cloud cells. So the cut is now per cell:
+  `distribution.generator.omitBelow` (metres, the layer's own heights) leaves out every cell whose top is below it.
+- It is a parameter, so you can key it through the arc: `procedural/<cloud node>/distribution/generator/omitBelow`.
+  At or below −10000 (the default) it is off.
+- Your opacity cut `smoothstep(core, core + 6)` on the slab centre at 0.5 maps to
+  `omitBelow ≈ (1.5 · cloud_core − 0.5) · relief + 3 + thickness / 2`. At night, with `cloud_core` 0.55, that is
+  9.25 m (low layer) and 50.75 m (mid).
+  `cpd-r2-clouds-night-masked-top-percell-cores-bottom.png` compares it with today's masked night.
+- The cloud positions differ between those two stills for a second reason. Your clouds had been taking the ground's
+  `tileDynamics`: the 0.4 m/s rolling slid them, and the waves moved them. With `"dynamics": false` they hold still,
+  so if you want drift, key the node's position (the wind).
+- The opt-outs don't measurably save anything here (the clouds' kernels are small); they are for correctness: no
+  waves or contour bits on a cloud.
+- The masked figure here (+103 ms) is larger than your +44 ms because this window flies under more of the cover. The
+  conclusion is the same.
+
+**R1's kernel cost** (the larger uniform block and the feature loops), measured the same way, generators pass:
+- R1 against the build just before it (8debbd60), on the same draft scene with only the CP-A river: 1.57 → 1.76 ms,
+  **+0.20 ms**;
+- your current scene with its 3 rivers, 6 ponds and 1 valley against the same scene with the features stripped:
+  1.07 → 1.24 ms, **+0.17 ms**.
+- About 0.4 ms in all. Whole-frame GPU totals moved by less than the run-to-run noise.
+
+**The night clouds** (ADR-1967): three new material inputs.
+- `keyLightDirection`: xyz points at the key light; w = 1 when one is up. The key light is the strongest
+  shadow-casting directional above the horizon: the sun by day, the moon once the sun is down or at 0, never the fill.
+- `keyLightColor`: rgb = its colour × intensity; w = its luminance.
+- `skyAmbient`: the analytic sky's mean of zenith and horizon × intensity; w = 1 when the sky is on.
+
+There is no `dot` op. Build n·L from `multiply` and three `swizzle`s plus two `add`s. The demo in
+`cpd-r2-clouds-night-lining.png` appends 14 ops to your cloud program:
+- n·L, then `smoothstep` 0.15–0.9;
+- × `keyLightColor` × 0.35;
+- added to the emission.
+
+It is only a proof that the input works; the look is yours.
+
+**`river` is gone** (ADR-441). The CP-A `river`, `riverWidth` and `valleyWidth` keys are now refused like any unknown
+key; write `rivers`. The flight's `"follow": "river"` still works: it is a river name or index.
+
+**Stills** in `11-pass-cpd-r2/`:
+- `cpd-r2-clouds-day-masked-top-omit-bottom.png`: identical at 45 s, apart from 0.1% of pixels at the cut edges;
+- `cpd-r2-clouds-night-masked-top-percell-cores-bottom.png`;
+- `cpd-r2-clouds-night-lining-off-top-on-bottom.png`: the `keyLightDirection` demo, subtle, on the faces toward the
+  moon.
+
+**Not built:** cloud shadows on the ground (the nice-to-have).
 #### CPD-R3 (art → engineering, 2026-11-10): raised land where the route needs a wall, and islands
 
 The owner asked for no "long endless horizons": land should rise to meet or cut the horizon in most frames.

@@ -781,6 +781,9 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
         ctx.beat = frame.beat;
         ctx.tileGlow = frame.tileGlow; // ADR-1963
         ctx.landingGlow = frame.landingGlow; // ADR-1960
+        ctx.keyLightDirection = frame.keyLightDirection; // ADR-1967
+        ctx.keyLightColor = frame.keyLightColor;
+        ctx.skyAmbient = frame.skyAmbient;
         ctx.viewDirection = v;
         ctx.depth = distance(frame.cameraPos.xyz, worldPos);
         ctx.curvature = geometry.x;

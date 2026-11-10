@@ -115,9 +115,9 @@ struct TileTerrainSpec {
     std::vector<glm::vec2> path;
     float pathWidth = 1.0f;          // metres
     float pathLift = 0.35f;          // metres
-    // ADR-1965: the rivers, ponds and dry valleys (see TileRiver, TilePond, TileValley). The scene file's `river`,
-    // `riverWidth`, `valleyWidth` (the CP-A single river, at the sea floor) are read as the first river, at art's
-    // request; a file is written with `rivers`. A camera or a character follows a river by its index or name.
+    // ADR-1965: the rivers, ponds and dry valleys (see TileRiver, TilePond, TileValley). The CP-A single `river` key is
+    // gone (ADR-441: no alias): its river is `rivers[0]` with the default bedDepth. The flight follows a river by its
+    // index or name.
     std::vector<TileRiver> rivers;
     std::vector<TilePond> ponds;
     std::vector<TileValley> valleys;

@@ -144,6 +144,9 @@ enum class MaterialInput : std::uint8_t {
     TileGlow, // ADR-1963: environment.tileDynamics.glow (path, contour, crest, pads), 1 = as authored
     LandingGlow, // ADR-1960: rgb = the landing glow's colour x gain, w = its gain (environment.tileDynamics)
     WaterBody,   // ADR-1965: a tiles record's water body, one-hot (sea, river, pond) and the class, from instanceEmissive.w
+    KeyLightDirection, // ADR-1967: xyz towards the key light (the sun, or the moon at night), w = 1 when one is up
+    KeyLightColor,     // ADR-1967: rgb = the key light's colour x intensity, w = its luminance
+    SkyAmbient,        // ADR-1967: rgb = the sky's ambient colour, w = 1 when the analytic sky is drawn
 };
 [[nodiscard]] const char* materialInputName(MaterialInput input);
 [[nodiscard]] std::optional<MaterialInput> materialInputFromName(std::string_view name);
@@ -338,6 +341,9 @@ struct MaterialContext {
     glm::vec4 materialEmission{0.0f};
     glm::vec4 tileGlow{1.0f}; // ADR-1963
     glm::vec4 landingGlow{0.0f}; // ADR-1960
+    glm::vec4 keyLightDirection{0.0f, 1.0f, 0.0f, 0.0f}; // ADR-1967
+    glm::vec4 keyLightColor{0.0f};
+    glm::vec4 skyAmbient{0.0f};
     // Field samples by name are resolved through this callback (null = zeros).
     const struct MaterialFieldSampler* fields = nullptr;
     // ADR-1642: the first two columns of the tangent frame the shader applies a program's tangent-space normal in (the

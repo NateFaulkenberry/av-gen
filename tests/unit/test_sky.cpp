@@ -342,3 +342,47 @@ TEST_CASE("cirrus bands: 0 is the even layer exactly; 1 gathers it into fewer ba
     CHECK(sumBanded < 0.8 * sumEven);
     CHECK(clearBanded > clearEven);
 }
+
+// ADR-1967: the key light material programs read -- the sun by day, the moon when the sun is down, never the fill.
+TEST_CASE("the frame's key light is the sun by day and the moon by night", "[sky][material][adr1967]") {
+    scene::PunctualLight sun;
+    sun.name = "sun";
+    sun.direction = {0.5f, -0.6f, 0.6f};
+    sun.color = {1.0f, 0.9f, 0.75f};
+    sun.intensity = 4.0f;
+    sun.castsShadow = true;
+    scene::PunctualLight moon = sun;
+    moon.name = "moon";
+    moon.direction = {-0.4f, -0.7f, 0.55f};
+    moon.color = {0.58f, 0.46f, 1.0f};
+    moon.intensity = 0.0f;
+    scene::PunctualLight fill = sun;
+    fill.name = "fill";
+    fill.direction = {-0.62f, -0.3f, 0.62f};
+    fill.intensity = 1.4f;
+    fill.castsShadow = false;
+
+    // day: the sun
+    auto key = scene::frameKeyLight({sun, moon, fill});
+    REQUIRE(key.valid);
+    CHECK(glm::dot(key.toLight, glm::normalize(-sun.direction)) > 0.9999f);
+    CHECK_THAT(key.radiance.r, WithinAbs(4.0, 0.05));
+    // night: the sun has set (below the horizon, or dimmed to 0) and the moon is up -- the moon, though the fill is
+    // brighter, because the fill casts no shadow
+    sun.direction = {0.5f, 0.3f, 0.6f};
+    moon.intensity = 1.2f;
+    key = scene::frameKeyLight({sun, moon, fill});
+    REQUIRE(key.valid);
+    CHECK(glm::dot(key.toLight, glm::normalize(-moon.direction)) > 0.9999f);
+    sun.direction = {0.5f, -0.6f, 0.6f};
+    sun.intensity = 0.0f;
+    key = scene::frameKeyLight({sun, moon, fill});
+    CHECK(glm::dot(key.toLight, glm::normalize(-moon.direction)) > 0.9999f);
+    // no caster up: the strongest directional that is
+    moon.intensity = 0.0f;
+    key = scene::frameKeyLight({sun, moon, fill});
+    REQUIRE(key.valid);
+    CHECK(glm::dot(key.toLight, glm::normalize(-fill.direction)) > 0.9999f);
+    // nothing up at all
+    CHECK_FALSE(scene::frameKeyLight({sun, moon}).valid);
+}

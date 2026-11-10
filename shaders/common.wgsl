@@ -203,6 +203,9 @@ struct FrameUniforms {
     waterColumn: vec4<f32>, // ADR-1910: x = the water surface (world y), yzw = downwelling absorption per metre
     tileGlow: vec4<f32>,   // ADR-1963: environment.tileDynamics.glow, the `tileGlow` material input
     landingGlow: vec4<f32>, // ADR-1960: the landing glow's colour x gain (rgb) and gain (w)
+    keyLightDirection: vec4<f32>, // ADR-1967: xyz towards the key light (sun, or the moon at night), w = 1 when up
+    keyLightColor: vec4<f32>,     // rgb = its colour x intensity, w = its luminance
+    skyAmbient: vec4<f32>,        // rgb = the sky's ambient colour, w = 1 when the analytic sky is drawn
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 

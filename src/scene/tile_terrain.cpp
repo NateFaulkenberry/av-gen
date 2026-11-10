@@ -852,25 +852,7 @@ Result<TileTerrainSpec> tileTerrainFromJson(const nlohmann::json& j) {
         return fail("'tiles' must be an object");
     }
     TileTerrainSpec spec;
-    // the CP-A single river (`river`, `riverWidth`, `valleyWidth`): read as the first river, at the sea floor
-    std::optional<TileRiver> single;
-    const auto singleRiver = [&single]() -> TileRiver& {
-        if (!single) single.emplace();
-        return *single;
-    };
     for (const auto& [key, value] : j.items()) {
-        if (key == "river") {
-            auto l = readLine(value, "tiles.river");
-            if (!l) return std::unexpected(l.error());
-            singleRiver().points = std::move(*l);
-            continue;
-        }
-        if (key == "riverWidth" || key == "valleyWidth") {
-            auto n = readNum(value, "tiles." + key);
-            if (!n) return std::unexpected(n.error());
-            (key == "riverWidth" ? singleRiver().width : singleRiver().valleyWidth) = *n;
-            continue;
-        }
         if (key == "rivers" || key == "ponds" || key == "valleys") {
             if (!value.is_array()) return fail("'tiles.{}' must be an array", key);
             for (std::size_t i = 0; i < value.size(); ++i) {
@@ -925,12 +907,6 @@ Result<TileTerrainSpec> tileTerrainFromJson(const nlohmann::json& j) {
         if (!found) {
             return fail("'tiles.{}' is not a key this build reads", key);
         }
-    }
-    if (single && !single->points.empty()) {
-        if (!spec.rivers.empty()) {
-            return fail("tiles: `river` and `rivers` together; write the single river as rivers[0]");
-        }
-        spec.rivers.insert(spec.rivers.begin(), std::move(*single));
     }
     if (auto r = spec.validate(); !r) {
         return std::unexpected(r.error());

@@ -455,17 +455,10 @@ TEST_CASE("tiles: a dry valley sinks the land along its line, by depth or a frac
 }
 
 TEST_CASE("tiles: water bodies read, write and refuse", "[geography][tiles][adr1965]") {
-    // the CP-A single river is read as rivers[0], at the sea floor
-    auto legacy = scene::tileTerrainFromJson(nlohmann::json::parse(
-        R"({"river": [[0, 0], [50, 10], [90, 40]], "riverWidth": 6, "valleyWidth": 80})"));
-    REQUIRE(legacy.has_value());
-    REQUIRE(legacy->rivers.size() == 1);
-    CHECK(legacy->rivers[0].width == 6.0f);
-    CHECK(legacy->rivers[0].valleyWidth == 80.0f);
-    CHECK(legacy->rivers[0].bedDepth < 0.0f);
-    CHECK(legacy->riverIndex("river") == 0);
-    CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(
-                    R"({"river": [[0, 0], [5, 5]], "rivers": [{"points": [[0, 0], [9, 9]]}]})")).has_value());
+    // ADR-441: the CP-A single `river` key is not read (no alias); it is refused like any unknown key
+    CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(R"({"river": [[0, 0], [50, 10], [90, 40]]})"))
+                    .has_value());
+    CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(R"({"riverWidth": 6})")).has_value());
     // a round trip
     auto spec = scene::tileTerrainFromJson(nlohmann::json::parse(R"({
         "rivers": [{"name": "brook", "points": [[0, 0], [40, 10]], "width": 3, "valleyWidth": 14, "bedDepth": 1,

@@ -163,6 +163,9 @@ constexpr InputName kInputNames[] = {
     {MaterialInput::TileGlow, "tileGlow"}, // ADR-1963
     {MaterialInput::LandingGlow, "landingGlow"}, // ADR-1960
     {MaterialInput::WaterBody, "waterBody"},     // ADR-1965
+    {MaterialInput::KeyLightDirection, "keyLightDirection"}, // ADR-1967
+    {MaterialInput::KeyLightColor, "keyLightColor"},
+    {MaterialInput::SkyAmbient, "skyAmbient"},
 };
 
 // ---- structural hashing (FNV-1a over the bit patterns, as in procedural.cpp) ----------------------
@@ -549,6 +552,12 @@ glm::vec4 inputValue(MaterialInput input, const MaterialContext& ctx) {
         return ctx.tileGlow;
     case MaterialInput::LandingGlow:
         return ctx.landingGlow;
+    case MaterialInput::KeyLightDirection: // ADR-1967
+        return ctx.keyLightDirection;
+    case MaterialInput::KeyLightColor:
+        return ctx.keyLightColor;
+    case MaterialInput::SkyAmbient:
+        return ctx.skyAmbient;
     case MaterialInput::WaterBody: { // ADR-1965: the tile's water body, one-hot (sea, river, pond), and its class
         const float cls = std::floor(std::max(ctx.instanceEmissive.w, 0.0f) / kTileClassStride);
         return {cls < 0.5f ? 1.0f : 0.0f, std::abs(cls - 1.0f) < 0.5f ? 1.0f : 0.0f,

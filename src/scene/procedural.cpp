@@ -3342,6 +3342,18 @@ json ProceduralGeometry::toJson() const {
                 if (g.childrenMin) {
                     gj["childrenMin"] = true; // ADR-1953
                 }
+                if (g.omitWater) {
+                    gj["omit"] = "water"; // ADR-1966
+                }
+                if (!g.dynamics) {
+                    gj["dynamics"] = false;
+                }
+                if (!g.contours) {
+                    gj["contours"] = false;
+                }
+                if (g.omitBelow > -10000.0f) {
+                    gj["omitBelow"] = g.omitBelow;
+                }
                 if (g.blendCells > 0) {
                     gj["blend"] = json{{"cells", g.blendCells}, {"ratio", g.blendRatio}};
                 }
@@ -3714,6 +3726,16 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                 }
                 AVGEN_PROC_READ(gs.skirt, "skirt", readFloat); // CP-A r3: the slab skirt
                 AVGEN_PROC_READ(gs.childrenMin, "childrenMin", readBool); // ADR-1953: an underlay's cells at the lowest
+                AVGEN_PROC_READ(gs.dynamics, "dynamics", readBool);       // ADR-1966: the layer's opt-outs
+                AVGEN_PROC_READ(gs.contours, "contours", readBool);
+                AVGEN_PROC_READ(gs.omitBelow, "omitBelow", readFloat);
+                if (j.contains("omit")) { // ADR-1966
+                    const json& o = j.at("omit");
+                    if (!o.is_string() || (o.get<std::string>() != "water" && o.get<std::string>() != "none")) {
+                        return fail("'distribution.generator.omit' must be \"water\" or \"none\"");
+                    }
+                    gs.omitWater = o.get<std::string>() == "water";
+                }
                 if (j.contains("blend")) { // ADR-1976 (amended): the seam band
                     const json& bj = j.at("blend");
                     if (!bj.is_object() || !bj.contains("cells") || !bj.at("cells").is_number_integer() ||
@@ -4197,6 +4219,9 @@ ProceduralParameters registerProceduralParameters(params::ParameterSet& params, 
         r.f("distribution/generator/groundHeight", g.groundHeight, -10000.0f, 10000.0f, -50.0f, 50.0f);
         r.f("distribution/generator/groundAmplitude", g.groundAmplitude, -1000.0f, 1000.0f, 0.0f, 40.0f);
         r.f("distribution/generator/groundFrequency", g.groundFrequency, 0.0f, 10.0f, 0.0f, 0.2f);
+        if (g.isTiles()) { // ADR-1966: the per-cell cut, keyable
+            r.f("distribution/generator/omitBelow", g.omitBelow, -10000.0f, 10000.0f, -100.0f, 300.0f);
+        }
     }
     p.distributionCount = r.i("distribution/count", d.count, 1, kMaxInstances, 1, 256);
     r.v3("distribution/start", d.start, -1e4f, 1e4f, -20.0f, 20.0f);
@@ -4487,6 +4512,7 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     copyValue(p, "distribution/generator/groundHeight", d.generator.groundHeight);
     copyValue(p, "distribution/generator/groundAmplitude", d.generator.groundAmplitude);
     copyValue(p, "distribution/generator/groundFrequency", d.generator.groundFrequency);
+    copyValue(p, "distribution/generator/omitBelow", d.generator.omitBelow); // ADR-1966 (tiles only)
     d.points = rest.distribution.points;
     d.pointsHash = rest.distribution.pointsHash;
     copyValue(p, "distribution/count", d.count);

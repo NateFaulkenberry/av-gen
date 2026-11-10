@@ -24,8 +24,8 @@ ap.add_argument("--fog-steps", type=int, default=32)
 a = ap.parse_args()
 
 TILES = {"seed": a.seed, "path": [[-400, 120], [-150, 40], [0, -30], [140, -160], [380, -260]],
-         "river": [[-980, -420], [-800, -300], [-700, -170], [-560, -90], [-420, -30], [-330, -10]],
-         "riverWidth": 8.0, "valleyWidth": 200.0}
+         "rivers": [{"name": "river", "points": [[-980, -420], [-800, -300], [-700, -170], [-560, -90], [-420, -30],
+                                                 [-330, -10]], "width": 8.0, "valleyWidth": 200.0}]}
 GAP = 0.92
 fv = a.fine_view
 
