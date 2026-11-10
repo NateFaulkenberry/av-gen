@@ -643,3 +643,16 @@ add skinning plus their shadows. The p99 tail is §5's work, in hand.
 - grounding jitter on fast waves (mitigated by sampling at the character's own time with a 2-frame-smoothed height);
 - clips that don't match buoyant arcs (time-scale the fall loop);
 - the camera passing too far from the characters to read them (route authoring).
+
+## 13. Phase 8 engineering list (added 2026-11-10, during CP-D r2; not started)
+
+Queued by the coordinator after the ADR-1991 feet fix. Do these in Phase 8, not before.
+
+1. **Measure the CPU cost of the per-vertex lift** (`Composition::groundCharactersOnTiles`, ADR-1991): three aliens,
+   about a third of each mesh skinned on the CPU every frame. Report it at 60 fps live and offline, and cut it if it
+   matters (e.g. the bind-pose low-vertex set thinned, or the lift computed only for rigs in view).
+2. **The hop simulation depends on the frame rate.** A 2 fps render started at 140 s puts alien0 somewhere else at
+   142 s than a 30 fps render does; 30 fps renders started at 140, 141 and 142 s agree, so seek is not the issue, the
+   step size is. Live runs at a variable frame rate and can diverge from the offline render. Find out whether the hop
+   (or the entity world) needs a fixed step, and whether the divergence is visible: landing positions and times
+   against their cues, at 30, 60 and a jittered live rate.
