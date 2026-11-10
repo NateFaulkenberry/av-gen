@@ -73,6 +73,7 @@ struct TileSpringSpec {
     float damping = 0.18f;      // zeta, 0..1
     float rippleSpeed = 12.0f;  // metres per second the copy travels outward
     float rippleRadius = 5.0f;  // metres over which it falls to 1/e
+    float glowRadius = 3.0f;    // ADR-1960: metres over which the landing glow falls to 1/e (the landed tile and its ring)
 };
 
 struct TileEvent {

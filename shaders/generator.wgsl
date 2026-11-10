@@ -222,7 +222,7 @@ struct TileParams {
     waves: array<vec4<f32>, 12>,
     events: array<vec4<f32>, 16>,
     spring0: vec4<f32>,    // ADR-1954: depth, frequency, damping, ripple speed
-    spring1: vec4<f32>,    // ripple radius, spring count
+    spring1: vec4<f32>,    // ripple radius, spring count, ADR-1960 glow radius
     springs: array<vec4<f32>, 256>, // x, z, time, strength (scene::kMaxTileSprings)
 };
 
@@ -490,10 +490,13 @@ fn tileSpring(x: f32, z: f32) -> vec2<f32> {
         }
         let k = clamp((reach - 5.0) / (6.0 - 5.0), 0.0, 1.0); // kTileSpringReachStart .. kTileSpringReach
         let window = 1.0 - k * k * (3.0 - 2.0 * k);
-        let fall = exp(-r / tile.spring1.x) * window;
         let env = exp(-zeta * w * a);
-        h = h - tile.spring0.x * e.w * fall * env * sin(wd * a);
-        l = l + e.w * fall * env * (1.0 - exp(-a / 0.06));
+        h = h - tile.spring0.x * e.w * exp(-r / tile.spring1.x) * window * env * sin(wd * a);
+        // ADR-1960: the glow on its own, tighter falloff (glowRadius <= rippleRadius), eased out by 6 of its radii
+        let gr = r / tile.spring1.z;
+        let gk = clamp(gr - 5.0, 0.0, 1.0);
+        let gw = 1.0 - gk * gk * (3.0 - 2.0 * gk);
+        l = l + e.w * exp(-gr) * gw * env * (1.0 - exp(-a / 0.06));
     }
     return vec2<f32>(h, clamp(l, 0.0, 1.0));
 }

@@ -230,7 +230,8 @@ float tileLanding(const TileSpringSpec& s, const std::vector<TileEvent>& springs
     const float zeta = std::clamp(s.damping, 0.0f, 0.999f);
     for (const TileEvent& e : springs) {
         const float r = std::sqrt((x - e.position.x) * (x - e.position.x) + (z - e.position.y) * (z - e.position.y));
-        const float reach = r / std::max(s.rippleRadius, 1e-3f);
+        const float glowR = std::clamp(s.glowRadius, 1e-3f, s.rippleRadius); // within the spring's reach
+        const float reach = r / glowR;
         if (reach >= kTileSpringReach) {
             continue;
         }
@@ -240,7 +241,7 @@ float tileLanding(const TileSpringSpec& s, const std::vector<TileEvent>& springs
         }
         const float k = std::clamp((reach - kTileSpringReachStart) / (kTileSpringReach - kTileSpringReachStart), 0.0f, 1.0f);
         const float window = 1.0f - k * k * (3.0f - 2.0f * k);
-        l += e.strength * std::exp(-r / s.rippleRadius) * window * std::exp(-zeta * w * a) * (1.0f - std::exp(-a / 0.06f));
+        l += e.strength * std::exp(-r / glowR) * window * std::exp(-zeta * w * a) * (1.0f - std::exp(-a / 0.06f));
     }
     return std::clamp(l, 0.0f, 1.0f);
 }
@@ -638,12 +639,13 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
         const TileSpringSpec& s = d.spring;
         const TileSpringSpec ds;
         if (s.depth != ds.depth || s.frequency != ds.frequency || s.damping != ds.damping ||
-            s.rippleSpeed != ds.rippleSpeed || s.rippleRadius != ds.rippleRadius) {
+            s.rippleSpeed != ds.rippleSpeed || s.rippleRadius != ds.rippleRadius || s.glowRadius != ds.glowRadius) {
             j["spring"] = {{"depth", s.depth},
                            {"frequency", s.frequency},
                            {"damping", s.damping},
                            {"rippleSpeed", s.rippleSpeed},
-                           {"rippleRadius", s.rippleRadius}};
+                           {"rippleRadius", s.rippleRadius},
+                           {"glowRadius", s.glowRadius}};
         }
     }
     if (d.contourInterval != def.contourInterval || d.contourOffset != def.contourOffset) {
@@ -701,7 +703,8 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
                                                      {"frequency", &TileSpringSpec::frequency},
                                                      {"damping", &TileSpringSpec::damping},
                                                      {"rippleSpeed", &TileSpringSpec::rippleSpeed},
-                                                     {"rippleRadius", &TileSpringSpec::rippleRadius}},
+                                                     {"rippleRadius", &TileSpringSpec::rippleRadius},
+                                                     {"glowRadius", &TileSpringSpec::glowRadius}},
                                                     d.spring);
                 !r) {
                 return std::unexpected(r.error());

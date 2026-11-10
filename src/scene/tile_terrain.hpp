@@ -113,8 +113,8 @@ struct TileSample {
     const float l = std::round(std::clamp(landing, 0.0f, 1.0f) * 255.0f);
     return std::clamp(crest, 0.0f, 1.0f) + 2.0f * static_cast<float>(mask) + 32.0f * l;
 }
-// ADR-1960: the landing glow at (x, z, t): each ringing landing's envelope -- the same reach, falloff and decay as its
-// spring, without the swing, after a 60 ms rise -- summed and clamped to 0..1. It settles exactly as the tile does.
+// ADR-1960: the landing glow at (x, z, t): each ringing landing's envelope -- its spring's decay without the swing,
+// after a 60 ms rise, over the tighter glowRadius -- summed and clamped to 0..1. It settles exactly as the tile does.
 [[nodiscard]] float tileLanding(const TileSpringSpec& spec, const std::vector<TileEvent>& springs, float x, float z,
                                 float t);
 // ADR-1954: the landing springs' height offset at (x, z, t) from `springs` (springsAt(t)).

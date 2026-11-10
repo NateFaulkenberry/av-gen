@@ -197,7 +197,7 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, 16> events; // x, z, time, strength (the frame's visible events, newest first)
     // ADR-1954: the landing springs.
     glm::vec4 spring0;    // depth, frequency (Hz), damping, ripple speed
-    glm::vec4 spring1;    // ripple radius, spring count, 0, 0
+    glm::vec4 spring1;    // ripple radius, spring count, ADR-1960 glow radius, 0
     std::array<glm::vec4, scene::kMaxTileSprings> springs; // x, z, time, strength (CP-D r2: 256)
 };
 static_assert(sizeof(GeneratorTileUniforms) == 1104 - 8 * 16 + scene::kMaxTileSprings * 16);

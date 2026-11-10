@@ -883,7 +883,12 @@ add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 1})
 - **Gain and colour:** `environment.tileDynamics.glow.landing` (gain) and `glow.landingColor` (`[r, g, b]`). As
   parameters they are `env/tiles/glow/landing` and `env/tiles/glow/landingColor`, so you can key them per arc state
   like the other gains.
+- **Spread:** `spring.glowRadius` (default 3 m) is how far the glow spreads around the impact. Keep it near a tile.
+  The ripple's 14 m lit the whole field, because about 100 landings ring at once.
 - **The clip's values:** gain 12, colour `[1.0, 0.85, 0.6]`, chosen to read in daylight. Night will want much less.
+- **Clips** (`06-characters/`):
+  - `cpd-r2-landing-before-vs-after-glow-50-70s.mp4`: top is draft3, bottom is the fix plus the glow;
+  - `cpd-r2-landing-before-after-soft-50-70s.mp4`: draft3, then the fix, then the fix with the softer spring.
 
 **One more thing, which the reactivity explainer covers in full (`10-audio-reactivity-now.md`):** the project needs
 `"sonic": {"live": true}`. Without it, `response.low`, `response.onset`, `response.mid`, `response.high` and

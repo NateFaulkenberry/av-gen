@@ -1295,7 +1295,8 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         }
         const std::vector<scene::TileEvent> springs = dyn.springsAt(time); // ADR-1954
         u.spring0 = glm::vec4(dyn.spring.depth, dyn.spring.frequency, dyn.spring.damping, dyn.spring.rippleSpeed);
-        u.spring1 = glm::vec4(dyn.spring.rippleRadius, static_cast<float>(springs.size()), 0.0f, 0.0f);
+        u.spring1 = glm::vec4(dyn.spring.rippleRadius, static_cast<float>(springs.size()),
+                              std::clamp(dyn.spring.glowRadius, 1e-3f, dyn.spring.rippleRadius), 0.0f); // ADR-1960
         for (std::size_t i = 0; i < springs.size(); ++i) {
             u.springs[i] = glm::vec4(springs[i].position.x, springs[i].position.y, springs[i].time, springs[i].strength);
         }

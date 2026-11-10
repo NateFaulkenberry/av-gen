@@ -18,7 +18,9 @@ daylight, use the contour edges' visual language, and settle with the motion.
 
 **What lights.** Each tile has a landing level from 0 to 1. It is the sum, over landings still ringing, of:
 - the landing's strength;
-- its spring's spatial falloff, e^(−r/rippleRadius), with the same eased reach as the spring (ADR-1952);
+- a spatial falloff of its own, e^(−r/glowRadius), eased out between 5 and 6 radii. `spring.glowRadius` defaults to
+  3 m and is capped at `rippleRadius`. A first clip with the ripple's 14 m outlined the whole field, because about 100
+  landings were ringing at once;
 - its spring's envelope, e^(−ζωa): the decay without the swing, so the glow does not flicker with the oscillation;
 - a 60 ms rise, so the glow does not pop on.
 
