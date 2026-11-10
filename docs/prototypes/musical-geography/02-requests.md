@@ -1465,3 +1465,18 @@ inland water sits flush in the land, with no bank and no shallows: just a differ
 
 **What data did meanwhile** (cpd-r3): more motion on inland water (river waves 0.25 → 0.4, pond waves 0.1 → 0.3,
 downstream drift 0.35 → 0.6 m), so it reads as water by its movement as well as its colour.
+
+#### CPD-R5 (art → engineering, 2026-11-10, optional): a depth-aware tilt-shift band
+
+The owner asked for a tilt-shift. The engine already has one: ADR-079, `post/tiltShift/*`, a screen-band circle of
+confusion in the defocus pass. It is now on in the scene (`look.TILT`) and costs about +0.7 ms by day and at night.
+
+**The gap.** Its band is pure screen space, and it combines with the depth of field by `max`. So a tall near hill
+that crosses the band edge gets cut by the blur line. Turning the depth of field on as well can only add blur, never
+protect the near-mid subject.
+
+**Ask (if cheap):** a `post/tiltShift/protectNear` distance in metres. Pixels nearer than it, by depth, are held
+sharp, or their circle is scaled down, whatever their screen position. The mid-ground band then stays sharp where a
+near flank rises through it.
+
+**Not blocking:** the screen band alone reads well in the stills.

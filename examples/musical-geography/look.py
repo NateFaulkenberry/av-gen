@@ -576,9 +576,18 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
 # AgX (operator 1, the default) in every state; the day's "Punchy" is a grade (contrast, saturation) on top of it.
 
 
+# cpd-r3 (owner: "add tilt shift post-processing effect"): the existing ADR-079 band (the defocus pass's screen-band
+# circle of confusion), sharp across the mid-ground where the aliens and the near-mid tiles sit, softening the near
+# foreground and the horizon and sky -- the miniature, toy-world read -- with a slight grade lift. Off unless TILT_SHIFT.
+TILT_SHIFT = False
+TILT = {"post/tiltShift/enabled": True, "post/tiltShift/centre": [0.5, 0.6], "post/tiltShift/rotation": 0.0,
+        "post/tiltShift/bandWidth": 0.16, "post/tiltShift/falloff": 0.28, "post/tiltShift/maxRadius": 6.0}
+TILT_GRADE = (1.06, 0.04)   # saturation x, contrast +
+
+
 def post(state):
     s = STATES[state] if isinstance(state, str) else state
-    return {
+    out = {
         "post/bloom/enabled": True,
         "post/bloom/intensity": s["bloom"],
         "post/bloom/threshold": 1.0,
@@ -590,6 +599,11 @@ def post(state):
         # 02-requests.md). Kept just above the 8-bit step so slow sky gradients break up without visible noise.
         "post/output/grain": 0.035,
     }
+    if TILT_SHIFT:
+        out.update(TILT)
+        out["post/grade/saturation"] = s["saturation"] * TILT_GRADE[0]
+        out["post/grade/contrast"] = s["contrast"] + TILT_GRADE[1]
+    return out
 
 
 # ---- the sky's clouds (CP-D r2, owner: "the sky reads too plain, add cinematic clouds") ------------------------------

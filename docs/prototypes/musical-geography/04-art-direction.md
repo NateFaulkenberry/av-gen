@@ -1768,3 +1768,26 @@ Raising the low layer, or thinning it over high ground, is an option.
   30 / 35 s.
 - **v2 at 156 / 160 / 165 s:** 0.35 / 0.16 / 0.65, the same as before. The exit is now open in the frame.
 - **Stills:** `cpd-r3-inlet-*`.
+
+**Tilt-shift** (owner: "add tilt shift post-processing effect"). It uses the existing ADR-079 band, through
+`build.py --tiltshift` (`look.TILT`):
+
+| Setting | Value |
+|---|---|
+| Centre | (0.5, 0.6): the mid-ground, where the aliens and the near-mid tiles sit |
+| Band width | 0.16 of the frame height |
+| Falloff | 0.28 |
+| Max radius | 6 (12 px at 1080p) |
+| Grade lift | saturation × 1.06, contrast + 0.04 |
+
+- **The read:** the horizon, the hills and the sky soften, and the near foreground a little, a toy-table read. The
+  night contour lines soften at the horizon, but the near ones stay crisp. The clouds soften without smearing.
+- **Cost** (the defocus pass): 0.74 ms. GPU median, two runs each:
+
+  | | Off | On |
+  |---|---|---|
+  | Day | 20.6 ms | 21.3 / 21.8 ms |
+  | Night | 16.1 / 16.2 ms | 17.1 / 16.9 ms |
+
+- **Not keyed per state yet**; the same band in every state.
+- **Depth-aware band:** requested as optional CPD-R5.

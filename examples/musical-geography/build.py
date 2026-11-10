@@ -372,10 +372,12 @@ def main():
     ap.add_argument("--characters", action="store_true")
     ap.add_argument("--full", action="store_true", help="CP-D: the whole song, one flight, the arc on the timeline")
     ap.add_argument("--clouds", action="store_true", help="CP-D r2: the slab clouds (look.CLOUD_LAYERS)")
+    ap.add_argument("--tiltshift", action="store_true", help="cpd-r3: the ADR-079 tilt-shift band (look.TILT)")
     ap.add_argument("--tiles", default=None, help="CP-D r2: JSON overrides for world.TILES (terrain variants)")
     a = ap.parse_args()
     global CLOUDS
     CLOUDS = a.clouds
+    look.TILT_SHIFT = a.tiltshift
     if a.tiles:
         world.TILES.update(json.loads(a.tiles))
     global FULL
