@@ -202,6 +202,8 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, scene::kMaxTileRidgePool / 2> ridgePts;
     std::array<glm::vec4, scene::kMaxTileRises> rises;        // centre x, centre z, radius, edge
     std::array<glm::vec4, scene::kMaxTileRises / 4> riseH;    // heights, four per lane
+    std::array<glm::vec4, scene::kMaxTileRidges / 4> ridgeNoise; // ADR-1994
+    std::array<glm::vec4, scene::kMaxTileRises / 4> riseNoise;
     // ADR-1953: the moving ground (scene/tile_dynamics.hpp), the same for every tiles generator in the frame.
     glm::vec4 dyn;        // t (s), amplitude, wave count, event count
     glm::vec4 breath;     // amplitude, period, wavelength, 1 when anything moves
@@ -220,7 +222,7 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, scene::kMaxTileSprings> springs; // x, z, time, strength (CP-D r2: 256)
 };
 // ADR-1965: 79 lanes more than before; ADR-1992: valleys +4 info +4 bounds +1 frac +16 points, raised land +59
-static_assert(sizeof(GeneratorTileUniforms) == (140 + 25 + 59) * 16 + scene::kMaxTileSprings * 16);
+static_assert(sizeof(GeneratorTileUniforms) == (140 + 25 + 59 + 4) * 16 + scene::kMaxTileSprings * 16); // ADR-1994: +4
 // Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied, and (ADR-1953)
 // the scene's moving ground at time `t`.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,

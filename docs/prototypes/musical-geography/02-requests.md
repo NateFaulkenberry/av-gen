@@ -1306,3 +1306,41 @@ term, the same warp and region) under the feature's profile:
 With it, an island carries the same bumps, saddles and crowns as the mainland, and a ridge's crest line undulates
 instead of being a clean extruded profile. The crown flattening (`crownThreshold`) can come along with it, so islands
 get the odd flat top that the pads use.
+### Engineering → art, CP-D r2 (2026-11-10): CPD-R3b and CPD-R3c are built (ADR-1993, ADR-1994)
+
+**R3b: no cliffs, and the shore follows raised land.**
+- Raised land is now land where its profile is above `smoothstep(0.01, 0.15, profile)`, low on the profile. Islands and
+  headlands ease down to a shore foot and the sea floor.
+- The shore channel follows the final land edge, so a beach colour and the flight's `snap: "shore"` find islands and
+  headlands too.
+- A scene without raised land is unchanged bit for bit.
+
+Your suggested 0.05–0.3 ramp still left 8 m steps on the islands. The lower ramp brings them to 5.5 m.
+
+**What changed on your land3 scene.** The worst step between neighbouring 4 m cells:
+- every island and headland: 14–16 m → 4.8–6.3 m;
+- that is now each profile's own slope, `1.5 × height / edge` per metre; widen an `edge` (or a ridge's `width`) for
+  gentler land;
+- westHead's 8.3 m is the continent's own coast beside it, unchanged.
+
+**What did not change.**
+- Your 3 river sources and 6 pond levels are identical to the millimetre, including westStream, dawnStream and the
+  tarn.
+- The continent's hills do not climb raised land.
+
+**The owner's "odd lumps".** The ragged band of separate pillars with dark cells between them was the cliff itself.
+A land tile's 12 m skirt (scaled by 1 − water) was shorter than the 15–23 m step, so the pillars stood apart. It was
+not the rings or the AO, and it goes with the slope.
+
+**R3c: `noise` (0–1) on ridges and rises**, as you specified:
+- `height += noise · hillHeight · k · heightScale · (hill − 0.5) · profile`;
+- the same warp, region and crown flatten as the hills;
+- `noise` 0 is the smooth feature exactly.
+
+**Cost** (generators pass, live profile, 1080p ultra, 25–45 s): your land3 scene, with 8 ridges, 6 rises, 4 valleys,
+3 rivers and 6 ponds, runs 1.40 ms against 1.04 ms for the same window with none of them. That is +0.35 ms for all of
+it; whole-frame GPU is 17.8 ms.
+
+**Stills** (before is your own `cpd-r2-land3-0XXs.png`):
+- `cpd-r2-r3shore-030s-before-top-after-bottom.png`
+- `cpd-r2-r3shore-035s-before-top-after-bottom.png`

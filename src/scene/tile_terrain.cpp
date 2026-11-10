@@ -134,6 +134,7 @@ struct LandPart {
     float c = 0.0f;      // the continent field
     float shaped = 0.0f;
     float inland = 0.0f;
+    float shore = 0.0f;  // ADR-1993: 1 on the final coast (the continent's, or raised land's)
 };
 
 LandPart landPart(const TileTerrainSpec& s, float x, float z, float t, float rollX, float rollZ, float breathAmp,
@@ -150,6 +151,37 @@ LandPart landPart(const TileTerrainSpec& s, float x, float z, float t, float rol
     out.c = c;
     out.land = smooth01(s.landThreshold - s.shoreBand, s.landThreshold + s.shoreBand, c);
     out.inland = smooth01(s.landThreshold, s.landThreshold + s.inlandBand, c);
+    // ADR-1993: the coast follows the final land edge. Each raised feature (ADR-1992) has a coast coordinate
+    // u = (w - 0.08) / 0.07 in the continent's units (u = (c - threshold) / shoreBand: land ramps over u in -1..1,
+    // the shore band is |u| < 3). Its land is smoothstep(0.01, 0.15, w): low on the profile, so raised land eases down
+    // to its shore and the sea floor instead of standing on a cliff of half its height (CPD-R3b). The land's coast is
+    // the largest u; where no raised feature leads, everything is the continent's, bit for bit. Inland stays the
+    // continent's: the hills do not climb the raised land (ADR-1994's `noise` puts their relief there instead).
+    float raisedU = -1e9f;
+    float raisedHeight = 0.0f;
+    float raisedNoise = 0.0f; // ADR-1994: sum of noise x profile
+    for (const TileRidge& r : s.ridges) {
+        const float d = polylineNearest(r.points.data(), std::min(r.points.size(), kMaxTileRidgePoints), x, z).x;
+        const float w = 1.0f - smooth01(0.0f, 0.5f * r.width, d);
+        if (w <= 0.0f) continue;
+        raisedHeight += r.height * w;
+        raisedNoise += r.noise * w;
+        raisedU = std::max(raisedU, (w - 0.08f) / 0.07f);
+    }
+    for (const TileRise& r : s.rises) {
+        const float d = glm::length(glm::vec2(x, z) - r.centre);
+        const float w = 1.0f - smooth01(r.radius, r.radius + r.edge, d);
+        if (w <= 0.0f) continue;
+        raisedHeight += r.height * w;
+        raisedNoise += r.noise * w;
+        raisedU = std::max(raisedU, (w - 0.08f) / 0.07f);
+    }
+    const float continentU = (c - s.landThreshold) / s.shoreBand;
+    out.shore = 1.0f - smooth01(0.0f, 3.0f * s.shoreBand, std::abs(c - s.landThreshold));
+    if (raisedU > continentU) {
+        out.land = std::max(out.land, smooth01(-1.0f, 1.0f, raisedU)); // = smoothstep(0.01, 0.15, w)
+        out.shore = 1.0f - smooth01(0.0f, 3.0f, std::abs(raisedU));
+    }
     const float wx =
         (tileFbm(seed ^ kWarpXSeed, hx / s.warpWavelength, hz / s.warpWavelength, 2) * 2.0f - 1.0f) * s.hillWarp;
     const float wz =
@@ -167,21 +199,9 @@ LandPart landPart(const TileTerrainSpec& s, float x, float z, float t, float rol
         breath = 1.0f + breathAmp * std::sin(kTwoPi * (t / breathPeriod + n));
     }
     out.height = s.shoreRise + s.hillHeight * k * hill * out.inland * s.heightScale * breath;
-    // ADR-1992: the raised land. Each adds height * its profile; where the profile passes about a half, the land
-    // channel is lifted to 1 (a ridge across the sea is a causeway of land, a rise an island).
-    for (const TileRidge& r : s.ridges) {
-        const float d = polylineNearest(r.points.data(), std::min(r.points.size(), kMaxTileRidgePoints), x, z).x;
-        const float w = 1.0f - smooth01(0.0f, 0.5f * r.width, d);
-        if (w <= 0.0f) continue;
-        out.height += r.height * w;
-        out.land = std::max(out.land, smooth01(0.35f, 0.65f, w));
-    }
-    for (const TileRise& r : s.rises) {
-        const float d = glm::length(glm::vec2(x, z) - r.centre);
-        const float w = 1.0f - smooth01(r.radius, r.radius + r.edge, d);
-        if (w <= 0.0f) continue;
-        out.height += r.height * w;
-        out.land = std::max(out.land, smooth01(0.35f, 0.65f, w));
+    out.height += raisedHeight; // ADR-1992: the raised land, after the hills (their land and coast above)
+    if (raisedNoise != 0.0f) { // ADR-1994: the hills' own relief on the raised surface, centred on half
+        out.height += raisedNoise * s.hillHeight * k * s.heightScale * (hill - 0.5f);
     }
     return out;
 }
@@ -328,7 +348,7 @@ TileSample baseSample(const TileTerrainSpec& s, float x, float z, float t, float
     out.river = f.river * land;
     out.pond = f.pond * land * (1.0f - f.river);
     out.riverS = f.riverS;
-    out.shore = 1.0f - smooth01(0.0f, 3.0f * s.shoreBand, std::abs(l.c - s.landThreshold));
+    out.shore = l.shore; // ADR-1993: the final coast
     out.flat = smooth01(s.crownThreshold, s.crownThreshold + 0.06f, l.shaped) * s.crownFlatten * l.inland * land;
     if (!s.path.empty()) {
         const float d = tilePathDistance(s, x, z);
@@ -583,8 +603,8 @@ Result<void> TileTerrainSpec::validate() const {
     std::size_t ridgePool = 0;
     for (const TileRidge& r : ridges) {
         if (r.points.size() < 2 || r.points.size() > kMaxTileRidgePoints || !(r.width > 0.0f) ||
-            !std::isfinite(r.height) || !std::isfinite(r.width)) {
-            return fail("tiles: ridge '{}': 2..{} points, a positive width and a finite height", r.name,
+            !std::isfinite(r.height) || !std::isfinite(r.width) || !(r.noise >= 0.0f && r.noise <= 1.0f)) {
+            return fail("tiles: ridge '{}': 2..{} points, a positive width, a finite height, noise 0..1", r.name,
                         kMaxTileRidgePoints);
         }
         ridgePool += r.points.size();
@@ -594,8 +614,9 @@ Result<void> TileTerrainSpec::validate() const {
     }
     for (const TileRise& r : rises) {
         if (!(r.radius >= 0.0f) || !(r.edge > 0.0f) || !std::isfinite(r.height) || !std::isfinite(r.centre.x) ||
-            !std::isfinite(r.centre.y) || !std::isfinite(r.radius) || !std::isfinite(r.edge)) {
-            return fail("tiles: rise '{}': radius >= 0, a positive edge, finite centre and height", r.name);
+            !std::isfinite(r.centre.y) || !std::isfinite(r.radius) || !std::isfinite(r.edge) ||
+            !(r.noise >= 0.0f && r.noise <= 1.0f)) {
+            return fail("tiles: rise '{}': radius >= 0, a positive edge, finite centre and height, noise 0..1", r.name);
         }
     }
     if (rivers.size() > kMaxTileRivers || ponds.size() > kMaxTilePonds || valleys.size() > kMaxTileValleys) {
@@ -689,10 +710,11 @@ std::uint64_t TileTerrainSpec::hash() const {
         }
         f(r.height);
         f(r.width);
+        f(r.noise);
     }
     for (const TileRise& r : rises) {
         mix(0x52495345u); // "RISE"
-        for (const float v : {r.centre.x, r.centre.y, r.radius, r.height, r.edge}) f(v);
+        for (const float v : {r.centre.x, r.centre.y, r.radius, r.height, r.edge, r.noise}) f(v);
     }
     mix(static_cast<std::uint64_t>(hillOctaves));
     for (const glm::vec2& p : path) {
@@ -788,6 +810,7 @@ nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec) {
         nlohmann::json ridges = nlohmann::json::array();
         for (const TileRidge& r : spec.ridges) {
             nlohmann::json o = {{"points", line(r.points)}, {"height", r.height}, {"width", r.width}};
+            if (r.noise != 0.0f) o["noise"] = r.noise; // ADR-1994
             if (!r.name.empty()) o["name"] = r.name;
             ridges.push_back(std::move(o));
         }
@@ -800,6 +823,7 @@ nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec) {
                                 {"radius", r.radius},
                                 {"height", r.height},
                                 {"edge", r.edge}};
+            if (r.noise != 0.0f) o["noise"] = r.noise; // ADR-1994
             if (!r.name.empty()) o["name"] = r.name;
             rises.push_back(std::move(o));
         }
@@ -906,10 +930,10 @@ Result<TileRidge> readRidge(const nlohmann::json& o, const std::string& where) {
             auto l = readLine(val, at);
             if (!l) return std::unexpected(l.error());
             r.points = std::move(*l);
-        } else if (k == "height" || k == "width") {
+        } else if (k == "height" || k == "width" || k == "noise") {
             auto n = readNum(val, at);
             if (!n) return std::unexpected(n.error());
-            (k == "height" ? r.height : r.width) = *n;
+            (k == "height" ? r.height : k == "width" ? r.width : r.noise) = *n;
         } else {
             return fail("'{}' is not a key this build reads", at);
         }
@@ -929,10 +953,10 @@ Result<TileRise> readRise(const nlohmann::json& o, const std::string& where) { /
                 return fail("'{}' must be [x, z]", at);
             }
             r.centre = {val[0].get<float>(), val[1].get<float>()};
-        } else if (k == "radius" || k == "height" || k == "edge") {
+        } else if (k == "radius" || k == "height" || k == "edge" || k == "noise") {
             auto n = readNum(val, at);
             if (!n) return std::unexpected(n.error());
-            (k == "radius" ? r.radius : k == "height" ? r.height : r.edge) = *n;
+            (k == "radius" ? r.radius : k == "height" ? r.height : k == "edge" ? r.edge : r.noise) = *n;
         } else {
             return fail("'{}' is not a key this build reads", at);
         }

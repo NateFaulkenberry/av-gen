@@ -97,6 +97,7 @@ struct TileRidge {
     std::vector<glm::vec2> points;
     float height = 20.0f;
     float width = 120.0f;
+    float noise = 0.0f; // ADR-1994: 0..1, the hills' own shaped fBm on the raised surface
 };
 // ADR-1992: a rise -- land raised by `height` within `radius` of `centre`, easing to nothing over `edge` metres beyond
 // it. Its core is land: in the sea, an island.
@@ -106,6 +107,7 @@ struct TileRise {
     float radius = 40.0f;
     float height = 20.0f;
     float edge = 40.0f;
+    float noise = 0.0f; // ADR-1994
 };
 
 struct TileTerrainSpec {
