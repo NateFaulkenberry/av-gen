@@ -196,7 +196,10 @@ def cast_nodes(state="day"):
                                "observe": "Idle", "react": "Fight_idle", "jump": "Jumping", "fall": "Floating",
                                "land": "Landing"},
                      "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
-                     "behaviors": [dict({"kind": "hop", "hopChance": 0.5, "homeRadius": HOME_RADIUS[hab], "goalMin": 2,
+                     # E (ADR-1990): the cast answers the music in turns -- each alien hops only on a cue, every 4th beat
+                     # at its own place in the cycle, at most once per 2.5 s, two beats in the air; 10 s at most at rest
+                     "behaviors": [dict({"kind": "hop", "hopChance": 0.0, "cueOnly": 1, "cueEvery": 4, "cueGap": 2.5,
+                                         "airBeats": 2, "maxWait": 10.0, "homeRadius": HOME_RADIUS[hab], "goalMin": 2,
                                          "goalMax": 5, "pauseMin": 0.6, "pauseMax": 2.2, "airTime": 1.3,
                                          "apex": 3.0, "strength": 1.2}, **PREFS[hab])],
                      "reactions": [dict(r) for r in look.ALIEN_REACTIONS]})   # Phase 7: hop on the beat

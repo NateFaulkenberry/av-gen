@@ -1483,3 +1483,27 @@ and the silent drop is filed with engineering.
 - **Plot:** `cpd-r2-smooth-edge-glow-vs-loudness-whole-song.png`. The glow dims through the build, rises through the
   main section into the climax and eases down at the outro.
 - **Clips:** `cpd-r2-smooth-{day,night}-music-over-silent-*.mp4`.
+
+### CP-D r2 final: B, E, the two late chains and the day edges (2026-11-10, on eng a5a4b691)
+
+- **B, the swell on the land.** `look.LAND_SWELL` is 0.5 on both wave trains (draft3 had 0.08). It is authored in
+  `tile_dynamics`, so the flight's clearance reads it. The camera skims swelling tiles on the low sea and path legs
+  and never cuts into them in either clip.
+- **E, the hops.** `cueOnly` 1, `cueEvery` 4, `cueGap` 2.5 s, `airBeats` 2, `maxWait` 10 s, `hopChance` 0. The
+  `beat.pulse → hop/trigger` reaction is kept. The cast hops in turns, each alien at most once per 2.5 s and in the
+  air for two beats.
+- **The two late chains.**
+  - `hop/apex` and `hop/strength` from `response.level`: now 300/1200 ms. The whole-song p99 step is 0.017 of the
+    range.
+  - `breathing/amplitude` from `audio.energy`: now 400/2000 ms. It reads 0.02–0.025 in both windows, where it was
+    0.05.
+  - The route reader now refuses flat chain keys, and this build loads clean.
+- **The day edges.** The day `edge_gain` goes from 0 to 0.6 (`#FFF4C8`), so the contours read faintly on the day
+  hills. They ride the same energy drift, with no beat term.
+- **Feet:**
+  - **Watched:** the close landings at 50.4–50.9 s, at 5 fps, at full resolution.
+  - **Seen:** the alien stands on its own sprung tile, which sits below its neighbours. The neighbours' front faces
+    sometimes hide its feet, which at a glance reads like clipping, but it is the pit.
+  - **Not seen:** feet through a tile top.
+- **Jitter:** `11-pass-cpd-r2/cpd-r2-final-route-jitter.txt`, comparing draft3-react, the approved smooth pass and
+  this pass.

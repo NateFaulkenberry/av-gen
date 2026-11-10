@@ -45,7 +45,7 @@ STATES = {
         land=["#A848C8", "#DC56AE", "#FF7486", "#FF9442", "#FFC03A"],   # r7: magenta-orchid lowlands, gold hill masses
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
         path="#FFF5E2", path_emit=0.875, pad="#FF8FB4", pad_emit=0.0,
-        drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.0, crest_gain=0.0,
+        drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.6, crest_gain=0.0,
         fog_mult=4.5, exposure=-0.5, saturation=1.6, look="punchy", bloom=0.25),
     "sunset": dict(
         side_px=26,   # slabSidePixels (ADR-1959): risers smaller than this shade as their tops (r8)
@@ -180,6 +180,11 @@ def fog_density_default(phase):
 CONTOUR_INTERVAL = 4.0   # metres between contour lines (04- §6); 3 -> 4 with the 4 m tiles
 
 
+# B (ADR-1990): the swell reaches the land. Authored here (the flight's clearance reads the authored waves), keyable per
+# state as env/tiles/waveN/onLand. Draft3: 0.08 (the land barely felt the sea's trains).
+LAND_SWELL = 0.5
+
+
 def tile_dynamics(state="day"):  # noqa: E302
     """Two crossing wave trains on the water (the land barely feels them), a slow regional breath, a drift, and rings
     that onsets drop ahead of the camera. Quiet audio leaves a calm sea, not a constant swell (04- §6, brief §10)."""
@@ -188,9 +193,9 @@ def tile_dynamics(state="day"):  # noqa: E302
         "glow": dict(GLOW_REST, landing=landing_glow(state)[0], landingColor=landing_glow(state)[1]),   # Phase 7
         "waves": [
             {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
-             "onLand": 0.08, "onWater": 1, "crest": 0.6},
+             "onLand": LAND_SWELL, "onWater": 1, "crest": 0.6},
             {"kind": "planar", "amplitude": 0.6, "wavelength": 44, "speed": 5.5, "direction": 265, "sharpness": 0.35,
-             "onLand": 0.08, "onWater": 1, "crest": 0.6},
+             "onLand": LAND_SWELL, "onWater": 1, "crest": 0.6},
         ],
         "breathing": {"amplitude": 0.12, "period": 18, "wavelength": 800},
         "rolling": [0.4, 0.0],
@@ -248,7 +253,7 @@ def audio_routes():
         r("response.low", "env/tiles/amplitude", 1.0, attackMs=600.0, decayMs=2500.0, springHz=0.4, springDamping=1.0),
         r("response.onset", "env/tiles/rings/trigger", 1.0, envelope="peakhold", envelopeHoldMs=0.0,
           envelopeFallPerSecond=20.0, envelopeRefractoryMs=2500.0),
-        r("audio.energy", "env/tiles/breathing/amplitude", 0.25),
+        r("audio.energy", "env/tiles/breathing/amplitude", 0.25, attackMs=400.0, decayMs=2000.0),   # one 0.97 jump
         r("beat.phrase", "env/tiles/contour/offset", CONTOUR_INTERVAL),
         r("audio.energy", "env/tiles/glow/contour", 0.9, **EDGE_ENERGY),
         r("audio.energy", "env/tiles/glow/path", 0.9, **EDGE_ENERGY),
@@ -259,8 +264,9 @@ def audio_routes():
 # the aliens (entity reactions: a seek replays them, so a scrub hops the way a play does)
 ALIEN_REACTIONS = [
     {"signal": "beat.pulse", "target": "hop/trigger", "depth": 1.0},
-    {"signal": "response.level", "target": "hop/apex", "depth": 1.6, "chain": {"attackMs": 80.0, "decayMs": 400.0}},
-    {"signal": "response.level", "target": "hop/strength", "depth": 0.8, "chain": {"attackMs": 80.0, "decayMs": 400.0}},
+    # CP-D r2 final: 300/1200 ms (was 80/400: 0.055 of range per frame at p99, over the 0.05 spec)
+    {"signal": "response.level", "target": "hop/apex", "depth": 1.6, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
+    {"signal": "response.level", "target": "hop/strength", "depth": 0.8, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
 ]
 
 # Feline's stems: the beat clock and the hits from the drums, the levels from the bass (docs/help/audio-input.md)
