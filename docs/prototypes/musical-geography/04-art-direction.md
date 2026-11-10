@@ -1526,3 +1526,41 @@ a box above the surface the bodies stand on. I called it from a look, not a meas
 - **The feet:** the aliens stand on the tile tops at 100 and 200 s.
 
 Nothing needed retuning.
+
+### CP-D r2 land: a distinct landform on every leg (2026-11-10, ADR-1965)
+
+These are in `world.TILES`. The scene is now on `rivers` everywhere, the ground and the cloud layers alike; the
+`river` alias is no longer written. Every leg has its own form at its time of day (`11-pass-cpd-r2/cpd-r2-land-sheet.png`
+and the top map `cpd-r2-land-map.png`):
+
+| Song time | Light | Landform |
+|---|---|---|
+| 0–20 s | day | the bay and the west-shore hills, with `westStream` falling off them into the bay |
+| 56–80 s | day | the lit path through rolling hills |
+| 83–92 s | sunset | two lowland ponds under the crowns (`low1`, `low2`) |
+| 96–108 s | sunset | the dry valley `sweep`, which the flight runs down (90 m wide, `depthFraction` 0.7) |
+| 108–128 s | dusk | the river valley (`rivers[0]`, "river") |
+| about 140 s | night | the plateau `tarn` on the high flat ground where the night comes |
+| 145–160 s | night | a chain of three ponds along the coast |
+| 160–172 s | night | the inlet's sea |
+| 185–210 s | dawn | `dawnStream` down the low peninsula into the northern sea |
+
+All the ponds and streams use `level` and `sourceLevel` `"auto"`.
+
+**Water by body** (`look.WATER_BODIES`, keyed through the arc). The tile program now reads `waterBody` and ramps
+sea, river and pond colours and glows by its class (+3 ops; the 1× ring is at 78 of 96):
+
+| State | River | Pond |
+|---|---|---|
+| Day | cyan `#1FC6F2` | aqua `#3EE4D2` |
+| Sunset | rose `#F08AC4` | peach `#FFB08C` |
+| Night | blue `#3A6CFF`, glow 0.6 | violet `#B060FF`, glow 1.1 |
+| Dawn | periwinkle `#9CB8FF` | blush `#FFC4D4` |
+
+**The water's motion:** `riverWaves` 0.25, `pondWaves` 0.1, and a downstream drift (0.35 m, 24 m wavelength, 3 m/s)
+with no audio term. Within the smoothness spec by construction.
+
+**The terrain itself** is unchanged (seed 3, heightScale 1.25). The `regionVariation` prototype was not adopted: it
+flattened the middle legs.
+
+**The camera rules hold.** The route is unchanged, and the clearance follows the carved ground.

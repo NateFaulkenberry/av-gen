@@ -191,6 +191,10 @@ def tile_dynamics(state="day"):  # noqa: E302
     return {
         "amplitude": 0.35,                     # response.low adds up to +0.6 (routes)
         "glow": dict(GLOW_REST, landing=landing_glow(state)[0], landingColor=landing_glow(state)[1]),   # Phase 7
+        # ADR-1965: rivers ripple downstream (a slow drift, no audio term) and carry a quarter of the sea's swell; the
+        # ponds lie nearly still (a tenth), so they read as calm water set into the land, apart from the open sea
+        "water": {"riverWaves": 0.25, "pondWaves": 0.1, "driftAmplitude": 0.35, "driftWavelength": 24.0,
+                  "driftSpeed": 3.0},
         "waves": [
             {"kind": "planar", "amplitude": 1.0, "wavelength": 64, "speed": 7, "direction": 205, "sharpness": 0.55,
              "onLand": LAND_SWELL, "onWater": 1, "crest": 0.6},
@@ -358,6 +362,26 @@ PAD_HEIGHT = (17.0, 20.0)              # crowns light only up here (04- §6)
 PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 
 
+# The water bodies per state (CP-D r2 land): the sea keeps its ramp's first stop; the rivers and ponds their own colour,
+# and a night glow (river blue, ponds violet) so each body reads apart from the sea.
+WATER_BODIES = {
+    "day": dict(river_col="#1FC6F2", pond_col="#3EE4D2", river_emit=0.0, pond_emit=0.0),
+    "sunset": dict(river_col="#F08AC4", pond_col="#FFB08C", river_emit=0.08, pond_emit=0.15),
+    "night": dict(river_col="#3A6CFF", pond_col="#B060FF", river_emit=0.6, pond_emit=1.1),
+    "dawn": dict(river_col="#9CB8FF", pond_col="#FFC4D4", river_emit=0.0, pond_emit=0.0),
+}
+
+
+def water_bodies(s):
+    """Linear colours and glows for (sea, river, pond) from a state dict (an arc blend carries the WATER_BODIES keys)."""
+    w = s
+    sea_emit = w.get("water_emit") or 0.0
+    gains = [sea_emit, w["river_emit"], w["pond_emit"]]
+    cols = [hexlin(w["water"][0]), hexlin(w["river_col"]), hexlin(w["pond_col"])]
+    glow_src = [hexlin(w["water"][3]), hexlin(w["river_col"]), hexlin(w["pond_col"])]
+    return {"col": cols, "emit": [[v * g for v in c] for c, g in zip(glow_src, gains)], "emit_gain": gains}
+
+
 def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, scale=1.0, contour=True, always=False,
                  ramp_offset=0.0):
     """The slab's whole look, for one palette state and one ring.
@@ -376,7 +400,7 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     `state` is a state's name or a state dict (arc.py's blends). `always` (CP-D, the full piece) keeps every optional
     op (the night water glow, the contour band) even at gain 0, so one program serves every state and the timeline
     keys its constants through the arc."""
-    s = STATES[state] if isinstance(state, str) else state
+    s = dict(STATES[state], **WATER_BODIES[state]) if isinstance(state, str) else state
     far = cell > 1.0 if far is None else far
     name = name or "mgTile%dx_%s" % (int(cell), state)
     land = [hexlin(c) for c in s["land"]]
@@ -425,13 +449,21 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
     else:
         add({"kind": "constant", "dst": 4, "constant": [0, 0, 0, 1]})
     add({"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(0)})                        # water
-    add({"kind": "remap", "dst": 6, "srcA": 3, "constant": [0, 1, ROUGH_LAND, ROUGH_WATER], "value": 1.0})
-    add({"kind": "constant", "dst": 7, "constant": _c4(hexlin(s["water"][0]))})
+    # CP-D r2 land (ADR-1965): each body of water its own colour and night glow -- sea, river, pond -- read from the
+    # waterBody class (w = 0, 1, 2) through a ramp whose stops are the three colours (the class lands exactly on one)
+    wb = water_bodies(s)
+    add({"kind": "input", "input": "waterBody", "dst": 6})
+    add({"kind": "swizzle", "dst": 6, "srcA": 6, "constant": B(3)})
+    add({"kind": "remap", "dst": 6, "srcA": 6, "constant": [0, 3, 0, 1], "value": 1.0})    # class / 3
+    add({"kind": "oklabRamp", "dst": 7, "srcA": 6, "value": 1.0, "constant": _c4(wb["col"][0]),
+         "constant2": _c4(wb["col"][1]), "constant3": _c4(wb["col"][2]), "constant4": _c4(wb["col"][2])})
     add({"kind": "mixBy", "dst": 2, "srcA": 2, "srcB": 7, "srcC": 3})
-    if always or (s.get("water_emit") or 0.0) > 0:   # CP-B r2: a faint glow on the water at night, so the river reads
-        add({"kind": "constant", "dst": 7, "constant": _c4([v * (s.get("water_emit") or 0.0) for v in hexlin(s["water"][3])])})
+    if always or max(wb["emit_gain"]) > 0:   # the night glow per body (CP-B r2's sea glow, now the river's and ponds' own)
+        add({"kind": "oklabRamp", "dst": 7, "srcA": 6, "value": 1.0, "constant": _c4(wb["emit"][0]),
+             "constant2": _c4(wb["emit"][1]), "constant3": _c4(wb["emit"][2]), "constant4": _c4(wb["emit"][2])})
         add({"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 3})
         add({"kind": "add", "dst": 4, "srcA": 4, "srcB": 7})
+    add({"kind": "remap", "dst": 6, "srcA": 3, "constant": [0, 1, ROUGH_LAND, ROUGH_WATER], "value": 1.0})
     add({"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(1)})                        # shore -> shallows
     add({"kind": "constant", "dst": 7, "constant": _c4(hexlin(s["shallow"]))})
     add({"kind": "mix", "dst": 7, "srcA": 2, "srcB": 7, "value": SHALLOW_AMT})
@@ -537,7 +569,7 @@ CLOUD_LAYERS = [
 ]
 CLOUD_BASE = dict(shoreBand=0.02, seaLevel=0.0, seaDepth=0.0, shoreRise=1.0, hillOctaves=2, hillWarp=40.0,
                   warpWavelength=300.0, hillLow=0.2, hillHigh=0.85, crownThreshold=1.0, crownFlatten=0.0,
-                  regionWavelength=3000.0, regionVariation=0.2, path=[], river=[], heightScale=1.0)
+                  regionWavelength=3000.0, regionVariation=0.2, path=[], rivers=[], heightScale=1.0)
 CLOUD_COLOR = "#FFFFFF"
 CLOUD_SHADE = 0.45   # an underside, of a top (a cheap self-shadow: the sun never reaches a slab's underside)
 

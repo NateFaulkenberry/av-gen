@@ -106,6 +106,7 @@ def full_state(name):
     s.setdefault("sun_az_offset", 0.0)
     s["glow"] = 1.0 if name == "night" else 0.0   # the aliens' night glow and halos
     s.update(look.CLOUD_STATE[name])               # the clouds (CP-D r2 v2)
+    s.update(look.WATER_BODIES[name])              # the rivers' and ponds' colours and glows (CP-D r2 land)
     s["landing_gain"], s["landing_color"] = look.LANDING_GLOW[name][0], look.LANDING_GLOW[name][1]
     return s
 

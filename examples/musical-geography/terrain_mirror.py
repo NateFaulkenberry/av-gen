@@ -91,11 +91,25 @@ def tile_sample(s, x, z):
     hill = shaped - np.maximum(shaped - s["crownThreshold"], 0) * s["crownFlatten"]
     land_h = s["shoreRise"] + s["hillHeight"] * k * hill * inland * s.get("heightScale", 1.0)
     channel = np.zeros_like(land_h)
-    if s.get("river"):
-        d = path_distance(s["river"], x, z)
-        v = 1 - _sm(0.5 * s["riverWidth"], 0.5 * s["valleyWidth"], d)
+    # ADR-1965 (approximate, for planning maps): rivers carve to the sea floor (the CP-A rule; a bedDepth >= 0 bed is
+    # drawn at the floor too, so a stream's valley reads but its level is not mirrored), dry valleys lower the land by
+    # depthFraction of its relief, ponds are water within their radius in a basin. Legacy `river` = rivers[0].
+    rivers = list(s.get("rivers") or ([{"points": s["river"], "width": s["riverWidth"], "valleyWidth": s["valleyWidth"]}]
+                                      if s.get("river") else []))
+    for r in rivers:
+        d = path_distance(r["points"], x, z)
+        v = 1 - _sm(0.5 * r["width"], 0.5 * r["valleyWidth"], d)
         land_h = land_h + (-s["seaDepth"] - land_h) * v
-        channel = 1 - _sm(0.5 * s["riverWidth"] - 0.5, 0.5 * s["riverWidth"] + 0.5, d)
+        channel = np.maximum(channel, 1 - _sm(0.5 * r["width"] - 0.5, 0.5 * r["width"] + 0.5, d))
+    for vl in s.get("valleys") or []:
+        d = path_distance(vl["points"], x, z)
+        v = 1 - _sm(0.0, 0.5 * vl["valleyWidth"], d)
+        land_h = land_h - (land_h - s["shoreRise"]) * vl.get("depthFraction", 0.5) * v
+    for p in s.get("ponds") or []:
+        d = np.hypot(x - p["centre"][0], z - p["centre"][1])
+        v = 1 - _sm(p["radius"], p["radius"] + p["basinWidth"], d)
+        land_h = land_h * (1 - 0.6 * v)
+        channel = np.maximum(channel, 1 - _sm(p["radius"] - 0.5, p["radius"] + 0.5, d))
     lo = s["seaLevel"] - s["seaDepth"]
     h = lo + ((s["seaLevel"] + land_h) - lo) * land
     out = {"water": 1 - land + channel * land, "shore": 1 - _sm(0, 3 * sb, np.abs(c - lt)),
