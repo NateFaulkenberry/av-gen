@@ -1791,3 +1791,16 @@ Raising the low layer, or thinning it over high ground, is an option.
 
 - **Not keyed per state yet**; the same band in every state.
 - **Depth-aware band:** requested as optional CPD-R5.
+
+**Tilt-shift 2** (owner: "make it stronger"). I tried two settings (`cpd-r3-tiltshift2-*`):
+
+| Setting | Centre y | Band | Falloff | Radius | Grade | Defocus pass |
+|---|---|---|---|---|---|---|
+| Strong | 0.58 | 0.10 | 0.18 | 10 (20 px) | saturation × 1.10, contrast + 0.06 | 2.25 ms |
+| Very strong | 0.58 | 0.07 | 0.12 | 14 | saturation × 1.12, contrast + 0.07 | 4.3 ms |
+
+- **Picked: strong.** It reads clearly as a miniature: the near foreground blurs now, and the hills, horizon and
+  clouds are soft. The aliens in the band stay sharp, and the night contours soften without turning to mush.
+- **Why not very strong:** it also blurs aliens just below the band (dawn 200 s) into bokeh blobs, and it costs
+  twice as much.
+- **Strong, GPU median:** day 22.8 ms (20.6 with it off), night 18.0 ms (16.2 off).

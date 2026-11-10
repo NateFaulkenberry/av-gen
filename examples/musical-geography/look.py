@@ -580,9 +580,11 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
 # circle of confusion), sharp across the mid-ground where the aliens and the near-mid tiles sit, softening the near
 # foreground and the horizon and sky -- the miniature, toy-world read -- with a slight grade lift. Off unless TILT_SHIFT.
 TILT_SHIFT = False
-TILT = {"post/tiltShift/enabled": True, "post/tiltShift/centre": [0.5, 0.6], "post/tiltShift/rotation": 0.0,
-        "post/tiltShift/bandWidth": 0.16, "post/tiltShift/falloff": 0.28, "post/tiltShift/maxRadius": 6.0}
-TILT_GRADE = (1.06, 0.04)   # saturation x, contrast +
+# tiltshift2 (owner: "make it stronger"): "strong" picked over "very strong" (band 0.07, falloff 0.12, radius 14:
+# blurred aliens just below the band, 4.3 ms); was band 0.16, falloff 0.28, radius 6, grade 1.06 / +0.04
+TILT = {"post/tiltShift/enabled": True, "post/tiltShift/centre": [0.5, 0.58], "post/tiltShift/rotation": 0.0,
+        "post/tiltShift/bandWidth": 0.10, "post/tiltShift/falloff": 0.18, "post/tiltShift/maxRadius": 10.0}
+TILT_GRADE = (1.10, 0.06)   # saturation x, contrast +
 
 
 def post(state):
