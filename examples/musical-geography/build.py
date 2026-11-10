@@ -86,7 +86,8 @@ FLIGHT = {
     "pitchMin": -14, "pitchMax": 0, "bankLimit": 16, "bankGain": 2.2, "loop": False,
 }
 FLY = False   # set by --flight
-FULL = False  # set by --full (CP-D: the whole song, the arc on the timeline)
+FULL = False  # set by --full
+CLOUDS = False  # set by --clouds (CP-D r2) (CP-D: the whole song, the arc on the timeline)
 
 # ---- CP-D: the whole song as ONE flight (owner approved CP-C r3 "for now"). The approved CP-B/C legs keep their
 # shape and their song time (30 -> ~120 s); the crown leg flies at 14 m (it was 22: the aliens there were small) and the
@@ -249,6 +250,10 @@ def scene_doc(state, interim, camera_name):
         "materialPrograms": programs,
     }
     doc["camera"]["far"] = 200000.0   # the 64 m far ring reaches 4.5 km
+    if CLOUDS:
+        cn, cp = look.cloud_nodes()
+        doc["nodes"] += cn
+        doc["materialPrograms"] += cp
     if FULL:
         doc["lights"][1]["castsShadow"] = True   # the moon's shadows at night (a light's shadow is not keyable)
         doc["flight"] = FLIGHT_FULL
@@ -347,7 +352,13 @@ def main():
     ap.add_argument("--flight", action="store_true")
     ap.add_argument("--characters", action="store_true")
     ap.add_argument("--full", action="store_true", help="CP-D: the whole song, one flight, the arc on the timeline")
+    ap.add_argument("--clouds", action="store_true", help="CP-D r2: the slab clouds (look.CLOUD_LAYERS)")
+    ap.add_argument("--tiles", default=None, help="CP-D r2: JSON overrides for world.TILES (terrain variants)")
     a = ap.parse_args()
+    global CLOUDS
+    CLOUDS = a.clouds
+    if a.tiles:
+        world.TILES.update(json.loads(a.tiles))
     global FULL
     FULL = a.full
     if FULL:

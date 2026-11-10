@@ -477,3 +477,57 @@ def post(state):
         # 02-requests.md). Kept just above the 8-bit step so slow sky gradients break up without visible noise.
         "post/output/grain": 0.035,
     }
+
+
+# ---- the sky's clouds (CP-D r2, owner: "the sky reads too plain, add cinematic clouds") ------------------------------
+# Clouds in the tile world's own language: each layer is a second "tiles" ground (ADR-1950) lifted to altitude, on a
+# lattice of square slabs. Its own continent field is the cover (the "sea" cells are cut away: the program writes
+# opacity = 1 - water, alphaMode mask) and its own hills are the billows, so a cloud's top and underside step like the
+# land below. Lit by the scene's sun, moon, fill and sky (they carry the arc for free) and veiled by the same fog, so the
+# layers recede. Live: GPU-generated per frame and culled like the ground; no volume march (ADR-1289's lobes cost
+# 18-26 ms, ADR-1864).
+# (name, cell m, slab thickness m, altitude m, viewDistance m, the cover's TileTerrain overrides)
+CLOUD_LAYERS = [
+    ("mgCloudLow", 16.0, 6.0, 170.0, 1800.0,      # low scud: the scale cue well above the 40 m ceiling (sparse)
+     dict(seed=21, continentWavelength=260.0, landThreshold=0.70, inlandBand=0.1, hillHeight=10.0,
+          hillWavelength=90.0)),
+    ("mgCloudMid", 48.0, 24.0, 650.0, 5000.0,     # the cumulus masses: stepped towers, clear sky between
+     dict(seed=33, continentWavelength=1100.0, landThreshold=0.63, inlandBand=0.12, hillHeight=110.0,
+          hillWavelength=300.0)),
+]
+CLOUD_BASE = dict(shoreBand=0.02, seaLevel=0.0, seaDepth=0.0, shoreRise=1.0, hillOctaves=2, hillWarp=40.0,
+                  warpWavelength=300.0, hillLow=0.2, hillHigh=0.85, crownThreshold=1.0, crownFlatten=0.0,
+                  regionWavelength=3000.0, regionVariation=0.2, path=[], river=[], heightScale=1.0)
+CLOUD_COLOR = "#FFFFFF"
+CLOUD_SHADE = 0.45   # an underside, of a top (a cheap self-shadow: the sun never reaches a slab's underside)
+
+
+def cloud_program(name, thick):
+    B = lambda k: [float(k)] * 4   # noqa: E731
+    return {"name": name, "ops": [
+        {"kind": "input", "input": "instanceRandom", "dst": 5},
+        {"kind": "swizzle", "dst": 3, "srcA": 5, "constant": B(0)},                            # water = no cloud
+        {"kind": "remap", "dst": 3, "srcA": 3, "constant": [0, 1, 1, 0], "value": 1.0},         # opacity
+        {"kind": "constant", "dst": 2, "constant": _c4(hexlin(CLOUD_COLOR))},
+        {"kind": "input", "input": "normal", "dst": 0},                                           # tops lit, sides
+        {"kind": "swizzle", "dst": 1, "srcA": 0, "constant": B(1)},                               # mid, undersides
+        {"kind": "remap", "dst": 1, "srcA": 1, "constant": [-1.0, 1.0, CLOUD_SHADE, 1.0], "value": 1.0},  # dark
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 1},
+        {"kind": "constant", "dst": 6, "constant": B(1.0)},
+    ], "baseColor": 2, "metallic": -1, "roughness": 6, "emission": -1, "emissionIntensity": 1.0, "opacity": 3}
+
+
+def cloud_nodes():
+    nodes, programs = [], []
+    for name, cell, thick, alt, view, cover in CLOUD_LAYERS:
+        tiles = dict(CLOUD_BASE, **cover)
+        programs.append(cloud_program(name + "Prog", thick))
+        nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": {
+            "source": {"kind": "box", "size": [cell, thick, cell]},
+            "distribution": {"kind": "generator", "generator": {
+                "name": "tiles", "version": 1, "cellSize": cell, "viewDistance": view, "align": 1, "tiles": tiles}},
+            "distributionTransform": {"position": [0, alt, 0]},
+            "castsShadow": False, "lod": {"cull": True},
+            "material": {"baseColor": [1, 1, 1], "roughness": 1.0, "metallic": 0.0, "program": name + "Prog",
+                         "alphaMode": "mask", "alphaCutoff": 0.5}}})
+    return nodes, programs

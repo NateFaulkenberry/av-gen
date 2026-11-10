@@ -854,3 +854,83 @@ pipelines, at 180 ms.
 
 **For CP-D's perf line, use the 60 fps arm's GPU numbers** (p99 15.8 ms over the whole song) as the cost. At a
 30 fps target the GPU time is stretched by the clock. It still meets the deadline: 1 miss in 6122 frames.
+
+### Art → engineering, CP-D r2 (2026-11-10): terrain variety and tile clouds (owner's CP-D notes 1 and 3)
+
+The owner said of draft3: "pretty good start", but "terrain needs more variety: hills, valleys, rivers and ponds", and
+"the sky reads too plain, add cinematic clouds". Stills are in
+`~/Desktop/av-gen-review/105-musical-geography/10-full/cpd-r2-terrain-*` and `cpd-r2-sky-*`. ADR numbers are
+yours to assign; the art range 1970–1979 is used up.
+
+#### CPD-R1. Water bodies and valleys in TileTerrain
+
+Today TileTerrain has one `river` (at most 16 points) that carves its valley down to the sea floor, and `water` is a
+single class. The stills fake each feature with that one polyline:
+- a pond is a short, wide capsule: `riverWidth` 80, `valleyWidth` 190;
+- a dry valley is a 1 m channel.
+
+Both read well, with contour rings around the basin at night. What I need is several features at once, at their own
+levels:
+
+1. **`rivers`: several polylines.** Each has `points` (up to 32), `width`, `valleyWidth` and `bedDepth`.
+   - `bedDepth` is in metres below the land on either side. Today the bed always goes down to the sea floor.
+   - The bed should ease down from the source to the mouth (sea level), so an upland stream runs at its own height.
+   - `river` stays as `rivers[0]`.
+   - The flight's `follow` and the characters take a river's index or name.
+2. **`ponds`: small lakes set into the land.** Each has `centre`, `radius`, `basinWidth`, `level` and `shoreNoise`.
+   - `level` is in metres, or `"auto"`: the basin rim's lowest point minus 1 m, so a pond can sit up on a plateau.
+   - `shoreNoise` (0–1) makes the shoreline irregular.
+   - Tiles within the radius are water at `level`. The basin eases the land down over `basinWidth` with the river's
+     smoothstep profile: rolling, with no walls.
+3. **`valleys`: dry valleys.** These are polylines with a valley and no water. Each has `valleyWidth` and a `depth`
+   (in metres, or a fraction of the local relief), so the valley does not cut down to sea level.
+4. **A water-body channel.** The material and the motion need to know which body a water tile belongs to: sea 0,
+   river 1, pond 2. That could be `instanceColor.r` or a fifth lane. It would let the material colour ponds apart
+   from the sea, with their own glow at night. The ADR-1953 waves need a weight per class:
+   - the sea keeps its swell;
+   - a river gets a slow drift downstream along its polyline;
+   - a pond stays still, with rings on onsets.
+
+**Data-side today:** the hills can vary more by region (`regionVariation` 0.45 over a 1400 m `regionWavelength`).
+That gives broad low plains and taller ranges (`cpd-r2-terrain-maps-now-A-B-C.png`). The real variety, though, comes
+from ponds, more rivers and valleys, and that needs R1.
+
+#### CPD-R2. Tile clouds: let the `tiles` kernel omit water cells
+
+**The look is proven.** Each cloud layer is a second `tiles` ground lifted to altitude through `distributionTransform`.
+- Its continent field is the cloud cover and its hills are the billows.
+- A program cuts the "sea" cells (`opacity = 1 − water`, `alphaMode` mask).
+- The result is stepped square-slab clouds in the world's own language. The scene's sun, moon and fill light them,
+  so they carry the arc, and the fog layers them.
+- There are two layers: low scud at 170 m (16 m cells), a scale cue above the 40 m ceiling, and cumulus at 650 m
+  (48 m cells, stepped towers up to 110 m).
+- Stills: `cpd-r2-sky-{day,dusk,night,dawn}.png`.
+
+**The cost is the problem.** Measured at 1080p ultra on the full-song build, 40–60 s:
+
+| Variant | GPU p50 | Change | Where |
+|---|---|---|---|
+| No clouds | 12.8 ms | | |
+| Masked clouds | 57–61 ms | +44 ms | depth prepass 28 ms, scene 21 ms |
+| The same layers drawn opaque | 20.4 ms | +7.6 ms | |
+
+Every cell rasterises, and the empty half of the lattice runs the masked program in the prepass and then discards.
+
+**The ask:** a generator flag, for example `"omit": "water"` on the `tiles` kernel, so cells whose `water` ≥ 0.5 are
+never emitted. Then only the cloud cells raster, and the alpha mask goes away.
+- **Target:** at most 2 ms for the two layers. Please measure it.
+- **Also wanted, if cheap:**
+  - a layer can opt out of `tileDynamics` and the contour neighbours (clouds need neither);
+  - confirm that a generator window stays centred on the camera when the node's transform is keyed (wind drift on the
+    timeline).
+- **Nice to have:** cheap cloud shadows on the ground. That could be the cloud layer's cover field evaluated
+  analytically along the sun direction at shading time, with no shadow-map cascade.
+
+**Alternatives I looked at first:**
+- **ADR-1289 volumetric lobes:** 18–26 ms for streaks, and authored, static masses.
+- **ADR-1864 analytic cirrus:** cheap, but only a high streak layer, and its lit and shade colours are fixed rather
+  than following the arc.
+- **Rainbow World's mesh clouds (ADR-1590/1591):** smooth billowed meshes, a different language from the tiles, with
+  about 900 heads.
+- **The `cells` kernel:** it skips cells, but every element gets a random yaw (`generator.wgsl` line 175), so the slabs
+  scatter like confetti, and its cluster fertility is a density dither rather than a mass with an edge.

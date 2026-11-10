@@ -1348,3 +1348,48 @@ The 1× ring is now 71 ops and the 2× and 4× rings 56, all under `kMaxMaterial
 - **So the wiring costs no GPU,** as engineering measured. The long runs' tail is environmental: `gpu-lock` waited
   60 s for another session's GPU job during this pass, and it matches engineering's GPU-clocking finding.
 - **CPU work p50 is 2.5–3.2 ms** (2.2–3.3 ms before), which is the stems and the routes.
+
+### CP-D r2, stills only: terrain variety and clouds (2026-11-10; owner's draft3 notes 1 and 3)
+
+**Terrain** (`cpd-r2-terrain-sheet.png`, plus the single stills and the maps).
+- **What the data can do now:** more regional variety in the hills (`--tiles '{"regionVariation":0.45,
+  "regionWavelength":1400}'`). That gives broad low plains against taller ranges.
+  - Stronger variants (more octaves, warp) streak into swirls on the map, so I rejected them.
+  - On its own, the variety tweak reads only a little different in flight.
+- **What the generator cannot do, so I prototyped it on the one river polyline:**
+  - **A pond:** a short capsule 80 m wide in a 190 m basin. The low water tiles sit in rolling land, and at night the
+    contours ring the basin.
+  - **A dry valley:** a 1 m channel in a 170 m valley, which carves a clear trough that the contours follow.
+  - **The real river's winding valley.**
+- **Request CPD-R1 in 02-requests asks for:**
+  - several rivers with their own bed depth;
+  - ponds at their own level;
+  - dry valleys;
+  - a water-body channel for colour and motion.
+- **The plan, once R1 lands:** a distinct landform on every leg of the flight:
+  - the bay and the west-shore hills;
+  - the lit path through rolling hills;
+  - a pond plateau on the crowns;
+  - the river valley;
+  - a dry valley through the sweep;
+  - the night coast with a chain of ponds;
+  - the inlet;
+  - a stream down the peninsula at dawn.
+
+**Sky** (`cpd-r2-sky-sheet.png`; day 50 s, dusk 118 s, night 150 s, dawn 200 s).
+- **The approach:** tile clouds. Each layer is a second `tiles` ground at altitude: its continent field is the cover
+  and its hills are the billows, with the "sea" cells cut away by `look.cloud_program` (opacity = 1 − water, mask).
+  Stepped square-slab cumulus, in the world's own language.
+- **Layers:**
+  - low scud at 170 m, a sparse scale cue above the 40 m ceiling;
+  - cumulus masses at 650 m, stepping up to about 110 m.
+- **Light:** normal-shaded (undersides at 0.45), and lit by the scene's own sun, moon, fill and sky.
+- **Across the arc:**
+  - day: white masses on blue;
+  - dusk: pink-gold-lit decks;
+  - night: dark violet silhouettes, with moonlit side edges that streak a little;
+  - dawn: peach-gold tops.
+- **Cost:** the masked stopgap costs about +44 ms of GPU (the empty cells raster and discard), so it is not shippable.
+  The same layers drawn opaque cost +7.6 ms. Request CPD-R2 asks the `tiles` kernel to omit water cells, with a
+  target of at most 2 ms.
+- **The build:** `--clouds` (off by default). Nothing in the approved build changes.
