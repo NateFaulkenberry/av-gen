@@ -40,19 +40,23 @@ TILES = {
         {"name": "river", "points": [[270.0, -530], [311.3, -592], [324.5, -654], [300.7, -716], [255.9, -778],
                                      [220.8, -840], [219.1, -902], [252.0, -964], [297.2, -1026], [323.9, -1088],
                                      [313.9, -1150], [274.1, -1212], [231.5, -1274], [215.1, -1336], [236.0, -1398],
-                                     [280.0, -1460]], "width": 16.0, "valleyWidth": 240.0},
+                                     [280.0, -1460]], "width": 16.0, "valleyWidth": 240.0,
+         "lip": 0.5, "step": 1.0},   # cpd-r3 final (ADR-1999): the dusk river set into its banks
         {"name": "westStream", "points": [[-770, -95], [-700, -65], [-625, -45], [-545, -28], [-455, -15]],
-         "width": 8.0, "valleyWidth": 44.0, "bedDepth": 1.2, "sourceLevel": "auto"},
+         "width": 8.0, "valleyWidth": 44.0, "bedDepth": 1.2, "sourceLevel": "auto",
+         "lip": 0.3, "step": 0.6},   # a narrow stream: a low lip
         {"name": "dawnStream", "points": [[1592, -1700], [1590, -1820], [1556, -1950], [1530, -2060], [1486, -2200],
                                           [1440, -2330]], "width": 10.0, "valleyWidth": 54.0, "bedDepth": 1.5,
-         "sourceLevel": "auto"},
+         "sourceLevel": "auto", "lip": 0.3, "step": 0.6},
     ],
     "ponds": [
         # clouds2: every pond sits on its valley's FLOOR, on the flight line. Auto-levelled on a valley wall (land2 put
         # them there), a pond's flat water stood up the slope as one glowing slab -- the "white block" at 148 s was a
         # coast pond, not contour bunching (measured: gone with the ponds removed, cpd-r2-clouds2-148s-*).
-        {"name": "low1", "centre": [-316, -1043], "radius": 30, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35},
-        {"name": "low2", "centre": [-218, -1166], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.4},
+        {"name": "low1", "centre": [-316, -1043], "radius": 30, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35,
+         "lip": 0.6, "step": 0.8},   # cpd-r3 final (ADR-1999): a rim, the water set in
+        {"name": "low2", "centre": [-218, -1166], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.4,
+         "lip": 0.6, "step": 0.8},
     ],
     # land3 (ADR-1992; the owner: "no long endless horizons"): raised land where the route needs a wall or the sea
     # needs a far side -- headlands across the bay's mouth, a spit and a north-shore ridge inside the bay, islands

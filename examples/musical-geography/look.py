@@ -186,7 +186,7 @@ CONTOUR_INTERVAL = 9.0   # clouds2: 6 -> 9 m (the steep night hills bunched into
 
 # B (ADR-1990): the swell reaches the land. Authored here (the flight's clearance reads the authored waves), keyable per
 # state as env/tiles/waveN/onLand. Draft3: 0.08 (the land barely felt the sea's trains).
-LAND_SWELL = 0.5
+LAND_SWELL = 1.0   # cpd-r3 final (ADR-1998): the crest that throws an alien must read under it (was 0.5)
 
 
 def tile_dynamics(state="day"):  # noqa: E302
@@ -273,7 +273,7 @@ def audio_routes():
 ALIEN_REACTIONS = [
     # CP-D r2 final: 300/1200 ms (was 80/400: 0.055 of range per frame at p99, over the 0.05 spec)
     {"signal": "response.level", "target": "hop/apex", "depth": 1.6, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
-    {"signal": "response.level", "target": "hop/strength", "depth": 0.8, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
+    {"signal": "response.level", "target": "hop/strength", "depth": 0.3, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
 ]
 
 # Feline's stems: the beat clock and the hits from the drums, the levels from the bass (docs/help/audio-input.md)

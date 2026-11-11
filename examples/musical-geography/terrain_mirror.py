@@ -74,6 +74,18 @@ def path_distance(path, x, z):
     return best
 
 
+def bank_lip(e):
+    """ADR-1999 bankLip (src/scene/tile_terrain.cpp): full over the first 4 m beyond the waterline, gone by 6 m."""
+    return np.where(e >= 0, 1 - _sm(4.0, 6.0, e), 0.0)
+
+
+def bank_shore(width, e, inside):
+    """ADR-1999 bankShore: 1 at the waterline, 0 a bank's width out on the land and min(width, inside) into the water."""
+    if not width > 0:
+        return np.zeros_like(np.asarray(e, dtype=float))
+    return np.where(e >= 0, 1 - _sm(0.0, width, e), 1 - _sm(0.0, min(width, inside), -e))
+
+
 def tile_sample(s, x, z):
     seed = s["seed"]
     region = value_noise(seed ^ K_REGION, x / s["regionWavelength"], z / s["regionWavelength"])
@@ -103,6 +115,7 @@ def tile_sample(s, x, z):
     land = np.where(core, 1.0, land)
     land_h = np.where(core, np.maximum(land_h, s["shoreRise"]), land_h) + raise_
     channel = np.zeros_like(land_h)
+    bank = np.zeros_like(land_h)
     # ADR-1965 (approximate, for planning maps): rivers carve to the sea floor (the CP-A rule; a bedDepth >= 0 bed is
     # drawn at the floor too, so a stream's valley reads but its level is not mirrored), dry valleys lower the land by
     # depthFraction of its relief, ponds are water within their radius in a basin. Legacy `river` = rivers[0].
@@ -112,7 +125,11 @@ def tile_sample(s, x, z):
         d = path_distance(r["points"], x, z)
         v = 1 - _sm(0.5 * r["width"], 0.5 * r["valleyWidth"], d)
         land_h = land_h + (-s["seaDepth"] - land_h) * v
-        channel = np.maximum(channel, 1 - _sm(0.5 * r["width"] - 0.5, 0.5 * r["width"] + 0.5, d))
+        ch = 1 - _sm(0.5 * r["width"] - 0.5, 0.5 * r["width"] + 0.5, d)
+        channel = np.maximum(channel, ch)
+        e = d - 0.5 * r["width"]   # ADR-1999: the bank, from the waterline (negative in the water)
+        land_h = land_h + r.get("lip", 0.0) * bank_lip(e) - r.get("step", 0.0) * ch
+        bank = np.maximum(bank, bank_shore(s.get("bankWidth", 8.0), e, 0.5 * r["width"]))
     for vl in s.get("valleys") or []:
         d = path_distance(vl["points"], x, z)
         v = 1 - _sm(0.0, 0.5 * vl["valleyWidth"], d)
@@ -121,7 +138,11 @@ def tile_sample(s, x, z):
         d = np.hypot(x - p["centre"][0], z - p["centre"][1])
         v = 1 - _sm(p["radius"], p["radius"] + p["basinWidth"], d)
         land_h = land_h * (1 - 0.6 * v)
-        channel = np.maximum(channel, 1 - _sm(p["radius"] - 0.5, p["radius"] + 0.5, d))
+        ch = 1 - _sm(p["radius"] - 0.5, p["radius"] + 0.5, d)
+        channel = np.maximum(channel, ch)
+        e = d - p["radius"]   # ADR-1999 (the mirror ignores shoreNoise)
+        land_h = land_h + p.get("lip", 0.0) * bank_lip(e) - p.get("step", 0.0) * ch
+        bank = np.maximum(bank, bank_shore(s.get("bankWidth", 8.0), e, p["radius"]))
     lo = s["seaLevel"] - s["seaDepth"]
     h = lo + ((s["seaLevel"] + land_h) - lo) * land
     out = {"water": 1 - land + channel * land, "shore": 1 - _sm(0, 3 * sb, np.abs(c - lt)),
@@ -131,7 +152,7 @@ def tile_sample(s, x, z):
         d = path_distance(s["path"], x, z)
         p = (1 - _sm(0.5 * s["pathWidth"], 0.5 * s["pathWidth"] + 0.75, d)) * land
         h = h + s["pathLift"] * p
-    out["height"], out["path"] = h, p
+    out["height"], out["path"], out["bank"] = h, p, bank
     return out
 
 

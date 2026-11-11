@@ -151,7 +151,9 @@ CAST_FULL = [
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
-TOSS_GAIN, TOSS_MAX = 30.0, 11.0   # cpd-r3: the crest throw (ADR-1997)
+TOSS_GAIN, TOSS_MAX, TOSS_THRESHOLD = 8.0, 9.0, 0.5   # cpd-r3 final: the crest throw on the music (ADR-1998); was 30 / 11 / 0.2
+LAND_STRENGTH = 0.5   # cpd-r3 final: the landing spring (was 1.2): the springs, not the swell, moved a resting alien's tile
+AVOID_BANKS = 0.3     # ADR-1999: about a tile back from the inland water
 NIGHT_GLOW = 2.0
 NIGHT_HALO = {"color": "#FF4FA8", "intensity": 60.0, "range": 7.0, "height": 1.5}   # height in node units (x1.94 m)
 
@@ -200,10 +202,11 @@ def cast_nodes(state="day"):
                      # cpd-r3 (ADR-1997): the cast walks (and sometimes runs) between goals, and the swell's crests
                      # THROW them (owner: "throw the aliens into the air"): launch speed = tossGain x the crest's rise,
                      # capped by tossMax; gain 30 / cap 11 m/s throws 2.4-6.2 m (p10-p90, median 3.9; eng's 16 / 9 measured 0.6-2.5, median 1.0)
-                     "behaviors": [dict({"kind": "hop", "hopChance": 0.05, "tossThreshold": 0.2, "tossGain": TOSS_GAIN,
+                     "behaviors": [dict({"kind": "hop", "hopChance": 0.05, "tossThreshold": TOSS_THRESHOLD, "tossGain": TOSS_GAIN,
                                          "tossMax": TOSS_MAX, "tossCooldown": 3.0, "homeRadius": HOME_RADIUS[hab],
                                          "goalMin": 2, "goalMax": 6, "pauseMin": 0.8, "pauseMax": 3.0,
-                                         "airTime": 1.3, "apex": 3.0, "strength": 1.2}, **PREFS[hab])],
+                                         "airTime": 1.3, "apex": 3.0, "strength": LAND_STRENGTH,
+                                         "avoidBanks": AVOID_BANKS}, **PREFS[hab])],
                      "reactions": [dict(r) for r in look.ALIEN_REACTIONS]})   # Phase 7: hop on the beat
     return nodes, ents
 
