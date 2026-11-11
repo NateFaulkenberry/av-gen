@@ -81,7 +81,7 @@ FLIGHT = {
         {"follow": "river", "from": 0.4294, "to": 0.7026, "offset": 0, "altitude": 10},   # up the valley on the river (cpd-r4: the same stretch; the river now runs on to the north sea)
         {"position": [300, -1560], "altitude": 35, "speed": 24},               # a last rise, under the ceiling
     ],
-    "minClearance": 4, "clearanceRadius": 10, "amplitudeHeadroom": 2,
+    "minClearance": 2.5, "clearanceRadius": 6, "amplitudeHeadroom": 2,   # cpd-r4b: 4 / 10 held the close passes 7-9 m over the aliens' feet
     "climbRate": 6, "fallRate": 10, "lookAhead": 3.5, "pitchBias": 0.08,
     "pitchMin": -14, "pitchMax": 0, "bankLimit": 16, "bankGain": 2.2, "loop": False,
 }
@@ -103,7 +103,7 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     {"position": [-445, 10], "altitude": 10, "speed": 26},                # onto the west shore by ~11 s
     {"position": [-380, -210], "altitude": 12, "speed": 28},              # along its hills, the bay on the right
     {"position": [60, -250], "altitude": 12},                              # the bay (the approved route from here)
-    {"position": [60, -430], "altitude": 6},                               # low over the moving sea
+    {"position": [65, -430], "altitude": 6},                               # low over the moving sea (cpd-r4b: 5 m east, past the island's close-pass alien)
     {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
     {"follow": "path", "from": 0.0, "to": 0.85, "offset": 0, "altitude": 5},       # along the lit path (cpd-r4: to the pond, low: close pass 2)
     {"position": [-330, -1020], "altitude": 14, "speed": 24},              # over the crowns (CP-D: 22 -> 14)
