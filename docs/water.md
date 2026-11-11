@@ -328,8 +328,29 @@ A lake that is part of an imported GLB can be drawn as water too. Name its glTF 
   and the march missing on every far ray, the water's SSR is about 2-3 ms of GPU live (`--ab nowaterssr`). The live
   ladder halves it at Low and drops it at Emergency, and the mirror stays. Measure a real world with `--ab nowaterssr`
   (ADR-2020).
+- **The id AOV.** An imported water material's pixels carry its own identifier, so an id AOV shows the lake rather
+  than the ground under it (ADR-2021). A terrain's water still leaves the bed's identifier there. The depth AOV is
+  the opaque depth in both cases: the bed under the lake.
 - **Glossy SSR.** `environment.glossyReflections` never draws a water entity, so a converted lake is not reflected
   twice. Turn it off if nothing else in the scene wants it.
+
+## Shaping the frame's reflection (ADR-2021)
+
+`reflectionTint` and `reflection` colour and scale the *environment's* reflection: the cube, the sky. What the
+march and the sky mirror return is the frame's own picture, and three keys shape it. Their defaults are the
+reflection as it was, to the byte:
+
+| key | default | meaning |
+|---|---|---|
+| `ssrTint` | [1, 1, 1] | the march's and the mirror's reflection, multiplied per channel (0..4). A dark, blue lake: [0.64, 0.79, 0.88] |
+| `ssrBlur` | 1 | how much `roughness` blurs a march hit (0..4). Roughness is read as a cone angle, so at 1 a still lake at roughness 0.04 blurs a far treeline across about 3% of the frame. 0 is a mirror (the ripples still spread it) |
+| `ssrEdgeFade` | 0.06 | the share of the frame's width over which the march and the mirror fade to the environment at the left and right edges (0.001..0.25). The default hides a ripple's lookup leaving the frame. On a still lake it shows the cube's bright horizon as a pale band, and 0.004 removes it |
+
+Any water takes them, a terrain's included. None changes the cost.
+
+**Not reflected:** anything drawn after the water. That means blended meshes (an alpha-blended waterfall, glass, leaf
+cards), particles and ribbons. The frame copy the water reads is taken before them. A fall exported as an alpha
+*mask* is opaque and is reflected. ADR-2021 lists the engine options.
 
 ## Things that float
 

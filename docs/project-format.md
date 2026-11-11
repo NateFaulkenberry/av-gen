@@ -218,7 +218,9 @@ Every entity of the node with that material becomes a water surface. The node's 
 neither does `roughnessScale`. Skinned entities are skipped with a warning. A name that matches no material is a
 warning listing the names the asset has, and is also one of the project's warnings. A scene draws at most 8 water
 surfaces, terrains included, and asking for more is refused at load. Absent, the key changes nothing. It is written
-back as authored. See [water.md](water.md#water-on-an-imported-mesh-adr-2020).
+back as authored. Its pixels carry the lake's own identifier in the id AOV (ADR-2021). See
+[water.md](water.md#water-on-an-imported-mesh-adr-2020); the water keys `ssrTint`, `ssrBlur` and `ssrEdgeFade`
+([water.md](water.md#shaping-the-frames-reflection-adr-2021)) shape what the lake reflects.
 
 ### `cameraDirection` — more than one camera (ADR-245)
 
