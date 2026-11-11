@@ -6,6 +6,7 @@
 // (a hole where a side should be), a face turned to the camera in a shadow view (light leaking through the casters),
 // or a depth disagreement between the prepass and the lit pass (missing surfaces).
 
+#include "assets/image.hpp"
 #include "core/log.hpp"
 #include "gpu/context.hpp"
 #include "gpu/readback.hpp"
@@ -19,6 +20,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
@@ -309,5 +311,67 @@ TEST_CASE("The side rule's normal ease reaches the lit pass", "[gpu][procedural]
         CAPTURE(change);
         CHECK(change > 0.5); // the flattened sides shade as the tops: the lit pass saw the ease
     }
+    CHECK(ctx->errorCount() == 0);
+}
+
+namespace {
+
+// ADR-2004: a flat "tiles" ring seen low down a column gap, which runs away from the camera at the image's centre. Its
+// walls (x sides) are near edge-on, and with the rule off the slits between consecutive tiles' walls open onto the
+// z sides deeper in the gap. The faces are coloured by the slab debug mode (x sides green, z sides blue, tops red).
+scene::Scene gapScene(float edgeOn) {
+    scene::Scene s = ringScene(0.0f);
+    scene::ProceduralGeometry& pg = s.procedurals[0];
+    pg.slabEdgeOn = edgeOn;
+    pg.slabDebugFaces = true;
+    pg.source.size = {0.9f, 0.6f, 0.9f}; // the MG proportions: a gap a tenth of the pitch, tall sides
+    pg.distribution.generator.tiles.hillHeight = 3.0f; // steps, so a wall stands above the next tile
+    REQUIRE(pg.rebuild());
+    s.camera.position = {0.0f, 2.5f, 14.0f};
+    s.camera.target = {0.0f, 0.0f, -20.0f};
+    return s;
+}
+
+// A z side's pixel between two x side pixels along a row or a column: a hole in a wall, through to the gap behind.
+// Counted in the columns [x0, x1): the camera stands over the gap at x = 0 and looks straight down it, so its walls
+// project within a few pixels of the image's centre column all the way to the horizon.
+int holes(const gpu::Image8& img, std::uint32_t x0, std::uint32_t x1) {
+    const auto face = [&](std::uint32_t x, std::uint32_t y) {
+        const auto* p = img.pixel(x, y);
+        if (p[1] > p[0] + 8 && p[1] > p[2] + 8) return 1; // x side
+        if (p[2] > p[0] + 8 && p[2] > p[1] + 8) return 2; // z side
+        return 0;
+    };
+    int n = 0;
+    for (std::uint32_t y = 1; y + 1 < img.height; ++y) {
+        for (std::uint32_t x = std::max(x0, 1u); x < x1 && x + 1 < img.width; ++x) {
+            if (face(x, y) != 2) continue;
+            if ((face(x - 1, y) == 1 && face(x + 1, y) == 1) || (face(x, y - 1) == 1 && face(x, y + 1) == 1)) ++n;
+        }
+    }
+    return n;
+}
+
+} // namespace
+
+TEST_CASE("An edge-on side spans the gap to its neighbour, so a gap's walls do not open into holes",
+          "[gpu][procedural][geography][adr2004]") {
+    // CPD-R11: the dotted line was the walls of a column gap seen edge-on, holed by the slits between tiles. With the
+    // rule off (0) they show as isolated z-side pixels in the x-side walls; with the default (0.1) they close.
+    auto ctx = makeContext();
+    const auto off = render(*ctx, gapScene(0.0f));
+    const auto on = render(*ctx, gapScene(0.1f));
+    const std::uint32_t mid = off.width / 2;
+    const int before = holes(off, mid - 16, mid + 16);
+    const int after = holes(on, mid - 16, mid + 16);
+    const Diff d = compare(off, on);
+    CAPTURE(before, after, d.lit, d.differ);
+    if (const char* dump = std::getenv("AVGEN_SLAB_TEST_DUMP"); dump != nullptr) { // a look at the two frames
+        REQUIRE(assets::writePng(std::filesystem::path(dump) / "gap-off.png", off.width, off.height, off.rgba).has_value());
+        REQUIRE(assets::writePng(std::filesystem::path(dump) / "gap-on.png", on.width, on.height, on.rgba).has_value());
+    }
+    CHECK(before > 20);
+    CHECK(after * 5 < before);
+    CHECK(d.differ < static_cast<int>(off.width * off.height / 50)); // nothing else moves
     CHECK(ctx->errorCount() == 0);
 }

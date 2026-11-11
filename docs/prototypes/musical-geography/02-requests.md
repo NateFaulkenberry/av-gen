@@ -1732,3 +1732,50 @@ lane home is not built.
 
 Throws drop about 10% because running bodies change tiles more. If you want them back, use `tossCooldown` or
 `runChance`.
+
+#### CPD-R11 (coordinator → engineering, 2026-11-11): the dotted vertical line in the owner's live screenshot
+
+The owner's draft8 screenshot showed a thin dotted vertical line, top to bottom, near the right edge. Art reproduced it
+live at high and ultra on draft8b at 58 s; the offline render of that frame looked plain. Find the cause and prove it,
+fix it if it is ours with no cost in live frame time, and show a live before/after at the same spot.
+
+### Engineering → art, CPD-R11 (2026-11-11): the dotted line was the gap between tiles (ADR-2004)
+
+**The cause, proven.**
+- **It is geometry, live and offline alike.** The offline render of the same instant (58.0 s, matched to the frame)
+  has the dots too; your offline crop was of another spot.
+- **No pass changes them.** They stay with shadows, AO, fog, grain, dither, bloom and tilt-shift off, a plain
+  material, mgTiles1 alone, and the general (non-slab) path.
+- **The AOVs say what they are.** At every dot, the normal is +z and the depth is 1-1.4 m behind the wall beside it.
+  They are holes: the walls of a column gap that runs away from the camera are seen nearly edge-on, and the 0.34 m
+  gap between one tile's side and the next opens in that thin band as a slit a pixel or two long. Down a long gap they
+  line up into the dotted line.
+
+**The fix (ADR-2004).** A side face seen nearly edge-on spans the gap to its neighbour in its own plane:
+- full when the face is within cos 0.1 of edge-on, none past 0.2 (`"slabEdgeOn"` on the node, default 0.1, 0 = off);
+- the camera's views only, so shadows keep their gaps;
+- an edge-on face has no area on screen, so the overlap shows nothing; it only closes the slits.
+
+| Measured | before | after |
+|---|---|---|
+| Owner's wall, live high: isolated dark pixels in the crop box | 64 | 6 |
+| Owner's wall, live ultra | 80 | 6 |
+| Rest of the frame: mean change | | 0.02-0.03 levels |
+
+**Cost: none measurable.** Draft9 at 85 s, ultra, rule off vs on, two runs each: GPU p50 33.32/33.36 vs
+33.42/33.07 ms, p99 45.72/45.95 vs 46.02/45.27 ms, which is run-to-run noise.
+
+**Yours:** nothing required.
+
+**The faint vertical streaks on the tile tops in your crop are a different defect, and are not fixed.** They come
+from the live ambient occlusion, which runs at half resolution at every live tier; offline runs it at full resolution.
+- With live AO at full resolution, the streaks are gone.
+- A cheaper fix (scaling GTAO's occluder bias to the AO texel) did not remove them.
+- Full-resolution AO costs live frame time this scene does not have at 85 s. The options are yours and the
+  coordinator's: leave it; lower `aoFadeEnd` (120 m) or `aoRadius` so the term is weaker on the tops; or
+  `ambientOcclusion` off live.
+
+Media in `18-pass-cpd-draft9/`:
+- `cpd-r11-dotted-line-live-high-ultra-before-after-58s-crop.png`;
+- `cpd-r11-live-ultra-58s-full-before.png` and `cpd-r11-live-ultra-58s-full-after.png`;
+- `cpd-r11-cause-offline-and-normal-aov-58s.png`.

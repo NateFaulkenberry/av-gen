@@ -730,6 +730,10 @@ struct ProceduralGeometry {
     // distance where it is a few pixels tall a slope of them reads as blue dashes; this is how far out they are kept.
     // 0 = 2 x slabFarPixels (the default rule). Written only when set.
     float slabSidePixels = 0.0f;
+    // ADR-2004 (CPD-R11): a side face seen this close to edge-on (|cos| between its normal and the view, fully below
+    // it, none above twice it) spans the gap to its neighbour in its own plane, so the walls of a gap running away from
+    // the camera do not open into a lattice of single-pixel holes (the dotted line). 0 = never. Written only when changed.
+    float slabEdgeOn = 0.1f;
     // Diagnostic (CP-A r3): colour a slab by the face it draws -- top red, x side green, z side blue, a face the
     // far-tile rule has flattened toward yellow -- through the instance colour. Never saved; for investigation only.
     bool slabDebugFaces = false;

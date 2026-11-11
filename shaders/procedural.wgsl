@@ -1085,8 +1085,27 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     } else {
         if (dot(toCam, az) < 0.0) { p = vec3<f32>(-p.x, p.y, -p.z); n = vec3<f32>(-n.x, n.y, -n.z); }
     }
+    // ADR-2004 (CPD-R11): an edge-on side spans the gap in its own plane. A side seen nearly edge-on -- the walls of a
+    // column gap running away from the camera -- is a thin band on screen, and the 0.34 m gap between it and the next
+    // tile's side in the same plane opens in that band as a slit a pixel or two long: down a slot, a regular lattice
+    // of holes onto the faces behind, the dotted line. So a side face whose normal is within proc.windTiming.w of
+    // perpendicular to the view (|cos| fully below it, none above twice it) eases its in-plane width out to the pitch,
+    // meeting its neighbour's. Seen edge-on the overlap has no area of its own; anything else keeps its gaps. The
+    // camera's views only (the prepass and the lit pass, from the same instance centre, so they agree to the bit); a
+    // shadow view keeps the gaps.
+    var closeX = close;
+    var closeZ = close;
+    if (proc.windPlant.w > 0.5 && proc.windTiming.w > 0.0 && mode != 2u) {
+        let lo = proc.windTiming.w;
+        let view = normalize(toCam);
+        if (abs(in.normal.x) > 0.5) {
+            closeZ = max(closeZ, 1.0 - smoothstep(lo, 2.0 * lo, abs(dot(normalize(ax), view))));
+        } else if (abs(in.normal.z) > 0.5) {
+            closeX = max(closeX, 1.0 - smoothstep(lo, 2.0 * lo, abs(dot(normalize(az), view))));
+        }
+    }
     // The gap closes: x and z ease out to the pitch.
-    p = vec3<f32>(p.x * mix(1.0, proc.windPlant.x, close), p.y, p.z * mix(1.0, proc.windPlant.z, close));
+    p = vec3<f32>(p.x * mix(1.0, proc.windPlant.x, closeX), p.y, p.z * mix(1.0, proc.windPlant.z, closeZ));
     // The sides read as the top to a program (its local height): a far step's side is a sliver of the top's colour.
     let topY = abs(in.position.y);
     out.localPos = vec3<f32>(p.x, select(p.y, mix(p.y, topY, flatten), abs(in.normal.y) < 0.5), p.z);
