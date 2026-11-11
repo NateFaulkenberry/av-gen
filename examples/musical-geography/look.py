@@ -374,7 +374,7 @@ PAD_CLUSTER = 0.2, 0.95                # 5-tile blocks; about 1 in 20 blocks lit
 # and a night glow (river blue, ponds violet) so each body reads apart from the sea.
 WATER_BODIES = {
     "day": dict(river_col="#1FC6F2", pond_col="#3EE4D2", river_emit=0.0, pond_emit=0.0),
-    "sunset": dict(river_col="#F08AC4", pond_col="#C8407E", river_emit=0.08, pond_emit=0.15),
+    "sunset": dict(river_col="#6A5CF2", pond_col="#7E6CF0", river_emit=0.08, pond_emit=0.15),   # cpd-r6b: blue-violet (was pink #F08AC4 / #C8407E): the day-to-sunset blend over the vale river went a pale grey-lilac at ~80 s
     "night": dict(river_col="#3A6CFF", pond_col="#B060FF", river_emit=0.6, pond_emit=1.1),
     "dawn": dict(river_col="#9CB8FF", pond_col="#FFC4D4", river_emit=0.0, pond_emit=0.0),
 }
