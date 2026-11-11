@@ -1721,3 +1721,29 @@ the planning top by more than about 0.1 s or 0.3 m?
 - **Constraint:** the owner keeps the original landing spring (CP-D r2), so a softer spring is not my way out.
 - **Evidence:** scratch `r6/audit.py`, `r6/audit-before.csv`, `r6/audit-after.csv` (one row per event: body, time,
   airtime, cause, offset to the drawn top, crest size, activity before).
+
+#### CPD-R10 (art → engineering, 2026-11-11): a home that is a lane along the route, so near aliens can run without nearing the lens
+
+**The owner:** "need to see them running around more". The coordinator: keep them off the line, with nothing
+under the lens.
+
+**Today.** The hop's home is a circle (`homeRadius`). A near alien sitting d metres off the flight line can only roam
+d − 4.5 m and still stay 4.5 m off the line. For the near band (5–14 m off) that is a 1–9 m circle: one or two tiles.
+On the r6b trace (63 aliens):
+
+| Setting | Idle share | Closest any body comes to the camera |
+|---|---|---|
+| The near band's homes at d − 4.5 m | 0.33 | 4.67 m |
+| At least 4 m, three aliens held at 1 m, goals 1–3 tiles (shipped) | 0.26 | 4.92 m |
+| At least 4 m, no exceptions | 0.24 | 2.6 m (three aliens reach the lens) |
+
+r6, with the near band 9–26 m off and homes up to 18 m, measured 0.21. But its aliens were far from the camera.
+
+**The request,** either of these:
+1. **A lane home:** a home shaped as a segment or capsule. For example `homeSegment: [[x0, z0], [x1, z1]]` with a
+   half-width, laid parallel to the flight line, so an alien runs back and forth along the route at a steady distance.
+2. **A keep-out line:** `avoidLine: <the flight's route>` with a minimum distance, honoured by goals, walks and the
+   throw's steering, as `landOnWater` is today.
+
+Either would let the near band run long distances along the line (and still be thrown by crests) while staying 5 m
+or more off it. I'd then expect idle near 0.2 at the r6b distances.

@@ -145,7 +145,8 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # loose groups and loners 5-14 m off the flown line all along the song, coast aliens on the shore beside the low bay
 # and inlet legs (5-20 m), the four r4b close passes and 3 far ones (scratch r6/gen4.py seed 11, trimmed to 63 (seed 3) + coast seed 5, on
 # the CPD-R6 trace of the flown camera). Homes are dry tile centres off the banks; each near or coast alien roams
-# at most its distance off the line minus 4.5 m, so it runs short loops but never under the lens:
+# at most its distance off the line minus 4.5 m, but at least 4 m (one tile; r6b idle fix, checked on the trace),
+# except alien16/38/46 (1 m: at 4 m they reached the lens), so it runs short loops but never under the lens:
 # (x, z, habitat, home radius).
 CAST = [
     (-34, -1126, "pass", 1),   # 5.5 m off the line at 104 s
@@ -158,7 +159,7 @@ CAST = [
     (-246, -1110, "near", 4),   # 8.5 m off the line at 93 s
     (-178, -1190, "near", 5),   # 9.7 m off the line at 97 s
     (-142, -1174, "near", 5),   # 9.7 m off the line at 98 s
-    (-134, -1174, "near", 3),   # 7.1 m off the line at 99 s
+    (-134, -1174, "near", 4),   # 7.1 m off the line at 99 s
     (-98, -1178, "near", 9),   # 13.4 m off the line at 100 s
     (-66, -1138, "near", 5),   # 9.1 m off the line at 102 s
     (-26, -1138, "near", 4),   # 8.8 m off the line at 104 s
@@ -184,9 +185,9 @@ CAST = [
     (402, -1614, "near", 4),   # 8.1 m off the line at 150 s
     (410, -1618, "near", 5),   # 9.5 m off the line at 150 s
     (446, -1626, "near", 4),   # 8.1 m off the line at 152 s
-    (494, -1622, "near", 2),   # 6.8 m off the line at 154 s
+    (494, -1622, "near", 4),   # 6.8 m off the line at 154 s
     (534, -1630, "near", 4),   # 8.2 m off the line at 156 s
-    (526, -1630, "near", 2),   # 6.4 m off the line at 155 s
+    (526, -1630, "near", 1),   # 6.4 m off the line at 155 s
     (582, -1638, "near", 4),   # 8.5 m off the line at 158 s
     (614, -1638, "near", 7),   # 11.4 m off the line at 159 s
     (678, -1658, "near", 5),   # 9.5 m off the line at 161 s
@@ -194,8 +195,8 @@ CAST = [
     (770, -1626, "near", 4),   # 8.1 m off the line at 165 s
     (1426, -1510, "near", 6),   # 10.2 m off the line at 195 s
     (1482, -1538, "near", 8),   # 13.0 m off the line at 197 s
-    (1474, -1538, "near", 2),   # 6.7 m off the line at 197 s
-    (1494, -1586, "near", 1),   # 5.8 m off the line at 199 s
+    (1474, -1538, "near", 1),   # 6.7 m off the line at 197 s
+    (1494, -1586, "near", 4),   # 5.8 m off the line at 199 s
     (1494, -1594, "near", 6),   # 10.3 m off the line at 199 s
     (1534, -1618, "near", 5),   # 9.4 m off the line at 201 s
     (1538, -1662, "near", 8),   # 12.8 m off the line at 203 s
@@ -205,7 +206,7 @@ CAST = [
     (54, -978, "ridge", 30),   # 98.7 m off the line at 110 s
     (-138, -366, "coast", 9),   # 18.7 m off the line at 40 s
     (78, -478, "coast", 7),   # 11.5 m off the line at 53 s
-    (70, -426, "coast", 3),   # 7.5 m off the line at 51 s
+    (70, -426, "coast", 4),   # 7.5 m off the line at 51 s
     (-238, -394, "coast", 9),   # 17.8 m off the line at 35 s
     (-78, -362, "coast", 9),   # 15.9 m off the line at 43 s
     (-206, -386, "coast", 9),   # 17.0 m off the line at 37 s
@@ -275,7 +276,8 @@ def cast_nodes(state="day"):
                      # capped by tossMax; gain 30 / cap 11 m/s throws 2.4-6.2 m (p10-p90, median 3.9; eng's 16 / 9 measured 0.6-2.5, median 1.0)
                      "behaviors": [dict({"kind": "hop", "hopChance": HOP_CHANCE, "tossThreshold": TOSS_THRESHOLD, "tossGain": TOSS_GAIN,
                                          "tossMax": TOSS_MAX, "tossCooldown": 3.0, "throwClipLift": THROW_CLIP_LIFT, "throwCrouchRate": THROW_CROUCH_RATE, "homeRadius": home,
-                                         "goalMin": 1, "goalMax": 8, "pauseMin": 0.2, "pauseMax": 1.0, "runChance": RUN_CHANCE,
+                                         "goalMin": 1, "goalMax": 3,   # r6b: short runs (idle 0.33 -> 0.26)
+                                         "pauseMin": 0.2, "pauseMax": 1.0, "runChance": RUN_CHANCE,
                                          "stepHeight": 3.0, "jumpTiles": 0,   # no step hops: walk up steps, never hop (r6 audit)
                                          "airTime": 1.3, "apex": 3.0, "strength": LAND_STRENGTH,
                                          "avoidBanks": AVOID_BANKS}, **PREFS[hab])],
