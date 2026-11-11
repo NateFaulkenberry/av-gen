@@ -290,6 +290,47 @@ fall off the top and those pixels keep the environment reflection.
 **Cost:** off, nothing (compiled out). On, one tap of the frame copy and one of the depth per water pixel; see ADR-1650
 for the measurement.
 
+## Water on an imported mesh (ADR-2020)
+
+A lake that is part of an imported GLB can be drawn as water too. Name its glTF material in the gltf node's
+`waterMaterials`; the value is exactly the `water` object above, read by the same reader:
+
+```json
+{ "name": "environment", "kind": "gltf", "asset": "alpine.glb",
+  "waterMaterials": {
+    "Lake": { "shallowColor": [0.113, 0.25, 0.251], "deepColor": [0.02, 0.09, 0.11],
+              "clarity": 6.0, "maxOpacity": 1.0, "edgeFade": 0.6, "fresnel": 0.04, "reflection": 1.0,
+              "roughness": 0.04, "ripple": 0.03, "rippleScale": 0.05, "rippleSpeed": 0.0,
+              "ssr": 1.0, "ssrDistance": 2000, "ssrSteps": 128, "skyMirror": 1.0 } } }
+```
+
+- **What it reflects.** Distant terrain comes from the sky mirror: anything past half `ssrDistance` that is on screen at
+  the reflected ray's vanishing point. Near things (a bank, a boat, the trees at the shore) come from the march, out
+  to `ssrDistance`. A mountain range 3-6 km out needs no long march, so the 2000 m cap is not what limits it. Off-screen
+  sources fall back to the environment cube, as with any screen-space reflection, so a camera pitched well down shows
+  cube in the lower lake.
+- **Matching.** The match is exact and case-sensitive on the glTF material name (what Blender calls the material).
+  Batching merges nodes but keeps material names, so batch freely. A name that matches nothing logs `gltf node 'n':
+  waterMaterials 'X' matches no material; available: ...` and is added to the project's warnings.
+- **Flow.** The water reads its vertex normal as flow. A flat sheet's normal (0, 1, 0) is direction zero (the shader's
+  +X fallback), and its speed fraction is 1 of a still-water 0.05 m/s. Set `rippleSpeed` 0 for a dead-still lake. A
+  curved mesh's normals tilt, and the tilt reads as a direction.
+- **Shoreline.** Depth thickness and the edge fade come from the scene depth under the surface, so a terrain bed under
+  the lake gives the shoreline. A sheet with nothing under it reads as deep water out to its edge.
+- **What does not apply.** The node's `program` and `roughnessScale`, skinned entities (skipped with a warning), and
+  routes. A gltf water surface has no `nodes/<n>/water/*` parameters. Day/night still drives its reflection and deep
+  colour, as it does every surface.
+- **Limit.** A scene draws 8 water surfaces in all, terrains included. Asking for more is refused at load.
+- **Checking it.** The load logs `gltf node 'n': water material 'Lake' -> N entity(ies), M triangles, bounds y
+  [lo..hi], cinematic=yes (ssr 1, skyMirror 1)`. The renderer's first frame with water logs `water: K surface(s), C
+  cinematic`.
+- **Cost.** It is the cinematic water's cost. On the acceptance scene at 1080p, with half the frame lake, 128 steps
+  and the march missing on every far ray, the water's SSR is about 2-3 ms of GPU live (`--ab nowaterssr`). The live
+  ladder halves it at Low and drops it at Emergency, and the mirror stays. Measure a real world with `--ab nowaterssr`
+  (ADR-2020).
+- **Glossy SSR.** `environment.glossyReflections` never draws a water entity, so a converted lake is not reflected
+  twice. Turn it off if nothing else in the scene wants it.
+
 ## Things that float
 
 A `float` block on a **procedural** node makes its instances drift on water instead of standing on
@@ -384,7 +425,7 @@ environment cube, and its only refraction is a wobble in the depth the shoreline
 cinematic pipeline (ADR-1286) adds both. It copies the lit opaque frame just before the water is drawn,
 reflects the scene by a screen-space march against that copy (`ssr`), and sees the bed through it with
 absorption; the [sky mirror](#sky-mirror-adr-1650) and [flow streaks](#flow-streaks-adr-1643) ride on
-the same pipeline. There is no planar reflection.
+the same pipeline, and an imported mesh can use it too ([ADR-2020](#water-on-an-imported-mesh-adr-2020)). There is no planar reflection.
 
 No underwater post-processing when the camera dips below the surface: the surface shades itself
 differently from beneath and that is all. No caustics. Each of those is another pass, and the brief

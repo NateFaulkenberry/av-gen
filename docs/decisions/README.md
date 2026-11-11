@@ -75,6 +75,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1700-1719 | eng/midi-mapping (MIDI performance mapping: Learn, scopes and defaults, the monitor, the MIDI panel) |
 | 1800-1849 | eng/qa-pass-2 (the second QA, debugging, refactoring and cleanup pass) |
 | 1930-1969 | scene/chronos (CHRONOS: temporal imaging and its canyon) |
+| 2020-2029 | `eng/gltf-water-materials` (a gltf node's named materials drawn as water, for av-agent's imported lake) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -995,3 +996,4 @@ confirm the citation you are about to change is your own.
 | [1937](ADR-1937-the-feedback-has-a-centre.md) | The feedback zooms and turns about a routable centre (default the frame's, byte-identical), so it can pour into a moving subject. Amends ADR-1066. scene/chronos | Accepted |
 | [1980](ADR-1980-live-panel-audio-rescan-off-the-frame.md) | The Live panel's audio device rescan (3-9 ms every 3 s on the UI thread) runs in an async task and is swapped in when it lands; MIDI and display scans stay (under 0.1 ms). eng/app-stalls | Accepted |
 | [1981](ADR-1981-asset-hashes-cached-by-size-and-time.md) | Asset hashes in the project document are cached by path, size and modification time, so the idle dirty check stops re-hashing the song (a 250 ms frame every ~2.5 s after playback ends). eng/app-stalls | Accepted |
+| [2020](ADR-2020-gltf-water-materials.md) | A gltf node's `waterMaterials` draws the named glTF materials as water with their own WaterSurface, read by terrain.water's reader, so an imported lake gets the march and the sky mirror; at most 8 surfaces, refused at load; absent changes nothing. eng/gltf-water-materials | Accepted |

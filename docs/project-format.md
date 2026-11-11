@@ -203,6 +203,23 @@ A `gltf` node may carry `"castsShadow": false` to keep its meshes out of the sha
 made of light, such as a rainbow or a glow card. It defaults to true and is written only when false. Procedural
 nodes take the same key in their `procedural` block (ADR-1545).
 
+A `gltf` node may carry `"waterMaterials"` (ADR-2020) to draw some of its glTF materials as water, the terrain water's
+cinematic path (the march and the [sky mirror](water.md#sky-mirror-adr-1650)). The key is an exact, case-sensitive
+glTF material name; the value is the object `terrain.water` takes, read by the same reader (same keys, ranges and
+defaults; `enabled` defaults to true):
+
+```json
+{ "name": "environment", "kind": "gltf", "asset": "alpine.glb",
+  "waterMaterials": { "Lake": { "fresnel": 0.04, "roughness": 0.04, "rippleSpeed": 0,
+                                "ssr": 1, "ssrDistance": 2000, "ssrSteps": 128, "skyMirror": 1 } } }
+```
+
+Every entity of the node with that material becomes a water surface. The node's `program` does not apply to it, and
+neither does `roughnessScale`. Skinned entities are skipped with a warning. A name that matches no material is a
+warning listing the names the asset has, and is also one of the project's warnings. A scene draws at most 8 water
+surfaces, terrains included, and asking for more is refused at load. Absent, the key changes nothing. It is written
+back as authored. See [water.md](water.md#water-on-an-imported-mesh-adr-2020).
+
 ### `cameraDirection` — more than one camera (ADR-245)
 
 Optional, and written only when the scene has more than the one camera it has always had, so a scene
