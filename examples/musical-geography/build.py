@@ -74,7 +74,7 @@ FLIGHT = {
         {"position": [60, -250], "altitude": 12},                              # the bay
         {"position": [60, -430], "altitude": 6},                               # low over the moving sea
         {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
-        {"follow": "valeRiver", "from": 0.9274, "to": 0.45, "offset": 0, "altitude": 10},   # cpd-r6: the vale river (was the lit path)
+        {"follow": "valeRiver", "from": 1.0, "to": 0.485, "offset": 0, "altitude": 10},   # cpd-r6: the vale river (was the lit path)
         {"position": [-330, -1020], "altitude": 22, "speed": 24},              # rise over the crowns (r3: 28 -> 22)
         {"position": [-180, -1180], "altitude": 17, "speed": 26},              # a banked sweep north-east (22 -> 17)
         {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river (18 -> 14)
@@ -111,7 +111,7 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     {"position": [-40, -362], "altitude": 7},                              # round the arm's tip
     {"position": [65, -430], "altitude": 6},                               # low past the island (close pass 1)
     {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
-    {"follow": "valeRiver", "from": 0.9274, "to": 0.1391, "offset": 0, "altitude": 5},   # cpd-r6: up the vale river from the bay to the pond (was the lit path)
+    {"follow": "valeRiver", "from": 1.0, "to": 0.15, "offset": 0, "altitude": 5},   # cpd-r6: up the vale river from the bay to the pond (was the lit path)
     {"position": [-330, -1020], "altitude": 14, "speed": 24},              # over the crowns (CP-D: 22 -> 14)
     {"position": [-180, -1180], "altitude": 15, "speed": 26},              # the banked sweep north-east (17 -> 15)
     {"position": [-87, -1157], "altitude": 4},                             # cpd-r4 close pass 3 (on the curve, low)
@@ -152,30 +152,27 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # (x, z, habitat, home radius).
 CAST = [
     # cpd-r6c (owner: "make sure more are present in the first 30 seconds or so"): the opening shore
-    (-342, 158, "coast", 7),   # r6d: in frame ahead-left at 2-8 s (the nearest land, ~60 m out at first)
     #(-206, 246, "coast", 9),   # 15.8 m off the line at 0 s
-    (-454, 6, "coast", 1),   # r6d: 6.3 m off the line at 14 s
     #(-454, 18, "coast", 8),   # 12.4 m off the line at 13 s
+    #(-482, -66, "coast", 6),   # 10.9 m off the line at 16 s
+    #(-486, -86, "coast", 8),   # 12.3 m off the line at 17 s
+    #(-430, -350, "coast", 9),   # 24.7 m off the line at 27 s
+    (-342, 158, "coast", 7),   # r6d: in frame ahead-left at 2-8 s (the nearest land, ~60 m out at first)
+    (-454, 6, "coast", 1),   # r6d: 6.3 m off the line at 14 s
     (-470, -34, "coast", 7),   # 6.3 m off the line at 15 s
     (-482, -74, "coast", 1),   # r6d: 6.3 m off the line at 17 s
-    #(-482, -66, "coast", 6),   # 10.9 m off the line at 16 s
     (-474, -258, "coast", 1),   # r6d: 6.6 m off the line at 23 s
-    #(-486, -86, "coast", 8),   # 12.3 m off the line at 17 s
     (-474, -278, "coast", 7),   # 19.7 m off the line at 24 s
     (-466, -298, "coast", 7),   # 21.1 m off the line at 25 s
     (-446, -314, "coast", 1),   # r6d: 11 m off the line at 26 s
-    #(-430, -350, "coast", 9),   # 24.7 m off the line at 27 s
     (-34, -1126, "pass", 1),   # 5.5 m off the line at 104 s
     (422, -1606, "pass", 1),   # 5.4 m off the line at 150 s
     (1542, -1654, "pass", 1),   # 4.9 m off the line at 203 s
     (-94, -350, "near", 7),   # 8.3 m off the line at 42 s
     (78, -462, "near", 7),   # 10.5 m off the line at 52 s
-    (78, -446, "near", 7),   # 11.0 m off the line at 52 s
     (-142, -1174, "near", 7),   # 9.7 m off the line at 98 s
-    (-134, -1174, "near", 7),   # 7.1 m off the line at 99 s
     (-30, -1146, "near", 7),   # 14.1 m off the line at 104 s
     (58, -1098, "near", 7),   # 12.1 m off the line at 108 s
-    (50, -1098, "near", 7),   # 8.3 m off the line at 108 s
     (182, -1062, "near", 7),   # 12.5 m off the line at 113 s
     (214, -1058, "near", 7),   # 12.3 m off the line at 115 s
     (254, -1030, "near", 7),   # 11.8 m off the line at 116 s
@@ -186,22 +183,33 @@ CAST = [
     (494, -1622, "near", 7),   # 6.8 m off the line at 154 s
     (678, -1658, "near", 7),   # 9.5 m off the line at 161 s
     (722, -1634, "near", 7),   # 8.7 m off the line at 163 s
-    (1474, -1538, "near", 7),   # 6.7 m off the line at 197 s
     (1494, -1586, "near", 7),   # 5.8 m off the line at 199 s
-    (1494, -1594, "near", 7),   # 10.3 m off the line at 199 s
     (1534, -1618, "near", 7),   # 9.4 m off the line at 201 s
-    (1538, -1662, "near", 7),   # 12.8 m off the line at 203 s
     (626, -1686, "far", 40),   # 36.0 m off the line at 159 s
     (1698, -1822, "ridge", 30),   # 151.7 m off the line at 209 s
     (54, -978, "ridge", 30),   # 98.7 m off the line at 110 s
     (-138, -366, "coast", 7),   # 18.7 m off the line at 40 s
-    (78, -478, "coast", 7),   # 11.5 m off the line at 53 s
     (70, -426, "coast", 7),   # 7.5 m off the line at 51 s
     (-238, -394, "coast", 7),   # 17.8 m off the line at 35 s
     (-78, -362, "coast", 7),   # 15.9 m off the line at 43 s
     (-206, -386, "coast", 7),   # 17.0 m off the line at 37 s
     (810, -1610, "coast", 7),   # 15.9 m off the line at 166 s
-    (690, -1662, "coast", 7),   # 14.7 m off the line at 162 s
+    (1314, -1558, "coast", 7),   # draft9: on the shore 8.1 m off the line at 188 s (owner: "more aliens needed along shorelines")
+    (-350, -998, "coast", 7),   # draft9: on the shore 10.4 m off the line at 86 s (owner: "more aliens needed along shorelines")
+    (1338, -1534, "coast", 7),   # draft9: on the shore 9.9 m off the line at 189 s (owner: "more aliens needed along shorelines")
+    (-350, -930, "coast", 7),   # draft9: on the shore 15.0 m off the line at 83 s (owner: "more aliens needed along shorelines")
+    (-350, -974, "coast", 7),   # draft9: on the shore 8.2 m off the line at 85 s (owner: "more aliens needed along shorelines")
+    (1334, -1506, "coast", 7),   # draft9: on the shore 11.3 m off the line at 190 s (owner: "more aliens needed along shorelines")
+    (-354, -954, "coast", 7),   # draft9: on the shore 14.8 m off the line at 84 s (owner: "more aliens needed along shorelines")
+    (1318, -1530, "coast", 7),   # draft9: on the shore 7.9 m off the line at 189 s (owner: "more aliens needed along shorelines")
+    (46, -626, "coast", 7),   # draft9: on the shore 11.5 m off the line at 60 s (owner: "more aliens needed along shorelines")
+    (-310, -886, "coast", 7),   # draft9: on the shore 13.9 m off the line at 81 s (owner: "more aliens needed along shorelines")
+    (-246, -814, "coast", 7),   # draft9: on the shore 17.7 m off the line at 76 s (owner: "more aliens needed along shorelines")
+    (-122, -750, "coast", 7),   # draft9: on the shore 17.0 m off the line at 69 s (owner: "more aliens needed along shorelines")
+    (-190, -786, "coast", 7),   # draft9: on the shore 18.8 m off the line at 73 s (owner: "more aliens needed along shorelines")
+    (-290, -806, "coast", 7),   # draft9: on the shore 19.5 m off the line at 77 s (owner: "more aliens needed along shorelines")
+    (-26, -702, "coast", 7),   # draft9: on the shore 19.1 m off the line at 65 s (owner: "more aliens needed along shorelines")
+    (-46, -670, "coast", 7),   # draft9: on the shore 18.6 m off the line at 64 s (owner: "more aliens needed along shorelines")
 ]
 CAST_FULL = []   # cpd-r4: one cast for every mode (was the route-side additions of the full piece)
 HOME_RADIUS = {"pass": 1.0, "coast": 5.0, "near": 10.0, "far": 40.0, "ridge": 30.0}   # defaults; CAST carries each one's own

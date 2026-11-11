@@ -46,22 +46,26 @@ TILES = {
         {"name": "westStream", "points": [[-770, -95], [-700, -65], [-625, -45], [-545, -28], [-455, -15]],
          "width": 8.0, "valleyWidth": 44.0, "bedDepth": 1.2, "sourceLevel": "auto",
          "lip": 0.3, "step": 0.6},   # a narrow stream: a low lip
-        {"name": "dawnStream", "points": [[1592, -1700], [1590, -1820], [1556, -1950], [1530, -2060], [1486, -2200],
+        {"name": "dawnStream", "points": [[1300, -1515], [1400, -1525], [1500, -1555], [1565, -1620], [1592, -1700], [1590, -1820], [1556, -1950], [1530, -2060], [1486, -2200],
                                           [1440, -2330], [1435, -2450], [1450, -2600], [1470, -2750],
                                           [1490, -2880]], "width": 10.0, "valleyWidth": 54.0, "bedDepth": 1.5,   # cpd-r4: on to the northern sea
          "sourceLevel": "auto", "lip": 0.3, "step": 0.6},
         # cpd-r6: the old lit path as a river, out of pond low1 (its source) down to the bay (its mouth), 20 m wide in a
         # 90 m vale, set into its banks -- one connected water course from pond to sea
         {"name": "valeRiver", "points": [[-320, -1020], [-338, -950], [-325, -880], [-260, -800], [-150, -745],
-                                         [-40, -690], [40, -610], [62, -568]], "width": 20.0, "valleyWidth": 90.0,
+                                         [-40, -690], [-5, -660]], "width": 20.0, "valleyWidth": 90.0,   # draft9: ends in the lagoon
          "bedDepth": 1.5, "sourceLevel": "auto", "lip": 0.5, "step": 1.0},
     ],
     "ponds": [
         # clouds2: every pond sits on its valley's FLOOR, on the flight line. Auto-levelled on a valley wall (land2 put
         # them there), a pond's flat water stood up the slope as one glowing slab -- the "white block" at 148 s was a
         # coast pond, not contour bunching (measured: gone with the ponds removed, cpd-r2-clouds2-148s-*).
-        {"name": "low1", "centre": [-316, -1043], "radius": 30, "basinWidth": 34, "level": "auto", "shoreNoise": 0.35,
+        {"name": "low1", "centre": [-316, -1043], "radius": 45, "basinWidth": 40, "level": "auto", "shoreNoise": 0.35,
          "lip": 0.6, "step": 0.8},   # cpd-r3 final (ADR-1999): a rim, the water set in
+        # draft9 (owner, third time: the river must not "stop in the middle of nowhere"): the vale river's lower end is
+        # a lagoon by the bay -- a lake that reads as one (84 m across, banked) -- and low1 at its head is now 90 m across
+        {"name": "lagoon", "centre": [5, -650], "radius": 42, "basinWidth": 30, "level": "auto", "shoreNoise": 0.3,
+         "lip": 0.6, "step": 0.8},
         {"name": "low2", "centre": [-218, -1166], "radius": 26, "basinWidth": 30, "level": "auto", "shoreNoise": 0.4,
          "lip": 0.6, "step": 0.8},
     ],
