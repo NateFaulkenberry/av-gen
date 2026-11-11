@@ -6,6 +6,7 @@
 #include "app/engine.hpp"
 #include "audio/audio_file.hpp"
 #include "core/time.hpp"
+#include "entity/tile_nav.hpp"
 #include "params/modulation.hpp"
 #include "scene/composition.hpp"
 #include "support/synth.hpp"
@@ -316,5 +317,51 @@ TEST_CASE("crest throws on the music, on a real project (measure)", "[.][tiles][
                 << drawnRise << "," << p.y << "\n";
         }
         was[static_cast<std::size_t>(who)] = st.airborne;
+    }
+}
+
+TEST_CASE("every body's position and the water under it, on a real project (measure)",
+          "[.][tiles][hop][measure][cpdr6]") {
+    // CPD-R6. AVGEN_TRACE_PROJECT: a project file; AVGEN_TRACE_CSV: where to write; AVGEN_TRACE_FROM / _TO (s, default
+    // 0 / the song's end) and AVGEN_TRACE_FPS (default 30). One row per frame per body:
+    //   t, body (index), name, x, y, z, water (0 dry, 1 sea, 2 river, 3 pond: tileWaterBody on the sample the walker
+    //   and landOnWater read, ground.planned at the tile under it), bank (that sample's bank channel), airborne,
+    //   landed (1 on the first grounded frame after a flight), activity (entity::Activity), and the drawn camera's
+    //   x, y, z that frame.
+    const char* projectPath = std::getenv("AVGEN_TRACE_PROJECT");
+    const char* csvPath = std::getenv("AVGEN_TRACE_CSV");
+    if (projectPath == nullptr || csvPath == nullptr) SKIP("set AVGEN_TRACE_PROJECT and AVGEN_TRACE_CSV");
+    const auto env = [](const char* k, double d) { return std::getenv(k) != nullptr ? std::atof(std::getenv(k)) : d; };
+    const double fps = env("AVGEN_TRACE_FPS", 30.0);
+    const double t0 = env("AVGEN_TRACE_FROM", 0.0);
+    app::Engine engine{app::EngineMode::Offline};
+    REQUIRE(engine.loadProject(projectPath).has_value());
+    const double t1 = env("AVGEN_TRACE_TO", engine.durationSeconds());
+    std::ofstream out(csvPath);
+    out << "t,body,name,x,y,z,water,bank,airborne,landed,activity,camX,camY,camZ\n";
+    const entity::TileNavRules rules; // the walker's own threshold
+    std::vector<bool> was;
+    for (long long k = 0; k <= static_cast<long long>(t1 * fps); ++k) {
+        const double t = static_cast<double>(k) / fps;
+        engine.update(FrameTime{t, k == 0 ? 0.0 : 1.0 / fps, static_cast<std::uint64_t>(k)});
+        scene::Composition* comp = engine.composition();
+        REQUIRE(comp != nullptr);
+        const world::GroundSource* g = comp->entityWorld().ground();
+        REQUIRE(g != nullptr);
+        const auto& es = comp->entityWorld().entities();
+        was.resize(es.size(), false);
+        const glm::vec3 cam = comp->scene().camera.position;
+        for (std::size_t i = 0; i < es.size(); ++i) {
+            const entity::EntityState& st = es[i]->state();
+            const bool landed = was[i] && !st.airborne;
+            was[i] = st.airborne;
+            if (t < t0) continue;
+            const glm::vec3 p = st.position();
+            const world::GroundSample s = g->planned(p.x, p.z, t);
+            out << t << "," << i << "," << es[i]->name() << "," << p.x << "," << p.y << "," << p.z << ","
+                << entity::tileWaterBody(s, rules) << "," << s.bank << "," << (st.airborne ? 1 : 0) << ","
+                << (landed ? 1 : 0) << "," << static_cast<int>(st.activity) << "," << cam.x << "," << cam.y << ","
+                << cam.z << "\n";
+        }
     }
 }

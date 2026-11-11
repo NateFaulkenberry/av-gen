@@ -51,6 +51,18 @@ using TileQuery = std::function<world::GroundSample(glm::ivec2 tile)>;
 [[nodiscard]] bool tileWalkAllowed(const world::GroundSample& from, const world::GroundSample& to, const TileNavRules& r);
 [[nodiscard]] bool tileJumpAllowed(const world::GroundSample& from, const world::GroundSample& to, int tiles,
                                    const TileNavRules& r);
+// Whether a body counts a sample as water (what TileNav, `landOnWater` and the hop's off-water checks read), and which
+// body: 0 dry, 1 sea, 2 river, 3 pond (the larger share, as the record's class). The measure traces read this too.
+[[nodiscard]] inline bool tileWet(const world::GroundSample& s, const TileNavRules& r) {
+    return s.water >= r.waterThreshold;
+}
+[[nodiscard]] inline int tileWaterBody(const world::GroundSample& s, const TileNavRules& r) {
+    if (!tileWet(s, r)) return 0;
+    if (s.river >= 0.5f * s.water && s.river > s.pond && s.river > 0.0f) return 2;
+    if (s.pond >= 0.5f * s.water && s.pond > 0.0f) return 3;
+    return 1;
+}
+
 [[nodiscard]] TilePath planTiles(const TileQuery& query, glm::ivec2 from, glm::ivec2 to, const TileNavRules& rules);
 
 } // namespace avgen::entity

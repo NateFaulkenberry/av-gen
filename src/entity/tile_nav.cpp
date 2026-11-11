@@ -16,14 +16,14 @@ std::uint64_t key(glm::ivec2 t) {
 } // namespace
 
 bool tileWalkAllowed(const world::GroundSample& from, const world::GroundSample& to, const TileNavRules& r) {
-    return to.water < r.waterThreshold && std::abs(to.height - from.height) <= r.stepHeight;
+    return !tileWet(to, r) && std::abs(to.height - from.height) <= r.stepHeight;
 }
 
 bool tileJumpAllowed(const world::GroundSample& from, const world::GroundSample& to, int tiles, const TileNavRules& r) {
     if (tiles < 1 || tiles > r.jumpTiles) {
         return false;
     }
-    if (!r.landOnWater && to.water >= r.waterThreshold) {
+    if (!r.landOnWater && tileWet(to, r)) {
         return false; // ADR-1997
     }
     const float dh = to.height - from.height;

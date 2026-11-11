@@ -3715,7 +3715,7 @@ private:
     // ADR-1999 (CPD-R4): with `avoidBanks` (0..1, 0 = off) an inland water's bank counts as water to a walker -- no
     // goal, step, landing or rest on it -- so a body keeps a bank's width away from a pond or a river.
     [[nodiscard]] bool wetSample(const world::GroundSample& s) const {
-        return s.water >= rules_.waterThreshold || (avoidBanks_ > 0.0f && s.bank >= avoidBanks_);
+        return tileWet(s, rules_) || (avoidBanks_ > 0.0f && s.bank >= avoidBanks_);
     }
     // The nearest dry tile centre to `p`, within `reach` tiles (rings outward, in a fixed order); `p`'s own tile if none.
     [[nodiscard]] glm::vec2 nearestDry(const world::GroundSource& g, glm::vec2 p, double t, int reach) const {

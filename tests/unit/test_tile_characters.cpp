@@ -1248,3 +1248,48 @@ TEST_CASE("with avoidBanks a body keeps off a pond's bank; without it, it may st
     CHECK(free > 0);  // the bank is ground like any other without the setting
     CHECK(kept == 0); // and is kept off with it
 }
+
+// ---- CPD-R6: the trace's water column is the walker's own check ----------------------------------------------------
+
+TEST_CASE("the water body a trace reports is the walker's own water check", "[tiles][nav][geography][cpdr6]") {
+    // a coast (sea and land) with a pond and a river in the land, sampled the way the hop samples (planned, at the tile)
+    scene::TileTerrainSpec spec;
+    spec.continentWavelength = 4000.0f;
+    spec.landThreshold = 0.05f;
+    spec.ponds = {scene::TilePond{.name = "p", .centre = {40.0f, 0.0f}, .radius = 12.0f, .basinWidth = 10.0f}};
+    spec.rivers = {scene::TileRiver{.name = "r", .points = {{-60.0f, -80.0f}, {-60.0f, 80.0f}}, .width = 10.0f,
+                                    .valleyWidth = 30.0f, .bedDepth = 1.0f}};
+    REQUIRE(spec.validate().has_value());
+    spec.resolveWater();
+    scene::TileGround g;
+    g.set(spec, scene::TileDynamics{}, 4.0f, glm::vec3(0.0f));
+    const entity::TileNavRules rules;
+    const auto body = [&](float x, float z) { return entity::tileWaterBody(g.planned(x, z, 0.0), rules); };
+    CHECK(body(40.0f, 0.0f) == 3);  // the pond
+    CHECK(body(-60.0f, 0.0f) == 2); // the river
+    CHECK(body(0.0f, 0.0f) == 0);   // land between them
+    // a sea: the default continent near the origin has both
+    scene::TileTerrainSpec coast;
+    coast.continentWavelength = 120.0f;
+    scene::TileGround sea;
+    sea.set(coast, scene::TileDynamics{}, 4.0f, glm::vec3(0.0f));
+    int seaTiles = 0;
+    int dryTiles = 0;
+    // and everywhere, on both grounds: wet (the walker's check) exactly when the body is not 0
+    for (const scene::TileGround* ground : {&g, &sea}) {
+        for (float z = -100.0f; z <= 100.0f; z += 4.0f) {
+            for (float x = -100.0f; x <= 100.0f; x += 4.0f) {
+                const world::GroundSample s = ground->planned(x, z, 0.0);
+                const int b = entity::tileWaterBody(s, rules);
+                CHECK(entity::tileWet(s, rules) == (b != 0));
+                CHECK(entity::tileWalkAllowed(s, s, rules) == (b == 0));
+                if (ground == &sea) {
+                    seaTiles += b == 1 ? 1 : 0;
+                    dryTiles += b == 0 ? 1 : 0;
+                }
+            }
+        }
+    }
+    CHECK(seaTiles > 20);
+    CHECK(dryTiles > 20);
+}

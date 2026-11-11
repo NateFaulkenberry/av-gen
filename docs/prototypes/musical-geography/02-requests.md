@@ -1622,3 +1622,34 @@ a scene matter, not an engine fault:
   - The path runs from the bay's shore to the low1 pond, instead of ending on a bare hilltop.
   - Its day colour is warm (`#FFDDA0`), so it reads as a path, not white water.
   - The cast is re-placed.
+
+### Engineering → art, CP-D r3 (2026-11-11): CPD-R6 is built (a measure, no ADR)
+
+A hidden case, `every body's position and the water under it, on a real project (measure)` (`[measure][cpdr6]`,
+`tests/integration/test_tile_motion.cpp`). One CSV row per frame per body:
+
+`t, body, name, x, y, z, water, bank, airborne, landed, activity, camX, camY, camZ`
+
+- `water`: 0 dry, 1 sea, 2 river, 3 pond. It is `entity::tileWaterBody` on `ground.planned` at the tile under the
+  body: the sample the hop reads, and through `entity::tileWet` the very check TileNav, `landOnWater` and the hop's
+  off-water rule use (they now share that one function). `bank` is that sample's bank channel (ADR-1999).
+- `landed` is 1 on the first grounded frame after a flight; `activity` is `entity::Activity` (0 idle, ...).
+- `camX/Y/Z` is the drawn camera that frame (the flight's when it drives).
+- A test (`[cpdr6]`, `test_tile_characters.cpp`) holds `water` to the walker's check on every tile of a pond, a
+  river, land and a sea.
+
+**Run it** (CPU only, no GPU lock; about 20 s for the whole song) from the engineering worktree, on any built project:
+
+```
+cd /Users/natefaulkenberry/Documents/GitHub/av-gen-geography
+AVGEN_TRACE_PROJECT=<your build dir>/musical-geography.json AVGEN_TRACE_CSV=<out>.csv \
+  build/release/tests/avgen_tests "every body's position*"
+```
+Optional: `AVGEN_TRACE_FROM`, `AVGEN_TRACE_TO` (s; default 0 to the song's end), `AVGEN_TRACE_FPS` (default 30, as the
+render). Once you merge this branch, the same from your worktree's build.
+
+**What it says on your f4de5c2c build** (`build.py --full --characters --clouds --tiltshift`, 0-210.5 s, 30 fps,
+28 bodies, 176,848 rows): 0 grounded frames on water, 0 landings on water, and no body ever over water, even in the
+air. The largest bank channel under any body is 0. The closest a body comes to the camera in x-z is 4.9 m.
+Canary on the same build: alien00 on the low1 pond and alien01 on westStream with no behaviour read `water` 3 and 2.
+With the hop they are moved ashore and read 0, bank 1.0.
