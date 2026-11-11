@@ -1804,3 +1804,73 @@ Raising the low layer, or thinning it over high ground, is an option.
 - **Why not very strong:** it also blurs aliens just below the band (dawn 200 s) into bokeh blobs, and it costs
   twice as much.
 - **Strong, GPU median:** day 22.8 ms (20.6 with it off), night 18.0 ms (16.2 off).
+
+### CP-D r3: the walking cast, crest throws, off the water; tilt-shift at 70% (2026-11-10, ADR-1997)
+
+**The cast** (on ADR-1997):
+
+- **Removed:**
+  - the cue keys (trigger, cueOnly, cueEvery, cueGap, airBeats, maxWait);
+  - `preferWater`;
+  - the `beat.pulse → hop/trigger` reaction.
+- **Added:** hopChance 0.05, tossThreshold 0.2, tossCooldown 3, goalMin 2, goalMax 6, pauseMin 0.8, pauseMax 3.
+- **Home radius:** at least 14 (crown, bank and inlet 6/6/8 → 14; sea and path stay at 30).
+- **Throw gain:** tossGain 30, tossMax 11 m/s (eng's clip values were 16 and 9).
+- **Moved off the water.** Each new position was checked on `terrain_mirror` (water and height):
+
+  | Alien | New position | Where |
+  |---|---|---|
+  | 00 | (228, −200) | the bay saddle |
+  | 01 | (160, −450) | the north isle |
+  | 03 | (30, −640) | shore |
+  | 08 | (−276, −1043) | off the low1 pond |
+  | 10 | (−184, −1166) | off the low2 pond |
+  | 16 | (60, 10) | the south island's shoulder |
+  | 17 | (−485, −25) | the west shore |
+  | 18 | (−510, −200) | the west shore |
+  | 23 | (1180, −1735) | dry ground near inletPeak; every spot on the inlet's north shore I tried was water |
+
+**Measured throw heights.**
+
+- **How:** the hidden `[measure][adr1997]` case, over all 28 aliens, 0–215 s, on the real scene file.
+- **Height from airtime:** h = g·T²/8. Flights of exactly the hop's 1.3 s are counted as hops.
+
+| Gain / cap | Throws | p10 | Median | p90 | Max | Share ≥ 3 m |
+|---|---|---|---|---|---|---|
+| 16 / 9 (eng's values) | 512 | 0.6 m | 1.0 m | 2.5 m | 6.6 m | 6% |
+| **30 / 11 (picked)** | 512 | 2.4 m | 3.9 m | 6.2 m | 9.3 m | 71% |
+| 40 / 11 | 527 | 3.8 m | 5.9 m | 6.4 m | 8.8 m | 100%, mostly at the cap |
+
+- **The pick:**
+  - At 16, a throw is under a third of the body's height (3.2 m), which is invisible from the flight.
+  - At 30, the median throw is above the body's height, and a bigger crest still throws visibly higher.
+  - At 40, nearly every throw hits the cap, so they all look the same.
+- **Frequency:** each alien is thrown about every 12 s (11–27 throws per alien in the song).
+- **Max above the cap's 6.2 m apex:** some landings are lower than the launch.
+
+**The close clip** (`cpd-r3-cast-close-throw-41-50s.mp4`):
+
+- **Setup:** alien09 (the crown alien at (−266, −1112)), static camera about 40 m off.
+- **The throw:** at 44.1 s, landing about 46.4 s with the spring and glow; airtime 2.3 s, about 6.5 m.
+- **Pixel track:** standing body 115 px = 3.2 m; the head rises about 260 px, about 7 m. This is a rough track: the tilt blur desaturates the alien above the band.
+
+**Known gap (not worked around):** throws follow the authored waves, not the music (ADR-1997).
+
+**Tilt-shift 3** (owner: "70% of the strong tilt shift"):
+
+| Setting | Band | Falloff | Radius | Grade |
+|---|---|---|---|---|
+| Was (strong) | 0.10 | 0.18 | 10 | saturation × 1.10, contrast + 0.06 |
+| Now (70%) | 0.12 | 0.22 | 7 | saturation × 1.07, contrast + 0.04 |
+
+- **Centre:** unchanged at (0.5, 0.58).
+- **Stills:** `cpd-r3-tiltshift3-*`.
+- **Cost:** the defocus pass takes 1.09 ms, against 2.25 ms at strong. GPU median, two runs each:
+
+  | | Off | Strong | 70% |
+  |---|---|---|---|
+  | Day (40 s) | 20.7 / 20.7 ms | 23.7 / 22.7 ms | 22.0 / 21.6 ms |
+  | Night (140 s) | 16.7 / 16.8 ms | 18.1 / 18.4 ms | 17.0 / 17.4 ms |
+
+- **The read:** still a clear miniature. The near foreground and the hills soften less, and the band is a little
+  wider.

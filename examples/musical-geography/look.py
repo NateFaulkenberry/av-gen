@@ -271,7 +271,6 @@ def audio_routes():
 
 # the aliens (entity reactions: a seek replays them, so a scrub hops the way a play does)
 ALIEN_REACTIONS = [
-    {"signal": "beat.pulse", "target": "hop/trigger", "depth": 1.0},
     # CP-D r2 final: 300/1200 ms (was 80/400: 0.055 of range per frame at p99, over the 0.05 spec)
     {"signal": "response.level", "target": "hop/apex", "depth": 1.6, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
     {"signal": "response.level", "target": "hop/strength", "depth": 0.8, "chain": {"attackMs": 300.0, "decayMs": 1200.0}},
@@ -580,11 +579,11 @@ def tile_program(state, cell=1.0, name=None, far=None, shade=1.0, border=None, s
 # circle of confusion), sharp across the mid-ground where the aliens and the near-mid tiles sit, softening the near
 # foreground and the horizon and sky -- the miniature, toy-world read -- with a slight grade lift. Off unless TILT_SHIFT.
 TILT_SHIFT = False
-# tiltshift2 (owner: "make it stronger"): "strong" picked over "very strong" (band 0.07, falloff 0.12, radius 14:
-# blurred aliens just below the band, 4.3 ms); was band 0.16, falloff 0.28, radius 6, grade 1.06 / +0.04
+# tiltshift3 (owner: "70% of the strong tilt shift"): the strong setting (band 0.10, falloff 0.18, radius 10, grade
+# 1.10 / +0.06) backed off ~30%: radius x0.7, band, falloff and grade 30% of the way back toward off
 TILT = {"post/tiltShift/enabled": True, "post/tiltShift/centre": [0.5, 0.58], "post/tiltShift/rotation": 0.0,
-        "post/tiltShift/bandWidth": 0.10, "post/tiltShift/falloff": 0.18, "post/tiltShift/maxRadius": 10.0}
-TILT_GRADE = (1.10, 0.06)   # saturation x, contrast +
+        "post/tiltShift/bandWidth": 0.12, "post/tiltShift/falloff": 0.22, "post/tiltShift/maxRadius": 7.0}
+TILT_GRADE = (1.07, 0.04)   # saturation x, contrast +
 
 
 def post(state):

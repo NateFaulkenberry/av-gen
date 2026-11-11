@@ -129,28 +129,29 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # (11 m on the river, off the water) on the INSIDE of each turn -- the side the camera banks toward -- placed on a
 # numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
 CAST = [
-    (78, -330, "sea"), (44, -395, "sea"), (72, -470, "sea"),             # low over the moving sea
-    (28, -585, "path"), (-48, -700, "path"), (-170, -742, "path"),     # the shore and the lit path
+    (228, -200, "sea"), (160, -450, "sea"), (72, -470, "sea"),   # cpd-r3: 00/01 off the water, onto the bay islands             # low over the moving sea
+    (30, -640, "path"), (-48, -700, "path"), (-170, -742, "path"),     # the shore and the lit path
     (-268, -812, "path"),
-    (-356, -945, "crown"), (-317, -1029, "crown"), (-266, -1112, "crown"),   # rising over the crowns (banking right)
-    (-202, -1167, "crown"), (-118, -1163, "crown"),                          # the banked sweep (right)
+    (-356, -945, "crown"), (-276, -1043, "crown"), (-266, -1112, "crown"),   # rising over the crowns (banking right)
+    (-184, -1166, "crown"), (-118, -1163, "crown"),                          # the banked sweep (right)
     (98, -1075, "bank"), (196, -1051, "bank"), (267, -1045, "bank"),        # down toward the river (banking left)
     (310, -1096, "bank"),                                                    # onto the river, its left bank
 ]
-HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 6.0, "bank": 6.0, "inlet": 8.0}
+HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 14.0, "bank": 14.0, "inlet": 14.0}   # cpd-r3: >= 14 (ADR-1997)
 # CP-D (the full song; draft2 positions for the new intro, which runs ~10 s longer): the intro's sea, the sweep's return leg (the CP-C r3 gap at clip +60..66 s), and the night and
 # dawn legs -- each 7 m off the flight line on the inside of its turn (the flight mirror), at its song time
 CAST_FULL = [
-    (-309, 116, "sea"), (-447, -19, "bank"), (-382, -200, "sea"),          # 6, 14, 22 s: the bay, its west shore
+    (60, 10, "sea"), (-485, -25, "bank"), (-510, -200, "sea"),   # cpd-r3: off the water (the south island, the west shore)          # 6, 14, 22 s: the bay, its west shore
     (-38, -1126, "crown"),                                                  # 92 s: the sweep's return leg
     (414, -1601, "crown"), (648, -1642, "bank"), (887, -1614, "bank"),     # 137-155 s: the north coast at night
-    (1121, -1554, "inlet"), (1352, -1485, "bank"),                          # 164-173 s: the inlet, the far shore
+    (1180, -1735, "inlet"), (1352, -1485, "bank"),                          # 164-173 s: the inlet, the far shore
     (1509, -1596, "bank"), (1553, -1792, "crown"),                          # 181-189 s: banking north at dawn
     (1533, -1881, "bank"),                                                  # ~203 s: the peninsula (draft2 timing)
 ]
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
+TOSS_GAIN, TOSS_MAX = 30.0, 11.0   # cpd-r3: the crest throw (ADR-1997)
 NIGHT_GLOW = 2.0
 NIGHT_HALO = {"color": "#FF4FA8", "intensity": 60.0, "range": 7.0, "height": 1.5}   # height in node units (x1.94 m)
 
@@ -163,12 +164,12 @@ def cast_lights(state):
              "position": [0.0, h["height"], -0.3], "color": look.hexlin(h["color"]), "intensity": h["intensity"] if state == "night" else 0.0,
              "range": h["range"], "castsShadow": False}
             for i in range(len(cast()))]
-PREFS = {  # where each habitat's aliens like to hop (lower preferPath so they don't bunch on the path)
-    "sea": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
-    "path": {"preferWater": 0.2, "preferCrowns": 0.5, "preferPath": 0.3},
-    "crown": {"preferWater": 0.1, "preferCrowns": 1.0, "preferPath": 0.1},
-    "bank": {"preferWater": 0.6, "preferCrowns": 0.4, "preferPath": 0.1},
-    "inlet": {"preferWater": 1.0, "preferCrowns": 0.2, "preferPath": 0.1},
+PREFS = {  # where each habitat's aliens like to go (ADR-1997: nobody stands on water, so no preferWater)
+    "sea": {"preferCrowns": 0.2, "preferPath": 0.1},
+    "path": {"preferCrowns": 0.5, "preferPath": 0.3},
+    "crown": {"preferCrowns": 1.0, "preferPath": 0.1},
+    "bank": {"preferCrowns": 0.4, "preferPath": 0.1},
+    "inlet": {"preferCrowns": 0.2, "preferPath": 0.1},
 }
 # the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
 # the landing spring: the original (owner, CP-D r2: eng's soft 0.7 Hz / 0.35 arm rejected -- "the other bounces look much
@@ -196,12 +197,13 @@ def cast_nodes(state="day"):
                                "observe": "Idle", "react": "Fight_idle", "jump": "Jumping", "fall": "Floating",
                                "land": "Landing"},
                      "gait": {"walkSpeed": 1.7, "runSpeed": 3.6},
-                     # E (ADR-1990): the cast answers the music in turns -- each alien hops only on a cue, every 4th beat
-                     # at its own place in the cycle, at most once per 2.5 s, two beats in the air; 10 s at most at rest
-                     "behaviors": [dict({"kind": "hop", "hopChance": 0.0, "cueOnly": 1, "cueEvery": 4, "cueGap": 2.5,
-                                         "airBeats": 2, "maxWait": 10.0, "homeRadius": HOME_RADIUS[hab], "goalMin": 2,
-                                         "goalMax": 5, "pauseMin": 0.6, "pauseMax": 2.2, "airTime": 1.3,
-                                         "apex": 3.0, "strength": 1.2}, **PREFS[hab])],
+                     # cpd-r3 (ADR-1997): the cast walks (and sometimes runs) between goals, and the swell's crests
+                     # THROW them (owner: "throw the aliens into the air"): launch speed = tossGain x the crest's rise,
+                     # capped by tossMax; gain 30 / cap 11 m/s throws 2.4-6.2 m (p10-p90, median 3.9; eng's 16 / 9 measured 0.6-2.5, median 1.0)
+                     "behaviors": [dict({"kind": "hop", "hopChance": 0.05, "tossThreshold": 0.2, "tossGain": TOSS_GAIN,
+                                         "tossMax": TOSS_MAX, "tossCooldown": 3.0, "homeRadius": HOME_RADIUS[hab],
+                                         "goalMin": 2, "goalMax": 6, "pauseMin": 0.8, "pauseMax": 3.0,
+                                         "airTime": 1.3, "apex": 3.0, "strength": 1.2}, **PREFS[hab])],
                      "reactions": [dict(r) for r in look.ALIEN_REACTIONS]})   # Phase 7: hop on the beat
     return nodes, ents
 
