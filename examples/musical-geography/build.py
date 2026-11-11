@@ -141,43 +141,77 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # off. CP-C r3: the hills, sweep and river legs (clip +43..+79 s) fly higher, so those aliens sit 6 m off the line
 # (11 m on the river, off the water) on the INSIDE of each turn -- the side the camera banks toward -- placed on a
 # numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
-# cpd-r4 (owner: the aliens "feel too intentionally placed along the camera path ... they don't ever look big enough"):
-# the cast lives in the land, not along the line. Five close-pass aliens sit 4.5-9 m off the flight line where it flies
-# low (~50, 64, 101, 148, 196 s), held near home (1 m), each on the inside of its turn (the look-ahead swings toward it; r4b: 4 and 5 were outside and left the frame early) so they cannot walk under the lens; the rest are scattered
-# groups (2-4) and loners, 30-250 m off the route, on slopes, ridges and the bay islands, with gaps where nobody is.
-# Placed on the flight mirror and terrain_mirror (dry, off the banks); planning: scratch r4/scatter.py (seed 7).
+# cpd-r6 (owner: "the aliens are still too far away from the camera ... more aliens ... need to see them running
+# around more"): 62 aliens. A busy near band -- loose groups and loners 9-26 m off the flight line all along the song,
+# placed on the CPD-R6 trace of the flown camera (scratch r6/gen.py, seed 11) -- plus the four r4b close passes and
+# 12 far ones (30-200 m, some on ridges). Every home is a tile centre, dry and off the banks; each near alien's home
+# radius keeps it at least ~5 m off the line while it walks and runs: (x, z, habitat, home radius).
 CAST = [
-    (68, -440, "pass"),
-    (-63, -695, "pass"),
-    (-35, -1128, "pass"),
-    (422, -1606, "pass"),
-    (1542, -1654, "pass"),
-    (-225, -952, "wild"),
-    (-237, -958, "wild"),
-    (62, -1306, "wild"),
-    (69, -1301, "wild"),
-    (61, -1296, "wild"),
-    (290, -1254, "wild"),
-    (272, -1280, "wild"),
-    (238, -1523, "wild"),
-    (203, -1530, "wild"),
-    (217, -1530, "wild"),
-    (1577, -1489, "wild"),
-    (1569, -1491, "wild"),
-    (-397, -791, "wild"),
-    (-300, -1210, "ridge"),
-    (-138, -1147, "wild"),
-    (135, -1316, "ridge"),
-    (497, -1465, "wild"),
-    (603, -1750, "wild"),
-    (590, -1555, "ridge"),
-    (1484, -1873, "wild"),
-    (1689, -1722, "ridge"),
-    (60, 10, "sea"),
-    (228, -200, "sea"),
+    (-34, -1126, "pass", 1),   # 5.5 m off the line at 104 s
+    (422, -1606, "pass", 1),   # 5.4 m off the line at 150 s
+    (1542, -1654, "pass", 1),   # 4.9 m off the line at 203 s
+    (-406, 94, "near", 18),   # 24.7 m off the line at 10 s
+    (-398, 102, "near", 18),   # 25.1 m off the line at 10 s
+    (-270, -394, "near", 8),   # 13.2 m off the line at 34 s
+    (-282, -394, "near", 8),   # 12.6 m off the line at 34 s
+    (-78, -366, "near", 15),   # 19.7 m off the line at 44 s
+    (-86, -366, "near", 17),   # 22.2 m off the line at 43 s
+    (38, -646, "near", 18),   # 24.0 m off the line at 62 s
+    (-34, -654, "near", 16),   # 21.2 m off the line at 64 s
+    (-142, -722, "near", 12),   # 17.0 m off the line at 70 s
+    (-362, -978, "near", 16),   # 20.5 m off the line at 86 s
+    (-294, -1098, "near", 14),   # 19.2 m off the line at 91 s
+    (-162, -1174, "near", 5),   # 10.4 m off the line at 97 s
+    (-110, -1146, "near", 15),   # 20.4 m off the line at 100 s
+    (-118, -1146, "near", 18),   # 24.3 m off the line at 100 s
+    (-54, -1130, "near", 6),   # 11.1 m off the line at 103 s
+    (-46, -1126, "near", 6),   # 11.0 m off the line at 103 s
+    (10, -1098, "near", 6),   # 10.6 m off the line at 106 s
+    (10, -1090, "near", 13),   # 17.7 m off the line at 106 s
+    (70, -1102, "near", 16),   # 21.1 m off the line at 108 s
+    (206, -1058, "near", 6),   # 11.5 m off the line at 114 s
+    (198, -1058, "near", 6),   # 10.5 m off the line at 114 s
+    (214, -1062, "near", 11),   # 16.3 m off the line at 115 s
+    (266, -1058, "near", 12),   # 17.0 m off the line at 117 s
+    (266, -1066, "near", 18),   # 25.0 m off the line at 117 s
+    (274, -1182, "near", 11),   # 16.3 m off the line at 127 s
+    (274, -1242, "near", 12),   # 16.9 m off the line at 129 s
+    (242, -1290, "near", 9),   # 14.0 m off the line at 132 s
+    (250, -1294, "near", 18),   # 22.8 m off the line at 132 s
+    (250, -1286, "near", 15),   # 20.2 m off the line at 131 s
+    (202, -1362, "near", 16),   # 20.6 m off the line at 135 s
+    (206, -1354, "near", 10),   # 14.6 m off the line at 135 s
+    (198, -1354, "near", 17),   # 22.4 m off the line at 135 s
+    (258, -1506, "near", 12),   # 16.6 m off the line at 142 s
+    (318, -1554, "near", 12),   # 17.2 m off the line at 145 s
+    (322, -1546, "near", 18),   # 25.1 m off the line at 144 s
+    (498, -1614, "near", 10),   # 15.5 m off the line at 154 s
+    (486, -1614, "near", 8),   # 12.6 m off the line at 153 s
+    (582, -1630, "near", 11),   # 16.4 m off the line at 157 s
+    (662, -1630, "near", 14),   # 19.5 m off the line at 161 s
+    (658, -1638, "near", 7),   # 11.8 m off the line at 160 s
+    (758, -1650, "near", 8),   # 13.3 m off the line at 164 s
+    (766, -1650, "near", 10),   # 14.7 m off the line at 164 s
+    (1430, -1478, "near", 12),   # 17.4 m off the line at 194 s
+    (1474, -1530, "near", 7),   # 11.7 m off the line at 197 s
+    (1562, -1654, "near", 7),   # 11.6 m off the line at 203 s
+    (1546, -1706, "near", 10),   # 14.8 m off the line at 205 s
+    (1542, -1766, "near", 7),   # 11.6 m off the line at 208 s
+    (366, -1542, "far", 40),   # 47.8 m off the line at 147 s
+    (1570, -1622, "far", 40),   # 36.6 m off the line at 202 s
+    (182, -630, "far", 40),   # 142.7 m off the line at 59 s
+    (114, -494, "far", 40),   # 49.1 m off the line at 54 s
+    (1622, -1706, "ridge", 30),   # 61.1 m off the line at 205 s
+    (1370, -1642, "far", 40),   # 107.8 m off the line at 188 s
+    (130, -962, "ridge", 30),   # 94.3 m off the line at 112 s
+    (-30, -782, "far", 40),   # 86.7 m off the line at 67 s
+    (210, -1486, "far", 40),   # 54.6 m off the line at 140 s
+    (-26, -858, "far", 40),   # 156.5 m off the line at 69 s
+    (594, -1518, "ridge", 30),   # 129.0 m off the line at 157 s
+    (290, -990, "far", 40),   # 49.7 m off the line at 118 s
 ]
 CAST_FULL = []   # cpd-r4: one cast for every mode (was the route-side additions of the full piece)
-HOME_RADIUS = {"sea": 24.0, "pass": 1.0, "wild": 24.0, "ridge": 14.0}   # cpd-r4: a close-pass alien stays by the line, never on it
+HOME_RADIUS = {"pass": 1.0, "near": 10.0, "far": 40.0, "ridge": 30.0}   # defaults; CAST carries each one's own
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
@@ -185,6 +219,7 @@ TOSS_GAIN, TOSS_MAX, TOSS_THRESHOLD = 6.25, 10.8, 0.4   # CPD-R7: launches leave
 LAND_STRENGTH = 0.5   # cpd-r3 final: the landing spring (was 1.2): the springs, not the swell, moved a resting alien's tile
 THROW_CROUCH_RATE = 0.75   # owner (lab r2): crouch "a little sooner ... a bit before the wave crest": 0.8 s before the top (was 0.6)
 THROW_CLIP_LIFT = 1.5   # CPD-R7 (ADR-2000): the Jumping clip lifts the feet 1.52 m itself; the arc gives that up
+RUN_CHANCE = 0.7   # cpd-r6 (owner: "need to see them running around more"); pauses 0.2-1 s (were 0.8-3)
 HOP_CHANCE = 0.0     # cpd-r3 final: no random hops (was 0.05); the wave throws, and the walk still hops up steps
 AVOID_BANKS = 0.3     # ADR-1999: about a tile back from the inland water
 NIGHT_GLOW = 2.0
@@ -200,9 +235,9 @@ def cast_lights(state):
              "range": h["range"], "castsShadow": False}
             for i in range(len(cast()))]
 PREFS = {  # where each habitat's aliens like to go (ADR-1997: nobody stands on water, so no preferWater)
-    "sea": {"preferCrowns": 0.2, "preferPath": 0.1},
     "pass": {"preferCrowns": 0.0, "preferPath": 0.0},
-    "wild": {"preferCrowns": 0.3, "preferPath": 0.2},
+    "near": {"preferCrowns": 0.2, "preferPath": 0.0},
+    "far": {"preferCrowns": 0.4, "preferPath": 0.0},
     "ridge": {"preferCrowns": 1.0, "preferPath": 0.0},
 }
 # the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
@@ -218,7 +253,8 @@ def cast():
 
 def cast_nodes(state="day"):
     nodes, ents = [], []
-    for i, (x, z, hab) in enumerate(cast()):
+    for i, (x, z, hab, *rest) in enumerate(cast()):
+        home = rest[0] if rest else HOME_RADIUS[hab]
         name = "alien%02d" % i
         nodes.append({"name": name, "kind": "gltf",
                       "asset": os.path.abspath(os.path.join(ALIENS_DIR, "alien-%s.glb" % KINDS[i % len(KINDS)])),
@@ -235,8 +271,9 @@ def cast_nodes(state="day"):
                      # THROW them (owner: "throw the aliens into the air"): launch speed = tossGain x the crest's rise,
                      # capped by tossMax; gain 30 / cap 11 m/s throws 2.4-6.2 m (p10-p90, median 3.9; eng's 16 / 9 measured 0.6-2.5, median 1.0)
                      "behaviors": [dict({"kind": "hop", "hopChance": HOP_CHANCE, "tossThreshold": TOSS_THRESHOLD, "tossGain": TOSS_GAIN,
-                                         "tossMax": TOSS_MAX, "tossCooldown": 3.0, "throwClipLift": THROW_CLIP_LIFT, "throwCrouchRate": THROW_CROUCH_RATE, "homeRadius": HOME_RADIUS[hab],
-                                         "goalMin": 2, "goalMax": 6, "pauseMin": 0.8, "pauseMax": 3.0,
+                                         "tossMax": TOSS_MAX, "tossCooldown": 3.0, "throwClipLift": THROW_CLIP_LIFT, "throwCrouchRate": THROW_CROUCH_RATE, "homeRadius": home,
+                                         "goalMin": 1, "goalMax": 8, "pauseMin": 0.2, "pauseMax": 1.0, "runChance": RUN_CHANCE,
+                                         "stepHeight": 3.0, "jumpTiles": 0,   # no step hops: walk up steps, never hop (r6 audit)
                                          "airTime": 1.3, "apex": 3.0, "strength": LAND_STRENGTH,
                                          "avoidBanks": AVOID_BANKS}, **PREFS[hab])],
                      "reactions": [dict(r) for r in look.ALIEN_REACTIONS]})   # Phase 7: hop on the beat
