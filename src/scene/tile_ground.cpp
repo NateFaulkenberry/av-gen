@@ -46,6 +46,8 @@ world::GroundSample TileGround::sample(const TileDynamics& d, float x, float z, 
     s.flat = tile.flat;
     s.path = tile.path;
     s.bank = tile.bank; // ADR-1999
+    s.river = tile.river;
+    s.pond = tile.pond;
     return s;
 }
 

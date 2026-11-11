@@ -18,6 +18,8 @@ struct GroundSample {
     float flat = 0.0f;   // 0..1: a gathering place (a tiles ground's crown)
     float path = 0.0f;   // 0..1: on the path
     float bank = 0.0f;   // 0..1: ADR-1999, on an inland water's bank (1 at the waterline)
+    float river = 0.0f;  // the river and pond shares of `water` (the sea's is the rest): which body it is
+    float pond = 0.0f;
 };
 
 class GroundSource {
