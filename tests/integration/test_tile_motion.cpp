@@ -475,6 +475,54 @@ TEST_CASE("a keep-out line: bodies roam and are thrown, and never come within it
     }
 }
 
+TEST_CASE("a running body takes off and lands on a tile's centre", "[tiles][hop][geography][seek][adr2005][adr2006]") {
+    // ADR-2005 (CPD-R13): bodies running about with wide homes are thrown by the swell; every throw takes off and lands
+    // within a few centimetres of a tile's centre (the owner saw one leave from a tile's edge). ADR-2006: no grounded
+    // body moves more than half a metre vertically between two 60 Hz frames while walking (a step up is eased).
+    nlohmann::json j = keepOutScene();
+    for (auto& e : j["entities"]) {
+        e["behaviors"][0].erase("avoidLine");
+        e["behaviors"][0].erase("avoidDistance");
+    }
+    Rig rig(4.0f, j);
+    const double step = 1.0 / 60.0;
+    std::vector<bool> was(3, false);
+    std::vector<glm::vec3> last(3, glm::vec3(0.0f));
+    int launches = 0;
+    int landings = 0;
+    float worstOff = 0.0f;
+    float worstPop = 0.0f;
+    for (long long k = 0; k <= 20 * 60; ++k) {
+        const double t = static_cast<double>(k) * step;
+        rig.frame(t, k == 0 ? 0.0 : step, static_cast<std::uint64_t>(k));
+        const auto& es = rig.comp().entityWorld().entities();
+        const world::GroundSource* g = rig.comp().entityWorld().ground();
+        for (std::size_t i = 0; i < es.size(); ++i) {
+            const entity::EntityState& st = es[i]->state();
+            const glm::vec3 p = st.position();
+            const glm::vec2 c = g->cellCentre(p.x, p.z);
+            if (st.airborne != was[i]) {
+                // the frame before a launch (on the crouch) and the first frame down
+                const glm::vec3 at = st.airborne ? last[i] : p;
+                const glm::vec2 cc = g->cellCentre(at.x, at.z);
+                worstOff = std::max(worstOff, glm::length(glm::vec2(at.x, at.z) - cc));
+                (st.airborne ? launches : landings) += 1;
+            }
+            const bool walking = !st.airborne && (st.activity == entity::Activity::Walk || st.activity == entity::Activity::Run);
+            if (walking && k > 0 && glm::length(glm::vec2(p.x - last[i].x, p.z - last[i].z)) > 1e-4f) {
+                worstPop = std::max(worstPop, std::abs(p.y - last[i].y));
+            }
+            (void)c;
+            last[i] = p;
+            was[i] = st.airborne;
+        }
+    }
+    CAPTURE(launches, landings, worstOff, worstPop);
+    CHECK(launches >= 3);
+    CHECK(worstOff < 0.05f);
+    CHECK(worstPop < 0.5f);
+}
+
 TEST_CASE("crest throws on the music, on a real project (measure)", "[.][tiles][hop][measure][adr1998]") {
     // AVGEN_TOSS_PROJECT: a project file; AVGEN_TOSS_CSV: where to write; AVGEN_TOSS_ENTITY: which body (index).
     // Per frame at 30 fps: the drawn swell, the ground's upward speed under the body (what throws it), and its throws.

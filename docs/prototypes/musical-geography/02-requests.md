@@ -1779,3 +1779,42 @@ Media in `18-pass-cpd-draft9/`:
 - `cpd-r11-dotted-line-live-high-ultra-before-after-58s-crop.png`;
 - `cpd-r11-live-ultra-58s-full-before.png` and `cpd-r11-live-ultra-58s-full-after.png`;
 - `cpd-r11-cause-offline-and-normal-aov-58s.png`.
+
+#### CPD-R13 (owner → engineering via the coordinator, 2026-11-11): jumps on the tile centre; a flicker audit
+
+The owner on draft9: "saw one alien that was slightly clipping off the edge of the tile when it jumped - let's try to
+keep em more on center of tile for jumps and lets make sure there is no potential for animation flicker when
+traversing these tiles (... don't make a fix unless you find something truly reproducible/diagnosible here".
+
+### Engineering → art, CPD-R13 (2026-11-11): centred jumps (ADR-2005), stepping and stopping (ADR-2006)
+
+Measured on your draft9 (c5535ba6, the CPD-R6 trace at 60 fps, 53 aliens).
+
+**Off-centre jumps: the cause.**
+- A walker mid-step crouched and jumped where it stood, often at a tile's edge.
+- Take-off from the centre: median 0.54 m. 397 throws were over 1 m out, and 79 had the feet over the gap.
+- Landings were the same, because a crouch throw goes straight up.
+
+**Off-centre jumps: the fix (ADR-2005).**
+- A walker reads the crest of the tile it is stepping onto, and stops on that centre.
+- It crouches only near a centre, settling onto it.
+
+| | before | after |
+|---|---|---|
+| Take-off from the centre (p50 / max) | 0.54 / 2.00 m | 0.00 / 0.02 m |
+| Feet past the edge | 79 | 0 |
+| Throws | 1,300 | 1,096 |
+| Off the drawn top, your rule | 101 (7.8%) | 71 (6.5%) |
+| By height | 1 | 3 |
+| Idle | 0.279 | 0.303 |
+
+**Flicker audit.**
+- **Not reproduced:** one-frame activity blips (none) and one-frame grounded/airborne blips (none).
+- **Reproduced and fixed (ADR-2006):** 358 one-frame pops of over 1 m (up to 3.4 m) as walkers stepped up onto
+  higher tiles. Your `stepHeight` 3 made them climb 3 m steps in one frame. The step now rises over about 0.06 s,
+  starting a quarter-second ahead. Also fixed: about 15 one-frame drops when a walker stopped mid-descent.
+  - Over 1 m: 358 -> 2 (max 1.16 m).
+- **Left alone:** a tile under a body moving up to about 0.3 m per frame on a ring front. That is the floor, and it is
+  drawn the same with or without a body.
+
+**Yours:** nothing required. If the 16% fewer throws shows, `tossCooldown` (3 s) is the lever.
