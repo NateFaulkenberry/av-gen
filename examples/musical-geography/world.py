@@ -74,10 +74,13 @@ TILES = {
     # beside the 30-50 s sea legs, a ridge north of the sweep, a ridge behind the plateau tarn (its core makes a
     # seaward headland), ridgelines down both sides of the dawn peninsula, an island in the inlet. Metres, unscaled.
     "ridges": [   # land4: noise 0.5 on every ridge (ADR-1994: the hills' own fBm); the spit and the north shore 42 m
-        {"name": "westHead", "points": [[-470, 120], [-330, 260], [-180, 330]], "height": 45, "width": 160, "noise": 0.5},
+        {"name": "westHead", "points": [[-470, 120], [-330, 260], [-180, 330]], "height": 27,   # draft10: -40% (owner: the left hills of the first 40 s "read as too tall")
+         "width": 160, "noise": 0.5},
         {"name": "eastHead", "points": [[620, 80], [480, 240], [320, 330]], "height": 45, "width": 160, "noise": 0.5},
-        {"name": "northShore", "points": [[-330, -560], [-200, -600], [-90, -610]], "height": 42, "width": 120, "noise": 0.5},
-        {"name": "baySpit", "points": [[-470, -420], [-330, -445], [-200, -430], [-90, -395]], "height": 42, "width": 110, "noise": 0.5},
+        {"name": "northShore", "points": [[-330, -560], [-200, -600], [-90, -610]], "height": 25,   # draft10: -40%
+         "width": 120, "noise": 0.5},
+        {"name": "baySpit", "points": [[-470, -420], [-330, -445], [-200, -430], [-90, -395]], "height": 25,   # draft10: -40%
+         "width": 110, "noise": 0.5},
         {"name": "sweepNorth", "points": [[-360, -1210], [-220, -1280], [-70, -1260]], "height": 40, "width": 150, "noise": 0.5},
         {"name": "tarnRidge", "points": [[250, -1700], [420, -1740], [560, -1745], [700, -1755]], "height": 36, "width": 120, "noise": 0.5},
         {"name": "capeEast", "points": [[1640, -1550], [1680, -1750], [1660, -1950], [1620, -2150]], "height": 48, "width": 150, "noise": 0.5},
@@ -104,6 +107,10 @@ TILES = {
     # cape's vale the dawn stream runs in. The sweep runs on into the river's valley: ending at (13, -1108), it left the
     # flight climbing a 60 m flank head-on (a wall filling the frame, 104-106 s). Each follows the flight line (the scratch mirror's track), 150 m wall to wall.
     "valleys": [
+        # draft10: the west shore's own hills (the 58 m plateau left of frame at 8-25 s) cut ~40%: a broad shallow dip
+        # along their crest (45% at the crest line, ~36% across the plateau, fading to ~10% at the shore)
+        {"name": "westShoreDip", "points": [[-610, 220], [-610, 60], [-600, -120], [-600, -360]], "valleyWidth": 420.0,
+         "depthFraction": 0.45},
         {"name": "pathVale", "points": [[35, -615], [-30, -680], [-114, -727], [-200, -770], [-284, -819], [-360, -876]],
          "valleyWidth": 150.0, "depthFraction": 0.85},
         {"name": "sweep", "points": [[-372, -905], [-352, -975], [-316, -1043], [-275, -1109], [-218, -1166], [-139, -1175], [-61, -1145], [13, -1108], [74, -1078], [150, -1062], [235, -1072]],
