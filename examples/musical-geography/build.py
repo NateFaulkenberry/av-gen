@@ -173,8 +173,9 @@ HOME_RADIUS = {"sea": 24.0, "pass": 1.0, "wild": 24.0, "ridge": 14.0}   # cpd-r4
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
-TOSS_GAIN, TOSS_MAX, TOSS_THRESHOLD = 14.0, 10.0, 0.4   # cpd-r3 final: the crest throw on the music (ADR-1998); was 30 / 11 / 0.2
+TOSS_GAIN, TOSS_MAX, TOSS_THRESHOLD = 6.25, 10.8, 0.4   # CPD-R7: launches leave from the crest top now (ADR-2000); feet 1.7-6.0 m over the launch, median ~3 (trace); was 14 / 10
 LAND_STRENGTH = 0.5   # cpd-r3 final: the landing spring (was 1.2): the springs, not the swell, moved a resting alien's tile
+THROW_CLIP_LIFT = 1.5   # CPD-R7 (ADR-2000): the Jumping clip lifts the feet 1.52 m itself; the arc gives that up
 HOP_CHANCE = 0.0     # cpd-r3 final: no random hops (was 0.05); the wave throws, and the walk still hops up steps
 AVOID_BANKS = 0.3     # ADR-1999: about a tile back from the inland water
 NIGHT_GLOW = 2.0
@@ -225,7 +226,7 @@ def cast_nodes(state="day"):
                      # THROW them (owner: "throw the aliens into the air"): launch speed = tossGain x the crest's rise,
                      # capped by tossMax; gain 30 / cap 11 m/s throws 2.4-6.2 m (p10-p90, median 3.9; eng's 16 / 9 measured 0.6-2.5, median 1.0)
                      "behaviors": [dict({"kind": "hop", "hopChance": HOP_CHANCE, "tossThreshold": TOSS_THRESHOLD, "tossGain": TOSS_GAIN,
-                                         "tossMax": TOSS_MAX, "tossCooldown": 3.0, "homeRadius": HOME_RADIUS[hab],
+                                         "tossMax": TOSS_MAX, "tossCooldown": 3.0, "throwClipLift": THROW_CLIP_LIFT, "homeRadius": HOME_RADIUS[hab],
                                          "goalMin": 2, "goalMax": 6, "pauseMin": 0.8, "pauseMax": 3.0,
                                          "airTime": 1.3, "apex": 3.0, "strength": LAND_STRENGTH,
                                          "avoidBanks": AVOID_BANKS}, **PREFS[hab])],
