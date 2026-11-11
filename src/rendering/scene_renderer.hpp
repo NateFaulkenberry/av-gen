@@ -1257,6 +1257,7 @@ private:
     bool entitySsrFailed_ = false;
     std::uint32_t entitySsrFeatures_ = 0x1FFu;
     bool glossySsrLogged_ = false;
+    bool waterLogged_ = false; // ADR-2020: the first frame's "water: K surface(s), C cinematic"
     bool glossySsrDrawn_ = false;
     std::array<wgpu::BindGroupEntry, 6> iblEntries_{}; // ADR-1820: the IBL group's entries, for the SSR's group 3
     wgpu::RenderPipeline litTexturedOpaqueCull_;

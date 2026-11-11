@@ -4586,6 +4586,14 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // the same place in an offline render as it is live, and the project verifies that by hashing
     // captured frames.
     {
+        // ADR-2020: said once, on the first frame that has any water, so a scene's water can be checked from the log
+        // (which of its surfaces take the cinematic path) the way its glossy SSR can.
+        if (!waterLogged_ && !scene.waters.empty()) {
+            const auto cinematic = std::ranges::count_if(
+                scene.waters, [](const scene::WaterSurface& w) { return w.settings.cinematic(); });
+            log::info("water: {} surface(s), {} cinematic", scene.waters.size(), cinematic);
+            waterLogged_ = true;
+        }
         waterUniforms_.clear();
         const float flowTime = static_cast<float>(time.renderTime);
         for (const scene::WaterSurface& surface : scene.waters) {

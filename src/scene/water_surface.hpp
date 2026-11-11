@@ -170,6 +170,11 @@ struct WaterSettings {
     [[nodiscard]] std::uint64_t structuralHash() const;
 };
 
+// How many water surfaces one scene may carry: the renderer's uniform slots (`rendering::kMaxWaterMaterials` is this
+// number). Here, in `scene`, so a scene file that asks for more can be refused where it is read (ADR-2020) instead of
+// the ninth surface quietly drawing with the first one's settings.
+inline constexpr std::uint32_t kMaxWaterSurfaces = 8;
+
 // One water surface in a scene, as the renderer receives it. `program` is the material-program name
 // the water entities of this surface carry, which is how a draw finds its settings without an index
 // on every entity in the world.

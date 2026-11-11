@@ -605,6 +605,11 @@ std::string terrainWaterProgramName(const std::string& node) {
     return node + "_water";
 }
 
+// ADR-2020: the name a gltf node's water material's entities and WaterSurface share.
+std::string gltfWaterProgramName(const std::string& node, const std::string& material) {
+    return node + "_water_" + material;
+}
+
 std::string prefixed(const std::string& prefix, const std::string& name) {
     if (name.empty() || prefix.empty() || name.compare(0, prefix.size(), prefix) == 0) {
         return name;
@@ -4401,6 +4406,8 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
     copy.floats = node.floats;
     copy.castsShadow = node.castsShadow; // ADR-1547 (it was missing here too)
     copy.program = node.program;         // ADR-1572
+    copy.waterMaterials = node.waterMaterials;         // ADR-2020
+    copy.waterMaterialsJson = node.waterMaterialsJson;
     // The live transform, not the one the node was born with: duplicating something you have just
     // moved has to duplicate it where it is now. The parameter is the value the flattened scene
     // uses, so it is the one that is true.
@@ -4720,6 +4727,33 @@ Result<CompositionNode*> Composition::addNode(CompositionNode node) {
             return std::unexpected(asset.error());
         }
         node.sceneAsset = std::move(*asset);
+        // ADR-2020: a `waterMaterials` name that matches nothing in the asset is said here, once per load, with
+        // the names that would have matched -- in the log and, through waterMaterialProblems(), in the project's
+        // warnings. A misspelt lake otherwise renders exactly as if the key were absent.
+        node.waterMaterialProblems.clear();
+        node.waterMaterialsLogged = false;
+        if (!node.waterMaterials.empty()) {
+            std::vector<std::string> available;
+            for (const Entity& e : node.sceneAsset->scene.entities) {
+                if (!e.materialName.empty() && std::ranges::find(available, e.materialName) == available.end()) {
+                    available.push_back(e.materialName);
+                }
+            }
+            std::string list;
+            for (const std::string& name : available) {
+                list += (list.empty() ? "" : ", ") + name;
+            }
+            for (const CompositionNode::WaterMaterial& m : node.waterMaterials) {
+                if (std::ranges::find(available, m.material) != available.end()) {
+                    continue;
+                }
+                std::string message =
+                    fmt::format("gltf node '{}': waterMaterials '{}' matches no material; available: {}", node.name,
+                                m.material, list.empty() ? "none (the asset names no materials)" : list);
+                log::warn("{}", message);
+                node.waterMaterialProblems.push_back(std::move(message));
+            }
+        }
         break;
     }
     case NodeKind::Scene: {
@@ -4838,6 +4872,14 @@ CompositionNode* Composition::findNode(const std::string& name) {
     const auto it = std::find_if(nodes_.begin(), nodes_.end(),
                                  [&](const std::unique_ptr<CompositionNode>& n) { return n->name == name; });
     return it == nodes_.end() ? nullptr : it->get();
+}
+
+std::vector<std::string> Composition::waterMaterialProblems() const {
+    std::vector<std::string> out;
+    for (const auto& node : nodes_) {
+        out.insert(out.end(), node->waterMaterialProblems.begin(), node->waterMaterialProblems.end());
+    }
+    return out;
 }
 
 const CompositionNode* Composition::findNode(const std::string& name) const {
@@ -7073,6 +7115,14 @@ void Composition::rebuild() {
             // Re-apply the node's request to the fresh rigs, at the timeline second it was first
             // made: a rebuild must not restart a walk cycle, so `animationAppliedAt` is kept.
             node.animationPushed = false;
+            // ADR-2020: what each of the node's water materials took, for its WaterSurface and its one info line.
+            struct WaterTally {
+                std::size_t entities = 0;
+                std::size_t triangles = 0;
+                float yLo = std::numeric_limits<float>::max();
+                float yHi = std::numeric_limits<float>::lowest();
+            };
+            std::vector<WaterTally> waterTally(node.waterMaterials.size());
             for (const Entity& src : asset.scene.entities) {
                 Entity e = src;
                 offsetEntityIds(e, meshOffset, textureOffset);
@@ -7087,10 +7137,75 @@ void Composition::rebuild() {
                     // of the scene before the first frame (route liveness: which programs a surface names) sees it
                     e.material.program = prefixed(sanitise(prefix_), node.program);
                 }
+                // ADR-2020: a material the node names in `waterMaterials` is drawn as water, set up exactly as a
+                // terrain's water chunk is -- its own style, a fresh material whose `program` is only the name the
+                // draw finds its WaterSurface by, double-sided, no shadow. The node's `program` and `roughnessScale`
+                // do not reach it. A skinned entity keeps the asset's material: the water pipeline draws a static
+                // sheet, and a posed one would be drawn at its bind pose.
+                if (!node.waterMaterials.empty() && !src.materialName.empty()) {
+                    const auto wm = std::ranges::find_if(
+                        node.waterMaterials,
+                        [&](const CompositionNode::WaterMaterial& m) { return m.material == src.materialName; });
+                    if (wm != node.waterMaterials.end() && wm->settings.enabled) {
+                        WaterTally& tally = waterTally[static_cast<std::size_t>(wm - node.waterMaterials.begin())];
+                        const MeshData& mesh = scene_.meshes[e.mesh];
+                        if (e.rig != kInvalidRig || mesh.skinned()) {
+                            if (!node.waterMaterialsLogged) {
+                                log::warn("gltf node '{}': water material '{}': entity '{}' is skinned; skipped, it "
+                                          "keeps the asset's material",
+                                          node.name, wm->material, e.name);
+                            }
+                        } else {
+                            e.style = MeshStyle::Water;
+                            e.material = Material{};
+                            e.material.baseColor = wm->settings.shallowColor;
+                            e.material.roughness = wm->settings.roughness;
+                            e.material.metallic = 0.0f;
+                            e.material.doubleSided = true;
+                            e.material.program =
+                                prefixed(sanitise(prefix_), gltfWaterProgramName(node.name, wm->material));
+                            e.material.surfaceClass = SurfaceClass::Water; // ADR-256
+                            e.castsShadow = false;
+                            ++tally.entities;
+                            tally.triangles += mesh.indices.size() / 3;
+                            if (!node.waterMaterialsLogged) {
+                                const glm::mat4 m = e.transform.matrix();
+                                for (const Vertex& v : mesh.vertices) {
+                                    const float y = (m * glm::vec4(v.position, 1.0f)).y;
+                                    tally.yLo = std::min(tally.yLo, y);
+                                    tally.yHi = std::max(tally.yHi, y);
+                                }
+                            }
+                        }
+                    }
+                }
                 scene_.entities.push_back(std::move(e));
                 range.restTransforms.push_back(src.transform);
                 range.restRoughness.push_back(src.material.roughness);
             }
+            for (std::size_t w = 0; w < node.waterMaterials.size(); ++w) {
+                const CompositionNode::WaterMaterial& wm = node.waterMaterials[w];
+                const WaterTally& tally = waterTally[w];
+                if (!wm.settings.enabled || tally.entities == 0) {
+                    continue; // an unmatched name was reported when the asset loaded; a skinned-only one above
+                }
+                WaterSurface surface;
+                surface.program = prefixed(sanitise(prefix_), gltfWaterProgramName(node.name, wm.material));
+                surface.settings = wm.settings;
+                // The vertex's normal is the water's flow lane (water.wgsl: xz the direction, y the speed as a
+                // fraction of this). An imported sheet's normal is its surface normal, so a flat lake reads as
+                // direction zero (the shader's +X fallback) at a fraction of 1: this is then the lake's whole drift,
+                // and the terrain's still-water floor is the honest number for a body with no current.
+                surface.fastestFlow = 0.05f;
+                scene_.waters.push_back(std::move(surface));
+                if (!node.waterMaterialsLogged) {
+                    log::info("gltf node '{}': water material '{}' -> {} entity(ies), {} triangles, bounds y "
+                              "[{:.2f}..{:.2f}], cinematic={} (ssr {:g}, skyMirror {:g})",
+                              node.name, wm.material, tally.entities, tally.triangles, tally.yLo, tally.yHi,
+                              wm.settings.cinematic() ? "yes" : "no", wm.settings.ssr, wm.settings.skyMirror);
+                }
+            }
+            node.waterMaterialsLogged = true;
             range.firstLight = scene_.lights.size();
             for (const PunctualLight& src : asset.scene.lights) {
                 PunctualLight light = src;
@@ -9130,7 +9245,8 @@ void Composition::applyParameters() {
             if (!node.castsShadow) {
                 e.castsShadow = false; // ADR-1547: only ever clears; the node flag is not a parameter
             }
-            if (!node.program.empty()) {
+            // ADR-2020: not onto a water entity, whose `program` is the name of its surface.
+            if (!node.program.empty() && e.style != MeshStyle::Water) {
                 e.material.program = prefixed(sanitise(prefix_), node.program); // ADR-1572
             }
             // ADR-903: the boost is the entity's emission lane, applied by the shader after any
@@ -11192,6 +11308,9 @@ nlohmann::json Composition::toJson() const {
         if (!node.program.empty()) {
             n["program"] = node.program; // ADR-1572: written only when set
         }
+        if (!node.waterMaterialsJson.is_null()) {
+            n["waterMaterials"] = node.waterMaterialsJson; // ADR-2020: as authored, written only when authored
+        }
         // Only when locked: an additive key that no existing scene carries, so a file written by
         // this build and read by an older one loses a working preference and nothing else, and a
         // file that was never locked round-trips byte for byte.
@@ -11766,6 +11885,105 @@ nlohmann::json Composition::toJson() const {
     }
     return j;
 }
+
+namespace {
+// A water object -- `terrain.water`, or one entry of a gltf node's `waterMaterials` (ADR-2020) -- read over `w`'s
+// current values. One reader for both, so the two accept the same keys, types, ranges and defaults by construction
+// rather than by two lists kept in step by hand. `where` opens every message ("node 'valley'"), which keeps the
+// terrain's messages the words they always were.
+Result<void> readWaterSettings(const json& wj, const std::string& where, WaterSettings& w) {
+    struct WaterFloat { const char* key; float* target; };
+    if (wj.contains("enabled")) {
+        if (!wj.at("enabled").is_boolean()) {
+            return fail("{}: water 'enabled' must be a boolean", where);
+        }
+        w.enabled = wj.at("enabled").get<bool>();
+    }
+    for (const WaterFloat& f :
+         {WaterFloat{"shallow", &w.shallow}, WaterFloat{"roughness", &w.roughness},
+          WaterFloat{"emissiveIntensity", &w.emissiveIntensity},
+          WaterFloat{"clarity", &w.clarity}, WaterFloat{"maxOpacity", &w.maxOpacity},
+          WaterFloat{"edgeFade", &w.edgeFade}, WaterFloat{"fresnel", &w.fresnel},
+          WaterFloat{"reflection", &w.reflection},
+          WaterFloat{"specular", &w.specular}, WaterFloat{"ripple", &w.ripple},
+          WaterFloat{"rippleScale", &w.rippleScale},
+          WaterFloat{"rippleSpeed", &w.rippleSpeed}, WaterFloat{"chop", &w.chop},
+          WaterFloat{"foam", &w.foam}, WaterFloat{"foamWidth", &w.foamWidth},
+          WaterFloat{"refraction", &w.refraction}, WaterFloat{"glow", &w.glow},
+          WaterFloat{"glowScale", &w.glowScale},
+          WaterFloat{"glowCoverage", &w.glowCoverage},
+          WaterFloat{"glowDepth", &w.glowDepth},
+          WaterFloat{"sparkle", &w.sparkle}, WaterFloat{"swell", &w.swell},
+          WaterFloat{"cascade", &w.cascade},
+          WaterFloat{"tears", &w.tears}, WaterFloat{"tearShear", &w.tearShear},
+          WaterFloat{"tearCoverage", &w.tearCoverage},
+          WaterFloat{"tearCell", &w.tearCell},
+          WaterFloat{"tearSpacing", &w.tearSpacing},
+          WaterFloat{"tearStretch", &w.tearStretch},
+          WaterFloat{"tearDrift", &w.tearDrift}, WaterFloat{"tearWind", &w.tearWind},
+          // ADR-1286: the cinematic path
+          WaterFloat{"ssr", &w.ssr}, WaterFloat{"ssrDistance", &w.ssrDistance},
+          WaterFloat{"ssrSteps", &w.ssrSteps}, WaterFloat{"ssrGain", &w.ssrGain},
+          WaterFloat{"transmission", &w.transmission},
+          WaterFloat{"undulation", &w.undulation},
+          WaterFloat{"undulationScale", &w.undulationScale},
+          WaterFloat{"roughnessVariation", &w.roughnessVariation},
+          WaterFloat{"streak", &w.streak}, WaterFloat{"reflectionRays", &w.reflectionRays},
+          WaterFloat{"tintPatches", &w.tintPatches},
+          WaterFloat{"tintPatchScale", &w.tintPatchScale}, WaterFloat{"glints", &w.glints},
+          // ADR-1643: the flow streaks
+          WaterFloat{"flowStreaks", &w.flowStreaks},
+          WaterFloat{"streakDensity", &w.streakDensity},
+          WaterFloat{"streakLength", &w.streakLength},
+          WaterFloat{"streakLines", &w.streakLines},
+          WaterFloat{"streakSpeed", &w.streakSpeed},
+          WaterFloat{"streakHighlight", &w.streakHighlight},
+          WaterFloat{"streakColorScale", &w.streakColorScale},
+          // ADR-1650: the sky mirror
+          WaterFloat{"skyMirror", &w.skyMirror}}) {
+        auto v = readFloat(wj, f.key, *f.target);
+        if (!v) {
+            return fail("{}: water: {}", where, v.error().message);
+        }
+        *f.target = *v;
+    }
+    // ADR-916: "wind" (the seams run along the scene wind) or an angle in radians
+    // about +Y, the wind's own convention (0 = +X, pi/2 = +Z).
+    if (wj.contains("tearDirection")) {
+        const json& d = wj.at("tearDirection");
+        if (d.is_string() && d.get<std::string>() == "wind") {
+            w.tearFollowsWind = true;
+        } else if (d.is_number()) {
+            w.tearFollowsWind = false;
+            w.tearAngle = d.get<float>();
+        } else {
+            return fail("{}: water 'tearDirection' must be \"wind\" or an angle in radians", where);
+        }
+    }
+    for (const auto& [key, target] : {std::pair{"shallowColor", &w.shallowColor},
+                                      std::pair{"deepColor", &w.deepColor},
+                                      std::pair{"emissiveColor", &w.emissiveColor},
+                                      std::pair{"reflectionTint", &w.reflectionTint},
+                                      std::pair{"foamColor", &w.foamColor},
+                                      std::pair{"glowColor", &w.glowColor},
+                                      std::pair{"sparkleColor", &w.sparkleColor},
+                                      std::pair{"absorption", &w.absorption},
+                                      std::pair{"reflectionTint2", &w.reflectionTint2},
+                                      std::pair{"streakColor1", &w.streakColor1},
+                                      std::pair{"streakColor2", &w.streakColor2},
+                                      std::pair{"streakColor3", &w.streakColor3}}) {
+        auto v = readVec<3>(wj, key, *target);
+        if (!v) {
+            return fail("{}: water: {}", where, v.error().message);
+        }
+        *target = *v;
+    }
+    if (auto vr = w.validate(); !vr) {
+        return fail("{}: {}", where, vr.error().message);
+    }
+    return {};
+}
+} // namespace
 
 Result<std::unique_ptr<Composition>> Composition::fromJson(const nlohmann::json& j,
                                                            assets::AssetRegistry& registry, int depth) {
@@ -13066,6 +13284,37 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 }
                 node.program = it->get<std::string>();
             }
+            if (const auto it = item.find("waterMaterials"); it != item.end()) { // ADR-2020
+                if (node.kind != NodeKind::Gltf) {
+                    return fail("node '{}': 'waterMaterials' applies to gltf nodes only", node.name);
+                }
+                if (!it->is_object()) {
+                    return fail("node '{}': 'waterMaterials' must be an object of glTF material name -> water",
+                                node.name);
+                }
+                for (const auto& [material, wj] : it->items()) {
+                    const std::string where = fmt::format("node '{}': waterMaterials '{}'", node.name, material);
+                    if (!wj.is_object()) {
+                        return fail("{}: must be an object (the keys terrain.water takes)", where);
+                    }
+                    CompositionNode::WaterMaterial wm;
+                    wm.material = material;
+                    if (auto read = readWaterSettings(wj, where, wm.settings); !read) {
+                        return std::unexpected(read.error());
+                    }
+                    node.waterMaterials.push_back(std::move(wm));
+                }
+                // A node alone cannot carry more surfaces than the renderer has slots; the scene-wide count (with
+                // the terrains' water) is checked once every node is read.
+                const auto enabled = std::ranges::count_if(
+                    node.waterMaterials, [](const CompositionNode::WaterMaterial& m) { return m.settings.enabled; });
+                if (enabled > static_cast<std::ptrdiff_t>(kMaxWaterSurfaces)) {
+                    return fail("node '{}': waterMaterials names {} enabled materials; a scene draws at most {} water "
+                                "surfaces (kMaxWaterMaterials)",
+                                node.name, enabled, kMaxWaterSurfaces);
+                }
+                node.waterMaterialsJson = *it;
+            }
             node.locked = *locked;
             node.emissiveBoost = *emissive;
             node.roughnessScale = *roughness;
@@ -13799,96 +14048,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                         if (!wj.is_object()) {
                             return fail("node '{}': terrain 'water' must be an object", node.name);
                         }
-                        world::WaterSettings& w = ts.water;
-                        if (wj.contains("enabled")) {
-                            if (!wj.at("enabled").is_boolean()) {
-                                return fail("node '{}': water 'enabled' must be a boolean", node.name);
-                            }
-                            w.enabled = wj.at("enabled").get<bool>();
-                        }
-                        for (const TerrainFloat& f :
-                             {TerrainFloat{"shallow", &w.shallow}, TerrainFloat{"roughness", &w.roughness},
-                              TerrainFloat{"emissiveIntensity", &w.emissiveIntensity},
-                              TerrainFloat{"clarity", &w.clarity}, TerrainFloat{"maxOpacity", &w.maxOpacity},
-                              TerrainFloat{"edgeFade", &w.edgeFade}, TerrainFloat{"fresnel", &w.fresnel},
-                              TerrainFloat{"reflection", &w.reflection},
-                              TerrainFloat{"specular", &w.specular}, TerrainFloat{"ripple", &w.ripple},
-                              TerrainFloat{"rippleScale", &w.rippleScale},
-                              TerrainFloat{"rippleSpeed", &w.rippleSpeed}, TerrainFloat{"chop", &w.chop},
-                              TerrainFloat{"foam", &w.foam}, TerrainFloat{"foamWidth", &w.foamWidth},
-                              TerrainFloat{"refraction", &w.refraction}, TerrainFloat{"glow", &w.glow},
-                              TerrainFloat{"glowScale", &w.glowScale},
-                              TerrainFloat{"glowCoverage", &w.glowCoverage},
-                              TerrainFloat{"glowDepth", &w.glowDepth},
-                              TerrainFloat{"sparkle", &w.sparkle}, TerrainFloat{"swell", &w.swell},
-                              TerrainFloat{"cascade", &w.cascade},
-                              TerrainFloat{"tears", &w.tears}, TerrainFloat{"tearShear", &w.tearShear},
-                              TerrainFloat{"tearCoverage", &w.tearCoverage},
-                              TerrainFloat{"tearCell", &w.tearCell},
-                              TerrainFloat{"tearSpacing", &w.tearSpacing},
-                              TerrainFloat{"tearStretch", &w.tearStretch},
-                              TerrainFloat{"tearDrift", &w.tearDrift}, TerrainFloat{"tearWind", &w.tearWind},
-                              // ADR-1286: the cinematic path
-                              TerrainFloat{"ssr", &w.ssr}, TerrainFloat{"ssrDistance", &w.ssrDistance},
-                              TerrainFloat{"ssrSteps", &w.ssrSteps}, TerrainFloat{"ssrGain", &w.ssrGain},
-                              TerrainFloat{"transmission", &w.transmission},
-                              TerrainFloat{"undulation", &w.undulation},
-                              TerrainFloat{"undulationScale", &w.undulationScale},
-                              TerrainFloat{"roughnessVariation", &w.roughnessVariation},
-                              TerrainFloat{"streak", &w.streak}, TerrainFloat{"reflectionRays", &w.reflectionRays},
-                              TerrainFloat{"tintPatches", &w.tintPatches},
-                              TerrainFloat{"tintPatchScale", &w.tintPatchScale}, TerrainFloat{"glints", &w.glints},
-                              // ADR-1643: the flow streaks
-                              TerrainFloat{"flowStreaks", &w.flowStreaks},
-                              TerrainFloat{"streakDensity", &w.streakDensity},
-                              TerrainFloat{"streakLength", &w.streakLength},
-                              TerrainFloat{"streakLines", &w.streakLines},
-                              TerrainFloat{"streakSpeed", &w.streakSpeed},
-                              TerrainFloat{"streakHighlight", &w.streakHighlight},
-                              TerrainFloat{"streakColorScale", &w.streakColorScale},
-                              // ADR-1650: the sky mirror
-                              TerrainFloat{"skyMirror", &w.skyMirror}}) {
-                            auto v = readFloat(wj, f.key, *f.target);
-                            if (!v) {
-                                return fail("node '{}': water: {}", node.name, v.error().message);
-                            }
-                            *f.target = *v;
-                        }
-                        // ADR-916: "wind" (the seams run along the scene wind) or an angle in radians
-                        // about +Y, the wind's own convention (0 = +X, pi/2 = +Z).
-                        if (wj.contains("tearDirection")) {
-                            const json& d = wj.at("tearDirection");
-                            if (d.is_string() && d.get<std::string>() == "wind") {
-                                w.tearFollowsWind = true;
-                            } else if (d.is_number()) {
-                                w.tearFollowsWind = false;
-                                w.tearAngle = d.get<float>();
-                            } else {
-                                return fail("node '{}': water 'tearDirection' must be \"wind\" or an angle in "
-                                            "radians",
-                                            node.name);
-                            }
-                        }
-                        for (const auto& [key, target] : {std::pair{"shallowColor", &w.shallowColor},
-                                                          std::pair{"deepColor", &w.deepColor},
-                                                          std::pair{"emissiveColor", &w.emissiveColor},
-                                                          std::pair{"reflectionTint", &w.reflectionTint},
-                                                          std::pair{"foamColor", &w.foamColor},
-                                                          std::pair{"glowColor", &w.glowColor},
-                                                          std::pair{"sparkleColor", &w.sparkleColor},
-                                                          std::pair{"absorption", &w.absorption},
-                                                          std::pair{"reflectionTint2", &w.reflectionTint2},
-                                                          std::pair{"streakColor1", &w.streakColor1},
-                                                          std::pair{"streakColor2", &w.streakColor2},
-                                                          std::pair{"streakColor3", &w.streakColor3}}) {
-                            auto v = readVec<3>(wj, key, *target);
-                            if (!v) {
-                                return fail("node '{}': water: {}", node.name, v.error().message);
-                            }
-                            *target = *v;
-                        }
-                        if (auto vr = w.validate(); !vr) {
-                            return fail("node '{}': {}", node.name, vr.error().message);
+                        if (auto read = readWaterSettings(wj, fmt::format("node '{}'", node.name), ts.water); !read) {
+                            return std::unexpected(read.error());
                         }
                     }
                     if (t.contains("flow")) {
@@ -13982,6 +14143,27 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                           parentName);
             }
             comp->findNode(child)->parent = parentName;
+        }
+        // ADR-2020: the scene-wide water count, refused here rather than drawn wrong (the renderer gives a surface
+        // past its last slot the first surface's settings). Counted only when a gltf node asks for water, so a scene
+        // of terrains alone keeps loading exactly as it did; each terrain's water is one surface whether or not any
+        // chunk of it carries water, which is what the flatten registers.
+        {
+            std::size_t terrainWaters = 0;
+            std::size_t gltfWaters = 0;
+            for (const auto& n : comp->nodes_) {
+                if (n->kind == NodeKind::Terrain && n->terrain.water.enabled) {
+                    ++terrainWaters;
+                }
+                for (const CompositionNode::WaterMaterial& m : n->waterMaterials) {
+                    gltfWaters += m.settings.enabled ? 1u : 0u;
+                }
+            }
+            if (gltfWaters > 0 && terrainWaters + gltfWaters > kMaxWaterSurfaces) {
+                return fail("{} water surfaces ({} from terrains, {} from gltf waterMaterials); a scene draws at most "
+                            "{} (kMaxWaterMaterials)",
+                            terrainWaters + gltfWaters, terrainWaters, gltfWaters, kMaxWaterSurfaces);
+            }
         }
         // ADR-1140 / ADR-1142: cross-object references are refused at load, by name, rather than
         // left to draw nothing (ADR-704: a binding that silently answers 0 is the defect). Both

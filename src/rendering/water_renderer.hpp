@@ -84,7 +84,7 @@ inline constexpr std::uint64_t kWaterUniformsPlainSize = 240;
 
 // How many distinct water materials one frame may carry. Uniform slots are cheap; the number is a
 // bound on the dynamic-offset buffer and nothing else.
-inline constexpr std::uint32_t kMaxWaterMaterials = 8;
+inline constexpr std::uint32_t kMaxWaterMaterials = scene::kMaxWaterSurfaces; // the scene file's limit (ADR-2020)
 
 // Fills a WaterUniforms from the authored settings. `flowTime` is the timeline second the surface
 // is being drawn at -- never a wall clock and never an accumulated delta, because an offline render
