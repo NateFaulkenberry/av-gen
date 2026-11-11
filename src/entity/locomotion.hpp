@@ -173,6 +173,9 @@ struct LocomotionState {
     // Clip seconds per timeline second. The gait's answer to a walk clip authored at 1.6 m/s being
     // played by a body moving at 2.0.
     float playbackRate = 1.0f;
+    // ADR-2000: `time` is the clip's origin and `playbackRate` its rate, set by the behaviour (EntityState::clipRate):
+    // the animation layer restarts the state on that clock rather than continuing it.
+    bool clipClock = false;
     // Cross-fade seconds into this state; negative leaves it to the animation state's own blendIn.
     float blend = -1.0f;
 };

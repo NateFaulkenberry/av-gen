@@ -1653,3 +1653,31 @@ render). Once you merge this branch, the same from your worktree's build.
 air. The largest bank channel under any body is 0. The closest a body comes to the camera in x-z is 4.9 m.
 Canary on the same build: alien00 on the low1 pond and alien01 on westStream with no behaviour read `water` 3 and 2.
 With the hop they are moved ashore and read 0, bank 1.0.
+
+### Engineering → art, CP-D r4 (2026-11-11): CPD-R7, the crest throw's timing and the Throw Lab (ADR-2000)
+
+**What the lab measured** (art's alien and hop settings, one 1.2 m wave; `14-pass-throw-lab/throwlab-plot-before.png`):
+- *Levitating*: the throw launched at the fastest rise and started `Jumping` there, but that clip keeps its feet on
+  its floor until clip 0.60 s: the alien rose 3 m in its crouch pose before the clip jumped at all.
+- *Launch vs crest*: 0.62 s before the crest's top.
+- *The apex hang*: at the apex the hop switched to `fall`, which your cast maps to `Floating` (a hover pose, the feet
+  0.7 m above the root): a 0.25 s cross-fade and 1.15 s of hovering before `Landing`.
+
+**What the engine does now (no change needed):** a crouch on the tile (riding the crest up, the clip's first 0.6 s),
+the pop at the crest's top, and the whole flight on `Jumping`, stretched so its feet come down as the body lands;
+`Landing` as before. Your `fall: Floating` mapping is no longer used by throws (walking hops still use it).
+
+**What to set (yours):**
+- `"throwClipLift": 1.5` on the cast's hop: the `Jumping` clip lifts the feet 1.52 m itself (at 1.94x), so the arc
+  gives that up and the jump peaks where `tossGain` says. Without it, throws peak 1.5 m higher than before.
+- Throws now leave from the crest's top, higher than before; retune `tossGain`/`tossMax` by eye.
+- Optional: `throwCrouchRate` < 1 for a slower, deeper crouch up the crest; `throwClipPop` / `throwClipDown` only if
+  you change the jump clip (0.60 / 1.12 for the aliens' `Jumping`).
+
+**The lab, for you** (CPU measure ~3 s, a clip ~1 min under the GPU lock):
+```
+cd /Users/natefaulkenberry/Documents/GitHub/av-gen-geography
+python3 tools/throw_lab.py --scene <build>/musical-geography.scene.json --project <build>/musical-geography.json \
+  --out <dir> --measure --plot --render --camera side   # or --camera close; --amplitude --wavelength --speed
+  # --sharpness --crest --tossGain --tossMax --tossThreshold --throwClipLift --tag
+```

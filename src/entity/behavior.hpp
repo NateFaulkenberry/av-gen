@@ -111,6 +111,10 @@ struct EntityState {
     // Without the distinction, `ground` writes `travel.y` back to the terrain every frame and the
     // lift is a cow standing in a beam looking startled.
     bool airborne = false;
+    // ADR-2000: a behaviour that times its clip itself (a crest throw's crouch and flight): the clip's local time is
+    // (t - clipOrigin) x clipRate from the timeline. clipRate 0: the gait's own clock, as always.
+    double clipOrigin = 0.0;
+    float clipRate = 0.0f;
     [[nodiscard]] glm::vec3 position() const { return anchor + travel; }
     // The unit vector the body is facing, from `yaw`. This engine's convention, stated in one place
     // rather than re-derived at each call site: `yaw = atan2(direction.x, direction.z)`

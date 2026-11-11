@@ -244,14 +244,25 @@ TEST_CASE("the ground a body is thrown by is the ground the renderer draws", "[t
     CHECK(worst < 1e-4f);
 }
 
-TEST_CASE("a throw comes at the fastest rise of the ground under the body", "[tiles][hop][geography][audio][adr1998]") {
-    // The owner: "it should look like the wave is throwing the alien upwards as it passes through". Each throw leaves
-    // at the instant the drawn ground under the body rises fastest on that swing: the rise there is at least the rise a
-    // step either side, and above the threshold. (ADR-1997 threw once the rise had fallen 10% under its best: after it.)
+TEST_CASE("a throw crouches on the rising tile, pops at the crest's top and flies on one clip clock",
+          "[tiles][hop][geography][audio][adr1998][adr2000]") {
+    // The owner (CPD-R7): "the popping animation will be timed with the crest of the wave (tile height max)". Each throw:
+    //   * a crouch first, on the tile's drawn top (riding the crest up), activity Jump, on the jump clip's clock whose
+    //     pop (0.60 clip s by default) falls on the launch;
+    //   * the launch at the crest's top: the ground under the body is at its highest that instant;
+    //   * the flight on the same state (no fall clip at the apex), the clip stretched so its feet come down (1.12 clip s)
+    //     as the body lands.
     Rig rig(4.0f);
-    std::vector<bool> was(3, false);
-    int checked = 0;
     const double step = 1.0 / 60.0;
+    struct Body {
+        bool air = false;
+        bool crouch = false;
+        int crouchFrames = 0;
+        double launch = -1.0;
+    };
+    std::vector<Body> bodies(3);
+    int launches = 0;
+    int landings = 0;
     for (long long k = 0; k <= 20 * 60; ++k) {
         const double t = static_cast<double>(k) * step;
         rig.frame(t, k == 0 ? 0.0 : step, static_cast<std::uint64_t>(k));
@@ -259,22 +270,46 @@ TEST_CASE("a throw comes at the fastest rise of the ground under the body", "[ti
         const world::GroundSource* g = rig.comp().entityWorld().ground();
         for (std::size_t i = 0; i < es.size(); ++i) {
             const entity::EntityState& st = es[i]->state();
-            if (st.airborne && !was[i]) {
-                const glm::vec2 c = g->cellCentre(st.position().x, st.position().z);
-                const auto rise = [&](double u) {
-                    return (g->landscape(c.x, c.y, u + 0.5 * step).height - g->landscape(c.x, c.y, u - 0.5 * step).height) /
-                           step;
-                };
-                CAPTURE(t, i, rise(t - step), rise(t), rise(t + step));
-                CHECK(rise(t) >= 0.3f);
-                CHECK(rise(t) >= rise(t - step) - 1e-4f);
-                CHECK(rise(t) >= rise(t + step) - 1e-4f);
-                ++checked;
+            Body& b = bodies[i];
+            const glm::vec2 c = g->cellCentre(st.position().x, st.position().z);
+            const bool crouching = !st.airborne && st.activity == entity::Activity::Jump;
+            if (crouching) {
+                // on the drawn top, on the clip clock, the pop still ahead
+                CAPTURE(t, i);
+                CHECK(std::abs(st.position().y - g->at(c.x, c.y, t).height) < 1e-3f);
+                CHECK(st.clipRate > 0.0f);
+                CHECK((t - st.clipOrigin) * st.clipRate <= 0.60 + 1e-3);
+                ++b.crouchFrames;
             }
-            was[i] = st.airborne;
+            if (st.airborne && !b.air) {
+                // the launch: the crest's top under the body, and the clip at its pop
+                const auto h = [&](double u) { return g->landscape(c.x, c.y, u).height; };
+                CAPTURE(t, i, h(t - step), h(t), h(t + step), b.crouchFrames);
+                CHECK(h(t) >= h(t - step) - 1e-3f); // the top, on the 60 Hz step grid (within a millimetre)
+                CHECK(h(t) >= h(t + step) - 1e-3f);
+                CHECK(b.crouch); // it crouched first
+                CHECK((t - st.clipOrigin) * st.clipRate == Catch::Approx(0.60).margin(0.03));
+                b.launch = t;
+                ++launches;
+            }
+            if (st.airborne) {
+                CHECK(st.activity == entity::Activity::Jump); // no fall clip at the apex
+            }
+            if (!st.airborne && b.air && b.launch >= 0.0) {
+                // the landing: the clip's feet come down as the body does (the last flying frame's clock)
+                ++landings;
+                b.crouchFrames = 0;
+            }
+            if (st.airborne && st.clipRate > 0.0f) {
+                CHECK((t - st.clipOrigin) * st.clipRate <= 1.12 + 1e-2);
+            }
+            b.air = st.airborne;
+            b.crouch = crouching;
         }
     }
-    CHECK(checked >= 3);
+    CAPTURE(launches, landings);
+    CHECK(launches >= 3);
+    CHECK(landings >= 2);
 }
 
 TEST_CASE("crest throws on the music, on a real project (measure)", "[.][tiles][hop][measure][adr1998]") {

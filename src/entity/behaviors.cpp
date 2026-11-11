@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -3624,6 +3625,10 @@ public:
           tossCooldownDefault_(readFloat(s, "tossCooldown", 3.0f)),
           tossMax_(readFloat(s, "tossMax", 9.0f)),
           avoidBanks_(readFloat(s, "avoidBanks", 0.0f)),
+          clipPop_(readFloat(s, "throwClipPop", 0.60f)),
+          clipDown_(readFloat(s, "throwClipDown", 1.12f)),
+          clipCrouchRate_(readFloat(s, "throwCrouchRate", 1.0f)),
+          clipLift_(readFloat(s, "throwClipLift", 0.0f)),
           gravity_(readFloat(s, "gravity", 9.81f)) {
         rules_.stepHeight = readFloat(s, "stepHeight", 0.6f);
         rules_.jumpTiles = static_cast<int>(readFloat(s, "jumpTiles", 3.0f));
@@ -3696,10 +3701,18 @@ public:
         state.speed = speed_;
         state.activity = activity_;
         state.airborne = phase_ == Phase::Air || phase_ == Phase::Toss;
+        // ADR-2000: the jump clip on the throw's own clock -- the crouch from its origin, the flight stretched over the
+        // air time -- so the pop is the crest's top and the feet come down as the body lands. 0: the gait's clock.
+        if (phase_ == Phase::Crouch || phase_ == Phase::Toss) {
+            state.clipOrigin = clipOrigin_;
+            state.clipRate = clipRate_;
+        } else {
+            state.clipRate = 0.0f;
+        }
     }
 
 private:
-    enum class Phase : std::uint8_t { Pause, Move, Air, Land, Toss };
+    enum class Phase : std::uint8_t { Pause, Move, Air, Land, Toss, Crouch };
 
     [[nodiscard]] static float value(const params::Parameter<float>* p, float d) { return p != nullptr ? p->value() : d; }
 
@@ -3800,17 +3813,42 @@ private:
                                 bestK = k;
                             }
                         }
+                        // ADR-2000: on to the crest's top -- where the rise falls to nothing -- which is where it pops
+                        int topK = bestK;
+                        bool top = false;
+                        if (k <= cap) {
+                            for (topK = bestK + 1; topK <= cap; ++topK) {
+                                if (groundRise(ground, pos_, t + topK * step) <= 0.0f) {
+                                    top = true;
+                                    break;
+                                }
+                            }
+                        }
                         armed_ = true;
                         armedTile_ = tile;
                         peak_ = best;
-                        launchAt_ = t + bestK * step;
-                        rescan_ = k > cap; // still climbing at the horizon: look again from there
+                        launchAt_ = t + (top ? topK : bestK) * step;
+                        peakAt_ = t + bestK * step;
+                        rescan_ = k > cap || !top; // still climbing at the horizon: look again from there
                     }
                 }
-                if (armed_ && !rescan_ && t >= launchAt_ - 1e-9) {
+                // A/B arm (the Throw Lab's "before"): ADR-1998's timing -- thrown at the fastest rise, no crouch, the clip
+                // on the gait's clock and switched to the fall at the apex
+                static const bool adr1998 = std::getenv("AVGEN_THROW_ADR1998") != nullptr;
+                if (adr1998 && armed_ && !rescan_ && t >= peakAt_ - 1e-9) {
                     toss(ground, t, peak_);
                     armed_ = false;
                     return;
+                }
+                // the crouch starts so that the clip's pop lands on the crest's top (mid-crouch when it armed late)
+                const double crouchAt = launchAt_ - static_cast<double>(clipPop_ / std::max(clipCrouchRate_, 0.05f));
+                if (!adr1998 && armed_ && !rescan_ && t >= crouchAt - 1e-9) {
+                    phase_ = Phase::Crouch;
+                    clipOrigin_ = crouchAt;
+                    clipRate_ = std::max(clipCrouchRate_, 0.05f);
+                    steps_.clear();
+                    wantsHop_.clear();
+                    leg_ = 0;
                 }
             } else {
                 armed_ = false;
@@ -3879,7 +3917,21 @@ private:
             }
             if (glm::dot(tossTo_ - tossFrom_, tossTo_ - tossFrom_) > 1e-6f) face(tossTo_ - tossFrom_, dt);
             speed_ = glm::length(tossTo_ - tossFrom_) / std::max(tossT_, 1e-3f);
-            activity_ = tossV0_ - gravity_ * tau > 0.0f ? Activity::Jump : Activity::Fall;
+            static const bool adr1998 = std::getenv("AVGEN_THROW_ADR1998") != nullptr; // the A/B arm
+            activity_ = adr1998 && tossV0_ - gravity_ * tau <= 0.0f ? Activity::Fall : Activity::Jump; // ADR-2000: one clip
+            break;
+        }
+        case Phase::Crouch: {
+            // ADR-2000: on the tile's drawn top, riding the crest up, crouching on the jump clip's clock; at the crest's
+            // top the pop: thrown at the swing's fastest rise, the flight on the same clip, stretched to the air time
+            y_ = ground.at(pos_.x, pos_.y, t).height;
+            activity_ = Activity::Jump;
+            if (t >= launchAt_ - 1e-9) {
+                armed_ = false;
+                toss(ground, t, peak_, clipLift_);
+                clipRate_ = std::max(clipDown_ - clipPop_, 0.05f) / std::max(tossT_, 0.05f);
+                clipOrigin_ = t - static_cast<double>(clipPop_ / clipRate_);
+            }
             break;
         }
         case Phase::Land: {
@@ -3911,8 +3963,11 @@ private:
     // (a resting body goes up and down where it stands), and down on a dry tile -- steered to the nearest one when the
     // course would end on water. The flight is solved now, on the planning surface, step by step, so where and when it
     // lands is what a seek replays; the drawn arc meets the drawn top at the landing (tossAt).
-    void toss(world::GroundSource& ground, double t, float crest) {
-        const float v0 = std::min(value(tossGain_, tossGainDefault_) * crest, tossMax_);
+    void toss(world::GroundSource& ground, double t, float crest, float lift = 0.0f) {
+        float v0 = std::min(value(tossGain_, tossGainDefault_) * crest, tossMax_);
+        if (lift > 0.0f) { // ADR-2000: the clip's own jump is part of the height
+            v0 = std::sqrt(std::max(v0 * v0 - 2.0f * gravity_ * lift, 0.25f * v0 * v0));
+        }
         tossFrom_ = pos_;
         const float flat = 2.0f * v0 / std::max(gravity_, 1e-3f); // the time aloft over level ground
         glm::vec2 to = pos_;
@@ -4055,7 +4110,15 @@ private:
     float pauseMin_, pauseMax_;
     int goalMin_, goalMax_;
     float wantFlat_, wantPath_, home_;
-    float tossThresholdDefault_, tossGainDefault_, tossCooldownDefault_, tossMax_, avoidBanks_, gravity_;
+    float tossThresholdDefault_, tossGainDefault_, tossCooldownDefault_, tossMax_, avoidBanks_;
+    // CPD-R7 (ADR-2000): the jump clip's own clock. `throwClipPop` is the clip second the feet leave the floor,
+    // `throwClipDown` the second they meet it again (the Glowmere aliens' `Jumping`, measured in the Throw Lab: 0.60
+    // and 1.12); the crouch before the pop plays at `throwCrouchRate`.
+    float clipPop_, clipDown_, clipCrouchRate_;
+    // ...and `throwClipLift`, how high the clip itself lifts the feet in its jump (m, at the body's scale; the aliens'
+    // 1.52 at 1.94x): the throw's arc gives up that much apex, so the drawn jump peaks where the throw says.
+    float clipLift_;
+    float gravity_;
     TileNavRules rules_;
     params::Parameter<float>* walk_ = nullptr;
     params::Parameter<float>* run_ = nullptr;
@@ -4095,6 +4158,9 @@ private:
     double launchAt_ = 0.0;     // ADR-1998: the swing's fastest instant, where the throw comes
     glm::ivec2 armedTile_{0};   // the tile it was found under
     bool rescan_ = false;       // the swing outran the look-ahead: look again at launchAt_
+    double peakAt_ = 0.0;       // the swing's fastest instant (the A/B arm throws there)
+    double clipOrigin_ = 0.0;   // ADR-2000: the jump clip's clock (origin, rate)
+    float clipRate_ = 0.0f;
     int tosses_ = 0;
     glm::vec2 tossFrom_{0.0f};
     glm::vec2 tossTo_{0.0f};
