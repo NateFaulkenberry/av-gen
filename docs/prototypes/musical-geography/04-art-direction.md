@@ -2111,3 +2111,24 @@ camera than 4.92 m.
   88 to 40 m.
 
 **Media:** `16-pass-cpd-r6/`.
+
+**r6b** (coordinator: the aliens must read big, not just busy):
+- **The near band** is now 5–14 m off the flown line. Its homes roam at least 4 m (three aliens are held at 1 m) and
+  its goals are 1–3 tiles away.
+- **Coast aliens:** eight on the shore beside the low bay and inlet legs.
+- **Cast:** 63 aliens, with the far ones cut to 3.
+- **Measured** (CPD-R6 trace on the final build, c63c):
+
+  | | Share |
+  |---|---|
+  | Frames with an alien within 15 m of the camera | 16% |
+  | Frames with an alien within 25 m | 32% |
+  | Largest on-screen alien within 25 m | 0.21 median, 0.31 p90 |
+  | Idle | 0.26 |
+  | Running | 25% |
+
+  Water 0 on every count; no body comes nearer the camera than 4.92 m.
+- **Live at 85 s** (c63b, the same cast with the earlier roaming): frame p99 31.7–33.6 ms against the 33 ms budget.
+- **Getting idle toward 0.2** without nearing the lens needs a lane-shaped home or a keep-out line (CPD-R10).
+- **Sunset water:** the river is now #6A5CF2 and the pond #7E6CF0. The day-to-sunset blend had made the vale river
+  grey-lilac at about 80 s; it now stays blue. As a side effect the main river at sunset is blue-violet, not pink.
