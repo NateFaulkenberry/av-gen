@@ -2024,3 +2024,41 @@ The sources stay in the hills.
 - **Lens and tiles:** no throw came near the lens, and the camera clipped no tiles, in any pass frame I checked.
 
 **On water:** the count needs CPD-R6, the per-body position trace (02-requests.md).
+
+**r4b: why passes 3–5 were small, measured on the CPD-R6 trace.**
+
+- **What it wasn't:** the aliens weren't wandering.
+- **Cause 1, the clearance held the camera high.** Over rough ground, `minClearance` 4 over the highest ground within
+  `clearanceRadius` 10 (plus the ring margin) kept the camera 5–9 m above a close-pass alien's feet. The alien left the
+  bottom of the frame while still 10–17 m away.
+  - **Change:** `minClearance` 2.5, `clearanceRadius` 6. These are scene values.
+  - **Guarantee:** the engine still holds the camera at least 3.6 m over the highest ground within 6 m.
+  - **Effect:** the route over the ground is unchanged. The camera is 0.6 m lower on average and at most 3.3 m lower,
+    only where the clearance used to bind.
+- **Cause 2, passes 4 and 5 sat on the outside of their turns.** The camera aims about 2.5 s ahead along the curve, so
+  it swung away from them and they left the side of the frame early.
+  - **Change:** both moved to the inside of their turns.
+- **Cause 3, bodies stand on 4 m tile centres.** That snap is what read as "wandering": 2–3 m from home. An alien could
+  end up 4.0 m from the line.
+  - **Change:** homes now sit on tile centres, with a 1 m home radius.
+- **Pass 1:** the bay waypoint moved 5 m east, so pass 1 now passes its island alien at 5.5 m instead of 10.4 m.
+
+**Distances on the trace:** the close-pass aliens pass at 4.9–6.2 m, and no body comes nearer the camera than 4.93 m.
+
+**Largest on-screen height** (share of frame height, full-resolution frames with a ruler):
+
+| Pass | Time | Light | Share |
+|---|---|---|---|
+| 1 | 48.9 s | day | ~0.27 |
+| 2 | 64.4 s | day | 0.41 (the r4 clip) |
+| 3 | 101.4 s | sunset | ~0.29 (feet below the frame) |
+| 4 | 148.1 s | night, mid-throw | ~0.30 |
+| 5 | 195.9 s | dawn | ~0.27 |
+
+**Water** (trace on the final build): 0 frames grounded on water, 0 landings on water, 0 frames airborne over water.
+The largest bank channel under any body is 0.
+
+**Skimming** (`cpd-r4b-skimming-*`, draft6 against r4b at the five spots that dropped most outside the passes):
+- **72.5 and 81 s** (the path leg, flown at 5 m): the nearest path tiles now fill the lower third, but the land ahead
+  and the horizon still read. Nothing brushes the lens.
+- **111, 189 and 204 s:** barely changed.
