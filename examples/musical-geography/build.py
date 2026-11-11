@@ -135,15 +135,15 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
 # cpd-r4 (owner: the aliens "feel too intentionally placed along the camera path ... they don't ever look big enough"):
 # the cast lives in the land, not along the line. Five close-pass aliens sit 4.5-9 m off the flight line where it flies
-# low (~50, 64, 101, 148, 196 s), held near home (2.5 m) so they cannot walk under the lens; the rest are scattered
+# low (~50, 64, 101, 148, 196 s), held near home (1 m), each on the inside of its turn (the look-ahead swings toward it; r4b: 4 and 5 were outside and left the frame early) so they cannot walk under the lens; the rest are scattered
 # groups (2-4) and loners, 30-250 m off the route, on slopes, ridges and the bay islands, with gaps where nobody is.
 # Placed on the flight mirror and terrain_mirror (dry, off the banks); planning: scratch r4/scatter.py (seed 7).
 CAST = [
     (68, -440, "pass"),
     (-63, -695, "pass"),
     (-35, -1128, "pass"),
-    (426, -1617, "pass"),
-    (1554, -1655, "pass"),
+    (422, -1606, "pass"),
+    (1542, -1654, "pass"),
     (-225, -952, "wild"),
     (-237, -958, "wild"),
     (62, -1306, "wild"),
@@ -169,7 +169,7 @@ CAST = [
     (228, -200, "sea"),
 ]
 CAST_FULL = []   # cpd-r4: one cast for every mode (was the route-side additions of the full piece)
-HOME_RADIUS = {"sea": 24.0, "pass": 2.5, "wild": 24.0, "ridge": 14.0}   # cpd-r4: a close-pass alien stays by the line, never on it
+HOME_RADIUS = {"sea": 24.0, "pass": 1.0, "wild": 24.0, "ridge": 14.0}   # cpd-r4: a close-pass alien stays by the line, never on it
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
