@@ -48,7 +48,7 @@ STATES = {
         sun="#FFF4E0", sun_int=4.0, amb="#A6B6FF", amb_int=0.3,
         land=["#A848C8", "#DC56AE", "#FF7486", "#FF9442", "#FFC03A"],   # r7: magenta-orchid lowlands, gold hill masses
         water=["#0B36D0", "#0F44E0", "#3A86FF", "#8CC6FF"], shallow="#2EC2D2", under="#4A3C9A",
-        path="#FFF5E2", path_emit=0.875, pad="#FF8FB4", pad_emit=0.0,
+        path="#FFDDA0", path_emit=0.875, pad="#FF8FB4", pad_emit=0.0,
         drift="#8E9CF2", drift_amt=0.14, edge="#FFF4C8", edge_gain=0.6, crest_gain=0.0,
         fog_mult=4.5, exposure=-0.5, saturation=1.6, look="punchy", bloom=0.25),
     "sunset": dict(

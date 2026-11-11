@@ -107,9 +107,10 @@ TILES = {
     ],
     # taller land so the top of the colour ramp (orange, yellow; 20-30 m) shows on the crowns (04- §3)
     "heightScale": 2.2,   # land2 (owner: "no long endless horizons"): 1.25 -> 2.2, hills to ~65 m
-    # from the bay's north shore up into the north-west hills (terrain_mirror.py --map shows the layout)
-    "path": [[40, -610], [-40, -690], [-150, -745], [-260, -800], [-360, -880], [-470, -940], [-590, -975],
-             [-720, -1010], [-830, -1090]],
+    # cpd-r4 (owner: the path "just starts in the middle of nowhere ... make it a continual path"): from the bay's north
+    # shore to the low1 pond under the crowns, one connected walk from water to water (was: on up into the north-west
+    # hills, ending on a bare hilltop)
+    "path": [[40, -610], [-40, -690], [-150, -745], [-260, -800], [-325, -880], [-338, -950], [-320, -1020]],
 }
 
 # The rings (ADR-1976 B), as engineering's fixture sets them (eng/make_ground.py, fd110d88): 1x slabs with the 8.5%

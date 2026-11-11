@@ -105,16 +105,21 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     {"position": [60, -250], "altitude": 12},                              # the bay (the approved route from here)
     {"position": [60, -430], "altitude": 6},                               # low over the moving sea
     {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
-    {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 10},       # along the lit path
+    {"follow": "path", "from": 0.0, "to": 0.85, "offset": 0, "altitude": 6},       # along the lit path (cpd-r4: to the pond, low: close pass 2)
     {"position": [-330, -1020], "altitude": 14, "speed": 24},              # over the crowns (CP-D: 22 -> 14)
     {"position": [-180, -1180], "altitude": 15, "speed": 26},              # the banked sweep north-east (17 -> 15)
+    {"position": [-87, -1157], "altitude": 5},                             # cpd-r4 close pass 3 (on the curve, low)
+    {"position": [6, -1112], "altitude": 5},
     {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river
     {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 10},     # up the valley on the river
     {"position": [300, -1560], "altitude": 30, "speed": 26},               # rise out of the valley at dusk
+    {"position": [356, -1588], "altitude": 8},                             # cpd-r4 close pass 4: drop to the coast
+    {"position": [456, -1620], "altitude": 5},
     {"position": [660, -1650], "altitude": 14, "speed": 27},               # east along the north coast
     {"position": [1060, -1580], "altitude": 8, "speed": 27},               # low across the inlet's moving sea: night
     {"position": [1400, -1480], "altitude": 14, "speed": 27},              # the far shore's low hills, the peak
-    {"position": [1560, -1720], "altitude": 12, "speed": 26},              # bank north along the east shore: dawn
+    {"position": [1534, -1635], "altitude": 5},                            # cpd-r4 close pass 5
+    {"position": [1560, -1720], "altitude": 6, "speed": 26},               # bank north along the east shore: dawn (12 -> 6)
     {"position": [1500, -2020], "altitude": 10, "speed": 24},              # down the peninsula
     {"position": [1420, -2320], "altitude": 8, "speed": 22},               # out low over the northern sea; the fade
 ])
@@ -128,26 +133,43 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # off. CP-C r3: the hills, sweep and river legs (clip +43..+79 s) fly higher, so those aliens sit 6 m off the line
 # (11 m on the river, off the water) on the INSIDE of each turn -- the side the camera banks toward -- placed on a
 # numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
+# cpd-r4 (owner: the aliens "feel too intentionally placed along the camera path ... they don't ever look big enough"):
+# the cast lives in the land, not along the line. Five close-pass aliens sit 9 m off the flight line where it flies
+# low (~50, 64, 101, 148, 196 s), held near home (4 m) so they cannot walk under the lens; the rest are scattered
+# groups (2-4) and loners, 30-250 m off the route, on slopes, ridges and the bay islands, with gaps where nobody is.
+# Placed on the flight mirror and terrain_mirror (dry, off the banks); planning: scratch r4/scatter.py (seed 7).
 CAST = [
-    (228, -200, "sea"), (160, -450, "sea"), (72, -470, "sea"),   # cpd-r3: 00/01 off the water, onto the bay islands             # low over the moving sea
-    (30, -640, "path"), (-48, -700, "path"), (-170, -742, "path"),     # the shore and the lit path
-    (-268, -812, "path"),
-    (-356, -945, "crown"), (-276, -1043, "crown"), (-266, -1112, "crown"),   # rising over the crowns (banking right)
-    (-184, -1166, "crown"), (-118, -1163, "crown"),                          # the banked sweep (right)
-    (98, -1075, "bank"), (196, -1051, "bank"), (267, -1045, "bank"),        # down toward the river (banking left)
-    (310, -1096, "bank"),                                                    # onto the river, its left bank
+    (68, -440, "pass"),
+    (-64, -692, "pass"),
+    (-37, -1124, "pass"),
+    (425, -1622, "pass"),
+    (1558, -1653, "pass"),
+    (-225, -952, "wild"),
+    (-237, -958, "wild"),
+    (62, -1306, "wild"),
+    (69, -1301, "wild"),
+    (61, -1296, "wild"),
+    (290, -1254, "wild"),
+    (272, -1280, "wild"),
+    (238, -1523, "wild"),
+    (203, -1530, "wild"),
+    (217, -1530, "wild"),
+    (1577, -1489, "wild"),
+    (1569, -1491, "wild"),
+    (-397, -791, "wild"),
+    (-300, -1210, "ridge"),
+    (-138, -1147, "wild"),
+    (135, -1316, "ridge"),
+    (497, -1465, "wild"),
+    (603, -1750, "wild"),
+    (590, -1555, "ridge"),
+    (1484, -1873, "wild"),
+    (1689, -1722, "ridge"),
+    (60, 10, "sea"),
+    (228, -200, "sea"),
 ]
-HOME_RADIUS = {"sea": 30.0, "path": 30.0, "crown": 14.0, "bank": 14.0, "inlet": 14.0}   # cpd-r3: >= 14 (ADR-1997)
-# CP-D (the full song; draft2 positions for the new intro, which runs ~10 s longer): the intro's sea, the sweep's return leg (the CP-C r3 gap at clip +60..66 s), and the night and
-# dawn legs -- each 7 m off the flight line on the inside of its turn (the flight mirror), at its song time
-CAST_FULL = [
-    (60, 10, "sea"), (-485, -25, "bank"), (-510, -200, "sea"),   # cpd-r3: off the water (the south island, the west shore)          # 6, 14, 22 s: the bay, its west shore
-    (-38, -1126, "crown"),                                                  # 92 s: the sweep's return leg
-    (414, -1601, "crown"), (648, -1642, "bank"), (887, -1614, "bank"),     # 137-155 s: the north coast at night
-    (1180, -1735, "inlet"), (1352, -1485, "bank"),                          # 164-173 s: the inlet, the far shore
-    (1509, -1596, "bank"), (1553, -1792, "crown"),                          # 181-189 s: banking north at dawn
-    (1533, -1881, "bank"),                                                  # ~203 s: the peninsula (draft2 timing)
-]
+CAST_FULL = []   # cpd-r4: one cast for every mode (was the route-side additions of the full piece)
+HOME_RADIUS = {"sea": 24.0, "pass": 4.0, "wild": 24.0, "ridge": 14.0}   # cpd-r4: a close-pass alien stays by the line, never on it
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
@@ -169,10 +191,9 @@ def cast_lights(state):
             for i in range(len(cast()))]
 PREFS = {  # where each habitat's aliens like to go (ADR-1997: nobody stands on water, so no preferWater)
     "sea": {"preferCrowns": 0.2, "preferPath": 0.1},
-    "path": {"preferCrowns": 0.5, "preferPath": 0.3},
-    "crown": {"preferCrowns": 1.0, "preferPath": 0.1},
-    "bank": {"preferCrowns": 0.4, "preferPath": 0.1},
-    "inlet": {"preferCrowns": 0.2, "preferPath": 0.1},
+    "pass": {"preferCrowns": 0.0, "preferPath": 0.0},
+    "wild": {"preferCrowns": 0.3, "preferPath": 0.2},
+    "ridge": {"preferCrowns": 1.0, "preferPath": 0.0},
 }
 # the landing spring, sized to read at cruise height on 4 m tiles (CP-C used depth 0.7 / ripple 5 m at 1 m)
 # the landing spring: the original (owner, CP-D r2: eng's soft 0.7 Hz / 0.35 arm rejected -- "the other bounces look much
