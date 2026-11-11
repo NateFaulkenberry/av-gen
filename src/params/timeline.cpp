@@ -117,6 +117,8 @@ float interpolateComponent(const std::vector<Key>& keys, std::size_t i, std::siz
     return left.value[c];
 }
 
+} // namespace
+
 float applyTrackMode(TrackMode mode, float current, float value) {
     switch (mode) {
     case TrackMode::Replace:
@@ -128,6 +130,8 @@ float applyTrackMode(TrackMode mode, float current, float value) {
     }
     return current;
 }
+
+namespace {
 
 bool keyTimesMatch(double a, double b) {
     return std::abs(a - b) <= kKeyTimeEpsilon;

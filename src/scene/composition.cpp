@@ -1407,8 +1407,24 @@ void Composition::updateAttractorWorld() {
 void Composition::applyFlightCamera(float& fovDegrees) {
     flightRollDegrees_ = 0.0f;
     flightActive_ = false;
-    if (!flight_.enabled || flight_.route.size() < 2) {
+    if (ensureFlightTable() == nullptr) {
         return;
+    }
+    const FlightPose pose = flightPoseAt(flight_, flightTable_, currentTime_);
+    scene_.camera.position = pose.eye;
+    scene_.camera.target = pose.target;
+    flightUp_ = pose.up;
+    flightActive_ = true;
+    scene_.camera.farPlane = std::max(scene_.camera.farPlane, 4000.0f);
+    if (flight_.fov > 0.0f) {
+        fovDegrees = flight_.fov;
+    }
+    flightRollDegrees_ = pose.rollDegrees;
+}
+
+const FlightTable* Composition::ensureFlightTable(bool evenDisabled) {
+    if ((!flight_.enabled && !evenDisabled) || flight_.route.size() < 2) {
+        return nullptr;
     }
     const ProceduralGeometry* ground = nullptr;
     for (const ProceduralGeometry& p : scene_.procedurals) {
@@ -1420,7 +1436,7 @@ void Composition::applyFlightCamera(float& fovDegrees) {
         }
     }
     if (ground == nullptr) {
-        return;
+        return nullptr;
     }
     const TileDynamics& dyn = volumeSetting_.tileDynamics;
     const glm::vec3 offset(ground->distributionTransform.matrix()[3]);
@@ -1477,7 +1493,7 @@ void Composition::applyFlightCamera(float& fovDegrees) {
             log::warn("flight: {}", resolved.error().message);
             flightKey_ = key;
             flightTable_ = {};
-            return;
+            return nullptr;
         }
         for (FlightWaypoint& w : resolved->route) w.position += glm::vec2(offset.x, offset.z);
         flightResolved_ = std::move(*resolved);
@@ -1490,16 +1506,7 @@ void Composition::applyFlightCamera(float& fovDegrees) {
         flightTable_ = buildFlightTable(flightResolved_, world, flightLiveMargin(dyn, flight_.amplitudeHeadroom));
         flightKey_ = key;
     }
-    const FlightPose pose = flightPoseAt(flight_, flightTable_, currentTime_);
-    scene_.camera.position = pose.eye;
-    scene_.camera.target = pose.target;
-    flightUp_ = pose.up;
-    flightActive_ = true;
-    scene_.camera.farPlane = std::max(scene_.camera.farPlane, 4000.0f);
-    if (flight_.fov > 0.0f) {
-        fovDegrees = flight_.fov;
-    }
-    flightRollDegrees_ = pose.rollDegrees;
+    return flightTable_.valid() ? &flightTable_ : nullptr;
 }
 
 void Composition::applyAttractorCamera(float& fovDegrees) {
@@ -3652,7 +3659,7 @@ void Composition::updateBehaviour(const FrameTime& time, const signals::SignalBu
     for (const auto& sink : animationSinks_) {
         sink->prepareChain();
     }
-    refreshTileGround(); // ADR-1955: the ground as it will be drawn, before the bodies stand on it
+    refreshTileGround(time.renderTime); // ADR-1955: the ground as it will be drawn, before the bodies stand on it
     entityWorld_.update(update, *params_);
 }
 
@@ -3908,6 +3915,7 @@ std::uint64_t Composition::replayInputKey() const {
     };
     mix(staging_.epoch());
     mix(stagingDesc_.empty() ? 0u : 1u);
+    mix(tileMotion_ != nullptr ? tileMotion_->key : 0u); // ADR-1998: the music the ground moves to
     for (const Performer& p : performers_) { // ADR-758: a changed performance is a different replay
         mix(p.signature);
     }
@@ -4017,7 +4025,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
             };
         }
         tileGround_.forgetAfter(seconds); // ADR-1954: the landings that had not happened yet
-        refreshTileGround();
+        refreshTileGround(seconds);
         entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
         return;
     }
@@ -4093,7 +4101,7 @@ void Composition::seekWithDirector(double seconds, params::ParameterSet& params,
     };
     hooks.inputKey = withSignalKey(withHistoryKey(replayInputKey(), history), signals, reactions);
     tileGround_.forgetAfter(seconds); // ADR-1954: the landings that had not happened yet
-    refreshTileGround();
+    refreshTileGround(seconds);
     entityWorld_.seek(seconds, &params, bus, step, budget, &hooks);
     seekPlaced_ = placement.placed();
     seekPlacedValid_ = placement.valid();
@@ -9260,6 +9268,12 @@ void Composition::updateTileDynamics(const FrameTime& time) {
     }
     const TileDynamicsParams& p = tileDynamicsParams_;
     const auto now = static_cast<float>(time.renderTime);
+    if (tileMotion_ != nullptr && tileMotion_->hasRings && !tileMotionLive_) {
+        // ADR-1998: the rings the song drops, where it drops them, whatever the playhead did to get here
+        tileMotion_->apply(scene_.environment.tileDynamics, time.renderTime);
+        tileLastTime_ = time.renderTime;
+        return;
+    }
     if (tileLastTime_ >= 0.0 && time.renderTime < tileLastTime_ - 1e-4) {
         std::erase_if(tileLiveEvents_, [now](const TileEvent& e) { return e.time > now; });
         tileTriggerPrevious_ = 0.0f;
@@ -9325,6 +9339,9 @@ TileDynamics Composition::liveTileDynamics() const {
             d.landingColor = p.landingColor->value();
         }
         d.live = tileLiveEvents_;
+        if (tileMotion_ != nullptr && !tileMotionLive_) {
+            tileMotion_->apply(d, currentTime_); // ADR-1998: the song's ground at this instant, as every body reads it
+        }
     }
     return out;
 }
@@ -9362,7 +9379,142 @@ TileDynamics Composition::baseTileDynamics() const {
     return out;
 }
 
-void Composition::refreshTileGround() {
+// ---- ADR-1998: the moving ground's music as a function of song time ----
+
+std::vector<params::IParameter*> Composition::tileMotionParameters() const {
+    std::vector<params::IParameter*> out;
+    if (!tileDynamicsAuthored_) {
+        return out;
+    }
+    const TileDynamicsParams& p = tileDynamicsParams_;
+    const auto add = [&out](params::IParameter* q) {
+        if (q != nullptr) out.push_back(q);
+    };
+    add(p.amplitude);
+    for (std::size_t i = 0; i < kMaxTileWaves; ++i) {
+        add(p.waveAmplitude[i]);
+        add(p.waveSpeed[i]);
+        add(p.waveWavelength[i]);
+        add(p.waveDirection[i]);
+        add(p.waveOnLand[i]);
+    }
+    add(p.breathingAmplitude);
+    add(p.breathingPeriod);
+    add(p.rollingX);
+    add(p.rollingZ);
+    add(p.ringAmplitude);
+    add(p.ringSpeed);
+    add(p.ringDecay);
+    add(p.ringTrigger);
+    add(p.ringStrength);
+    add(p.ringX);
+    add(p.ringZ);
+    add(p.ringAhead);
+    return out;
+}
+
+bool Composition::tileMotionLane(const params::IParameter* q, TileMotionField& field, int& wave) const {
+    const TileDynamicsParams& p = tileDynamicsParams_;
+    wave = -1;
+    const auto is = [q](const params::Parameter<float>* x) { return x != nullptr && x == q; };
+    if (is(p.amplitude)) { field = TileMotionField::Amplitude; return true; }
+    for (std::size_t i = 0; i < kMaxTileWaves; ++i) {
+        wave = static_cast<int>(i);
+        if (is(p.waveAmplitude[i])) { field = TileMotionField::WaveAmplitude; return true; }
+        if (is(p.waveSpeed[i])) { field = TileMotionField::WaveSpeed; return true; }
+        if (is(p.waveWavelength[i])) { field = TileMotionField::WaveWavelength; return true; }
+        if (is(p.waveDirection[i])) { field = TileMotionField::WaveDirection; return true; }
+        if (is(p.waveOnLand[i])) { field = TileMotionField::WaveOnLand; return true; }
+    }
+    wave = -1;
+    if (is(p.breathingAmplitude)) { field = TileMotionField::BreathingAmplitude; return true; }
+    if (is(p.breathingPeriod)) { field = TileMotionField::BreathingPeriod; return true; }
+    if (is(p.rollingX)) { field = TileMotionField::RollingX; return true; }
+    if (is(p.rollingZ)) { field = TileMotionField::RollingZ; return true; }
+    if (is(p.ringAmplitude)) { field = TileMotionField::RingAmplitude; return true; }
+    if (is(p.ringSpeed)) { field = TileMotionField::RingSpeed; return true; }
+    if (is(p.ringDecay)) { field = TileMotionField::RingDecay; return true; }
+    return false; // the trigger and what places a ring: not a lane
+}
+
+void Composition::setTileMotionSeries(std::shared_ptr<const TileMotionSeries> series) {
+    tileMotionSeries_ = std::move(series);
+    rebuildTileMotion();
+}
+
+void Composition::rebuildTileMotion() {
+    if (tileMotionSeries_ == nullptr || !tileDynamicsAuthored_ || tileMotionLive_) {
+        tileMotion_.reset();
+        tileMotionBuiltKey_ = 0;
+        return;
+    }
+    const TileMotionSeries& series = *tileMotionSeries_;
+    const TileDynamicsParams& p = tileDynamicsParams_;
+    const auto find = [&series](const params::IParameter* q) -> const std::vector<float>* {
+        for (const auto& [param, values] : series.values) {
+            if (param == q && q != nullptr) return &values;
+        }
+        return nullptr;
+    };
+    const std::vector<float>* trigger = find(p.ringTrigger);
+    // the rings ahead of the camera are placed by the flight's camera, which is a function of time; with no flight a
+    // ring ahead cannot be placed before the frame, so the rings stay live (ADR-1953)
+    const float aheadBase = p.ringAhead != nullptr ? p.ringAhead->baseComponent(0) : 0.0f;
+    const std::vector<float>* aheadSeries = find(p.ringAhead);
+    const bool needsCamera = aheadBase > 0.0f || aheadSeries != nullptr;
+    // a disabled flight still says where the film's camera is: a review camera parked elsewhere sees the film's rings
+    const FlightTable* table = trigger != nullptr && needsCamera ? ensureFlightTable(true) : nullptr;
+    const bool rings = trigger != nullptr && (!needsCamera || table != nullptr);
+    std::uint64_t key = series.key ^ (rings && needsCamera ? flightKey_ * 0x9e3779b97f4a7c15ull : 0u);
+    key = key == 0 ? 1 : key;
+    if (tileMotion_ != nullptr && key == tileMotionBuiltKey_) {
+        return;
+    }
+    auto track = std::make_shared<TileMotionTrack>();
+    track->rate = series.rate;
+    track->key = key;
+    for (const auto& [param, values] : series.values) {
+        TileMotionTrack::Lane lane;
+        if (tileMotionLane(param, lane.field, lane.wave)) {
+            lane.values = values;
+            track->lanes.push_back(std::move(lane));
+        }
+    }
+    if (rings) {
+        // the trigger's rising edges through 0.5 on the grid, as `updateTileDynamics` finds them per frame
+        track->hasRings = true;
+        const auto at = [&](const params::Parameter<float>* q, std::size_t k, float fallback) {
+            if (q == nullptr) return fallback;
+            if (const std::vector<float>* v = find(q); v != nullptr && !v->empty()) return (*v)[std::min(k, v->size() - 1)];
+            return q->baseComponent(0);
+        };
+        float previous = 0.0f;
+        for (std::size_t k = 0; k < trigger->size(); ++k) {
+            const float x = (*trigger)[k];
+            if (x >= 0.5f && previous < 0.5f) {
+                const double t = static_cast<double>(k) / series.rate;
+                TileEvent e;
+                e.time = static_cast<float>(t);
+                e.strength = at(p.ringStrength, k, 1.0f);
+                const float ahead = at(p.ringAhead, k, 0.0f);
+                if (ahead > 0.0f && table != nullptr) {
+                    const FlightPose pose = flightPoseAt(flight_, *table, t);
+                    glm::vec2 heading(pose.target.x - pose.eye.x, pose.target.z - pose.eye.z);
+                    heading = glm::dot(heading, heading) > 1e-8f ? glm::normalize(heading) : glm::vec2(0.0f, -1.0f);
+                    e.position = glm::vec2(pose.eye.x, pose.eye.z) + heading * ahead;
+                } else {
+                    e.position = {at(p.ringX, k, 0.0f), at(p.ringZ, k, 0.0f)};
+                }
+                track->rings.push_back(e);
+            }
+            previous = x;
+        }
+    }
+    tileMotion_ = std::move(track);
+    tileMotionBuiltKey_ = key;
+}
+
+void Composition::refreshTileGround(double now) {
     const ProceduralGeometry* ground = nullptr;
     for (const ProceduralGeometry& p : scene_.procedurals) {
         if (p.distribution.generator.isTiles() &&
@@ -9377,8 +9529,40 @@ void Composition::refreshTileGround() {
         return;
     }
     tileGroundOffset_ = glm::vec3(ground->distributionTransform.matrix()[3]);
-    tileGround_.set(ground->distribution.generator.tiles, liveTileDynamics(), baseTileDynamics(),
-                    ground->distribution.generator.cellSize, tileGroundOffset_);
+    rebuildTileMotion();
+    if (tileMotionLive_ && tileDynamicsAuthored_) {
+        // ADR-1998, live: the bodies read the live ground (its finals and live rings), and the lanes run from the last
+        // frame's values to this one's, so a swell's rise between the two frames reaches the crest a body feels
+        const TileDynamics live = liveTileDynamics();
+        const std::vector<params::IParameter*> inputs = tileMotionParameters();
+        std::vector<float> nowValues;
+        nowValues.reserve(inputs.size());
+        for (const params::IParameter* q : inputs) nowValues.push_back(q->finalComponent(0));
+        auto track = std::make_shared<TileMotionTrack>();
+        const bool continues = tileLivePreviousTime_ >= 0.0 && now > tileLivePreviousTime_ &&
+                               now - tileLivePreviousTime_ < 0.5 && tileLivePrevious_.size() == nowValues.size();
+        track->start = continues ? tileLivePreviousTime_ : now;
+        track->rate = continues ? 1.0 / (now - tileLivePreviousTime_) : 60.0;
+        std::size_t i = 0;
+        for (const params::IParameter* q : inputs) {
+            TileMotionTrack::Lane lane;
+            if (tileMotionLane(q, lane.field, lane.wave)) {
+                lane.values = continues ? std::vector<float>{tileLivePrevious_[i], nowValues[i]}
+                                        : std::vector<float>{nowValues[i]};
+                track->lanes.push_back(std::move(lane));
+            }
+            ++i;
+        }
+        tileLivePrevious_ = std::move(nowValues);
+        tileLivePreviousTime_ = now;
+        tileGround_.set(ground->distribution.generator.tiles, live, live, ground->distribution.generator.cellSize,
+                        tileGroundOffset_);
+        tileGround_.setMotion(std::move(track));
+    } else {
+        tileGround_.set(ground->distribution.generator.tiles, liveTileDynamics(), baseTileDynamics(),
+                        ground->distribution.generator.cellSize, tileGroundOffset_);
+        tileGround_.setMotion(tileMotion_);
+    }
     entityWorld_.setGround(&tileGround_);
 }
 

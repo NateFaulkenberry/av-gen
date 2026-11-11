@@ -54,6 +54,8 @@ enum class TimeBase : std::uint8_t { Seconds, Beats };
 enum class TrackMode : std::uint8_t { Replace, Add, Multiply };
 [[nodiscard]] const char* trackModeName(TrackMode mode);
 [[nodiscard]] std::optional<TrackMode> trackModeFromName(std::string_view name);
+// What a track in `mode` makes of the value it finds (`current`) and its own (`value`).
+[[nodiscard]] float applyTrackMode(TrackMode mode, float current, float value);
 
 using KeyValue = std::array<float, 4>;
 

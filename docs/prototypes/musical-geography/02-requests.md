@@ -1532,3 +1532,55 @@ near flank rises through it.
 
 - Those within 48 m of land move ashore by themselves.
 - The bay's sea aliens (00, 01, 16, 18) may be further out than that. Please put them on the islands or the shore.
+
+### Engineering → art, CP-D r3 (2026-11-10): throws on the music, timed by the crest (ADR-1998)
+
+**The cause.** ADR-1997's throws read the tile parameters' bases: the routes (`response.low` on the swell, the
+onset rings, the energy on the breath) were left out because a seek did not replay them. On your close clip
+(alien09, 41-50 s, e37d3787) the drawn swell's rise under the alien peaked at 0.87 m/s at 43.4 s; the surface the
+throw read peaked at 0.37 m/s at 43.8 s; the rule fired once that had fallen 10% (44.1 s), and the drawn crest's top
+then passed under the alien while it was 5 m up. That is the owner's "jumps before the wave reaches him".
+Plot: `12-pass-cpd-r3/cpd-r3-musictoss-timing-plot-alien09-41-50s-before-left-after-right.png`.
+
+**What changed in the engine (no scene change needed):**
+- Offline, the routes onto the ground are run once over the song (36 ms for Feline) and every surface reads that
+  record at the instant it asks about: the drawn ground, the bodies' stance and plan, and the throw. The crest that
+  throws an alien is the crest drawn under it, music and rings included; seek equals play; 30 and 60 fps agree.
+- A throw now comes at the fastest rise of the swing under the alien (it looks ahead along the swing), at that speed.
+- Live: the bodies read the live ground.
+- Rings ahead of the camera are placed by the flight's camera even with `flight.enabled: false`, so a parked review
+  camera sees (and is thrown by) the film's rings. Remove the flight from a review scene and the rings stay live.
+
+**What you will see, and what to tune (yours):**
+- The swell's rise is now 0.5-1.2 m/s and the rings' fronts 3-5 m/s, so at `tossGain` 30 nearly every throw hits
+  `tossMax` 11 (6.2 m). Alien05, 0-60 s: 3 launches before, 12 after (`cpd-r3-musictoss-plot-alien05-0-60s.png`).
+- At `onLand` 0.5 the land's swell is too small to read under a 6 m throw, and the tile under a resting alien is
+  mostly moved by landing springs (±2-6 m/s), which the throw does not read. A canary of a tuning, mine, not a
+  proposal: waves `onLand` 1.0, `tossThreshold` 0.5, `tossGain` 8, `tossMax` 9, hop `strength` 0.5. There the crest
+  band visibly passes under alien09 and lifts it (`cpd-r3-musictoss-timing-close-alien09-40-55s-after-tuning-canary.mp4`).
+  At your values: `cpd-r3-musictoss-timing-close-alien09-41-50s-before-left-after-right.mp4`.
+
+### Engineering → art, CP-D r3 (2026-11-10): CPD-R4 is built (ADR-1999)
+
+1. **The inland shore**, `tiles.bankWidth` (default 8 m, 0 = none): 1 at a pond's or river's waterline, 0 a bank's
+   width out; inside the water over the same width (at most to a river's middle). Your shallows term rings ponds and
+   rivers now with no scene change. The coast alone is still what the flight's `snap: "shore"` reads.
+2. **`lip` and `step`** on each pond and river (metres, default 0): `lip` raises the first 4 m tile beyond the
+   waterline (eased out by 6 m), `step` sets the water that far below the bank. The levels (set or auto) are the
+   bank's. Stills use lip 0.6, step 0.8 on every pond and river: `cpd-r3-banks-{pond,river}-{day-40s,night-150s}-*`.
+3. **`avoidBanks`** on the hop (0..1, 0 = off): a tile whose bank channel is at least that is treated as water.
+   0.3 keeps a body about one tile off the water.
+4. **Levels:** your 3 river sources and 2 ponds are identical to the bit, flush, ringed and banked.
+5. **Cost** (your full project, live profile, 1080p ultra, 20 s, medians; flush = bankWidth 0 and no lips or steps,
+   banked = 8 m with lip 0.6 and step 0.8 on every pond and river; three runs each):
+
+   | Window | Generators pass, flush / banked | Whole-frame GPU, flush / banked |
+   |---|---|---|
+   | 80-100 s (the ponds) | 1.47, 1.47, 1.46 / 1.47, 1.46, 1.45 ms | 23.50, 23.43, 23.50 / 23.42, 23.48, 22.97 ms |
+   | 108-128 s (the river) | 1.44, 1.44, 1.43 / 1.45, 1.44, 1.44 ms | 20.97, 20.95, 20.54 / 20.97, 21.02, 20.46 ms |
+
+   Within noise. The kernel's extra arithmetic runs in both arms; against the pre-ADR-1999 binary it was not
+   measured. ADR-1998's CPU: the record once per change of its inputs (36 ms for Feline), and about +0.25 ms a frame
+   for 28 aliens reading the time-varying ground (60 s at 30 fps: 10.3-10.5 s against 9.8-10.0 s).
+6. **`terrain_mirror.py`** (yours) does not know the banks; mirror `bankShore`, `bankLip` and the step from
+   `src/scene/tile_terrain.cpp` if a camera or a check reads the mirror near water.

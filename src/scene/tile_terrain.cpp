@@ -275,10 +275,24 @@ struct Features {
     float river = 0.0f;
     float pond = 0.0f;
     float riverS = 0.0f;
+    float bank = 0.0f; // ADR-1999: the inland shore channel
 };
 
+// ADR-1999 (CPD-R4): the inland shore at `e` metres from a waterline (negative in the water): 1 at the line, 0 at
+// `bankWidth` out on the land and at min(bankWidth, `inside`) into the water.
+float bankShore(float bankWidth, float e, float inside) {
+    if (!(bankWidth > 0.0f)) return 0.0f;
+    return e >= 0.0f ? 1.0f - smooth01(0.0f, bankWidth, e) : 1.0f - smooth01(0.0f, std::min(bankWidth, inside), -e);
+}
+
+// ADR-1999: the lip's profile beyond the waterline: full over the first 4 m (a 4 m tile), gone by 6 m, none in the water.
+float bankLip(float e) {
+    return e >= 0.0f ? 1.0f - smooth01(4.0f, 6.0f, e) : 0.0f;
+}
+
+// `banks`: the lips and steps (ADR-1999); the "auto" levels read the land without them, so a bank never moves a level.
 Features applyFeatures(const TileTerrainSpec& s, float x, float z, float landHeight, std::size_t riversUpTo,
-                       bool valleys, bool ponds) {
+                       bool valleys, bool ponds, bool banks = true) {
     Features f;
     f.landHeight = landHeight;
     if (valleys) {
@@ -307,6 +321,11 @@ Features applyFeatures(const TileTerrainSpec& s, float x, float z, float landHei
         const float v = 1.0f - smooth01(0.5f * r.width, 0.5f * r.valleyWidth, d);
         f.landHeight = f.landHeight + (level - f.landHeight) * v;
         const float channel = 1.0f - smooth01(0.5f * r.width - 0.5f, 0.5f * r.width + 0.5f, d);
+        const float e = d - 0.5f * r.width; // ADR-1999: from the waterline, negative in the water
+        if (banks) {
+            f.landHeight += r.lip * bankLip(e) - r.step * channel;
+        }
+        f.bank = std::max(f.bank, bankShore(s.bankWidth, e, 0.5f * r.width));
         if (channel > f.river || (channel == f.river && d < bestRiver)) {
             f.river = channel;
             f.riverS = near.y;
@@ -322,7 +341,13 @@ Features applyFeatures(const TileTerrainSpec& s, float x, float z, float landHei
             const float level = pondLevel(s, i) - s.seaLevel;
             const float v = 1.0f - smooth01(shore, shore + p.basinWidth, d);
             f.landHeight = f.landHeight + (level - f.landHeight) * v;
-            f.pond = std::max(f.pond, 1.0f - smooth01(shore - 0.5f, shore + 0.5f, d));
+            const float channel = 1.0f - smooth01(shore - 0.5f, shore + 0.5f, d);
+            f.pond = std::max(f.pond, channel);
+            const float e = d - shore; // ADR-1999
+            if (banks) {
+                f.landHeight += p.lip * bankLip(e) - p.step * channel;
+            }
+            f.bank = std::max(f.bank, bankShore(s.bankWidth, e, shore));
         }
     }
     return f;
@@ -330,7 +355,7 @@ Features applyFeatures(const TileTerrainSpec& s, float x, float z, float landHei
 
 float staticSurface(const TileTerrainSpec& s, float x, float z, std::size_t riversUpTo, bool valleys) {
     const LandPart l = landPart(s, x, z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
-    const Features f = applyFeatures(s, x, z, l.height, riversUpTo, valleys, false);
+    const Features f = applyFeatures(s, x, z, l.height, riversUpTo, valleys, false, false);
     return mixedTop(s, f.landHeight, l.land);
 }
 
@@ -348,7 +373,9 @@ TileSample baseSample(const TileTerrainSpec& s, float x, float z, float t, float
     out.river = f.river * land;
     out.pond = f.pond * land * (1.0f - f.river);
     out.riverS = f.riverS;
-    out.shore = l.shore; // ADR-1993: the final coast
+    out.bank = f.bank * land; // ADR-1999: inland water's banks (on the land part; the sea has its own coast)
+    out.coast = l.shore; // ADR-1993: the final coast
+    out.shore = std::max(out.coast, out.bank);
     out.flat = smooth01(s.crownThreshold, s.crownThreshold + 0.06f, l.shaped) * s.crownFlatten * l.inland * land;
     if (!s.path.empty()) {
         const float d = tilePathDistance(s, x, z);
@@ -642,6 +669,9 @@ Result<void> TileTerrainSpec::validate() const {
             (r.sourceLevel && !std::isfinite(*r.sourceLevel))) {
             return fail("tiles: river '{}': width must be positive, valleyWidth above it, the levels finite", r.name);
         }
+        if (!std::isfinite(r.lip) || !std::isfinite(r.step) || r.lip < 0.0f || r.step < 0.0f) {
+            return fail("tiles: river '{}': lip and step are metres >= 0", r.name); // ADR-1999
+        }
         riverPool += r.points.size();
     }
     if (riverPool > kMaxTileRiverPool) {
@@ -651,6 +681,9 @@ Result<void> TileTerrainSpec::validate() const {
         if (!(p.radius > 0.0f) || !(p.basinWidth > 0.0f) || p.shoreNoise < 0.0f || p.shoreNoise > 1.0f ||
             (p.level && !std::isfinite(*p.level)) || !std::isfinite(p.centre.x) || !std::isfinite(p.centre.y)) {
             return fail("tiles: pond '{}': radius and basinWidth positive, shoreNoise 0..1, level finite", p.name);
+        }
+        if (!std::isfinite(p.lip) || !std::isfinite(p.step) || p.lip < 0.0f || p.step < 0.0f) {
+            return fail("tiles: pond '{}': lip and step are metres >= 0", p.name); // ADR-1999
         }
     }
     std::size_t valleyPool = 0;
@@ -666,6 +699,9 @@ Result<void> TileTerrainSpec::validate() const {
     }
     if (!(pathWidth > 0.0f)) {
         return fail("tiles: pathWidth must be positive");
+    }
+    if (!std::isfinite(bankWidth) || bankWidth < 0.0f) {
+        return fail("tiles: bankWidth is metres >= 0"); // ADR-1999
     }
     for (const float v : {landThreshold, shoreBand, inlandBand, seaLevel, seaDepth, shoreRise, hillHeight, hillWarp,
                           hillLow, hillHigh, crownThreshold, crownFlatten, pathLift}) {
@@ -686,7 +722,8 @@ std::uint64_t TileTerrainSpec::hash() const {
     mix(seed);
     for (const float v : {continentWavelength, landThreshold, shoreBand, inlandBand, seaLevel, seaDepth, shoreRise,
                           hillWavelength, hillHeight, hillWarp, warpWavelength, hillLow, hillHigh, crownThreshold,
-                          crownFlatten, regionWavelength, regionVariation, pathWidth, pathLift, heightScale}) {
+                          crownFlatten, regionWavelength, regionVariation, pathWidth, pathLift, heightScale,
+                          bankWidth}) {
         f(v);
     }
     // ADR-1965: the rivers, ponds and valleys (their resolved levels follow from these)
@@ -696,12 +733,12 @@ std::uint64_t TileTerrainSpec::hash() const {
             f(p.x);
             f(p.y);
         }
-        for (const float v : {r.width, r.valleyWidth, r.bedDepth, r.sourceLevel.value_or(-12345.0f)}) f(v);
+        for (const float v : {r.width, r.valleyWidth, r.bedDepth, r.sourceLevel.value_or(-12345.0f), r.lip, r.step}) f(v);
     }
     for (const TilePond& p : ponds) {
         mix(0x504F4E44u); // "POND"
         for (const float v : {p.centre.x, p.centre.y, p.radius, p.basinWidth, p.level.value_or(-12345.0f),
-                              p.shoreNoise}) {
+                              p.shoreNoise, p.lip, p.step}) {
             f(v);
         }
     }
@@ -762,6 +799,7 @@ constexpr FloatKey kFloatKeys[] = {
     {"pathWidth", &TileTerrainSpec::pathWidth},
     {"pathLift", &TileTerrainSpec::pathLift},
     {"heightScale", &TileTerrainSpec::heightScale},
+    {"bankWidth", &TileTerrainSpec::bankWidth}, // ADR-1999
 };
 
 } // namespace
@@ -790,6 +828,8 @@ nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec) {
                                 {"bedDepth", r.bedDepth}};
             if (!r.name.empty()) o["name"] = r.name;
             o["sourceLevel"] = r.sourceLevel ? nlohmann::json(*r.sourceLevel) : nlohmann::json("auto");
+            if (r.lip != 0.0f) o["lip"] = r.lip; // ADR-1999
+            if (r.step != 0.0f) o["step"] = r.step;
             rivers.push_back(std::move(o));
         }
         j["rivers"] = std::move(rivers);
@@ -803,6 +843,8 @@ nlohmann::json tileTerrainToJson(const TileTerrainSpec& spec) {
                                 {"shoreNoise", p.shoreNoise}};
             if (!p.name.empty()) o["name"] = p.name;
             o["level"] = p.level ? nlohmann::json(*p.level) : nlohmann::json("auto");
+            if (p.lip != 0.0f) o["lip"] = p.lip; // ADR-1999
+            if (p.step != 0.0f) o["step"] = p.step;
             ponds.push_back(std::move(o));
         }
         j["ponds"] = std::move(ponds);
@@ -888,10 +930,11 @@ Result<TileRiver> readRiver(const nlohmann::json& o, const std::string& where) {
             auto l = readLine(v, at);
             if (!l) return std::unexpected(l.error());
             r.points = std::move(*l);
-        } else if (k == "width" || k == "valleyWidth" || k == "bedDepth") {
+        } else if (k == "width" || k == "valleyWidth" || k == "bedDepth" || k == "lip" || k == "step") {
             auto n = readNum(v, at);
             if (!n) return std::unexpected(n.error());
-            (k == "width" ? r.width : k == "valleyWidth" ? r.valleyWidth : r.bedDepth) = *n;
+            (k == "width" ? r.width : k == "valleyWidth" ? r.valleyWidth : k == "bedDepth" ? r.bedDepth
+                                                                         : k == "lip" ? r.lip : r.step) = *n;
         } else if (k == "sourceLevel") {
             auto l = readLevel(v, at);
             if (!l) return std::unexpected(l.error());
@@ -915,10 +958,11 @@ Result<TilePond> readPond(const nlohmann::json& o, const std::string& where) {
                 return fail("'{}' must be [x, z]", at);
             }
             p.centre = {v[0].get<float>(), v[1].get<float>()};
-        } else if (k == "radius" || k == "basinWidth" || k == "shoreNoise") {
+        } else if (k == "radius" || k == "basinWidth" || k == "shoreNoise" || k == "lip" || k == "step") {
             auto n = readNum(v, at);
             if (!n) return std::unexpected(n.error());
-            (k == "radius" ? p.radius : k == "basinWidth" ? p.basinWidth : p.shoreNoise) = *n;
+            (k == "radius" ? p.radius : k == "basinWidth" ? p.basinWidth : k == "shoreNoise" ? p.shoreNoise
+                                                                         : k == "lip" ? p.lip : p.step) = *n;
         } else if (k == "level") {
             auto l = readLevel(v, at);
             if (!l) return std::unexpected(l.error());

@@ -3623,6 +3623,7 @@ public:
           tossGainDefault_(readFloat(s, "tossGain", 8.0f)),
           tossCooldownDefault_(readFloat(s, "tossCooldown", 3.0f)),
           tossMax_(readFloat(s, "tossMax", 9.0f)),
+          avoidBanks_(readFloat(s, "avoidBanks", 0.0f)),
           gravity_(readFloat(s, "gravity", 9.81f)) {
         rules_.stepHeight = readFloat(s, "stepHeight", 0.6f);
         rules_.jumpTiles = static_cast<int>(readFloat(s, "jumpTiles", 3.0f));
@@ -3709,7 +3710,12 @@ private:
         return glm::ivec2(glm::round((p - c00_) / pitch));
     }
     [[nodiscard]] bool wet(const world::GroundSource& g, glm::vec2 p, double t) const {
-        return g.planned(p.x, p.y, t).water >= rules_.waterThreshold;
+        return wetSample(g.planned(p.x, p.y, t));
+    }
+    // ADR-1999 (CPD-R4): with `avoidBanks` (0..1, 0 = off) an inland water's bank counts as water to a walker -- no
+    // goal, step, landing or rest on it -- so a body keeps a bank's width away from a pond or a river.
+    [[nodiscard]] bool wetSample(const world::GroundSample& s) const {
+        return s.water >= rules_.waterThreshold || (avoidBanks_ > 0.0f && s.bank >= avoidBanks_);
     }
     // The nearest dry tile centre to `p`, within `reach` tiles (rings outward, in a fixed order); `p`'s own tile if none.
     [[nodiscard]] glm::vec2 nearestDry(const world::GroundSource& g, glm::vec2 p, double t, int reach) const {
@@ -3766,33 +3772,49 @@ private:
         const float pitch = ground.pitch();
         speed_ = 0.0f;
         activity_ = Activity::Idle;
-        // ADR-1997: a crest passing under a body on its feet throws it. The rise arms the toss above the threshold;
-        // the throw comes once the rise has passed its peak (10% under the best seen) or fallen under the threshold, at
-        // the peak speed, so a bigger crest throws higher. The cooldown runs from the last throw.
+        // ADR-1997, timed by ADR-1998: a crest passing under a body on its feet throws it at the PEAK of the ground's
+        // upward speed under it -- the instant the visible tile is pushing up hardest, so it reads as the wave throwing
+        // it. The landscape is a pure function of where and when (the song's ground), so when a rising swing first
+        // passes the threshold the body looks ahead along it (until the rise falls under the threshold or a fifth under
+        // its best; 4 s at most, then again from there) and takes the throw at its fastest instant, at that speed. A walk
+        // onto another tile looks again from there. The cooldown runs from the last throw.
         if (phase_ == Phase::Pause || phase_ == Phase::Move) {
             const float threshold = value(tossThreshold_, tossThresholdDefault_);
-            const float rise = groundRise(ground, pos_, t);
+            const glm::ivec2 tile = tileOf(pos_, pitch);
             if (threshold > 0.0f && t - lastToss_ >= static_cast<double>(value(tossCooldown_, tossCooldownDefault_))) {
-                if (rise >= threshold) {
-                    // past the crest's peak: 10% under the best rise seen (a walk onto the next tile steps the rise
-                    // a little, which must not count as the peak)
-                    if (armed_ && rise < 0.9f * peak_) {
-                        toss(ground, t, peak_);
-                        armed_ = false;
-                        return;
+                const double step = 1.0 / kHopRate;
+                if (!armed_ || tile != armedTile_ || (t >= launchAt_ - 1e-9 && rescan_)) {
+                    // arm only on a rising swing (a cooldown that ends past a swing's fastest instant waits for the next)
+                    armed_ = false;
+                    const float now = groundRise(ground, pos_, t);
+                    if (now >= threshold && now >= groundRise(ground, pos_, t - step)) {
+                        float best = now;
+                        int bestK = 0;
+                        int k = 1;
+                        const int cap = static_cast<int>(4.0 * kHopRate);
+                        for (; k <= cap; ++k) {
+                            const float r = groundRise(ground, pos_, t + k * step);
+                            if (r < threshold || r < 0.8f * best) break; // the swing is over, or well past its peak
+                            if (r > best) {
+                                best = r;
+                                bestK = k;
+                            }
+                        }
+                        armed_ = true;
+                        armedTile_ = tile;
+                        peak_ = best;
+                        launchAt_ = t + bestK * step;
+                        rescan_ = k > cap; // still climbing at the horizon: look again from there
                     }
-                    armed_ = true;
-                    peak_ = std::max(peak_, rise);
-                } else if (armed_) {
-                    toss(ground, t, peak_); // it fell back under the threshold within one step: throw at the peak seen
+                }
+                if (armed_ && !rescan_ && t >= launchAt_ - 1e-9) {
+                    toss(ground, t, peak_);
                     armed_ = false;
                     return;
                 }
             } else {
                 armed_ = false;
-                peak_ = 0.0f;
             }
-            if (!armed_) peak_ = 0.0f;
         }
         switch (phase_) {
         case Phase::Pause: {
@@ -3999,7 +4021,7 @@ private:
             const glm::vec2 centre = tileCentreOf(c, pitch);
             if (glm::length(centre - origin_) > home_ || c == here) continue;
             const world::GroundSample g = ground.planned(centre.x, centre.y, t);
-            if (g.water >= rules_.waterThreshold) continue;
+            if (wetSample(g)) continue;
             const float score = wantFlat_ * g.flat + wantPath_ * g.path + noise;
             if (score > bestScore) {
                 bestScore = score;
@@ -4008,7 +4030,9 @@ private:
         }
         const auto query = [&](glm::ivec2 tile) {
             const glm::vec2 c = tileCentreOf(tile, pitch);
-            return ground.planned(c.x, c.y, t); // ADR-1964: what no route moves
+            world::GroundSample g = ground.planned(c.x, c.y, t); // ADR-1964: what no route moves
+            if (wetSample(g)) g.water = 1.0f;                     // ADR-1999: a bank to keep off is water to TileNav
+            return g;
         };
         TilePath path = planTiles(query, here, best, rules_);
         if (!path.found || path.steps.empty()) {
@@ -4031,7 +4055,7 @@ private:
     float pauseMin_, pauseMax_;
     int goalMin_, goalMax_;
     float wantFlat_, wantPath_, home_;
-    float tossThresholdDefault_, tossGainDefault_, tossCooldownDefault_, tossMax_, gravity_;
+    float tossThresholdDefault_, tossGainDefault_, tossCooldownDefault_, tossMax_, avoidBanks_, gravity_;
     TileNavRules rules_;
     params::Parameter<float>* walk_ = nullptr;
     params::Parameter<float>* run_ = nullptr;
@@ -4068,6 +4092,9 @@ private:
     double lastToss_ = -1e9;
     bool armed_ = false;
     float peak_ = 0.0f;
+    double launchAt_ = 0.0;     // ADR-1998: the swing's fastest instant, where the throw comes
+    glm::ivec2 armedTile_{0};   // the tile it was found under
+    bool rescan_ = false;       // the swing outran the look-ahead: look again at launchAt_
     int tosses_ = 0;
     glm::vec2 tossFrom_{0.0f};
     glm::vec2 tossTo_{0.0f};

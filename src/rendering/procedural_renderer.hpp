@@ -189,17 +189,17 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, 8> path;  // two points per lane
     // ADR-1965: the rivers, ponds and dry valleys (scene/tile_terrain.hpp), points pooled two per lane
     std::array<glm::vec4, scene::kMaxTileRivers> riverInfo;   // first point, point count, width, valley width
-    std::array<glm::vec4, scene::kMaxTileRivers> riverLevel;  // source level, mouth level, length, 0 (metres)
+    std::array<glm::vec4, scene::kMaxTileRivers> riverLevel;  // source level, mouth level, length, lip (ADR-1999) (m)
     std::array<glm::vec4, scene::kMaxTileRivers> riverBounds; // min x, min z, max x, max z, widened by half the valley
     std::array<glm::vec4, scene::kMaxTileRiverPool / 2> riverPts;
     std::array<glm::vec4, scene::kMaxTilePonds> ponds;        // centre x, centre z, radius, basin width
-    std::array<glm::vec4, scene::kMaxTilePonds> pondB;        // level, shore noise, 0, 0
+    std::array<glm::vec4, scene::kMaxTilePonds> pondB;        // level, shore noise, lip, step (ADR-1999)
     std::array<glm::vec4, scene::kMaxTileValleys> valleyInfo; // first point, point count, valley width, depth
     std::array<glm::vec4, scene::kMaxTileValleys> valleyB;    // min x, min z, max x, max z (widened)
     std::array<glm::vec4, scene::kMaxTileValleys / 4> valleyFrac; // each valley's depth fraction, four per lane
     std::array<glm::vec4, scene::kMaxTileValleyPool / 2> valleyPts;
     // ADR-1992: the raised land
-    glm::vec4 land0;                                          // ridge count, rise count, 0, 0
+    glm::vec4 land0;                                          // ridge count, rise count, bank width (ADR-1999), 0
     std::array<glm::vec4, scene::kMaxTileRidges> ridgeInfo;   // first point, point count, width, height
     std::array<glm::vec4, scene::kMaxTileRidges> ridgeB;      // min x, min z, max x, max z (widened)
     std::array<glm::vec4, scene::kMaxTileRidgePool / 2> ridgePts;
@@ -207,6 +207,7 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, scene::kMaxTileRises / 4> riseH;    // heights, four per lane
     std::array<glm::vec4, scene::kMaxTileRidges / 4> ridgeNoise; // ADR-1994
     std::array<glm::vec4, scene::kMaxTileRises / 4> riseNoise;
+    glm::vec4 riverStep;  // ADR-1999: each river's water step below its bank (m), one per lane
     // ADR-1953: the moving ground (scene/tile_dynamics.hpp), the same for every tiles generator in the frame.
     glm::vec4 dyn;        // t (s), amplitude, wave count, event count
     glm::vec4 breath;     // amplitude, period, wavelength, 1 when anything moves
@@ -225,7 +226,7 @@ struct GeneratorTileUniforms {
     std::array<glm::vec4, scene::kMaxTileSprings> springs; // x, z, time, strength (CP-D r2: 256)
 };
 // ADR-1965: 79 lanes more than before; ADR-1992: valleys +4 info +4 bounds +1 frac +16 points, raised land +59
-static_assert(sizeof(GeneratorTileUniforms) == (140 + 25 + 59 + 4 + 2) * 16 + scene::kMaxTileSprings * 16); // ADR-1995: +2
+static_assert(sizeof(GeneratorTileUniforms) == (140 + 25 + 59 + 4 + 2 + 1) * 16 + scene::kMaxTileSprings * 16); // ADR-1995: +2; ADR-1999: +1
 // Packs a "tiles" generator's block for a camera at `cameraGen` (generator space), the live reach applied, and (ADR-1953)
 // the scene's moving ground at time `t`.
 [[nodiscard]] GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object, const glm::vec3& cameraGen,

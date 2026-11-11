@@ -68,6 +68,10 @@ struct TileRiver {
     float valleyWidth = 200.0f;
     float bedDepth = -1.0f;
     std::optional<float> sourceLevel;
+    // ADR-1999 (CPD-R4): the bank. `lip` raises a rim over the first 4 m beyond the waterline (easing out by 6 m);
+    // `step` sets the water's surface that far below the bank. Metres; 0 = flush, as before.
+    float lip = 0.0f;
+    float step = 0.0f;
 };
 // A pond: water at `level` (metres; unset = "auto", the basin rim's lowest land minus 1 m, so a pond can sit up on a
 // plateau) within `radius`, its shoreline made irregular by `shoreNoise` (0..1); around it the land eases down to the
@@ -79,6 +83,8 @@ struct TilePond {
     float basinWidth = 40.0f;
     std::optional<float> level;
     float shoreNoise = 0.0f;
+    float lip = 0.0f;  // ADR-1999 (CPD-R4): the bank, as a river's
+    float step = 0.0f;
 };
 // A dry valley: a polyline the land sinks along over `valleyWidth`, by `depth` metres -- or, with `depthFraction` > 0,
 // by that fraction of the local relief (the land's height above the shore) -- never below the shore's top, and with no
@@ -146,6 +152,10 @@ struct TileTerrainSpec {
     // index or name.
     std::vector<TileRiver> rivers;
     std::vector<TilePond> ponds;
+    // ADR-1999 (CPD-R4): the inland shore. Within `bankWidth` metres of river or pond water the shore channel ramps from
+    // 1 at the waterline to 0 (and inside the water over the same width, at most to the middle of a river), so the
+    // shallows and a bank colour ring inland water as they ring the sea. 0 = none.
+    float bankWidth = 8.0f;
     std::vector<TileValley> valleys;
     // ADR-1992: ridges and rises, added to the land's height (metres, not scaled by heightScale) before the valleys,
     // rivers and ponds cut it; their cores make land in the sea.
@@ -178,7 +188,9 @@ inline constexpr std::size_t kMaxTilePathPoints = 16;
 struct TileSample {
     float height = 0.0f; // metres: the top of the tile
     float water = 0.0f;  // 1 = sea
-    float shore = 0.0f;  // 1 = on the shoreline, falling to 0 a shore band away
+    float shore = 0.0f;  // 1 = on the shoreline, falling to 0 a shore band away (ADR-1999: inland water's banks too)
+    float bank = 0.0f;   // ADR-1999: the inland part of `shore` alone (river and pond banks), for the walkers...
+    float coast = 0.0f;  // ...and the sea's part alone (the continent's and raised land's coast), for the flight's snap
     float flat = 0.0f;   // 1 = a crown (a flattened hill top)
     float path = 0.0f;   // 1 = on the path
     float crest = 0.0f;  // ADR-1953: the crest channel, 0..1 (0 on a static ground)

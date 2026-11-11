@@ -1194,3 +1194,57 @@ TEST_CASE("crest throws on a real scene (measure)", "[.][tiles][hop][measure][ad
         wasAir = st.airborne;
     }
 }
+
+// ---- ADR-1999 (CPD-R4): a walker can keep off inland water's banks ------------------------------------------------
+
+TEST_CASE("with avoidBanks a body keeps off a pond's bank; without it, it may stand there", "[tiles][hop][geography][adr1999]") {
+    // a pond in the land beside the body's start
+    scene::TileTerrainSpec spec;
+    spec.continentWavelength = 4000.0f;
+    spec.landThreshold = 0.05f; // land everywhere near the origin
+    spec.ponds = {scene::TilePond{.name = "p", .centre = {12.0f, 0.0f}, .radius = 10.0f, .basinWidth = 12.0f}};
+    spec.bankWidth = 8.0f;
+    REQUIRE(spec.validate().has_value());
+    spec.resolveWater();
+    scene::TileGround g;
+    g.set(spec, scene::TileDynamics{}, 4.0f, glm::vec3(0.0f));
+    REQUIRE(g.planned(12.0f, 0.0f, 0.0).water > 0.99f);
+    REQUIRE(g.planned(22.0f, 0.0f, 0.0).bank > 0.5f);
+    const auto run = [&](float avoid) {
+        nlohmann::json settings = {{"hopChance", 0.3}, {"pauseMin", 0.2}, {"pauseMax", 0.6}, {"homeRadius", 28.0},
+                                   {"goalMin", 2}, {"goalMax", 5}};
+        if (avoid > 0.0f) settings["avoidBanks"] = avoid;
+        auto hop = entity::makeBehavior("hop", &settings);
+        params::ParameterSet params;
+        hop->registerParameters(params, "e/hop/");
+        Rng rng(7);
+        hop->reset(rng);
+        entity::EntityState state;
+        state.anchor = glm::vec3(-2.0f, 0.0f, 2.0f);
+        entity::MotionOffset offset;
+        int onBank = 0;
+        int grounded = 0;
+        for (int f = 0; f <= 60 * 90; ++f) {
+            params.resetFinals();
+            entity::BehaviorContext ctx;
+            ctx.time = f / 60.0;
+            ctx.dt = f == 0 ? 0.0 : 1.0 / 60.0;
+            ctx.rng = &rng;
+            ctx.ground = &g;
+            hop->update(ctx, state, offset);
+            const glm::vec3 p = state.position();
+            if (!state.airborne) {
+                ++grounded;
+                onBank += g.planned(p.x, p.z, ctx.time).bank >= 0.3f ? 1 : 0;
+            }
+        }
+        return std::pair{onBank, grounded};
+    };
+    const auto [free, freeGrounded] = run(0.0f);
+    const auto [kept, keptGrounded] = run(0.3f);
+    CAPTURE(free, freeGrounded, kept, keptGrounded);
+    CHECK(freeGrounded > 600);
+    CHECK(keptGrounded > 600);
+    CHECK(free > 0);  // the bank is ground like any other without the setting
+    CHECK(kept == 0); // and is kept off with it
+}

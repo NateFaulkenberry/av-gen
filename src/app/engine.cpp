@@ -267,6 +267,13 @@ public:
 
     // ADR-901: whether this seek replays any of the project's routes (tests and the log ask).
     [[nodiscard]] bool replaysRoutes() const { return replaysRoutes_; }
+    // ADR-1998: whether this replay advances `r`'s chain (its source is rebuilt at every step), the engine-shaped bus
+    // the last step's routes read (a depth signal's value), and the musical position the step stood at.
+    [[nodiscard]] bool replays(const params::ModRoute& r) const { return replaysRoutes_ && replayed(r); }
+    [[nodiscard]] const signals::SignalBus& sampling() const { return sampling_; }
+    [[nodiscard]] double musicalBeats() const {
+        return state_.haveClockBeats ? engine_.meter().beats(state_.clockBeats) : 0.0;
+    }
 
 private:
     // Which signals a replayed step can rebuild -- this pipeline's prefix of the engine's bus, and
@@ -2835,6 +2842,7 @@ void Engine::seekSeconds(double seconds) {
         // abolished; carrying it over would cut to an event camera for an event that is no longer
         // happening.
         composition->clearCameraEventState();
+        refreshTileMotion(); // ADR-1998: the song's ground, which the replay's bodies stand on and are thrown by
         // No camera position and no distance-detail flag: a seek that culled by distance was a
         // function of where the camera happened to be, and ADR-267 measured that at 50.263 m over
         // eight explorers at thirty seconds. What used to be saved by skipping distant bodies is
@@ -2992,6 +3000,255 @@ bool Engine::controlReplayNeeded() const {
         }
     }
     return false;
+}
+
+// ---- ADR-1998: the moving ground's music over the song ---------------------------------------------------------------
+//
+// The ground's routed parameters as a function of song time. A play draws the routes' finals frame by frame, and their
+// chains are history; a seek's entity replay never wrote them, so what a body felt on a scrub was not what it felt on a
+// play, and the bodies were kept on the parameters' bases (ADR-1964) -- the crests that threw them (ADR-1997) were the
+// waves' authored rhythm, not the music. Offline every input of those routes is a function of time (ADR-901's
+// replay), so the routes are run once over the song on a fixed grid and every surface reads that record at the instant
+// it asks about: the drawn ground, the stance, the plan, the throw. Live there is no seek and the composition reads
+// the live ground.
+void Engine::refreshTileMotion() {
+    scene::Composition* comp = composition();
+    if (comp == nullptr) {
+        return;
+    }
+    const auto clear = [&] {
+        if (tileMotionComposedKey_ != 0 || comp->tileMotion() != nullptr) {
+            comp->setTileMotionSeries(nullptr);
+        }
+        tileMotionComposedKey_ = 0;
+    };
+    // A/B arm (bench and canaries): the ground as ADR-1964 left it, the bodies on the parameters' bases
+    static const bool off = std::getenv("AVGEN_NO_TILE_MOTION") != nullptr;
+    if (off) {
+        comp->setTileMotionLive(false);
+        clear();
+        return;
+    }
+    if (mode_ != EngineMode::Offline) {
+        comp->setTileMotionLive(true);
+        clear();
+        return;
+    }
+    comp->setTileMotionLive(false);
+    const std::vector<params::IParameter*> inputs = comp->tileMotionParameters();
+    const double duration = durationSeconds();
+    if (inputs.empty() || !(duration > 0.0)) {
+        clear();
+        return;
+    }
+    const auto isInput = [&inputs](const params::IParameter* q) {
+        return q != nullptr && std::find(inputs.begin(), inputs.end(), q) != inputs.end();
+    };
+    std::uint64_t h = 0x7111e5c0ffee1998ull;
+    const auto mix = [&h](std::uint64_t v) { h ^= v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2); };
+    const auto bits = [](float f) { return static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(f)); };
+    // ---- what the record is a function of: the song's signals, and every route onto the ground with its sources
+    mix(replaySignalKey(true));
+    mix(std::bit_cast<std::uint64_t>(duration));
+    mix(bits(modulator_.masterGain));
+    bool anyRoute = false;
+    const std::vector<params::ModRoute>& routes = modulator_.routes();
+    for (std::size_t i = 0; i < routes.size(); ++i) {
+        const params::ModRoute& r = routes[i];
+        if (!r.enabled || !isInput(r.targetParam)) {
+            continue;
+        }
+        anyRoute = true;
+        mix(i);
+        mix(std::hash<std::string>{}(r.source));
+        mix(std::hash<std::string>{}(r.target));
+        mix(std::hash<std::string>{}(r.depthSource));
+        mix(static_cast<std::uint64_t>(r.component + 1));
+        mix(static_cast<std::uint64_t>(r.op) | (static_cast<std::uint64_t>(r.polarity) << 8u) |
+            (r.fromEntity ? 1ull << 16u : 0u) | (r.depthMissing ? 1ull << 17u : 0u));
+        const params::ProcessorChain& c = r.chain;
+        for (const float f : {r.amount, r.spatialGain, r.depthMin, r.depthMax, r.depthDefault.value_or(-1.0f), c.delayMs,
+                              c.gain, c.offset, c.curveAmount, c.clampMin, c.clampMax, c.thresholdLevel, c.attackMs,
+                              c.decayMs, c.envelopeHoldMs, c.envelopeFallPerSecond, c.remapInMin, c.remapInMax,
+                              c.remapOutMin, c.remapOutMax, c.envelopeRefractoryMs, c.envelopeRearm, c.trendSeconds,
+                              c.trendFastMs, c.trendFloor, c.springHz, c.springDamping, c.integrateMin, c.integrateMax,
+                              c.normalizeSeconds, c.normalizeFloor, c.normalizeSmoothMs}) {
+            mix(bits(f));
+        }
+        mix(static_cast<std::uint64_t>(c.curve) | (static_cast<std::uint64_t>(c.threshold) << 8u) |
+            (static_cast<std::uint64_t>(c.envelope) << 16u) | (c.clampEnabled ? 1ull << 24u : 0u) |
+            (c.remapEnabled ? 1ull << 25u : 0u) | (c.integrate ? 1ull << 26u : 0u));
+    }
+    bool anyTrack = false;
+    for (const params::Track& tr : timeline_.tracks()) {
+        anyTrack = anyTrack || (timeline_.enabled && tr.enabled && isInput(tr.param));
+    }
+    if (!anyRoute && !anyTrack) {
+        clear();
+        return;
+    }
+    if (anyRoute) {
+        for (const auto& source : sources_.sources()) {
+            if (source->pureInTime()) {
+                mix(std::hash<std::string>{}(source->kind() + "/" + source->name() + "/" + source->settingsToJson().dump()));
+            }
+        }
+        for (const params::IParameter* q : params_.ordered()) {
+            // the sources' and the response model's own settings are inputs of the signals the routes read
+            if (q->path().starts_with("sources/") || q->path().starts_with("sonic/")) {
+                for (std::size_t c = 0; c < q->componentCount(); ++c) mix(bits(q->baseComponent(c)));
+            }
+        }
+    }
+    const std::uint64_t recordKey = h;
+    if (recordKey != tileRouteRecord_.key) {
+        const auto began = std::chrono::steady_clock::now();
+        TileRouteRecord rec;
+        rec.key = recordKey;
+        rec.rate = 60.0;
+        rec.samples = static_cast<std::size_t>(std::floor(duration * rec.rate)) + 2;
+        ReplaySignals replay(*this);
+        // What the replay touches that a play owns: every route's chain and last output, and the sources' finals
+        // (`prepareRoutes` resets them). Put back afterwards, so recording changes nothing a play reads.
+        const auto all = [](const params::ModRoute&) { return true; };
+        const std::vector<params::ProcessorChain::State> chains = modulator_.chainStates(all);
+        std::vector<float> outputs;
+        for (const params::ModRoute& r : routes) outputs.push_back(r.lastOutput);
+        std::vector<std::pair<params::IParameter*, std::vector<float>>> sourceFinals;
+        for (params::IParameter* q : params_.ordered()) {
+            if (q->path().starts_with("sources/")) {
+                std::vector<float> v;
+                for (std::size_t c = 0; c < q->componentCount(); ++c) v.push_back(q->finalComponent(c));
+                sourceFinals.emplace_back(q, std::move(v));
+            }
+        }
+        replay.begin(true, duration);
+        const auto staging = [this](signals::SignalId id) {
+            return std::any_of(stagingSignals_.begin(), stagingSignals_.end(),
+                               [id](const auto& s) { return s.second == id; });
+        };
+        // a parameter is recorded when every route onto it is: one this replay cannot rebuild (a control, a state,
+        // an entity, an envelope or random source, a set piece's beat) leaves the parameter on the live path
+        for (const params::IParameter* q : inputs) {
+            bool ok = true;
+            std::vector<std::size_t> mine;
+            for (std::size_t i = 0; i < routes.size(); ++i) {
+                const params::ModRoute& r = routes[i];
+                if (!r.enabled || r.targetParam != q) continue;
+                const bool scalar = r.component <= 0;
+                const bool depthOk = r.depthSource.empty() || r.depthMissing ||
+                                     (r.depthId != signals::kInvalidSignal && r.depthId < replay.sampling().size());
+                if (!replay.replays(r) || staging(r.sourceId) || !scalar || !depthOk) {
+                    ok = false;
+                    break;
+                }
+                mine.push_back(i);
+            }
+            if (!ok) continue;
+            rec.recorded.push_back(q);
+            for (const std::size_t i : mine) {
+                TileRouteRecord::Lane lane;
+                lane.route = i;
+                lane.output.resize(rec.samples);
+                if (!routes[i].depthSource.empty()) lane.depth.resize(rec.samples);
+                rec.lanes.push_back(std::move(lane));
+            }
+        }
+        rec.beats.resize(rec.samples);
+        replay.reset();
+        for (std::size_t k = 0; k < rec.samples; ++k) {
+            const double t = static_cast<double>(k) / rec.rate;
+            replay.build(t, k == 0 ? 0.0 : 1.0 / rec.rate);
+            rec.beats[k] = replay.musicalBeats();
+            for (TileRouteRecord::Lane& lane : rec.lanes) {
+                const params::ModRoute& r = routes[lane.route];
+                lane.output[k] = r.lastOutput;
+                if (!lane.depth.empty()) {
+                    const float d = r.depthMissing ? *r.depthDefault : replay.sampling().value(r.depthId);
+                    lane.depth[k] = r.depthMin + (r.depthMax - r.depthMin) * d;
+                }
+            }
+        }
+        modulator_.restoreChainStates(all, chains);
+        for (std::size_t i = 0; i < outputs.size() && i < modulator_.routes().size(); ++i) {
+            modulator_.routes()[i].lastOutput = outputs[i];
+        }
+        for (auto& [q, v] : sourceFinals) {
+            for (std::size_t c = 0; c < v.size(); ++c) q->setFinalComponent(c, v[c]);
+        }
+        log::info("tile motion: {} route(s) onto {} ground parameter(s) recorded over {:.1f} s in {:.0f} ms (ADR-1998)",
+                  rec.lanes.size(), rec.recorded.size(), duration,
+                  std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count());
+        tileRouteRecord_ = std::move(rec);
+    }
+    // ---- composed onto the bases and the keys: cheap, redone when a base or a key moves
+    const TileRouteRecord& rec = tileRouteRecord_;
+    std::uint64_t ck = recordKey;
+    const auto cmix = [&ck](std::uint64_t v) { ck ^= v + 0x9e3779b97f4a7c15ull + (ck << 6) + (ck >> 2); };
+    for (const params::IParameter* q : inputs) {
+        cmix(bits(q->baseComponent(0)));
+    }
+    cmix(timeline_.enabled ? 1u : 0u);
+    for (const params::Track& tr : timeline_.tracks()) {
+        if (!isInput(tr.param)) continue;
+        cmix(std::hash<std::string>{}(tr.target));
+        cmix(static_cast<std::uint64_t>(tr.component + 1) | (static_cast<std::uint64_t>(tr.mode) << 8u) |
+             (static_cast<std::uint64_t>(tr.timeBase) << 16u) | (tr.enabled ? 1ull << 24u : 0u));
+        cmix(std::bit_cast<std::uint64_t>(tr.loopLength));
+        for (const params::Key& key : tr.keys) {
+            cmix(std::bit_cast<std::uint64_t>(key.time));
+            cmix(bits(key.value[0]));
+            cmix(static_cast<std::uint64_t>(key.interp));
+            cmix(bits(key.tangentIn[0]));
+            cmix(bits(key.tangentOut[0]));
+        }
+    }
+    ck = ck == 0 ? 1 : ck;
+    if (ck == tileMotionComposedKey_ && comp->tileMotion() != nullptr) {
+        return;
+    }
+    auto series = std::make_shared<scene::Composition::TileMotionSeries>();
+    series->rate = rec.rate;
+    series->key = ck;
+    for (const params::IParameter* q : inputs) {
+        std::vector<const params::Track*> tracks;
+        if (timeline_.enabled) {
+            for (const params::Track& tr : timeline_.tracks()) {
+                if (tr.enabled && tr.param == q && tr.component <= 0) tracks.push_back(&tr);
+            }
+        }
+        std::vector<const TileRouteRecord::Lane*> lanes;
+        for (const params::ModOp op : params::kModOpPriority) {
+            for (const TileRouteRecord::Lane& lane : rec.lanes) {
+                if (routes[lane.route].targetParam == q && routes[lane.route].op == op) lanes.push_back(&lane);
+            }
+        }
+        const bool recorded = std::find(rec.recorded.begin(), rec.recorded.end(), q) != rec.recorded.end();
+        if (!recorded || (lanes.empty() && tracks.empty())) {
+            continue; // not moved, or moved by something the record cannot carry: the live path
+        }
+        const float lo = q->hardMin(0);
+        const float hi = q->hardMax(0);
+        const auto clamp = [lo, hi](float v) { return v < lo ? lo : (v > hi ? hi : v); };
+        std::vector<float> values(rec.samples);
+        for (std::size_t k = 0; k < rec.samples; ++k) {
+            // as a play builds a final: the base, the timeline (ADR-018), then the routes in op order (ADR-900's depth)
+            float v = q->baseComponent(0);
+            for (const params::Track* tr : tracks) {
+                const double at = tr->timeBase == params::TimeBase::Beats ? rec.beats[k]
+                                                                          : static_cast<double>(k) / rec.rate;
+                v = clamp(params::applyTrackMode(tr->mode, v, tr->evaluate(at)[0]));
+            }
+            for (const TileRouteRecord::Lane* lane : lanes) {
+                const float full = params::applyModOp(routes[lane->route].op, v, lane->output[k]);
+                v = clamp(lane->depth.empty() ? full : v + (full - v) * lane->depth[k]);
+            }
+            values[k] = v;
+        }
+        series->values.emplace_back(q, std::move(values));
+    }
+    tileMotionComposedKey_ = ck;
+    comp->setTileMotionSeries(series->values.empty() ? nullptr : std::move(series));
 }
 
 void Engine::replayControl(double target) {
@@ -5169,6 +5426,7 @@ void Engine::update(const FrameTime& time) {
         bus_.set(stateProgressSignal_, states_.progress());
         bus_.set(stateIndexSignal_, static_cast<float>(std::max(0, states_.currentIndex())));
     }
+    refreshTileMotion(); // ADR-1998: the ground's music over the song, before anything stands on the ground
     params_.resetFinals();
     timeline_.apply(timelineClock_); // automation: the first modulation layer (ADR-018)
     // Spatial reactivity, between automation and the routes (ADR-097). After timeline_.apply so a
