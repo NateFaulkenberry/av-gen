@@ -3638,6 +3638,15 @@ public:
         rules_.jumpRise = readFloat(s, "jumpRise", 3.0f);
         rules_.jumpDrop = readFloat(s, "jumpDrop", 8.0f);
         rules_.landOnWater = false; // ADR-1997: never on water (a sea slab, a river, a pond)
+        // ADR-2003: a keep-out line (world x, z points) and how far to keep off it
+        avoidDistance_ = readFloat(s, "avoidDistance", 0.0f);
+        if (s != nullptr && s->is_object() && s->contains("avoidLine") && (*s)["avoidLine"].is_array()) {
+            for (const auto& q : (*s)["avoidLine"]) {
+                if (q.is_array() && q.size() == 2 && q[0].is_number() && q[1].is_number()) {
+                    avoidLine_.emplace_back(q[0].get<float>(), q[1].get<float>());
+                }
+            }
+        }
     }
 
     [[nodiscard]] std::string_view kind() const override { return "hop"; }
@@ -3727,7 +3736,19 @@ private:
         return glm::ivec2(glm::round((p - c00_) / pitch));
     }
     [[nodiscard]] bool wet(const world::GroundSource& g, glm::vec2 p, double t) const {
-        return wetSample(g.planned(p.x, p.y, t));
+        return wetSample(g.planned(p.x, p.y, t)) || kept(p);
+    }
+    // ADR-2003 (CPD-R10): with `avoidLine` and `avoidDistance` a body keeps that far off the line (the flight's route,
+    // so nothing walks under the lens): a tile whose centre is nearer counts as water to it -- no goal, step, landing
+    // or rest there. A walk goes centre to centre, and the distance to a straight line is linear along a step, so the
+    // body itself never comes nearer than a centre it stands on. A pure function of where: seek-safe.
+    [[nodiscard]] bool kept(glm::vec2 p) const {
+        for (const auto& [a, b] : keepOut_) {
+            const glm::vec2 ab = b - a;
+            const float u = glm::dot(ab, ab) > 1e-8f ? std::clamp(glm::dot(p - a, ab) / glm::dot(ab, ab), 0.0f, 1.0f) : 0.0f;
+            if (glm::length(p - (a + ab * u)) < avoidDistance_) return true;
+        }
+        return false;
     }
     // ADR-1999 (CPD-R4): with `avoidBanks` (0..1, 0 = off) an inland water's bank counts as water to a walker -- no
     // goal, step, landing or rest on it -- so a body keeps a bank's width away from a pond or a river.
@@ -3763,6 +3784,19 @@ private:
     void prime(world::GroundSource& ground, const BehaviorContext& ctx, const EntityState& state, double t) {
         const glm::vec3 here = state.position();
         c00_ = ground.cellCentre(0.0f, 0.0f);
+        // ADR-2003: the keep-out line's segments this body can ever reach (its home, a plan's search window, the
+        // distance), so a check reads a handful of segments, not the whole route
+        keepOut_.clear();
+        if (avoidDistance_ > 0.0f) {
+            const glm::vec2 at(here.x, here.z);
+            const float reach = home_ + static_cast<float>(rules_.window + 12) * ground.pitch() + avoidDistance_;
+            for (std::size_t i = 1; i < avoidLine_.size(); ++i) {
+                const glm::vec2 a = avoidLine_[i - 1];
+                const glm::vec2 ab = avoidLine_[i] - a;
+                const float u = glm::dot(ab, ab) > 1e-8f ? std::clamp(glm::dot(at - a, ab) / glm::dot(ab, ab), 0.0f, 1.0f) : 0.0f;
+                if (glm::length(at - (a + ab * u)) <= reach) keepOut_.emplace_back(a, avoidLine_[i]);
+            }
+        }
         // ADR-1997: a body placed on water starts on the nearest dry tile (12 tiles at most)
         origin_ = nearestDry(ground, ground.cellCentre(here.x, here.z), t, 12);
         pos_ = origin_;
@@ -4192,7 +4226,7 @@ private:
             const glm::vec2 centre = tileCentreOf(c, pitch);
             if (glm::length(centre - origin_) > home_ || c == here) continue;
             const world::GroundSample g = ground.planned(centre.x, centre.y, t);
-            if (wetSample(g)) continue;
+            if (wetSample(g) || kept(centre)) continue;
             const float score = wantFlat_ * g.flat + wantPath_ * g.path + noise;
             if (score > bestScore) {
                 bestScore = score;
@@ -4202,7 +4236,7 @@ private:
         const auto query = [&](glm::ivec2 tile) {
             const glm::vec2 c = tileCentreOf(tile, pitch);
             world::GroundSample g = ground.planned(c.x, c.y, t); // ADR-1964: what no route moves
-            if (wetSample(g)) g.water = 1.0f;                     // ADR-1999: a bank to keep off is water to TileNav
+            if (wetSample(g) || kept(c)) g.water = 1.0f;          // ADR-1999/2003: a bank or the line, water to TileNav
             return g;
         };
         TilePath path = planTiles(query, here, best, rules_);
@@ -4238,6 +4272,10 @@ private:
     // `throwCrestMargin` m moves the pop there; none when a higher one passed within the window, or the crest rose less
     // than `throwMinCrest` m.
     float crestWindow_, crestMargin_, minCrest_;
+    // ADR-2003: the keep-out line, and the segments of it this body can reach (found when it is primed)
+    std::vector<glm::vec2> avoidLine_;
+    float avoidDistance_ = 0.0f;
+    std::vector<std::pair<glm::vec2, glm::vec2>> keepOut_;
     float gravity_;
     TileNavRules rules_;
     params::Parameter<float>* walk_ = nullptr;

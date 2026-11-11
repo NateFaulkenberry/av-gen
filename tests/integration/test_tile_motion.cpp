@@ -414,6 +414,67 @@ TEST_CASE("crowded bodies springing each other's tiles: a seek lands where a pla
     }
 }
 
+namespace {
+// ADR-2003: the swell scene's three bodies with wide homes, running, and a bent keep-out line between them.
+nlohmann::json keepOutScene() {
+    nlohmann::json j = scene(0.3f);
+    const nlohmann::json line = {{-200.0, 1.0}, {0.0, 2.0}, {200.0, -1.0}};
+    for (auto& e : j["entities"]) {
+        e["behaviors"][0].update({{"homeRadius", 24.0}, {"runChance", 1.0}, {"pauseMin", 0.2}, {"pauseMax", 0.5},
+                                  {"goalMin", 2.0}, {"goalMax", 6.0}, {"avoidLine", line}, {"avoidDistance", 5.0}});
+    }
+    return j;
+}
+} // namespace
+
+TEST_CASE("a keep-out line: bodies roam and are thrown, and never come within its distance",
+          "[tiles][hop][geography][seek][nav][adr2003]") {
+    // ADR-2003 (CPD-R10): the flight's route as `avoidLine`, kept `avoidDistance` off. Bodies with wide homes on both
+    // sides run about for 20 s; none is ever nearer the line than the distance (grounded or in the air), they do run,
+    // the crests still throw them, and a cold seek lands every body where the play does.
+    const nlohmann::json j = keepOutScene();
+    const auto distance = [](glm::vec2 p) {
+        const std::vector<glm::vec2> pts = {{-200.0f, 1.0f}, {0.0f, 2.0f}, {200.0f, -1.0f}};
+        float best = 1e9f;
+        for (std::size_t i = 1; i < pts.size(); ++i) {
+            const glm::vec2 ab = pts[i] - pts[i - 1];
+            const float u = std::clamp(glm::dot(p - pts[i - 1], ab) / glm::dot(ab, ab), 0.0f, 1.0f);
+            best = std::min(best, glm::length(p - (pts[i - 1] + ab * u)));
+        }
+        return best;
+    };
+    Rig rig(4.0f, j);
+    float nearest = 1e9f;
+    int running = 0;
+    int throws = 0;
+    std::vector<bool> was(3, false);
+    for (long long k = 0; k <= 20 * 30; ++k) {
+        const double t = static_cast<double>(k) / 30.0;
+        rig.frame(t, k == 0 ? 0.0 : 1.0 / 30.0, static_cast<std::uint64_t>(k));
+        const auto& es = rig.comp().entityWorld().entities();
+        for (std::size_t i = 0; i < es.size(); ++i) {
+            const entity::EntityState& st = es[i]->state();
+            nearest = std::min(nearest, distance(glm::vec2(st.position().x, st.position().z)));
+            running += st.activity == entity::Activity::Run ? 1 : 0;
+            throws += st.airborne && !was[i] ? 1 : 0;
+            was[i] = st.airborne;
+        }
+    }
+    const auto want = rig.bodies();
+    Rig sought(4.0f, j);
+    sought.engine.seekSeconds(20.0);
+    sought.frame(20.0, 0.0, 0);
+    const auto got = sought.bodies();
+    CAPTURE(nearest, running, throws);
+    CHECK(nearest >= 5.0f - 1e-3f);
+    CHECK(running > 30 * 3); // they run (more than three body-seconds of it)
+    CHECK(throws >= 3);
+    for (std::size_t i = 0; i < want.size(); ++i) {
+        CAPTURE(i, want[i].x, want[i].z, got[i].x, got[i].z);
+        CHECK(glm::length(want[i] - got[i]) < 1e-3f);
+    }
+}
+
 TEST_CASE("crest throws on the music, on a real project (measure)", "[.][tiles][hop][measure][adr1998]") {
     // AVGEN_TOSS_PROJECT: a project file; AVGEN_TOSS_CSV: where to write; AVGEN_TOSS_ENTITY: which body (index).
     // Per frame at 30 fps: the drawn swell, the ground's upward speed under the body (what throws it), and its throws.

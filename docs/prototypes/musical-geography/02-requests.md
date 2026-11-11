@@ -1680,3 +1680,55 @@ elsewhere.
 `--neighbour DX` (a second alien whose landings spring the tile) and `--run`. Media:
 `16-pass-cpd-r6/cpd-r9-*` (the lab before/after plots and clips, the 100-110 s scene before/after, 10 fps strips at
 102 s and 105 s, both audits).
+
+#### CPD-R10 (art → engineering, 2026-11-11): a home that is a lane along the route, so near aliens can run without nearing the lens
+
+**The owner:** "need to see them running around more". The coordinator: keep them off the line, with nothing
+under the lens.
+
+**Today.** The hop's home is a circle (`homeRadius`). A near alien sitting d metres off the flight line can only roam
+d − 4.5 m and still stay 4.5 m off the line. For the near band (5–14 m off) that is a 1–9 m circle: one or two tiles.
+On the r6b trace (63 aliens):
+
+| Setting | Idle share | Closest any body comes to the camera |
+|---|---|---|
+| The near band's homes at d − 4.5 m | 0.33 | 4.67 m |
+| At least 4 m, three aliens held at 1 m, goals 1–3 tiles (shipped) | 0.26 | 4.92 m |
+| At least 4 m, no exceptions | 0.24 | 2.6 m (three aliens reach the lens) |
+
+r6, with the near band 9–26 m off and homes up to 18 m, measured 0.21. But its aliens were far from the camera.
+
+**The request,** either of these:
+1. **A lane home:** a home shaped as a segment or capsule. For example `homeSegment: [[x0, z0], [x1, z1]]` with a
+   half-width, laid parallel to the flight line, so an alien runs back and forth along the route at a steady distance.
+2. **A keep-out line:** `avoidLine: <the flight's route>` with a minimum distance, honoured by goals, walks and the
+   throw's steering, as `landOnWater` is today.
+
+Either would let the near band run long distances along the line (and still be thrown by crests) while staying 5 m
+or more off it. I'd then expect idle near 0.2 at the r6b distances.
+
+### Engineering → art, CPD-R10 (2026-11-11): a keep-out line (ADR-2003)
+
+**Built: the keep-out line** (your option 2). It is one rule the walker already had a place for: what counts as water.
+So goals, paths, rests, throw landings and the start all honour it, and your homes stay circles of any size. The
+lane home is not built.
+
+**What to set on the cast's hop:**
+- `"avoidLine": [[x, z], ...]`: the flight's route in world x-z. One list for every body; points every ~0.5 s of
+  flight is plenty.
+- `"avoidDistance": 5.0`: metres. A tile whose centre is nearer counts as water to that body.
+- Then widen the near band's `homeRadius`; nothing has to subtract the distance any more.
+
+**Measured on your HEAD** (dd3849d0; the camera's x-z every 0.5 s as the line, distance 5 m, the 53 homes of
+1-9 m widened to 24 m; CPD-R6 trace, whole song):
+
+| | as shipped | keep-out line, near homes 24 m |
+|---|---|---|
+| near band: idle / walk / run / jump | 0.389 / 0.129 / 0.185 / 0.248 | 0.160 / 0.217 / 0.357 / 0.221 |
+| whole cast: idle / run | 0.342 / 0.222 | 0.150 / 0.366 |
+| closest any body comes to the camera (3D / x-z) | 5.61 / 4.88 m | 10.05 / 6.44 m |
+| on water (grounded frames, landings) | 0, 0 | 0, 0 |
+| throws | 1,503 | 1,359 |
+
+Throws drop about 10% because running bodies change tiles more. If you want them back, use `tossCooldown` or
+`runChance`.
