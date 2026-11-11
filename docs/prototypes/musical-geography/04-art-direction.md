@@ -2132,3 +2132,37 @@ camera than 4.92 m.
 - **Getting idle toward 0.2** without nearing the lens needs a lane-shaped home or a keep-out line (CPD-R10).
 - **Sunset water:** the river is now #6A5CF2 and the pond #7E6CF0. The day-to-sunset blend had made the vale river
   grey-lilac at about 80 s; it now stays blue. As a side effect the main river at sunset is blue-violet, not pink.
+
+### Draft9 (2026-11-11): the river ends, the shorelines, the spacing
+
+The owner on draft8b: the river still "stop[s] in the middle of nowhere"; more aliens are needed along the shorelines
+at 1:00–1:30 and 2:50–3:10; and the paired-up aliens should be spaced out.
+
+**The river ends.**
+- **What the owner saw:** the screenshot matches draft8b at about 58.4 s, the vale river's mouth into the bay. By day
+  the sea near the shore is the same blue as the low land, so the cyan river reads as ending on open ground.
+- **The vale river now runs lake to lake:** from low1 (enlarged to 90 m across) to a new lagoon by the bay (84 m
+  across, banked). The flight's river leg starts at the lagoon.
+- **The dawn stream** now runs from the inlet's sea, where its source used to sit on open ground.
+- **The audit:** every 2 s, each river end is projected with the trace camera, out to 500 m. The before/after lists
+  are in the hand-back.
+- **Still unchanged:** the west stream's source (415–464 m away, in haze) and its narrow mouth into the bay.
+
+**Shorelines.** 16 aliens were added on the river banks, the lagoon and low1 at 60–90 s, and on the inlet's north
+shore at 170–190 s.
+
+| Window | Within 15 m | Within 25 m |
+|---|---|---|
+| 60–90 s | 0% → 7% | 0% → 50% |
+| 170–190 s | 0% → 11% | 0% → 16% |
+
+**Spacing.** No two homes are within 20 m of each other. Eight aliens were relocated.
+
+**Totals.**
+- **Cast:** 53 aliens. Idle 0.28.
+- **Water:** zero on every count.
+- **Live at 85 s:** frame p99 33.5 ms, at the 33 ms budget.
+
+**The dotted vertical line in the owner's screenshot.** It is the side wall of a tile step seen edge-on. It shows a
+dot pattern in live captures (quality high and ultra), but not in the offline render. That makes it engine-side, in
+the live renderer.
