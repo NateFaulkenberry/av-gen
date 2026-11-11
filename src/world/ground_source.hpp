@@ -34,6 +34,12 @@ public:
     // ADR-1997: the landscape's own motion -- the planning surface without the bodies' landings (a tiles ground's
     // springs). What a body feels as a crest passing under it, so its own landing does not throw it again.
     [[nodiscard]] virtual GroundSample landscape(float x, float z, double t) const { return planned(x, z, t); }
+    // ADR-2002: the drawn surface (`at`) with only the landings made by `landedBy` -- what a body can know of the
+    // ground the viewer will see, whatever order the bodies are stepped in, when `landedBy` is behind every body's clock.
+    [[nodiscard]] virtual GroundSample drawnBy(float x, float z, double t, double landedBy) const {
+        (void)landedBy;
+        return at(x, z, t);
+    }
     // The cell a point belongs to and its centre, for a surface made of cells; `pitch` 0 for a continuous one.
     [[nodiscard]] virtual float pitch() const = 0;
     [[nodiscard]] virtual glm::vec2 cellCentre(float x, float z) const = 0;

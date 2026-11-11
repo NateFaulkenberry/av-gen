@@ -9,6 +9,7 @@
 #include "entity/tile_nav.hpp"
 #include "params/modulation.hpp"
 #include "scene/composition.hpp"
+#include "scene/tile_ground.hpp"
 #include "support/synth.hpp"
 #include "support/temp_dir.hpp"
 
@@ -87,8 +88,9 @@ struct Rig {
     app::Engine engine{app::EngineMode::Offline};
 
     // `amount` scales the route from the bass onto the swell (0: no route).
-    explicit Rig(float amount, float tossThreshold = 0.3f) {
-        REQUIRE(engine.setCompositionJson(scene(tossThreshold)).has_value());
+    explicit Rig(float amount, float tossThreshold = 0.3f) : Rig(amount, scene(tossThreshold)) {}
+    Rig(float amount, const nlohmann::json& sceneJson) {
+        REQUIRE(engine.setCompositionJson(sceneJson).has_value());
         REQUIRE(engine.loadAudio(swellWav()).has_value());
         for (params::ModRoute& r : engine.modulator().routes()) {
             // the composition's default routes turn and scale the whole scene with the music; a tiles world is not
@@ -312,6 +314,106 @@ TEST_CASE("a throw crouches on the rising tile, pops at the crest's top and flie
     CHECK(landings >= 2);
 }
 
+// CPD-R9: three bodies a tile apart, springing under each other's landings at art's spring (CP-D r2: depth 1.1, 1.4 Hz,
+// ripple 14 m; landing strength 0.5), on crests with several tops: a short train riding the swell, and authored rings
+// at art's ring spec (45 m/s, a 24 m ripple inside a 20 m front) passing every few seconds.
+namespace {
+nlohmann::json crowdedScene() {
+    nlohmann::json j = scene(0.3f);
+    j["environment"]["tileDynamics"]["waves"].push_back({{"amplitude", 0.35}, {"wavelength", 9}, {"speed", 6}, {"onLand", 1}});
+    j["environment"]["tileDynamics"]["rings"] = {{"amplitude", 1.6}, {"speed", 45.0}, {"wavelength", 24.0},
+                                                 {"width", 20.0},    {"decay", 2.4},   {"crest", 1.0}};
+    for (const float when : {2.5f, 6.0f, 9.0f, 12.5f, 16.0f}) {
+        j["environment"]["tileDynamics"]["events"].push_back(
+            {{"time", when}, {"position", {-60.0, 6.0}}, {"strength", 1.0}});
+    }
+    j["environment"]["tileDynamics"]["spring"] = {{"depth", 1.1},       {"frequency", 1.4},     {"damping", 0.16},
+                                                  {"rippleSpeed", 16.0}, {"rippleRadius", 14.0}, {"glowRadius", 3.0}};
+    const std::vector<glm::vec2> at = {{6, 6}, {10, 6}, {6, 10}};
+    for (std::size_t i = 0; i < at.size(); ++i) {
+        j["nodes"][i + 1]["position"] = {at[i].x, 0.0, at[i].y};
+        j["entities"][i]["behaviors"][0]["strength"] = 0.5;
+        j["entities"][i]["behaviors"][0]["tossGain"] = 3.0;
+    }
+    return j;
+}
+} // namespace
+
+TEST_CASE("a throw pops on the crest the viewer sees, and none without one", "[tiles][hop][geography][audio][adr2001][adr2002]") {
+    // ADR-2001: on the landscape, the pop is the swing's highest top: no top within 0.7 s either side is 0.1 m higher,
+    // and the crest rose at least 0.25 m into it. ADR-2002: on the drawn tile (the landings' springs included), read
+    // once the window has played, the pop is the top too -- except where a landing made after the crouch began moved it.
+    Rig rig(4.0f, crowdedScene());
+    const double step = 1.0 / 60.0;
+    struct Launch {
+        std::size_t body;
+        double t0;
+        glm::vec2 tile;
+    };
+    std::vector<Launch> launches;
+    std::vector<bool> was(3, false);
+    const world::GroundSource* g = nullptr;
+    for (long long k = 0; k <= 20 * 60; ++k) {
+        const double t = static_cast<double>(k) * step;
+        rig.frame(t, k == 0 ? 0.0 : step, static_cast<std::uint64_t>(k));
+        g = rig.comp().entityWorld().ground();
+        const auto& es = rig.comp().entityWorld().entities();
+        for (std::size_t i = 0; i < es.size(); ++i) {
+            const entity::EntityState& st = es[i]->state();
+            if (st.airborne && !was[i] && t < 19.0) {
+                launches.push_back({i, t, g->cellCentre(st.position().x, st.position().z)});
+            }
+            was[i] = st.airborne;
+        }
+    }
+    REQUIRE(g != nullptr);
+    int drawnOff = 0;
+    int springs = 0;
+    for (const Launch& l : launches) {
+        const auto land = [&](double u) { return g->landscape(l.tile.x, l.tile.y, u).height; };
+        const auto drawn = [&](double u) { return g->at(l.tile.x, l.tile.y, u).height; };
+        float highLand = -1e9f;
+        float highDrawn = -1e9f;
+        float low = land(l.t0);
+        for (int j = -42; j <= 42; ++j) {
+            highLand = std::max(highLand, land(l.t0 + j * step));
+            highDrawn = std::max(highDrawn, drawn(l.t0 + j * step));
+            springs += std::abs(drawn(l.t0 + j * step) - land(l.t0 + j * step)) > 0.05f ? 1 : 0;
+        }
+        for (int j = -120; j <= 0; ++j) low = std::min(low, land(l.t0 + j * step));
+        CAPTURE(l.body, l.t0, highLand, land(l.t0), highDrawn, drawn(l.t0), low);
+        CHECK(highLand <= land(l.t0) + 0.1f + 0.3f); // the landscape's own top (a pop moved onto a drawn top stays near)
+        CHECK(land(l.t0) - low >= 0.25f);              // a readable crest
+        drawnOff += highDrawn > drawn(l.t0) + 0.1f ? 1 : 0;
+    }
+    CAPTURE(launches.size(), drawnOff, springs);
+    CHECK(launches.size() >= 12);
+    CHECK(springs > 0); // the springs do move the tiles the pops leave from
+    CHECK(drawnOff * 10 <= static_cast<int>(launches.size()));
+}
+
+TEST_CASE("crowded bodies springing each other's tiles: a seek lands where a play does, at any frame rate",
+          "[tiles][hop][geography][seek][audio][adr2002]") {
+    // ADR-2002 reads the other bodies' landings (lagged 0.1 s, so no body's step order matters while a frame is
+    // shorter than that). A 30 fps play, a 60 fps play and a cold seek agree to a millimetre.
+    const double T = 16.0;
+    Rig played(4.0f, crowdedScene());
+    played.playTo(T, 30.0);
+    Rig sixty(4.0f, crowdedScene());
+    sixty.playTo(T, 60.0);
+    Rig sought(4.0f, crowdedScene());
+    sought.engine.seekSeconds(T);
+    sought.frame(T, 0.0, 0);
+    const auto want = played.bodies();
+    const auto at60 = sixty.bodies();
+    const auto got = sought.bodies();
+    for (std::size_t i = 0; i < want.size(); ++i) {
+        CAPTURE(i, want[i].x, want[i].y, want[i].z, at60[i].y, got[i].y);
+        CHECK(glm::length(want[i] - at60[i]) < 1e-3f);
+        CHECK(glm::length(want[i] - got[i]) < 1e-3f);
+    }
+}
+
 TEST_CASE("crest throws on the music, on a real project (measure)", "[.][tiles][hop][measure][adr1998]") {
     // AVGEN_TOSS_PROJECT: a project file; AVGEN_TOSS_CSV: where to write; AVGEN_TOSS_ENTITY: which body (index).
     // Per frame at 30 fps: the drawn swell, the ground's upward speed under the body (what throws it), and its throws.
@@ -397,6 +499,116 @@ TEST_CASE("every body's position and the water under it, on a real project (meas
                 << entity::tileWaterBody(s, rules) << "," << s.bank << "," << (st.airborne ? 1 : 0) << ","
                 << (landed ? 1 : 0) << "," << static_cast<int>(st.activity) << "," << cam.x << "," << cam.y << ","
                 << cam.z << "\n";
+        }
+    }
+}
+
+TEST_CASE("every launch against the drawn tile and the landscape, on a real project (measure)",
+          "[.][tiles][hop][measure][cpdr9]") {
+    // CPD-R9. AVGEN_LAUNCH_PROJECT: a project file; AVGEN_LAUNCH_DIR: where to write; AVGEN_LAUNCH_TO (s, default the
+    // song's end); AVGEN_LAUNCH_FPS (default 60). Every body, one run. Two files:
+    //   frames.csv: per frame per body -- t, body, x, y, z, airborne, activity, drawn (the drawn top under the body, the
+    //     surface art's r6 audit reads);
+    //   launches.csv: per launch, the tile it left from sampled at 60 Hz over [launch - 2, launch + 1] s once that span
+    //     has played (so every landing in it has happened) -- event, body, t0, crouched (the frame before was a crouch:
+    //     a crest throw), u, drawn (all springs), land (the landscape: no springs, what the throw reads), own (the
+    //     body's own landings' part of the drawn top), others (the other bodies' part), known (the springs of the
+    //     landings made by the crouch's start, launch - 0.8 s - 0.1 s: what a throw could have known when it committed).
+    const char* projectPath = std::getenv("AVGEN_LAUNCH_PROJECT");
+    const char* dirPath = std::getenv("AVGEN_LAUNCH_DIR");
+    if (projectPath == nullptr || dirPath == nullptr) SKIP("set AVGEN_LAUNCH_PROJECT and AVGEN_LAUNCH_DIR");
+    const auto env = [](const char* k, double d) { return std::getenv(k) != nullptr ? std::atof(std::getenv(k)) : d; };
+    const double fps = env("AVGEN_LAUNCH_FPS", 60.0);
+    app::Engine engine{app::EngineMode::Offline};
+    REQUIRE(engine.loadProject(projectPath).has_value());
+    const double t1 = env("AVGEN_LAUNCH_TO", engine.durationSeconds());
+    const std::filesystem::path dir(dirPath);
+    std::ofstream frames(dir / "frames.csv");
+    std::ofstream launches(dir / "launches.csv");
+    frames << "t,body,x,y,z,airborne,activity,drawn\n";
+    launches << "event,body,t0,crouched,u,drawn,land,own,others,known\n";
+    struct Launch {
+        int event;
+        std::size_t body;
+        double t0;
+        glm::vec2 tile;
+        bool crouched;
+    };
+    struct Body {
+        bool air = false;
+        bool crouch = false;
+        std::vector<scene::TileEvent> landed; // its own landings (world space, as the ground keeps them)
+    };
+    std::vector<Body> bodies;
+    std::vector<Launch> open;
+    int events = 0;
+    const auto own = [](const scene::TileEvent& e, const Body& b) {
+        for (const scene::TileEvent& l : b.landed) {
+            if (std::abs(l.time - e.time) < 1e-3f && glm::length(l.position - e.position) < 0.05f) return true;
+        }
+        return false;
+    };
+    for (long long k = 0; k <= static_cast<long long>(t1 * fps); ++k) {
+        const double t = static_cast<double>(k) / fps;
+        engine.update(FrameTime{t, k == 0 ? 0.0 : 1.0 / fps, static_cast<std::uint64_t>(k)});
+        scene::Composition* comp = engine.composition();
+        REQUIRE(comp != nullptr);
+        const auto* g = dynamic_cast<const scene::TileGround*>(comp->entityWorld().ground());
+        REQUIRE(g != nullptr);
+        const auto& es = comp->entityWorld().entities();
+        bodies.resize(es.size());
+        for (std::size_t i = 0; i < es.size(); ++i) {
+            const entity::EntityState& st = es[i]->state();
+            const glm::vec3 p = st.position();
+            Body& b = bodies[i];
+            if (st.airborne && !b.air) {
+                open.push_back(Launch{events++, i, t, g->cellCentre(p.x, p.z), b.crouch});
+            }
+            if (!st.airborne && b.air) {
+                // the landing the hop just registered: the newest landing at this body's tile
+                const glm::vec2 c = g->cellCentre(p.x, p.z);
+                const scene::TileEvent* best = nullptr;
+                for (const scene::TileEvent& e : g->landings()) {
+                    if (glm::length(e.position - c) < 0.75f * g->pitch() && (best == nullptr || e.time > best->time)) {
+                        best = &e;
+                    }
+                }
+                if (best != nullptr) b.landed.push_back(*best);
+            }
+            b.air = st.airborne;
+            b.crouch = !st.airborne && st.activity == entity::Activity::Jump;
+            frames << t << "," << i << "," << p.x << "," << p.y << "," << p.z << "," << (st.airborne ? 1 : 0) << ","
+                   << static_cast<int>(st.activity) << "," << g->at(p.x, p.z, t).height << "\n";
+        }
+        // the launches whose span has played: the tile they left, with and without each body's landings
+        const bool last = k == static_cast<long long>(t1 * fps);
+        for (auto it = open.begin(); it != open.end();) {
+            if (t < it->t0 + 1.0 && !last) {
+                ++it;
+                continue;
+            }
+            std::vector<scene::TileEvent> others;
+            for (const scene::TileEvent& e : g->landings()) {
+                if (!own(e, bodies[it->body])) others.push_back(e);
+            }
+            scene::TileGround withoutOwn = *g;
+            withoutOwn.restoreLandings(others);
+            std::vector<scene::TileEvent> early;
+            for (const scene::TileEvent& e : g->landings()) {
+                if (e.time <= it->t0 - 0.9) early.push_back(e);
+            }
+            scene::TileGround known = *g;
+            known.restoreLandings(early);
+            for (int j = -120; j <= 60; ++j) {
+                const double u = it->t0 + j / 60.0;
+                const float drawn = g->at(it->tile.x, it->tile.y, u).height;
+                const float land = g->landscape(it->tile.x, it->tile.y, u).height;
+                const float noOwn = withoutOwn.at(it->tile.x, it->tile.y, u).height;
+                launches << it->event << "," << it->body << "," << it->t0 << "," << (it->crouched ? 1 : 0) << "," << u
+                         << "," << drawn << "," << land << "," << (drawn - noOwn) << "," << (noOwn - land) << ","
+                         << (known.at(it->tile.x, it->tile.y, u).height - land) << "\n";
+            }
+            it = open.erase(it);
         }
     }
 }

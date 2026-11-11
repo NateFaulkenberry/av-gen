@@ -3629,6 +3629,9 @@ public:
           clipDown_(readFloat(s, "throwClipDown", 1.12f)),
           clipCrouchRate_(readFloat(s, "throwCrouchRate", 1.0f)),
           clipLift_(readFloat(s, "throwClipLift", 0.0f)),
+          crestWindow_(readFloat(s, "throwCrestWindow", 0.7f)),
+          crestMargin_(readFloat(s, "throwCrestMargin", 0.1f)),
+          minCrest_(readFloat(s, "throwMinCrest", 0.25f)),
           gravity_(readFloat(s, "gravity", 9.81f)) {
         rules_.stepHeight = readFloat(s, "stepHeight", 0.6f);
         rules_.jumpTiles = static_cast<int>(readFloat(s, "jumpTiles", 3.0f));
@@ -3666,6 +3669,7 @@ public:
         leg_ = 0;
         timer_ = 0.0f;
         lastToss_ = -1e9;
+        withheldUntil_ = -1e9;
         armed_ = false;
         peak_ = 0.0f;
         tosses_ = 0;
@@ -3780,6 +3784,100 @@ private:
                                   (2.0 * h));
     }
 
+    // ADR-2001: the crest a throw pops on. From the swing's first top (`topK` steps after `t`, ADR-2000) on: a later top
+    // of the same landscape within `throwCrestWindow` seconds that is higher by more than `throwCrestMargin` is the crest
+    // the viewer sees (a ring's next ripple, a second train's crest arriving), so the pop moves there, again from it --
+    // and so does a climb still going over the chosen top at the window's end, to where it tops -- and the throw's
+    // speed is the fastest rise on the way. Then the crest must read as one: no top within the window
+    // before it is higher by the margin (the crest has passed: this is its aftershock), and it rose at least
+    // `throwMinCrest` metres in the two seconds before it. A pure function of where and when, like the landscape.
+    struct Crest {
+        int k = 0;
+        float peak = 0.0f;
+        bool readable = true;
+    };
+    [[nodiscard]] Crest visibleCrest(const world::GroundSource& g, double t, int topK, float best) const {
+        const double step = 1.0 / kHopRate;
+        const auto h = [&](int j) { return g.landscape(pos_.x, pos_.y, t + j * step).height; };
+        Crest c{topK, best, true};
+        if (!(crestWindow_ > 0.0f)) {
+            return c;
+        }
+        const int window = static_cast<int>(std::lround(static_cast<double>(crestWindow_) * kHopRate));
+        const int cap = static_cast<int>(8.0 * kHopRate);
+        float top = h(topK);
+        float run = 0.0f; // the fastest rise since the chosen top
+        bool rising = false;
+        for (int j = topK + 1; j <= cap; ++j) {
+            const float r = groundRise(g, pos_, t + j * step);
+            // past the window, unless still climbing over the chosen top: then on to where that climb tops
+            if (j > c.k + window && !(rising && h(j) > top + crestMargin_)) break;
+            if (r > 0.0f) {
+                rising = true;
+                run = std::max(run, r);
+                continue;
+            }
+            if (!rising) continue;
+            rising = false; // a top at j
+            const float hj = h(j);
+            if (hj > top + crestMargin_) {
+                c.k = j;
+                c.peak = std::max(c.peak, run);
+                top = hj;
+            }
+            run = 0.0f;
+        }
+        float low = top;
+        for (int j = c.k - 1; j >= c.k - static_cast<int>(2.0 * kHopRate); --j) {
+            const float hj = h(j);
+            if (j >= c.k - window && hj > top + crestMargin_) {
+                c.readable = false; // higher a moment ago: the crest has passed
+                return c;
+            }
+            low = std::min(low, hj);
+        }
+        c.readable = top - low >= minCrest_;
+        return c;
+    }
+
+    // ADR-2002: the tile the viewer sees is the landscape plus the landing springs (ADR-1954), and a neighbour's landing
+    // can put the drawn top somewhere the landscape's is not. When the crouch would start, the throw reads the drawn
+    // tile under it over the crest's window with the landings made by `t - kDrawnLag` (every body's step is past that
+    // instant in a play and in a seek alike, so the answer does not depend on the order the bodies are stepped in). A
+    // drawn top higher by `throwCrestMargin` later in the window moves the pop there (the crouch then starts from it);
+    // one earlier means the drawn crest has passed: the throw is withheld.
+    static constexpr double kDrawnLag = 0.1;
+    void drawnCrest(const world::GroundSource& g, double t, glm::ivec2 tile) {
+        static const bool landscapeOnly = std::getenv("AVGEN_THROW_LANDSCAPE") != nullptr; // the A/B arm: ADR-2001 alone
+        if (!(crestWindow_ > 0.0f) || landscapeOnly) {
+            return;
+        }
+        const double step = 1.0 / kHopRate;
+        const double by = t - kDrawnLag;
+        const int window = static_cast<int>(std::lround(static_cast<double>(crestWindow_) * kHopRate));
+        const auto f = [&](int j) { return g.drawnBy(pos_.x, pos_.y, launchAt_ + j * step, by).height; };
+        const float at = f(0);
+        int best = 0;
+        float high = at;
+        for (int j = -window; j <= window; ++j) {
+            const float h = j == 0 ? at : f(j);
+            if (h > high) {
+                high = h;
+                best = j;
+            }
+        }
+        if (!(high > at + crestMargin_)) {
+            return;
+        }
+        if (best < 0 || best == window) { // passed already, or still climbing at the window's end
+            armed_ = false;
+            withheldUntil_ = launchAt_ + crestWindow_;
+            withheldTile_ = tile;
+            return;
+        }
+        launchAt_ += best * step;
+    }
+
     // One fixed step at time `t`.
     void step(world::GroundSource& ground, const BehaviorContext& ctx, double t, float dt) {
         const float pitch = ground.pitch();
@@ -3796,7 +3894,9 @@ private:
             const glm::ivec2 tile = tileOf(pos_, pitch);
             if (threshold > 0.0f && t - lastToss_ >= static_cast<double>(value(tossCooldown_, tossCooldownDefault_))) {
                 const double step = 1.0 / kHopRate;
-                if (!armed_ || tile != armedTile_ || (t >= launchAt_ - 1e-9 && rescan_)) {
+                if (t < withheldUntil_ - 1e-9 && tile == withheldTile_) {
+                    armed_ = false; // ADR-2001: a withheld swing, until its crest has passed
+                } else if (!armed_ || tile != armedTile_ || (t >= launchAt_ - 1e-9 && rescan_)) {
                     // arm only on a rising swing (a cooldown that ends past a swing's fastest instant waits for the next)
                     armed_ = false;
                     const float now = groundRise(ground, pos_, t);
@@ -3824,12 +3924,21 @@ private:
                                 }
                             }
                         }
-                        armed_ = true;
-                        armedTile_ = tile;
-                        peak_ = best;
-                        launchAt_ = t + (top ? topK : bestK) * step;
-                        peakAt_ = t + bestK * step;
-                        rescan_ = k > cap || !top; // still climbing at the horizon: look again from there
+                        // ADR-2001: the crest the viewer sees -- the highest top of the swing, not the first one after
+                        // its fastest rise -- and none at all when the crest has already passed or is too small to read
+                        const Crest crest = top ? visibleCrest(ground, t, topK, best) : Crest{topK, best, true};
+                        if (!crest.readable) {
+                            withheldUntil_ = t + crest.k * step; // this swing throws nobody: wait for the next one
+                            withheldTile_ = tile;
+                        } else {
+                            armed_ = true;
+                            drawnChecked_ = false;
+                            armedTile_ = tile;
+                            peak_ = crest.peak;
+                            launchAt_ = t + (top ? crest.k : bestK) * step;
+                            peakAt_ = t + bestK * step;
+                            rescan_ = k > cap || !top; // still climbing at the horizon: look again from there
+                        }
                     }
                 }
                 // A/B arm (the Throw Lab's "before"): ADR-1998's timing -- thrown at the fastest rise, no crouch, the clip
@@ -3841,7 +3950,14 @@ private:
                     return;
                 }
                 // the crouch starts so that the clip's pop lands on the crest's top (mid-crouch when it armed late)
-                const double crouchAt = launchAt_ - static_cast<double>(clipPop_ / std::max(clipCrouchRate_, 0.05f));
+                const double lead = static_cast<double>(clipPop_ / std::max(clipCrouchRate_, 0.05f));
+                double crouchAt = launchAt_ - lead;
+                // ADR-2002: committing to the crouch, the throw looks once at the drawn tile it will pop from
+                if (!adr1998 && armed_ && !rescan_ && t >= crouchAt - 1e-9 && !drawnChecked_) {
+                    drawnChecked_ = true;
+                    drawnCrest(ground, t, tile);
+                    crouchAt = launchAt_ - lead;
+                }
                 if (!adr1998 && armed_ && !rescan_ && t >= crouchAt - 1e-9) {
                     phase_ = Phase::Crouch;
                     clipOrigin_ = crouchAt;
@@ -4118,6 +4234,10 @@ private:
     // ...and `throwClipLift`, how high the clip itself lifts the feet in its jump (m, at the body's scale; the aliens'
     // 1.52 at 1.94x): the throw's arc gives up that much apex, so the drawn jump peaks where the throw says.
     float clipLift_;
+    // ADR-2001: which crest a throw pops on (visibleCrest): a later top within `throwCrestWindow` s higher by more than
+    // `throwCrestMargin` m moves the pop there; none when a higher one passed within the window, or the crest rose less
+    // than `throwMinCrest` m.
+    float crestWindow_, crestMargin_, minCrest_;
     float gravity_;
     TileNavRules rules_;
     params::Parameter<float>* walk_ = nullptr;
@@ -4159,6 +4279,9 @@ private:
     glm::ivec2 armedTile_{0};   // the tile it was found under
     bool rescan_ = false;       // the swing outran the look-ahead: look again at launchAt_
     double peakAt_ = 0.0;       // the swing's fastest instant (the A/B arm throws there)
+    double withheldUntil_ = -1e9; // ADR-2001: a swing that throws nobody, until its crest has passed (on this tile)
+    glm::ivec2 withheldTile_{0};
+    bool drawnChecked_ = false;   // ADR-2002: the drawn tile has been read for this throw
     double clipOrigin_ = 0.0;   // ADR-2000: the jump clip's clock (origin, rate)
     float clipRate_ = 0.0f;
     int tosses_ = 0;

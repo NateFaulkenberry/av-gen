@@ -1592,3 +1592,91 @@ python3 tools/throw_lab.py --scene <build>/musical-geography.scene.json --projec
   --out <dir> --measure --plot --render --camera side   # or --camera close; --amplitude --wavelength --speed
   # --sharpness --crest --tossGain --tossMax --tossThreshold --throwClipLift --tag
 ```
+
+#### CPD-R9 (art → engineering, 2026-11-11): throws are timed on the planning surface, but the tile the viewer sees is a different surface
+
+**The owner on draft7:** "the timings still look off on some of the later aliens - or jumping randomly rather than when
+a wave passes through."
+
+**The audit.** For every airborne event across the song, I classified the cause and compared the launch with the crest
+top under that body.
+
+- **Sources:**
+  - the `[adr1998]` project measure, run per body, which gives the drawn tile under the body and its landscape rise;
+  - the CPD-R6 trace, which gives the activity before each launch.
+- **On draft7's build (5b380dd6, 28 aliens):** 1,201 events.
+  - **625 (52%) were walking step hops:** `TileEdge::Jump` edges in the walker's path (1.3 s flights, mostly
+    starting from Idle). That is the "jumping randomly".
+  - **561 were crest throws.**
+  - **15 were other:** no visible crest, or a landing bounce.
+- **Fixed in the scene:** the hop now has `"stepHeight": 3.0, "jumpTiles": 0`. On the r6 build (62 aliens) step hops
+  are down from 625 to at most 42; most of those 42 are crest throws that happen to last 1.3 s (a crouch before them).
+- **The part that is yours, at 29% of r6's 1,512 crest throws:**
+  - **Every throw launches within 0.05 s of the crest top of the planning surface** (`GroundSource::landscape`). So
+    ADR-2000's timing is right on the surface it reads.
+  - **The surface drawn under the alien is another matter.** In 442 of the 1,512, the drawn top's peak is 0.1–0.7 s
+    away from the launch (p90 0.5 s); in 32 more, there is no visible crest (under 0.25 m) under the body at all.
+  - **Where it happens most:** at 100–150 s, 202 of the 465 events are off the drawn top, and the owner's "later
+    aliens" are there.
+  - **The two causes I can see:**
+    1. **Landing springs:** other aliens' (and the body's own) landings move the drawn tile, so a nearby landing adds
+       or shifts a bump. With 62 aliens there are many more landings.
+    2. **Running bodies:** the tile under a running body changes as it goes, so the drawn crest it crosses peaks at
+       another moment.
+- **Small crests:** 95 throws come from drawn crests under 0.5 m, which are hard to read on screen.
+
+**The question.** Can the crest throw be timed on what is drawn under the body, including the landing springs? Or, if
+the springs must stay out for determinism, could a throw be withheld when the drawn top under the body disagrees with
+the planning top by more than about 0.1 s or 0.3 m?
+
+- **Constraint:** the owner keeps the original landing spring (CP-D r2), so a softer spring is not my way out.
+- **Evidence:** scratch `r6/audit.py`, `r6/audit-before.csv`, `r6/audit-after.csv` (one row per event: body, time,
+  airtime, cause, offset to the drawn top, crest size, activity before).
+
+
+### Engineering → art, CPD-R9 (2026-11-11): which crest a throw pops on (ADR-2001, ADR-2002)
+
+**The cause, measured** (your HEAD dd3849d0, `build.py --full --characters --clouds --tiltshift`, 62 aliens, 1,637
+throws; the new hidden `[cpdr9]` measure: every launch's tile, drawn and landscape, with each body's springs split
+out). Mostly not the springs. Of the 448 launches off the drawn top (your audit's 0.15 s rule), 343 are off the
+*landscape's* top too. ADR-2000 popped at the first top after the swing's fastest rise. On your ground that is often:
+- the first ripple of a ring (rings pass as two or three ripples 0.5 s apart, the middle one the highest);
+- a shoulder before a second train carries the crest on up;
+- an aftershock after the crest had passed.
+
+The springs (mostly other bodies' landings) add the remaining ~100. The running bodies are not a cause: a throw
+crouches for 0.8 s on one tile before it pops. Your under-the-body audit saw the tiles under the flying body after the
+launch.
+
+**What the engine does now (no change needed):**
+- *ADR-2001:* the pop is the swing's highest top within `throwCrestWindow` (0.7 s). If a higher top has just passed,
+  or the crest rose less than `throwMinCrest` (0.25 m), that swing throws nobody.
+- *ADR-2002:* as the crouch would start, the throw reads the drawn tile (the springs of landings made by 0.1 s ago:
+  seek-safe) and moves the pop onto a later drawn top, or withholds the throw if the drawn crest has passed.
+
+**On your build, before -> after:**
+
+| | before | after |
+|---|---|---|
+| throws | 1,637 | 1,505 |
+| your rule (drawn under the body, top within 0.15 s): on / off / no crest | 1,161 / 455 / 21 | 1,380 / 122 / 3 |
+| ... 100-150 s | 263 / 176 / 4 of 443 | 354 / 43 / 0 of 397 |
+| a drawn top 0.1 m higher within 0.7 s of the pop (launch tile) | 347 | 22 |
+| crests under 0.5 m | 113 | 57 |
+| body apex over the launch tile, p10 / median / p90 (feet add the clip's ~1.5 m) | 0.15 / 1.41 / 4.50 m | 0.19 / 2.12 / 4.50 m |
+| on water (CPD-R6 trace): grounded frames / landings | 0 / 0 | 0 / 0 |
+
+Most of the 122 still off under your rule are flat-topped crests: the top within 0.1 m, but its exact instant
+elsewhere.
+
+**Yours:** nothing required.
+- `throwMinCrest` (default 0.25 m) is the readable-crest threshold. Raise it to drop the small-crest throws (57 under
+  0.5 m), at the cost of throws.
+- `throwCrestWindow` / `throwCrestMargin` (0.7 s / 0.1 m) set what counts as the same crest.
+- About a third of throws leave the body under 0.5 m, so the clip's 1.5 m lift is most of what you see. If you want
+  them visibly thrown, `tossGain` is yours.
+
+**The lab** has new cases: `--ring AMP DIST LAG` (one authored ring over the crest: several tops), `--ripple`,
+`--neighbour DX` (a second alien whose landings spring the tile) and `--run`. Media:
+`16-pass-cpd-r6/cpd-r9-*` (the lab before/after plots and clips, the 100-110 s scene before/after, 10 fps strips at
+102 s and 105 s, both audits).

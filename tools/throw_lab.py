@@ -42,19 +42,30 @@ def lab_scene(base, a):
     alien = next(n for n in s["nodes"] if n["name"] == a.body)
     alien["position"] = [a.x, 0.0, a.z]
     keep = {a.ground, a.body}
+    if a.neighbour is not None:   # CPD-R9: a second alien whose landings spring the measured one's tile
+        other = next(n for n in s["nodes"] if n["name"] == a.neighbour_body)
+        other["position"] = [a.x + a.neighbour, 0.0, a.z]
+        keep.add(a.neighbour_body)
     s["nodes"] = [n for n in s["nodes"] if n["name"] in keep]
     s["lights"] = [l for l in s.get("lights", []) if l.get("name") in ("sun", "moon", "fill")]
     s.pop("flight", None)
-    ent = next(e for e in s["entities"] if e["name"] == a.body)
-    for b in ent["behaviors"]:
-        if b.get("kind") == "hop":
-            b.update(homeRadius=0.0, hopChance=0.0, pauseMin=0.5, pauseMax=0.5)
-            for key in ("tossThreshold", "tossGain", "tossMax", "tossCooldown", "throwClipLift"):
-                v = getattr(a, key)
-                if v is not None:
-                    b[key] = v
-    ent.pop("reactions", None)  # no music: the hop's apex and strength stay as authored
-    s["entities"] = [ent]
+    ents = []
+    for name, running in ((a.body, a.run), (a.neighbour_body, False)):
+        if name != a.body and a.neighbour is None:
+            continue
+        ent = next(e for e in s["entities"] if e["name"] == name)
+        for b in ent["behaviors"]:
+            if b.get("kind") == "hop":
+                b.update(homeRadius=0.0, hopChance=0.0, pauseMin=0.5, pauseMax=0.5)
+                if running:   # CPD-R9: a body running about where the crest passes (short goals, short pauses)
+                    b.update(homeRadius=12.0, runChance=1.0, pauseMin=0.2, pauseMax=0.4, goalMin=2, goalMax=4)
+                for key in ("tossThreshold", "tossGain", "tossMax", "tossCooldown", "throwClipLift"):
+                    v = getattr(a, key)
+                    if v is not None:
+                        b[key] = v
+        ent.pop("reactions", None)  # no music: the hop's apex and strength stay as authored
+        ents.append(ent)
+    s["entities"] = ents
     # one planar train along +X whose crest reaches the alien at --crest (and every period after)
     phase = 0.25 + a.speed * a.crest / a.wavelength - a.x / a.wavelength
     dyn = s["environment"]["tileDynamics"]
@@ -62,7 +73,19 @@ def lab_scene(base, a):
     dyn["waves"] = [{"kind": "planar", "amplitude": a.amplitude, "wavelength": a.wavelength, "speed": a.speed,
                      "direction": 0, "sharpness": a.sharpness, "onLand": 1, "onWater": 1, "crest": 0.6,
                      "phase": round(phase - math.floor(phase), 6)}]
+    if a.ripple is not None:   # CPD-R9: a second, shorter train riding the first -- a crest with two tops
+        amp, wl, sp = a.ripple
+        p2 = 0.25 + sp * (a.crest + a.ripple_lag) / wl - a.x / wl
+        dyn["waves"].append({"kind": "planar", "amplitude": amp, "wavelength": wl, "speed": sp, "direction": 0,
+                             "sharpness": 0.0, "onLand": 1, "onWater": 1, "crest": 0.6,
+                             "phase": round(p2 - math.floor(p2), 6)})
     dyn.setdefault("rings", {})["amplitude"] = 0.0
+    if a.ring is not None:   # CPD-R9: one authored ring (the scene's ring spec) passing over the crest -- several tops
+        amp, dist, lag = a.ring
+        dyn["rings"]["amplitude"] = amp
+        gx, _, gz = ground.get("position", [0.0, 0.0, 0.0])
+        when = a.crest + lag - dist / dyn["rings"].get("speed", 20.0)
+        dyn["events"] = [{"time": round(when, 4), "position": [a.x - dist - gx, a.z - gz], "strength": 1.0}]
     eye = 1.4 + a.amplitude
     if a.camera == "side":   # side-on, at the alien's height, the wave crossing the frame left to right
         s["camera"] = {"mode": 1, "orbitSpeed": 0.0, "position": [a.x, eye, a.z + 22.0],
@@ -156,6 +179,16 @@ def main():
     ap.add_argument("--tossMax", type=float, default=None)
     ap.add_argument("--tossCooldown", type=float, default=None)
     ap.add_argument("--throwClipLift", type=float, default=None, help="the jump clip's own foot lift (m) to take off the arc")
+    ap.add_argument("--ripple", type=float, nargs=3, default=None, metavar=("AMP", "WAVELENGTH", "SPEED"),
+                    help="CPD-R9: a second planar train (a crest with two tops)")
+    ap.add_argument("--ripple-lag", type=float, default=0.45, help="its crest's top this long after the first's (s)")
+    ap.add_argument("--ring", type=float, nargs=3, default=None, metavar=("AMP", "DIST", "LAG"),
+                    help="CPD-R9: one ring (the scene's ring spec, this amplitude) dropped DIST m up-wave, its front "
+                         "reaching the alien LAG s after the crest's top")
+    ap.add_argument("--neighbour", type=float, default=None, metavar="DX",
+                    help="CPD-R9: a second alien DX metres along the wave, thrown too; its landings spring the tile")
+    ap.add_argument("--neighbour-body", default="alien01")
+    ap.add_argument("--run", action="store_true", help="CPD-R9: the measured alien runs about instead of standing")
     ap.add_argument("--camera", default="side", choices=("side", "close"))
     ap.add_argument("--seconds", type=float, default=10.0)
     ap.add_argument("--width", type=int, default=1280)
