@@ -11,6 +11,9 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
 #include <cmath>
 #include <vector>
 
@@ -861,4 +864,156 @@ TEST_CASE("tiles: noise on raised land is the hills' own relief, under the profi
     CHECK_FALSE(scene::tileTerrainFromJson(nlohmann::json::parse(
                     R"({"rises": [{"centre": [0, 0], "radius": 5, "height": 4, "edge": 6, "noise": 1.5}]})"))
                     .has_value());
+}
+
+// ---- ADR-1999 (CPD-R4): banks for inland water ----------------------------------------------------------------------
+
+namespace {
+// Land everywhere near the origin, far from any coast, so a bank is the only shore there.
+TileTerrainSpec inlandWorld() {
+    TileTerrainSpec s;
+    s.seed = 11;
+    s.continentWavelength = 4000.0f;
+    s.landThreshold = 0.05f;
+    return s;
+}
+} // namespace
+
+TEST_CASE("tiles: inland water has a shore -- 1 at the waterline, 0 a bank's width out, none mid-river",
+          "[geography][tiles][adr1999]") {
+    TileTerrainSpec s = inlandWorld();
+    const glm::vec2 p(0.0f);
+    REQUIRE(scene::tileSample(s, p.x, p.y).coast == 0.0f);
+    s.ponds = {scene::TilePond{.name = "tarn", .centre = p, .radius = 20.0f, .basinWidth = 24.0f}};
+    s.rivers = {scene::TileRiver{.name = "brook", .points = {p + glm::vec2(60.0f, -80.0f), p + glm::vec2(60.0f, 80.0f)},
+                                 .width = 8.0f, .valleyWidth = 40.0f, .bedDepth = 1.0f}};
+    REQUIRE(s.validate().has_value());
+    s.resolveWater();
+    CHECK(s.bankWidth == 8.0f); // the default
+    const auto at = [&](glm::vec2 q) { return scene::tileSample(s, q.x, q.y); };
+    // the pond: the waterline, half a bank out, a bank out, and the open water
+    CHECK(at(p + glm::vec2(20.0f, 0.0f)).shore > 0.99f);
+    CHECK(at(p + glm::vec2(24.0f, 0.0f)).shore == Catch::Approx(0.5f).margin(0.02));
+    CHECK(at(p + glm::vec2(28.5f, 0.0f)).bank == 0.0f);
+    CHECK(at(p + glm::vec2(16.0f, 0.0f)).shore == Catch::Approx(0.5f).margin(0.02)); // the shallows, inside
+    CHECK(at(p).shore == 0.0f);
+    CHECK(at(p + glm::vec2(20.0f, 0.0f)).bank == at(p + glm::vec2(20.0f, 0.0f)).shore);
+    // the river: its banks both sides, its middle (4 m in, its half width) none
+    CHECK(at(p + glm::vec2(64.0f, 0.0f)).shore > 0.99f);
+    CHECK(at(p + glm::vec2(56.0f, 0.0f)).shore > 0.99f);
+    CHECK(at(p + glm::vec2(60.0f, 0.0f)).shore == 0.0f);
+    CHECK(at(p + glm::vec2(72.5f, 0.0f)).bank == 0.0f);
+    // the coast stays the sea's: inland banks are not coast
+    CHECK(at(p + glm::vec2(20.0f, 0.0f)).coast < 0.01f);
+    // 0 turns it off, and the land does not move
+    TileTerrainSpec off = s;
+    off.bankWidth = 0.0f;
+    CHECK(scene::tileSample(off, p.x + 20.0f, p.y).shore < 0.01f);
+    CHECK(scene::tileSample(off, p.x + 22.0f, p.y).height == at(p + glm::vec2(22.0f, 0.0f)).height);
+}
+
+TEST_CASE("tiles: a bank's lip rises over its first tile and its step drops the water, and no level moves",
+          "[geography][tiles][adr1999]") {
+    TileTerrainSpec s = inlandWorld();
+    const glm::vec2 p(0.0f);
+    REQUIRE(scene::tileSample(s, p.x, p.y).coast == 0.0f);
+    s.ponds = {scene::TilePond{.name = "tarn", .centre = p, .radius = 20.0f, .basinWidth = 24.0f}};
+    s.rivers = {scene::TileRiver{.name = "brook", .points = {p + glm::vec2(60.0f, -80.0f), p + glm::vec2(60.0f, 80.0f)},
+                                 .width = 8.0f, .valleyWidth = 40.0f, .bedDepth = 1.0f, .sourceLevel = std::nullopt}};
+    s.resolveWater();
+    TileTerrainSpec banked = s;
+    banked.ponds[0].lip = 0.6f;
+    banked.ponds[0].step = 0.8f;
+    banked.rivers[0].lip = 0.5f;
+    banked.rivers[0].step = 1.0f;
+    REQUIRE(banked.validate().has_value());
+    banked.resolveWater();
+    // the levels (auto here) are the bank's, unchanged
+    CHECK(scene::tilePondLevel(banked, 0) == scene::tilePondLevel(s, 0));
+    CHECK(scene::tileRiverSourceLevel(banked, 0) == scene::tileRiverSourceLevel(s, 0));
+    const auto dh = [&](glm::vec2 q) {
+        return scene::tileSample(banked, q.x, q.y).height - scene::tileSample(s, q.x, q.y).height;
+    };
+    CHECK(dh(p) == Catch::Approx(-0.8f).margin(1e-4));                      // the pond's water, stepped down
+    CHECK(dh(p + glm::vec2(22.0f, 0.0f)) == Catch::Approx(0.6f).margin(1e-4)); // its first bank tile, lipped
+    CHECK(dh(p + glm::vec2(27.0f, 0.0f)) == 0.0f);                          // past the lip
+    CHECK(dh(p + glm::vec2(60.0f, 0.0f)) == Catch::Approx(-1.0f).margin(1e-4)); // the river's water
+    CHECK(dh(p + glm::vec2(66.0f, 0.0f)) == Catch::Approx(0.5f).margin(1e-4)); // its bank
+    // the water stays water and its class stays put
+    CHECK(scene::tileWaterClass(scene::tileSample(banked, p.x, p.y)) == 2);
+    CHECK(scene::tileSample(banked, p.x + 60.0f, p.y).water > 0.99f);
+    CHECK(scene::tileSample(banked, p.x + 22.0f, p.y).water < 0.01f);
+}
+
+TEST_CASE("tiles: banks read, write and refuse", "[geography][tiles][json][adr1999]") {
+    TileTerrainSpec s = landWorld();
+    s.bankWidth = 6.0f;
+    s.ponds = {scene::TilePond{.name = "a", .centre = {10.0f, 10.0f}, .radius = 8.0f, .basinWidth = 8.0f, .lip = 0.4f,
+                               .step = 0.7f}};
+    s.rivers = {scene::TileRiver{.name = "r", .points = {{0.0f, 0.0f}, {50.0f, 0.0f}}, .width = 6.0f,
+                                 .valleyWidth = 30.0f, .lip = 0.3f, .step = 0.9f}};
+    const nlohmann::json j = scene::tileTerrainToJson(s);
+    CHECK(j.at("bankWidth") == 6.0f);
+    CHECK(j.at("ponds")[0].at("lip") == 0.4f);
+    CHECK(j.at("rivers")[0].at("step") == 0.9f);
+    auto back = scene::tileTerrainFromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->bankWidth == 6.0f);
+    CHECK(back->ponds[0].step == 0.7f);
+    CHECK(back->rivers[0].lip == 0.3f);
+    CHECK(back->hash() == s.hash());
+    TileTerrainSpec flush = s;
+    flush.ponds[0].lip = 0.0f;
+    CHECK(flush.hash() != s.hash());
+    CHECK_FALSE(scene::tileTerrainToJson(flush).at("ponds")[0].contains("lip")); // 0 is not written
+    TileTerrainSpec bad = s;
+    bad.rivers[0].step = -1.0f;
+    CHECK_FALSE(bad.validate().has_value());
+    bad = s;
+    bad.bankWidth = -2.0f;
+    CHECK_FALSE(bad.validate().has_value());
+}
+
+TEST_CASE("tiles: banks on a real scene's water -- levels and heights (measure)", "[.][geography][tiles][measure][adr1999]") {
+    // AVGEN_TILES_JSON: a tiles spec (the scene's generator `tiles` block). Prints every river's source and pond's level
+    // flush and banked (lip 0.6, step 0.8 on all), and the worst height change outside the banks with them flush.
+    const char* path = std::getenv("AVGEN_TILES_JSON");
+    if (path == nullptr) SKIP("set AVGEN_TILES_JSON");
+    std::ifstream in(path);
+    REQUIRE(in);
+    auto spec = scene::tileTerrainFromJson(nlohmann::json::parse(in));
+    REQUIRE(spec.has_value());
+    TileTerrainSpec flush = *spec;
+    flush.bankWidth = 0.0f;
+    for (auto& r : flush.rivers) r.lip = r.step = 0.0f;
+    for (auto& p : flush.ponds) p.lip = p.step = 0.0f;
+    TileTerrainSpec ring = flush;
+    ring.bankWidth = 8.0f;
+    TileTerrainSpec banked = ring;
+    for (auto& r : banked.rivers) { r.lip = 0.6f; r.step = 0.8f; }
+    for (auto& p : banked.ponds) { p.lip = 0.6f; p.step = 0.8f; }
+    for (TileTerrainSpec* s : {&flush, &ring, &banked}) s->resolveWater();
+    for (std::size_t i = 0; i < flush.rivers.size(); ++i) {
+        std::printf("river %-12s source %.4f | ring %.4f | banked %.4f\n", flush.rivers[i].name.c_str(),
+                    scene::tileRiverSourceLevel(flush, i), scene::tileRiverSourceLevel(ring, i),
+                    scene::tileRiverSourceLevel(banked, i));
+        CHECK(scene::tileRiverSourceLevel(banked, i) == scene::tileRiverSourceLevel(flush, i));
+    }
+    for (std::size_t i = 0; i < flush.ponds.size(); ++i) {
+        std::printf("pond  %-12s level  %.4f | ring %.4f | banked %.4f\n", flush.ponds[i].name.c_str(),
+                    scene::tilePondLevel(flush, i), scene::tilePondLevel(ring, i), scene::tilePondLevel(banked, i));
+        CHECK(scene::tilePondLevel(banked, i) == scene::tilePondLevel(flush, i));
+    }
+    // the ring alone moves no height anywhere near the water
+    float worst = 0.0f;
+    for (const auto& p : flush.ponds) {
+        for (float dz = -80.0f; dz <= 80.0f; dz += 4.0f) {
+            for (float dx = -80.0f; dx <= 80.0f; dx += 4.0f) {
+                worst = std::max(worst, std::abs(scene::tileSample(ring, p.centre.x + dx, p.centre.y + dz).height -
+                                                 scene::tileSample(flush, p.centre.x + dx, p.centre.y + dz).height));
+            }
+        }
+    }
+    std::printf("worst height change from the ring alone: %.6f m\n", worst);
+    CHECK(worst == 0.0f);
 }

@@ -1870,7 +1870,7 @@ private:
     // dynamics' springs (ADR-1954). `tileGroundOffset_` is the node's world translation.
     TileGround tileGround_;
     glm::vec3 tileGroundOffset_{0.0f};
-    void refreshTileGround();
+    void refreshTileGround(double now);
     // ADR-1991: no skinned mesh sinks into a tile. After the rigs are posed, each character near the camera is lifted
     // (drawn only; the simulation is untouched) by the deepest of its low vertices (feet, shins, hands) below the top
     // of the tile under THAT vertex -- a landing crouch, a neighbouring tile ringing higher, a stride over a step.
@@ -2584,6 +2584,9 @@ private:
     float attractorRollDegrees_ = 0.0f; // ADR-1853: the flythrough's bank this frame
     // ADR-1956: the flight over a tiles ground (scene file "flight"), built into a table when its spec or ground changes.
     void applyFlightCamera(float& fovDegrees);
+    // The flight's table over its ground, rebuilt when the spec or the ground changes; null when there is no flight
+    // (ADR-1998: the rings ahead of the camera are placed by it before any frame has posed the camera).
+    const FlightTable* ensureFlightTable(bool evenDisabled = false);
     float flightRollDegrees_ = 0.0f;
     FlightSpec flight_;
     FlightTable flightTable_;
@@ -2595,6 +2598,35 @@ public:
     [[nodiscard]] const FlightSpec& flight() const { return flight_; }
     [[nodiscard]] const FlightTable& flightTable() const { return flightTable_; }
     [[nodiscard]] const FlightSpec& flightResolved() const { return flightResolved_; }
+
+    // ---- ADR-1998: the moving ground's music as a function of song time ----
+    // The parameters that move the ground's height (the swell, the trains, the breath, the drift, the rings and what
+    // triggers and places them): what the engine samples over the song. Empty with no moving ground.
+    [[nodiscard]] std::vector<params::IParameter*> tileMotionParameters() const;
+    // Each of those parameters' final values on a fixed grid (sample k at k / rate), for the ones a route or the
+    // timeline moves; the others are their bases. Offline the engine makes it from the analysed song, so every surface
+    // -- the drawn ground, the bodies' stance and plan, the crest that throws them -- reads the same music at the
+    // same instant on a play and on a seek. Null: the routes' finals are drawn and the bodies plan on the bases.
+    struct TileMotionSeries {
+        double rate = 60.0;
+        std::vector<std::pair<const params::IParameter*, std::vector<float>>> values;
+        std::uint64_t key = 0; // what it was made from
+    };
+    void setTileMotionSeries(std::shared_ptr<const TileMotionSeries> series);
+    // Live (no seek, the analysis is real time): the bodies read the live ground -- this frame's finals and live
+    // rings, and the last frame's, so a swell's rise reaches the crest a body feels.
+    void setTileMotionLive(bool live) { tileMotionLive_ = live; }
+    [[nodiscard]] const TileMotionTrack* tileMotion() const { return tileMotion_.get(); }
+private:
+    std::shared_ptr<const TileMotionSeries> tileMotionSeries_;
+    std::shared_ptr<const TileMotionTrack> tileMotion_; // built from the series (and the flight, for rings ahead)
+    std::uint64_t tileMotionBuiltKey_ = 0;
+    bool tileMotionLive_ = false;
+    std::vector<float> tileLivePrevious_; // live: the last frame's lane values (tileMotionParameters order)...
+    double tileLivePreviousTime_ = -1.0;  // ...and its instant
+    void rebuildTileMotion();
+    // the lane a parameter drives (false for the ring trigger and what places a ring)
+    [[nodiscard]] bool tileMotionLane(const params::IParameter* q, TileMotionField& field, int& wave) const;
 private:
     int attractorSunLight_ = -1;        // ADR-1857: the key light's index in scene_.lights, or -1
     std::vector<std::size_t> attractorChunks_; // ADR-1862: the terrain chunks' indices in scene_.entities

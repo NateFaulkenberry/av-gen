@@ -4,9 +4,11 @@
 // (ADR-1954), in world space. The composition owns one per scene with a tiles ground, refreshes it every frame with
 // the live tiles spec and dynamics, and drains the landings into the moving ground's spring list.
 
+#include "scene/tile_motion.hpp"
 #include "scene/tile_terrain.hpp"
 #include "world/ground_source.hpp"
 
+#include <memory>
 #include <vector>
 
 namespace avgen::scene {
@@ -20,6 +22,11 @@ public:
     void set(const TileTerrainSpec& tiles, const TileDynamics& dyn, const TileDynamics& plan, float pitch,
              glm::vec3 offset);
     [[nodiscard]] bool valid() const { return pitch_ > 0.0f; }
+    // ADR-1998: the music's part of the ground as a function of time. Every surface (`at`, `planned`, `landscape`)
+    // reads its lanes and rings at the instant asked, so a body sees the ground the viewer sees at that instant, on
+    // a play and on a seek's replay alike. Null: the dynamics as set, at every instant (as before).
+    void setMotion(std::shared_ptr<const TileMotionTrack> motion) { motion_ = std::move(motion); }
+    [[nodiscard]] const TileMotionTrack* motion() const { return motion_.get(); }
 
     [[nodiscard]] world::GroundSample at(float x, float z, double t) const override;
     [[nodiscard]] world::GroundSample planned(float x, float z, double t) const override;
@@ -44,6 +51,7 @@ private:
     float pitch_ = 0.0f;
     glm::vec3 offset_{0.0f};
     std::vector<TileEvent> landings_;
+    std::shared_ptr<const TileMotionTrack> motion_;
 };
 
 } // namespace avgen::scene

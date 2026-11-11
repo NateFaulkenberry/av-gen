@@ -1293,7 +1293,8 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         if (pool + n > scene::kMaxTileRiverPool) break;
         u.riverInfo[i] = glm::vec4(static_cast<float>(pool), static_cast<float>(n), r.width, r.valleyWidth);
         u.riverLevel[i] = glm::vec4(scene::tileRiverSourceLevel(t, i), scene::tileRiverMouthLevel(t),
-                                    scene::tileRiverLength(t, i), 0.0f);
+                                    scene::tileRiverLength(t, i), r.lip);
+        u.riverStep[static_cast<glm::length_t>(i)] = r.step; // ADR-1999
         u.riverBounds[i] = widened(r.points, 0.5f * r.valleyWidth + 1.0f);
         for (std::uint32_t k = 0; k < n; ++k) put(u.riverPts, pool + k, r.points[k]);
         pool += n;
@@ -1303,7 +1304,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
     for (std::size_t i = 0; i < ponds; ++i) {
         const scene::TilePond& p = t.ponds[i];
         u.ponds[i] = glm::vec4(p.centre.x, p.centre.y, p.radius, p.basinWidth);
-        u.pondB[i] = glm::vec4(scene::tilePondLevel(t, i), p.shoreNoise, 0.0f, 0.0f);
+        u.pondB[i] = glm::vec4(scene::tilePondLevel(t, i), p.shoreNoise, p.lip, p.step); // ADR-1999: the bank
     }
     const std::size_t valleys = std::min(t.valleys.size(), scene::kMaxTileValleys);
     pool = 0;
@@ -1342,7 +1343,7 @@ GeneratorTileUniforms packGeneratorTiles(const scene::ProceduralGeometry& object
         u.riseH[i / 4][static_cast<glm::length_t>(i % 4)] = r.height;
         u.riseNoise[i / 4][static_cast<glm::length_t>(i % 4)] = r.noise; // ADR-1994
     }
-    u.land0 = glm::vec4(static_cast<float>(ridgeCount), static_cast<float>(rises), 0.0f, 0.0f);
+    u.land0 = glm::vec4(static_cast<float>(ridgeCount), static_cast<float>(rises), t.bankWidth, 0.0f);
     for (std::uint32_t i = 0; i < points; ++i) {
         glm::vec4& lane = u.path[i / 2];
         if ((i & 1u) == 0u) {

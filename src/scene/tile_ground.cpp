@@ -33,11 +33,19 @@ world::GroundSample TileGround::sample(const TileDynamics& d, float x, float z, 
         return s;
     }
     const glm::vec2 c = cellCentre(x, z) - glm::vec2(offset_.x, offset_.z);
-    const TileSample tile = tileSampleMoving(tiles_, d, c.x, c.y, static_cast<float>(t), pitch_);
+    TileSample tile;
+    if (motion_ != nullptr && !motion_->empty()) {
+        TileDynamics moved = d; // ADR-1998: the music's lanes and rings at this instant
+        motion_->apply(moved, t);
+        tile = tileSampleMoving(tiles_, moved, c.x, c.y, static_cast<float>(t), pitch_);
+    } else {
+        tile = tileSampleMoving(tiles_, d, c.x, c.y, static_cast<float>(t), pitch_);
+    }
     s.height = tile.height + offset_.y;
     s.water = tile.water;
     s.flat = tile.flat;
     s.path = tile.path;
+    s.bank = tile.bank; // ADR-1999
     return s;
 }
 

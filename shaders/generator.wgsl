@@ -216,16 +216,16 @@ struct TileParams {
     morph2: vec4<f32>,     // ADR-1995: the coarser ring's sample pitch (m), the contour fade (fraction of a step)
     path: array<vec4<f32>, 8>, // two points per lane: (x0, z0, x1, z1)
     riverInfo: array<vec4<f32>, 4>,   // ADR-1965: first point (pool index), point count, width, valley width
-    riverLevel: array<vec4<f32>, 4>,  // source level, mouth level, length, 0
+    riverLevel: array<vec4<f32>, 4>,  // source level, mouth level, length, lip (ADR-1999)
     riverBounds: array<vec4<f32>, 4>, // min x, min z, max x, max z, widened by half the valley
     riverPts: array<vec4<f32>, 32>,   // the rivers' points, pooled, two per lane
     ponds: array<vec4<f32>, 8>,       // centre x, centre z, radius, basin width
-    pondB: array<vec4<f32>, 8>,       // level, shore noise, 0, 0
+    pondB: array<vec4<f32>, 8>,       // level, shore noise, lip, step (ADR-1999)
     valleyInfo: array<vec4<f32>, 8>,  // first point, point count, valley width, depth (ADR-1992: 8 valleys)
     valleyB: array<vec4<f32>, 8>,     // min x, min z, max x, max z (widened)
     valleyFrac: array<vec4<f32>, 2>,  // each valley's depth fraction, four per lane
     valleyPts: array<vec4<f32>, 32>,  // the valleys' points, pooled (ADR-1992: 64)
-    land0: vec4<f32>,                 // ADR-1992: ridge count, rise count, 0, 0
+    land0: vec4<f32>,                 // ADR-1992: ridge count, rise count, bank width (ADR-1999), 0
     ridgeInfo: array<vec4<f32>, 8>,   // first point, point count, width, height
     ridgeB: array<vec4<f32>, 8>,      // min x, min z, max x, max z (widened by half the width)
     ridgePts: array<vec4<f32>, 32>,   // the ridges' points, pooled
@@ -233,6 +233,7 @@ struct TileParams {
     riseH: array<vec4<f32>, 2>,       // each rise's height, four per lane
     ridgeNoise: array<vec4<f32>, 2>,  // ADR-1994: each ridge's noise, four per lane
     riseNoise: array<vec4<f32>, 2>,   // each rise's noise
+    riverStep: vec4<f32>,             // ADR-1999: each river's water step below its bank (m)
     // ADR-1953: the moving ground (procedural_renderer.hpp GeneratorTileUniforms).
     dyn: vec4<f32>,        // t, amplitude, wave count, event count
     breath: vec4<f32>,     // amplitude, period, wavelength, 1 when anything moves
@@ -396,6 +397,22 @@ struct TileOut {
     riverS: f32,
 };
 
+// ADR-1999 (CPD-R4): the inland shore at `e` metres from a waterline (negative in the water) -- bankShore's twin -- and
+// the lip's profile beyond it -- bankLip's.
+fn tileBankShore(bankWidth: f32, e: f32, inside: f32) -> f32 {
+    if (!(bankWidth > 0.0)) {
+        return 0.0;
+    }
+    if (e >= 0.0) {
+        return 1.0 - tileSmooth(0.0, bankWidth, e);
+    }
+    return 1.0 - tileSmooth(0.0, min(bankWidth, inside), -e);
+}
+
+fn tileBankLip(e: f32) -> f32 {
+    return select(0.0, 1.0 - tileSmooth(4.0, 6.0, e), e >= 0.0);
+}
+
 fn tileSample(x: f32, z: f32) -> TileOut {
     let seed = tile.info.x;
     let region = tileValueNoise(seed ^ TILE_REGION_SEED, x / tile.e.x, z / tile.e.x);
@@ -483,6 +500,7 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     var river = 0.0;
     var riverS = 0.0;
     var bestRiver = 1e9;
+    var bank = 0.0; // ADR-1999: the inland shore
     let riverCount = min(u32(tile.water0.x + 0.5), 4u);
     for (var i = 0u; i < riverCount; i = i + 1u) {
         let ri = tile.riverInfo[i];
@@ -501,6 +519,9 @@ fn tileSample(x: f32, z: f32) -> TileOut {
         let v = 1.0 - tileSmooth(0.5 * ri.z, 0.5 * ri.w, d);
         landHeight = landHeight + (level - landHeight) * v;
         let channel = 1.0 - tileSmooth(0.5 * ri.z - 0.5, 0.5 * ri.z + 0.5, d);
+        let e = d - 0.5 * ri.z; // ADR-1999: the bank (applyFeatures' twin)
+        landHeight = landHeight + rl.w * tileBankLip(e) - tile.riverStep[i] * channel;
+        bank = max(bank, tileBankShore(tile.land0.z, e, 0.5 * ri.z));
         if (channel > river || (channel == river && d < bestRiver)) {
             river = channel;
             riverS = near.y;
@@ -525,7 +546,11 @@ fn tileSample(x: f32, z: f32) -> TileOut {
         let level = pb.x - tile.b.x;
         let v = 1.0 - tileSmooth(shore, shore + pd.w, d);
         landHeight = landHeight + (level - landHeight) * v;
-        pond = max(pond, 1.0 - tileSmooth(shore - 0.5, shore + 0.5, d));
+        let channel = 1.0 - tileSmooth(shore - 0.5, shore + 0.5, d);
+        pond = max(pond, channel);
+        let e = d - shore; // ADR-1999
+        landHeight = landHeight + pb.z * tileBankLip(e) - pb.w * channel;
+        bank = max(bank, tileBankShore(tile.land0.z, e, shore));
     }
     var out: TileOut;
     out.height = (tile.b.x - tile.b.y) + ((tile.b.x + landHeight) - (tile.b.x - tile.b.y)) * land;
@@ -534,7 +559,7 @@ fn tileSample(x: f32, z: f32) -> TileOut {
     out.river = river * land;
     out.pond = pond * land * (1.0 - river);
     out.riverS = riverS;
-    out.shore = shore; // ADR-1993: the final coast
+    out.shore = max(shore, bank * land); // ADR-1993: the final coast; ADR-1999: and inland water's banks
     out.flat = tileSmooth(tile.d.z, tile.d.z + 0.06, shaped) * tile.d.w * inland * land;
     out.path = 0.0;
     out.crest = 0.0;

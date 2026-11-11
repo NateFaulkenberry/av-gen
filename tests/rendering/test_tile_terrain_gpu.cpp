@@ -628,6 +628,55 @@ TEST_CASE("The tiles kernel draws the CPU's rivers, ponds and dry valleys", "[gp
     CHECK(ctx->errorCount() == 0);
 }
 
+// ADR-1999 (CPD-R4): banks -- the inland shore ring, the lips and the steps -- drawn as the CPU has them.
+TEST_CASE("The tiles kernel draws the CPU's banks: the inland shore, the lips and the steps",
+          "[gpu][generator][geography][adr1999]") {
+    auto ctx = makeContext();
+    Rig rig(*ctx);
+    auto pg = tilesObject("banks", 1.0f, 48.0f, 4, 0.0f, 0.0f, 0.0f, 1);
+    scene::TileTerrainSpec& t = pg.distribution.generator.tiles;
+    t.rivers.clear();
+    t.continentWavelength = 4000.0f; // land everywhere near the origin: every shore here is a bank
+    t.landThreshold = 0.05f;
+    t.bankWidth = 6.0f;
+    t.rivers = {scene::TileRiver{.name = "stream", .points = {{-60.0f, -40.0f}, {-10.0f, 4.0f}, {50.0f, 20.0f}},
+                                 .width = 6.0f, .valleyWidth = 24.0f, .bedDepth = 1.0f, .sourceLevel = std::nullopt,
+                                 .lip = 0.5f, .step = 0.9f}};
+    t.ponds = {scene::TilePond{.name = "auto", .centre = {20.0f, -30.0f}, .radius = 12.0f, .basinWidth = 10.0f,
+                               .shoreNoise = 0.4f, .lip = 0.7f, .step = 0.6f},
+               scene::TilePond{.name = "flush", .centre = {-36.0f, 30.0f}, .radius = 9.0f, .basinWidth = 8.0f}};
+    REQUIRE(t.validate().has_value());
+    t.resolveWater();
+    REQUIRE(pg.validate().has_value());
+    const float top = scene::tileSample(t, 0.0f, 60.0f).height;
+    const glm::vec3 camera(0.0f, top + 40.0f, 60.0f);
+    scene::Scene s;
+    s.procedurals.push_back(pg);
+    s.camera.position = camera;
+    s.camera.target = camera + glm::vec3(0.0f, -0.6f, -1.0f);
+    REQUIRE(rig.renderer.renderToImage(s, FrameTime{1.0, 1.0 / 30.0, 1}, 160, 90).has_value());
+    const Parity par = compare(rig.renderer, pg, camera);
+    CAPTURE(par.present, par.worstHeight, par.worstChannel, par.classWrong, par.classes[1], par.classes[2]);
+    CHECK(par.identity == 0);
+    CHECK(par.worstHeight <= 1e-3f);
+    CHECK(par.worstChannel <= 1e-4f);
+    CHECK(par.classWrong == 0);
+    CHECK(par.classes[1] > 20);
+    CHECK(par.classes[2] > 20);
+    // the ring is there: tiles beside the water with a shore, and none of it the coast's
+    int banks = 0;
+    const scene::GeneratorWindow w = rig.renderer.procedurals().generatorWindow(pg.name);
+    for (std::int32_t z = 0; z < w.countZ; ++z) {
+        for (std::int32_t x = 0; x < w.countX; ++x) {
+            const scene::TileSample c = scene::generatorTile(pg.distribution.generator, w.originX + x, w.originZ + z);
+            if (c.bank > 0.3f && c.water < 0.01f) ++banks;
+            CHECK(c.coast == 0.0f);
+        }
+    }
+    CHECK(banks > 40);
+    CHECK(ctx->errorCount() == 0);
+}
+
 // ADR-1992: ridges, rises and 8 valleys -- the kernel raises (and lands) what the CPU does, still and moving.
 TEST_CASE("The tiles kernel raises the CPU's ridges and rises, with 8 valleys", "[gpu][generator][geography][adr1992]") {
     auto ctx = makeContext();

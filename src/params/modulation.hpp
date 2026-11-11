@@ -8,6 +8,7 @@
 #include "params/processor.hpp"
 #include "signals/signal_bus.hpp"
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -22,6 +23,9 @@ class Facts;
 }
 
 enum class ModOp : std::uint8_t { Add, Multiply, Replace, Min, Max };
+// The order the modulator applies the ops in: every route of one op, then the next.
+inline constexpr std::array<ModOp, 5> kModOpPriority{ModOp::Replace, ModOp::Multiply, ModOp::Add, ModOp::Min,
+                                                     ModOp::Max};
 enum class Polarity : std::uint8_t { Unipolar, Bipolar }; // Bipolar maps the source 0..1 -> -1..1 before the chain
 
 struct ModRoute {

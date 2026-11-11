@@ -1201,6 +1201,27 @@ private:
     [[nodiscard]] std::uint64_t replaySignalKey(bool playing) const;
     class ReplaySignals;
     std::unique_ptr<ReplaySignals> replaySignals_;
+    // ADR-1998: the moving ground's music over the whole song, for the composition (`setTileMotionSeries`). Offline,
+    // the routes on the ground's parameters are run once over the song on a fixed 60 Hz grid (a signal replay from
+    // zero), their outputs recorded, and composed onto the parameters' bases and timeline keys; a route, a source, the
+    // audio or the controls changed re-records, a base or a key changed only re-composes. Live: the composition reads
+    // the live ground. Called before every frame's entity step and before a seek's replay.
+    void refreshTileMotion();
+    struct TileRouteRecord {
+        std::uint64_t key = 0;
+        double rate = 60.0;
+        std::size_t samples = 0;
+        std::vector<double> beats; // the musical position per sample (a beat-timed key's clock)
+        struct Lane {
+            std::size_t route = 0;     // index in the modulator's routes
+            std::vector<float> output; // the route's output per sample (amount and gains applied)
+            std::vector<float> depth;  // its depth per sample; empty = full depth
+        };
+        std::vector<Lane> lanes;
+        std::vector<const params::IParameter*> recorded; // the parameters every route of which is recorded
+    };
+    TileRouteRecord tileRouteRecord_;
+    std::uint64_t tileMotionComposedKey_ = 0;
     // Shared by loadComposition and setCompositionJson: detach, swap, attach, reapply.
     [[nodiscard]] Result<void> installComposition(std::unique_ptr<scene::Composition> composition);
     void installController(std::unique_ptr<scene::SceneController> controller);

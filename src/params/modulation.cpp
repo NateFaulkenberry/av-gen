@@ -13,8 +13,7 @@ namespace avgen::params {
 namespace {
 // Evaluation order: Replace establishes a base, Multiply scales it, Add offsets it and Min/Max
 // finally bound it. Routes with the same op are applied in insertion order.
-constexpr std::array<ModOp, 5> kOpPriority{ModOp::Replace, ModOp::Multiply, ModOp::Add, ModOp::Min,
-                                           ModOp::Max};
+constexpr const std::array<ModOp, 5>& kOpPriority = kModOpPriority;
 } // namespace
 
 float applyModOp(ModOp op, float current, float modulation) {

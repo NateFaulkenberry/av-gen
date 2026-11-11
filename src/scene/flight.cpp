@@ -229,7 +229,7 @@ Result<FlightSpec> resolveFlightRoute(const FlightSpec& spec, const TileTerrainS
         }
         FlightWaypoint q = w;
         if (!w.snap.empty()) {
-            // the best point near the hint: the shoreline (the shore channel's peak) or a crown's top (the flat channel,
+            // the best point near the hint: the shoreline (the coast's peak, not a pond's or a river's bank) or a crown's top (the flat channel,
             // then height), searched on a grid within snapRadius; ties go to the nearest
             const float step = std::max(2.0f, w.snapRadius / 60.0f);
             float best = -1.0f;
@@ -240,7 +240,7 @@ Result<FlightSpec> resolveFlightRoute(const FlightSpec& spec, const TileTerrainS
                     if (dist > w.snapRadius) continue;
                     const glm::vec2 p = w.position + glm::vec2(dx, dz);
                     const TileSample t = tileSample(tiles, p.x, p.y);
-                    const float score = w.snap == "shore" ? t.shore : t.flat + 1e-3f * t.height;
+                    const float score = w.snap == "shore" ? t.coast : t.flat + 1e-3f * t.height; // ADR-1999: the sea's
                     if (score > best + 1e-6f || (std::abs(score - best) <= 1e-6f && dist < bestDist)) {
                         best = score;
                         bestDist = dist;
