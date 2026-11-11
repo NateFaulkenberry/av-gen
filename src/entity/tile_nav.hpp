@@ -28,6 +28,8 @@ struct TileNavRules {
     float jumpDrop = 8.0f;    // metres a hop may drop
     int window = 48;          // tiles from the start the search may go
     float waterThreshold = 0.5f;
+    // ADR-1997: a hop may land on water (a sea slab) only when this is set. Off: no step of a path is on water.
+    bool landOnWater = false;
     float jumpCost = 1.5f;    // added per hop, so a walk is preferred where one exists
 };
 

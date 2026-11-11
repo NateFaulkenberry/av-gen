@@ -21,6 +21,8 @@
 #include <nlohmann/json.hpp>
 
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
 #include <filesystem>
 #include <map>
 
@@ -442,8 +444,8 @@ struct HopScene {
                 {"name": "b", "kind": "orb", "position": [-10, 0, 3]}
             ],
             "entities": [
-                {"name": "a", "node": "a", "seed": 5, "behaviors": [{"kind": "hop", "hopChance": 0.5, "pauseMax": 1.5}]},
-                {"name": "b", "node": "b", "seed": 9, "behaviors": [{"kind": "hop", "hopChance": 0.5, "pauseMax": 1.5}]}
+                {"name": "a", "node": "a", "seed": 5, "behaviors": [{"kind": "hop", "hopChance": 0.5, "pauseMax": 1.5, "tossThreshold": 0.25}]},
+                {"name": "b", "node": "b", "seed": 9, "behaviors": [{"kind": "hop", "hopChance": 0.5, "pauseMax": 1.5, "tossThreshold": 0.25}]}
             ]})");
         auto c = scene::Composition::fromJson(json, registry);
         REQUIRE(c.has_value());
@@ -527,52 +529,6 @@ TEST_CASE("characters hop on the drawn tiles, spring them, and a seek lands wher
 }
 
 // ---- Phase 7: what the music reaches (ADR-1963, ADR-1964) ---------------------------------------------------------
-
-TEST_CASE("a hop cue sets a resting body off with a hop, on the edge only", "[tiles][hop][geography][audio]") {
-    const scene::TileTerrainSpec spec;
-    scene::TileGround g;
-    g.set(spec, movingGround(), 4.0f, glm::vec3(0.0f));
-    nlohmann::json settings = {{"pauseMin", 30.0}, {"pauseMax", 30.0}, {"hopChance", 0.0}};
-    auto hop = entity::makeBehavior("hop", &settings);
-    params::ParameterSet params;
-    hop->registerParameters(params, "e/hop/");
-    auto* cue = params.find("e/hop/trigger");
-    REQUIRE(cue != nullptr);
-    Rng rng(4);
-    hop->reset(rng);
-    entity::EntityState state;
-    state.anchor = glm::vec3(6.0f, 0.0f, -10.0f);
-    entity::MotionOffset offset;
-    glm::vec3 rest{0.0f};
-    bool jumped = false;
-    int jumpFrame = -1;
-    for (int f = 0; f < 600; ++f) {
-        const double t = f / 60.0;
-        params.resetFinals();
-        cue->setBaseComponent(0, (f >= 300 && f < 306) ? 1.0f : 0.0f); // one pulse at 5 s
-        entity::BehaviorContext ctx;
-        ctx.time = t;
-        ctx.dt = 1.0 / 60.0;
-        ctx.rng = &rng;
-        ctx.ground = &g;
-        hop->update(ctx, state, offset);
-        if (f == 299) {
-            rest = state.position();
-        }
-        if (f < 300) {
-            CHECK(state.activity == entity::Activity::Idle); // a 30 s rest: nothing before the cue
-        }
-        if (f >= 300 && state.activity == entity::Activity::Jump && !jumped) {
-            jumped = true;
-            jumpFrame = f;
-        }
-    }
-    CAPTURE(jumpFrame);
-    CHECK(jumped);
-    CHECK(jumpFrame >= 300);
-    CHECK(jumpFrame <= 302); // it sets off with a hop on the cue's frame (or the next)
-    CHECK(glm::length(glm::vec2(state.position().x - rest.x, state.position().z - rest.z)) > 1.0f);
-}
 
 TEST_CASE("where a body goes does not depend on what the routes do to the ground", "[tiles][hop][geography][audio]") {
     // ADR-1964: the plan reads the planning surface (the parameters' bases), the stance the drawn one. Two runs whose
@@ -888,84 +844,207 @@ TEST_CASE("a route refuses a processor-chain key written on the route itself", "
     CHECK(params::routeFromJson(odd).has_value());
 }
 
-// ---- CP-D r2 (E): choreographed hops -----------------------------------------------------------------------------
+// ---- ADR-1997: the crest toss, walking off water, and a fixed step ------------------------------------------------
 
 namespace {
 
-struct CueRun {
-    int launches = 0;
-    float minGap = 1e9f;
-    std::vector<float> airTimes;
+struct TossRun {
+    std::vector<double> launches;          // when it left the ground on a throw
+    std::vector<float> apexes;             // the height above its launch it reached
+    std::vector<glm::vec3> landings;       // where each throw came down
+    std::vector<std::pair<double, glm::vec3>> track; // (t, position) every frame
+    float worstLanding = 0.0f;             // |position.y - the drawn top| at each landing
 };
 
-// A body under a cue that fires on every beat at `bpm` for `seconds`; counts its launches and the gaps between them.
-CueRun runCues(const nlohmann::json& settings, float bpm, double seconds, std::uint64_t seed) {
-    const scene::TileTerrainSpec spec;
+// A body resting (a pause far longer than the run) on a ground with one wave train, updated at `fps`.
+TossRun runTosses(const scene::TileDynamics& d, nlohmann::json settings, double fps, double seconds,
+                  glm::vec3 anchor = glm::vec3(6.0f, 0.0f, -10.0f), const scene::TileTerrainSpec& spec = {}) {
     scene::TileGround g;
-    g.set(spec, scene::TileDynamics{}, 4.0f, glm::vec3(0.0f));
+    g.set(spec, d, 4.0f, glm::vec3(0.0f));
+    settings["pauseMin"] = 1000.0;
+    settings["pauseMax"] = 1000.0;
     auto hop = entity::makeBehavior("hop", &settings);
     params::ParameterSet params;
     hop->registerParameters(params, "e/hop/");
-    auto* cue = params.find("e/hop/trigger");
-    signals::SignalBus bus;
-    const signals::SignalId bpmId = bus.declare("beat.bpm", 0.0f, 300.0f);
-    bus.set(bpmId, bpm);
-    Rng rng(seed);
+    Rng rng(7);
     hop->reset(rng);
     entity::EntityState state;
-    state.anchor = glm::vec3(6.0f, 0.0f, -10.0f);
+    state.anchor = anchor;
     entity::MotionOffset offset;
-    CueRun out;
+    TossRun out;
     bool wasAir = false;
-    double airStart = 0.0;
-    double last = -1e9;
-    const double beat = 60.0 / bpm;
-    for (int f = 0; f * (1.0 / 60.0) < seconds; ++f) {
-        const double t = f / 60.0;
+    float launchY = 0.0f;
+    float top = 0.0f;
+    const auto frames = static_cast<long long>(seconds * fps);
+    for (long long f = 0; f <= frames; ++f) {
+        const double t = static_cast<double>(f) / fps;
         params.resetFinals();
-        cue->setBaseComponent(0, f > 0 && std::fmod(t, beat) < 1.0 / 60.0 ? 1.0f : 0.0f); // a one-frame pulse a beat
         entity::BehaviorContext ctx;
         ctx.time = t;
-        ctx.dt = 1.0 / 60.0;
+        ctx.dt = f == 0 ? 0.0 : 1.0 / fps;
         ctx.rng = &rng;
         ctx.ground = &g;
-        ctx.bus = &bus;
         hop->update(ctx, state, offset);
+        const glm::vec3 p = state.position();
+        out.track.emplace_back(t, p);
         if (state.airborne && !wasAir) {
-            ++out.launches;
-            out.minGap = std::min(out.minGap, static_cast<float>(t - last));
-            last = t;
-            airStart = t;
+            out.launches.push_back(t);
+            launchY = p.y;
+            top = p.y;
         }
+        if (state.airborne) top = std::max(top, p.y);
         if (!state.airborne && wasAir) {
-            out.airTimes.push_back(static_cast<float>(t - airStart));
+            out.apexes.push_back(top - launchY);
+            out.landings.push_back(p);
+            out.worstLanding = std::max(out.worstLanding, std::abs(p.y - g.at(p.x, p.z, t).height));
         }
         wasAir = state.airborne;
     }
     return out;
 }
 
+scene::TileDynamics swell(float amplitude) {
+    scene::TileDynamics d;
+    scene::TileWave w;
+    w.amplitude = amplitude;
+    w.wavelength = 36.0f;
+    w.speed = 5.0f; // peak rise = amplitude x 2 pi 5 / 36 = 0.87 x amplitude m/s
+    w.direction = 20.0f;
+    d.waves = {w};
+    return d;
+}
+
 } // namespace
 
-TEST_CASE("cue-only hops answer in turns, never faster than the gap, and last whole beats", "[tiles][hop][geography][audio]") {
-    // 120 BPM, a cue every 0.5 s for 60 s. Cue-only, every 4th cue (each body at its own place), at least 2 s apart, a
-    // two-beat hop; walking hops off, so every launch is an answered cue.
-    const nlohmann::json settings = {{"cueOnly", 1.0}, {"cueEvery", 4.0}, {"cueGap", 2.0}, {"airBeats", 2.0},
-                                     {"hopChance", 0.0}, {"maxWait", 60.0}, {"goalMin", 1.0}, {"goalMax", 2.0},
-                                     {"jumpTiles", 1.0}};
-    const CueRun r = runCues(settings, 120.0f, 60.0, 17);
-    CAPTURE(r.launches, r.minGap);
-    CHECK(r.launches >= 8);            // it does answer
-    CHECK(r.launches <= 31);           // at most one every couple of seconds (60 s / 2 s + 1)
-    CHECK(r.minGap >= 2.0f - 1e-3f);   // never two answers closer than the gap
-    REQUIRE_FALSE(r.airTimes.empty());
-    for (const float a : r.airTimes) {
-        CHECK(a == Approx(1.0f).margin(1.0f / 60.0f + 1e-4f)); // two beats at 120 BPM
+TEST_CASE("a crest throws a resting body, higher for a bigger crest, at most once per cooldown",
+          "[tiles][hop][geography][adr1997]") {
+    const nlohmann::json toss = {{"hopChance", 0.0}, {"tossThreshold", 0.3}, {"tossGain", 8.0}, {"tossCooldown", 2.0}};
+    const TossRun small = runTosses(swell(0.5f), toss, 60.0, 40.0);  // peak rise ~0.44 m/s
+    const TossRun big = runTosses(swell(1.0f), toss, 60.0, 40.0);    // ~0.87 m/s
+    const TossRun calm = runTosses(swell(0.2f), toss, 60.0, 40.0);   // ~0.17 m/s: under the threshold
+    const TossRun off = runTosses(swell(1.0f), {{"hopChance", 0.0}}, 60.0, 40.0); // tossThreshold 0: off
+    CAPTURE(small.launches.size(), big.launches.size(), calm.launches.size());
+    CHECK(calm.launches.empty());
+    CHECK(off.launches.empty());
+    REQUIRE(small.launches.size() >= 3); // the wave passes every 7.2 s
+    REQUIRE(big.launches.size() >= 3);
+    const auto mean = [](const std::vector<float>& v) {
+        float s = 0.0f;
+        for (const float x : v) s += x;
+        return s / static_cast<float>(std::max<std::size_t>(v.size(), 1));
+    };
+    CAPTURE(mean(small.apexes), mean(big.apexes));
+    CHECK(mean(big.apexes) > 2.0f * mean(small.apexes)); // v0 doubles: the climb is ballistic, about 4x
+    for (std::size_t i = 1; i < big.launches.size(); ++i) {
+        CHECK(big.launches[i] - big.launches[i - 1] >= 2.0 - 1e-6); // the cooldown
     }
-    // and with no cue at all a cue-only body rests until maxWait
-    const nlohmann::json patient = {{"cueOnly", 1.0}, {"maxWait", 5.0}, {"hopChance", 0.0}};
-    const CueRun none = runCues(patient, 0.001f, 4.5, 3); // bpm ~0: the cue never pulses within 4.5 s
-    CHECK(none.launches == 0);
+    // it lands on the drawn top (ADR-1991), on dry land
+    CHECK(big.worstLanding < 1e-3f);
+    CHECK(small.worstLanding < 1e-3f);
+}
+
+TEST_CASE("the hop runs on a fixed step: 30, 45 and 60 fps throw and walk alike", "[tiles][hop][geography][adr1997]") {
+    // a walking, tossed body; positions compared at the instants all three rates share (every 1/15 s)
+    const nlohmann::json walker = {{"hopChance", 0.2}, {"tossThreshold", 0.3}, {"tossGain", 8.0}, {"tossCooldown", 2.0},
+                                   {"pauseMin", 0.5}, {"pauseMax", 1.5}};
+    const auto run = [&](double fps) {
+        scene::TileGround g;
+        g.set(scene::TileTerrainSpec{}, swell(0.8f), 4.0f, glm::vec3(0.0f));
+        auto hop = entity::makeBehavior("hop", &walker);
+        params::ParameterSet params;
+        hop->registerParameters(params, "e/hop/");
+        Rng rng(11);
+        hop->reset(rng);
+        entity::EntityState state;
+        state.anchor = glm::vec3(-6.0f, 0.0f, 14.0f);
+        entity::MotionOffset offset;
+        std::vector<glm::vec3> at;
+        const auto frames = static_cast<long long>(30.0 * fps);
+        for (long long f = 0; f <= frames; ++f) {
+            params.resetFinals();
+            entity::BehaviorContext ctx;
+            ctx.time = static_cast<double>(f) / fps;
+            ctx.dt = f == 0 ? 0.0 : 1.0 / fps;
+            ctx.rng = &rng;
+            ctx.ground = &g;
+            hop->update(ctx, state, offset);
+            if (f % static_cast<long long>(fps / 15.0) == 0) at.push_back(state.position());
+        }
+        return at;
+    };
+    const auto a = run(30.0);
+    const auto b = run(45.0);
+    const auto c = run(60.0);
+    REQUIRE(a.size() == b.size());
+    REQUIRE(a.size() == c.size());
+    float worst = 0.0f;
+    float travelled = 0.0f;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        worst = std::max({worst, glm::length(a[i] - b[i]), glm::length(a[i] - c[i])});
+        if (i > 0) travelled += glm::length(glm::vec2(a[i].x - a[i - 1].x, a[i].z - a[i - 1].z));
+    }
+    CAPTURE(worst, travelled);
+    CHECK(travelled > 10.0f); // the control: it walks
+    CHECK(worst < 1e-3f);
+}
+
+TEST_CASE("bodies keep off water: a start on water moves ashore, and no walk, hop or throw ends on it",
+          "[tiles][hop][geography][adr1997]") {
+    // a coast in the window: the default spec's continent field gives sea and land within a few tiles
+    scene::TileTerrainSpec spec;
+    spec.continentWavelength = 120.0f;
+    scene::TileGround g;
+    g.set(spec, swell(0.9f), 4.0f, glm::vec3(0.0f));
+    // find a sea tile with land within 12 tiles
+    glm::vec2 sea{0.0f};
+    bool found = false;
+    for (int z = -20; z <= 20 && !found; ++z) {
+        for (int x = -20; x <= 20 && !found; ++x) {
+            const glm::vec2 p = g.cellCentre(x * 4.0f, z * 4.0f);
+            if (g.planned(p.x, p.y, 0.0).water < 0.5f) continue;
+            for (int r = 1; r <= 6 && !found; ++r) {
+                if (g.planned(p.x + 4.0f * r, p.y, 0.0).water < 0.5f) {
+                    sea = p;
+                    found = true;
+                }
+            }
+        }
+    }
+    REQUIRE(found);
+    const nlohmann::json settings = {{"hopChance", 0.5}, {"tossThreshold", 0.3}, {"tossGain", 8.0},
+                                     {"tossCooldown", 1.5}, {"pauseMin", 0.3}, {"pauseMax", 1.0}, {"homeRadius", 40.0}};
+    auto hop = entity::makeBehavior("hop", &settings);
+    params::ParameterSet params;
+    hop->registerParameters(params, "e/hop/");
+    Rng rng(3);
+    hop->reset(rng);
+    entity::EntityState state;
+    state.anchor = glm::vec3(sea.x, 0.0f, sea.y);
+    entity::MotionOffset offset;
+    int grounded = 0;
+    int wetFrames = 0;
+    float travelled = 0.0f;
+    glm::vec3 last{0.0f};
+    for (int f = 0; f <= 60 * 60; ++f) {
+        params.resetFinals();
+        entity::BehaviorContext ctx;
+        ctx.time = f / 60.0;
+        ctx.dt = f == 0 ? 0.0 : 1.0 / 60.0;
+        ctx.rng = &rng;
+        ctx.ground = &g;
+        hop->update(ctx, state, offset);
+        const glm::vec3 p = state.position();
+        if (f > 0) travelled += glm::length(p - last);
+        last = p;
+        if (!state.airborne && (state.activity == entity::Activity::Idle || state.activity == entity::Activity::Land)) {
+            ++grounded;
+            wetFrames += g.planned(p.x, p.z, ctx.time).water >= 0.5f ? 1 : 0;
+        }
+    }
+    CAPTURE(grounded, wetFrames, travelled);
+    CHECK(grounded > 600);
+    CHECK(travelled > 10.0f);
+    CHECK(wetFrames == 0);
 }
 
 // ---- ADR-1991: no skinned mesh sinks into a tile ------------------------------------------------------------------
@@ -1014,7 +1093,7 @@ TEST_CASE("a hopping alien's mesh never sinks into the tile under any of its ver
     float worstAt = 0.0f;
     float liftMax = 0.0f;
     int landings = 0;
-    for (int f = 0; f <= 30 * 14; ++f) {
+    for (int f = 0; f <= 30 * 40; ++f) { // ADR-1997: 40 s (the fixed step moved the landings; more of them)
         FrameTime t{};
         t.renderTime = f / 30.0;
         t.deltaTime = f == 0 ? 0.0 : 1.0 / 30.0;
@@ -1064,4 +1143,54 @@ TEST_CASE("a hopping alien's mesh never sinks into the tile under any of its ver
     CHECK(landings > 0);
     CHECK(liftMax > 0.05f);   // the canary: without the pass the pose does sink (a landing crouch, a ringing tile)
     CHECK(worst <= 0.02f);    // with it, no vertex is more than 2 cm inside the tile under it (the subset's margin)
+}
+
+// ADR-1997 (measure, hidden): the ground's rise under one alien against its throws, on a real scene. AVGEN_TOSS_SCENE is
+// a scene file, AVGEN_TOSS_ENTITY the entity's index, AVGEN_TOSS_CSV where to write (t, rise m/s, airborne, throw).
+TEST_CASE("crest throws on a real scene (measure)", "[.][tiles][hop][measure][adr1997]") {
+    const char* scenePath = std::getenv("AVGEN_TOSS_SCENE");
+    const char* csvPath = std::getenv("AVGEN_TOSS_CSV");
+    if (scenePath == nullptr || csvPath == nullptr) SKIP("set AVGEN_TOSS_SCENE and AVGEN_TOSS_CSV");
+    const int who = std::getenv("AVGEN_TOSS_ENTITY") != nullptr ? std::atoi(std::getenv("AVGEN_TOSS_ENTITY")) : 0;
+    const double t0 = std::getenv("AVGEN_TOSS_FROM") != nullptr ? std::atof(std::getenv("AVGEN_TOSS_FROM")) : 0.0;
+    const double t1 = std::getenv("AVGEN_TOSS_TO") != nullptr ? std::atof(std::getenv("AVGEN_TOSS_TO")) : 60.0;
+    std::ifstream in(scenePath);
+    REQUIRE(in);
+    nlohmann::json json = nlohmann::json::parse(in);
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto c = scene::Composition::fromJson(json, registry);
+    REQUIRE(c.has_value());
+    scene::Composition& comp = **c;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    signals::SignalBus bus;
+    comp.attach(params, modulator);
+    std::ofstream out(csvPath);
+    out << "t,rise,airborne,activity,throw\n";
+    bool wasAir = false;
+    for (long long f = 0; f <= static_cast<long long>(t1 * 60.0); ++f) {
+        FrameTime t{};
+        t.renderTime = static_cast<double>(f) / 60.0;
+        t.deltaTime = f == 0 ? 0.0 : 1.0 / 60.0;
+        t.frameIndex = static_cast<std::uint64_t>(f);
+        params.resetFinals();
+        comp.updateFields(t, bus, modulator);
+        modulator.applyRoutes(bus, params, t.deltaTime);
+        comp.updateBehaviour(t, bus);
+        comp.update(t);
+        if (t.renderTime < t0) continue;
+        const auto& es = comp.entityWorld().entities();
+        REQUIRE(static_cast<std::size_t>(who) < es.size());
+        const entity::EntityState& st = es[static_cast<std::size_t>(who)]->state();
+        const glm::vec3 p = st.position();
+        const world::GroundSource* g = comp.entityWorld().ground();
+        REQUIRE(g != nullptr);
+        const double h = 1.0 / 120.0;
+        const double rise = (g->landscape(p.x, p.z, t.renderTime + h).height - g->landscape(p.x, p.z, t.renderTime - h).height) /
+                            (2.0 * h);
+        const bool thrown = st.airborne && !wasAir && st.activity == entity::Activity::Jump;
+        out << t.renderTime << "," << rise << "," << (st.airborne ? 1 : 0) << "," << static_cast<int>(st.activity) << ","
+            << (thrown ? 1 : 0) << "\n";
+        wasAir = st.airborne;
+    }
 }

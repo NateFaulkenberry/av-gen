@@ -28,6 +28,9 @@ public:
     // modulation is not replayed by a seek, so a plan that read it would land a scrub somewhere a play did not go).
     // Where the body stands is `at`; where it decides to go is `planned`. A surface with no such terms: `at`.
     [[nodiscard]] virtual GroundSample planned(float x, float z, double t) const { return at(x, z, t); }
+    // ADR-1997: the landscape's own motion -- the planning surface without the bodies' landings (a tiles ground's
+    // springs). What a body feels as a crest passing under it, so its own landing does not throw it again.
+    [[nodiscard]] virtual GroundSample landscape(float x, float z, double t) const { return planned(x, z, t); }
     // The cell a point belongs to and its centre, for a surface made of cells; `pitch` 0 for a continuous one.
     [[nodiscard]] virtual float pitch() const = 0;
     [[nodiscard]] virtual glm::vec2 cellCentre(float x, float z) const = 0;
