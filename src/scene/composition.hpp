@@ -67,6 +67,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <chrono>
 #include <filesystem>
 #include <map>
@@ -1881,8 +1882,15 @@ private:
     };
     std::unordered_map<MeshId, LowVertices> lowVertices_;
     float lastCharacterLift_ = 0.0f; // the largest lift this frame (diagnostic, read by tests)
+    std::unordered_map<RigId, float> lowestFoot_; // CPD-R7
 public:
     [[nodiscard]] float lastCharacterLift() const { return lastCharacterLift_; }
+    // The Throw Lab's diagnostic (CPD-R7): per rig, the lowest posed low vertex (feet, shins, hands) in world y this
+    // frame, after the lift -- where the drawn feet are. NaN when the rig was not grounded this frame.
+    [[nodiscard]] float lowestFootY(RigId rig) const {
+        const auto it = lowestFoot_.find(rig);
+        return it == lowestFoot_.end() ? std::numeric_limits<float>::quiet_NaN() : it->second;
+    }
 private:
     params::Parameter<bool>* showSkybox_ = nullptr;                 // ADR-350
     params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350

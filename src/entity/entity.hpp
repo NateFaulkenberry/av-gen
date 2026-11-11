@@ -1435,6 +1435,8 @@ private:
     void replayStep(double now, double stepDt, std::uint64_t i, const signals::SignalBus* bus,
                     const SeekHooks* hooks, bool buildCrowd);
     // What every seek publishes on the way out, so the next frame builds on it.
+    // ADR-2000: a behaviour's own clip clock (EntityState::clipRate) onto the published locomotion.
+    static void applyClipClock(Entity& entity);
     void publishSeek(double target, double dt, bool replayedNothing);
     void seekWindow(double time, params::ParameterSet* params, const signals::SignalBus* bus,
                     double step, SeekBudget budget, const SeekHooks* hooks);

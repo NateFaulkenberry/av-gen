@@ -2153,6 +2153,14 @@ void EntityWorld::replayStep(double now, double stepDt, std::uint64_t i, const s
     }
 }
 
+void EntityWorld::applyClipClock(Entity& entity) {
+    entity.locomotion_.clipClock = entity.state_.clipRate > 0.0f;
+    if (entity.locomotion_.clipClock) {
+        entity.locomotion_.time = entity.state_.clipOrigin;
+        entity.locomotion_.playbackRate = entity.state_.clipRate;
+    }
+}
+
 void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
     // Publish the state the next frame will build on, without touching the parameter set.
     for (auto& entityPtr : entities_) {
@@ -2167,6 +2175,7 @@ void EntityWorld::publishSeek(double target, double dt, bool replayedNothing) {
         }
         entity.locomotion_.blend = entity.desc_.gait.blend;
         entity.locomotion_.time = target;
+        applyClipClock(entity);
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;
@@ -2972,6 +2981,7 @@ void EntityWorld::update(const EntityUpdate& ctx, params::ParameterSet& params) 
             entity.locomotion_.action.assign(intentActivity);
         }
         entity.locomotion_.time = ctx.time;
+        applyClipClock(entity);
         entity.locomotion_.position = entity.state_.position() + entity.motion_.position;
         entity.locomotion_.yaw = entity.state_.yaw;
         entity.locomotion_.speed = entity.state_.speed;

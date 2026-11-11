@@ -2381,7 +2381,10 @@ void Composition::AnimationSink::setLocomotion(const entity::LocomotionState& st
     // no-op rather than a restart, so "what should be playing now" is the only thing a behaviour
     // has to know. The timeline second rather than a wall clock is what keeps an offline render
     // reproducible (ADR-086).
-    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate, /*rebase=*/false, loop);
+    // ADR-2000: on a behaviour's own clip clock the state is (re)started at its origin and rate -- idempotent, so it
+    // lands once per change of the clock, not every frame.
+    owner_.setNodeAnimation(node_, want, state.time, state.blend, state.playbackRate, /*rebase=*/state.clipClock,
+                            loop);
 }
 
 // ADR-300. The other four fields.
@@ -8612,6 +8615,7 @@ void Composition::update(const FrameTime& time) {
 // which reach the ground in a crouch): about a third of a mesh, skinned on the CPU only for characters within 150 m.
 void Composition::groundCharactersOnTiles() {
     lastCharacterLift_ = 0.0f;
+    lowestFoot_.clear();
     if (!tileGround_.valid() || scene_.rigs.empty()) {
         return;
     }
@@ -8636,6 +8640,7 @@ void Composition::groundCharactersOnTiles() {
         if (rig.palette.empty()) continue;
         if (glm::length(scene_.entities[list.front()].transform.position - eye) > 150.0f) continue;
         float lift = 0.0f;
+        float lowest = std::numeric_limits<float>::max();
         for (const std::size_t idx : list) {
             const Entity& e = scene_.entities[idx];
             const MeshData& mesh = scene_.meshes[e.mesh];
@@ -8669,8 +8674,10 @@ void Composition::groundCharactersOnTiles() {
                     it = tops.emplace(key, tileGround_.at(c.x, c.y, currentTime_).height).first;
                 }
                 lift = std::max(lift, it->second - world.y);
+                lowest = std::min(lowest, world.y);
             }
         }
+        lowestFoot_[rigId] = lowest + std::max(lift, 0.0f);
         if (lift > 0.0f) {
             for (const std::size_t idx : list) {
                 scene_.entities[idx].transform.position.y += lift;
