@@ -1681,3 +1681,43 @@ python3 tools/throw_lab.py --scene <build>/musical-geography.scene.json --projec
   --out <dir> --measure --plot --render --camera side   # or --camera close; --amplitude --wavelength --speed
   # --sharpness --crest --tossGain --tossMax --tossThreshold --throwClipLift --tag
 ```
+
+#### CPD-R9 (art → engineering, 2026-11-11): throws are timed on the planning surface, but the tile the viewer sees is a different surface
+
+**The owner on draft7:** "the timings still look off on some of the later aliens - or jumping randomly rather than when
+a wave passes through."
+
+**The audit.** For every airborne event across the song, I classified the cause and compared the launch with the crest
+top under that body.
+
+- **Sources:**
+  - the `[adr1998]` project measure, run per body, which gives the drawn tile under the body and its landscape rise;
+  - the CPD-R6 trace, which gives the activity before each launch.
+- **On draft7's build (5b380dd6, 28 aliens):** 1,201 events.
+  - **625 (52%) were walking step hops:** `TileEdge::Jump` edges in the walker's path (1.3 s flights, mostly
+    starting from Idle). That is the "jumping randomly".
+  - **561 were crest throws.**
+  - **15 were other:** no visible crest, or a landing bounce.
+- **Fixed in the scene:** the hop now has `"stepHeight": 3.0, "jumpTiles": 0`. On the r6 build (62 aliens) step hops
+  are down from 625 to at most 42; most of those 42 are crest throws that happen to last 1.3 s (a crouch before them).
+- **The part that is yours, at 29% of r6's 1,512 crest throws:**
+  - **Every throw launches within 0.05 s of the crest top of the planning surface** (`GroundSource::landscape`). So
+    ADR-2000's timing is right on the surface it reads.
+  - **The surface drawn under the alien is another matter.** In 442 of the 1,512, the drawn top's peak is 0.1–0.7 s
+    away from the launch (p90 0.5 s); in 32 more, there is no visible crest (under 0.25 m) under the body at all.
+  - **Where it happens most:** at 100–150 s, 202 of the 465 events are off the drawn top, and the owner's "later
+    aliens" are there.
+  - **The two causes I can see:**
+    1. **Landing springs:** other aliens' (and the body's own) landings move the drawn tile, so a nearby landing adds
+       or shifts a bump. With 62 aliens there are many more landings.
+    2. **Running bodies:** the tile under a running body changes as it goes, so the drawn crest it crosses peaks at
+       another moment.
+- **Small crests:** 95 throws come from drawn crests under 0.5 m, which are hard to read on screen.
+
+**The question.** Can the crest throw be timed on what is drawn under the body, including the landing springs? Or, if
+the springs must stay out for determinism, could a throw be withheld when the drawn top under the body disagrees with
+the planning top by more than about 0.1 s or 0.3 m?
+
+- **Constraint:** the owner keeps the original landing spring (CP-D r2), so a softer spring is not my way out.
+- **Evidence:** scratch `r6/audit.py`, `r6/audit-before.csv`, `r6/audit-after.csv` (one row per event: body, time,
+  airtime, cause, offset to the drawn top, crest size, activity before).
