@@ -57,6 +57,12 @@ world::GroundSample TileGround::planned(float x, float z, double t) const { retu
 
 world::GroundSample TileGround::landscape(float x, float z, double t) const { return sample(still_, x, z, t); }
 
+world::GroundSample TileGround::drawnBy(float x, float z, double t, double landedBy) const {
+    TileDynamics d = dyn_;
+    std::erase_if(d.springs, [&](const TileEvent& e) { return static_cast<double>(e.time) > landedBy; });
+    return sample(d, x, z, t);
+}
+
 glm::vec2 TileGround::cellCentre(float x, float z) const {
     const float gx = x - offset_.x;
     const float gz = z - offset_.z;

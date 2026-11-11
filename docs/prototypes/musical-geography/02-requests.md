@@ -1722,6 +1722,54 @@ the planning top by more than about 0.1 s or 0.3 m?
 - **Evidence:** scratch `r6/audit.py`, `r6/audit-before.csv`, `r6/audit-after.csv` (one row per event: body, time,
   airtime, cause, offset to the drawn top, crest size, activity before).
 
+
+### Engineering → art, CPD-R9 (2026-11-11): which crest a throw pops on (ADR-2001, ADR-2002)
+
+**The cause, measured** (your HEAD dd3849d0, `build.py --full --characters --clouds --tiltshift`, 62 aliens, 1,637
+throws; the new hidden `[cpdr9]` measure: every launch's tile, drawn and landscape, with each body's springs split
+out). Mostly not the springs. Of the 448 launches off the drawn top (your audit's 0.15 s rule), 343 are off the
+*landscape's* top too. ADR-2000 popped at the first top after the swing's fastest rise. On your ground that is often:
+- the first ripple of a ring (rings pass as two or three ripples 0.5 s apart, the middle one the highest);
+- a shoulder before a second train carries the crest on up;
+- an aftershock after the crest had passed.
+
+The springs (mostly other bodies' landings) add the remaining ~100. The running bodies are not a cause: a throw
+crouches for 0.8 s on one tile before it pops. Your under-the-body audit saw the tiles under the flying body after the
+launch.
+
+**What the engine does now (no change needed):**
+- *ADR-2001:* the pop is the swing's highest top within `throwCrestWindow` (0.7 s). If a higher top has just passed,
+  or the crest rose less than `throwMinCrest` (0.25 m), that swing throws nobody.
+- *ADR-2002:* as the crouch would start, the throw reads the drawn tile (the springs of landings made by 0.1 s ago:
+  seek-safe) and moves the pop onto a later drawn top, or withholds the throw if the drawn crest has passed.
+
+**On your build, before -> after:**
+
+| | before | after |
+|---|---|---|
+| throws | 1,637 | 1,505 |
+| your rule (drawn under the body, top within 0.15 s): on / off / no crest | 1,161 / 455 / 21 | 1,380 / 122 / 3 |
+| ... 100-150 s | 263 / 176 / 4 of 443 | 354 / 43 / 0 of 397 |
+| a drawn top 0.1 m higher within 0.7 s of the pop (launch tile) | 347 | 22 |
+| crests under 0.5 m | 113 | 57 |
+| body apex over the launch tile, p10 / median / p90 (feet add the clip's ~1.5 m) | 0.15 / 1.41 / 4.50 m | 0.19 / 2.12 / 4.50 m |
+| on water (CPD-R6 trace): grounded frames / landings | 0 / 0 | 0 / 0 |
+
+Most of the 122 still off under your rule are flat-topped crests: the top within 0.1 m, but its exact instant
+elsewhere.
+
+**Yours:** nothing required.
+- `throwMinCrest` (default 0.25 m) is the readable-crest threshold. Raise it to drop the small-crest throws (57 under
+  0.5 m), at the cost of throws.
+- `throwCrestWindow` / `throwCrestMargin` (0.7 s / 0.1 m) set what counts as the same crest.
+- About a third of throws leave the body under 0.5 m, so the clip's 1.5 m lift is most of what you see. If you want
+  them visibly thrown, `tossGain` is yours.
+
+**The lab** has new cases: `--ring AMP DIST LAG` (one authored ring over the crest: several tops), `--ripple`,
+`--neighbour DX` (a second alien whose landings spring the tile) and `--run`. Media:
+`16-pass-cpd-r6/cpd-r9-*` (the lab before/after plots and clips, the 100-110 s scene before/after, 10 fps strips at
+102 s and 105 s, both audits).
+
 #### CPD-R10 (art → engineering, 2026-11-11): a home that is a lane along the route, so near aliens can run without nearing the lens
 
 **The owner:** "need to see them running around more". The coordinator: keep them off the line, with nothing
@@ -1747,3 +1795,29 @@ r6, with the near band 9–26 m off and homes up to 18 m, measured 0.21. But its
 
 Either would let the near band run long distances along the line (and still be thrown by crests) while staying 5 m
 or more off it. I'd then expect idle near 0.2 at the r6b distances.
+
+### Engineering → art, CPD-R10 (2026-11-11): a keep-out line (ADR-2003)
+
+**Built: the keep-out line** (your option 2). It is one rule the walker already had a place for: what counts as water.
+So goals, paths, rests, throw landings and the start all honour it, and your homes stay circles of any size. The
+lane home is not built.
+
+**What to set on the cast's hop:**
+- `"avoidLine": [[x, z], ...]`: the flight's route in world x-z. One list for every body; points every ~0.5 s of
+  flight is plenty.
+- `"avoidDistance": 5.0`: metres. A tile whose centre is nearer counts as water to that body.
+- Then widen the near band's `homeRadius`; nothing has to subtract the distance any more.
+
+**Measured on your HEAD** (dd3849d0; the camera's x-z every 0.5 s as the line, distance 5 m, the 53 homes of
+1-9 m widened to 24 m; CPD-R6 trace, whole song):
+
+| | as shipped | keep-out line, near homes 24 m |
+|---|---|---|
+| near band: idle / walk / run / jump | 0.389 / 0.129 / 0.185 / 0.248 | 0.160 / 0.217 / 0.357 / 0.221 |
+| whole cast: idle / run | 0.342 / 0.222 | 0.150 / 0.366 |
+| closest any body comes to the camera (3D / x-z) | 5.61 / 4.88 m | 10.05 / 6.44 m |
+| on water (grounded frames, landings) | 0, 0 | 0, 0 |
+| throws | 1,503 | 1,359 |
+
+Throws drop about 10% because running bodies change tiles more. If you want them back, use `tossCooldown` or
+`runChance`.
