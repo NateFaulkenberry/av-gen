@@ -7197,6 +7197,7 @@ void Composition::rebuild() {
                 // direction zero (the shader's +X fallback) at a fraction of 1: this is then the lake's whole drift,
                 // and the terrain's still-water floor is the honest number for a body with no current.
                 surface.fastestFlow = 0.05f;
+                surface.writesIds = true; // ADR-2021: the lake is an object of the asset; its pixels are its own
                 scene_.waters.push_back(std::move(surface));
                 if (!node.waterMaterialsLogged) {
                     log::info("gltf node '{}': water material '{}' -> {} entity(ies), {} triangles, bounds y "
@@ -11732,6 +11733,16 @@ nlohmann::json Composition::toJson() const {
                 if (w.skyMirror != d.skyMirror) {
                     n["terrain"]["water"]["skyMirror"] = w.skyMirror;
                 }
+                // ADR-2021: the same, for the three that shape the frame's reflection.
+                if (w.ssrTint != d.ssrTint) {
+                    n["terrain"]["water"]["ssrTint"] = vecToJson(w.ssrTint);
+                }
+                if (w.ssrBlur != d.ssrBlur) {
+                    n["terrain"]["water"]["ssrBlur"] = w.ssrBlur;
+                }
+                if (w.ssrEdgeFade != d.ssrEdgeFade) {
+                    n["terrain"]["water"]["ssrEdgeFade"] = w.ssrEdgeFade;
+                }
             }
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
@@ -11940,7 +11951,9 @@ Result<void> readWaterSettings(const json& wj, const std::string& where, WaterSe
           WaterFloat{"streakHighlight", &w.streakHighlight},
           WaterFloat{"streakColorScale", &w.streakColorScale},
           // ADR-1650: the sky mirror
-          WaterFloat{"skyMirror", &w.skyMirror}}) {
+          WaterFloat{"skyMirror", &w.skyMirror},
+          // ADR-2021: the frame's reflection, shaped
+          WaterFloat{"ssrBlur", &w.ssrBlur}, WaterFloat{"ssrEdgeFade", &w.ssrEdgeFade}}) {
         auto v = readFloat(wj, f.key, *f.target);
         if (!v) {
             return fail("{}: water: {}", where, v.error().message);
@@ -11971,7 +11984,8 @@ Result<void> readWaterSettings(const json& wj, const std::string& where, WaterSe
                                       std::pair{"reflectionTint2", &w.reflectionTint2},
                                       std::pair{"streakColor1", &w.streakColor1},
                                       std::pair{"streakColor2", &w.streakColor2},
-                                      std::pair{"streakColor3", &w.streakColor3}}) {
+                                      std::pair{"streakColor3", &w.streakColor3},
+                                      std::pair{"ssrTint", &w.ssrTint}}) { // ADR-2021
         auto v = readVec<3>(wj, key, *target);
         if (!v) {
             return fail("{}: water: {}", where, v.error().message);

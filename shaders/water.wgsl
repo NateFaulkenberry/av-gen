@@ -66,6 +66,9 @@ struct WaterUniforms {
     cineAbsorb: vec4<f32>,     // rgb = absorption per metre of the transmitted bed, w = 0
     cineC: vec4<f32>,          // x = streak (normal spread along the view), y = reflection rays, z = tint patches, w = glints
     cineTint2: vec4<f32>,      // rgb = the second reflection tint (the patches), w = patch scale (cycles/m)
+    cineD: vec4<f32>,          // ADR-2021: rgb = the frame reflection's tint (march and mirror), w = how much
+                               //   roughness blurs a march hit (1 = as before)
+    cineE: vec4<f32>,          // ADR-2021: x = the left/right edge fade's width (share of the frame), yzw = 0
     // ---- cinematic (ADR-1286) end ----
     // ---- flow streaks (ADR-1643) begin ----
     streakA: vec4<f32>,        // x = amount, y = density, z = length (m), w = lanes bank to bank
@@ -109,6 +112,13 @@ fn waterSceneAt(uv: vec2<f32>, radius: f32) -> vec3<f32> {
                                        vec2<f32>(1.0)), 0.0).rgb;
     }
     return sum / 7.0;
+}
+
+// ADR-2021: the fade toward the frame's left and right edges, over `ssrEdgeFade` of its width. At the default (0.06)
+// it is the expression it always was, so a surface that does not set it draws the same bytes.
+fn waterEdgeFadeX(x: f32) -> f32 {
+    let a = min(x, 1.0 - x);
+    return select(smoothstep(0.0, 0.06, a), smoothstep(0.0, water.cineE.x, a), water.cineE.x != 0.06);
 }
 
 fn waterLinearDepthAt(uv: vec2<f32>) -> f32 {
@@ -173,13 +183,14 @@ fn waterSsr(p: vec3<f32>, r: vec3<f32>, rough: f32, jitter: f32, spread: f32) ->
     let ch = frame.viewProj * vec4<f32>(qh, 1.0);
     let nh = ch.xy / max(ch.w, 1e-4);
     let uvh = vec2<f32>(nh.x * 0.5 + 0.5, 0.5 - nh.y * 0.5);
-    let edge = smoothstep(0.0, 0.06, min(uvh.x, 1.0 - uvh.x)) * smoothstep(0.0, 0.06, min(uvh.y, 1.0 - uvh.y));
+    let edge = waterEdgeFadeX(uvh.x) * smoothstep(0.0, 0.06, min(uvh.y, 1.0 - uvh.y));
     let far = 1.0 - smoothstep(0.7 * reach, reach, hitS);
     // the reflection blurs with the surface's roughness and with how far the ray travelled to its hit,
     // measured in the hit's own screen size (a metre of travel is fewer pixels far away)
     // ADR-1868: plus the reflected ray's own spread across the pixel (ripples bending it), so the hit's colour is the
     // average over what the pixel's rays see rather than one point of it
-    let radius = clamp((rough * 0.9 + spread * 0.5) * hitS / max(ch.w, 0.5), 0.0, 0.03);
+    // ADR-2021: `ssrBlur` scales the roughness's share (1, the default, is the old blur exactly).
+    let radius = clamp((rough * 0.9 * water.cineD.w + spread * 0.5) * hitS / max(ch.w, 0.5), 0.0, 0.03);
     return vec4<f32>(waterSceneAt(uvh, radius), edge * far);
 }
 // ---- cinematic (ADR-1286) end ----
@@ -1025,7 +1036,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         if (cm.w > 1e-4 && rm.y > 0.0) {
             let nm = cm.xy / cm.w;
             let um = vec2<f32>(nm.x * 0.5 + 0.5, 0.5 - nm.y * 0.5);
-            let inside = smoothstep(0.0, 0.06, min(um.x, 1.0 - um.x)) * smoothstep(0.0, 0.06, min(um.y, 1.0 - um.y));
+            let inside = waterEdgeFadeX(um.x) * smoothstep(0.0, 0.06, min(um.y, 1.0 - um.y));
             if (inside > 0.0) {
                 let uc = clamp(um, vec2<f32>(0.0), vec2<f32>(1.0));
                 var far = 1.0;
@@ -1034,7 +1045,7 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
                     far = smoothstep(0.35 * reach, 0.5 * reach, waterLinearDepthAt(uc));
                 }
                 let trust = inside * far * smoothstep(0.0, 0.04, rm.y) * clamp(water.mirror.x, 0.0, 1.0);
-                reflected = mix(reflected, waterSceneAt(uc, 0.0) * water.cineB.w, trust);
+                reflected = mix(reflected, waterSceneAt(uc, 0.0) * water.cineB.w * water.cineD.rgb, trust); // ADR-2021
             }
         }
     }
@@ -1100,7 +1111,8 @@ fn fs_water(in: WaterOut, @builtin(front_facing) frontFacing: bool) -> SceneOut 
         }
         let cover = wsum / f32(rays);
         let ssrColor = acc / max(wsum, 1e-4);
-        reflected = mix(reflected, ssrColor * water.cineB.w, clamp(cover * water.cineA.x, 0.0, 1.0));
+        reflected = mix(reflected, ssrColor * water.cineB.w * water.cineD.rgb, // ADR-2021: the tint
+                        clamp(cover * water.cineA.x, 0.0, 1.0));
         // Glints: the finest facets catch the bright things the reflection found, in their colour -- a cyan
         // organism gives cyan sparks, the violet falls violet ones. Nothing bright nearby, no glint.
         if (water.cineC.w > 0.0) {

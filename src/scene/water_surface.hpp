@@ -161,6 +161,14 @@ struct WaterSettings {
     // draws none, with the code compiled out; above 0 the surface is drawn by the cinematic pipeline with it in.
     float skyMirror = 0.0f;      // how much of the reflection the drawn sky supplies where it is trusted (0..1)
 
+    // ---- the frame's reflection, shaped (ADR-2021) -----------------------------------------------------
+    // Three controls on what the march and the sky mirror return. Their defaults are the reflection as it was, to the
+    // byte. `reflectionTint` and `reflection` colour and scale the environment's sample only; these act on the frame's.
+    glm::vec3 ssrTint{1.0f, 1.0f, 1.0f}; // the march's and the mirror's reflection, multiplied per channel (0..4)
+    float ssrBlur = 1.0f;        // how much `roughness` blurs a march hit (0 = a mirror; 1 = as before; 0..4)
+    float ssrEdgeFade = 0.06f;   // the share of the frame's width over which the march and the mirror fade to the
+                                 // environment at the left and right edges (0.001..0.25)
+
     [[nodiscard]] bool cinematic() const {
         return ssr > 0.0f || transmission > 0.0f || undulation > 0.0f || roughnessVariation > 0.0f ||
                tintPatches > 0.0f || flowStreaks > 0.0f || skyMirror > 0.0f;
@@ -184,6 +192,10 @@ struct WaterSurface {
     // Metres per second of the quickest body in the world this surface belongs to. The vertex's
     // speed lane is a fraction of it, so the shader needs it to get back to metres per second.
     float fastestFlow = 0.55f;
+    // ADR-2021: whether the surface's pixels carry its entity's identifier in the ids target (and so the id AOV).
+    // A terrain's water leaves the bed's identifier there, as it always has (ADR-035); a gltf water material is an
+    // object of the asset, and claims its own pixels.
+    bool writesIds = false;
 };
 
 } // namespace avgen::scene

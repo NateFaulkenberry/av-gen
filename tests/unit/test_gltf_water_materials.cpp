@@ -294,3 +294,42 @@ TEST_CASE("a skinned entity of a water material is skipped", "[composition][gltf
     CHECK(pond->style == scene::MeshStyle::Water);
     CHECK(s.waters.size() == 1);
 }
+
+// ADR-2021: the frame reflection's three controls are read by the shared reader (so a terrain takes them too), checked
+// against their ranges, and a gltf water surface claims its pixels in the id AOV.
+TEST_CASE("ssrTint, ssrBlur and ssrEdgeFade are read, ranged and default to the old reflection",
+          "[composition][gltf][water][adr2021]") {
+    const scene::WaterSettings d{};
+    CHECK(d.ssrTint == glm::vec3(1.0f));
+    CHECK(d.ssrBlur == 1.0f);
+    CHECK(d.ssrEdgeFade == 0.06f);
+
+    const auto glb = lakeGlb();
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto comp = scene::Composition::loadFile(
+        writeScene("shaped", R"(, "waterMaterials": {"Lake": {"skyMirror": 1, "ssrTint": [0.64, 0.79, 0.88],
+            "ssrBlur": 0.05, "ssrEdgeFade": 0.004}})", glb).filename(),
+        registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    REQUIRE((*comp)->scene().waters.size() == 1);
+    const scene::WaterSurface& surface = (*comp)->scene().waters[0];
+    CHECK(surface.settings.ssrTint == glm::vec3(0.64f, 0.79f, 0.88f));
+    CHECK(surface.settings.ssrBlur == 0.05f);
+    CHECK(surface.settings.ssrEdgeFade == 0.004f);
+    CHECK(surface.writesIds); // the lake is an object of the asset
+
+    const auto refused = [&](const std::string& name, const std::string& extra, const std::string& words) {
+        auto bad = scene::Composition::loadFile(writeScene(name, extra, glb).filename(), registry);
+        REQUIRE_FALSE(bad.has_value());
+        INFO(bad.error().message);
+        CHECK(bad.error().message.find(words) != std::string::npos);
+    };
+    refused("tint", R"(, "waterMaterials": {"Lake": {"ssrTint": [5, 1, 1]}})", "ssrTint must be in [0, 4]");
+    refused("blur", R"(, "waterMaterials": {"Lake": {"ssrBlur": -1}})", "ssrBlur must be in [0, 4]");
+    refused("edge", R"(, "waterMaterials": {"Lake": {"ssrEdgeFade": 0}})", "ssrEdgeFade must be in [0.001, 0.25]");
+}

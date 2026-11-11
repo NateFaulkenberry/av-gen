@@ -4595,17 +4595,19 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             waterLogged_ = true;
         }
         waterUniforms_.clear();
+        std::array<bool, kMaxWaterMaterials> writesIds{}; // ADR-2021
         const float flowTime = static_cast<float>(time.renderTime);
         for (const scene::WaterSurface& surface : scene.waters) {
             if (waterUniforms_.size() >= kMaxWaterMaterials) {
                 break;
             }
+            writesIds[waterUniforms_.size()] = surface.writesIds;
             waterUniforms_.push_back(
                 waterUniformsFrom(surface.settings, flowTime, surface.fastestFlow, needsDepthPrepass));
             // ADR-1603: the ladder's lever on the cinematic water's SSR -- fewer steps and rays, none at 0.
             applyWaterSsrScale(waterUniforms_.back(), qualitySettings_.waterSsrScale);
         }
-        water_->upload(queue, waterUniforms_);
+        water_->upload(queue, waterUniforms_, writesIds);
     }
 
 
