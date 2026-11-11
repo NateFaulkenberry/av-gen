@@ -105,20 +105,20 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     {"position": [60, -250], "altitude": 12},                              # the bay (the approved route from here)
     {"position": [60, -430], "altitude": 6},                               # low over the moving sea
     {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
-    {"follow": "path", "from": 0.0, "to": 0.85, "offset": 0, "altitude": 6},       # along the lit path (cpd-r4: to the pond, low: close pass 2)
+    {"follow": "path", "from": 0.0, "to": 0.85, "offset": 0, "altitude": 5},       # along the lit path (cpd-r4: to the pond, low: close pass 2)
     {"position": [-330, -1020], "altitude": 14, "speed": 24},              # over the crowns (CP-D: 22 -> 14)
     {"position": [-180, -1180], "altitude": 15, "speed": 26},              # the banked sweep north-east (17 -> 15)
-    {"position": [-87, -1157], "altitude": 5},                             # cpd-r4 close pass 3 (on the curve, low)
-    {"position": [6, -1112], "altitude": 5},
+    {"position": [-87, -1157], "altitude": 4},                             # cpd-r4 close pass 3 (on the curve, low)
+    {"position": [6, -1112], "altitude": 4},
     {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river
     {"follow": "river", "from": 0.4294, "to": 0.7026, "offset": 0, "altitude": 10},   # up the valley on the river (cpd-r4: the same stretch; the river now runs on to the north sea)
     {"position": [300, -1560], "altitude": 30, "speed": 26},               # rise out of the valley at dusk
     {"position": [356, -1588], "altitude": 8},                             # cpd-r4 close pass 4: drop to the coast
-    {"position": [456, -1620], "altitude": 5},
+    {"position": [456, -1620], "altitude": 4},
     {"position": [660, -1650], "altitude": 14, "speed": 27},               # east along the north coast
     {"position": [1060, -1580], "altitude": 8, "speed": 27},               # low across the inlet's moving sea: night
     {"position": [1400, -1480], "altitude": 14, "speed": 27},              # the far shore's low hills, the peak
-    {"position": [1534, -1635], "altitude": 5},                            # cpd-r4 close pass 5
+    {"position": [1534, -1635], "altitude": 4},                            # cpd-r4 close pass 5
     {"position": [1560, -1720], "altitude": 6, "speed": 26},               # bank north along the east shore: dawn (12 -> 6)
     {"position": [1500, -2020], "altitude": 10, "speed": 24},              # down the peninsula
     {"position": [1420, -2320], "altitude": 8, "speed": 22},               # out low over the northern sea; the fade
@@ -134,16 +134,16 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # (11 m on the river, off the water) on the INSIDE of each turn -- the side the camera banks toward -- placed on a
 # numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
 # cpd-r4 (owner: the aliens "feel too intentionally placed along the camera path ... they don't ever look big enough"):
-# the cast lives in the land, not along the line. Five close-pass aliens sit 9 m off the flight line where it flies
-# low (~50, 64, 101, 148, 196 s), held near home (4 m) so they cannot walk under the lens; the rest are scattered
+# the cast lives in the land, not along the line. Five close-pass aliens sit 6-9 m off the flight line where it flies
+# low (~50, 64, 101, 148, 196 s), held near home (3 m) so they cannot walk under the lens; the rest are scattered
 # groups (2-4) and loners, 30-250 m off the route, on slopes, ridges and the bay islands, with gaps where nobody is.
 # Placed on the flight mirror and terrain_mirror (dry, off the banks); planning: scratch r4/scatter.py (seed 7).
 CAST = [
     (68, -440, "pass"),
-    (-64, -692, "pass"),
-    (-37, -1124, "pass"),
-    (425, -1622, "pass"),
-    (1558, -1653, "pass"),
+    (-63, -695, "pass"),
+    (-36, -1126, "pass"),
+    (426, -1619, "pass"),
+    (1556, -1654, "pass"),
     (-225, -952, "wild"),
     (-237, -958, "wild"),
     (62, -1306, "wild"),
@@ -169,7 +169,7 @@ CAST = [
     (228, -200, "sea"),
 ]
 CAST_FULL = []   # cpd-r4: one cast for every mode (was the route-side additions of the full piece)
-HOME_RADIUS = {"sea": 24.0, "pass": 4.0, "wild": 24.0, "ridge": 14.0}   # cpd-r4: a close-pass alien stays by the line, never on it
+HOME_RADIUS = {"sea": 24.0, "pass": 3.0, "wild": 24.0, "ridge": 14.0}   # cpd-r4: a close-pass alien stays by the line, never on it
 # night (CP-C r3): the aliens were dark silhouettes on the lit path. Each one carries a small shadowless point light in
 # the night accent (the path pink) riding its node above the head -- a pink rim on head and shoulders and a faint pool
 # on the slabs it stands on, so it reads off the path -- and its own emissive lamps are lifted a little.
