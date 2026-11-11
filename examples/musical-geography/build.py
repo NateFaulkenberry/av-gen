@@ -103,7 +103,7 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     # about 15 m off the land (terrain_mirror), instead of crossing the open bay 40-170 m out
     {"position": [-201, 231], "altitude": 12, "speed": 24},               # the open bay, by its south shore: the intro
     {"position": [-445, 10], "altitude": 10, "speed": 26},                # onto the west shore by ~11 s
-    {"position": [-468, -225], "altitude": 10, "speed": 28},              # along the west shore
+    {"position": [-477, -221], "altitude": 9, "speed": 28},               # along the west shore (r6d: ~7 m off it, was 16)
     {"position": [-404, -341], "altitude": 10},
     {"position": [-300, -381], "altitude": 9},                             # under the north arm's shore
     {"position": [-199, -367], "altitude": 8},
@@ -152,14 +152,19 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # (x, z, habitat, home radius).
 CAST = [
     # cpd-r6c (owner: "make sure more are present in the first 30 seconds or so"): the opening shore
-    (-206, 246, "coast", 9),   # 15.8 m off the line at 0 s
-    (-454, 18, "coast", 8),   # 12.4 m off the line at 13 s
+    (-342, 158, "coast", 4),   # r6d: in frame ahead-left at 2-8 s (the nearest land, ~60 m out at first)
+    #(-206, 246, "coast", 9),   # 15.8 m off the line at 0 s
+    (-454, 6, "coast", 1),   # r6d: 6.3 m off the line at 14 s
+    #(-454, 18, "coast", 8),   # 12.4 m off the line at 13 s
     (-470, -34, "coast", 1),   # 6.3 m off the line at 15 s
-    (-482, -66, "coast", 6),   # 10.9 m off the line at 16 s
-    (-486, -86, "coast", 8),   # 12.3 m off the line at 17 s
+    (-482, -74, "coast", 1),   # r6d: 6.3 m off the line at 17 s
+    #(-482, -66, "coast", 6),   # 10.9 m off the line at 16 s
+    (-474, -258, "coast", 1),   # r6d: 6.6 m off the line at 23 s
+    #(-486, -86, "coast", 8),   # 12.3 m off the line at 17 s
     (-474, -278, "coast", 9),   # 19.7 m off the line at 24 s
     (-466, -298, "coast", 9),   # 21.1 m off the line at 25 s
-    (-430, -350, "coast", 9),   # 24.7 m off the line at 27 s
+    (-446, -314, "coast", 4),   # r6d: 11 m off the line at 26 s
+    #(-430, -350, "coast", 9),   # 24.7 m off the line at 27 s
     (-34, -1126, "pass", 1),   # 5.5 m off the line at 104 s
     (422, -1606, "pass", 1),   # 5.4 m off the line at 150 s
     (1542, -1654, "pass", 1),   # 4.9 m off the line at 203 s
