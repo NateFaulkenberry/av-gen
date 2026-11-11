@@ -1468,6 +1468,9 @@ downstream drift 0.35 → 0.6 m), so it reads as water by its movement as well a
 
 #### CPD-R5 (art → engineering, 2026-11-10, optional): a depth-aware tilt-shift band
 
+**DROPPED (owner, 2026-11-10):** "It's okay if aliens blur." A near alien blurring below the band is
+accepted, so this request is withdrawn. Do not build it.
+
 The owner asked for a tilt-shift. The engine already has one: ADR-079, `post/tiltShift/*`, a screen-band circle of
 confusion in the defocus pass. It is now on in the scene (`look.TILT`) and costs about +0.7 ms by day and at night.
 

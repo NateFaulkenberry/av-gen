@@ -1874,3 +1874,23 @@ Raising the low layer, or thinning it over high ground, is an option.
 
 - **The read:** still a clear miniature. The near foreground and the hills soften less, and the band is a little
   wider.
+
+**Tilt-shift 4** (owner: "reduce tilt shift more, the focus is too narrow. It's okay if aliens blur"):
+
+| Setting | Band | Falloff | Radius | Grade |
+|---|---|---|---|---|
+| Was (tilt-shift 3) | 0.12 | 0.22 | 7 | saturation × 1.07, contrast + 0.04 |
+| Now | 0.22 | 0.30 | 5 | saturation × 1.05, contrast + 0.03 |
+
+- **Centre:** unchanged at (0.5, 0.58).
+- **The read:** a light miniature. The sky and the farthest hills soften, and so does the bottom fifth of the frame;
+  the mid-ground is sharp.
+- **Cost:** the defocus pass takes 0.52 ms. GPU median, two runs each:
+
+  | | Off | Tilt-shift 4 |
+  |---|---|---|
+  | Day (40 s) | 20.4 / 20.7 ms | 21.0 / 21.0 ms |
+  | Night (140 s) | 15.6 / 15.8 ms | 16.1 / 16.5 ms |
+
+- **Stills:** `cpd-r3-tiltshift4-*`.
+- **CPD-R5:** dropped. The owner accepts a near alien blurring.
