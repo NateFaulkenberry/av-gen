@@ -2062,3 +2062,52 @@ The largest bank channel under any body is 0.
 - **72.5 and 81 s** (the path leg, flown at 5 m): the nearest path tiles now fill the lower third, but the land ahead
   and the horizon still read. Nothing brushes the lens.
 - **111, 189 and 204 s:** barely changed.
+
+### CP-D r6: more aliens, nearer and running; the vale river; a coast-hugging intro (2026-11-11)
+
+The owner on draft7: the aliens "are still too far away from the camera", there should be "more aliens", "too many of
+them look like they're still just standing there idle", the throws look like "jumping randomly". Also: "adjust the
+camera path to be a little closer to coastlines", and the path "still just ends in the middle of nowhere and its too
+thin and doesnt read like a river".
+
+**The timing audit.** I classified every airborne event in the song by cause.
+- **Step hops:** on draft7's build, 52% were not throws at all. They were walking step hops: the walker hopping a
+  `Jump` edge in its path.
+- **The fix:** `"stepHeight": 3, "jumpTiles": 0`. The aliens now walk up steps, and step hops drop from 625 to at
+  most 42; most of those 42 are crest throws that happen to last 1.3 s.
+- **What is left is engine-side (CPD-R9).**
+  - Every crest throw launches within 0.05 s of the planning surface's crest top.
+  - The drawn tile under the alien differs. Landing springs and bodies running across tiles move it, so about 30% of
+    throws pop 0.1–0.7 s off the visible top.
+  - Engineering has it.
+
+**The cast: 62 aliens.**
+- **The near band (50):** loose groups and loners 9–26 m off the flown line all along the song, placed on the CPD-R6
+  trace of the camera.
+- **The rest:** 12 far ones and the 4 r4b close passes.
+- **Home radius:** each near alien's is its distance off the line minus 5 m, so it can run but not under the lens.
+- **Cost:** about 0.065 ms of frame time per alien. At 85 s the frame p99 sits at the 33 ms budget, so 62 is the
+  ceiling.
+
+**Running.** runChance 0.7, pauses 0.2–1 s, goals 1–8 tiles.
+
+| | draft7 | r6 |
+|---|---|---|
+| Idle share | 0.35 | 0.21 |
+| Running | 7% | 31% |
+| Frames with an alien within 25 m of the camera | 7% | 25% |
+
+**Water.** 0 frames grounded on water, 0 landings on water, 0 frames airborne over water. No body comes nearer the
+camera than 4.92 m.
+
+**The vale river.**
+- The lit path is now `valeRiver`: 20 m wide in a 90 m vale, with banks (lip 0.5 m, step 1.0 m).
+- It runs out of pond low1 (its source) down to the bay (its mouth). The flight follows it upstream.
+- There is no lit path any more.
+
+**The coastline.**
+- The bay intro hugs the west shore and the north arm about 15 m off; the inlet follows its north shore.
+- Median distance from the camera to the shore on the water legs went from 32–132 m to 12–28 m; the inlet went from
+  88 to 40 m.
+
+**Media:** `16-pass-cpd-r6/`.
