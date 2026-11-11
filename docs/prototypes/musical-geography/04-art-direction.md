@@ -1959,3 +1959,68 @@ from eng's canary (onLand 1.0, threshold 0.5, gain 8, cap 9, landing strength 0.
 and throw.
 
 **Media:** `cpd-r3-final-*` and `cpd-draft5-*` in 12-pass-cpd-r3/.
+
+### CP-D r4: a lived-in cast, close passes, one connected path (2026-11-11)
+
+The owner on draft5: "the aliens feel too intentionally placed along the camera path and the camera doesn't ever
+really get close enough when passing by the aliens … Also fix the 'path' thats visible around 1 min in … make it a
+continual path."
+
+**The path.**
+- **What the strip was:** the 0:55 white strip is the lit path (`TILES["path"]`), not water. Along it,
+  `terrain_mirror` reads water 0 and path 1. The aliens on it had been placed there on purpose (the path habitat).
+- **The route:** it now runs from the bay's north shore to the shore of pond low1, one walk from water to water.
+  Before, it climbed on into the north-west hills and ended on a bare hilltop.
+- **The flight:** it follows the path to 0.85 of its length (was 0.5) and arrives over the pond.
+- **The day colour:** warmed from #FFF5E2 to #FFDDA0, so it no longer reads as white water. It is still the same lit
+  path, and the coordinator kept it.
+- **Before/after:** `cpd-r4-path-*`.
+
+**The other water, checked for dead ends:**
+
+| Water | Before | Now |
+|---|---|---|
+| The river | Ended in dry land at the valley head (280, −1460) | Runs on to the north sea at (200, −1720); the flight's river follow is re-fractioned to 0.4294–0.7026, the same stretch |
+| dawnStream | Its mouth ran into 50 m hills at (1440, −2330) | Carved through to the northern sea at (1490, −2880) |
+| westStream | Hill source into the bay | Unchanged |
+
+The sources stay in the hills.
+
+**The cast** (28): it lives in the land now, not along the line.
+- **Groups:** five groups of 2–3, on slopes and the valley sides.
+- **Loners:** six, 30–160 m off the route, four of them on ridges at 24–67 m.
+- **The bay:** two on the islands.
+- **Gaps:** there are stretches where nobody is, such as 155–185 s on the night coast.
+- **Habitats:** "wild" (home 24 m), "ridge" (home 14 m), "sea" (home 24 m), and "pass" for the close-pass aliens
+  (home 2.5 m, so they cannot walk under the lens).
+- **Checks:** every home was checked dry and off the banks on the mirror. The map is `cpd-r4-cast-map-before-after.png`;
+  the planning script is scratch `r4/scatter.py`, seed 7.
+
+**Close passes.**
+- **The flight:** five low stretches at altitude 4–6 m: about 50 s (over the bay), 64 s (the path), 101 s (the
+  sweep), 148 s (the night coast) and 196 s (dawn).
+  - The extra waypoints sit on the existing curve, so the camera still looks where it travels: no turns toward
+    anyone, no orbits.
+- **The aliens:** each close-pass alien is 4.5–9 m off the line.
+- **Largest on-screen alien height, as a share of the frame:**
+
+  | Pass | Share | Note |
+  |---|---|---|
+  | 1 (day, over the sea) | about 0.19–0.22 | stays 9 m off, because 6 m would be water |
+  | 2 (day, on the path, 64.4 s) | 0.41 (440 px) | lower left, at head height, as the camera sweeps past |
+  | 3 (sunset, 101.2 s) | about 0.25 | |
+  | 4 (night, 148.2 s) | about 0.26 | |
+  | 5 (dawn, 195.7 s) | about 0.18 | |
+
+- **How measured:** read off full-resolution frames with a ruler. The green-skin detector misses the white suits and
+  fails in sunset and night light.
+- **Why 3–5 stay smaller than 2:** they read smaller than the flight mirror predicts, and moving them from 6 m to
+  4.5 m off the line barely changed them. The likely reason is the camera's height:
+  - on rough or sloping ground the clearance (4 m over the highest ground within 10 m, plus the ring margin) holds
+    the camera higher;
+  - so the alien leaves the bottom or the side of the frame while still about 10 m away.
+  - This is not yet proven. It needs CPD-R6's camera and body positions.
+- **Limit:** no alien is closer than 4.5 m to the line (coordinator).
+- **Lens and tiles:** no throw came near the lens, and the camera clipped no tiles, in any pass frame I checked.
+
+**On water:** the count needs CPD-R6, the per-body position trace (02-requests.md).
