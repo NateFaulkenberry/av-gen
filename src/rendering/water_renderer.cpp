@@ -74,11 +74,14 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              s.flowStreaks, s.streakDensity, s.streakLength, s.streakLines, s.streakSpeed,
                              s.streakHighlight, s.streakColorScale,
                              // ADR-1650
-                             s.skyMirror};
+                             s.skyMirror,
+                             // ADR-2021
+                             s.ssrBlur, s.ssrEdgeFade};
     bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
               finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
               finite3(s.emissiveColor) && finite3(s.absorption) && finite3(s.reflectionTint2) &&
-              finite3(s.streakColor1) && finite3(s.streakColor2) && finite3(s.streakColor3);
+              finite3(s.streakColor1) && finite3(s.streakColor2) && finite3(s.streakColor3) &&
+              finite3(s.ssrTint); // ADR-2021
     for (const float v : scalars) {
         ok = ok && std::isfinite(v);
     }
