@@ -1584,3 +1584,41 @@ Plot: `12-pass-cpd-r3/cpd-r3-musictoss-timing-plot-alien09-41-50s-before-left-af
    for 28 aliens reading the time-varying ground (60 s at 30 fps: 10.3-10.5 s against 9.8-10.0 s).
 6. **`terrain_mirror.py`** (yours) does not know the banks; mirror `bankShore`, `bankLip` and the step from
    `src/scene/tile_terrain.cpp` if a camera or a check reads the mirror near water.
+
+#### CPD-R6 (art → engineering, 2026-11-11): a per-body position trace, to count bodies on water
+
+**Why.** The owner asked, and the coordinator relayed: "In draft6, no alien may stand, walk or land on any stream,
+river or pond … report the count you measured."
+
+I can't measure that today:
+- **The hidden measure cases write no position.**
+  - `[measure][adr1997]` (`test_tile_characters.cpp`) and `[measure][adr1998]` (`test_tile_motion.cpp`) write t,
+    rise, airborne, throw, above, drawn, drawnRise and y.
+  - They write no x or z, and not which water body, if any, is under the body.
+- **No avgen flag dumps entity or camera positions.** The `--live-profile` JSON has neither.
+
+**The request.** Add four columns to the `[adr1998]` project measure, or a sibling `[measure]` case over all bodies:
+- `x`, `z`: the body's position;
+- `water`: the tile's water class under it (0 none, 1 sea, 2 river, 3 pond), from the same sample the walker and
+  `landOnWater` read;
+- `bank`: the tile's bank channel under it.
+
+Ideally the camera's position per frame too (the flight table's x, y, z), so close passes can be measured as
+distances rather than estimated from the flight mirror. Then I can count, per body over the song:
+- the frames it stands or walks on water;
+- the landings that end on water.
+
+**What the 0:55 white strip was** (the owner: "If that's a stream there shouldn't be an alien jumping on it"). This is
+a scene matter, not an engine fault:
+
+- **It is the lit path, not water.**
+  - It is the tiles' `path` polyline (`world.py` `TILES["path"]`).
+  - The material draws the path channel (`instanceRandom.w`) in `s["path"]`, which by day was `#FFF5E2`, near white.
+  - Along it, `terrain_mirror` gives water 0 and path 1, for example at (−40, −690), (−150, −745) and (−260, −800).
+- **The aliens on it were placed there on purpose:** alien03–06 had the "path" habitat at (30, −640), (−48, −700),
+  (−170, −742) and (−268, −812), with `preferPath` 0.3.
+- **The off-water check is right to allow it:** a path is land.
+- **Fix in this pass (scene):**
+  - The path runs from the bay's shore to the low1 pond, instead of ending on a bare hilltop.
+  - Its day colour is warm (`#FFDDA0`), so it reads as a path, not white water.
+  - The cast is re-placed.
