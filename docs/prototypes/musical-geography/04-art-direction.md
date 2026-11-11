@@ -1894,3 +1894,68 @@ Raising the low layer, or thinning it over high ground, is an option.
 
 - **Stills:** `cpd-r3-tiltshift4-*`.
 - **CPD-R5:** dropped. The owner accepts a near alien blurring.
+
+### CP-D r3 final: throws on the music, banks, draft5 (2026-11-10, ADR-1998/1999)
+
+**The throw** (owner: "it should look like the wave is throwing the alien upwards as it passes through"). I started
+from eng's canary (onLand 1.0, threshold 0.5, gain 8, cap 9, landing strength 0.5).
+
+| Setting | Value | Was |
+|---|---|---|
+| `onLand` (both swell trains) | 1.0 | 0.5 |
+| Throw threshold | 0.4 | 0.2 |
+| Throw gain | 14 | 30 |
+| Throw cap | 10 m/s | 11 |
+| Cooldown | 3 s | 3 s |
+| `hopChance` | 0 | 0.05 |
+| Landing spring strength | 0.5 | 1.2 |
+| `response.level → hop/strength` | depth 0.3 | 0.8 |
+
+- **No random hops:** a hop the wave did not cause is a false cue. The walk still hops up steps.
+- **Damped springs:** eng measured that the springs, not the swell, moved a resting alien's tile.
+- **Measured.** The hidden `[measure][adr1997]` case, all 28 aliens, 0–215 s; height from airtime (h = g·T²/8):
+  - Flights of the hop's own 1.3 s are step hops, so I left them out.
+  - 338 throws, about 12 per alien in the song: p10 1.7 m, p25 2.3, median 3.1, p75 4.5, p90 5.1, max 5.8 m.
+  - Height follows the crest's size. Half the throws are above the body's height (3.2 m) and 12% above 5 m.
+  - The comparisons:
+
+    | Setting | Throws | Median | p90 | Max |
+    |---|---|---|---|---|
+    | Eng's canary (gain 8 / cap 9 / threshold 0.5) | 237 | 1.0 m | 1.7 m | 3.5 m |
+    | Gain 12 / cap 10 / threshold 0.4 | 359 | 1.7 m | 4.2 m | 5.2 m |
+
+  - **Too low to read from the flight:** at the canary the median throw is a third of the body's height.
+- **alien09 in the close clip:** thrown at 43.8 s (about 5.1 m) and 52.1 s (about 3.9 m).
+- **Camera clearance with onLand 1.0:** the flight solves its clearance on the moving ground at each sample's time
+  (`flight.cpp`, `buildFlightTable`: 4 m over the highest ground within 10 m, plus the ring margin). That moving
+  ground is `tileFlightGround` with the tiles' dynamics, `onLand` included, and amplitude headroom 2. So the larger
+  land swell is inside the solve, and the draft5 contact sheet is the visual check.
+
+**Banks** (ADR-1999):
+
+| Water | Lip | Step | Why |
+|---|---|---|---|
+| Ponds low1, low2 | 0.6 m | 0.8 m | a rim, the water set in |
+| The river (16 m) | 0.5 m | 1.0 m | |
+| westStream, dawnStream | 0.3 m | 0.6 m | narrow streams, a low lip |
+
+- **bankWidth:** stays at 8 m.
+- **avoidBanks:** 0.3.
+- **terrain_mirror.py:** mirrors the lip, the bank shore and the step, and returns `bank`. It ignores pond shore noise.
+
+**The bank colour:**
+- The bank's colour is the existing shallows term (shore → shallows at 33%).
+- **Not tuned on its own:**
+  - The shore channel is shared with the sea coast on the land side; the material cannot tell a bank tile from a coast
+    tile there.
+  - The 1x ring's program is at 95 of 96 ops, so there is no room for a bank-only term.
+  - So I left `SHALLOW_AMT` alone, and the coast's look is unchanged.
+- **The read:** the bank comes from the lip and step (a rim, the water set in) and a light shallows ring. By day the
+  pond's rim reads clearly. At night the water's own glow carries it.
+- **If the owner wants a distinct bank colour:** it needs a bank channel in the material and op room, or a cheaper
+  1x program.
+
+**Review scenes:** they keep the flight with `"enabled": false` and park the camera, so the film's rings still exist
+and throw.
+
+**Media:** `cpd-r3-final-*` and `cpd-draft5-*` in 12-pass-cpd-r3/.
