@@ -50,6 +50,11 @@ TILES = {
                                           [1440, -2330], [1435, -2450], [1450, -2600], [1470, -2750],
                                           [1490, -2880]], "width": 10.0, "valleyWidth": 54.0, "bedDepth": 1.5,   # cpd-r4: on to the northern sea
          "sourceLevel": "auto", "lip": 0.3, "step": 0.6},
+        # cpd-r6: the old lit path as a river, out of pond low1 (its source) down to the bay (its mouth), 20 m wide in a
+        # 90 m vale, set into its banks -- one connected water course from pond to sea
+        {"name": "valeRiver", "points": [[-320, -1020], [-338, -950], [-325, -880], [-260, -800], [-150, -745],
+                                         [-40, -690], [40, -610], [62, -568]], "width": 20.0, "valleyWidth": 90.0,
+         "bedDepth": 1.5, "sourceLevel": "auto", "lip": 0.5, "step": 1.0},
     ],
     "ponds": [
         # clouds2: every pond sits on its valley's FLOOR, on the flight line. Auto-levelled on a valley wall (land2 put
@@ -109,10 +114,9 @@ TILES = {
     ],
     # taller land so the top of the colour ramp (orange, yellow; 20-30 m) shows on the crowns (04- §3)
     "heightScale": 2.2,   # land2 (owner: "no long endless horizons"): 1.25 -> 2.2, hills to ~65 m
-    # cpd-r4 (owner: the path "just starts in the middle of nowhere ... make it a continual path"): from the bay's north
-    # shore to the low1 pond under the crowns, one connected walk from water to water (was: on up into the north-west
-    # hills, ending on a bare hilltop)
-    "path": [[40, -610], [-40, -690], [-150, -745], [-260, -800], [-325, -880], [-338, -950], [-320, -1020]],
+    # cpd-r6 (owner: "that path / river in the middle of the map still just ends in the middle of nowhere and its too
+    # thin and doesnt read like a river"): the lit path is now a river (TILES["rivers"], "valeRiver"); no path
+    "path": [],
 }
 
 # The rings (ADR-1976 B), as engineering's fixture sets them (eng/make_ground.py, fd110d88): 1x slabs with the 8.5%

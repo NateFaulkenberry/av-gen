@@ -74,7 +74,7 @@ FLIGHT = {
         {"position": [60, -250], "altitude": 12},                              # the bay
         {"position": [60, -430], "altitude": 6},                               # low over the moving sea
         {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
-        {"follow": "path", "from": 0.0, "to": 0.5, "offset": 0, "altitude": 10},       # along the lit path
+        {"follow": "valeRiver", "from": 0.9274, "to": 0.45, "offset": 0, "altitude": 10},   # cpd-r6: the vale river (was the lit path)
         {"position": [-330, -1020], "altitude": 22, "speed": 24},              # rise over the crowns (r3: 28 -> 22)
         {"position": [-180, -1180], "altitude": 17, "speed": 26},              # a banked sweep north-east (22 -> 17)
         {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river (18 -> 14)
@@ -99,13 +99,19 @@ CLOUDS = False  # set by --clouds (CP-D r2) (CP-D: the whole song, the arc on th
 FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     # draft2 (coordinator: 0-36 s was the same open sea in every frame): the bay opens the piece for ~10 s, then the
     # flight banks onto the bay's west shore and runs along its hills before swinging east to the approved route
-    {"position": [-190, 200], "altitude": 12, "speed": 24},               # the open bay: the intro
+    # cpd-r6 (owner: "adjust the camera path to be a little closer to coastlines"): the intro hugs the bay's shores,
+    # about 15 m off the land (terrain_mirror), instead of crossing the open bay 40-170 m out
+    {"position": [-201, 231], "altitude": 12, "speed": 24},               # the open bay, by its south shore: the intro
     {"position": [-445, 10], "altitude": 10, "speed": 26},                # onto the west shore by ~11 s
-    {"position": [-380, -210], "altitude": 12, "speed": 28},              # along its hills, the bay on the right
-    {"position": [60, -250], "altitude": 12},                              # the bay (the approved route from here)
-    {"position": [65, -430], "altitude": 6},                               # low over the moving sea (cpd-r4b: 5 m east, past the island's close-pass alien)
+    {"position": [-468, -225], "altitude": 10, "speed": 28},              # along the west shore
+    {"position": [-404, -341], "altitude": 10},
+    {"position": [-300, -381], "altitude": 9},                             # under the north arm's shore
+    {"position": [-199, -367], "altitude": 8},
+    {"position": [-110, -340], "altitude": 8},
+    {"position": [-40, -362], "altitude": 7},                              # round the arm's tip
+    {"position": [65, -430], "altitude": 6},                               # low past the island (close pass 1)
     {"snap": "shore", "position": [40, -600], "snapRadius": 40, "altitude": 9},    # cross the shore
-    {"follow": "path", "from": 0.0, "to": 0.85, "offset": 0, "altitude": 5},       # along the lit path (cpd-r4: to the pond, low: close pass 2)
+    {"follow": "valeRiver", "from": 0.9274, "to": 0.1391, "offset": 0, "altitude": 5},   # cpd-r6: up the vale river from the bay to the pond (was the lit path)
     {"position": [-330, -1020], "altitude": 14, "speed": 24},              # over the crowns (CP-D: 22 -> 14)
     {"position": [-180, -1180], "altitude": 15, "speed": 26},              # the banked sweep north-east (17 -> 15)
     {"position": [-87, -1157], "altitude": 4},                             # cpd-r4 close pass 3 (on the curve, low)
@@ -116,7 +122,9 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     {"position": [356, -1588], "altitude": 8},                             # cpd-r4 close pass 4: drop to the coast
     {"position": [456, -1620], "altitude": 4},
     {"position": [660, -1650], "altitude": 14, "speed": 27},               # east along the north coast
-    {"position": [1060, -1580], "altitude": 8, "speed": 27},               # low across the inlet's moving sea: night
+    {"position": [999, -1596], "altitude": 8, "speed": 27},   # cpd-r6: 15 m off the inlet's shore (was 78 m out)               # low across the inlet's moving sea: night
+    {"position": [1141, -1650], "altitude": 8},                            # cpd-r6: along the inlet's north shore
+    {"position": [1288, -1570], "altitude": 9},
     {"position": [1400, -1480], "altitude": 14, "speed": 27},              # the far shore's low hills, the peak
     {"position": [1534, -1635], "altitude": 4},                            # cpd-r4 close pass 5
     {"position": [1560, -1720], "altitude": 6, "speed": 26},               # bank north along the east shore: dawn (12 -> 6)
