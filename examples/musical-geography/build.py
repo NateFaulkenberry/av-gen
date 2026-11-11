@@ -141,7 +141,9 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # off. CP-C r3: the hills, sweep and river legs (clip +43..+79 s) fly higher, so those aliens sit 6 m off the line
 # (11 m on the river, off the water) on the INSIDE of each turn -- the side the camera banks toward -- placed on a
 # numpy mirror of the flight table (scratch track.py), and held near home (HOME_RADIUS) so they cannot hop away.
-# cpd-r6b (owner: "aliens are still too far away from the camera most of the time"): 63 aliens. A near band of
+# cpd-r6c (owner: "cut the amount of aliens added by half and make sure more are present in the first 30 seconds"):
+# 45 aliens -- r6b's 63 less 26 from the densest near band (100-160 s), plus 8 on the opening shore (0-27 s).
+# cpd-r6b (owner: "aliens are still too far away from the camera most of the time"): was 63 aliens. A near band of
 # loose groups and loners 5-14 m off the flown line all along the song, coast aliens on the shore beside the low bay
 # and inlet legs (5-20 m), the four r4b close passes and 3 far ones (scratch r6/gen4.py seed 11, trimmed to 63 (seed 3) + coast seed 5, on
 # the CPD-R6 trace of the flown camera). Homes are dry tile centres off the banks; each near or coast alien roams
@@ -149,58 +151,41 @@ KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # except alien16/38/46 (1 m: at 4 m they reached the lens), so it runs short loops but never under the lens:
 # (x, z, habitat, home radius).
 CAST = [
+    # cpd-r6c (owner: "make sure more are present in the first 30 seconds or so"): the opening shore
+    (-206, 246, "coast", 9),   # 15.8 m off the line at 0 s
+    (-454, 18, "coast", 8),   # 12.4 m off the line at 13 s
+    (-470, -34, "coast", 1),   # 6.3 m off the line at 15 s
+    (-482, -66, "coast", 6),   # 10.9 m off the line at 16 s
+    (-486, -86, "coast", 8),   # 12.3 m off the line at 17 s
+    (-474, -278, "coast", 9),   # 19.7 m off the line at 24 s
+    (-466, -298, "coast", 9),   # 21.1 m off the line at 25 s
+    (-430, -350, "coast", 9),   # 24.7 m off the line at 27 s
     (-34, -1126, "pass", 1),   # 5.5 m off the line at 104 s
     (422, -1606, "pass", 1),   # 5.4 m off the line at 150 s
     (1542, -1654, "pass", 1),   # 4.9 m off the line at 203 s
     (-94, -350, "near", 4),   # 8.3 m off the line at 42 s
-    (78, -454, "near", 6),   # 10.6 m off the line at 52 s
     (78, -462, "near", 6),   # 10.5 m off the line at 52 s
     (78, -446, "near", 6),   # 11.0 m off the line at 52 s
-    (-246, -1110, "near", 4),   # 8.5 m off the line at 93 s
-    (-178, -1190, "near", 5),   # 9.7 m off the line at 97 s
     (-142, -1174, "near", 5),   # 9.7 m off the line at 98 s
     (-134, -1174, "near", 4),   # 7.1 m off the line at 99 s
-    (-98, -1178, "near", 9),   # 13.4 m off the line at 100 s
-    (-66, -1138, "near", 5),   # 9.1 m off the line at 102 s
-    (-26, -1138, "near", 4),   # 8.8 m off the line at 104 s
     (-30, -1146, "near", 9),   # 14.1 m off the line at 104 s
-    (6, -1102, "near", 4),   # 8.9 m off the line at 106 s
-    (-2, -1110, "near", 1),   # 5.3 m off the line at 105 s
     (58, -1098, "near", 8),   # 12.1 m off the line at 108 s
     (50, -1098, "near", 4),   # 8.3 m off the line at 108 s
-    (90, -1082, "near", 7),   # 11.2 m off the line at 110 s
-    (82, -1086, "near", 7),   # 11.8 m off the line at 109 s
-    (118, -1070, "near", 4),   # 8.7 m off the line at 111 s
-    (110, -1074, "near", 6),   # 10.4 m off the line at 110 s
     (182, -1062, "near", 8),   # 12.5 m off the line at 113 s
-    (174, -1062, "near", 7),   # 11.4 m off the line at 113 s
     (214, -1058, "near", 8),   # 12.3 m off the line at 115 s
     (254, -1030, "near", 7),   # 11.8 m off the line at 116 s
-    (262, -1030, "near", 7),   # 11.2 m off the line at 117 s
-    (290, -1054, "near", 9),   # 14.3 m off the line at 118 s
     (302, -1134, "near", 9),   # 13.7 m off the line at 124 s
     (210, -1366, "near", 9),   # 14.2 m off the line at 136 s
     (278, -1542, "near", 8),   # 12.0 m off the line at 144 s
     (310, -1582, "near", 4),   # 8.4 m off the line at 145 s
-    (402, -1614, "near", 4),   # 8.1 m off the line at 150 s
-    (410, -1618, "near", 5),   # 9.5 m off the line at 150 s
-    (446, -1626, "near", 4),   # 8.1 m off the line at 152 s
-    (494, -1622, "near", 4),   # 6.8 m off the line at 154 s
-    (534, -1630, "near", 4),   # 8.2 m off the line at 156 s
-    (526, -1630, "near", 1),   # 6.4 m off the line at 155 s
-    (582, -1638, "near", 4),   # 8.5 m off the line at 158 s
-    (614, -1638, "near", 7),   # 11.4 m off the line at 159 s
+    (494, -1622, "near", 1),   # 6.8 m off the line at 154 s
     (678, -1658, "near", 5),   # 9.5 m off the line at 161 s
     (722, -1634, "near", 4),   # 8.7 m off the line at 163 s
-    (770, -1626, "near", 4),   # 8.1 m off the line at 165 s
-    (1426, -1510, "near", 6),   # 10.2 m off the line at 195 s
-    (1482, -1538, "near", 8),   # 13.0 m off the line at 197 s
     (1474, -1538, "near", 1),   # 6.7 m off the line at 197 s
-    (1494, -1586, "near", 4),   # 5.8 m off the line at 199 s
+    (1494, -1586, "near", 1),   # 5.8 m off the line at 199 s
     (1494, -1594, "near", 6),   # 10.3 m off the line at 199 s
     (1534, -1618, "near", 5),   # 9.4 m off the line at 201 s
     (1538, -1662, "near", 8),   # 12.8 m off the line at 203 s
-    (1542, -1774, "near", 6),   # 10.3 m off the line at 208 s
     (626, -1686, "far", 40),   # 36.0 m off the line at 159 s
     (1698, -1822, "ridge", 30),   # 151.7 m off the line at 209 s
     (54, -978, "ridge", 30),   # 98.7 m off the line at 110 s
