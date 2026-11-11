@@ -40,13 +40,15 @@ TILES = {
         {"name": "river", "points": [[270.0, -530], [311.3, -592], [324.5, -654], [300.7, -716], [255.9, -778],
                                      [220.8, -840], [219.1, -902], [252.0, -964], [297.2, -1026], [323.9, -1088],
                                      [313.9, -1150], [274.1, -1212], [231.5, -1274], [215.1, -1336], [236.0, -1398],
-                                     [280.0, -1460]], "width": 16.0, "valleyWidth": 240.0,
+                                     [280.0, -1460], [300.0, -1530], [290.0, -1600], [250.0, -1660],
+                                     [200.0, -1720]], "width": 16.0, "valleyWidth": 240.0,   # cpd-r4: on to the north sea
          "lip": 0.5, "step": 1.0},   # cpd-r3 final (ADR-1999): the dusk river set into its banks
         {"name": "westStream", "points": [[-770, -95], [-700, -65], [-625, -45], [-545, -28], [-455, -15]],
          "width": 8.0, "valleyWidth": 44.0, "bedDepth": 1.2, "sourceLevel": "auto",
          "lip": 0.3, "step": 0.6},   # a narrow stream: a low lip
         {"name": "dawnStream", "points": [[1592, -1700], [1590, -1820], [1556, -1950], [1530, -2060], [1486, -2200],
-                                          [1440, -2330]], "width": 10.0, "valleyWidth": 54.0, "bedDepth": 1.5,
+                                          [1440, -2330], [1435, -2450], [1450, -2600], [1470, -2750],
+                                          [1490, -2880]], "width": 10.0, "valleyWidth": 54.0, "bedDepth": 1.5,   # cpd-r4: on to the northern sea
          "sourceLevel": "auto", "lip": 0.3, "step": 0.6},
     ],
     "ponds": [

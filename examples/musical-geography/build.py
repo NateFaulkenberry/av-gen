@@ -78,7 +78,7 @@ FLIGHT = {
         {"position": [-330, -1020], "altitude": 22, "speed": 24},              # rise over the crowns (r3: 28 -> 22)
         {"position": [-180, -1180], "altitude": 17, "speed": 26},              # a banked sweep north-east (22 -> 17)
         {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river (18 -> 14)
-        {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 10},     # up the valley on the river
+        {"follow": "river", "from": 0.4294, "to": 0.7026, "offset": 0, "altitude": 10},   # up the valley on the river (cpd-r4: the same stretch; the river now runs on to the north sea)
         {"position": [300, -1560], "altitude": 35, "speed": 24},               # a last rise, under the ceiling
     ],
     "minClearance": 4, "clearanceRadius": 10, "amplitudeHeadroom": 2,
@@ -111,7 +111,7 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
     {"position": [-87, -1157], "altitude": 5},                             # cpd-r4 close pass 3 (on the curve, low)
     {"position": [6, -1112], "altitude": 5},
     {"position": [120, -1060], "altitude": 14, "speed": 26},               # sweep back down toward the river
-    {"follow": "river", "from": 0.55, "to": 0.9, "offset": 0, "altitude": 10},     # up the valley on the river
+    {"follow": "river", "from": 0.4294, "to": 0.7026, "offset": 0, "altitude": 10},   # up the valley on the river (cpd-r4: the same stretch; the river now runs on to the north sea)
     {"position": [300, -1560], "altitude": 30, "speed": 26},               # rise out of the valley at dusk
     {"position": [356, -1588], "altitude": 8},                             # cpd-r4 close pass 4: drop to the coast
     {"position": [456, -1620], "altitude": 5},
