@@ -1482,5 +1482,16 @@ Plot: `12-pass-cpd-r3/cpd-r3-musictoss-timing-plot-alien09-41-50s-before-left-af
 3. **`avoidBanks`** on the hop (0..1, 0 = off): a tile whose bank channel is at least that is treated as water.
    0.3 keeps a body about one tile off the water.
 4. **Levels:** your 3 river sources and 2 ponds are identical to the bit, flush, ringed and banked.
-5. **`terrain_mirror.py`** (yours) does not know the banks; mirror `bankShore`, `bankLip` and the step from
+5. **Cost** (your full project, live profile, 1080p ultra, 20 s, medians; flush = bankWidth 0 and no lips or steps,
+   banked = 8 m with lip 0.6 and step 0.8 on every pond and river; three runs each):
+
+   | Window | Generators pass, flush / banked | Whole-frame GPU, flush / banked |
+   |---|---|---|
+   | 80-100 s (the ponds) | 1.47, 1.47, 1.46 / 1.47, 1.46, 1.45 ms | 23.50, 23.43, 23.50 / 23.42, 23.48, 22.97 ms |
+   | 108-128 s (the river) | 1.44, 1.44, 1.43 / 1.45, 1.44, 1.44 ms | 20.97, 20.95, 20.54 / 20.97, 21.02, 20.46 ms |
+
+   Within noise. The kernel's extra arithmetic runs in both arms; against the pre-ADR-1999 binary it was not
+   measured. ADR-1998's CPU: the record once per change of its inputs (36 ms for Feline), and about +0.25 ms a frame
+   for 28 aliens reading the time-varying ground (60 s at 30 fps: 10.3-10.5 s against 9.8-10.0 s).
+6. **`terrain_mirror.py`** (yours) does not know the banks; mirror `bankShore`, `bankLip` and the step from
    `src/scene/tile_terrain.cpp` if a camera or a check reads the mirror near water.
