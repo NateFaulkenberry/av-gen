@@ -1,7 +1,7 @@
 """Musical Geography CP-D: the time-of-day arc over the whole of Feline Footwear, as timeline tracks.
 
-The arc is the Gate 1 recommendation (04- §3): day -> sunset -> night -> dawn, with night on the song's climax and dawn
-over the last ~15%. One continuous flight; the states change in flight.
+The arc is the Gate 1 recommendation (04- §3): day -> sunset -> night, with night on the song's climax and held to the end
+(draft12: the dawn return over the last ~15% was cut). One continuous flight; the states change in flight.
 
 How it is driven (no engine change):
   * `env/dayNight/dayPhase` is keyed on the timeline. It moves the sun and every DayNight curve (sky, sun, fog, haze,
@@ -33,9 +33,8 @@ ARC = [
     (100.0, "sunset"),    # the sweep and the river at sunset
     (108.0, "sunset"),
     (128.0, "night"),     # dusk through the lift; night lands as the climax begins (~130)
-    (180.0, "night"),
-    (196.0, "dawn"),      # dawn takes the outro
-    (SONG, "dawn"),
+    (SONG, "night"),      # draft12 (owner: "lets also end on the night cycle ... keep it dark to end with"): no dawn
+                          # return -- night holds from ~130 s through the last frame
 ]
 
 # toward night the lights come on in order: path (sunset), contours (dusk), pads + halos (night)

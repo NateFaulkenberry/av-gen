@@ -157,7 +157,7 @@ CAST = [
     #(-482, -66, "coast", 6),   # 10.9 m off the line at 16 s
     #(-486, -86, "coast", 8),   # 12.3 m off the line at 17 s
     #(-430, -350, "coast", 9),   # 24.7 m off the line at 27 s
-    (-342, 158, "coast", 7),   # r6d: in frame ahead-left at 2-8 s (the nearest land, ~60 m out at first)
+    (86, -177, "near", 6),   # island: the south knoll's crown, in frame 20-45 s (draft12); was (-342, 158) coast, seldom in frame
     (-454, 6, "coast", 1),   # r6d: 6.3 m off the line at 14 s
     (-470, -34, "coast", 7),   # 6.3 m off the line at 15 s
     (-482, -74, "coast", 1),   # r6d: 6.3 m off the line at 17 s
@@ -178,16 +178,16 @@ CAST = [
     (254, -1030, "near", 7),   # 11.8 m off the line at 116 s
     (302, -1134, "near", 7),   # 13.7 m off the line at 124 s
     (210, -1366, "near", 7),   # 14.2 m off the line at 136 s
-    (278, -1542, "near", 7),   # 12.0 m off the line at 144 s
-    (310, -1582, "near", 7),   # 8.4 m off the line at 145 s
+    (-64, -684, "near", 7),   # 16.0 m off the line at 65.7 s (draft12, the middle); was (278, -1542) near, seldom in frame
+    (-243, -1139, "near", 5),   # 9.9 m off the line at 93.1 s (draft12, the middle); was (310, -1582) near, seldom in frame
     (494, -1622, "near", 7),   # 6.8 m off the line at 154 s
     (678, -1658, "near", 7),   # 9.5 m off the line at 161 s
     (722, -1634, "near", 7),   # 8.7 m off the line at 163 s
     (1494, -1586, "near", 7),   # 5.8 m off the line at 199 s
     (1534, -1618, "near", 7),   # 9.4 m off the line at 201 s
-    (626, -1686, "far", 40),   # 36.0 m off the line at 159 s
-    (1698, -1822, "ridge", 30),   # 151.7 m off the line at 209 s
-    (54, -978, "ridge", 30),   # 98.7 m off the line at 110 s
+    (101, -374, "near", 6),   # island: the bay island's near tail, 61 m off the line at 50 s (draft12); was (626, -1686) far, seldom in frame
+    (131, -362, "near", 6),   # island: the bay island's tail, 92 m off the line at 50 s (draft12); was (1698, -1822) ridge, seldom in frame
+    (-98, -1173, "near", 4.5),   # 9.0 m off the line at 99.4 s (draft12, the middle); was (54, -978) ridge, seldom in frame
     (-138, -366, "coast", 7),   # 18.7 m off the line at 40 s
     (70, -426, "coast", 7),   # 7.5 m off the line at 51 s
     (-238, -394, "coast", 7),   # 17.8 m off the line at 35 s
@@ -195,12 +195,12 @@ CAST = [
     (-206, -386, "coast", 7),   # 17.0 m off the line at 37 s
     (810, -1610, "coast", 7),   # 15.9 m off the line at 166 s
     (1314, -1558, "coast", 7),   # draft9: on the shore 8.1 m off the line at 188 s (owner: "more aliens needed along shorelines")
-    (-350, -998, "coast", 7),   # draft9: on the shore 10.4 m off the line at 86 s (owner: "more aliens needed along shorelines")
+    (308, -1098, "near", 7),   # 13.2 m off the line at 121.3 s (draft12, the middle); was (-350, -998) coast, seldom in frame
     (1338, -1534, "coast", 7),   # draft9: on the shore 9.9 m off the line at 189 s (owner: "more aliens needed along shorelines")
     (-350, -930, "coast", 7),   # draft9: on the shore 15.0 m off the line at 83 s (owner: "more aliens needed along shorelines")
     (-350, -974, "coast", 7),   # draft9: on the shore 8.2 m off the line at 85 s (owner: "more aliens needed along shorelines")
     (1334, -1506, "coast", 7),   # draft9: on the shore 11.3 m off the line at 190 s (owner: "more aliens needed along shorelines")
-    (-354, -954, "coast", 7),   # draft9: on the shore 14.8 m off the line at 84 s (owner: "more aliens needed along shorelines")
+    (234, -1319, "near", 7),   # 13.9 m off the line at 132.4 s (draft12, the middle); was (-354, -954) coast, seldom in frame
     (1318, -1530, "coast", 7),   # draft9: on the shore 7.9 m off the line at 189 s (owner: "more aliens needed along shorelines")
     (46, -626, "coast", 7),   # draft9: on the shore 11.5 m off the line at 60 s (owner: "more aliens needed along shorelines")
     (-310, -886, "coast", 7),   # draft9: on the shore 13.9 m off the line at 81 s (owner: "more aliens needed along shorelines")
@@ -208,7 +208,7 @@ CAST = [
     (-122, -750, "coast", 7),   # draft9: on the shore 17.0 m off the line at 69 s (owner: "more aliens needed along shorelines")
     (-190, -786, "coast", 7),   # draft9: on the shore 18.8 m off the line at 73 s (owner: "more aliens needed along shorelines")
     (-290, -806, "coast", 7),   # draft9: on the shore 19.5 m off the line at 77 s (owner: "more aliens needed along shorelines")
-    (-26, -702, "coast", 7),   # draft9: on the shore 19.1 m off the line at 65 s (owner: "more aliens needed along shorelines")
+    (239, -1364, "near", 7),   # 13.8 m off the line at 135.1 s (draft12, the middle); was (-26, -702) coast, seldom in frame
     (-46, -670, "coast", 7),   # draft9: on the shore 18.6 m off the line at 64 s (owner: "more aliens needed along shorelines")
 ]
 CAST_FULL = []   # cpd-r4: one cast for every mode (was the route-side additions of the full piece)
@@ -260,18 +260,26 @@ CHARACTERS = False   # set by --characters
 # grid search over the flown route (the ball in frame 20-120 m, the whole 18 m arc in frame 25-80 m, never nearer the
 # line than 10 m), and each start (drop height above the ground, launch speed up) is picked from 16 traced variants so
 # one impact lands in frame 45-75 m out. The trace is the proof: 4.1-7.4 s in frame each, closest 8.5 m to the lens.
+# draft12 (owner: "add another half dozen balls across the journey, esp during the middle section"): six more at
+# 72-165 s by the same method (16 in all); ball08 off its bend's corner; ball03 restarted after the alien moves.
 # (x, z, ground y, song time, drop m, launch m/s up)
 BALLS = [
-    (-301.8, 133.0, 0.0, 6, 6.0, 2.0),   # nearest the flight at 5.8 s, 12 m off it; lands in frame at 3.5 s, 57 m out
-    (-451.4, -37.0, 0.02, 15, 6.0, 6.0),   # nearest the flight at 15.1 s, 14 m off it; lands in frame at 12.2 s, 72 m out
-    (-385.1, -334.2, 0.0, 24, 12.0, 8.0),   # nearest the flight at 28.0 s, 18 m off it; lands in frame at 25.8 s, 62 m out
-    (-6.5, -647.3, 0.0, 64, 6.0, 6.0),   # nearest the flight at 62.5 s, 12 m off it; lands in frame at 59.0 s, 66 m out
-    (61.5, -1094.1, 6.08, 104, 6.0, 2.0),   # nearest the flight at 107.4 s, 10 m off it; lands in frame at 105.3 s, 50 m out
-    (303.7, -1094.1, 1.02, 121, 2.0, 8.0),   # nearest the flight at 121.0 s, 17 m off it; lands in frame at 118.6 s, 52 m out
-    (361.2, -1578.3, 5.67, 151, 6.0, 0.0),   # nearest the flight at 146.6 s, 12 m off it; lands in frame at 144.1 s, 57 m out
-    (1175.2, -1622.8, 0.0, 176, 2.0, 8.0),   # nearest the flight at 180.0 s, 21 m off it; lands in frame at 177.8 s, 48 m out
-    (1415.7, -1531.2, 0.0, 197, 6.0, 10.0),   # nearest the flight at 194.4 s, 33 m off it; lands in frame at 192.1 s, 57 m out
-    (1548.3, -1703.2, 4.65, 205, 6.0, 2.0),   # nearest the flight at 204.3 s, 13 m off it; lands in frame at 202.1 s, 49 m out
+    (-301.8, 133.0, 0.0, 6, 6.0, 2.0),   # nearest the flight at 5.7 s, 12 m from the lens; lands in frame at 3.5 s, 57 m out
+    (-451.4, -37.0, 0.02, 15, 6.0, 6.0),   # nearest the flight at 14.9 s, 16 m from the lens; lands in frame at 12.2 s, 72 m out
+    (-385.1, -334.2, 0.0, 24, 12.0, 8.0),   # nearest the flight at 28.5 s, 17 m from the lens; lands in frame at 25.8 s, 62 m out
+    (-6.5, -647.3, 0.0, 64, 16.0, 8.0),   # nearest the flight at 62.6 s, 16 m from the lens; lands in frame at 59.4 s, 70 m out (draft12: restarted (drop 16) after the alien moves pushed its in-frame impact to 79 m)
+    (61.5, -1094.1, 6.08, 104, 6.0, 2.0),   # nearest the flight at 107.4 s, 8 m from the lens; lands in frame at 105.3 s, 50 m out
+    (303.7, -1094.1, 1.02, 121, 2.0, 8.0),   # nearest the flight at 121.1 s, 16 m from the lens; lands in frame at 118.6 s, 52 m out
+    (361.2, -1578.3, 5.67, 151, 6.0, 0.0),   # nearest the flight at 146.4 s, 13 m from the lens; lands in frame at 144.1 s, 57 m out
+    (1175.2, -1622.8, 0.0, 176, 2.0, 8.0),   # nearest the flight at 180.1 s, 13 m from the lens; lands in frame at 177.8 s, 48 m out
+    (1415.7, -1515.2, 2.06, 197, 6.0, -3.0),   # nearest the flight at 194.1 s, 26 m from the lens; lands in frame at 191.7 s, 57 m out (draft12: moved off the bend's corner -- its impact had landed in the frame's bottom-left corner)
+    (1548.3, -1703.2, 4.65, 205, 6.0, 2.0),   # nearest the flight at 204.4 s, 13 m from the lens; lands in frame at 202.1 s, 49 m out
+    (-175.9, -769.9, 0.46, 72, 12.0, 8.0),   # nearest the flight at 72.1 s, 11 m from the lens; lands in frame at 69.0 s, 70 m out (draft12: new, the middle)
+    (-310.0, -1011.3, 0.0, 87, 4.0, 8.0),   # nearest the flight at 87.3 s, 17 m from the lens; lands in frame at 84.7 s, 56 m out (draft12: new, the middle)
+    (-124.6, -1157.3, 5.91, 95, 6.0, 4.0),   # nearest the flight at 98.6 s, 15 m from the lens; lands in frame at 96.3 s, 52 m out (draft12: new, the middle)
+    (290.4, -1158.5, 0.38, 128, 6.0, 10.0),   # nearest the flight at 124.6 s, 19 m from the lens; lands in frame at 121.7 s, 60 m out (draft12: new, the middle)
+    (246.0, -1383.5, 0.42, 136, 16.0, 8.0),   # nearest the flight at 135.9 s, 18 m from the lens; lands in frame at 133.0 s, 60 m out (draft12: new, the middle)
+    (806.6, -1638.7, 4.69, 165, 6.0, 12.0),   # nearest the flight at 165.1 s, 9 m from the lens; lands in frame at 163.3 s, 52 m out (draft12: new, the middle)
 ]
 # the impact: its own colours, apart from the aliens' warm landing glow. draft11: read from 40-80 m out -- the lit outline
 # 0.12 -> 0.45 m wide (about 10 px at 50 m), the glow 5 m / 1.3 s, the sparks running 18 m/s out to 40 m over 1.4 s, 3 m

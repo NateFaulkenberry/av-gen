@@ -91,11 +91,15 @@ TILES = {
     # wider, sizes varied (a big three-part island, a knoll with a shoulder, a small stack, a broad low north isle, the
     # inlet's long island), all with the hills' own noise (ADR-1994) and the soft coast (ADR-1993)
     "rises": [
-        {"name": "bayPeak", "centre": [205, -130], "radius": 30, "height": 38, "edge": 46, "noise": 0.6},
-        {"name": "baySaddle", "centre": [228, -200], "radius": 36, "height": 28, "edge": 70, "noise": 0.6},
-        {"name": "bayTail", "centre": [262, -268], "radius": 32, "height": 17, "edge": 85, "noise": 0.6},
-        {"name": "southKnoll", "centre": [100, -62], "radius": 26, "height": 31, "edge": 44, "noise": 0.6},
-        {"name": "southShoulder", "centre": [70, 0], "radius": 36, "height": 19, "edge": 80, "noise": 0.6},
+        # draft12 (owner: "move the islands a little closer in to where the camera travels so they are more
+        # noticable"): both bay islands moved together 90 m west / 50 m north (their shapes and the water between
+        # them kept); nearest to the flown line 253 -> 151 m, every footprint still >= 30 m off it (the ground under
+        # the route is unchanged)
+        {"name": "bayPeak", "centre": [115, -180], "radius": 30, "height": 38, "edge": 46, "noise": 0.6},
+        {"name": "baySaddle", "centre": [138, -250], "radius": 36, "height": 28, "edge": 70, "noise": 0.6},
+        {"name": "bayTail", "centre": [172, -318], "radius": 32, "height": 17, "edge": 85, "noise": 0.6},
+        {"name": "southKnoll", "centre": [10, -112], "radius": 26, "height": 31, "edge": 44, "noise": 0.6},
+        {"name": "southShoulder", "centre": [-20, -50], "radius": 36, "height": 19, "edge": 80, "noise": 0.6},
         {"name": "northIsle", "centre": [160, -450], "radius": 40, "height": 32, "edge": 65, "noise": 0.6},
         # cpd-r3 (owner: the inlet island at 160-165 s, "move it aside a bit and lower it"): off the flight line to
         # the left (north) of the view as the vale opens, lower, a peak and a shoulder with the hills' noise

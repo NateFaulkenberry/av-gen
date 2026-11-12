@@ -2194,3 +2194,37 @@ camera along its path, instead of beside it, and make the impact glow and sparks
 - **What it reads like:** clearly at sunset, night and dawn. The core pales by the ball for about 0.2 s. On the
   day's bright cyan tiles it is weak, because an added light washes out there.
 - **The way out is engineering:** keyable impact gains, or a tint blend instead of an add.
+
+### Draft12 (2026-11-11): closer bay islands, aliens moved into the gaps, 16 balls, and the song ends at night
+
+The owner on draft11, verbatim:
+- "add another half dozen balls across the journey, esp during the middle section it seems a little empty";
+- "add some [aliens] to these far islands towards the beginning and maybe move the islands a little closer in to
+  where the camera travels so they are more noticable";
+- "keep alien count within live playback specs";
+- "lets also end on the night cycle ... keep it dark to end with".
+
+**Islands (world.py).**
+- **What the owner pointed at:** at about 37 s, the bay's three-part island (bayPeak, baySaddle, bayTail) and its
+  knoll (southKnoll, southShoulder), 440-490 m out across the water.
+- **The move:** both, together, 90 m west and 50 m north. Their shapes and the water between them are kept.
+- **Result:** nearest to the flown line 253 → 151 m. Seen at 33-41 s, they stand about a third larger in frame.
+- **Ruled out:**
+  - most of the bay's interior is out of frame on every leg (the camera looks along the shore), so moving the islands
+    into mid-bay hid them;
+  - moving them ahead and east merged them with northIsle and the east shore.
+- **Kept:** every footprint is at least 30 m off the line, so the ground under the route (and its altitude) is
+  unchanged.
+
+**Aliens (build.py `CAST`): still 53, the live ceiling.** Nine moved from spots that were in frame within 40 m for
+0-0.2 s of the song:
+- **Three to the islands:** one on the knoll's crown, two on the bay island's near tail.
+- **Six to the middle's gaps:** 65, 93, 99, 121, 132 and 135 s, each 9-16 m off the line, dry, and on gentle ground.
+
+**Balls (`BALLS`): 16.**
+- **Six new**, at 72, 87, 95, 128, 136 and 165 s, by draft11's method (a home on the approach, then one start traced
+  from 16 variants).
+- **ball08** moved off its bend's corner: its impact now lands at about (611, 885) px, not the frame's corner.
+- **ball03** was restarted, because the alien moves had pushed its impact to 79 m.
+
+**Night to the end (arc.py).** The dawn return (196-210.5 s) was cut. Night holds from about 130 s to the last frame.
