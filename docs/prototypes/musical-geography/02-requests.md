@@ -2056,3 +2056,136 @@ hitches.
   gains 2/2. The rows are 59.72 s and 69.38 s (day, ball03 and ball10), 3.88 s (day, ball00) and 144.45 s (night,
   ball06).
 - `cpd-r15-ball-impact-59.72s-full-before-top-after-bottom.png` and `...-69.38s-...`: the whole frames.
+
+### Engineering → art (2026-11-11): the app's pair, `build.py --release` (ADR-2010)
+
+The owner approved the scene for the app (Worlds). Two projects are now committed, beside `build.py`:
+
+| Project | Index entry | What it is |
+|---|---|---|
+| `musical-geography.json` | Musical Geography (offline), Offline > Worlds | Your draft12 film: Feline, stems and feeds, the arc in song time, `sonic.live` false |
+| `musical-geography-live.json` | Musical Geography, Live > Worlds | Live input (`sonic.live`), no file. The flight loops, and the arc loops every 240 s |
+
+**How to make them:** `python3 examples/musical-geography/build.py --release`.
+- It is `--full --characters --clouds --tiltshift` with relative paths.
+- The scenes go to `scene/release-offline.scene.json` and `scene/release-live.scene.json` (gitignored, because they
+  reference the aliens).
+- **After any look change, run it again and commit the two project JSONs.** They carry the arc's 212 tracks, so they
+  do not follow `look.py` / `arc.py` by themselves.
+
+**The live loop.**
+- **The flight** is your route with `loop: true` (ADR-2010). From the northern sea it closes back to the bay in one
+  straight Catmull-Rom leg. The first lap is the opening; the second repeats for ever, eased into its own start over
+  10 s, so there is no cut.
+- **The arc:** each track holds its value at 210.5 s, then runs linearly back to its first key by 240 s, and loops.
+  That is a 30 s dawn after the night, then the day again. `LIVE_LOOP` in `build.py` sets it; it is yours to tune.
+  The palette and the flight loop independently.
+
+**Two changes to your look-development build:**
+- `sonic.live` is now **false** in the default project (`scene/musical-geography.json`). With it on, a live run of
+  that project (`--live-profile --mode live`) heard the microphone, not Feline; my baseline below was taken that
+  way (headless runs are unaffected; they play the file). Also, any `sonic.live` project under `examples/` must be listed as live in the index (a test checks this),
+  and yours is not.
+- Alien asset paths are absolute as before, except under `--release`.
+
+### Engineering (2026-11-12): live playback over the whole song, the brief's Phase 8 performance half
+
+**Verdict: it holds 30 fps at 1080p over the whole song, at every tier, with no change.** The only missed deadlines
+are the app shell's own stall about 13 s after a project opens. The same stall shows on a near-empty scene.
+
+**Method.**
+- `avgen --live-profile --mode live` on the M2 Max, 1920x1080, 30 fps target, Feline 0-210 s, 4 s warm-up,
+  `AVGEN_SLOW_FRAME_MS=40`.
+- Two kinds of run:
+  - **Pinned at 30 fps:** the frame interval, deadline misses and the quality tier held. Its GPU times are stretched
+    by the clock-down in each frame's idle half (see 2026-11-09).
+  - **A 60 fps arm:** the GPU kept busy, so its GPU times are the real work.
+- **Before:** draft12 (your look-development build). Its `sonic.live` made a live run hear the microphone, not Feline.
+- **After:** the release projects:
+  - the offline Feline project (the file playing);
+  - the live project on live input, with Feline played into BlackHole, at the app's default tier (auto).
+
+**Whole song, 30 fps, per 30 s window** (interval p50/p99/max; GPU p50/p99; missed = intervals over 41.7 ms):
+
+| Window | Before, ultra | Before, high | After, offline ultra | After, offline high | After, live auto (BlackHole) |
+|---|---|---|---|---|---|
+| 0-30 | 33.4/36.6/52.0; 23.7/28.5; 1 | 33.3/36.4/51.2; 20.6/30.9; 1 | 33.4/37.6/55.2; 23.3/30.5; 1 | 33.5/36.7/49.8; 19.5/27.9; 1 | 33.3/36.6/49.6; 29.6/32.0; 1 |
+| 30-60 | 33.4/37.4/38.0; 22.3/28.7; 0 | 33.3/36.8/37.5; 29.5/31.8; 0 | 33.5/37.9/39.8; 29.4/31.6; 0 | 33.4/37.1/38.0; 28.8/31.6; 0 | 33.3/37.0/37.8; 29.5/31.8; 0 |
+| 60-90 | 33.3/38.3/40.2; 24.2/31.6; 0 | 33.3/37.4/39.2; 29.4/31.5; 0 | 33.4/38.2/39.5; 29.5/31.5; 0 | 33.3/37.5/42.5; 29.4/31.6; 1 | 33.2/37.6/38.3; 29.4/31.4; 0 |
+| 90-120 | 33.3/37.2/39.0; 29.3/32.1; 0 | 33.2/37.3/39.2; 29.3/32.1; 0 | 33.4/37.8/39.0; 29.4/31.4; 0 | 33.2/37.0/38.9; 29.4/31.5; 0 | 33.3/37.3/38.8; 29.4/31.5; 0 |
+| 120-150 | 33.3/36.5/43.5; 29.5/32.6; 1 | 33.3/36.6/39.0; 29.7/32.2; 0 | 33.3/37.0/37.9; 29.7/31.3; 0 | 33.3/36.1/37.3; 29.6/31.6; 0 | 33.3/37.7/39.2; 29.6/31.2; 0 |
+| 150-180 | 33.3/36.2/37.4; 29.8/32.3; 0 | 33.3/35.8/36.4; 29.9/32.9; 0 | 33.3/36.9/39.2; 30.0/31.3; 0 | 33.3/35.9/36.8; 29.9/35.5; 0 | 33.4/36.5/40.5; 29.8/31.4; 0 |
+| 180-210 | 33.3/36.0/37.4; 29.8/32.3; 0 | 33.3/36.1/41.1; 29.9/33.3; 0 | 33.3/36.2/39.3; 30.0/31.2; 0 | 33.3/35.9/36.4; 29.7/37.4; 0 | 33.3/36.6/38.9; 29.9/31.4; 0 |
+| **Whole song** | **33.3/37.2/52.0; 28.7/32.1; 2 of 6181** | **33.3/36.8/51.2; 29.5/32.3; 1** | **33.3/37.5/55.2; 29.5/31.4; 1** | **33.3/36.7/49.8; 29.3/33.6; 2** | **33.3/37.2/49.6; 29.6/31.6; 1 of 6000** |
+
+- Auto held Ultra after the first minute: High for 633 + 70 frames while it warmed, then Ultra to the end.
+- **Every miss is a shell stall**, from `AVGEN_SLOW_FRAME_MS`:
+  - `events.poll` (the OS event pump) at 17-23 ms, about 13-15 s after the project opens, in every run;
+  - one 42.5 ms `ui.build` in the after-high run.
+  - No miss comes from the scene's update or its GPU.
+- **The interval p99 of 36-38 ms is the loop's present jitter, not dropped frames.** A dropped frame at 30 fps is a
+  50 ms interval. The Audio Response Lab (a near-empty live scene) measures 33.3/35.6/51.4 by the same method, with
+  the same 13 s stall. MG adds about 1.5 ms to that p99.
+
+**The real GPU work (the 60 fps arm, before, whole song, per 30 s window, p50/p99 ms):**
+
+| Window | 0-30 | 30-60 | 60-90 | 90-120 | 120-150 | 150-180 | 180-210 | Whole song |
+|---|---|---|---|---|---|---|---|---|
+| Ultra | 23.4/26.1 | 21.9/24.5 | 23.3/25.7 | 21.6/24.7 | 17.3/20.7 | 17.1/19.7 | 16.9/18.6 | 20.0/25.3 (max 27.5) |
+| High | 19.6/22.3 | 18.2/20.9 | 19.4/21.8 | 17.9/20.7 | 14.2/17.4 | 14.0/15.6 | 13.8/15.2 | 16.9/21.4 (max 23.9) |
+
+- Ultra's worst frame (27.5 ms) is under the 29.3 ms the live ladder allows at 30 fps (33.3 less 12%). High has
+  about 8 ms spare.
+- 60 fps is not a brief target (§11: "30 FPS minimum"), and it does not hold: the day half is 20-23 ms.
+
+**What costs the frame** (headless ultra, whole song, medians):
+
+| Pass | Cost |
+|---|---|
+| The lit scene pass | 19.3 ms of 25.9 |
+| The tile generators | 2.0 ms |
+| Shadows and the shadow mask | 2.3 ms |
+| Live AO | 0.8 ms |
+| Depth of field | 0.75 ms |
+| Depth prepass | 0.45 ms |
+
+- The lit scene pass is mostly the tiles' material programs: 6 programs averaging 56 ops, over the visible tops,
+  about 18-20k tiles by day.
+- Shadows are cheap here: one key light and one directional.
+- Alien skinning and draws do not show as a GPU line.
+- The day half costs about 5 ms more than the night: the sunlit tiles' programs.
+
+**The suspects, ruled in or out:**
+- **Shadows:** not 8-14 ms here; 2.3 ms.
+- **Live AO:** 0.8 ms.
+- **The tile instancing:** the effector/generator pass is 2.0 ms.
+- **CPU spikes:** the p99 is the shell's present jitter and its one 13 s `events.poll` stall. CPU work per frame is
+  p50 6.0 ms, p99 13.9 ms (headless), against a 33 ms budget.
+- **ADR-1998's per-frame CPU (53 aliens):**
+  - with the record: CPU work 6.02 ms p50, 13.87 ms p99;
+  - with `AVGEN_NO_TILE_MOTION=1`: 5.94 / 14.28 ms;
+  - noise either way, on 60 s from 30 s. The record itself costs 45 ms once, at load.
+- **The lift (ADR-1991):** it is inside the "scene update" phase, 3.5 ms median with every animation, entity and
+  procedural update together. It is not separately timed, and that whole phase fits.
+- **The 60 fps arm:** the brief defines none.
+- **Headless p99s of 44-69 ms at 85 s:** those are the GPU's clock bursts in the headless loop. In the headless
+  trace, every pass (scene, shadow, post) slows by the same 2.7x for 10-40 frames together, so the cost is not in
+  the content. They do not appear in live runs.
+
+**No engine change was made for performance, so the offline look is untouched.** The live release adds no cost of
+its own:
+- the looped flight's table is three laps (387 s each, 34,850 samples), built once in 545 ms at load;
+- the live input's analysis is 0.3% of a core.
+
+**Live input reaches the world.** The live project was opened in the app with `--input BlackHole`, Feline played
+into BlackHole, against a silent run:
+- onset events: 114 against 0;
+- the swell and the rings are visibly bigger
+  (`22-pass-ship/live-release-blackhole-feline-vs-silence-frames.png`).
+
+The live project's routes are the film's own:
+- `response.low` on the swell;
+- `response.onset` on the rings;
+- `audio.energy` on the breath and the edge, path and pad glows;
+- `beat.phrase` on the contours.
+All of these come from the live bus.
