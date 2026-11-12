@@ -2083,6 +2083,8 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"nodispersion", [](QualitySettings& q) { q.refractionDispersion = false; }, "refractionDispersion=false (ADR-1640: the single refraction read)"},
         {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
         {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
+        {"nowaterblend", [](QualitySettings& q) { q.waterBlendedReflection = false; },
+         "waterBlendedReflection=false (ADR-2022: no blended meshes drawn into the water's frame copy)"},
         {"auroraplanes75", [](QualitySettings& q) { q.auroraStepScale = 0.75f; }, "auroraStepScale=0.75 (ADR-1651: 3/4 of the aurora ribbons' planes)"},
         {"auroraplaneshalf", [](QualitySettings& q) { q.auroraStepScale = 0.5f; }, "auroraStepScale=0.5 (ADR-1651: half the aurora ribbons' planes)"},
         {"bilinearupscale", [](QualitySettings& q) { q.spatialUpscaler = false; }, "spatialUpscaler=false (ADR-1607: the bilinear fetch)"},
@@ -5255,7 +5257,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         // ADR-1819: the entities' glass too; ADR-1820: and the glossy SSR, which reads the copy (and only reads it)
         // ADR-2022: a cinematic surface that asks for the frame's blended meshes in its reflection. Gated on there being
         // a blended draw this frame, so a scene with the key on and nothing blended in view pays nothing either.
-        const bool blendedIntoCopy = cinematicWater && !blended.empty() &&
+        const bool blendedIntoCopy = cinematicWater && !blended.empty() && qualitySettings_.waterBlendedReflection &&
                                      std::any_of(scene.waters.begin(),
                                                  scene.waters.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(
                                                                             scene.waters.size(), kMaxWaterMaterials)),
