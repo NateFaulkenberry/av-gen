@@ -77,6 +77,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1930-1949 | scene/chronos (CHRONOS: temporal imaging and its canyon; narrowed from 1930-1969 on 2026-11-08, when the coordinator gave 1950-1979 to Musical Geography -- CHRONOS had used 1930-1937) |
 | 1950-1969 | scene/musical-geography (Musical Geography, engineering) |
 | 1970-1979 | scene/musical-geography (Musical Geography, the art agent's requests, built by engineering) |
+| 2020-2029 | `eng/gltf-water-materials`, `eng/water-followups` and `eng/water-blend-reflect` (a gltf node's named materials drawn as water, for av-agent's imported lake, and its follow-ups) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -1040,3 +1041,6 @@ confirm the citation you are about to change is your own.
 | [1977](ADR-1977-output-dither.md) | Output dither (`post/output/dither`, triangular PDF in 8-bit steps after the encode; 0 = byte-identical) against sky and fog banding. scene/musical-geography | Accepted |
 | [1980](ADR-1980-live-panel-audio-rescan-off-the-frame.md) | The Live panel's audio device rescan (3-9 ms every 3 s on the UI thread) runs in an async task and is swapped in when it lands; MIDI and display scans stay (under 0.1 ms). eng/app-stalls | Accepted |
 | [1981](ADR-1981-asset-hashes-cached-by-size-and-time.md) | Asset hashes in the project document are cached by path, size and modification time, so the idle dirty check stops re-hashing the song (a 250 ms frame every ~2.5 s after playback ends). eng/app-stalls | Accepted |
+| [2020](ADR-2020-gltf-water-materials.md) | A gltf node's `waterMaterials` draws the named glTF materials as water with their own WaterSurface, read by terrain.water's reader, so an imported lake gets the march and the sky mirror; at most 8 surfaces, refused at load; absent changes nothing. eng/gltf-water-materials | Accepted |
+| [2021](ADR-2021-water-reflection-follow-ups.md) | Follow-ups to ADR-2020: a gltf water material writes its identifier (id AOV shows the lake; terrain water unchanged); `ssrTint`, `ssrBlur` and `ssrEdgeFade` shape the march's and the sky mirror's reflection, byte-identical at their defaults; the far treeline's band was the march's roughness blur. eng/water-followups | Accepted |
+| [2022](ADR-2022-blended-meshes-in-the-water-reflection.md) | `reflectBlended` (a water key, off by default): the frame's blended meshes are drawn a second time into the water's frame copy, so a translucent waterfall is reflected; same draws, no scratch targets (the blend pipelines write colour only); `--ab nowaterblend`. eng/water-blend-reflect | Accepted |

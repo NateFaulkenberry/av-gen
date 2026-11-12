@@ -305,6 +305,20 @@ struct CompositionNode {
     // alpha mode; the program decides what the surface shows, so a route can move light along it. Empty (the
     // default) leaves every material as the asset authored it; written only when set.
     std::string program;
+    // ADR-2020: a gltf node's named materials drawn as water (`"waterMaterials": {"Lake": {...}}`), each value read by
+    // the same reader as `terrain.water`. Every entity whose glTF material name matches exactly becomes a
+    // MeshStyle::Water entity drawn with that material's own WaterSurface, so an imported lake gets the cinematic
+    // water (the march and the sky mirror). Empty (the default) changes nothing. `waterMaterialsJson` is the object as
+    // authored, written back verbatim; `waterMaterialProblems` are the names that matched nothing, found when the
+    // asset loaded.
+    struct WaterMaterial {
+        std::string material;
+        WaterSettings settings;
+    };
+    std::vector<WaterMaterial> waterMaterials;
+    nlohmann::json waterMaterialsJson;
+    std::vector<std::string> waterMaterialProblems;
+    bool waterMaterialsLogged = false; // the per-material info line, once per node per asset load
     // Locked out of the pointer, the way a locked layer is in an image editor. It still renders and
     // still belongs to the scene -- it simply stops answering clicks and box selections, so the
     // ground plane a world is built on stops being what you select every time you aim at something
@@ -1386,6 +1400,9 @@ public:
     void installEntities();
     // Everything the entity layer could not resolve. Empty when all of it resolved.
     [[nodiscard]] const std::vector<std::string>& entityProblems() const { return entityWorld_.problems(); }
+    // ADR-2020: every gltf node's `waterMaterials` name that matched no material of its asset, one message each, for
+    // Engine::projectWarnings. Empty when every name matched.
+    [[nodiscard]] std::vector<std::string> waterMaterialProblems() const;
 
     // ---- procedural graph (ADR-028) ----
     // A composition is either graph-driven or flat: installing a graph replaces every node this

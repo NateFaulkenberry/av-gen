@@ -69,13 +69,14 @@ struct WaterBench {
         std::unique_ptr<rendering::SceneRenderer> renderer;
     };
 
-    static WaterBench make(std::uint32_t w, std::uint32_t h) {
+    // `scene` is the QA river unless a test brings its own (ADR-2020's acceptance lake).
+    static WaterBench make(std::uint32_t w, std::uint32_t h, const std::filesystem::path& scene = qaWaterScene()) {
         WaterBench b;
         b.ctx = makeWaterContext();
         b.width = w;
         b.height = h;
         b.engine = std::make_unique<app::Engine>(app::EngineMode::Offline);
-        REQUIRE(b.engine->loadComposition(qaWaterScene()).has_value());
+        REQUIRE(b.engine->loadComposition(scene).has_value());
         b.time = b.engine->tick(b.clock);
         b.engine->setViewport(w, h);
         b.engine->update(b.time);

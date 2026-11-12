@@ -176,6 +176,18 @@ Result<void> WaterSettings::validate() const {
         return fail("water: streakColorScale must be in [0.001, 10] cycles per metre");
     }
     // ADR-1650
+    // ADR-2021
+    for (int i = 0; i < 3; ++i) {
+        if (!(ssrTint[i] >= 0.0f && ssrTint[i] <= 4.0f)) {
+            return fail("water: ssrTint must be in [0, 4] in each channel");
+        }
+    }
+    if (!(ssrBlur >= 0.0f && ssrBlur <= 4.0f)) {
+        return fail("water: ssrBlur must be in [0, 4]");
+    }
+    if (!(ssrEdgeFade >= 0.001f && ssrEdgeFade <= 0.25f)) {
+        return fail("water: ssrEdgeFade must be in [0.001, 0.25]");
+    }
     if (!(skyMirror >= 0.0f && skyMirror <= 1.0f)) {
         return fail("water: skyMirror must be in [0, 1]");
     }

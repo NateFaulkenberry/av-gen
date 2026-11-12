@@ -161,6 +161,22 @@ struct WaterSettings {
     // draws none, with the code compiled out; above 0 the surface is drawn by the cinematic pipeline with it in.
     float skyMirror = 0.0f;      // how much of the reflection the drawn sky supplies where it is trusted (0..1)
 
+    // ---- the frame's reflection, shaped (ADR-2021) -----------------------------------------------------
+    // Three controls on what the march and the sky mirror return. Their defaults are the reflection as it was, to the
+    // byte. `reflectionTint` and `reflection` colour and scale the environment's sample only; these act on the frame's.
+    glm::vec3 ssrTint{1.0f, 1.0f, 1.0f}; // the march's and the mirror's reflection, multiplied per channel (0..4)
+    float ssrBlur = 1.0f;        // how much `roughness` blurs a march hit (0 = a mirror; 1 = as before; 0..4)
+    float ssrEdgeFade = 0.06f;   // the share of the frame's width over which the march and the mirror fade to the
+                                 // environment at the left and right edges (0.001..0.25)
+
+    // ---- blended meshes in the reflection (ADR-2022) ---------------------------------------------------
+    // The frame copy the cinematic water reflects is taken before anything blended is drawn, so an alpha-blended
+    // waterfall, spray or glass is never in it. On, the frame's blended meshes are drawn a second time into the copy
+    // (after it is taken, before the water), so the march and the sky mirror see them, translucency and all. The
+    // frame itself is drawn exactly as before. Frame-wide: any cinematic surface asking for it puts them in the one
+    // copy every surface reads. Off (the default): no extra pass, and the copy is the texture it was.
+    bool reflectBlended = false;
+
     [[nodiscard]] bool cinematic() const {
         return ssr > 0.0f || transmission > 0.0f || undulation > 0.0f || roughnessVariation > 0.0f ||
                tintPatches > 0.0f || flowStreaks > 0.0f || skyMirror > 0.0f;
@@ -169,6 +185,11 @@ struct WaterSettings {
     [[nodiscard]] Result<void> validate() const;
     [[nodiscard]] std::uint64_t structuralHash() const;
 };
+
+// How many water surfaces one scene may carry: the renderer's uniform slots (`rendering::kMaxWaterMaterials` is this
+// number). Here, in `scene`, so a scene file that asks for more can be refused where it is read (ADR-2020) instead of
+// the ninth surface quietly drawing with the first one's settings.
+inline constexpr std::uint32_t kMaxWaterSurfaces = 8;
 
 // One water surface in a scene, as the renderer receives it. `program` is the material-program name
 // the water entities of this surface carry, which is how a draw finds its settings without an index
@@ -179,6 +200,10 @@ struct WaterSurface {
     // Metres per second of the quickest body in the world this surface belongs to. The vertex's
     // speed lane is a fraction of it, so the shader needs it to get back to metres per second.
     float fastestFlow = 0.55f;
+    // ADR-2021: whether the surface's pixels carry its entity's identifier in the ids target (and so the id AOV).
+    // A terrain's water leaves the bed's identifier there, as it always has (ADR-035); a gltf water material is an
+    // object of the asset, and claims its own pixels.
+    bool writesIds = false;
 };
 
 } // namespace avgen::scene

@@ -74,11 +74,14 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
                              s.flowStreaks, s.streakDensity, s.streakLength, s.streakLines, s.streakSpeed,
                              s.streakHighlight, s.streakColorScale,
                              // ADR-1650
-                             s.skyMirror};
+                             s.skyMirror,
+                             // ADR-2021
+                             s.ssrBlur, s.ssrEdgeFade};
     bool ok = finite3(s.shallowColor) && finite3(s.deepColor) && finite3(s.foamColor) &&
               finite3(s.glowColor) && finite3(s.sparkleColor) && finite3(s.reflectionTint) &&
               finite3(s.emissiveColor) && finite3(s.absorption) && finite3(s.reflectionTint2) &&
-              finite3(s.streakColor1) && finite3(s.streakColor2) && finite3(s.streakColor3);
+              finite3(s.streakColor1) && finite3(s.streakColor2) && finite3(s.streakColor3) &&
+              finite3(s.ssrTint); // ADR-2021
     for (const float v : scalars) {
         ok = ok && std::isfinite(v);
     }
@@ -122,6 +125,8 @@ WaterUniforms waterUniformsFrom(const scene::WaterSettings& s, float flowTime, f
     u.cineAbsorb = glm::vec4(s.absorption, 0.0f);
     u.cineC = glm::vec4(s.streak, s.reflectionRays, s.tintPatches, s.glints);
     u.cineTint2 = glm::vec4(s.reflectionTint2, std::max(s.tintPatchScale, 1e-3f));
+    u.cineD = glm::vec4(s.ssrTint, s.ssrBlur); // ADR-2021
+    u.cineE = glm::vec4(std::max(s.ssrEdgeFade, 1e-4f), 0.0f, 0.0f, 0.0f);
     // ADR-1643. Read only by the streaks pipeline, which draws a surface only when `flowStreaks` > 0.
     u.streakA = glm::vec4(s.flowStreaks, std::clamp(s.streakDensity, 0.0f, 1.0f), std::max(s.streakLength, 0.5f),
                           std::clamp(s.streakLines, 4.0f, 2000.0f));
@@ -298,6 +303,7 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
         return std::unexpected(mirror.error());
     }
     mirrorPipeline_ = *mirror;
+    modules_[Mirror] = *mirrorModule;
     auto noMirror = waterSourceWithout(*source, "sky mirror (ADR-1650)");
     if (!noMirror) {
         return std::unexpected(noMirror.error());
@@ -315,6 +321,7 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
         return std::unexpected(streaks.error());
     }
     streaksPipeline_ = *streaks;
+    modules_[Streaks] = *streaksModule;
     auto tornSource = waterSourceWithout(*noStreaks, "cinematic (ADR-1286)");
     if (!tornSource) {
         return std::unexpected(tornSource.error());
@@ -332,6 +339,7 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
         return std::unexpected(cine.error());
     }
     cinePipeline_ = *cine;
+    modules_[Cine] = *cineModule;
     auto module = shaders.compile(*tornSource, "water.wgsl");
     if (!module) {
         return std::unexpected(module.error());
@@ -350,11 +358,36 @@ Result<void> WaterRenderer::createPipeline(gpu::ShaderLibrary& shaders) {
     }
     pipeline_ = *torn;
     plainPipeline_ = *plain;
+    modules_[Torn] = *module;
+    modules_[Plain] = *plainModule;
+    // A reload's twins are rebuilt from the new modules the next time a surface asks.
+    idPipelines_ = {};
+    idPipelinesFailed_ = false;
     return {};
 }
 
+void WaterRenderer::ensureIdPipelines() {
+    if (idPipelines_[Plain] || idPipelinesFailed_ || context_ == nullptr) {
+        return;
+    }
+    constexpr std::array<const char*, kVariants> kLabels = {"water-ids", "water-no-tears-ids", "water-cinematic-ids",
+                                                            "water-cinematic-streaks-ids",
+                                                            "water-cinematic-mirror-ids"};
+    for (std::size_t v = 0; v < kVariants; ++v) {
+        const wgpu::PipelineLayout& layout = v >= Cine ? cinePipelineLayout_ : pipelineLayout_;
+        auto built = buildPipeline(modules_[v], kLabels[v], layout, true);
+        if (!built) {
+            log::warn("water: {}; the surface keeps the opaque geometry's identifier", built.error().message);
+            idPipelines_ = {};
+            idPipelinesFailed_ = true;
+            return;
+        }
+        idPipelines_[v] = *built;
+    }
+}
+
 Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModule& module, const char* label,
-                                                         const wgpu::PipelineLayout& layout) {
+                                                         const wgpu::PipelineLayout& layout, bool writesIds) {
     VertexLayoutStorage vertex;
 
     wgpu::BlendState blend{};
@@ -383,6 +416,11 @@ Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModu
         // Normals, velocity and identifiers stay the opaque geometry's (ADR-035): one of those
         // averaged over a transparency is worse than none. Emission is the exception, above.
         targets[i].writeMask = (i == 0 || i == 3) ? wgpu::ColorWriteMask::All : wgpu::ColorWriteMask::None;
+    }
+    // ADR-2021: a surface that is an object in its own right (an imported lake) claims its pixels in the ids target,
+    // so an id AOV shows the water rather than the bed under it. Integer target: written, never blended.
+    if (writesIds) {
+        targets[kSceneTargetCount - 1].writeMask = wgpu::ColorWriteMask::All;
     }
     targets[0].blend = &blend;
     targets[3].blend = &additive;
@@ -433,10 +471,19 @@ Result<wgpu::RenderPipeline> WaterRenderer::buildPipeline(const wgpu::ShaderModu
     return pipeline;
 }
 
-void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUniforms>& materials) {
+void WaterRenderer::upload(const wgpu::Queue& queue, const std::vector<WaterUniforms>& materials,
+                           std::span<const bool> writesIds) {
     uploaded_ = static_cast<std::uint32_t>(std::min<std::size_t>(materials.size(), kMaxWaterMaterials));
     if (uploaded_ == 0) {
         return;
+    }
+    bool anyIds = false;
+    for (std::uint32_t i = 0; i < uploaded_; ++i) {
+        ids_[i] = i < writesIds.size() && writesIds[i]; // ADR-2021
+        anyIds = anyIds || ids_[i];
+    }
+    if (anyIds) {
+        ensureIdPipelines();
     }
     for (std::uint32_t i = 0; i < uploaded_; ++i) {
         std::memcpy(staging_.data() + static_cast<std::size_t>(i) * kStride, &materials[i],

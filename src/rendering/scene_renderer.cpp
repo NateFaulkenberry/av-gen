@@ -2083,6 +2083,8 @@ std::span<const SceneRenderer::QualityArm> SceneRenderer::qualityArms() {
         {"nodispersion", [](QualitySettings& q) { q.refractionDispersion = false; }, "refractionDispersion=false (ADR-1640: the single refraction read)"},
         {"waterssrhalf", [](QualitySettings& q) { q.waterSsrScale = 0.5f; }, "waterSsrScale=0.5 (ADR-1603: half the water's SSR steps and rays)"},
         {"nowaterssr", [](QualitySettings& q) { q.waterSsrScale = 0.0f; }, "waterSsrScale=0 (ADR-1603: no water SSR)"},
+        {"nowaterblend", [](QualitySettings& q) { q.waterBlendedReflection = false; },
+         "waterBlendedReflection=false (ADR-2022: no blended meshes drawn into the water's frame copy)"},
         {"auroraplanes75", [](QualitySettings& q) { q.auroraStepScale = 0.75f; }, "auroraStepScale=0.75 (ADR-1651: 3/4 of the aurora ribbons' planes)"},
         {"auroraplaneshalf", [](QualitySettings& q) { q.auroraStepScale = 0.5f; }, "auroraStepScale=0.5 (ADR-1651: half the aurora ribbons' planes)"},
         {"bilinearupscale", [](QualitySettings& q) { q.spatialUpscaler = false; }, "spatialUpscaler=false (ADR-1607: the bilinear fetch)"},
@@ -4470,6 +4472,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     queue.WriteBuffer(tonemapUniforms_, 0, &tonemap, sizeof(tonemap));
 
     stats_.drawCalls = 0;
+    stats_.waterBlendedCopyDraws = 0; // ADR-2022
     stats_.triangles = 0;
     stats_.entities = objectIndex;
     stats_.lights = lightCount;
@@ -4621,18 +4624,28 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     // the same place in an offline render as it is live, and the project verifies that by hashing
     // captured frames.
     {
+        // ADR-2020: said once, on the first frame that has any water, so a scene's water can be checked from the log
+        // (which of its surfaces take the cinematic path) the way its glossy SSR can.
+        if (!waterLogged_ && !scene.waters.empty()) {
+            const auto cinematic = std::ranges::count_if(
+                scene.waters, [](const scene::WaterSurface& w) { return w.settings.cinematic(); });
+            log::info("water: {} surface(s), {} cinematic", scene.waters.size(), cinematic);
+            waterLogged_ = true;
+        }
         waterUniforms_.clear();
+        std::array<bool, kMaxWaterMaterials> writesIds{}; // ADR-2021
         const float flowTime = static_cast<float>(time.renderTime);
         for (const scene::WaterSurface& surface : scene.waters) {
             if (waterUniforms_.size() >= kMaxWaterMaterials) {
                 break;
             }
+            writesIds[waterUniforms_.size()] = surface.writesIds;
             waterUniforms_.push_back(
                 waterUniformsFrom(surface.settings, flowTime, surface.fastestFlow, needsDepthPrepass));
             // ADR-1603: the ladder's lever on the cinematic water's SSR -- fewer steps and rays, none at 0.
             applyWaterSsrScale(waterUniforms_.back(), qualitySettings_.waterSsrScale);
         }
-        water_->upload(queue, waterUniforms_);
+        water_->upload(queue, waterUniforms_, writesIds);
     }
 
 
@@ -5277,16 +5290,31 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const bool cinematicWater = !water.empty() && water_->ready() && water_->anyCinematic();
         const bool refractiveSurfaces = procedurals_->refractionPhase();
         // ADR-1819: the entities' glass too; ADR-1820: and the glossy SSR, which reads the copy (and only reads it)
+        // ADR-2022: a cinematic surface that asks for the frame's blended meshes in its reflection. Gated on there being
+        // a blended draw this frame, so a scene with the key on and nothing blended in view pays nothing either.
+        const bool blendedIntoCopy = cinematicWater && !blended.empty() && qualitySettings_.waterBlendedReflection &&
+                                     std::any_of(scene.waters.begin(),
+                                                 scene.waters.begin() + static_cast<std::ptrdiff_t>(std::min<std::size_t>(
+                                                                            scene.waters.size(), kMaxWaterMaterials)),
+                                                 [](const scene::WaterSurface& w) {
+                                                     return w.settings.reflectBlended && w.settings.cinematic();
+                                                 });
         if (cinematicWater || refractiveSurfaces || !refractive.empty() || glossySsrActive) {
             rp.End();
             const wgpu::Texture& src = hdr_.colorTexture();
             if (!refractionCopy_ || refractionCopy_.GetWidth() != hdr_.width() ||
-                refractionCopy_.GetHeight() != hdr_.height()) {
+                refractionCopy_.GetHeight() != hdr_.height() || (blendedIntoCopy && !refractionCopyRenderable_)) {
                 wgpu::TextureDescriptor td{};
                 td.label = "refraction-copy";
                 td.size = {hdr_.width(), hdr_.height(), 1};
                 td.format = kHdrFormat;
                 td.usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst;
+                // ADR-2022: renderable only when blended meshes are to be drawn into it. Once made renderable it stays
+                // so until the next resize: the usage changes no pixel, only what the copy may be bound as.
+                refractionCopyRenderable_ = blendedIntoCopy;
+                if (blendedIntoCopy) {
+                    td.usage |= wgpu::TextureUsage::RenderAttachment;
+                }
                 refractionCopy_ = context_.device().CreateTexture(&td);
                 refractionCopyView_ = refractionCopy_.CreateView();
                 water_->setSceneColor(refractionCopyView_);
@@ -5302,6 +5330,25 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
                 attachment.loadOp = wgpu::LoadOp::Load;
             }
             depth.depthLoadOp = wgpu::LoadOp::Load;
+            // ---- ADR-2022: the frame's blended meshes, drawn a second time, into the copy ----
+            // The same draws the end of this pass makes (same pipelines, same order, same depth test against the opaque
+            // depth), aimed at the copy instead of the frame. Their pipelines write the colour target only -- the four
+            // auxiliary targets are masked (ADR-035) -- so the pass binds the frame's own auxiliary targets and they come
+            // out untouched: no scratch target is allocated. Its own timestamp label, so a profile shows what it costs.
+            if (blendedIntoCopy) {
+                std::array<wgpu::RenderPassColorAttachment, kSceneTargetCount> intoCopy = attachments;
+                intoCopy[0].view = refractionCopyView_;
+                wgpu::RenderPassDescriptor copyPass = pass;
+                copyPass.label = "water-blended-into-copy";
+                copyPass.colorAttachments = intoCopy.data();
+                copyPass.timestampWrites = timeline_->mark("waterblend", gpu::FrameTimeline::PassKind::Render);
+                rp = encoder.BeginRenderPass(&copyPass);
+                rp.SetBindGroup(0, frameBindGroup_);
+                rp.SetBindGroup(3, iblBindGroup_);
+                drawItems(blended, true);
+                rp.End();
+                stats_.waterBlendedCopyDraws += static_cast<std::uint32_t>(blended.size());
+            }
             pass.label = "scene-pass-after-refraction-copy";
             pass.timestampWrites = timeline_->mark("scene", gpu::FrameTimeline::PassKind::Render);
             rp = encoder.BeginRenderPass(&pass);

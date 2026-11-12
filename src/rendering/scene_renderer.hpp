@@ -114,6 +114,7 @@ struct RenderStats {
     std::uint32_t skippedDraws = 0;    // draws not recorded because the level has been empty
     std::uint32_t computeDispatches = 0; // compute passes encoded this frame, over every subsystem
     std::uint32_t shadowDraws = 0;     // draws recorded across every shadow view
+    std::uint32_t waterBlendedCopyDraws = 0; // ADR-2022: blended meshes drawn a second time into the water's copy
     std::uint32_t gpuPasses = 0;       // render + compute passes the timeline measured
     std::uint64_t visibleInstances = 0; // procedural instances that survived culling
     std::uint64_t culledInstances = 0;
@@ -1243,6 +1244,9 @@ private:
     // cinematic water and the refractive procedural surfaces), one copy for both. Bound to the water's own group and,
     // through `frameBindGroupRefract_`, to frame binding 18.
     wgpu::Texture refractionCopy_;
+    // ADR-2022: whether the copy was made with RenderAttachment usage, which only a frame that draws blended meshes
+    // into it (a water surface's `reflectBlended`) asks for; every other frame's copy is the texture it always was.
+    bool refractionCopyRenderable_ = false;
     wgpu::TextureView refractionCopyView_;
     wgpu::Sampler refractionSampler_;      // frame binding 19: linear, clamped
     wgpu::BindGroup frameBindGroupRefract_; // the frame group with the copy at 18 (the others bind a placeholder)
@@ -1276,6 +1280,7 @@ private:
     bool entitySsrFailed_ = false;
     std::uint32_t entitySsrFeatures_ = 0x1FFu;
     bool glossySsrLogged_ = false;
+    bool waterLogged_ = false; // ADR-2020: the first frame's "water: K surface(s), C cinematic"
     bool glossySsrDrawn_ = false;
     std::array<wgpu::BindGroupEntry, 6> iblEntries_{}; // ADR-1820: the IBL group's entries, for the SSR's group 3
     wgpu::RenderPipeline litTexturedOpaqueCull_;

@@ -1364,6 +1364,10 @@ void Engine::rebind() {
         for (const std::string& problem : comp->entityProblems()) {
             noteBindingProblem(problem);
         }
+        // ADR-2020: a gltf node's water material that names nothing in its asset is the same kind of silence.
+        for (std::string& problem : comp->waterMaterialProblems()) {
+            noteBindingProblem(std::move(problem));
+        }
     }
 }
 

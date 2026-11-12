@@ -1,0 +1,658 @@
+// ADR-2020: a gltf node's water material on the GPU -- the acceptance test of the request that asked for it
+// (docs/requests/2026-11-11-gltf-water-materials.md §7). A generated GLB: a 3 km plane at y = 0 whose material is
+// `Lake`, a 1500 m ridge 3 km out with its lit face to the camera, and a red block 200 m out standing in the lake.
+// The camera sits 5 m above the water, level with the horizon.
+//   * with `waterMaterials.Lake` the ridge is in the lake (the sky mirror: it is past the march's 2000 m) and so is the
+//     block (the march: it is too near for the mirror to trust);
+//   * without the key, neither is: the lake is the asset's PBR sheet and reflects the environment cube alone;
+//   * the live ladder's `nowaterssr` (waterSsrScale 0) takes the block's reflection and leaves the ridge's;
+//   * `skyMirror` 0 takes the ridge's and leaves the block's;
+//   * a key that names no material in the asset renders byte-identically to no key.
+// ADR-2021 (the follow-ups):
+//   * the lake writes its own identifier into the ids target (the id AOV), the same one the PBR lake wrote; a
+//     terrain's water still leaves the bed's;
+//   * `ssrTint` colours the march's and the mirror's reflection (the ridge and the block), not the environment's;
+//   * `ssrBlur` 0 keeps a far comb of posts sharp in the lake, where the old roughness blur smeared it to a band;
+//   * a narrow `ssrEdgeFade` takes away the pale band at the frame's left and right edges;
+//   * at their defaults the three are the shader they replaced, to the byte.
+// With AVGEN_WATER_DUMP set, each frame is written there as a PNG, and the scene and its GLB beside them (for
+// `avgen --headless --ab nowaterssr`).
+
+#include "support/gltf_fixture.hpp"
+#include "support/temp_dir.hpp"
+#include "support/water_bench.hpp"
+#include "support/water_shader_variant.hpp"
+
+#include "rendering/water_renderer.hpp"
+
+#include <catch2/catch_test_macros.hpp>
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <numeric>
+#include <string>
+#include <vector>
+
+using namespace avgen;
+using namespace avgen::testsupport;
+namespace fs = std::filesystem;
+
+namespace {
+
+constexpr glm::vec3 kEye{0.0f, 5.0f, 0.0f};
+constexpr glm::vec3 kLookAt{0.0f, 5.0f, -3000.0f};
+// The ridge: 2000 m wide, 1500 m tall, its near face at z = -3000. The block: 40 x 30 x 20 m, 200 m out, right of
+// centre, so its reflection sits inside the ridge's and the two can be told apart.
+constexpr glm::vec3 kRidgeLo{-1000.0f, 0.0f, -3200.0f};
+constexpr glm::vec3 kRidgeHi{1000.0f, 1500.0f, -3000.0f};
+constexpr glm::vec3 kBlockLo{40.0f, 0.0f, -220.0f};
+constexpr glm::vec3 kBlockHi{80.0f, 30.0f, -200.0f};
+
+fs::path acceptanceGlb() {
+    std::array<GlbMesh, 3> meshes;
+    meshes[0].node = "water";
+    meshes[0].material = "Lake";
+    meshes[0].color = {0.1f, 0.45f, 0.45f}; // teal
+    meshes[0].roughness = 0.5f;             // the patched value the request's lake carries today
+    appendPlane(meshes[0], {-1500.0f, -2900.0f}, {1500.0f, 100.0f}, 0.0f);
+    meshes[1].node = "ridge";
+    meshes[1].material = "Rock";
+    meshes[1].color = {0.85f, 0.85f, 0.85f};
+    meshes[1].roughness = 0.9f;
+    appendBox(meshes[1], kRidgeLo, kRidgeHi);
+    meshes[2].node = "block";
+    meshes[2].material = "Red";
+    meshes[2].color = {0.9f, 0.04f, 0.03f};
+    meshes[2].roughness = 0.7f;
+    appendBox(meshes[2], kBlockLo, kBlockHi);
+    return writeMeshesGlb("gltf_water_acceptance", meshes);
+}
+
+// The request's own `waterMaterials.Lake`, verbatim (§5).
+constexpr const char* kLakeWater = R"({"shallowColor": [0.113, 0.250, 0.251], "deepColor": [0.02, 0.09, 0.11],
+    "clarity": 6.0, "maxOpacity": 1.0, "edgeFade": 0.6, "fresnel": 0.04, "reflection": 1.0, "reflectionTint": [1, 1, 1],
+    "roughness": 0.04, "ripple": 0.03, "rippleScale": 0.05, "rippleSpeed": 0.0, "foam": 0.0, "refraction": 0.0,
+    "ssr": 1.0, "ssrDistance": 2000, "ssrSteps": 128, "ssrGain": 1.0, "skyMirror": 1.0})";
+
+// `waterMaterials` is the whole key and its value, or empty for none.
+fs::path acceptanceScene(const std::string& name, const fs::path& glb, const std::string& waterMaterials) {
+    const std::string text = fmt::format(
+        R"({{"format": "avgen-scene", "version": 1, "name": "gltf-water-acceptance",
+  "camera": {{"mode": 1, "position": [{}, {}, {}], "target": [{}, {}, {}], "fov": 60, "orbitSpeed": 0}},
+  "environment": {{"intensity": 1.0, "volumeDensity": 0.0, "sky": {{"enabled": true, "background": true}}}},
+  "lights": [{{"name": "sun", "type": "directional", "direction": [0.3, -0.45, -0.84], "color": [1.0, 0.95, 0.88],
+              "intensity": 3.0, "castsShadow": true}}],
+  "nodes": [{{"name": "environment", "kind": "gltf", "asset": "{}"{}}}]}})",
+        kEye.x, kEye.y, kEye.z, kLookAt.x, kLookAt.y, kLookAt.z, glb.filename().string(),
+        waterMaterials.empty() ? std::string() : ", " + waterMaterials);
+    const fs::path path = glb.parent_path() / ("avgen_gltf_water_" + name + ".scene.json");
+    std::ofstream(path) << text;
+    if (const char* dir = std::getenv("AVGEN_WATER_DUMP"); dir != nullptr && dir[0] != '\0') {
+        std::error_code ec;
+        fs::copy_file(glb, fs::path(dir) / glb.filename(), fs::copy_options::overwrite_existing, ec);
+        fs::copy_file(path, fs::path(dir) / path.filename(), fs::copy_options::overwrite_existing, ec);
+    }
+    return path;
+}
+
+struct Rgb {
+    double r = 0.0, g = 0.0, b = 0.0;
+    [[nodiscard]] double sum() const { return r + g + b; }
+    [[nodiscard]] double redness() const { return sum() > 0.0 ? (r - 0.5 * (g + b)) / sum() : 0.0; }
+};
+
+double distance(const Rgb& a, const Rgb& b) {
+    return std::abs(a.r - b.r) + std::abs(a.g - b.g) + std::abs(a.b - b.b);
+}
+
+// A screen rectangle, in pixels, rows from the top.
+struct Box {
+    int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    [[nodiscard]] bool empty() const { return x1 <= x0 || y1 <= y0; }
+};
+
+Rgb mean(const gpu::ImageF& img, const Box& box) {
+    Rgb out;
+    std::size_t n = 0;
+    for (int y = std::max(box.y0, 0); y < std::min(box.y1, static_cast<int>(img.height)); ++y) {
+        for (int x = std::max(box.x0, 0); x < std::min(box.x1, static_cast<int>(img.width)); ++x) {
+            const float* p = img.pixel(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y));
+            out.r += p[0];
+            out.g += p[1];
+            out.b += p[2];
+            ++n;
+        }
+    }
+    if (n > 0) {
+        out.r /= static_cast<double>(n);
+        out.g /= static_cast<double>(n);
+        out.b /= static_cast<double>(n);
+    }
+    return out;
+}
+
+// Where a world point lands, in pixels.
+glm::vec2 project(const scene::Scene& s, glm::vec3 p, std::uint32_t w, std::uint32_t h) {
+    const glm::vec4 clip = s.camera.projection(static_cast<float>(w) / static_cast<float>(h)) * s.camera.view() *
+                           glm::vec4(p, 1.0f);
+    const glm::vec2 ndc = glm::vec2(clip) / clip.w;
+    return {(ndc.x * 0.5f + 0.5f) * static_cast<float>(w), (0.5f - ndc.y * 0.5f) * static_cast<float>(h)};
+}
+
+// Where a point's flat-mirror image in the plane y = 0 lands.
+glm::vec2 projectMirrored(const scene::Scene& s, glm::vec3 p, std::uint32_t w, std::uint32_t h) {
+    return project(s, {p.x, -p.y, p.z}, w, h);
+}
+
+bool allFinite(const gpu::ImageF& img) {
+    return std::all_of(img.rgba.begin(), img.rgba.end(), [](float v) { return std::isfinite(v); });
+}
+
+// The ids target's words (pick id low, ordinal high) over a box.
+std::vector<std::uint32_t> idsIn(gpu::Context& ctx, rendering::SceneRenderer& renderer, std::uint32_t w,
+                                 std::uint32_t h, const Box& box) {
+    auto words = gpu::readTextureR32Uint(ctx, renderer.identifierTexture(), w, h);
+    REQUIRE(words.has_value());
+    std::vector<std::uint32_t> out;
+    for (int y = box.y0; y < box.y1; ++y) {
+        for (int x = box.x0; x < box.x1; ++x) {
+            out.push_back((*words)[static_cast<std::size_t>(y) * w + static_cast<std::size_t>(x)]);
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("an imported lake with a water material mirrors the far ridge and the near block",
+          "[gpu][renderer][water][gltf][adr2020]") {
+    const fs::path glb = acceptanceGlb();
+    const fs::path withKey = acceptanceScene("lake", glb, std::string(R"("waterMaterials": {"Lake": )") + kLakeWater + "}");
+    const fs::path without = acceptanceScene("plain", glb, "");
+    const fs::path misnamed = acceptanceScene("misnamed", glb, R"("waterMaterials": {"Lakee": {"skyMirror": 1}})");
+
+    constexpr std::uint32_t kW = 480;
+    constexpr std::uint32_t kH = 270;
+    WaterBench bench = WaterBench::make(kW, kH, withKey);
+    WaterBench::Arm live = bench.arm();
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    REQUIRE(bench.scene().waters.size() == 1);
+    scene::WaterSettings& w = bench.scene().waters.at(0).settings;
+    REQUIRE(w.cinematic());
+
+    // The regions, from the geometry: the horizon row, the ridge's columns, the block's mirror image.
+    const scene::Scene& s = bench.scene();
+    const float horizon = project(s, {0.0f, kEye.y, -1e5f}, kW, kH).y;
+    const glm::vec2 ridgeLeft = project(s, {kRidgeLo.x, 0.0f, kRidgeHi.z}, kW, kH);
+    const glm::vec2 ridgeRight = project(s, {kRidgeHi.x, 0.0f, kRidgeHi.z}, kW, kH);
+    const glm::vec2 blockA = projectMirrored(s, {kBlockLo.x, kBlockLo.y, kBlockHi.z}, kW, kH);
+    const glm::vec2 blockB = projectMirrored(s, {kBlockHi.x, kBlockHi.y, kBlockHi.z}, kW, kH);
+    INFO("horizon row " << horizon << ", ridge columns " << ridgeLeft.x << ".." << ridgeRight.x
+                        << ", the block's mirror image " << blockA.x << ".." << blockB.x << " x " << blockA.y << ".."
+                        << blockB.y);
+    const int h0 = static_cast<int>(std::ceil(horizon)) + 4; // below the far shore
+    // the ridge's reflection: inside its columns, clear of the block's, from just under the shore down
+    const int blockX0 = static_cast<int>(blockA.x) - 6;
+    const int blockX1 = static_cast<int>(blockB.x) + 6;
+    const Box ridgeMirror{static_cast<int>(ridgeLeft.x) + 8, h0, std::min(blockX0, static_cast<int>(ridgeRight.x) - 8),
+                          static_cast<int>(kH) - 8};
+    // the same rows outside the ridge: the sky's reflection
+    const Box skyMirror{4, h0, static_cast<int>(ridgeLeft.x) - 8, static_cast<int>(kH) - 8};
+    // the block's mirror image, its middle (the ripples move its edge)
+    const Box blockMirror{static_cast<int>(blockA.x) + 3, static_cast<int>(blockA.y) + 2, static_cast<int>(blockB.x) - 3,
+                          static_cast<int>(blockB.y) - 2};
+    REQUIRE_FALSE(ridgeMirror.empty());
+    REQUIRE_FALSE(skyMirror.empty());
+    REQUIRE_FALSE(blockMirror.empty());
+
+    const auto ssrScale = [&](float scale) {
+        rendering::QualitySettings q = live.renderer->qualitySettings();
+        q.waterSsrScale = scale;
+        live.renderer->setQualitySettings(q);
+    };
+    // the ridge in the lake: its reflection against the sky's, the same rows
+    const auto ridgeContrast = [&](const gpu::ImageF& img) { return distance(mean(img, ridgeMirror), mean(img, skyMirror)); };
+
+    const gpu::ImageF on = bench.render(live);
+    ssrScale(0.0f);
+    const gpu::ImageF noSsr = bench.render(live);
+    ssrScale(1.0f);
+    w.skyMirror = 0.0f;
+    const gpu::ImageF noMirror = bench.render(live);
+    w.skyMirror = 1.0f;
+    dumpWater(on, "gltf-lake-key");
+    dumpWater(noSsr, "gltf-lake-nowaterssr");
+    dumpWater(noMirror, "gltf-lake-skymirror0");
+    CHECK(allFinite(on));
+
+    REQUIRE(bench.engine->loadComposition(without).has_value());
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    REQUIRE(bench.scene().waters.empty());
+    const gpu::ImageF plain = bench.render(live);
+    dumpWater(plain, "gltf-lake-nokey");
+
+    REQUIRE(bench.engine->loadComposition(misnamed).has_value());
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    REQUIRE(bench.scene().waters.empty());
+    const gpu::ImageF misnamedFrame = bench.render(live);
+
+    const Rgb ridgeDirect = mean(on, Box{ridgeMirror.x0, static_cast<int>(horizon) - 30, ridgeMirror.x1,
+                                         static_cast<int>(horizon) - 4});
+    INFO("the ridge itself " << ridgeDirect.r << ", " << ridgeDirect.g << ", " << ridgeDirect.b);
+    INFO("ridge-vs-sky contrast in the lake: key " << ridgeContrast(on) << ", nowaterssr " << ridgeContrast(noSsr)
+                                                   << ", skyMirror 0 " << ridgeContrast(noMirror) << ", no key "
+                                                   << ridgeContrast(plain));
+    INFO("redness of the block's mirror image: key " << mean(on, blockMirror).redness() << ", nowaterssr "
+                                                     << mean(noSsr, blockMirror).redness() << ", skyMirror 0 "
+                                                     << mean(noMirror, blockMirror).redness() << ", no key "
+                                                     << mean(plain, blockMirror).redness());
+
+    // with the key: the ridge and the block are both in the lake
+    CHECK(ridgeContrast(on) > 4.0 * std::max(ridgeContrast(plain), 1e-3));
+    CHECK(mean(on, blockMirror).redness() > 0.25);
+    // without it: neither
+    CHECK(mean(plain, blockMirror).redness() < 0.1);
+    // nowaterssr: the ridge stays (the sky mirror), the block goes (it was the march's)
+    CHECK(ridgeContrast(noSsr) > 0.7 * ridgeContrast(on));
+    CHECK(mean(noSsr, blockMirror).redness() < 0.1);
+    // skyMirror 0: the ridge goes (past the march's reach), the block stays
+    CHECK(ridgeContrast(noMirror) < 0.25 * ridgeContrast(on));
+    CHECK(mean(noMirror, blockMirror).redness() > 0.25);
+    // a key that matched nothing is no key at all
+    CHECK(gpu::hashImage(misnamedFrame) == gpu::hashImage(plain));
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// Hidden ([.]): the cinematic lake's cost at 1080p on the acceptance scene (honest timestamps, ADR-1600): the scene
+// label's median over interleaved reps, with the water's SSR on and with the live ladder's `nowaterssr`, and the
+// same scene without the key (the asset's plain PBR lake).
+TEST_CASE("gltf water material: cost (measure)", "[.][gpu][water][gltf][measure][adr2020]") {
+    const fs::path glb = acceptanceGlb();
+    const fs::path withKey = acceptanceScene("lake", glb, std::string(R"("waterMaterials": {"Lake": )") + kLakeWater + "}");
+    const fs::path without = acceptanceScene("plain", glb, "");
+    WaterBench lake = WaterBench::make(1920, 1080, withKey);
+    WaterBench::Arm live = lake.arm();
+    if (!live.renderer->timeline().available()) {
+        SKIP("timestamp queries unavailable");
+    }
+    lake.aim(kEye, kLookAt);
+    lake.hold(4.0);
+    const auto measure = [&](WaterBench& bench, float ssrScale) {
+        rendering::QualitySettings q = live.renderer->qualitySettings();
+        q.waterSsrScale = ssrScale;
+        live.renderer->setQualitySettings(q);
+        std::vector<double> ms;
+        for (int i = 0; i < 80; ++i) {
+            bench.time.renderTime = 4.0 + i / 60.0;
+            REQUIRE(live.renderer->renderFrame(bench.scene(), bench.time, 1920, 1080).has_value());
+            if (i >= 20) {
+                ms.push_back(live.renderer->timeline().msFor("scene"));
+            }
+        }
+        std::sort(ms.begin(), ms.end());
+        return ms[ms.size() / 2];
+    };
+    WaterBench plainBench = WaterBench::make(1920, 1080, without);
+    plainBench.aim(kEye, kLookAt);
+    plainBench.hold(4.0);
+    std::array<std::vector<double>, 3> ms;
+    for (int rep = 0; rep < 7; ++rep) {
+        const double a = measure(lake, 1.0f);
+        const double b = measure(lake, 0.0f);
+        const double c = measure(plainBench, 1.0f);
+        if (rep == 0) {
+            continue; // warm-up
+        }
+        ms[0].push_back(a);
+        ms[1].push_back(b);
+        ms[2].push_back(c);
+    }
+    const auto list = [](const std::vector<double>& v) {
+        std::string out;
+        for (const double x : v) {
+            out += fmt::format(" {:.3f}", x);
+        }
+        return out;
+    };
+    WARN("1080p acceptance lake (level camera, ~half the frame water), the scene label's median (ms), 6 interleaved "
+         "reps: cinematic lake, SSR 128 steps"
+         << list(ms[0]) << " | nowaterssr" << list(ms[1]) << " | no key (PBR lake)" << list(ms[2]));
+    CHECK(ms[0][0] > 0.0);
+}
+
+TEST_CASE("the imported lake writes its own identifier; a terrain's water does not", "[gpu][renderer][water][gltf][adr2021]") {
+    const fs::path glb = acceptanceGlb();
+    const fs::path withKey = acceptanceScene("lake", glb, std::string(R"("waterMaterials": {"Lake": )") + kLakeWater + "}");
+    const fs::path without = acceptanceScene("plain", glb, "");
+    constexpr std::uint32_t kW = 320;
+    constexpr std::uint32_t kH = 180;
+    WaterBench bench = WaterBench::make(kW, kH, withKey);
+    WaterBench::Arm live = bench.arm();
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    // the lake, under the far shore across the frame
+    const Box lake{0, static_cast<int>(kH) / 2 + 6, static_cast<int>(kW), static_cast<int>(kH)};
+    static_cast<void>(bench.render(live));
+    const std::vector<std::uint32_t> water = idsIn(*bench.ctx, *live.renderer, kW, kH, lake);
+    REQUIRE(bench.engine->loadComposition(without).has_value());
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    static_cast<void>(bench.render(live));
+    const std::vector<std::uint32_t> pbr = idsIn(*bench.ctx, *live.renderer, kW, kH, lake);
+    // the block stands in the lake and is drawn over it: compare where the PBR lake is
+    const std::uint32_t lakeId = pbr.back(); // the bottom-right corner is lake in both (entity 0: ordinal 1)
+    REQUIRE(lakeId != 0);
+    std::size_t lakePixels = 0;
+    std::size_t same = 0;
+    for (std::size_t i = 0; i < pbr.size(); ++i) {
+        if (pbr[i] == lakeId) {
+            ++lakePixels;
+            same += water[i] == lakeId ? 1 : 0;
+        }
+    }
+    INFO(same << " of " << lakePixels << " lake pixels carry the lake's identifier as water");
+    REQUIRE(lakePixels > 10000);
+    CHECK(same == lakePixels);
+    CHECK(bench.ctx->errorCount() == 0);
+
+    SECTION("a terrain's water leaves the bed's identifier, as it always has") {
+        if (!fs::is_regular_file(qaWaterScene())) {
+            SKIP("the water QA scene is not present");
+        }
+        WaterBench river = WaterBench::make(256, 176);
+        WaterBench::Arm arm = river.arm();
+        river.aim({40.0f, 6.0f, -86.0f}, {12.0f, 6.5f, -108.0f});
+        river.hold(12.0);
+        river.scene().waters.at(0).settings.ssr = 0.5f; // the cinematic path too
+        const Box all{0, 0, 256, 176};
+        static_cast<void>(river.render(arm));
+        const auto wet = idsIn(*river.ctx, *arm.renderer, 256, 176, all);
+        static_cast<void>(river.renderDry(arm));
+        const auto dry = idsIn(*river.ctx, *arm.renderer, 256, 176, all);
+        CHECK(wet == dry);
+    }
+}
+
+TEST_CASE("ssrTint colours the frame's reflection, not the environment's", "[gpu][renderer][water][gltf][adr2021]") {
+    const fs::path glb = acceptanceGlb();
+    const fs::path withKey = acceptanceScene("lake", glb, std::string(R"("waterMaterials": {"Lake": )") + kLakeWater + "}");
+    constexpr std::uint32_t kW = 480;
+    constexpr std::uint32_t kH = 270;
+    WaterBench bench = WaterBench::make(kW, kH, withKey);
+    WaterBench::Arm live = bench.arm();
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    scene::WaterSettings& w = bench.scene().waters.at(0).settings;
+    const scene::Scene& s = bench.scene();
+    const float horizon = project(s, {0.0f, kEye.y, -1e5f}, kW, kH).y;
+    const glm::vec2 ridgeLeft = project(s, {kRidgeLo.x, 0.0f, kRidgeHi.z}, kW, kH);
+    const glm::vec2 blockA = projectMirrored(s, {kBlockLo.x, kBlockLo.y, kBlockHi.z}, kW, kH);
+    const glm::vec2 blockB = projectMirrored(s, {kBlockHi.x, kBlockHi.y, kBlockHi.z}, kW, kH);
+    const int h0 = static_cast<int>(std::ceil(horizon)) + 4;
+    const Box ridgeMirror{static_cast<int>(ridgeLeft.x) + 8, h0, static_cast<int>(blockA.x) - 6, static_cast<int>(kH) - 8};
+    const Box blockMirror{static_cast<int>(blockA.x) + 3, static_cast<int>(blockA.y) + 2, static_cast<int>(blockB.x) - 3,
+                          static_cast<int>(blockB.y) - 2};
+
+    const gpu::ImageF plain = bench.render(live);
+    w.ssrTint = glm::vec3(0.5f, 0.5f, 1.0f);
+    const gpu::ImageF tinted = bench.render(live);
+    dumpWater(tinted, "gltf-lake-ssrtint");
+    for (const auto& [label, box] : {std::pair{"ridge (the mirror)", ridgeMirror}, std::pair{"block (the march)", blockMirror}}) {
+        const Rgb a = mean(plain, box);
+        const Rgb b = mean(tinted, box);
+        INFO(label << ": " << a.r << ", " << a.g << ", " << a.b << " -> " << b.r << ", " << b.g << ", " << b.b);
+        CHECK(b.r < 0.8 * a.r);
+        CHECK(b.g < 0.8 * a.g);
+        CHECK(std::abs(b.b - a.b) < 0.05 * a.b);
+    }
+    // the environment's reflection is `reflectionTint`'s: with the march and the mirror both off, the tint does nothing
+    w.skyMirror = 0.0f;
+    rendering::QualitySettings q = live.renderer->qualitySettings();
+    q.waterSsrScale = 0.0f;
+    live.renderer->setQualitySettings(q);
+    const std::uint64_t envOnlyTinted = gpu::hashImage(bench.render(live));
+    w.ssrTint = glm::vec3(1.0f);
+    CHECK(gpu::hashImage(bench.render(live)) == envOnlyTinted);
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+TEST_CASE("a narrow ssrEdgeFade takes the pale band off the frame's edges", "[gpu][renderer][water][gltf][adr2021]") {
+    const fs::path glb = acceptanceGlb();
+    const fs::path withKey = acceptanceScene("lake", glb, std::string(R"("waterMaterials": {"Lake": )") + kLakeWater + "}");
+    constexpr std::uint32_t kW = 480;
+    constexpr std::uint32_t kH = 270;
+    WaterBench bench = WaterBench::make(kW, kH, withKey);
+    WaterBench::Arm live = bench.arm();
+    // turned so the ridge runs off the left edge: the edge columns of the lake reflect it, not the sky
+    bench.aim(kEye, {2500.0f, 5.0f, -3000.0f});
+    bench.hold(4.0);
+    scene::WaterSettings& w = bench.scene().waters.at(0).settings;
+    const int top = static_cast<int>(kH) / 2 + 12;
+    const Box edge{0, top, 12, static_cast<int>(kH) - 8};
+    const Box inner{30, top, 60, static_cast<int>(kH) - 8};
+    const gpu::ImageF before = bench.render(live);
+    w.ssrEdgeFade = 0.004f;
+    const gpu::ImageF after = bench.render(live);
+    dumpWater(before, "gltf-lake-edge-default");
+    dumpWater(after, "gltf-lake-edge-narrow");
+    const double bandBefore = distance(mean(before, edge), mean(before, inner));
+    const double bandAfter = distance(mean(after, edge), mean(after, inner));
+    INFO("edge vs inner, default fade " << bandBefore << ", narrow " << bandAfter);
+    CHECK(bandBefore > 0.02);
+    CHECK(bandAfter < 0.35 * bandBefore);
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+TEST_CASE("ssrBlur 0 keeps a far comb sharp in the lake", "[gpu][renderer][water][gltf][adr2021]") {
+    // A lake and a comb of dark posts 1.5 km out, 12 m wide with 12 m gaps, against a bright backdrop 3 km out.
+    std::array<GlbMesh, 3> meshes;
+    meshes[0].node = "water";
+    meshes[0].material = "Lake";
+    appendPlane(meshes[0], {-1500.0f, -1450.0f}, {1500.0f, 100.0f}, 0.0f);
+    meshes[1].node = "comb";
+    meshes[1].material = "Post";
+    meshes[1].color = {0.02f, 0.03f, 0.02f};
+    meshes[1].roughness = 0.9f;
+    for (int i = 0; i < 40; ++i) {
+        const float x = -480.0f + 24.0f * static_cast<float>(i);
+        appendBox(meshes[1], {x, 0.0f, -1512.0f}, {x + 12.0f, 60.0f, -1500.0f});
+    }
+    meshes[2].node = "backdrop";
+    meshes[2].material = "Rock";
+    meshes[2].color = {0.85f, 0.85f, 0.85f};
+    appendBox(meshes[2], {-2000.0f, 0.0f, -3200.0f}, {2000.0f, 1500.0f, -3000.0f});
+    const fs::path glb = writeMeshesGlb("gltf_water_comb", meshes);
+    const fs::path scenePath = acceptanceScene("comb", glb, std::string(R"("waterMaterials": {"Lake": )") + kLakeWater + "}");
+    constexpr std::uint32_t kW = 640;
+    constexpr std::uint32_t kH = 360;
+    WaterBench bench = WaterBench::make(kW, kH, scenePath);
+    WaterBench::Arm live = bench.arm();
+    bench.aim(kEye, kLookAt);
+    bench.hold(4.0);
+    scene::WaterSettings& w = bench.scene().waters.at(0).settings;
+    const scene::Scene& s = bench.scene();
+    // the comb's reflection: under the shore, between the mirror images of the posts' feet and tops
+    const glm::vec2 left = projectMirrored(s, {-480.0f, 0.0f, -1500.0f}, kW, kH);
+    const glm::vec2 right = projectMirrored(s, {456.0f, 60.0f, -1500.0f}, kW, kH);
+    const glm::vec2 top = projectMirrored(s, {0.0f, 60.0f, -1500.0f}, kW, kH);
+    const glm::vec2 foot = projectMirrored(s, {0.0f, 0.0f, -1500.0f}, kW, kH);
+    const int y0 = static_cast<int>(foot.y) + 1;
+    const int y1 = static_cast<int>(top.y) - 1;
+    REQUIRE(y1 > y0);
+    // how much the lake's columns under the comb differ from each other: posts against gaps
+    const auto contrast = [&](const gpu::ImageF& img) {
+        std::vector<double> cols;
+        for (int x = static_cast<int>(left.x) + 2; x < static_cast<int>(right.x) - 2; ++x) {
+            cols.push_back(mean(img, Box{x, y0, x + 1, y1}).sum());
+        }
+        const double m = std::accumulate(cols.begin(), cols.end(), 0.0) / static_cast<double>(cols.size());
+        double v = 0.0;
+        for (const double c : cols) {
+            v += (c - m) * (c - m);
+        }
+        return std::sqrt(v / static_cast<double>(cols.size())) / std::max(m, 1e-6);
+    };
+    const gpu::ImageF blurred = bench.render(live);
+    w.ssrBlur = 0.0f;
+    const gpu::ImageF sharp = bench.render(live);
+    dumpWater(blurred, "gltf-lake-comb-blur1");
+    dumpWater(sharp, "gltf-lake-comb-blur0");
+    INFO("rows " << y0 << ".." << y1 << ", columns " << left.x << ".." << right.x << ": column contrast with the old blur "
+                 << contrast(blurred) << ", with ssrBlur 0 " << contrast(sharp));
+    CHECK(contrast(sharp) > 1.8 * contrast(blurred));
+    CHECK(contrast(sharp) > 0.1);
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+TEST_CASE("at their defaults the reflection's three new controls are the shader they replaced",
+          "[gpu][renderer][water][adr2021][identity]") {
+    if (!fs::is_regular_file(qaWaterScene())) {
+        SKIP("the water QA scene is not present");
+    }
+    // The pre-ADR-2021 expressions, put back (the record keeps its new fields, so the layout is the same).
+    std::string old = readWaterShaderSource();
+    const auto revert = [&](const std::string& now, const std::string& was) {
+        const std::size_t at = old.find(now);
+        REQUIRE(at != std::string::npos);
+        old.replace(at, now.size(), was);
+    };
+    revert("let edge = waterEdgeFadeX(uvh.x) * smoothstep(0.0, 0.06, min(uvh.y, 1.0 - uvh.y));",
+           "let edge = smoothstep(0.0, 0.06, min(uvh.x, 1.0 - uvh.x)) * smoothstep(0.0, 0.06, min(uvh.y, 1.0 - uvh.y));");
+    revert("(rough * 0.9 * water.cineD.w + spread * 0.5)", "(rough * 0.9 + spread * 0.5)");
+    revert("let inside = waterEdgeFadeX(um.x) * smoothstep(0.0, 0.06, min(um.y, 1.0 - um.y));",
+           "let inside = smoothstep(0.0, 0.06, min(um.x, 1.0 - um.x)) * smoothstep(0.0, 0.06, min(um.y, 1.0 - um.y));");
+    revert("waterSceneAt(uc, 0.0) * water.cineB.w * water.cineD.rgb", "waterSceneAt(uc, 0.0) * water.cineB.w");
+    revert("ssrColor * water.cineB.w * water.cineD.rgb", "ssrColor * water.cineB.w");
+    const fs::path oldDir = writeWaterShaderVariant("pre-adr2021", old);
+
+    WaterBench bench = WaterBench::make(256, 176);
+    WaterBench::Arm live = bench.arm();
+    WaterBench::Arm was = bench.arm({oldDir});
+    bench.aim({40.0f, 6.0f, -86.0f}, {12.0f, 6.5f, -108.0f});
+    bench.hold(12.0);
+    scene::WaterSettings& w = bench.scene().waters.at(0).settings;
+    w.ssr = 0.6f;
+    w.ssrSteps = 24.0f;
+    w.reflection = 1.0f;
+    w.fresnel = 0.6f;
+    w.roughness = 0.08f;
+    for (const float mirror : {0.0f, 1.0f}) {
+        w.skyMirror = mirror;
+        INFO("skyMirror " << mirror);
+        CHECK(gpu::hashImage(bench.render(live)) == gpu::hashImage(bench.render(was)));
+    }
+    // THE CONTROL: off their defaults, they reach the picture
+    w.ssrTint = glm::vec3(0.6f, 0.8f, 1.0f);
+    CHECK(gpu::hashImage(bench.render(live)) != gpu::hashImage(bench.render(was)));
+    CHECK(bench.ctx->errorCount() == 0);
+}
+
+// ADR-2022: `reflectBlended` draws the frame's blended meshes a second time into the water's frame copy, so the lake
+// reflects a translucent veil hung in front of the ridge. Off (the default) the veil is not in the lake, no extra
+// pass is recorded, and the frame is the frame the key-absent scene draws, to the byte. On, everything above the
+// waterline is unchanged to the byte: only what the water reads moved.
+TEST_CASE("reflectBlended puts a blended mesh in the lake's reflection", "[gpu][renderer][water][gltf][adr2022]") {
+    std::array<GlbMesh, 3> meshes;
+    meshes[0].node = "water";
+    meshes[0].material = "Lake";
+    meshes[0].color = {0.1f, 0.45f, 0.45f};
+    meshes[0].roughness = 0.5f;
+    appendPlane(meshes[0], {-1500.0f, -2900.0f}, {1500.0f, 100.0f}, 0.0f);
+    meshes[1].node = "ridge";
+    meshes[1].material = "Rock";
+    meshes[1].color = {0.85f, 0.85f, 0.85f};
+    meshes[1].roughness = 0.9f;
+    appendBox(meshes[1], kRidgeLo, kRidgeHi);
+    // the veil: a translucent magenta sheet facing the camera, 50 m in front of the ridge's face
+    constexpr glm::vec3 kVeilLo{-600.0f, 150.0f, -2950.0f};
+    constexpr glm::vec3 kVeilHi{-200.0f, 1100.0f, -2950.0f};
+    meshes[2].node = "veil";
+    meshes[2].material = "Veil";
+    meshes[2].color = {0.9f, 0.08f, 0.9f};
+    meshes[2].alpha = 0.55f;
+    meshes[2].blend = true;
+    for (const glm::vec3 p : {glm::vec3(kVeilLo.x, kVeilLo.y, kVeilLo.z), glm::vec3(kVeilHi.x, kVeilLo.y, kVeilLo.z),
+                              glm::vec3(kVeilHi.x, kVeilHi.y, kVeilLo.z), glm::vec3(kVeilLo.x, kVeilHi.y, kVeilLo.z)}) {
+        meshes[2].positions.push_back(p);
+        meshes[2].normals.emplace_back(0.0f, 0.0f, 1.0f);
+    }
+    meshes[2].indices = {0, 1, 2, 0, 2, 3};
+    const fs::path glb = writeMeshesGlb("gltf_water_veil", meshes);
+    const std::string lake = std::string(R"("waterMaterials": {"Lake": )") + kLakeWater;
+    const fs::path absent = acceptanceScene("veil-absent", glb, lake + "}");
+    const fs::path off = acceptanceScene("veil-off", glb, lake.substr(0, lake.size() - 1) + R"(, "reflectBlended": false}})");
+    const fs::path on = acceptanceScene("veil-on", glb, lake.substr(0, lake.size() - 1) + R"(, "reflectBlended": true}})");
+
+    constexpr std::uint32_t kW = 480;
+    constexpr std::uint32_t kH = 270;
+    WaterBench bench = WaterBench::make(kW, kH, absent);
+    WaterBench::Arm live = bench.arm();
+    const auto shoot = [&](const fs::path& scenePath) {
+        REQUIRE(bench.engine->loadComposition(scenePath).has_value());
+        bench.aim(kEye, kLookAt);
+        bench.hold(4.0);
+        return bench.render(live);
+    };
+    const gpu::ImageF none = shoot(absent);
+    const std::uint32_t absentDraws = live.renderer->stats().drawCalls;
+    const gpu::ImageF offFrame = shoot(off);
+    const std::uint32_t offCopyDraws = live.renderer->stats().waterBlendedCopyDraws;
+    const std::uint32_t offDraws = live.renderer->stats().drawCalls;
+    const gpu::ImageF onFrame = shoot(on);
+    const std::uint32_t onCopyDraws = live.renderer->stats().waterBlendedCopyDraws;
+    dumpWater(offFrame, "gltf-lake-veil-off");
+    dumpWater(onFrame, "gltf-lake-veil-on");
+
+    // off is the absent key: the same bytes, the same draws, no extra pass
+    CHECK(gpu::hashImage(offFrame) == gpu::hashImage(none));
+    CHECK(offCopyDraws == 0);
+    CHECK(offDraws == absentDraws);
+    CHECK(onCopyDraws == 1);
+
+    // above the waterline, on is off to the byte
+    const scene::Scene& s = bench.scene();
+    const float horizon = project(s, {0.0f, kEye.y, -1e5f}, kW, kH).y;
+    std::size_t aboveDiffer = 0;
+    for (std::uint32_t y = 0; y + 2 < static_cast<std::uint32_t>(horizon); ++y) {
+        for (std::uint32_t x = 0; x < kW; ++x) {
+            const float* a = onFrame.pixel(x, y);
+            const float* b = offFrame.pixel(x, y);
+            aboveDiffer += (a[0] != b[0] || a[1] != b[1] || a[2] != b[2]) ? 1 : 0;
+        }
+    }
+    CHECK(aboveDiffer == 0);
+
+    // the veil's reflection: its mirror image, its middle (the ripples move its edge)
+    const glm::vec2 a = projectMirrored(s, {kVeilLo.x, kVeilLo.y, kVeilLo.z}, kW, kH);
+    const glm::vec2 b = projectMirrored(s, {kVeilHi.x, kVeilHi.y, kVeilLo.z}, kW, kH);
+    const Box veilMirror{static_cast<int>(a.x) + 3, static_cast<int>(a.y) + 3, static_cast<int>(b.x) - 3,
+                         static_cast<int>(b.y) - 3};
+    REQUIRE_FALSE(veilMirror.empty());
+    // the veil itself, above the waterline, for its colour
+    const glm::vec2 da = project(s, {kVeilLo.x, kVeilHi.y, kVeilLo.z}, kW, kH);
+    const glm::vec2 db = project(s, {kVeilHi.x, kVeilLo.y, kVeilLo.z}, kW, kH);
+    const Box veilDirect{static_cast<int>(da.x) + 3, static_cast<int>(da.y) + 3, static_cast<int>(db.x) - 3,
+                         static_cast<int>(db.y) - 3};
+    const auto magenta = [](const Rgb& c) { return c.sum() > 0.0 ? (0.5 * (c.r + c.b) - c.g) / c.sum() : 0.0; };
+    const Rgb seen = mean(onFrame, veilDirect);
+    const Rgb inOff = mean(offFrame, veilMirror);
+    const Rgb inOn = mean(onFrame, veilMirror);
+    INFO("veil above the waterline " << seen.r << ", " << seen.g << ", " << seen.b << " (magenta " << magenta(seen)
+                                     << "); its reflection off " << inOff.r << ", " << inOff.g << ", " << inOff.b
+                                     << " (" << magenta(inOff) << "), on " << inOn.r << ", " << inOn.g << ", "
+                                     << inOn.b << " (" << magenta(inOn) << ")");
+    REQUIRE(magenta(seen) > 0.1); // the control: there is a magenta veil to reflect
+    CHECK(magenta(inOff) < 0.02);
+    CHECK(magenta(inOn) > 0.5 * magenta(seen)); // through the water's own colour and fresnel
+    // translucent in the reflection too: the ridge shows through it, so it is not the veil's full colour
+    CHECK(inOn.g > 0.2 * inOff.g);
+    CHECK(bench.ctx->errorCount() == 0);
+}

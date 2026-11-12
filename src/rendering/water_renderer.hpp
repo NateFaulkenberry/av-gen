@@ -30,6 +30,7 @@
 #include <webgpu/webgpu_cpp.h>
 
 #include <array>
+#include <span>
 #include <cstdint>
 #include <cstddef>
 #include <string>
@@ -69,6 +70,9 @@ struct WaterUniforms {
     glm::vec4 cineAbsorb{0.0f};   // absorption rgb per metre, 0
     glm::vec4 cineC{0.0f};        // streak, reflection rays, tint patches, glints
     glm::vec4 cineTint2{0.0f};    // second reflection tint rgb, patch scale
+    // ADR-2021, inside the cinematic block (every pipeline that reads them has it; the plain ones have none of it).
+    glm::vec4 cineD{0.0f};        // ssrTint rgb, ssrBlur
+    glm::vec4 cineE{0.0f};        // ssrEdgeFade, 0, 0, 0
     // ADR-1643, appended. Read only by the streaks pipeline.
     glm::vec4 streakA{0.0f};      // amount, density, length (m), lanes bank to bank
     glm::vec4 streakB{0.0f};      // speed (x the water's), highlight, colour scale (cycles/m), 0
@@ -78,13 +82,13 @@ struct WaterUniforms {
     // ADR-1650, appended. Read only by the sky-mirror pipeline.
     glm::vec4 mirror{0.0f};       // sky mirror amount (0..1), 0, 0, 0
 };
-static_assert(sizeof(WaterUniforms) == 416);
+static_assert(sizeof(WaterUniforms) == 448);
 // The part of the record a shader without the cinematic block reads (its binding's minimum size).
 inline constexpr std::uint64_t kWaterUniformsPlainSize = 240;
 
 // How many distinct water materials one frame may carry. Uniform slots are cheap; the number is a
 // bound on the dynamic-offset buffer and nothing else.
-inline constexpr std::uint32_t kMaxWaterMaterials = 8;
+inline constexpr std::uint32_t kMaxWaterMaterials = scene::kMaxWaterSurfaces; // the scene file's limit (ADR-2020)
 
 // Fills a WaterUniforms from the authored settings. `flowTime` is the timeline second the surface
 // is being drawn at -- never a wall clock and never an accumulated delta, because an offline render
@@ -120,8 +124,11 @@ public:
     // Rebuilds the pipeline from a reloaded shader module (hot reload); keeps the layouts.
     [[nodiscard]] Result<void> reload(gpu::ShaderLibrary& shaders);
 
-    // Uploads this frame's water materials. Slot `i` is addressed by `offset(i)`.
-    void upload(const wgpu::Queue& queue, const std::vector<WaterUniforms>& materials);
+    // Uploads this frame's water materials. Slot `i` is addressed by `offset(i)`. `writesIds[i]` (ADR-2021) draws slot
+    // `i` with a pipeline that writes the entity's identifier into the ids target; absent or false, the opaque
+    // geometry's identifier stays (ADR-035), as it always has.
+    void upload(const wgpu::Queue& queue, const std::vector<WaterUniforms>& materials,
+                std::span<const bool> writesIds = {});
     [[nodiscard]] std::uint32_t offset(std::size_t slot) const {
         return static_cast<std::uint32_t>(slot) * kStride;
     }
@@ -146,15 +153,12 @@ public:
     // byte-identical to the shader before them, which one shader with the code gated could not promise
     // (the compiler builds the shared ripple path differently once the tear's data flows through it).
     [[nodiscard]] const wgpu::RenderPipeline& pipeline(std::size_t slot) const {
-        if (slot < cine_.size() && cine_[slot] && cineBindGroup_) {
-            // ADR-1650: the sky mirror, in a fifth pipeline (the full source) only a surface with it is drawn by.
-            if (slot < mirror_.size() && mirror_[slot]) {
-                return mirrorPipeline_;
-            }
-            // ADR-1643: the flow streaks, compiled into a fourth pipeline only a surface with streaks is drawn by.
-            return slot < streaks_.size() && streaks_[slot] ? streaksPipeline_ : cinePipeline_;
+        const Variant v = variant(slot);
+        // ADR-2021: the same shader with the identifier written, for a surface that asks for it.
+        if (slot < ids_.size() && ids_[slot] && idPipelines_[v]) {
+            return idPipelines_[v];
         }
-        return slot < torn_.size() && torn_[slot] ? pipeline_ : plainPipeline_;
+        return *pipelines()[v];
     }
     [[nodiscard]] bool ready() const {
         return static_cast<bool>(pipeline_) && static_cast<bool>(plainPipeline_) && static_cast<bool>(cinePipeline_) &&
@@ -164,14 +168,33 @@ public:
 
 private:
     // Dynamic uniform offsets must be a multiple of the device's minimum alignment, which is 256
-    // on every backend this runs on. 416 bytes of record (ADR-1286, ADR-1643, ADR-1650), padded.
+    // on every backend this runs on. 448 bytes of record (ADR-1286, ADR-1643, ADR-1650, ADR-2021), padded.
     static constexpr std::uint32_t kStride = 512;
     static_assert(kStride % 256 == 0);
     static_assert(sizeof(WaterUniforms) <= kStride);
 
     [[nodiscard]] Result<void> createPipeline(gpu::ShaderLibrary& shaders);
     [[nodiscard]] Result<wgpu::RenderPipeline> buildPipeline(const wgpu::ShaderModule& module, const char* label,
-                                                             const wgpu::PipelineLayout& layout);
+                                                             const wgpu::PipelineLayout& layout,
+                                                             bool writesIds = false);
+    // The five shaders, in the order `variant` names them.
+    enum Variant : std::size_t { Torn, Plain, Cine, Streaks, Mirror, kVariants };
+    [[nodiscard]] Variant variant(std::size_t slot) const {
+        if (slot < cine_.size() && cine_[slot] && cineBindGroup_) {
+            // ADR-1650: the sky mirror, in a fifth pipeline (the full source) only a surface with it is drawn by.
+            if (slot < mirror_.size() && mirror_[slot]) {
+                return Mirror;
+            }
+            // ADR-1643: the flow streaks, compiled into a fourth pipeline only a surface with streaks is drawn by.
+            return slot < streaks_.size() && streaks_[slot] ? Streaks : Cine;
+        }
+        return slot < torn_.size() && torn_[slot] ? Torn : Plain;
+    }
+    [[nodiscard]] std::array<const wgpu::RenderPipeline*, kVariants> pipelines() const {
+        return {&pipeline_, &plainPipeline_, &cinePipeline_, &streaksPipeline_, &mirrorPipeline_};
+    }
+    // ADR-2021: the identifier-writing twins, built the first time a surface asks (most scenes never do).
+    void ensureIdPipelines();
 
     gpu::Context* context_ = nullptr;
     wgpu::TextureFormat hdrFormat_ = wgpu::TextureFormat::RGBA16Float;
@@ -192,6 +215,11 @@ private:
     std::array<bool, kMaxWaterMaterials> torn_{};
     std::array<bool, kMaxWaterMaterials> streaks_{}; // ADR-1643
     std::array<bool, kMaxWaterMaterials> mirror_{};  // ADR-1650
+    std::array<bool, kMaxWaterMaterials> ids_{};     // ADR-2021
+    // ADR-2021: the modules the five pipelines were built from, kept for their identifier-writing twins.
+    std::array<wgpu::ShaderModule, kVariants> modules_{};
+    std::array<wgpu::RenderPipeline, kVariants> idPipelines_{};
+    bool idPipelinesFailed_ = false;
     wgpu::Buffer uniforms_;
     wgpu::BindGroup bindGroup_;
     std::uint32_t uploaded_ = 0;
