@@ -2166,3 +2166,31 @@ shore at 170–190 s.
 **The dotted vertical line in the owner's screenshot.** It is the side wall of a tile step seen edge-on. It shows a
 dot pattern in live captures (quality high and ultra), but not in the offline render. That makes it engine-side, in
 the live renderer.
+
+### Draft11 (2026-11-11): the beach balls ahead of the camera, and impacts that read from 40-80 m
+
+The owner on draft10: "balls should bounce way higher", then approved the plan: place the balls 40-80 m ahead of the
+camera along its path, instead of beside it, and make the impact glow and sparks bigger and brighter.
+
+**Placement (build.py `BALLS`).**
+- **Homes:** a grid search over the flown route, near each draft10 song time. The score is the seconds the ball is in
+  frame at 20-120 m, plus the seconds its whole 18 m arc is in frame at 25-80 m. A home may never come nearer the line
+  than 10 m. Most winners sit on the outside of a bend, where the camera comes at them head-on.
+- **Starts:** each ball's drop height and upward launch speed was picked from 16 traced variants, so that one impact
+  lands in frame 48-72 m out. The ball's motion is unchanged: minBounce 12, gravity x0.22, and so on.
+- **The camera model** behind the measure rebuilds `flight.cpp`'s aim (look-ahead, pitch hold, smoothing, bank). It
+  was checked against an offline render: within about 30 px of the ball at 1080p.
+
+**Measured (trace):**
+- each ball is in frame 4.1-7.4 s (2.5-5.2 s within 80 m);
+- one impact in frame per ball, 48-72 m out;
+- closest to the lens 8.5-35.6 m;
+- apexes 17-29 m.
+
+**The impact (`BALL_IMPACT`).**
+- **Outline:** 0.12 → 0.45 m wide.
+- **Glow:** teal → lime, gain 4, 5 m, 1.3 s. Teal vanished on the day's cyan tiles, and no state's tiles are green.
+- **Sparks:** a deeper magenta, gain 3.5, 18 m/s out to 40 m, 1.4 s, 3 m wide.
+- **What it reads like:** clearly at sunset, night and dawn. The core pales by the ball for about 0.2 s. On the
+  day's bright cyan tiles it is weak, because an added light washes out there.
+- **The way out is engineering:** keyable impact gains, or a tint blend instead of an add.

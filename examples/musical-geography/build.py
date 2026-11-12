@@ -253,36 +253,44 @@ CHARACTERS = False   # set by --characters
 
 
 # draft10 (CPD-R12, ADR-2007/2008; owner: "about 10 of these dispersed throughout the cameras path - they can act
-# very light - take big bounces ... start with a reflective orb"): chrome orbs (metallic 1, roughness 0.04), each ~20 m
-# off the flown line at its song time, homeRadius 4, no sideways launch, speed capped 10 m/s (apex 12-23 m, in frame), slope 0.3 (less wander); three in the
-# first 30 s, and beside the close passes (64, 104, 151, 205 s). (x, z, ground y, song time)
+# very light - take big bounces ... start with a reflective orb"): chrome orbs (metallic 1, roughness 0.04), homeRadius 4,
+# no sideways launch, speed capped 10 m/s, slope 0.3; three in the first 30 s.
+# draft11 (owner-approved plan: "Place the balls 40-80 m ahead of the camera along its path, instead of beside it"):
+# each home is ahead of the flight where the camera comes at it head-on (often on the outside of a bend), picked by a
+# grid search over the flown route (the ball in frame 20-120 m, the whole 18 m arc in frame 25-80 m, never nearer the
+# line than 10 m), and each start (drop height above the ground, launch speed up) is picked from 16 traced variants so
+# one impact lands in frame 45-75 m out. The trace is the proof: 4.1-7.4 s in frame each, closest 8.5 m to the lens.
+# (x, z, ground y, song time, drop m, launch m/s up)
 BALLS = [
-    (-301.5, 123.3, 0.0, 6),   # 20.0 m off the line
-    (-482.7, -24.7, 0.4, 15),   # 20.0 m off the line
-    (-445.5, -262.9, 0.0, 24),   # 20.0 m off the line
-    (-38.4, -662.3, 1.0, 64),   # 20.0 m off the line
-    (-20.5, -1102.8, 13.3, 104),   # 20.0 m off the line
-    (301.0, -1093.7, 1.7, 121),   # 20.0 m off the line
-    (454.9, -1599.3, 13.5, 151),   # 20.0 m off the line
-    (1074.3, -1643.8, 0.0, 176),   # 20.0 m off the line
-    (1497.2, -1546.4, 0.4, 197),   # 20.0 m off the line
-    (1539.8, -1718.8, 8.4, 205),   # 20.0 m off the line
+    (-301.8, 133.0, 0.0, 6, 6.0, 2.0),   # nearest the flight at 5.8 s, 12 m off it; lands in frame at 3.5 s, 57 m out
+    (-451.4, -37.0, 0.02, 15, 6.0, 6.0),   # nearest the flight at 15.1 s, 14 m off it; lands in frame at 12.2 s, 72 m out
+    (-385.1, -334.2, 0.0, 24, 12.0, 8.0),   # nearest the flight at 28.0 s, 18 m off it; lands in frame at 25.8 s, 62 m out
+    (-6.5, -647.3, 0.0, 64, 6.0, 6.0),   # nearest the flight at 62.5 s, 12 m off it; lands in frame at 59.0 s, 66 m out
+    (61.5, -1094.1, 6.08, 104, 6.0, 2.0),   # nearest the flight at 107.4 s, 10 m off it; lands in frame at 105.3 s, 50 m out
+    (303.7, -1094.1, 1.02, 121, 2.0, 8.0),   # nearest the flight at 121.0 s, 17 m off it; lands in frame at 118.6 s, 52 m out
+    (361.2, -1578.3, 5.67, 151, 6.0, 0.0),   # nearest the flight at 146.6 s, 12 m off it; lands in frame at 144.1 s, 57 m out
+    (1175.2, -1622.8, 0.0, 176, 2.0, 8.0),   # nearest the flight at 180.0 s, 21 m off it; lands in frame at 177.8 s, 48 m out
+    (1415.7, -1531.2, 0.0, 197, 6.0, 10.0),   # nearest the flight at 194.4 s, 33 m off it; lands in frame at 192.1 s, 57 m out
+    (1548.3, -1703.2, 4.65, 205, 6.0, 2.0),   # nearest the flight at 204.3 s, 13 m off it; lands in frame at 202.1 s, 49 m out
 ]
-# the impact: its own colours, apart from the aliens' warm landing glow -- a teal glow and magenta sparks along the tile
-# edges, at gains 2.5 so neither clips to white on the sunset tiles
-BALL_IMPACT = {"glowColor": [0.05, 0.85, 0.6], "glowGain": 2.5, "glowRadius": 4.0, "glowLife": 0.8,
-               "sparkColor": [0.9, 0.15, 0.75], "sparkGain": 2.5, "sparkSpeed": 14.0, "sparkReach": 24.0,
-               "sparkLife": 0.9, "sparkWidth": 2.5, "edgeBand": 0.12}
+# the impact: its own colours, apart from the aliens' warm landing glow. draft11: read from 40-80 m out -- the lit outline
+# 0.12 -> 0.45 m wide (about 10 px at 50 m), the glow 5 m / 1.3 s, the sparks running 18 m/s out to 40 m over 1.4 s, 3 m
+# wide. The glow went teal -> lime: teal vanished on the day's cyan tiles; lime holds against every state's tiles
+# (none of them is green). Sparks a deeper magenta. Gains 4 / 3.5: hue holds on the sunset and night tiles (the spark
+# core still pales for ~0.2 s by the ball); the day's bright tiles wash both out at any gain that keeps the night in hue.
+BALL_IMPACT = {"glowColor": [0.3, 1.0, 0.0], "glowGain": 4.0, "glowRadius": 5.0, "glowLife": 1.3,
+               "sparkColor": [1.0, 0.0, 0.5], "sparkGain": 3.5, "sparkSpeed": 18.0, "sparkReach": 40.0,
+               "sparkLife": 1.4, "sparkWidth": 3.0, "edgeBand": 0.45}
 
 
 def ball_nodes():
     nodes, ents = [], []
-    for i, (x, z, gy, t) in enumerate(BALLS):
+    for i, (x, z, gy, t, drop, vy) in enumerate(BALLS):
         name = "ball%02d" % i
-        nodes.append({"name": name, "kind": "orb", "position": [x, gy + 4.0, z], "scale": [1.0, 1.0, 1.0],
+        nodes.append({"name": name, "kind": "orb", "position": [x, gy + drop, z], "scale": [1.0, 1.0, 1.0],
                       "material": {"baseColor": [0.95, 0.95, 0.97], "metallic": 1.0, "roughness": 0.04}})
         ents.append({"name": name, "node": name, "seed": 9100 + i,
-                     "behaviors": [{"kind": "ball", "radius": 1.0, "velocity": [0.0, 8.0, 0.0], "homeRadius": 4.0,
+                     "behaviors": [{"kind": "ball", "radius": 1.0, "velocity": [0.0, vy, 0.0], "homeRadius": 4.0,
                                     # owner: "balls should bounce way higher": every bounce at least 12 m (was 3), lighter
                                     # (gravity x0.22, was 0.35) so they hang, livelier (restitution 0.95, waves kick x2)
                                     "minBounce": 12.0, "gravityScale": 0.22, "restitution": 0.95, "tileKick": 1.5,
