@@ -3676,6 +3676,21 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
     {
         const auto& td = scene.environment.tileDynamics;
         frame.landingGlow = glm::vec4(td.landingColor * td.landingGain, td.landingGain); // ADR-1960
+        // ADR-2008: the balls' impacts still lit (the newest kMaxBallImpacts), world space
+        const scene::TileBallSpec& b = td.balls;
+        frame.ballGlow = glm::vec4(b.glowColor * b.glowGain, b.glowGain);
+        frame.ballSpark = glm::vec4(b.sparkColor * b.sparkGain, b.sparkGain);
+        frame.ballFx = glm::vec4(b.glowRadius, b.sparkSpeed, b.sparkReach, b.sparkLife);
+        const auto now = static_cast<float>(time.renderTime);
+        const float horizon = 6.0f * std::max(b.glowLife, b.sparkLife);
+        std::size_t n = 0;
+        for (auto it = td.ballImpacts.rbegin(); it != td.ballImpacts.rend() && n < scene::kMaxBallImpacts; ++it) {
+            const float age = now - it->time;
+            if (age < 0.0f || age > horizon) continue;
+            frame.ballImpacts[n++] = glm::vec4(it->position.x, it->position.y, it->time, std::abs(it->strength));
+        }
+        for (std::size_t i = n; i < scene::kMaxBallImpacts; ++i) frame.ballImpacts[i] = glm::vec4(0.0f);
+        frame.ballFx2 = glm::vec4(static_cast<float>(n), b.sparkWidth, b.edgeBand, b.glowLife);
     }
     {
         // ADR-1151: the reflection-only bands; all zero (the gate closed) unless the scene authored them.

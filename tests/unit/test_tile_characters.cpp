@@ -1141,7 +1141,10 @@ TEST_CASE("a hopping alien's mesh never sinks into the tile under any of its ver
     WARN("ADR-1991: deepest pose below its tile before the lift " << liftMax * 100.0f << " cm; after, any vertex "
                                                                   << worst * 100.0f << " cm");
     CHECK(landings > 0);
-    CHECK(liftMax > 0.05f);   // the canary: without the pass the pose does sink (a landing crouch, a ringing tile)
+    // the canary: without the pass the pose does sink (a landing crouch, a ringing tile). ADR-2006 (CPD-R13): a walker
+    // now rises onto a higher tile before its feet reach the riser, so the deepest sink in this scene fell from 28 cm
+    // to 1.9 cm; the pass is still exercised.
+    CHECK(liftMax > 0.01f);
     CHECK(worst <= 0.02f);    // with it, no vertex is more than 2 cm inside the tile under it (the subset's margin)
 }
 

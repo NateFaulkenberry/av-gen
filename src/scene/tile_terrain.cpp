@@ -475,7 +475,7 @@ float tileSpring(const TileSpringSpec& s, const std::vector<TileEvent>& springs,
         }
         const float k = std::clamp((reach - kTileSpringReachStart) / (kTileSpringReach - kTileSpringReachStart), 0.0f, 1.0f);
         const float window = 1.0f - k * k * (3.0f - 2.0f * k); // CP-D r2: the reach eases out, no edge
-        const float amp = s.depth * e.strength * std::exp(-r / s.rippleRadius) * window;
+        const float amp = s.depth * std::abs(e.strength) * std::exp(-r / s.rippleRadius) * window; // ADR-2008: a ball (< 0) springs alike
         h -= amp * std::exp(-zeta * w * a) * std::sin(wd * a); // an impulse: starts at rest, first goes down
     }
     return h;
@@ -498,7 +498,7 @@ float tileLanding(const TileSpringSpec& s, const std::vector<TileEvent>& springs
         }
         const float k = std::clamp((reach - kTileSpringReachStart) / (kTileSpringReach - kTileSpringReachStart), 0.0f, 1.0f);
         const float window = 1.0f - k * k * (3.0f - 2.0f * k);
-        l += e.strength * std::exp(-r / glowR) * window * std::exp(-zeta * w * a) * (1.0f - std::exp(-a / 0.06f));
+        l += std::max(e.strength, 0.0f) * std::exp(-r / glowR) * window * std::exp(-zeta * w * a) * (1.0f - std::exp(-a / 0.06f));
     }
     return std::clamp(l, 0.0f, 1.0f);
 }
@@ -1311,6 +1311,20 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
                       {"driftSpeed", d.riverDriftSpeed}};
     }
     {
+        const TileBallSpec& b = d.balls;
+        const TileBallSpec db;
+        const auto rgb = [](glm::vec3 c) { return nlohmann::json::array({c.x, c.y, c.z}); };
+        if (b.glowColor != db.glowColor || b.glowGain != db.glowGain || b.glowRadius != db.glowRadius ||
+            b.glowLife != db.glowLife || b.sparkColor != db.sparkColor || b.sparkGain != db.sparkGain ||
+            b.sparkSpeed != db.sparkSpeed || b.sparkReach != db.sparkReach || b.sparkLife != db.sparkLife ||
+            b.sparkWidth != db.sparkWidth || b.edgeBand != db.edgeBand) { // ADR-2008
+            j["balls"] = {{"glowColor", rgb(b.glowColor)}, {"glowGain", b.glowGain},   {"glowRadius", b.glowRadius},
+                          {"glowLife", b.glowLife},         {"sparkColor", rgb(b.sparkColor)},
+                          {"sparkGain", b.sparkGain},       {"sparkSpeed", b.sparkSpeed}, {"sparkReach", b.sparkReach},
+                          {"sparkLife", b.sparkLife},       {"sparkWidth", b.sparkWidth}, {"edgeBand", b.edgeBand}};
+        }
+    }
+    {
         const TileSpringSpec& s = d.spring;
         const TileSpringSpec ds;
         if (s.depth != ds.depth || s.frequency != ds.frequency || s.damping != ds.damping ||
@@ -1373,6 +1387,30 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
             d.breathingAmplitude = b.amplitude;
             d.breathingPeriod = b.period;
             d.breathingWavelength = b.wavelength;
+        } else if (key == "balls") { // ADR-2008
+            if (auto r = readFields<TileBallSpec>(value, where,
+                                                  {{"glowGain", &TileBallSpec::glowGain},
+                                                   {"glowRadius", &TileBallSpec::glowRadius},
+                                                   {"glowLife", &TileBallSpec::glowLife},
+                                                   {"sparkGain", &TileBallSpec::sparkGain},
+                                                   {"sparkSpeed", &TileBallSpec::sparkSpeed},
+                                                   {"sparkReach", &TileBallSpec::sparkReach},
+                                                   {"sparkLife", &TileBallSpec::sparkLife},
+                                                   {"sparkWidth", &TileBallSpec::sparkWidth},
+                                                   {"edgeBand", &TileBallSpec::edgeBand}},
+                                                  d.balls, {"glowColor", "sparkColor"});
+                !r) {
+                return std::unexpected(r.error());
+            }
+            for (const auto& [name, out] : {std::pair<const char*, glm::vec3*>{"glowColor", &d.balls.glowColor},
+                                            std::pair<const char*, glm::vec3*>{"sparkColor", &d.balls.sparkColor}}) {
+                if (!value.contains(name)) continue;
+                const auto& c = value[name];
+                if (!c.is_array() || c.size() != 3 || !c[0].is_number() || !c[1].is_number() || !c[2].is_number()) {
+                    return fail("'{}.{}' must be [r, g, b]", where, name);
+                }
+                *out = {c[0].get<float>(), c[1].get<float>(), c[2].get<float>()};
+            }
         } else if (key == "spring") {
             if (auto r = readFields<TileSpringSpec>(value, where,
                                                     {{"depth", &TileSpringSpec::depth},

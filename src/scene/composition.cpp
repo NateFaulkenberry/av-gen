@@ -10448,10 +10448,12 @@ void Composition::applyParameters() {
         env.horizonFill = volumeSetting_.horizonFill; // Phase 5
         env.tileDynamics = liveTileDynamics(); // ADR-1953: the authored block, then its parameters
         env.tileDynamics.springs.clear(); // ADR-1954: the characters' landings, in the ground's generator space
+        env.tileDynamics.ballImpacts.clear();
         if (tileGround_.valid()) {
             for (const TileEvent& e : tileGround_.landings()) {
                 env.tileDynamics.springs.push_back(
                     TileEvent{e.time, e.position - glm::vec2(tileGroundOffset_.x, tileGroundOffset_.z), e.strength});
+                if (e.strength < 0.0f) env.tileDynamics.ballImpacts.push_back(e); // ADR-2008: world space
             }
         }
         env.shadowSplitLambda = volumeSetting_.shadowSplitLambda; // ADR-1867

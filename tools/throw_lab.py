@@ -66,6 +66,17 @@ def lab_scene(base, a):
         ent.pop("reactions", None)  # no music: the hop's apex and strength stay as authored
         ents.append(ent)
     s["entities"] = ents
+    # CPD-R12 (ADR-2007): beach balls -- chrome orbs bouncing on the tiles around the alien
+    for i in range(a.balls):
+        ang = 2.0 * math.pi * i / max(a.balls, 1)
+        bx, bz = a.x + 6.0 * math.cos(ang), a.z + 6.0 * math.sin(ang)
+        name = "ball%02d" % i
+        s["nodes"].append({"name": name, "kind": "orb", "position": [bx, 4.0 + 1.5 * i, bz],
+                           "scale": [a.ball_radius] * 3,
+                           "material": {"baseColor": [0.95, 0.95, 0.97], "metallic": 1.0, "roughness": 0.04}})
+        s["entities"].append({"name": name, "node": name, "seed": 9000 + i,
+                              "behaviors": [{"kind": "ball", "radius": a.ball_radius, "homeRadius": 10.0,
+                                             "velocity": [2.0 * math.sin(ang), 5.0 + i, -2.0 * math.cos(ang)]}]})
     # one planar train along +X whose crest reaches the alien at --crest (and every period after)
     phase = 0.25 + a.speed * a.crest / a.wavelength - a.x / a.wavelength
     dyn = s["environment"]["tileDynamics"]
@@ -189,6 +200,8 @@ def main():
                     help="CPD-R9: a second alien DX metres along the wave, thrown too; its landings spring the tile")
     ap.add_argument("--neighbour-body", default="alien01")
     ap.add_argument("--run", action="store_true", help="CPD-R9: the measured alien runs about instead of standing")
+    ap.add_argument("--balls", type=int, default=0, help="CPD-R12: this many beach balls bouncing around the alien")
+    ap.add_argument("--ball-radius", type=float, default=0.6)
     ap.add_argument("--camera", default="side", choices=("side", "close"))
     ap.add_argument("--seconds", type=float, default=10.0)
     ap.add_argument("--width", type=int, default=1280)

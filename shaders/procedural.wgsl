@@ -739,6 +739,8 @@ struct ProcVertexOut {
     @location(9) @interpolate(flat) variation: vec2<f32>,
     // ADR-1995: a tile record's contour side dimming (position.w; flat, so the packed integer arrives exact).
     @location(10) @interpolate(flat) instSides: f32,
+    // ADR-2008: a tile slab's world centre (xyz) and its half width (w); w = 0 for anything that is not a tiles slab.
+    @location(11) @interpolate(flat) tileCentre: vec4<f32>,
 };
 
 // ADR-1491: one vertex stage, two entries. `vs_proc` (the lit pass) and `vs_proc_depth` (the depth prepass and the
@@ -763,6 +765,7 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     let inst = instances[recordIndex];
     fieldElement = inst.random.w; // ADR-1116: Field deformers sample per element, as the effector pass does
     var out: ProcVertexOut;
+    out.tileCentre = vec4<f32>(0.0);
     out.uv = in.uv;
     out.instColor = inst.color;
     // ADR-057: the hue drifts where this specimen stands, sampled once per vertex at the root so
@@ -1043,6 +1046,7 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
     out.instRandom = inst.random;
     out.instIndex = inst.scale.w;
     out.instSides = inst.position.w; // ADR-1995
+    out.tileCentre = vec4<f32>(0.0);
 
     // The camera in the instance's own frame: which side of each axis it is on.
     let centre = (object.model * vec4<f32>(inst.position.xyz, 1.0)).xyz;
@@ -1122,6 +1126,9 @@ fn slabVertex(in: VertexIn, instanceIndex: u32, mode: u32) -> ProcVertexOut {
             dbg = mix(dbg, vec3<f32>(1.0, 1.0, 0.0), flatten);
         }
         out.instColor = vec4<f32>(dbg, out.instColor.a);
+    }
+    if (proc.windPlant.w > 0.5 && proc.windPlant.x > 1.0001) { // ADR-2008: a tiles slab -- its centre and half width
+        out.tileCentre = vec4<f32>(centre, abs(in.position.x) * length(ax) * abs(s0.x));
     }
     let srcPos = (proc.sourceMatrix * vec4<f32>(p, 1.0)).xyz;
     let srcNormal = (proc.sourceNormalMatrix * vec4<f32>(n, 0.0)).xyz;
@@ -1276,7 +1283,37 @@ fn fs_proc_refract(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) 
     return out;
 }
 
+// ADR-2008 (CPD-R12): the light a beach ball's impacts put on a tile at `c` (world x-z): its own glow, strongest on the
+// struck tiles and fading with distance and age, and sparks -- a ring running out from the impact, lighting some tiles
+// and not others (a hash per tile and impact), fading with age and with distance to the reach. The caller lays it on
+// the tile's outline.
+fn ballImpactLight(c: vec2<f32>) -> vec3<f32> {
+    var glow = 0.0;
+    var spark = 0.0;
+    let now = frame.params.x;
+    let n = min(u32(frame.ballFx2.x + 0.5), 16u);
+    for (var i = 0u; i < n; i = i + 1u) {
+        let e = frame.ballImpacts[i];
+        let a = now - e.z;
+        if (a < 0.0) { continue; }
+        let r = distance(c, e.xy);
+        glow = glow + e.w * exp(-r / max(frame.ballFx.x, 1e-3)) * exp(-a / max(frame.ballFx2.w, 1e-3)) *
+                          (1.0 - exp(-a / 0.05));
+        if (r < frame.ballFx.z) {
+            let d = (r - frame.ballFx.y * a) / max(frame.ballFx2.y, 1e-3);
+            let tw = fract(sin(dot(c, vec2<f32>(12.9898, 78.233)) + e.z * 37.719) * 43758.5453);
+            spark = spark + e.w * exp(-d * d) * exp(-a / max(frame.ballFx.w, 1e-3)) * (1.0 - r / frame.ballFx.z) *
+                                step(0.35, tw) * (0.6 + 0.8 * tw);
+        }
+    }
+    return frame.ballGlow.rgb * min(glow, 2.0) + frame.ballSpark.rgb * min(spark, 2.0);
+}
+
 fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
+    // ADR-2008: how far inside its outline this fragment is (metres) and its footprint, taken here in uniform flow
+    let tileOff = abs(in.worldPos.xz - in.tileCentre.xz);
+    let edgeDist = in.tileCentre.w - max(tileOff.x, tileOff.y);
+    let edgeFw = fwidth(edgeDist);
     let emissiveMul = in.instEmissive.rgb;
     var info: MaterialInstanceInfo;
     // ADR-905: the emissive field is a gain on everything the surface emits, after its program --
@@ -1308,6 +1345,16 @@ fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
     out.normalRoughness = packNormalRoughness(shaded.normal, shaded.roughness, shaded.flags);
     out.velocity = screenVelocityAt(in.clip, in.prevClip);
     out.emission = vec4<f32>(shaded.emission, shaded.bloomWeight);
+    // ADR-2008: the balls' impacts light the tops' outlines
+    if (in.tileCentre.w > 0.0 && frame.ballFx2.x > 0.5 && in.normal.y > 0.5) {
+        let band = max(frame.ballFx2.z, edgeFw);
+        let outline = 1.0 - smoothstep(band, band + max(edgeFw, 1e-4), edgeDist);
+        if (outline > 0.0) {
+            let light = ballImpactLight(in.tileCentre.xz) * outline;
+            out.color = vec4<f32>(out.color.rgb + light, out.color.a);
+            out.emission = vec4<f32>(out.emission.rgb + light, out.emission.w);
+        }
+    }
     out.ids = packIds(object.ids.x, object.ids.y);
     // Effect Library Wave 2: the clip's discard, last, after every derivative (pbr_shade.wgsl).
     if (fxClipDiscard) {

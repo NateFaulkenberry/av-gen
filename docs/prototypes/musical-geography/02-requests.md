@@ -1818,3 +1818,96 @@ Measured on your draft9 (c5535ba6, the CPD-R6 trace at 60 fps, 53 aliens).
   drawn the same with or without a body.
 
 **Yours:** nothing required. If the 16% fewer throws shows, `tossCooldown` (3 s) is the lever.
+
+#### CPD-R12 (owner → engineering via the coordinator, 2026-11-11): beach balls
+
+The owner on draft9, verbatim: "let's add one more visual element to this scene: bouncing beach balls that bounce off
+of surfaces, ramp off of waves, let's add an effect when they hit a surface similar to the alien when it lands - but
+use a different color, and add a sparking explosion like effect that also radiates out from where the ball landed
+(using the tilte edges for light paths / point particles) let's try to have about 10 of these dispersed throughout
+the cameras path - they can act very light - take big bounces, it's okay if they bounce off water for now - let's
+start here and get an idea for how this looks in the scene. for the beach ball itself start with a reflective orb
+let's see what that looks like"
+
+### Engineering → art, CPD-R12 (2026-11-11): beach balls, how to place and tune them (ADR-2007, ADR-2008)
+
+**What a ball is.**
+- An `orb` node (the look), with an entity on it that has a `ball` behaviour (the motion).
+- It bounces on the tiles' drawn tops (the aliens' ground). A rising tile kicks it up, and the land's slope tilts its
+  bounce, so it ramps off waves.
+- It never settles (every bounce reaches at least `minBounce`) and stays near where you place it.
+- Water is bounced off like land, for now.
+- Each impact springs the tile like an alien's landing and lights the tile outlines: a glow in the ball's own colour,
+  and sparks running out along the tile edges.
+- Seek equals play.
+
+**One ball, in the scene** (scale = radius; a chrome orb is metallic 1 and roughness near 0):
+```json
+{"name": "ball00", "kind": "orb", "position": [x, groundY + 4, z], "scale": [1.0, 1.0, 1.0],
+ "material": {"baseColor": [0.95, 0.95, 0.97], "metallic": 1.0, "roughness": 0.04}}
+```
+```json
+{"name": "ball00", "node": "ball00", "seed": 9100,
+ "behaviors": [{"kind": "ball", "radius": 1.0, "velocity": [1.5, 6.0, 0.0], "homeRadius": 12.0}]}
+```
+
+**The `ball` behaviour's keys:**
+
+| Key | Default | What it does |
+|---|---|---|
+| `radius` | 0.6 | match the orb's scale |
+| `velocity` | [2, 6, 1] | its start, m/s |
+| `gravityScale` | 0.35 | lower is lighter: bigger, slower bounces |
+| `drag` | 0.05 | 1/s |
+| `restitution` | 0.92 | |
+| `minBounce` | 3 | metres each bounce reaches at least |
+| `maxSpeed` | 25 | m/s cap |
+| `tileKick` | 1 | how much of a rising tile's speed it takes |
+| `slope` | 1 | how much the land's slope tilts a bounce |
+| `homeRadius` | 30 | metres it strays before bounces steer it back |
+| `strength` | 0.5 | how hard its impacts spring the tile |
+
+**The impact's look**, in `environment.tileDynamics.balls`:
+
+| Key | Default | What it does |
+|---|---|---|
+| `glowColor` | [0.35, 0.8, 1.0] | linear colour of the glow |
+| `glowGain` | 6 | |
+| `glowRadius` | 4 | metres to 1/e |
+| `glowLife` | 0.8 | seconds to 1/e |
+| `sparkColor` | [1.0, 0.75, 0.35] | |
+| `sparkGain` | 10 | |
+| `sparkSpeed` | 14 | m/s the ring runs out |
+| `sparkReach` | 24 | metres; none beyond |
+| `sparkLife` | 0.9 | s |
+| `sparkWidth` | 2.5 | metres |
+| `edgeBand` | 0.12 | metres of outline lit |
+
+Gain 0 turns either part off. At most the 16 newest impacts are lit at once.
+
+**Placing ten.**
+- My preview put one 25 m ahead of the camera and 9 m to a side at 20, 40, 60, 80, 85, 90, 110, 130, 160 and 190 s
+  (scratch `eng/r12/withballs.py`).
+- In that preview ball01 came within 1 m of the lens at 41 s. Keep them off the line: the keep-out line (ADR-2003) is
+  a walker's rule and does not steer balls. Use `homeRadius` and the placement for that.
+
+**Cost: none measurable.** Draft9 at 85 s, live-profile headless at ultra, without and with the 10 preview balls, two
+runs each:
+
+| | GPU p50 | GPU p99 |
+|---|---|---|
+| without balls | 33.98 / 33.18 ms | 46.48 / 46.89 ms |
+| with balls | 32.88 / 33.37 ms | 47.41 / 44.50 ms |
+
+The differences are run-to-run noise. A ball is one orb draw. The impact light is a loop over at most 16 impacts, on
+the tiles' tops only, and only while one is lit.
+
+**Media** in `19-pass-cpd-draft10/`:
+- `cpd-r12-ball-lab-close-10s.mp4`: the Throw Lab with 6 balls (`throw_lab.py --balls 6 --camera close`);
+- `cpd-r12-ball-lab-sheet-1-5s.png`;
+- `cpd-r12-ball-lab-impact-strip-10fps.png`;
+- `cpd-r12-draft9-with-10-balls-80-92s.mp4` and `cpd-r12-draft9-balls-sheet-80-92s.png`: the preview placement.
+
+**What I saw.** The chrome orbs read and pick up the sky. Impacts light the tile outlines and the sparks run outward
+tile by tile. At the default gains the glow and the sparks clip to near-white on your sunset tiles, so the cyan and
+amber hues hardly show. Try `glowGain` and `sparkGain` around 2-3, or more saturated colours. They are yours.

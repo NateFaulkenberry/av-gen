@@ -4400,6 +4400,153 @@ private:
     float tossMiss_ = 0.0f;
 };
 
+// ADR-2007 (CPD-R12): a beach ball. A light, lively body that bounces on the tiles' drawn tops -- the ground the viewer
+// sees, the landing springs included (read with the landings every body has passed, ADR-2002) -- and takes their
+// motion: a tile rising under it adds its upward speed, and the land's slope across the neighbouring tiles tilts the
+// bounce, so a wave ramps it. It strikes a tile's side when it runs into a taller one. A bounce never dies (each
+// leaves at least fast enough to reach `minBounce` metres), and a ball strays at most `homeRadius` from where it was
+// placed before its bounces steer it back. Its impacts spring the tile like an alien's landing, as a landing with a
+// negative strength: no alien landing glow, its own (TileBallSpec). On the hop's fixed 60 Hz step, so a seek, a 30
+// fps render and a 60 fps play bounce it alike; between steps it is drawn on its ballistic arc.
+class Ball final : public CheckpointedBehavior<Ball> {
+public:
+    explicit Ball(const nlohmann::json* s)
+        : radius_(readFloat(s, "radius", 0.6f)),
+          gravityScale_(readFloat(s, "gravityScale", 0.35f)),
+          drag_(readFloat(s, "drag", 0.05f)),
+          restitution_(readFloat(s, "restitution", 0.92f)),
+          minBounce_(readFloat(s, "minBounce", 3.0f)),
+          maxSpeed_(readFloat(s, "maxSpeed", 25.0f)),
+          tileKick_(readFloat(s, "tileKick", 1.0f)),
+          slope_(readFloat(s, "slope", 1.0f)),
+          home_(readFloat(s, "homeRadius", 30.0f)),
+          strength_(readFloat(s, "strength", 0.5f)),
+          gravity_(readFloat(s, "gravity", 9.81f)) {
+        if (s != nullptr && s->is_object() && s->contains("velocity") && (*s)["velocity"].is_array() &&
+            (*s)["velocity"].size() == 3) {
+            const auto& v = (*s)["velocity"];
+            for (int i = 0; i < 3; ++i) {
+                if (v[i].is_number()) v0_[i] = v[i].get<float>();
+            }
+        }
+    }
+
+    [[nodiscard]] std::string_view kind() const override { return "ball"; }
+
+    void registerParameters(params::ParameterSet&, const std::string&) override {}
+    void collectParameterPaths(std::vector<std::string>&) const override {}
+    void reset(Rng&) override {
+        primed_ = false;
+        impacts_ = 0;
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
+        world::GroundSource* ground = ctx.ground;
+        if (ground == nullptr || ground->pitch() <= 0.0f) {
+            return;
+        }
+        const double t = ctx.time;
+        if (!primed_) {
+            const glm::vec3 here = state.position();
+            home_xz_ = glm::vec2(here.x, here.z);
+            p_ = here;
+            p_.y = std::max(p_.y, surface(*ground, home_xz_, t) + radius_ + 1.0f);
+            v_ = v0_;
+            tick_ = static_cast<long long>(std::floor(t * kRate + 1e-6));
+            primed_ = true;
+        }
+        const auto target = static_cast<long long>(std::floor(t * kRate + 1e-6));
+        while (tick_ < target) {
+            ++tick_;
+            step(*ground, static_cast<double>(tick_) / kRate, static_cast<float>(1.0 / kRate));
+        }
+        // on its arc since the last step, never below the drawn top
+        const auto tau = static_cast<float>(t - static_cast<double>(tick_) / kRate);
+        const float g = gravity_ * gravityScale_;
+        glm::vec3 p = p_ + v_ * tau - glm::vec3(0.0f, 0.5f * g * tau * tau, 0.0f);
+        p.y = std::max(p.y, surface(*ground, glm::vec2(p.x, p.z), t) + radius_);
+        state.travel = p - state.anchor;
+        state.speed = glm::length(v_);
+        state.activity = Activity::Idle;
+        state.airborne = false;
+    }
+
+    // For tests: how many times it has struck the ground.
+    [[nodiscard]] int impacts() const { return impacts_; }
+
+private:
+    static constexpr double kRate = 60.0;
+    static constexpr double kLag = 0.1; // ADR-2002's: the landings every body has passed
+
+    [[nodiscard]] static float surface(const world::GroundSource& g, glm::vec2 p, double t) {
+        return g.drawnBy(p.x, p.y, t, t - kLag).height;
+    }
+
+    void step(world::GroundSource& g, double t, float dt) {
+        const float grav = gravity_ * gravityScale_;
+        v_.y -= grav * dt;
+        v_ *= std::exp(-drag_ * dt);
+        glm::vec3 next = p_ + v_ * dt;
+        const glm::vec2 cellFrom = g.cellCentre(p_.x, p_.z);
+        const glm::vec2 cellTo = g.cellCentre(next.x, next.z);
+        float under = surface(g, glm::vec2(next.x, next.z), t);
+        // a taller tile's side: bounce off it, back the way it came
+        if (cellTo != cellFrom && under > next.y - radius_ + 0.25f * radius_ &&
+            surface(g, cellFrom, t) <= p_.y - radius_ + 0.05f) {
+            if (std::abs(cellTo.x - cellFrom.x) > 1e-3f) v_.x = -v_.x * restitution_;
+            if (std::abs(cellTo.y - cellFrom.y) > 1e-3f) v_.z = -v_.z * restitution_;
+            next = glm::vec3(p_.x, next.y, p_.z);
+            under = surface(g, glm::vec2(next.x, next.z), t);
+        }
+        if (next.y - radius_ < under) {
+            const glm::vec2 xz(next.x, next.z);
+            const double h = 0.5 / kRate;
+            const auto rise = static_cast<float>((g.drawnBy(xz.x, xz.y, t + h, t - kLag).height -
+                                                  g.drawnBy(xz.x, xz.y, t - h, t - kLag).height) / (2.0 * h));
+            const float pitch = g.pitch();
+            const float sx = (g.landscape(xz.x + pitch, xz.y, t).height - g.landscape(xz.x - pitch, xz.y, t).height) /
+                             (2.0f * pitch);
+            const float sz = (g.landscape(xz.x, xz.y + pitch, t).height - g.landscape(xz.x, xz.y - pitch, t).height) /
+                             (2.0f * pitch);
+            const glm::vec3 n = glm::normalize(glm::vec3(-slope_ * sx, 1.0f, -slope_ * sz));
+            const glm::vec3 surfaceV(0.0f, std::max(rise, 0.0f) * tileKick_, 0.0f);
+            glm::vec3 rel = v_ - surfaceV;
+            const float vn = glm::dot(rel, n);
+            if (vn < 0.0f) {
+                rel -= (1.0f + restitution_) * vn * n;
+                v_ = rel + surfaceV;
+                const float floor = std::sqrt(2.0f * grav * std::max(minBounce_, 0.0f));
+                v_.y = std::max(v_.y, floor); // never dies
+                const glm::vec2 toHome = home_xz_ - xz;
+                const float out = glm::length(toHome);
+                if (home_ > 0.0f && out > home_) { // back toward home
+                    const glm::vec2 vh(v_.x, v_.z);
+                    const glm::vec2 want = toHome / out * std::max(glm::length(vh), 2.0f);
+                    const glm::vec2 m = glm::mix(vh, want, 0.6f);
+                    v_.x = m.x;
+                    v_.z = m.y;
+                }
+                const float sp = glm::length(v_);
+                if (sp > maxSpeed_) v_ *= maxSpeed_ / sp;
+                g.landed(xz, t, -strength_ * std::clamp(-vn / 8.0f, 0.2f, 1.0f));
+                ++impacts_;
+            }
+            next.y = under + radius_;
+        }
+        p_ = next;
+    }
+
+    float radius_, gravityScale_, drag_, restitution_, minBounce_, maxSpeed_, tileKick_, slope_, home_, strength_,
+        gravity_;
+    glm::vec3 v0_{2.0f, 6.0f, 1.0f};
+    bool primed_ = false;
+    long long tick_ = 0;
+    glm::vec3 p_{0.0f};
+    glm::vec3 v_{0.0f};
+    glm::vec2 home_xz_{0.0f};
+    int impacts_ = 0;
+};
+
 } // namespace
 
 float BehaviorContext::signal(std::string_view name) const {
@@ -4420,7 +4567,7 @@ bool BehaviorContext::event(std::string_view name) const {
 
 std::vector<std::string_view> behaviorKinds() {
     return {"hover",  "drift",  "bank",     "spin",  "wander",
-            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide", "hop"};
+            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide", "hop", "ball"};
 }
 
 
@@ -4553,6 +4700,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "hop") {
         return std::make_unique<Hop>(settings); // ADR-1958
+    }
+    if (kind == "ball") {
+        return std::make_unique<Ball>(settings); // ADR-2007
     }
     if (kind == "ground") {
         return std::make_unique<Ground>(settings);
