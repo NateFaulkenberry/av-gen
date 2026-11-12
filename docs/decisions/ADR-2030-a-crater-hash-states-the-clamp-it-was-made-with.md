@@ -69,7 +69,8 @@ rounds.
 ## Consequences
 
 - The UBSan job can now run the whole default set rather than a third of it, so a report the lunar one was hiding
-  would surface. The local UBSan run of the whole set on this commit has none.
+  would surface. A local UBSan run on this commit reached 3867 of the 4773 cases (it was stopped, not finished) and
+  reported nothing; the rest is proven only by the next nightly.
 - Assertion failures under the sanitizers are still listed and still do not gate, as the **Gating** paragraph of
   `docs/development/ci.md` ("Sanitizers") describes. They are:
   - wall-clock budgets;
