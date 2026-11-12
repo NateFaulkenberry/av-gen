@@ -26,6 +26,22 @@ std::uint32_t hashU(std::uint32_t x) {
     return x;
 }
 
+// A crater position as a hash term. Converting a float that no unsigned int can hold is undefined,
+// and every crater west or south of the origin gave one: `static_cast<std::uint32_t>(-392.7f)`.
+// Apple silicon's conversion instruction (fcvtzu) clamps, so negatives and NaN read 0 and anything
+// past the top reads the top. That clamp is what every Moon and Mars frame was made and approved
+// with, so it is written out here rather than replaced with a wrap that would re-seed the rim of
+// three craters in four. It also makes an x86 build, whose conversion wraps, draw the same craters.
+std::uint32_t craterHashTerm(float v) {
+    if (!(v > 0.0f)) {
+        return 0u;
+    }
+    if (v >= 4294967296.0f) {
+        return 0xFFFFFFFFu;
+    }
+    return static_cast<std::uint32_t>(v);
+}
+
 float hash01(std::int32_t x, std::int32_t y, std::uint32_t seed) {
     return static_cast<float>(hashU(static_cast<std::uint32_t>(x) * 73856093U ^ static_cast<std::uint32_t>(y) * 19349663U ^
                                     hashU(seed)) &
@@ -132,7 +148,7 @@ void applyCraters(Field& f, const std::vector<LunarCrater>& craters, std::uint32
             }
         }
         const float mean = cnt > 0 ? static_cast<float>(sum / cnt) : 0.0f;
-        const std::uint32_t cs = hashU(static_cast<std::uint32_t>(c.x * 13.0f) ^ static_cast<std::uint32_t>(c.z * 7.0f) ^ seed);
+        const std::uint32_t cs = hashU(craterHashTerm(c.x * 13.0f) ^ craterHashTerm(c.z * 7.0f) ^ seed);
         for (int j = j0; j <= j1; ++j) {
             for (int i = i0; i <= i1; ++i) {
                 const float dx = f.x(i) - c.x, dz = f.x(j) - c.z;

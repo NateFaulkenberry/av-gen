@@ -78,6 +78,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 1950-1969 | scene/musical-geography (Musical Geography, engineering) |
 | 1970-1979 | scene/musical-geography (Musical Geography, the art agent's requests, built by engineering) |
 | 2020-2029 | `eng/gltf-water-materials`, `eng/water-followups` and `eng/water-blend-reflect` (a gltf node's named materials drawn as water, for av-agent's imported lake, and its follow-ups) |
+| 2030-2039 | `eng/ci-fixes` (CI and the nightly Sanitizers workflow green: undefined behaviour and hosted-runner timings) |
 | 2040-2049 | `eng/scene-key-fixes` (scene keys that were written and never read, found writing the Scene Authoring Reference) |
 | 1370+ | unassigned; ask before taking |
 
@@ -1045,4 +1046,5 @@ confirm the citation you are about to change is your own.
 | [2020](ADR-2020-gltf-water-materials.md) | A gltf node's `waterMaterials` draws the named glTF materials as water with their own WaterSurface, read by terrain.water's reader, so an imported lake gets the march and the sky mirror; at most 8 surfaces, refused at load; absent changes nothing. eng/gltf-water-materials | Accepted |
 | [2021](ADR-2021-water-reflection-follow-ups.md) | Follow-ups to ADR-2020: a gltf water material writes its identifier (id AOV shows the lake; terrain water unchanged); `ssrTint`, `ssrBlur` and `ssrEdgeFade` shape the march's and the sky mirror's reflection, byte-identical at their defaults; the far treeline's band was the march's roughness blur. eng/water-followups | Accepted |
 | [2022](ADR-2022-blended-meshes-in-the-water-reflection.md) | `reflectBlended` (a water key, off by default): the frame's blended meshes are drawn a second time into the water's frame copy, so a translucent waterfall is reflected; same draws, no scratch targets (the blend pipelines write colour only); `--ab nowaterblend`. eng/water-blend-reflect | Accepted |
+| [2030](ADR-2030-a-crater-hash-states-the-clamp-it-was-made-with.md) | A crater's hash term states the clamp Apple silicon applied to a negative coordinate (UBSan's float-to-unsigned report, which failed every nightly Sanitizers run from 2026-11-01), so no approved Moon or Mars frame moves; the two-stage motion search's timing interleaves its rounds and the mixdown guard reads the fastest of three mixes, with their bounds unchanged. eng/ci-fixes | Accepted |
 | [2040](ADR-2040-a-nodes-opacity-key.md) | A node's `opacity` key is read from the scene file as the base of `nodes/<name>/opacity` (0..1, refused outside), written only when not 1, kept on duplicate; Strange Attractor's old rover tracks now fade as built. Musical Geography's `horizonDensity` 9 -> 8 (the engine maximum). eng/scene-key-fixes | Accepted |
