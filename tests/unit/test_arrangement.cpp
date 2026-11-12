@@ -13,9 +13,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 
 using namespace avgen;
 using audio::AudioClip;
@@ -328,13 +330,21 @@ TEST_CASE("Mixing a piece costs what a load costs", "[audio][arrangement][perfor
     }
     REQUIRE(sources.sync(clips).empty());
 
+    // The fastest of three mixes. One mix was the measurement until a hosted CI runner read 2851 ms
+    // for a loop that reads 50-400 ms on nearly every hosted run (one other read 1908 ms): a
+    // 138 MB output buffer on a 7 GB runner running three shards can stall on memory that is not
+    // the loop's fault. A quadratic is slow on every mix, so the fastest of three still catches it.
     audio::MixReport report;
-    const auto mixed = audio::mixArrangement(clips, sources, &report);
-    REQUIRE(mixed.has_value());
-    CHECK_THAT(report.durationSeconds, WithinAbs(360.0, 1e-6));
-    WARN("six-minute stereo arrangement of six clips mixed in " << report.millis << " ms");
+    double fastest = std::numeric_limits<double>::max();
+    for (int run = 0; run < 3; ++run) {
+        const auto mixed = audio::mixArrangement(clips, sources, &report);
+        REQUIRE(mixed.has_value());
+        CHECK_THAT(report.durationSeconds, WithinAbs(360.0, 1e-6));
+        fastest = std::min(fastest, report.millis);
+    }
+    WARN("six-minute stereo arrangement of six clips mixed in " << fastest << " ms (fastest of 3)");
     // Generous, because this is a correctness guard against an accidental quadratic rather than a
     // performance target: a second here would mean something is wrong with the loop, not that the
     // machine is slow.
-    CHECK(report.millis < 2000.0);
+    CHECK(fastest < 2000.0);
 }

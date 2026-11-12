@@ -608,29 +608,34 @@ TEST_CASE("the two-stage search is worth it only at a scale nothing here has",
     for (const std::uint32_t count : {1738u, 1000000u}) {
         const scene::MotionDatabase db = synthesise(count, config);
         query.current = count / 2u;
-        const auto time = [&](bool staged) {
-            double best = std::numeric_limits<double>::max();
-            const int repeats = count >= 1000000u ? 3 : 50;
-            for (int r = 0; r < 5; ++r) {
-                const auto t0 = std::chrono::steady_clock::now();
-                for (int i = 0; i < repeats; ++i) {
-                    if (staged) {
-                        (void)scene::searchMotionStaged(db, query, weights, plan);
-                    } else {
-                        (void)scene::searchMotion(db, query, weights);
-                    }
+        const int repeats = count >= 1000000u ? 3 : 50;
+        const auto round = [&](bool staged) {
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int i = 0; i < repeats; ++i) {
+                if (staged) {
+                    (void)scene::searchMotionStaged(db, query, weights, plan);
+                } else {
+                    (void)scene::searchMotion(db, query, weights);
                 }
-                const auto t1 = std::chrono::steady_clock::now();
-                best = std::min(best,
-                                std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(
-                                    t1 - t0)
-                                        .count() /
-                                    repeats);
             }
-            return best;
+            const auto t1 = std::chrono::steady_clock::now();
+            return std::chrono::duration_cast<std::chrono::duration<double, std::micro>>(t1 - t0).count() /
+                   repeats;
         };
-        const double linear = time(false);
-        const double staged = time(true);
+        // **Interleaved, best of nine each.** The two searches used to be timed one after the other:
+        // five rounds of the linear scan, then five of the two-stage search. At a million samples the
+        // two-stage block lasts about 50 ms, so one slow spell on a shared machine (CI runs three
+        // shards on a three-vCPU runner) can cover every one of its rounds. A hosted run read 10.0 ms
+        // for a search that reads 3-5 ms on most hosted runs, and a 4.9x speedup failed the 5x bound
+        // (the median over 28 hosted runs is 10.5x). Alternating the two spreads each one's rounds
+        // over the whole measurement, so a slow spell costs a round of each rather than every round
+        // of one, and the best of each is a quiet round of each. The bounds are unchanged.
+        double linear = std::numeric_limits<double>::max();
+        double staged = std::numeric_limits<double>::max();
+        for (int r = 0; r < 9; ++r) {
+            linear = std::min(linear, round(false));
+            staged = std::min(staged, round(true));
+        }
         WARN(fmt::format("{:>9}  {:>9.1f} us  {:>9.1f} us  {:>9.1f}x", count, linear, staged,
                          linear / staged));
         if (count >= 1000000u) {
