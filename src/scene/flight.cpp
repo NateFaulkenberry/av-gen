@@ -262,13 +262,32 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
         return out;
     }
     const float rate = kFlightRate;
-    const int n = static_cast<int>(spec.duration * rate) + 1;
     const Dense dense = densify(spec);
+    // ADR-2010: a loop's table covers three laps (the first, the one that repeats, and one more so the repeating lap
+    // is never smoothed against the table's end), whatever `duration` says
+    float lap = 0.0f;
+    if (spec.loop) {
+        float s = 0.0f;
+        const float total = dense.arc.back();
+        int k = 0;
+        for (; s < total && k < static_cast<int>(7200.0f * rate); ++k) {
+            const float v = along(dense, true, s).speed / rate;
+            if (s + v >= total) { // the fraction of this step that reaches the lap
+                lap = (static_cast<float>(k) + (total - s) / std::max(v, 1e-6f)) / rate;
+                break;
+            }
+            s += v;
+        }
+        if (!(lap > 0.0f) || lap * 3.0f > 7200.0f) return out; // a lap too long to table
+    }
+    const int n = spec.loop ? static_cast<int>(std::ceil(3.0f * lap * rate)) + 2 : static_cast<int>(spec.duration * rate) + 1;
     // 1. the route by time: arc length advances at the local speed
     std::vector<glm::vec2> xz(static_cast<std::size_t>(n));
     std::vector<float> altitude(static_cast<std::size_t>(n));
     // the sample at which the flight first passes each waypoint (the dense route has 64 points per leg)
-    std::vector<int> passed(spec.route.size(), -1);
+    // (ADR-2010: on a loop, every lap's pass)
+    std::vector<std::vector<int>> passed(spec.route.size());
+    const float total = dense.arc.back();
     float s = 0.0f;
     for (int k = 0; k < n; ++k) {
         const AlongOut a = along(dense, spec.loop, s);
@@ -276,7 +295,8 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
         altitude[static_cast<std::size_t>(k)] = a.altitude;
         for (std::size_t j = 0; j < spec.route.size(); ++j) {
             const std::size_t at = std::min(j * 64, dense.arc.size() - 1);
-            if (passed[j] < 0 && s >= dense.arc[at]) passed[j] = k;
+            const float mark = dense.arc[at] + static_cast<float>(passed[j].size()) * total;
+            if ((spec.loop || passed[j].empty()) && s >= mark) passed[j].push_back(k);
         }
         s += a.speed / rate;
     }
@@ -365,14 +385,16 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
     std::vector<float> nadir(aim.size(), 0.0f);
     for (std::size_t j = 0; j < spec.route.size(); ++j) {
         const float span = spec.route[j].nadir;
-        if (!(span > 0.0f) || passed[j] < 0) continue;
-        for (std::size_t i = 0; i < aim.size(); ++i) {
-            const float u = (static_cast<float>(i) - static_cast<float>(passed[j])) / (span * rate) + 0.5f;
-            const auto ease = [](float e0, float e1, float x) {
-                const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
-                return t * t * (3.0f - 2.0f * t);
-            };
-            nadir[i] = std::max(nadir[i], ease(0.0f, 0.3f, u) * (1.0f - ease(0.7f, 1.0f, u)));
+        if (!(span > 0.0f)) continue;
+        for (const int pass : passed[j]) {
+            for (std::size_t i = 0; i < aim.size(); ++i) {
+                const float u = (static_cast<float>(i) - static_cast<float>(pass)) / (span * rate) + 0.5f;
+                const auto ease = [](float e0, float e1, float x) {
+                    const float t = std::clamp((x - e0) / (e1 - e0), 0.0f, 1.0f);
+                    return t * t * (3.0f - 2.0f * t);
+                };
+                nadir[i] = std::max(nadir[i], ease(0.0f, 0.3f, u) * (1.0f - ease(0.7f, 1.0f, u)));
+            }
         }
     }
     // On the leg, screen-up turns from the look-ahead heading to the direction of travel itself (the eye's own
@@ -406,6 +428,7 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
     turn = smoothSamples(turn, 0.8f * rate);
     const float limit = glm::radians(spec.bankLimit);
     out.eye.resize(eyes.size());
+    out.lap = lap;
     out.aim = aim;
     out.heading = heading;
     out.nadir = nadir;
@@ -418,25 +441,63 @@ FlightTable buildFlightTable(const FlightSpec& spec, const FlightGround& ground,
     return out;
 }
 
+namespace {
+
+struct FlightSample {
+    glm::vec4 eye; // xyz, w = bank
+    glm::vec3 aim;
+    glm::vec2 heading;
+};
+
+// The table at local second `tau` (linear between samples), clamped to its ends.
+FlightSample sampleFlight(const FlightTable& table, double tau) {
+    const auto n = static_cast<int>(table.eye.size());
+    const double f = std::clamp(tau * kFlightRate, 0.0, static_cast<double>(n - 1));
+    const int i = std::min(static_cast<int>(f), n - 2);
+    const auto a = static_cast<float>(f - i);
+    const auto ui = static_cast<std::size_t>(i);
+    FlightSample s;
+    s.eye = glm::mix(table.eye[ui], table.eye[ui + 1], a);
+    s.aim = glm::mix(table.aim[ui], table.aim[ui + 1], a);
+    s.heading = table.heading.size() == table.eye.size() ? glm::mix(table.heading[ui], table.heading[ui + 1], a)
+                                                         : glm::vec2(s.aim.x, s.aim.z);
+    return s;
+}
+
+} // namespace
+
 FlightPose flightPoseAt(const FlightSpec& spec, const FlightTable& table, double t) {
     FlightPose pose;
     if (!table.valid()) return pose;
-    const auto n = static_cast<int>(table.eye.size());
-    const double f = std::clamp((t - static_cast<double>(spec.startTime)) * kFlightRate, 0.0, static_cast<double>(n - 1));
-    const int i = std::min(static_cast<int>(f), n - 2);
-    const auto a = static_cast<float>(f - i);
-    const glm::vec4 e = glm::mix(table.eye[static_cast<std::size_t>(i)], table.eye[static_cast<std::size_t>(i) + 1], a);
-    const glm::vec3 d = glm::normalize(
-        glm::mix(table.aim[static_cast<std::size_t>(i)], table.aim[static_cast<std::size_t>(i) + 1], a));
+    double tau = t - static_cast<double>(spec.startTime);
+    FlightSample sm;
+    const auto lap = static_cast<double>(table.lap);
+    if (lap > 0.0) {
+        // ADR-2010: past the second lap, the second lap again; over its last seconds it eases into the pose a lap
+        // earlier -- the same point of the route, the second lap's start -- so the wrap is seamless
+        if (tau >= 2.0 * lap) tau = lap + std::fmod(tau - lap, lap);
+        sm = sampleFlight(table, tau);
+        const double blend = std::min(static_cast<double>(kFlightLoopBlend), 0.25 * lap);
+        const double into = tau - (2.0 * lap - blend);
+        if (into > 0.0) {
+            const auto x = static_cast<float>(std::clamp(into / blend, 0.0, 1.0));
+            const float w = x * x * (3.0f - 2.0f * x);
+            const FlightSample b = sampleFlight(table, tau - lap);
+            sm.eye = glm::mix(sm.eye, b.eye, w);
+            sm.aim = glm::mix(sm.aim, b.aim, w);
+            sm.heading = glm::mix(sm.heading, b.heading, w);
+        }
+    } else {
+        sm = sampleFlight(table, tau);
+    }
+    const glm::vec4 e = sm.eye;
+    const glm::vec3 d = glm::normalize(sm.aim);
     pose.eye = glm::vec3(e);
     pose.target = pose.eye + 100.0f * d;
     pose.rollDegrees = glm::degrees(e.w);
     // screen-up: in the plane of the aim and the heading, perpendicular to the aim -- the world's up when level, the
     // heading at the nadir, continuous between
-    glm::vec2 h = table.heading.size() == table.eye.size()
-                      ? glm::mix(table.heading[static_cast<std::size_t>(i)], table.heading[static_cast<std::size_t>(i) + 1], a)
-                      : glm::vec2(d.x, d.z);
-    h = glm::dot(h, h) > 1e-12f ? glm::normalize(h) : glm::vec2(1.0f, 0.0f);
+    glm::vec2 h = sm.heading;
     const float pitch = std::asin(std::clamp(d.y, -1.0f, 1.0f));
     pose.up = glm::normalize(glm::vec3(-h.x * std::sin(pitch), std::cos(pitch), -h.y * std::sin(pitch)));
     return pose;

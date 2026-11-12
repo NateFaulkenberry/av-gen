@@ -136,6 +136,12 @@ FLIGHT_FULL = dict(FLIGHT, startTime=0.0, duration=210.5, route=[
 # CP-B r2 route -- sea slabs, the shore and path, the crowns, the sweep, the river banks -- so every leg passes some.
 # They are passed, never framed (the camera rule). Referenced from assets/aliens (commercial; never copied).
 ALIENS_DIR = os.path.join(HERE, "..", "..", "assets", "aliens")
+RELATIVE_TO = None   # --release: asset paths relative to this directory (the scene's), so a checkout can open it
+
+
+def asset_path(path, base=None):
+    base = base or RELATIVE_TO
+    return os.path.relpath(os.path.abspath(path), base) if base else os.path.abspath(path)
 KINDS = ["scout", "ranger", "elder", "pilot", "diver", "trooper"]
 # (x, z, habitat): beside the flight line so they cross the lower frame. The sea and path legs (r2, approved): 8-16 m
 # off. CP-C r3: the hills, sweep and river legs (clip +43..+79 s) fly higher, so those aliens sit 6 m off the line
@@ -316,7 +322,7 @@ def cast_nodes(state="day"):
         home = rest[0] if rest else HOME_RADIUS[hab]
         name = "alien%02d" % i
         nodes.append({"name": name, "kind": "gltf",
-                      "asset": os.path.abspath(os.path.join(ALIENS_DIR, "alien-%s.glb" % KINDS[i % len(KINDS)])),
+                      "asset": asset_path(os.path.join(ALIENS_DIR, "alien-%s.glb" % KINDS[i % len(KINDS)])),
                       "position": [float(x), 0.0, float(z)], "rotation": [0.0, (i * 47) % 360 * 1.0, 0.0],
                       "scale": [1.94, 1.94, 1.94], "emissiveBoost": NIGHT_GLOW if state == "night" else 1.0,
                       "animation": {"state": "Idle", "blend": 0.25, "speed": 1.0, "updateHz": 30,
@@ -433,8 +439,30 @@ def arc_programs(S):  # noqa: C901
     return progs
 
 
-def arc_timeline():
-    """Every parameter the arc moves, sampled through each transition (arc.sample_times) and keyed linearly."""
+# The live release (ADR-2010): a live scene's transport never ends (ADR-1342), so the flight loops (its route comes
+# round to the bay, the second lap repeating for ever) and the arc loops on its own: day to night over the song's
+# 210.5 s as the film has it, then back to day by LIVE_LOOP, from the night's last values to the first keys.
+LIVE_LOOP = 240.0
+
+
+def loop_tracks(tracks, period):
+    """Each track holds its value at arc.SONG, then runs linearly to its first key's value at `period`, and loops."""
+    out = []
+    for tr in tracks:
+        keys = [k for k in tr["keys"] if k["time"] <= arc.SONG + 1e-6]
+        last = keys[-1]
+        if last["time"] < arc.SONG - 1e-6:
+            keys.append({"time": arc.SONG, "value": last["value"], "interp": "linear"})
+        else:
+            keys[-1] = dict(last, interp="linear")
+        keys.append({"time": period, "value": tr["keys"][0]["value"], "interp": "linear"})
+        out.append(dict(tr, keys=keys, loopLength=period))
+    return out
+
+
+def arc_timeline(loop=0.0):
+    """Every parameter the arc moves, sampled through each transition (arc.sample_times) and keyed linearly. `loop` > 0:
+    the live release's looped arc (loop_tracks)."""
     times = arc.sample_times(1.0)
     samples = {}
 
@@ -477,26 +505,41 @@ def arc_timeline():
             put("lights/halo%02d/intensity" % i, t, round(NIGHT_HALO["intensity"] * S["glow"], 6))
     tracks = [arc.track("env/dayNight/dayPhase", arc.phase_track())]
     tracks += [arc.keyed(k, v) for k, v in sorted(samples.items()) if not arc.is_static(v)]
+    if loop > 0.0:
+        tracks = loop_tracks(tracks, loop)
     return {"enabled": True, "cues": [], "tracks": tracks}
 
 
-def project_doc(scene_rel, state):
-    return {
+def project_doc(scene_rel, state, proj_dir=None, live=None):
+    """live None: the look-development project (Feline, sonic.live as before); False: the release's offline Feline
+    project; True: the release's live project (live input, no file, the arc looped)."""
+    if live:
+        assets = {"scene": {"kind": "composition", "path": scene_rel}}
+    else:
+        assets = {"scene": {"kind": "composition", "path": scene_rel},
+                  "audio": asset_path(AUDIO, proj_dir),
+                  "stems": [dict(st, file=asset_path(os.path.join(AUDIO_DIR, st["file"]), proj_dir))
+                            for st in look.FELINE_STEMS]}
+    doc = {
         "format": "avgen-project", "version": 4,
-        "assets": {"scene": {"kind": "composition", "path": scene_rel},
-                   "audio": AUDIO,
-                   "stems": [dict(st, file=os.path.join(AUDIO_DIR, st["file"])) for st in look.FELINE_STEMS]},
+        **({"app": {"name": "Musical Geography" + ("" if live else " (offline)")}} if live is not None else {}),
+        "assets": assets,
         "parameters": dict(look.post(state), **{"post/output/dither": 1.0, "env/tiles/rings/ahead": 150.0}),
         "routes": look.audio_routes(),
         # the response bus (response.low/mid/high/onset/level) publishes only with a sonic block: without it four of the
-        # seven terrain routes and the loudness hops were dead in draft3 (eng, 10-audio-reactivity-now.md)
-        "sonic": {"live": True},
-        # Phase 7: Feline's stems as feeds (the beat clock follows the drums, the levels the bass)
-        "feeds": dict(look.FELINE_FEEDS),
-        **({"timeline": arc_timeline()} if FULL else {}),
+        # seven terrain routes and the loudness hops were dead in draft3 (eng, 10-audio-reactivity-now.md).
+        # sonic.live turns live input on when the project opens (ADR-1025): the live release only. (The look-development
+        # project had it on, so a live run of it heard the microphone, not Feline; and any sonic.live project under
+        # examples/ must be listed as live in the index.)
+        "sonic": {"live": bool(live)},
+        # Phase 7: Feline's stems as feeds (the beat clock follows the drums, the levels the bass); live input has no
+        # stems, so the live release reads the mix (or a multichannel input's mapped stems)
+        **({} if live else {"feeds": dict(look.FELINE_FEEDS)}),
+        **({"timeline": arc_timeline(LIVE_LOOP if live else 0.0)} if FULL else {}),
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video",
                    "path": "renders/musical-geography.mp4"},
     }
+    return doc
 
 
 def main():
@@ -512,7 +555,13 @@ def main():
     ap.add_argument("--clouds", action="store_true", help="CP-D r2: the slab clouds (look.CLOUD_LAYERS)")
     ap.add_argument("--tiltshift", action="store_true", help="cpd-r3: the ADR-079 tilt-shift band (look.TILT)")
     ap.add_argument("--tiles", default=None, help="CP-D r2: JSON overrides for world.TILES (terrain variants)")
+    ap.add_argument("--release", action="store_true",
+                    help="the app's pair (examples/index.json, Worlds): the full scene with characters, clouds and "
+                         "tilt-shift, as musical-geography.json (offline, Feline) and musical-geography-live.json "
+                         "(live input, the flight and the arc looped), their scenes in scene/; paths relative")
     a = ap.parse_args()
+    if a.release:
+        a.full = a.characters = a.clouds = a.tiltshift = True
     global CLOUDS
     CLOUDS = a.clouds
     look.TILT_SHIFT = a.tiltshift
@@ -528,6 +577,9 @@ def main():
     FLY = a.flight
     global CHARACTERS
     CHARACTERS = a.characters
+    if a.release:
+        release()
+        return
     os.makedirs(a.out, exist_ok=True)
     scene_path = os.path.join(a.out, "musical-geography.scene.json")
     with open(scene_path, "w") as f:
@@ -537,6 +589,29 @@ def main():
     with open(proj_path, "w") as f:
         json.dump(project_doc(os.path.relpath(scene_path, proj_dir), a.state), f, indent=1)
     print("wrote", scene_path, "and", proj_path)
+
+
+def release():
+    """The app's two projects (committed) and their scenes (generated, gitignored), with relative paths."""
+    global RELATIVE_TO
+    scene_dir = os.path.join(HERE, "scene")
+    os.makedirs(scene_dir, exist_ok=True)
+    RELATIVE_TO = scene_dir
+    state = arc.ARC[0][1]
+    for live, stem, scene_stem in ((False, "musical-geography", "release-offline"),
+                                   (True, "musical-geography-live", "release-live")):
+        doc = scene_doc(state, False, "low")
+        if live:
+            doc["flight"] = dict(doc["flight"], loop=True)   # ADR-2010: round to the bay and on, for ever
+        scene_path = os.path.join(scene_dir, scene_stem + ".scene.json")   # apart from the look-development scene
+        with open(scene_path, "w") as f:
+            json.dump(doc, f, indent=1)
+        proj_path = os.path.join(HERE, stem + ".json")
+        with open(proj_path, "w") as f:
+            # compact: the arc's keyed tracks are most of it (committed; regenerate after a look change)
+            json.dump(project_doc(os.path.relpath(scene_path, HERE), state, HERE, live), f, separators=(",", ":"))
+            f.write("\n")
+        print("wrote", scene_path, "and", proj_path)
 
 
 if __name__ == "__main__":

@@ -345,3 +345,49 @@ TEST_CASE("the top-down leg looks straight down with no flip, then looks ahead a
     CHECK(glm::dot(glm::vec2(down.up.x, down.up.z), travel) > 0.9f);
     CHECK(std::abs(table.eye[deepest].w) < 1e-4f); // no bank at the nadir
 }
+
+TEST_CASE("a looped flight never ends: it repeats its second lap and wraps without a jump", "[flight][geography][adr2010]") {
+    // ADR-2010: a live scene's transport is endless (ADR-1342). A looped route's table covers three laps; from the
+    // second lap on the pose is the second lap's again, eased into its own start over the lap's last seconds.
+    auto f = route();
+    f.loop = true;
+    f.route[1].nadir = 4.0f; // a top-down leg, which must come round on every lap
+    const scene::FlightTable table =
+        scene::buildFlightTable(f, scene::tileFlightGround(hills(), swell(), 1.0f, 1.0f), 0.0f);
+    REQUIRE(table.valid());
+    const double lap = table.lap;
+    REQUIRE(lap > 20.0);
+    CHECK(static_cast<double>(table.eye.size()) >= 3.0 * lap * scene::kFlightRate);
+
+    // the second lap repeats exactly, an hour on as well
+    for (const double x : {0.0, 3.3, 0.5 * lap}) {
+        const auto a = scene::flightPoseAt(f, table, lap + x);
+        for (const int k : {1, 2, 11}) {
+            const auto b = scene::flightPoseAt(f, table, lap + x + k * lap);
+            CHECK(glm::length(a.eye - b.eye) < 1e-3f);
+            CHECK(glm::length(a.target - b.target) < 1e-2f);
+        }
+    }
+    // played at 60 fps over three laps' wraps: no step bigger than the flight's fastest motion allows, and the
+    // top-down leg in every lap
+    float worst = 0.0f;
+    float fastest = 0.0f;
+    for (const auto& w : f.route) fastest = std::max(fastest, w.speed > 0.0f ? w.speed : f.speed);
+    int nadirLaps = 0;
+    bool inNadir = false;
+    scene::FlightPose prev = scene::flightPoseAt(f, table, 0.0);
+    for (int k = 1; k <= static_cast<int>(4.0 * lap * 60.0); ++k) {
+        const scene::FlightPose p = scene::flightPoseAt(f, table, k / 60.0);
+        worst = std::max(worst, glm::length(p.eye - prev.eye));
+        const bool down = glm::normalize(p.target - p.eye).y < -0.95f;
+        if (down && !inNadir) ++nadirLaps;
+        inNadir = down;
+        prev = p;
+    }
+    CAPTURE(lap, worst, fastest, nadirLaps);
+    CHECK(worst < 2.0f * fastest / 60.0f + 0.05f); // the speed's own step, with room for a climb
+    CHECK(nadirLaps >= 4);
+    // and it is still a function of time: seek equals play past the wraps
+    const scene::FlightPose seeked = scene::flightPoseAt(f, table, static_cast<int>(4.0 * lap * 60.0) / 60.0);
+    CHECK(seeked.eye == prev.eye);
+}

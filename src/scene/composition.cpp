@@ -1503,8 +1503,14 @@ const FlightTable* Composition::ensureFlightTable(bool evenDisabled) {
         const FlightGround world = [tiles, offset](float x, float z, float t) {
             return tiles(x - offset.x, z - offset.z, t) + offset.y;
         };
+        const auto built = std::chrono::steady_clock::now();
         flightTable_ = buildFlightTable(flightResolved_, world, flightLiveMargin(dyn, flight_.amplitudeHeadroom));
         flightKey_ = key;
+        if (flightTable_.lap > 0.0f) { // ADR-2010
+            log::info("flight: a looped route, {:.1f} s a lap; {} samples (three laps) in {:.0f} ms", flightTable_.lap,
+                      flightTable_.eye.size(),
+                      std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - built).count());
+        }
     }
     return flightTable_.valid() ? &flightTable_ : nullptr;
 }

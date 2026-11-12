@@ -745,6 +745,21 @@
       "generate": "python3 examples/rainbow-world/build.py   (needs Blender 5.x and the six CC0 Poly Haven rocks in assets/terrain/rocks: tools/fetch_polyhaven.py)"
     },
     {
+      "category": "Worlds",
+      "description": "Play live audio (any mix). Musical Geography: a world of square tiles -- a coast, a bay, rolling hills, rivers and ponds, all built from thin slabs -- that a drone flies low over, round and round, through day, sunset and night and back to day. The land itself plays the music: the low end swells the ground in slow rolling waves, each hit sends a ring rippling out across the tiles ahead, the overall loudness makes the land breathe and lights the tile edges, the paths and the pads, and the phrase moves the glowing contour lines. Green aliens walk the tiles and get thrown into the air when a crest passes under them; chrome beach balls bounce off the waves and flash the tile edges where they land. The camera looks where it flies (and once, straight down). Musical Geography (offline), under Offline > Worlds, is the same world on Feline Footwear for renders. Run examples/musical-geography/build.py --release first (it writes the scenes). See docs/prototypes/musical-geography/.",
+      "live": true,
+      "name": "Musical Geography",
+      "project": "musical-geography/musical-geography-live.json",
+      "generate": "python3 examples/musical-geography/build.py --release   (writes both scenes into examples/musical-geography/scene/; needs the six Glowmere aliens in assets/aliens -- commercial, not in the repository, see assets/aliens/ATTRIBUTION.md -- and, for the offline project, assets/audio/feline-footwear.wav and its three stems in assets/audio/stems)"
+    },
+    {
+      "category": "Worlds",
+      "description": "Musical Geography at full quality, for renders, on Feline Footwear: the tile world's coast, bay, hills and rivers flown once through the song, day turning to sunset at the sweep and night at the climb, ending in the dark. The song's bass swells the ground, its hits ripple rings across the tiles, its loudness makes the land breathe and lights the tile edges, and the drum stem keeps the beat; aliens are thrown up by the crests and beach balls bounce and flash where they land. Musical Geography, under Live > Worlds, is the same world on live input, looping. Run examples/musical-geography/build.py --release first (it writes the scenes). See docs/prototypes/musical-geography/.",
+      "name": "Musical Geography (offline)",
+      "project": "musical-geography/musical-geography.json",
+      "generate": "python3 examples/musical-geography/build.py --release   (writes both scenes into examples/musical-geography/scene/; needs the six Glowmere aliens in assets/aliens -- commercial, not in the repository, see assets/aliens/ATTRIBUTION.md -- and, for the offline project, assets/audio/feline-footwear.wav and its three stems in assets/audio/stems)"
+    },
+    {
       "category": "Diagnostics",
       "name": "Audio Response Lab",
       "description": "An engineering instrument, not a show: a fixed board of meters, lamps, a beat dial and probes, each a route from a real production signal (response.*, audio.*Level, beat.*, stem.<key>.* for sources keyed drums/bass/synth/pad, control.labCC1 on MIDI CC 1). Play live audio (and optionally map input sources with those keys) to see what the analysis publishes, when, and where. A red lamp under a source means it is not configured or not sending. Fixtures and the measured report: tools/audio_lab, docs/prototypes/audio-response-lab.",
