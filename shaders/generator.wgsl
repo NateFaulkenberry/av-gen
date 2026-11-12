@@ -697,12 +697,13 @@ fn tileSpring(x: f32, z: f32) -> vec2<f32> {
         let k = clamp((reach - 5.0) / (6.0 - 5.0), 0.0, 1.0); // kTileSpringReachStart .. kTileSpringReach
         let window = 1.0 - k * k * (3.0 - 2.0 * k);
         let env = exp(-zeta * w * a);
-        h = h - tile.spring0.x * e.w * exp(-r / tile.spring1.x) * window * env * sin(wd * a);
+        // ADR-2008: a beach ball's impact (strength < 0) springs the tile like a landing, without the landing glow
+        h = h - tile.spring0.x * abs(e.w) * exp(-r / tile.spring1.x) * window * env * sin(wd * a);
         // ADR-1960: the glow on its own, tighter falloff (glowRadius <= rippleRadius), eased out by 6 of its radii
         let gr = r / tile.spring1.z;
         let gk = clamp(gr - 5.0, 0.0, 1.0);
         let gw = 1.0 - gk * gk * (3.0 - 2.0 * gk);
-        l = l + e.w * exp(-gr) * gw * env * (1.0 - exp(-a / 0.06));
+        l = l + max(e.w, 0.0) * exp(-gr) * gw * env * (1.0 - exp(-a / 0.06));
     }
     return vec2<f32>(h, clamp(l, 0.0, 1.0));
 }

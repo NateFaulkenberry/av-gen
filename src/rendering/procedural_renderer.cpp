@@ -3092,7 +3092,8 @@ void ProceduralRenderer::update(wgpu::CommandEncoder& encoder, const scene::Scen
                 // CP-A r3: the side rule's threshold (windTiming is free on a slab draw too: no wind)
                 u.windTiming = glm::vec4(object.slabSidePixels > 0.0f ? object.slabSidePixels
                                                                       : 2.0f * std::max(object.slabFarPixels, 0.0f),
-                                         object.slabDebugFaces ? 1.0f : 0.0f, scene::slabRuleScale(object), 0.0f);
+                                         object.slabDebugFaces ? 1.0f : 0.0f, scene::slabRuleScale(object),
+                                         std::max(object.slabEdgeOn, 0.0f)); // ADR-2004: the edge-on sides
             }
         }
         im.deformerStaging.assign(static_cast<std::size_t>(lodCount) * kDeformerSlotStride, 0);

@@ -3231,6 +3231,9 @@ json ProceduralGeometry::toJson() const {
     if (slabFarPixels != 6.0f) {
         j["slabFarPixels"] = slabFarPixels; // ADR-1959 (amended)
     }
+    if (slabEdgeOn != 0.1f) {
+        j["slabEdgeOn"] = slabEdgeOn; // ADR-2004
+    }
     {
         json s = json::object();
         s["kind"] = primitiveKindName(source.kind);
@@ -3551,6 +3554,7 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(g.slabs, "slabs", readBool); // ADR-1959
         AVGEN_PROC_READ(g.slabFarPixels, "slabFarPixels", readFloat); // ADR-1959 (amended)
         AVGEN_PROC_READ(g.slabSidePixels, "slabSidePixels", readFloat); // CP-A r3
+        AVGEN_PROC_READ(g.slabEdgeOn, "slabEdgeOn", readFloat); // ADR-2004
         AVGEN_PROC_READ(g.slabDebugFaces, "slabDebugFaces", readBool); // CP-A r3 diagnostic
         AVGEN_PROC_READ(g.sourceTransform, "sourceTransform", readTransform);
         AVGEN_PROC_READ(g.distributionTransform, "distributionTransform", readTransform);

@@ -3679,6 +3679,7 @@ public:
         timer_ = 0.0f;
         lastToss_ = -1e9;
         withheldUntil_ = -1e9;
+        carry_ = 0.0f;
         armed_ = false;
         peak_ = 0.0f;
         tosses_ = 0;
@@ -3703,7 +3704,9 @@ public:
         glm::vec2 xz = pos_;
         float y = ground->at(pos_.x, pos_.y, t).height;
         if (phase_ == Phase::Move) {
-            y = y_; // the walk's step-down ease, from the last step
+            y = y_; // the walk's step ease, from the last step
+        } else if ((phase_ == Phase::Pause || phase_ == Phase::Crouch) && carry_ > 0.0f && t >= carry0_) {
+            y += carry_ * std::exp(-static_cast<float>(t - carry0_) / kCarryTime); // ADR-2006
         } else if (phase_ == Phase::Air) {
             arcAt(*ground, t, xz, y);
         } else if (phase_ == Phase::Toss) {
@@ -3832,7 +3835,7 @@ private:
     };
     [[nodiscard]] Crest visibleCrest(const world::GroundSource& g, double t, int topK, float best) const {
         const double step = 1.0 / kHopRate;
-        const auto h = [&](int j) { return g.landscape(pos_.x, pos_.y, t + j * step).height; };
+        const auto h = [&](int j) { return g.landscape(armPos_.x, armPos_.y, t + j * step).height; };
         Crest c{topK, best, true};
         if (!(crestWindow_ > 0.0f)) {
             return c;
@@ -3843,7 +3846,7 @@ private:
         float run = 0.0f; // the fastest rise since the chosen top
         bool rising = false;
         for (int j = topK + 1; j <= cap; ++j) {
-            const float r = groundRise(g, pos_, t + j * step);
+            const float r = groundRise(g, armPos_, t + j * step);
             // past the window, unless still climbing over the chosen top: then on to where that climb tops
             if (j > c.k + window && !(rising && h(j) > top + crestMargin_)) break;
             if (r > 0.0f) {
@@ -3889,7 +3892,7 @@ private:
         const double step = 1.0 / kHopRate;
         const double by = t - kDrawnLag;
         const int window = static_cast<int>(std::lround(static_cast<double>(crestWindow_) * kHopRate));
-        const auto f = [&](int j) { return g.drawnBy(pos_.x, pos_.y, launchAt_ + j * step, by).height; };
+        const auto f = [&](int j) { return g.drawnBy(armPos_.x, armPos_.y, launchAt_ + j * step, by).height; };
         const float at = f(0);
         int best = 0;
         float high = at;
@@ -3912,6 +3915,23 @@ private:
         launchAt_ += best * step;
     }
 
+    // ADR-2006 (CPD-R13): how far ahead a walker looks for a step up (seconds of its walk), and how fast it rises to it.
+    static constexpr float kStepLead = 0.25f;
+    static constexpr float kStepRise = 0.06f;
+    // ...and the height a walker was still easing down when it stopped (pause, crouch): it eases out over kCarryTime
+    // seconds in the drawn position rather than snapping to the tile in one frame.
+    static constexpr float kCarryTime = 0.05f;
+    // ADR-2005: how far from a tile's centre a walker may start a crouch, and how long it takes to settle onto it.
+    static constexpr float kCrouchReach = 1.0f;
+    static constexpr float kCrouchSettle = 0.4f;
+    static constexpr float kMinCrouch = 0.1f;
+    static constexpr float kSettleSpeed = 2.5f; // m/s at most: a crouch with less time than that to settle waits
+    void leaveMove(const world::GroundSource& g, double t) {
+        if (phase_ != Phase::Move) return;
+        carry_ = std::max(0.0f, y_ - g.at(pos_.x, pos_.y, t).height);
+        carry0_ = t;
+    }
+
     // One fixed step at time `t`.
     void step(world::GroundSource& ground, const BehaviorContext& ctx, double t, float dt) {
         const float pitch = ground.pitch();
@@ -3925,7 +3945,10 @@ private:
         // onto another tile looks again from there. The cooldown runs from the last throw.
         if (phase_ == Phase::Pause || phase_ == Phase::Move) {
             const float threshold = value(tossThreshold_, tossThresholdDefault_);
-            const glm::ivec2 tile = tileOf(pos_, pitch);
+            // ADR-2005 (CPD-R13): a walker mid-step reads the crest of the tile it is stepping onto -- the centre it will
+            // stand on -- and, armed there, stops on it instead of walking on.
+            armPos_ = phase_ == Phase::Move && leg_ < steps_.size() ? tileCentreOf(steps_[leg_].tile, pitch) : pos_;
+            const glm::ivec2 tile = tileOf(armPos_, pitch);
             if (threshold > 0.0f && t - lastToss_ >= static_cast<double>(value(tossCooldown_, tossCooldownDefault_))) {
                 const double step = 1.0 / kHopRate;
                 if (t < withheldUntil_ - 1e-9 && tile == withheldTile_) {
@@ -3933,14 +3956,14 @@ private:
                 } else if (!armed_ || tile != armedTile_ || (t >= launchAt_ - 1e-9 && rescan_)) {
                     // arm only on a rising swing (a cooldown that ends past a swing's fastest instant waits for the next)
                     armed_ = false;
-                    const float now = groundRise(ground, pos_, t);
-                    if (now >= threshold && now >= groundRise(ground, pos_, t - step)) {
+                    const float now = groundRise(ground, armPos_, t);
+                    if (now >= threshold && now >= groundRise(ground, armPos_, t - step)) {
                         float best = now;
                         int bestK = 0;
                         int k = 1;
                         const int cap = static_cast<int>(4.0 * kHopRate);
                         for (; k <= cap; ++k) {
-                            const float r = groundRise(ground, pos_, t + k * step);
+                            const float r = groundRise(ground, armPos_, t + k * step);
                             if (r < threshold || r < 0.8f * best) break; // the swing is over, or well past its peak
                             if (r > best) {
                                 best = r;
@@ -3952,7 +3975,7 @@ private:
                         bool top = false;
                         if (k <= cap) {
                             for (topK = bestK + 1; topK <= cap; ++topK) {
-                                if (groundRise(ground, pos_, t + topK * step) <= 0.0f) {
+                                if (groundRise(ground, armPos_, t + topK * step) <= 0.0f) {
                                     top = true;
                                     break;
                                 }
@@ -3967,6 +3990,10 @@ private:
                         } else {
                             armed_ = true;
                             drawnChecked_ = false;
+                            if (phase_ == Phase::Move && leg_ < steps_.size()) { // ADR-2005: stop on that centre
+                                steps_.resize(leg_ + 1);
+                                wantsHop_.resize(std::min(wantsHop_.size(), leg_ + 1));
+                            }
                             armedTile_ = tile;
                             peak_ = crest.peak;
                             launchAt_ = t + (top ? crest.k : bestK) * step;
@@ -3986,14 +4013,30 @@ private:
                 // the crouch starts so that the clip's pop lands on the crest's top (mid-crouch when it armed late)
                 const double lead = static_cast<double>(clipPop_ / std::max(clipCrouchRate_, 0.05f));
                 double crouchAt = launchAt_ - lead;
+                // ADR-2005 (CPD-R13): the crouch begins only near a tile's centre (within kCrouchReach, with time to
+                // settle at kSettleSpeed before the pop), and settles onto it as it crouches. A walker further out finishes its step first (arriving on another tile, it
+                // looks again from there), so the throw takes off -- and, straight up, lands -- on the centre, never at
+                // an edge with its feet over the gap.
+                const glm::vec2 centre = tileCentreOf(tile, pitch);
+                const float off = glm::length(pos_ - centre);
+                // and with at least kMinCrouch seconds before the pop (an arm too late for a crouch lets the crest go)
+                const bool onCentre = launchAt_ - t >= static_cast<double>(kMinCrouch) - 1e-9 &&
+                                      (off <= 0.05f || (off <= kCrouchReach && launchAt_ - t >= off / kSettleSpeed));
+                if (armed_ && !rescan_ && t > launchAt_ + 1e-9) {
+                    armed_ = false; // its crest has gone by without a crouch: look again
+                }
                 // ADR-2002: committing to the crouch, the throw looks once at the drawn tile it will pop from
-                if (!adr1998 && armed_ && !rescan_ && t >= crouchAt - 1e-9 && !drawnChecked_) {
+                if (!adr1998 && armed_ && !rescan_ && onCentre && t >= crouchAt - 1e-9 && !drawnChecked_) {
                     drawnChecked_ = true;
                     drawnCrest(ground, t, tile);
                     crouchAt = launchAt_ - lead;
                 }
-                if (!adr1998 && armed_ && !rescan_ && t >= crouchAt - 1e-9) {
+                if (!adr1998 && armed_ && !rescan_ && onCentre && t >= crouchAt - 1e-9) {
+                    leaveMove(ground, t);
                     phase_ = Phase::Crouch;
+                    crouchFrom_ = pos_;
+                    crouchTo_ = centre;
+                    crouchStart_ = t;
                     clipOrigin_ = crouchAt;
                     clipRate_ = std::max(clipCrouchRate_, 0.05f);
                     steps_.clear();
@@ -4015,6 +4058,7 @@ private:
         }
         case Phase::Move: {
             if (leg_ >= steps_.size()) {
+                leaveMove(ground, t);
                 pause(ctx);
                 break;
             }
@@ -4037,9 +4081,20 @@ private:
                 pos_ += to / dist * stepLen;
                 face(to, dt);
             }
-            // up a step at once (never inside the tile), down it over a few steps
+            // never inside the tile; down a step over a few steps. ADR-2006 (CPD-R13): up a step from just before its
+            // edge -- the ground a short stride ahead (kStepLead seconds of the walk) draws the body up over kStepRise
+            // seconds -- instead of in one frame (art's stepHeight 3 popped walkers up to 3.4 m between two frames).
             const float under = ground.at(pos_.x, pos_.y, t).height;
-            y_ = under >= y_ ? under : y_ + (under - y_) * std::min(1.0f, dt / 0.08f);
+            float ahead = under;
+            if (dist > 1e-4f) {
+                const glm::vec2 a = pos_ + to / dist * std::min(dist, walk * kStepLead);
+                ahead = ground.at(a.x, a.y, t).height;
+            }
+            if (ahead > y_ + 1e-4f) {
+                y_ = std::max(under, y_ + (ahead - y_) * std::min(1.0f, dt / kStepRise));
+            } else {
+                y_ = under >= y_ ? under : y_ + (under - y_) * std::min(1.0f, dt / 0.08f);
+            }
             speed_ = walk;
             activity_ = running_ ? Activity::Run : Activity::Walk;
             break;
@@ -4074,6 +4129,12 @@ private:
         case Phase::Crouch: {
             // ADR-2000: on the tile's drawn top, riding the crest up, crouching on the jump clip's clock; at the crest's
             // top the pop: thrown at the swing's fastest rise, the flight on the same clip, stretched to the air time
+            {   // ADR-2005: settling onto the tile's centre over the crouch's first kCrouchSettle seconds
+                const double settle = std::max(std::min(static_cast<double>(kCrouchSettle), launchAt_ - crouchStart_),
+                                               1.0 / kHopRate); // done by the pop when the crouch is short
+                const float u = std::clamp(static_cast<float>((t - crouchStart_) / settle), 0.0f, 1.0f);
+                pos_ = glm::mix(crouchFrom_, crouchTo_, u * u * (3.0f - 2.0f * u));
+            }
             y_ = ground.at(pos_.x, pos_.y, t).height;
             activity_ = Activity::Jump;
             if (t >= launchAt_ - 1e-9) {
@@ -4320,6 +4381,12 @@ private:
     double withheldUntil_ = -1e9; // ADR-2001: a swing that throws nobody, until its crest has passed (on this tile)
     glm::ivec2 withheldTile_{0};
     bool drawnChecked_ = false;   // ADR-2002: the drawn tile has been read for this throw
+    glm::vec2 armPos_{0.0f};      // ADR-2005: where the crest is read (the centre a walker is stepping onto)
+    glm::vec2 crouchFrom_{0.0f};  // ADR-2005: the crouch settles from here onto the tile's centre
+    glm::vec2 crouchTo_{0.0f};
+    double crouchStart_ = 0.0;
+    float carry_ = 0.0f;          // ADR-2006: the descent a walker was still easing when it stopped, and when
+    double carry0_ = 0.0;
     double clipOrigin_ = 0.0;   // ADR-2000: the jump clip's clock (origin, rate)
     float clipRate_ = 0.0f;
     int tosses_ = 0;
@@ -4331,6 +4398,153 @@ private:
     float tossV0_ = 0.0f;
     float tossY0_ = 0.0f;
     float tossMiss_ = 0.0f;
+};
+
+// ADR-2007 (CPD-R12): a beach ball. A light, lively body that bounces on the tiles' drawn tops -- the ground the viewer
+// sees, the landing springs included (read with the landings every body has passed, ADR-2002) -- and takes their
+// motion: a tile rising under it adds its upward speed, and the land's slope across the neighbouring tiles tilts the
+// bounce, so a wave ramps it. It strikes a tile's side when it runs into a taller one. A bounce never dies (each
+// leaves at least fast enough to reach `minBounce` metres), and a ball strays at most `homeRadius` from where it was
+// placed before its bounces steer it back. Its impacts spring the tile like an alien's landing, as a landing with a
+// negative strength: no alien landing glow, its own (TileBallSpec). On the hop's fixed 60 Hz step, so a seek, a 30
+// fps render and a 60 fps play bounce it alike; between steps it is drawn on its ballistic arc.
+class Ball final : public CheckpointedBehavior<Ball> {
+public:
+    explicit Ball(const nlohmann::json* s)
+        : radius_(readFloat(s, "radius", 0.6f)),
+          gravityScale_(readFloat(s, "gravityScale", 0.35f)),
+          drag_(readFloat(s, "drag", 0.05f)),
+          restitution_(readFloat(s, "restitution", 0.92f)),
+          minBounce_(readFloat(s, "minBounce", 3.0f)),
+          maxSpeed_(readFloat(s, "maxSpeed", 25.0f)),
+          tileKick_(readFloat(s, "tileKick", 1.0f)),
+          slope_(readFloat(s, "slope", 1.0f)),
+          home_(readFloat(s, "homeRadius", 30.0f)),
+          strength_(readFloat(s, "strength", 0.5f)),
+          gravity_(readFloat(s, "gravity", 9.81f)) {
+        if (s != nullptr && s->is_object() && s->contains("velocity") && (*s)["velocity"].is_array() &&
+            (*s)["velocity"].size() == 3) {
+            const auto& v = (*s)["velocity"];
+            for (int i = 0; i < 3; ++i) {
+                if (v[i].is_number()) v0_[i] = v[i].get<float>();
+            }
+        }
+    }
+
+    [[nodiscard]] std::string_view kind() const override { return "ball"; }
+
+    void registerParameters(params::ParameterSet&, const std::string&) override {}
+    void collectParameterPaths(std::vector<std::string>&) const override {}
+    void reset(Rng&) override {
+        primed_ = false;
+        impacts_ = 0;
+    }
+
+    void update(const BehaviorContext& ctx, EntityState& state, MotionOffset&) override {
+        world::GroundSource* ground = ctx.ground;
+        if (ground == nullptr || ground->pitch() <= 0.0f) {
+            return;
+        }
+        const double t = ctx.time;
+        if (!primed_) {
+            const glm::vec3 here = state.position();
+            home_xz_ = glm::vec2(here.x, here.z);
+            p_ = here;
+            p_.y = std::max(p_.y, surface(*ground, home_xz_, t) + radius_ + 1.0f);
+            v_ = v0_;
+            tick_ = static_cast<long long>(std::floor(t * kRate + 1e-6));
+            primed_ = true;
+        }
+        const auto target = static_cast<long long>(std::floor(t * kRate + 1e-6));
+        while (tick_ < target) {
+            ++tick_;
+            step(*ground, static_cast<double>(tick_) / kRate, static_cast<float>(1.0 / kRate));
+        }
+        // on its arc since the last step, never below the drawn top
+        const auto tau = static_cast<float>(t - static_cast<double>(tick_) / kRate);
+        const float g = gravity_ * gravityScale_;
+        glm::vec3 p = p_ + v_ * tau - glm::vec3(0.0f, 0.5f * g * tau * tau, 0.0f);
+        p.y = std::max(p.y, surface(*ground, glm::vec2(p.x, p.z), t) + radius_);
+        state.travel = p - state.anchor;
+        state.speed = glm::length(v_);
+        state.activity = Activity::Idle;
+        state.airborne = false;
+    }
+
+    // For tests: how many times it has struck the ground.
+    [[nodiscard]] int impacts() const { return impacts_; }
+
+private:
+    static constexpr double kRate = 60.0;
+    static constexpr double kLag = 0.1; // ADR-2002's: the landings every body has passed
+
+    [[nodiscard]] static float surface(const world::GroundSource& g, glm::vec2 p, double t) {
+        return g.drawnBy(p.x, p.y, t, t - kLag).height;
+    }
+
+    void step(world::GroundSource& g, double t, float dt) {
+        const float grav = gravity_ * gravityScale_;
+        v_.y -= grav * dt;
+        v_ *= std::exp(-drag_ * dt);
+        glm::vec3 next = p_ + v_ * dt;
+        const glm::vec2 cellFrom = g.cellCentre(p_.x, p_.z);
+        const glm::vec2 cellTo = g.cellCentre(next.x, next.z);
+        float under = surface(g, glm::vec2(next.x, next.z), t);
+        // a taller tile's side: bounce off it, back the way it came
+        if (cellTo != cellFrom && under > next.y - radius_ + 0.25f * radius_ &&
+            surface(g, cellFrom, t) <= p_.y - radius_ + 0.05f) {
+            if (std::abs(cellTo.x - cellFrom.x) > 1e-3f) v_.x = -v_.x * restitution_;
+            if (std::abs(cellTo.y - cellFrom.y) > 1e-3f) v_.z = -v_.z * restitution_;
+            next = glm::vec3(p_.x, next.y, p_.z);
+            under = surface(g, glm::vec2(next.x, next.z), t);
+        }
+        if (next.y - radius_ < under) {
+            const glm::vec2 xz(next.x, next.z);
+            const double h = 0.5 / kRate;
+            const auto rise = static_cast<float>((g.drawnBy(xz.x, xz.y, t + h, t - kLag).height -
+                                                  g.drawnBy(xz.x, xz.y, t - h, t - kLag).height) / (2.0 * h));
+            const float pitch = g.pitch();
+            const float sx = (g.landscape(xz.x + pitch, xz.y, t).height - g.landscape(xz.x - pitch, xz.y, t).height) /
+                             (2.0f * pitch);
+            const float sz = (g.landscape(xz.x, xz.y + pitch, t).height - g.landscape(xz.x, xz.y - pitch, t).height) /
+                             (2.0f * pitch);
+            const glm::vec3 n = glm::normalize(glm::vec3(-slope_ * sx, 1.0f, -slope_ * sz));
+            const glm::vec3 surfaceV(0.0f, std::max(rise, 0.0f) * tileKick_, 0.0f);
+            glm::vec3 rel = v_ - surfaceV;
+            const float vn = glm::dot(rel, n);
+            if (vn < 0.0f) {
+                rel -= (1.0f + restitution_) * vn * n;
+                v_ = rel + surfaceV;
+                const float floor = std::sqrt(2.0f * grav * std::max(minBounce_, 0.0f));
+                v_.y = std::max(v_.y, floor); // never dies
+                const glm::vec2 toHome = home_xz_ - xz;
+                const float out = glm::length(toHome);
+                if (home_ > 0.0f && out > home_) { // back toward home
+                    const glm::vec2 vh(v_.x, v_.z);
+                    const glm::vec2 want = toHome / out * std::max(glm::length(vh), 2.0f);
+                    const glm::vec2 m = glm::mix(vh, want, 0.6f);
+                    v_.x = m.x;
+                    v_.z = m.y;
+                }
+                const float sp = glm::length(v_);
+                if (sp > maxSpeed_) v_ *= maxSpeed_ / sp;
+                g.landed(xz, t, -strength_ * std::clamp(-vn / 8.0f, 0.2f, 1.0f));
+                ++impacts_;
+            }
+            next.y = under + radius_;
+        }
+        p_ = next;
+    }
+
+    float radius_, gravityScale_, drag_, restitution_, minBounce_, maxSpeed_, tileKick_, slope_, home_, strength_,
+        gravity_;
+    glm::vec3 v0_{2.0f, 6.0f, 1.0f};
+    bool primed_ = false;
+    long long tick_ = 0;
+    glm::vec3 p_{0.0f};
+    glm::vec3 v_{0.0f};
+    glm::vec2 home_xz_{0.0f};
+    int impacts_ = 0;
 };
 
 } // namespace
@@ -4353,7 +4567,7 @@ bool BehaviorContext::event(std::string_view name) const {
 
 std::vector<std::string_view> behaviorKinds() {
     return {"hover",  "drift",  "bank",     "spin",  "wander",
-            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide", "hop"};
+            "explore", "ground", "liveliness", "lookAt", "interest", "orbit", "decide", "hop", "ball"};
 }
 
 
@@ -4486,6 +4700,9 @@ std::unique_ptr<IBehavior> makeBehavior(std::string_view kind, const nlohmann::j
     }
     if (kind == "hop") {
         return std::make_unique<Hop>(settings); // ADR-1958
+    }
+    if (kind == "ball") {
+        return std::make_unique<Ball>(settings); // ADR-2007
     }
     if (kind == "ground") {
         return std::make_unique<Ground>(settings);

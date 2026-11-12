@@ -76,6 +76,25 @@ struct TileSpringSpec {
     float glowRadius = 3.0f;    // ADR-1960: metres over which the landing glow falls to 1/e (the landed tile and its ring)
 };
 
+// ADR-2008 (CPD-R12): how the ground answers a beach ball's impact (a landing with a negative strength: it springs the
+// tile like an alien's landing, without the alien's landing glow) -- its own glow on the struck tiles' outlines, and
+// sparks: a ring of light running out along the tile edges from the impact, twinkling tile by tile, fading with its age
+// and its distance. Colours are linear; gain 0 = off.
+struct TileBallSpec {
+    glm::vec3 glowColor{0.35f, 0.8f, 1.0f};
+    float glowGain = 6.0f;
+    float glowRadius = 4.0f;   // metres to 1/e from the impact
+    float glowLife = 0.8f;     // seconds to 1/e
+    glm::vec3 sparkColor{1.0f, 0.75f, 0.35f};
+    float sparkGain = 10.0f;
+    float sparkSpeed = 14.0f;  // metres per second the ring runs out
+    float sparkReach = 24.0f;  // metres: none beyond
+    float sparkLife = 0.9f;    // seconds to 1/e
+    float sparkWidth = 2.5f;   // metres, the ring's Gaussian
+    float edgeBand = 0.12f;    // metres of a tile's outline that lights
+};
+inline constexpr std::size_t kMaxBallImpacts = 16; // the newest still lit, drawn
+
 struct TileEvent {
     float time = 0.0f;        // seconds on the timeline
     glm::vec2 position{0.0f}; // generator space, metres
@@ -101,6 +120,8 @@ struct TileDynamics {
     float riverDriftSpeed = 1.5f;
     TileSpringSpec spring;             // ADR-1954
     std::vector<TileEvent> springs;    // landings while running (from the characters; not saved, like `live`)
+    TileBallSpec balls;                // ADR-2008
+    std::vector<TileEvent> ballImpacts; // ADR-2008: the balls' impacts, WORLD x-z (filled each frame; not saved)
     // ADR-1970: contour edges. A tile side is a contour edge where the level floor((h - offset) / interval) drops to the
     // neighbour across it; the kernel flags those sides in the record (with the crest) and the `tileContour` material
     // op draws them. interval 0 (the default) = none. They follow the moving ground: the contours move with it.

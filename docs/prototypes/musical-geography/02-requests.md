@@ -1821,3 +1821,182 @@ lane home is not built.
 
 Throws drop about 10% because running bodies change tiles more. If you want them back, use `tossCooldown` or
 `runChance`.
+
+#### CPD-R11 (coordinator → engineering, 2026-11-11): the dotted vertical line in the owner's live screenshot
+
+The owner's draft8 screenshot showed a thin dotted vertical line, top to bottom, near the right edge. Art reproduced it
+live at high and ultra on draft8b at 58 s; the offline render of that frame looked plain. Find the cause and prove it,
+fix it if it is ours with no cost in live frame time, and show a live before/after at the same spot.
+
+### Engineering → art, CPD-R11 (2026-11-11): the dotted line was the gap between tiles (ADR-2004)
+
+**The cause, proven.**
+- **It is geometry, live and offline alike.** The offline render of the same instant (58.0 s, matched to the frame)
+  has the dots too; your offline crop was of another spot.
+- **No pass changes them.** They stay with shadows, AO, fog, grain, dither, bloom and tilt-shift off, a plain
+  material, mgTiles1 alone, and the general (non-slab) path.
+- **The AOVs say what they are.** At every dot, the normal is +z and the depth is 1-1.4 m behind the wall beside it.
+  They are holes: the walls of a column gap that runs away from the camera are seen nearly edge-on, and the 0.34 m
+  gap between one tile's side and the next opens in that thin band as a slit a pixel or two long. Down a long gap they
+  line up into the dotted line.
+
+**The fix (ADR-2004).** A side face seen nearly edge-on spans the gap to its neighbour in its own plane:
+- full when the face is within cos 0.1 of edge-on, none past 0.2 (`"slabEdgeOn"` on the node, default 0.1, 0 = off);
+- the camera's views only, so shadows keep their gaps;
+- an edge-on face has no area on screen, so the overlap shows nothing; it only closes the slits.
+
+| Measured | before | after |
+|---|---|---|
+| Owner's wall, live high: isolated dark pixels in the crop box | 64 | 6 |
+| Owner's wall, live ultra | 80 | 6 |
+| Rest of the frame: mean change | | 0.02-0.03 levels |
+
+**Cost: none measurable.** Draft9 at 85 s, ultra, rule off vs on, two runs each: GPU p50 33.32/33.36 vs
+33.42/33.07 ms, p99 45.72/45.95 vs 46.02/45.27 ms, which is run-to-run noise.
+
+**Yours:** nothing required.
+
+**The faint vertical streaks on the tile tops in your crop are a different defect, and are not fixed.** They come
+from the live ambient occlusion, which runs at half resolution at every live tier; offline runs it at full resolution.
+- With live AO at full resolution, the streaks are gone.
+- A cheaper fix (scaling GTAO's occluder bias to the AO texel) did not remove them.
+- Full-resolution AO costs live frame time this scene does not have at 85 s. The options are yours and the
+  coordinator's: leave it; lower `aoFadeEnd` (120 m) or `aoRadius` so the term is weaker on the tops; or
+  `ambientOcclusion` off live.
+
+Media in `18-pass-cpd-draft9/`:
+- `cpd-r11-dotted-line-live-high-ultra-before-after-58s-crop.png`;
+- `cpd-r11-live-ultra-58s-full-before.png` and `cpd-r11-live-ultra-58s-full-after.png`;
+- `cpd-r11-cause-offline-and-normal-aov-58s.png`.
+
+#### CPD-R13 (owner → engineering via the coordinator, 2026-11-11): jumps on the tile centre; a flicker audit
+
+The owner on draft9: "saw one alien that was slightly clipping off the edge of the tile when it jumped - let's try to
+keep em more on center of tile for jumps and lets make sure there is no potential for animation flicker when
+traversing these tiles (... don't make a fix unless you find something truly reproducible/diagnosible here".
+
+### Engineering → art, CPD-R13 (2026-11-11): centred jumps (ADR-2005), stepping and stopping (ADR-2006)
+
+Measured on your draft9 (c5535ba6, the CPD-R6 trace at 60 fps, 53 aliens).
+
+**Off-centre jumps: the cause.**
+- A walker mid-step crouched and jumped where it stood, often at a tile's edge.
+- Take-off from the centre: median 0.54 m. 397 throws were over 1 m out, and 79 had the feet over the gap.
+- Landings were the same, because a crouch throw goes straight up.
+
+**Off-centre jumps: the fix (ADR-2005).**
+- A walker reads the crest of the tile it is stepping onto, and stops on that centre.
+- It crouches only near a centre, settling onto it.
+
+| | before | after |
+|---|---|---|
+| Take-off from the centre (p50 / max) | 0.54 / 2.00 m | 0.00 / 0.02 m |
+| Feet past the edge | 79 | 0 |
+| Throws | 1,300 | 1,096 |
+| Off the drawn top, your rule | 101 (7.8%) | 71 (6.5%) |
+| By height | 1 | 3 |
+| Idle | 0.279 | 0.303 |
+
+**Flicker audit.**
+- **Not reproduced:** one-frame activity blips (none) and one-frame grounded/airborne blips (none).
+- **Reproduced and fixed (ADR-2006):** 358 one-frame pops of over 1 m (up to 3.4 m) as walkers stepped up onto
+  higher tiles. Your `stepHeight` 3 made them climb 3 m steps in one frame. The step now rises over about 0.06 s,
+  starting a quarter-second ahead. Also fixed: about 15 one-frame drops when a walker stopped mid-descent.
+  - Over 1 m: 358 -> 2 (max 1.16 m).
+- **Left alone:** a tile under a body moving up to about 0.3 m per frame on a ring front. That is the floor, and it is
+  drawn the same with or without a body.
+
+**Yours:** nothing required. If the 16% fewer throws shows, `tossCooldown` (3 s) is the lever.
+
+#### CPD-R12 (owner → engineering via the coordinator, 2026-11-11): beach balls
+
+The owner on draft9, verbatim: "let's add one more visual element to this scene: bouncing beach balls that bounce off
+of surfaces, ramp off of waves, let's add an effect when they hit a surface similar to the alien when it lands - but
+use a different color, and add a sparking explosion like effect that also radiates out from where the ball landed
+(using the tilte edges for light paths / point particles) let's try to have about 10 of these dispersed throughout
+the cameras path - they can act very light - take big bounces, it's okay if they bounce off water for now - let's
+start here and get an idea for how this looks in the scene. for the beach ball itself start with a reflective orb
+let's see what that looks like"
+
+### Engineering → art, CPD-R12 (2026-11-11): beach balls, how to place and tune them (ADR-2007, ADR-2008)
+
+**What a ball is.**
+- An `orb` node (the look), with an entity on it that has a `ball` behaviour (the motion).
+- It bounces on the tiles' drawn tops (the aliens' ground). A rising tile kicks it up, and the land's slope tilts its
+  bounce, so it ramps off waves.
+- It never settles (every bounce reaches at least `minBounce`) and stays near where you place it.
+- Water is bounced off like land, for now.
+- Each impact springs the tile like an alien's landing and lights the tile outlines: a glow in the ball's own colour,
+  and sparks running out along the tile edges.
+- Seek equals play.
+
+**One ball, in the scene** (scale = radius; a chrome orb is metallic 1 and roughness near 0):
+```json
+{"name": "ball00", "kind": "orb", "position": [x, groundY + 4, z], "scale": [1.0, 1.0, 1.0],
+ "material": {"baseColor": [0.95, 0.95, 0.97], "metallic": 1.0, "roughness": 0.04}}
+```
+```json
+{"name": "ball00", "node": "ball00", "seed": 9100,
+ "behaviors": [{"kind": "ball", "radius": 1.0, "velocity": [1.5, 6.0, 0.0], "homeRadius": 12.0}]}
+```
+
+**The `ball` behaviour's keys:**
+
+| Key | Default | What it does |
+|---|---|---|
+| `radius` | 0.6 | match the orb's scale |
+| `velocity` | [2, 6, 1] | its start, m/s |
+| `gravityScale` | 0.35 | lower is lighter: bigger, slower bounces |
+| `drag` | 0.05 | 1/s |
+| `restitution` | 0.92 | |
+| `minBounce` | 3 | metres each bounce reaches at least |
+| `maxSpeed` | 25 | m/s cap |
+| `tileKick` | 1 | how much of a rising tile's speed it takes |
+| `slope` | 1 | how much the land's slope tilts a bounce |
+| `homeRadius` | 30 | metres it strays before bounces steer it back |
+| `strength` | 0.5 | how hard its impacts spring the tile |
+
+**The impact's look**, in `environment.tileDynamics.balls`:
+
+| Key | Default | What it does |
+|---|---|---|
+| `glowColor` | [0.35, 0.8, 1.0] | linear colour of the glow |
+| `glowGain` | 6 | |
+| `glowRadius` | 4 | metres to 1/e |
+| `glowLife` | 0.8 | seconds to 1/e |
+| `sparkColor` | [1.0, 0.75, 0.35] | |
+| `sparkGain` | 10 | |
+| `sparkSpeed` | 14 | m/s the ring runs out |
+| `sparkReach` | 24 | metres; none beyond |
+| `sparkLife` | 0.9 | s |
+| `sparkWidth` | 2.5 | metres |
+| `edgeBand` | 0.12 | metres of outline lit |
+
+Gain 0 turns either part off. At most the 16 newest impacts are lit at once.
+
+**Placing ten.**
+- My preview put one 25 m ahead of the camera and 9 m to a side at 20, 40, 60, 80, 85, 90, 110, 130, 160 and 190 s
+  (scratch `eng/r12/withballs.py`).
+- In that preview ball01 came within 1 m of the lens at 41 s. Keep them off the line: the keep-out line (ADR-2003) is
+  a walker's rule and does not steer balls. Use `homeRadius` and the placement for that.
+
+**Cost: none measurable.** Draft9 at 85 s, live-profile headless at ultra, without and with the 10 preview balls, two
+runs each:
+
+| | GPU p50 | GPU p99 |
+|---|---|---|
+| without balls | 33.98 / 33.18 ms | 46.48 / 46.89 ms |
+| with balls | 32.88 / 33.37 ms | 47.41 / 44.50 ms |
+
+The differences are run-to-run noise. A ball is one orb draw. The impact light is a loop over at most 16 impacts, on
+the tiles' tops only, and only while one is lit.
+
+**Media** in `19-pass-cpd-draft10/`:
+- `cpd-r12-ball-lab-close-10s.mp4`: the Throw Lab with 6 balls (`throw_lab.py --balls 6 --camera close`);
+- `cpd-r12-ball-lab-sheet-1-5s.png`;
+- `cpd-r12-ball-lab-impact-strip-10fps.png`;
+- `cpd-r12-draft9-with-10-balls-80-92s.mp4` and `cpd-r12-draft9-balls-sheet-80-92s.png`: the preview placement.
+
+**What I saw.** The chrome orbs read and pick up the sky. Impacts light the tile outlines and the sparks run outward
+tile by tile. At the default gains the glow and the sparks clip to near-white on your sunset tiles, so the cyan and
+amber hues hardly show. Try `glowGain` and `sparkGain` around 2-3, or more saturated colours. They are yours.
