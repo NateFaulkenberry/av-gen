@@ -206,7 +206,8 @@ struct FrameUniforms {
     keyLightDirection: vec4<f32>, // ADR-1967: xyz towards the key light (sun, or the moon at night), w = 1 when up
     keyLightColor: vec4<f32>,     // rgb = its colour x intensity, w = its luminance
     skyAmbient: vec4<f32>,        // rgb = the sky's ambient colour, w = 1 when the analytic sky is drawn
-    // ADR-2008: the beach balls' impacts on the tiles. ballGlow / ballSpark: rgb = colour x gain, w = gain;
+    // ADR-2008: the beach balls' impacts on the tiles. ballGlow / ballSpark: rgb = colour x gain;
+    // ADR-2009: ballGlow.w = tint (0 adds, 1 replaces the tile's colour under the light), ballSpark.w = spark min pixels;
     // ballFx: x = glow radius (m), y = spark speed (m/s), z = spark reach (m), w = spark life (s);
     // ballFx2: x = impacts in ballImpacts, y = spark width (m), z = edge band (m), w = glow life (s);
     // ballImpacts[i]: world x, world z, time (s), strength (> 0)

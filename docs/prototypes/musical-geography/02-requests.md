@@ -2000,3 +2000,59 @@ the tiles' tops only, and only while one is lit.
 **What I saw.** The chrome orbs read and pick up the sky. Impacts light the tile outlines and the sparks run outward
 tile by tile. At the default gains the glow and the sparks clip to near-white on your sunset tiles, so the cyan and
 amber hues hardly show. Try `glowGain` and `sparkGain` around 2-3, or more saturated colours. They are yours.
+
+#### CPD-R15 (coordinator → engineering, 2026-11-11): ball impacts wash out on the day tiles
+
+Ball impacts (lime glow, magenta sparks) were added on top of the tile colour. On the bright day tiles they washed out
+at any gain that kept the night in hue (ball03 at about 59 s, ball10 at about 69 s).
+
+### Engineering → art, CPD-R15 (2026-11-11): the impact tints the outline (ADR-2009)
+
+**The cause.** ADR-2008 added the light to the tile's lit colour. A bright cyan day tile already fills most of the
+range, so lime or magenta on top comes out as a pale cyan-white after the tone map.
+
+**The fix (ADR-2009): a tint blend.**
+- Under the light, the tile's own colour is taken out first, then the light is added:
+  `colour * (1 - cover) + light`. The cover saturates early: an impact strength of 0.25 already covers 63%.
+- On the dark night tiles there is almost nothing to take out, so night frames stay within a few levels of draft12.
+- By day the outline now reads lime and magenta.
+
+It is cheaper than keying the gains on the look timeline. That would have needed new plumbing and tuning per state,
+and a lower day gain only makes a pale mark fainter.
+
+**Sparks keep a minimum width.** A spark's lit band is now at least 3 pixels wide on screen, so it still reads
+beyond 70 m. The glow keeps your `edgeBand` (0.45 m).
+
+**Yours: nothing required.** Both are on by default, so draft12's build gets them unchanged. The new keys, in
+`environment.tileDynamics.balls`:
+
+| Key | Default | What it does |
+|---|---|---|
+| `tint` | 1 | 0-1. 0 adds the light on top (ADR-2008); 1 takes the tile's colour out under the light first |
+| `sparkMinPixels` | 3 | 0-16. The sparks' lit band is at least this many pixels wide on screen |
+
+- If you want deeper, more saturated colours, lower `glowGain` / `sparkGain`. Under the tint, the day no longer
+  needs a high gain.
+- At 2/2 the magenta is richer by day, but the night glow is dimmer. The crops' third column shows this.
+
+**Cost: none measurable.** Draft12 at 85 s (ball11's impact is lit), live-profile headless at ultra, ADR-2008's
+behaviour (`tint` 0, `sparkMinPixels` 1) vs the defaults, two runs each:
+
+| | GPU p50 | GPU p99 |
+|---|---|---|
+| add (ADR-2008) | 22.69 / 23.02 ms | 27.11 / 68.58 ms |
+| tint (ADR-2009) | 22.47 / 22.61 ms | 27.75 / 68.55 ms |
+
+The 68 ms p99 in the second pair is one hitch, and it hits both arms alike. Part 2 of the live work deals with
+hitches.
+
+**Tests:**
+- `[balls][adr2009]` (CPU): defaults, round-trip and range checks.
+- `[gpu][balls][adr2009]`: on a bright cyan tile field, green over blue on the struck outlines is -4 with no impact,
+  17 added and 49 tinted. The test fails with `tint` 0.
+
+**Media** in `22-pass-ship/`:
+- `cpd-r15-ball-impacts-before-after-59-69-4-144s-crops.png`. The columns are draft12 (add), the fix, and the fix at
+  gains 2/2. The rows are 59.72 s and 69.38 s (day, ball03 and ball10), 3.88 s (day, ball00) and 144.45 s (night,
+  ball06).
+- `cpd-r15-ball-impact-59.72s-full-before-top-after-bottom.png` and `...-69.38s-...`: the whole frames.

@@ -1317,11 +1317,13 @@ nlohmann::json tileDynamicsToJson(const TileDynamics& d) {
         if (b.glowColor != db.glowColor || b.glowGain != db.glowGain || b.glowRadius != db.glowRadius ||
             b.glowLife != db.glowLife || b.sparkColor != db.sparkColor || b.sparkGain != db.sparkGain ||
             b.sparkSpeed != db.sparkSpeed || b.sparkReach != db.sparkReach || b.sparkLife != db.sparkLife ||
-            b.sparkWidth != db.sparkWidth || b.edgeBand != db.edgeBand) { // ADR-2008
+            b.sparkWidth != db.sparkWidth || b.edgeBand != db.edgeBand || b.tint != db.tint ||
+            b.sparkMinPixels != db.sparkMinPixels) { // ADR-2008, ADR-2009
             j["balls"] = {{"glowColor", rgb(b.glowColor)}, {"glowGain", b.glowGain},   {"glowRadius", b.glowRadius},
                           {"glowLife", b.glowLife},         {"sparkColor", rgb(b.sparkColor)},
                           {"sparkGain", b.sparkGain},       {"sparkSpeed", b.sparkSpeed}, {"sparkReach", b.sparkReach},
-                          {"sparkLife", b.sparkLife},       {"sparkWidth", b.sparkWidth}, {"edgeBand", b.edgeBand}};
+                          {"sparkLife", b.sparkLife},       {"sparkWidth", b.sparkWidth}, {"edgeBand", b.edgeBand},
+                          {"tint", b.tint},                 {"sparkMinPixels", b.sparkMinPixels}};
         }
     }
     {
@@ -1397,10 +1399,18 @@ Result<TileDynamics> tileDynamicsFromJson(const nlohmann::json& j) {
                                                    {"sparkReach", &TileBallSpec::sparkReach},
                                                    {"sparkLife", &TileBallSpec::sparkLife},
                                                    {"sparkWidth", &TileBallSpec::sparkWidth},
-                                                   {"edgeBand", &TileBallSpec::edgeBand}},
+                                                   {"edgeBand", &TileBallSpec::edgeBand},
+                                                   {"tint", &TileBallSpec::tint},
+                                                   {"sparkMinPixels", &TileBallSpec::sparkMinPixels}},
                                                   d.balls, {"glowColor", "sparkColor"});
                 !r) {
                 return std::unexpected(r.error());
+            }
+            if (d.balls.tint < 0.0f || d.balls.tint > 1.0f) { // ADR-2009
+                return fail("'{}.tint' must be 0-1", where);
+            }
+            if (d.balls.sparkMinPixels < 0.0f || d.balls.sparkMinPixels > 16.0f) {
+                return fail("'{}.sparkMinPixels' must be 0-16", where);
             }
             for (const auto& [name, out] : {std::pair<const char*, glm::vec3*>{"glowColor", &d.balls.glowColor},
                                             std::pair<const char*, glm::vec3*>{"sparkColor", &d.balls.sparkColor}}) {

@@ -375,3 +375,71 @@ TEST_CASE("An edge-on side spans the gap to its neighbour, so a gap's walls do n
     CHECK(d.differ < static_cast<int>(off.width * off.height / 50)); // nothing else moves
     CHECK(ctx->errorCount() == 0);
 }
+
+namespace {
+
+// ADR-2009 (CPD-R15): a bright, cyan "day" tile field seen from above with one beach-ball impact at its centre, lime
+// glow only (no sparks). `impact` false: no impact at all, to find the outline pixels the impact lights.
+scene::Scene dayImpactScene(bool impact, float tint) {
+    scene::Scene s = ringScene(0.0f);
+    s.procedurals[0].material.baseColor = {0.45f, 0.95f, 1.0f};
+    s.lights[0].intensity = 4.0f; // a bright day: light cyan tops, as MG's day tiles
+    s.camera.position = {0.3f, 14.0f, 0.3f};
+    scene::TileBallSpec& b = s.environment.tileDynamics.balls;
+    b.glowColor = {0.3f, 1.0f, 0.0f};
+    b.glowGain = 4.0f;
+    b.glowRadius = 3.0f;
+    b.sparkGain = 0.0f;
+    b.edgeBand = 0.08f;
+    b.tint = tint;
+    if (impact) s.environment.tileDynamics.ballImpacts.push_back(scene::TileEvent{0.6f, {0.0f, 0.0f}, -1.0f});
+    return s;
+}
+
+} // namespace
+
+TEST_CASE("A ball's impact keeps its own hue on a bright day tile when it tints", "[gpu][procedural][geography][balls][adr2009]") {
+    // CPD-R15: added on top of a bright cyan tile (tint 0, ADR-2008) the lime glow washes out to a pale cyan-white;
+    // tinting (1) takes the tile's colour out under the light first, so the outline reads lime. Measured on the
+    // pixels the impact changes: green over blue, the lime's mark (cyan has as much blue as green).
+    auto ctx = makeContext();
+    const auto none = render(*ctx, dayImpactScene(false, 1.0f));
+    const auto add = render(*ctx, dayImpactScene(true, 0.0f));
+    const auto tint = render(*ctx, dayImpactScene(true, 1.0f));
+    const auto lime = [&](const gpu::Image8& img, int& count) {
+        double sum = 0.0;
+        count = 0;
+        for (std::uint32_t y = 0; y < img.height; ++y) {
+            for (std::uint32_t x = 0; x < img.width; ++x) {
+                const double dx = static_cast<double>(x) - 0.5 * img.width, dy = static_cast<double>(y) - 0.5 * img.height;
+                if (dx * dx + dy * dy > 120.0 * 120.0) continue; // the struck tiles, about two tiles round the impact
+                const auto* p = none.pixel(x, y);
+                const auto* q = tint.pixel(x, y); // the same pixel set for both arms: where the tint lights
+                int d = 0;
+                for (int c = 0; c < 3; ++c) d += std::abs(static_cast<int>(p[c]) - static_cast<int>(q[c]));
+                if (d < 30) continue;
+                const auto* r = img.pixel(x, y);
+                sum += static_cast<double>(r[1]) - static_cast<double>(r[2]);
+                ++count;
+            }
+        }
+        return count > 0 ? sum / count : 0.0;
+    };
+    int nAdd = 0, nTint = 0, nNone = 0;
+    const double limeNone = lime(none, nNone);
+    const double limeAdd = lime(add, nAdd);
+    const double limeTint = lime(tint, nTint);
+    CAPTURE(nTint, limeNone, limeAdd, limeTint);
+    if (const char* dump = std::getenv("AVGEN_SLAB_TEST_DUMP"); dump != nullptr) {
+        for (const auto& [name, img] : {std::pair<const char*, const gpu::Image8*>{"impact-none.png", &none},
+                                        {"impact-add.png", &add}, {"impact-tint.png", &tint}}) {
+            REQUIRE(assets::writePng(std::filesystem::path(dump) / name, img->width, img->height, img->rgba).has_value());
+        }
+    }
+    CHECK(nTint > 300);                // the outlines around the impact light up
+    // and read lime, where the added light stays near the tile's cyan. Measured: green over blue -4 (no impact),
+    // 17 (added), 49 (tinted).
+    CHECK(limeTint > limeAdd + 20.0);
+    CHECK(limeTint > 2.0 * limeAdd);
+    CHECK(ctx->errorCount() == 0);
+}

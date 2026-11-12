@@ -92,6 +92,10 @@ struct TileBallSpec {
     float sparkLife = 0.9f;    // seconds to 1/e
     float sparkWidth = 2.5f;   // metres, the ring's Gaussian
     float edgeBand = 0.12f;    // metres of a tile's outline that lights
+    // ADR-2009 (CPD-R15): how the light meets the tile's own colour. 0 adds on top (a bright day tile washes it out);
+    // 1 takes the tile's colour out under the light first, so the impact keeps its hue on any tile. 0-1.
+    float tint = 1.0f;
+    float sparkMinPixels = 3.0f; // ADR-2009: the sparks' lit band is at least this many pixels wide on screen (so a far one reads)
 };
 inline constexpr std::size_t kMaxBallImpacts = 16; // the newest still lit, drawn
 

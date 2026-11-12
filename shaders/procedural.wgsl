@@ -1286,8 +1286,8 @@ fn fs_proc_refract(in: ProcVertexOut, @builtin(front_facing) frontFacing: bool) 
 // ADR-2008 (CPD-R12): the light a beach ball's impacts put on a tile at `c` (world x-z): its own glow, strongest on the
 // struck tiles and fading with distance and age, and sparks -- a ring running out from the impact, lighting some tiles
 // and not others (a hash per tile and impact), fading with age and with distance to the reach. The caller lays it on
-// the tile's outline.
-fn ballImpactLight(c: vec2<f32>) -> vec3<f32> {
+// the tile's outline. Returns the two strengths, (glow, spark), each capped at 2; ADR-2009: the caller lays them on.
+fn ballImpactLight(c: vec2<f32>) -> vec2<f32> {
     var glow = 0.0;
     var spark = 0.0;
     let now = frame.params.x;
@@ -1306,7 +1306,7 @@ fn ballImpactLight(c: vec2<f32>) -> vec3<f32> {
                                 step(0.35, tw) * (0.6 + 0.8 * tw);
         }
     }
-    return frame.ballGlow.rgb * min(glow, 2.0) + frame.ballSpark.rgb * min(spark, 2.0);
+    return vec2<f32>(min(glow, 2.0), min(spark, 2.0));
 }
 
 fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
@@ -1347,12 +1347,25 @@ fn procShade(in: ProcVertexOut, frontFacing: bool) -> SceneOut {
     out.emission = vec4<f32>(shaded.emission, shaded.bloomWeight);
     // ADR-2008: the balls' impacts light the tops' outlines
     if (in.tileCentre.w > 0.0 && frame.ballFx2.x > 0.5 && in.normal.y > 0.5) {
+        // ADR-2009 (CPD-R15): the sparks' band is at least sparkMinPixels wide on screen (ballSpark.w), so a far one
+        // still reads; the glow keeps the authored band (at least a pixel).
+        let fw = max(edgeFw, 1e-4);
         let band = max(frame.ballFx2.z, edgeFw);
-        let outline = 1.0 - smoothstep(band, band + max(edgeFw, 1e-4), edgeDist);
-        if (outline > 0.0) {
-            let light = ballImpactLight(in.tileCentre.xz) * outline;
-            out.color = vec4<f32>(out.color.rgb + light, out.color.a);
-            out.emission = vec4<f32>(out.emission.rgb + light, out.emission.w);
+        let sparkBand = max(band, frame.ballSpark.w * edgeFw);
+        let outline = 1.0 - smoothstep(band, band + fw, edgeDist);
+        let sparkOutline = 1.0 - smoothstep(sparkBand, sparkBand + fw, edgeDist);
+        if (sparkOutline > 0.0) {
+            let k = ballImpactLight(in.tileCentre.xz) * vec2<f32>(outline, sparkOutline);
+            let light = frame.ballGlow.rgb * k.x + frame.ballSpark.rgb * k.y;
+            // ADR-2009: tint (ballGlow.w, 0-1) takes the tile's own colour out under the light before adding it, so
+            // the impact holds its hue on a bright day tile; 0 adds on top (ADR-2008). The cover saturates early (a
+            // strength of 0.25 already takes out 63%), so the outer glow and a faint spark carry the hue too.
+            // A part whose gain is 0 is off: it takes nothing out either.
+            let on = vec2<f32>(step(1e-6, max(frame.ballGlow.r, max(frame.ballGlow.g, frame.ballGlow.b))),
+                               step(1e-6, max(frame.ballSpark.r, max(frame.ballSpark.g, frame.ballSpark.b))));
+            let cover = frame.ballGlow.w * (1.0 - exp(-4.0 * dot(k, on)));
+            out.color = vec4<f32>(out.color.rgb * (1.0 - cover) + light, out.color.a);
+            out.emission = vec4<f32>(out.emission.rgb * (1.0 - cover) + light, out.emission.w);
         }
     }
     out.ids = packIds(object.ids.x, object.ids.y);

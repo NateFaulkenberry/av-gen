@@ -157,3 +157,25 @@ TEST_CASE("a ball's impact springs the tile but lights no landing glow; its look
     bad["balls"]["sparkColour"] = 1.0;
     CHECK(!scene::tileDynamicsFromJson(bad).has_value()); // an unknown key is refused
 }
+
+TEST_CASE("an impact's tint and its sparks' minimum width round-trip and are range-checked", "[tiles][geography][balls][adr2009]") {
+    const scene::TileBallSpec defaults;
+    CHECK(defaults.tint == 1.0f);           // CPD-R15: tinting is the default
+    CHECK(defaults.sparkMinPixels == 3.0f);
+    scene::TileDynamics look;
+    look.balls.tint = 0.25f;
+    look.balls.sparkMinPixels = 1.5f;
+    const nlohmann::json j = scene::tileDynamicsToJson(look);
+    REQUIRE(j.contains("balls"));
+    const auto back = scene::tileDynamicsFromJson(j);
+    REQUIRE(back.has_value());
+    CHECK(back->balls.tint == 0.25f);
+    CHECK(back->balls.sparkMinPixels == 1.5f);
+    for (const auto& [key, value] : {std::pair<const char*, float>{"tint", 1.5f}, {"tint", -0.1f},
+                                     {"sparkMinPixels", -1.0f}, {"sparkMinPixels", 40.0f}}) {
+        nlohmann::json bad = j;
+        bad["balls"][key] = value;
+        CAPTURE(key, value);
+        CHECK(!scene::tileDynamicsFromJson(bad).has_value());
+    }
+}

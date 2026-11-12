@@ -3678,8 +3678,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.landingGlow = glm::vec4(td.landingColor * td.landingGain, td.landingGain); // ADR-1960
         // ADR-2008: the balls' impacts still lit (the newest kMaxBallImpacts), world space
         const scene::TileBallSpec& b = td.balls;
-        frame.ballGlow = glm::vec4(b.glowColor * b.glowGain, b.glowGain);
-        frame.ballSpark = glm::vec4(b.sparkColor * b.sparkGain, b.sparkGain);
+        frame.ballGlow = glm::vec4(b.glowColor * b.glowGain, b.tint);              // ADR-2009: w = tint
+        frame.ballSpark = glm::vec4(b.sparkColor * b.sparkGain, b.sparkMinPixels); // ADR-2009: w = min pixels
         frame.ballFx = glm::vec4(b.glowRadius, b.sparkSpeed, b.sparkReach, b.sparkLife);
         const auto now = static_cast<float>(time.renderTime);
         const float horizon = 6.0f * std::max(b.glowLife, b.sparkLife);
