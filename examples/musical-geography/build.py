@@ -252,6 +252,44 @@ SPRING = {"depth": 1.1, "frequency": 1.4, "damping": 0.16, "rippleSpeed": 16.0, 
 CHARACTERS = False   # set by --characters
 
 
+# draft10 (CPD-R12, ADR-2007/2008; owner: "about 10 of these dispersed throughout the cameras path - they can act
+# very light - take big bounces ... start with a reflective orb"): chrome orbs (metallic 1, roughness 0.04), each ~20 m
+# off the flown line at its song time, homeRadius 4, no sideways launch, speed capped 10 m/s (apex 12-23 m, in frame), slope 0.3 (less wander); three in the
+# first 30 s, and beside the close passes (64, 104, 151, 205 s). (x, z, ground y, song time)
+BALLS = [
+    (-301.5, 123.3, 0.0, 6),   # 20.0 m off the line
+    (-482.7, -24.7, 0.4, 15),   # 20.0 m off the line
+    (-445.5, -262.9, 0.0, 24),   # 20.0 m off the line
+    (-38.4, -662.3, 1.0, 64),   # 20.0 m off the line
+    (-20.5, -1102.8, 13.3, 104),   # 20.0 m off the line
+    (301.0, -1093.7, 1.7, 121),   # 20.0 m off the line
+    (454.9, -1599.3, 13.5, 151),   # 20.0 m off the line
+    (1074.3, -1643.8, 0.0, 176),   # 20.0 m off the line
+    (1497.2, -1546.4, 0.4, 197),   # 20.0 m off the line
+    (1539.8, -1718.8, 8.4, 205),   # 20.0 m off the line
+]
+# the impact: its own colours, apart from the aliens' warm landing glow -- a teal glow and magenta sparks along the tile
+# edges, at gains 2.5 so neither clips to white on the sunset tiles
+BALL_IMPACT = {"glowColor": [0.05, 0.85, 0.6], "glowGain": 2.5, "glowRadius": 4.0, "glowLife": 0.8,
+               "sparkColor": [0.9, 0.15, 0.75], "sparkGain": 2.5, "sparkSpeed": 14.0, "sparkReach": 24.0,
+               "sparkLife": 0.9, "sparkWidth": 2.5, "edgeBand": 0.12}
+
+
+def ball_nodes():
+    nodes, ents = [], []
+    for i, (x, z, gy, t) in enumerate(BALLS):
+        name = "ball%02d" % i
+        nodes.append({"name": name, "kind": "orb", "position": [x, gy + 4.0, z], "scale": [1.0, 1.0, 1.0],
+                      "material": {"baseColor": [0.95, 0.95, 0.97], "metallic": 1.0, "roughness": 0.04}})
+        ents.append({"name": name, "node": name, "seed": 9100 + i,
+                     "behaviors": [{"kind": "ball", "radius": 1.0, "velocity": [0.0, 8.0, 0.0], "homeRadius": 4.0,
+                                    # owner: "balls should bounce way higher": every bounce at least 12 m (was 3), lighter
+                                    # (gravity x0.22, was 0.35) so they hang, livelier (restitution 0.95, waves kick x2)
+                                    "minBounce": 12.0, "gravityScale": 0.22, "restitution": 0.95, "tileKick": 1.5,
+                                    "maxSpeed": 10.0, "slope": 0.3}]})
+    return nodes, ents
+
+
 def cast():
     return CAST + (CAST_FULL if FULL else [])
 
@@ -276,7 +314,7 @@ def cast_nodes(state="day"):
                      # THROW them (owner: "throw the aliens into the air"): launch speed = tossGain x the crest's rise,
                      # capped by tossMax; gain 30 / cap 11 m/s throws 2.4-6.2 m (p10-p90, median 3.9; eng's 16 / 9 measured 0.6-2.5, median 1.0)
                      "behaviors": [dict({"kind": "hop", "hopChance": HOP_CHANCE, "tossThreshold": TOSS_THRESHOLD, "tossGain": TOSS_GAIN,
-                                         "tossMax": TOSS_MAX, "tossCooldown": 3.0, "throwClipLift": THROW_CLIP_LIFT, "throwCrouchRate": THROW_CROUCH_RATE, "homeRadius": home,
+                                         "tossMax": TOSS_MAX, "tossCooldown": 2.0, "throwClipLift": THROW_CLIP_LIFT, "throwCrouchRate": THROW_CROUCH_RATE, "homeRadius": home,
                                          "goalMin": 1, "goalMax": 3,   # r6b: short runs (idle 0.33 -> 0.26)
                                          "pauseMin": 0.2, "pauseMax": 1.0, "runChance": RUN_CHANCE,
                                          "stepHeight": 3.0, "jumpTiles": 0,   # no step hops: walk up steps, never hop (r6 audit)
@@ -351,6 +389,10 @@ def scene_doc(state, interim, camera_name):
         doc["entities"] = e
         doc["lights"] += cast_lights(state)
         env["tileDynamics"]["spring"] = SPRING
+        bn, be = ball_nodes()
+        doc["nodes"] += bn
+        doc["entities"] += be
+        env["tileDynamics"]["balls"] = BALL_IMPACT
     return doc
 
 
