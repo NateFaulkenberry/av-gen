@@ -110,7 +110,10 @@ TILES = {
         # draft10: the west shore's own hills (the 58 m plateau left of frame at 8-25 s) cut ~40%: a broad shallow dip
         # along their crest, wide enough that the slopes facing the camera drop too (~45% inland, ~35% at the shore)
         {"name": "westShoreDip", "points": [[-470, 360], [-560, 260], [-570, 60], [-565, -120], [-565, -380]],
-         "valleyWidth": 600.0, "depthFraction": 0.45},
+         "valleyWidth": 800.0, "depthFraction": 0.5},
+        # draft10: the north arm's own land (the pink-orange wall left of frame at 28-40 s), cut with its ridge
+        {"name": "armDip", "points": [[-470, -400], [-330, -430], [-200, -420], [-60, -385]], "valleyWidth": 300.0,
+         "depthFraction": 0.25},
         {"name": "pathVale", "points": [[35, -615], [-30, -680], [-114, -727], [-200, -770], [-284, -819], [-360, -876]],
          "valleyWidth": 150.0, "depthFraction": 0.85},
         {"name": "sweep", "points": [[-372, -905], [-352, -975], [-316, -1043], [-275, -1109], [-218, -1166], [-139, -1175], [-61, -1145], [13, -1108], [74, -1078], [150, -1062], [235, -1072]],
