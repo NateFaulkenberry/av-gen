@@ -108,9 +108,9 @@ TILES = {
     # flight climbing a 60 m flank head-on (a wall filling the frame, 104-106 s). Each follows the flight line (the scratch mirror's track), 150 m wall to wall.
     "valleys": [
         # draft10: the west shore's own hills (the 58 m plateau left of frame at 8-25 s) cut ~40%: a broad shallow dip
-        # along their crest (45% at the crest line, ~36% across the plateau, fading to ~10% at the shore)
-        {"name": "westShoreDip", "points": [[-610, 220], [-610, 60], [-600, -120], [-600, -360]], "valleyWidth": 420.0,
-         "depthFraction": 0.45},
+        # along their crest, wide enough that the slopes facing the camera drop too (~45% inland, ~35% at the shore)
+        {"name": "westShoreDip", "points": [[-470, 360], [-560, 260], [-570, 60], [-565, -120], [-565, -380]],
+         "valleyWidth": 600.0, "depthFraction": 0.45},
         {"name": "pathVale", "points": [[35, -615], [-30, -680], [-114, -727], [-200, -770], [-284, -819], [-360, -876]],
          "valleyWidth": 150.0, "depthFraction": 0.85},
         {"name": "sweep", "points": [[-372, -905], [-352, -975], [-316, -1043], [-275, -1109], [-218, -1166], [-139, -1175], [-61, -1145], [13, -1108], [74, -1078], [150, -1062], [235, -1072]],
