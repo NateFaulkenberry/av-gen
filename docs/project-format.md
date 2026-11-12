@@ -220,7 +220,8 @@ warning listing the names the asset has, and is also one of the project's warnin
 surfaces, terrains included, and asking for more is refused at load. Absent, the key changes nothing. It is written
 back as authored. Its pixels carry the lake's own identifier in the id AOV (ADR-2021). See
 [water.md](water.md#water-on-an-imported-mesh-adr-2020); the water keys `ssrTint`, `ssrBlur` and `ssrEdgeFade`
-([water.md](water.md#shaping-the-frames-reflection-adr-2021)) shape what the lake reflects.
+([water.md](water.md#shaping-the-frames-reflection-adr-2021)) shape what the lake reflects, and `reflectBlended`
+(ADR-2022) puts the frame's alpha-blended meshes, such as a translucent waterfall, in its reflection.
 
 ### `cameraDirection` — more than one camera (ADR-245)
 

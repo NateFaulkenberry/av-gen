@@ -348,9 +348,15 @@ reflection as it was, to the byte:
 
 Any water takes them, a terrain's included. None changes the cost.
 
-**Not reflected:** anything drawn after the water. That means blended meshes (an alpha-blended waterfall, glass, leaf
-cards), particles and ribbons. The frame copy the water reads is taken before them. A fall exported as an alpha
-*mask* is opaque and is reflected. ADR-2021 lists the engine options.
+**Not reflected, by default:** anything drawn after the water. That means blended meshes (an alpha-blended
+waterfall, glass, leaf cards), particles and ribbons. The frame copy the water reads is taken before them.
+
+**`reflectBlended`** (boolean, default false; ADR-2022) puts the blended *meshes* in. When any cinematic surface
+in the frame has it on, the frame's blended meshes are drawn a second time into the copy, before the water, so a
+translucent fall and its spray appear in the lake with their translucency intact. The frame itself is unchanged.
+It costs one more draw of every blended mesh in the frame, and no extra memory (the blend pipelines write only the
+colour target). Measure it with `--ab nowaterblend`; a profile shows it as the `waterblend` pass. Particles and
+ribbons stay out. A blended mesh *under* the water shows twice: refracted through it, and drawn over it as before.
 
 ## Things that float
 
