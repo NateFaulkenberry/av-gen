@@ -140,6 +140,9 @@ a run that had any.
 | `AVGEN_HEIGHT_CACHE=0`, `AVGEN_PATH_CUTOFF=0`, `AVGEN_LEVEL_BLEND=0` | the terrain height query without its cache, path cut-off or level blend |
 | `AVGEN_NAV_FORCE_TRUST=1` | the navigation grid's terrain trust forced on |
 | `AVGEN_DIAG_NO_SIGHTLINE` | a character's visibility signal without its sightline march |
+| `AVGEN_NO_TILE_MOTION` | a tiles ground's bodies read the planning surface, not the song's recorded ground (before ADR-1998) |
+| `AVGEN_THROW_ADR1998` | a crest throw at the swing's fastest rise, with no crouch (ADR-1998's timing, before ADR-2000) |
+| `AVGEN_THROW_LANDSCAPE` | a crest throw read on the landscape alone, not the drawn tile (ADR-2001, before ADR-2002) |
 
 ## Exit codes
 
