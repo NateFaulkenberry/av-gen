@@ -323,7 +323,7 @@ Parameters a composition registers (all saveable in a project and modulatable):
 | Path | Meaning |
 |---|---|
 | `nodes/<name>/position`, `rotation` (degrees), `scale` | offset from the node's rest transform |
-| `nodes/<name>/visible`, `emissiveBoost`, `roughnessScale` | per-instance overrides |
+| `nodes/<name>/visible`, `emissiveBoost`, `roughnessScale`, `opacity` | per-instance overrides (a node's `opacity` key, 0..1, sets the last one's starting value; under 1 the node draws blended) |
 | `nodes/<name>/nodes/<child>/…` | the same for nodes of a nested scene |
 | `particles/<name>/…` | the particle node's system (see `docs/rendering.md`) |
 | `camera/distance`, `height`, `orbitSpeed`, `fov`; `env/intensity`, `env/rotation`; `scene/brightness`, `scene/gridIntensity`; `root/scale`, `root/rotationSpeed`, `root/impulse` | as in the orb and glTF scenes |

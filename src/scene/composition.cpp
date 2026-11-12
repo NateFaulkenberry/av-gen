@@ -4526,6 +4526,7 @@ CompositionNode cloneNodeSpec(const CompositionNode& node) {
     copy.locked = node.locked;
     copy.emissiveBoost = node.emissiveBoost;
     copy.roughnessScale = node.roughnessScale;
+    copy.opacityScale = node.opacityScale; // ADR-2040
     copy.particles = node.particles;
     copy.procedural = node.procedural;
     copy.proceduralMaterialAuthored = node.proceduralMaterialAuthored;
@@ -11956,6 +11957,9 @@ nlohmann::json Composition::toJson() const {
         }
         n["emissiveBoost"] = node.emissiveBoost;
         n["roughnessScale"] = node.roughnessScale;
+        if (node.opacityScale != 1.0f) { // ADR-2040: additive, written only when the node is faded
+            n["opacity"] = node.opacityScale;
+        }
         // ADR-360. Written only when the node declares a wind body, so nothing else grows a key,
         // and written from the parameters' BASE so a session's edits survive the save -- the
         // failure this whole ADR is about was a reader whose writer could not be reached.
@@ -13872,6 +13876,16 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
             }
             auto emissive = readFloat(item, "emissiveBoost", 1.0f);
             auto roughness = readFloat(item, "roughnessScale", 1.0f);
+            // ADR-2040: the node's starting opacity, the base of `nodes/<name>/opacity`. It was written by
+            // scene builders and never read, so a fade authored in the file drew at full strength.
+            if (item.contains("opacity")) {
+                const json& o = item.at("opacity");
+                if (!o.is_number() || !std::isfinite(o.get<double>()) || o.get<double>() < 0.0 ||
+                    o.get<double>() > 1.0) {
+                    return fail("node '{}': 'opacity' must be a number 0..1", node.name);
+                }
+                node.opacityScale = o.get<float>();
+            }
             // ADR-370: which node's canopy a particle emitter is measured from.
             if (item.contains("canopySource") && item.at("canopySource").is_string()) {
                 node.canopySource = item.at("canopySource").get<std::string>();

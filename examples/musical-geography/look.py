@@ -294,7 +294,7 @@ def fog_medium(state):
         "fogColor": hexlin(STATES[state]["fog"]),
         "volumeDensity": round(0.0009 / m, 6),
         "volumeMaxDistance": 0.0,      # surface-only fog: the same air in closed form, no march (about 8 ms saved)
-        "horizonDensity": 9.0,         # near and mid ground clean, the far ring fully veiled (no window edge)
+        "horizonDensity": 8.0,         # the engine maximum: near and mid ground clean, the far ring fully veiled (no window edge)
         "fogHeight": 2.0,
         "fogHeightFalloff": 0.035,
         "volumeAnisotropy": 0.6,
