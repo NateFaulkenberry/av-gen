@@ -1222,8 +1222,9 @@ TEST_CASE("a non-finite water setting is refused rather than floored",
         constexpr std::size_t kColours = 13; // and ADR-1286's absorption and second reflection tint, ADR-1643's three,
                                              // ADR-2021's ssrTint
         CHECK(poisons.size() + 1 == kScalarFloats + kColours);
-        // Two bools (`enabled`, `tearFollowsWind`), each padded out to a float's alignment.
-        CHECK(sizeof(scene::WaterSettings) == sizeof(float) * (kScalarFloats + 3 * kColours) + 2 * alignof(float));
+        // Three bools (`enabled`, `tearFollowsWind`, ADR-2022's `reflectBlended`), each padded out to a float's
+        // alignment. A bool cannot be non-finite; the reader refuses a non-boolean `reflectBlended`.
+        CHECK(sizeof(scene::WaterSettings) == sizeof(float) * (kScalarFloats + 3 * kColours) + 3 * alignof(float));
     }
 
     SECTION("the two frame-supplied values are checked too") {

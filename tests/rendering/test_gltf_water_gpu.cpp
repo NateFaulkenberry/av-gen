@@ -554,3 +554,105 @@ TEST_CASE("at their defaults the reflection's three new controls are the shader 
     CHECK(gpu::hashImage(bench.render(live)) != gpu::hashImage(bench.render(was)));
     CHECK(bench.ctx->errorCount() == 0);
 }
+
+// ADR-2022: `reflectBlended` draws the frame's blended meshes a second time into the water's frame copy, so the lake
+// reflects a translucent veil hung in front of the ridge. Off (the default) the veil is not in the lake, no extra
+// pass is recorded, and the frame is the frame the key-absent scene draws, to the byte. On, everything above the
+// waterline is unchanged to the byte: only what the water reads moved.
+TEST_CASE("reflectBlended puts a blended mesh in the lake's reflection", "[gpu][renderer][water][gltf][adr2022]") {
+    std::array<GlbMesh, 3> meshes;
+    meshes[0].node = "water";
+    meshes[0].material = "Lake";
+    meshes[0].color = {0.1f, 0.45f, 0.45f};
+    meshes[0].roughness = 0.5f;
+    appendPlane(meshes[0], {-1500.0f, -2900.0f}, {1500.0f, 100.0f}, 0.0f);
+    meshes[1].node = "ridge";
+    meshes[1].material = "Rock";
+    meshes[1].color = {0.85f, 0.85f, 0.85f};
+    meshes[1].roughness = 0.9f;
+    appendBox(meshes[1], kRidgeLo, kRidgeHi);
+    // the veil: a translucent magenta sheet facing the camera, 50 m in front of the ridge's face
+    constexpr glm::vec3 kVeilLo{-600.0f, 150.0f, -2950.0f};
+    constexpr glm::vec3 kVeilHi{-200.0f, 1100.0f, -2950.0f};
+    meshes[2].node = "veil";
+    meshes[2].material = "Veil";
+    meshes[2].color = {0.9f, 0.08f, 0.9f};
+    meshes[2].alpha = 0.55f;
+    meshes[2].blend = true;
+    for (const glm::vec3 p : {glm::vec3(kVeilLo.x, kVeilLo.y, kVeilLo.z), glm::vec3(kVeilHi.x, kVeilLo.y, kVeilLo.z),
+                              glm::vec3(kVeilHi.x, kVeilHi.y, kVeilLo.z), glm::vec3(kVeilLo.x, kVeilHi.y, kVeilLo.z)}) {
+        meshes[2].positions.push_back(p);
+        meshes[2].normals.emplace_back(0.0f, 0.0f, 1.0f);
+    }
+    meshes[2].indices = {0, 1, 2, 0, 2, 3};
+    const fs::path glb = writeMeshesGlb("gltf_water_veil", meshes);
+    const std::string lake = std::string(R"("waterMaterials": {"Lake": )") + kLakeWater;
+    const fs::path absent = acceptanceScene("veil-absent", glb, lake + "}");
+    const fs::path off = acceptanceScene("veil-off", glb, lake.substr(0, lake.size() - 1) + R"(, "reflectBlended": false}})");
+    const fs::path on = acceptanceScene("veil-on", glb, lake.substr(0, lake.size() - 1) + R"(, "reflectBlended": true}})");
+
+    constexpr std::uint32_t kW = 480;
+    constexpr std::uint32_t kH = 270;
+    WaterBench bench = WaterBench::make(kW, kH, absent);
+    WaterBench::Arm live = bench.arm();
+    const auto shoot = [&](const fs::path& scenePath) {
+        REQUIRE(bench.engine->loadComposition(scenePath).has_value());
+        bench.aim(kEye, kLookAt);
+        bench.hold(4.0);
+        return bench.render(live);
+    };
+    const gpu::ImageF none = shoot(absent);
+    const std::uint32_t absentDraws = live.renderer->stats().drawCalls;
+    const gpu::ImageF offFrame = shoot(off);
+    const std::uint32_t offCopyDraws = live.renderer->stats().waterBlendedCopyDraws;
+    const std::uint32_t offDraws = live.renderer->stats().drawCalls;
+    const gpu::ImageF onFrame = shoot(on);
+    const std::uint32_t onCopyDraws = live.renderer->stats().waterBlendedCopyDraws;
+    dumpWater(offFrame, "gltf-lake-veil-off");
+    dumpWater(onFrame, "gltf-lake-veil-on");
+
+    // off is the absent key: the same bytes, the same draws, no extra pass
+    CHECK(gpu::hashImage(offFrame) == gpu::hashImage(none));
+    CHECK(offCopyDraws == 0);
+    CHECK(offDraws == absentDraws);
+    CHECK(onCopyDraws == 1);
+
+    // above the waterline, on is off to the byte
+    const scene::Scene& s = bench.scene();
+    const float horizon = project(s, {0.0f, kEye.y, -1e5f}, kW, kH).y;
+    std::size_t aboveDiffer = 0;
+    for (std::uint32_t y = 0; y + 2 < static_cast<std::uint32_t>(horizon); ++y) {
+        for (std::uint32_t x = 0; x < kW; ++x) {
+            const float* a = onFrame.pixel(x, y);
+            const float* b = offFrame.pixel(x, y);
+            aboveDiffer += (a[0] != b[0] || a[1] != b[1] || a[2] != b[2]) ? 1 : 0;
+        }
+    }
+    CHECK(aboveDiffer == 0);
+
+    // the veil's reflection: its mirror image, its middle (the ripples move its edge)
+    const glm::vec2 a = projectMirrored(s, {kVeilLo.x, kVeilLo.y, kVeilLo.z}, kW, kH);
+    const glm::vec2 b = projectMirrored(s, {kVeilHi.x, kVeilHi.y, kVeilLo.z}, kW, kH);
+    const Box veilMirror{static_cast<int>(a.x) + 3, static_cast<int>(a.y) + 3, static_cast<int>(b.x) - 3,
+                         static_cast<int>(b.y) - 3};
+    REQUIRE_FALSE(veilMirror.empty());
+    // the veil itself, above the waterline, for its colour
+    const glm::vec2 da = project(s, {kVeilLo.x, kVeilHi.y, kVeilLo.z}, kW, kH);
+    const glm::vec2 db = project(s, {kVeilHi.x, kVeilLo.y, kVeilLo.z}, kW, kH);
+    const Box veilDirect{static_cast<int>(da.x) + 3, static_cast<int>(da.y) + 3, static_cast<int>(db.x) - 3,
+                         static_cast<int>(db.y) - 3};
+    const auto magenta = [](const Rgb& c) { return c.sum() > 0.0 ? (0.5 * (c.r + c.b) - c.g) / c.sum() : 0.0; };
+    const Rgb seen = mean(onFrame, veilDirect);
+    const Rgb inOff = mean(offFrame, veilMirror);
+    const Rgb inOn = mean(onFrame, veilMirror);
+    INFO("veil above the waterline " << seen.r << ", " << seen.g << ", " << seen.b << " (magenta " << magenta(seen)
+                                     << "); its reflection off " << inOff.r << ", " << inOff.g << ", " << inOff.b
+                                     << " (" << magenta(inOff) << "), on " << inOn.r << ", " << inOn.g << ", "
+                                     << inOn.b << " (" << magenta(inOn) << ")");
+    REQUIRE(magenta(seen) > 0.1); // the control: there is a magenta veil to reflect
+    CHECK(magenta(inOff) < 0.02);
+    CHECK(magenta(inOn) > 0.5 * magenta(seen)); // through the water's own colour and fresnel
+    // translucent in the reflection too: the ridge shows through it, so it is not the veil's full colour
+    CHECK(inOn.g > 0.2 * inOff.g);
+    CHECK(bench.ctx->errorCount() == 0);
+}

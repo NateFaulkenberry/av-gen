@@ -333,3 +333,31 @@ TEST_CASE("ssrTint, ssrBlur and ssrEdgeFade are read, ranged and default to the 
     refused("blur", R"(, "waterMaterials": {"Lake": {"ssrBlur": -1}})", "ssrBlur must be in [0, 4]");
     refused("edge", R"(, "waterMaterials": {"Lake": {"ssrEdgeFade": 0}})", "ssrEdgeFade must be in [0.001, 0.25]");
 }
+
+// ADR-2022: `reflectBlended` is read by the shared reader as a boolean, off by default, refused when not a boolean.
+TEST_CASE("reflectBlended is a boolean water key, off by default", "[composition][gltf][water][adr2022]") {
+    CHECK_FALSE(scene::WaterSettings{}.reflectBlended);
+    const auto glb = lakeGlb();
+    assets::AssetRegistry registry{testsupport::processTempDir()};
+    auto comp = scene::Composition::loadFile(
+        writeScene("blendon", R"(, "waterMaterials": {"Lake": {"skyMirror": 1, "reflectBlended": true}})", glb)
+            .filename(),
+        registry);
+    if (!comp) {
+        FAIL(comp.error().message);
+    }
+    params::ParameterSet params;
+    params::Modulator modulator;
+    (*comp)->attach(params, modulator);
+    REQUIRE((*comp)->scene().waters.size() == 1);
+    CHECK((*comp)->scene().waters[0].settings.reflectBlended);
+    for (const char* bad : {R"(1)", R"("yes")", R"(null)"}) {
+        auto refused = scene::Composition::loadFile(
+            writeScene("blendbad", std::string(R"(, "waterMaterials": {"Lake": {"reflectBlended": )") + bad + "}}",
+                       glb)
+                .filename(),
+            registry);
+        REQUIRE_FALSE(refused.has_value());
+        CHECK(refused.error().message.find("water 'reflectBlended' must be a boolean") != std::string::npos);
+    }
+}

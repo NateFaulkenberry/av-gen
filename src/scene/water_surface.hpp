@@ -169,6 +169,14 @@ struct WaterSettings {
     float ssrEdgeFade = 0.06f;   // the share of the frame's width over which the march and the mirror fade to the
                                  // environment at the left and right edges (0.001..0.25)
 
+    // ---- blended meshes in the reflection (ADR-2022) ---------------------------------------------------
+    // The frame copy the cinematic water reflects is taken before anything blended is drawn, so an alpha-blended
+    // waterfall, spray or glass is never in it. On, the frame's blended meshes are drawn a second time into the copy
+    // (after it is taken, before the water), so the march and the sky mirror see them, translucency and all. The
+    // frame itself is drawn exactly as before. Frame-wide: any cinematic surface asking for it puts them in the one
+    // copy every surface reads. Off (the default): no extra pass, and the copy is the texture it was.
+    bool reflectBlended = false;
+
     [[nodiscard]] bool cinematic() const {
         return ssr > 0.0f || transmission > 0.0f || undulation > 0.0f || roughnessVariation > 0.0f ||
                tintPatches > 0.0f || flowStreaks > 0.0f || skyMirror > 0.0f;

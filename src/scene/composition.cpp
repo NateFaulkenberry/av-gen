@@ -11743,6 +11743,9 @@ nlohmann::json Composition::toJson() const {
                 if (w.ssrEdgeFade != d.ssrEdgeFade) {
                     n["terrain"]["water"]["ssrEdgeFade"] = w.ssrEdgeFade;
                 }
+                if (w.reflectBlended) { // ADR-2022: written only when on
+                    n["terrain"]["water"]["reflectBlended"] = true;
+                }
             }
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
@@ -11909,6 +11912,12 @@ Result<void> readWaterSettings(const json& wj, const std::string& where, WaterSe
             return fail("{}: water 'enabled' must be a boolean", where);
         }
         w.enabled = wj.at("enabled").get<bool>();
+    }
+    if (wj.contains("reflectBlended")) { // ADR-2022
+        if (!wj.at("reflectBlended").is_boolean()) {
+            return fail("{}: water 'reflectBlended' must be a boolean", where);
+        }
+        w.reflectBlended = wj.at("reflectBlended").get<bool>();
     }
     for (const WaterFloat& f :
          {WaterFloat{"shallow", &w.shallow}, WaterFloat{"roughness", &w.roughness},

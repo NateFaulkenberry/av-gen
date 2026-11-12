@@ -83,6 +83,8 @@ struct GlbMesh {
     std::vector<glm::vec3> normals;
     std::vector<std::uint32_t> indices;
     bool skinned = false;
+    float alpha = 1.0f;   // the base colour's alpha
+    bool blend = false;   // alphaMode BLEND (otherwise OPAQUE)
 };
 
 // An axis-aligned box, 24 vertices (each face its own, so the normals are the face's), outward and counter-clockwise.
@@ -171,9 +173,13 @@ inline std::filesystem::path writeMeshesGlb(const std::string& name, std::span<c
         }
         materials.push_back({{"name", m.material},
                              {"pbrMetallicRoughness",
-                              {{"baseColorFactor", {m.color.r, m.color.g, m.color.b, 1.0}},
+                              {{"baseColorFactor", {m.color.r, m.color.g, m.color.b, m.alpha}},
                                {"metallicFactor", 0.0},
                                {"roughnessFactor", m.roughness}}}});
+        if (m.blend) {
+            materials.back()["alphaMode"] = "BLEND";
+            materials.back()["doubleSided"] = true;
+        }
         gltfMeshes.push_back({{"primitives", {{{"attributes", attributes}, {"indices", indexAccessor},
                                                 {"material", materials.size() - 1}}}}});
         nlohmann::json node{{"name", m.node}, {"mesh", gltfMeshes.size() - 1}};
