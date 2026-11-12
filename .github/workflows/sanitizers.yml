@@ -147,7 +147,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/cmake-preset
         with:
-          preset: ubsan   # Debug + -fsanitize=undefined
+          preset: ubsan   # Debug (assertions on) at -O1 + -fsanitize=undefined (ADR-2031)
           out: ${{ env.RESULTS }}/build-ubsan
       - uses: ./.github/actions/test-inputs   # numpy, for the sonic-* scores
       - name: Run avgen_tests under UBSan

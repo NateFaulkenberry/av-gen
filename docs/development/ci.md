@@ -181,6 +181,13 @@ report     one row per sanitizer in the run summary; prunes caches on main
   - its verdict is its own row, not a line inside an ASan summary;
   - `UBSAN_OPTIONS=halt_on_error=1` makes a report kill its process with a non-zero exit, which
     `catch2_run.py` reads as a failure on its own, besides the `runtime error:` line it also gates on.
+  - **It builds at `-O1`, not `-O0` (ADR-2031, 2026-11-12).** Still `CMAKE_BUILD_TYPE=Debug`, so assertions
+    stay on and the test set is the same (`kOptimised` keys on `NDEBUG`). Once the lunar report stopped
+    halting it at about a third of the set, the slowest of the three shards was estimated at 280-300 of
+    its 330 minutes at `-O0`, and a GitHub-hosted job cannot run longer than 6 hours. `-O1` is clang's
+    recommended level for the sanitizers. The cost, which the owner accepted: the optimiser can fold away
+    a little undefined behaviour before a check sees it. The ASan build (with UBSan's checks as a
+    second net) stays at `-O0`.
   The ASan build keeps UBSan's checks (recoverable, `halt_on_error=0`) as a second net: they cost
   nothing extra there, and any `runtime error:` line still fails that job.
 - **TSan:** `--preset tsan` over the concurrency set (below), **every night** since 2026-09-28. It was

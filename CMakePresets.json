@@ -16,7 +16,7 @@
     { "name": "relwithdebinfo", "inherits": "base", "displayName": "RelWithDebInfo", "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" } },
     { "name": "asan", "inherits": "base", "displayName": "Debug + ASan/UBSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_ASAN": "ON" } },
     { "name": "tsan", "inherits": "base", "displayName": "Debug + TSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_TSAN": "ON" } },
-    { "name": "ubsan", "inherits": "base", "displayName": "Debug + UBSan", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "AVGEN_ENABLE_UBSAN": "ON" } }
+    { "name": "ubsan", "inherits": "base", "displayName": "Debug + UBSan (-O1)", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_FLAGS_DEBUG": "-O1 -g", "CMAKE_CXX_FLAGS_DEBUG": "-O1 -g", "AVGEN_ENABLE_UBSAN": "ON" } }
   ],
   "buildPresets": [
     { "name": "debug", "configurePreset": "debug" },
