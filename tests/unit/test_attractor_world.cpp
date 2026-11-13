@@ -204,8 +204,11 @@ TEST_CASE("in the live editor a seed change generates on a worker and the old wo
     // the frame that asked did not wait: the old world is still drawn (unless the worker was already done)
     const auto during = c.comp->scene().attractorWorld.world;
     CHECK((during == first || during->gen.seed == 22u));
+    // A wall-clock deadline, not a count of 10 ms polls: 400 polls (about 4 s) ran out on a loaded hosted runner
+    // while the worker was still generating (scheduled CI 2026-11-13). A hang still fails, at the deadline.
     std::shared_ptr<const scene::AttractorWorld> now = during;
-    for (int i = 0; i < 400 && now->gen.seed != 22u; ++i) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+    for (int i = 0; now->gen.seed != 22u && std::chrono::steady_clock::now() < deadline; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         c.frame((2.0 + i) / 30.0);
         now = c.comp->scene().attractorWorld.world;
