@@ -67,6 +67,56 @@
    "height_m": 63.8
   },
   {
+   "asset": "decks/deck_quay_6m.glb",
+   "tris": 140,
+   "height_m": 0.1
+  },
+  {
+   "asset": "decks/deck_stair_3m2.glb",
+   "tris": 372,
+   "height_m": 4.2
+  },
+  {
+   "asset": "decks/gangway_10m.glb",
+   "tris": 348,
+   "height_m": 1.1
+  },
+  {
+   "asset": "decks/pier_span_22m.glb",
+   "tris": 684,
+   "height_m": 1.1
+  },
+  {
+   "asset": "garden/umbel_tree_a.glb",
+   "tris": 1608,
+   "height_m": 11.4
+  },
+  {
+   "asset": "garden/umbel_tree_b.glb",
+   "tris": 1272,
+   "height_m": 8.6
+  },
+  {
+   "asset": "garden/umbel_tree_c.glb",
+   "tris": 1828,
+   "height_m": 13.1
+  },
+  {
+   "asset": "buildings/mooring_capsule_tower.glb",
+   "tris": 3140,
+   "height_m": 73.7
+  },
+  {
+   "asset": "vehicles/gondola_cabin.glb",
+   "tris": 252,
+   "height_m": 3.7
+  },
+  {
+   "asset": "vehicles/cloud_skiff.glb",
+   "tris": 198,
+   "height_m": 4.6
+  },
+  {
    "asset": "landmarks/great_lantern_frame.glb",
    "tris": 6092,
    "height_m": 110.2,

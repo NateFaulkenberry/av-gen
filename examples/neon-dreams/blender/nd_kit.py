@@ -73,6 +73,8 @@ def mats():
     pbr("strip", (0.01, 0.01, 0.01), 0.4, emit=hex2lin("#c06bff"), strength=12.0)
     pbr("beacon", (0.01, 0.0, 0.0), 0.4, emit=hex2lin("#ff2030"), strength=40.0)
     pbr("landmark", (0.02, 0.012, 0.018), 0.5, emit=hex2lin("#ff9be6"), strength=6.0, tex=lv)
+    pbr("deck", (0.05, 0.045, 0.06), 0.34)
+    pbr("garden", (0.01, 0.006, 0.012), 0.5, emit=hex2lin("#ff7ad9"), strength=18.0, tex=lv)
 
 
 class Asset:
@@ -309,6 +311,141 @@ def great_lantern():
     return frame, bell
 
 
+def lvl_uv(r, lo=0.0):
+    u = (int((lo + (1 - lo) * r.random()) * 15.99) + 0.5) / 16.0
+    return (u, r.random(), u, r.random())
+
+
+def octa(mb, c, s_, uv):
+    """Tiny emissive point: an octahedron of 8 triangles with collapsed UVs."""
+    x, y, z = c
+    t, b = (x, y, z + s_), (x, y, z - s_)
+    ring = [(x + s_, y, z), (x, y + s_, z), (x - s_, y, z), (x, y - s_, z)]
+    u = (uv[0], uv[1])
+    for i in range(4):
+        a_, b_ = ring[i], ring[(i + 1) % 4]
+        mb._add([a_, b_, t], [(0, 1, 2)], None, [u, u, u]); mb._add([b_, a_, b], [(0, 1, 2)], None, [u, u, u])
+
+
+def deck_kit():
+    out = []
+    A = Asset("deck_quay_6m")                       # one 6 m length of the Quay, 8.6 m wide; instance along the street spline
+    A.m("deck").box((0, 0, -0.14), (6.0, 8.6, 0.28)); A.m("trim").box((0, 0, -0.42), (6.0, 8.2, 0.28))
+    for sy in (-4.2, 4.2):
+        A.m("trim").box((0, sy, -0.3), (6.0, 0.24, 0.6)); A.m("metal").box((0, sy * 0.98, 0.07), (6.0, 0.1, 0.14))
+    for sy in (-3.7, 3.7):
+        A.m("metal").cyl((0, sy, -14), 0.28, 13.4, n=8, cap=False)
+    A.m("metal").beam((0, -3.7, -1.2), (0, 3.7, -7.0), 0.1); A.m("metal").beam((0, 3.7, -1.2), (0, -3.7, -7.0), 0.1); A.m("metal").beam((0, -3.7, -7.3), (0, 3.7, -7.3), 0.16)
+    out.append(A.finish())
+    A = Asset("deck_stair_3m2")                     # one floor (3.2 m) down over 4.8 m, full street width
+    for i in range(16):
+        A.m("deck").box((-2.4 + (i + 0.5) * 0.3, 0, 3.2 - (i + 0.5) * 0.2 - 0.1), (0.3, 8.6, 0.2 + i * 0.2 if False else 0.2))
+    for sy in (-4.2, 4.2):
+        A.m("trim").beam((-2.4, sy, 3.2), (2.4, sy, 0.0), 0.2, t2=0.5); A.m("metal").beam((-2.4, sy, 4.2), (2.4, sy, 1.0), 0.05)
+        for k in range(5):
+            x = -2.4 + k * 1.2; z = 3.2 - k * 0.8
+            A.m("metal").box((x, sy, z + 0.5), (0.04, 0.04, 1.0))
+    A.m("strip").beam((-2.4, 0, 3.02), (2.4, 0, -0.18), 7.6, t2=0.05)
+    out.append(A.finish())
+    A = Asset("gangway_10m")                        # a footbridge between buildings at third-floor height
+    A.m("deck").box((0, 0, -0.1), (2.0, 10.0, 0.2)); A.m("trim").box((0, 0, -0.32), (1.5, 10.0, 0.26))
+    for sx in (-0.95, 0.95):
+        A.m("metal").box((sx, 0, 1.05), (0.05, 10.0, 0.05)); A.m("metal").box((sx, 0, 0.55), (0.03, 10.0, 0.03))
+        for k in range(11):
+            A.m("metal").box((sx, -5 + k, 0.52), (0.035, 0.035, 1.05))
+    A.m("strip").box((0, 0, -0.46), (0.08, 9.6, 0.05))
+    out.append(A.finish())
+    A = Asset("pier_span_22m")                      # the pier: instance end to end; drop and tilt the last ones for the broken spans
+    A.m("deck").box((0, 0, -0.2), (22.0, 5.5, 0.4)); A.m("trim").box((0, 0, -0.75), (22.0, 1.2, 0.7))
+    for sy in (-2.65, 2.65):
+        A.m("trim").box((0, sy, -0.35), (22.0, 0.2, 0.7))
+        for k in range(3):
+            x = -8.0 + k * 8.0
+            A.m("metal").box((x, sy, 0.45), (0.06, 0.06, 0.9)); A.m("win_cool").sphere((x, sy, 1.0), 0.13, n=8, m=5)
+    for sy in (-1, 1):                               # A-frame legs splay outward and are lost in the cloud
+        A.m("metal").beam((0, sy * 2.2, -0.9), (0, sy * 6.5, -70.0), 0.42)
+        A.m("metal").beam((0, sy * 2.6, -8.0), (0, -sy * 3.0, -22.0), 0.14)
+    for z in (-12.0, -30.0, -52.0):
+        w_ = 2.2 + (-z) / 70.0 * 4.3
+        A.m("metal").beam((0, -w_, z), (0, w_, z), 0.18)
+    out.append(A.finish())
+    return out
+
+
+def umbel_tree(name, seed, height=9.0, radius=4.6, n_pts=120):
+    """Garden tree of the Moorings: a thin trunk and a shallow dome of light points on fine rays."""
+    r = random.Random(seed); A = Asset(name)
+    lean = (r.uniform(-0.6, 0.6), r.uniform(-0.6, 0.6)); seg = 6; pts = []
+    for i in range(seg + 1):
+        t = i / seg
+        pts.append(Vector((lean[0] * t * t, lean[1] * t * t, height * t)))
+    for i in range(seg):
+        A.m("trim").beam(pts[i], pts[i + 1], 0.3 - 0.16 * (i / seg))
+    top = pts[-1]
+    for k in range(n_pts):
+        u_ = (k + 0.5) / n_pts; th = math.acos(1 - u_ * 0.74); ph = k * 2.39996 + r.uniform(-0.1, 0.1)
+        rr_ = radius * r.uniform(0.86, 1.06)
+        q = Vector((top.x + rr_ * math.sin(th) * math.cos(ph), top.y + rr_ * math.sin(th) * math.sin(ph), top.z + rr_ * 0.55 * math.cos(th) - radius * 0.2))
+        octa(A.m("garden"), tuple(q), r.uniform(0.07, 0.13), lvl_uv(r, 0.15))
+        if k % 4 == 0:
+            A.m("trim").beam(top, q, 0.03)
+    for k in range(5):                               # a few low buds on the trunk
+        t = r.uniform(0.35, 0.8); a = r.uniform(0, 6.283); pt = Vector((lean[0] * t * t, lean[1] * t * t, height * t))
+        q = pt + Vector((math.cos(a) * 0.9, math.sin(a) * 0.9, 0.5))
+        A.m("trim").beam(pt, q, 0.03); octa(A.m("garden"), tuple(q), 0.09, lvl_uv(r, 0.1))
+    return A.finish()
+
+
+def capsule_tower(seed=5):
+    """Metabolist plug-in tower: a service core with 34 capsules, each with one round window."""
+    r = random.Random(seed); A = Asset("mooring_capsule_tower"); H = 60.0
+    A.m("facade").box((0, 0, H / 2), (5.0, 5.0, H)); A.m("trim").box((0, 0, H + 0.2), (5.6, 5.6, 0.4))
+    A.m("metal").box((0, 0, H + 2.4), (3.0, 3.0, 4.0)); A.m("metal").cyl((0, 0, H + 4.4), 0.08, 9.0, n=6); A.m("beacon").sphere((0, 0, H + 13.5), 0.18, n=8, m=5)
+    for k in range(34):
+        side = k % 4; z = 2.0 + (k // 4) * 6.4 + (side % 2) * 3.2 + r.uniform(-0.25, 0.25)
+        a = side * math.pi / 2; c_, s_ = math.cos(a), math.sin(a)
+        ctr = (c_ * 4.7, s_ * 4.7, z + 1.4)
+        A.m("trim").box(ctr, (4.2, 3.0, 2.8), a); A.m("facade").box((c_ * 4.7, s_ * 4.7, z + 2.86), (4.0, 2.8, 0.12), a)
+        A.m("metal").box((c_ * 2.55, s_ * 2.55, z + 1.4), (0.3, 1.2, 1.2), a)
+        lit = r.random() < 0.4
+        mat = (r.choice(["win_warm", "win_cool", "win_cool"])) if lit else "glass"
+        cx_, cy_ = c_ * 6.83, s_ * 6.83; n = 14; uv = lvl_uv(r, 0.2); u = (uv[0], uv[1])
+        ring = [(cx_ - s_ * 0.8 * math.cos(i / n * 6.283), cy_ + c_ * 0.8 * math.cos(i / n * 6.283), z + 1.45 + 0.8 * math.sin(i / n * 6.283)) for i in range(n)]
+        A.m(mat)._add(ring, [tuple(range(n))], None, [u] * n)
+        ring2 = [(cx_ + c_ * 0.03 - s_ * 0.9 * math.cos(i / n * 6.283), cy_ + s_ * 0.03 + c_ * 0.9 * math.cos(i / n * 6.283), z + 1.45 + 0.9 * math.sin(i / n * 6.283)) for i in range(n)]
+        for i in range(n):                           # window rim
+            j = (i + 1) % n
+            A.m("metal")._add([ring[i], ring[j], ring2[j], ring2[i]], [(0, 1, 2, 3)])
+    stilts(A, 0, 0, 5.6, 5.6)
+    return A.finish()
+
+
+def craft():
+    out = []
+    A = Asset("gondola_cabin")                      # hangs from a cable at y = 3.6 above the cabin floor; origin at floor centre
+    A.m("trim").box((0, 0, 1.2), (4.0, 2.0, 2.4)); A.m("facade").box((0, 0, 2.46), (4.3, 2.3, 0.12)); A.m("metal").box((0, 0, -0.08), (4.1, 2.1, 0.16))
+    for sy in (-1.005, 1.005):
+        for k in range(4):
+            x = -1.5 + k * 1.0
+            A.m("win_warm").quad((x - 0.42, sy, 0.95), (x + 0.42, sy, 0.95), (x + 0.42, sy, 1.95), (x - 0.42, sy, 1.95), uv=(0.72, 0.5, 0.72, 0.5), double=True)
+    for sx in (-2.005, 2.005):
+        A.m("win_warm").quad((sx, -0.7, 0.95), (sx, 0.7, 0.95), (sx, 0.7, 1.95), (sx, -0.7, 1.95), uv=(0.6, 0.5, 0.6, 0.5), double=True)
+    A.m("metal").beam((0, 0, 2.5), (0, 0, 3.5), 0.1); A.m("metal").box((0, 0, 3.6), (1.6, 0.14, 0.2))
+    for sx in (-0.7, 0.7):
+        A.m("metal").cyl((sx, -0.1, 3.5), 0.18, 0.2, n=10)
+    A.m("beacon").sphere((0, 0, -0.25), 0.1, n=8, m=5)
+    out.append(A.finish())
+    A = Asset("cloud_skiff")                        # a moored boat of the cloud sea; origin at the keel line amidships
+    for (x, w_, l_) in ((-2.4, 1.3, 1.8), (-0.6, 2.0, 2.0), (1.4, 2.0, 2.0), (3.0, 1.2, 1.4)):
+        A.m("trim").box((x, 0, 0.45), (l_, w_, 0.9))
+    A.m("metal").box((0.4, 0, 0.94), (6.6, 2.1, 0.08)); A.m("facade").box((1.0, 0, 1.55), (2.6, 1.6, 1.2)); A.m("trim").box((1.0, 0, 2.2), (3.0, 1.9, 0.1))
+    A.m("win_warm").quad((-0.305, -0.5, 1.2), (-0.305, 0.5, 1.2), (-0.305, 0.5, 1.9), (-0.305, -0.5, 1.9), uv=(0.6, 0.5, 0.6, 0.5), double=False)
+    A.m("metal").cyl((-2.2, 0, 0.9), 0.05, 3.4, n=6); A.m("win_warm").sphere((-2.2, 0, 4.42), 0.16, n=8, m=5)
+    A.m("metal").beam((-2.2, 0, 4.2), (2.3, 0, 2.3), 0.02)
+    out.append(A.finish())
+    return out
+
+
 def export(ob, sub):
     d = os.path.join(OUT, sub); os.makedirs(d, exist_ok=True)
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
@@ -332,6 +469,15 @@ for i, (name, seed, kw) in enumerate(specs):
     path = export(ob, "buildings")
     manifest.append({"asset": "buildings/" + name + ".glb", "tris": tris, "floors": kw["floors"], "footprint_m": [kw["w"], kw["d"]], "height_m": round(max(v.co.z for v in ob.data.vertices), 1)})
     ob.location = (-34 + i * 15.5, 0, 0); placed.append(ob)
+extra = []
+for (ob, tris), sub in [(x, "decks") for x in deck_kit()] + [(umbel_tree("umbel_tree_a", 3, 9.5, 5.0, 130), "garden"), (umbel_tree("umbel_tree_b", 4, 7.0, 4.0, 100), "garden"),
+                                                             (umbel_tree("umbel_tree_c", 6, 11.0, 5.6, 150), "garden"), (capsule_tower(), "buildings")] + [(x, "vehicles") for x in craft()]:
+    export(ob, sub)
+    manifest.append({"asset": sub + "/" + ob.name + ".glb", "tris": tris, "height_m": round(max(v.co.z for v in ob.data.vertices), 1)})
+    extra.append(ob)
+xs_ = 0.0
+for ob in extra:                                    # lay the small pieces out in front of the buildings for the preview
+    ob.location = (-40 + xs_, -26, 0 if not ob.name.startswith("gondola") else 4); xs_ += {"deck_quay_6m": 9, "deck_stair_3m2": 9, "gangway_10m": 6, "pier_span_22m": 20}.get(ob.name, 12)
 (frame, ftris), (bell, btris) = great_lantern()
 manifest.append({"asset": "landmarks/great_lantern_frame.glb", "tris": ftris, "height_m": 110.2, "diameter_m": 38})
 manifest.append({"asset": "landmarks/great_lantern_bell.glb", "tris": btris, "height_m": 55.1, "rest_offset_y_m": 16.0, "ride_m": [14.5, 34.0]})
@@ -346,7 +492,7 @@ print("KIT", json.dumps(manifest))
 
 if PREVIEW:
     sc = bpy.context.scene
-    for nm_, hexc in (("win_warm", "#ffb86b"), ("win_cool", "#d9ccff"), ("landmark", "#ff9be6")):   # preview only: tint the lights
+    for nm_, hexc in (("win_warm", "#ffb86b"), ("win_cool", "#d9ccff"), ("landmark", "#ff9be6"), ("garden", "#ff7ad9")):   # preview only: tint the lights
         nt_ = MATS[nm_].node_tree; b_ = [n for n in nt_.nodes if n.type == 'BSDF_PRINCIPLED'][0]
         for l_ in list(b_.inputs['Emission Color'].links):
             nt_.links.remove(l_)
