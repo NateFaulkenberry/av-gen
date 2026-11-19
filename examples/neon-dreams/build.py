@@ -607,6 +607,25 @@ def cloud_routes():
     ]
 
 
+def trim_track(track):
+    """Keys past the song's end (a walker's or vehicle's last leg) made the render run on to the last key (254 s)."""
+    keys = sorted(track["keys"], key=lambda k: k["time"])
+    out = [k for k in keys if k["time"] <= SONG]
+    later = [k for k in keys if k["time"] > SONG]
+    if later and track.get("loopLength", 0.0) == 0.0:
+        out.append(later[0] if later[0]["time"] - SONG < 0.05 else dict(later[0], time=round(SONG, 3)) if
+                   later[0]["interp"] == "step" else interpolate_key(out[-1] if out else later[0], later[0], SONG))
+    track = dict(track, keys=out if out else keys[:1])
+    return track
+
+
+def interpolate_key(a, b, t):
+    u = (t - a["time"]) / max(b["time"] - a["time"], 1e-6)
+    va, vb = a["value"], b["value"]
+    v = [round(x + (y - x) * u, 3) for x, y in zip(va, vb)] if isinstance(va, list) else round(va + (vb - va) * u, 6)
+    return {"time": round(t, 3), "value": v, "interp": b["interp"]}
+
+
 def project_doc(scene_rel, audio_dir, tracks):
     stems = [("kick", "Kick", "drums"), ("snare", "Snare", "drums"), ("hh", "HH", "drums"), ("bass", "BASS", "bass"),
              ("moog", "Moog", "synth"), ("cloud", "Cloud Diving", "synth"), ("crash", "Crash", "drums"),
@@ -621,7 +640,7 @@ def project_doc(scene_rel, audio_dir, tracks):
         "feeds": {"beat": "stem.kick", "hits": "stem.kick", "levels": "audio"},
         "parameters": {"camera/lookAhead": 45.0, "camera/splineBank": 5.0, "post/output/dither": 1.0},
         "routes": cloud_routes(),
-        "timeline": {"enabled": True, "cues": [], "tracks": tracks},
+        "timeline": {"enabled": True, "cues": [], "tracks": [trim_track(t) for t in tracks]},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4"},
     }
 
