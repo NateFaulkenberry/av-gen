@@ -33,8 +33,8 @@ if MODE == "day":
     bg.inputs[0].default_value = (0.55, 0.6, 0.75, 1); bg.inputs[1].default_value = 1.0
     sun.energy = 3.0; sun.angle = math.radians(8); sun.color = (1.0, 0.96, 0.9)
 else:
-    bg.inputs[0].default_value = (*PAL["sky_horizon"], 1); bg.inputs[1].default_value = 1.6
-    sun.energy = 0.35; sun.angle = math.radians(3); sun.color = PAL["moon_light"]
+    bg.inputs[0].default_value = (*PAL["sky_horizon"], 1); bg.inputs[1].default_value = 6.0
+    sun.energy = 0.8; sun.angle = math.radians(3); sun.color = PAL["moon_light"]
 cam = bpy.data.cameras.new("c"); co = bpy.data.objects.new("c", cam); sc.collection.objects.link(co); sc.camera = co
 cam.lens = 50; cam.sensor_width = 36; cam.clip_start = 0.1; cam.clip_end = 5000
 bpy.ops.mesh.primitive_plane_add(size=4000, location=(0, 0, -30)); floor = bpy.context.object

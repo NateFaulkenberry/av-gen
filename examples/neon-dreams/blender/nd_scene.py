@@ -36,6 +36,7 @@ CLD = json.load(open(arg("--clouds", os.path.join(ROOT, "art", "cloud_design.jso
 PALFILE = arg("--palette", os.path.join(ROOT, "art", "palette.json"))
 BINDS = AS.BINDS
 S = dict(world=2.2, amb=7.0, moon=1.0)
+AS.GAIN["neon_a"] = 0.75                               # sign faces a little under the GLB's strength: the nearest blade should not clip
 scene = bpy.context.scene
 for o in list(bpy.data.objects):
     bpy.data.objects.remove(o)
@@ -66,7 +67,8 @@ for i in LAY["instances"]:
                     m = AS._BASE[r.split("@")[0]].copy(); AS._principled(m).inputs['Base Color'].default_value = (*col, 1); _cloth[key] = m
                 slot.link = 'OBJECT'; slot.material = _cloth[key]
 for l in LAY["lights"]:
-    lamp = bpy.data.lights.new(l["name"], 'POINT'); lamp.energy = l["intensity"] * 2500.0 * (l["radius_m"] / 9.0) ** 1.4; lamp.shadow_soft_size = max(0.5, l["radius_m"] * 0.06)
+    lamp = bpy.data.lights.new(l["name"], 'POINT'); lamp.shadow_soft_size = max(0.5, l["radius_m"] * 0.06)
+    lamp.energy = l["intensity"] * 2500.0 * (l["radius_m"] / 9.0) ** 1.4 * (0.3 if l["radius_m"] < 20 else 1.0)      # street lamps are near geometry: keep them from burning it out
     BINDS.append((lambda c, la=lamp: setattr(la, "color", c), l["key"]))
     link(bpy.data.objects.new(l["name"], lamp)).location = P(l["pos"])
 for g in CLD["clouds_block"]["glows"]:                # the cloud glows of the engine's block, as lamps inside the cloud
@@ -119,11 +121,15 @@ def mat_cloud(name, density, noise_scale=0.022, erode=0.8, emis_key=None, emis=0
     geo = node(nt, 'ShaderNodeNewGeometry')
     fld = node(nt, 'ShaderNodeAttribute', attribute_name="density").outputs['Fac']; wgt = node(nt, 'ShaderNodeAttribute', attribute_name="weight").outputs['Fac']
     nz = node(nt, 'ShaderNodeTexNoise'); nt.links.new(geo.outputs['Position'], nz.inputs['Vector'])
-    nz.inputs['Scale'].default_value = noise_scale; nz.inputs['Detail'].default_value = 4.0 if detail else 2.0; nz.inputs['Roughness'].default_value = 0.56
-    mixn = nz.outputs[0]                                    # one noise: the lobes already carry the cauliflower, a second (cellular) noise cost more than it showed
-    thr = math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY_ADD', mixn, 1.9, -0.5, clamp=True), erode * 0.4)
+    nz.inputs['Scale'].default_value = noise_scale; nz.inputs['Detail'].default_value = 5.0 if detail else 2.0; nz.inputs['Roughness'].default_value = 0.6
+    mixn = nz.outputs[0]
+    if detail:                                              # a second, finer octave so near cloud is not smooth pillows
+        nz2 = node(nt, 'ShaderNodeTexNoise'); nt.links.new(geo.outputs['Position'], nz2.inputs['Vector'])
+        nz2.inputs['Scale'].default_value = noise_scale * 3.7; nz2.inputs['Detail'].default_value = 2.0
+        mixn = math_(nt, 'ADD', math_(nt, 'MULTIPLY', nz.outputs[0], 0.68), math_(nt, 'MULTIPLY', nz2.outputs[0], 0.32))
+    thr = math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY_ADD', mixn, 2.2, -0.62, clamp=True), erode * 0.42)
     edge = node(nt, 'ShaderNodeMapRange', interpolation_type='SMOOTHSTEP'); nt.links.new(fld, edge.inputs[0])
-    nt.links.new(thr, edge.inputs[1]); nt.links.new(math_(nt, 'ADD', thr, 0.1), edge.inputs[2])
+    nt.links.new(thr, edge.inputs[1]); nt.links.new(math_(nt, 'ADD', thr, 0.07), edge.inputs[2])
     d = math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY', edge.outputs[0], density), wgt)
     nt.links.new(d, pv.inputs['Density'])
     if emis_key:
@@ -138,7 +144,7 @@ def add_volume(name, path, mat):
 
 
 vx = 1.6 if QUICK else 1.0
-M_CLOUD = mat_cloud("cloud_hero", 0.11, 0.022, erode=0.8)
+M_CLOUD = mat_cloud("cloud_hero", 0.11, 0.028, erode=0.85)
 M_ROCK = mat_cloud("cloud_rock", 0.2, 0.03, erode=0.55)
 M_FAR = mat_cloud("cloud_far", 0.05, 0.006, erode=0.85, detail=False)
 M_PLUME = mat_cloud("plume", 0.03, 0.02, erode=0.9, emis_key="cond_a", emis=0.004)
@@ -224,7 +230,7 @@ bowl = lambda v, w: math_(nt, 'MULTIPLY', math_(nt, 'SUBTRACT', 1.0, math_(nt, '
 height = math_(nt, 'ADD', math_(nt, 'ADD', math_(nt, 'MULTIPLY', n1.outputs[0], 1.0), math_(nt, 'MULTIPLY', n3.outputs[0], 0.25)),
                math_(nt, 'ADD', math_(nt, 'MULTIPLY', bowl(cr1, 0.32), -0.55), math_(nt, 'MULTIPLY', bowl(cr2, 0.3), -0.2)))
 bump = node(nt, 'ShaderNodeBump'); nt.links.new(height, bump.inputs['Height']); bump.inputs['Strength'].default_value = 1.0; bump.inputs['Distance'].default_value = MR * 0.035
-LDIR = Vector((-0.47, 0.443, 0.763)).normalized()                                      # the sun that lights the moon: high on its upper left, nearly side-on, so a terminator crosses the disc
+LDIR = Vector((-0.1005, 0.597, 0.796)).normalized()                                    # the sun that lights the moon: high on its upper left and a little behind it: a wide crescent, the terminator across the disc
 ndl = vmath(nt, 'DOT_PRODUCT', bump.outputs['Normal'], tuple(LDIR), out='Value')        # relief shows along the terminator
 ndl0 = vmath(nt, 'DOT_PRODUCT', geo_.outputs['Normal'], tuple(LDIR), out='Value')
 lam = math_(nt, 'POWER', math_(nt, 'MAXIMUM', math_(nt, 'MULTIPLY_ADD', ndl, 0.75, math_(nt, 'MULTIPLY', ndl0, 0.25)), 0.0), 0.8)
@@ -232,8 +238,8 @@ maria = node(nt, 'ShaderNodeMapRange', interpolation_type='SMOOTHSTEP'); nt.link
 maria.inputs[1].default_value = 0.42; maria.inputs[2].default_value = 0.6; maria.inputs[3].default_value = 0.42; maria.inputs[4].default_value = 1.0
 alb = math_(nt, 'MULTIPLY', maria.outputs[0], math_(nt, 'MULTIPLY_ADD', n3.outputs[0], 0.3, 0.85))
 mc = rgb(nt); bind_sock(mc.outputs[0], "moon_disc"); hzc = rgb(nt); bind_sock(hzc.outputs[0], "haze")
-lit = node(nt, 'ShaderNodeVectorMath', operation='SCALE'); nt.links.new(mc.outputs[0], lit.inputs[0]); nt.links.new(math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY', lam, alb), 0.62), lit.inputs[3])
-dark = node(nt, 'ShaderNodeVectorMath', operation='SCALE'); nt.links.new(hzc.outputs[0], dark.inputs[0]); nt.links.new(math_(nt, 'MULTIPLY', alb, 0.35), dark.inputs[3])     # earthshine: the night side is not black
+lit = node(nt, 'ShaderNodeVectorMath', operation='SCALE'); nt.links.new(mc.outputs[0], lit.inputs[0]); nt.links.new(math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY', lam, alb), 0.5), lit.inputs[3])
+dark = node(nt, 'ShaderNodeVectorMath', operation='SCALE'); nt.links.new(hzc.outputs[0], dark.inputs[0]); nt.links.new(math_(nt, 'MULTIPLY', alb, 1.1), dark.inputs[3])     # earthshine: the night side is not black
 addc = node(nt, 'ShaderNodeVectorMath', operation='ADD'); nt.links.new(lit.outputs[0], addc.inputs[0]); nt.links.new(dark.outputs[0], addc.inputs[1])
 nt.links.new(addc.outputs[0], e_.inputs[0]); e_.inputs[1].default_value = 1.0
 moon.data.materials.append(m_moon)
@@ -306,9 +312,9 @@ tcb = node(nt, 'ShaderNodeTexCoord'); spb = node(nt, 'ShaderNodeSeparateXYZ'); n
 bxp = math_(nt, 'MAXIMUM', spb.outputs[0], 0.0)
 fall = math_(nt, 'DIVIDE', 1.0, math_(nt, 'ADD', 1.0, math_(nt, 'POWER', math_(nt, 'DIVIDE', bxp, 220.0), 1.6)))
 radn = math_(nt, 'DIVIDE', math_(nt, 'SQRT', math_(nt, 'ADD', math_(nt, 'MULTIPLY', spb.outputs[1], spb.outputs[1]), math_(nt, 'MULTIPLY', spb.outputs[2], spb.outputs[2]))),
-             math_(nt, 'MULTIPLY_ADD', bxp, math.tan(math.radians(1.6)), 0.6))
+             math_(nt, 'MULTIPLY_ADD', bxp, math.tan(math.radians(1.0)), 0.6))
 core = math_(nt, 'POWER', math_(nt, 'SUBTRACT', 1.0, math_(nt, 'MINIMUM', radn, 1.0, clamp=True)), 1.5)
-bind_sock(em_.inputs[0], "moon_disc"); nt.links.new(math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY', fall, core), 0.02), em_.inputs[1])
+bind_sock(em_.inputs[0], "moon_disc"); nt.links.new(math_(nt, 'MULTIPLY', math_(nt, 'MULTIPLY', fall, core), 0.014), em_.inputs[1])
 BEAMS = []
 for b in LAY["beams"]:
     for k in range(b["count"]):
@@ -395,6 +401,74 @@ def post(exr, png, exposure):
     bpy.data.images.remove(img); bpy.data.images.remove(res)
 
 
+def place_cast(cast_dir, cam_pos, maxn, radius):
+    """The inhabitants in a concept frame: the Glowmere cast (third-party GLBs, read from where they live, never copied)
+    posed from their own clips and frozen as static meshes at the layout's spots and along its paths."""
+    import glob
+    files = sorted(glob.glob(os.path.join(cast_dir, "alien-*.glb")))
+    if not files:
+        log("no cast found in", cast_dir); return
+    rnd = random.Random(5); inh = LAY["inhabitants"]; cand = []
+    for sp in inh["spots"]:
+        cand.append((sp["priority"], (P(sp["pos"]) - cam_pos).length, P(sp["pos"]), sp["facing_deg"], sp["clips"][0]))
+    for pth in inh["paths"]:
+        pts = [P(q) for q in pth["points"]]
+        for w in range(pth.get("walkers", 1) + 1):
+            i = rnd.randrange(len(pts) - 1); u = rnd.random(); a, b = pts[i], pts[i + 1]; pos = a.lerp(b, u); d = (b - a) * (1 if rnd.random() < 0.5 else -1)
+            cand.append((pth["priority"], (pos - cam_pos).length, pos, math.degrees(math.atan2(d.y, d.x)), pth.get("clip", "Walking")))
+    cand = sorted([c for c in cand if c[1] < radius], key=lambda c: (c[0], c[1]))[:maxn]
+    for k, (prio, dist, pos, face, clip) in enumerate(cand):
+        before = set(bpy.data.objects); acts_before = set(bpy.data.actions)
+        bpy.ops.import_scene.gltf(filepath=files[k % len(files)])
+        new = [o for o in bpy.data.objects if o not in before]
+        arm = next((o for o in new if o.type == 'ARMATURE'), None)
+        acts = [a_ for a_ in bpy.data.actions if a_ not in acts_before]
+        act = next((a_ for a_ in acts if a_.name.split(".")[0].split("_Armature")[0] == clip or a_.name.startswith(clip)), None)
+        if arm and act:
+            if not arm.animation_data:
+                arm.animation_data_create()
+            arm.animation_data.action = act
+            try:
+                if hasattr(arm.animation_data, "action_slot") and len(act.slots):
+                    arm.animation_data.action_slot = act.slots[0]
+            except Exception as e:
+                log("slot:", e)
+            f0, f1 = act.frame_range; scene.frame_set(int(f0 + rnd.random() * max(1.0, f1 - f0)))
+        dg = bpy.context.evaluated_depsgraph_get(); dg.update()
+        rz = Quaternion((0, 0, 1), math.radians(face + 90.0)).to_matrix().to_4x4()
+        for o in [o for o in new if o.type == 'MESH' and any(m_.type == 'ARMATURE' for m_ in o.modifiers)]:      # not the importer's bone-shape helper
+            ev = o.evaluated_get(dg); me = bpy.data.meshes.new_from_object(ev)
+            st = link(bpy.data.objects.new("cast_%02d" % k, me))
+            st.matrix_world = __import__("mathutils").Matrix.Translation(pos) @ rz @ ev.matrix_world
+        for o in new:
+            bpy.data.objects.remove(o)
+    log("cast placed:", len(cand))
+
+
+if "--clearance" in argv:                              # the true distance from the journey to the kit's geometry (not to bounding boxes)
+    from mathutils.bvhtree import BVHTree
+    trees = {}; worst = []
+    insts = [o for o in bpy.data.objects if o.type == 'MESH' and not o.hide_render and o.data.users > 0 and o.name not in ("far_floor", "cosmic_ocean", "haze", "drowned_moon", "long_arc", "long_arc_lights") and not o.name.startswith("beam")]
+    bpy.context.view_layer.update()
+    for o in insts:
+        if o.data.name not in trees:
+            trees[o.data.name] = BVHTree.FromPolygons([v.co.copy() for v in o.data.vertices], [tuple(p.vertices) for p in o.data.polygons])
+    inv = [(o, o.matrix_world.inverted(), max(o.scale)) for o in insts]
+    best = (1e9, None, 0.0)
+    for ti in range(0, 703):
+        t = ti / 10.0; c = Vector(WD.cam_at(t)); near = (1e9, None)
+        for o, mi, sc in inv:
+            if (o.matrix_world.translation - c).length > 140.0:
+                continue
+            hit = trees[o.data.name].find_nearest(mi @ c, 30.0)
+            if hit[0] is not None and hit[3] * sc < near[0]:
+                near = (hit[3] * sc, o.name)
+        if near[0] < best[0]:
+            best = (near[0], near[1], t)
+        if near[0] < 2.5:
+            worst.append((t, round(near[0], 2), near[1]))
+    log("CLEARANCE min %.2f m to %s at t=%.1f" % best); log("CLEARANCE under 2.5 m:", worst[:40])
+    sys.exit(0)
 if arg("--blend", ""):
     AS.apply_palette(AS.load_palette(PALFILE, "uv")); bpy.ops.wm.save_as_mainfile(filepath=arg("--blend", ""))
 for camn, paln in JOBS:
@@ -403,6 +477,8 @@ for camn, paln in JOBS:
     dv = Vector((math.cos(math.radians(pt)) * math.cos(math.radians(hd)), math.cos(math.radians(pt)) * math.sin(math.radians(hd)), math.sin(math.radians(pt))))
     camo.rotation_euler = dv.to_track_quat('-Z', 'Y').to_euler()
     aim_beams(tj)
+    if arg("--cast", "") and not any(o.name.startswith("cast_") for o in bpy.data.objects):
+        place_cast(arg("--cast", ""), Vector(pos), int(arg("--cast-n", 28)), float(arg("--cast-radius", 110)))
     AS.apply_palette(AS.load_palette(PALFILE, paln))
     scene.view_settings.exposure = 0.0
     exr = os.path.join(OUT, "%s_%s.exr" % (camn, paln)); scene.render.filepath = exr

@@ -47,29 +47,38 @@ def cauliflower(rr, out, x, y, z, r, depth, soft, dens=1.0, up=0.25, n=(5, 7), s
         cauliflower(rr, out, cx, cy, cz, cr, depth - 1, soft, dens, up, (2, 3), (0.36, 0.5), rmin)
 
 
-def shelf(rr, out, x, y, z, length, width, thick, yaw, dens=0.8, soft=0.5, scraps=3):
-    """A thin sheet reaching out along yaw: overlapping flat lobes, thinner and more ragged toward the end."""
-    cs, sn = math.cos(yaw), math.sin(yaw); n = max(3, int(length / (width * 0.42)))
-    for i in range(n):
-        t = (i + 0.3) / n; w = width * (1.0 - 0.45 * t) * rr.uniform(0.75, 1.1)
-        off = rr.uniform(-0.25, 0.25) * width
-        px, py = x + cs * length * t - sn * off, y + sn * length * t + cs * off
-        out.append(L(px, py, z + rr.uniform(-0.2, 0.2) * thick, w * 0.5, thick / (w * 0.5) * rr.uniform(0.8, 1.2), dens * (1.0 - 0.35 * t), soft, sx=rr.uniform(1.1, 1.5), sz=rr.uniform(0.8, 1.1)))
-        if rr.random() < 0.5:                                                   # small domes on the sheet
-            out.append(L(px + rr.uniform(-0.3, 0.3) * w, py + rr.uniform(-0.3, 0.3) * w, z + thick * 0.7, w * rr.uniform(0.14, 0.24), 0.8, dens, 0.35))
-    for k in range(scraps):                                                     # detached scraps beyond the end
-        t = 1.0 + rr.uniform(0.08, 0.4); off = rr.uniform(-0.5, 0.5) * width
-        out.append(L(x + cs * length * t - sn * off, y + sn * length * t + cs * off, z + rr.uniform(-0.5, 0.5) * thick, width * rr.uniform(0.1, 0.2), 0.45, 0.5, 0.6, sx=1.6))
+def shelf(rr, out, x, y, z, length, width, thick, yaw, dens=0.6, soft=0.5, scraps=3):
+    """A shelf reaching out along yaw from inside a turret: a ragged mat of small flattened lobes, two or three abreast,
+    narrowing and thinning toward the end. (One wide flat lobe reads as a saucer; a mat of small ones reads as cloud.)"""
+    cs, sn = math.cos(yaw), math.sin(yaw); rows = max(3, int(length / (width * 0.3)))
+    for i in range(rows):
+        t = (i + 0.2) / rows; w = width * (1.0 - 0.55 * t)
+        for j in range(rr.randint(2, 3)):
+            off = rr.uniform(-0.5, 0.5) * w; r = w * rr.uniform(0.2, 0.32)
+            px, py = x + cs * length * t - sn * off, y + sn * length * t + cs * off
+            out.append(L(px, py, z + rr.uniform(-0.5, 0.5) * thick, r, min(0.7, max(0.24, thick / r * rr.uniform(0.7, 1.2))), dens * (1.0 - 0.4 * t), soft, sx=rr.uniform(1.0, 1.5), sz=rr.uniform(0.9, 1.2)))
+        if rr.random() < 0.6:                                                   # a small dome on the mat
+            off = rr.uniform(-0.3, 0.3) * w
+            out.append(L(x + cs * length * t - sn * off, y + sn * length * t + cs * off, z + thick * 0.8, max(12.0, w * rr.uniform(0.12, 0.2)), 0.8, dens + 0.2, 0.35))
+    for k in range(scraps):                                                     # detached scraps just beyond the end
+        t = 1.0 + rr.uniform(0.05, 0.25); off = rr.uniform(-0.4, 0.4) * width
+        out.append(L(x + cs * length * t - sn * off, y + sn * length * t + cs * off, z + rr.uniform(-0.5, 0.5) * thick, max(12.0, width * rr.uniform(0.08, 0.14)), 0.5, 0.45, 0.6, sx=1.5))
 
 
-def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42, 1.2), (0.68, 0.7)), dense=False, skirt=True, mist=True, detail=2, kids=(5, 7)):
+def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42, 1.2), (0.68, 0.7)), dense=False, skirt=True, mist=True, detail=2, kids=(5, 7), rich=True):
     """One formation. base/top: heights of its foot and of its tallest turret; radius: the foot's radius."""
     rr = random.Random(seed); out = []; H = top - base
     soft = 0.2 if dense else 0.34; dens = 1.0
     if skirt:
         for k in range(rr.randint(6, 7)):
-            a = k / 6.5 * 6.283 + rr.uniform(-0.3, 0.3); d = radius * rr.uniform(0.45, 0.95); r = radius * rr.uniform(0.36, 0.52)
-            out.append(L(x + d * math.cos(a), y + d * math.sin(a), base + r * 0.12, r, rr.uniform(0.42, 0.62), dens, soft + 0.08))
+            a = k / 6.5 * 6.283 + rr.uniform(-0.3, 0.3); d = radius * rr.uniform(0.45, 0.95); r = radius * rr.uniform(0.36, 0.52); sy_ = rr.uniform(0.42, 0.62)
+            out.append(L(x + d * math.cos(a), y + d * math.sin(a), base + 15 + r * sy_ * 0.9, r, sy_, dens, soft + 0.08))        # the skirt shows above the sea as a low dome ring
+        for k in range(4 if rich else 3):                        # shoulders: the mass that keeps a formation from being a pillar
+            a = rr.uniform(0, 6.283); d = radius * rr.uniform(0.2, 0.6); r = radius * rr.uniform(0.28, 0.4)
+            sx_, sy2 = x + d * math.cos(a), y + d * math.sin(a); sz_ = base + H * rr.uniform(0.2, 0.42)
+            out.append(L(sx_, sy2, sz_, r, rr.uniform(0.8, 1.0), dens, soft))
+            if rich:
+                cauliflower(rr, out, sx_, sy2, sz_, r, 1, soft, dens, n=(2, 3))
     tops = sorted([1.0] + [rr.uniform(0.45, 0.85) for _ in range(turrets - 1)], reverse=True)
     spots = [(rr.uniform(-0.25, 0.1) * radius, rr.uniform(-0.2, 0.2) * radius)] + [(radius * rr.uniform(0.35, 0.7) * math.cos(a), radius * rr.uniform(0.35, 0.7) * math.sin(a))
                                                                                    for a in [rr.uniform(0, 6.283) for _ in range(turrets - 1)]]
@@ -79,7 +88,13 @@ def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42,
         while True:
             out.append(L(px, py, z, r, rr.uniform(0.88, 1.0), dens, soft)); cores.append((px, py, z, r))
             cauliflower(rr, out, px, py, z, r, detail, soft, dens, n=kids)
-            nz = z + r * rr.uniform(0.62, 0.86); nr = r * rr.uniform(0.7, 0.86)
+            if r > radius * 0.16:                                               # a sibling beside each core: a crown is a cluster of heads, never a spire
+                a = rr.uniform(0, 6.283); sr = r * rr.uniform(0.68, 0.85)
+                qx, qy_, qz_ = px + math.cos(a) * r * 0.85, py + math.sin(a) * r * 0.85, z - r * rr.uniform(0.05, 0.3)
+                out.append(L(qx, qy_, qz_, sr, rr.uniform(0.85, 1.0), dens, soft))
+                if rich:
+                    cauliflower(rr, out, qx, qy_, qz_, sr, 1, soft, dens, n=(2, 4))
+            nz = z + r * rr.uniform(0.55, 0.75); nr = r * rr.uniform(0.76, 0.9)
             if nz + nr * 0.8 > base + th or nr < radius * 0.1:
                 break
             px += WIND[0] * r * lean * rr.uniform(0.5, 1.5) + rr.uniform(-0.2, 0.2) * r; py += WIND[1] * r * lean * rr.uniform(0.5, 1.5) + rr.uniform(-0.2, 0.2) * r
@@ -88,7 +103,7 @@ def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42,
     for (hf, lf) in shelves:                                                    # shelves reach out downwind (one may go the other way)
         zz = base + H * hf; yaw = wyaw + rr.uniform(-0.5, 0.5) + (math.pi * 0.8 if rr.random() < 0.3 else 0.0)
         near = min(cores, key=lambda c: abs(c[2] - zz))
-        shelf(rr, out, near[0], near[1], zz, radius * lf * rr.uniform(0.9, 1.3), radius * rr.uniform(0.5, 0.75), radius * 0.075, yaw, dens=0.85 if dense else 0.7)
+        shelf(rr, out, near[0], near[1], zz, near[3] + radius * lf * rr.uniform(0.5, 0.75), radius * rr.uniform(0.5, 0.75), radius * 0.075, yaw, dens=0.8 if dense else 0.62)
     if mist:
         for k in range(5):
             a = rr.uniform(0, 6.283); d = radius * rr.uniform(0.9, 1.5)
@@ -107,7 +122,7 @@ def rock(seed, x, y, top, radius, base=SEA_TOP - 30):
         out.append(L(x + d * math.cos(a), y + d * math.sin(a), z, r, rr.uniform(0.85, 1.25), 1.0, 0.2))
         cauliflower(rr, out, x + d * math.cos(a), y + d * math.sin(a), z, r, 2, 0.22, 1.0, up=0.5, n=(3, 5), shrink=(0.36, 0.5), rmin=(radius * 0.26, radius * 0.13))
     wyaw = math.atan2(WIND[1], WIND[0])
-    shelf(rr, out, x, y, base + H * 0.5, radius * 2.0, radius * 0.9, radius * 0.09, wyaw + rr.uniform(-0.4, 0.4), dens=0.7, soft=0.45)
+    shelf(rr, out, x, y, base + H * 0.5, radius * 1.7, radius * 0.9, radius * 0.11, wyaw + rr.uniform(-0.4, 0.4), dens=0.65, soft=0.45)
     for k in range(7):                                                           # mist round the foot
         a = rr.uniform(0, 6.283); d = radius * rr.uniform(1.0, 1.9)
         out.append(L(x + d * math.cos(a), y + d * math.sin(a), base + rr.uniform(15, 45), radius * rr.uniform(0.3, 0.55), 0.28, 0.35, 0.75, sx=1.5))
@@ -131,7 +146,7 @@ def mooring_mound():
         while gx < 460:
             x, y = gx + rr.uniform(-12, 12), gy + rr.uniform(-12, 12)
             t, e = top(x, y)
-            if e < 1.95 and math.hypot(x - HEAD[0], y - HEAD[1]) > 175 and math.hypot(x - VEIL[0], y - VEIL[1]) > 120:
+            if e < 1.95 and math.hypot(x - HEAD[0], y - HEAD[1]) > 200 and math.hypot(x - VEIL[0], y - VEIL[1]) > 190:
                 r = rr.uniform(34, 50) if e < 1.0 else rr.uniform(44, 70)
                 hollow = 26 * math.exp(-(((x + 250) / 110.0) ** 2 + ((y + 125) / 60.0) ** 2))  # the pier reaches out over a hollow
                 out.append(L(x, y, t - hollow - r * 0.5 * 0.8, r, 0.5, 1.0, 0.26 if e < 1.0 else 0.32))
@@ -146,7 +161,13 @@ def mooring_mound():
                             cauliflower(rr, out, bx, by, bz, br, 1, 0.3, 1.0, n=(2, 4), shrink=(0.38, 0.5))
             gx += 56.0
         gy += 56.0
-    out += [L(185, -5, 104, 34, 0.8), L(204, -22, 108, 26, 0.85), L(170, 16, 102, 28, 0.8)]      # a swell that laps the garden terrace from behind
+    out += [L(185, -5, 108, 34, 0.8), L(204, -22, 112, 26, 0.85), L(170, 16, 106, 28, 0.8)]      # a swell that laps the garden terrace from behind
+    # wisps: thin cloud standing a little above deck level round the edges of the town (never on the Quay), so the
+    # outer stilts, the Low Walk and the backs of the Stacks are half lost in it
+    for (x, y, z, r) in ((-96, -40, 126, 20), (-60, -30, 122, 18), (-20, -34, 118, 20), (24, -40, 116, 19), (150, -66, 118, 22), (176, -30, 120, 20), (-150, 20, 130, 22),
+                         (-96, 84, 138, 22), (-20, 112, 142, 24), (40, 118, 142, 22), (96, 70, 134, 22), (132, 30, 124, 18), (-140, -60, 126, 20), (-190, -100, 124, 22),
+                         (-250, -150, 120, 24), (70, -52, 114, 18)):
+        out.append(L(x + rr.uniform(-6, 6), y + rr.uniform(-6, 6), z, r, rr.uniform(0.45, 0.6), 0.4, 0.6, sx=rr.uniform(1.2, 1.7)))
     return out
 
 
@@ -184,27 +205,27 @@ def bins_report(lobes):
 
 def build():
     masses = {"mooring_mound": mooring_mound()}
-    masses["head"] = cumulus(21, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(4, 6))
-    masses["veil"] = cumulus(22, VEIL[0], VEIL[1], SEA_TOP - 20, 275, 150, turrets=3, lean=0.24, shelves=((0.5, 1.0), (0.74, 0.6)))
+    masses["head"] = cumulus(21, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 5))
+    masses["veil"] = cumulus(22, VEIL[0], VEIL[1], SEA_TOP - 20, 290, 185, turrets=3, lean=0.06, shelves=((0.5, 1.0), (0.74, 0.6)), kids=(3, 4))      # upright and broad: it must hide the Condensery from the Mooring
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
     for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
         masses["rock_" + name] = rock(31 + i, x, y, z - 8.0, (54, 60, 50)[i])
     cx, cy, cz = CONDENSERY
     col = rock(40, cx, cy, cz - 12.0, 150, base=SEA_TOP - 40)
-    col += cumulus(42, cx - 190, cy + 140, SEA_TOP - 20, 300, 150, turrets=3, shelves=((0.45, 1.1),), detail=1) + cumulus(43, cx + 180, cy - 80, SEA_TOP - 20, 190, 130, turrets=2, shelves=((0.55, 0.9),), detail=1)
+    col += cumulus(42, cx - 190, cy + 140, SEA_TOP - 20, 300, 150, turrets=3, shelves=((0.45, 1.1),), detail=1, kids=(3, 5), rich=False) + cumulus(43, cx + 180, cy - 80, SEA_TOP - 20, 190, 130, turrets=2, shelves=((0.55, 0.9),), detail=1, kids=(3, 5), rich=False)
     masses["condensery_column"] = col
     masses["condensery_plume"] = plume()
     lx, ly, lz = LONE_LAMP
     masses["lone_lamp"] = rock(50, lx, ly, lz - 9.0, 48)
     mid = []
     for i, (x, y, top, rad) in enumerate(((760, 430, 300, 170), (1250, 620, 240, 150), (1180, -520, 210, 140), (520, -620, 170, 120), (-560, 420, 230, 150), (1560, -260, 150, 110))):
-        mid += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=3, shelves=((0.45, 1.2), (0.7, 0.6)), detail=1)
+        mid += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=3, shelves=((0.45, 1.2), (0.7, 0.6)), detail=1, kids=(3, 5), rich=False)
     masses["mid_field"] = mid
     far = []
     for i, (fx, fy, fh, fr) in enumerate(((-900, 1500, 500, 420), (1200, 2600, 700, 520), (3400, 2200, 900, 600), (4200, -300, 600, 520), (2600, -1500, 450, 420), (5200, 3800, 1300, 800),
                                           (7600, 900, 1100, 900), (300, 4600, 1000, 800), (8200, 4800, 1600, 1000), (-2800, 3200, 800, 700), (6200, -2600, 900, 800), (9800, 2000, 1400, 1100))):
         rr = random.Random(80 + i); f = []
-        far += [l for l in cumulus(80 + i, fx, fy, SEA_TOP - 40, fh, fr * 0.6, turrets=3, shelves=((0.5, 1.2),), mist=False, detail=1) if l["r"] > fr * 0.11]
+        far += [l for l in cumulus(80 + i, fx, fy, SEA_TOP - 40, fh, fr * 0.6, turrets=3, shelves=((0.5, 1.2),), mist=False, detail=1, kids=(3, 4), rich=False) if l["r"] > fr * 0.11]
     return masses, far
 
 

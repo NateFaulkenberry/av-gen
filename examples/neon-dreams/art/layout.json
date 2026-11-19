@@ -18552,7 +18552,7 @@
    "phase": 0.0,
    "elevation_deg": -1.5,
    "length_m": 900.0,
-   "half_angle_deg": 1.6,
+   "half_angle_deg": 1.0,
    "key": "moon_disc",
    "intensity": 1.0,
    "spin_axis": [
@@ -18581,7 +18581,7 @@
    "phase": 0.37,
    "elevation_deg": -1.5,
    "length_m": 1100.0,
-   "half_angle_deg": 1.6,
+   "half_angle_deg": 1.0,
    "key": "moon_disc",
    "intensity": 1.0,
    "spin_axis": [
@@ -18610,7 +18610,7 @@
    "phase": 0.71,
    "elevation_deg": -1.5,
    "length_m": 1000.0,
-   "half_angle_deg": 1.6,
+   "half_angle_deg": 1.0,
    "key": "moon_disc",
    "intensity": 1.0,
    "spin_axis": [

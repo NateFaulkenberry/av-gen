@@ -566,7 +566,7 @@ def lighthouses():
         a = "landmarks/%s.glb" % asset; m = MAN[a]
         inst(a, x, y, z, math.radians(yawd), 1.0, "lighthouse", tint={"win_warm": "amber", "win_cool": "win_a", "strip": "eave", "beam_lamp": "moon_disc"}, iid=name)
         lm = m["lamp_m"]; dx, dy = rot(math.radians(yawd), lm[0], -lm[2]); lamp_p = (x + dx, y + dy, z + lm[1])
-        beams.append({"name": name, "origin": E(lamp_p), "count": 2, "rpm": rpm, "phase": phase, "elevation_deg": -1.5, "length_m": blen, "half_angle_deg": 1.6,
+        beams.append({"name": name, "origin": E(lamp_p), "count": 2, "rpm": rpm, "phase": phase, "elevation_deg": -1.5, "length_m": blen, "half_angle_deg": 1.0,
                       "key": "moon_disc", "intensity": 1.0, "spin_axis": [0, 1, 0],
                       "cloud_glow": {"radius_m": 110.0, "orbit_radius_m": round(blen * 0.55, 1), "y": round(z - 20.0, 1), "intensity": 0.6},
                       "pane_program": "the lit pane of the lantern room follows the beam: beam_lamp uv.v = pane bearing / 360",

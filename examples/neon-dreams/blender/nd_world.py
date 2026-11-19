@@ -80,8 +80,9 @@ def cam_at(t):
 
 
 def town_top(x, y):
-    """The height the cloud should reach under the Mooring: about 9 m under every deck, so the 14 m stilts vanish into it."""
+    """The height the cloud's lobes reach under the Mooring: about 5 m under every deck (the eroded surface sits a few
+    metres lower), so the 14 m stilts vanish into it and the town emerges from the cloud instead of standing over it."""
     dy = y - qy(x)
-    t = 119.6 - 0.0474 * max(-110.0, min(125.0, x))
+    t = 123.6 - 0.0474 * max(-110.0, min(125.0, x))
     t += min(11.0, 0.115 * dy) if dy > 0 else max(-13.0, 0.36 * dy)
     return t
