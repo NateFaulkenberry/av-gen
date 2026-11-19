@@ -117,6 +117,276 @@
    "height_m": 4.6
   },
   {
+   "asset": "signs/sign_blade_0.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Lumen & Daughters"
+  },
+  {
+   "asset": "signs/sign_blade_1.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Ninefold Tea"
+  },
+  {
+   "asset": "signs/sign_blade_2.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Kite Line"
+  },
+  {
+   "asset": "signs/sign_blade_3.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Slow Tide Baths"
+  },
+  {
+   "asset": "signs/sign_blade_4.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Oru Noodle"
+  },
+  {
+   "asset": "signs/sign_blade_5.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Vesper Hotel"
+  },
+  {
+   "asset": "signs/sign_blade_6.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Halcyon Remedies"
+  },
+  {
+   "asset": "signs/sign_blade_7.gltf",
+   "tris": 64,
+   "size_m": [
+    1.34,
+    6.5
+   ],
+   "brand": "Deepwell Radio"
+  },
+  {
+   "asset": "signs/sign_fascia_0.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Oru Noodle"
+  },
+  {
+   "asset": "signs/sign_fascia_1.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Vesper Hotel"
+  },
+  {
+   "asset": "signs/sign_fascia_2.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Halcyon Remedies"
+  },
+  {
+   "asset": "signs/sign_fascia_3.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Deepwell Radio"
+  },
+  {
+   "asset": "signs/sign_fascia_4.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Paper Kite Books"
+  },
+  {
+   "asset": "signs/sign_fascia_5.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Pilot Light"
+  },
+  {
+   "asset": "signs/sign_fascia_6.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Mooring Seven"
+  },
+  {
+   "asset": "signs/sign_fascia_7.gltf",
+   "tris": 14,
+   "size_m": [
+    4.5,
+    1.2
+   ],
+   "brand": "Greywater Laundry"
+  },
+  {
+   "asset": "signs/sign_roundel_0.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "lamp"
+  },
+  {
+   "asset": "signs/sign_roundel_1.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "nine"
+  },
+  {
+   "asset": "signs/sign_roundel_2.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "chev"
+  },
+  {
+   "asset": "signs/sign_roundel_3.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "wave"
+  },
+  {
+   "asset": "signs/sign_roundel_4.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "bowl"
+  },
+  {
+   "asset": "signs/sign_roundel_5.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "moon"
+  },
+  {
+   "asset": "signs/sign_roundel_6.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "cross"
+  },
+  {
+   "asset": "signs/sign_roundel_7.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "arcs"
+  },
+  {
+   "asset": "signs/sign_roundel_8.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "kite"
+  },
+  {
+   "asset": "signs/sign_roundel_9.gltf",
+   "tris": 28,
+   "size_m": [
+    1.4,
+    1.4
+   ],
+   "brand": "cup"
+  },
+  {
+   "asset": "signs/sign_roof_0.gltf",
+   "tris": 170,
+   "size_m": [
+    13.2,
+    2.2
+   ],
+   "brand": "Vesper Hotel"
+  },
+  {
+   "asset": "signs/sign_roof_1.gltf",
+   "tris": 170,
+   "size_m": [
+    13.2,
+    2.2
+   ],
+   "brand": "Kite Line"
+  },
+  {
+   "asset": "signs/sign_roof_2.gltf",
+   "tris": 170,
+   "size_m": [
+    13.2,
+    2.2
+   ],
+   "brand": "Lumen & Daughters"
+  },
+  {
+   "asset": "signs/sign_roof_3.gltf",
+   "tris": 170,
+   "size_m": [
+    13.2,
+    2.2
+   ],
+   "brand": "Mooring Seven"
+  },
+  {
    "asset": "landmarks/great_lantern_frame.glb",
    "tris": 6092,
    "height_m": 110.2,

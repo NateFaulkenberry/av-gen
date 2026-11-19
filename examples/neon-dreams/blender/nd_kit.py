@@ -446,6 +446,70 @@ def craft():
     return out
 
 
+def sign_kit():
+    """Signs on the Tideglyph atlas. One grey emissive texture shared by every sign (.gltf + external PNG, so it is stored once)."""
+    sd = os.path.join(OUT, "signs"); os.makedirs(sd, exist_ok=True)
+    src_dir = arg("--atlas", os.path.join(HERE, "..", "signs"))
+    cells = {c["id"]: c for c in json.load(open(os.path.join(src_dir, "tideglyph_atlas.json")))["cells"]}
+    src = bpy.data.images.load(os.path.join(src_dir, "tideglyph_atlas.png")); w_, h_ = src.size
+    px = np.empty(w_ * h_ * 4, dtype=np.float32); src.pixels.foreach_get(px); px = px.reshape(h_, w_, 4)
+    g = np.clip(px[..., 0] + 0.35 * px[..., 1] + 0.004, 0, 1)
+    img = bpy.data.images.new("tideglyph_emissive", w_, h_, alpha=False); img.colorspace_settings.name = 'sRGB'
+    out = np.stack([g, g, g, np.ones_like(g)], -1); img.pixels.foreach_set(out.ravel().astype(np.float32))
+    img.filepath_raw = os.path.join(sd, "tideglyph_emissive.png"); img.file_format = 'PNG'; img.save()
+    img = bpy.data.images.load(os.path.join(sd, "tideglyph_emissive.png"))
+    m, nt = new_mat("neon_a")
+    o_ = node(nt, 'ShaderNodeOutputMaterial'); b = node(nt, 'ShaderNodeBsdfPrincipled'); nt.links.new(b.outputs[0], o_.inputs[0])
+    b.inputs['Base Color'].default_value = (0.008, 0.008, 0.01, 1); b.inputs['Roughness'].default_value = 0.35
+    t = node(nt, 'ShaderNodeTexImage'); t.image = img
+    nt.links.new(t.outputs[0], b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = 20.0
+    MATS["neon_a"] = m
+    res = []
+
+    def face(A, cell, p0, p1, p2, p3, double):
+        u0, v0, u1, v1 = cells[cell]["uv"]
+        A.m("neon_a").quad(p0, p1, p2, p3, uv=(u0, v0, u1, v1), double=False)
+        if double:
+            A.m("neon_a").quad(p1, p0, p3, p2, uv=(u0, v0, u1, v1), double=False)
+
+    for i in range(8):          # blade: hangs off a wall. Origin = wall mount; the panel runs out along +x, centred on z = 0
+        A = Asset("sign_blade_%d" % i); hgt = 6.5; wid = hgt * cells["blade_%d" % i]["aspect"]; x0 = 0.3
+        A.m("metal").box((x0 + wid / 2, 0, 0), (wid + 0.16, 0.22, hgt + 0.16))
+        for zz in (-hgt * 0.38, hgt * 0.38):
+            A.m("metal").box((x0 / 2, 0, zz), (x0, 0.08, 0.08)); A.m("metal").beam((0, 0, zz + 0.5), (x0 + wid * 0.5, 0, zz), 0.03)
+        face(A, "blade_%d" % i, (x0, -0.115, -hgt / 2), (x0 + wid, -0.115, -hgt / 2), (x0 + wid, -0.115, hgt / 2), (x0, -0.115, hgt / 2), False)
+        face(A, "blade_%d" % i, (x0 + wid, 0.115, -hgt / 2), (x0, 0.115, -hgt / 2), (x0, 0.115, hgt / 2), (x0 + wid, 0.115, hgt / 2), False)
+        res.append(A.finish() + ({"size_m": [round(wid, 2), hgt], "brand": cells["blade_%d" % i]["brand"]},))
+    for i in range(8):          # fascia: stands on an awning edge. Origin = bottom centre; faces -y
+        A = Asset("sign_fascia_%d" % i); hgt = 1.2; wid = hgt * cells["fascia_%d" % i]["aspect"]
+        A.m("metal").box((0, 0.1, hgt / 2), (wid + 0.12, 0.2, hgt + 0.12))
+        face(A, "fascia_%d" % i, (-wid / 2, -0.005, 0), (wid / 2, -0.005, 0), (wid / 2, -0.005, hgt), (-wid / 2, -0.005, hgt), False)
+        res.append(A.finish() + ({"size_m": [round(wid, 2), hgt], "brand": cells["fascia_%d" % i]["brand"]},))
+    for i in range(10):         # roundel lightbox on a short arm. Origin = wall mount; disc centre at x = 1.0
+        A = Asset("sign_roundel_%d" % i); d_ = 1.4
+        A.m("metal").box((1.0, 0, 0), (d_ + 0.12, 0.19, d_ + 0.12))
+        A.m("metal").box((0.15, 0, 0), (0.3, 0.06, 0.06))
+        face(A, "roundel_%d" % i, (1.0 - d_ / 2, -0.1, -d_ / 2), (1.0 + d_ / 2, -0.1, -d_ / 2), (1.0 + d_ / 2, -0.1, d_ / 2), (1.0 - d_ / 2, -0.1, d_ / 2), False)
+        face(A, "roundel_%d" % i, (1.0 + d_ / 2, 0.1, -d_ / 2), (1.0 - d_ / 2, 0.1, -d_ / 2), (1.0 - d_ / 2, 0.1, d_ / 2), (1.0 + d_ / 2, 0.1, d_ / 2), False)
+        res.append(A.finish() + ({"size_m": [d_, d_], "brand": cells["roundel_%d" % i]["brand"]},))
+    for i in range(4):          # rooftop letters on a scaffold. Origin = base centre on the roof; faces -y
+        A = Asset("sign_roof_%d" % i); hgt = 2.2; wid = hgt * cells["roof_%d" % i]["aspect"]; lift = 2.6
+        for k in range(6):
+            x = -wid / 2 + k * wid / 5
+            A.m("metal").box((x, 0.25, (lift + hgt) / 2), (0.1, 0.1, lift + hgt)); A.m("metal").beam((x, 0.25, lift * 0.9), (x, 1.6, 0), 0.06)
+        for zz in (lift, lift + hgt):
+            A.m("metal").box((0, 0.25, zz), (wid + 0.2, 0.08, 0.08))
+        face(A, "roof_%d" % i, (-wid / 2, 0.18, lift), (wid / 2, 0.18, lift), (wid / 2, 0.18, lift + hgt), (-wid / 2, 0.18, lift + hgt), False)
+        res.append(A.finish() + ({"size_m": [round(wid, 2), hgt], "brand": cells["roof_%d" % i]["brand"]},))
+    return res, sd
+
+
+def export_sep(ob, d):
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
+    bpy.ops.export_scene.gltf(filepath=os.path.join(d, ob.name + ".gltf"), export_format='GLTF_SEPARATE', use_selection=True, export_apply=True,
+                              export_yup=True, export_keep_originals=True)
+
+
 def export(ob, sub):
     d = os.path.join(OUT, sub); os.makedirs(d, exist_ok=True)
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
@@ -478,6 +542,11 @@ for (ob, tris), sub in [(x, "decks") for x in deck_kit()] + [(umbel_tree("umbel_
 xs_ = 0.0
 for ob in extra:                                    # lay the small pieces out in front of the buildings for the preview
     ob.location = (-40 + xs_, -26, 0 if not ob.name.startswith("gondola") else 4); xs_ += {"deck_quay_6m": 9, "deck_stair_3m2": 9, "gangway_10m": 6, "pier_span_22m": 20}.get(ob.name, 12)
+signs, sign_dir = sign_kit()
+for i, (ob, tris, meta) in enumerate(signs):
+    export_sep(ob, sign_dir)
+    manifest.append({"asset": "signs/" + ob.name + ".gltf", "tris": tris, **meta})
+    ob.location = (-46 + (i % 15) * 6.2, -40 - (i // 15) * 6, 5.0)
 (frame, ftris), (bell, btris) = great_lantern()
 manifest.append({"asset": "landmarks/great_lantern_frame.glb", "tris": ftris, "height_m": 110.2, "diameter_m": 38})
 manifest.append({"asset": "landmarks/great_lantern_bell.glb", "tris": btris, "height_m": 55.1, "rest_offset_y_m": 16.0, "ride_m": [14.5, 34.0]})
