@@ -1,124 +1,2975 @@
 {
- "units": "metres, Y-up in the GLB, origin at base centre at deck level",
+ "units": "metres, Y-up in the GLB, origin at base centre at deck level; a building's front (shop side) faces +z in the GLB",
+ "window_rule": "every pane (glass, win_warm, win_cool, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
  "materials": {
   "facade": "dark wall",
-  "trim": "slabs, frames",
+  "trim": "slabs, frames, sills",
   "metal": "pipes, rails, stilts",
+  "deck": "walking surfaces",
   "glass": "unlit panes; uv = (level, window hash)",
-  "win_warm": "lit panes and shop bays, emissive texture win_levels.png, strength 8",
-  "win_cool": "lit panes, strength 8",
-  "strip": "eave lines, strength 12",
-  "beacon": "mast light, strength 40",
-  "landmark": "Great Lantern bell, strength 6"
+  "cloth": "awnings, laundry (tint per instance)",
+  "foliage": "dark leaves",
+  "pool": "garden pool",
+  "win_warm": "lit panes and shop bays; uv = (level, window hash)",
+  "win_cool": "lit panes; uv = (level, window hash)",
+  "strip": "eave lines, soffit lines, crown",
+  "beacon": "red mast lights",
+  "landmark": "Great Lantern bell; uv = (level, panel id)",
+  "garden": "plant light points; uv = (level, hash)",
+  "lantern": "lantern strings, street and soffit lamps",
+  "keel": "keel lanterns under the decks",
+  "neon_a": "sign faces on the Tideglyph atlas",
+  "beam_lamp": "lighthouse lantern-room panes; uv.v = pane bearing / 360",
+  "beam": "fallback beam cone (additive)",
+  "cond_glow": "Condensery throats, louvres, flare",
+  "cond_lamp": "Condensery sodium lamps",
+  "cond_work": "Condensery work lights"
+ },
+ "emissive_strength": {
+  "win_warm": 3.0,
+  "win_cool": 3.0,
+  "strip": 10.0,
+  "beacon": 40.0,
+  "landmark": 1.6,
+  "garden": 18.0,
+  "lantern": 14.0,
+  "keel": 12.0,
+  "cond_glow": 5.0,
+  "cond_lamp": 22.0,
+  "cond_work": 22.0,
+  "neon_a": 20.0,
+  "beam_lamp": 30.0,
+  "beam": 1.0
  },
  "grid": {
   "floor_m": 3.2,
   "bay_m": 2.4
  },
+ "inhabitant_scale": {
+  "cast": "Glowmere aliens at scale 1.0 (1.66 to 1.79 m)",
+  "door_head_m": 2.04,
+  "rail_m": 1.05,
+  "step_riser_m": 0.2,
+  "balcony_depth_m": 1.05,
+  "gallery_depth_m": 1.5,
+  "gangway_width_m": 2.0,
+  "bench_seat_m": 0.43
+ },
  "assets": [
   {
    "asset": "buildings/mooring_shophouse_a.glb",
-   "tris": 4674,
+   "tris": 5804,
+   "height_m": 28.6,
+   "bounds_m": [
+    -6.5,
+    -14.0,
+    -7.1,
+    5.3,
+    28.57,
+    6.5
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
    "floors": 6,
    "footprint_m": [
     8.4,
     10.8
    ],
-   "height_m": 28.6
+   "roof": "kit",
+   "roof_y_m": 19.31,
+   "roof_centre_m": [
+    0,
+    0.0
+   ],
+   "roof_size_m": [
+    8.4,
+    10.8
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 8.4,
+     "d": 10.8,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      1.2
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      -1.2,
+      0.0
+     ],
+     "z0": 9.6,
+     "floors": 2,
+     "w": 6.0,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 16.0,
+     "floors": 1,
+     "w": 8.4,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
   },
   {
    "asset": "buildings/mooring_shophouse_b.glb",
-   "tris": 7038,
+   "tris": 8576,
+   "height_m": 35.0,
+   "bounds_m": [
+    -5.9,
+    -14.0,
+    -7.1,
+    5.9,
+    34.97,
+    7.1
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
    "floors": 8,
    "footprint_m": [
     9.6,
     10.8
    ],
-   "height_m": 35.0
+   "roof": "kit",
+   "roof_y_m": 25.71,
+   "roof_centre_m": [
+    0,
+    -0.6
+   ],
+   "roof_size_m": [
+    7.199999999999999,
+    10.8
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 10.8,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 7.199999999999999,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 12.8,
+     "floors": 3,
+     "w": 7.199999999999999,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 22.4,
+     "floors": 1,
+     "w": 7.199999999999999,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 0
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
   },
   {
    "asset": "buildings/mooring_shophouse_c.glb",
-   "tris": 3494,
+   "tris": 4128,
+   "height_m": 22.2,
+   "bounds_m": [
+    -4.7,
+    -14.0,
+    -6.5,
+    4.7,
+    22.17,
+    5.9
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
    "floors": 4,
    "footprint_m": [
     7.2,
     8.4
    ],
-   "height_m": 22.2
+   "roof": "kit",
+   "roof_y_m": 12.91,
+   "roof_centre_m": [
+    -0.0,
+    0.0
+   ],
+   "roof_size_m": [
+    7.2,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -0.0,
+      0.6
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      -0.0,
+      0.0
+     ],
+     "z0": 9.6,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
   },
   {
    "asset": "buildings/mooring_stack_a.glb",
-   "tris": 11094,
+   "tris": 13954,
+   "height_m": 51.0,
+   "bounds_m": [
+    -7.1,
+    -14.0,
+    -6.5,
+    7.1,
+    50.97,
+    6.5
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
    "floors": 13,
    "footprint_m": [
     9.6,
     9.6
    ],
-   "height_m": 51.0
+   "roof": "kit",
+   "roof_y_m": 41.71,
+   "roof_centre_m": [
+    0,
+    -0.6
+   ],
+   "roof_size_m": [
+    9.6,
+    9.6
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": 3
+    },
+    {
+     "c": [
+      1.2,
+      0.6
+     ],
+     "z0": 9.6,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      -1.2,
+      -0.6
+     ],
+     "z0": 16.0,
+     "floors": 3,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -1.8
+     ],
+     "z0": 25.6,
+     "floors": 3,
+     "w": 7.199999999999999,
+     "d": 7.199999999999999,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 35.2,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": 0
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
   },
   {
    "asset": "buildings/mooring_stack_b.glb",
-   "tris": 11842,
+   "tris": 16918,
+   "height_m": 63.8,
+   "bounds_m": [
+    -5.9,
+    -14.0,
+    -7.1,
+    6.5,
+    63.77,
+    7.1
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
    "floors": 17,
    "footprint_m": [
     8.4,
     9.6
    ],
-   "height_m": 63.8
+   "roof": "kit",
+   "roof_y_m": 54.51,
+   "roof_centre_m": [
+    0,
+    -0.6
+   ],
+   "roof_size_m": [
+    6.0,
+    9.6
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 8.4,
+     "d": 9.6,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      1.2,
+      -0.6
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 8.4,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 12.8,
+     "floors": 2,
+     "w": 6.0,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 19.2,
+     "floors": 3,
+     "w": 6.0,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 28.8,
+     "floors": 3,
+     "w": 8.4,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      0,
+      1.8
+     ],
+     "z0": 38.4,
+     "floors": 2,
+     "w": 8.4,
+     "d": 7.199999999999999,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      -0.6
+     ],
+     "z0": 44.8,
+     "floors": 2,
+     "w": 6.0,
+     "d": 7.199999999999999,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 51.2,
+     "floors": 1,
+     "w": 6.0,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_d.glb",
+   "tris": 8388,
+   "height_m": 17.0,
+   "bounds_m": [
+    -5.3,
+    -14.0,
+    -5.3,
+    4.7,
+    16.96,
+    6.07
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 3,
+   "footprint_m": [
+    7.2,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 9.71,
+   "roof_centre_m": [
+    0.0,
+    -0.6
+   ],
+   "roof_size_m": [
+    7.2,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0.0,
+      -0.6
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_e.glb",
+   "tris": 9740,
+   "height_m": 20.2,
+   "bounds_m": [
+    -7.1,
+    -14.0,
+    -6.5,
+    7.1,
+    20.16,
+    5.3
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 4,
+   "footprint_m": [
+    9.6,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 12.91,
+   "roof_centre_m": [
+    -1.2,
+    0.6
+   ],
+   "roof_size_m": [
+    9.6,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      1.2,
+      0.6
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      0.6
+     ],
+     "z0": 9.6,
+     "floors": 1,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_f.glb",
+   "tris": 10546,
+   "height_m": 23.4,
+   "bounds_m": [
+    -5.9,
+    -14.0,
+    -5.9,
+    5.3,
+    23.36,
+    6.09
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 5,
+   "footprint_m": [
+    8.4,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 16.11,
+   "roof_centre_m": [
+    0,
+    -0.6
+   ],
+   "roof_size_m": [
+    8.4,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      1.8
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 6.0,
+     "d": 6.0,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 12.8,
+     "floors": 1,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_g.glb",
+   "tris": 7662,
+   "height_m": 31.8,
+   "bounds_m": [
+    -5.3,
+    -14.0,
+    -7.1,
+    5.3,
+    31.77,
+    7.35
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 7,
+   "footprint_m": [
+    7.2,
+    10.8
+   ],
+   "roof": "kit",
+   "roof_y_m": 22.51,
+   "roof_centre_m": [
+    0.0,
+    1.8
+   ],
+   "roof_size_m": [
+    7.2,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 10.8,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -0.0,
+      -0.6
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 7.2,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 0
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 9.6,
+     "floors": 3,
+     "w": 7.2,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0.0,
+      1.8
+     ],
+     "z0": 19.2,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_h.glb",
+   "tris": 11664,
+   "height_m": 38.2,
+   "bounds_m": [
+    -6.5,
+    -14.0,
+    -7.7,
+    6.5,
+    38.17,
+    7.1
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 9,
+   "footprint_m": [
+    9.6,
+    10.8
+   ],
+   "roof": "kit",
+   "roof_y_m": 28.91,
+   "roof_centre_m": [
+    1.2,
+    0.0
+   ],
+   "roof_size_m": [
+    7.199999999999999,
+    10.8
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 10.8,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      1.2,
+      0.6
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 7.199999999999999,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 12.8,
+     "floors": 3,
+     "w": 9.6,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 0
+    },
+    {
+     "c": [
+      1.2,
+      0.0
+     ],
+     "z0": 22.4,
+     "floors": 2,
+     "w": 7.199999999999999,
+     "d": 10.8,
+     "shop": false,
+     "front_balcony_bay": 0
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_stack_c.glb",
+   "tris": 15746,
+   "height_m": 39.4,
+   "bounds_m": [
+    -6.5,
+    -14.0,
+    -5.3,
+    5.3,
+    39.36,
+    6.16
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 10,
+   "footprint_m": [
+    8.4,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 32.11,
+   "roof_centre_m": [
+    -1.2,
+    0.0
+   ],
+   "roof_size_m": [
+    8.4,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 6.0,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 12.8,
+     "floors": 2,
+     "w": 6.0,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      -0.6
+     ],
+     "z0": 19.2,
+     "floors": 2,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      0.0
+     ],
+     "z0": 25.6,
+     "floors": 2,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_stack_d.glb",
+   "tris": 18878,
+   "height_m": 57.4,
+   "bounds_m": [
+    -6.5,
+    -14.0,
+    -6.5,
+    6.5,
+    57.37,
+    6.5
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 15,
+   "footprint_m": [
+    9.6,
+    9.6
+   ],
+   "roof": "kit",
+   "roof_y_m": 48.11,
+   "roof_centre_m": [
+    0,
+    0.0
+   ],
+   "roof_size_m": [
+    7.199999999999999,
+    9.6
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -1.2,
+      0.6
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 7.199999999999999,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 9.6,
+     "floors": 3,
+     "w": 7.199999999999999,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 19.2,
+     "floors": 2,
+     "w": 9.6,
+     "d": 7.199999999999999,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 25.6,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 32.0,
+     "floors": 2,
+     "w": 9.6,
+     "d": 7.199999999999999,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 38.4,
+     "floors": 3,
+     "w": 7.199999999999999,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_stack_e.glb",
+   "tris": 15550,
+   "height_m": 42.6,
+   "bounds_m": [
+    -5.3,
+    -14.0,
+    -6.5,
+    5.3,
+    42.56,
+    6.05
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 11,
+   "footprint_m": [
+    7.2,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 35.31,
+   "roof_centre_m": [
+    0,
+    -0.6
+   ],
+   "roof_size_m": [
+    7.2,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      1.2
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 7.2,
+     "d": 6.0,
+     "shop": false,
+     "front_balcony_bay": 0
+    },
+    {
+     "c": [
+      -0.0,
+      1.8
+     ],
+     "z0": 12.8,
+     "floors": 3,
+     "w": 7.2,
+     "d": 6.0,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0.0,
+      0.6
+     ],
+     "z0": 22.4,
+     "floors": 2,
+     "w": 7.2,
+     "d": 6.0,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 28.8,
+     "floors": 2,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_i.glb",
+   "tris": 7802,
+   "height_m": 13.8,
+   "bounds_m": [
+    -5.9,
+    -14.0,
+    -5.3,
+    7.1,
+    13.76,
+    5.48
+   ],
+   "materials": [
+    "beacon",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 2,
+   "footprint_m": [
+    9.6,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 6.51,
+   "roof_centre_m": [
+    1.2,
+    0.0
+   ],
+   "roof_size_m": [
+    9.6,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      1.2,
+      0.0
+     ],
+     "z0": 3.2,
+     "floors": 1,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_shophouse_j.glb",
+   "tris": 6324,
+   "height_m": 13.8,
+   "bounds_m": [
+    -4.7,
+    -14.0,
+    -5.3,
+    4.7,
+    13.76,
+    5.5
+   ],
+   "materials": [
+    "beacon",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 2,
+   "footprint_m": [
+    7.2,
+    8.4
+   ],
+   "roof": "garden",
+   "roof_y_m": 6.51,
+   "roof_centre_m": [
+    0.0,
+    0.0
+   ],
+   "roof_size_m": [
+    7.2,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0.0,
+      0.0
+     ],
+     "z0": 3.2,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/mooring_gallery_slab.glb",
+   "tris": 50139,
+   "height_m": 37.0,
+   "bounds_m": [
+    -19.5,
+    -14.0,
+    -6.5,
+    16.7,
+    36.97,
+    6.24
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 8,
+   "footprint_m": [
+    34.8,
+    9.9
+   ],
+   "gallery_side": "front (-z in Blender y, +z in the GLB)",
+   "roof_y_m": 25.71
+  },
+  {
+   "asset": "buildings/mooring_corner_tower.glb",
+   "tris": 30990,
+   "height_m": 83.6,
+   "bounds_m": [
+    -8.3,
+    -14.0,
+    -8.0,
+    7.7,
+    83.57,
+    8.0
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "floors": 21,
+   "footprint_m": [
+    12.0,
+    12.0
+   ],
+   "roof_y_m": 67.31,
+   "roof_centre_m": [
+    -0.3,
+    1.2
+   ],
+   "roof_size_m": [
+    9.6,
+    9.6
+   ],
+   "blocks": [
+    {
+     "c": [
+      0.0,
+      0.0
+     ],
+     "z0": 0.0,
+     "floors": 5,
+     "w": 12.0,
+     "d": 12.0,
+     "shop": true,
+     "front_balcony_bay": -1,
+     "stair_slot_bay": 2
+    },
+    {
+     "c": [
+      0.6,
+      -0.3
+     ],
+     "z0": 16.0,
+     "floors": 5,
+     "w": 12.0,
+     "d": 12.0,
+     "shop": false,
+     "front_balcony_bay": -1,
+     "stair_slot_bay": 2
+    },
+    {
+     "c": [
+      -0.6,
+      0.3
+     ],
+     "z0": 32.0,
+     "floors": 4,
+     "w": 12.0,
+     "d": 12.0,
+     "shop": false,
+     "front_balcony_bay": -1,
+     "stair_slot_bay": 2
+    },
+    {
+     "c": [
+      0.6,
+      0.6
+     ],
+     "z0": 44.8,
+     "floors": 4,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1,
+     "stair_slot_bay": 2
+    },
+    {
+     "c": [
+      -0.3,
+      1.2
+     ],
+     "z0": 57.6,
+     "floors": 3,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1,
+     "stair_slot_bay": 2
+    }
+   ],
+   "sign_mount": "rooftop letters stand on the front strip of the roof (the roof kit is set 2.4 m back)"
+  },
+  {
+   "asset": "buildings/mooring_capsule_tower.glb",
+   "tris": 5316,
+   "height_m": 73.7,
+   "bounds_m": [
+    -6.8,
+    -14.0,
+    -6.8,
+    6.8,
+    73.68,
+    6.8
+   ],
+   "materials": [
+    "beacon",
+    "facade",
+    "glass",
+    "metal",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ]
+  },
+  {
+   "asset": "buildings/mooring_station.glb",
+   "tris": 2258,
+   "height_m": 16.4,
+   "bounds_m": [
+    -8.7,
+    -14.0,
+    -5.1,
+    8.7,
+    16.36,
+    5.1
+   ],
+   "materials": [
+    "beacon",
+    "facade",
+    "glass",
+    "lantern",
+    "metal",
+    "strip",
+    "trim",
+    "win_warm"
+   ],
+   "footprint_m": [
+    16.8,
+    9.6
+   ],
+   "cable_anchor_m": [
+    -7.1,
+    14.299999999999999,
+    -1.2
+   ],
+   "roundel_mount_m": [
+    0.0,
+    6.6,
+    4.7
+   ]
+  },
+  {
+   "asset": "buildings/kiosk.glb",
+   "tris": 84,
+   "height_m": 2.8,
+   "bounds_m": [
+    -1.5,
+    0.0,
+    -1.2,
+    1.5,
+    2.76,
+    1.7
+   ],
+   "materials": [
+    "facade",
+    "strip",
+    "trim",
+    "win_warm"
+   ]
+  },
+  {
+   "asset": "buildings/lone_lamp_house.glb",
+   "tris": 3892,
+   "height_m": 27.2,
+   "bounds_m": [
+    -5.3,
+    -14.0,
+    -5.3,
+    4.7,
+    27.17,
+    5.9
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "glass",
+    "metal",
+    "trim",
+    "win_warm"
+   ]
+  },
+  {
+   "asset": "landmarks/great_lantern_frame.glb",
+   "tris": 6092,
+   "height_m": 110.5,
+   "bounds_m": [
+    -27.0,
+    -16.0,
+    -27.0,
+    27.0,
+    110.5,
+    27.0
+   ],
+   "materials": [
+    "beacon",
+    "metal",
+    "strip",
+    "trim"
+   ]
+  },
+  {
+   "asset": "landmarks/great_lantern_bell.glb",
+   "tris": 2276,
+   "height_m": 55.1,
+   "bounds_m": [
+    -15.65,
+    -0.3,
+    -15.65,
+    15.65,
+    55.1,
+    15.65
+   ],
+   "materials": [
+    "landmark",
+    "trim"
+   ]
+  },
+  {
+   "asset": "landmarks/lighthouse_a.glb",
+   "tris": 3832,
+   "height_m": 60.6,
+   "bounds_m": [
+    -5.98,
+    -26.02,
+    -5.98,
+    8.14,
+    60.66,
+    5.98
+   ],
+   "materials": [
+    "beacon",
+    "beam_lamp",
+    "cloth",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "lamp_m": [
+    -0.6,
+    54.02,
+    -0.6
+   ],
+   "gallery_y_m": 51.9,
+   "deck_y_m": 20.22,
+   "panes": "beam_lamp, uv.v = pane bearing / 360 (pane 0 faces +x), so a program can spin the lit pane with the beam"
+  },
+  {
+   "asset": "landmarks/lighthouse_b.glb",
+   "tris": 4044,
+   "height_m": 43.6,
+   "bounds_m": [
+    -5.98,
+    -26.02,
+    -5.98,
+    8.14,
+    43.66,
+    5.98
+   ],
+   "materials": [
+    "beacon",
+    "beam_lamp",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "lamp_m": [
+    -0.6,
+    37.02,
+    -0.6
+   ],
+   "gallery_y_m": 34.9,
+   "deck_y_m": 12.22,
+   "panes": "beam_lamp, uv.v = pane bearing / 360 (pane 0 faces +x), so a program can spin the lit pane with the beam"
+  },
+  {
+   "asset": "landmarks/lighthouse_c.glb",
+   "tris": 2988,
+   "height_m": 52.6,
+   "bounds_m": [
+    -4.78,
+    -26.02,
+    -4.78,
+    6.94,
+    52.66,
+    4.78
+   ],
+   "materials": [
+    "beacon",
+    "beam_lamp",
+    "facade",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_warm"
+   ],
+   "lamp_m": [
+    0,
+    46.02,
+    0
+   ],
+   "gallery_y_m": 43.9,
+   "deck_y_m": 24.22,
+   "panes": "beam_lamp, uv.v = pane bearing / 360 (pane 0 faces +x), so a program can spin the lit pane with the beam"
+  },
+  {
+   "asset": "landmarks/beam_cone_unit.glb",
+   "tris": 24,
+   "height_m": 0.1,
+   "bounds_m": [
+    0.0,
+    -0.12,
+    -0.12,
+    1.0,
+    0.12,
+    0.12
+   ],
+   "materials": [
+    "beam"
+   ]
   },
   {
    "asset": "decks/deck_quay_6m.glb",
-   "tris": 140,
-   "height_m": 0.1
+   "tris": 152,
+   "height_m": 0.1,
+   "bounds_m": [
+    -3.0,
+    -14.0,
+    -4.32,
+    3.35,
+    0.14,
+    4.32
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "trim"
+   ]
   },
   {
    "asset": "decks/deck_stair_3m2.glb",
-   "tris": 372,
-   "height_m": 4.2
+   "tris": 444,
+   "height_m": 4.3,
+   "bounds_m": [
+    -2.54,
+    -0.21,
+    -4.3,
+    2.54,
+    4.27,
+    4.3
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "strip",
+    "trim"
+   ]
   },
   {
    "asset": "decks/gangway_10m.glb",
    "tris": 348,
-   "height_m": 1.1
+   "height_m": 1.1,
+   "bounds_m": [
+    -1.0,
+    -0.49,
+    -5.02,
+    1.0,
+    1.08,
+    5.02
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "strip",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/gangway_garden_10m.glb",
+   "tris": 6438,
+   "height_m": 1.1,
+   "bounds_m": [
+    -1.51,
+    -3.82,
+    -5.02,
+    1.54,
+    1.08,
+    5.02
+   ],
+   "materials": [
+    "deck",
+    "facade",
+    "foliage",
+    "garden",
+    "metal",
+    "strip",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/catwalk_stair.glb",
+   "tris": 376,
+   "height_m": 4.3,
+   "bounds_m": [
+    -2.51,
+    -12.0,
+    -1.31,
+    2.51,
+    4.27,
+    1.31
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/alley_stair.glb",
+   "tris": 560,
+   "height_m": 15.4,
+   "bounds_m": [
+    -1.3,
+    -10.0,
+    -1.9,
+    1.3,
+    15.35,
+    1.9
+   ],
+   "materials": [
+    "deck",
+    "lantern",
+    "metal",
+    "trim"
+   ],
+   "top_y_m": 12.8,
+   "footprint_m": [
+    2.2,
+    3.4
+   ]
   },
   {
    "asset": "decks/pier_span_22m.glb",
-   "tris": 684,
-   "height_m": 1.1
+   "tris": 1020,
+   "height_m": 2.0,
+   "bounds_m": [
+    -11.0,
+    -70.01,
+    -6.71,
+    11.0,
+    2.04,
+    6.71
+   ],
+   "materials": [
+    "deck",
+    "lantern",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/deck_lowwalk_6m.glb",
+   "tris": 124,
+   "height_m": 4.5,
+   "bounds_m": [
+    -3.02,
+    -12.0,
+    -1.3,
+    3.02,
+    4.51,
+    1.3
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/deck_pad_6m.glb",
+   "tris": 88,
+   "height_m": 0.0,
+   "bounds_m": [
+    -3.0,
+    -14.0,
+    -3.0,
+    3.0,
+    0.0,
+    3.0
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/deck_round_27m.glb",
+   "tris": 424,
+   "height_m": 0.0,
+   "bounds_m": [
+    -27.0,
+    -16.0,
+    -27.0,
+    27.0,
+    0.0,
+    27.0
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/deck_round_14m.glb",
+   "tris": 280,
+   "height_m": 0.0,
+   "bounds_m": [
+    -14.0,
+    -16.0,
+    -14.0,
+    14.0,
+    0.0,
+    14.0
+   ],
+   "materials": [
+    "deck",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "decks/rail_6m.glb",
+   "tris": 96,
+   "height_m": 1.1,
+   "bounds_m": [
+    -3.02,
+    -0.0,
+    -0.03,
+    3.02,
+    1.08,
+    0.03
+   ],
+   "materials": [
+    "metal"
+   ]
+  },
+  {
+   "asset": "decks/pool_15m.glb",
+   "tris": 252,
+   "height_m": 0.1,
+   "bounds_m": [
+    -7.8,
+    0.0,
+    -7.8,
+    7.8,
+    0.14,
+    7.8
+   ],
+   "materials": [
+    "pool",
+    "trim"
+   ]
+  },
+  {
+   "asset": "street/lantern_string_9m.glb",
+   "tris": 1152,
+   "height_m": 0.0,
+   "bounds_m": [
+    -4.5,
+    -1.36,
+    -0.17,
+    4.5,
+    0.01,
+    0.17
+   ],
+   "materials": [
+    "lantern",
+    "metal"
+   ],
+   "span_m": 9.0,
+   "sag_m": 0.9,
+   "bulbs": 9
+  },
+  {
+   "asset": "street/awning_1bay.glb",
+   "tris": 224,
+   "height_m": 0.3,
+   "bounds_m": [
+    -1.12,
+    -0.46,
+    -0.01,
+    1.12,
+    0.32,
+    1.72
+   ],
+   "materials": [
+    "cloth",
+    "lantern",
+    "metal"
+   ],
+   "mount": "origin on the wall above a shop bay, 2.62 m above the deck; projects 1.7 m out of the wall (the building's front)",
+   "width_m": 2.4
+  },
+  {
+   "asset": "street/awning_2bay.glb",
+   "tris": 384,
+   "height_m": 0.3,
+   "bounds_m": [
+    -2.32,
+    -0.46,
+    -0.01,
+    2.32,
+    0.32,
+    1.72
+   ],
+   "materials": [
+    "cloth",
+    "lantern",
+    "metal"
+   ],
+   "mount": "origin on the wall above a shop bay, 2.62 m above the deck; projects 1.7 m out of the wall (the building's front)",
+   "width_m": 4.8
+  },
+  {
+   "asset": "street/awning_3bay.glb",
+   "tris": 544,
+   "height_m": 0.3,
+   "bounds_m": [
+    -3.52,
+    -0.46,
+    -0.01,
+    3.52,
+    0.32,
+    1.72
+   ],
+   "materials": [
+    "cloth",
+    "lantern",
+    "metal"
+   ],
+   "mount": "origin on the wall above a shop bay, 2.62 m above the deck; projects 1.7 m out of the wall (the building's front)",
+   "width_m": 7.2
+  },
+  {
+   "asset": "street/street_lamp.glb",
+   "tris": 128,
+   "height_m": 4.3,
+   "bounds_m": [
+    -0.09,
+    0.0,
+    -0.2,
+    0.75,
+    4.27,
+    0.2
+   ],
+   "materials": [
+    "lantern",
+    "metal"
+   ]
+  },
+  {
+   "asset": "street/keel_lantern_8m.glb",
+   "tris": 120,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.26,
+    -8.76,
+    -0.26,
+    0.26,
+    0.0,
+    0.26
+   ],
+   "materials": [
+    "keel",
+    "metal"
+   ]
+  },
+  {
+   "asset": "street/keel_lantern_16m.glb",
+   "tris": 120,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.26,
+    -16.76,
+    -0.26,
+    0.26,
+    0.0,
+    0.26
+   ],
+   "materials": [
+    "keel",
+    "metal"
+   ]
+  },
+  {
+   "asset": "street/keel_lantern_26m.glb",
+   "tris": 120,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.26,
+    -26.76,
+    -0.26,
+    0.26,
+    0.0,
+    0.26
+   ],
+   "materials": [
+    "keel",
+    "metal"
+   ]
+  },
+  {
+   "asset": "street/crate_stack.glb",
+   "tris": 96,
+   "height_m": 1.2,
+   "bounds_m": [
+    -0.89,
+    0.0,
+    -0.79,
+    1.07,
+    1.2,
+    0.34
+   ],
+   "materials": [
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "street/mooring_post.glb",
+   "tris": 92,
+   "height_m": 0.9,
+   "bounds_m": [
+    -0.17,
+    0.0,
+    -0.35,
+    0.66,
+    0.85,
+    0.17
+   ],
+   "materials": [
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "street/cable_unit.glb",
+   "tris": 12,
+   "height_m": 0.0,
+   "bounds_m": [
+    0.0,
+    -0.03,
+    -0.03,
+    1.0,
+    0.03,
+    0.03
+   ],
+   "materials": [
+    "metal"
+   ]
+  },
+  {
+   "asset": "street/gondola_pylon.glb",
+   "tris": 336,
+   "height_m": 15.0,
+   "bounds_m": [
+    -0.75,
+    -12.0,
+    -2.6,
+    0.75,
+    14.98,
+    2.6
+   ],
+   "materials": [
+    "beacon",
+    "metal"
+   ],
+   "cable_y_m": 14.0,
+   "cable_offsets_m": [
+    -2.2,
+    2.2
+   ]
   },
   {
    "asset": "garden/umbel_tree_a.glb",
    "tris": 1608,
-   "height_m": 11.4
+   "height_m": 11.4,
+   "bounds_m": [
+    -4.99,
+    -0.0,
+    -5.06,
+    4.43,
+    11.36,
+    4.6
+   ],
+   "materials": [
+    "garden",
+    "trim"
+   ]
   },
   {
    "asset": "garden/umbel_tree_b.glb",
    "tris": 1272,
-   "height_m": 8.6
+   "height_m": 8.6,
+   "bounds_m": [
+    -4.23,
+    -0.0,
+    -3.24,
+    3.49,
+    8.58,
+    4.41
+   ],
+   "materials": [
+    "garden",
+    "trim"
+   ]
   },
   {
    "asset": "garden/umbel_tree_c.glb",
    "tris": 1828,
-   "height_m": 13.1
+   "height_m": 13.1,
+   "bounds_m": [
+    -5.17,
+    -0.0,
+    -6.08,
+    6.02,
+    13.07,
+    5.07
+   ],
+   "materials": [
+    "garden",
+    "trim"
+   ]
   },
   {
-   "asset": "buildings/mooring_capsule_tower.glb",
-   "tris": 3140,
-   "height_m": 73.7
+   "asset": "garden/umbel_tree_s.glb",
+   "tris": 948,
+   "height_m": 5.5,
+   "bounds_m": [
+    -2.31,
+    -0.0,
+    -2.0,
+    2.09,
+    5.5,
+    2.39
+   ],
+   "materials": [
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/umbel_sapling.glb",
+   "tris": 612,
+   "height_m": 3.2,
+   "bounds_m": [
+    -1.16,
+    -0.0,
+    -1.36,
+    1.13,
+    3.17,
+    0.91
+   ],
+   "materials": [
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/planter_trough_a.glb",
+   "tris": 586,
+   "height_m": 0.8,
+   "bounds_m": [
+    -1.1,
+    0.0,
+    -0.33,
+    1.1,
+    0.76,
+    0.21
+   ],
+   "materials": [
+    "facade",
+    "foliage",
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/planter_trough_b.glb",
+   "tris": 1330,
+   "height_m": 0.8,
+   "bounds_m": [
+    -1.1,
+    -2.55,
+    -0.48,
+    1.1,
+    0.79,
+    0.26
+   ],
+   "materials": [
+    "facade",
+    "foliage",
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/planter_trough_c.glb",
+   "tris": 1630,
+   "height_m": 0.8,
+   "bounds_m": [
+    -2.2,
+    -2.24,
+    -0.44,
+    2.2,
+    0.8,
+    0.37
+   ],
+   "materials": [
+    "facade",
+    "foliage",
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/planter_round.glb",
+   "tris": 353,
+   "height_m": 1.3,
+   "bounds_m": [
+    -0.52,
+    0.0,
+    -0.49,
+    0.56,
+    1.27,
+    0.55
+   ],
+   "materials": [
+    "foliage",
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/shrub_a.glb",
+   "tris": 325,
+   "height_m": 0.7,
+   "bounds_m": [
+    -0.75,
+    -0.08,
+    -0.55,
+    0.76,
+    0.69,
+    0.63
+   ],
+   "materials": [
+    "foliage",
+    "garden"
+   ]
+  },
+  {
+   "asset": "garden/shrub_b.glb",
+   "tris": 373,
+   "height_m": 1.1,
+   "bounds_m": [
+    -0.63,
+    -0.11,
+    -0.87,
+    1.14,
+    1.07,
+    0.9
+   ],
+   "materials": [
+    "foliage",
+    "garden"
+   ]
+  },
+  {
+   "asset": "garden/sprig_bed_3m.glb",
+   "tris": 960,
+   "height_m": 1.1,
+   "bounds_m": [
+    -1.5,
+    0.0,
+    -1.5,
+    1.5,
+    1.12,
+    1.5
+   ],
+   "materials": [
+    "facade",
+    "foliage",
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/vine_curtain_a.glb",
+   "tris": 490,
+   "height_m": 0.0,
+   "bounds_m": [
+    -1.2,
+    -3.15,
+    -0.25,
+    1.2,
+    0.0,
+    0.2
+   ],
+   "materials": [
+    "foliage",
+    "garden",
+    "metal"
+   ]
+  },
+  {
+   "asset": "garden/vine_curtain_b.glb",
+   "tris": 1298,
+   "height_m": 0.0,
+   "bounds_m": [
+    -1.2,
+    -6.2,
+    -0.3,
+    1.2,
+    0.0,
+    0.24
+   ],
+   "materials": [
+    "foliage",
+    "garden",
+    "metal"
+   ]
+  },
+  {
+   "asset": "garden/vine_curtain_c.glb",
+   "tris": 220,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.54,
+    -1.79,
+    -0.29,
+    0.5,
+    0.0,
+    0.23
+   ],
+   "materials": [
+    "foliage",
+    "garden",
+    "metal"
+   ]
+  },
+  {
+   "asset": "garden/pergola_4m.glb",
+   "tris": 790,
+   "height_m": 2.8,
+   "bounds_m": [
+    -2.25,
+    0.0,
+    -1.65,
+    2.25,
+    2.77,
+    1.65
+   ],
+   "materials": [
+    "foliage",
+    "garden",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/garden_bench.glb",
+   "tris": 72,
+   "height_m": 0.9,
+   "bounds_m": [
+    -0.9,
+    0.0,
+    -0.23,
+    0.9,
+    0.9,
+    0.21
+   ],
+   "materials": [
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/tree_pit.glb",
+   "tris": 368,
+   "height_m": 1.0,
+   "bounds_m": [
+    -1.25,
+    0.0,
+    -1.25,
+    1.25,
+    0.96,
+    1.25
+   ],
+   "materials": [
+    "facade",
+    "foliage",
+    "garden",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/terrace_step_6m.glb",
+   "tris": 1980,
+   "height_m": 0.9,
+   "bounds_m": [
+    -3.0,
+    -14.0,
+    -3.0,
+    3.0,
+    0.86,
+    4.2
+   ],
+   "materials": [
+    "deck",
+    "facade",
+    "foliage",
+    "garden",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "garden/pavilion.glb",
+   "tris": 402,
+   "height_m": 3.2,
+   "bounds_m": [
+    -4.4,
+    0.0,
+    -3.2,
+    4.4,
+    3.2,
+    3.2
+   ],
+   "materials": [
+    "deck",
+    "facade",
+    "metal",
+    "strip",
+    "trim",
+    "win_warm"
+   ]
   },
   {
    "asset": "vehicles/gondola_cabin.glb",
-   "tris": 252,
-   "height_m": 3.7
+   "tris": 380,
+   "height_m": 3.7,
+   "bounds_m": [
+    -2.15,
+    -0.35,
+    -1.15,
+    2.15,
+    3.7,
+    1.15
+   ],
+   "materials": [
+    "beacon",
+    "facade",
+    "metal",
+    "trim",
+    "win_warm"
+   ],
+   "cable_y_m": 3.6
   },
   {
    "asset": "vehicles/cloud_skiff.glb",
-   "tris": 198,
-   "height_m": 4.6
+   "tris": 276,
+   "height_m": 4.6,
+   "bounds_m": [
+    -3.3,
+    0.0,
+    -1.05,
+    3.7,
+    4.58,
+    1.05
+   ],
+   "materials": [
+    "facade",
+    "lantern",
+    "metal",
+    "trim",
+    "win_warm"
+   ]
+  },
+  {
+   "asset": "condensery/cond_stack_a.glb",
+   "tris": 3840,
+   "height_m": 118.0,
+   "bounds_m": [
+    -25.8,
+    -0.17,
+    -25.8,
+    25.8,
+    118.9,
+    25.8
+   ],
+   "materials": [
+    "beacon",
+    "cond_glow",
+    "cond_lamp",
+    "facade",
+    "metal",
+    "trim"
+   ],
+   "base_radius_m": 25.0,
+   "throat_radius_m": 18.2,
+   "plume_origin_m": [
+    0.0,
+    120.0,
+    0.0
+   ]
+  },
+  {
+   "asset": "condensery/cond_stack_b.glb",
+   "tris": 3840,
+   "height_m": 146.0,
+   "bounds_m": [
+    -29.87,
+    -0.19,
+    -29.87,
+    29.87,
+    146.9,
+    29.87
+   ],
+   "materials": [
+    "beacon",
+    "cond_glow",
+    "cond_lamp",
+    "facade",
+    "metal",
+    "trim"
+   ],
+   "base_radius_m": 29.0,
+   "throat_radius_m": 21.1,
+   "plume_origin_m": [
+    0.0,
+    148.0,
+    0.0
+   ]
+  },
+  {
+   "asset": "condensery/cond_stack_c.glb",
+   "tris": 3840,
+   "height_m": 100.0,
+   "bounds_m": [
+    -23.77,
+    -0.17,
+    -23.77,
+    23.77,
+    100.9,
+    23.77
+   ],
+   "materials": [
+    "beacon",
+    "cond_glow",
+    "cond_lamp",
+    "facade",
+    "metal",
+    "trim"
+   ],
+   "base_radius_m": 23.0,
+   "throat_radius_m": 16.7,
+   "plume_origin_m": [
+    0.0,
+    102.0,
+    0.0
+   ]
+  },
+  {
+   "asset": "condensery/cond_sphere_tank.glb",
+   "tris": 1112,
+   "height_m": 34.3,
+   "bounds_m": [
+    -15.8,
+    -0.02,
+    -15.8,
+    20.06,
+    34.3,
+    15.8
+   ],
+   "materials": [
+    "cond_work",
+    "facade",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "condensery/cond_flare_mast.glb",
+   "tris": 2032,
+   "height_m": 160.0,
+   "bounds_m": [
+    -5.01,
+    -0.08,
+    -5.01,
+    5.01,
+    174.22,
+    5.01
+   ],
+   "materials": [
+    "beacon",
+    "cond_glow",
+    "metal"
+   ],
+   "flame_m": [
+    0.4,
+    166.4,
+    -0.2
+   ]
+  },
+  {
+   "asset": "condensery/cond_crane.glb",
+   "tris": 1078,
+   "height_m": 104.0,
+   "bounds_m": [
+    -30.05,
+    -0.19,
+    -18.8,
+    140.6,
+    105.1,
+    18.8
+   ],
+   "materials": [
+    "beacon",
+    "cond_work",
+    "metal",
+    "trim",
+    "win_warm"
+   ],
+   "boom_tip_m": [
+    140.0,
+    80.0,
+    0.0
+   ]
+  },
+  {
+   "asset": "condensery/cond_shed_a.glb",
+   "tris": 3520,
+   "height_m": 16.3,
+   "bounds_m": [
+    -17.4,
+    -0.6,
+    -8.9,
+    18.5,
+    16.3,
+    8.9
+   ],
+   "materials": [
+    "cloth",
+    "cond_glow",
+    "facade",
+    "glass",
+    "metal",
+    "trim",
+    "win_warm"
+   ]
+  },
+  {
+   "asset": "condensery/cond_shed_b.glb",
+   "tris": 3780,
+   "height_m": 19.5,
+   "bounds_m": [
+    -14.9,
+    -0.6,
+    -6.6,
+    13.8,
+    19.5,
+    6.6
+   ],
+   "materials": [
+    "cloth",
+    "cond_glow",
+    "facade",
+    "glass",
+    "metal",
+    "trim",
+    "win_warm"
+   ]
+  },
+  {
+   "asset": "condensery/cond_conveyor_span.glb",
+   "tris": 348,
+   "height_m": 3.8,
+   "bounds_m": [
+    -10.08,
+    -150.0,
+    -2.58,
+    10.04,
+    3.82,
+    2.5
+   ],
+   "materials": [
+    "cond_lamp",
+    "deck",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "condensery/cond_platform.glb",
+   "tris": 2316,
+   "height_m": 0.3,
+   "bounds_m": [
+    -120.4,
+    -190.0,
+    -65.4,
+    120.4,
+    0.3,
+    65.4
+   ],
+   "materials": [
+    "deck",
+    "keel",
+    "metal",
+    "trim"
+   ]
+  },
+  {
+   "asset": "condensery/cond_lamp_post.glb",
+   "tris": 44,
+   "height_m": 10.3,
+   "bounds_m": [
+    -0.16,
+    0.0,
+    -0.25,
+    1.95,
+    10.35,
+    0.25
+   ],
+   "materials": [
+    "cond_lamp",
+    "metal"
+   ]
   },
   {
    "asset": "signs/sign_blade_0.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -128,6 +2979,14 @@
   {
    "asset": "signs/sign_blade_1.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -137,6 +2996,14 @@
   {
    "asset": "signs/sign_blade_2.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -146,6 +3013,14 @@
   {
    "asset": "signs/sign_blade_3.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -155,6 +3030,14 @@
   {
    "asset": "signs/sign_blade_4.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -164,6 +3047,14 @@
   {
    "asset": "signs/sign_blade_5.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -173,6 +3064,14 @@
   {
    "asset": "signs/sign_blade_6.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -182,6 +3081,14 @@
   {
    "asset": "signs/sign_blade_7.gltf",
    "tris": 64,
+   "bounds_m": [
+    -0.01,
+    -3.33,
+    -0.12,
+    1.72,
+    3.33,
+    0.12
+   ],
    "size_m": [
     1.34,
     6.5
@@ -191,6 +3098,14 @@
   {
    "asset": "signs/sign_fascia_0.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -200,6 +3115,14 @@
   {
    "asset": "signs/sign_fascia_1.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -209,6 +3132,14 @@
   {
    "asset": "signs/sign_fascia_2.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -218,6 +3149,14 @@
   {
    "asset": "signs/sign_fascia_3.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -227,6 +3166,14 @@
   {
    "asset": "signs/sign_fascia_4.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -236,6 +3183,14 @@
   {
    "asset": "signs/sign_fascia_5.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -245,6 +3200,14 @@
   {
    "asset": "signs/sign_fascia_6.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -254,6 +3217,14 @@
   {
    "asset": "signs/sign_fascia_7.gltf",
    "tris": 14,
+   "bounds_m": [
+    -2.31,
+    -0.06,
+    -0.2,
+    2.31,
+    1.26,
+    0.0
+   ],
    "size_m": [
     4.5,
     1.2
@@ -263,6 +3234,14 @@
   {
    "asset": "signs/sign_roundel_0.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -272,6 +3251,14 @@
   {
    "asset": "signs/sign_roundel_1.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -281,6 +3268,14 @@
   {
    "asset": "signs/sign_roundel_2.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -290,6 +3285,14 @@
   {
    "asset": "signs/sign_roundel_3.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -299,6 +3302,14 @@
   {
    "asset": "signs/sign_roundel_4.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -308,6 +3319,14 @@
   {
    "asset": "signs/sign_roundel_5.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -317,6 +3336,14 @@
   {
    "asset": "signs/sign_roundel_6.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -326,6 +3353,14 @@
   {
    "asset": "signs/sign_roundel_7.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -335,6 +3370,14 @@
   {
    "asset": "signs/sign_roundel_8.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -344,6 +3387,14 @@
   {
    "asset": "signs/sign_roundel_9.gltf",
    "tris": 28,
+   "bounds_m": [
+    0.0,
+    -0.76,
+    -0.1,
+    1.76,
+    0.76,
+    0.1
+   ],
    "size_m": [
     1.4,
     1.4
@@ -353,6 +3404,14 @@
   {
    "asset": "signs/sign_roof_0.gltf",
    "tris": 170,
+   "bounds_m": [
+    -6.7,
+    -0.01,
+    -1.63,
+    6.7,
+    4.84,
+    -0.18
+   ],
    "size_m": [
     13.2,
     2.2
@@ -362,6 +3421,14 @@
   {
    "asset": "signs/sign_roof_1.gltf",
    "tris": 170,
+   "bounds_m": [
+    -6.7,
+    -0.01,
+    -1.63,
+    6.7,
+    4.84,
+    -0.18
+   ],
    "size_m": [
     13.2,
     2.2
@@ -371,6 +3438,14 @@
   {
    "asset": "signs/sign_roof_2.gltf",
    "tris": 170,
+   "bounds_m": [
+    -6.7,
+    -0.01,
+    -1.63,
+    6.7,
+    4.84,
+    -0.18
+   ],
    "size_m": [
     13.2,
     2.2
@@ -380,27 +3455,19 @@
   {
    "asset": "signs/sign_roof_3.gltf",
    "tris": 170,
+   "bounds_m": [
+    -6.7,
+    -0.01,
+    -1.63,
+    6.7,
+    4.84,
+    -0.18
+   ],
    "size_m": [
     13.2,
     2.2
    ],
    "brand": "Mooring Seven"
-  },
-  {
-   "asset": "landmarks/great_lantern_frame.glb",
-   "tris": 6092,
-   "height_m": 110.2,
-   "diameter_m": 38
-  },
-  {
-   "asset": "landmarks/great_lantern_bell.glb",
-   "tris": 2276,
-   "height_m": 55.1,
-   "rest_offset_y_m": 16.0,
-   "ride_m": [
-    14.5,
-    34.0
-   ]
   }
  ]
 }

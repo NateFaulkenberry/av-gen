@@ -1,0 +1,157 @@
+{
+ "rule": "see nd_kitcore.py",
+ "assets_with_panes": 30,
+ "violations": 0,
+ "assets": {
+  "mooring_shophouse_a": {
+   "openings": 57,
+   "pane_polygons": 102,
+   "violations": []
+  },
+  "mooring_shophouse_b": {
+   "openings": 88,
+   "pane_polygons": 145,
+   "violations": []
+  },
+  "mooring_shophouse_c": {
+   "openings": 38,
+   "pane_polygons": 64,
+   "violations": []
+  },
+  "mooring_stack_a": {
+   "openings": 153,
+   "pane_polygons": 284,
+   "violations": []
+  },
+  "mooring_stack_b": {
+   "openings": 156,
+   "pane_polygons": 302,
+   "violations": []
+  },
+  "mooring_shophouse_d": {
+   "openings": 29,
+   "pane_polygons": 50,
+   "violations": []
+  },
+  "mooring_shophouse_e": {
+   "openings": 46,
+   "pane_polygons": 76,
+   "violations": []
+  },
+  "mooring_shophouse_f": {
+   "openings": 35,
+   "pane_polygons": 56,
+   "violations": []
+  },
+  "mooring_shophouse_g": {
+   "openings": 71,
+   "pane_polygons": 123,
+   "violations": []
+  },
+  "mooring_shophouse_h": {
+   "openings": 106,
+   "pane_polygons": 191,
+   "violations": []
+  },
+  "mooring_stack_c": {
+   "openings": 87,
+   "pane_polygons": 166,
+   "violations": []
+  },
+  "mooring_stack_d": {
+   "openings": 172,
+   "pane_polygons": 317,
+   "violations": []
+  },
+  "mooring_stack_e": {
+   "openings": 94,
+   "pane_polygons": 168,
+   "violations": []
+  },
+  "mooring_shophouse_i": {
+   "openings": 26,
+   "pane_polygons": 47,
+   "violations": []
+  },
+  "mooring_shophouse_j": {
+   "openings": 18,
+   "pane_polygons": 30,
+   "violations": []
+  },
+  "mooring_gallery_slab": {
+   "openings": 233,
+   "pane_polygons": 346,
+   "violations": []
+  },
+  "mooring_corner_tower": {
+   "openings": 304,
+   "pane_polygons": 533,
+   "violations": []
+  },
+  "mooring_capsule_tower": {
+   "openings": 34,
+   "pane_polygons": 34,
+   "violations": []
+  },
+  "mooring_station": {
+   "openings": 7,
+   "pane_polygons": 10,
+   "violations": []
+  },
+  "kiosk": {
+   "openings": 1,
+   "pane_polygons": 1,
+   "violations": []
+  },
+  "lone_lamp_house": {
+   "openings": 36,
+   "pane_polygons": 67,
+   "violations": []
+  },
+  "lighthouse_a": {
+   "openings": 30,
+   "pane_polygons": 51,
+   "violations": []
+  },
+  "lighthouse_b": {
+   "openings": 37,
+   "pane_polygons": 59,
+   "violations": []
+  },
+  "lighthouse_c": {
+   "openings": 21,
+   "pane_polygons": 37,
+   "violations": []
+  },
+  "pavilion": {
+   "openings": 3,
+   "pane_polygons": 3,
+   "violations": []
+  },
+  "gondola_cabin": {
+   "openings": 10,
+   "pane_polygons": 10,
+   "violations": []
+  },
+  "cloud_skiff": {
+   "openings": 5,
+   "pane_polygons": 5,
+   "violations": []
+  },
+  "cond_crane": {
+   "openings": 1,
+   "pane_polygons": 1,
+   "violations": []
+  },
+  "cond_shed_a": {
+   "openings": 48,
+   "pane_polygons": 89,
+   "violations": []
+  },
+  "cond_shed_b": {
+   "openings": 51,
+   "pane_polygons": 104,
+   "violations": []
+  }
+ }
+}

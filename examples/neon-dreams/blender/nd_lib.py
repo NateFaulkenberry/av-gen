@@ -40,7 +40,7 @@ class MB:
 
     BOXF = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
 
-    def box(self, c, size, yaw=0.0, attrs=None, M=None):
+    def box(self, c, size, yaw=0.0, attrs=None, M=None, skip=()):
         hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
         loc = [(-hx, -hy, -hz), (hx, -hy, -hz), (hx, hy, -hz), (-hx, hy, -hz),
                (-hx, -hy, hz), (hx, -hy, hz), (hx, hy, hz), (-hx, hy, hz)]
@@ -49,7 +49,7 @@ class MB:
             pts = [(c[0] + x * cs - y * sn, c[1] + x * sn + y * cs, c[2] + z) for x, y, z in loc]
         else:
             pts = [tuple(Vector(c) + M @ Vector(p)) for p in loc]
-        self._add(pts, self.BOXF, attrs)
+        self._add(pts, [f for i, f in enumerate(self.BOXF) if i not in skip], attrs)   # skip: 0 bottom, 1 top, 2 -y, 3 +x, 4 +y, 5 -x
 
     def beam(self, p0, p1, t=0.3, attrs=None, t2=None):
         p0, p1 = Vector(p0), Vector(p1)
@@ -94,10 +94,10 @@ class MB:
         self._add(pts, faces, attrs)
 
     def quad(self, p0, p1, p2, p3, uv=(0, 0, 1, 1), attrs=None, double=True):
+        # `double` is kept for callers but adds nothing: the kit's materials export as glTF doubleSided, and a coincident
+        # reversed copy z-fights (and renders black in Cycles).
         u0, v0, u1, v1 = uv
         self._add([p0, p1, p2, p3], [(0, 1, 2, 3)], attrs, [(u0, v0), (u1, v0), (u1, v1), (u0, v1)])
-        if double:
-            self._add([p1, p0, p3, p2], [(0, 1, 2, 3)], attrs, [(u1, v0), (u0, v0), (u0, v1), (u1, v1)])
 
     def build(self, name, mat, smooth=False):
         if not self.v:
