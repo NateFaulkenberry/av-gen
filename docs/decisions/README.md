@@ -80,6 +80,7 @@ So numbers are **assigned by range** rather than claimed by checking:
 | 2020-2029 | `eng/gltf-water-materials`, `eng/water-followups` and `eng/water-blend-reflect` (a gltf node's named materials drawn as water, for av-agent's imported lake, and its follow-ups) |
 | 2030-2039 | `eng/ci-fixes` (CI and the nightly Sanitizers workflow green: undefined behaviour and hosted-runner timings) |
 | 2040-2049 | `eng/scene-key-fixes` (scene keys that were written and never read, found writing the Scene Authoring Reference) |
+| 2100-2119 | `avagent/neon-dreams` (Neon Dreams, the AV Agent studio project: Cloud Environment v2 and the scene's engine needs) |
 | 1370+ | unassigned; ask before taking |
 
 Take the next free number **inside your range** and do not look outside it. A range with gaps is the
@@ -1049,3 +1050,4 @@ confirm the citation you are about to change is your own.
 | [2030](ADR-2030-a-crater-hash-states-the-clamp-it-was-made-with.md) | A crater's hash term states the clamp Apple silicon applied to a negative coordinate (UBSan's float-to-unsigned report, which failed every nightly Sanitizers run from 2026-11-01), so no approved Moon or Mars frame moves; the two-stage motion search's timing interleaves its rounds and the mixdown guard reads the fastest of three mixes, with their bounds unchanged. eng/ci-fixes | Accepted |
 | [2031](ADR-2031-the-ubsan-job-builds-at-o1.md) | The UBSan nightly job builds at `-O1 -g` (still Debug: assertions on, same test set) so the whole default set fits GitHub's 6-hour job limit; ASan and TSan stay at -O0, and ASan's recoverable UBSan checks remain a -O0 second net. eng/ci-fixes | Accepted |
 | [2040](ADR-2040-a-nodes-opacity-key.md) | A node's `opacity` key is read from the scene file as the base of `nodes/<name>/opacity` (0..1, refused outside), written only when not 1, kept on duplicate; Strange Attractor's old rover tracks now fade as built. Musical Geography's `horizonDensity` 9 -> 8 (the engine maximum). eng/scene-key-fixes | Accepted |
+| [2100](ADR-2100-cloud-environment-v2.md) | Cloud Environment v2 extends ADR-1289: an unbounded analytic cloud `sea` (coverage map, height profile, Perlin-Worley shape), lobes binned on an xz grid, cloud `glows` (coloured lights inside or below the cloud), `drift` and `swell`, `clouds/...` knobs for routes and moods, and a half-resolution jittered march with temporal accumulation and a depth-aware upsample; Neon Dreams' clouds 33-68 ms -> 0.7-5.1 ms at 1080p. avagent/neon-dreams | Accepted |

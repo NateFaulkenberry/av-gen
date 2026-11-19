@@ -62,6 +62,9 @@ struct EnvironmentFrame {
     glm::mat4 viewProj{1.0f};
     glm::vec3 cameraPos{0.0f};
     glm::vec3 cameraForward{0.0f, 0.0f, -1.0f};
+    // ADR-2100: false on a discontinuity of the picture (the first frame, a seek, a cut, a scene swap), so an
+    // environment that accumulates across frames drops its history exactly when the renderer's own temporal passes do.
+    bool historyValid = false;
 };
 
 class EnvironmentRenderer {

@@ -41,56 +41,67 @@ def r3(v):
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# clouds (ADR-1289 lobes): the sea, the primary formation, the secondary formation
-def sea_lobes(rng):
-    """A jittered sheet of broad flat lobes, tops near y = 0, out to ~7 km, with a few holes (the cloud breaks)."""
-    lobes = []
-    spacing = 900.0
-    n = 8
-    holes = [(-900.0, -3200.0, 420.0), (1500.0, -2600.0, 300.0)]   # where the cosmic floor shows through
-    for i in range(-n, n + 1):
-        for j in range(-n, n + 1):
-            x = i * spacing + rng.uniform(-180, 180)
-            z = -2200.0 + j * spacing + rng.uniform(-180, 180)
-            if math.hypot(x, z + 2200.0) > n * spacing:
-                continue
-            if any(math.hypot(x - hx, z - hz) < hr for hx, hz, hr in holes):
-                continue
-            r = rng.uniform(520, 700)
-            lobes.append({"c": r3([x, rng.uniform(-260, -200), z]), "r": round(r, 1),
-                          "scale": r3([rng.uniform(0.9, 1.25), rng.uniform(0.32, 0.45), rng.uniform(0.9, 1.25)]),
-                          "density": round(rng.uniform(0.75, 1.0), 3), "soft": 0.55})
-    return lobes
+# clouds (ADR-1289 lobes + ADR-2100 v2): an analytic sea to the horizon, lobe formations under the settlements, and
+# glow emitters that light the cloud with the settlements' neon
+SEA_BASE, SEA_TOP = -420.0, -40.0
 
 
 def formation_lobes(rng, cx, cz, radius, top, count):
-    """A cumulus mass: big lobes low and wide, smaller ones stacked toward the top; denser at the core."""
+    """A cumulus mass rising out of the sea: a wide skirt low down, stacked billows toward the top, denser at the core,
+    a few outriders so the silhouette is irregular."""
     lobes = []
     for k in range(count):
         u = k / max(count - 1, 1)
         a = rng.uniform(0, 2 * math.pi)
-        d = radius * math.sqrt(rng.uniform(0.0, 1.0)) * (1.0 - 0.45 * u)
-        y = -40.0 + top * (u ** 0.8) * rng.uniform(0.7, 1.0)
-        r = radius * rng.uniform(0.22, 0.38) * (1.0 - 0.5 * u)
+        d = radius * math.sqrt(rng.uniform(0.0, 1.0)) * (1.15 - 0.6 * u)
+        y = SEA_TOP - 60.0 + (top - SEA_TOP + 60.0) * (u ** 0.9) * rng.uniform(0.75, 1.0)
+        r = radius * rng.uniform(0.2, 0.34) * (1.0 - 0.45 * u)
+        flat = rng.uniform(0.55, 0.8) if u < 0.4 else rng.uniform(0.7, 0.95)
         lobes.append({"c": r3([cx + d * math.cos(a), y, cz + d * math.sin(a)]), "r": round(r, 1),
-                      "scale": r3([1.0, rng.uniform(0.6, 0.85), 1.0]), "density": 1.0, "soft": 0.5})
+                      "scale": r3([rng.uniform(0.9, 1.3), flat, rng.uniform(0.9, 1.3)]),
+                      "density": round(rng.uniform(0.8, 1.0), 3), "soft": 0.45})
+    for k in range(count // 6):  # outriders: lower, further out, thinner
+        a = rng.uniform(0, 2 * math.pi)
+        d = radius * rng.uniform(1.0, 1.6)
+        lobes.append({"c": r3([cx + d * math.cos(a), SEA_TOP + rng.uniform(-40, 40), cz + d * math.sin(a)]),
+                      "r": round(radius * rng.uniform(0.18, 0.3), 1),
+                      "scale": r3([1.3, rng.uniform(0.4, 0.6), 1.1]), "density": 0.6, "soft": 0.7})
     return lobes
 
 
+# where the neon is: the glow emitters (ADR-2100). Low in the settlements, so they light the cloud they stand in from
+# inside and below; one broad underglow per settlement colours the whole formation faintly.
+GLOWS = [
+    {"name": "primaryUnder", "position": [0.0, -110.0, -1600.0], "color": VIOLET, "radius": 420.0, "intensity": 0.18},
+    {"name": "primaryMagenta", "position": [-150.0, 10.0, -1480.0], "color": MAGENTA, "radius": 140.0, "intensity": 1.2},
+    {"name": "primaryBlue", "position": [170.0, 20.0, -1720.0], "color": EBLUE, "radius": 140.0, "intensity": 1.1},
+    {"name": "primaryAmber", "position": [30.0, -10.0, -1420.0], "color": AMBER, "radius": 110.0, "intensity": 0.9},
+    {"name": "primaryPink", "position": [-60.0, 0.0, -1820.0], "color": PINK, "radius": 130.0, "intensity": 0.9},
+    {"name": "secondaryUnder", "position": [SECONDARY[0], -60.0, SECONDARY[1]], "color": MAGENTA, "radius": 380.0,
+     "intensity": 0.5},
+    {"name": "secondaryBlue", "position": [SECONDARY[0] + 120.0, 10.0, SECONDARY[1] - 80.0], "color": EBLUE,
+     "radius": 160.0, "intensity": 1.0},
+]
+
+
 def clouds_block(rng):
-    lobes = sea_lobes(rng)
-    lobes += formation_lobes(rng, PRIMARY[0], PRIMARY[1], 520.0, 150.0, 90)
-    lobes += formation_lobes(rng, SECONDARY[0], SECONDARY[1], 380.0, 120.0, 45)
+    lobes = formation_lobes(rng, PRIMARY[0], PRIMARY[1], 560.0, 90.0, 120)
+    lobes += formation_lobes(rng, SECONDARY[0], SECONDARY[1], 400.0, 80.0, 60)
     return {
         "lobes": lobes,
-        "extinction": 0.012, "steps": 64, "lightSteps": 2, "lightDistance": 250.0,
-        # the key is the moon, low and violet-white; the "warm" glow from the city side colours the flanks
-        "lightDirection": [0.35, 0.35, -0.85], "lightColor": [0.45, 0.35, 1.0], "lightIntensity": 0.35,
-        "anisotropy": 0.55,
-        "ambientTop": [0.006, 0.005, 0.026], "ambientBottom": [0.016, 0.002, 0.02],
-        "warmColor": [0.20, 0.02, 0.12], "warmDirection": [0.0, 0.0, -1.0], "warmHeight": 900.0,
-        "noiseScale": 0.008, "noiseAmount": 0.7,
-        "hazeColor": [0.012, 0.006, 0.04], "hazeDistance": 9000.0, "powder": 0.5, "seed": 7,
+        "sea": {"base": SEA_BASE, "top": SEA_TOP, "coverage": 0.72, "coverageScale": 0.00032, "density": 1.8},
+        "glows": GLOWS, "glowGain": 1.0, "glowOcclusion": 2.5,
+        "extinction": 0.011, "density": 1.0, "swell": 0.0,
+        "steps": 64, "lightSteps": 0, "lightDistance": 220.0,
+        "resolution": 0.5, "temporal": 0.85, "minStep": 6.0, "stepGrowth": 0.035, "maxDistance": 30000.0,
+        # night: the moon is a faint violet key, the sky ambient barely there; the neon does the lighting
+        "lightDirection": [0.35, 0.35, -0.85], "lightColor": [0.45, 0.38, 1.0], "lightIntensity": 0.12,
+        "anisotropy": 0.45,
+        "ambientTop": [0.012, 0.009, 0.045], "ambientBottom": [0.0015, 0.0008, 0.006],
+        "warmColor": [0.02, 0.003, 0.025], "warmDirection": [0.0, 0.0, -1.0], "warmHeight": 900.0,
+        "noiseScale": 0.0028, "noiseAmount": 0.6, "detailScale": 0.018, "detailAmount": 0.4,
+        "drift": [3.0, 0.0, -1.5],
+        "hazeColor": [0.006, 0.003, 0.02], "hazeDistance": 14000.0, "powder": 0.5, "seed": 7,
     }
 
 
@@ -242,8 +253,9 @@ def nodes_and_programs(rng):
         box_node("signsMagenta", signs[:6], "ndSignMagenta", shadow=False),
         box_node("signsBlue", signs[6:], "ndSignBlue", shadow=False),
         # the cosmic floor, far under the sea: seen only through the breaks
-        {"name": "cosmicFloor", "kind": "procedural", "position": [0, -1400, -2500], "procedural": {
-            "source": {"kind": "box", "size": [1000, 2, 1000]},
+        # (400 m thick: a 2 m slab's top and bottom faces z-fought kilometres away and drew 32 px black tiles)
+        {"name": "cosmicFloor", "kind": "procedural", "position": [0, -1600, -2500], "procedural": {
+            "source": {"kind": "box", "size": [1000, 400, 1000]},
             "distribution": {"kind": "single"}, "castsShadow": False,
             "distributionTransform": {"scale": [60.0, 1.0, 60.0]},
             "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndCosmicFloor"}}},
@@ -310,7 +322,7 @@ def scene_doc(camera_name, rng):
         "intensity": 0.25, "skyIntensity": 1.0, "lightFromEnvironment": False,
         "sky": {"enabled": True, "background": True, "useKeyLight": False,
                 "sunDirection": [-0.35, 0.32, -0.88],
-                "zenithColor": [0.002, 0.002, 0.010], "horizonColor": [0.045, 0.012, 0.075],
+                "zenithColor": [0.002, 0.002, 0.010], "horizonColor": [0.024, 0.006, 0.042],
                 "groundColor": [0.02, 0.006, 0.04], "haze": 0.18,
                 "sunColor": [0.85, 0.80, 1.0], "sunIntensity": 0.0, "sunSize": 0.012, "sunGlow": 0.03,
                 "intensity": 1.0},
@@ -348,6 +360,21 @@ def scene_doc(camera_name, rng):
     }
 
 
+def cloud_routes():
+    """ADR-2100: the clouds through ordinary routes. The bass stem swells the sea and fattens the formations, slowly;
+    the kick lifts one district's glow at a time (the magenta quarter), not the whole sky."""
+    def r(source, target, amount, **chain):
+        out = {"source": source, "target": target, "amount": amount, "op": "add", "polarity": "unipolar"}
+        if chain:
+            out["chain"] = chain
+        return out
+    return [
+        r("stem.bass.level", "clouds/swell", 0.45, attackMs=350.0, decayMs=1800.0),
+        r("stem.kick.onset", "clouds/glow/1/intensity", 1.6, attackMs=15.0, decayMs=450.0),
+        r("stem.snare.onset", "clouds/glow/2/intensity", 1.2, attackMs=15.0, decayMs=350.0),
+    ]
+
+
 def project_doc(scene_rel, audio_dir):
     stems = [("kick", "Kick", "drums"), ("snare", "Snare", "drums"), ("hh", "HH", "drums"), ("bass", "BASS", "bass"),
              ("moog", "Moog", "synth"), ("cloud", "Cloud Diving", "synth"), ("crash", "Crash", "drums"),
@@ -361,7 +388,7 @@ def project_doc(scene_rel, audio_dir):
         "sonic": {"live": False},
         "feeds": {"beat": "stem.kick", "hits": "stem.kick", "levels": "audio"},
         "parameters": {"camera/lookAhead": 120.0, "camera/splineBank": 6.0, "post/output/dither": 1.0},
-        "routes": [],
+        "routes": cloud_routes(),
         "timeline": {"enabled": True, "cues": [], "tracks": [
             {"target": "camera/splineT", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
              "loopLength": 0.0, "keys": [{"time": 0.0, "value": 0.0, "interp": "linear"},
@@ -376,12 +403,16 @@ def main():
     ap.add_argument("--camera", default="ride", choices=["ride"] + sorted(STILLS))
     ap.add_argument("--audio", default=SABERTOOTH)
     ap.add_argument("--name", default="neon-dreams")
+    ap.add_argument("--no-clouds", action="store_true", help="the cloud block disabled (for an A/B of its cost)")
     a = ap.parse_args()
     rng = random.Random(20261119)
     os.makedirs(a.out, exist_ok=True)
     scene_path = os.path.join(a.out, a.name + ".scene.json")
     with open(scene_path, "w") as f:
-        json.dump(scene_doc(a.camera, rng), f, indent=1)
+        doc = scene_doc(a.camera, rng)
+        if a.no_clouds:
+            doc["clouds"]["enabled"] = False
+        json.dump(doc, f, indent=1)
     proj_path = os.path.join(a.out, a.name + ".json")
     with open(proj_path, "w") as f:
         json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio), f, indent=1)

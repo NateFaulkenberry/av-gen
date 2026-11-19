@@ -5516,6 +5516,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         envFrame.viewProj = frame.viewProj;
         envFrame.cameraPos = glm::vec3(frame.cameraPos);
         envFrame.cameraForward = glm::vec3(frame.cameraForward);
+        envFrame.historyValid = havePrevViewProj_; // ADR-2100
         for (EnvironmentRenderer* env : environments_) {
             if (env->wants(scene)) {
                 env->encode(envFrame);

@@ -1,5 +1,7 @@
 #include "scene/clouds.hpp"
 
+#include "params/parameter_set.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -94,6 +96,33 @@ Result<void> Clouds::validate() const {
         return fail("clouds: lightDirection and warmDirection must not be zero");
     }
     if (lobes.size() > kMaxCloudLobes) return fail("clouds: too many lobes");
+    // ADR-2100
+    if (sea.enabled) {
+        if (!(sea.top > sea.base)) return fail("clouds: sea.top must be above sea.base");
+        if (!(sea.coverage >= 0.0f && sea.coverage <= 1.0f)) return fail("clouds: sea.coverage must be in [0, 1]");
+        if (!(sea.coverageScale > 0.0f && sea.coverageScale <= 1.0f)) {
+            return fail("clouds: sea.coverageScale must be in (0, 1] cycles per metre");
+        }
+        if (!(sea.density >= 0.0f && sea.density <= 4.0f)) return fail("clouds: sea.density must be in [0, 4]");
+    }
+    if (glows.size() > kMaxCloudGlows) return fail("clouds: {} glows, more than the {} the renderer holds", glows.size(), kMaxCloudGlows);
+    for (const CloudGlow& g : glows) {
+        if (!(g.radius > 0.0f) || !(g.intensity >= 0.0f) || !std::isfinite(g.position.x + g.position.y + g.position.z)) {
+            return fail("clouds: a glow needs a positive radius, a non-negative intensity and a finite position");
+        }
+    }
+    if (!(glowGain >= 0.0f && glowGain <= 100.0f)) return fail("clouds: glowGain must be in [0, 100]");
+    if (!(glowOcclusion >= 0.0f && glowOcclusion <= 10.0f)) return fail("clouds: glowOcclusion must be in [0, 10]");
+    if (!(density >= 0.0f && density <= 8.0f)) return fail("clouds: density must be in [0, 8]");
+    if (!(swell >= 0.0f && swell <= 1.0f)) return fail("clouds: swell must be in [0, 1]");
+    if (!(detailScale > 0.0f && detailScale <= 4.0f)) return fail("clouds: detailScale must be in (0, 4]");
+    if (!(detailAmount >= 0.0f && detailAmount <= 1.0f)) return fail("clouds: detailAmount must be in [0, 1]");
+    if (!(resolution >= 0.25f && resolution <= 1.0f)) return fail("clouds: resolution must be in [0.25, 1]");
+    if (!(temporal >= 0.0f && temporal <= 0.97f)) return fail("clouds: temporal must be in [0, 0.97]");
+    if (!(minStep > 0.0f && minStep <= 1000.0f)) return fail("clouds: minStep must be in (0, 1000] metres");
+    if (!(stepGrowth >= 0.0f && stepGrowth <= 0.5f)) return fail("clouds: stepGrowth must be in [0, 0.5]");
+    if (!(maxDistance > 0.0f && maxDistance <= 200000.0f)) return fail("clouds: maxDistance must be in (0, 200000]");
+    if (!std::isfinite(drift.x + drift.y + drift.z)) return fail("clouds: drift must be finite");
     return {};
 }
 
@@ -119,20 +148,60 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
                         std::pair{"lightIntensity", &c.lightIntensity}, std::pair{"anisotropy", &c.anisotropy},
                         std::pair{"warmHeight", &c.warmHeight}, std::pair{"noiseScale", &c.noiseScale},
                         std::pair{"noiseAmount", &c.noiseAmount}, std::pair{"hazeDistance", &c.hazeDistance},
-                        std::pair{"powder", &c.powder}}) {
+                        std::pair{"powder", &c.powder}, std::pair{"glowGain", &c.glowGain},
+                        std::pair{"glowOcclusion", &c.glowOcclusion}, std::pair{"density", &c.density},
+                        std::pair{"swell", &c.swell}, std::pair{"detailScale", &c.detailScale},
+                        std::pair{"detailAmount", &c.detailAmount}, std::pair{"resolution", &c.resolution},
+                        std::pair{"temporal", &c.temporal}, std::pair{"minStep", &c.minStep},
+                        std::pair{"stepGrowth", &c.stepGrowth}, std::pair{"maxDistance", &c.maxDistance}}) {
         if (auto r = num(k, *t); !r) return std::unexpected(r.error());
     }
     for (auto [k, t] : {std::pair{"lightDirection", &c.lightDirection}, std::pair{"lightColor", &c.lightColor},
                         std::pair{"ambientTop", &c.ambientTop}, std::pair{"ambientBottom", &c.ambientBottom},
                         std::pair{"warmColor", &c.warmColor}, std::pair{"warmDirection", &c.warmDirection},
-                        std::pair{"hazeColor", &c.hazeColor}}) {
+                        std::pair{"hazeColor", &c.hazeColor}, std::pair{"drift", &c.drift}}) {
         if (auto r = vec(k, *t); !r) return std::unexpected(r.error());
     }
     if (j.contains("steps")) c.steps = j.at("steps").get<int>();
     if (j.contains("lightSteps")) c.lightSteps = j.at("lightSteps").get<int>();
     if (j.contains("seed")) c.seed = j.at("seed").get<std::uint32_t>();
-    if (!j.contains("lobes")) return fail("clouds: 'lobes' (a lobes file path, or an array) is required");
-    const json& lj = j.at("lobes");
+    // ADR-2100: the sea and the glows
+    if (j.contains("sea")) {
+        const json& sj = j.at("sea");
+        if (!sj.is_object()) return fail("clouds: 'sea' must be an object");
+        c.sea.enabled = sj.value("enabled", true);
+        for (auto [k, t] : {std::pair{"base", &c.sea.base}, std::pair{"top", &c.sea.top},
+                            std::pair{"coverage", &c.sea.coverage}, std::pair{"coverageScale", &c.sea.coverageScale},
+                            std::pair{"density", &c.sea.density}}) {
+            if (!sj.contains(k)) continue;
+            if (!sj.at(k).is_number()) return fail("clouds: 'sea.{}' must be a number", k);
+            *t = sj.at(k).get<float>();
+        }
+    }
+    if (j.contains("glows")) {
+        const json& gj = j.at("glows");
+        if (!gj.is_array()) return fail("clouds: 'glows' must be an array");
+        for (const json& g : gj) {
+            if (!g.is_object() || !g.contains("position")) return fail("clouds: a glow needs a 'position'");
+            CloudGlow glow;
+            auto pos = vec3Of(g.at("position"), "position");
+            if (!pos) return std::unexpected(pos.error());
+            glow.position = *pos;
+            if (g.contains("color")) {
+                auto col = vec3Of(g.at("color"), "color");
+                if (!col) return std::unexpected(col.error());
+                glow.color = *col;
+            }
+            if (g.contains("radius")) glow.radius = g.at("radius").get<float>();
+            if (g.contains("intensity")) glow.intensity = g.at("intensity").get<float>();
+            if (g.contains("name")) glow.name = g.at("name").get<std::string>();
+            c.glows.push_back(glow);
+        }
+    }
+    if (!j.contains("lobes") && !c.sea.enabled) {
+        return fail("clouds: 'lobes' (a lobes file path, or an array) is required unless there is a 'sea'");
+    }
+    const json lj = j.contains("lobes") ? j.at("lobes") : json::array();
     if (lj.is_string()) {
         c.source = lj.get<std::string>();
         const std::filesystem::path path = base / c.source;
@@ -166,7 +235,24 @@ json Clouds::toJson() const {
               {"ambientTop", v3(ambientTop)}, {"ambientBottom", v3(ambientBottom)}, {"warmColor", v3(warmColor)},
               {"warmDirection", v3(warmDirection)}, {"warmHeight", warmHeight}, {"noiseScale", noiseScale},
               {"noiseAmount", noiseAmount}, {"hazeColor", v3(hazeColor)}, {"hazeDistance", hazeDistance},
-              {"powder", powder}, {"seed", seed}};
+              {"powder", powder}, {"seed", seed}, {"glowGain", glowGain}, {"glowOcclusion", glowOcclusion},
+              {"drift", v3(drift)}, {"density", density}, {"swell", swell}, {"detailScale", detailScale},
+              {"detailAmount", detailAmount}, {"resolution", resolution}, {"temporal", temporal},
+              {"minStep", minStep}, {"stepGrowth", stepGrowth}, {"maxDistance", maxDistance}};
+    if (sea.enabled) {
+        j["sea"] = {{"enabled", true}, {"base", sea.base}, {"top", sea.top}, {"coverage", sea.coverage},
+                    {"coverageScale", sea.coverageScale}, {"density", sea.density}};
+    }
+    if (!glows.empty()) {
+        json gs = json::array();
+        for (const CloudGlow& g : glows) {
+            json gj = {{"position", v3(g.position)}, {"color", v3(g.color)}, {"radius", g.radius},
+                       {"intensity", g.intensity}};
+            if (!g.name.empty()) gj["name"] = g.name;
+            gs.push_back(std::move(gj));
+        }
+        j["glows"] = std::move(gs);
+    }
     if (!masses.empty()) j["masses"] = masses;
     if (!source.empty()) {
         j["lobes"] = source; // by reference, as authored
@@ -179,6 +265,114 @@ json Clouds::toJson() const {
         j["lobes"] = std::move(arr);
     }
     return j;
+}
+
+// ADR-2100: the live knobs.
+namespace {
+
+struct CloudFloat {
+    const char* key;
+    float Clouds::*field;
+    float lo, hi, softLo, softHi;
+};
+
+constexpr CloudFloat kCloudFloats[] = {
+    {"density", &Clouds::density, 0.0f, 8.0f, 0.0f, 3.0f},
+    {"swell", &Clouds::swell, 0.0f, 1.0f, 0.0f, 1.0f},
+    {"lightIntensity", &Clouds::lightIntensity, 0.0f, 100.0f, 0.0f, 4.0f},
+    {"glowGain", &Clouds::glowGain, 0.0f, 100.0f, 0.0f, 4.0f},
+    {"glowOcclusion", &Clouds::glowOcclusion, 0.0f, 10.0f, 0.0f, 3.0f},
+    {"noiseAmount", &Clouds::noiseAmount, 0.0f, 1.0f, 0.0f, 1.0f},
+    {"detailAmount", &Clouds::detailAmount, 0.0f, 1.0f, 0.0f, 1.0f},
+    {"hazeDistance", &Clouds::hazeDistance, 1.0f, 200000.0f, 1000.0f, 40000.0f},
+    {"powder", &Clouds::powder, 0.0f, 1.0f, 0.0f, 1.0f},
+};
+constexpr std::size_t kCloudFloatCount = sizeof(kCloudFloats) / sizeof(kCloudFloats[0]);
+
+struct CloudVector {
+    const char* key;
+    glm::vec3 Clouds::*field;
+    bool colour;
+};
+
+constexpr CloudVector kCloudVectors[] = {
+    {"lightColor", &Clouds::lightColor, true},   {"ambientTop", &Clouds::ambientTop, true},
+    {"ambientBottom", &Clouds::ambientBottom, true}, {"warmColor", &Clouds::warmColor, true},
+    {"hazeColor", &Clouds::hazeColor, true},     {"drift", &Clouds::drift, false},
+};
+constexpr std::size_t kCloudVectorCount = sizeof(kCloudVectors) / sizeof(kCloudVectors[0]);
+
+// the sea's two, after the vectors: coverage and its density
+constexpr std::size_t kCloudSeaCount = 2;
+
+} // namespace
+
+CloudParameters registerCloudParameters(params::ParameterSet& params, const Clouds& rest, const std::string& prefix) {
+    CloudParameters out;
+    const std::string group = "Clouds";
+    const auto addFloat = [&](const std::string& path, float value, float lo, float hi, float softLo, float softHi) {
+        params::ParamDesc<float> d;
+        d.path = path;
+        d.group = group;
+        d.defaultValue = value;
+        d.hardMin = lo;
+        d.hardMax = hi;
+        d.softMin = softLo;
+        d.softMax = softHi;
+        out.all.push_back(&params.add(std::move(d)));
+    };
+    const auto addVec = [&](const std::string& path, glm::vec3 value, bool colour) {
+        params::ParamDesc<glm::vec3> d;
+        d.path = path;
+        d.group = group;
+        d.defaultValue = value;
+        d.hardMin = colour ? glm::vec3(0.0f) : glm::vec3(-1000.0f);
+        d.hardMax = colour ? glm::vec3(100.0f) : glm::vec3(1000.0f);
+        d.softMin = colour ? glm::vec3(0.0f) : glm::vec3(-50.0f);
+        d.softMax = colour ? glm::vec3(1.0f) : glm::vec3(50.0f);
+        d.isColor = colour;
+        out.all.push_back(&params.add(std::move(d)));
+    };
+    for (const CloudFloat& f : kCloudFloats) {
+        addFloat(prefix + f.key, rest.*(f.field), f.lo, f.hi, f.softLo, f.softHi);
+    }
+    out.floats = kCloudFloatCount;
+    for (const CloudVector& v : kCloudVectors) {
+        addVec(prefix + v.key, rest.*(v.field), v.colour);
+    }
+    out.vectors = kCloudVectorCount;
+    addFloat(prefix + "sea/coverage", rest.sea.coverage, 0.0f, 1.0f, 0.0f, 1.0f);
+    addFloat(prefix + "sea/density", rest.sea.density, 0.0f, 4.0f, 0.0f, 2.0f);
+    for (std::size_t i = 0; i < rest.glows.size(); ++i) {
+        const std::string base = prefix + "glow/" + std::to_string(i) + "/";
+        addFloat(base + "intensity", rest.glows[i].intensity, 0.0f, 1000.0f, 0.0f, 20.0f);
+        addVec(base + "color", rest.glows[i].color, true);
+    }
+    return out;
+}
+
+void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& live) {
+    live = rest;
+    const auto f = [&](std::size_t i) -> const params::Parameter<float>* {
+        return i < p.all.size() ? dynamic_cast<const params::Parameter<float>*>(p.all[i]) : nullptr;
+    };
+    const auto v = [&](std::size_t i) -> const params::Parameter<glm::vec3>* {
+        return i < p.all.size() ? dynamic_cast<const params::Parameter<glm::vec3>*>(p.all[i]) : nullptr;
+    };
+    for (std::size_t k = 0; k < kCloudFloatCount; ++k) {
+        if (const auto* q = f(k)) live.*(kCloudFloats[k].field) = q->value();
+    }
+    for (std::size_t k = 0; k < kCloudVectorCount; ++k) {
+        if (const auto* q = v(kCloudFloatCount + k)) live.*(kCloudVectors[k].field) = q->value();
+    }
+    const std::size_t sea = kCloudFloatCount + kCloudVectorCount;
+    if (const auto* q = f(sea)) live.sea.coverage = q->value();
+    if (const auto* q = f(sea + 1)) live.sea.density = q->value();
+    const std::size_t glow0 = sea + kCloudSeaCount;
+    for (std::size_t i = 0; i < live.glows.size(); ++i) {
+        if (const auto* q = f(glow0 + 2 * i)) live.glows[i].intensity = q->value();
+        if (const auto* q = v(glow0 + 2 * i + 1)) live.glows[i].color = q->value();
+    }
 }
 
 } // namespace avgen::scene

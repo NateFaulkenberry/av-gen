@@ -49,6 +49,7 @@ medium, bloom and tone mapping.
 - A scene with no `clouds` block records nothing, and the frame is unchanged. The GPU test holds a disabled block to
   byte-identity with no block.
 - Static by design: there are no parameters beyond the authored ones and no motion. These are still-image clouds.
+  (ADR-2100 adds a sea, glows, drift, registered knobs and a cheaper half-resolution temporal march to this block.)
 - Offline cost: about lobes-on-ray × steps × (1 + light steps) density evaluations per sky pixel. It is not
   measured in this phase.
 - The shadow march sees only the lobes on the view ray, which is an approximation. A lobe that shadows a sample

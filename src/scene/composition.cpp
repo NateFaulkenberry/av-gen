@@ -1242,6 +1242,25 @@ void Composition::setAttractorWorld(AttractorWorldBlock block) {
     dirty_ = true;
 }
 
+void Composition::setClouds(Clouds clouds) {
+    clouds_ = std::move(clouds);
+    if (params_ != nullptr) { // attached already: register its knobs now (ADR-2100)
+        if (cloudParams_) {
+            for (const params::IParameter* q : cloudParams_->all) {
+                params_->remove(q->path());
+            }
+            cloudParams_.reset();
+        }
+        if (clouds_.active()) {
+            cloudParams_ = registerCloudParameters(*params_, clouds_, "clouds/" + sanitise(prefix_));
+            for (const params::IParameter* q : cloudParams_->all) {
+                registeredPaths_.push_back(q->path());
+            }
+        }
+    }
+    dirty_ = true;
+}
+
 void Composition::setMeshWire(MeshWire wire) {
     meshWire_ = std::move(wire);
     if (params_ != nullptr) { // attached already: register its knobs now
@@ -5598,6 +5617,11 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     if (!meshWire_.targets.empty()) {
         meshWireParams_ = registerMeshWireParameters(params, meshWire_, "meshWire/" + sanitise(prefix_));
     }
+    // ADR-2100: the clouds'.
+    cloudParams_.reset();
+    if (clouds_.active()) {
+        cloudParams_ = registerCloudParameters(params, clouds_, "clouds/" + sanitise(prefix_));
+    }
     if (root) {
         addDefaultRoutes(modulator);
     } else {
@@ -6631,6 +6655,7 @@ void Composition::detach() {
     gridParams_.clear(); // ADR-1122 (the parameters themselves go with `registeredPaths_`)
     astralParams_.reset(); // ADR-1221, likewise
     attractorParams_.reset(); // ADR-1850, likewise
+    cloudParams_.reset();     // ADR-2100, likewise
     cameraDistance_ = nullptr;
     cameraHeight_ = nullptr;
     cameraOrbitSpeed_ = nullptr;
@@ -10170,7 +10195,11 @@ void Composition::applyParameters() {
     }
     // ADR-1200: the ecosystem, with its finals. Layers share their templates by pointer, so this is cheap.
     scene_.ecosystem = ecosystem_;
-    scene_.clouds = clouds_; // ADR-1289
+    if (cloudParams_) { // ADR-1289, with ADR-2100's finals
+        applyCloudParameters(*cloudParams_, clouds_, scene_.clouds);
+    } else {
+        scene_.clouds = clouds_;
+    }
     applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
     updateAstral(); // ADR-1221: before the camera, which it may place
     updateAttractorWorld(); // ADR-1850: likewise

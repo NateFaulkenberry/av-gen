@@ -1478,7 +1478,7 @@ public:
     void setAstral(AstralForge astral);
     [[nodiscard]] const AstralForge& astral() const { return astral_; }
     // ADR-1289: the authored cloud block (static: copied to the scene as is).
-    void setClouds(Clouds clouds) { clouds_ = std::move(clouds); }
+    void setClouds(Clouds clouds); // ADR-1289; ADR-2100 registers its knobs when attached
     // ---- the Strange Attractor (ADR-1850): a scene-level Environment (`"attractorWorld"`) ----
     // Generates the world at once; its parameters (`attractorWorld/...`) are registered when attached, and a change
     // of a structural one regenerates the world on the next frame.
@@ -2541,6 +2541,7 @@ private:
     std::optional<AttractorWorldParameters> attractorParams_; // its live knobs, while attached
     MeshWire meshWire_;                      // ADR-1862: the authored block (rest values)
     std::optional<MeshWireParameters> meshWireParams_; // its live knobs, while attached
+    std::optional<CloudParameters> cloudParams_;       // ADR-2100: the clouds' live knobs, while attached
     Corruption corruption_;                  // ADR-1873: the authored block (rest values)
     std::optional<CorruptionParameters> corruptionParams_;
     std::vector<std::size_t> corruptionEchoes_; // the echo copies' entity indices
