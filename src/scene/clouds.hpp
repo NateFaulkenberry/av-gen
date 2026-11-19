@@ -52,6 +52,21 @@ struct CloudSea {
     float coverage = 0.6f;         // 0..1: the fraction of the sea that is cloud (low = breaks open)
     float coverageScale = 0.0003f; // cycles per metre of the coverage map (the size of the breaks)
     float density = 1.0f;          // 0..4: a multiplier on the sea's density
+    // ADR-2101: a sea with relief. relief > 0 switches the band model for a TOP SURFACE: a height field (one swell of
+    // `reliefScale` metres plus three octaves of billow noise, rounded tops and creased troughs) of +-`relief` metres
+    // about `top`, bumped in 3D by `billow` metres of the shape noise (cauliflower), with the cloud solid below it down
+    // to `base`. The key's light is then shadowed by the height field itself (crests lit, troughs dark).
+    float relief = 0.0f;           // metres; 0 = the ADR-2100 band
+    float reliefScale = 2000.0f;   // metres: the wavelength of the largest swell
+    float billow = 0.0f;           // metres of 3D bumps on the surface
+    float farFade = 0.0f;          // 0..1: the share of maxDistance over which the far sea fades out (0 = none)
+    struct Break {
+        glm::vec2 centre{0.0f};    // x, z
+        float radius = 200.0f;     // metres, across the narrow axis
+        float elongation = 1.0f;   // the long axis is radius * elongation, along x before the yaw
+        float yaw = 0.0f;          // radians about +y
+    };
+    std::vector<Break> breaks;     // at most 2: holes through the sea, all the way down
 };
 
 // ADR-2100: a glow emitter: light from inside or below the cloud (a city's neon), falling off over `radius`.

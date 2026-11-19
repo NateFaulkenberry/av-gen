@@ -32,6 +32,10 @@ struct CloudUniforms {
     march2: vec4<f32>,
     sea: vec4<f32>,
     sea2: vec4<f32>,
+    sea3: vec4<f32>,
+    sea4: vec4<f32>,
+    sea5: vec4<f32>,
+    sea6: vec4<f32>,
     boxMin: vec4<f32>,
     boxMax: vec4<f32>,
     grid: vec4<f32>,
@@ -90,7 +94,15 @@ fn lobeBase(p: vec3<f32>) -> vec2<f32> {
     }
     let k = u32(cell.y * nx + cell.x);
     let offset = bins[2u * k];
-    let count = bins[2u * k + 1u];
+    let packed = bins[2u * k + 1u];
+    let count = packed & 0xFFu;
+    // ADR-2101: outside the column's height range there is nothing to read
+    let span = max(cu.boxMax.y - cu.boxMin.y, 1.0);
+    let y0 = cu.boxMin.y + f32((packed >> 8u) & 0xFFFu) / 4095.0 * span;
+    let y1 = cu.boxMin.y + f32(packed >> 20u) / 4095.0 * span;
+    if (p.y < y0 || p.y > y1) {
+        return vec2<f32>(0.0);
+    }
     var base = 0.0;
     var above = 0.0;
     for (var i = 0u; i < count; i = i + 1u) {
@@ -110,6 +122,63 @@ fn lobeBase(p: vec3<f32>) -> vec2<f32> {
         above = max(above, chord * shape);
     }
     return vec2<f32>(base, above);
+}
+
+
+// ADR-2101: the relief sea's top surface (metres) at xz: one rounded swell plus up to three octaves of billow noise
+// (|n| inverted: rounded tops, creased troughs), lowered to the floor inside the breaks and where the coverage is thin.
+fn seaSurface(xz: vec2<f32>, octaves: u32) -> f32 {
+    let f = cu.sea3.y;
+    let s0 = (noiseTap(vec3<f32>(xz.x, 211.0, xz.y), f).a - 0.5) * 2.5;
+    var h = 0.55 * s0;
+    if (octaves > 1u) {
+        let s1 = 1.0 - abs((noiseTap(vec3<f32>(xz.x * 4.3 + 57.0, 401.0, xz.y * 4.3 - 91.0), f).a - 0.5) * 3.0);
+        h = h + 0.28 * (s1 * 2.0 - 1.0);
+    }
+    if (octaves > 2u) {
+        let s2 = 1.0 - abs((noiseTap(vec3<f32>(xz.x * 10.5 - 13.0, 613.0, xz.y * 10.5 + 29.0), f).a - 0.5) * 3.0);
+        h = h + 0.17 * (s2 * 2.0 - 1.0);
+    }
+    if (octaves > 3u) {
+        let s3 = 1.0 - abs((noiseTap(vec3<f32>(xz.x * 26.0 + 7.0, 877.0, xz.y * 26.0 + 3.0), f).a - 0.5) * 3.0);
+        h = h + 0.09 * (s3 * 2.0 - 1.0);
+    }
+    var surface = cu.sea3.w + cu.sea3.x * h;
+    // the breaks
+    let floorY = cu.sea.x - 40.0;
+    let nb = u32(cu.sea6.z + 0.5);
+    for (var b = 0u; b < nb; b = b + 1u) {
+        let br = select(cu.sea4, cu.sea5, b == 1u);
+        let yaw = select(cu.sea6.x, cu.sea6.y, b == 1u);
+        let v = xz - br.xy;
+        let c = cos(yaw);
+        let sn = sin(yaw);
+        let lx = (c * v.x - sn * v.y) / max(br.w, 0.1);
+        let lz = sn * v.x + c * v.y;
+        let d = length(vec2<f32>(lx, lz)) / max(br.z, 1.0);
+        surface = mix(floorY, surface, smoothstep(0.7, 1.2, d + 0.12 * h));
+    }
+    if (cu.sea.z < 0.999) {
+        let cov = noiseTap(vec3<f32>(xz.x, 37.0, xz.y), cu.sea.w).a;
+        let amount = remap01(cov, 1.0 - cu.sea.z - 0.12, 1.0 - cu.sea.z + 0.12);
+        surface = mix(floorY, surface, amount);
+    }
+    return surface;
+}
+
+// ADR-2101: metres of sea along the ray toward the key, from the height field (crests lit, troughs in shadow)
+fn seaShadow(p: vec3<f32>, L: vec3<f32>) -> f32 {
+    var od = 0.0;
+    var prev = 0.0;
+    let ds = array<f32, 4>(10.0, 35.0, 100.0, 260.0);
+    for (var i = 0u; i < 4u; i = i + 1u) {
+        let d = ds[i];
+        let q = p + L * d;
+        let surf = seaSurface(q.xz + cu.drift.xz, 3u) + cu.sea3.z * 0.3;
+        od = od + clamp((surf - q.y) / 12.0, 0.0, 1.0) * (d - prev);
+        prev = d;
+    }
+    return od;
 }
 
 struct Density {
@@ -140,7 +209,13 @@ fn densityBase(p: vec3<f32>) -> Density {
     let shape = noiseTap(q + seed, cu.march.w);
     // Perlin-Worley, sharpened by its own cells
     let sn = remap01(shape.r, (shape.g * 0.625 + shape.b * 0.25) * 0.35, 1.0);
-    if (inSea) {
+    if (inSea && cu.sea3.x > 0.0) {
+        // ADR-2101: the relief sea -- solid below a billowed top surface
+        let surface = seaSurface(q.xz, 4u) + cu.sea3.z * (sn - 0.55) * 2.0;
+        let below = surface - p.y;
+        sea = remap01(below, 0.0, 4.0 + 0.25 * cu.sea3.z) * remap01(p.y - cu.sea.x, 0.0, 40.0) * cu.sea2.x;
+        out.above = -1.0; // the march asks the height field (seaShadow)
+    } else if (inSea) {
         // the coverage map: two octaves of the slow channel, in xz only, so a break goes all the way down
         let c0 = noiseTap(vec3<f32>(q.x, 37.0, q.z), cu.sea.w).a;
         let c1 = noiseTap(vec3<f32>(q.x * 2.7 + 311.0, 91.0, q.z * 2.7 - 173.0), cu.sea.w).a;
@@ -158,7 +233,7 @@ fn densityBase(p: vec3<f32>) -> Density {
         lob = clamp(lobe * (1.0 + 0.5 * swell) - cu.warmColor.w * (1.0 - sn), 0.0, 1.0);
     }
     out.base = max(sea, lob);
-    out.above = max(out.above, lobeAbove.y * 0.6);
+    out.above = select(max(out.above, lobeAbove.y * 0.6), -1.0 - lobeAbove.y * 0.6, out.above < 0.0 && sea >= lob);
     if (lob > sea) {
         out.height = remap01(p.y, cu.boxMin.y, cu.boxMax.y);
     } else {
@@ -191,6 +266,51 @@ fn slab(ro: vec3<f32>, rd: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>, box: bool) -
         return vec2<f32>(max(max(tmin.x, tmin.y), max(tmin.z, 0.0)), min(min(tmax.x, tmax.y), tmax.z));
     }
     return vec2<f32>(max(tmin.y, 0.0), tmax.y);
+}
+
+
+// ADR-2101: how far an empty sample can jump. Above the sea band, a sample in a bin column with no lobes (or outside the
+// lobes' box) can go straight to the nearer of the sea's top, the column's exit and the box's entry: the march spent
+// its whole budget crossing kilometres of empty air before the sea when the eye was inside the lobes' box.
+fn emptySkip(ro: vec3<f32>, rd: vec3<f32>, t: f32, seaEntry: f32, boxEntry: f32) -> f32 {
+    let p = ro + rd * t;
+    if (cu.sea2.y > 0.5 && p.y <= cu.sea.y) {
+        return t;
+    }
+    var goal = seaEntry;
+    let inBox = cu.boxMin.w > 0.5 && all(p >= cu.boxMin.xyz) && all(p <= cu.boxMax.xyz);
+    if (inBox) {
+        let cell = vec2<i32>(floor((p.xz - cu.grid.xy) / cu.grid.z));
+        let nx = i32(cu.grid.w + 0.5);
+        let nz = i32(cu.grid2.x + 0.5);
+        if (cell.x >= 0 && cell.y >= 0 && cell.x < nx && cell.y < nz) {
+            let k = u32(cell.y * nx + cell.x);
+            let packed = bins[2u * k + 1u];
+            if ((packed & 0xFFu) > 0u) {
+                let span = max(cu.boxMax.y - cu.boxMin.y, 1.0);
+                let y0 = cu.boxMin.y + f32((packed >> 8u) & 0xFFFu) / 4095.0 * span;
+                let y1 = cu.boxMin.y + f32(packed >> 20u) / 4095.0 * span;
+                if (p.y >= y0 && p.y <= y1) {
+                    return t;
+                }
+                // above or below this column's lobes: go no further than where the ray meets their band
+                if (p.y > y1 && rd.y < 0.0) {
+                    goal = min(goal, (y1 - ro.y) / rd.y);
+                } else if (p.y < y0 && rd.y > 0.0) {
+                    goal = min(goal, (y0 - ro.y) / rd.y);
+                }
+            }
+        }
+        // the column's exit in x and z
+        let lo = cu.grid.xy + vec2<f32>(cell) * cu.grid.z;
+        let hi = lo + vec2<f32>(cu.grid.z);
+        let inv = 1.0 / select(rd.xz, vec2<f32>(1e-6), abs(rd.xz) < vec2<f32>(1e-6));
+        let tx = max((lo - ro.xz) * inv, (hi - ro.xz) * inv);
+        goal = min(goal, min(tx.x, tx.y) + 0.25);
+    } else if (cu.boxMin.w > 0.5 && boxEntry > t) {
+        goal = min(goal, boxEntry);
+    }
+    return max(t, goal);
 }
 
 struct MarchOut {
@@ -229,11 +349,14 @@ fn fs_clouds(in: VsOut) -> MarchOut {
     // the span: the sea band and the lobes' box, cut at the scene and the reach
     var tA = 1e30;
     var tB = -1e30;
+    var seaEntry = 1e30;
+    var boxEntry = 1e30;
     if (cu.sea2.y > 0.5) {
         let s = slab(ro, rd, vec3<f32>(0.0, cu.sea.x, 0.0), vec3<f32>(0.0, cu.sea.y, 0.0), false);
         if (s.y > s.x) {
             tA = min(tA, s.x);
             tB = max(tB, s.y);
+            seaEntry = s.x;
         }
     }
     if (cu.boxMin.w > 0.5) {
@@ -241,6 +364,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
         if (s.y > s.x) {
             tA = min(tA, s.x);
             tB = max(tB, s.y);
+            boxEntry = s.x;
         }
     }
     tB = min(tB, min(sceneT, cu.march2.z));
@@ -281,8 +405,13 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 // the key's light reaching this point (the light march reads the undetailed density)
                 var od = 0.0;
                 if (lightSteps == 0u) {
-                    // analytic: the cloud above the sample, slanted toward the key
-                    od = db.above / max(L.y, 0.25);
+                    if (db.above < 0.0) {
+                        // ADR-2101: the relief sea shadows itself through its height field
+                        od = seaShadow(p, L) + (-1.0 - db.above) / max(L.y, 0.25);
+                    } else {
+                        // analytic: the cloud above the sample, slanted toward the key
+                        od = db.above / max(L.y, 0.25);
+                    }
                 }
                 for (var j = 0u; j < lightSteps; j = j + 1u) {
                     od = od + densityBase(p + L * ((f32(j) + 0.5) * lightDt)).base * lightDt;
@@ -312,7 +441,10 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 var radiance = cu.lightColor.rgb * cu.light.w * shadow * phase * powder + ambient + warm + glow;
                 let hz = 1.0 - exp(-t / max(cu.haze.w, 1.0));
                 radiance = mix(radiance, cu.haze.rgb, hz);
-                let a = 1.0 - exp(-ext * dens * dt);
+                var a = 1.0 - exp(-ext * dens * dt);
+                if (cu.sea6.w > 0.0) {
+                    a = a * (1.0 - smoothstep(cu.sea6.w, cu.march2.z, t)); // ADR-2101: the far sea fades out
+                }
                 let w = trans * a;
                 col = col + w * radiance;
                 tSum = tSum + w * t;
@@ -324,6 +456,11 @@ fn fs_clouds(in: VsOut) -> MarchOut {
             }
         } else {
             dt = dt * 2.0; // empty air: stride
+            // ADR-2101: and jump empty columns above the sea outright
+            let skip = emptySkip(ro, rd, t + dt, seaEntry, boxEntry);
+            if (skip > t + dt) {
+                dt = skip - t + dt * jitter;
+            }
         }
         t = t + dt;
     }

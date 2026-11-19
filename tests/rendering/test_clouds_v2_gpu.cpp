@@ -212,7 +212,13 @@ TEST_CASE("the lobe bins hold every lobe that covers a point, in that point's ce
             REQUIRE(inside); // a covered point is inside the grid
             const std::size_t c = static_cast<std::size_t>(cell.y) * bins.nx + static_cast<std::size_t>(cell.x);
             const std::uint32_t offset = bins.words[2 * c];
-            const std::uint32_t count = bins.words[2 * c + 1];
+            const std::uint32_t count = bins.words[2 * c + 1] & rendering::kBinCountMask;
+            // ADR-2101: the column's packed height range covers this lobe
+            const float span = std::max(bins.yHi - bins.yLo, 1.0f);
+            const float y0 = bins.yLo + static_cast<float>((bins.words[2 * c + 1] >> 8) & 0xFFFu) / 4095.0f * span;
+            const float y1 = bins.yLo + static_cast<float>(bins.words[2 * c + 1] >> 20) / 4095.0f * span;
+            CHECK(y0 <= l.centre.y - l.radius * l.scale.y + 1e-3f * span);
+            CHECK(y1 >= l.centre.y + l.radius * l.scale.y - 1e-3f * span);
             bool found = false;
             for (std::uint32_t j = 0; j < count; ++j) found = found || bins.words[offset + j] == i;
             REQUIRE(found);

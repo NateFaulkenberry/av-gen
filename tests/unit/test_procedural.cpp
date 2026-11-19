@@ -2445,3 +2445,45 @@ TEST_CASE("Blocks deformer: whole cells move together, a share of them, reshuffl
         CHECK(applyDeformer(z, p, 0.0) == p);
     }
 }
+
+// ADR-2101: per-part material overrides of a multi-material mesh source, keyed by the glTF material's name.
+TEST_CASE("partMaterials reads, round-trips, is written only when authored and rejects unknown keys",
+          "[procedural][adr2101]") {
+    const nlohmann::json j = nlohmann::json::parse(R"({
+        "source": {"kind": "mesh", "asset": "a.glb"},
+        "distribution": {"kind": "single"},
+        "partMaterials": {"win_warm": {"program": "panes"},
+                          "neon_a": {"emissiveColor": [1.0, 0.1, 0.5], "emissiveIntensity": 16.0}}})");
+    const auto g = scene::ProceduralGeometry::fromJson(j);
+    REQUIRE(g);
+    REQUIRE(g->partMaterials.size() == 2);
+    const auto find = [&](const std::string& name) -> const scene::ProceduralGeometry::PartMaterial* {
+        for (const auto& [n, p] : g->partMaterials) {
+            if (n == name) return &p;
+        }
+        return nullptr;
+    };
+    REQUIRE(find("win_warm") != nullptr);
+    CHECK(find("win_warm")->program == "panes");
+    CHECK_FALSE(find("win_warm")->emissiveColor.has_value());
+    REQUIRE(find("neon_a") != nullptr);
+    REQUIRE(find("neon_a")->emissiveColor.has_value());
+    CHECK(find("neon_a")->emissiveColor->y == 0.1f);
+    CHECK(find("neon_a")->emissiveIntensity.value_or(0.0f) == 16.0f);
+    const nlohmann::json out = g->toJson();
+    REQUIRE(out.contains("partMaterials"));
+    const auto again = scene::ProceduralGeometry::fromJson(out);
+    REQUIRE(again);
+    CHECK(again->partMaterials.size() == 2);
+
+    nlohmann::json plain = j;
+    plain.erase("partMaterials");
+    const auto none = scene::ProceduralGeometry::fromJson(plain);
+    REQUIRE(none);
+    CHECK_FALSE(none->toJson().contains("partMaterials"));
+
+    nlohmann::json bad = j;
+    bad["partMaterials"]["win_warm"]["tint"] = 1.0;
+    CHECK_FALSE(scene::ProceduralGeometry::fromJson(bad));
+}
+

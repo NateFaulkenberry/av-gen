@@ -104,6 +104,18 @@ Result<void> Clouds::validate() const {
             return fail("clouds: sea.coverageScale must be in (0, 1] cycles per metre");
         }
         if (!(sea.density >= 0.0f && sea.density <= 4.0f)) return fail("clouds: sea.density must be in [0, 4]");
+        if (!(sea.relief >= 0.0f && sea.relief <= 2000.0f)) return fail("clouds: sea.relief must be in [0, 2000] metres");
+        if (!(sea.reliefScale >= 50.0f && sea.reliefScale <= 100000.0f)) {
+            return fail("clouds: sea.reliefScale must be in [50, 100000] metres");
+        }
+        if (!(sea.billow >= 0.0f && sea.billow <= 500.0f)) return fail("clouds: sea.billow must be in [0, 500] metres");
+        if (!(sea.farFade >= 0.0f && sea.farFade <= 1.0f)) return fail("clouds: sea.farFade must be in [0, 1]");
+        if (sea.breaks.size() > 2) return fail("clouds: at most 2 sea breaks");
+        for (const CloudSea::Break& b : sea.breaks) {
+            if (!(b.radius > 0.0f) || !(b.elongation >= 0.1f)) {
+                return fail("clouds: a sea break needs a positive radius and an elongation of at least 0.1");
+            }
+        }
     }
     if (glows.size() > kMaxCloudGlows) return fail("clouds: {} glows, more than the {} the renderer holds", glows.size(), kMaxCloudGlows);
     for (const CloudGlow& g : glows) {
@@ -172,10 +184,27 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
         c.sea.enabled = sj.value("enabled", true);
         for (auto [k, t] : {std::pair{"base", &c.sea.base}, std::pair{"top", &c.sea.top},
                             std::pair{"coverage", &c.sea.coverage}, std::pair{"coverageScale", &c.sea.coverageScale},
-                            std::pair{"density", &c.sea.density}}) {
+                            std::pair{"density", &c.sea.density}, std::pair{"relief", &c.sea.relief},
+                            std::pair{"reliefScale", &c.sea.reliefScale}, std::pair{"billow", &c.sea.billow},
+                            std::pair{"farFade", &c.sea.farFade}}) {
             if (!sj.contains(k)) continue;
             if (!sj.at(k).is_number()) return fail("clouds: 'sea.{}' must be a number", k);
             *t = sj.at(k).get<float>();
+        }
+        if (sj.contains("breaks")) { // ADR-2101
+            const json& bj = sj.at("breaks");
+            if (!bj.is_array()) return fail("clouds: 'sea.breaks' must be an array");
+            for (const json& b : bj) {
+                if (!b.is_object() || !b.contains("centre") || !b.at("centre").is_array() || b.at("centre").size() != 2) {
+                    return fail("clouds: a sea break needs 'centre': [x, z]");
+                }
+                CloudSea::Break br;
+                br.centre = glm::vec2(b.at("centre")[0].get<float>(), b.at("centre")[1].get<float>());
+                br.radius = b.value("radius", br.radius);
+                br.elongation = b.value("elongation", br.elongation);
+                br.yaw = b.value("yaw", br.yaw);
+                c.sea.breaks.push_back(br);
+            }
         }
     }
     if (j.contains("glows")) {
@@ -242,6 +271,20 @@ json Clouds::toJson() const {
     if (sea.enabled) {
         j["sea"] = {{"enabled", true}, {"base", sea.base}, {"top", sea.top}, {"coverage", sea.coverage},
                     {"coverageScale", sea.coverageScale}, {"density", sea.density}};
+        if (sea.relief > 0.0f) {
+            j["sea"]["relief"] = sea.relief;
+            j["sea"]["reliefScale"] = sea.reliefScale;
+            j["sea"]["billow"] = sea.billow;
+        }
+        if (sea.farFade > 0.0f) j["sea"]["farFade"] = sea.farFade;
+        if (!sea.breaks.empty()) {
+            json bs = json::array();
+            for (const CloudSea::Break& b : sea.breaks) {
+                bs.push_back({{"centre", json::array({b.centre.x, b.centre.y})}, {"radius", b.radius},
+                              {"elongation", b.elongation}, {"yaw", b.yaw}});
+            }
+            j["sea"]["breaks"] = std::move(bs);
+        }
     }
     if (!glows.empty()) {
         json gs = json::array();

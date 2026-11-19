@@ -4,6 +4,7 @@
 #include "params/parameter_set.hpp"
 #include "scene/clouds.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
@@ -161,4 +162,37 @@ TEST_CASE("clouds v2: the registered knobs start at the block's values and reach
     CHECK(live.glows[0].color.y == 0.25f);
     CHECK(live.lightIntensity == 0.2f);
     CHECK(rest.swell == 0.1f);
+}
+
+// ADR-2101: the relief sea's keys read, validate and round-trip; the default sea is the ADR-2100 band.
+TEST_CASE("the relief sea and its breaks read, validate and round-trip", "[clouds][adr2101]") {
+    const nlohmann::json j = {{"sea", {{"base", -150.0}, {"top", -38.0}, {"relief", 70.0}, {"reliefScale", 2000.0},
+                                       {"billow", 26.0}, {"farFade", 0.35},
+                                       {"breaks", {{{"centre", {1640.0, -60.0}}, {"radius", 270.0},
+                                                    {"elongation", 2.0}, {"yaw", -0.05}}}}}}};
+    auto c = scene::Clouds::fromJson(j, fs::temp_directory_path());
+    REQUIRE(c);
+    CHECK(c->sea.relief == 70.0f);
+    CHECK(c->sea.billow == 26.0f);
+    REQUIRE(c->sea.breaks.size() == 1);
+    CHECK(c->sea.breaks[0].centre.x == 1640.0f);
+    CHECK(c->sea.breaks[0].elongation == 2.0f);
+    auto again = scene::Clouds::fromJson(c->toJson(), fs::temp_directory_path());
+    REQUIRE(again);
+    CHECK(again->sea.relief == 70.0f);
+    CHECK(again->sea.farFade == Catch::Approx(0.35f));
+    REQUIRE(again->sea.breaks.size() == 1);
+    CHECK(again->sea.breaks[0].yaw == Catch::Approx(-0.05f));
+
+    auto band = scene::Clouds::fromJson({{"sea", {{"base", -100.0}, {"top", 0.0}}}}, fs::temp_directory_path());
+    REQUIRE(band);
+    CHECK(band->sea.relief == 0.0f);
+    CHECK_FALSE(band->toJson().at("sea").contains("relief"));
+
+    nlohmann::json three = j;
+    for (int i = 0; i < 2; ++i) three["sea"]["breaks"].push_back(three["sea"]["breaks"][0]);
+    CHECK_FALSE(scene::Clouds::fromJson(three, fs::temp_directory_path()));
+    nlohmann::json negative = j;
+    negative["sea"]["relief"] = -1.0;
+    CHECK_FALSE(scene::Clouds::fromJson(negative, fs::temp_directory_path()));
 }

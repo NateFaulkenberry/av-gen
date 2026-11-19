@@ -35,10 +35,15 @@ struct CloudLobeBins {
     float cellSize = 1.0f;   // metres
     std::uint32_t nx = 0;
     std::uint32_t nz = 0;
-    std::vector<std::uint32_t> words; // nx*nz (offset, count) pairs, then the lobe indices
+    // nx*nz (offset, packed) pairs, then the lobe indices. ADR-2101: packed = count (bits 0..7) | the column's lowest
+    // lobe bottom (bits 8..19) | its highest lobe top (bits 20..31), both quantised over [yLo, yHi] (kBinCountMask etc.)
+    std::vector<std::uint32_t> words;
+    float yLo = 0.0f;                 // the lobes' vertical extent, as the renderer's box has it
+    float yHi = 0.0f;
     std::uint32_t truncated = 0;      // cells that held more lobes than the renderer reads (the extra are dropped)
 };
 inline constexpr std::uint32_t kMaxLobesPerCell = 64;
+inline constexpr std::uint32_t kBinCountMask = 0xFFu;
 [[nodiscard]] CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes);
 
 // ADR-2100: the tiling shape-noise volume, kCloudNoiseSize^3 RGBA8 (R Perlin-Worley, G Worley fbm at 4/8/16 cells,

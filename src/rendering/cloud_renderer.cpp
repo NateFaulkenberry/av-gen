@@ -33,6 +33,10 @@ struct CloudUniformGpu {
     glm::vec4 march2;        // x = min step (m), y = step growth, z = max distance (m), w = detail scale
     glm::vec4 sea;           // x = base, y = top (swell applied), z = coverage, w = coverage scale
     glm::vec4 sea2;          // x = sea density, y = 1 when the sea is on, z = detail amount, w = swell
+    glm::vec4 sea3;          // ADR-2101: x = relief (m), y = 1 / reliefScale, z = billow (m), w = the mean top
+    glm::vec4 sea4;          // break 0: centre x, z, radius, elongation
+    glm::vec4 sea5;          // break 1
+    glm::vec4 sea6;          // x = yaw 0, y = yaw 1, z = break count, w = far fade start (m; 0 = none)
     glm::vec4 boxMin;        // xyz = the lobes' bounds, w = lobe count
     glm::vec4 boxMax;        // xyz, w = glow count
     glm::vec4 grid;          // x, y = origin (xz), z = cell size, w = cells along x
@@ -42,7 +46,7 @@ struct CloudUniformGpu {
     glm::mat4 prevViewProj;  // the view-projection the history was drawn with
     std::array<glm::vec4, 2 * scene::kMaxCloudGlows> glows; // per glow: (position, radius), (colour * intensity, 0)
 };
-static_assert(sizeof(CloudUniformGpu) == (17 + 4 + 2 * scene::kMaxCloudGlows) * 16);
+static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows) * 16);
 
 struct LobeGpu {
     glm::vec4 centreRadius;
@@ -203,6 +207,12 @@ CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes) {
         return bins;
     }
     glm::vec2 lo(1e30f), hi(-1e30f);
+    bins.yLo = 1e30f;
+    bins.yHi = -1e30f;
+    for (const scene::CloudLobe& l : lobes) {
+        bins.yLo = std::min(bins.yLo, l.centre.y - l.radius * l.scale.y);
+        bins.yHi = std::max(bins.yHi, l.centre.y + l.radius * l.scale.y);
+    }
     std::vector<float> extents;
     extents.reserve(lobes.size());
     for (const scene::CloudLobe& l : lobes) {
@@ -241,7 +251,19 @@ CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes) {
             ++bins.truncated;
         }
         bins.words[2 * k] = static_cast<std::uint32_t>(bins.words.size());
-        bins.words[2 * k + 1] = static_cast<std::uint32_t>(list.size());
+        // ADR-2101: the column's vertical extent, so the march can skip the air above and below its lobes
+        float y0 = 1e30f, y1 = -1e30f;
+        for (const std::uint32_t i : list) {
+            y0 = std::min(y0, lobes[i].centre.y - lobes[i].radius * lobes[i].scale.y);
+            y1 = std::max(y1, lobes[i].centre.y + lobes[i].radius * lobes[i].scale.y);
+        }
+        const float span = std::max(bins.yHi - bins.yLo, 1.0f);
+        const auto q = [&](float y, bool up) {
+            const float u = std::clamp((y - bins.yLo) / span, 0.0f, 1.0f) * 4095.0f;
+            return static_cast<std::uint32_t>(std::clamp(up ? std::ceil(u) : std::floor(u), 0.0f, 4095.0f));
+        };
+        const std::uint32_t packed = list.empty() ? 0u : (q(y0, false) << 8) | (q(y1, true) << 20);
+        bins.words[2 * k + 1] = static_cast<std::uint32_t>(list.size()) | packed;
         bins.words.insert(bins.words.end(), list.begin(), list.end());
     }
     return bins;
@@ -499,6 +521,18 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.sea = glm::vec4(c.sea.base, seaTop, std::clamp(c.sea.coverage + 0.15f * c.swell, 0.0f, 1.0f),
                       c.sea.coverageScale);
     u.sea2 = glm::vec4(c.sea.density, c.sea.enabled ? 1.0f : 0.0f, c.detailAmount, c.swell);
+    if (c.sea.relief > 0.0f) { // ADR-2101: the band becomes [base, the highest the surface can reach]
+        const float meanTop = seaTop;
+        u.sea.y = meanTop + c.sea.relief * 1.15f + c.sea.billow;
+        u.sea3 = glm::vec4(c.sea.relief, 1.0f / c.sea.reliefScale, c.sea.billow, meanTop);
+    }
+    for (std::size_t b = 0; b < std::min<std::size_t>(c.sea.breaks.size(), 2); ++b) {
+        const scene::CloudSea::Break& br = c.sea.breaks[b];
+        (b == 0 ? u.sea4 : u.sea5) = glm::vec4(br.centre, br.radius, br.elongation);
+        (b == 0 ? u.sea6.x : u.sea6.y) = br.yaw;
+    }
+    u.sea6.z = static_cast<float>(std::min<std::size_t>(c.sea.breaks.size(), 2));
+    u.sea6.w = c.sea.farFade > 0.0f ? c.maxDistance * (1.0f - c.sea.farFade) : 0.0f;
     u.boxMin = glm::vec4(boxMin_, static_cast<float>(lobeCount_));
     const std::size_t glowCount = std::min(c.glows.size(), scene::kMaxCloudGlows);
     u.boxMax = glm::vec4(boxMax_, static_cast<float>(glowCount));

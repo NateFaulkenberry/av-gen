@@ -8145,6 +8145,21 @@ void Composition::rebuild() {
                             resolved.anisotropy = authored.anisotropy;
                         }
                     }
+                    // ADR-2101: the scene's per-part override, by the glTF material's name
+                    for (const auto& [name, override] : node.proceduralRest.partMaterials) {
+                        if (name != part.name) {
+                            continue;
+                        }
+                        if (!override.program.empty()) {
+                            resolved.program = override.program;
+                        }
+                        if (override.emissiveColor) {
+                            resolved.emissiveColor = *override.emissiveColor;
+                        }
+                        if (override.emissiveIntensity) {
+                            resolved.emissiveIntensity = *override.emissiveIntensity;
+                        }
+                    }
                     return resolved;
                 };
                 mutableNode.materialPartNames.clear();

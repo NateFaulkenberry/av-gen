@@ -701,6 +701,16 @@ struct ProceduralGeometry {
     // moved into a scene file, which is exactly the kind of thing that stays hidden until something
     // crosses the boundary.
     std::string baseColorTexturePath;               // attribute projected into InstanceRecord::emissive.a
+    // ADR-2101: per-part material overrides of a multi-material mesh source, keyed by the glTF material's NAME (not
+    // the area-ordered part index). A part named here takes this program (instead of the node's) and, when set, this
+    // emissive colour and strength; parts not named keep the node's program and their own factors. Lets a window
+    // program run on a building's pane materials only, and a sign's neon face take its own colour per node.
+    struct PartMaterial {
+        std::string program;                    // empty = the node's program
+        std::optional<glm::vec3> emissiveColor; // multiplies the part's emissive texture, as the glTF factor does
+        std::optional<float> emissiveIntensity;
+    };
+    std::vector<std::pair<std::string, PartMaterial>> partMaterials;
     HierarchySpec hierarchy;             // self-recursion (structural)
     LodSettings lod;                     // GPU culling / LOD (only lodCount is structural)
     // Whether this object is drawn into the shadow maps. Ground cover is the case this exists for:

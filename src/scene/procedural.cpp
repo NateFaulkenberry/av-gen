@@ -3475,6 +3475,23 @@ json ProceduralGeometry::toJson() const {
         }
         j["lod"] = std::move(s2);
     }
+    if (!partMaterials.empty()) { // ADR-2101: written only when authored
+        json pm = json::object();
+        for (const auto& [name, part] : partMaterials) {
+            json e = json::object();
+            if (!part.program.empty()) {
+                e["program"] = part.program;
+            }
+            if (part.emissiveColor) {
+                e["emissiveColor"] = json::array({part.emissiveColor->x, part.emissiveColor->y, part.emissiveColor->z});
+            }
+            if (part.emissiveIntensity) {
+                e["emissiveIntensity"] = *part.emissiveIntensity;
+            }
+            pm[name] = std::move(e);
+        }
+        j["partMaterials"] = std::move(pm);
+    }
     if (motion.windSensitivity > 0.0f) { // ADR-1292: written only when the object answers the wind
         j["motion"] = wind::motionToJson(motion);
     }
@@ -3956,6 +3973,45 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
         AVGEN_PROC_READ(l.impostorSize, "impostorSize", readFloat);
         AVGEN_PROC_READ(l.lockBorder, "lockBorder", readBool); // ADR-1546
         AVGEN_PROC_READ(l.thinning, "thinning", readBool);     // ADR-1548
+    }
+    if (root.contains("partMaterials")) { // ADR-2101
+        const json& pm = root.at("partMaterials");
+        if (!pm.is_object()) {
+            return fail("'partMaterials' must be an object keyed by glTF material name");
+        }
+        for (auto it = pm.begin(); it != pm.end(); ++it) {
+            const json& e = it.value();
+            if (!e.is_object()) {
+                return fail("'partMaterials.{}' must be an object", it.key());
+            }
+            ProceduralGeometry::PartMaterial part;
+            if (e.contains("program")) {
+                if (!e.at("program").is_string()) {
+                    return fail("'partMaterials.{}.program' must be a string", it.key());
+                }
+                part.program = e.at("program").get<std::string>();
+            }
+            if (e.contains("emissiveColor")) {
+                const json& c = e.at("emissiveColor");
+                if (!c.is_array() || c.size() != 3 || !c[0].is_number() || !c[1].is_number() || !c[2].is_number()) {
+                    return fail("'partMaterials.{}.emissiveColor' must be [r, g, b]", it.key());
+                }
+                part.emissiveColor = glm::vec3(c[0].get<float>(), c[1].get<float>(), c[2].get<float>());
+            }
+            if (e.contains("emissiveIntensity")) {
+                if (!e.at("emissiveIntensity").is_number()) {
+                    return fail("'partMaterials.{}.emissiveIntensity' must be a number", it.key());
+                }
+                part.emissiveIntensity = e.at("emissiveIntensity").get<float>();
+            }
+            for (const auto& key : e.items()) {
+                if (key.key() != "program" && key.key() != "emissiveColor" && key.key() != "emissiveIntensity") {
+                    return fail("'partMaterials.{}': unknown key '{}' (program, emissiveColor, emissiveIntensity)",
+                                it.key(), key.key());
+                }
+            }
+            g.partMaterials.emplace_back(it.key(), std::move(part));
+        }
     }
     if (root.contains("material")) {
         const json& j = root.at("material");
