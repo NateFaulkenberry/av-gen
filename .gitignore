@@ -201,3 +201,4 @@ __pycache__/
 # Musical Geography: look-development scenes and projects (examples/musical-geography/build.py writes them)
 /examples/musical-geography/scene/
 /examples/musical-geography/__pycache__/
+/examples/neon-dreams/scene/
