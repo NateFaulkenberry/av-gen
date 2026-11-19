@@ -1,0 +1,638 @@
+{
+ "size": 2048,
+ "channels": "R tube mask, G near glow, B wide glow",
+ "cells": [
+  {
+   "id": "blade_0",
+   "brand": "Lumen & Daughters",
+   "trade": "lamp makers",
+   "kind": "blade",
+   "px": [
+    16,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.0078125,
+    0.4609375,
+    0.1171875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_1",
+   "brand": "Ninefold Tea",
+   "trade": "tea house",
+   "kind": "blade",
+   "px": [
+    272,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.1328125,
+    0.4609375,
+    0.2421875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_2",
+   "brand": "Kite Line",
+   "trade": "cable ferry",
+   "kind": "blade",
+   "px": [
+    528,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.2578125,
+    0.4609375,
+    0.3671875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_3",
+   "brand": "Slow Tide Baths",
+   "trade": "bath house",
+   "kind": "blade",
+   "px": [
+    784,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.3828125,
+    0.4609375,
+    0.4921875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_4",
+   "brand": "Oru Noodle",
+   "trade": "noodle counter",
+   "kind": "blade",
+   "px": [
+    1040,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.5078125,
+    0.4609375,
+    0.6171875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_5",
+   "brand": "Vesper Hotel",
+   "trade": "hotel",
+   "kind": "blade",
+   "px": [
+    1296,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.6328125,
+    0.4609375,
+    0.7421875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_6",
+   "brand": "Halcyon Remedies",
+   "trade": "pharmacy",
+   "kind": "blade",
+   "px": [
+    1552,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.7578125,
+    0.4609375,
+    0.8671875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "blade_7",
+   "brand": "Deepwell Radio",
+   "trade": "radio repair",
+   "kind": "blade",
+   "px": [
+    1808,
+    16,
+    224,
+    1088
+   ],
+   "aspect": 0.20588235294117646,
+   "uv": [
+    0.8828125,
+    0.4609375,
+    0.9921875,
+    0.9921875
+   ]
+  },
+  {
+   "id": "fascia_0",
+   "brand": "Oru Noodle",
+   "trade": "noodle counter",
+   "kind": "fascia",
+   "px": [
+    16,
+    1136,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.0078125,
+    0.3828125,
+    0.2421875,
+    0.4453125
+   ]
+  },
+  {
+   "id": "fascia_1",
+   "brand": "Vesper Hotel",
+   "trade": "hotel",
+   "kind": "fascia",
+   "px": [
+    528,
+    1136,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.2578125,
+    0.3828125,
+    0.4921875,
+    0.4453125
+   ]
+  },
+  {
+   "id": "fascia_2",
+   "brand": "Halcyon Remedies",
+   "trade": "pharmacy",
+   "kind": "fascia",
+   "px": [
+    1040,
+    1136,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.5078125,
+    0.3828125,
+    0.7421875,
+    0.4453125
+   ]
+  },
+  {
+   "id": "fascia_3",
+   "brand": "Deepwell Radio",
+   "trade": "radio repair",
+   "kind": "fascia",
+   "px": [
+    1552,
+    1136,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.7578125,
+    0.3828125,
+    0.9921875,
+    0.4453125
+   ]
+  },
+  {
+   "id": "fascia_4",
+   "brand": "Paper Kite Books",
+   "trade": "bookshop",
+   "kind": "fascia",
+   "px": [
+    16,
+    1296,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.0078125,
+    0.3046875,
+    0.2421875,
+    0.3671875
+   ]
+  },
+  {
+   "id": "fascia_5",
+   "brand": "Pilot Light",
+   "trade": "bar",
+   "kind": "fascia",
+   "px": [
+    528,
+    1296,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.2578125,
+    0.3046875,
+    0.4921875,
+    0.3671875
+   ]
+  },
+  {
+   "id": "fascia_6",
+   "brand": "Mooring Seven",
+   "trade": "district mark",
+   "kind": "fascia",
+   "px": [
+    1040,
+    1296,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.5078125,
+    0.3046875,
+    0.7421875,
+    0.3671875
+   ]
+  },
+  {
+   "id": "fascia_7",
+   "brand": "Greywater Laundry",
+   "trade": "laundry",
+   "kind": "fascia",
+   "px": [
+    1552,
+    1296,
+    480,
+    128
+   ],
+   "aspect": 3.75,
+   "uv": [
+    0.7578125,
+    0.3046875,
+    0.9921875,
+    0.3671875
+   ]
+  },
+  {
+   "id": "roundel_0",
+   "brand": "lamp",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    16,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.0078125,
+    0.19140625,
+    0.09765625,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_1",
+   "brand": "nine",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    216,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.10546875,
+    0.19140625,
+    0.1953125,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_2",
+   "brand": "chev",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    416,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.203125,
+    0.19140625,
+    0.29296875,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_3",
+   "brand": "wave",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    616,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.30078125,
+    0.19140625,
+    0.390625,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_4",
+   "brand": "bowl",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    816,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.3984375,
+    0.19140625,
+    0.48828125,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_5",
+   "brand": "moon",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    1016,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.49609375,
+    0.19140625,
+    0.5859375,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_6",
+   "brand": "cross",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    1216,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.59375,
+    0.19140625,
+    0.68359375,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_7",
+   "brand": "arcs",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    1416,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.69140625,
+    0.19140625,
+    0.78125,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_8",
+   "brand": "kite",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    1616,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.7890625,
+    0.19140625,
+    0.87890625,
+    0.28125
+   ]
+  },
+  {
+   "id": "roundel_9",
+   "brand": "cup",
+   "trade": "pictogram",
+   "kind": "roundel",
+   "px": [
+    1816,
+    1472,
+    184,
+    184
+   ],
+   "aspect": 1.0,
+   "uv": [
+    0.88671875,
+    0.19140625,
+    0.9765625,
+    0.28125
+   ]
+  },
+  {
+   "id": "roof_0",
+   "brand": "Vesper Hotel",
+   "trade": "rooftop letters",
+   "kind": "roof",
+   "px": [
+    16,
+    1680,
+    960,
+    160
+   ],
+   "aspect": 6.0,
+   "uv": [
+    0.0078125,
+    0.1015625,
+    0.4765625,
+    0.1796875
+   ]
+  },
+  {
+   "id": "roof_1",
+   "brand": "Kite Line",
+   "trade": "rooftop letters",
+   "kind": "roof",
+   "px": [
+    1024,
+    1680,
+    960,
+    160
+   ],
+   "aspect": 6.0,
+   "uv": [
+    0.5,
+    0.1015625,
+    0.96875,
+    0.1796875
+   ]
+  },
+  {
+   "id": "roof_2",
+   "brand": "Lumen & Daughters",
+   "trade": "rooftop letters",
+   "kind": "roof",
+   "px": [
+    16,
+    1856,
+    960,
+    160
+   ],
+   "aspect": 6.0,
+   "uv": [
+    0.0078125,
+    0.015625,
+    0.4765625,
+    0.09375
+   ]
+  },
+  {
+   "id": "roof_3",
+   "brand": "Mooring Seven",
+   "trade": "rooftop letters",
+   "kind": "roof",
+   "px": [
+    1024,
+    1856,
+    960,
+    160
+   ],
+   "aspect": 6.0,
+   "uv": [
+    0.5,
+    0.015625,
+    0.96875,
+    0.09375
+   ]
+  }
+ ],
+ "brands": [
+  {
+   "name": "Lumen & Daughters",
+   "trade": "lamp makers",
+   "pictogram": "lamp"
+  },
+  {
+   "name": "Ninefold Tea",
+   "trade": "tea house",
+   "pictogram": "nine"
+  },
+  {
+   "name": "Kite Line",
+   "trade": "cable ferry",
+   "pictogram": "chev"
+  },
+  {
+   "name": "Slow Tide Baths",
+   "trade": "bath house",
+   "pictogram": "wave"
+  },
+  {
+   "name": "Oru Noodle",
+   "trade": "noodle counter",
+   "pictogram": "bowl"
+  },
+  {
+   "name": "Vesper Hotel",
+   "trade": "hotel",
+   "pictogram": "moon"
+  },
+  {
+   "name": "Halcyon Remedies",
+   "trade": "pharmacy",
+   "pictogram": "cross"
+  },
+  {
+   "name": "Deepwell Radio",
+   "trade": "radio repair",
+   "pictogram": "arcs"
+  },
+  {
+   "name": "Paper Kite Books",
+   "trade": "bookshop",
+   "pictogram": "kite"
+  },
+  {
+   "name": "Pilot Light",
+   "trade": "bar",
+   "pictogram": "cup"
+  },
+  {
+   "name": "Mooring Seven",
+   "trade": "district mark",
+   "pictogram": "nine"
+  },
+  {
+   "name": "Greywater Laundry",
+   "trade": "laundry",
+   "pictogram": "wave"
+  }
+ ]
+}

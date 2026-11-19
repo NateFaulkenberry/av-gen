@@ -1,0 +1,86 @@
+{
+ "units": "metres, Y-up in the GLB, origin at base centre at deck level",
+ "materials": {
+  "facade": "dark wall",
+  "trim": "slabs, frames",
+  "metal": "pipes, rails, stilts",
+  "glass": "unlit panes; uv = (level, window hash)",
+  "win_warm": "lit panes and shop bays, emissive texture win_levels.png, strength 8",
+  "win_cool": "lit panes, strength 8",
+  "strip": "eave lines, strength 12",
+  "beacon": "mast light, strength 40",
+  "landmark": "Great Lantern bell, strength 6"
+ },
+ "grid": {
+  "floor_m": 3.2,
+  "bay_m": 2.4
+ },
+ "assets": [
+  {
+   "asset": "buildings/mooring_shophouse_a.glb",
+   "tris": 4674,
+   "floors": 6,
+   "footprint_m": [
+    8.4,
+    10.8
+   ],
+   "height_m": 28.6
+  },
+  {
+   "asset": "buildings/mooring_shophouse_b.glb",
+   "tris": 7038,
+   "floors": 8,
+   "footprint_m": [
+    9.6,
+    10.8
+   ],
+   "height_m": 35.0
+  },
+  {
+   "asset": "buildings/mooring_shophouse_c.glb",
+   "tris": 3494,
+   "floors": 4,
+   "footprint_m": [
+    7.2,
+    8.4
+   ],
+   "height_m": 22.2
+  },
+  {
+   "asset": "buildings/mooring_stack_a.glb",
+   "tris": 11094,
+   "floors": 13,
+   "footprint_m": [
+    9.6,
+    9.6
+   ],
+   "height_m": 51.0
+  },
+  {
+   "asset": "buildings/mooring_stack_b.glb",
+   "tris": 11842,
+   "floors": 17,
+   "footprint_m": [
+    8.4,
+    9.6
+   ],
+   "height_m": 63.8
+  },
+  {
+   "asset": "landmarks/great_lantern_frame.glb",
+   "tris": 6092,
+   "height_m": 110.2,
+   "diameter_m": 38
+  },
+  {
+   "asset": "landmarks/great_lantern_bell.glb",
+   "tris": 2276,
+   "height_m": 55.1,
+   "rest_offset_y_m": 16.0,
+   "ride_m": [
+    14.5,
+    34.0
+   ]
+  }
+ ]
+}
