@@ -40,7 +40,9 @@ namespace avgen::rendering {
 
 namespace {
 
-constexpr std::uint32_t kMaxProceduralObjects = 256; // 256-byte slots in one uniform buffer
+// ADR-2101: 1024 (was 256). A kit-built town is many multi-material assets, and every material part is an object:
+// Neon Dreams' Mooring flattens to about 600. Each slot is one 256-byte dynamic offset, so the buffers grow, not a binding.
+constexpr std::uint32_t kMaxProceduralObjects = 1024;
 // ADR-287: the shadow caster list's indirect-args and stats slots live in the same two buffers as
 // the camera list's, offset by this. One buffer rather than two, because ADR-051 measured the cost
 // per distinct indirect buffer a pass reads and this frame reads one in five passes; the slot is an

@@ -41,12 +41,19 @@ rim. Two defects hid behind that look:
    their own factors. Keyed by name, not by the area-ordered part index, so an asset re-export does not silently move
    an override onto a different part.
 
+4. **`kMaxProceduralObjects` 256 -> 1024.** Every material part of a multi-material asset is a procedural object; the
+   art agent's layout of the Mooring (606 instances of 93 assets) flattens to 598 objects, and past 256 the renderer
+   skipped the rest with one warning (decks, the pier and the Great Lantern vanished). The slots are 256-byte dynamic
+   offsets into one buffer, so only the buffers grow. `[procedural]` render tests pass.
+
 ## Consequences
 
 - Neon Dreams' sea has crests and troughs to the horizon; the march reaches it in a handful of steps. The skip also
   makes the cloud pass cheaper wherever the lobes are sparse (measured in the Neon Dreams iteration-3 notes).
 - A window program can run on a kit's pane materials only (`glass`, `win_warm`, `win_cool`) and read the panes' own
   UVs, so the lit pattern always sits on a modelled pane; each sign node gives its `neon_a` part its own colour.
+- Found, not fixed: a procedural mesh with `alphaMode: blend` and a program opacity still draws opaque, so the
+  lighthouse beam cones are built (`build.py --beams`) but left out.
 - Not done: a per-instance colour for one asset (the points distribution has no colour column), so one sign colour is
   one node.
 - Found, not fixed: a node's `position` parameter clamps at +-10 km (`nodes/<n>/position`), so a far object (a moon at

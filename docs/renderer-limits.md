@@ -226,7 +226,7 @@ otherwise.
 |---|---|---|---|---|
 | `kMaxObjects` | **lifted (ADR-128)** | `scene_renderer.hpp` | Allocation policy; 64 MiB budget = 131,072 slots | Yes — clamp logs both numbers |
 | entity naming | 16,383 | `scene_types.hpp` (`kPickIndexBits`) | Encoding (identifier target) | No — `packPickId` saturates |
-| `kMaxProceduralObjects` | 256 | `procedural_renderer.cpp:32` | Architectural (same mechanism as above) | Yes — log warning, objects dropped |
+| `kMaxProceduralObjects` | 1024 (ADR-2101) | `procedural_renderer.cpp:32` | Architectural (same mechanism as above) | Yes — log warning, objects dropped |
 | `kMaxSceneLights` | 256 | `light_data.hpp:63` | Quality setting (fixed light buffer) | No |
 | `kMaxLightsPerCluster` | 32 | `light_data.hpp:62` | Quality setting (fixed froxel index width) | Overflow only, no log |
 | `kMaxShadowViews` | 8 | `shadow_math.hpp:17` | Quality setting via fixed uniform array | No |
