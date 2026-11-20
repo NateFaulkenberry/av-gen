@@ -403,7 +403,7 @@ def mesa(seed, x, y, top, radius, base=SEA_TOP - 40):
             continue                                                                        # a well under each stack: the throats' light comes up between the heads (engine: an amber glow in each)
         r = rr.uniform(20, 46) if e > 0.8 else rr.uniform(26, 44)
         if e < 0.85:
-            t = top - rr.uniform(3, 11)                                                     # under the yard
+            t = top - rr.uniform(0, 6)                                                      # under the yard (iteration 6: was 3 to 11 m under; the erosion takes 5 to 15 m more)
         elif e < 1.35:
             t = top + rr.uniform(-6, 26) * (0.5 + 0.5 * rr.random())                        # the rim: level with the deck or over it
         else:
@@ -932,12 +932,12 @@ def build():
     col += cumulus(42, cx - 190, cy + 140, SEA_TOP - 20, 262, 175, turrets=2, shelves=((0.45, 1.1),), detail=1, kids=(3, 5), rich=False) + cumulus(43, cx + 180, cy - 80, SEA_TOP - 20, 190, 130, turrets=2, shelves=((0.55, 0.9),), detail=1, kids=(3, 5), rich=False)
     # a tongue of the pedestal under the conveyor pier (iteration 6): the pier runs 260 m out from the platform toward the
     # Mooring and the mesa ends 170 m short of its tip, so from the reveal's lower path its stilts stood in the open as
-    # a fence. Heads under it, their tops 5 to 14 m under its deck, falling away toward the tip.
+    # a fence. Heads under it, their authored tops level with its deck to 7 m under it, a little lower toward the tip.
     rr_ = random.Random(44); c_, s_ = math.cos(CONDENSERY_YAW), math.sin(CONDENSERY_YAW)
     ax, ay = cx + (-112) * c_ - (-20) * s_, cy + (-112) * s_ + (-20) * c_; ux, uy = -0.95 * c_ + 0.3 * s_, -0.95 * s_ - 0.3 * c_
     for k in range(9):
         dd = 70 + 34 * k; off = rr_.uniform(-16, 16); r = rr_.uniform(34, 46) * (1.0 - 0.03 * k)
-        heads(rr_, col, ax + ux * dd - uy * off, ay + uy * dd + ux * off, cz + 4.0 + SEAT - 0.3 * (dd / 20.0) - rr_.uniform(5, 12) - 1.2 * k, r, soft=0.24, kids=(2, 4))
+        heads(rr_, col, ax + ux * dd - uy * off, ay + uy * dd + ux * off, cz + 4.0 + SEAT - 0.3 * (dd / 20.0) - rr_.uniform(2, 7) - 0.5 * k, r, soft=0.24, kids=(2, 4))
     for k in range(3):
         dd = 110 + 100 * k
         col.append(L(ax + ux * dd, ay + uy * dd, cz - 95 - 14 * k, 92 - 9 * k, 0.95, 1.0, 0.4))
