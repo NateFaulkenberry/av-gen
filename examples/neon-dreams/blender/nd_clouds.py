@@ -798,10 +798,13 @@ def highwater_island():
     for k in range(11):
         a = k / 11.0 * 6.283 + rr.uniform(-0.25, 0.25); d = rr.uniform(70, 230); r = rr.uniform(55, 82)
         east = math.cos(a) > 0.2
-        heads(rr, out, x + d * math.cos(a), y + d * math.sin(a), z + SEAT + (rr.uniform(8, 44) if east else rr.uniform(-16, 2)), r, soft=0.24, kids=(1, 2))
+        heads(rr, out, x + d * math.cos(a), y + d * math.sin(a), z + SEAT + (rr.uniform(8, 44) if east else rr.uniform(-6, 12)), r * 1.15, soft=0.24, kids=(1, 2))      # the west heads stand 1 to 17 m over the decks as authored: the erosion takes about 15 m off a head this size
     out += [l for l in cumulus(72, x + 270, y + 210, SEA_TOP - 40, z + 105, 250, turrets=2, shelves=((0.5, 1.0),), mist=False, detail=1, kids=(2, 3), rich=False) if l["r"] >= 50.0]       # low and broad: at z + 250 it was a thumb beside the town
     for (dx, dy, dz, r, sy_) in ((-250, 60, 8, 95, 0.34), (-215, -70, 14, 80, 0.4), (-285, -10, -8, 110, 0.32)):       # the veil across its near side
         out.append(L(x + dx, y + dy, z + dz, r, sy_, 0.8, 0.6, sz=1.5))
+    for l in out[1:]:
+        if abs(l["c"][1] + l["r"] * l["scale"][1] - z) < 30.0:
+            l["tag"] = "seat"
     return out
 
 
@@ -946,8 +949,21 @@ def build():
     # cloudlet of its own, 100 m deep, that touches neither the sea nor anything else, with a small cumulus beside the
     # house rising 105 m over its deck for the lamp to light (glow `lone_lamp`): what reads from the approach is a
     # small warm cloud with a house on it.
-    ll = rock(50, lx, ly, lz - 9.0 + SEAT, 44, base=lz - 110.0)
-    ll += [l for l in cumulus(51, lx + 38, ly - 32, lz - 70, lz + 105, 56, turrets=2, lean=0.1, shelves=(), skirt=False, mist=False, detail=1, kids=(3, 4), rich=False)]
+    # Under the engine's erosion (ADR-2106) the first cloudlet, a 44 m rock with small buttresses, was eaten to a few
+    # puffs and the house hung in the open air. It is now a core of 56 m whose authored top is 6 m over the deck, four
+    # shoulders of 34 to 42 m and a cumulus of 70 m: lobes big enough to keep a body in the erosion's bays. All of it
+    # is tagged "seat".
+    rl = random.Random(50)
+    ll = [L(lx, ly, lz - 44.0, 56.0, 0.9, 1.0, 0.3)]
+    for k in range(4):
+        a_ = k * 1.5708 + rl.uniform(-0.4, 0.4); d_ = rl.uniform(28, 40); r_ = rl.uniform(34, 42)
+        ll.append(L(lx + d_ * math.cos(a_), ly + d_ * math.sin(a_), lz + rl.uniform(-6, 2) - r_ * 0.8, r_, 0.8, 1.0, 0.3))
+    ll += [l for l in cumulus(51, lx + 44, ly - 36, lz - 80, lz + 110, 70, turrets=2, lean=0.1, shelves=(), skirt=False, mist=False, detail=1, kids=(2, 3), rich=False) if l["r"] >= 20.0]
+    for k in range(4):                                             # mist under it: it touches nothing
+        a_ = rl.uniform(0, 6.283); d_ = rl.uniform(30, 70)
+        ll.append(L(lx + d_ * math.cos(a_), ly + d_ * math.sin(a_), lz - rl.uniform(70, 100), rl.uniform(30, 40), 0.4, 0.5, 0.6, sx=1.4))
+    for l in ll:
+        l["tag"] = "seat"
     masses["lone_lamp"] = ll
     masses["reveal_fore"] = reveal_fore()
     # the mid field (iteration 6): it was six cumulus of one recipe (tops 140 to 270, radii 125 to 190). Now a long low
