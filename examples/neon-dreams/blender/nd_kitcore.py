@@ -28,12 +28,12 @@ OUT = arg("--out", os.path.join(HERE, "out"))
 os.makedirs(OUT, exist_ok=True)
 FLOOR, BAY = 3.2, 2.4
 Z = Vector((0, 0, 1))
-PANE_MATS = ("glass", "win_warm", "win_cool", "beam_lamp")
+PANE_MATS = ("glass", "win_warm", "win_cool", "win_stair", "beam_lamp")
 MATS = {}
 # Emissive strengths written into the GLBs (KHR_materials_emissive_strength). Scene-linear with white colour and the
 # brightest level; the scene multiplies by a palette colour. Large surfaces stay low so they keep their hue under the
 # tone curve (the bell was near-white at 6); only points a few pixels across go high.
-STRENGTH = dict(win_warm=3.0, win_cool=3.0, strip=10.0, beacon=40.0, landmark=1.6, garden=18.0, lantern=14.0, keel=12.0,
+STRENGTH = dict(win_warm=3.0, win_cool=3.0, win_stair=3.5, strip=10.0, beacon=40.0, landmark=1.6, garden=18.0, lantern=14.0, keel=12.0,
                 cond_glow=5.0, cond_lamp=22.0, cond_work=22.0, neon_a=20.0, beam_lamp=30.0, beam=1.0)
 
 
@@ -83,6 +83,7 @@ def mats():
     # emissive roles: white colour, grey level texture; the scene supplies colour and gain per role and per instance
     pbr("win_warm", (0.01, 0.008, 0.006), 0.3, emit=W, tex=lv)
     pbr("win_cool", (0.006, 0.007, 0.012), 0.3, emit=W, tex=lv)
+    pbr("win_stair", (0.006, 0.007, 0.012), 0.3, emit=W, tex=lv)  # stairwell slots: ALWAYS lit (the town's light at distance); no lit/dark program
     pbr("strip", (0.01, 0.01, 0.01), 0.4, emit=W)
     pbr("beacon", (0.01, 0.0, 0.0), 0.4, emit=W)
     pbr("landmark", (0.02, 0.012, 0.018), 0.5, emit=W, tex=lv)
@@ -292,8 +293,14 @@ def pipe(A, O, T, Nn, u, v0, v1, rad=0.055):
         k += FLOOR
 
 
+def stair_slot(A, O, T, Nn, u, v, fl, wid):
+    """A stairwell's slot window: tall, narrow, always lit. A column of them is a building's light at a distance."""
+    pane_opening(A, O, T, Nn, (u + 0.85, u + 1.55, v + 0.5, v + 2.75), (u, u + BAY, v, v + FLOOR), 0.14, "win_stair", 0.72 if fl % 3 else 0.92, wid,
+                 sill=False, mullions=0, transom=v + 1.6, kind="stair")
+
+
 def block(A, r, r2, cx, cy, z0, w, d, floors, lit_p, warm_p, wbase, balcony_side=None, shop=False, blank_p=0.1, pipes=True,
-          sides_on=(0, 1, 2, 3), special=None):
+          sides_on=(0, 1, 2, 3), special=None, stair=None):
     """One stacked block: four facades of window cells. special(si, fl, b, O, T, Nn, u, v) -> True if it built the cell."""
     sides = [(Vector((cx - w / 2, cy - d / 2, 0)), Vector((1, 0, 0)), w), (Vector((cx + w / 2, cy - d / 2, 0)), Vector((0, 1, 0)), d),
              (Vector((cx + w / 2, cy + d / 2, 0)), Vector((-1, 0, 0)), w), (Vector((cx - w / 2, cy + d / 2, 0)), Vector((0, -1, 0)), d)]
@@ -314,12 +321,19 @@ def block(A, r, r2, cx, cy, z0, w, d, floors, lit_p, warm_p, wbase, balcony_side
                 u = mg + b * BAY
                 if special and special(si, fl, b, O, T, Nn, u, v):
                     continue
+                is_stair = stair is not None and si == stair and b == nb // 2 and bal_col != b
+                wid = (wbase * 0.137 + si * 0.251 + fl * 0.0613 + b * 0.0171) % 1.0
                 if shop and si == 0 and fl == 0:
                     shop_bay(A, r, O, T, Nn, u, v, door=(b == nb // 2))
                 elif r.random() < blank_p or (si in (1, 3) and r.random() < 0.25):
-                    wq(A, "facade", O, T, Nn, u, u + BAY, v, v + FLOOR)
+                    if is_stair:
+                        stair_slot(A, O, T, Nn, u, v, fl, wid)
+                    else:
+                        wq(A, "facade", O, T, Nn, u, u + BAY, v, v + FLOOR)
+                elif is_stair:                                    # draw the cell's random numbers on a scratch asset, so every other cell stays as approved
+                    window_cell(Asset("_scratch"), r, r2, O, T, Nn, u, v, lit_p, warm_p, wid, balcony=False)
+                    stair_slot(A, O, T, Nn, u, v, fl, wid)
                 else:
-                    wid = (wbase * 0.137 + si * 0.251 + fl * 0.0613 + b * 0.0171) % 1.0
                     window_cell(A, r, r2, O, T, Nn, u, v, lit_p, warm_p, wid, balcony=(b == bal_col and fl > 0))
         if pipes and nb >= 2 and not (shop and si == 0):
             # pipes live on cell boundaries only; a conduit runs in the band above the window heads (v + 2.3 .. 3.2)

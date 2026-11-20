@@ -25,50 +25,82 @@ def _ring_quads(mb, r0, z0, r1, z1, n, level=None, hsh=0.5, inward=False):
         mb._add(p, [(0, 1, 2, 3)], None, uv)
 
 
-def cond_stack(name, H, R, seed):
-    """Hyperboloid stack with a glowing throat. Origin at the base centre on the platform."""
-    r = random.Random(seed); A = Asset(name); n = 24
-    rw, zw = 0.6 * R, 0.66 * H; c = zw / math.sqrt((R / rw) ** 2 - 1)
-    rad = lambda z: rw * math.sqrt(1 + ((z - zw) / c) ** 2)
-    leg = 7.0
-    for i in range(n):                                                       # the open lattice base: diagonal columns
-        a0, a1 = i / n * 6.2832, (i + 1) / n * 6.2832
-        A.m("metal").beam((R * 1.02 * math.cos(a0), R * 1.02 * math.sin(a0), 0), (rad(leg) * math.cos(a1), rad(leg) * math.sin(a1), leg), 0.5)
-        A.m("metal").beam((R * 1.02 * math.cos(a1), R * 1.02 * math.sin(a1), 0), (rad(leg) * math.cos(a0), rad(leg) * math.sin(a0), leg), 0.5)
-    b0 = len(A.m("cond_glow").uv); A.m("cond_glow").cyl((0, 0, 0.3), R * 0.7, 0.2, n=n); _set_uv(A.m("cond_glow"), b0, 0.3, 0.1)      # the basin glows through the legs
-    segs = 14; zs = [leg + (H - 2.6 - leg) * k / segs for k in range(segs + 1)]
-    for k in range(segs):
-        _ring_quads(A.m("facade"), rad(zs[k]), zs[k], rad(zs[k + 1]), zs[k + 1], n)
-    A.m("trim").cyl((0, 0, leg - 0.4), rad(leg) + 0.5, 0.8, n=n, cap=False)
-    _ring_quads(A.m("cond_glow"), rad(H - 2.6), H - 2.6, rad(H), H, n, 0.55, 0.5)                    # the hot rim, seen from every side
-    _ring_quads(A.m("cond_glow"), rad(H) - 0.6, H, rad(H - 9) - 1.2, H - 9, n, 0.8, 0.6, inward=True)   # the throat's inner wall
-    b0 = len(A.m("cond_glow").uv); A.m("cond_glow").cyl((0, 0, H - 9.2), rad(H - 9) - 1.2, 0.2, n=n); _set_uv(A.m("cond_glow"), b0, 1.0, 0.7)
-    _ring_quads(A.m("trim"), rad(H), H, rad(H) - 0.6, H, n)
-    for zf in (0.44, 0.8):                                                   # ring walkways with rails
-        z = H * zf; rr_ = rad(z)
-        _ring_quads(A.m("trim"), rr_, z, rr_ + 2.0, z, n); _ring_quads(A.m("trim"), rr_ + 2.0, z - 0.3, rr_, z - 0.3, n); _ring_quads(A.m("trim"), rr_ + 2.0, z - 0.3, rr_ + 2.0, z, n)
-        for i in range(n):
-            a0, a1 = i / n * 6.2832, (i + 1) / n * 6.2832
-            A.m("metal").beam(((rr_ + 1.95) * math.cos(a0), (rr_ + 1.95) * math.sin(a0), z + 1.1), ((rr_ + 1.95) * math.cos(a1), (rr_ + 1.95) * math.sin(a1), z + 1.1), 0.08)
-            if i % 4 == 0:
-                lamp(A.m("cond_lamp"), ((rr_ + 1.9) * math.cos(a0), (rr_ + 1.9) * math.sin(a0), z + 1.6), 0.28, 0.6 + 0.4 * r.random(), r.random(), n=6, m=4)
-    zb = H * 0.56                                                            # a band of glowing louvres at the waist
+def _gon(mb, cx, cy, r0, z0, r1, z1, n, level=None, hsh=0.5, inward=False, rot=0.0):
+    """One ring of flat faces of an n-sided drum (a polygon, not a smooth cylinder: it must read as built)."""
     for i in range(n):
-        if i % 3 == 2:
-            continue
-        a0, a1 = (i + 0.2) / n * 6.2832, (i + 0.8) / n * 6.2832; rr_ = rad(zb) + 0.06
-        p = [(rr_ * math.cos(a0), rr_ * math.sin(a0), zb), (rr_ * math.cos(a1), rr_ * math.sin(a1), zb), (rr_ * math.cos(a1), rr_ * math.sin(a1), zb + 3.4), (rr_ * math.cos(a0), rr_ * math.sin(a0), zb + 3.4)]
-        A.m("cond_glow")._add(p, [(0, 1, 2, 3)], None, [(lvl(0.3 + 0.35 * r.random()), r.random())] * 4)
-    for k in range(8):                                                       # rim lamps and aviation beacons
-        a = k / 8 * 6.2832
-        lamp(A.m("cond_lamp"), ((rad(H) + 0.4) * math.cos(a), (rad(H) + 0.4) * math.sin(a), H + 0.5), 0.4, 0.9, k / 8, n=6, m=4)
-    for k in range(4):
-        a = k / 4 * 6.2832 + 0.4
-        A.m("beacon").sphere(((rad(zw) + 0.3) * math.cos(a), (rad(zw) + 0.3) * math.sin(a), zw), 0.35, n=6, m=4)
-    a = 0.9                                                                  # the ladder cage, a straight line up the shell
-    for k in range(segs):
-        A.m("metal").beam(((rad(zs[k]) + 0.5) * math.cos(a), (rad(zs[k]) + 0.5) * math.sin(a), zs[k]), ((rad(zs[k + 1]) + 0.5) * math.cos(a), (rad(zs[k + 1]) + 0.5) * math.sin(a), zs[k + 1]), 0.5, t2=0.5)
-    A.meta = dict(height_m=H, base_radius_m=R, throat_radius_m=round(rad(H), 1), plume_origin_m=[0.0, H + 2.0, 0.0])
+        a0, a1 = rot + i / n * 6.2832, rot + (i + 1) / n * 6.2832
+        p = [(cx + r0 * math.cos(a0), cy + r0 * math.sin(a0), z0), (cx + r0 * math.cos(a1), cy + r0 * math.sin(a1), z0),
+             (cx + r1 * math.cos(a1), cy + r1 * math.sin(a1), z1), (cx + r1 * math.cos(a0), cy + r1 * math.sin(a0), z1)]
+        if inward:
+            p.reverse()
+        mb._add(p, [(0, 1, 2, 3)], None, None if level is None else [(lvl(level), hsh)] * 4)
+
+
+def cond_stack(name, H, R, seed):
+    """A condenser LANTERN, the Condensery's stack in the Lanternwright vernacular (the first version was a hyperboloid
+    and read as a nuclear cooling tower): an open braced base over a glowing basin; three stacked twelve-sided drums,
+    each a little narrower and shifted off the one below; a ring gallery with a rail and a lit eave line at every step;
+    a tall band of recessed glowing louvres round the top drum (the lantern); a flared throat whose inner wall glows.
+    Origin at the base centre on the platform."""
+    r = random.Random(seed); A = Asset(name); n = 12; leg = 10.0
+    for i in range(n):                                                       # the braced base
+        a0, a1 = i / n * 6.2832, (i + 1) / n * 6.2832
+        A.m("metal").beam((R * 1.04 * math.cos(a0), R * 1.04 * math.sin(a0), 0), (R * 0.92 * math.cos(a1), R * 0.92 * math.sin(a1), leg), 0.55)
+        A.m("metal").beam((R * 1.04 * math.cos(a1), R * 1.04 * math.sin(a1), 0), (R * 0.92 * math.cos(a0), R * 0.92 * math.sin(a0), leg), 0.55)
+        A.m("metal").cyl((R * 1.04 * math.cos(a0), R * 1.04 * math.sin(a0), 0), 0.5, leg, n=6, cap=False)
+    b0 = len(A.m("cond_glow").uv); A.m("cond_glow").cyl((0, 0, 0.3), R * 0.8, 0.2, n=n); _set_uv(A.m("cond_glow"), b0, 0.45, 0.1)      # the basin glows through the legs
+    hs = [0.36, 0.27, 0.2]; rs = [(0.92, 0.84), (0.72, 0.68), (0.58, 0.56)]; z = leg; cx = cy = 0.0; rot = 0.0; prev_r = R * 0.92
+    for k in range(3):
+        if k:
+            cx += r.uniform(-1.4, 1.4); cy += r.uniform(-1.4, 1.4); rot += 0.13
+        r0, r1 = R * rs[k][0], R * rs[k][1]; z1 = z + H * hs[k]
+        # the ring gallery this drum stands on: a slab out to 2.4 m beyond the drum below, a rail, an eave line under its edge
+        ro = prev_r + 2.4
+        _gon(A.m("trim"), cx, cy, r0 - 0.3, z, ro, z, n, rot=rot); _gon(A.m("trim"), cx, cy, ro, z - 0.5, r0 - 0.3, z - 0.5, n, rot=rot); _gon(A.m("trim"), cx, cy, ro, z - 0.5, ro, z, n, rot=rot)
+        _gon(A.m("cond_lamp"), cx, cy, ro - 0.5, z - 0.75, ro - 0.5, z - 0.5, n, 0.5, 0.2 + 0.2 * k, rot=rot)                 # the eave line
+        for i in range(n):
+            a0, a1 = rot + i / n * 6.2832, rot + (i + 1) / n * 6.2832
+            A.m("metal").beam((cx + (ro - 0.1) * math.cos(a0), cy + (ro - 0.1) * math.sin(a0), z + 1.1), (cx + (ro - 0.1) * math.cos(a1), cy + (ro - 0.1) * math.sin(a1), z + 1.1), 0.09)
+            A.m("metal").box((cx + (ro - 0.1) * math.cos(a0), cy + (ro - 0.1) * math.sin(a0), z + 0.55), (0.09, 0.09, 1.1))
+        if k < 2:
+            _gon(A.m("facade"), cx, cy, r0, z, r1, z1, n, rot=rot)
+            for i in range(n):                                                # ribs at the corners
+                a0 = rot + i / n * 6.2832
+                A.m("trim").beam((cx + r0 * 1.004 * math.cos(a0), cy + r0 * 1.004 * math.sin(a0), z), (cx + r1 * 1.004 * math.cos(a0), cy + r1 * 1.004 * math.sin(a0), z1), 0.5)
+            if k == 0:                                                        # a few small work lights and a red beacon ring on the big drum
+                for i in range(0, n, 3):
+                    a0 = rot + (i + 0.5) / n * 6.2832
+                    lamp(A.m("cond_work"), (cx + (r0 + 0.3) * math.cos(a0), cy + (r0 + 0.3) * math.sin(a0), z + H * hs[k] * 0.5), 0.4, 0.9, i / n, n=6, m=4)
+        else:                                                                 # the lantern: every face a tall recessed louvre of light
+            zl0, zl1 = z + 2.2, z1 - 2.0; dep = 0.6
+            for i in range(n):
+                a0, a1 = rot + i / n * 6.2832, rot + (i + 1) / n * 6.2832
+                P0 = Vector((cx + r0 * math.cos(a0), cy + r0 * math.sin(a0), 0)); P1 = Vector((cx + r0 * math.cos(a1), cy + r0 * math.sin(a1), 0))
+                T = (P1 - P0).normalized(); Nn = T.cross(Z); L_ = (P1 - P0).length; m_ = L_ * 0.16
+                fill_cell(A, P0, T, Nn, (0, L_, z, z1), [(m_, L_ - m_, zl0, zl1)])
+                for (p0, p1) in (((m_, zl0), (L_ - m_, zl0)), ((L_ - m_, zl0), (L_ - m_, zl1)), ((L_ - m_, zl1), (m_, zl1)), ((m_, zl1), (m_, zl0))):
+                    q = [P0 + T * p0[0] + Z * p0[1], P0 + T * p1[0] + Z * p1[1], P0 + T * p1[0] + Z * p1[1] - Nn * dep, P0 + T * p0[0] + Z * p0[1] - Nn * dep]
+                    A.m("trim").quad(*[tuple(x) for x in q], uv=(0, 0, 0.1, 0.1), double=False)
+                bands = 5
+                for j in range(bands):                                        # louvre slats: light between dark bars
+                    y0 = zl0 + (zl1 - zl0) * j / bands; y1 = zl0 + (zl1 - zl0) * (j + 0.78) / bands
+                    wq(A, "cond_glow", P0, T, Nn, m_, L_ - m_, y0, y1, n=-dep, uv=(lvl(0.62 + 0.38 * r.random()), (i * bands + j) / (n * bands), 0, 0))
+                    wq(A, "trim", P0, T, Nn, m_, L_ - m_, y1, zl0 + (zl1 - zl0) * (j + 1) / bands, n=-dep)
+        z = z1; prev_r = r1
+    r1 = R * rs[2][1]; zt = H                                                 # the throat: a flared crown, hot inside
+    _gon(A.m("facade"), cx, cy, r1, z, r1 * 1.28, zt, n, rot=rot)
+    _gon(A.m("cond_glow"), cx, cy, r1 * 1.28 - 0.5, zt, r1 - 0.6, z - 4.0, n, 0.85, 0.6, inward=True, rot=rot)
+    b0 = len(A.m("cond_glow").uv); A.m("cond_glow").cyl((cx, cy, z - 4.2), r1 - 0.6, 0.2, n=n); _set_uv(A.m("cond_glow"), b0, 1.0, 0.7)
+    _gon(A.m("cond_glow"), cx, cy, r1 * 1.28, zt - 1.6, r1 * 1.28 + 0.05, zt, n, 0.7, 0.5, rot=rot)                          # the hot rim, seen from every side
+    _gon(A.m("trim"), cx, cy, r1 * 1.28 + 0.05, zt, r1 * 1.28 - 0.5, zt, n, rot=rot)
+    for i in range(0, n, 2):                                                  # rim lamps, and red beacons on alternate corners
+        a0 = rot + i / n * 6.2832
+        lamp(A.m("cond_lamp"), (cx + (r1 * 1.28 + 0.4) * math.cos(a0), cy + (r1 * 1.28 + 0.4) * math.sin(a0), zt + 0.5), 0.42, 0.9, i / n, n=6, m=4)
+    for i in range(1, n, 4):
+        a0 = rot + i / n * 6.2832
+        A.m("beacon").sphere((cx + (R * 0.72 + 0.4) * math.cos(a0), cy + (R * 0.72 + 0.4) * math.sin(a0), leg + H * 0.36 + 3.0), 0.36, n=6, m=4)
+    A.meta = dict(height_m=H, base_radius_m=R, throat_radius_m=round(r1 * 1.28, 1), plume_origin_m=[round(cx, 2), H + 2.0, round(-cy, 2)],
+                  note="a stepped lantern tower: drums of 12 sides, ring galleries with eave lines (cond_lamp), a louvre band of light on the top drum and a glowing throat (cond_glow)")
     A.finish()
     return A
 
@@ -184,7 +216,8 @@ def cond_conveyor_span():
 
 
 def cond_platform():
-    """The Condensery's deck, 240 x 130 m, on eighteen legs that go 190 m down into its cloud column."""
+    """The Condensery's deck, 240 x 130 m, on eighteen braced legs that go 46 m down into the cloud mesa under it (they were
+    190 m long and stood bare over the sea when the pedestal was thinner than the deck)."""
     A = Asset("cond_platform"); r = random.Random(3)
     A.m("deck").box((0, 0, -0.6), (240, 130, 1.2)); A.m("trim").box((0, 0, -2.0), (236, 126, 1.6))
     for (sx, sy, lw, ld) in ((0, -65, 240, 0.8), (0, 65, 240, 0.8), (-120, 0, 0.8, 130), (120, 0, 0.8, 130)):
@@ -192,14 +225,13 @@ def cond_platform():
     xs = [-110 + i * 44 for i in range(6)]; ys = [-55, 0, 55]
     for x in xs:
         for y in ys:
-            A.m("metal").cyl((x, y, -190), 1.4, 187.5, n=8, cap=False)
+            A.m("metal").cyl((x, y, -46), 1.4, 43.5, n=8, cap=False)
     for y in ys:
         for x0, x1 in zip(xs[:-1], xs[1:]):
-            for zz in (-12.0, -60.0):
-                A.m("metal").beam((x0, y, zz), (x1, y, zz - 36), 0.5); A.m("metal").beam((x1, y, zz), (x0, y, zz - 36), 0.5)
-            A.m("metal").beam((x0, y, -50), (x1, y, -50), 0.7)
+            A.m("metal").beam((x0, y, -6.0), (x1, y, -30.0), 0.5); A.m("metal").beam((x1, y, -6.0), (x0, y, -30.0), 0.5)
+            A.m("metal").beam((x0, y, -32), (x1, y, -32), 0.7)
     for k in range(22):                                                      # keel lamps under the deck light the column red
-        lamp(A.m("keel"), (r.uniform(-105, 105), r.uniform(-55, 55), -r.uniform(8, 30)), 0.5, r.uniform(0.5, 1.0), r.random(), n=6, m=4)
+        lamp(A.m("keel"), (r.uniform(-105, 105), r.uniform(-55, 55), -r.uniform(5, 14)), 0.5, r.uniform(0.5, 1.0), r.random(), n=6, m=4)
     A.finish()
     return A
 
@@ -213,6 +245,6 @@ def cond_lamp_post():
 
 
 def condensery_kit():
-    return [cond_stack("cond_stack_a", 118.0, 25.0, 1), cond_stack("cond_stack_b", 146.0, 29.0, 2), cond_stack("cond_stack_c", 100.0, 23.0, 3),
+    return [cond_stack("cond_stack_a", 118.0, 24.0, 1), cond_stack("cond_stack_b", 146.0, 27.0, 2), cond_stack("cond_stack_c", 100.0, 22.0, 3),
             cond_sphere_tank(), cond_flare_mast(), cond_crane(), cond_shed("cond_shed_a", 71), cond_shed("cond_shed_b", 73, L=26.4, W=12.0, floors=4),
             cond_conveyor_span(), cond_platform(), cond_lamp_post()]

@@ -150,14 +150,14 @@ if signs:
                                       round(max(v.co.x for v in vs), 2), round(max(v.co.z for v in vs), 2), round(-min(v.co.y for v in vs), 2)], **A.meta})
 mat_doc = {"facade": "dark wall", "trim": "slabs, frames, sills", "metal": "pipes, rails, stilts", "deck": "walking surfaces", "glass": "unlit panes; uv = (level, window hash)",
            "cloth": "awnings, laundry (tint per instance)", "foliage": "dark leaves", "pool": "garden pool",
-           "win_warm": "lit panes and shop bays; uv = (level, window hash)", "win_cool": "lit panes; uv = (level, window hash)", "strip": "eave lines, soffit lines, crown",
+           "win_warm": "lit panes and shop bays; uv = (level, window hash)", "win_cool": "lit panes; uv = (level, window hash)", "win_stair": "stairwell slot windows, always lit: do not run the lit/dark pane program on it", "strip": "eave lines, soffit lines, crown",
            "beacon": "red mast lights", "landmark": "Great Lantern bell; uv = (level, panel id)", "garden": "plant light points; uv = (level, hash)",
            "lantern": "lantern strings, street and soffit lamps", "keel": "keel lanterns under the decks", "neon_a": "sign faces on the Tideglyph atlas",
            "beam_lamp": "lighthouse lantern-room panes; uv.v = pane bearing / 360", "beam": "fallback beam cone (additive)",
            "cond_glow": "Condensery throats, louvres, flare", "cond_lamp": "Condensery sodium lamps", "cond_work": "Condensery work lights"}
 if not ONLY:
     json.dump({"units": "metres, Y-up in the GLB, origin at base centre at deck level; a building's front (shop side) faces +z in the GLB",
-               "window_rule": "every pane (glass, win_warm, win_cool, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
+               "window_rule": "every pane (glass, win_warm, win_cool, win_stair, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
                "materials": mat_doc, "emissive_strength": STRENGTH, "grid": {"floor_m": FLOOR, "bay_m": BAY},
                "inhabitant_scale": {"cast": "Glowmere aliens at scale 1.0 (1.66 to 1.79 m)", "door_head_m": 2.04, "rail_m": 1.05, "step_riser_m": 0.2, "balcony_depth_m": 1.05,
                                     "gallery_depth_m": 1.5, "gangway_width_m": 2.0, "bench_seat_m": 0.43},

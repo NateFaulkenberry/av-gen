@@ -678,7 +678,7 @@ out = {
     "kit": "../meshes/",
     "palette": "../art/palette.json",
     "tint_doc": "tint maps a light-role material of the instance to a palette key; roles not listed use defaults: " + json.dumps(
-        dict(win_warm="win_d", win_cool="win_a", strip="eave", beacon="beacon", landmark="landmark", garden="garden_a", lantern="amber", keel="bounce_a", neon_a="sign_a", beam_lamp="moon_disc",
+        dict(win_warm="win_d", win_cool="win_a", win_stair="win_a", strip="eave", beacon="beacon", landmark="landmark", garden="garden_a", lantern="amber", keel="bounce_a", neon_a="sign_a", beam_lamp="moon_disc",
              cond_glow="cond_a", cond_lamp="cond_a", cond_work="cond_c")),
     "inhabitants": {"cast": "Glowmere aliens (assets/aliens/alien-*.glb, third-party: referenced by path, never copied)", "scale": 1.0,
                     "scale_note": "the kit is built for bodies 1.66 to 1.79 m tall: doors 2.04 m, rails 1.05 m, risers 0.2 m. At Glowmere's 1.94x a body is taller than a storey (3.2 m).",

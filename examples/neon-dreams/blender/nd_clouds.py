@@ -68,7 +68,7 @@ def shelf(rr, out, x, y, z, length, width, thick, yaw, dens=0.6, soft=0.5, scrap
 def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42, 1.2), (0.68, 0.7)), dense=False, skirt=True, mist=True, detail=2, kids=(5, 7), rich=True):
     """One formation. base/top: heights of its foot and of its tallest turret; radius: the foot's radius."""
     rr = random.Random(seed); out = []; H = top - base
-    soft = 0.2 if dense else 0.34; dens = 1.0
+    soft = 0.2 if dense else 0.28; dens = 1.0                                      # crisp enough that cauliflower stays cauliflower under the engine's noise
     if skirt:
         for k in range(rr.randint(6, 7)):
             a = k / 6.5 * 6.283 + rr.uniform(-0.3, 0.3); d = radius * rr.uniform(0.45, 0.95); r = radius * rr.uniform(0.36, 0.52); sy_ = rr.uniform(0.42, 0.62)
@@ -132,57 +132,96 @@ def rock(seed, x, y, top, radius, base=SEA_TOP - 30):
 
 
 def mooring_mound():
-    """The plateau under the town: flattened lobes whose tops follow town_top, a rim of billows that grows away from the
-    decks, and a hollow under the pier."""
+    """The plateau under the town, built in four sizes so it never reads as a field of equal balls:
+    a BODY of a few very large lobes down to the sea; flat SHELVES (terraces) whose tops follow town_top, about 5 m
+    under the decks, stepping with them; a RIM of cauliflower heads (a medium lobe with a flattened base and small
+    lobes on top) that rises a little above deck level away from the streets; an APRON of big low lobes falling to
+    the sea. The pier reaches out over a hollow."""
     rr = random.Random(11); out = []
-
-    def top(x, y):
-        e = math.sqrt(((x - 15) / 250.0) ** 2 + ((y - 22) / 165.0) ** 2)             # 1 at the edge of the built area
-        if e <= 1.0:
-            return town_top(x, y), e
-        f = min(1.0, (e - 1.0) / 0.9); f = f * f * (3 - 2 * f)
-        return town_top(x, y) * (1 - f) + (SEA_TOP + 6) * f, e
-    gy = -330
-    while gy < 380:
-        gx = -420
-        while gx < 460:
-            x, y = gx + rr.uniform(-12, 12), gy + rr.uniform(-12, 12)
-            t, e = top(x, y)
-            if e < 1.95 and math.hypot(x - HEAD[0], y - HEAD[1]) > 200 and math.hypot(x - VEIL[0], y - VEIL[1]) > 175:
-                r = rr.uniform(34, 50) if e < 1.0 else rr.uniform(44, 70)
-                hollow = 26 * math.exp(-(((x + 250) / 110.0) ** 2 + ((y + 125) / 60.0) ** 2))  # the pier reaches out over a hollow
-                out.append(L(x, y, t - hollow - r * 0.5 * 0.8, r, 0.5, 1.0, 0.26 if e < 1.0 else 0.32))
-                if e > 0.92:                                                      # the rim billows; calm under the decks
-                    grow = min(1.0, (e - 0.92) / 0.5)
-                    for k in range(rr.randint(1, 2)):
-                        br = rr.uniform(16, 22 + 26 * grow)
-                        bx, by = x + rr.uniform(-30, 30), y + rr.uniform(-30, 30)
-                        bz = top(bx, by)[0] - hollow + br * rr.uniform(-0.1, 0.45) * grow
-                        out.append(L(bx, by, bz, br, rr.uniform(0.75, 1.0), 1.0, 0.3))
-                        if br > 32:
-                            cauliflower(rr, out, bx, by, bz, br, 1, 0.3, 1.0, n=(2, 4), shrink=(0.38, 0.5))
-            gx += 56.0
-        gy += 56.0
-    out += [L(185, -5, 108, 34, 0.8), L(204, -22, 112, 26, 0.85), L(170, 16, 106, 28, 0.8)]      # a swell that laps the garden terrace from behind
+    CX, CY, AX, AY = 15.0, 22.0, 250.0, 165.0
+    clear = lambda x, y: math.hypot(x - HEAD[0], y - HEAD[1]) > 190 and math.hypot(x - VEIL[0], y - VEIL[1]) > 170
+    hollow = lambda x, y: 30 * math.exp(-(((x + 250) / 110.0) ** 2 + ((y + 125) / 60.0) ** 2))
+    for (x, y, r) in ((-150, 10, 170), (-40, 40, 200), (80, 30, 190), (170, -10, 150), (-60, -40, 150), (60, -50, 150), (0, 110, 170), (-230, -110, 120)):       # body
+        out.append(L(x, y, town_top(x, y) - 22 - r * 0.5, r, 0.5, 1.0, 0.3))
+    gy = CY - AY
+    while gy <= CY + AY:                                                           # shelves: wide, thin, crisp-topped
+        gx = CX - AX
+        while gx <= CX + AX:
+            x, y = gx + rr.uniform(-18, 18), gy + rr.uniform(-14, 14)
+            e = math.sqrt(((x - CX) / AX) ** 2 + ((y - CY) / AY) ** 2)
+            if e < 1.08:
+                r = rr.uniform(88, 122); sy = rr.uniform(0.17, 0.23)
+                out.append(L(x, y, town_top(x, y) - hollow(x, y) - r * sy, r, sy, 1.0, 0.2, sx=rr.uniform(1.0, 1.3), sz=rr.uniform(0.9, 1.1)))
+            gx += 92.0
+        gy += 82.0
+    n_rim = 30
+    for k in range(n_rim):                                                         # rim: cauliflower heads, flattened bases
+        a = k / n_rim * 6.283 + rr.uniform(-0.08, 0.08); e = rr.uniform(1.0, 1.28)
+        x, y = CX + AX * e * math.cos(a), CY + AY * e * math.sin(a)
+        if not clear(x, y):
+            continue
+        r = rr.uniform(34, 52); t = town_top(x, y) - hollow(x, y) + rr.uniform(-6, 5) + (8 if e > 1.15 else 0)
+        out.append(L(x, y, t - r * 0.62 * 0.55, r, 0.62, 1.0, 0.26, sx=rr.uniform(1.0, 1.25)))
+        for j in range(rr.randint(3, 5)):
+            ph = rr.uniform(0, 6.283); d = r * rr.uniform(0.3, 0.8); cr = rr.uniform(12, 20)
+            out.append(L(x + d * math.cos(ph), y + d * math.sin(ph), t + cr * rr.uniform(-0.2, 0.35), cr, rr.uniform(0.78, 0.95), 1.0, 0.28))
+    for k in range(16):                                                            # apron: big and low, down to the sea
+        a = k / 16 * 6.283 + rr.uniform(-0.15, 0.15); e = rr.uniform(1.45, 1.8)
+        x, y = CX + AX * e * math.cos(a), CY + AY * e * math.sin(a)
+        if not clear(x, y):
+            continue
+        r = rr.uniform(85, 130); t = SEA_TOP + rr.uniform(40, 95) - hollow(x, y)
+        out.append(L(x, y, t - r * 0.36, r, 0.36, 1.0, 0.32, sx=rr.uniform(1.0, 1.3)))
+        if rr.random() < 0.6:
+            cr = rr.uniform(26, 40)
+            out.append(L(x + rr.uniform(-40, 40), y + rr.uniform(-40, 40), t + cr * 0.2, cr, 0.7, 1.0, 0.28))
+    out += [L(185, -5, 108, 34, 0.7), L(204, -22, 112, 26, 0.75), L(170, 16, 106, 28, 0.7)]      # a swell that laps the garden terrace from behind
     # wisps: thin cloud standing a little above deck level round the edges of the town (never on the Quay), so the
     # outer stilts, the Low Walk and the backs of the Stacks are half lost in it
     for (x, y, z, r) in ((-96, -40, 126, 20), (-60, -30, 122, 18), (-20, -34, 118, 20), (24, -40, 116, 19), (150, -66, 118, 22), (176, -30, 120, 20), (-150, 20, 130, 22),
                          (-96, 84, 138, 22), (-20, 112, 142, 24), (40, 118, 142, 22), (96, 70, 134, 22), (132, 30, 124, 18), (-140, -60, 126, 20), (-190, -100, 124, 22),
                          (-250, -150, 120, 24), (70, -52, 114, 18)):
-        out.append(L(x + rr.uniform(-6, 6), y + rr.uniform(-6, 6), z, r, rr.uniform(0.45, 0.6), 0.4, 0.6, sx=rr.uniform(1.2, 1.7)))
+        out.append(L(x + rr.uniform(-6, 6), y + rr.uniform(-6, 6), z, r, rr.uniform(0.4, 0.5), 0.4, 0.6, sx=rr.uniform(1.4, 1.9)))
+    return out
+
+
+def mesa(seed, x, y, top, radius, base=SEA_TOP - 40):
+    """The Condensery's pedestal: a cloud MESA, wider than the platform it carries and flat-topped just under it, so the
+    platform's legs are buried. A broad body, a cap of flat shelves, buttresses with cauliflower, a shelf mat halfway up,
+    mist at the foot."""
+    rr = random.Random(seed); out = []; H = top - base
+    for (dx, dy, f) in ((0, 0, 1.0), (0.45, 0.2, 0.8), (-0.5, -0.15, 0.8), (0.1, -0.5, 0.75), (-0.15, 0.5, 0.75)):          # body
+        r = radius * f * 0.8
+        out.append(L(x + dx * radius, y + dy * radius, base + H * 0.48, r, min(1.25, H * 0.5 / r), 1.0, 0.2))
+    out.append(L(x, y, base + r * 0.2, radius * 1.25, 0.4, 1.0, 0.3))                                                    # foot
+    for (dx, dy) in ((0, 0), (0.42, 0.1), (-0.42, -0.1), (0.0, 0.4), (0.05, -0.4)):                                       # cap: flat shelves under the platform
+        r = radius * rr.uniform(0.6, 0.72); sy = 0.2
+        out.append(L(x + dx * radius, y + dy * radius, top - r * sy, r, sy, 1.0, 0.16, sx=rr.uniform(1.0, 1.2)))
+    for k in range(12):                                                            # buttresses
+        a = k / 12 * 6.283 + rr.uniform(-0.2, 0.2); d = radius * rr.uniform(0.75, 1.05); r = radius * rr.uniform(0.24, 0.36)
+        z = base + H * rr.uniform(0.3, 0.85)
+        out.append(L(x + d * math.cos(a), y + d * math.sin(a), z, r, rr.uniform(0.8, 1.15), 1.0, 0.2))
+        cauliflower(rr, out, x + d * math.cos(a), y + d * math.sin(a), z, r, 1, 0.22, 1.0, up=0.5, n=(3, 5), shrink=(0.34, 0.48), rmin=(30.0, 13.0))
+    wyaw = math.atan2(WIND[1], WIND[0])
+    shelf(rr, out, x, y, base + H * 0.55, radius * 1.6, radius * 0.9, radius * 0.08, wyaw + 0.3, dens=0.7, soft=0.4)
+    for k in range(8):
+        a = rr.uniform(0, 6.283); d = radius * rr.uniform(1.1, 1.7)
+        out.append(L(x + d * math.cos(a), y + d * math.sin(a), base + rr.uniform(20, 55), radius * rr.uniform(0.3, 0.5), 0.3, 0.4, 0.7, sx=1.5))
     return out
 
 
 def plume():
+    """Three plumes that rise from the throats, lean with the wind and merge into one trail: dense at the throat (the
+    amber glow lights them from below), thinning downwind. Dense enough to read from 1.5 km."""
     out = []; cx, cy, cz = CONDENSERY; rr = random.Random(41)
     for (lx, ly, hb) in ((-58, 14, 118), (-2, 30, 146), (52, 2, 100)):
-        c, s = math.cos(CONDENSERY_YAW), math.sin(CONDENSERY_YAW); x, y = cx + lx * c - ly * s, cy + lx * s + ly * c; z = cz + hb + 10
-        r = 22.0
-        for k in range(7):
-            out.append(L(x, y, z, r, rr.uniform(0.85, 1.0), 0.4 - 0.03 * k, 0.6))
-            if k > 1:
-                out.append(L(x + rr.uniform(-0.5, 0.5) * r, y + rr.uniform(-0.5, 0.5) * r, z + r * 0.5, r * 0.5, 0.9, 0.35, 0.5))
-            x += WIND[0] * r * (0.35 + 0.22 * k); y += WIND[1] * r * (0.35 + 0.22 * k); z += r * max(0.2, 1.0 - 0.15 * k); r *= 1.2
+        c, s = math.cos(CONDENSERY_YAW), math.sin(CONDENSERY_YAW); x, y = cx + lx * c - ly * s, cy + lx * s + ly * c; z = cz + hb + 6
+        r = 17.0
+        for k in range(9):
+            out.append(L(x, y, z, r, rr.uniform(0.85, 1.0), max(0.3, 0.8 - 0.06 * k), 0.45))
+            if k > 0:
+                out.append(L(x + rr.uniform(-0.5, 0.5) * r, y + rr.uniform(-0.5, 0.5) * r, z + r * 0.45, r * 0.55, 0.9, max(0.3, 0.7 - 0.06 * k), 0.4))
+            x += WIND[0] * r * (0.25 + 0.2 * k); y += WIND[1] * r * (0.25 + 0.2 * k); z += r * max(0.15, 1.0 - 0.12 * k); r *= 1.22
     return out
 
 
@@ -216,7 +255,7 @@ def build():
     for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
         masses["rock_" + name] = rock(31 + i, x, y, z - 8.0, (54, 60, 50)[i])
     cx, cy, cz = CONDENSERY
-    col = rock(40, cx, cy, cz - 12.0, 150, base=SEA_TOP - 40)
+    col = mesa(40, cx, cy, cz - 5.0, 205)
     col += cumulus(42, cx - 190, cy + 140, SEA_TOP - 20, 300, 150, turrets=3, shelves=((0.45, 1.1),), detail=1, kids=(3, 5), rich=False) + cumulus(43, cx + 180, cy - 80, SEA_TOP - 20, 190, 130, turrets=2, shelves=((0.55, 0.9),), detail=1, kids=(3, 5), rich=False)
     masses["condensery_column"] = col
     masses["condensery_plume"] = plume()
@@ -237,14 +276,14 @@ def build():
 def glows():
     g = lambda name, p, radius, key, gain: {"name": name, "position": E(p), "radius": radius, "intensity": gain, "key": key}
     cx, cy, cz = CONDENSERY; lh = LIGHTHOUSES
-    return [g("quay_west", (-55, qy(-55), qz(-55) + 4.5), 80, "bounce_b", 1.0), g("quay_mid", (10, qy(10), qz(10) + 4.5), 85, "bounce_b", 1.0), g("quay_east", (80, qy(80), qz(80) + 4.5), 80, "bounce_b", 0.9),
-            g("keel_west", (-50, -12, 116), 120, "bounce_a", 1.4), g("keel_east", (50, -18, 110), 130, "bounce_a", 1.4),
-            g("great_lantern", (GREAT_LANTERN[0], GREAT_LANTERN[1], GREAT_LANTERN[2] + 36), 190, "landmark", 2.0),
-            g("gardens", (112, -30, 127), 100, "garden_a", 1.0), g("stacks", (10, 60, 150), 200, "bounce_b", 0.5), g("station_pier", (-150, -45, 134), 110, "win_a", 0.7),
-            g("harbour_light", (lh[0][2], lh[0][3], lh[0][4] + 8), 90, "moon_disc", 0.8), g("outer_light", (lh[1][2], lh[1][3], lh[1][4] + 8), 110, "moon_disc", 0.8),
-            g("break_light", (lh[2][2], lh[2][3], lh[2][4] + 8), 110, "moon_disc", 0.8),
-            g("condensery_throats", (cx, cy - 12, cz + 130), 280, "cond_a", 2.0), g("condensery_flare", (cx - 112, cy + 40, cz + 166), 180, "cond_a", 1.6),
-            g("condensery_keel", (cx - 20, cy, cz - 30), 220, "cond_b", 1.2), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -210), 420, "ocean_b", 1.8)]
+    return [g("quay_west", (-55, qy(-55), qz(-55) + 4.5), 46, "bounce_b", 1.0), g("quay_mid", (10, qy(10), qz(10) + 4.5), 48, "bounce_b", 1.0), g("quay_east", (80, qy(80), qz(80) + 4.5), 46, "bounce_b", 0.9),
+            g("keel_west", (-50, -12, 116), 70, "bounce_a", 1.2), g("keel_east", (50, -18, 110), 75, "bounce_a", 1.2),
+            g("great_lantern", (GREAT_LANTERN[0], GREAT_LANTERN[1], GREAT_LANTERN[2] + 36), 105, "landmark", 1.6),
+            g("gardens", (112, -30, 127), 60, "garden_a", 0.9), g("stacks", (10, 60, 150), 110, "bounce_b", 0.4), g("station_pier", (-150, -45, 134), 65, "win_a", 0.6),
+            g("harbour_light", (lh[0][2], lh[0][3], lh[0][4] + 8), 70, "moon_disc", 0.7), g("outer_light", (lh[1][2], lh[1][3], lh[1][4] + 8), 80, "moon_disc", 0.7),
+            g("break_light", (lh[2][2], lh[2][3], lh[2][4] + 8), 80, "moon_disc", 0.7),
+            g("condensery_throats", (cx, cy, cz + 150), 150, "cond_a", 2.2), g("condensery_yard", (cx, cy, cz + 12), 130, "cond_a", 1.2),
+            g("condensery_keel", (cx, cy, cz - 40), 170, "cond_b", 1.0), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -210), 420, "ocean_b", 1.8)]
 
 
 if __name__ == "__main__":
@@ -283,7 +322,7 @@ if __name__ == "__main__":
                  "note": "replica of binCloudLobes: a cell holds at most 64 lobes and keeps the biggest. The far towers stretch the grid (cells of span/64), which overfills the cells of the detailed formations: keep them as a second lobe set, or draw them another way."},
         "counts": {k: len(v) for k, v in masses.items()},
     }
-    dst = os.path.join(HERE, "..", "art", "cloud_design.json")
+    dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "art", "cloud_design.json")
     json.dump(out, open(dst, "w"), indent=None, separators=(",", ":"))
     print("cloud design:", out["counts"], "total", len(allhero), "far", len(far))
     print("bins hero:", out["bins"]["hero_masses"]); print("bins with far:", out["bins"]["with_far_towers"])

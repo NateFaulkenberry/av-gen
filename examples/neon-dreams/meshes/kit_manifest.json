@@ -1,6 +1,6 @@
 {
  "units": "metres, Y-up in the GLB, origin at base centre at deck level; a building's front (shop side) faces +z in the GLB",
- "window_rule": "every pane (glass, win_warm, win_cool, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
+ "window_rule": "every pane (glass, win_warm, win_cool, win_stair, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
  "materials": {
   "facade": "dark wall",
   "trim": "slabs, frames, sills",
@@ -12,6 +12,7 @@
   "pool": "garden pool",
   "win_warm": "lit panes and shop bays; uv = (level, window hash)",
   "win_cool": "lit panes; uv = (level, window hash)",
+  "win_stair": "stairwell slot windows, always lit: do not run the lit/dark pane program on it",
   "strip": "eave lines, soffit lines, crown",
   "beacon": "red mast lights",
   "landmark": "Great Lantern bell; uv = (level, panel id)",
@@ -28,6 +29,7 @@
  "emissive_strength": {
   "win_warm": 3.0,
   "win_cool": 3.0,
+  "win_stair": 3.5,
   "strip": 10.0,
   "beacon": 40.0,
   "landmark": 1.6,
@@ -58,7 +60,7 @@
  "assets": [
   {
    "asset": "buildings/mooring_shophouse_a.glb",
-   "tris": 5804,
+   "tris": 5886,
    "height_m": 28.6,
    "bounds_m": [
     -6.5,
@@ -77,6 +79,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 6,
@@ -148,7 +151,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_b.glb",
-   "tris": 8576,
+   "tris": 8564,
    "height_m": 35.0,
    "bounds_m": [
     -5.9,
@@ -167,6 +170,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 8,
@@ -238,7 +242,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_c.glb",
-   "tris": 4128,
+   "tris": 4140,
    "height_m": 22.2,
    "bounds_m": [
     -4.7,
@@ -257,6 +261,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 4,
@@ -316,7 +321,7 @@
   },
   {
    "asset": "buildings/mooring_stack_a.glb",
-   "tris": 13954,
+   "tris": 13830,
    "height_m": 51.0,
    "bounds_m": [
     -7.1,
@@ -324,7 +329,7 @@
     -6.5,
     7.1,
     50.97,
-    6.5
+    6.56
    ],
    "materials": [
     "beacon",
@@ -335,6 +340,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 13,
@@ -430,7 +436,7 @@
   },
   {
    "asset": "buildings/mooring_stack_b.glb",
-   "tris": 16918,
+   "tris": 16920,
    "height_m": 63.8,
    "bounds_m": [
     -5.9,
@@ -451,6 +457,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 17,
@@ -591,6 +598,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 3,
@@ -638,7 +646,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_e.glb",
-   "tris": 9740,
+   "tris": 9592,
    "height_m": 20.2,
    "bounds_m": [
     -7.1,
@@ -659,6 +667,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 4,
@@ -718,7 +727,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_f.glb",
-   "tris": 10546,
+   "tris": 10534,
    "height_m": 23.4,
    "bounds_m": [
     -5.9,
@@ -739,6 +748,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 5,
@@ -798,7 +808,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_g.glb",
-   "tris": 7662,
+   "tris": 7664,
    "height_m": 31.8,
    "bounds_m": [
     -5.3,
@@ -819,6 +829,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 7,
@@ -890,7 +901,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_h.glb",
-   "tris": 11664,
+   "tris": 11644,
    "height_m": 38.2,
    "bounds_m": [
     -6.5,
@@ -911,6 +922,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 9,
@@ -982,10 +994,10 @@
   },
   {
    "asset": "buildings/mooring_stack_c.glb",
-   "tris": 15746,
+   "tris": 15606,
    "height_m": 39.4,
    "bounds_m": [
-    -6.5,
+    -6.56,
     -14.0,
     -5.3,
     5.3,
@@ -1003,6 +1015,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 10,
@@ -1086,7 +1099,7 @@
   },
   {
    "asset": "buildings/mooring_stack_d.glb",
-   "tris": 18878,
+   "tris": 18582,
    "height_m": 57.4,
    "bounds_m": [
     -6.5,
@@ -1107,6 +1120,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 15,
@@ -1214,7 +1228,7 @@
   },
   {
    "asset": "buildings/mooring_stack_e.glb",
-   "tris": 15550,
+   "tris": 15500,
    "height_m": 42.6,
    "bounds_m": [
     -5.3,
@@ -1235,6 +1249,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 11,
@@ -1318,7 +1333,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_i.glb",
-   "tris": 7802,
+   "tris": 7818,
    "height_m": 13.8,
    "bounds_m": [
     -5.9,
@@ -1338,6 +1353,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 2,
@@ -1385,7 +1401,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_j.glb",
-   "tris": 6324,
+   "tris": 6278,
    "height_m": 13.8,
    "bounds_m": [
     -4.7,
@@ -1405,6 +1421,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 2,
@@ -1473,6 +1490,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 8,
@@ -1506,6 +1524,7 @@
     "strip",
     "trim",
     "win_cool",
+    "win_stair",
     "win_warm"
    ],
    "floors": 21,
@@ -2711,87 +2730,93 @@
   },
   {
    "asset": "condensery/cond_stack_a.glb",
-   "tris": 3840,
+   "tris": 3160,
    "height_m": 118.0,
    "bounds_m": [
-    -25.8,
-    -0.17,
-    -25.8,
-    25.8,
-    118.9,
-    25.8
+    -25.46,
+    -0.21,
+    -25.39,
+    25.46,
+    118.92,
+    25.39
    ],
    "materials": [
     "beacon",
     "cond_glow",
     "cond_lamp",
+    "cond_work",
     "facade",
     "metal",
     "trim"
    ],
-   "base_radius_m": 25.0,
-   "throat_radius_m": 18.2,
+   "base_radius_m": 24.0,
+   "throat_radius_m": 17.2,
    "plume_origin_m": [
-    0.0,
+    -0.29,
     120.0,
-    0.0
-   ]
+    -0.29
+   ],
+   "note": "a stepped lantern tower: drums of 12 sides, ring galleries with eave lines (cond_lamp), a louvre band of light on the top drum and a glowing throat (cond_glow)"
   },
   {
    "asset": "condensery/cond_stack_b.glb",
-   "tris": 3840,
+   "tris": 3160,
    "height_m": 146.0,
    "bounds_m": [
-    -29.87,
-    -0.19,
-    -29.87,
-    29.87,
-    146.9,
-    29.87
+    -28.58,
+    -0.22,
+    -28.51,
+    28.58,
+    146.92,
+    28.51
    ],
    "materials": [
     "beacon",
     "cond_glow",
     "cond_lamp",
+    "cond_work",
     "facade",
     "metal",
     "trim"
    ],
-   "base_radius_m": 29.0,
-   "throat_radius_m": 21.1,
+   "base_radius_m": 27.0,
+   "throat_radius_m": 19.4,
    "plume_origin_m": [
-    0.0,
+    0.04,
     148.0,
-    0.0
-   ]
+    -0.09
+   ],
+   "note": "a stepped lantern tower: drums of 12 sides, ring galleries with eave lines (cond_lamp), a louvre band of light on the top drum and a glowing throat (cond_glow)"
   },
   {
    "asset": "condensery/cond_stack_c.glb",
-   "tris": 3840,
+   "tris": 3160,
    "height_m": 100.0,
    "bounds_m": [
-    -23.77,
-    -0.17,
-    -23.77,
-    23.77,
-    100.9,
-    23.77
+    -23.38,
+    -0.21,
+    -23.31,
+    23.38,
+    100.92,
+    23.31
    ],
    "materials": [
     "beacon",
     "cond_glow",
     "cond_lamp",
+    "cond_work",
     "facade",
     "metal",
     "trim"
    ],
-   "base_radius_m": 23.0,
-   "throat_radius_m": 16.7,
+   "base_radius_m": 22.0,
+   "throat_radius_m": 15.8,
    "plume_origin_m": [
-    0.0,
+    -1.1,
     102.0,
-    0.0
-   ]
+    -0.41
+   ],
+   "note": "a stepped lantern tower: drums of 12 sides, ring galleries with eave lines (cond_lamp), a louvre band of light on the top drum and a glowing throat (cond_glow)"
   },
   {
    "asset": "condensery/cond_sphere_tank.glb",
@@ -2925,11 +2950,11 @@
   },
   {
    "asset": "condensery/cond_platform.glb",
-   "tris": 2316,
+   "tris": 1956,
    "height_m": 0.3,
    "bounds_m": [
     -120.4,
-    -190.0,
+    -46.0,
     -65.4,
     120.4,
     0.3,

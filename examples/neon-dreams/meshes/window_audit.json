@@ -4,77 +4,77 @@
  "violations": 0,
  "assets": {
   "mooring_shophouse_a": {
-   "openings": 57,
-   "pane_polygons": 102,
+   "openings": 61,
+   "pane_polygons": 103,
    "violations": []
   },
   "mooring_shophouse_b": {
-   "openings": 88,
-   "pane_polygons": 145,
+   "openings": 92,
+   "pane_polygons": 147,
    "violations": []
   },
   "mooring_shophouse_c": {
-   "openings": 38,
-   "pane_polygons": 64,
+   "openings": 40,
+   "pane_polygons": 62,
    "violations": []
   },
   "mooring_stack_a": {
-   "openings": 153,
-   "pane_polygons": 284,
+   "openings": 157,
+   "pane_polygons": 278,
    "violations": []
   },
   "mooring_stack_b": {
-   "openings": 156,
+   "openings": 165,
    "pane_polygons": 302,
    "violations": []
   },
   "mooring_shophouse_d": {
-   "openings": 29,
-   "pane_polygons": 50,
+   "openings": 30,
+   "pane_polygons": 49,
    "violations": []
   },
   "mooring_shophouse_e": {
    "openings": 46,
-   "pane_polygons": 76,
+   "pane_polygons": 74,
    "violations": []
   },
   "mooring_shophouse_f": {
-   "openings": 35,
-   "pane_polygons": 56,
+   "openings": 37,
+   "pane_polygons": 54,
    "violations": []
   },
   "mooring_shophouse_g": {
-   "openings": 71,
-   "pane_polygons": 123,
+   "openings": 75,
+   "pane_polygons": 126,
    "violations": []
   },
   "mooring_shophouse_h": {
-   "openings": 106,
-   "pane_polygons": 191,
+   "openings": 109,
+   "pane_polygons": 190,
    "violations": []
   },
   "mooring_stack_c": {
-   "openings": 87,
-   "pane_polygons": 166,
+   "openings": 89,
+   "pane_polygons": 160,
    "violations": []
   },
   "mooring_stack_d": {
-   "openings": 172,
+   "openings": 176,
    "pane_polygons": 317,
    "violations": []
   },
   "mooring_stack_e": {
-   "openings": 94,
-   "pane_polygons": 168,
+   "openings": 98,
+   "pane_polygons": 163,
    "violations": []
   },
   "mooring_shophouse_i": {
-   "openings": 26,
-   "pane_polygons": 47,
+   "openings": 27,
+   "pane_polygons": 48,
    "violations": []
   },
   "mooring_shophouse_j": {
-   "openings": 18,
+   "openings": 19,
    "pane_polygons": 30,
    "violations": []
   },

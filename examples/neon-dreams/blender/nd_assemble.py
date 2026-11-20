@@ -9,7 +9,7 @@ This is the reference reading of art/layout.json (the engine's build.py does the
 import bpy, os, math, json
 from mathutils import Vector, Matrix, Euler
 
-DEFAULT_KEY = dict(win_warm="win_d", win_cool="win_a", strip="eave", beacon="beacon", landmark="landmark", garden="garden_a", lantern="amber",
+DEFAULT_KEY = dict(win_warm="win_d", win_cool="win_a", win_stair="win_a", strip="eave", beacon="beacon", landmark="landmark", garden="garden_a", lantern="amber",
                    keel="bounce_a", neon_a="sign_a", beam_lamp="moon_disc", beam="moon_disc", cond_glow="cond_a", cond_lamp="cond_a", cond_work="cond_c")
 BINDS = []            # (setter(rgb), key): filled as tinted materials are made; apply_palette() runs them
 _TEMPLATES, _BASE, _VARIANTS = {}, {}, {}

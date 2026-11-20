@@ -78,14 +78,15 @@ def shophouse(name, seed, floors=6, w=8.4, d=10.8, lit=0.34, warm=0.3, roof="kit
         ww = w if first else w - r.choice([0, 0, 2.4]) if w > 7.2 else w
         dd = d if first else d - r.choice([0, 0, 0, 2.4])
         cx, cy = ox, oy + (d - dd) / 2 * (1 if r.random() < 0.7 else -1) * (0 if first else 1)
-        bal = block(A, r, r2, cx, cy, z, ww, dd, n, lit, warm, seed + z, balcony_side=None if first else r.choice([0, 0, 2, None]), shop=first and shop, special=special)
+        bal = block(A, r, r2, cx, cy, z, ww, dd, n, lit, warm, seed + z, balcony_side=None if first else r.choice([0, 0, 2, None]), shop=first and shop, special=special, stair=3)
         meta_blocks.append(dict(c=[round(cx, 2), round(cy, 2)], z0=round(z, 2), floors=n, w=ww, d=dd, shop=bool(first and shop), front_balcony_bay=bal.get(0, -1)))
         z += n * FLOOR; left -= n
         A.m("trim").box((cx, cy, z), (ww + 2.2, dd + 2.2, 0.22))                                   # the eave slab
         A.m("trim").box((cx, cy - dd / 2 - 1.0, z - 0.2), (ww + 2.2, 0.12, 0.18))                   # fascia lip
         if first or r.random() < 0.6:                                                               # the eave line
-            A.m("strip").box((cx, cy - dd / 2 - 0.86, z - 0.15), (ww + 1.6, 0.07, 0.06))
-            A.m("strip").box((cx + ww / 2 + 0.86, cy, z - 0.15), (0.07, dd + 1.6, 0.06))
+            A.m("strip").box((cx, cy - dd / 2 - 0.86, z - 0.18), (ww + 1.6, 0.09, 0.12))               # 12 cm high: still a line at 5 m, no longer lost at 500 m
+            A.m("strip").box((cx + ww / 2 + 0.86, cy, z - 0.18), (0.09, dd + 1.6, 0.12))
+            A.m("strip").box((cx - ww / 2 - 0.86, cy, z - 0.18), (0.09, dd + 1.6, 0.12))                # the west side too: it faces the approach
         blocks.append((cx, cy, z, ww, dd))
         top = (cx, cy, z, ww, dd); first = False
     for i in range(1, len(blocks) - 1):                                       # planted ledges where the block above stands back
@@ -95,6 +96,9 @@ def shophouse(name, seed, floors=6, w=8.4, d=10.8, lit=0.34, warm=0.3, roof="kit
         roof_garden(A, r2, top[0], top[1], top[2] + 0.11, top[3], top[4])
     else:
         roof_kit(A, r2, top[0], top[1], top[2] + 0.11, top[3], top[4])
+    if floors >= 10:                                                                              # tall stacks wear a lit crown on the sides the approach sees
+        cx, cy, z, ww, dd = top
+        A.m("strip").box((cx, cy - dd / 2 - 1.12, z + 0.02), (ww + 2.2, 0.08, 0.14)); A.m("strip").box((cx - ww / 2 - 1.12, cy, z + 0.02), (0.08, dd + 2.2, 0.14))
     stilts(A, 0, 0, w, d)
     A.meta = dict(floors=floors, footprint_m=[w, d], roof=roof, roof_y_m=round(top[2] + 0.11, 2), roof_centre_m=[round(top[0], 2), round(top[1], 2)],
                   roof_size_m=[top[3], top[4]], blocks=meta_blocks,
@@ -193,7 +197,7 @@ def gallery_slab():
 
     def slot(si, fl, b, O, T, Nn, u, v):
         if si == 0:
-            pane_opening(A, O, T, Nn, (u + 0.85, u + 1.55, v + 0.5, v + 2.75), (u, u + BAY, v, v + FLOOR), 0.14, "win_cool", 0.72 if fl % 3 else 0.9, (0.9 + fl * 0.03) % 1.0,
+            pane_opening(A, O, T, Nn, (u + 0.85, u + 1.55, v + 0.5, v + 2.75), (u, u + BAY, v, v + FLOOR), 0.14, "win_stair", 0.72 if fl % 3 else 0.9, (0.9 + fl * 0.03) % 1.0,
                          sill=False, mullions=0, transom=v + 1.6, kind="stair")
             return True
         wq(A, "facade", O, T, Nn, u, u + BAY, v, v + FLOOR)
@@ -216,7 +220,7 @@ def corner_tower():
     def slot_col(nb):
         def f(si, fl, b, O, T, Nn, u, v):
             if si == 0 and b == nb // 2 and not (v < 0.1):
-                pane_opening(A, O, T, Nn, (u + 0.575, u + 1.825, v + 0.3, v + 2.85), (u, u + BAY, v, v + FLOOR), 0.16, "win_cool", 0.66 + 0.2 * ((int(v / FLOOR)) % 2), 0.05,
+                pane_opening(A, O, T, Nn, (u + 0.575, u + 1.825, v + 0.3, v + 2.85), (u, u + BAY, v, v + FLOOR), 0.16, "win_stair", 0.66 + 0.2 * ((int(v / FLOOR)) % 2), 0.05,
                              sill=False, mullions=1, transom=v + 1.6, kind="stair")
                 return True
             return False

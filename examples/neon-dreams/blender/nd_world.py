@@ -35,19 +35,23 @@ PLAZA = (-102.0, -6.0, 131.2)
 PIER_ROOT, PIER_DIR = (-118.0, -26.0, 131.2), (-0.8211, -0.5708)          # the pier runs south-west for 250 m, then breaks
 GARDEN = (140.0, -34.0, 121.6)
 HEAD, VEIL, FORE = (0.0, 262.0), (345.0, -45.0), (-120.0, -330.0)           # the cumulus towers around the Mooring (the Veil sits on the line from the approach to the Condensery)
-CONDENSERY, CONDENSERY_YAW = (2050.0, 450.0, 250.0), 0.3
+CONDENSERY, CONDENSERY_YAW = (2050.0, 450.0, 250.0), 0.3 - math.radians(60.0)      # turned 60 degrees (engine, iteration 4): seen from the reveal the stacks stand apart instead of in one line
 LONE_LAMP = (900.0, -300.0, 96.0)
 BREAK = dict(centre=(1640.0, 60.0), radius=270.0, elongation=2.0, yaw=0.05)
 # lighthouses on cloud-rock outcrops: (name, asset, x, y, deck z, yaw deg, beam rpm, phase, beam length)
 LIGHTHOUSES = [("harbour_light", "lighthouse_a", -374.0, -339.0, 128.0, 20.0, 5.0, 0.0, 900.0),
                ("outer_light", "lighthouse_b", 700.0, -250.0, 118.0, -35.0, 3.75, 0.37, 1100.0),
                ("break_light", "lighthouse_c", 1150.0, -40.0, 66.0, 60.0, 4.3, 0.71, 1000.0)]
-MOON = dict(light_from_bearing_deg=34.0, light_elevation_deg=26.0, disc_bearing_deg=19.0, disc_centre_elevation_deg=2.2, disc_angular_radius_deg=8.2)
+# bearings are plan headings: 0 = +x (east), counter-clockwise, 90 = north. The cloud key was 34 / 26 in the Blender frames;
+# in the engine that sat ahead of the approach and forward-scattered every cloud to milk, so the engine moved it to -18 / 12.
+MOON = dict(light_from_bearing_deg=-18.0, light_elevation_deg=12.0, disc_bearing_deg=19.0, disc_centre_elevation_deg=2.2, disc_angular_radius_deg=8.2,
+            blender_frames_light_from=[34.0, 26.0], bearing_convention="plan heading: 0 = +x (east), counter-clockwise, 90 = north = -z")
 
 # ---- the 70.2 s journey (Sabertooth): time, x, y, z. The camera looks along its path.
 _APPROACH = [(0.0, -640, -400, 118), (2.8, -615, -386, 140), (10.0, -500, -322, 150), (17.0, -340, -236, 141), (25.25, -170, -100, 143), (29.0, -118, -34, 141.5)]
 _QUAY_KEYS = [(31.0, -92, 140.0), (35.75, -30, 137.0), (41.75, 40, 133.5), (43.6, 70, 132.6)]      # time, x, z: y follows the street's centreline
-_LEAVE = [(45.0, 95, -17.0, 133.5), (46.2, 125, -26, 137.5), (47.0, 150, -30, 139.5), (50.5, 250, -18, 170), (54.4, 360, 10, 235), (58.95, 470, 48, 285), (70.2, 640, 84, 315)]
+# after 47 s: the engine's tail (iteration 4), which keeps the camera in the Veil passage and ends nearer the Condensery
+_LEAVE = [(45.0, 95, -17.0, 133.5), (46.2, 125, -26, 137.5), (47.0, 150, -30, 139.5), (50.5, 290, -5, 175), (54.4, 470, 40, 215), (58.95, 660, 95, 245), (66.5, 835, 144, 256), (70.2, 865, 152, 258)]
 
 
 def _quay_path():
