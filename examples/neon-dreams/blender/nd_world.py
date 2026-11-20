@@ -34,7 +34,7 @@ GREAT_LANTERN = (-128.0, 48.0, 134.4)
 PLAZA = (-102.0, -6.0, 131.2)
 PIER_ROOT, PIER_DIR = (-118.0, -26.0, 131.2), (-0.8211, -0.5708)          # the pier runs south-west for 250 m, then breaks
 GARDEN = (140.0, -34.0, 121.6)
-HEAD, VEIL, FORE = (0.0, 262.0), (338.0, -6.0), (-120.0, -330.0)            # the cumulus towers around the Mooring
+HEAD, VEIL, FORE = (0.0, 262.0), (345.0, -45.0), (-120.0, -330.0)           # the cumulus towers around the Mooring (the Veil sits on the line from the approach to the Condensery)
 CONDENSERY, CONDENSERY_YAW = (2050.0, 450.0, 250.0), 0.3
 LONE_LAMP = (900.0, -300.0, 96.0)
 BREAK = dict(centre=(1640.0, 60.0), radius=270.0, elongation=2.0, yaw=0.05)

@@ -148,7 +148,7 @@ def mooring_mound():
         while gx < 460:
             x, y = gx + rr.uniform(-12, 12), gy + rr.uniform(-12, 12)
             t, e = top(x, y)
-            if e < 1.95 and math.hypot(x - HEAD[0], y - HEAD[1]) > 200 and math.hypot(x - VEIL[0], y - VEIL[1]) > 190:
+            if e < 1.95 and math.hypot(x - HEAD[0], y - HEAD[1]) > 200 and math.hypot(x - VEIL[0], y - VEIL[1]) > 175:
                 r = rr.uniform(34, 50) if e < 1.0 else rr.uniform(44, 70)
                 hollow = 26 * math.exp(-(((x + 250) / 110.0) ** 2 + ((y + 125) / 60.0) ** 2))  # the pier reaches out over a hollow
                 out.append(L(x, y, t - hollow - r * 0.5 * 0.8, r, 0.5, 1.0, 0.26 if e < 1.0 else 0.32))
@@ -208,7 +208,10 @@ def bins_report(lobes):
 def build():
     masses = {"mooring_mound": mooring_mound()}
     masses["head"] = cumulus(23, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 4))
-    masses["veil"] = cumulus(22, VEIL[0], VEIL[1], SEA_TOP - 20, 290, 185, turrets=3, lean=0.06, shelves=((0.5, 1.0), (0.74, 0.6)), kids=(3, 4))      # upright and broad: it must hide the Condensery from the Mooring
+    # the Veil: upright, on the line from the approach to the Condensery, so it hides the flare from the Mooring, and
+    # narrow enough above 190 m that the Drowned Moon's left limb shows beside it (seed and place chosen by projecting
+    # its lobes from the approach camera: the flare covered, eight sample points on the limb free)
+    masses["veil"] = cumulus(32, VEIL[0], VEIL[1], SEA_TOP - 20, 290, 150, turrets=3, lean=0.06, shelves=((0.5, 1.0), (0.74, 0.6)), kids=(3, 4))
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
     for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
         masses["rock_" + name] = rock(31 + i, x, y, z - 8.0, (54, 60, 50)[i])
