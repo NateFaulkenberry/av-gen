@@ -377,6 +377,8 @@ def mesa(seed, x, y, top, radius, base=SEA_TOP - 40):
         e = math.sqrt((lx / 150.0) ** 2 + (ly / 95.0) ** 2)                                # 1 at the platform's edge
         if any(math.hypot(px - o["c"][0], py + o["c"][2]) < 0.75 * (o["r"] + 22) for o in out[7:] if o.get("_head")):
             continue
+        if any(math.hypot(lx - sx_, ly - sy0_) < 30.0 for (sx_, sy0_) in ((-58, 14), (-2, 30), (52, 2))):
+            continue                                                                        # a well under each stack: the throats' light comes up between the heads (engine: an amber glow in each)
         r = rr.uniform(20, 46) if e > 0.8 else rr.uniform(26, 44)
         if e < 0.85:
             t = top - rr.uniform(3, 11)                                                     # under the yard
@@ -495,7 +497,7 @@ def veil():
             l = L(c[0], c[1], c[2], r, rr.uniform(0.8, 1.0), 1.0, 0.34, sx=rr.uniform(0.9, 1.2), sz=rr.uniform(0.9, 1.2))
             if _admit(l, voids, 0.32):
                 out.append(l)
-                l["_keep"] = True
+                l["_keep"] = True; l["tag"] = "wall"
                 for j_ in range(rr.randint(0, 2)):                            # small billows on its face, toward the room
                     a1, a2 = rr.uniform(-0.9, 0.9), rr.uniform(-0.9, 0.9); cr = r * rr.uniform(0.32, 0.46)
                     w = (-u[0] + a1 * u[1] + a2 * u[2] * 0.3, -u[1] - a1 * u[0], -u[2] + a2 * (1.0 - abs(u[2])))
@@ -531,12 +533,12 @@ def veil():
     # 4. the plug: solid, full density, on the axis and round it
     for sm in VEIL_PLUG:
         p, d, right, t = at(sm)
-        l = L(p[0], p[1], p[2] - 3.0, rr.uniform(38, 42), 1.0, 1.0, 0.22); l["_keep"] = True; out.append(l)
+        l = L(p[0], p[1], p[2] - 3.0, rr.uniform(38, 42), 1.0, 1.0, 0.22); l["_keep"] = True; l["tag"] = "plug"; out.append(l)
         for k in range(5):
             a = k / 5.0 * 6.283 + rr.uniform(-0.4, 0.4); off = rr.uniform(34, 52); r = rr.uniform(34, 48)
             l = L(p[0] + right[0] * off * math.cos(a), p[1] + right[1] * off * math.cos(a), p[2] + off * math.sin(a) - 3.0, r, rr.uniform(0.9, 1.0), 1.0, 0.24)
             if _admit(l, rooms, 0.25):
-                out.append(l)
+                l["tag"] = "plug"; out.append(l)
     # 5. tatters in the clear air after it: a few thin scraps beside the path until the reveal at 58.95 s
     for sm in (462, 472, 484, 498, 514, 532):
         p, d, right, t = at(sm)
@@ -741,6 +743,8 @@ if __name__ == "__main__":
         "designed_for": {"extinction": 0.15, "noiseAmount": 0.72, "noiseScale": 0.018, "note": "tested in AV Gen with the scene's other values as they are (art test stills, work/art/it5/av); see notes/00-coordination.md, 'Art: iteration 5'"},
         "veil": {"note": "the Veil's rooms are built as absences (masses.veil holds the walls). The engine's generated passage lobes (build.py veil_passage) would fill them: drop them, and take the Veil's glows from here (same names as the routes use).",
                  "t0": VEIL_T0, "rooms": [{"room": v["room"], "t": v["t"], "centre": E(v["c"]), "radius": v["rho"]} for v in veil_voids()[0]],
+                 "tags": "lobes of masses.veil carry \"tag\": \"wall\" (a room's shell) or \"plug\" (the solid before the crash); if lobes may be denser than 1 (ADR-2105), the plug is where to use it",
+                 "wells": "condensery_column leaves a well 60 m across under each stack (plan offsets in the works' frame (-58, 14), (-2, 30), (52, 2), turned by the Condensery's yaw): a glow in each lights the heads round it from below",
                  "plug": {"from_t": 54.9, "to_t": 56.9, "note": "solid: the camera is blind from the lantern room's far wall to the crash at 56.85 s"},
                  "clear_after_t": 56.9, "glows": vg},
         "sea_design": {"top_mean": SEA_TOP, "top_range": [-85, 60], "base": SEA_BASE,
