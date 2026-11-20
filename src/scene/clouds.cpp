@@ -224,6 +224,16 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
         if (auto r = vec(k, *t); !r) return std::unexpected(r.error());
     }
     if (j.contains("steps")) c.steps = j.at("steps").get<int>();
+    // ADR-2109: a block written for ADR-1289's march keeps it
+    if (j.contains("evenSteps")) {
+        c.evenSteps = j.at("evenSteps").get<bool>();
+    } else if (!j.contains("resolution") && !j.contains("temporal") && !j.contains("minStep") &&
+               !j.contains("stepGrowth") && !j.contains("maxDistance")) {
+        c.evenSteps = true;
+    }
+    if (c.evenSteps && !j.contains("resolution")) {
+        c.resolution = 1.0f;
+    }
     if (j.contains("lightSteps")) c.lightSteps = j.at("lightSteps").get<int>();
     if (j.contains("erosionOctaves")) c.erosionOctaves = j.at("erosionOctaves").get<int>(); // ADR-2106
     if (j.contains("lightSpacing")) c.lightSpacing = j.at("lightSpacing").get<int>();
@@ -386,6 +396,9 @@ json Clouds::toJson() const {
               {"drift", v3(drift)}, {"density", density}, {"swell", swell}, {"detailScale", detailScale},
               {"detailAmount", detailAmount}, {"resolution", resolution}, {"temporal", temporal},
               {"minStep", minStep}, {"stepGrowth", stepGrowth}, {"maxDistance", maxDistance}};
+    if (evenSteps) { // ADR-2109
+        j["evenSteps"] = true;
+    }
     if (glowBreakup > 0.0f || glowShadow > 0.0f) { // ADR-2104: written only when used
         j["glowBreakup"] = glowBreakup;
         j["glowShadow"] = glowShadow;

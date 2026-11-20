@@ -127,8 +127,12 @@ if(APPLE)
     # ADR-1560: an identifier of its own, so Metal keeps avgen's compiled shaders in their own cache
     # ($DARWIN_USER_CACHE_DIR/com.avgen.avgen/com.apple.metal) rather than in the one every unbundled tool on the
     # machine shares -- the test binaries fill that one with gigabytes of shader variants.
-    target_link_options(avgen PRIVATE "LINKER:-sectcreate,__TEXT,__info_plist,${CMAKE_SOURCE_DIR}/cmake/avgen-Info.plist")
-    set_property(TARGET avgen APPEND PROPERTY LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/avgen-Info.plist")
+    # ADR-2109: that cache is shared by every worktree's avgen and macOS holds it near 1.1 GB, evicting the least
+    # recently used shaders; a worktree can take a cache of its own with -DAVGEN_BUNDLE_ID=com.avgen.avgen.<name>.
+    set(AVGEN_BUNDLE_ID "com.avgen.avgen" CACHE STRING "avgen's bundle identifier: names its Metal shader cache (ADR-1560/2109)")
+    configure_file("${CMAKE_SOURCE_DIR}/cmake/avgen-Info.plist" "${AVGEN_BUILD_INFO_DIR}/avgen-Info.plist" @ONLY)
+    target_link_options(avgen PRIVATE "LINKER:-sectcreate,__TEXT,__info_plist,${AVGEN_BUILD_INFO_DIR}/avgen-Info.plist")
+    set_property(TARGET avgen APPEND PROPERTY LINK_DEPENDS "${AVGEN_BUILD_INFO_DIR}/avgen-Info.plist")
 endif()
 target_include_directories(avgen PRIVATE "${AVGEN_BUILD_INFO_DIR}")
 target_link_libraries(avgen PRIVATE avgen_core)

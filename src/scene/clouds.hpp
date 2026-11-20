@@ -176,6 +176,10 @@ struct Clouds {
     float minStep = 4.0f;             // metres: the shortest step
     float stepGrowth = 0.03f;         // a step is at least this fraction of its distance from the eye
     float maxDistance = 40000.0f;     // metres the march reaches
+    // ADR-2109: ADR-1289's march -- `steps` even steps across the cloud's span, at full resolution. A clouds block
+    // that names none of resolution, temporal, minStep, stepGrowth and maxDistance was authored for that march (the
+    // biovalley shots), and reads with this on, so v2's distance-grown steps do not soften it. Saved as "evenSteps".
+    bool evenSteps = false;
     // ADR-2102
     std::vector<CloudBeam> beams;
     float beamAir = 1.0f;             // the beams' scatter in clear air (a multiplier; 0 = none)

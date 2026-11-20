@@ -518,8 +518,9 @@ def clouds_block(state="uv", moon_dir=None):
         "glowBreakup": CLOUD_LOOK["glowBreakup"], "glowShadow": CLOUD_LOOK["glowShadow"],
         "glowBreakupScale": 0.014, "glowShadowDistance": 16.0,
         "extinction": CLOUD_LOOK["extinction"], "density": 1.0, "swell": 0.0,
-        "steps": 72, "lightSteps": 6, "lightDistance": CLOUD_LOOK["lightDistance"],
-        "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02, "maxDistance": 24000.0,
+        "steps": CLOUD_Q["steps"], "lightSteps": CLOUD_Q["lightSteps"], "lightDistance": CLOUD_LOOK["lightDistance"],
+        "resolution": CLOUD_Q["resolution"], "temporal": CLOUD_Q["temporal"], "minStep": CLOUD_Q["minStep"],
+        "stepGrowth": CLOUD_Q["stepGrowth"], "maxDistance": 24000.0,
         "lightDirection": r3(LIGHT_DIR), "lightColor": pal("moon_light", state),
         "lightIntensity": CLOUD_LOOK["lightIntensity"], "anisotropy": CLOUD_LOOK["anisotropy"],
         "ambientTop": [v * CLOUD_LOOK["ambientTop"] for v in pal("sky_horizon", state)],
@@ -530,7 +531,7 @@ def clouds_block(state="uv", moon_dir=None):
         # ADR-2106: each lobe's surface eaten by billow octaves (cauliflower crowns, wispy flat bases); the key's light
         # through six squared taps with multiple scattering (two even taps cast every lobe as a black stencil)
         "erosion": CLOUD_LOOK["erosion"], "erosionScale": CLOUD_LOOK["erosionScale"], "erosionDetail": 1.0,
-        "erosionCurl": 6.0, "erosionFlatten": 0.4, "erosionOctaves": 3,
+        "erosionCurl": 6.0, "erosionFlatten": 0.4, "erosionOctaves": CLOUD_Q["erosionOctaves"],
         "lightSpacing": 2, "multiScatter": CLOUD_LOOK["multiScatter"],
         "drift": r3([v * 0.7 for v in cb["drift"]]),
         "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": CLOUD_LOOK["powder"], "seed": 7,
@@ -555,6 +556,15 @@ CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseA
               # iteration 6: the art's cloud design v3 is built for 0.15 ("designed_for"); at 0.02 every formation
               # read as fog
               "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
+# iteration 8: the cloud march's cost knobs, by quality. "offline" is the look every render so far was judged on; "live"
+# is the 1080p30 soft target's preset (build.py --quality live writes neon-dreams-live.{scene.json,json} beside it)
+CLOUD_QUALITY = {
+    "offline": {"steps": 72, "lightSteps": 6, "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02,
+                "erosionOctaves": 3},
+    "live": {"steps": 72, "lightSteps": 6, "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02,
+             "erosionOctaves": 3},
+}
+CLOUD_Q = dict(CLOUD_QUALITY["offline"])
 AIR = {"density": 0.0003, "scattering": 0.0, "fogSky": 0.5}   # extinction = density x volumeAbsorption 0.5
 WELL_GLOW = {"radius": 95.0, "intensity": 6.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
 LOBE_ERODE = {"plug": 0.3, "seat": 0.3}
@@ -1008,7 +1018,18 @@ def main():
     ap.add_argument("--sky", default="sky/sky_uv.hdr", help="equirect sky map relative to this folder ('' = analytic)")
     ap.add_argument("--no-clouds", action="store_true", help="the cloud block disabled (for an A/B of its cost)")
     ap.add_argument("--no-arc", action="store_true", help="hold the starting palette (no palette arc tracks)")
+    ap.add_argument("--quality", default="offline", choices=sorted(CLOUD_QUALITY),
+                    help="the cloud march's cost preset; 'live' writes <name>-live.* unless --name is given")
+    ap.add_argument("--cloud", action="append", default=[], metavar="KEY=VALUE",
+                    help="override one cloud quality knob (for measuring a preset); repeatable")
     a = ap.parse_args()
+    CLOUD_Q.clear()
+    CLOUD_Q.update(CLOUD_QUALITY[a.quality])
+    for kv in a.cloud:
+        k, v = kv.split("=", 1)
+        CLOUD_Q[k] = int(v) if k in ("steps", "lightSteps", "erosionOctaves") else float(v)
+    if a.quality != "offline" and a.name == "neon-dreams":
+        a.name = "neon-dreams-" + a.quality
     os.makedirs(a.out, exist_ok=True)
     sky = os.path.relpath(os.path.join(HERE, a.sky), a.out) if a.sky else None
     scene_path = os.path.join(a.out, a.name + ".scene.json")

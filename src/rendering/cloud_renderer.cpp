@@ -562,7 +562,8 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.warmColor = glm::vec4(c.warmColor, c.noiseAmount);
     u.haze = glm::vec4(c.hazeColor, c.hazeDistance);
     u.march = glm::vec4(static_cast<float>(c.steps), static_cast<float>(c.lightSteps), c.lightDistance, c.noiseScale);
-    u.march2 = glm::vec4(c.minStep, c.stepGrowth, c.maxDistance, c.detailScale);
+    // ADR-2109: a negative growth asks the shader for ADR-1289's even steps
+    u.march2 = glm::vec4(c.minStep, c.evenSteps ? -1.0f : c.stepGrowth, c.maxDistance, c.detailScale);
     const float seaTop = c.sea.top + c.swell * 0.5f * (c.sea.top - c.sea.base);
     u.sea = glm::vec4(c.sea.base, seaTop, std::clamp(c.sea.coverage + 0.15f * c.swell, 0.0f, 1.0f),
                       c.sea.coverageScale);

@@ -351,6 +351,54 @@ fn densityBase(p: vec3<f32>, e: Ero) -> Density {
     return out;
 }
 
+// ADR-2109: ADR-1289's density, for a block written for its march (evenSteps): the lobes' soft ellipsoids (the same
+// union lobeBase reads, uneroded) shaped by billows of domain-warped value noise and eroded into wisps by a finer fbm.
+// Ported unchanged from the ADR-1289 shader so the biovalley shots keep the look they were authored with.
+fn legacyHash3(p: vec3<f32>) -> f32 {
+    let q = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+    let r = q + dot(q, q.yxz + 33.33);
+    return fract((r.x + r.y) * r.z);
+}
+
+fn legacyNoise(p: vec3<f32>) -> f32 {
+    let i = floor(p);
+    let f = p - i;
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = mix(mix(legacyHash3(i), legacyHash3(i + vec3<f32>(1.0, 0.0, 0.0)), u.x),
+                mix(legacyHash3(i + vec3<f32>(0.0, 1.0, 0.0)), legacyHash3(i + vec3<f32>(1.0, 1.0, 0.0)), u.x), u.y);
+    let b = mix(mix(legacyHash3(i + vec3<f32>(0.0, 0.0, 1.0)), legacyHash3(i + vec3<f32>(1.0, 0.0, 1.0)), u.x),
+                mix(legacyHash3(i + vec3<f32>(0.0, 1.0, 1.0)), legacyHash3(i + vec3<f32>(1.0, 1.0, 1.0)), u.x), u.y);
+    return mix(a, b, u.z);
+}
+
+fn legacyFbm(p: vec3<f32>, octaves: u32) -> f32 {
+    var s = 0.0;
+    var a = 0.5;
+    var q = p;
+    for (var o = 0u; o < octaves; o = o + 1u) {
+        s = s + a * legacyNoise(q);
+        q = q * 2.03 + vec3<f32>(17.1, -9.3, 4.7);
+        a = a * 0.5;
+    }
+    return s / (1.0 - pow(0.5, f32(octaves)));
+}
+
+fn legacyDensity(p: vec3<f32>, detail: u32) -> f32 {
+    let base = lobeBase(p, noErosion()).x;
+    if (base <= 0.0) {
+        return 0.0;
+    }
+    let ns = cu.march.w;
+    let seed = vec3<f32>(cu.grid2.y * 7.13, cu.grid2.y * 3.71, 0.0);
+    let warp = vec3<f32>(legacyNoise(p * ns * 0.5 + seed), legacyNoise(p * ns * 0.5 + seed + 11.0),
+                         legacyNoise(p * ns * 0.5 + seed + 23.0)) - 0.5;
+    let n2 = legacyFbm(p * ns + warp * 2.5 + seed, detail);
+    let billow = legacyFbm(p * ns * 0.35 + warp + seed * 0.5, 3u);
+    let a = cu.warmColor.w;
+    let shaped = base * mix(1.0, smoothstep(0.25, 0.7, billow), a);
+    return clamp((shaped - a * (1.0 - n2) * 0.9) * (1.0 + a), 0.0, 1.0);
+}
+
 fn detailErode(p: vec3<f32>, base: f32) -> f32 {
     let q = p + cu.drift.xyz * 1.7;
     let d = noiseTap(q, cu.march2.w);
@@ -596,7 +644,10 @@ fn fs_clouds(in: VsOut) -> MarchOut {
     var col = vec3<f32>(0.0);
     var tSum = 0.0;
     var wSum = 0.0;
-    var dt = max(minStep, tA * growth);
+    // ADR-2109: growth < 0 is ADR-1289's march: `steps` even steps across the span, no stride or skip
+    let even = growth < 0.0;
+    let evenDt = (tB - tA) / f32(max(steps, 1u));
+    var dt = select(max(minStep, tA * growth), evenDt, even);
     var t = tA + dt * jitter;
     for (var s = 0u; s < steps; s = s + 1u) {
         if (t >= tB) {
@@ -605,14 +656,23 @@ fn fs_clouds(in: VsOut) -> MarchOut {
         let p = ro + rd * t;
         let octaves = u32(clamp(cu.erosion2.x, 1.0, 3.0) + 0.5);
         let ero = erosionAt(p, octaves, max(t * pixAngle, 0.5 * max(minStep, t * growth)));
-        let db = densityBase(p, ero);
-        dt = max(minStep, t * growth);
+        var db = densityBase(p, ero);
+        dt = select(max(minStep, t * growth), evenDt, even);
+        if (even && db.base > 0.0) {
+            db.base = legacyDensity(p, 4u); // ADR-2109
+        }
         if (db.base > 0.0) {
-            let dens = detailErode(p, db.base);
+            let dens = select(detailErode(p, db.base), db.base, even);
             if (dens > 0.003) {
                 // the key's light reaching this point (the light march reads the undetailed density)
                 var od = 0.0;
-                if (lightSteps == 0u) {
+                if (even) {
+                    // ADR-2109: ADR-1289's light march -- even taps through the eroded density, no 0.7
+                    for (var j = 1u; j <= lightSteps; j = j + 1u) {
+                        od = od + legacyDensity(p + L * (f32(j) * lightDt), 2u) * lightDt;
+                    }
+                    od = od / 0.7;
+                } else if (lightSteps == 0u) {
                     if (db.above < 0.0) {
                         // ADR-2101: the relief sea shadows itself through its height field
                         od = seaShadow(p, L) + (-1.0 - db.above) / max(L.y, 0.25);
@@ -621,7 +681,9 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                         od = db.above / max(L.y, 0.25);
                     }
                 }
-                if (cu.erosion2.y > 1.5) {
+                if (even) {
+                    // ADR-2109: taken above
+                } else if (cu.erosion2.y > 1.5) {
                     // ADR-2106: taps spaced by the square of their index (dense near the sample, where a billow
                     // shadows its neighbour; sparse far out), jittered per pixel and frame so the temporal resolve
                     // integrates between them. Even taps of tens of metres read the shadow as hard silhouettes of
@@ -732,7 +794,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     break;
                 }
             }
-        } else {
+        } else if (!even) {
             dt = dt * 2.0; // empty air: stride
             // ADR-2101: and jump empty columns above the sea outright
             let skip = emptySkip(ro, rd, t + dt, seaEntry, boxEntry);

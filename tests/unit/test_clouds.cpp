@@ -408,3 +408,29 @@ TEST_CASE("clouds: a lobe's erode share reads, validates and round-trips; 32 glo
                                   fs::temp_directory_path())
               .has_value());
 }
+
+TEST_CASE("clouds: a block written for ADR-1289's march keeps its even steps", "[unit][clouds][adr2109]") {
+    const json lobe = json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}});
+    // the biovalley shots: none of the v2 march's keys
+    auto legacy = scene::Clouds::fromJson({{"lobes", lobe}, {"steps", 128}}, fs::temp_directory_path());
+    REQUIRE(legacy);
+    CHECK(legacy->evenSteps);
+    CHECK(legacy->resolution == 1.0f);
+    // it survives a save (toJson writes resolution and the step keys, so the flag itself is written)
+    auto again = scene::Clouds::fromJson(legacy->toJson(), fs::temp_directory_path());
+    REQUIRE(again);
+    CHECK(again->evenSteps);
+    CHECK(again->resolution == 1.0f);
+    // any v2 march key opts into the v2 march, with its defaults
+    auto v2 = scene::Clouds::fromJson({{"lobes", lobe}, {"stepGrowth", 0.02}}, fs::temp_directory_path());
+    REQUIRE(v2);
+    CHECK_FALSE(v2->evenSteps);
+    CHECK(v2->resolution == 0.5f);
+    CHECK_FALSE(v2->toJson().contains("evenSteps"));
+    // and the flag can be asked for with a resolution of its own
+    auto explicitEven = scene::Clouds::fromJson({{"lobes", lobe}, {"evenSteps", true}, {"resolution", 0.5}},
+                                                fs::temp_directory_path());
+    REQUIRE(explicitEven);
+    CHECK(explicitEven->evenSteps);
+    CHECK(explicitEven->resolution == 0.5f);
+}
