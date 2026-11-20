@@ -443,66 +443,6 @@ BEAM_STANDINS = {"harbour_light", "outer_light", "break_light"}
 GLOW_SCALE = {"condensery_keel": 0.35}
 
 
-def veil_passage():
-    """Lobes laid along the journey from the garden's edge (46.9 s) to the thinning (53.5-57 s): the camera is inside
-    cloud the whole way, and from the town the passage reads as one tall turret (envelope lobes beside and above the
-    path, the highest about 290 m). Deterministic. Returns (lobes, path points of the glows)."""
-    _, _, _, s_at, dense, total = journey(full=True)
-    rnd = random.Random(2102)
-    cum = [0.0]
-    for k in range(1, len(dense)):
-        cum.append(cum[-1] + math.dist(dense[k - 1], dense[k]))
-
-    def point(t):
-        target = s_at(t)
-        for k in range(1, len(cum)):
-            if cum[k] >= target:
-                u = (target - cum[k - 1]) / max(cum[k] - cum[k - 1], 1e-6)
-                return [dense[k - 1][j] + (dense[k][j] - dense[k - 1][j]) * u for j in range(3)]
-        return dense[-1]
-    lobes = []
-    t = 46.9
-    while t < 57.2:
-        p = point(t)
-        # density: solid until 53.5 s, then thinning to wisps by 57 s
-        thin = min(max((t - 53.5) / 3.5, 0.0), 1.0)
-        dens = round(1.0 - 0.8 * thin, 3)
-        r = rnd.uniform(48.0, 70.0) * (1.0 - 0.35 * thin)
-        c = [p[0] + rnd.uniform(-10, 10), p[1] + rnd.uniform(-8, 12), p[2] + rnd.uniform(-12, 12)]
-        if thin < 0.95 and not (thin > 0.3 and rnd.random() < 0.35 * thin):
-            # iteration 5: the core is no longer one even density -- denser knots and thinner voids alternate, so
-            # the passage has structure to light and the toms' pockets something to light it from
-            knot = rnd.choice((0.35, 0.6, 0.85, 1.0, 1.0))
-            lobes.append({"c": r3(c), "r": round(r, 1), "scale": [1.0, 0.85, 1.0], "density": round(min(dens * knot, 1.0), 3),
-                          "soft": round(rnd.uniform(0.4, 0.7), 2)})
-            if thin < 0.6 and rnd.random() < 0.55:   # a smaller dense knot off the axis
-                lobes.append({"c": r3([c[0] + rnd.uniform(-25, 25), c[1] + rnd.uniform(-15, 25),
-                                       c[2] + rnd.uniform(-30, 30)]),
-                              "r": round(rnd.uniform(14.0, 26.0), 1), "scale": [1.0, 0.8, 1.0],
-                              "density": 1.0, "soft": 0.35})
-        if thin < 0.4:
-            # the envelope: beside and above, so the turret has a silhouette
-            for side in (-1, 1):
-                if rnd.random() < 0.7:
-                    rr = rnd.uniform(70.0, 105.0)
-                    lobes.append({"c": r3([c[0] + rnd.uniform(-20, 20), c[1] + rnd.uniform(10, 60),
-                                           c[2] + side * rnd.uniform(55, 85)]),
-                                  "r": round(rr, 1), "scale": [1.0, 1.15, 1.0], "density": 1.0, "soft": 0.45})
-            if 48.5 < t < 53.0 and rnd.random() < 0.6:
-                lobes.append({"c": r3([c[0], c[1] + rnd.uniform(75, 110), c[2] + rnd.uniform(-25, 25)]),
-                              "r": round(rnd.uniform(60.0, 85.0), 1), "scale": [1.0, 1.0, 1.0], "density": 1.0,
-                              "soft": 0.4})
-        t += 0.55 if thin == 0 else 0.4
-    # inner-lit pockets along the passage (the toms flash them in turn; a dim rest glow keeps the interior from
-    # reading as one flat colour)
-    pockets = []
-    for i, tp in enumerate((47.6, 48.6, 49.8, 51.0, 52.2, 53.4)):
-        p = point(tp)
-        side = -1 if i % 2 else 1
-        pockets.append(r3([p[0] + rnd.uniform(10, 30), p[1] + rnd.uniform(-12, 18), p[2] + side * rnd.uniform(18, 38)]))
-    return lobes, {"rose": point(49.8), "amber": point(57.8), "pockets": pockets}
-
-
 def clouds_block(state="uv", moon_dir=None):
     lobes = []
     for name, ls in DESIGN["masses"].items():
@@ -510,26 +450,23 @@ def clouds_block(state="uv", moon_dir=None):
     far = []   # ADR-2104: the far towers on their own grid (in one set they overflowed 18 hero cells)
     for name, ls in DESIGN.get("far_masses", {}).items():
         far += [dict(l) for l in ls]
-    passage, gp = veil_passage()
-    lobes += passage
     cb = DESIGN["clouds_block"]
     glows = [{"name": g["name"], "position": g["position"], "color": pal(g["key"], state), "radius": g["radius"],
               "intensity": g["intensity"] * GLOW_SCALE.get(g["name"], 1.0)} for g in cb["glows"]
              if g["name"] not in BEAM_STANDINS]
-    # the Veil: rose light inside (the toms flash it), and the first amber of the Condensery ahead
-    glows.append({"name": "veil_rose", "position": r3(gp["rose"]), "color": pal("garden_a", state), "radius": 70.0,
-                  "intensity": 0.5})
-    glows.append({"name": "veil_amber", "position": r3([gp["amber"][0] + 90, gp["amber"][1] + 10, gp["amber"][2] - 25]),
-                  "color": pal("cond_a", state), "radius": 55.0, "intensity": 1.2})
-    for i, pp in enumerate(gp["pockets"]):
-        glows.append({"name": "veil_pocket%d" % i, "position": pp,
-                      "color": pal("garden_b" if i % 2 else "garden_a", state), "radius": 30.0, "intensity": 0.6})
+    # iteration 6: the Veil is the art's (cloud design v3: rooms built as absences in masses.veil, a plug before the
+    # reveal); its glows come from the design under the names the routes use. The generated passage is gone.
+    veil_glows = DESIGN.get("veil", {}).get("glows", [])
+    for g in veil_glows:
+        glows.append({"name": g["name"], "position": g["position"], "color": pal(g["key"], state), "radius": g["radius"],
+                      "intensity": g["intensity"]})
     GLOW_INDEX.clear()
+    GLOW_BASE.clear()
+    GLOW_BASE.update({g["name"]: g["intensity"] for g in glows})
     GLOW_INDEX.update({g["name"]: i for i, g in enumerate(glows)})
     GLOW_KEYS.clear()
     GLOW_KEYS.update({g["name"]: g["key"] for g in cb["glows"]})
-    GLOW_KEYS.update({"veil_rose": "garden_a", "veil_amber": "cond_a"})
-    GLOW_KEYS.update({"veil_pocket%d" % i: ("garden_b" if i % 2 else "garden_a") for i in range(len(gp["pockets"]))})
+    GLOW_KEYS.update({g["name"]: g["key"] for g in veil_glows})
     sea = DESIGN["sea_design"]
     br = sea["break"]
     lo, hi = sea["top_range"]
@@ -545,14 +482,14 @@ def clouds_block(state="uv", moon_dir=None):
         # ADR-2104: the glows light the cloud's structure (pockets and the billows facing them), not spheres
         "glowBreakup": CLOUD_LOOK["glowBreakup"], "glowShadow": CLOUD_LOOK["glowShadow"],
         "glowBreakupScale": 0.014, "glowShadowDistance": 16.0,
-        "extinction": 0.02, "density": 1.0, "swell": 0.0,
+        "extinction": CLOUD_LOOK["extinction"], "density": 1.0, "swell": 0.0,
         "steps": 72, "lightSteps": 2, "lightDistance": CLOUD_LOOK["lightDistance"],
         "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02, "maxDistance": 24000.0,
         "lightDirection": r3(LIGHT_DIR), "lightColor": pal("moon_light", state),
         "lightIntensity": CLOUD_LOOK["lightIntensity"], "anisotropy": CLOUD_LOOK["anisotropy"],
         "ambientTop": [v * CLOUD_LOOK["ambientTop"] for v in pal("sky_horizon", state)],
         "ambientBottom": [v * CLOUD_LOOK["ambientBottom"] for v in pal("haze", state)],
-        "warmColor": [v * 0.10 for v in pal("horizon_glow", state)], "warmDirection": r3(cb["warmDirection"]),
+        "warmColor": [v * CLOUD_LOOK["warm"] for v in pal("horizon_glow", state)], "warmDirection": r3(cb["warmDirection"]),
         "warmHeight": 900.0,
         "noiseScale": 0.018, "noiseAmount": 0.72, "detailScale": 0.07, "detailAmount": 0.6,
         "drift": r3([v * 0.7 for v in cb["drift"]]),
@@ -567,11 +504,15 @@ def clouds_block(state="uv", moon_dir=None):
 
 
 # the cloud look (iteration 4: dark indigo bodies, rims toward the key, the city's light on them)
-CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.45, "lightDistance": 260.0, "ambientTop": 0.45,
-              "ambientBottom": 0.10, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
-              "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2}
+CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.35, "lightDistance": 260.0, "ambientTop": 0.25,
+              "ambientBottom": 0.06, "warm": 0.15, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
+              "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2,
+              # iteration 6: the art's cloud design v3 is built for 0.15 ("designed_for"); at 0.02 every formation
+              # read as fog
+              "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
 GLOW_INDEX = {}   # glow name -> index in clouds.glows (route targets)
 GLOW_KEYS = {}    # glow name -> palette key
+GLOW_BASE = {}    # glow name -> its rest intensity
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -771,13 +712,13 @@ def reactivity():
             routes.append(R("stem.bass.level", "material/%s/emissionIntensity" % n,
                             0.4 * info["doc"]["emissionIntensity"], **ember))
     # --- kick: the ring is the kickRing onset field on the kick stem's onsets (feeds.historyOnsets); no route
-    # --- snare: businesses A and B in turn (random.snareTurn cycles 0, 1 on each snare hit); the gangway strips
+    # --- snare: businesses A and B in turn (timeline.snareTurn steps 0, 1 on each snare onset); the gangway strips
     for n, info in PROGS.items():
         g = info["group"]
         if g in ("snareA", "snareB"):
             r = R("stem.snare.onset", "material/%s/emissionIntensity" % n, 1.1 * info["doc"]["emissionIntensity"],
                   attackMs=6.0, decayMs=320.0)
-            r.update({"depthSource": "random.snareTurn", "depthMin": 1.0 if g == "snareA" else 0.0,
+            r.update({"depthSource": "timeline.snareTurn", "depthMin": 1.0 if g == "snareA" else 0.0,
                       "depthMax": 0.0 if g == "snareA" else 1.0})
             routes.append(r)
         elif g == "gangway":
@@ -826,9 +767,22 @@ def reactivity():
             full = ROLE_GAIN["beacon"] * 0.9 if info["group"] == "block_beacon" else ROLE_GAIN["neon_a"] * 0.9
             routes.append(R("stem.block.level", "material/%s/emissionIntensity" % n, full, attackMs=20.0,
                             decayMs=180.0))
-            routes.append(R("random.blockStep", info["prog"].path("chase", "value"), 0.75, op="replace"))
-    sources = [{"kind": "random", "name": "snareTurn", "settings": {"trigger": "stem.snare.onset", "seed": 1, "cycle": 2}},
-               {"kind": "random", "name": "blockStep", "settings": {"trigger": "stem.block.onset", "seed": 1, "cycle": 4}}]
+            routes.append(R("timeline.blockStep", info["prog"].path("chase", "value"), 0.75, op="replace"))
+    # iteration 6: the alternation is a step timeline over the onsets AV Gen itself detects (audio/
+    # sabertooth_engine_onsets.json), not a counting source: a count restarts at 0 on a seek, a timeline is a function of
+    # time, so a seek lands on the same group play would. The k-th onset gives step k mod n of n even steps over [0, 1],
+    # set half a frame before the onset's frame.
+    with open(os.path.join(HERE, "audio", "sabertooth_engine_onsets.json")) as f:
+        eng = json.load(f)
+    half = 0.5 / eng["fps"]
+
+    def steps(times, n):
+        keys = [{"time": 0.0, "value": 0.0, "interp": "step"}]
+        for k, t in enumerate(times):
+            keys.append({"time": round(max(t - half, 0.0), 4), "value": round((k % n) / (n - 1), 4), "interp": "step"})
+        return keys
+    sources = [{"kind": "timeline", "name": "snareTurn", "settings": {"loopLength": 0.0, "keys": steps(eng["snare"], 2)}},
+               {"kind": "timeline", "name": "blockStep", "settings": {"loopLength": 0.0, "keys": steps(eng["block"], 4)}}]
 
     # --- the palette arc
     def P(key):
@@ -875,7 +829,7 @@ def reactivity():
                                                   "air", SONG)),
         AU.track("clouds/ambientBottom", AU.arc_keys(lambda st: [v * L["ambientBottom"] for v in pal("haze", st)],
                                                      "air", SONG)),
-        AU.track("clouds/warmColor", AU.arc_keys(lambda st: [v * 0.10 for v in pal("horizon_glow", st)], "air", SONG)),
+        AU.track("clouds/warmColor", AU.arc_keys(lambda st: [v * L["warm"] for v in pal("horizon_glow", st)], "air", SONG)),
         AU.track("clouds/hazeColor", AU.arc_keys(P("haze"), "air", SONG)),
     ]
     # the far field: the nebula (the sky map is the Ultraviolet bake: a per-channel tint moves its hue), the moon's
@@ -900,6 +854,20 @@ def reactivity():
                            AU.arc_keys(lambda st: pal("ocean_a", st) + [1.0], "far", SONG)))
     tracks.append(AU.track("material/ndOcean/op/10/oklabRamp/constant3",
                            AU.arc_keys(lambda st: pal("ocean_b", st) + [1.0], "far", SONG)))
+    # iteration 6 (art request 5): the Condensery is held at a tenth of its light until the crash that ends the
+    # Veil (C_FAR, 56.88 s) and comes up over 0.85 s on it: the works lights up as the plug opens, and nothing of it can
+    # show through the plug's last metres before then
+    lit_at = AU.C_FAR
+    hold = [(0.0, 0.1), (round(lit_at - 0.85, 3), 0.1), (round(lit_at, 3), 1.0)]
+
+    def held(base):
+        return [{"time": t, "value": round(base * f, 4), "interp": "linear"} for t, f in hold]
+    for n, info in sorted(PROGS.items()):
+        if info["group"] == "cond":
+            tracks.append(AU.track("material/%s/emissionIntensity" % n, held(info["doc"]["emissionIntensity"])))
+    for name, i in sorted(GLOW_INDEX.items()):
+        if name.startswith("condensery_"):
+            tracks.append(AU.track("clouds/glow/%d/intensity" % i, held(GLOW_BASE[name])))
     return routes, tracks, sources
 
 

@@ -8,7 +8,7 @@ One instrument, one system, never the whole town at once (art-direction section 
 |              | Condensery's every light and its plume/throat glows, as a slow ember (the Condensery's only cue) |
 | Kick onset   | a ring of light leaving the Great Lantern at 120 m/s (an onset field on the kick stem's onsets): |
 |              | eave lines, lantern strings and pier lights, lit panes brighten as it passes each building     |
-| Snare onset  | sign businesses A and B in turn (a cycle source on the snare), gangway strips                  |
+| Snare onset  | sign businesses A and B in turn (a step timeline on the snare onsets), gangway strips                  |
 | HH onset     | sparkle on the garden umbels' points, lantern bulbs, keel lanterns; star twinkle                 |
 | Toms onset   | a ripple running along the Quay's lantern strings; flashes of the Veil's inner pockets          |
 | Crash onset  | section events: the palette arc's steps, the sky's horizon lift, the lighthouse beams flaring   |
@@ -19,7 +19,9 @@ One instrument, one system, never the whole town at once (art-direction section 
 
 The palette arc (Ultraviolet Dream -> Neon Rose -> Electric Blue -> Amber Eclipse) steps on the crash stem's section
 crashes as timeline tracks, each system at its own rate (signs 1.5 s, eaves 2.5 s, windows 6 s with every building
-starting within 4 s, garden and lanterns 4 s, the bell 5 s, cloud underlight 10 s, the air 16 s, the far field 30 s).
+starting within 4 s, garden and lanterns 4 s, the bell 5 s, cloud underlight 10 s, the air 16 s, the far field 30 s;
+iteration 6: the later steps are quicker -- Electric Blue in the air and sky over 7-9 s, Amber Eclipse in the clouds, the
+air and the sky over 5-6 s from the crash at 56.88 s, so each mood is fully there while it is on screen).
 Colours interpolate in linear RGB between neighbouring states (violet, rose, blue and amber never pass through green).
 The Condensery keeps its amber; the Lone Lamp its single amber window; beacons stay red.
 """
@@ -45,9 +47,9 @@ ARC = {
     "practical": [(C_ARRIVAL, "rose", 6.0), (C_VEIL, "blue", 6.0), (C_REVEAL, "amber", 6.0)],
     "garden":   [(C_ARRIVAL, "rose", 4.0), (C_VEIL, "blue", 4.0), (C_REVEAL, "amber", 4.0)],
     "bell":     [(C_ARRIVAL, "rose", 5.0), (C_VEIL, "blue", 5.0), (C_REVEAL, "amber", 5.0)],
-    "underlight": [(C_ARRIVAL, "rose", 10.0), (C_VEIL, "blue", 10.0), (C_REVEAL, "amber", 10.0)],
-    "air":      [(C_ARRIVAL, "rose", 16.0), (C_VEIL, "blue", 16.0), (C_FAR, "amber", 13.0)],
-    "far":      [(C_ARRIVAL, "rose", 30.0), (C_VEIL, "blue", 20.0), (C_FAR, "amber", 13.0)],
+    "underlight": [(C_ARRIVAL, "rose", 10.0), (C_VEIL, "blue", 6.0), (C_FAR, "amber", 5.0)],
+    "air":      [(C_ARRIVAL, "rose", 16.0), (C_VEIL, "blue", 7.0), (C_FAR, "amber", 5.0)],
+    "far":      [(C_ARRIVAL, "rose", 30.0), (C_VEIL, "blue", 9.0), (C_FAR, "amber", 6.0)],
 }
 
 
