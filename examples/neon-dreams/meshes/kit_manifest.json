@@ -4530,6 +4530,37 @@
    ],
    "what": "a floating rock island, 1 unit across, top at 0 (scale = width in metres)",
    "third_party": "derived by blender/nd_isles.py from assets/treeisle/floating-isle-bare.glb (owner-supplied, no licence recorded): gitignored, never committed"
+  },
+  {
+   "asset": "props/jet_plume.glb",
+   "tris": 1472,
+   "bounds_m": [
+    -0.155,
+    -0.515,
+    -0.073,
+    0.155,
+    0.0,
+    0.073
+   ],
+   "materials": [
+    "jet_collar",
+    "jet_flame"
+   ],
+   "socket": {
+    "joint": "Backpack",
+    "position": [
+     0.0,
+     0.31,
+     0.01
+    ],
+    "rotation_deg": [
+     180.0,
+     0.0,
+     0.0
+    ],
+    "note": "cast variants alien-pilot and alien-ranger (Backpack_Jet); GLB -Y along the joint's +Y"
+   },
+   "note": "iteration 10 (msg 117): lantern-bulb exhaust for the jet-pack flyers; emissive roles jet_flame / jet_collar"
   }
  ]
 }
