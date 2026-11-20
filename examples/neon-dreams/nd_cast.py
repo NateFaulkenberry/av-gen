@@ -101,7 +101,20 @@ def track(target, keys):
             "loopLength": 0.0, "keys": keys}
 
 
-def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kicks):
+def apply_fixes(via, fixes):
+    """msg 123: move each via point by the pushes found near it (within 4 m, fading out), from the clearance check."""
+    out = []
+    for v in via:
+        d = [0.0, 0.0, 0.0]
+        for q, push in fixes:
+            w = max(0.0, 1.0 - math.dist(v, q) / 4.0)
+            for i in range(3):
+                d[i] += push[i] * w
+        out.append([v[i] + d[i] for i in range(3)])
+    return out
+
+
+def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kicks, fixes=None):
     """Returns (nodes, tracks, lights, sequence actors, crowd names, wake names)."""
     r = random.Random(1012)
     bobs = {b["name"]: b for b in design.get("bobs", [])}
@@ -169,6 +182,21 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         pause = p.get("pause_s", 2.5)
         seg = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
         out_t = sum(seg) / speed
+        # msg 125: a stop on the way out (a shopfront): the out leg is split there, Idle for its seconds, facing it
+        stops = p.get("stops", [])
+        out_pts, stop_at = list(pts), {}
+        for frac, dur, syaw in stops:
+            target, acc = frac * sum(seg), 0.0
+            for i in range(len(out_pts) - 1):
+                L = math.dist(out_pts[i], out_pts[i + 1])
+                if acc + L >= target and L > 0:
+                    u = (target - acc) / L
+                    q = [out_pts[i][j] + (out_pts[i + 1][j] - out_pts[i][j]) * u for j in range(3)]
+                    out_pts.insert(i + 1, q)
+                    stop_at[i + 1] = (dur, syaw)
+                    break
+                acc += L
+        out_t += sum(d for d, _ in stop_at.values())
         lap = 2 * (out_t + pause)
         for w in range(max(1, int(p.get("walkers", 1)))):
             cast = (p.get("cast") or ["alien-scout"])[w % len(p.get("cast") or ["x"])]
@@ -180,7 +208,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             pk, rk, cues = [], [], []
             t0 = -offset
             while t0 < song + 1:
-                for leg, (a_pts, start) in enumerate(((pts, t0), (pts[::-1], t0 + out_t + pause))):
+                for leg, (a_pts, start) in enumerate(((out_pts, t0), (pts[::-1], t0 + out_t + pause))):
                     tt = start
                     for i in range(len(a_pts) - 1):
                         d = [a_pts[i + 1][j] - a_pts[i][j] for j in range(3)]
@@ -191,6 +219,14 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                         tt += math.dist(a_pts[i], a_pts[i + 1]) / speed
                         pk.append({"time": round(tt, 3), "value": r3(a_pts[i + 1]), "interp": "linear"})
                         rk.append({"time": round(tt - 0.15, 3), "value": yaw, "interp": "linear"})
+                        if leg == 0 and (i + 1) in stop_at:
+                            dur, syaw = stop_at[i + 1]
+                            cues.append({"time": round(tt, 3), "clip": "Idle", "speed": 1.0, "blend": 0.4})
+                            rk.append({"time": round(tt + 0.6, 3), "value": syaw, "interp": "linear"})
+                            rk.append({"time": round(tt + dur - 0.5, 3), "value": syaw, "interp": "linear"})
+                            tt += dur
+                            pk.append({"time": round(tt, 3), "value": r3(a_pts[i + 1]), "interp": "linear"})
+                            cues.append({"time": round(tt - 0.3, 3), "clip": clip, "speed": rate, "blend": 0.35})
                     # the end: Idle, and a turn on the spot in its last 0.8 s
                     cues.append({"time": round(start, 3), "clip": clip, "speed": rate, "blend": 0.35})
                     cues.append({"time": round(tt, 3), "clip": "Idle", "speed": 1.0, "blend": 0.4})
@@ -214,7 +250,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                 k["value"] = [0.0, round(k["value"] + shift, 1), 0.0]
             pk = _clip_start(pk)
             rk = _clip_start(rk)
-            cues = [c for c in cues if c["time"] < song]
+            cues = sorted([c for c in cues if c["time"] < song], key=lambda c: c["time"])
             before = [c for c in cues if c["time"] <= 0]
             cues = ([dict(before[-1], time=0.0)] if before else []) + [c for c in cues if c["time"] > 0]
             n = {"name": name, "kind": "gltf", "asset": aliens + cast + ".glb", "position": pk[0]["value"],
@@ -241,9 +277,24 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
 
     # ---- flyers
     for fdat in pop.get("flyers", []):
+        if "flyer_" + fdat["id"] in (fixes or {}).get("_drop", []):
+            continue   # msg 123: no clear route found (listed in art/flight_fixes.json)
         keys = fdat["keys"]
         cruise = [k for k in keys if k.get("clip") == "Flying_jet"]
-        via = [k["pos"] for k in cruise[::max(1, len(cruise) // 6)]] if cruise else []
+        # the art's ray-checked cruise, one via point a second (fewer cut the loops its route makes round the bell)
+        step = max(1, int(round(0.4 / max(1e-3, (cruise[1]["t"] - cruise[0]["t"]))))) if len(cruise) > 1 else 1
+        via = [k["pos"] for k in cruise[::step]] if cruise else []
+        # the art's glide down to the deck becomes my vertical descent: a diagonal glide passed through the Lantern's
+        # gallery (msg 123's check); the via ends where the route starts to come down
+        if len(via) > 2:
+            top = max(v[1] for v in via)
+            while len(via) > 2 and via[-1][1] < top - 3.0:
+                via.pop()
+        via = apply_fixes(via, (fixes or {}).get("flyer_" + fdat["id"], []))
+        lift = (fixes or {}).get("_lift", {}).get("flyer_" + fdat["id"], 0.0)   # msg 123: a cruise raised clear
+        if lift:
+            top = max(v[1] for v in via) + lift
+            via = [[v[0], top, v[2]] for v in via]
         ta, tb = fdat["takeoff"], fdat["landing"]
         td = fdat.get("on_beat", {}).get("touchdown_kick_s", fdat["t_land"])
         f = {"name": "flyer_" + fdat["id"], "asset": aliens + fdat["cast"] + ".glb",

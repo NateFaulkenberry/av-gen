@@ -535,14 +535,16 @@ def clip_keys(keys):
 # iteration 10 (owner msg 117): jetpack flights. The layout's "flights" when the art has written them, else the
 # engine's prototype. Only the cast with a jetpack mesh (Backpack_Jet: alien-pilot, alien-ranger) fly.
 ENGINE_FLIGHTS = [
-    {"name": "flyer00", "cast": "alien-pilot", "from": "spot_066", "to": "spot_077", "t0": 29.6, "td": 35.9, "alt": 9.0},
+    # msg 123: off spot_066 (under its roof terrace's pergola) and spot_077 (under an eave), to the open-sky search's nearest
+    {"name": "flyer00", "cast": "alien-pilot", "from": {"pos": [-47.9, 147.31, 1.3], "yaw": -141.8}, "to": {"pos": [5.5, 134.51, 3.1]},
+     "t0": 29.6, "td": 35.9, "alt": 9.0},
 ]
 SEQUENCE_ACTORS = []
 
 
 def spot_place(ref):
     if isinstance(ref, dict):
-        return {"pos": ref["pos"], "yaw": ref.get("yaw", 0.0)}
+        return {"pos": ref["pos"], "yaw": ref.get("yaw")}
     sp = next(s for s in LAYOUT["inhabitants"]["spots"] if s["id"] == ref)
     f = sp["forward"]
     return {"pos": sp["pos"], "yaw": math.degrees(math.atan2(f[0], f[2]))}
@@ -567,19 +569,67 @@ def cast_nodes(state="uv"):
         return a + f, fl, at + ft
     amber = pal("amber", state)
     nodes, tracks, lights, actors, crowds, wakes = NC.build(
-        POPULATION, LAYOUT, DESIGN, ALIENS, CLIP_LEN, BELL_POS, SONG, r3,
-        lambda f: FL.flight(f, r3, SONG, amber, amber), kick_onsets())
+        POPULATION, LAYOUT, DESIGN, ALIENS, CLIP_LEN, BELL_POS, SONG, r3, logged_flight(amber), kick_onsets(),
+        FLIGHT_FIXES)
     SEQUENCE_ACTORS.extend(actors)
     CROWDS[:] = crowds
+    if PROTO_FLIGHT:   # the msg 117/121 close-up's prototype flight, beside the population's
+        n, l, t = flight_nodes(state, clear=False)
+        nodes, lights, tracks = nodes + n, lights + l, tracks + t
     return nodes, lights, tracks
 
 
-def flight_nodes(state="uv"):
+FLIGHT_LOG = []   # msg 123: every flight as flown (its ends and path), for --check-flights
+
+
+def logged_flight(color):
+    def fly(f):
+        out = FL.flight(f, r3, SONG, color, color)
+        FLIGHT_LOG.append(f)
+        return out
+    return fly
+
+
+def check_flights(scene_dir):
+    """Owner msg 123: open sky over every take-off and landing, and the whole path clear of the town (Blender BVH,
+    blender/nd_flight_check.py). Prints each flight's verdict; returns the failures."""
+    import subprocess
+    req = {"flights": [{"id": f["name"], "takeoff": f["from"]["pos"], "landing": f["to"]["pos"],
+                        "lift_a": f["_lift"][0], "lift_b": f["_lift"][1], "samples": f["_samples"]} for f in FLIGHT_LOG],
+           "open_near": OPEN_NEAR}
+    a, b = os.path.join(scene_dir, "flight_check_in.json"), os.path.join(scene_dir, "flight_check.json")
+    json.dump(req, open(a, "w"))
+    subprocess.run([BLENDER, "-b", "--factory-startup", "-P", os.path.join(HERE, "blender", "nd_flight_check.py"), "--",
+                    a, b], check=True, stdout=subprocess.DEVNULL)
+    rep = json.load(open(b))
+    bad = [r for r in rep["flights"] if not r["ok"]]
+    for r in rep["flights"]:
+        print("flight check: %-28s %s (take-off %s, landing %s, clearance %s m at %s s)" % (
+            r["id"], "ok" if r["ok"] else "FAIL", "open" if r["takeoff_open"] else "BLOCKED",
+            "open" if r["landing_open"] else "BLOCKED", r["min_clearance_m"], r["worst_t"]))
+    for k, v in rep.get("open", {}).items():
+        print("open sky near %s: %s" % (k, v))
+    return bad
+
+
+BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
+# msg 123: pushes the clearance check found it needed (nearest surface, push vector), applied to the flights' via points
+FIX_PATH = os.path.join(ART, "flight_fixes.json")
+FLIGHT_FIXES = json.load(open(FIX_PATH)) if os.path.exists(FIX_PATH) else {}
+OPEN_NEAR = []
+
+
+PROTO_FLIGHT = False
+
+
+def flight_nodes(state="uv", clear=True):
     nodes, lights, tracks = [], [], []
+    if clear:
+        SEQUENCE_ACTORS.clear()
     for fdat in LAYOUT.get("flights", ENGINE_FLIGHTS):
         f = dict(fdat, asset=ALIENS + fdat.get("cast", "alien-pilot") + ".glb", **{"from": spot_place(fdat["from"]),
                                                                                   "to": spot_place(fdat["to"])})
-        n, l, t, actor = FL.flight(f, r3, SONG, pal("amber", state), pal("amber", state))
+        n, l, t, actor = logged_flight(pal("amber", state))(f)
         nodes += n
         lights += l
         tracks += t
@@ -1032,6 +1082,7 @@ def scene_doc(state="uv", sky_map=None):
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
+        FL.plume_program("ndJetPlume"),   # iteration 10b (msg 121): the jet plumes
     ] + [PROGS[n]["doc"] for n in sorted(PROGS)]
     MOON_ARGS.update({"ml": ml, "R": R, "cy": md[1] * D})
     env = {
@@ -1368,10 +1419,16 @@ def main():
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="override one environment key (number); repeatable")
     ap.add_argument("--plug-fade", default="", help="A/B: start,end,floor of the plug light's dip (iteration 10)")
+    ap.add_argument("--check-flights", action="store_true", help="msg 123: test every flight against the town (Blender)")
+    ap.add_argument("--open-near", action="append", default=[], metavar="ID:X,Y,Z:R",
+                    help="with --check-flights: find the nearest open-sky floor point")
+    ap.add_argument("--proto-flight", action="store_true", help="add the prototype flight (flyer00) to the cast")
     ap.add_argument("--crowd-test", type=int, default=0, help="capacity probe: N aliens (not the film)")
     a = ap.parse_args()
     global NO_WISPS, CROWD_TEST, PLUG_FADE
     CROWD_TEST = a.crowd_test
+    global PROTO_FLIGHT
+    PROTO_FLIGHT = a.proto_flight
     if a.plug_fade:
         PLUG_FADE = tuple(float(v) for v in a.plug_fade.split(","))
     NO_WISPS = a.no_wisps
@@ -1406,6 +1463,36 @@ def main():
             arc = []
         json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio, tracks + arc, routes, sources), f, indent=1)
     print("wrote", scene_path, "and", proj_path)
+    if a.check_flights:
+        for q in a.open_near:
+            i, p, r = q.split(":")
+            OPEN_NEAR.append({"id": i, "near": [float(v) for v in p.split(",")], "radius": float(r), "lift": 10.0})
+        bad = check_flights(a.out)
+        for rnd in range(5):   # repair: push the failing flights' via points away from what they pass too close to
+            if not bad:
+                break
+            for r in bad:
+                if rnd >= 1:   # pushes did not clear it: fly it level over the top of its route, 2.5 m higher a round
+                    lifts = FLIGHT_FIXES.setdefault("_lift", {})
+                    lifts[r["id"]] = lifts.get(r["id"], 0.0) + 2.5
+                fx = FLIGHT_FIXES.setdefault(r["id"], [])
+                for t, p, q, d in r["violations"]:
+                    n = [p[i] - q[i] for i in range(3)]
+                    ln = math.sqrt(sum(v * v for v in n)) or 1.0
+                    fx.append([r3(q), r3([v / ln * (0.9 - d) for v in n])])
+            json.dump(FLIGHT_FIXES, open(FIX_PATH, "w"), indent=0)
+            print("flight repair round %d: %s" % (rnd + 1, ", ".join(r["id"] for r in bad)))
+            FLIGHT_LOG.clear()
+            doc, tracks = scene_doc(a.palette, sky)
+            with open(scene_path, "w") as f:
+                json.dump(doc, f, indent=1)
+            with open(proj_path, "w") as f:
+                routes, arc, sources = reactivity()
+                json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio, tracks + arc, routes, sources), f, indent=1)
+            bad = check_flights(a.out)
+        if bad:
+            print("WARNING: %d flight(s) fail the clearance check: %s" % (len(bad), ", ".join(r["id"] for r in bad)))
+            sys.exit(3)
 
 
 if __name__ == "__main__":

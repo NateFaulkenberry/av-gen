@@ -147,152 +147,261 @@ def _clip_weights(cues, t):
     return w
 
 
+# ---- iteration 10b (owner msg 121: "the flight path looks crazy", "make the exhaust glow look more realistic") ----
+G = 9.81
+BANK_MAX = 20.0
+PLUME_SPLIT = 0.095        # each nozzle's offset from the pack's centre line (m, the jet mesh: +-0.163 wide)
+
+
+def _chaikin(pts, n=3):
+    """Corner cutting: the via polyline becomes a smooth, curvature-limited path that keeps its ends."""
+    for _ in range(n):
+        out = [pts[0]]
+        for a, b in zip(pts[:-1], pts[1:]):
+            out.append([0.75 * a[i] + 0.25 * b[i] for i in range(len(a))])
+            out.append([0.25 * a[i] + 0.75 * b[i] for i in range(len(a))])
+        out.append(pts[-1])
+        pts = out
+    return pts
+
+
+def _poly(pts):
+    cum = [0.0]
+    for k in range(1, len(pts)):
+        cum.append(cum[-1] + math.dist(pts[k - 1], pts[k]))
+    return pts, cum
+
+
+def _poly_at(pts, cum, s):
+    s = max(0.0, min(cum[-1], s))
+    lo, hi = 0, len(cum) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if cum[mid] <= s:
+            lo = mid
+        else:
+            hi = mid
+    d = cum[hi] - cum[lo]
+    u = (s - cum[lo]) / d if d > 0 else 0.0
+    return [pts[lo][i] + (pts[hi][i] - pts[lo][i]) * u for i in range(len(pts[0]))]
+
+
+def _S(u):
+    u = max(0.0, min(1.0, u))
+    return u * u * u * (u * (6 * u - 15) + 10)
+
+
+def _noise1(seed, t):
+    """A smooth deterministic noise in about [-1, 1]: incommensurate sines (no state, seek-safe)."""
+    return (0.5 * math.sin(7.3 * t + seed) + 0.3 * math.sin(13.1 * t + 2.3 * seed) + 0.2 * math.sin(29.7 * t + 0.7 * seed))
+
+
+def _smooth(vals, k):
+    out = []
+    for i in range(len(vals)):
+        lo, hi = max(0, i - k), min(len(vals), i + k + 1)
+        out.append(sum(vals[lo:hi]) / (hi - lo))
+    return out
+
+
+def plume_program(name):
+    """A hot blue-white core shading to amber and a dull red tip, soft at the edges (facing) and fading down its length,
+    with a turbulent flicker running down it. The plume is a tapered tube from local (0,0,0) to (0,-1,0)."""
+    ops = [
+        {"kind": "input", "input": "localPosition", "dst": 0},
+        {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, -1.0, 0.0, 0.0], "value": 1.0},      # v: 0 nozzle, 1 tip
+        {"kind": "input", "input": "time", "dst": 2},
+        {"kind": "constant", "dst": 3, "constant": [0.0, 9.0, 0.0, 0.0]},
+        {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
+        {"kind": "add", "dst": 4, "srcA": 0, "srcB": 2},                                                  # flows down
+        {"kind": "noise", "dst": 5, "srcA": 4, "value": 9.0, "seed": 3},
+        {"kind": "gradient", "dst": 6, "srcA": 1, "constant": [1.0, 0.0, 0.0, 0.0], "value": 1.0},
+        {"kind": "mix", "dst": 6, "srcA": 6, "srcB": 5, "value": 0.25},                                    # a ragged length
+        {"kind": "oklabRamp", "dst": 7, "srcA": 6, "constant": [0.75, 0.88, 1.0, 1.0], "constant2": [1.0, 0.9, 0.62, 1.0],
+         "constant3": [1.0, 0.48, 0.12, 1.0], "constant4": [0.55, 0.1, 0.02, 1.0], "value": 1.0},
+        {"kind": "gradient", "dst": 8, "srcA": 6, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},      # 1 - v
+        {"kind": "smoothstep", "dst": 8, "srcA": 8, "constant": [0.0, 1.0, 0, 0]},
+        {"kind": "power", "dst": 8, "srcA": 8, "value": 1.6},
+        {"kind": "fresnel", "dst": 9, "value": 1.5},
+        {"kind": "gradient", "dst": 9, "srcA": 9, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},      # facing: soft edge
+        {"kind": "smoothstep", "dst": 9, "srcA": 9, "constant": [0.05, 0.85, 0, 0]},
+        {"kind": "multiply", "dst": 10, "srcA": 8, "srcB": 9},
+        {"kind": "gradient", "dst": 11, "srcA": 5, "constant": [0.6, 0.0, 0.0, 0.7], "value": 1.0},      # flicker 0.7-1.3
+        {"kind": "multiply", "dst": 10, "srcA": 10, "srcB": 11},
+        {"kind": "multiply", "dst": 12, "srcA": 7, "srcB": 10},
+        {"kind": "constant", "dst": 13, "constant": [0.0, 0.0, 0.0, 1.0]},
+    ]
+    return {"name": name, "ops": ops, "baseColor": 13, "metallic": -1, "roughness": -1, "emission": 12,
+            "emissionIntensity": 30.0, "opacity": 10}
+
+
 def flight(f, r3, song, light_color, flame_color):
-    """One flight: nodes (the flyer, its flame), lights, timeline tracks, and a sequence actor (clip cues)."""
+    """One flight: nodes (the flyer, two plumes), a light, timeline tracks, a sequence actor; f["_samples"] gets the
+    path (every 0.1 s, before any formation bob) for the clearance check."""
     name = f["name"]
     a, b = f["from"], f["to"]
     t0, td = f["t0"], f["td"]
     t_lift = t0 + JUMP_TAKEOFF
-    t_land = td - LAND_TOUCHDOWN                      # the Landing cue: its feet reach B at td
-    alt = f.get("alt", 8.0)
+    t_land = td - LAND_TOUCHDOWN                       # the Landing cue: its feet reach B at td
+    A, B = a["pos"], b["pos"]
     via = [list(v) for v in f.get("via", [])]
-    up_a = [a["pos"][0], a["pos"][1] + alt * 0.6, a["pos"][2]]
-    up_b = [b["pos"][0], b["pos"][1] + alt * 0.45, b["pos"][2]]
     if not via:
-        mid = [(a["pos"][i] + b["pos"][i]) / 2 for i in range(3)]
-        mid[1] = max(a["pos"][1], b["pos"][1]) + alt
-        via = [mid]
-    curve, cum = _curve([a["pos"], up_a] + via + [up_b, b["pos"]])
-    total = cum[-1]
-    fly = t_land - t_lift
-    yaw_a = a["yaw"]
-    yaw_b = b.get("yaw", None)
-
-    def s_of(t):
-        return total * _ease((t - t_lift) / fly)
+        cy = max(A[1], B[1]) + f.get("alt", 8.0)
+        via = [[(A[0] + B[0]) / 2, cy, (A[2] + B[2]) / 2]]
+    # over B it arrives at the route's top plus 2 m and comes straight down (open sky, checked): a glide in on a slant
+    # passes through whatever stands round a deck (the Great Lantern's strings and gallery, msg 123)
+    y1, yN = max(via[0][1], A[1] + 3.0), max(max(v[1] for v in via) + 2.0, B[1] + 3.0)
+    h_up, h_down = y1 - A[1], yN - B[1]
+    T_up = max(1.4, min(3.0, h_up / 2.6))
+    T_dn = max(1.6, min(3.2, h_down / 2.2))
+    total = t_land - t_lift
+    if T_up + T_dn + 1.0 > total:                      # a short hop: the climb and descent share the time
+        k = total / (T_up + T_dn + 1.0)
+        T_up, T_dn = T_up * k, T_dn * k
+    t_hover = t_lift + T_up                            # at height
+    t_desc = t_land - T_dn                             # leaving height
+    # the route in 3D (the art's ray-checked cruise, heights and all), from over A to over B, corner-cut smooth
+    route = [[A[0], y1, A[2]]] + via + [[B[0], yN, B[2]]]
+    hp, hc = _poly(_chaikin(route, 2))
+    L = hc[-1]
+    h0 = min(t_hover - 0.35, t_lift + 0.75 * T_up)     # it starts drifting while still rising: one motion, no corner
+    h1 = t_desc + 0.3 * T_dn                           # and is over the deck early in the descent: it comes down upright
 
     def pos_at(t):
-        return _at(curve, cum, s_of(t))
+        u = _S((t - h0) / max(h1 - h0, 1e-3))
+        r = _poly_at(hp, hc, L * u)
+        c = _S((t - t_lift) / T_up)
+        d = _S((t - t_desc) / T_dn)
+        y = A[1] * (1 - c) + r[1] * c * (1 - d) + B[1] * d
+        w = min(1.0, max(0.0, (t - t_hover + 0.5) / 1.0), max(0.0, (t_desc + 0.3 - t) / 1.0))
+        y += 0.12 * math.sin(2 * math.pi * 0.55 * (t - t_lift)) * w      # a gentle hover bob
+        return [r[0], y, r[2]]
 
-    def t_of(s_target):
-        lo, hi = t_lift, t_land
-        for _ in range(40):
-            mid = (lo + hi) / 2
-            if s_of(mid) < s_target:
-                lo = mid
-            else:
-                hi = mid
-        return lo
-    # the climb and the descent are the curve's vertical ends: Floating there, Flying_jet (prone) in between
-    climb_len = next(cum[k] for k in range(len(cum)) if curve[k][1] >= up_a[1] - 0.3)
-    desc_len = next(cum[k] for k in range(len(cum) - 1, -1, -1) if curve[k][1] >= up_b[1] - 0.3)
-    t_cruise = t_of(climb_len)
-    t_desc = t_of(desc_len)
-    cues = [(t0, "Jumping", 0.25), (t0 + JUMP_TO_HOVER, "Floating", 0.4)]
-    if t_desc - t_cruise > 1.5:
-        cues += [(t_cruise - 0.3, "Flying_jet", 0.7), (t_desc - 0.6, "Floating", 0.7)]
-    cues += [(t_land, "Landing", 0.2)]
-
-    def bob_w(t):
-        return max(0.0, min(1.0, (t - t_lift) / 1.2, (t_land - t) / 1.2))
-    n = max(2, int(fly * KEY_HZ))
-    prev_yaw = yaw_a
-    samples = []
-    for k in range(n + 1):
-        t = t_lift + fly * k / n
-        p = pos_at(t)
-        p[1] += 0.14 * math.sin(2 * math.pi * 0.65 * (t - t_lift)) * bob_w(t)
-        q = pos_at(min(t_land, t + 0.12))
-        o = pos_at(max(t_lift, t - 0.12))
-        vx, vz = (q[0] - o[0]) / 0.24, (q[2] - o[2]) / 0.24
-        hs = math.hypot(vx, vz)
-        yaw = math.degrees(math.atan2(vx, vz)) if hs > 0.05 else prev_yaw
-        while yaw - prev_yaw > 180:
-            yaw -= 360
-        while yaw - prev_yaw < -180:
-            yaw += 360
-        w = min(1.0, hs / 1.5)                      # standing climb: keep the facing it took off with
-        samples.append((t, p, yaw, w, hs))
-        prev_yaw = yaw
-    yaws = []
-    for t, p, yaw, w, hs in samples:
-        y0 = yaw_a + ((yaw - yaw_a + 180) % 360 - 180) * w
-        if yaw_b is not None:
-            wb = max(0.0, min(1.0, 1.0 - (t_land - t) / 1.6))
-            y0 = y0 + ((yaw_b - y0 + 180) % 360 - 180) * wb * wb
-        yaws.append(y0)
+    dt = 1.0 / 30.0
+    ts = [t_lift + k * dt for k in range(int(total / dt) + 1)] + [t_land]
+    P = [pos_at(t) for t in ts]
+    V = [[(P[min(i + 1, len(P) - 1)][j] - P[max(i - 1, 0)][j]) / (2 * dt) for j in range(3)] for i in range(len(P))]
+    Acc = [[(V[min(i + 1, len(V) - 1)][j] - V[max(i - 1, 0)][j]) / (2 * dt) for j in range(3)] for i in range(len(V))]
+    # facing: the take-off facing turns toward the route while rising, then follows the horizontal velocity
+    tan0 = [hp[min(3, len(hp) - 1)][0] - hp[0][0], hp[min(3, len(hp) - 1)][2] - hp[0][2]]
+    yaw_route0 = math.degrees(math.atan2(tan0[0], tan0[1])) if math.hypot(*tan0) > 1e-6 else a["yaw"]
+    yaws, prev = [], a["yaw"]
+    for i, t in enumerate(ts):
+        hs = math.hypot(V[i][0], V[i][2])
+        vel_yaw = math.degrees(math.atan2(V[i][0], V[i][2])) if hs > 0.05 else prev
+        turn_in = _S((t - t_lift) / max(T_up, 0.5))
+        y_pre = a["yaw"] + ((yaw_route0 - a["yaw"] + 180) % 360 - 180) * turn_in
+        w = _S(hs / 2.0)
+        y = y_pre + ((vel_yaw - y_pre + 180) % 360 - 180) * w
+        if b.get("yaw") is not None:
+            wb = _S((t - (t_land - 1.2)) / 1.2)
+            y = y + ((b["yaw"] - y + 180) % 360 - 180) * wb
+        while y - prev > 180:
+            y -= 360
+        while y - prev < -180:
+            y += 360
+        yaws.append(y)
+        prev = y
+    yaws = _smooth(yaws, 4)
+    pitches, rolls = [], []
+    for i in range(len(ts)):
+        hs = math.hypot(V[i][0], V[i][2])
+        yr = math.radians(yaws[i])
+        fwd = [math.sin(yr), math.cos(yr)]
+        a_fwd = Acc[i][0] * fwd[0] + Acc[i][2] * fwd[1]
+        a_side = Acc[i][0] * fwd[1] - Acc[i][2] * fwd[0]
+        pitches.append(max(-10.0, min(22.0, 1.6 * hs + math.degrees(math.atan2(a_fwd, G)))))
+        rolls.append(max(-BANK_MAX, min(BANK_MAX, math.degrees(math.atan2(a_side, G)))))
+    pitches, rolls = _smooth(pitches, 5), _smooth(rolls, 5)
     pk, rk = [], []
-    for i, (t, p, yaw, w, hs) in enumerate(samples):
-        dy = (yaws[min(i + 1, len(yaws) - 1)] - yaws[max(i - 1, 0)]) / max(2.0 / KEY_HZ, 1e-6)  # deg/s
-        upright = _clip_weights(cues, t).get("Floating", 0.0)
-        pitch = max(-6.0, min(14.0, hs * 1.6)) * upright      # an upright hover leans into its travel; prone does not
-        roll = max(-30.0, min(30.0, -dy * hs * 0.03))          # bank into the turn
-        pk.append({"time": round(t, 3), "value": r3(p), "interp": "linear"})
-        rk.append({"time": round(t, 3), "value": [round(v, 2) for v in _euler_zyx(yaws[i], pitch, roll)], "interp": "linear"})
-    rot_a = [0.0, round(yaw_a, 1), 0.0]
+    for i in range(0, len(ts), 2):                     # 15 Hz keys
+        pk.append({"time": round(ts[i], 3), "value": r3(P[i]), "interp": "linear"})
+        rk.append({"time": round(ts[i], 3), "value": [round(v, 2) for v in _euler_zyx(yaws[i], pitches[i], rolls[i])],
+                   "interp": "linear"})
+    f["_samples"] = [[round(ts[i], 2), r3(P[i])] for i in range(0, len(ts), 3)]
+    f["_lift"] = (h_up, h_down)
+    rot_a = [0.0, round(a["yaw"], 1), 0.0]
     rot_b = [0.0, round(yaws[-1], 1), 0.0]
     t_end = round(min(song, td + 0.5), 3)
-    pk = [{"time": 0.0, "value": r3(a["pos"]), "interp": "linear"},
-          {"time": round(t_lift - 1e-3, 3), "value": r3(a["pos"]), "interp": "linear"}] + pk[1:] + \
-         [{"time": t_end, "value": r3(b["pos"]), "interp": "linear"}]
-    rk = [{"time": 0.0, "value": rot_a, "interp": "linear"},
-          {"time": round(t_lift - 1e-3, 3), "value": rot_a, "interp": "linear"}] + rk[1:] + \
-         [{"time": t_end, "value": rot_b, "interp": "linear"}]
-    # the thruster: the flame (scale, and its place and direction on the jet, which move with the clip) and the light
-    flame, lamp = name + "_flame", name + "_jet"
-    sk = [{"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"},
-          {"time": round(t_lift - 0.25, 3), "value": [0.0, 0.0, 0.0], "interp": "linear"}]
-    lk = [{"time": 0.0, "value": 0.0, "interp": "linear"}, {"time": round(t_lift - 0.25, 3), "value": 0.0, "interp": "linear"}]
-    fpk, frk, lpk = [], [], []
+    pk = [{"time": 0.0, "value": r3(A), "interp": "linear"}, {"time": round(t_lift - 1e-3, 3), "value": r3(A), "interp": "linear"}] + \
+        pk[1:] + [{"time": round(t_land, 3), "value": r3(B), "interp": "linear"}, {"time": t_end, "value": r3(B), "interp": "linear"}]
+    pk = sorted({k["time"]: k for k in pk}.values(), key=lambda k: k["time"])
+    rk = [{"time": 0.0, "value": rot_a, "interp": "linear"}, {"time": round(t_lift - 1e-3, 3), "value": rot_a, "interp": "linear"}] + \
+        rk[1:] + [{"time": t_end, "value": rot_b, "interp": "linear"}]
+    rk = sorted({k["time"]: k for k in rk}.values(), key=lambda k: k["time"])
+    cues = [(t0, "Jumping", 0.25), (t0 + JUMP_TO_HOVER, "Floating", 0.45), (t_land, "Landing", 0.25)]
+
+    # ---- the thrust: what the jets must do to make this motion (gravity plus the vertical acceleration), so the plumes
+    # are longest at lift-off and in the braking before touchdown, and short in the hover
+    def thrust_at(t):
+        if t < t_lift - 0.2 or t > td + 0.05:
+            return 0.0
+        i = max(0, min(len(ts) - 1, int(round((t - t_lift) / dt))))
+        ay = Acc[i][1] if t_lift <= t <= t_land else 0.0
+        on = _S((t - (t_lift - 0.2)) / 0.25) * (1.0 - _S((t - (td - 0.25)) / 0.3))
+        push = 0.9 * math.exp(-max(0.0, t - t_lift) / 0.35) if t >= t_lift - 0.2 else 0.0   # the push-off burst
+        return on * max(0.4, (1.0 + ay / G)) + push
     kicks = f.get("kicks", [])
-    t = t_lift - 0.25
-    while t < td + 0.45:
-        ramp = max(0.0, min(1.0, (t - (t_lift - 0.25)) / 0.35, (td + 0.05 - t) / 0.3))
-        boost = 1.0 + 0.6 * max(0.0, 1.0 - abs(t - t_lift) / 0.8) + 0.4 * max(0.0, 1.0 - abs(t - t_land) / 0.8)
+    flames = [name + "_plumeL", name + "_plumeR"]
+    lamp = name + "_jet"
+    sk = {n: [] for n in flames}
+    fpk = {n: [] for n in flames}
+    frk, lk, lpk = [], [], []
+    t = max(0.0, t_lift - 0.4)
+    sk0 = [{"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"}]
+    lk0 = [{"time": 0.0, "value": 0.0, "interp": "linear"}]
+    seed = sum(ord(c) for c in name)
+    while t < td + 0.6:
+        th = thrust_at(t)
         wts = _clip_weights(cues, t)
         hover = wts.get("Floating", 0.0) / (sum(wts.values()) or 1.0)
         env = 0.0
         for k in kicks:
             if k - PUFF[2] <= t <= k + 5 * PUFF[3]:
                 env = max(env, min(1.0, (t - k + PUFF[2]) / PUFF[2]) * math.exp(-max(0.0, t - k) / PUFF[3]))
-        gain = 1.0 + PUFF[0] * env * hover
-        fl = _flicker(name, t) * ramp * boost
-        g = min(fl, 1.2) * ramp
-        sk.append({"time": round(t, 3), "value": r3([g, fl * (1.0 + PUFF[1] * env * hover), g]), "interp": "linear"})
-        lk.append({"time": round(t, 3), "value": round(f.get("light", 14.0) * fl * gain, 3), "interp": "linear"})
         tot = sum(wts.values()) or 1.0
-        nz = [sum(NOZZLE[c][0][i] * wv for c, wv in wts.items()) / tot for i in range(3)]
-        dr = [sum(NOZZLE[c][1][i] * wv for c, wv in wts.items()) / tot for i in range(3)]
-        fpk.append({"time": round(t, 3), "value": r3(nz), "interp": "linear"})
-        frk.append({"time": round(t, 3), "value": [round(v, 2) for v in _down_to(dr)], "interp": "linear"})
-        # the light sits half a metre down the thrust (it lights what the jet blows on)
-        lpk.append({"time": round(t, 3), "value": r3([nz[i] + 0.5 * dr[i] for i in range(3)]), "interp": "linear"})
+        nz = [sum(NOZZLE.get(c, NOZZLE["Floating"])[0][i] * wv for c, wv in wts.items()) / tot for i in range(3)]
+        dr = [sum(NOZZLE.get(c, NOZZLE["Floating"])[1][i] * wv for c, wv in wts.items()) / tot for i in range(3)]
+        rot = [round(v, 2) for v in _down_to(dr)]
+        frk.append({"time": round(t, 3), "value": rot, "interp": "linear"})
+        for side, n in zip((-1, 1), flames):
+            nn = _noise1(seed + side * 17, t)
+            length = th * (0.36 + 0.06 * nn) * (1.0 + PUFF[1] * env * hover)
+            length = min(0.85, length)
+            width = 0.0 if th <= 0 else 1.0 + 0.08 * _noise1(seed + side * 5, 1.7 * t)
+            sk[n].append({"time": round(t, 3), "value": r3([width, max(length, 0.0), width]), "interp": "linear"})
+            fpk[n].append({"time": round(t, 3), "value": r3([nz[0] + side * PLUME_SPLIT, nz[1], nz[2]]), "interp": "linear"})
+        lk.append({"time": round(t, 3), "value": round(f.get("light", 16.0) * th * (0.85 + 0.15 * _noise1(seed, 2 * t))
+                                                       * (1.0 + PUFF[0] * env * hover), 3), "interp": "linear"})
+        lpk.append({"time": round(t, 3), "value": r3([nz[i] + 0.6 * dr[i] for i in range(3)]), "interp": "linear"})
         t += 1.0 / 30.0
-    sk.append({"time": round(td + 0.5, 3), "value": [0.0, 0.0, 0.0], "interp": "linear"})
-    lk.append({"time": round(td + 0.5, 3), "value": 0.0, "interp": "linear"})
+    end = round(td + 0.7, 3)
 
     def track(target, keys):
         return {"target": target, "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
                 "loopLength": 0.0, "keys": keys}
-    nodes = [
-        {"name": name, "kind": "gltf", "asset": f["asset"], "position": r3(a["pos"]), "rotation": rot_a,
-         "scale": [1.0, 1.0, 1.0],
-         "animation": {"state": "Idle", "blend": 0.3, "phase": f.get("phase", 0.0), "updateHz": 0,
-                       "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 300.0}},
-        {"name": flame, "kind": "procedural", "parent": name, "position": NOZZLE["Jumping"][0],
-         "scale": [0.0, 0.0, 0.0], "procedural": {
-             "source": {"kind": "mesh", "asset": PLUME},
-             "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]},
-             "castsShadow": False,
-             "partMaterials": {"jet_flame": {"emissiveColor": flame_color, "emissiveIntensity": 26.0},
-                               "jet_collar": {"emissiveColor": flame_color, "emissiveIntensity": 9.0}}}},
-    ]
+    nodes = [{"name": name, "kind": "gltf", "asset": f["asset"], "position": r3(A), "rotation": rot_a,
+              "scale": [1.0, 1.0, 1.0],
+              "animation": {"state": "Idle", "blend": 0.3, "phase": f.get("phase", 0.0), "updateHz": 0,
+                            "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 300.0}}]
+    tracks = [track("nodes/%s/position" % name, pk), track("nodes/%s/rotation" % name, rk)]
+    for side, n in zip((-1, 1), flames):
+        nodes.append({"name": n, "kind": "procedural", "parent": name, "position": NOZZLE["Jumping"][0],
+                      "scale": [0.0, 0.0, 0.0], "procedural": {
+                          "source": {"kind": "tube", "tubeRadius": 0.055, "tubeTaper": 1.0, "tubeSides": 10,
+                                     "tubeSegments": 12, "tubeTwist": 0.0, "tubeCaps": False,
+                                     "curve": {"kind": "catmullRom", "generator": "points", "closed": False,
+                                               "points": [{"position": [0.0, -0.01 * k, 0.0]} for k in (0, 50, 100)]}},
+                          "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]},
+                          "castsShadow": False,
+                          "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndJetPlume",
+                                       "alphaMode": "blend"}}})
+        tracks += [track("nodes/%s/scale" % n, sk0 + sk[n] + [{"time": end, "value": [0.0, 0.0, 0.0], "interp": "linear"}]),
+                   track("nodes/%s/position" % n, fpk[n]), track("nodes/%s/rotation" % n, frk)]
     lights = [{"name": lamp, "type": "point", "node": name, "position": NOZZLE["Jumping"][0],
-               "color": light_color, "intensity": 0.0, "range": 9.0, "castsShadow": False, "volumetric": 0.0}]
-    tracks = [track("nodes/%s/position" % name, pk), track("nodes/%s/rotation" % name, rk),
-              track("nodes/%s/scale" % flame, sk), track("nodes/%s/position" % flame, fpk),
-              track("nodes/%s/rotation" % flame, frk), track("lights/%s/intensity" % lamp, lk),
-              track("lights/%s/position" % lamp, lpk)]
+               "color": light_color, "intensity": 0.0, "range": 8.0, "castsShadow": False, "volumetric": 0.0}]
+    tracks += [track("lights/%s/intensity" % lamp, lk0 + lk + [{"time": end, "value": 0.0, "interp": "linear"}]),
+               track("lights/%s/position" % lamp, lpk)]
     clips = []
     for time, clip, blend in cues:
         c = {"time": round(time, 3), "clip": clip, "speed": 1.0, "blend": blend,
