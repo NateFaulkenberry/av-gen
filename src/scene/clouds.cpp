@@ -38,6 +38,8 @@ Result<CloudLobe> lobeOf(const json& l) {
     }
     if (l.contains("density")) lobe.density = l.at("density").get<float>();
     if (l.contains("soft")) lobe.soft = l.at("soft").get<float>();
+    if (l.contains("erode")) lobe.erode = l.at("erode").get<float>(); // ADR-2107
+    if (!(lobe.erode >= 0.0f && lobe.erode <= 1.0f)) return fail("clouds: a lobe's erode must be in [0, 1]");
     if (!(lobe.radius > 0.0f) || !(lobe.scale.x > 0.0f && lobe.scale.y > 0.0f && lobe.scale.z > 0.0f) ||
         !(lobe.density >= 0.0f && lobe.density <= 1.0f) || !(lobe.soft > 0.0f && lobe.soft <= 1.0f) ||
         !std::isfinite(lobe.centre.x + lobe.centre.y + lobe.centre.z)) {
@@ -119,6 +121,7 @@ Result<void> Clouds::validate() const {
     }
     if (glows.size() > kMaxCloudGlows) return fail("clouds: {} glows, more than the {} the renderer holds", glows.size(), kMaxCloudGlows);
     for (const CloudGlow& g : glows) {
+        if (!(g.shadow >= 0.0f && g.shadow <= 1.0f)) return fail("clouds: a glow's shadow must be in [0, 1]"); // ADR-2107
         if (!(g.radius > 0.0f) || !(g.intensity >= 0.0f) || !std::isfinite(g.position.x + g.position.y + g.position.z)) {
             return fail("clouds: a glow needs a positive radius, a non-negative intensity and a finite position");
         }
@@ -271,6 +274,7 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
             }
             if (g.contains("radius")) glow.radius = g.at("radius").get<float>();
             if (g.contains("intensity")) glow.intensity = g.at("intensity").get<float>();
+            if (g.contains("shadow")) glow.shadow = g.at("shadow").get<float>(); // ADR-2107
             if (g.contains("name")) glow.name = g.at("name").get<std::string>();
             c.glows.push_back(glow);
         }
@@ -424,6 +428,7 @@ json Clouds::toJson() const {
             json gj = {{"position", v3(g.position)}, {"color", v3(g.color)}, {"radius", g.radius},
                        {"intensity", g.intensity}};
             if (!g.name.empty()) gj["name"] = g.name;
+            if (g.shadow != 1.0f) gj["shadow"] = g.shadow; // ADR-2107
             gs.push_back(std::move(gj));
         }
         j["glows"] = std::move(gs);
@@ -454,6 +459,7 @@ json Clouds::toJson() const {
         for (const CloudLobe& l : lobes) {
             arr.push_back({{"c", v3(l.centre)}, {"r", l.radius}, {"scale", v3(l.scale)}, {"density", l.density},
                            {"soft", l.soft}});
+            if (l.erode != 1.0f) arr.back()["erode"] = l.erode; // ADR-2107
         }
         j["lobes"] = std::move(arr);
     }
@@ -462,6 +468,7 @@ json Clouds::toJson() const {
         for (const CloudLobe& l : farLobes) {
             arr.push_back({{"c", v3(l.centre)}, {"r", l.radius}, {"scale", v3(l.scale)}, {"density", l.density},
                            {"soft", l.soft}});
+            if (l.erode != 1.0f) arr.back()["erode"] = l.erode; // ADR-2107
         }
         j["farLobes"] = std::move(arr);
     }

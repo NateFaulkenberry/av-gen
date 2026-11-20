@@ -371,3 +371,40 @@ TEST_CASE("clouds: the erosion and the light taps read, validate and round-trip"
     CHECK(live.erosion == 0.25f);
     CHECK(live.erosionScale == 60.0f);
 }
+
+// ADR-2107: a lobe's own share of the erosion, and 32 glows.
+TEST_CASE("clouds: a lobe's erode share reads, validates and round-trips; 32 glows fit", "[unit][clouds][adr2107]") {
+    const json j = {{"lobes", json::array({{{"c", {0, 100, 0}}, {"r", 50.0}, {"erode", 0.25}},
+                                           {{"c", {0, 200, 0}}, {"r", 50.0}}})},
+                    {"erosion", 1.0}};
+    auto c = scene::Clouds::fromJson(j, fs::temp_directory_path());
+    REQUIRE(c.has_value());
+    CHECK(c->lobes[0].erode == 0.25f);
+    CHECK(c->lobes[1].erode == 1.0f);
+    const json back = c->toJson();
+    CHECK(back.at("lobes")[0].at("erode").get<float>() == 0.25f);
+    CHECK_FALSE(back.at("lobes")[1].contains("erode"));
+    json bad = j;
+    bad["lobes"][0]["erode"] = 1.5;
+    CHECK_FALSE(scene::Clouds::fromJson(bad, fs::temp_directory_path()).has_value());
+
+    // a glow's own share of the shadow
+    const json gl = {{"lobes", json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}})},
+                     {"glows", json::array({{{"position", {0, 0, 0}}, {"shadow", 0.2}}, {{"position", {0, 1, 0}}}})}};
+    auto withGlows = scene::Clouds::fromJson(gl, fs::temp_directory_path());
+    REQUIRE(withGlows.has_value());
+    CHECK(withGlows->glows[0].shadow == 0.2f);
+    CHECK(withGlows->glows[1].shadow == 1.0f);
+    CHECK(withGlows->toJson().at("glows")[0].at("shadow").get<float>() == 0.2f);
+    CHECK_FALSE(withGlows->toJson().at("glows")[1].contains("shadow"));
+    json badGlow = gl;
+    badGlow["glows"][0]["shadow"] = -1.0;
+    CHECK_FALSE(scene::Clouds::fromJson(badGlow, fs::temp_directory_path()).has_value());
+
+    CHECK(scene::kMaxCloudGlows == 32);
+    json glows = json::array();
+    for (int i = 0; i < 32; ++i) glows.push_back({{"position", {0, 0, i}}});
+    CHECK(scene::Clouds::fromJson({{"lobes", json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}})}, {"glows", glows}},
+                                  fs::temp_directory_path())
+              .has_value());
+}

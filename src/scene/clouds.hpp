@@ -42,6 +42,7 @@ struct CloudLobe {
     glm::vec3 scale{1.0f};
     float density = 1.0f; // 0..1
     float soft = 0.35f;   // edge softness, a fraction of the radius
+    float erode = 1.0f;   // ADR-2107: this lobe's share of the block's `erosion` (0 = kept whole: a wall that must hide)
 };
 
 // ADR-2100: the analytic sea of cloud. Unbounded in x and z; between `base` and `top` in y.
@@ -76,9 +77,11 @@ struct CloudGlow {
     glm::vec3 color{1.0f, 0.3f, 0.8f};
     float radius = 300.0f;         // metres at which the light has fallen to half; it is gone by 4x
     float intensity = 1.0f;
+    float shadow = 1.0f;           // ADR-2107: this glow's share of the block's `glowShadow` (0 = a glow deep in cloud
+                                   // that must still light the cloud round it)
 };
 
-inline constexpr std::size_t kMaxCloudGlows = 24; // ADR-2104: 16 -> 24 (the Veil's inner pockets)
+inline constexpr std::size_t kMaxCloudGlows = 32; // ADR-2104: 16 -> 24 (the Veil's inner pockets); ADR-2107: 32
 
 // ADR-2102: a turning searchlight (a lighthouse) marched with the cloud: soft cones of light that scatter in the clear
 // air (cut by the opaque scene, hidden behind cloud) and light the cloud they pass through. `count` arms are spread

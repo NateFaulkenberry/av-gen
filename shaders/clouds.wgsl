@@ -43,7 +43,7 @@ struct CloudUniforms {
     drift: vec4<f32>,
     frameInfo: vec4<f32>,
     prevViewProj: mat4x4<f32>,
-    glows: array<vec4<f32>, 48>, // 2 x kMaxCloudGlows (ADR-2104: 24)
+    glows: array<vec4<f32>, 64>, // 2 x kMaxCloudGlows (ADR-2104: 24; ADR-2107: 32)
     beams: array<vec4<f32>, 24>,
     beamInfo: vec4<f32>,
     halo: vec4<f32>,
@@ -127,7 +127,9 @@ fn erosionAt(p: vec3<f32>, octaves: u32, footprint: f32) -> Ero {
     }
     // the volume's G channel is inverted Worley (4/8/16 features a tile): rounded heads where it is high
     let nc = noiseTap(q, 1.0 / lam);
-    e.c = nc.g * 0.8 + nc.r * 0.2;
+    // far off, the march's steps (a fiftieth of the distance) outgrow even the coarse octave: fade it there too, or it
+    // aliases into diagonal stripes on the far towers
+    e.c = mix(1.0, nc.g * 0.8 + nc.r * 0.2, 1.0 - smoothstep(0.6 * lam, 1.6 * lam, footprint));
     if (octaves > 1u) {
         let nm = noiseTap(q * 1.0 + cu.drift.xyz * 0.25 + vec3<f32>(37.0, -11.0, 5.0), 3.3 / lam);
         let lm = lam / 3.3;
@@ -190,11 +192,11 @@ fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yL
             continue;
         }
         var shape = 0.0;
-        if (e.on > 0.0) {
+        if (e.on > 0.0 && l.soft.y > 0.0) {
             // ADR-2106: the lobe's surface eaten in metres by the billow octaves, so it is no longer a sphere. Only
             // ever inward (the bins hold the lobe's own bounds). The lower half is flattened and its noise inverted
             // (wisps and tatters under a base, cauliflower heads over a crown), and its edge is softer.
-            let k = cu.erosion.x;
+            let k = cu.erosion.x * l.soft.y; // ADR-2107: the lobe's own share
             let hl = clamp(0.5 + 0.5 * d.y, 0.0, 1.0);
             if (d.y < 0.0) {
                 d.y = d.y * (1.0 + cu.erosion2.w * k);
@@ -662,6 +664,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 var glow = vec3<f32>(0.0);
                 var glowTo = vec3<f32>(0.0); // ADR-2104: toward the glow that lights this sample most
                 var glowBest = 0.0;
+                var glowBestShadow = 1.0; // ADR-2107: that glow's share of the shadow
                 for (var g = 0u; g < glowCount; g = g + 1u) {
                     let gp = cu.glows[2u * g];
                     let v = gp.xyz - p;
@@ -677,6 +680,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     let w = dot(c, vec3<f32>(0.3, 0.5, 0.2));
                     if (w > glowBest) {
                         glowBest = w;
+                        glowBestShadow = cu.glows[2u * g + 1u].w;
                         glowTo = v * inverseSqrt(max(d2, 1e-4));
                     }
                 }
@@ -695,7 +699,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                         // ADR-2105: the lobes alone (no sea relief, no noise): the glows sit among the lobes, and the
                         // full density cost ~25 ms a frame in the Neon Dreams Veil
                         let toward = min(lobeBase(p + glowTo * cu.glowShape.w, noErosion()).x, 1.0);
-                        glow = glow * exp(-cu.glowShape.y * toward * 3.0);
+                        glow = glow * exp(-cu.glowShape.y * glowBestShadow * toward * 3.0);
                     }
                 }
                 // ADR-2102: the beams on the cloud

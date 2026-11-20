@@ -34,7 +34,7 @@ struct CloudUniforms {
     drift: vec4<f32>,
     frameInfo: vec4<f32>,
     prevViewProj: mat4x4<f32>,
-    glows: array<vec4<f32>, 48>, // 2 x kMaxCloudGlows (ADR-2104: 24)
+    glows: array<vec4<f32>, 64>, // 2 x kMaxCloudGlows (ADR-2104: 24; ADR-2107: 32)
     beams: array<vec4<f32>, 24>,
     beamInfo: vec4<f32>,
     halo: vec4<f32>,

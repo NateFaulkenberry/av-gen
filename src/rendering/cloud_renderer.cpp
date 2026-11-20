@@ -472,7 +472,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         key = mixKey(key, static_cast<float>(set->size()));
         for (const scene::CloudLobe& l : *set) {
             for (float v : {l.centre.x, l.centre.y, l.centre.z, l.radius, l.scale.x, l.scale.y, l.scale.z, l.density,
-                            l.soft}) {
+                            l.soft, l.erode}) {
                 key = mixKey(key, v);
             }
         }
@@ -484,7 +484,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         for (const auto* set : {&c.lobes, &c.farLobes}) { // ADR-2104: the far set after the hero set
             for (const scene::CloudLobe& l : *set) {
                 rows.push_back(
-                    {glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density), glm::vec4(l.soft, 0, 0, 0)});
+                    {glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density), glm::vec4(l.soft, l.erode, 0, 0)}); // ADR-2107: y = erode
                 const glm::vec3 ext = l.radius * l.scale;
                 lo = glm::min(lo, l.centre - ext);
                 hi = glm::max(hi, l.centre + ext);
@@ -596,7 +596,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     for (std::size_t i = 0; i < glowCount; ++i) {
         const scene::CloudGlow& g = c.glows[i];
         u.glows[2 * i] = glm::vec4(g.position, g.radius);
-        u.glows[2 * i + 1] = glm::vec4(g.color * g.intensity, 0.0f);
+        u.glows[2 * i + 1] = glm::vec4(g.color * g.intensity, g.shadow); // ADR-2107: w = shadow share
     }
     // ADR-2102: the beams' arms at this timeline second
     std::size_t arms = 0;
