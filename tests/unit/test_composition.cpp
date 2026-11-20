@@ -1169,7 +1169,7 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
       "environment": {
         "volumeDensity": 0.05, "fogHeight": 2.0, "fogHeightFalloff": 0.25,
         "fogUpperDensity": 0.18, "fogHeightCurve": 0.65,
-        "volumeLocalLights": 1.7, "fogHeightAmount": 0.6, "fogSky": 0.7, "fogSkyDistance": 250.0,
+        "volumeLocalLights": 1.7, "fogHeightAmount": 0.6, "fogSky": 0.7, "fogSkyDistance": 250.0, "fogSkyBeyond": 40000.0,
         "volumeScattering": 1.2, "volumeAbsorption": 0.8, "volumeAnisotropy": 0.4,
         "volumeNoise": 0.6, "volumeNoiseScale": 0.09, "volumeNoiseSpeed": 0.2,
         "volumeEmission": 0.3, "volumeSteps": 48, "volumeMaxDistance": 120.0,
@@ -1236,6 +1236,7 @@ TEST_CASE("Composition round-trips simulated grids and the volumetric environmen
     CHECK(params.find("scene/fogSky")->flags().exposed);
     CHECK(std::string(params.find("scene/fogSky")->label()).find("sky behind it") != std::string::npos);
     CHECK(s.environment.fogSkyDistance == 250.0f);
+    CHECK(s.environment.fogSkyBeyond == 40000.0f); // ADR-2108
     REQUIRE(params.find("scene/fogSkyDistance") != nullptr);
     CHECK(params.find("scene/fogSkyDistance")->flags().exposed);
 

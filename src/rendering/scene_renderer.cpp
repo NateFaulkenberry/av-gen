@@ -3721,7 +3721,8 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         const float extinction = frame.fogParams.w;
         const float automatic = extinction > 0.0f ? 3.0f / extinction : 0.0f;
         const float fullAt = scene.environment.fogSkyDistance > 0.0f ? scene.environment.fogSkyDistance : automatic;
-        frame.fogSky = glm::vec4(drawFogSky_ ? amount : 0.0f, skyDrawn ? 1.0f : 0.0f, std::max(fullAt, 1e-3f), 0.0f);
+        frame.fogSky = glm::vec4(drawFogSky_ ? amount : 0.0f, skyDrawn ? 1.0f : 0.0f, std::max(fullAt, 1e-3f),
+                                 std::max(scene.environment.fogSkyBeyond, 0.0f)); // ADR-2108: w = sky beyond (0 = off)
         stats_.fogSkyMap = drawFogSky_;
     }
     // Effect Library Wave 2: the Stars effect's field. All zero with no live instance, which the

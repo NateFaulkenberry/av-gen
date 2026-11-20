@@ -854,6 +854,10 @@ struct Environment {
     // extinction lengths, where a level ray through the base density is 95% fog -- which is where a
     // far ridge would otherwise have been a cut-out.
     float fogSkyDistance = 0.0f;
+    // ADR-2108: surfaces farther than this many metres are part of the sky (a moon or a planet drawn as a mesh tens of
+    // kilometres out) and take no surface fog; the sky itself is never fogged either. 0 (the default) = off: every
+    // surface is fogged by its distance, as before.
+    float fogSkyBeyond = 0.0f;
     // ADR-058: how much of the volumetric's mist layer the *surface* fog sees. At 0 the distance
     // above is uniform, which is what it has always been; at 1 the view ray is integrated through
     // the same flat-topped layer the volumetric marches (uniform up to `fogHeight`, thinning by

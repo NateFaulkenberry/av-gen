@@ -72,6 +72,13 @@ fn fs_cloud_resolve(in: VsOut) -> @location(0) vec4<f32> {
     }
     var lo = cur;
     var hi = cur;
+    // ADR-2108: the march's per-pixel jitter is interleaved gradient noise, a fixed spatial pattern; blending 15 % of
+    // the raw frame each frame left that pattern on screen as a stipple wherever the samples disagree (soft cloud over
+    // lit cloud). Its 3x3 neighbourhood is evenly spread by design, so the frame's contribution is a tent average over
+    // the neighbours cut against the same scene depth (a tower's edge is not averaged with the sky beside it).
+    let zc = textureLoad(cloudMarchDepth, ip, 0).g;
+    var sum = cur * 4.0;
+    var wsum = 4.0;
     for (var dy = -1; dy <= 1; dy = dy + 1) {
         for (var dx = -1; dx <= 1; dx = dx + 1) {
             if (dx == 0 && dy == 0) {
@@ -81,8 +88,15 @@ fn fs_cloud_resolve(in: VsOut) -> @location(0) vec4<f32> {
             let c = textureLoad(cloudColour, q, 0);
             lo = min(lo, c);
             hi = max(hi, c);
+            let zq = textureLoad(cloudMarchDepth, q, 0).g;
+            if (abs(zq - zc) <= 0.08 * max(zc, 1.0)) {
+                let w = select(1.0, 2.0, dx == 0 || dy == 0);
+                sum = sum + c * w;
+                wsum = wsum + w;
+            }
         }
     }
+    let curF = sum / wsum;
     let uv = in.clip.xy / vec2<f32>(size);
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     let rd = cameraViewRay(ndc);
@@ -99,7 +113,7 @@ fn fs_cloud_resolve(in: VsOut) -> @location(0) vec4<f32> {
         return cur;
     }
     let hist = clamp(textureSampleLevel(cloudAux, cloudClamp, puv, 0.0), lo, hi);
-    return mix(cur, hist, weight);
+    return mix(curF, hist, weight);
 }
 
 @fragment

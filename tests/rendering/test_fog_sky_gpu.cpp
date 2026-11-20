@@ -305,3 +305,29 @@ TEST_CASE("near air keeps the fog colour, and the sky's colour takes over with d
     CHECK(farAutomatic < 0.01);
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("a surface beyond fogSkyBeyond is part of the sky and takes no fog", "[gpu][fog][adr2108]") {
+    // ADR-2108: a moon drawn as a mesh 60 km out was fogged out completely by air thin enough to put a building 1.4 km
+    // away only a quarter into the haze. Past `fogSkyBeyond` a surface is drawn as the sky is: unfogged.
+    auto ctx = testsupport::gpuContextOrSkip();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    auto shot = [&](float density, float beyond) {
+        scene::Scene s = ridgeShot(true);
+        s.environment.volumeDensity = density;
+        s.environment.fogSkyBeyond = beyond;
+        return render(*ctx, shaders, s);
+    };
+    const Shot clear = shot(0.0f, 0.0f);
+    const Shot fogged = shot(0.01f, 0.0f);
+    const Shot sky = shot(0.01f, 200.0f);   // the ridge (300 m) is past it
+    const Shot nearer = shot(0.01f, 400.0f); // the ridge is nearer than it
+    const double foggedVsClear = bandDifference(fogged.image, clear.image, kRidgeTop, kRidgeBottom);
+    const double skyVsClear = bandDifference(sky.image, clear.image, kRidgeTop, kRidgeBottom);
+    const double nearerVsFogged = bandDifference(nearer.image, fogged.image, kRidgeTop, kRidgeBottom);
+    INFO("fogged vs clear " << foggedVsClear << ", beyond 200 vs clear " << skyVsClear << ", beyond 400 vs fogged "
+                            << nearerVsFogged);
+    CHECK(foggedVsClear > 0.01);              // the air fogs the ridge
+    CHECK(skyVsClear < 0.1 * foggedVsClear);  // past the threshold it does not
+    CHECK(nearerVsFogged < 0.1 * foggedVsClear); // nearer than the threshold it still does
+    CHECK(ctx->errorCount() == 0);
+}

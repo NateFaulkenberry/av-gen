@@ -988,6 +988,9 @@ fn applyFog(color: vec3<f32>, worldPos: vec3<f32>) -> vec3<f32> {
     if (dist <= start) {
         return color; // the march has this whole ray
     }
+    if (frame.fogSky.w > 0.0 && dist > frame.fogSky.w) {
+        return color; // ADR-2108: a body in the sky (a moon drawn as a mesh far out) is not fogged, as the sky is not
+    }
     var travel = dist - start;
     let amount = frame.fogHeight.z;
     let falloff = frame.fogHeight.y;

@@ -74,7 +74,7 @@ constexpr std::string_view kEnvironmentKeys[] = {
     "skyBloom", "skyTint", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "ecologyPoolReach",
     "ecologyPoolFaintest", "skybox",
     "proceduralSkyBackground",
-    "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
+    "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "fogSkyBeyond", "background", "fogHeightAmount", "styledSkyAmbient",
     "styledGroundAmbient", "styledAmbientFloor", "volumeDensity", "fogHeight", "fogHeightFalloff",
     "fogUpperDensity", "fogHeightCurve", "fogGroundFollow", "fogPooling", "fogSpectral", "waterSurface", "waterDownwelling", "horizonDensity",
     "volumeScattering", "volumeAbsorption", "volumeAnisotropy", "volumeLocalLights", "volumeNoise",
@@ -10671,6 +10671,7 @@ void Composition::applyParameters() {
         env.fogHeightAmount = pick(fogHeightAmount_, volumeSetting_.fogHeightAmount);
         env.fogSky = std::clamp(pick(fogSky_, volumeSetting_.fogSky), 0.0f, 1.0f); // ADR-918
         env.fogSkyDistance = std::max(pick(fogSkyDistance_, volumeSetting_.fogSkyDistance), 0.0f);
+        env.fogSkyBeyond = std::max(volumeSetting_.fogSkyBeyond, 0.0f); // ADR-2108
         env.styledSkyAmbient =
             styledSkyAmbient_ != nullptr ? styledSkyAmbient_->value() : volumeSetting_.styledSkyAmbient;
         env.styledGroundAmbient = styledGroundAmbient_ != nullptr ? styledGroundAmbient_->value()
@@ -11800,6 +11801,9 @@ nlohmann::json Composition::toJson() const {
         const float fogSkyDistance = fogSkyDistance_ != nullptr ? fogSkyDistance_->base() : v.fogSkyDistance;
         if (fogSkyDistance != envDefaults.fogSkyDistance) {
             environment["fogSkyDistance"] = fogSkyDistance;
+        }
+        if (v.fogSkyBeyond != envDefaults.fogSkyBeyond) { // ADR-2108
+            environment["fogSkyBeyond"] = v.fogSkyBeyond;
         }
         if (!colourEq3(v.styledSkyAmbient, envDefaults.styledSkyAmbient)) {
             environment["styledSkyAmbient"] = {v.styledSkyAmbient.r, v.styledSkyAmbient.g, v.styledSkyAmbient.b};
@@ -13185,6 +13189,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(value.error());
             }
             comp->volumeSetting_.fogSkyDistance = std::max(*value, 0.0f);
+        }
+        {
+            // ADR-2108: absent means 0, off
+            auto value = readFloat(e, "fogSkyBeyond", comp->volumeSetting_.fogSkyBeyond);
+            if (!value) {
+                return std::unexpected(value.error());
+            }
+            comp->volumeSetting_.fogSkyBeyond = std::max(*value, 0.0f);
         }
         readColour("styledSkyAmbient", comp->volumeSetting_.styledSkyAmbient);
         readColour("styledGroundAmbient", comp->volumeSetting_.styledGroundAmbient);
