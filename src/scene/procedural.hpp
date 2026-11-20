@@ -709,6 +709,7 @@ struct ProceduralGeometry {
         std::string program;                    // empty = the node's program
         std::optional<glm::vec3> emissiveColor; // multiplies the part's emissive texture, as the glTF factor does
         std::optional<float> emissiveIntensity;
+        std::optional<glm::vec3> baseColor;     // ADR-2102: replaces the part's base colour factor (awning cloth)
     };
     std::vector<std::pair<std::string, PartMaterial>> partMaterials;
     HierarchySpec hierarchy;             // self-recursion (structural)

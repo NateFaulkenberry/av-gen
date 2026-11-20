@@ -35,6 +35,10 @@ struct CloudUniforms {
     frameInfo: vec4<f32>,
     prevViewProj: mat4x4<f32>,
     glows: array<vec4<f32>, 32>,
+    beams: array<vec4<f32>, 24>,
+    beamInfo: vec4<f32>,
+    halo: vec4<f32>,
+    haloColor: vec4<f32>,
 };
 
 @group(0) @binding(1) var<uniform> cu: CloudUniforms;
@@ -131,7 +135,7 @@ fn fs_cloud_composite(in: VsOut) -> @location(0) vec4<f32> {
     if (wsum > 1e-3) {
         c = acc / wsum;
     }
-    if (c.a < 1.0 / 1024.0) {
+    if (c.a < 1.0 / 1024.0 && max(c.r, max(c.g, c.b)) < 1e-6) { // ADR-2102: light with no cover (beams, halo)
         discard;
     }
     return c;

@@ -196,3 +196,84 @@ TEST_CASE("the relief sea and its breaks read, validate and round-trip", "[cloud
     negative["sea"]["relief"] = -1.0;
     CHECK_FALSE(scene::Clouds::fromJson(negative, fs::temp_directory_path()));
 }
+
+// ADR-2102: lighthouse beams and the moon's halo on the cloud block -- read, refused, round-tripped, turned by the
+// timeline second, and routable.
+TEST_CASE("cloud beams and the halo read, validate, round-trip and turn with the timeline", "[unit][clouds][adr2102]") {
+    const json j = {{"sea", {{"base", -100.0}, {"top", 0.0}}},
+                    {"beams", {{{"name", "harbour"}, {"origin", {10.0, 50.0, -20.0}}, {"count", 2}, {"yaw", 90.0},
+                                {"elevation", 0.0}, {"rpm", 15.0}, {"length", 800.0}, {"halfAngle", 2.0},
+                                {"radius", 1.5}, {"color", {0.5, 0.6, 1.0}}, {"intensity", 2.0}}}},
+                    {"beamAir", 0.3},
+                    {"beamCloud", 1.5},
+                    {"halo", {{"direction", {0.0, 0.0, -2.0}}, {"color", {0.3, 0.3, 0.4}}, {"radius", 3.0},
+                              {"intensity", 0.5}}}};
+    auto c = scene::Clouds::fromJson(j, fs::temp_directory_path());
+    REQUIRE(c);
+    REQUIRE(c->beams.size() == 1);
+    CHECK(c->beams[0].count == 2);
+    CHECK(c->beams[0].rpm == 15.0f);
+    CHECK(c->beams[0].color.z == 1.0f);
+    CHECK(c->beamAir == Catch::Approx(0.3f));
+    CHECK(c->beamCloud == Catch::Approx(1.5f));
+    CHECK(c->halo.enabled);
+    CHECK(c->halo.direction.z == Catch::Approx(-1.0f)); // normalised on load
+
+    // yaw 90 at t = 0 points along -z (counter-clockwise from +x seen from above); the second arm is opposed; at 15
+    // rpm a second later the arm has turned a quarter turn further, to -x
+    const glm::vec3 d0 = scene::cloudBeamDirection(c->beams[0], 0, 0.0);
+    CHECK(d0.z == Catch::Approx(-1.0f).margin(1e-5));
+    const glm::vec3 d1 = scene::cloudBeamDirection(c->beams[0], 1, 0.0);
+    CHECK(d1.z == Catch::Approx(1.0f).margin(1e-5));
+    const glm::vec3 later = scene::cloudBeamDirection(c->beams[0], 0, 1.0);
+    CHECK(later.x == Catch::Approx(-1.0f).margin(1e-5));
+    // a seek lands where play would: a whole number of turns later the arm is where it started
+    const glm::vec3 turned = scene::cloudBeamDirection(c->beams[0], 0, 4.0 * 1000.0);
+    CHECK(turned.z == Catch::Approx(-1.0f).margin(1e-4));
+
+    auto again = scene::Clouds::fromJson(c->toJson(), fs::temp_directory_path());
+    REQUIRE(again);
+    REQUIRE(again->beams.size() == 1);
+    CHECK(again->beams[0].name == "harbour");
+    CHECK(again->beams[0].halfAngle == 2.0f);
+    CHECK(again->beams[0].intensity == 2.0f);
+    CHECK(again->beamCloud == Catch::Approx(1.5f));
+    CHECK(again->halo.enabled);
+    CHECK(again->halo.radius == 3.0f);
+
+    // none authored: nothing written
+    auto plain = scene::Clouds::fromJson({{"sea", {{"base", -100.0}, {"top", 0.0}}}}, fs::temp_directory_path());
+    REQUIRE(plain);
+    CHECK_FALSE(plain->toJson().contains("beams"));
+    CHECK_FALSE(plain->toJson().contains("halo"));
+
+    json typo = j;
+    typo["beams"][0]["speed"] = 3.0;
+    CHECK_FALSE(scene::Clouds::fromJson(typo, fs::temp_directory_path()));
+    json many = j;
+    many["beams"][0]["count"] = 9;
+    CHECK_FALSE(scene::Clouds::fromJson(many, fs::temp_directory_path()));
+    json wide = j;
+    wide["beams"][0]["halfAngle"] = 50.0;
+    CHECK_FALSE(scene::Clouds::fromJson(wide, fs::temp_directory_path()));
+    json arms = j; // five beams of two arms: ten arms, more than the renderer holds
+    for (int i = 0; i < 4; ++i) arms["beams"].push_back(j["beams"][0]);
+    CHECK_FALSE(scene::Clouds::fromJson(arms, fs::temp_directory_path()));
+
+    // the knobs: each beam's intensity, the air and cloud gains and the halo
+    params::ParameterSet ps;
+    const scene::CloudParameters p = scene::registerCloudParameters(ps, *c, "clouds/");
+    REQUIRE(ps.findAs<float>("clouds/beam/0/intensity") != nullptr);
+    REQUIRE(ps.findAs<float>("clouds/beamAir") != nullptr);
+    REQUIRE(ps.findAs<float>("clouds/halo/intensity") != nullptr);
+    CHECK(ps.findAs<float>("clouds/beam/0/intensity")->value() == 2.0f);
+    ps.findAs<float>("clouds/beam/0/intensity")->setFinalComponent(0, 7.0f);
+    ps.findAs<float>("clouds/beamCloud")->setFinalComponent(0, 0.25f);
+    ps.findAs<float>("clouds/halo/intensity")->setFinalComponent(0, 2.0f);
+    scene::Clouds live;
+    scene::applyCloudParameters(p, *c, live);
+    CHECK(live.beams[0].intensity == 7.0f);
+    CHECK(live.beamCloud == 0.25f);
+    CHECK(live.halo.intensity == 2.0f);
+    CHECK(c->beams[0].intensity == 2.0f);
+}

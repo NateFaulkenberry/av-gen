@@ -80,6 +80,34 @@ struct CloudGlow {
 
 inline constexpr std::size_t kMaxCloudGlows = 16;
 
+// ADR-2102: a turning searchlight (a lighthouse) marched with the cloud: soft cones of light that scatter in the clear
+// air (cut by the opaque scene, hidden behind cloud) and light the cloud they pass through. `count` arms are spread
+// evenly in yaw (2 = two opposed beams) and turn together about +y at `rpm`; the angle is a pure function of the
+// timeline second, so a seek lands where play would.
+struct CloudBeam {
+    std::string name;              // optional; the parameters are keyed on the index
+    glm::vec3 origin{0.0f};        // the lamp
+    int count = 1;                 // arms (1..8 in all beams together)
+    float yaw = 0.0f;              // degrees at t = 0: 0 = +x, 90 = -z (counter-clockwise seen from above)
+    float elevation = 0.0f;        // degrees above the horizontal
+    float rpm = 0.0f;              // turns per minute (negative = clockwise seen from above)
+    float length = 1000.0f;        // metres the light reaches
+    float halfAngle = 1.5f;        // degrees: the cone's half-width (where the light has fallen to e^-2)
+    float radius = 1.0f;           // metres: the half-width at the lamp
+    glm::vec3 color{1.0f};
+    float intensity = 1.0f;
+};
+inline constexpr std::size_t kMaxCloudBeamArms = 8;
+
+// ADR-2102: a glow in the sky around a bright body (the moon's corona), behind the cloud and the opaque scene.
+struct CloudHalo {
+    bool enabled = false;
+    glm::vec3 direction{0.0f, 0.2f, 1.0f}; // toward the body (normalised on load)
+    glm::vec3 color{0.3f, 0.3f, 0.4f};
+    float radius = 6.0f;           // degrees: the inner glow's e-folding angle (an outer glow four times wider)
+    float intensity = 1.0f;
+};
+
 struct Clouds {
     bool enabled = true;
     std::string source;               // the lobes file as authored (relative to the scene file), or empty when inline
@@ -120,6 +148,11 @@ struct Clouds {
     float minStep = 4.0f;             // metres: the shortest step
     float stepGrowth = 0.03f;         // a step is at least this fraction of its distance from the eye
     float maxDistance = 40000.0f;     // metres the march reaches
+    // ADR-2102
+    std::vector<CloudBeam> beams;
+    float beamAir = 1.0f;             // the beams' scatter in clear air (a multiplier; 0 = none)
+    float beamCloud = 1.0f;           // the beams' light on the cloud they pass through (a multiplier)
+    CloudHalo halo;
 
     [[nodiscard]] bool active() const { return enabled && (!lobes.empty() || sea.enabled); }
     [[nodiscard]] Result<void> validate() const;
@@ -134,14 +167,18 @@ struct Clouds {
 
 inline constexpr std::size_t kMaxCloudLobes = 4096;
 
-// ADR-2100: the block's live knobs (`clouds/<leaf>`, `clouds/glow/<i>/intensity|color`). Each default is the block's
+// ADR-2100: the block's live knobs (`clouds/<leaf>`, `clouds/glow/<i>/intensity|color`; ADR-2102 adds
+// `clouds/beam/<i>/intensity`, `clouds/beamAir`, `clouds/beamCloud`, `clouds/halo/intensity`). Each default is the block's
 // own value, so registering them changes no picture.
 struct CloudParameters {
     std::vector<params::IParameter*> all;
     std::size_t floats = 0;  // the leading float parameters (in kCloudFloats order)
     std::size_t vectors = 0; // then the vec3s (in kCloudVectors order)
-                             // then two per glow: intensity, colour
+                             // then two per glow: intensity, colour; then (ADR-2102) beamAir, beamCloud,
+                             // halo intensity, one per beam: intensity
 };
+// ADR-2102: the direction of arm `arm` of `beam` at `seconds` on the timeline (unit, toward where the light goes).
+[[nodiscard]] glm::vec3 cloudBeamDirection(const CloudBeam& beam, int arm, double seconds);
 [[nodiscard]] CloudParameters registerCloudParameters(params::ParameterSet& params, const Clouds& rest,
                                                       const std::string& prefix);
 void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& live);

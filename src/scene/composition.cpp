@@ -8159,6 +8159,9 @@ void Composition::rebuild() {
                         if (override.emissiveIntensity) {
                             resolved.emissiveIntensity = *override.emissiveIntensity;
                         }
+                        if (override.baseColor) { // ADR-2102
+                            resolved.baseColor = *override.baseColor;
+                        }
                     }
                     return resolved;
                 };

@@ -135,6 +135,31 @@ Result<void> Clouds::validate() const {
     if (!(stepGrowth >= 0.0f && stepGrowth <= 0.5f)) return fail("clouds: stepGrowth must be in [0, 0.5]");
     if (!(maxDistance > 0.0f && maxDistance <= 200000.0f)) return fail("clouds: maxDistance must be in (0, 200000]");
     if (!std::isfinite(drift.x + drift.y + drift.z)) return fail("clouds: drift must be finite");
+    // ADR-2102
+    std::size_t arms = 0;
+    for (const CloudBeam& b : beams) {
+        if (b.count < 1 || b.count > static_cast<int>(kMaxCloudBeamArms)) {
+            return fail("clouds: a beam's count must be in [1, {}]", kMaxCloudBeamArms);
+        }
+        arms += static_cast<std::size_t>(b.count);
+        if (!(b.length > 0.0f && b.length <= 100000.0f) || !(b.halfAngle > 0.0f && b.halfAngle < 45.0f) ||
+            !(b.radius >= 0.0f) || !(b.intensity >= 0.0f) || !std::isfinite(b.origin.x + b.origin.y + b.origin.z) ||
+            !std::isfinite(b.yaw + b.elevation + b.rpm) || b.elevation < -90.0f || b.elevation > 90.0f) {
+            return fail("clouds: a beam needs a length in (0, 100000], a halfAngle in (0, 45) degrees, a non-negative "
+                        "radius and intensity, an elevation in [-90, 90] and a finite origin, yaw and rpm");
+        }
+    }
+    if (arms > kMaxCloudBeamArms) {
+        return fail("clouds: {} beam arms, more than the {} the renderer holds", arms, kMaxCloudBeamArms);
+    }
+    if (!(beamAir >= 0.0f && beamAir <= 100.0f) || !(beamCloud >= 0.0f && beamCloud <= 100.0f)) {
+        return fail("clouds: beamAir and beamCloud must be in [0, 100]");
+    }
+    if (halo.enabled && (glm::length(halo.direction) < 1e-6f || !(halo.radius > 0.0f && halo.radius <= 90.0f) ||
+                         !(halo.intensity >= 0.0f))) {
+        return fail("clouds: a halo needs a non-zero direction, a radius in (0, 90] degrees and a non-negative "
+                    "intensity");
+    }
     return {};
 }
 
@@ -227,6 +252,66 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
             c.glows.push_back(glow);
         }
     }
+    if (j.contains("beams")) { // ADR-2102
+        const json& bj = j.at("beams");
+        if (!bj.is_array()) return fail("clouds: 'beams' must be an array");
+        for (const json& b : bj) {
+            if (!b.is_object() || !b.contains("origin")) return fail("clouds: a beam needs an 'origin'");
+            CloudBeam beam;
+            auto o = vec3Of(b.at("origin"), "origin");
+            if (!o) return std::unexpected(o.error());
+            beam.origin = *o;
+            for (const auto& [key, value] : b.items()) {
+                if (key == "origin") continue;
+                if (key == "name") {
+                    beam.name = value.get<std::string>();
+                } else if (key == "color") {
+                    auto col = vec3Of(value, "color");
+                    if (!col) return std::unexpected(col.error());
+                    beam.color = *col;
+                } else if (key == "count") {
+                    if (!value.is_number_integer()) return fail("clouds: a beam's 'count' must be an integer");
+                    beam.count = value.get<int>();
+                } else {
+                    float* t = key == "yaw"         ? &beam.yaw
+                               : key == "elevation" ? &beam.elevation
+                               : key == "rpm"       ? &beam.rpm
+                               : key == "length"    ? &beam.length
+                               : key == "halfAngle" ? &beam.halfAngle
+                               : key == "radius"    ? &beam.radius
+                               : key == "intensity" ? &beam.intensity
+                                                    : nullptr;
+                    if (t == nullptr) {
+                        return fail("clouds: a beam has an unknown key '{}' (origin, count, yaw, elevation, rpm, length, "
+                                    "halfAngle, radius, color, intensity, name)",
+                                    key);
+                    }
+                    if (!value.is_number()) return fail("clouds: a beam's '{}' must be a number", key);
+                    *t = value.get<float>();
+                }
+            }
+            c.beams.push_back(beam);
+        }
+    }
+    if (auto r = num("beamAir", c.beamAir); !r) return std::unexpected(r.error());
+    if (auto r = num("beamCloud", c.beamCloud); !r) return std::unexpected(r.error());
+    if (j.contains("halo")) { // ADR-2102
+        const json& hj = j.at("halo");
+        if (!hj.is_object()) return fail("clouds: 'halo' must be an object");
+        c.halo.enabled = hj.value("enabled", true);
+        if (hj.contains("direction")) {
+            auto d = vec3Of(hj.at("direction"), "halo.direction");
+            if (!d) return std::unexpected(d.error());
+            c.halo.direction = *d;
+        }
+        if (hj.contains("color")) {
+            auto col = vec3Of(hj.at("color"), "halo.color");
+            if (!col) return std::unexpected(col.error());
+            c.halo.color = *col;
+        }
+        c.halo.radius = hj.value("radius", c.halo.radius);
+        c.halo.intensity = hj.value("intensity", c.halo.intensity);
+    }
     if (!j.contains("lobes") && !c.sea.enabled) {
         return fail("clouds: 'lobes' (a lobes file path, or an array) is required unless there is a 'sea'");
     }
@@ -253,6 +338,7 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
     if (auto ok = c.validate(); !ok) return std::unexpected(ok.error());
     c.lightDirection = glm::normalize(c.lightDirection);
     c.warmDirection = glm::normalize(c.warmDirection);
+    if (c.halo.enabled) c.halo.direction = glm::normalize(c.halo.direction);
     return c;
 }
 
@@ -295,6 +381,24 @@ json Clouds::toJson() const {
             gs.push_back(std::move(gj));
         }
         j["glows"] = std::move(gs);
+    }
+    if (!beams.empty()) { // ADR-2102
+        json bs = json::array();
+        for (const CloudBeam& b : beams) {
+            json bj = {{"origin", v3(b.origin)}, {"count", b.count},         {"yaw", b.yaw},
+                       {"elevation", b.elevation}, {"rpm", b.rpm},           {"length", b.length},
+                       {"halfAngle", b.halfAngle}, {"radius", b.radius},     {"color", v3(b.color)},
+                       {"intensity", b.intensity}};
+            if (!b.name.empty()) bj["name"] = b.name;
+            bs.push_back(std::move(bj));
+        }
+        j["beams"] = std::move(bs);
+        j["beamAir"] = beamAir;
+        j["beamCloud"] = beamCloud;
+    }
+    if (halo.enabled) {
+        j["halo"] = {{"enabled", true}, {"direction", v3(halo.direction)}, {"color", v3(halo.color)},
+                     {"radius", halo.radius}, {"intensity", halo.intensity}};
     }
     if (!masses.empty()) j["masses"] = masses;
     if (!source.empty()) {
@@ -391,7 +495,24 @@ CloudParameters registerCloudParameters(params::ParameterSet& params, const Clou
         addFloat(base + "intensity", rest.glows[i].intensity, 0.0f, 1000.0f, 0.0f, 20.0f);
         addVec(base + "color", rest.glows[i].color, true);
     }
+    // ADR-2102
+    addFloat(prefix + "beamAir", rest.beamAir, 0.0f, 100.0f, 0.0f, 4.0f);
+    addFloat(prefix + "beamCloud", rest.beamCloud, 0.0f, 100.0f, 0.0f, 4.0f);
+    addFloat(prefix + "halo/intensity", rest.halo.intensity, 0.0f, 1000.0f, 0.0f, 10.0f);
+    for (std::size_t i = 0; i < rest.beams.size(); ++i) {
+        addFloat(prefix + "beam/" + std::to_string(i) + "/intensity", rest.beams[i].intensity, 0.0f, 1000.0f, 0.0f,
+                 20.0f);
+    }
     return out;
+}
+
+glm::vec3 cloudBeamDirection(const CloudBeam& beam, int arm, double seconds) {
+    const double turns = static_cast<double>(beam.rpm) / 60.0 * seconds;
+    const double spread = static_cast<double>(arm) / static_cast<double>(std::max(beam.count, 1));
+    const double a = (static_cast<double>(beam.yaw) / 360.0 + std::fmod(turns, 1.0) + spread) * 6.283185307179586;
+    const double e = static_cast<double>(beam.elevation) * 0.017453292519943295;
+    return glm::vec3(static_cast<float>(std::cos(e) * std::cos(a)), static_cast<float>(std::sin(e)),
+                     static_cast<float>(-std::cos(e) * std::sin(a)));
 }
 
 void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& live) {
@@ -415,6 +536,13 @@ void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& 
     for (std::size_t i = 0; i < live.glows.size(); ++i) {
         if (const auto* q = f(glow0 + 2 * i)) live.glows[i].intensity = q->value();
         if (const auto* q = v(glow0 + 2 * i + 1)) live.glows[i].color = q->value();
+    }
+    const std::size_t beam0 = glow0 + 2 * rest.glows.size(); // ADR-2102
+    if (const auto* q = f(beam0)) live.beamAir = q->value();
+    if (const auto* q = f(beam0 + 1)) live.beamCloud = q->value();
+    if (const auto* q = f(beam0 + 2)) live.halo.intensity = q->value();
+    for (std::size_t i = 0; i < live.beams.size(); ++i) {
+        if (const auto* q = f(beam0 + 3 + i)) live.beams[i].intensity = q->value();
     }
 }
 

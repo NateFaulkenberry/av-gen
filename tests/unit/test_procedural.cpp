@@ -2487,3 +2487,24 @@ TEST_CASE("partMaterials reads, round-trips, is written only when authored and r
     CHECK_FALSE(scene::ProceduralGeometry::fromJson(bad));
 }
 
+// ADR-2102: a part's base colour (an awning's cloth per node), read and round-tripped; a malformed one refused.
+TEST_CASE("partMaterials take a base colour per part", "[procedural][adr2102]") {
+    const nlohmann::json j = nlohmann::json::parse(R"({
+        "source": {"kind": "mesh", "asset": "a.glb"},
+        "distribution": {"kind": "single"},
+        "partMaterials": {"cloth": {"baseColor": [0.09, 0.02, 0.07]}}})");
+    const auto g = scene::ProceduralGeometry::fromJson(j);
+    REQUIRE(g);
+    REQUIRE(g->partMaterials.size() == 1);
+    REQUIRE(g->partMaterials[0].second.baseColor.has_value());
+    CHECK(g->partMaterials[0].second.baseColor->x == 0.09f);
+    CHECK(g->partMaterials[0].second.program.empty());
+    const auto again = scene::ProceduralGeometry::fromJson(g->toJson());
+    REQUIRE(again);
+    REQUIRE(again->partMaterials[0].second.baseColor.has_value());
+    CHECK(again->partMaterials[0].second.baseColor->z == 0.07f);
+    nlohmann::json bad = j;
+    bad["partMaterials"]["cloth"]["baseColor"] = {0.1, 0.2};
+    CHECK_FALSE(scene::ProceduralGeometry::fromJson(bad));
+}
+

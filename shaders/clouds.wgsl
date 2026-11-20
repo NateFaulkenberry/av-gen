@@ -44,6 +44,10 @@ struct CloudUniforms {
     frameInfo: vec4<f32>,
     prevViewProj: mat4x4<f32>,
     glows: array<vec4<f32>, 32>,
+    beams: array<vec4<f32>, 24>,
+    beamInfo: vec4<f32>,
+    halo: vec4<f32>,
+    haloColor: vec4<f32>,
 };
 
 struct Lobe {
@@ -313,6 +317,56 @@ fn emptySkip(ro: vec3<f32>, rd: vec3<f32>, t: f32, seaEntry: f32, boxEntry: f32)
     return max(t, goal);
 }
 
+// ADR-2102: the fall of a beam's light along its length: full at the lamp, gone at its end.
+fn beamFade(s: f32, len: f32) -> f32 {
+    let u = clamp(s / len, 0.0, 1.0);
+    return (1.0 - u) * (1.0 - u) / (1.0 + 3.0 * u);
+}
+
+// ADR-2102: a beam arm's light on a cloud sample at p (the soft cone's profile at p, faded along the beam).
+fn beamOnCloud(p: vec3<f32>, arm: u32) -> vec3<f32> {
+    let o = cu.beams[3u * arm];
+    let d = cu.beams[3u * arm + 1u];
+    let v = p - o.xyz;
+    let s = dot(v, d.xyz);
+    if (s <= 0.0 || s >= o.w) {
+        return vec3<f32>(0.0);
+    }
+    let c = cu.beams[3u * arm + 2u];
+    let w = c.w + s * d.w;
+    let r2 = max(dot(v, v) - s * s, 0.0);
+    return c.rgb * (exp(-2.0 * r2 / (w * w)) * beamFade(s, o.w));
+}
+
+// ADR-2102: a beam arm's scatter in the air along the view ray, as one lump at the ray's closest approach to the arm's
+// axis: (distance along the ray, light). The profile integrated across the cone grows as the ray grazes the axis
+// (1 / sin of the angle between them, capped where the ray would run down the beam).
+fn beamAir(ro: vec3<f32>, rd: vec3<f32>, arm: u32) -> vec4<f32> {
+    let o = cu.beams[3u * arm];
+    let d = cu.beams[3u * arm + 1u];
+    let c = cu.beams[3u * arm + 2u];
+    let w0 = ro - o.xyz;
+    let b = dot(rd, d.xyz);
+    let dd = dot(rd, w0);
+    let e = dot(d.xyz, w0);
+    let den = max(1.0 - b * b, 1e-6);
+    var sb = clamp((e - b * dd) / den, 0.0, o.w);
+    let q = o.xyz + d.xyz * sb;
+    let tv = max(dot(q - ro, rd), 0.0);
+    let r = ro + rd * tv - q;
+    let w = c.w + sb * d.w;
+    let prof = exp(-2.0 * dot(r, r) / (w * w));
+    let sinT = max(sqrt(den), 0.12);
+    return vec4<f32>(tv, c.rgb * (prof * beamFade(sb, o.w) / sinT));
+}
+
+// ADR-2102: the glow around a bright body in the sky (the moon's corona): an inner and a four times wider outer glow.
+fn haloLight(rd: vec3<f32>) -> vec3<f32> {
+    let ang = acos(clamp(dot(rd, cu.halo.xyz), -1.0, 1.0));
+    let w = max(cu.halo.w, 1e-4);
+    return cu.haloColor.rgb * (exp(-ang / w) + 0.3 * exp(-ang / (4.0 * w)));
+}
+
 struct MarchOut {
     @location(0) colour: vec4<f32>,
     @location(1) depth: vec4<f32>,
@@ -367,8 +421,36 @@ fn fs_clouds(in: VsOut) -> MarchOut {
             boxEntry = s.x;
         }
     }
-    tB = min(tB, min(sceneT, cu.march2.z));
+    let reach = min(sceneT, cu.march2.z);
+    tB = min(tB, reach);
+    // ADR-2102: the beams' air scatter waits at its distance along the ray for the march to say how much cloud is in
+    // front of it; the halo sits behind everything, where the ray reaches the sky.
+    let arms = u32(cu.beamInfo.x + 0.5);
+    var airT: array<f32, 8>;
+    var airC: array<vec3<f32>, 8>;
+    for (var k = 0u; k < 8u; k = k + 1u) {
+        airT[k] = 1e30;
+        airC[k] = vec3<f32>(0.0);
+    }
+    if (cu.beamInfo.y > 0.0) {
+        for (var k = 0u; k < arms; k = k + 1u) {
+            let a = beamAir(ro, rd, k);
+            if (a.x < sceneT && dot(a.yzw, vec3<f32>(1.0)) > 1e-5) {
+                airT[k] = a.x;
+                airC[k] = a.yzw * cu.beamInfo.y;
+            }
+        }
+    }
+    var sky = vec3<f32>(0.0);
+    if (cu.beamInfo.w > 0.5 && sceneT >= cu.march2.z) {
+        sky = haloLight(rd);
+    }
     if (tB <= tA) {
+        var add = sky;
+        for (var k = 0u; k < arms; k = k + 1u) {
+            add = add + airC[k];
+        }
+        out.colour = vec4<f32>(add, 0.0);
         return out;
     }
 
@@ -438,6 +520,10 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     glow = glow + cu.glows[2u * g + 1u].rgb * (fall * occ);
                 }
                 glow = glow * cu.grid2.z;
+                // ADR-2102: the beams on the cloud
+                for (var k = 0u; k < arms; k = k + 1u) {
+                    glow = glow + beamOnCloud(p, k) * cu.beamInfo.z;
+                }
                 var radiance = cu.lightColor.rgb * cu.light.w * shadow * phase * powder + ambient + warm + glow;
                 let hz = 1.0 - exp(-t / max(cu.haze.w, 1.0));
                 radiance = mix(radiance, cu.haze.rgb, hz);
@@ -446,6 +532,13 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     a = a * (1.0 - smoothstep(cu.sea6.w, cu.march2.z, t)); // ADR-2101: the far sea fades out
                 }
                 let w = trans * a;
+                // ADR-2102: a beam's air scatter in front of this sample is seen through the cloud so far
+                for (var k = 0u; k < arms; k = k + 1u) {
+                    if (airT[k] < t) {
+                        col = col + airC[k] * trans;
+                        airT[k] = 1e30;
+                    }
+                }
                 col = col + w * radiance;
                 tSum = tSum + w * t;
                 wSum = wSum + w;
@@ -465,6 +558,15 @@ fn fs_clouds(in: VsOut) -> MarchOut {
         t = t + dt;
     }
     let alpha = 1.0 - trans;
+    // ADR-2102: the air scatter the march never passed (beyond the last sample, or the ray ended before the cloud)
+    if (trans >= 0.01) {
+        for (var k = 0u; k < arms; k = k + 1u) {
+            if (airT[k] < 1e29) {
+                col = col + airC[k] * trans;
+            }
+        }
+        col = col + sky * trans;
+    }
     out.colour = vec4<f32>(col, alpha);
     out.depth = vec4<f32>(select(0.0, tSum / max(wSum, 1e-6), wSum > 0.0), axial, 0.0, 0.0);
     return out;

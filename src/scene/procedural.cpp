@@ -3488,6 +3488,9 @@ json ProceduralGeometry::toJson() const {
             if (part.emissiveIntensity) {
                 e["emissiveIntensity"] = *part.emissiveIntensity;
             }
+            if (part.baseColor) { // ADR-2102
+                e["baseColor"] = json::array({part.baseColor->x, part.baseColor->y, part.baseColor->z});
+            }
             pm[name] = std::move(e);
         }
         j["partMaterials"] = std::move(pm);
@@ -4004,9 +4007,18 @@ Result<ProceduralGeometry> ProceduralGeometry::fromJson(const json& root) {
                 }
                 part.emissiveIntensity = e.at("emissiveIntensity").get<float>();
             }
+            if (e.contains("baseColor")) { // ADR-2102
+                const json& c = e.at("baseColor");
+                if (!c.is_array() || c.size() != 3 || !c[0].is_number() || !c[1].is_number() || !c[2].is_number()) {
+                    return fail("'partMaterials.{}.baseColor' must be [r, g, b]", it.key());
+                }
+                part.baseColor = glm::vec3(c[0].get<float>(), c[1].get<float>(), c[2].get<float>());
+            }
             for (const auto& key : e.items()) {
-                if (key.key() != "program" && key.key() != "emissiveColor" && key.key() != "emissiveIntensity") {
-                    return fail("'partMaterials.{}': unknown key '{}' (program, emissiveColor, emissiveIntensity)",
+                if (key.key() != "program" && key.key() != "emissiveColor" && key.key() != "emissiveIntensity" &&
+                    key.key() != "baseColor") {
+                    return fail("'partMaterials.{}': unknown key '{}' (program, emissiveColor, emissiveIntensity, "
+                                "baseColor)",
                                 it.key(), key.key());
                 }
             }

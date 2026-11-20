@@ -45,8 +45,13 @@ struct CloudUniformGpu {
     glm::vec4 frameInfo;     // x = jitter (0..1), y = history weight (0 = none), zw = march target size
     glm::mat4 prevViewProj;  // the view-projection the history was drawn with
     std::array<glm::vec4, 2 * scene::kMaxCloudGlows> glows; // per glow: (position, radius), (colour * intensity, 0)
+    // ADR-2102: per beam arm (origin, length), (direction, tan of the half angle), (colour * intensity, lamp radius)
+    std::array<glm::vec4, 3 * scene::kMaxCloudBeamArms> beams;
+    glm::vec4 beamInfo;      // x = arm count, y = air gain, z = cloud gain, w = 1 when the halo is on
+    glm::vec4 halo;          // xyz toward the body, w = the inner glow's e-folding angle (radians)
+    glm::vec4 haloColor;     // rgb * intensity
 };
-static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows) * 16);
+static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 3) * 16);
 
 struct LobeGpu {
     glm::vec4 centreRadius;
@@ -552,6 +557,19 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         u.glows[2 * i] = glm::vec4(g.position, g.radius);
         u.glows[2 * i + 1] = glm::vec4(g.color * g.intensity, 0.0f);
     }
+    // ADR-2102: the beams' arms at this timeline second
+    std::size_t arms = 0;
+    for (const scene::CloudBeam& b : c.beams) {
+        for (int a = 0; a < b.count && arms < scene::kMaxCloudBeamArms; ++a, ++arms) {
+            u.beams[3 * arms] = glm::vec4(b.origin, b.length);
+            u.beams[3 * arms + 1] = glm::vec4(scene::cloudBeamDirection(b, a, now),
+                                              std::tan(glm::radians(b.halfAngle)));
+            u.beams[3 * arms + 2] = glm::vec4(b.color * b.intensity, std::max(b.radius, 0.05f));
+        }
+    }
+    u.beamInfo = glm::vec4(static_cast<float>(arms), c.beamAir, c.beamCloud, c.halo.enabled ? 1.0f : 0.0f);
+    u.halo = glm::vec4(glm::normalize(c.halo.direction), glm::radians(c.halo.radius));
+    u.haloColor = glm::vec4(c.halo.color * c.halo.intensity, 0.0f);
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
     const auto bufferEntry = [](std::uint32_t binding, const wgpu::Buffer& b) {

@@ -226,3 +226,98 @@ TEST_CASE("the lobe bins hold every lobe that covers a point, in that point's ce
     }
     CHECK(checked > 100);
 }
+
+// ADR-2102: a lighthouse beam scatters in the clear air (drawn with no cloud cover, which the composite used to
+// discard), lights the sea it grazes, turns with the timeline second, and the halo brightens the sky around its body.
+TEST_CASE("a cloud beam lights the air and the sea along it, turns with time, and a halo glows in the sky",
+          "[gpu][renderer][clouds][adr2102]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    constexpr std::uint32_t W = 192, H = 108;
+    FrameTime t{};
+
+    scene::Scene plain = seaScene();
+    plain.clouds.ambientTop = plain.clouds.ambientBottom = plain.clouds.hazeColor = {0.02f, 0.02f, 0.02f};
+    auto a = renderer.renderToImage(plain, t, W, H);
+    REQUIRE(a.has_value());
+
+    // a beam 1.2 km ahead, crossing the frame from left to right a little above the horizon (yaw 0 = +x), and dipping
+    // into the sea's top at its far end
+    scene::Scene lit = plain;
+    scene::CloudBeam beam;
+    beam.origin = {-900.0f, 60.0f, -1200.0f};
+    beam.count = 1;
+    beam.yaw = 0.0f;
+    beam.elevation = -2.0f;
+    beam.length = 1800.0f;
+    beam.halfAngle = 1.5f;
+    beam.radius = 2.0f;
+    beam.color = {0.0f, 0.0f, 1.0f};
+    beam.intensity = 6.0f;
+    lit.clouds.beams = {beam};
+    lit.clouds.beamAir = 1.0f;
+    lit.clouds.beamCloud = 2.0f;
+    auto b = renderer.renderToImage(lit, t, W, H);
+    REQUIRE(b.has_value());
+    // find the rows the beam crosses in the frame's centre column band: blue rises there and not in the sky's top
+    double best = 0.0;
+    for (std::uint32_t y = 0; y + 4 <= H; y += 2) {
+        const double gain = meanRgb(*b, W / 2 - 10, y, W / 2 + 10, y + 4).b - meanRgb(*a, W / 2 - 10, y, W / 2 + 10, y + 4).b;
+        best = std::max(best, gain);
+    }
+    const double top = meanRgb(*b, 0, 0, W, 6).b - meanRgb(*a, 0, 0, W, 6).b;
+    INFO("the beam's best band gain " << best << ", the sky's top " << top);
+    CHECK(best > 20.0);
+    CHECK(top < 3.0);
+
+    // pointed away (yaw 180, toward -x and out of the frame) the frame is the plain one again
+    scene::Scene away = lit;
+    away.clouds.beams[0].yaw = 180.0f;
+    away.clouds.beams[0].origin = {-2500.0f, 60.0f, -1200.0f};
+    auto c = renderer.renderToImage(away, t, W, H);
+    REQUIRE(c.has_value());
+    const double awayGain = std::abs(luma(meanRgb(*c, 0, 0, W, H)) - luma(meanRgb(*a, 0, 0, W, H)));
+    INFO("pointed away the frame changes by " << awayGain);
+    CHECK(awayGain < 1.0);
+
+    // turning: at 30 rpm, half a second later the arm has turned 90 degrees, along -z, away from the centre column
+    scene::Scene turning = lit;
+    turning.clouds.beams[0].rpm = 30.0f;
+    turning.clouds.beams[0].origin = {0.0f, 60.0f, -1200.0f};
+    turning.clouds.beams[0].yaw = 90.0f; // along -z at t = 0: a line down the frame's centre
+    turning.clouds.temporal = 0.0f;
+    FrameTime t0{};
+    FrameTime t1{};
+    t1.renderTime = 0.5; // -z + 90 degrees = -x: a line across the left of the frame
+    auto d0 = renderer.renderToImage(turning, t0, W, H);
+    auto d1 = renderer.renderToImage(turning, t1, W, H);
+    REQUIRE(d0.has_value());
+    REQUIRE(d1.has_value());
+    const double centre0 = meanRgb(*d0, W / 2 - 4, H / 2, W / 2 + 4, 2 * H / 3).b;
+    const double centre1 = meanRgb(*d1, W / 2 - 4, H / 2, W / 2 + 4, 2 * H / 3).b;
+    INFO("centre column blue at t 0 " << centre0 << ", at t 0.5 " << centre1);
+    CHECK(centre0 > centre1 + 10.0);
+
+    // the halo: a body straight ahead, just above the horizon, brightens the sky there and not the far corner
+    scene::Scene halo = plain;
+    halo.clouds.halo.enabled = true;
+    halo.clouds.halo.direction = glm::normalize(glm::vec3(0.0f, 0.05f, -1.0f));
+    halo.clouds.halo.color = {1.0f, 1.0f, 1.0f};
+    halo.clouds.halo.radius = 4.0f;
+    halo.clouds.halo.intensity = 1.0f;
+    halo.camera.target.y = 300.0f; // level: the body is at the frame's centre
+    plain.camera.target.y = 300.0f;
+    auto e1 = renderer.renderToImage(halo, t, W, H);
+    auto a1 = renderer.renderToImage(plain, t, W, H);
+    REQUIRE(e1.has_value());
+    REQUIRE(a1.has_value());
+    const double near = luma(meanRgb(*e1, W / 2 - 6, H / 2 - 12, W / 2 + 6, H / 2 - 4)) -
+                        luma(meanRgb(*a1, W / 2 - 6, H / 2 - 12, W / 2 + 6, H / 2 - 4));
+    const double corner = luma(meanRgb(*e1, 0, 0, 12, 8)) - luma(meanRgb(*a1, 0, 0, 12, 8));
+    INFO("halo: near the body +" << near << ", the corner +" << corner);
+    CHECK(near > 20.0);
+    CHECK(corner < 0.3 * near);
+    CHECK(ctx->errorCount() == 0);
+}
