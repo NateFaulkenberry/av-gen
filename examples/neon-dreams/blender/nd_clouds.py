@@ -34,11 +34,16 @@ WIND = (0.86, -0.5)            # plan direction the wind blows toward (east-sout
 # its smallest semi-axis (about 0.3 to 0.45 on average), in every direction. Measured in AV Gen with erosion 1 and a 60 m
 # wavelength: the plateau under the Mooring and the heads under the Condensery's deck, authored 5 m under the decks, sat
 # 15 to 30 m under them, and every stilt stood in the open. SEAT lifts the authored tops of the cloud that decks stand
-# in. At 5 m they are level with the decks and never over them (the erosion only goes inward), so no street is under
-# cloud if the erosion is turned down; with erosion 1 the surface is then 5 to 15 m under the decks. Lobes whose
-# surface has to stay where it is authored carry "tag": "seat" (and the plug's walls "plug"): a per-lobe erosion factor
-# in the engine, if there is to be one, belongs on those.
-SEAT = 5.0
+# in (the plateau's body and shelves, the Condensery's heads, the lighthouse rocks) by 3 m. The heads beside the
+# buildings keep their heights of iteration 5: they stand beside decks, not under them.
+# What that buys, and what it risks. The seat follows town_top, which is smooth, and the decks step, so "2 m under the
+# decks" is an average: measured on this file, the authored cloud is above the deck in 118 of the 381 open cells of the
+# upper Quay's level (by more than 1 m in 82, at most 4 m). The erosion only goes inward: with all of it (about 9 m off
+# a shelf) the plateau is 8 to 15 m under the decks; with 0.3 of it, about 5 m under, and a few cells may carry a
+# shallow mist; with NONE, cloud lies on parts of the Quay. So: lobes tagged "seat" want a share of the erosion near 0.3
+# (the engine's LOBE_ERODE, ADR-2107), not 0. At 5 m with the heads lifted too (first try) 215 of 1,056 open deck cells
+# had authored cloud more than 3 m over them.
+SEAT = 3.0
 _town_top0 = town_top
 
 
@@ -210,17 +215,19 @@ def on_open_deck(cells, l, under=1.5, over=40.0):
     """True when lobe l (engine coordinates) stands in the air over an open deck: somewhere inside its footprint a deck
     cell with no building on it lies between the lobe's bottom and top there (from `under` metres below the deck to
     `over` above it). Cloud may wrap a building's lower floors and fill the space under a deck; it may not lie on a
-    street, a terrace or a garden."""
-    cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; rx, rz, ry = (l["r"] * v for v in l["scale"])
+    street, a terrace or a garden.
+    (Until iteration 6 this read a lobe's scale as (x, plan y, up); it is (x, up, plan y), as L() writes it. For a head
+    0.72 high that made the footprint 30 % too short north to south and the height 45 % too tall.)"""
+    cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; rx, rv, ry = (l["r"] * v for v in l["scale"])
     for i in range(int(math.floor((cx - rx) / CELL)), int(math.floor((cx + rx) / CELL)) + 1):
-        for j in range(int(math.floor((cy - rz) / CELL)), int(math.floor((cy + rz) / CELL)) + 1):
+        for j in range(int(math.floor((cy - ry) / CELL)), int(math.floor((cy + ry) / CELL)) + 1):
             c = cells.get((i, j))
             if c is None or c[1]:
                 continue
-            q = 1.0 - (((i + 0.5) * CELL - cx) / rx) ** 2 - (((j + 0.5) * CELL - cy) / rz) ** 2
+            q = 1.0 - (((i + 0.5) * CELL - cx) / rx) ** 2 - (((j + 0.5) * CELL - cy) / ry) ** 2
             if q <= 0.0:
                 continue
-            h = ry * math.sqrt(q)
+            h = rv * math.sqrt(q)
             if cz + h > c[0] - under and cz - h < c[0] + over:
                 return True
     return False
@@ -242,7 +249,7 @@ def mound_dressing(cells):
             d, dz = town_near(cells, px, py, 44.0)
             if d is None or d < 4.0:
                 continue
-            north = py > qy(px); ref = town_top(px, py) + 5.0
+            north = py > qy(px); ref = _town_top0(px, py) + 5.0                       # deck level (not the lifted seat)
             u = rr.random()
             if u < (0.42 if d < 16 else (0.3 if d < 30 else 0.16)):                        # a head
                 if d < 16:
@@ -276,7 +283,7 @@ def mound_dressing(cells):
             d, dz = town_near(cells, px, py, 14.0)
             if d is not None:
                 continue                                                                   # the dressing above has the town's own edges
-            r = rr.uniform(17, 32); top = town_top(px, py) - hollow(px, py) + rr.uniform(1, 13) - (10.0 * max(0.0, e - 0.85) / 0.27)
+            r = rr.uniform(17, 32); top = _town_top0(px, py) - hollow(px, py) + rr.uniform(1, 13) - (10.0 * max(0.0, e - 0.85) / 0.27)
             grp = []; heads(rr, grp, px, py, top, r, soft=0.22, kids=(2, 4))
             grp = [l for l in grp if path_gap(l, 0.0, 47.4) >= 14.0 and not on_open_deck(cells, l)]
             if grp and grp[0]["r"] >= 15.0:
