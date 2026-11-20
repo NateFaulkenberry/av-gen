@@ -466,15 +466,18 @@ VEIL_BEADS = [(20, 22, 0, 0, "gate"), (40, 22, 0, 1, "gate"), (58, 28, 0, 2, "an
 # normalised radius by up to 0.88 of its smallest semi-axis for a lobe under 18 m and 0.8 for one of 30 m, so a disc
 # loses its width with its thickness and a 30 m lobe is 6 m in the deepest bays. The Condensery and the moon stood in
 # the gaps from 54.4 s, two and a half seconds before the crash. Only big lobes survive a bay: one of 60 m keeps 23 m.
-# So the plug is ONE layer of 60 m lobes on a 40 m grid across the journey, centred 396 m from the 47.0 s point:
-# 336 to 456 m as authored, about 355 to 437 m once eroded on average (54.85 to 56.7 s), never less than 373 to 419 m.
+# So the plug is ONE layer of 60 m lobes on a 40 m grid across the journey, centred 388 m from the 47.0 s point:
+# 328 to 448 m as authored (54.25 to 56.95 s). The engine's build.py gives lobes tagged "plug" 0.3 of the erosion
+# (ADR-2107, LOBE_ERODE): with that the far face stands at about 442 m, and the lens is out on the crash at 56.88 s.
+# With the whole erosion it is about 347 to 429 m (out at 56.5 s, the works coming up through the last shreds), never
+# less than 365 to 411 m; with none, out at 56.95 s.
 # What it shows from inside is the engine's and the glows'. A glow inside solid cloud is occluded within about 20 m
 # (glowOcclusion 0.8 at this extinction), so one that stands beside the journey lights nothing the lens can see: the
 # first test was 1.3 s of flat dark blue. veil_pocket5 (372 m, 55.2 s) and veil_amber (414 m, 56.15 s) therefore stand
 # ON the journey: the lens flies through each, a warm pulse of about a second, the second larger: dark, ember, dark,
 # ember, and the works coming up through the last of the cloud. The Condensery's own light is held at a tenth until 56.03 s by the
 # engine's timeline. (The toms rest from 48.3 to 69.1 s: there is no tom hit to hang a flash on in the plug.)
-VEIL_WALLS = [(396.0, 60.0, 40.0, "plug")]          # (centre along the journey, lobe radius, grid spacing, name)
+VEIL_WALLS = [(388.0, 60.0, 40.0, "plug")]          # (centre along the journey, lobe radius, grid spacing, name)
 VEIL_EXIT_S = 444.0
 VEIL_EXIT = [(474, 30, 0, 0), (492, 44, 0, 0), (520, 60, 0, 0), (552, 76, 0, 0), (592, 92, 0, 0), (640, 112, 0, 0)]
 _S47 = _J.s_at(VEIL_T0)
@@ -1036,7 +1039,7 @@ if __name__ == "__main__":
                  "tags": "lobes of masses.veil carry \"tag\": \"wall\" (a room's shell) or \"plug\" (the solid before the crash); if lobes may be denser than 1 (ADR-2105), the plug is where to use it",
                  "wells": "condensery_column leaves a well 60 m across under each stack (plan offsets in the works' frame (-58, 14), (-2, 30), (52, 2), turned by the Condensery's yaw): a glow in each lights the heads round it from below",
                  "plug": {"from_t": 54.9, "to_t": 56.88, "walls": [{"name": n_, "centre_m_from_47s": c_, "lobe_radius_m": r_, "grid_m": g_} for (c_, r_, g_, n_) in VEIL_WALLS],
-                          "note": "iteration 6: one layer of 60 m lobes (tag plug), built to stay shut under ADR-2106's erosion at 1.0 / 60 m: 54.85 to about 56.7 s (to about 57.0 s with the erosion off). Lobes under about 50 m open in the erosion's bays: do not thin it, and keep the Condensery's light held at a tenth until 56.03 s. veil_pocket5 and veil_amber stand inside it."},
+                          "note": "iteration 6: one layer of 60 m lobes (tag plug), built to stay shut under ADR-2106's erosion at 1.0 / 60 m. Authored 328 to 448 m from the 47.0 s point (54.25 to 56.95 s); out at about 56.85 s with 0.3 of the erosion on tag plug (the engine's LOBE_ERODE), 56.5 s with all of it. Lobes under about 50 m open in the erosion's bays: do not thin it, and keep the Condensery's light held at a tenth until 56.03 s. veil_pocket5 and veil_amber stand inside it."},
                  "sill": "masses.reveal_fore: a floor under the journey from the mouth (56.88 s) to a lip at 58.95 s and a spur on its right; at the lip the ocean break opens below and the far field on the right. Keep the air clear of anything else from 56.88 s.",
                  "clear_after_t": 56.88, "glows": vg},
         "sea_design": {"top_mean": SEA_TOP, "top_range": [-85, 60], "base": SEA_BASE,
