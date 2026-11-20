@@ -302,7 +302,8 @@ nt.links.new(math_(nt, 'MULTIPLY_ADD', lp.outputs['Is Camera Ray'], S['world'] -
 ml = bpy.data.lights.new("moonlight", 'SUN'); ml.energy = S['moon']; ml.angle = math.radians(3.0)
 BINDS.append((lambda c: setattr(ml, "color", c), "moon_light"))
 mo = link(bpy.data.objects.new("moonlight", ml))
-a1, a2 = math.radians(MOON["light_from_bearing_deg"]), math.radians(MOON["light_elevation_deg"])
+_lf = MOON.get("blender_frames_light_from", [MOON["light_from_bearing_deg"], MOON["light_elevation_deg"]])     # Cycles wants the rim light of 34 / 26; the engine's key is elsewhere
+a1, a2 = math.radians(_lf[0]), math.radians(_lf[1])
 mo.rotation_euler = (-Vector((math.cos(a1) * math.cos(a2), math.sin(a1) * math.cos(a2), math.sin(a2)))).to_track_quat('-Z', 'Y').to_euler()
 
 # ---------------------------------------------------------------------------------------------- lighthouse beams
