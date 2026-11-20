@@ -50,8 +50,15 @@ struct CloudUniformGpu {
     glm::vec4 beamInfo;      // x = arm count, y = air gain, z = cloud gain, w = 1 when the halo is on
     glm::vec4 halo;          // xyz toward the body, w = the inner glow's e-folding angle (radians)
     glm::vec4 haloColor;     // rgb * intensity
+    // ADR-2104: x = glow breakup, y = glow shadow, z = breakup scale (cycles per metre), w = shadow tap distance (m)
+    glm::vec4 glowShape;
+    // ADR-2104: the far lobe set's grid: (origin x, origin z, cell size, cells along x), (cells along z, its lowest
+    // lobe bottom, its highest top, 1 when there is a far set), and the hero grid's own height range (x, y)
+    glm::vec4 farGrid;
+    glm::vec4 farGrid2;
+    glm::vec4 heroSpan;
 };
-static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 3) * 16);
+static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 7) * 16);
 
 struct LobeGpu {
     glm::vec4 centreRadius;
@@ -456,21 +463,27 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
 
     // The lobes and their bins, uploaded when they change.
     std::uint64_t key = 1469598103934665603ull;
-    for (const scene::CloudLobe& l : c.lobes) {
-        for (float v : {l.centre.x, l.centre.y, l.centre.z, l.radius, l.scale.x, l.scale.y, l.scale.z, l.density,
-                        l.soft}) {
-            key = mixKey(key, v);
+    for (const auto* set : {&c.lobes, &c.farLobes}) { // ADR-2104: the far set too
+        key = mixKey(key, static_cast<float>(set->size()));
+        for (const scene::CloudLobe& l : *set) {
+            for (float v : {l.centre.x, l.centre.y, l.centre.z, l.radius, l.scale.x, l.scale.y, l.scale.z, l.density,
+                            l.soft}) {
+                key = mixKey(key, v);
+            }
         }
     }
     if (key != lobesKey_ || !lobes_) {
         std::vector<LobeGpu> rows;
         rows.reserve(c.lobes.size());
         glm::vec3 lo(1e30f), hi(-1e30f);
-        for (const scene::CloudLobe& l : c.lobes) {
-            rows.push_back({glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density), glm::vec4(l.soft, 0, 0, 0)});
-            const glm::vec3 ext = l.radius * l.scale;
-            lo = glm::min(lo, l.centre - ext);
-            hi = glm::max(hi, l.centre + ext);
+        for (const auto* set : {&c.lobes, &c.farLobes}) { // ADR-2104: the far set after the hero set
+            for (const scene::CloudLobe& l : *set) {
+                rows.push_back(
+                    {glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density), glm::vec4(l.soft, 0, 0, 0)});
+                const glm::vec3 ext = l.radius * l.scale;
+                lo = glm::min(lo, l.centre - ext);
+                hi = glm::max(hi, l.centre + ext);
+            }
         }
         if (rows.empty()) {
             rows.push_back({glm::vec4(0.0f), glm::vec4(0.0f), glm::vec4(0.0f)});
@@ -488,6 +501,26 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
                       bins_cpu_.truncated, bins_cpu_.nx * bins_cpu_.nz, kMaxLobesPerCell);
         }
         std::vector<std::uint32_t> words = bins_cpu_.words;
+        // ADR-2104: the far set's grid after the hero grid's words; its offsets and lobe indices shifted to match
+        farBins_ = binCloudLobes(c.farLobes);
+        farWordBase_ = static_cast<std::uint32_t>(words.size());
+        if (!c.farLobes.empty()) {
+            if (farBins_.truncated > 0) {
+                log::warn("clouds: {} of {} far lobe bins held more than {} lobes; the smallest were dropped there",
+                          farBins_.truncated, farBins_.nx * farBins_.nz, kMaxLobesPerCell);
+            }
+            const std::size_t cellsWords = static_cast<std::size_t>(farBins_.nx) * farBins_.nz * 2;
+            const auto heroCount = static_cast<std::uint32_t>(c.lobes.size());
+            for (std::size_t w = 0; w < farBins_.words.size(); ++w) {
+                std::uint32_t v = farBins_.words[w];
+                if (w < cellsWords) {
+                    if (w % 2 == 0) v += farWordBase_; // a cell's offset into the shared buffer
+                } else {
+                    v += heroCount;                    // a lobe index into the shared lobe buffer
+                }
+                words.push_back(v);
+            }
+        }
         if (words.empty()) {
             words.assign(4, 0u);
         }
@@ -496,7 +529,10 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         bins_ = device.CreateBuffer(&bd);
         context_->queue().WriteBuffer(bins_, 0, words.data(), words.size() * sizeof(std::uint32_t));
         lobesKey_ = key;
-        lobeCount_ = static_cast<std::uint32_t>(c.lobes.size());
+        lobeCount_ = static_cast<std::uint32_t>(c.lobes.size() + c.farLobes.size());
+        heroYLo_ = bins_cpu_.yLo;
+        heroYHi_ = bins_cpu_.yHi;
+        farOn_ = !c.farLobes.empty();
         boxMin_ = lo;
         boxMax_ = hi;
     }
@@ -570,6 +606,10 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.beamInfo = glm::vec4(static_cast<float>(arms), c.beamAir, c.beamCloud, c.halo.enabled ? 1.0f : 0.0f);
     u.halo = glm::vec4(glm::normalize(c.halo.direction), glm::radians(c.halo.radius));
     u.haloColor = glm::vec4(c.halo.color * c.halo.intensity, 0.0f);
+    u.glowShape = glm::vec4(c.glowBreakup, c.glowShadow, c.glowBreakupScale, c.glowShadowDistance); // ADR-2104
+    u.farGrid = glm::vec4(farBins_.origin, farBins_.cellSize, static_cast<float>(farBins_.nx));
+    u.farGrid2 = glm::vec4(static_cast<float>(farBins_.nz), farBins_.yLo, farBins_.yHi, farOn_ ? 1.0f : 0.0f);
+    u.heroSpan = glm::vec4(heroYLo_, heroYHi_, static_cast<float>(farWordBase_), 0.0f);
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
     const auto bufferEntry = [](std::uint32_t binding, const wgpu::Buffer& b) {

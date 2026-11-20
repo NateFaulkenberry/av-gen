@@ -105,7 +105,7 @@ TEST_CASE("clouds v2: a sea and glows read, round-trip, and a sea needs no lobes
         const char* mentions;
     };
     json many = json::array();
-    for (int i = 0; i < 17; ++i) many.push_back({{"position", {0, 0, i}}});
+    for (int i = 0; i <= static_cast<int>(scene::kMaxCloudGlows); ++i) many.push_back({{"position", {0, 0, i}}}); // ADR-2104: 24
     const Bad bad[] = {
         {{{"sea", {{"base", 0.0}, {"top", -10.0}}}}, "sea.top"},
         {{{"sea", {{"coverage", 1.5}}}}, "coverage"},
@@ -276,4 +276,48 @@ TEST_CASE("cloud beams and the halo read, validate, round-trip and turn with the
     CHECK(live.beamCloud == 0.25f);
     CHECK(live.halo.intensity == 2.0f);
     CHECK(c->beams[0].intensity == 2.0f);
+}
+
+// ADR-2104: a far lobe set on its own grid, and the glows shaped by the cloud's structure: read, validate, round-trip.
+TEST_CASE("clouds: far lobes and the glow shape read, validate and round-trip", "[unit][clouds][adr2104]") {
+    const json j = {{"lobes", json::array({{{"c", {0, 100, 0}}, {"r", 50.0}}})},
+                    {"farLobes", json::array({{{"c", {5000, 300, 0}}, {"r", 400.0}}, {{"c", {6000, 300, 0}}, {"r", 300.0}}})},
+                    {"glowBreakup", 0.7}, {"glowShadow", 1.2}, {"glowBreakupScale", 0.02}, {"glowShadowDistance", 20.0},
+                    {"glows", json::array({{{"position", {0, 100, 0}}, {"color", {1, 0, 1}}, {"radius", 50.0}}})}};
+    auto c = scene::Clouds::fromJson(j, fs::temp_directory_path());
+    REQUIRE(c.has_value());
+    CHECK(c->lobes.size() == 1);
+    REQUIRE(c->farLobes.size() == 2);
+    CHECK(c->farLobes[1].radius == 300.0f);
+    CHECK(c->glowBreakup == 0.7f);
+    CHECK(c->glowShadow == 1.2f);
+    const json back = c->toJson();
+    CHECK(back.at("farLobes").size() == 2);
+    CHECK(back.at("glowBreakup").get<float>() == 0.7f);
+    auto again = scene::Clouds::fromJson(back, fs::temp_directory_path());
+    REQUIRE(again.has_value());
+    CHECK(again->farLobes.size() == 2);
+    CHECK(again->glowShadowDistance == 20.0f);
+
+    // off by default and not written
+    auto plain = scene::Clouds::fromJson({{"lobes", json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}})}}, fs::temp_directory_path());
+    REQUIRE(plain.has_value());
+    CHECK(plain->glowBreakup == 0.0f);
+    CHECK_FALSE(plain->toJson().contains("farLobes"));
+    CHECK_FALSE(plain->toJson().contains("glowBreakup"));
+
+    // refused out of range
+    json bad = j;
+    bad["glowBreakup"] = 1.5;
+    CHECK_FALSE(scene::Clouds::fromJson(bad, fs::temp_directory_path()).has_value());
+
+    // the breakup and shadow are live knobs
+    params::ParameterSet ps;
+    const scene::CloudParameters p = scene::registerCloudParameters(ps, *c, "clouds/");
+    REQUIRE(ps.findAs<float>("clouds/glowBreakup") != nullptr);
+    ps.findAs<float>("clouds/glowShadow")->setFinalComponent(0, 2.0f);
+    scene::Clouds live;
+    scene::applyCloudParameters(p, *c, live);
+    CHECK(live.glowShadow == 2.0f);
+    CHECK(live.farLobes.size() == 2);
 }

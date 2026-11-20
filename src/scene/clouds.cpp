@@ -95,7 +95,7 @@ Result<void> Clouds::validate() const {
     if (glm::length(lightDirection) < 1e-6f || glm::length(warmDirection) < 1e-6f) {
         return fail("clouds: lightDirection and warmDirection must not be zero");
     }
-    if (lobes.size() > kMaxCloudLobes) return fail("clouds: too many lobes");
+    if (lobes.size() + farLobes.size() > kMaxCloudLobes) return fail("clouds: too many lobes");
     // ADR-2100
     if (sea.enabled) {
         if (!(sea.top > sea.base)) return fail("clouds: sea.top must be above sea.base");
@@ -125,6 +125,12 @@ Result<void> Clouds::validate() const {
     }
     if (!(glowGain >= 0.0f && glowGain <= 100.0f)) return fail("clouds: glowGain must be in [0, 100]");
     if (!(glowOcclusion >= 0.0f && glowOcclusion <= 10.0f)) return fail("clouds: glowOcclusion must be in [0, 10]");
+    if (!(glowBreakup >= 0.0f && glowBreakup <= 1.0f)) return fail("clouds: glowBreakup must be in [0, 1]"); // ADR-2104
+    if (!(glowShadow >= 0.0f && glowShadow <= 4.0f)) return fail("clouds: glowShadow must be in [0, 4]");
+    if (!(glowBreakupScale > 0.0f && glowBreakupScale <= 1.0f)) return fail("clouds: glowBreakupScale must be in (0, 1]");
+    if (!(glowShadowDistance > 0.0f && glowShadowDistance <= 500.0f)) {
+        return fail("clouds: glowShadowDistance must be in (0, 500]");
+    }
     if (!(density >= 0.0f && density <= 8.0f)) return fail("clouds: density must be in [0, 8]");
     if (!(swell >= 0.0f && swell <= 1.0f)) return fail("clouds: swell must be in [0, 1]");
     if (!(detailScale > 0.0f && detailScale <= 4.0f)) return fail("clouds: detailScale must be in (0, 4]");
@@ -187,6 +193,9 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
                         std::pair{"noiseAmount", &c.noiseAmount}, std::pair{"hazeDistance", &c.hazeDistance},
                         std::pair{"powder", &c.powder}, std::pair{"glowGain", &c.glowGain},
                         std::pair{"glowOcclusion", &c.glowOcclusion}, std::pair{"density", &c.density},
+                        std::pair{"glowBreakup", &c.glowBreakup}, std::pair{"glowShadow", &c.glowShadow},
+                        std::pair{"glowBreakupScale", &c.glowBreakupScale},
+                        std::pair{"glowShadowDistance", &c.glowShadowDistance},
                         std::pair{"swell", &c.swell}, std::pair{"detailScale", &c.detailScale},
                         std::pair{"detailAmount", &c.detailAmount}, std::pair{"resolution", &c.resolution},
                         std::pair{"temporal", &c.temporal}, std::pair{"minStep", &c.minStep},
@@ -335,6 +344,11 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
         if (!lobes) return std::unexpected(lobes.error());
         c.lobes = std::move(*lobes);
     }
+    if (j.contains("farLobes")) { // ADR-2104
+        auto far = readCloudLobes(j.at("farLobes"), {});
+        if (!far) return fail("clouds: farLobes: {}", far.error().message);
+        c.farLobes = std::move(*far);
+    }
     if (auto ok = c.validate(); !ok) return std::unexpected(ok.error());
     c.lightDirection = glm::normalize(c.lightDirection);
     c.warmDirection = glm::normalize(c.warmDirection);
@@ -354,6 +368,12 @@ json Clouds::toJson() const {
               {"drift", v3(drift)}, {"density", density}, {"swell", swell}, {"detailScale", detailScale},
               {"detailAmount", detailAmount}, {"resolution", resolution}, {"temporal", temporal},
               {"minStep", minStep}, {"stepGrowth", stepGrowth}, {"maxDistance", maxDistance}};
+    if (glowBreakup > 0.0f || glowShadow > 0.0f) { // ADR-2104: written only when used
+        j["glowBreakup"] = glowBreakup;
+        j["glowShadow"] = glowShadow;
+        j["glowBreakupScale"] = glowBreakupScale;
+        j["glowShadowDistance"] = glowShadowDistance;
+    }
     if (sea.enabled) {
         j["sea"] = {{"enabled", true}, {"base", sea.base}, {"top", sea.top}, {"coverage", sea.coverage},
                     {"coverageScale", sea.coverageScale}, {"density", sea.density}};
@@ -411,6 +431,14 @@ json Clouds::toJson() const {
         }
         j["lobes"] = std::move(arr);
     }
+    if (!farLobes.empty()) { // ADR-2104
+        json arr = json::array();
+        for (const CloudLobe& l : farLobes) {
+            arr.push_back({{"c", v3(l.centre)}, {"r", l.radius}, {"scale", v3(l.scale)}, {"density", l.density},
+                           {"soft", l.soft}});
+        }
+        j["farLobes"] = std::move(arr);
+    }
     return j;
 }
 
@@ -429,6 +457,8 @@ constexpr CloudFloat kCloudFloats[] = {
     {"lightIntensity", &Clouds::lightIntensity, 0.0f, 100.0f, 0.0f, 4.0f},
     {"glowGain", &Clouds::glowGain, 0.0f, 100.0f, 0.0f, 4.0f},
     {"glowOcclusion", &Clouds::glowOcclusion, 0.0f, 10.0f, 0.0f, 3.0f},
+    {"glowBreakup", &Clouds::glowBreakup, 0.0f, 1.0f, 0.0f, 1.0f},   // ADR-2104
+    {"glowShadow", &Clouds::glowShadow, 0.0f, 4.0f, 0.0f, 2.0f},
     {"noiseAmount", &Clouds::noiseAmount, 0.0f, 1.0f, 0.0f, 1.0f},
     {"detailAmount", &Clouds::detailAmount, 0.0f, 1.0f, 0.0f, 1.0f},
     {"hazeDistance", &Clouds::hazeDistance, 1.0f, 200000.0f, 1000.0f, 40000.0f},

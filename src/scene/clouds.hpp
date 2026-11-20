@@ -78,7 +78,7 @@ struct CloudGlow {
     float intensity = 1.0f;
 };
 
-inline constexpr std::size_t kMaxCloudGlows = 16;
+inline constexpr std::size_t kMaxCloudGlows = 24; // ADR-2104: 16 -> 24 (the Veil's inner pockets)
 
 // ADR-2102: a turning searchlight (a lighthouse) marched with the cloud: soft cones of light that scatter in the clear
 // air (cut by the opaque scene, hidden behind cloud) and light the cloud they pass through. `count` arms are spread
@@ -113,6 +113,10 @@ struct Clouds {
     std::string source;               // the lobes file as authored (relative to the scene file), or empty when inline
     std::vector<std::string> masses;  // which masses of the file to use; empty = all
     std::vector<CloudLobe> lobes;     // resolved
+    // ADR-2104: a second lobe set binned on its own coarser grid (far formations kilometres out). In one set they
+    // stretch the grid's cells to hundreds of metres and overflow the hero cells; apart, each grid keeps its own scale.
+    // Inline only ("farLobes": an array). Its lobes count against kMaxCloudLobes together with `lobes`.
+    std::vector<CloudLobe> farLobes;
     float extinction = 0.006f;        // per metre at density 1
     int steps = 96;                   // view march steps (8..512)
     int lightSteps = 6;               // steps toward the key (0..32)
@@ -138,6 +142,13 @@ struct Clouds {
     std::vector<CloudGlow> glows;
     float glowGain = 1.0f;            // a multiplier over every glow (the route target for a global pulse)
     float glowOcclusion = 1.0f;       // how strongly cloud between a glow and a sample hides it (0 = not at all)
+    // ADR-2104: a glow lights the cloud's structure. `glowBreakup` (0..1) concentrates it in pockets of the cloud's
+    // coarse noise (at `glowBreakupScale` cycles per metre); `glowShadow` (0..4) darkens a sample by the cloud one tap
+    // of `glowShadowDistance` metres toward the strongest glow. 0 = as before.
+    float glowBreakup = 0.0f;
+    float glowShadow = 0.0f;
+    float glowBreakupScale = 0.012f;
+    float glowShadowDistance = 18.0f;
     glm::vec3 drift{0.0f};            // metres per second the cloud's noise moves (wind)
     float density = 1.0f;             // a multiplier over all density (sea and lobes)
     float swell = 0.0f;               // 0..1: raises the sea's top and fattens the lobes (a bass target)

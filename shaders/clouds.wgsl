@@ -43,11 +43,15 @@ struct CloudUniforms {
     drift: vec4<f32>,
     frameInfo: vec4<f32>,
     prevViewProj: mat4x4<f32>,
-    glows: array<vec4<f32>, 32>,
+    glows: array<vec4<f32>, 48>, // 2 x kMaxCloudGlows (ADR-2104: 24)
     beams: array<vec4<f32>, 24>,
     beamInfo: vec4<f32>,
     halo: vec4<f32>,
     haloColor: vec4<f32>,
+    glowShape: vec4<f32>, // ADR-2104: x = breakup, y = shadow, z = breakup scale, w = shadow tap distance (m)
+    farGrid: vec4<f32>,   // ADR-2104: the far lobe set's grid: origin xz, cell size, cells along x
+    farGrid2: vec4<f32>,  // cells along z, its lobes' lowest bottom, highest top, 1 when there is a far set
+    heroSpan: vec4<f32>,  // the hero grid's own height range (x, y), z = where the far grid's cell words start
 };
 
 struct Lobe {
@@ -90,20 +94,31 @@ fn lobeBase(p: vec3<f32>) -> vec2<f32> {
     if (cu.boxMin.w < 0.5 || any(p < cu.boxMin.xyz) || any(p > cu.boxMax.xyz)) {
         return vec2<f32>(0.0);
     }
-    let cell = vec2<i32>(floor((p.xz - cu.grid.xy) / cu.grid.z));
-    let nx = i32(cu.grid.w + 0.5);
-    let nz = i32(cu.grid2.x + 0.5);
+    var r = lobeGrid(p, cu.grid.xy, cu.grid.z, i32(cu.grid.w + 0.5), i32(cu.grid2.x + 0.5), cu.heroSpan.x,
+                     cu.heroSpan.y, 0u);
+    if (cu.farGrid2.w > 0.5) { // ADR-2104: the far set on its own grid
+        let f = lobeGrid(p, cu.farGrid.xy, cu.farGrid.z, i32(cu.farGrid.w + 0.5), i32(cu.farGrid2.x + 0.5),
+                         cu.farGrid2.y, cu.farGrid2.z, u32(cu.heroSpan.z + 0.5));
+        r = vec2<f32>(max(r.x, f.x), max(r.y, f.y));
+    }
+    return r;
+}
+
+// One grid's lobes at p (ADR-2100 bins; ADR-2104: the hero and the far set each have one). yLo/yHi are the range the
+// grid's column extents are quantised over.
+fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yLo: f32, yHi: f32, base0: u32) -> vec2<f32> {
+    let cell = vec2<i32>(floor((p.xz - origin) / cellSize));
     if (cell.x < 0 || cell.y < 0 || cell.x >= nx || cell.y >= nz) {
         return vec2<f32>(0.0);
     }
     let k = u32(cell.y * nx + cell.x);
-    let offset = bins[2u * k];
-    let packed = bins[2u * k + 1u];
+    let offset = bins[base0 + 2u * k];
+    let packed = bins[base0 + 2u * k + 1u];
     let count = packed & 0xFFu;
     // ADR-2101: outside the column's height range there is nothing to read
-    let span = max(cu.boxMax.y - cu.boxMin.y, 1.0);
-    let y0 = cu.boxMin.y + f32((packed >> 8u) & 0xFFFu) / 4095.0 * span;
-    let y1 = cu.boxMin.y + f32(packed >> 20u) / 4095.0 * span;
+    let span = max(yHi - yLo, 1.0);
+    let y0 = yLo + f32((packed >> 8u) & 0xFFFu) / 4095.0 * span;
+    let y1 = yLo + f32(packed >> 20u) / 4095.0 * span;
     if (p.y < y0 || p.y > y1) {
         return vec2<f32>(0.0);
     }
@@ -127,7 +142,6 @@ fn lobeBase(p: vec3<f32>) -> vec2<f32> {
     }
     return vec2<f32>(base, above);
 }
-
 
 // ADR-2101: the relief sea's top surface (metres) at xz: one rounded swell plus up to three octaves of billow noise
 // (|n| inverted: rounded tops, creased troughs), lowered to the floor inside the breaks and where the coverage is thin.
@@ -284,37 +298,54 @@ fn emptySkip(ro: vec3<f32>, rd: vec3<f32>, t: f32, seaEntry: f32, boxEntry: f32)
     var goal = seaEntry;
     let inBox = cu.boxMin.w > 0.5 && all(p >= cu.boxMin.xyz) && all(p <= cu.boxMax.xyz);
     if (inBox) {
-        let cell = vec2<i32>(floor((p.xz - cu.grid.xy) / cu.grid.z));
-        let nx = i32(cu.grid.w + 0.5);
-        let nz = i32(cu.grid2.x + 0.5);
-        if (cell.x >= 0 && cell.y >= 0 && cell.x < nx && cell.y < nz) {
-            let k = u32(cell.y * nx + cell.x);
-            let packed = bins[2u * k + 1u];
-            if ((packed & 0xFFu) > 0u) {
-                let span = max(cu.boxMax.y - cu.boxMin.y, 1.0);
-                let y0 = cu.boxMin.y + f32((packed >> 8u) & 0xFFFu) / 4095.0 * span;
-                let y1 = cu.boxMin.y + f32(packed >> 20u) / 4095.0 * span;
-                if (p.y >= y0 && p.y <= y1) {
-                    return t;
-                }
-                // above or below this column's lobes: go no further than where the ray meets their band
-                if (p.y > y1 && rd.y < 0.0) {
-                    goal = min(goal, (y1 - ro.y) / rd.y);
-                } else if (p.y < y0 && rd.y > 0.0) {
-                    goal = min(goal, (y0 - ro.y) / rd.y);
-                }
+        goal = skipGrid(ro, rd, p, goal, cu.grid.xy, cu.grid.z, i32(cu.grid.w + 0.5), i32(cu.grid2.x + 0.5),
+                        cu.heroSpan.x, cu.heroSpan.y, 0u);
+        if (goal < 0.0) {
+            return t;
+        }
+        if (cu.farGrid2.w > 0.5) { // ADR-2104: and the far set's grid
+            goal = skipGrid(ro, rd, p, goal, cu.farGrid.xy, cu.farGrid.z, i32(cu.farGrid.w + 0.5),
+                            i32(cu.farGrid2.x + 0.5), cu.farGrid2.y, cu.farGrid2.z, u32(cu.heroSpan.z + 0.5));
+            if (goal < 0.0) {
+                return t;
             }
         }
-        // the column's exit in x and z
-        let lo = cu.grid.xy + vec2<f32>(cell) * cu.grid.z;
-        let hi = lo + vec2<f32>(cu.grid.z);
-        let inv = 1.0 / select(rd.xz, vec2<f32>(1e-6), abs(rd.xz) < vec2<f32>(1e-6));
-        let tx = max((lo - ro.xz) * inv, (hi - ro.xz) * inv);
-        goal = min(goal, min(tx.x, tx.y) + 0.25);
     } else if (cu.boxMin.w > 0.5 && boxEntry > t) {
         goal = min(goal, boxEntry);
     }
     return max(t, goal);
+}
+
+// One grid's limit on an empty-air jump from p (ADR-2101; ADR-2104 made it per grid): -1 when p is inside a column's
+// lobes (no jump), else `goal` shortened to where the ray meets the column's band or leaves the column.
+fn skipGrid(ro: vec3<f32>, rd: vec3<f32>, p: vec3<f32>, goalIn: f32, origin: vec2<f32>, cellSize: f32, nx: i32,
+            nz: i32, yLo: f32, yHi: f32, base0: u32) -> f32 {
+    var goal = goalIn;
+    let cell = vec2<i32>(floor((p.xz - origin) / cellSize));
+    if (cell.x >= 0 && cell.y >= 0 && cell.x < nx && cell.y < nz) {
+        let k = u32(cell.y * nx + cell.x);
+        let packed = bins[base0 + 2u * k + 1u];
+        if ((packed & 0xFFu) > 0u) {
+            let span = max(yHi - yLo, 1.0);
+            let y0 = yLo + f32((packed >> 8u) & 0xFFFu) / 4095.0 * span;
+            let y1 = yLo + f32(packed >> 20u) / 4095.0 * span;
+            if (p.y >= y0 && p.y <= y1) {
+                return -1.0;
+            }
+            // above or below this column's lobes: go no further than where the ray meets their band
+            if (p.y > y1 && rd.y < 0.0) {
+                goal = min(goal, (y1 - ro.y) / rd.y);
+            } else if (p.y < y0 && rd.y > 0.0) {
+                goal = min(goal, (y0 - ro.y) / rd.y);
+            }
+        }
+    }
+    // the column's exit in x and z
+    let lo = origin + vec2<f32>(cell) * cellSize;
+    let hi = lo + vec2<f32>(cellSize);
+    let inv = 1.0 / select(rd.xz, vec2<f32>(1e-6), abs(rd.xz) < vec2<f32>(1e-6));
+    let tx = max((lo - ro.xz) * inv, (hi - ro.xz) * inv);
+    return min(goal, min(tx.x, tx.y) + 0.25);
 }
 
 // ADR-2102: the fall of a beam's light along its length: full at the lamp, gone at its end.
@@ -507,6 +538,8 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 let warm = cu.warmColor.rgb * warmLow * warmFace * (1.0 - 0.6 * db.height) * mix(0.4, 1.0, shadow);
                 // the glows: inverse-square-like within their radius, gone by four radii, dimmed by the cloud here
                 var glow = vec3<f32>(0.0);
+                var glowTo = vec3<f32>(0.0); // ADR-2104: toward the glow that lights this sample most
+                var glowBest = 0.0;
                 for (var g = 0u; g < glowCount; g = g + 1u) {
                     let gp = cu.glows[2u * g];
                     let v = gp.xyz - p;
@@ -517,9 +550,30 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     }
                     let fall = max(1.0 / (1.0 + d2 / r2) - 0.0588, 0.0) * 1.0625;
                     let occ = exp(-ext * cu.grid2.w * dens * sqrt(d2) * 0.5);
-                    glow = glow + cu.glows[2u * g + 1u].rgb * (fall * occ);
+                    let c = cu.glows[2u * g + 1u].rgb * (fall * occ);
+                    glow = glow + c;
+                    let w = dot(c, vec3<f32>(0.3, 0.5, 0.2));
+                    if (w > glowBest) {
+                        glowBest = w;
+                        glowTo = v * inverseSqrt(max(d2, 1e-4));
+                    }
                 }
                 glow = glow * cu.grid2.z;
+                // ADR-2104: a glow lights the cloud's own structure, not a sphere around itself. Breakup: pockets of
+                // the cloud's coarse noise take more of it and the gaps between them less (inner-lit pockets);
+                // shadow: one tap of the cloud toward the strongest glow, so billows facing it are lit and the far
+                // sides fall dark. Both off (0) by default.
+                if (glowBest > 1e-5 && (cu.glowShape.x > 0.0 || cu.glowShape.y > 0.0)) {
+                    if (cu.glowShape.x > 0.0) {
+                        let n = noiseTap(p + cu.drift.xyz * 0.6 + vec3<f32>(17.0, 3.0, -41.0), cu.glowShape.z);
+                        let pocket = smoothstep(0.3, 0.78, n.r * 0.7 + n.g * 0.3);
+                        glow = glow * mix(1.0, 0.12 + 1.9 * pocket * pocket, cu.glowShape.x);
+                    }
+                    if (cu.glowShape.y > 0.0) {
+                        let toward = densityBase(p + glowTo * cu.glowShape.w).base;
+                        glow = glow * exp(-cu.glowShape.y * toward * 3.0);
+                    }
+                }
                 // ADR-2102: the beams on the cloud
                 for (var k = 0u; k < arms; k = k + 1u) {
                     glow = glow + beamOnCloud(p, k) * cu.beamInfo.z;

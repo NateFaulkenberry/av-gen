@@ -83,6 +83,11 @@ private:
     std::uint64_t lobesKey_ = 0;
     std::uint32_t lobeCount_ = 0;
     CloudLobeBins bins_cpu_;
+    CloudLobeBins farBins_;          // ADR-2104: the far lobe set's grid (its words follow the hero grid's)
+    std::uint32_t farWordBase_ = 0;
+    bool farOn_ = false;
+    float heroYLo_ = 0.0f;
+    float heroYHi_ = 0.0f;
     glm::vec3 boxMin_{0.0f};
     glm::vec3 boxMax_{0.0f};
 

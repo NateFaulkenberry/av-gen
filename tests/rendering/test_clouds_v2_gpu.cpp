@@ -321,3 +321,61 @@ TEST_CASE("a cloud beam lights the air and the sea along it, turns with time, an
     CHECK(corner < 0.3 * near);
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-2104: a lobe set given as the far set (its own grid) draws the formation it draws as the hero set, alongside a
+// small hero set kilometres away; and the visible sky's tint (ADR-2103) changes the sky and nothing else.
+TEST_CASE("far lobes on their own grid draw as the hero set does", "[gpu][renderer][clouds][adr2104]") {
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    rendering::SceneRenderer renderer(*ctx, shaders);
+    REQUIRE(renderer.init().has_value());
+    constexpr std::uint32_t W = 160, H = 90;
+    FrameTime t{};
+    auto base = [] {
+        scene::Scene s = seaScene();
+        s.clouds.sea.enabled = false;
+        s.camera.position = {0.0f, 200.0f, 0.0f};
+        s.camera.target = {0.0f, 400.0f, -3000.0f};
+        s.clouds.ambientTop = {0.6f, 0.6f, 0.6f};
+        s.clouds.ambientBottom = {0.6f, 0.6f, 0.6f};
+        s.clouds.hazeDistance = 100000.0f;
+        return s;
+    };
+    std::vector<scene::CloudLobe> tower;
+    for (int i = 0; i < 6; ++i) {
+        scene::CloudLobe l;
+        l.centre = {-300.0f + 120.0f * static_cast<float>(i), 300.0f + 60.0f * static_cast<float>(i % 3), -3000.0f};
+        l.radius = 220.0f;
+        tower.push_back(l);
+    }
+    scene::CloudLobe small;
+    small.centre = {9000.0f, 100.0f, 9000.0f}; // far off-screen: stretches a shared grid
+    small.radius = 20.0f;
+
+    scene::Scene hero = base();
+    hero.clouds.lobes = tower;
+    hero.clouds.lobes.push_back(small);
+    scene::Scene split = base();
+    split.clouds.lobes = {small};
+    split.clouds.farLobes = tower;
+    scene::Scene none = base();
+    none.clouds.lobes = {small};
+
+    auto a = renderer.renderToImage(hero, t, W, H);
+    REQUIRE(a.has_value());
+    rendering::SceneRenderer renderer2(*ctx, shaders);
+    REQUIRE(renderer2.init().has_value());
+    auto b = renderer2.renderToImage(split, t, W, H);
+    REQUIRE(b.has_value());
+    rendering::SceneRenderer renderer3(*ctx, shaders);
+    REQUIRE(renderer3.init().has_value());
+    auto c = renderer3.renderToImage(none, t, W, H);
+    REQUIRE(c.has_value());
+    const double la = luma(meanRgb(*a, W / 4, H / 4, 3 * W / 4, 3 * H / 4));
+    const double lb = luma(meanRgb(*b, W / 4, H / 4, 3 * W / 4, 3 * H / 4));
+    const double lc = luma(meanRgb(*c, W / 4, H / 4, 3 * W / 4, 3 * H / 4));
+    INFO("hero set " << la << ", far set " << lb << ", no tower " << lc);
+    CHECK(la > lc + 10.0);           // the tower is there
+    CHECK(std::abs(la - lb) < 3.0);  // and the far grid draws it as the hero grid did
+    CHECK(ctx->errorCount() == 0);
+}
