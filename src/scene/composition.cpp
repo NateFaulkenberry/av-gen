@@ -7152,7 +7152,9 @@ void Composition::rebuild() {
     ranges_.reserve(nodes_.size());
 
     // Each unique asset's meshes and textures are stored once; instances share them by offset.
-    std::map<std::string, std::pair<MeshId, TextureId>> assetOffsets;
+    // ADR-2110: an asset's mesh offset and its textures' ids in this scene (shared by source file across assets)
+    std::map<std::string, std::pair<MeshId, std::vector<TextureId>>> assetOffsets;
+    TextureSharing textureSharing;
 
     // Imported-mesh resolution, shared by procedural nodes and by terrain's scatter layers: load
     // the asset once, share its meshes and textures with anything else that names it, merge it into
@@ -7171,19 +7173,17 @@ void Composition::rebuild() {
         const std::string key = asset.path.string();
         auto it = assetOffsets.find(key);
         if (it == assetOffsets.end()) {
-            const auto offsets = std::make_pair(static_cast<MeshId>(scene_.meshes.size()),
-                                                static_cast<TextureId>(scene_.textures.size()));
+            const auto meshOffset = static_cast<MeshId>(scene_.meshes.size());
             for (const auto& mesh : asset.scene.meshes) {
                 scene_.meshes.push_back(mesh);
             }
-            for (const auto& texture : asset.scene.textures) {
-                scene_.textures.push_back(texture);
-            }
-            it = assetOffsets.emplace(key, offsets).first;
+            it = assetOffsets.emplace(key, std::make_pair(meshOffset,
+                                                          textureSharing.add(scene_.textures, asset.scene.textures)))
+                     .first;
         }
         std::vector<AssetPart> parts = assetMaterialParts(asset);
         for (AssetPart& part : parts) {
-            offsetMaterialTextures(part.material, it->second.second);
+            remapMaterialTextures(part.material, it->second.second);
         }
         if (parts.size() > 1) {
             log::info("'{}': mesh asset '{}' carries {} materials; one instanced draw each", owner,
@@ -7212,17 +7212,16 @@ void Composition::rebuild() {
             const std::string key = asset.path.string();
             auto it = assetOffsets.find(key);
             if (it == assetOffsets.end()) {
-                const auto offsets = std::make_pair(static_cast<MeshId>(scene_.meshes.size()),
-                                                    static_cast<TextureId>(scene_.textures.size()));
+                const auto firstMesh = static_cast<MeshId>(scene_.meshes.size());
                 for (const auto& mesh : asset.scene.meshes) {
                     scene_.meshes.push_back(mesh);
                 }
-                for (const auto& texture : asset.scene.textures) {
-                    scene_.textures.push_back(texture);
-                }
-                it = assetOffsets.emplace(key, offsets).first;
+                it = assetOffsets.emplace(key, std::make_pair(firstMesh, textureSharing.add(scene_.textures,
+                                                                                            asset.scene.textures)))
+                         .first;
             }
-            const auto [meshOffset, textureOffset] = it->second;
+            const MeshId meshOffset = it->second.first;
+            const std::vector<TextureId>& textureTable = it->second.second;
             // ADR-351: the coarser rungs, when this node asked for them. Built once per (asset,
             // asset version, ladder) and shared by every node that asks for the same thing.
             //
@@ -7361,7 +7360,8 @@ void Composition::rebuild() {
             std::vector<WaterTally> waterTally(node.waterMaterials.size());
             for (const Entity& src : asset.scene.entities) {
                 Entity e = src;
-                offsetEntityIds(e, meshOffset, textureOffset);
+                offsetEntityIds(e, meshOffset, 0);
+                remapEntityTextures(e, textureTable); // ADR-2110
                 if (e.rig != kInvalidRig) {
                     e.rig += rigOffset;
                 }

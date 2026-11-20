@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <unordered_map>
 
@@ -68,6 +69,51 @@ void offsetMaterialTextures(Material& m, TextureId textureOffset) {
     offsetTextureRef(m.normalTexture, textureOffset);
     offsetTextureRef(m.emissiveTexture, textureOffset);
     offsetTextureRef(m.occlusionTexture, textureOffset);
+}
+
+std::vector<TextureId> TextureSharing::add(std::vector<TextureData>& sceneTextures,
+                                           const std::vector<TextureData>& assetTextures) {
+    std::vector<TextureId> table;
+    table.reserve(assetTextures.size());
+    // AVGEN_TEXTURE_SHARING=off: the measurement arm (every asset appends its own copies, as before ADR-2110)
+    static const bool off = [] {
+        const char* v = std::getenv("AVGEN_TEXTURE_SHARING");
+        return v != nullptr && std::string(v) == "off";
+    }();
+    for (const TextureData& t : assetTextures) {
+        if (!off && !t.source.empty()) {
+            const auto key = std::make_pair(t.source, static_cast<int>(t.format));
+            if (const auto it = bySource_.find(key); it != bySource_.end()) {
+                table.push_back(it->second);
+                ++shared_;
+                continue;
+            }
+            bySource_.emplace(key, static_cast<TextureId>(sceneTextures.size()));
+        }
+        table.push_back(static_cast<TextureId>(sceneTextures.size()));
+        sceneTextures.push_back(t);
+    }
+    return table;
+}
+
+namespace {
+void remapRef(TextureRef& ref, const std::vector<TextureId>& table) {
+    if (ref.valid()) {
+        ref.texture = ref.texture < table.size() ? table[ref.texture] : kInvalidTexture;
+    }
+}
+} // namespace
+
+void remapMaterialTextures(Material& m, const std::vector<TextureId>& table) {
+    remapRef(m.baseColorTexture, table);
+    remapRef(m.metallicRoughnessTexture, table);
+    remapRef(m.normalTexture, table);
+    remapRef(m.emissiveTexture, table);
+    remapRef(m.occlusionTexture, table);
+}
+
+void remapEntityTextures(Entity& e, const std::vector<TextureId>& table) {
+    remapMaterialTextures(e.material, table);
 }
 
 std::vector<AssetPart> assetMaterialParts(const assets::SceneAsset& asset) {

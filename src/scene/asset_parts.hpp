@@ -18,6 +18,7 @@
 #include <glm/glm.hpp>
 
 #include <cstddef>
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -32,6 +33,22 @@ void offsetEntityIds(Entity& e, MeshId meshOffset, TextureId textureOffset);
 
 // The same for the texture references inside a material.
 void offsetMaterialTextures(Material& m, TextureId textureOffset);
+
+// ADR-2110: an asset's textures appended to a scene's, sharing any texture whose source file (and format) the scene
+// already holds -- one atlas referenced by URI from 38 GLBs is uploaded once, not 38 times. `add` returns, for each
+// of the asset's textures in order, its id in the scene.
+class TextureSharing {
+public:
+    std::vector<TextureId> add(std::vector<TextureData>& sceneTextures, const std::vector<TextureData>& assetTextures);
+    [[nodiscard]] std::size_t shared() const { return shared_; } // textures not appended because they were held
+private:
+    std::map<std::pair<std::string, int>, TextureId> bySource_;
+    std::size_t shared_ = 0;
+};
+
+// Rewrites every texture id an entity (or a material) names through an asset's table from TextureSharing::add.
+void remapEntityTextures(Entity& e, const std::vector<TextureId>& table);
+void remapMaterialTextures(Material& m, const std::vector<TextureId>& table);
 
 // ---- grouping an asset's surfaces by material ---------------------------------------------------
 

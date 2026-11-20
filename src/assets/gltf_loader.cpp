@@ -846,9 +846,14 @@ private:
                 warn(fmt::format("image '{}': URI byte offsets are not supported", name));
                 return std::nullopt;
             }
-            result = loadImage(directory_ / uri->uri.fspath(), srgb);
+            const std::filesystem::path file = directory_ / uri->uri.fspath();
+            result = loadImage(file, srgb);
             if (result) {
                 result->name = name;
+                // ADR-2110: by resolved path, so assets that reference one image file can share its texture
+                std::error_code ec;
+                const auto canonical = std::filesystem::weakly_canonical(file, ec);
+                result->source = (ec ? file.lexically_normal() : canonical).string();
             }
         } else if (const auto bytes = inMemoryBytes(image.data); !bytes.empty()) {
             result = loadImageFromMemory(bytes, srgb, name);
@@ -1021,7 +1026,9 @@ Result<GltfLoadSummary> loadGltf(const std::filesystem::path& path, scene::Scene
         // ADR-1819: glass
         fastgltf::Extensions::KHR_materials_transmission | fastgltf::Extensions::KHR_materials_volume |
         fastgltf::Extensions::KHR_materials_ior);
-    constexpr auto kOptions = fastgltf::Options::LoadExternalBuffers | fastgltf::Options::LoadExternalImages |
+    // ADR-2110: external images are NOT loaded by the parser: their URI survives, so decodeImage reads the file itself
+    // and records which file it was (the key a flattened scene shares textures by)
+    constexpr auto kOptions = fastgltf::Options::LoadExternalBuffers |
                               fastgltf::Options::GenerateMeshIndices |
                               fastgltf::Options::DecomposeNodeMatrices | fastgltf::Options::AllowDouble;
     auto asset = parser.loadGltf(data.get(), path.parent_path(), kOptions);

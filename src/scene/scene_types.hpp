@@ -105,6 +105,9 @@ enum class TextureFormat : std::uint8_t { Rgba8Unorm, Rgba8Srgb, Rgba32Float };
 // CPU-side image. Rgba8*: 4 bytes per pixel; Rgba32Float: 16 bytes per pixel. Row-major, top-left.
 struct TextureData {
     std::string name;
+    // ADR-2110: the resolved file an image came from (a glTF image by URI), empty for embedded or generated data. Two
+    // assets naming the same file share one texture in a flattened scene (`TextureSharing`).
+    std::string source;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     TextureFormat format = TextureFormat::Rgba8Unorm;
