@@ -39670,9 +39670,9 @@
    "id": "isle_isle_west2",
    "asset": "_thirdparty/isles/isle_rock_c.gltf",
    "pos": [
-    -252.0,
-    140.0,
-    40.0
+    -262.0,
+    120.0,
+    262.0
    ],
    "rot_y_deg": -30.0,
    "quat": [
@@ -39693,16 +39693,16 @@
    "id": "root_curtain_b_1436",
    "asset": "garden/root_curtain_b.glb",
    "pos": [
-    -252.0,
-    132.031,
-    40.0
+    -262.0,
+    112.031,
+    262.0
    ],
-   "rot_y_deg": 342.888,
+   "rot_y_deg": 236.028,
    "quat": [
     0.0,
-    0.148779,
+    0.882835,
     -0.0,
-    -0.98887
+    -0.469684
    ],
    "scale": [
     0.5,
@@ -39719,9 +39719,9 @@
    "id": "deck_pad_6m_1437",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    -257.9,
-    140.0,
-    40.0
+    -267.9,
+    120.0,
+    262.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -39742,9 +39742,9 @@
    "id": "deck_pad_6m_1438",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    -252.0,
-    140.0,
-    45.9
+    -262.0,
+    120.0,
+    267.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -39765,9 +39765,9 @@
    "id": "deck_pad_6m_1439",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    -252.0,
-    140.0,
-    40.0
+    -262.0,
+    120.0,
+    262.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -39788,9 +39788,9 @@
    "id": "deck_pad_6m_1440",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    -252.0,
-    140.0,
-    34.1
+    -262.0,
+    120.0,
+    256.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -39811,9 +39811,9 @@
    "id": "deck_pad_6m_1441",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    -246.1,
-    140.0,
-    40.0
+    -256.1,
+    120.0,
+    262.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -39834,9 +39834,9 @@
    "id": "shophouse_j_isle_west2",
    "asset": "buildings/mooring_shophouse_j.glb",
    "pos": [
-    -252.0,
-    140.0,
-    39.0
+    -262.0,
+    120.0,
+    261.0
    ],
    "rot_y_deg": -30.0,
    "quat": [
@@ -39865,9 +39865,9 @@
    "id": "sign_fascia_3_1443",
    "asset": "signs/sign_fascia_3.gltf",
    "pos": [
-    -256.763,
-    142.5,
-    42.451
+    -266.763,
+    122.5,
+    264.451
    ],
    "rot_y_deg": -30.0,
    "quat": [
@@ -39891,9 +39891,9 @@
    "id": "vine_curtain_b_1444",
    "asset": "garden/vine_curtain_b.glb",
    "pos": [
-    -257.218,
-    142.9,
-    40.837
+    -267.218,
+    122.9,
+    262.837
    ],
    "rot_y_deg": -30.0,
    "quat": [
@@ -39917,9 +39917,9 @@
    "id": "vine_curtain_b_1445",
    "asset": "garden/vine_curtain_b.glb",
    "pos": [
-    -257.218,
-    146.1,
-    40.837
+    -267.218,
+    126.1,
+    262.837
    ],
    "rot_y_deg": -30.0,
    "quat": [
@@ -39943,9 +39943,9 @@
    "id": "tree_pit_1446",
    "asset": "garden/tree_pit.glb",
    "pos": [
-    -257.148,
-    140.0,
-    45.148
+    -267.148,
+    120.0,
+    267.148
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -39966,9 +39966,9 @@
    "id": "umbel_tree_c_1447",
    "asset": "garden/umbel_tree_c.glb",
    "pos": [
-    -257.148,
-    140.35,
-    45.148
+    -267.148,
+    120.35,
+    267.148
    ],
    "rot_y_deg": 17.024,
    "quat": [
@@ -39992,9 +39992,9 @@
    "id": "sprig_bed_3m_1448",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    -254.548,
-    140.0,
-    46.648
+    -264.548,
+    120.0,
+    268.648
    ],
    "rot_y_deg": 266.811,
    "quat": [
@@ -40018,9 +40018,9 @@
    "id": "shrub_b_1449",
    "asset": "garden/shrub_b.glb",
    "pos": [
-    -259.548,
-    140.0,
-    43.948
+    -269.548,
+    120.0,
+    265.948
    ],
    "rot_y_deg": 238.873,
    "quat": [
@@ -40602,9 +40602,9 @@
    "id": "isle_isle_inner2",
    "asset": "_thirdparty/isles/isle_rock_c.gltf",
    "pos": [
-    -40.0,
-    104.0,
-    110.0
+    -108.0,
+    118.0,
+    126.0
    ],
    "rot_y_deg": 10.0,
    "quat": [
@@ -40625,16 +40625,16 @@
    "id": "root_curtain_b_1474",
    "asset": "garden/root_curtain_b.glb",
    "pos": [
-    -40.0,
-    97.257,
-    110.0
+    -108.0,
+    111.257,
+    126.0
    ],
-   "rot_y_deg": 356.472,
+   "rot_y_deg": 85.954,
    "quat": [
     0.0,
-    0.030787,
+    0.681703,
     -0.0,
-    -0.999526
+    0.731629
    ],
    "scale": [
     0.5,
@@ -40651,9 +40651,9 @@
    "id": "deck_pad_6m_1475",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    -40.0,
-    104.0,
-    110.0
+    -108.0,
+    118.0,
+    126.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40674,9 +40674,9 @@
    "id": "tree_pit_1476",
    "asset": "garden/tree_pit.glb",
    "pos": [
-    -40.0,
-    104.0,
-    110.0
+    -108.0,
+    118.0,
+    126.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40697,9 +40697,9 @@
    "id": "umbel_tree_b_1477",
    "asset": "garden/umbel_tree_b.glb",
    "pos": [
-    -40.0,
-    104.35,
-    110.0
+    -108.0,
+    118.35,
+    126.0
    ],
    "rot_y_deg": 34.27,
    "quat": [
@@ -40723,9 +40723,9 @@
    "id": "sprig_bed_3m_1478",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    -37.4,
-    104.0,
-    111.5
+    -105.4,
+    118.0,
+    127.5
    ],
    "rot_y_deg": 17.564,
    "quat": [
@@ -40749,9 +40749,9 @@
    "id": "shrub_a_1479",
    "asset": "garden/shrub_a.glb",
    "pos": [
-    -42.4,
-    104.0,
-    108.8
+    -110.4,
+    118.0,
+    124.8
    ],
    "rot_y_deg": 31.697,
    "quat": [
@@ -40775,9 +40775,9 @@
    "id": "isle_isle_south",
    "asset": "_thirdparty/isles/isle_rock_b.gltf",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    88.0
+    72.0
    ],
    "rot_y_deg": -15.0,
    "quat": [
@@ -40798,21 +40798,21 @@
    "id": "root_curtain_a_1481",
    "asset": "garden/root_curtain_a.glb",
    "pos": [
-    25.0,
+    15.0,
     105.823,
-    88.0
+    72.0
    ],
-   "rot_y_deg": 98.12,
+   "rot_y_deg": 202.104,
    "quat": [
     0.0,
-    0.755398,
+    0.981454,
     -0.0,
-    0.655266
+    -0.191697
    ],
    "scale": [
-    0.7669685007034975,
-    0.7669685007034975,
-    0.7669685007034975
+    0.713077069013759,
+    0.713077069013759,
+    0.713077069013759
    ],
    "zone": "isle_south_isle",
    "tint": {
@@ -40824,9 +40824,9 @@
    "id": "deck_pad_6m_1482",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    13.2,
+    3.2,
     112.0,
-    99.8
+    83.8
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40847,9 +40847,9 @@
    "id": "deck_pad_6m_1483",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    13.2,
+    3.2,
     112.0,
-    93.9
+    77.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40870,9 +40870,9 @@
    "id": "deck_pad_6m_1484",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    13.2,
+    3.2,
     112.0,
-    88.0
+    72.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40893,9 +40893,9 @@
    "id": "deck_pad_6m_1485",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    13.2,
+    3.2,
     112.0,
-    82.1
+    66.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40916,9 +40916,9 @@
    "id": "deck_pad_6m_1486",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    13.2,
+    3.2,
     112.0,
-    76.2
+    60.2
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40939,9 +40939,9 @@
    "id": "deck_pad_6m_1487",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    19.1,
+    9.1,
     112.0,
-    99.8
+    83.8
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40962,9 +40962,9 @@
    "id": "deck_pad_6m_1488",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    19.1,
+    9.1,
     112.0,
-    93.9
+    77.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -40985,9 +40985,9 @@
    "id": "deck_pad_6m_1489",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    19.1,
+    9.1,
     112.0,
-    88.0
+    72.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41008,9 +41008,9 @@
    "id": "deck_pad_6m_1490",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    19.1,
+    9.1,
     112.0,
-    82.1
+    66.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41031,9 +41031,9 @@
    "id": "deck_pad_6m_1491",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    19.1,
+    9.1,
     112.0,
-    76.2
+    60.2
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41054,9 +41054,9 @@
    "id": "deck_pad_6m_1492",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    99.8
+    83.8
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41077,9 +41077,9 @@
    "id": "deck_pad_6m_1493",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    93.9
+    77.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41100,9 +41100,9 @@
    "id": "deck_pad_6m_1494",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    88.0
+    72.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41123,9 +41123,9 @@
    "id": "deck_pad_6m_1495",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    82.1
+    66.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41146,9 +41146,9 @@
    "id": "deck_pad_6m_1496",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    76.2
+    60.2
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41169,9 +41169,9 @@
    "id": "deck_pad_6m_1497",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    30.9,
+    20.9,
     112.0,
-    99.8
+    83.8
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41192,9 +41192,9 @@
    "id": "deck_pad_6m_1498",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    30.9,
+    20.9,
     112.0,
-    93.9
+    77.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41215,9 +41215,9 @@
    "id": "deck_pad_6m_1499",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    30.9,
+    20.9,
     112.0,
-    88.0
+    72.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41238,9 +41238,9 @@
    "id": "deck_pad_6m_1500",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    30.9,
+    20.9,
     112.0,
-    82.1
+    66.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41261,9 +41261,9 @@
    "id": "deck_pad_6m_1501",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    30.9,
+    20.9,
     112.0,
-    76.2
+    60.2
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41284,9 +41284,9 @@
    "id": "deck_pad_6m_1502",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    36.8,
+    26.8,
     112.0,
-    99.8
+    83.8
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41307,9 +41307,9 @@
    "id": "deck_pad_6m_1503",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    36.8,
+    26.8,
     112.0,
-    93.9
+    77.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41330,9 +41330,9 @@
    "id": "deck_pad_6m_1504",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    36.8,
+    26.8,
     112.0,
-    88.0
+    72.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41353,9 +41353,9 @@
    "id": "deck_pad_6m_1505",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    36.8,
+    26.8,
     112.0,
-    82.1
+    66.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41376,9 +41376,9 @@
    "id": "deck_pad_6m_1506",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    36.8,
+    26.8,
     112.0,
-    76.2
+    60.2
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41399,9 +41399,9 @@
    "id": "shophouse_i_isle_south0",
    "asset": "buildings/mooring_shophouse_i.glb",
    "pos": [
-    16.0,
+    6.0,
     112.0,
-    84.0
+    68.0
    ],
    "rot_y_deg": -10.0,
    "quat": [
@@ -41437,9 +41437,9 @@
    "id": "awning_1bay_1508",
    "asset": "street/awning_1bay.glb",
    "pos": [
-    11.725,
+    1.725,
     114.62,
-    87.511
+    71.511
    ],
    "rot_y_deg": -10.0,
    "quat": [
@@ -41467,9 +41467,9 @@
    "id": "vine_curtain_a_1509",
    "asset": "garden/vine_curtain_a.glb",
    "pos": [
-    18.816,
+    8.816,
     118.1,
-    88.761
+    72.761
    ],
    "rot_y_deg": -10.0,
    "quat": [
@@ -41493,9 +41493,9 @@
    "id": "vine_curtain_c_1510",
    "asset": "garden/vine_curtain_c.glb",
    "pos": [
-    16.452,
+    6.452,
     118.1,
-    88.345
+    72.345
    ],
    "rot_y_deg": -10.0,
    "quat": [
@@ -41519,9 +41519,9 @@
    "id": "vine_curtain_a_1511",
    "asset": "garden/vine_curtain_a.glb",
    "pos": [
-    14.089,
+    4.089,
     118.1,
-    87.928
+    71.928
    ],
    "rot_y_deg": -10.0,
    "quat": [
@@ -41545,9 +41545,9 @@
    "id": "vine_curtain_a_1512",
    "asset": "garden/vine_curtain_a.glb",
    "pos": [
-    17.634,
+    7.634,
     114.9,
-    88.553
+    72.553
    ],
    "rot_y_deg": -10.0,
    "quat": [
@@ -41571,9 +41571,9 @@
    "id": "shophouse_d_isle_south1",
    "asset": "buildings/mooring_shophouse_d.glb",
    "pos": [
-    34.0,
+    24.0,
     112.0,
-    82.0
+    66.0
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41602,9 +41602,9 @@
    "id": "awning_1bay_1514",
    "asset": "street/awning_1bay.glb",
    "pos": [
-    32.769,
+    22.769,
     114.62,
-    86.678
+    70.678
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41632,9 +41632,9 @@
    "id": "awning_1bay_1515",
    "asset": "street/awning_1bay.glb",
    "pos": [
-    37.405,
+    27.405,
     114.62,
-    85.436
+    69.436
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41662,9 +41662,9 @@
    "id": "vine_curtain_c_1516",
    "asset": "garden/vine_curtain_c.glb",
    "pos": [
-    34.083,
+    24.083,
     121.3,
-    86.947
+    70.947
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41688,9 +41688,9 @@
    "id": "vine_curtain_c_1517",
    "asset": "garden/vine_curtain_c.glb",
    "pos": [
-    31.765,
+    21.765,
     121.3,
-    87.568
+    71.568
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41714,9 +41714,9 @@
    "id": "vine_curtain_b_1518",
    "asset": "garden/vine_curtain_b.glb",
    "pos": [
-    33.928,
+    23.928,
     114.9,
-    86.367
+    70.367
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41740,9 +41740,9 @@
    "id": "vine_curtain_b_1519",
    "asset": "garden/vine_curtain_b.glb",
    "pos": [
-    38.564,
+    28.564,
     114.9,
-    85.125
+    69.125
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41766,9 +41766,9 @@
    "id": "vine_curtain_c_1520",
    "asset": "garden/vine_curtain_c.glb",
    "pos": [
-    36.246,
+    26.246,
     114.9,
-    85.746
+    69.746
    ],
    "rot_y_deg": 15.0,
    "quat": [
@@ -41792,9 +41792,9 @@
    "id": "pergola_4m_1521",
    "asset": "garden/pergola_4m.glb",
    "pos": [
-    25.0,
+    15.0,
     112.0,
-    97.0
+    81.0
    ],
    "rot_y_deg": -15.0,
    "quat": [
@@ -41815,9 +41815,9 @@
    "id": "tree_pit_1522",
    "asset": "garden/tree_pit.glb",
    "pos": [
-    26.0,
+    16.0,
     112.0,
-    103.0
+    87.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -41838,9 +41838,9 @@
    "id": "umbel_tree_c_1523",
    "asset": "garden/umbel_tree_c.glb",
    "pos": [
-    26.0,
+    16.0,
     112.35,
-    103.0
+    87.0
    ],
    "rot_y_deg": 80.37,
    "quat": [
@@ -41864,9 +41864,9 @@
    "id": "sprig_bed_3m_1524",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    28.6,
+    18.6,
     112.0,
-    104.5
+    88.5
    ],
    "rot_y_deg": 295.398,
    "quat": [
@@ -41890,9 +41890,9 @@
    "id": "shrub_b_1525",
    "asset": "garden/shrub_b.glb",
    "pos": [
-    23.6,
+    13.6,
     112.0,
-    101.8
+    85.8
    ],
    "rot_y_deg": 327.326,
    "quat": [
@@ -42497,9 +42497,9 @@
    "id": "isle_isle_east",
    "asset": "_thirdparty/isles/isle_rock_a.gltf",
    "pos": [
-    130.0,
-    152.0,
-    -62.0
+    158.0,
+    156.0,
+    -40.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42520,21 +42520,21 @@
    "id": "root_curtain_a_1550",
    "asset": "garden/root_curtain_a.glb",
    "pos": [
-    130.0,
-    144.752,
-    -62.0
+    158.0,
+    148.752,
+    -40.0
    ],
-   "rot_y_deg": 43.639,
+   "rot_y_deg": 101.49,
    "quat": [
     0.0,
-    0.371683,
+    0.774338,
     -0.0,
-    0.92836
+    0.632773
    ],
    "scale": [
-    0.5212298256887277,
-    0.5212298256887277,
-    0.5212298256887277
+    0.5,
+    0.5,
+    0.5
    ],
    "zone": "isle_east_isle",
    "tint": {
@@ -42546,9 +42546,9 @@
    "id": "deck_pad_6m_1551",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    124.1,
-    152.0,
-    -56.1
+    152.1,
+    156.0,
+    -34.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42569,9 +42569,9 @@
    "id": "deck_pad_6m_1552",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    124.1,
-    152.0,
-    -62.0
+    152.1,
+    156.0,
+    -40.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42592,9 +42592,9 @@
    "id": "deck_pad_6m_1553",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    124.1,
-    152.0,
-    -67.9
+    152.1,
+    156.0,
+    -45.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42615,9 +42615,9 @@
    "id": "deck_pad_6m_1554",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    130.0,
-    152.0,
-    -56.1
+    158.0,
+    156.0,
+    -34.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42638,9 +42638,9 @@
    "id": "deck_pad_6m_1555",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    130.0,
-    152.0,
-    -62.0
+    158.0,
+    156.0,
+    -40.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42661,9 +42661,9 @@
    "id": "deck_pad_6m_1556",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    130.0,
-    152.0,
-    -67.9
+    158.0,
+    156.0,
+    -45.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42684,9 +42684,9 @@
    "id": "deck_pad_6m_1557",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    135.9,
-    152.0,
-    -56.1
+    163.9,
+    156.0,
+    -34.1
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42707,9 +42707,9 @@
    "id": "deck_pad_6m_1558",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    135.9,
-    152.0,
-    -62.0
+    163.9,
+    156.0,
+    -40.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42730,9 +42730,9 @@
    "id": "deck_pad_6m_1559",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    135.9,
-    152.0,
-    -67.9
+    163.9,
+    156.0,
+    -45.9
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42753,9 +42753,9 @@
    "id": "tower_spire_isle_east",
    "asset": "buildings/tower_spire.glb",
    "pos": [
-    130.0,
-    152.0,
-    -63.0
+    158.0,
+    156.0,
+    -41.0
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42784,9 +42784,9 @@
    "id": "awning_1bay_1561",
    "asset": "street/awning_1bay.glb",
    "pos": [
-    127.6,
-    154.62,
-    -59.4
+    155.6,
+    158.62,
+    -37.4
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42814,9 +42814,9 @@
    "id": "sign_fascia_4_1562",
    "asset": "signs/sign_fascia_4.gltf",
    "pos": [
-    132.4,
-    154.5,
-    -58.23
+    160.4,
+    158.5,
+    -36.23
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42840,9 +42840,9 @@
    "id": "vine_curtain_a_1563",
    "asset": "garden/vine_curtain_a.glb",
    "pos": [
-    127.6,
-    170.9,
-    -61.2
+    155.6,
+    174.9,
+    -39.2
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42866,9 +42866,9 @@
    "id": "vine_curtain_b_1564",
    "asset": "garden/vine_curtain_b.glb",
    "pos": [
-    126.4,
-    154.9,
-    -59.4
+    154.4,
+    158.9,
+    -37.4
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42892,9 +42892,9 @@
    "id": "vine_curtain_a_1565",
    "asset": "garden/vine_curtain_a.glb",
    "pos": [
-    133.6,
-    154.9,
-    -59.4
+    161.6,
+    158.9,
+    -37.4
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42918,9 +42918,9 @@
    "id": "tree_pit_1566",
    "asset": "garden/tree_pit.glb",
    "pos": [
-    123.664,
-    152.0,
-    -55.664
+    151.664,
+    156.0,
+    -33.664
    ],
    "rot_y_deg": 0.0,
    "quat": [
@@ -42941,9 +42941,9 @@
    "id": "umbel_tree_c_1567",
    "asset": "garden/umbel_tree_c.glb",
    "pos": [
-    123.664,
-    152.35,
-    -55.664
+    151.664,
+    156.35,
+    -33.664
    ],
    "rot_y_deg": 210.292,
    "quat": [
@@ -42967,9 +42967,9 @@
    "id": "sprig_bed_3m_1568",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    126.264,
-    152.0,
-    -54.164
+    154.264,
+    156.0,
+    -32.164
    ],
    "rot_y_deg": 234.219,
    "quat": [
@@ -42993,9 +42993,9 @@
    "id": "shrub_b_1569",
    "asset": "garden/shrub_b.glb",
    "pos": [
-    121.264,
-    152.0,
-    -56.864
+    149.264,
+    156.0,
+    -34.864
    ],
    "rot_y_deg": 61.906,
    "quat": [
@@ -50034,11 +50034,11 @@
   },
   {
    "bob": "isle_west2",
-   "asset": 5.18610604587004,
+   "asset": 4.391653899960308,
    "centre": [
-    -252.0,
-    140.0,
-    40.0
+    -262.0,
+    120.0,
+    262.0
    ],
    "width_m": 26.0,
    "depth_m": 31.9,
@@ -50058,11 +50058,11 @@
   },
   {
    "bob": "isle_inner2",
-   "asset": 2.7948161205764483,
+   "asset": 6.251338520158269,
    "centre": [
-    -40.0,
-    104.0,
-    110.0
+    -108.0,
+    118.0,
+    126.0
    ],
    "width_m": 22.0,
    "depth_m": 27.0,
@@ -50070,11 +50070,11 @@
   },
   {
    "bob": "isle_south",
-   "asset": 2.5371773922323806,
+   "asset": 1.7307118112243418,
    "centre": [
-    25.0,
+    15.0,
     112.0,
-    88.0
+    72.0
    ],
    "width_m": 58.0,
    "depth_m": 24.7,
@@ -50094,11 +50094,11 @@
   },
   {
    "bob": "isle_east",
-   "asset": 3.977585801913339,
+   "asset": 2.869908994504717,
    "centre": [
-    130.0,
-    152.0,
-    -62.0
+    158.0,
+    156.0,
+    -40.0
    ],
    "width_m": 32.0,
    "depth_m": 29.0,
@@ -52245,9 +52245,9 @@
   {
    "name": "light_163",
    "pos": [
-    -252.0,
-    145.0,
-    40.0
+    -262.0,
+    125.0,
+    262.0
    ],
    "key": "garden_a",
    "radius_m": 14.0,
@@ -52271,9 +52271,9 @@
   {
    "name": "light_165",
    "pos": [
-    -40.0,
-    109.0,
-    110.0
+    -108.0,
+    123.0,
+    126.0
    ],
    "key": "garden_a",
    "radius_m": 14.0,
@@ -52284,9 +52284,9 @@
   {
    "name": "light_166",
    "pos": [
-    25.0,
+    15.0,
     117.0,
-    88.0
+    72.0
    ],
    "key": "garden_a",
    "radius_m": 29.0,
@@ -52310,9 +52310,9 @@
   {
    "name": "light_168",
    "pos": [
-    130.0,
-    157.0,
-    -62.0
+    158.0,
+    161.0,
+    -40.0
    ],
    "key": "garden_b",
    "radius_m": 16.0,

@@ -193,11 +193,12 @@ LANTERNHILL = dict(rows=[(147.2, 116.0), (153.6, 142.0), (160.0, 168.0), (166.4,
 MOORING_MAST = (12.0, 224.0, 166.4)        # the observation mast at the hill's crest
 # Eastreach: garden roofs on two terraces east of the Stacks, north of the Veil (left of the journey at 41 to 47 s).
 EASTREACH = dict(rows=[(137.6, 120.0, (150.0, 262.0)), (144.0, 146.0, (160.0, 276.0)), (150.4, 172.0, (176.0, 270.0))], yaw_deg=-8.0)
-# owner msg 83: small floating islands in the gaps round the town. (bob, rock variant, x, y, top z, width, yaw, content)
-SMALL_ISLES = [("isle_west", "a", -215.0, 5.0, 127.0, 50.0, 20.0, "grove"), ("isle_west2", "c", -252.0, -40.0, 140.0, 26.0, -30.0, "house:mooring_shophouse_j"),
-               ("isle_inner", "b", -72.0, -72.0, 117.0, 36.0, 60.0, "tea"), ("isle_inner2", "c", -40.0, -110.0, 104.0, 22.0, 10.0, "tree"),
-               ("isle_south", "b", 25.0, -88.0, 112.0, 58.0, -15.0, "houses"), ("isle_south2", "a", 95.0, -108.0, 124.0, 36.0, 35.0, "tower:tower_hanging"),
-               ("isle_east", "a", 130.0, 62.0, 152.0, 32.0, 0.0, "tower:tower_spire"), ("isle_exit", "c", 178.0, -95.0, 134.0, 30.0, -20.0, "tower:tower_mast")]
+# owner msg 83: small floating islands in the gaps round the town. Msg 92: west2, inner2, south and east moved in toward the
+# journey so they pass through the foreground (55-70 m from the lens) instead of sitting at 140-200 m or behind the town. (bob, rock variant, x, y, top z, width, yaw, content)
+SMALL_ISLES = [("isle_west", "a", -215.0, 5.0, 127.0, 50.0, 20.0, "grove"), ("isle_west2", "c", -262.0, -262.0, 120.0, 26.0, -30.0, "house:mooring_shophouse_j"),
+               ("isle_inner", "b", -72.0, -72.0, 117.0, 36.0, 60.0, "tea"), ("isle_inner2", "c", -108.0, -126.0, 118.0, 22.0, 10.0, "tree"),
+               ("isle_south", "b", 15.0, -72.0, 112.0, 58.0, -15.0, "houses"), ("isle_south2", "a", 95.0, -108.0, 124.0, 36.0, 35.0, "tower:tower_hanging"),
+               ("isle_east", "a", 158.0, 40.0, 156.0, 32.0, 0.0, "tower:tower_spire"), ("isle_exit", "c", 178.0, -95.0, 134.0, 30.0, -20.0, "tower:tower_mast")]
 # Floating formations (they bob: cloud_design.json "bobs"). (name, plan x, y, deck z or top, foot radius)
 ISLE_LAMPWICK = (235.0, -165.0, 140.0, 62.0)     # (owner msg 83: moved in toward the town, was (300, -255)) a hamlet on its own cloud, reached by gondola from the garden; right of the approach, right of the Quay's exit at 41-46 s
 ISLE_WATCH = (640.0, -350.0, 172.0, 44.0)        # one tall house on a tall cloud stack
