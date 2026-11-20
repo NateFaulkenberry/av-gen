@@ -182,6 +182,42 @@ TEST_CASE("the lobe bins hold a riding lobe wherever its formation can take it",
     CHECK(bins.yLo <= -20.0f - 12.0f + 1e-3f);
 }
 
+TEST_CASE("an overfull lobe bin is split into finer cells, not trimmed", "[renderer][clouds][adr2114]") {
+    // a dense 14 x 14 patch of small lobes (3 m apart) in a set 4 km across: at 128 cells a side one 31 m cell holds
+    // ~190 of them, more than kMaxLobesPerCell; the grid must split until every cell fits (ADR-2114)
+    std::vector<scene::CloudLobe> lobes;
+    for (int z = 0; z < 14; ++z) {
+        for (int x = 0; x < 14; ++x) {
+            scene::CloudLobe l;
+            l.centre = {3.0f * static_cast<float>(x), 0.0f, 3.0f * static_cast<float>(z)};
+            l.radius = 5.0f;
+            lobes.push_back(l);
+        }
+    }
+    for (const float x : {-2000.0f, 2000.0f}) {
+        scene::CloudLobe l;
+        l.centre = {x, 0.0f, x};
+        l.radius = 5.0f;
+        lobes.push_back(l);
+    }
+    const rendering::CloudLobeBins bins = rendering::binCloudLobes(lobes);
+    CHECK(bins.truncated == 0);
+    CHECK(std::max(bins.nx, bins.nz) > rendering::kMaxBinCellsPerSide);
+    CHECK(std::max(bins.nx, bins.nz) <= rendering::kMaxBinCellsPerSideSplit + 1);
+    // every lobe is still listed in the cell under its centre
+    for (std::size_t i = 0; i < lobes.size(); ++i) {
+        const glm::vec2 at(lobes[i].centre.x, lobes[i].centre.z);
+        const glm::ivec2 cell = glm::ivec2(glm::floor((at - bins.origin) / bins.cellSize));
+        const std::size_t c = static_cast<std::size_t>(cell.y) * bins.nx + static_cast<std::size_t>(cell.x);
+        const std::uint32_t offset = bins.words[2 * c];
+        const std::uint32_t count = bins.words[2 * c + 1] & rendering::kBinCountMask;
+        REQUIRE(count <= rendering::kMaxLobesPerCell);
+        bool found = false;
+        for (std::uint32_t j = 0; j < count; ++j) found = found || bins.words[offset + j] == i;
+        CHECK(found);
+    }
+}
+
 TEST_CASE("a clouds block reads and writes bobs, riders and wisps, and rejects an unknown formation",
           "[scene][clouds][adr2112][adr2113]") {
     const nlohmann::json j = nlohmann::json::parse(R"({

@@ -245,7 +245,10 @@ glm::vec2 cloudFrameJitter(std::uint32_t frameNonce) {
             static_cast<float>(std::fmod(n * (3.5698402910 / 8.0) + 0.37, 1.0))};
 }
 
-CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach) {
+namespace {
+
+CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach,
+                                std::uint32_t maxCellsPerSide) {
     CloudLobeBins bins;
     if (lobes.empty()) {
         return bins;
@@ -279,7 +282,7 @@ CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const st
     const float span = std::max(hi.x - lo.x, hi.y - lo.y);
     // a cell about half a typical lobe's radius (few lobes per cell), and at most kMaxBinCellsPerSide along the longer
     // side (ADR-2105: 128, was 64: a 3.4 km hero set had 52 m cells that held every level of a bank at once)
-    bins.cellSize = std::max({0.5f * sorted[sorted.size() / 2], span / static_cast<float>(kMaxBinCellsPerSide), 1.0f});
+    bins.cellSize = std::max({0.5f * sorted[sorted.size() / 2], span / static_cast<float>(maxCellsPerSide), 1.0f});
     bins.origin = lo;
     bins.nx = std::max(1u, static_cast<std::uint32_t>(std::ceil((hi.x - lo.x) / bins.cellSize)));
     bins.nz = std::max(1u, static_cast<std::uint32_t>(std::ceil((hi.y - lo.y) / bins.cellSize)));
@@ -319,6 +322,20 @@ CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const st
         const std::uint32_t packed = list.empty() ? 0u : (q(y0, false) << 8) | (q(y1, true) << 20);
         bins.words[2 * k + 1] = static_cast<std::uint32_t>(list.size()) | packed;
         bins.words.insert(bins.words.end(), list.begin(), list.end());
+    }
+    return bins;
+}
+
+} // namespace
+
+CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach) {
+    // ADR-2114: a cell over kMaxLobesPerCell is split, not trimmed: the grid is rebuilt with cells half the size
+    // (up to kMaxBinCellsPerSideSplit along the longer side) until every cell fits. Only past that are the smallest
+    // lobes dropped. A finer grid also costs the march less per sample, so the split is never a slowdown.
+    CloudLobeBins bins = binCloudLobesOnce(lobes, bobReach, kMaxBinCellsPerSide);
+    for (std::uint32_t side = 2 * kMaxBinCellsPerSide; bins.truncated > 0 && side <= kMaxBinCellsPerSideSplit;
+         side *= 2) {
+        bins = binCloudLobesOnce(lobes, bobReach, side);
     }
     return bins;
 }

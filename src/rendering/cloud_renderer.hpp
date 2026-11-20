@@ -44,6 +44,7 @@ struct CloudLobeBins {
 };
 inline constexpr std::uint32_t kMaxLobesPerCell = 64;
 inline constexpr std::uint32_t kMaxBinCellsPerSide = 128; // ADR-2105 (was 64)
+inline constexpr std::uint32_t kMaxBinCellsPerSideSplit = 512; // ADR-2114: the finest grid an overfull cell splits to
 inline constexpr std::uint32_t kBinCountMask = 0xFFu;
 // ADR-2112: `bobReach` (per formation, metres) widens a riding lobe's footprint and height range by how far its
 // formation can move, so the bins built once still hold it wherever it bobs.
