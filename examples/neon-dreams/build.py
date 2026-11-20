@@ -638,6 +638,8 @@ BEAM_GAIN = 1.0
 # iteration 10 (the art's audio idea 4): the lighthouses keep the bar -- one turn per 8 bars of the 1.4 s bar clock,
 # a quarter bar apart -- and whip half a turn (to the next arm) on each section crash, 120 ms in and 700 ms out
 BAR = 1.4
+# the pad's (Cloud Diving) phrases, about 4 s every 5.6 s (the art's measure, notes/audio-ideas-it10.md)
+PAD_PHRASES = [2.8, 8.5, 14.1, 19.7, 25.3, 30.9, 36.6, 42.2, 47.8, 59.1, 63.3]
 BAR_RPM = round(60.0 / (8 * BAR), 4)
 WHIP = (0.12, 0.7, 180.0)
 
@@ -1280,12 +1282,20 @@ def reactivity():
                                     {"time": PLUG_FADE[1], "value": round(b * PLUG_FADE[2], 4), "interp": "linear"},
                                     {"time": PLUG_FADE[1] + 1.5, "value": b, "interp": "linear"}]))
     # --- iteration 10 (owner msg 112; the art's audio ideas 2, 4, 6; ADR-2117/2118): bodies that listen
-    # heads to the Lantern on the bass swell, ring by ring outward (each ring a second later: the wave runs at 60 m/s)
-    # (the top of the bass level only: 0.68 -> 0, 0.78 -> 1, so heads turn on a swell, not all song)
-    look = dict(attackMs=600.0, decayMs=2500.0, gain=10.0, offset=-6.8, clampEnabled=True, clampMin=0.0, clampMax=1.0)
+    # heads to the Lantern on each pad phrase (the bass plays all song, so its level could not make a gesture: traced
+    # at 0.3-0.8 throughout), ring by ring outward one second apart (the wave runs at 60 m/s). Timeline keys: exact.
     for ring in CROWDS:
         k = int(ring[4:])
-        routes.append(R("stem.bass.level", "crowds/%s/look" % ring, 1.0, delayMs=min(4000.0, (k + 0.5) * 1000.0), **look))
+        keys = [{"time": 0.0, "value": 0.0, "interp": "linear"}]
+        for i, p in enumerate(PAD_PHRASES):
+            a = p + min(4.0, k + 0.5)
+            end = min(a + 4.9, (PAD_PHRASES[i + 1] + min(4.0, k + 0.5)) if i + 1 < len(PAD_PHRASES) else 1e9)
+            keys += [{"time": round(a, 3), "value": 0.0, "interp": "smooth"},
+                     {"time": round(a + 0.6, 3), "value": 1.0, "interp": "smooth"},
+                     {"time": round(min(a + 2.4, end - 1.2), 3), "value": 1.0, "interp": "smooth"},
+                     {"time": round(end, 3), "value": 0.0, "interp": "smooth"}]
+        tracks.append(AU.track("crowds/%s/look" % ring, keys))
+    for ring in CROWDS:
         # the groups sway on the drum bus (kick and snare levels), at two beats a period, dying in the drum breaks
         for stem in ("kick", "snare"):
             routes.append(R("stem.%s.level" % stem, "crowds/%s/sway" % ring, 0.4, attackMs=800.0, decayMs=3000.0,
