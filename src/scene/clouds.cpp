@@ -748,6 +748,8 @@ CloudParameters registerCloudParameters(params::ParameterSet& params, const Clou
     for (std::size_t i = 0; i < rest.beams.size(); ++i) {
         addFloat(prefix + "beam/" + std::to_string(i) + "/intensity", rest.beams[i].intensity, 0.0f, 1000.0f, 0.0f,
                  20.0f);
+        // ADR-2118: the sweep's yaw at t = 0 (degrees), so a timeline track or a route can turn a beam on the music
+        addFloat(prefix + "beam/" + std::to_string(i) + "/yaw", rest.beams[i].yaw, -1e6f, 1e6f, -360.0f, 360.0f);
     }
     // ADR-2112: per formation, its lift (metres; clamped to +-liftMax where it is applied)
     for (std::size_t i = 0; i < rest.bobs.size(); ++i) {
@@ -797,9 +799,10 @@ void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& 
     if (const auto* q = f(beam0 + 1)) live.beamCloud = q->value();
     if (const auto* q = f(beam0 + 2)) live.halo.intensity = q->value();
     for (std::size_t i = 0; i < live.beams.size(); ++i) {
-        if (const auto* q = f(beam0 + 3 + i)) live.beams[i].intensity = q->value();
+        if (const auto* q = f(beam0 + 3 + 2 * i)) live.beams[i].intensity = q->value();
+        if (const auto* q = f(beam0 + 3 + 2 * i + 1)) live.beams[i].yaw = q->value(); // ADR-2118
     }
-    const std::size_t bob0 = beam0 + 3 + rest.beams.size(); // ADR-2112
+    const std::size_t bob0 = beam0 + 3 + 2 * rest.beams.size(); // ADR-2112
     for (std::size_t i = 0; i < live.bobs.size(); ++i) {
         if (const auto* q = f(bob0 + i)) {
             live.bobs[i].lift = std::clamp(q->value(), -live.bobs[i].liftMax, live.bobs[i].liftMax);

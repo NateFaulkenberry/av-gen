@@ -34,6 +34,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the palette arc)
 import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flights)
+import nd_cast as NC  # noqa: E402  (iteration 10, owner msg 112: the population from art/population.json)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SABERTOOTH = os.path.expanduser("~/Desktop/sabertooth")
@@ -547,9 +548,34 @@ def spot_place(ref):
     return {"pos": sp["pos"], "yaw": math.degrees(math.atan2(f[0], f[2]))}
 
 
+POP_PATH = os.path.join(ART, "population.json")
+POPULATION = json.load(open(POP_PATH)) if os.path.exists(POP_PATH) else None
+CROWDS = []          # ADR-2117: the crowd rings the population made (routes target them)
+WAKES = ["walkA*", "flyer*"]
+
+
+def kick_onsets():
+    return [round(t, 3) for t, _ in AU.EVENTS["stems"]["kick"]["onsets"]]
+
+
+def cast_nodes(state="uv"):
+    """Iteration 10: the population (art/population.json) with its flyers, or the older layout cast without it."""
+    SEQUENCE_ACTORS.clear()
+    if POPULATION is None or CROWD_TEST:
+        a, at = population_nodes() if not CROWD_TEST else crowd_test_nodes(CROWD_TEST)
+        f, fl, ft = flight_nodes(state)
+        return a + f, fl, at + ft
+    amber = pal("amber", state)
+    nodes, tracks, lights, actors, crowds, wakes = NC.build(
+        POPULATION, LAYOUT, DESIGN, ALIENS, CLIP_LEN, BELL_POS, SONG, r3,
+        lambda f: FL.flight(f, r3, SONG, amber, amber), kick_onsets())
+    SEQUENCE_ACTORS.extend(actors)
+    CROWDS[:] = crowds
+    return nodes, lights, tracks
+
+
 def flight_nodes(state="uv"):
     nodes, lights, tracks = [], [], []
-    SEQUENCE_ACTORS.clear()
     for fdat in LAYOUT.get("flights", ENGINE_FLIGHTS):
         f = dict(fdat, asset=ALIENS + fdat.get("cast", "alien-pilot") + ".glb", **{"from": spot_place(fdat["from"]),
                                                                                   "to": spot_place(fdat["to"])})
@@ -609,12 +635,36 @@ def vehicle_nodes(state="uv"):
 BEAM_GAIN = 1.0
 
 
+# iteration 10 (the art's audio idea 4): the lighthouses keep the bar -- one turn per 8 bars of the 1.4 s bar clock,
+# a quarter bar apart -- and whip half a turn (to the next arm) on each section crash, 120 ms in and 700 ms out
+BAR = 1.4
+BAR_RPM = round(60.0 / (8 * BAR), 4)
+WHIP = (0.12, 0.7, 180.0)
+
+
+def beam_yaw0(i, b):
+    return round(b.get("phase", 0.0) * 360.0 + i * 360.0 / 32.0, 2)
+
+
+def beam_whip_keys(yaw0):
+    keys = [{"time": 0.0, "value": yaw0, "interp": "linear"}]
+    turned = 0.0
+    for c in AU.CRASH:
+        a, d = c - WHIP[0], c + WHIP[1]
+        for k in range(9):
+            u = k / 8
+            e = u * u * (3 - 2 * u)
+            keys.append({"time": round(a + (d - a) * u, 3), "value": round(yaw0 + turned + WHIP[2] * e, 2), "interp": "linear"})
+        turned += WHIP[2]
+    return keys
+
+
 def cloud_beams(state="uv"):
     out = []
-    for b in LAYOUT["beams"]:
+    for bi, b in enumerate(LAYOUT["beams"]):
         col = pal(b["key"], state)
         out.append({"name": b["name"], "origin": r3(b["origin"]), "count": b["count"],
-                    "yaw": round(b.get("phase", 0.0) * 360.0, 2), "elevation": b["elevation_deg"], "rpm": b["rpm"],
+                    "yaw": beam_yaw0(bi, b), "elevation": b["elevation_deg"], "rpm": BAR_RPM,
                     "length": b["length_m"], "halfAngle": max(b["half_angle_deg"], 1.8), "radius": 1.2,
                     "color": col, "intensity": round(BEAM_GAIN * b.get("intensity", 1.0), 3)})
         if b.get("bob"):
@@ -818,7 +868,7 @@ PLUG_POCKETS = []
 # was a flat veil). The band sits over the sea's mean top; the walking cast are its wakes. The art's cloud design `wisps` (same keys, plus zones round island rims) overrides any of it.
 WISPS = {"enabled": True, "base": 0.0, "top": 0.0, "density": 1.8, "scale": 10.0, "coverage": 0.55, "tatter": 0.65,
          "stretch": 3.0, "drift": [0.9, 0.0, 0.5], "wakeRadius": 1.2, "wakeStrength": 0.8, "wakeSwirl": 1.4,
-         "wakeHeight": 2.2, "wakeTrail": 2.6, "wakes": ["alien*", "flyer*"],
+         "wakeHeight": 2.2, "wakeTrail": 2.6, "wakes": ["walkA*", "flyer*"],
          # no band (the art: nowhere over open sea); the first lens, used when the design has no wisp_regions
          "zones": [{"name": "mooring", "centre": [0.0, 10.0], "floor": 131.0, "radii": [330.0, 280.0], "yaw": 0.0,
                     "below": 30.0, "above": 6.0, "density": 1.0}]}
@@ -974,11 +1024,9 @@ def scene_doc(state="uv", sky_map=None):
                                                        op["semi_axes"][1]]]},
         "castsShadow": False,
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
-    aliens, alien_tracks = population_nodes() if not CROWD_TEST else crowd_test_nodes(CROWD_TEST)
+    aliens, flyer_lights, alien_tracks = cast_nodes(state)
     vehicles, vehicle_tracks = vehicle_nodes(state)
-    flyers, flyer_lights, flyer_tracks = flight_nodes(state)
-    vehicle_tracks = vehicle_tracks + flyer_tracks
-    nodes += aliens + flyers + vehicles + bob_nodes()
+    nodes += aliens + vehicles + bob_nodes()
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
@@ -1231,6 +1279,20 @@ def reactivity():
                                     {"time": PLUG_FADE[0], "value": b, "interp": "linear"},
                                     {"time": PLUG_FADE[1], "value": round(b * PLUG_FADE[2], 4), "interp": "linear"},
                                     {"time": PLUG_FADE[1] + 1.5, "value": b, "interp": "linear"}]))
+    # --- iteration 10 (owner msg 112; the art's audio ideas 2, 4, 6; ADR-2117/2118): bodies that listen
+    # heads to the Lantern on the bass swell, ring by ring outward (each ring a second later: the wave runs at 60 m/s)
+    # (the top of the bass level only: 0.68 -> 0, 0.78 -> 1, so heads turn on a swell, not all song)
+    look = dict(attackMs=600.0, decayMs=2500.0, gain=10.0, offset=-6.8, clampEnabled=True, clampMin=0.0, clampMax=1.0)
+    for ring in CROWDS:
+        k = int(ring[4:])
+        routes.append(R("stem.bass.level", "crowds/%s/look" % ring, 1.0, delayMs=min(4000.0, (k + 0.5) * 1000.0), **look))
+        # the groups sway on the drum bus (kick and snare levels), at two beats a period, dying in the drum breaks
+        for stem in ("kick", "snare"):
+            routes.append(R("stem.%s.level" % stem, "crowds/%s/sway" % ring, 0.4, attackMs=800.0, decayMs=3000.0,
+                            gain=1.5, clampEnabled=True, clampMin=0.0, clampMax=1.0))
+    # the beams: bar-locked, whipping on the crashes (timeline tracks: exactly seek-safe)
+    for bi, b in enumerate(LAYOUT["beams"]):
+        tracks.append(AU.track("clouds/beam/%d/yaw" % bi, beam_whip_keys(beam_yaw0(bi, b))))
     return routes, tracks, sources
 
 
@@ -1295,10 +1357,13 @@ def main():
     ap.add_argument("--no-key-shadow", action="store_true", help="the moon key casts no shadow (measuring a preset)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="override one environment key (number); repeatable")
+    ap.add_argument("--plug-fade", default="", help="A/B: start,end,floor of the plug light's dip (iteration 10)")
     ap.add_argument("--crowd-test", type=int, default=0, help="capacity probe: N aliens (not the film)")
     a = ap.parse_args()
-    global NO_WISPS, CROWD_TEST
+    global NO_WISPS, CROWD_TEST, PLUG_FADE
     CROWD_TEST = a.crowd_test
+    if a.plug_fade:
+        PLUG_FADE = tuple(float(v) for v in a.plug_fade.split(","))
     NO_WISPS = a.no_wisps
     for kv in a.wisp:
         k, v = kv.split("=", 1)

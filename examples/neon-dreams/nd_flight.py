@@ -25,11 +25,16 @@ KEY_HZ = 15.0             # flight keys a second (linear between: smooth at 30 f
 # The jet's nozzle (the bottom of Backpack_Jet, through the Backpack joint) and its thrust direction in the flyer's
 # own frame, per clip, measured from alien-pilot.glb's clips (work/engine/it10/fly/nozzle.py in the studio project):
 # Jumping and Landing upright, Floating upright and raised, Flying_jet prone (the jet blows back along -z).
-NOZZLE = {"Idle": ([0.06, 0.82, -0.22], [0.03, -1.0, -0.04]),
-          "Jumping": ([0.06, 0.82, -0.22], [0.03, -1.0, -0.04]),
-          "Floating": ([0.04, 1.19, -0.17], [0.07, -0.83, -0.55]),
-          "Flying_jet": ([0.0, 0.945, -0.10], [0.01, -0.19, -0.98]),
-          "Landing": ([0.15, 1.436, -0.206], [0.32, -0.75, -0.58])}
+NOZZLE = {"Idle": ([0.133, 0.764, -0.251], [0.12, -0.95, -0.28]),
+          "Jumping": ([0.081, 0.822, -0.256], [0.08, -0.99, -0.10]),
+          "Floating": ([0.072, 1.22, -0.204], [0.07, -0.77, -0.63]),
+          "Flying_jet": ([-0.006, 0.984, -0.107], [0.01, -0.11, -0.99]),
+          "Landing": ([0.177, 1.46, -0.227], [0.36, -0.70, -0.62])}
+# iteration 10: the art's jet_plume.glb (two chains of lantern bulbs from the nozzles, its -y along the thrust) is
+# placed on the art's socket (joint Backpack, (0, 0.31, 0.01)), which the table above is measured at, per clip.
+PLUME = "../meshes/props/jet_plume.glb"
+# kick puffs while hovering (the art's audio idea 1): +60 % gain, +15 % length, 15 ms in, 220 ms out
+PUFF = (0.6, 0.15, 0.015, 0.22)
 
 
 def _catmull(p0, p1, p2, p3, u):
@@ -239,14 +244,22 @@ def flight(f, r3, song, light_color, flame_color):
           {"time": round(t_lift - 0.25, 3), "value": [0.0, 0.0, 0.0], "interp": "linear"}]
     lk = [{"time": 0.0, "value": 0.0, "interp": "linear"}, {"time": round(t_lift - 0.25, 3), "value": 0.0, "interp": "linear"}]
     fpk, frk, lpk = [], [], []
+    kicks = f.get("kicks", [])
     t = t_lift - 0.25
     while t < td + 0.45:
         ramp = max(0.0, min(1.0, (t - (t_lift - 0.25)) / 0.35, (td + 0.05 - t) / 0.3))
         boost = 1.0 + 0.6 * max(0.0, 1.0 - abs(t - t_lift) / 0.8) + 0.4 * max(0.0, 1.0 - abs(t - t_land) / 0.8)
-        fl = _flicker(name, t) * ramp * boost
-        sk.append({"time": round(t, 3), "value": r3([0.09 * min(fl, 1.2), 0.40 * fl, 0.09 * min(fl, 1.2)]), "interp": "linear"})
-        lk.append({"time": round(t, 3), "value": round(f.get("light", 14.0) * fl, 3), "interp": "linear"})
         wts = _clip_weights(cues, t)
+        hover = wts.get("Floating", 0.0) / (sum(wts.values()) or 1.0)
+        env = 0.0
+        for k in kicks:
+            if k - PUFF[2] <= t <= k + 5 * PUFF[3]:
+                env = max(env, min(1.0, (t - k + PUFF[2]) / PUFF[2]) * math.exp(-max(0.0, t - k) / PUFF[3]))
+        gain = 1.0 + PUFF[0] * env * hover
+        fl = _flicker(name, t) * ramp * boost
+        g = min(fl, 1.2) * ramp
+        sk.append({"time": round(t, 3), "value": r3([g, fl * (1.0 + PUFF[1] * env * hover), g]), "interp": "linear"})
+        lk.append({"time": round(t, 3), "value": round(f.get("light", 14.0) * fl * gain, 3), "interp": "linear"})
         tot = sum(wts.values()) or 1.0
         nz = [sum(NOZZLE[c][0][i] * wv for c, wv in wts.items()) / tot for i in range(3)]
         dr = [sum(NOZZLE[c][1][i] * wv for c, wv in wts.items()) / tot for i in range(3)]
@@ -254,7 +267,7 @@ def flight(f, r3, song, light_color, flame_color):
         frk.append({"time": round(t, 3), "value": [round(v, 2) for v in _down_to(dr)], "interp": "linear"})
         # the light sits half a metre down the thrust (it lights what the jet blows on)
         lpk.append({"time": round(t, 3), "value": r3([nz[i] + 0.5 * dr[i] for i in range(3)]), "interp": "linear"})
-        t += 1.0 / KEY_HZ
+        t += 1.0 / 30.0
     sk.append({"time": round(td + 0.5, 3), "value": [0.0, 0.0, 0.0], "interp": "linear"})
     lk.append({"time": round(td + 0.5, 3), "value": 0.0, "interp": "linear"})
 
@@ -268,11 +281,11 @@ def flight(f, r3, song, light_color, flame_color):
                        "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 300.0}},
         {"name": flame, "kind": "procedural", "parent": name, "position": NOZZLE["Jumping"][0],
          "scale": [0.0, 0.0, 0.0], "procedural": {
-             "source": {"kind": "sphere", "radius": 1.0, "segments": 12, "rings": 8},
-             "distribution": {"kind": "points", "points": [[0, -0.85, 0, 0, 0, 0, 1, 1, 1, 1]]},
+             "source": {"kind": "mesh", "asset": PLUME},
+             "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]},
              "castsShadow": False,
-             "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0,
-                          "emissiveColor": flame_color, "emissiveIntensity": 22.0}}},
+             "partMaterials": {"jet_flame": {"emissiveColor": flame_color, "emissiveIntensity": 26.0},
+                               "jet_collar": {"emissiveColor": flame_color, "emissiveIntensity": 9.0}}}},
     ]
     lights = [{"name": lamp, "type": "point", "node": name, "position": NOZZLE["Jumping"][0],
                "color": light_color, "intensity": 0.0, "range": 9.0, "castsShadow": False, "volumetric": 0.0}]
