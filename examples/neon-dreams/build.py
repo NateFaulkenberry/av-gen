@@ -426,6 +426,98 @@ def crowd_test_nodes(n):
     return nodes, tracks
 
 
+WALK_STRIDE = 1.34   # m/s a Walking stance foot sweeps back at clip rate 1 (alien-pilot's feet: work/engine/it10/fly/stride.py)
+TURN_RATE = 225.0    # degrees a second a walker turns on the spot at a path's corner (walking in place)
+
+
+def population_nodes():
+    """Iteration 10 (owner msg 112, ADR-2116): the whole cast. Every spot in the layout (all priorities), every walker
+    on every path, riders on vehicles; phases and rates from a few buckets so rigs in step share a pose. Reads the
+    art's population extensions when present: `cast`, `phase`, `speed`, `group`, `activity`, `bob`, `ride`."""
+    inh = LAYOUT["inhabitants"]
+    scale = inh.get("scale", 1.0)
+    r = random.Random(112)
+    nodes, tracks = [], []
+    counter = [0]
+
+    def node(name, pos, yaw_deg, clip, sp):
+        k = counter[0]
+        counter[0] += 1
+        cast = sp.get("cast") or CAST[k % len(CAST)]
+        anim = {"state": clip, "blend": 0.3, "speed": sp.get("speed", r.choice(SPEEDS)),
+                "phase": sp.get("phase", crowd_phase(r, clip)), "updateHz": 0,
+                "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 400.0}
+        n = {"name": name, "kind": "gltf", "asset": ALIENS + cast + ".glb", "position": r3(pos),
+             "rotation": [0.0, round(yaw_deg, 1), 0.0], "scale": [scale] * 3, "animation": anim}
+        if sp.get("bob"):
+            n["bob"] = sp["bob"]
+        if sp.get("ride"):
+            n["parent"] = sp["ride"]
+        return n
+    spots = sorted(inh["spots"], key=lambda sp: (sp.get("priority", 1), sp["id"]))
+    for sp in spots:
+        f = sp.get("forward")
+        yaw = math.degrees(math.atan2(f[0], f[2])) if f else 90.0 - sp.get("facing_deg", 0.0)
+        clips = sp.get("clips") or ["Idle"]
+        nodes.append(node("alien_%s" % sp["id"], sp["pos"], yaw, r.choice(clips), sp))
+    for p in inh["paths"]:
+        pts = p["points"]
+        route = pts + pts[-2::-1] if p.get("mode", "pingpong") == "pingpong" else pts + pts[:1]
+        speed = p.get("speed_mps", 1.2)
+        rate = round(speed / WALK_STRIDE, 3)           # the feet sweep at the ground's speed: no skating
+        # the timing of one lap: walk each leg, turn on the spot at each corner
+        legs = []
+        for i in range(len(route) - 1):
+            d = [route[i + 1][j] - route[i][j] for j in range(3)]
+            legs.append((math.dist(route[i], route[i + 1]), math.degrees(math.atan2(d[0], d[2]))))
+        lap, sched = 0.0, []
+        for i, (dist, yaw) in enumerate(legs):
+            prev = legs[i - 1][1] if i > 0 else legs[-1][1]
+            turn = abs((yaw - prev + 180) % 360 - 180)
+            tt = max(0.12, turn / TURN_RATE) if turn > 2 else 0.0
+            sched.append((lap, tt, dist / speed, i, prev, yaw))
+            lap += tt + dist / speed
+        walkers = max(1, int(p.get("walkers", 1)))
+        for w in range(walkers):
+            name = "alien_%s_%d" % (p["id"], w)
+            offset = (w + r.uniform(0.15, 0.85)) / walkers * lap
+            pk, rk = [], []
+            t0 = -offset
+            while t0 < SONG + 1 + lap * 0:
+                if t0 + lap < 0:
+                    t0 += lap
+                    continue
+                for start, tt, wt, i, prev, yaw in sched:
+                    a = t0 + start
+                    while yaw - prev > 180:
+                        yaw -= 360
+                    while yaw - prev < -180:
+                        yaw += 360
+                    pk.append({"time": round(a, 3), "value": r3(route[i]), "interp": "linear"})
+                    rk.append({"time": round(a, 3), "value": [0.0, round(prev, 1), 0.0], "interp": "linear"})
+                    pk.append({"time": round(a + tt + 1e-3, 3), "value": r3(route[i]), "interp": "linear"})
+                    rk.append({"time": round(a + tt + 1e-3, 3), "value": [0.0, round(yaw, 1), 0.0], "interp": "linear"})
+                    rk.append({"time": round(a + tt + wt - 2e-3, 3), "value": [0.0, round(yaw, 1), 0.0], "interp": "linear"})
+                t0 += lap
+            end = t0  # one more vertex after the song's end keeps the last leg's motion
+            pk.append({"time": round(end, 3), "value": r3(route[0]), "interp": "linear"})
+            pk = clip_keys(sorted(pk, key=lambda kk: kk["time"]))
+            rk = sorted(rk, key=lambda kk: kk["time"])
+            for q in range(1, len(rk)):   # one continuous yaw: never a full spin between two keys
+                y, py = rk[q]["value"][1], rk[q - 1]["value"][1]
+                rk[q]["value"][1] = round(py + ((y - py + 180) % 360 - 180), 1)
+            rk = clip_keys(rk)
+            sp = dict(p, speed=rate)
+            n = node(name, pk[0]["value"], rk[0]["value"][1], p.get("clip", "Walking"), sp)
+            n["animation"]["speed"] = rate
+            nodes.append(n)
+            tracks.append({"target": "nodes/%s/position" % name, "component": -1, "enabled": True,
+                           "timeBase": "seconds", "mode": "replace", "loopLength": 0.0, "keys": pk})
+            tracks.append({"target": "nodes/%s/rotation" % name, "component": -1, "enabled": True,
+                           "timeBase": "seconds", "mode": "replace", "loopLength": 0.0, "keys": rk})
+    return nodes, tracks
+
+
 def clip_keys(keys):
     """Linear keys trimmed to start at t = 0 (the first key interpolated there)."""
     out = [kk for kk in keys if kk["time"] >= 0]
@@ -726,7 +818,7 @@ PLUG_POCKETS = []
 # was a flat veil). The band sits over the sea's mean top; the walking cast are its wakes. The art's cloud design `wisps` (same keys, plus zones round island rims) overrides any of it.
 WISPS = {"enabled": True, "base": 0.0, "top": 0.0, "density": 1.8, "scale": 10.0, "coverage": 0.55, "tatter": 0.65,
          "stretch": 3.0, "drift": [0.9, 0.0, 0.5], "wakeRadius": 1.2, "wakeStrength": 0.8, "wakeSwirl": 1.4,
-         "wakeHeight": 2.2, "wakeTrail": 2.6, "wakes": ["alien*"],
+         "wakeHeight": 2.2, "wakeTrail": 2.6, "wakes": ["alien*", "flyer*"],
          # no band (the art: nowhere over open sea); the first lens, used when the design has no wisp_regions
          "zones": [{"name": "mooring", "centre": [0.0, 10.0], "floor": 131.0, "radii": [330.0, 280.0], "yaw": 0.0,
                     "below": 30.0, "above": 6.0, "density": 1.0}]}
@@ -882,7 +974,7 @@ def scene_doc(state="uv", sky_map=None):
                                                        op["semi_axes"][1]]]},
         "castsShadow": False,
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
-    aliens, alien_tracks = inhabitant_nodes() if not CROWD_TEST else crowd_test_nodes(CROWD_TEST)
+    aliens, alien_tracks = population_nodes() if not CROWD_TEST else crowd_test_nodes(CROWD_TEST)
     vehicles, vehicle_tracks = vehicle_nodes(state)
     flyers, flyer_lights, flyer_tracks = flight_nodes(state)
     vehicle_tracks = vehicle_tracks + flyer_tracks
