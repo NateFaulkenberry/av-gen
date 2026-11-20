@@ -447,7 +447,7 @@ GLOW_SHADOW = {"veil_pocket5": 0.15, "veil_amber": 0.15}   # ADR-2107: the art's
 def clouds_block(state="uv", moon_dir=None):
     lobes = []
     for name, ls in DESIGN["masses"].items():
-        lobes += [dict(l) for l in ls]
+        lobes += [dict(l, erode=MASS_ERODE[name]) if name in MASS_ERODE else dict(l) for l in ls]
     far = []   # ADR-2104: the far towers on their own grid (in one set they overflowed 18 hero cells)
     for name, ls in DESIGN.get("far_masses", {}).items():
         far += [dict(l) for l in ls]
@@ -557,7 +557,8 @@ CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseA
               "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
 AIR = {"density": 0.0003, "scattering": 0.0, "fogSky": 0.5}   # extinction = density x volumeAbsorption 0.5
 WELL_GLOW = {"radius": 95.0, "intensity": 6.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
-LOBE_ERODE = {"plug": 0.3, "seat": 0.3}   # ADR-2107: a lobe's share of the erosion, by the art's tag
+LOBE_ERODE = {"plug": 0.3, "seat": 0.3}
+MASS_ERODE = {"condensery_plume": 0.25}   # iteration 7: fully eroded, the stacks' thin plumes were eaten away   # ADR-2107: a lobe's share of the erosion, by the art's tag
 # iteration 7: inside an opaque cloud the camera sees ~7 m of uniform colour (the flat card at 55-56.5 s). At 0.45 of
 # its density the plug still holds an optical depth of ~5 over its 100 m, but the eye sees 20 to 40 m into it: its
 # eroded billows and the pockets' light pass by
