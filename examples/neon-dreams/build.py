@@ -13,7 +13,11 @@ engine frame (Y up, x east, z = -north; the Mooring at the origin, the journey t
 - The clouds: the design's lobes on the Cloud Environment v2 with the ADR-2101 relief sea and the designed break.
 - The Glowmere cast (gitignored, symlinked from the main checkout, never committed) stands at the layout's priority
   spots and walks its paths as timeline tracks (linear keys: deterministic and seek-safe).
-- Lighthouse beams: the kit's unit cone, additive, swept by a looping rotation track.
+- Lighthouse beams: ADR-2102 cloud beams (marched with the cloud: air scatter hidden behind cloud, the cloud they cross
+  lit), turning at the layout's rpm.
+- The Veil passage (iteration 4): a turret of lobes laid along the journey from 47 s, thinning from 53.5 s, so the camera
+  is inside cloud from the garden's edge to the reveal; a rose glow inside answers the toms, an amber one ahead is the
+  first hint of the Condensery.
 - The camera rides the layout's waypoints (camera mode 2, arc-length keys from a monotone cubic of distance over time).
 
 Writes <out>/<name>.scene.json and <out>/<name>.json (out defaults to scene/, gitignored). Deterministic.
@@ -61,7 +65,51 @@ def bearing_dir(bearing_deg, elev_deg):
 
 
 MOON = DESIGN["moon"]
-LIGHT_DIR = bearing_dir(MOON["light_from_bearing_deg"], MOON["light_elevation_deg"])   # toward the key
+# Iteration 4 (orchestrator): the moon was centre-stage and too big in every shot, and the key from bearing 34 sat in
+# front of the approach, so every cloud was forward-scattered milk. The disc is now a backdrop right of the journey
+# (behind and right of the Condensery at the reveal, at the right edge on the approach), smaller, and the key comes
+# from its side, low: crowns facing it are rimmed, the flanks the camera sees stay dark.
+MOON_DISC = {"bearing": -2.0, "elevation": 2.0, "radius": 3.4}
+KEY = {"bearing": -18.0, "elevation": 12.0}
+LIGHT_DIR = bearing_dir(KEY["bearing"], KEY["elevation"])   # toward the key
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# The Condensery turned to face the reveal. Its long axis ran along +x, the journey's own direction, so from the
+# reveal every stack, the mast and the crane stood in one line and the works read as a single tower (the orchestrator
+# took it for a lighthouse). The whole family turns together about the platform's centre: the instances, the column
+# and plume lobes and the three Condensery glows. Its conveyor then points back across the journey.
+COND_CENTRE = (2050.0, -450.0)
+COND_YAW = -60.0  # degrees, counter-clockwise seen from above
+COND_MASSES = ("condensery_column", "condensery_plume")
+COND_GLOWS = ("condensery_throats", "condensery_flare", "condensery_keel")
+
+
+def cond_turn(p):
+    a = math.radians(COND_YAW)
+    x, z = p[0] - COND_CENTRE[0], p[2] - COND_CENTRE[1]
+    return [COND_CENTRE[0] + x * math.cos(a) + z * math.sin(a), p[1], COND_CENTRE[1] - x * math.sin(a) + z * math.cos(a)]
+
+
+def cond_quat(q):
+    a = math.radians(COND_YAW) / 2
+    r = [0.0, math.sin(a), 0.0, math.cos(a)]   # r * q
+    return [r[3] * q[0] + r[0] * q[3] + r[1] * q[2] - r[2] * q[1],
+            r[3] * q[1] - r[0] * q[2] + r[1] * q[3] + r[2] * q[0],
+            r[3] * q[2] + r[0] * q[1] - r[1] * q[0] + r[2] * q[3],
+            r[3] * q[3] - r[0] * q[0] - r[1] * q[1] - r[2] * q[2]]
+
+
+for _inst in LAYOUT["instances"]:
+    if _inst.get("zone") == "condensery":
+        _inst["pos"] = cond_turn(_inst["pos"])
+        _inst["quat"] = cond_quat(_inst["quat"])
+for _m in COND_MASSES:
+    for _l in DESIGN["masses"].get(_m, []):
+        _l["c"] = cond_turn(_l["c"])   # (lobes are axis-aligned ellipsoids: their x/z scales are kept)
+for _g in DESIGN["clouds_block"]["glows"]:
+    if _g["name"] in COND_GLOWS:
+        _g["position"] = cond_turn(_g["position"])
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -119,23 +167,35 @@ def window_program(name, tints, intensity):
             "emissionIntensity": intensity, "opacity": -1}
 
 
-def moon_program(name, disc, light_dir, scale):
-    """A wide crescent: N . L soft terminator, dark maria from a slow noise, a faint earthshine."""
+def moon_program(name, disc, light_dir, scale, centre_y, radius):
+    """The Drowned Moon: a soft terminator, two octaves of maria and craters, limb darkening, and extinction toward the
+    sea horizon (the lower part dims and warms through the haze); the corona is the cloud block's halo (ADR-2102)."""
+    deep = [disc[0] * 0.30, disc[1] * 0.16, disc[2] * 0.16]
+    mid = [disc[0] * 0.62, disc[1] * 0.50, disc[2] * 0.62]
     ops = [
         {"kind": "input", "input": "normal", "dst": 0},
         {"kind": "gradient", "dst": 1, "srcA": 0, "constant": light_dir + [0.0], "value": 1.0},
-        {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.1, 0.35, 0, 0]},
+        {"kind": "smoothstep", "dst": 1, "srcA": 1, "constant": [0.0, 0.5, 0, 0]},
         {"kind": "input", "input": "worldPosition", "dst": 2},
         {"kind": "noise", "dst": 3, "srcA": 2, "value": scale, "seed": 5},
-        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.35, 0.65, 0, 0]},
-        {"kind": "gradient", "dst": 3, "srcA": 3, "constant": [-0.45, 0.0, 0.0, 1.0], "value": 1.0},
+        {"kind": "noise", "dst": 4, "srcA": 2, "value": scale * 4.7, "seed": 11},
+        {"kind": "mix", "dst": 3, "srcA": 3, "srcB": 4, "value": 0.35},
+        {"kind": "smoothstep", "dst": 3, "srcA": 3, "constant": [0.38, 0.62, 0, 0]},
+        {"kind": "gradient", "dst": 3, "srcA": 3, "constant": [-0.42, 0.0, 0.0, 1.0], "value": 1.0},
         {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 3},
-        {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [0.97, 0.0, 0.0, 0.03], "value": 1.0},
-        {"kind": "constant", "dst": 4, "constant": disc + [1.0]},
-        {"kind": "multiply", "dst": 5, "srcA": 4, "srcB": 1},
-        {"kind": "constant", "dst": 6, "constant": [0.0, 0.0, 0.0, 1.0]},
+        {"kind": "gradient", "dst": 1, "srcA": 1, "constant": [0.96, 0.0, 0.0, 0.04], "value": 1.0},   # earthshine
+        {"kind": "fresnel", "dst": 5, "value": 2.0},
+        {"kind": "gradient", "dst": 5, "srcA": 5, "constant": [-0.55, 0.0, 0.0, 1.0], "value": 1.0},  # limb
+        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 5},
+        # extinction: 0 at the disc's foot, 1 a little above its centre
+        {"kind": "gradient", "dst": 6, "srcA": 2, "constant": [0.0, 1.0, 0.0, -(centre_y - radius) / (1.25 * radius)],
+         "value": 1.0 / (1.25 * radius)},
+        {"kind": "oklabRamp", "dst": 6, "srcA": 6, "constant": deep + [1.0], "constant2": mid + [1.0],
+         "constant3": disc + [1.0], "constant4": disc + [1.0], "value": 1.0},
+        {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 1},
+        {"kind": "constant", "dst": 4, "constant": [0.0, 0.0, 0.0, 1.0]},
     ]
-    return {"name": name, "ops": ops, "baseColor": 6, "metallic": -1, "roughness": -1, "emission": 5,
+    return {"name": name, "ops": ops, "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 7,
             "emissionIntensity": 1.0, "opacity": -1}
 
 
@@ -175,26 +235,29 @@ ROLE_GAIN = {"strip": 7.0, "beacon": 40.0, "landmark": 6.0, "garden": 10.0, "lan
              "neon_a": 14.0, "beam_lamp": 14.0, "cond_glow": 9.0, "cond_lamp": 18.0, "cond_work": 8.0}
 
 
-def part_materials(tint, state="uv"):
+def part_materials(tint, state="uv", color=None):
     pm = {name: {"program": "ndPanes"} for name in PANES}
     for role, default in TINT_DEFAULTS.items():
         if role in PANES:
             continue
         key = tint.get(role, default)
         pm[role] = {"emissiveColor": pal(key, state), "emissiveIntensity": ROLE_GAIN[role]}
+    for role, rgb in (color or {}).items():   # ADR-2102: the layout's per-instance base colour (awning cloth)
+        pm.setdefault(role, {})["baseColor"] = r3(rgb)
     return pm
 
 
 def kit_nodes(state="uv"):
-    """One procedural node per (asset, tint) group of the layout's instances."""
+    """One procedural node per (asset, tint, colour) group of the layout's instances."""
     groups = {}
     for inst in LAYOUT["instances"]:
         tint = inst.get("tint", {})
-        key = (inst["asset"], tuple(sorted(tint.items())))
+        color = json.dumps(inst.get("color", {}), sort_keys=True)
+        key = (inst["asset"], tuple(sorted(tint.items())), color)
         groups.setdefault(key, []).append(inst)
     nodes = []
     used = set()
-    for (asset, tint), insts in sorted(groups.items()):
+    for (asset, tint, color), insts in sorted(groups.items()):
         base = os.path.splitext(os.path.basename(asset))[0]
         name = base
         k = 1
@@ -208,7 +271,7 @@ def kit_nodes(state="uv"):
             "source": {"kind": "mesh", "asset": MESH + asset},
             "distribution": {"kind": "points", "points": pts},
             "castsShadow": shadow,
-            "partMaterials": part_materials(dict(tint), state)}})
+            "partMaterials": part_materials(dict(tint), state, json.loads(color))}})
     return nodes
 
 
@@ -347,100 +410,138 @@ def vehicle_nodes(state="uv"):
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# lighthouse beams: the kit's unit cone (1 m along +x), additive, swept by a looping yaw track on the node
-def beam_program(name, color, intensity):
-    """Bright at the lamp, fading along the beam (local x 0..1) and toward its rim."""
-    ops = [
-        {"kind": "input", "input": "localPosition", "dst": 0},
-        {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},   # 1 - x
-        {"kind": "power", "dst": 1, "srcA": 1, "value": 1.6},
-        {"kind": "fresnel", "dst": 2, "value": 1.5},
-        {"kind": "gradient", "dst": 2, "srcA": 2, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},   # facing core
-        {"kind": "multiply", "dst": 1, "srcA": 1, "srcB": 2},
-        {"kind": "constant", "dst": 3, "constant": color + [1.0]},
-        {"kind": "multiply", "dst": 4, "srcA": 3, "srcB": 1},
-        {"kind": "constant", "dst": 5, "constant": [0.0, 0.0, 0.0, 1.0]},
-        {"kind": "constant", "dst": 6, "constant": [0.12, 0.12, 0.12, 0.12]},
-        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 1},                                          # opacity
-    ]
-    return {"name": name, "ops": ops, "baseColor": 5, "metallic": -1, "roughness": -1, "emission": 4,
-            "emissionIntensity": intensity, "opacity": 6}
+# lighthouse beams: ADR-2102 cloud beams (soft cones marched with the cloud: they scatter in the clear air, are hidden
+# behind cloud and light the cloud they cross), turning at the layout's rpm
+BEAM_GAIN = 1.0
 
 
-def beam_nodes(state="uv"):
-    nodes, tracks = [], []
+def cloud_beams(state="uv"):
+    out = []
     for b in LAYOUT["beams"]:
-        L = b["length_m"]
-        rr = L * math.tan(math.radians(b["half_angle_deg"])) / 0.12
-        pitch = math.radians(b["elevation_deg"])
-        pts = []
-        for c in range(b["count"]):
-            yaw = 2 * math.pi * c / b["count"]
-            # yaw about +y, then the pitch about the beam's own z (quat = qy * qz)
-            qy = [0.0, math.sin(yaw / 2), 0.0, math.cos(yaw / 2)]
-            qz = [0.0, 0.0, math.sin(pitch / 2), math.cos(pitch / 2)]
-            q = [qy[3] * qz[0] + qy[0] * qz[3] + qy[1] * qz[2] - qy[2] * qz[1],
-                 qy[3] * qz[1] - qy[0] * qz[2] + qy[1] * qz[3] + qy[2] * qz[0],
-                 qy[3] * qz[2] + qy[0] * qz[1] - qy[1] * qz[0] + qy[2] * qz[3],
-                 qy[3] * qz[3] - qy[0] * qz[0] - qy[1] * qz[1] - qy[2] * qz[2]]
-            pts.append([0, 0, 0] + r3(q) + [L, round(rr, 3), round(rr, 3)])
-        name = "beam_" + b["name"]
-        nodes.append({"name": name, "kind": "procedural", "position": r3(b["origin"]), "procedural": {
-            "source": {"kind": "mesh", "asset": MESH + "landmarks/beam_cone_unit.glb"},
-            "distribution": {"kind": "points", "points": pts}, "castsShadow": False,
-            "material": {"baseColor": [0, 0, 0], "opacity": 0.1, "alphaMode": "blend", "unlit": False,
-                         "doubleSided": True, "program": "ndBeam"}}})
-        period = 60.0 / b["rpm"]
-        ph = b.get("phase", 0.0) * 360.0
-        tracks.append({"target": "nodes/%s/rotation" % name, "component": -1, "enabled": True, "timeBase": "seconds",
-                       "mode": "replace", "loopLength": round(period, 4),
-                       "keys": [{"time": 0.0, "value": [0.0, round(ph - 180.0, 2), 0.0], "interp": "linear"},
-                                {"time": round(period, 4), "value": [0.0, round(ph + 180.0, 2), 0.0],
-                                 "interp": "linear"}]})
-    return nodes, tracks
+        col = pal(b["key"], state)
+        out.append({"name": b["name"], "origin": r3(b["origin"]), "count": b["count"],
+                    "yaw": round(b.get("phase", 0.0) * 360.0, 2), "elevation": b["elevation_deg"], "rpm": b["rpm"],
+                    "length": b["length_m"], "halfAngle": max(b["half_angle_deg"], 1.8), "radius": 1.2,
+                    "color": col, "intensity": round(BEAM_GAIN * b.get("intensity", 1.0), 3)})
+    return out
 
 
 # ---------------------------------------------------------------------------------------------------------------
 # clouds: the design's lobes on the v2 block with the relief sea
-def clouds_block(state="uv"):
+# glows the beams replace (the layout's cloud_glow stand-ins for the lighthouse beams)
+BEAM_STANDINS = {"harbour_light", "outer_light", "break_light"}
+# the Condensery's keel glow lit one lobe of its column into a pink ball under the platform at the reveal
+GLOW_SCALE = {"condensery_keel": 0.35}
+
+
+def veil_passage():
+    """Lobes laid along the journey from the garden's edge (46.9 s) to the thinning (53.5-57 s): the camera is inside
+    cloud the whole way, and from the town the passage reads as one tall turret (envelope lobes beside and above the
+    path, the highest about 290 m). Deterministic. Returns (lobes, path points of the glows)."""
+    _, _, _, s_at, dense, total = journey(full=True)
+    rnd = random.Random(2102)
+    cum = [0.0]
+    for k in range(1, len(dense)):
+        cum.append(cum[-1] + math.dist(dense[k - 1], dense[k]))
+
+    def point(t):
+        target = s_at(t)
+        for k in range(1, len(cum)):
+            if cum[k] >= target:
+                u = (target - cum[k - 1]) / max(cum[k] - cum[k - 1], 1e-6)
+                return [dense[k - 1][j] + (dense[k][j] - dense[k - 1][j]) * u for j in range(3)]
+        return dense[-1]
+    lobes = []
+    t = 46.9
+    while t < 57.2:
+        p = point(t)
+        # density: solid until 53.5 s, then thinning to wisps by 57 s
+        thin = min(max((t - 53.5) / 3.5, 0.0), 1.0)
+        dens = round(1.0 - 0.8 * thin, 3)
+        r = rnd.uniform(48.0, 70.0) * (1.0 - 0.35 * thin)
+        c = [p[0] + rnd.uniform(-10, 10), p[1] + rnd.uniform(-8, 12), p[2] + rnd.uniform(-12, 12)]
+        if thin < 0.95 and not (thin > 0.3 and rnd.random() < 0.35 * thin):
+            lobes.append({"c": r3(c), "r": round(r, 1), "scale": [1.0, 0.85, 1.0], "density": dens, "soft": 0.55})
+        if thin < 0.4:
+            # the envelope: beside and above, so the turret has a silhouette
+            for side in (-1, 1):
+                if rnd.random() < 0.7:
+                    rr = rnd.uniform(70.0, 105.0)
+                    lobes.append({"c": r3([c[0] + rnd.uniform(-20, 20), c[1] + rnd.uniform(10, 60),
+                                           c[2] + side * rnd.uniform(55, 85)]),
+                                  "r": round(rr, 1), "scale": [1.0, 1.15, 1.0], "density": 1.0, "soft": 0.45})
+            if 48.5 < t < 53.0 and rnd.random() < 0.6:
+                lobes.append({"c": r3([c[0], c[1] + rnd.uniform(75, 110), c[2] + rnd.uniform(-25, 25)]),
+                              "r": round(rnd.uniform(60.0, 85.0), 1), "scale": [1.0, 1.0, 1.0], "density": 1.0,
+                              "soft": 0.4})
+        t += 0.55 if thin == 0 else 0.4
+    return lobes, {"rose": point(49.8), "amber": point(57.8)}
+
+
+def clouds_block(state="uv", moon_dir=None):
     lobes = []
     for name, ls in DESIGN["masses"].items():
         lobes += [dict(l) for l in ls]
     for name, ls in DESIGN.get("far_masses", {}).items():
         lobes += [dict(l) for l in ls]
+    passage, gp = veil_passage()
+    lobes += passage
     cb = DESIGN["clouds_block"]
     glows = [{"name": g["name"], "position": g["position"], "color": pal(g["key"], state), "radius": g["radius"],
-              "intensity": g["intensity"]} for g in cb["glows"]]
+              "intensity": g["intensity"] * GLOW_SCALE.get(g["name"], 1.0)} for g in cb["glows"]
+             if g["name"] not in BEAM_STANDINS]
+    # the Veil: rose light inside (the toms flash it), and the first amber of the Condensery ahead
+    glows.append({"name": "veil_rose", "position": r3(gp["rose"]), "color": pal("garden_a", state), "radius": 70.0,
+                  "intensity": 0.5})
+    glows.append({"name": "veil_amber", "position": r3([gp["amber"][0] + 90, gp["amber"][1] + 10, gp["amber"][2] - 25]),
+                  "color": pal("cond_a", state), "radius": 55.0, "intensity": 1.2})
     sea = DESIGN["sea_design"]
     br = sea["break"]
     lo, hi = sea["top_range"]
-    return {
+    out = {
         "lobes": lobes,
         "sea": {"base": sea["base"], "top": sea["top_mean"], "coverage": 1.0, "coverageScale": 0.0003,
                 "density": 1.6, "relief": round((hi - lo) / 2.4, 1), "reliefScale": 2000.0, "billow": 24.0,
                 "farFade": 0.35,
                 "breaks": [{"centre": br["centre"], "radius": br["radius"], "elongation": br["elongation"],
                             "yaw": br["yaw_rad"]}]},
-        "glows": glows, "glowGain": 0.35, "glowOcclusion": 2.0,
+        "glows": glows, "glowGain": CLOUD_LOOK["glowGain"], "glowOcclusion": 1.6,
         "extinction": 0.02, "density": 1.0, "swell": 0.0,
-        "steps": 72, "lightSteps": 2, "lightDistance": 160.0,
+        "steps": 72, "lightSteps": 2, "lightDistance": CLOUD_LOOK["lightDistance"],
         "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02, "maxDistance": 24000.0,
-        "lightDirection": r3(LIGHT_DIR), "lightColor": pal("moon_light", state), "lightIntensity": 0.34,
-        "anisotropy": 0.5,
-        "ambientTop": [v * 0.6 for v in pal("sky_horizon", state)], "ambientBottom": [v * 0.12 for v in pal("haze", state)],
-        "warmColor": [v * 0.15 for v in pal("horizon_glow", state)], "warmDirection": r3(cb["warmDirection"]),
+        "lightDirection": r3(LIGHT_DIR), "lightColor": pal("moon_light", state),
+        "lightIntensity": CLOUD_LOOK["lightIntensity"], "anisotropy": CLOUD_LOOK["anisotropy"],
+        "ambientTop": [v * CLOUD_LOOK["ambientTop"] for v in pal("sky_horizon", state)],
+        "ambientBottom": [v * CLOUD_LOOK["ambientBottom"] for v in pal("haze", state)],
+        "warmColor": [v * 0.10 for v in pal("horizon_glow", state)], "warmDirection": r3(cb["warmDirection"]),
         "warmHeight": 900.0,
         "noiseScale": 0.018, "noiseAmount": 0.72, "detailScale": 0.07, "detailAmount": 0.6,
         "drift": r3([v * 0.7 for v in cb["drift"]]),
-        "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": 0.6, "seed": 7,
+        "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": CLOUD_LOOK["powder"], "seed": 7,
+        # ADR-2102: the lighthouses
+        "beams": cloud_beams(state), "beamAir": CLOUD_LOOK["beamAir"], "beamCloud": CLOUD_LOOK["beamCloud"],
     }
+    if moon_dir is not None:
+        out["halo"] = {"direction": r3(moon_dir), "color": [v * 0.42 for v in pal("moon_disc", state)],
+                       "radius": 3.0, "intensity": CLOUD_LOOK["halo"]}
+    return out
+
+
+# the cloud look (iteration 4: dark indigo bodies, rims toward the key, the city's light on them)
+CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.45, "lightDistance": 260.0, "ambientTop": 0.45,
+              "ambientBottom": 0.10, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
+              "halo": 0.45}
 
 
 # ---------------------------------------------------------------------------------------------------------------
 # the journey: the layout's waypoints (engine frame)
-WAYPOINTS = [(w["t"], w["pos"]) for w in LAYOUT["camera"]["waypoints"]]
-if WAYPOINTS[-1][0] < SONG:
-    WAYPOINTS[-1] = (SONG, WAYPOINTS[-1][1])
+# The layout's waypoints up to the dive (47 s). Iteration 4 replaces its second half: the art waypoints climbed over the
+# Veil (the camera never entered cloud) and ended 1.6 km from the Condensery looking 10 degrees up. Now the camera
+# dives into the passage at 47 s, crosses 450 m of cloud at 40-50 m/s, leaves it at 57-58 s level with the Condensery's
+# throats and heading straight at it (bearing ~15 degrees), and slows to a near hover by 70 s.
+TAIL = [(50.5, [290.0, 175.0, 5.0]), (54.4, [470.0, 215.0, -40.0]), (58.95, [660.0, 245.0, -95.0]),
+        (66.5, [835.0, 256.0, -144.0]), (SONG, [865.0, 258.0, -152.0])]
+WAYPOINTS = [(w["t"], w["pos"]) for w in LAYOUT["camera"]["waypoints"] if w["t"] <= 47.0] + TAIL
 def catmull(p0, p1, p2, p3, t, alpha=0.5):
     def tj(ti, a, b):
         return ti + max(math.dist(a, b), 1e-6) ** alpha
@@ -461,7 +562,7 @@ def catmull(p0, p1, p2, p3, t, alpha=0.5):
     return lerp(b1, b2, t1, t2)
 
 
-def journey():
+def journey(full=False):
     pts = [list(p) for _, p in WAYPOINTS]
     ext = [[2 * pts[0][i] - pts[1][i] for i in range(3)]] + pts + [[2 * pts[-1][i] - pts[-2][i] for i in range(3)]]
     dense = []
@@ -510,21 +611,30 @@ def journey():
         keys.append({"time": round(t, 3), "value": round(s_at(t) / total, 6), "interp": "linear"})
         t += 0.25
     keys.append({"time": SONG, "value": 1.0, "interp": "linear"})
+    if full:
+        return dense, keys, total, s_at, dense, total
     return dense, keys, total, s_at
 
 
 
 # ---------------------------------------------------------------------------------------------------------------
 STILL_TIMES = [2.8, 17.0, 35.75, 50.5, 58.95, 66.0]
-BEAMS = False
+
+
+def fov_track():
+    """The lens closes from 52 to 36 degrees as the camera leaves the Veil, so the Condensery (1.2-1.6 km out, the
+    reveal's subject) fills the frame without flying closer than the song allows; it eases in over the thinning."""
+    keys = [(0.0, 52.0), (54.0, 52.0), (55.5, 50.5), (57.0, 45.0), (58.95, 39.0), (62.0, 36.5), (SONG, 35.0)]
+    return {"target": "camera/fov", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
+            "loopLength": 0.0, "keys": [{"time": t, "value": v, "interp": "linear"} for t, v in keys]}
 
 
 def scene_doc(state="uv", sky_map=None):
     nodes = kit_nodes(state)
-    # the Drowned Moon: bearing 19, centre 2.2 degrees up, 8.2 degrees in radius, far out
-    md = bearing_dir(MOON["disc_bearing_deg"], MOON["disc_centre_elevation_deg"])
+    # the Drowned Moon (MOON_DISC: a backdrop right of the journey), far out
+    md = bearing_dir(MOON_DISC["bearing"], MOON_DISC["elevation"])
     D = 60000.0  # placed by its point: a node position clamps at 10 km (nodes/<n>/position)
-    R = D * math.tan(math.radians(MOON["disc_angular_radius_deg"]))
+    R = D * math.tan(math.radians(MOON_DISC["radius"]))
     up = [0.0, 1.0, 0.0]
     right = [md[2] * up[1] - md[1] * up[2], md[0] * up[2] - md[2] * up[0], md[1] * up[0] - md[0] * up[1]]
     rl = math.sqrt(sum(v * v for v in right))
@@ -546,16 +656,12 @@ def scene_doc(state="uv", sky_map=None):
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
     aliens, alien_tracks = inhabitant_nodes()
     vehicles, vehicle_tracks = vehicle_nodes(state)
-    # The beam cones draw opaque (a procedural mesh's blend/opacity is not honoured: found this iteration), so they are
-    # built but left out until the beams have a transparent path; --beams puts them in.
-    beams, beam_tracks = beam_nodes(state) if BEAMS else ([], [])
-    nodes += aliens + vehicles + beams
+    nodes += aliens + vehicles
     programs = [
         window_program("ndPanes", [pal("win_a", state), pal("win_b", state), pal("win_c", state), pal("win_d", state)],
                        4.0),
-        moon_program("ndMoon", [v * 0.55 for v in pal("moon_disc", state)], ml, 3.0 / R),
+        moon_program("ndMoon", [v * 0.22 for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
-        beam_program("ndBeam", pal("moon_disc", state), 1.2),
     ]
     env = {
         "background": [0.001, 0.001, 0.004],
@@ -587,10 +693,10 @@ def scene_doc(state="uv", sky_map=None):
             "name": "ride", "kind": "catmullRom", "closed": False, "tension": 0.5, "generator": "points",
             "samplesPerSegment": 4, "points": [{"position": r3(p), "roll": 0.0, "scale": 1.0} for p in dense]}}],
         "materialPrograms": programs,
-        "clouds": clouds_block(state),
+        "clouds": clouds_block(state, md),
     }
     return doc, [{"target": "camera/splineT", "component": -1, "enabled": True, "timeBase": "seconds",
-                  "mode": "replace", "loopLength": 0.0, "keys": keys}] + alien_tracks + vehicle_tracks + beam_tracks
+                  "mode": "replace", "loopLength": 0.0, "keys": keys}, fov_track()] + alien_tracks + vehicle_tracks
 
 
 def cloud_routes():
@@ -600,10 +706,13 @@ def cloud_routes():
         if chain:
             out["chain"] = chain
         return out
+    VEIL_ROSE_INDEX = len([g for g in DESIGN["clouds_block"]["glows"] if g["name"] not in BEAM_STANDINS])
     return [
         r("stem.bass.level", "clouds/swell", 0.25, attackMs=350.0, decayMs=1800.0),
         r("stem.kick.onset", "clouds/glow/0/intensity", 1.2, attackMs=15.0, decayMs=450.0),
         r("stem.snare.onset", "clouds/glow/2/intensity", 1.0, attackMs=15.0, decayMs=350.0),
+        # the Veil's rose light answers the toms (the fills at 24, 35 and the 41.75-48 build light it from inside)
+        r("stem.toms.onset", "clouds/glow/%d/intensity" % VEIL_ROSE_INDEX, 6.0, attackMs=10.0, decayMs=380.0),
     ]
 
 
@@ -653,10 +762,7 @@ def main():
     ap.add_argument("--palette", default="uv", choices=sorted(STATE_NAMES))
     ap.add_argument("--sky", default="sky/sky_uv.hdr", help="equirect sky map relative to this folder ('' = analytic)")
     ap.add_argument("--no-clouds", action="store_true", help="the cloud block disabled (for an A/B of its cost)")
-    ap.add_argument("--beams", action="store_true", help="include the lighthouse beam cones (they draw opaque today)")
     a = ap.parse_args()
-    global BEAMS
-    BEAMS = a.beams
     os.makedirs(a.out, exist_ok=True)
     sky = os.path.relpath(os.path.join(HERE, a.sky), a.out) if a.sky else None
     scene_path = os.path.join(a.out, a.name + ".scene.json")
