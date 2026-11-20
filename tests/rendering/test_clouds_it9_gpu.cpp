@@ -347,3 +347,93 @@ TEST_CASE("the wisp layer draws thin torn cloud in its band, and a wake parts it
     CHECK(l[2] < l[1] - 2.0);   // the wakes clear some of it
     CHECK(ctx->errorCount() == 0);
 }
+
+TEST_CASE("the eroded edge's width and the detail floor read, write and are bounded", "[scene][clouds][adr2115]") {
+    nlohmann::json j = nlohmann::json::parse(R"({"lobes": [{"c": [0, 0, 0], "r": 10}], "erosion": 1,
+        "erosionEdge": 0.5, "erosionDetailFloor": 0.4})");
+    auto c = scene::Clouds::fromJson(j, ".");
+    REQUIRE(c.has_value());
+    CHECK(c->erosionEdge == Catch::Approx(0.5f));
+    CHECK(c->erosionDetailFloor == Catch::Approx(0.4f));
+    const nlohmann::json out = c->toJson();
+    CHECK(out["erosionEdge"].get<float>() == Catch::Approx(0.5f));
+    CHECK(out["erosionDetailFloor"].get<float>() == Catch::Approx(0.4f));
+    // the defaults are not written (a block without them is unchanged)
+    auto plain = scene::Clouds::fromJson(nlohmann::json::parse(R"({"lobes": [{"c": [0, 0, 0], "r": 10}], "erosion": 1})"), ".");
+    REQUIRE(plain.has_value());
+    CHECK_FALSE(plain->toJson().contains("erosionEdge"));
+    CHECK_FALSE(plain->toJson().contains("erosionDetailFloor"));
+    j["erosionEdge"] = 0.0;
+    CHECK_FALSE(scene::Clouds::fromJson(j, ".").has_value());
+    j["erosionEdge"] = 0.5;
+    j["erosionDetailFloor"] = 1.5;
+    CHECK_FALSE(scene::Clouds::fromJson(j, ".").has_value());
+}
+
+namespace {
+
+// the mean absolute horizontal luma step between neighbouring pixels (how crisp the silhouettes are)
+double edgeEnergy(const gpu::Image8& img) {
+    double sum = 0.0;
+    for (std::uint32_t y = 0; y < img.height; ++y) {
+        for (std::uint32_t x = 1; x < img.width; ++x) {
+            const auto* p = img.pixel(x, y);
+            const auto* q = img.pixel(x - 1, y);
+            sum += std::fabs((0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) - (0.2126 * q[0] + 0.7152 * q[1] + 0.0722 * q[2]));
+        }
+    }
+    return sum / (static_cast<double>(img.width - 1) * img.height);
+}
+
+double meanAbsDiff(const gpu::Image8& a, const gpu::Image8& b) {
+    double sum = 0.0;
+    for (std::uint32_t y = 0; y < a.height; ++y) {
+        for (std::uint32_t x = 0; x < a.width; ++x) {
+            for (int c = 0; c < 3; ++c) sum += std::fabs(double(a.pixel(x, y)[c]) - double(b.pixel(x, y)[c]));
+        }
+    }
+    return sum / (3.0 * a.width * a.height);
+}
+
+} // namespace
+
+TEST_CASE("a narrower eroded edge draws crisper lobes, and the detail floor reaches a low-share lobe",
+          "[gpu][renderer][clouds][adr2115]") {
+    auto ctx = makeContext9();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    constexpr std::uint32_t W = 200, H = 120;
+    const auto render = [&](float edge, float floor, float erode) {
+        scene::Scene s = greyClouds();
+        s.clouds.erosion = 1.0f;
+        s.clouds.erosionScale = 40.0f;
+        s.clouds.erosionEdge = edge;
+        s.clouds.erosionDetailFloor = floor;
+        for (int i = 0; i < 3; ++i) {
+            scene::CloudLobe l;
+            l.centre = {-60.0f + 60.0f * static_cast<float>(i), 0.0f, -120.0f};
+            l.radius = 30.0f;
+            l.soft = 0.3f;
+            l.erode = erode;
+            s.clouds.lobes.push_back(l);
+        }
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        FrameTime t{};
+        t.renderTime = 1.0;
+        auto img = renderer.renderToImage(s, t, W, H);
+        REQUIRE(img.has_value());
+        return std::move(*img);
+    };
+    const gpu::Image8 soft = render(1.0f, 0.0f, 1.0f);
+    const gpu::Image8 crisp = render(0.3f, 0.0f, 1.0f);
+    INFO("edge energy at edge 1: " << edgeEnergy(soft) << ", at 0.3: " << edgeEnergy(crisp));
+    CHECK(edgeEnergy(crisp) > edgeEnergy(soft) * 1.05);
+    // a lobe held at a 0.2 share: the floor erodes its skin (it changes), and a zero floor leaves the old result
+    const gpu::Image8 held = render(0.3f, 0.0f, 0.2f);
+    const gpu::Image8 floored = render(0.3f, 1.0f, 0.2f);
+    const gpu::Image8 heldAgain = render(0.3f, 0.0f, 0.2f);
+    INFO("a 0.2-share lobe vs the floor at 1: mean |diff| " << meanAbsDiff(held, floored));
+    CHECK(meanAbsDiff(held, floored) > 0.5);
+    CHECK(meanAbsDiff(held, heldAgain) == 0.0);
+    CHECK(ctx->errorCount() == 0);
+}

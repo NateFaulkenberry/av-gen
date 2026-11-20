@@ -563,6 +563,8 @@ def clouds_block(state="uv", moon_dir=None):
         # through six squared taps with multiple scattering (two even taps cast every lobe as a black stencil)
         "erosion": CLOUD_LOOK["erosion"], "erosionScale": CLOUD_LOOK["erosionScale"], "erosionDetail": 1.0,
         "erosionCurl": 6.0, "erosionFlatten": 0.4, "erosionOctaves": CLOUD_Q["erosionOctaves"],
+        # ADR-2115 (owner msg 105: the wall behind the garden "too blobby"): a crisper eroded edge
+        "erosionEdge": CLOUD_LOOK["erosionEdge"],
         "lightSpacing": 2, "multiScatter": CLOUD_LOOK["multiScatter"],
         "drift": r3([v * 0.7 for v in cb["drift"]]),
         "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": CLOUD_LOOK["powder"], "seed": 7,
@@ -594,7 +596,9 @@ def clouds_block(state="uv", moon_dir=None):
 
 # the cloud look (iteration 4: dark indigo bodies, rims toward the key, the city's light on them)
 # iteration 7: key 0.11 -> 0.22 with six squared light taps (the two even taps let most crowns see the key unshadowed)
-CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseAmount": 0.72,
+# iteration 9b (ADR-2115, owner msg 105): billows 60 -> 40 m and the eroded edge at half its width: at 50-150 m a 40 m
+# lobe read as a soft round ball. The seat lobes keep their 0.3 share (no detail floor): a floor sank the decks' cloud.
+CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 40.0, "erosionEdge": 0.5, "multiScatter": 0.7, "noiseAmount": 0.72,
               "lightIntensity": 0.22, "anisotropy": 0.35, "lightDistance": 260.0, "ambientTop": 0.25,
               "ambientBottom": 0.06, "warm": 0.15, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
               "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2,

@@ -148,6 +148,8 @@ Result<void> Clouds::validate() const {
     if (!(erosionDetail >= 0.0f && erosionDetail <= 2.0f)) return fail("clouds: erosionDetail must be in [0, 2]");
     if (!(erosionCurl >= 0.0f && erosionCurl <= 200.0f)) return fail("clouds: erosionCurl must be in [0, 200]");
     if (!(erosionFlatten >= 0.0f && erosionFlatten <= 1.0f)) return fail("clouds: erosionFlatten must be in [0, 1]");
+    if (!(erosionEdge >= 0.05f && erosionEdge <= 4.0f)) return fail("clouds: erosionEdge must be in [0.05, 4]");
+    if (!(erosionDetailFloor >= 0.0f && erosionDetailFloor <= 1.0f)) return fail("clouds: erosionDetailFloor must be in [0, 1]");
     if (erosionOctaves < 1 || erosionOctaves > 3) return fail("clouds: erosionOctaves must be in [1, 3]");
     if (lightSpacing < 1 || lightSpacing > 2) return fail("clouds: lightSpacing must be 1 or 2");
     if (!(multiScatter >= 0.0f && multiScatter <= 1.0f)) return fail("clouds: multiScatter must be in [0, 1]");
@@ -247,7 +249,8 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
                         std::pair{"stepGrowth", &c.stepGrowth}, std::pair{"maxDistance", &c.maxDistance},
                         std::pair{"erosion", &c.erosion}, std::pair{"erosionScale", &c.erosionScale},
                         std::pair{"erosionDetail", &c.erosionDetail}, std::pair{"erosionCurl", &c.erosionCurl},
-                        std::pair{"erosionFlatten", &c.erosionFlatten}, std::pair{"multiScatter", &c.multiScatter}}) {
+                        std::pair{"erosionFlatten", &c.erosionFlatten}, std::pair{"multiScatter", &c.multiScatter},
+                        std::pair{"erosionEdge", &c.erosionEdge}, std::pair{"erosionDetailFloor", &c.erosionDetailFloor}}) {
         if (auto r = num(k, *t); !r) return std::unexpected(r.error());
     }
     for (auto [k, t] : {std::pair{"lightDirection", &c.lightDirection}, std::pair{"lightColor", &c.lightColor},
@@ -537,6 +540,8 @@ json Clouds::toJson() const {
         j["erosionCurl"] = erosionCurl;
         j["erosionFlatten"] = erosionFlatten;
         j["erosionOctaves"] = erosionOctaves;
+        if (erosionEdge != 1.0f) j["erosionEdge"] = erosionEdge; // ADR-2115
+        if (erosionDetailFloor > 0.0f) j["erosionDetailFloor"] = erosionDetailFloor;
     }
     if (lightSpacing != 1 || multiScatter > 0.0f) {
         j["lightSpacing"] = lightSpacing;
@@ -669,6 +674,8 @@ constexpr CloudFloat kCloudFloats[] = {
     {"erosionScale", &Clouds::erosionScale, 1.0f, 2000.0f, 5.0f, 200.0f},
     {"erosionDetail", &Clouds::erosionDetail, 0.0f, 2.0f, 0.0f, 2.0f},
     {"erosionCurl", &Clouds::erosionCurl, 0.0f, 200.0f, 0.0f, 40.0f},
+    {"erosionEdge", &Clouds::erosionEdge, 0.05f, 4.0f, 0.1f, 2.0f},       // ADR-2115
+    {"erosionDetailFloor", &Clouds::erosionDetailFloor, 0.0f, 1.0f, 0.0f, 1.0f},
     {"multiScatter", &Clouds::multiScatter, 0.0f, 1.0f, 0.0f, 1.0f},
     {"hazeDistance", &Clouds::hazeDistance, 1.0f, 200000.0f, 1000.0f, 40000.0f},
     {"powder", &Clouds::powder, 0.0f, 1.0f, 0.0f, 1.0f},

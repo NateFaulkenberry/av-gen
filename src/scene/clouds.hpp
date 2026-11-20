@@ -233,6 +233,12 @@ struct Clouds {
     float erosionCurl = 6.0f;         // metres: the distortion of the coarse octaves (tatters)
     float erosionFlatten = 0.4f;      // 0..1: lobes' lower halves squashed (flatter bases), times `erosion`
     int erosionOctaves = 3;           // 1..3: the offline-quality knob (3 = the fine octave too)
+    // ADR-2115: the eroded edge's width, times its default (lam x 0.07 on a crown to lam x 0.28 under a base); below 1
+    // the silhouette is crisper. Never narrower than a march pixel's footprint or half a step.
+    float erosionEdge = 1.0f;
+    // ADR-2115: the least share of the mid and fine octaves and of the crisp edge any lobe takes, whatever its own
+    // `erode` (which still scales the coarse octave): a lobe held at a low share keeps its body but not a smooth skin.
+    float erosionDetailFloor = 0.0f;
     // ADR-2106: the key's light. `lightSpacing` 1 = even taps (as before); 2 = taps spaced by the square of their
     // index and jittered (no hard lobe-silhouette shadows). `multiScatter` 0..1 adds Wrenninge-style multiple scattering.
     int lightSpacing = 1;

@@ -61,6 +61,7 @@ struct CloudUniformGpu {
     // base flattening)
     glm::vec4 erosion;
     glm::vec4 erosion2;
+    glm::vec4 erosion3; // ADR-2115: x = the eroded edge's width factor, y = the detail share's floor
     // ADR-2112: each formation's offset at this second (xyz, metres)
     std::array<glm::vec4, scene::kMaxCloudBobs> bobs;
     // ADR-2113: the wisps: (on, base, top, density), (scale, coverage, tatter, stretch), (drift offset xyz m, wake
@@ -76,7 +77,7 @@ struct CloudUniformGpu {
     // (below, above, 0, 0)
     std::array<glm::vec4, 3 * scene::kMaxCloudWispZones> zones;
 };
-static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 9 +
+static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 10 +
                                           scene::kMaxCloudBobs + 5 + 2 * scene::kMaxCloudWakes +
                                           3 * scene::kMaxCloudWispZones) * 16);
 
@@ -718,6 +719,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.erosion = glm::vec4(c.erosion, c.erosionScale, c.erosionDetail, c.erosionCurl); // ADR-2106
     u.erosion2 = glm::vec4(static_cast<float>(c.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
                            c.erosionFlatten);
+    u.erosion3 = glm::vec4(c.erosionEdge, c.erosionDetailFloor, 0.0f, 0.0f);
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
     const auto bufferEntry = [](std::uint32_t binding, const wgpu::Buffer& b) {
