@@ -253,7 +253,9 @@ fn densityBase(p: vec3<f32>) -> Density {
     out.base = max(sea, lob);
     out.above = select(max(out.above, lobeAbove.y * 0.6), -1.0 - lobeAbove.y * 0.6, out.above < 0.0 && sea >= lob);
     if (lob > sea) {
-        out.height = remap01(p.y, cu.boxMin.y, cu.boxMax.y);
+        // ADR-2105: over the hero lobes' own height range (the box also holds the far set, which put every hero
+        // formation in its bottom tenth: all base, no crown); the same range as the box when there is no far set
+        out.height = remap01(p.y, cu.heroSpan.x, cu.heroSpan.y);
     } else {
         out.height = clamp(seaH, 0.0, 1.0);
     }
@@ -570,7 +572,9 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                         glow = glow * mix(1.0, 0.12 + 1.9 * pocket * pocket, cu.glowShape.x);
                     }
                     if (cu.glowShape.y > 0.0) {
-                        let toward = densityBase(p + glowTo * cu.glowShape.w).base;
+                        // ADR-2105: the lobes alone (no sea relief, no noise): the glows sit among the lobes, and the
+                        // full density cost ~25 ms a frame in the Neon Dreams Veil
+                        let toward = min(lobeBase(p + glowTo * cu.glowShape.w).x, 1.0);
                         glow = glow * exp(-cu.glowShape.y * toward * 3.0);
                     }
                 }
@@ -598,6 +602,9 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 wSum = wSum + w;
                 trans = trans * (1.0 - a);
                 if (trans < 0.01) {
+                    // ADR-2105: opaque from here: the 1 % left used to composite whatever was behind (a bright
+                    // emitter showed through any thickness of cloud)
+                    trans = 0.0;
                     break;
                 }
             }

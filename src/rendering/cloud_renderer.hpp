@@ -43,6 +43,7 @@ struct CloudLobeBins {
     std::uint32_t truncated = 0;      // cells that held more lobes than the renderer reads (the extra are dropped)
 };
 inline constexpr std::uint32_t kMaxLobesPerCell = 64;
+inline constexpr std::uint32_t kMaxBinCellsPerSide = 128; // ADR-2105 (was 64)
 inline constexpr std::uint32_t kBinCountMask = 0xFFu;
 [[nodiscard]] CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes);
 

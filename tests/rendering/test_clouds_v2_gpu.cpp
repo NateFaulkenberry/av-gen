@@ -10,6 +10,7 @@
 #include "rendering/scene_renderer.hpp"
 #include "scene/scene.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -378,4 +379,66 @@ TEST_CASE("far lobes on their own grid draw as the hero set does", "[gpu][render
     CHECK(la > lc + 10.0);           // the tower is there
     CHECK(std::abs(la - lb) < 3.0);  // and the far grid draws it as the hero grid did
     CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("an opaque cloud hides a bright sky completely", "[gpu][renderer][clouds][adr2105]") {
+    // ADR-2105: the march stopped at 1 % transmittance and composited the 1 % left, so a bright emitter (the Neon Dreams
+    // Condensery, a moon) showed through any thickness of cloud. Past the cut-off the cloud is now opaque.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    constexpr std::uint32_t W = 160, H = 90;
+    FrameTime t{};
+    auto make = [](bool lobe) {
+        scene::Scene s = seaScene();
+        s.clouds.sea.enabled = false;
+        s.clouds.extinction = 0.15f;
+        s.clouds.ambientTop = {0.0f, 0.0f, 0.0f};
+        s.clouds.ambientBottom = {0.0f, 0.0f, 0.0f};
+        s.clouds.hazeColor = {0.0f, 0.0f, 0.0f};
+        s.clouds.hazeDistance = 100000.0f;
+        s.environment.backgroundColor = {2000.0f, 2000.0f, 2000.0f}; // far brighter than white: 1 % of it would show
+        s.camera.position = {0.0f, 300.0f, 0.0f};
+        s.camera.target = {0.0f, 330.0f, -1000.0f};
+        if (lobe) {
+            scene::CloudLobe l;
+            l.centre = {0.0f, 300.0f, -1000.0f};
+            l.radius = 950.0f; // fills the view, so no bright sky beside it blooms over the cloud
+            l.soft = 0.2f;
+            s.clouds.lobes = {l};
+        } else {
+            scene::CloudLobe l; // far off-screen, so the cloud pass still runs
+            l.centre = {0.0f, 300.0f, 9000.0f};
+            l.radius = 10.0f;
+            s.clouds.lobes = {l};
+        }
+        return s;
+    };
+    double lum[2] = {0, 0};
+    for (int i = 0; i < 2; ++i) {
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto img = renderer.renderToImage(make(i == 1), t, W, H);
+        REQUIRE(img.has_value());
+        lum[i] = luma(meanRgb(*img, 3 * W / 8, 3 * H / 8, 5 * W / 8, 5 * H / 8));
+    }
+    INFO("clear sky " << lum[0] << ", behind the cloud " << lum[1]);
+    CHECK(lum[0] > 150.0); // the sky is bright
+    CHECK(lum[1] < 3.0);   // and none of it comes through
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("the lobe bins reach 128 cells along the longer side", "[renderer][clouds][adr2105]") {
+    // ADR-2105: a long, fine-grained set (small lobes over 3.4 km) gets cells of span / 128, not span / 64
+    std::vector<scene::CloudLobe> lobes;
+    for (int i = 0; i <= 340; ++i) {
+        scene::CloudLobe l;
+        l.centre = {10.0f * static_cast<float>(i), 100.0f, 0.0f};
+        l.radius = 8.0f;
+        lobes.push_back(l);
+    }
+    const rendering::CloudLobeBins b = rendering::binCloudLobes(lobes);
+    const float span = 3400.0f + 16.0f;
+    CHECK(b.nx <= rendering::kMaxBinCellsPerSide);
+    CHECK(b.nx >= rendering::kMaxBinCellsPerSide - 1);
+    CHECK(b.cellSize == Catch::Approx(span / 128.0f).epsilon(0.01));
 }

@@ -236,8 +236,9 @@ CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes) {
     std::vector<float> sorted = extents;
     std::nth_element(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(sorted.size() / 2), sorted.end());
     const float span = std::max(hi.x - lo.x, hi.y - lo.y);
-    // a cell about half a typical lobe's radius (few lobes per cell), and at most 64 along the longer side
-    bins.cellSize = std::max({0.5f * sorted[sorted.size() / 2], span / 64.0f, 1.0f});
+    // a cell about half a typical lobe's radius (few lobes per cell), and at most kMaxBinCellsPerSide along the longer
+    // side (ADR-2105: 128, was 64: a 3.4 km hero set had 52 m cells that held every level of a bank at once)
+    bins.cellSize = std::max({0.5f * sorted[sorted.size() / 2], span / static_cast<float>(kMaxBinCellsPerSide), 1.0f});
     bins.origin = lo;
     bins.nx = std::max(1u, static_cast<std::uint32_t>(std::ceil((hi.x - lo.x) / bins.cellSize)));
     bins.nz = std::max(1u, static_cast<std::uint32_t>(std::ceil((hi.y - lo.y) / bins.cellSize)));
