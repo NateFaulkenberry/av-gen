@@ -1279,6 +1279,8 @@ def glows():
             dict(g("lampmarket", (LAMPMARKET["centre"][0], LAMPMARKET["centre"][1], LAMPMARKET["deck"] - 6), 75, "sign_a", 1.1)),
             g("lanternhill", (10, 150, 146), 95, "bounce_b", 0.9),
             dict(g("lampwick", (ISLE_LAMPWICK[0], ISLE_LAMPWICK[1], ISLE_LAMPWICK[2] - 4), 60, "amber", 2.0), bob="isle_lampwick"),
+            # the works on its rock: the throats' light caught in the rim cloud and under the island's lip (it8's amber pedestal)
+            dict(g("condensery_rim", (CONDENSERY[0], CONDENSERY[1], CONDENSERY[2] - 14), 190, "cond_b", 1.6), bob="condensery"),
             dict(g("keep_town", (KEEP_SHELF[0], KEEP_SHELF[1], KEEP_SHELF[2] + 10), 220, "amber", 4.0), bob="keep"), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -150), 600, "ocean_b", 3.0)]      # iteration 6: 420 m / 1.8 at -210 left the break's walls dark from the reveal
 
 
