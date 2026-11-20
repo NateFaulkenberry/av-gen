@@ -217,6 +217,18 @@ const std::vector<std::uint8_t>& cloudNoiseVolume() {
     return volume;
 }
 
+glm::vec2 cloudFrameJitter(std::uint32_t frameNonce) {
+    // ADR-2111: the nonce counts 1/240 s ticks, so it steps by 8 a frame at 30 fps, 4 at 60, 10 at 24. A golden-ratio
+    // step per TICK (ADR-2100) became fract(8 x 0.618) = -0.056 a frame at 30 fps -- a slow ramp, not a spread -- and
+    // the light taps' 2x of it a ramp that wrapped every 8.97 frames: every cloud's self-shadow crept and snapped back
+    // three times a second (the Neon Dreams "pops", owner msg 73). The steps per tick here are chosen so the step
+    // per FRAME is a good low-discrepancy step at the common rates: x = (phi^-1 + 2) / 8 per tick gives 0.618 a frame
+    // at 30 fps, 0.309 at 60, 0.273 at 24; y = (0.5698 + 3) / 8 (R2's second constant) gives 0.570, 0.785, 0.462.
+    const double n = static_cast<double>(frameNonce);
+    return {static_cast<float>(std::fmod(n * (2.6180339887 / 8.0), 1.0)),
+            static_cast<float>(std::fmod(n * (3.5698402910 / 8.0) + 0.37, 1.0))};
+}
+
 CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes) {
     CloudLobeBins bins;
     if (lobes.empty()) {
@@ -589,9 +601,9 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     // The drift is a velocity: the offset is a pure function of the timeline second, so a seek lands where play would.
     const glm::vec3 offset = c.drift * static_cast<float>(std::fmod(now, 100000.0));
     u.drift = glm::vec4(offset, static_cast<float>(now));
-    // a golden-ratio sequence over the frame nonce: every frame a different slice of the step, evenly spread
-    const float jitter = static_cast<float>(std::fmod(static_cast<double>(f.time.frameNonce()) * 0.6180339887, 1.0));
-    u.frameInfo = glm::vec4(jitter, historyUsable ? std::clamp(c.temporal, 0.0f, 0.97f) : 0.0f,
+    // ADR-2111: two per-frame jitters (the march's step offset, the light taps' offset) from the frame nonce
+    const glm::vec2 jitter = cloudFrameJitter(f.time.frameNonce());
+    u.frameInfo = glm::vec4(jitter.x, historyUsable ? std::clamp(c.temporal, 0.0f, 0.97f) : 0.0f,
                             static_cast<float>(mw), static_cast<float>(mh));
     u.prevViewProj = historyUsable ? lastViewProj_ : f.viewProj;
     for (std::size_t i = 0; i < glowCount; ++i) {
@@ -615,7 +627,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.glowShape = glm::vec4(c.glowBreakup, c.glowShadow, c.glowBreakupScale, c.glowShadowDistance); // ADR-2104
     u.farGrid = glm::vec4(farBins_.origin, farBins_.cellSize, static_cast<float>(farBins_.nx));
     u.farGrid2 = glm::vec4(static_cast<float>(farBins_.nz), farBins_.yLo, farBins_.yHi, farOn_ ? 1.0f : 0.0f);
-    u.heroSpan = glm::vec4(heroYLo_, heroYHi_, static_cast<float>(farWordBase_), 0.0f);
+    u.heroSpan = glm::vec4(heroYLo_, heroYHi_, static_cast<float>(farWordBase_), jitter.y); // ADR-2111: w = light jitter
     u.erosion = glm::vec4(c.erosion, c.erosionScale, c.erosionDetail, c.erosionCurl); // ADR-2106
     u.erosion2 = glm::vec4(static_cast<float>(c.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
                            c.erosionFlatten);

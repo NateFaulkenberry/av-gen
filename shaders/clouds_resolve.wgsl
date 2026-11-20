@@ -79,6 +79,8 @@ fn fs_cloud_resolve(in: VsOut) -> @location(0) vec4<f32> {
     let zc = textureLoad(cloudMarchDepth, ip, 0).g;
     var sum = cur * 4.0;
     var wsum = 4.0;
+    var m1 = cur;        // ADR-2111: the neighbourhood's moments, for a variance clip of the history
+    var m2 = cur * cur;
     for (var dy = -1; dy <= 1; dy = dy + 1) {
         for (var dx = -1; dx <= 1; dx = dx + 1) {
             if (dx == 0 && dy == 0) {
@@ -88,6 +90,8 @@ fn fs_cloud_resolve(in: VsOut) -> @location(0) vec4<f32> {
             let c = textureLoad(cloudColour, q, 0);
             lo = min(lo, c);
             hi = max(hi, c);
+            m1 = m1 + c;
+            m2 = m2 + c * c;
             let zq = textureLoad(cloudMarchDepth, q, 0).g;
             if (abs(zq - zc) <= 0.08 * max(zc, 1.0)) {
                 let w = select(1.0, 2.0, dx == 0 || dy == 0);
@@ -112,7 +116,14 @@ fn fs_cloud_resolve(in: VsOut) -> @location(0) vec4<f32> {
     if (any(puv < vec2<f32>(0.0)) || any(puv > vec2<f32>(1.0))) {
         return cur;
     }
-    let hist = clamp(textureSampleLevel(cloudAux, cloudClamp, puv, 0.0), lo, hi);
+    // ADR-2111: the history is clipped to the neighbourhood's mean +- 1.25 sigma (inside its min/max), not to the
+    // min/max alone: where a cloud came out from behind a nearer one, the min/max box held the frame's jittered
+    // extremes and the history was snapped to one or the other per pixel -- a stipple that took five frames to settle
+    let mean = m1 / 9.0;
+    let sigma = sqrt(max(m2 / 9.0 - mean * mean, vec4<f32>(0.0)));
+    let vlo = max(lo, mean - 1.25 * sigma);
+    let vhi = min(hi, mean + 1.25 * sigma);
+    let hist = clamp(textureSampleLevel(cloudAux, cloudClamp, puv, 0.0), vlo, vhi);
     return mix(curF, hist, weight);
 }
 

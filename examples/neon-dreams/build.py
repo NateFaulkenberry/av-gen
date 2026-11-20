@@ -559,7 +559,9 @@ CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseA
 # iteration 8: the cloud march's cost knobs, by quality. "offline" is the look every render so far was judged on; "live"
 # is the 1080p30 soft target's preset (build.py --quality live writes neon-dreams-live.{scene.json,json} beside it)
 CLOUD_QUALITY = {
-    "offline": {"steps": 72, "lightSteps": 6, "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02,
+    # iteration 9 (ADR-2111): 72 -> 128 steps. Leaving the Veil's plug, the rays spent their 72 on the plug and ended
+    # before the cloud beyond it, each pixel a jittered step short or long: that cloud came in as a stipple for 0.2 s
+    "offline": {"steps": 128, "lightSteps": 6, "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02,
                 "erosionOctaves": 3},
     # iteration 8, measured (--live-profile headless, 1080p, Medium): 31-42 ms against 80-115 ms for the offline preset
     # at Ultra. The march at 0.4 resolution, 40 steps growing 3.5 % of the distance, three light taps, two erosion octaves

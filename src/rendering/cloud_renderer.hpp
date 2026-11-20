@@ -47,6 +47,10 @@ inline constexpr std::uint32_t kMaxBinCellsPerSide = 128; // ADR-2105 (was 64)
 inline constexpr std::uint32_t kBinCountMask = 0xFFu;
 [[nodiscard]] CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes);
 
+// ADR-2111: the march's per-frame jitters from FrameTime::frameNonce (x = the step offset, y = the light taps'),
+// each a low-discrepancy sequence per FRAME at 24, 30 and 60 fps (public for the unit test).
+[[nodiscard]] glm::vec2 cloudFrameJitter(std::uint32_t frameNonce);
+
 // ADR-2100: the tiling shape-noise volume, kCloudNoiseSize^3 RGBA8 (R Perlin-Worley, G Worley fbm at 4/8/16 cells,
 // B at 8/16/32, A Perlin fbm). Deterministic; built once per process.
 inline constexpr std::uint32_t kCloudNoiseSize = 64;

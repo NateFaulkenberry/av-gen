@@ -631,6 +631,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
     // interleaved gradient noise, rotated each frame by the golden-ratio jitter
     let ign = fract(52.9829189 * fract(dot(in.clip.xy, vec2<f32>(0.06711056, 0.00583715))));
     let jitter = fract(ign + cu.frameInfo.x);
+    let ign2 = fract(52.9829189 * fract(dot(in.clip.yx + vec2<f32>(11.0, 5.0), vec2<f32>(0.06711056, 0.00583715))));
     let L = cu.light.xyz;
     let cosT = dot(rd, L);
     let phase = mix(cPhase(cosT, cu.lightColor.w), cPhase(cosT, -0.25), 0.25) * 12.566371;
@@ -662,7 +663,10 @@ fn fs_clouds(in: VsOut) -> MarchOut {
             db.base = legacyDensity(p, 4u); // ADR-2109
         }
         if (db.base > 0.0) {
-            let dens = select(detailErode(p, db.base), db.base, even);
+            // ADR-2111: the cloud within two minimum steps of the eye fades out: there the reprojection has nothing to
+            // hold (parallax of metres a frame) and a fast camera leaving a cloud saw its last metres as a stipple
+            let dens = select(detailErode(p, db.base), db.base, even) *
+                       select(smoothstep(0.0, 2.0 * minStep, t), 1.0, even);
             if (dens > 0.003) {
                 // the key's light reaching this point (the light march reads the undetailed density)
                 var od = 0.0;
@@ -688,7 +692,10 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     // shadows its neighbour; sparse far out), jittered per pixel and frame so the temporal resolve
                     // integrates between them. Even taps of tens of metres read the shadow as hard silhouettes of
                     // whole lobes cast on the cloud below (the dark blotches of Neon Dreams iteration 6).
-                    let lj = 0.5 + 0.35 * (fract(cu.frameInfo.x * 2.0 + 0.37) - 0.5); // per frame only: a per-pixel jitter left a screen-door
+                    // ADR-2111: per pixel (a second interleaved-gradient pattern, transposed so it does not follow the
+                    // step jitter) plus the frame's own low-discrepancy offset. One value for the whole frame was a slow
+                    // ramp at 30 fps that every cloud's shadow followed and snapped back from three times a second.
+                    let lj = 0.5 + 0.35 * (fract(ign2 + cu.heroSpan.w) - 0.5);
                     let n = f32(lightSteps);
                     var prevS = 0.0;
                     for (var j = 0u; j < lightSteps; j = j + 1u) {
