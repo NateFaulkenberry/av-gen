@@ -429,6 +429,11 @@ struct SkinnedRig {
     // ADR-2116: set by `updateRigs` to the rig whose palette this one adopted this frame (-1: its own).
     // The skinning renderer draws both from one slice when their palettes are also equal last frame.
     std::int32_t sharedFrom = -1;
+    // ADR-2117: seconds this rig's clips run behind the timeline (a crowd's `lag`); 0 = on the timeline.
+    double clockLag = 0.0;
+    // ADR-2117: whether any layer has a non-zero weight (a stack of idle layers leaves the clip's pose alone, so
+    // the pose can still be shared).
+    [[nodiscard]] bool layersActive() const;
     // Declares a transport discontinuity: the next `evaluate` reports no motion rather than motion
     // across the jump. Idempotent, and cheap enough to call on every rig at every seek.
     void reseedAfterDiscontinuity() { reseedPrevious = true; }

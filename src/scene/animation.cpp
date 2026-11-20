@@ -584,8 +584,17 @@ RootMotionSample SkinnedRig::rootMotionAt(double now) const {
     return sample;
 }
 
+bool SkinnedRig::layersActive() const {
+    for (const PoseLayer& layer : layers.layers()) {
+        if (layer.weight > 0.0f || layer.weightBefore > 0.0f) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::uint64_t SkinnedRig::poseKey(double now, float hz) const {
-    if (!semanticsCache || !layers.empty() || !rootMotion.empty() || hasExternalPose || !player.active() ||
+    if (!semanticsCache || layersActive() || !rootMotion.empty() || hasExternalPose || !player.active() ||
         reseedPrevious) {
         return 0;
     }
@@ -752,16 +761,17 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
         }
         // ADR-2116: a rig whose pose is the same as one already posed this frame adopts it.
         rig.sharedFrom = -1;
-        const std::uint64_t key = rig.poseKey(time.renderTime, hz);
+        const double now = time.renderTime - rig.clockLag; // ADR-2117: a crowd's clips may run behind
+        const std::uint64_t key = rig.poseKey(now, hz);
         if (key != 0) {
             const auto found = posedBy.find(key);
             if (found != posedBy.end()) {
                 const SkinnedRig& source = scene.rigs[found->second];
-                const double t = SkinnedRig::sampleTime(time.renderTime, hz);
+                const double t = SkinnedRig::sampleTime(now, hz);
                 if (source.semanticsCache == rig.semanticsCache && source.paletteTime == t &&
                     source.player.currentStateIndex() == rig.player.currentStateIndex() &&
                     source.player.stateTime(source.clips, t) == rig.player.stateTime(rig.clips, t)) {
-                    if (rig.adoptPose(source, time.renderTime, hz)) {
+                    if (rig.adoptPose(source, now, hz)) {
                         rig.sharedFrom = static_cast<std::int32_t>(found->second);
                         ++stats.posed;
                         ++stats.shared;
@@ -773,7 +783,7 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
                 }
             }
         }
-        if (rig.evaluate(time.renderTime, hz)) {
+        if (rig.evaluate(now, hz)) {
             if (key != 0) {
                 posedBy.emplace(key, i);
             }

@@ -188,6 +188,10 @@ struct NodeAnimation {
     // one clip is not in step. Only the scene file's opening state has it; a state a behaviour, a cue or
     // the sequencer asks for later starts when it is asked for, as before.
     float phase = 0.0f;
+    // ADR-2117: the crowd this body listens with (`crowds/<name>/look`, `sway`, `lag`, `lookTarget`), and how much
+    // of the crowd's look it takes (0..1). "" = none.
+    std::string crowd;
+    float crowdWeight = 1.0f;
     // ---- the distance ladder, all four rungs authorable ----------------------------------------
     float updateHz = 0.0f;       // pose rate ceiling; 0 = every frame when near the camera
     float nearDistance = 15.0f;  // nearer than this: posed every frame (subject to updateHz)
@@ -229,7 +233,7 @@ struct NodeAnimation {
     // Empty is the default and 163 of the 168 clips this project loads will keep it.
     std::vector<RootMotionSpec> rootMotion;
     [[nodiscard]] bool authored() const {
-        return !state.empty() || blend >= 0.0f || speed != 1.0f || phase != 0.0f || updateHz != 0.0f ||
+        return !state.empty() || blend >= 0.0f || speed != 1.0f || phase != 0.0f || !crowd.empty() || updateHz != 0.0f ||
                nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f ||
                !layers.empty() || !rootMotion.empty();
     }
@@ -2129,6 +2133,19 @@ private:
     double currentTime_ = 0.0;
     void updateCharacters(const FrameTime& time); // ADR-086
     RigStats rigStats_;   // ADR-086: what the last update() spent posing skinned characters
+    // ADR-2117: one parameter set per crowd the nodes name. `look` (0..1) weights every member's "crowd-look" aim
+    // layer toward `lookTarget` (world); `sway` (0..1) weights its "crowd-sway" layers; `lag` (seconds) is how far
+    // its clips run behind the timeline -- a timeline track of it is a seek-safe slow-down (its slope is 1 - speed).
+    struct CrowdParams {
+        std::string name;
+        params::Parameter<float>* look = nullptr;
+        params::Parameter<float>* sway = nullptr;
+        params::Parameter<float>* lag = nullptr;
+        params::Parameter<glm::vec3>* lookTarget = nullptr;
+    };
+    std::vector<CrowdParams> crowds_;
+    void registerCrowdParameters(params::ParameterSet& params);
+    void driveCrowds();
     // ADR-551. `terrainGround_` adapts this composition's own terrain to `IGroundQuery`;
     // `groundQuery_` is what the layers actually ask, and is null until something installs one.
     class TerrainGroundQuery final : public IGroundQuery {

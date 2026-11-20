@@ -123,3 +123,65 @@ TEST_CASE("the opening phase survives a save and reload", "[scene][composition][
     REQUIRE(again.has_value());
     CHECK((*again)->findNode("a")->animation.phase == 0.4f);
 }
+
+namespace {
+
+nlohmann::json listener(const std::string& name, float x) {
+    nlohmann::json n = alienNode(name, x, "Walk", 1.0f, 0.0f);
+    n["animation"]["crowd"] = "town";
+    n["animation"]["layers"] = nlohmann::json::array(
+        {{{"name", "crowd-look"}, {"kind", "aim"}, {"drive", "manual"},
+          {"joints", {"mixamorig:Head", "mixamorig:HeadTop_End"}}, {"pivot", "mixamorig:Head"}, {"maxYaw", 60.0}},
+         {{"name", "crowd-sway"}, {"kind", "secondary"}, {"drive", "manual"},
+          {"joints", {"mixamorig:Spine", "mixamorig:Spine1", "mixamorig:Spine2"}}, {"degrees", 4.0}, {"period", 1.32}}});
+    return n;
+}
+
+} // namespace
+
+TEST_CASE("a crowd turns its heads, sways and runs behind the timeline by its parameters", "[scene][animation][adr2117]") {
+    if (!std::filesystem::is_regular_file(charactersDir() / "../../assets/imported/alien.gltf")) {
+        SKIP("the imported alien is not present");
+    }
+    auto c = crowd(nlohmann::json::array({listener("a", -1.0f), listener("b", 1.0f)}));
+    auto ref = crowd(nlohmann::json::array({alienNode("a", -1.0f, "Walk", 1.0f, 0.0f)}));
+    FrameTime time;
+    time.renderTime = 0.5;
+    // Idle parameters: the layers do nothing, so the two share a pose and match a plain walker.
+    c->composition->update(time);
+    ref->composition->update(time);
+    CHECK(c->composition->rigStats().shared == 1);
+    CHECK(rigOf(*c->composition, "a").palette == rigOf(*ref->composition, "a").palette);
+
+    // The crowd looks at a point well off to one side: the heads move, the poses are their own.
+    auto* look = c->parameters.findAs<float>("crowds/town/look");
+    auto* target = c->parameters.findAs<glm::vec3>("crowds/town/lookTarget");
+    auto* lag = c->parameters.findAs<float>("crowds/town/lag");
+    REQUIRE(look != nullptr);
+    REQUIRE(target != nullptr);
+    REQUIRE(lag != nullptr);
+    look->setBase(1.0f);
+    target->setBase({-20.0f, 1.0f, 3.0f});
+    c->parameters.resetFinals();
+    time.renderTime = 0.55;
+    c->composition->update(time);
+    CHECK(c->composition->rigStats().shared == 0);
+    const auto layered = rigOf(*c->composition, "a").palette;
+    look->setBase(0.0f);
+    c->parameters.resetFinals();
+    time.renderTime = 0.6;
+    c->composition->update(time);
+    time.renderTime = 0.55;
+    c->composition->update(time);
+    CHECK(rigOf(*c->composition, "a").palette != layered);
+
+    // A lag of 0.3 s: the clips are where an unlagged body was 0.3 s earlier.
+    lag->setBase(0.3f);
+    c->parameters.resetFinals();
+    time.renderTime = 1.0;
+    c->composition->update(time);
+    FrameTime earlier;
+    earlier.renderTime = 0.7;
+    ref->composition->update(earlier);
+    CHECK(rigOf(*c->composition, "a").palette == rigOf(*ref->composition, "a").palette);
+}

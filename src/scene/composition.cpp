@@ -5599,6 +5599,7 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
     for (auto& node : nodes_) {
         registerNodeParameters(*node);
     }
+    registerCrowdParameters(params); // ADR-2117
     // ADR-1122: each simulated grid's behaviour (its layout stays in the file).
     gridParams_.clear();
     for (const spatial::GridField& g : grids_) {
@@ -8992,7 +8993,79 @@ void Composition::updateCharacters(const FrameTime& time) {
         }
         node.animationPushed = true; // whether or not it landed: do not warn again every frame
     }
+    driveCrowds(); // ADR-2117
     rigStats_ = updateRigs(scene_, time);
+}
+
+// ADR-2117: a crowd's parameters, one set per name the nodes use.
+void Composition::registerCrowdParameters(params::ParameterSet& params) {
+    for (const CrowdParams& c : crowds_) {
+        for (const char* leaf : {"look", "sway", "lag", "lookTarget"}) {
+            params.remove(prefix_ + "crowds/" + c.name + "/" + leaf);
+        }
+    }
+    crowds_.clear();
+    for (const auto& np : nodes_) {
+        const std::string& name = np->animation.crowd;
+        if (name.empty() || std::any_of(crowds_.begin(), crowds_.end(), [&](const CrowdParams& c) { return c.name == name; })) {
+            continue;
+        }
+        const std::string base = prefix_ + "crowds/" + name + "/";
+        CrowdParams c;
+        c.name = name;
+        c.look = &params.add(floatDesc(base + "look", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+        c.sway = &params.add(floatDesc(base + "sway", 0.0f, 0.0f, 1.0f, 0.0f, 1.0f));
+        c.lag = &params.add(floatDesc(base + "lag", 0.0f, -600.0f, 600.0f, 0.0f, 10.0f));
+        c.lookTarget = &params.add(vec3Desc(base + "lookTarget", glm::vec3(0.0f), -1e5f, 1e5f, -1e3f, 1e3f));
+        crowds_.push_back(c);
+    }
+}
+
+// ADR-2117: hand each member's rig its crowd's clock lag and its "crowd-look" / "crowd-sway" layers their weights and
+// the look target (in the rig's own frame). A pure function of this frame's parameters: nothing is remembered.
+void Composition::driveCrowds() {
+    if (crowds_.empty()) {
+        return;
+    }
+    for (const auto& np : nodes_) {
+        CompositionNode& node = *np;
+        if (node.animation.crowd.empty() || node.rigs.empty()) {
+            continue;
+        }
+        const auto it = std::find_if(crowds_.begin(), crowds_.end(),
+                                     [&](const CrowdParams& c) { return c.name == node.animation.crowd; });
+        if (it == crowds_.end()) {
+            continue;
+        }
+        const float look = std::clamp(it->look->value(), 0.0f, 1.0f) * std::clamp(node.animation.crowdWeight, 0.0f, 1.0f);
+        const float sway = std::clamp(it->sway->value(), 0.0f, 1.0f);
+        const float lag = it->lag->value();
+        glm::vec3 localTarget(0.0f);
+        if (look > 0.0f) {
+            const glm::mat4 world = nodeWorldTransform(node).matrix();
+            localTarget = glm::vec3(glm::inverse(world) * glm::vec4(it->lookTarget->value(), 1.0f));
+        }
+        for (const RigId id : node.rigs) {
+            if (id >= scene_.rigs.size()) {
+                continue;
+            }
+            SkinnedRig& rig = scene_.rigs[id];
+            rig.clockLag = static_cast<double>(lag);
+            for (PoseLayer& layer : rig.layers.layers()) {
+                if (layer.name == "crowd-look") {
+                    layer.weight = look;
+                    layer.weightBefore = look;
+                    layer.blendSeconds = 0.0f;
+                    layer.target = localTarget;
+                    layer.hasTarget = look > 0.0f;
+                } else if (layer.name == "crowd-sway") {
+                    layer.weight = sway;
+                    layer.weightBefore = sway;
+                    layer.blendSeconds = 0.0f;
+                }
+            }
+        }
+    }
 }
 
 Composition::ClipReadout Composition::clipReadout(const std::string& nodeName, double now) const {
@@ -12177,6 +12250,12 @@ nlohmann::json Composition::toJson() const {
             if (node.animation.phase != 0.0f) {
                 anim["phase"] = node.animation.phase; // ADR-2116
             }
+            if (!node.animation.crowd.empty()) { // ADR-2117
+                anim["crowd"] = node.animation.crowd;
+                if (node.animation.crowdWeight != 1.0f) {
+                    anim["crowdWeight"] = node.animation.crowdWeight;
+                }
+            }
             if (node.animation.updateHz != 0.0f) {
                 anim["updateHz"] = node.animation.updateHz;
             }
@@ -14234,7 +14313,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ladder read as configured in the file while being a single rung in the engine.
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
-                    "state", "blend",        "speed",  "phase", "updateHz",  "nearDistance",
+                    "state", "blend",        "speed",  "phase", "crowd", "crowdWeight", "updateHz",  "nearDistance",
                     "farHz",   "cullDistance", "layers",    "rootMotion",
                     "bodyCompensation", "contacts", "contactMode", "matchPhase", "inertialize"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
@@ -14243,6 +14322,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 node.animation.blend = *blend;
                 node.animation.speed = *speed;
                 node.animation.phase = *phase;
+                node.animation.crowd = anim.value("crowd", std::string()); // ADR-2117
+                node.animation.crowdWeight = anim.value("crowdWeight", 1.0f);
                 node.animation.updateHz = *hz;
                 node.animation.nearDistance = *near;
                 node.animation.farHz = *farHz;
