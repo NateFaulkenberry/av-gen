@@ -440,7 +440,7 @@ def cloud_beams(state="uv"):
 # glows the beams replace (the layout's cloud_glow stand-ins for the lighthouse beams)
 BEAM_STANDINS = {"harbour_light", "outer_light", "break_light"}
 # the Condensery's keel glow lit one lobe of its column into a pink ball under the platform at the reveal
-GLOW_SCALE = {"condensery_keel": 0.35}
+GLOW_SCALE = {"condensery_keel": 0.35, "condensery_throats": 1.4}
 
 
 def clouds_block(state="uv", moon_dir=None):
@@ -478,7 +478,7 @@ def clouds_block(state="uv", moon_dir=None):
                 "farFade": 0.35,
                 "breaks": [{"centre": br["centre"], "radius": br["radius"], "elongation": br["elongation"],
                             "yaw": br["yaw_rad"]}]},
-        "glows": glows, "glowGain": CLOUD_LOOK["glowGain"], "glowOcclusion": 1.6,
+        "glows": glows, "glowGain": CLOUD_LOOK["glowGain"], "glowOcclusion": CLOUD_LOOK["glowOcclusion"],
         # ADR-2104: the glows light the cloud's structure (pockets and the billows facing them), not spheres
         "glowBreakup": CLOUD_LOOK["glowBreakup"], "glowShadow": CLOUD_LOOK["glowShadow"],
         "glowBreakupScale": 0.014, "glowShadowDistance": 16.0,
@@ -507,6 +507,9 @@ def clouds_block(state="uv", moon_dir=None):
 CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.35, "lightDistance": 260.0, "ambientTop": 0.25,
               "ambientBottom": 0.06, "warm": 0.15, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
               "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2,
+              # iteration 6: occlusion is per metre of extinction, so at 7.5x the extinction 1.6 buried every glow
+              # inside its own cloud (the Condensery's wells read black); 0.4 lets the throats underlight the pedestal
+              "glowOcclusion": 0.4,
               # iteration 6: the art's cloud design v3 is built for 0.15 ("designed_for"); at 0.02 every formation
               # read as fog
               "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
