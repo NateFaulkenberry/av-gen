@@ -35,7 +35,7 @@ PLAZA = (-102.0, -6.0, 131.2)
 PIER_ROOT, PIER_DIR = (-118.0, -26.0, 131.2), (-0.8211, -0.5708)          # the pier runs south-west for 250 m, then breaks
 GARDEN = (140.0, -34.0, 121.6)
 HEAD, VEIL, FORE = (0.0, 262.0), (345.0, -45.0), (-120.0, -330.0)           # the cumulus towers around the Mooring (the Veil sits on the line from the approach to the Condensery)
-CONDENSERY, CONDENSERY_YAW = (2050.0, 450.0, 250.0), 0.3 - math.radians(60.0)      # turned 60 degrees (engine, iteration 4): seen from the reveal the stacks stand apart instead of in one line
+CONDENSERY, CONDENSERY_YAW = (2050.0, 450.0, 215.0), 0.3 - math.radians(60.0)      # turned 60 degrees (engine, iteration 4): seen from the reveal the stacks stand apart instead of in one line
 LONE_LAMP = (746.0, -563.0, 205.0)        # iteration 6: was (900, -300, 96), 2 degrees from the Outer Light as the approach sees it and level with the sea's crests. Now 11 degrees right of the Outer Light and 110 m higher, on a cloud of its own that touches nothing ((882, -478) was tried: from the approach it stood in front of Highwater's lights)
 # iteration 6: a third settlement, never reached: glimpsed on the right of the reveal, 2.2 km out, at the horizon, half behind its own cloud
 HIGHWATER, HIGHWATER_YAW = (2850.0, -480.0, 196.0), math.radians(-14.0)
@@ -67,8 +67,11 @@ _QUAY_KEYS = [(31.0, -92, 140.0), (35.75, -30, 137.0), (41.75, 40, 133.5), (43.6
 # ocean break, easing a few degrees to the left over the last seconds so the works holds its place: the Condensery stands
 # on the left third against the moon's limb, the break opens below right, and the horizon sits above the middle of the
 # frame. The camera still only looks where it travels.
-_LEAVE = [(45.0, 95, -17.0, 133.5), (46.2, 125, -26, 137.5), (47.0, 150, -30, 139.5), (50.5, 290, -5, 175), (54.4, 470, 30, 214),
-          (56.88, 578, 44, 229), (58.95, 653, 51, 232.5), (66.5, 819, 66, 224.5), (70.2, 849, 69.5, 223)]
+# Iteration 9 (owner msg 103): the dive stays low. The Veil is now a low flat bank (crown 205 m) the camera descends
+# into, not a tower it climbs through: 50.5 s at 158 (was 175), 54.4 s at 186 (214), out at 56.88 s at 206 (229), the
+# reveal a little lower (226, was 232.5).
+_LEAVE = [(45.0, 95, -17.0, 133.5), (46.2, 125, -26, 137.5), (47.0, 150, -30, 139.5), (50.5, 290, -5, 158), (54.4, 470, 30, 186),
+          (56.88, 578, 44, 206), (58.95, 653, 51, 226), (66.5, 819, 66, 220), (70.2, 849, 69.5, 219)]
 
 
 def _quay_path():

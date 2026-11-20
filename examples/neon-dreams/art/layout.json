@@ -3390,7 +3390,7 @@
     "kind": "stand",
     "pos": [
      1999.99,
-     250.0,
+     215.0,
      -425.445
     ],
     "facing_deg": 250,
@@ -3413,7 +3413,7 @@
     "kind": "stand",
     "pos": [
      2005.75,
-     250.0,
+     215.0,
      -422.834
     ],
     "facing_deg": 280,
@@ -3436,7 +3436,7 @@
     "kind": "stand",
     "pos": [
      2094.556,
-     250.0,
+     215.0,
      -395.093
     ],
     "facing_deg": 20,
@@ -18434,7 +18434,7 @@
    "asset": "condensery/cond_platform.glb",
    "pos": [
     2050.0,
-    250.0,
+    215.0,
     -450.0
    ],
    "rot_y_deg": -42.811,
@@ -18464,7 +18464,7 @@
    "asset": "condensery/cond_stack_a.glb",
    "pos": [
     2016.966,
-    250.0,
+    215.0,
     -499.686
    ],
    "rot_y_deg": -19.893,
@@ -18487,7 +18487,7 @@
    "asset": "condensery/cond_stack_b.glb",
    "pos": [
     2068.92,
-    250.0,
+    215.0,
     -473.367
    ],
    "rot_y_deg": -19.893,
@@ -18510,7 +18510,7 @@
    "asset": "condensery/cond_stack_c.glb",
    "pos": [
     2089.506,
-    250.0,
+    215.0,
     -416.129
    ],
    "rot_y_deg": -19.893,
@@ -18533,7 +18533,7 @@
    "asset": "condensery/cond_sphere_tank.glb",
    "pos": [
     2144.566,
-    250.0,
+    215.0,
     -419.648
    ],
    "rot_y_deg": 14.485,
@@ -18556,7 +18556,7 @@
    "asset": "condensery/cond_sphere_tank.glb",
    "pos": [
     2138.635,
-    250.0,
+    215.0,
     -389.701
    ],
    "rot_y_deg": 14.485,
@@ -18579,7 +18579,7 @@
    "asset": "condensery/cond_shed_a.glb",
    "pos": [
     1971.681,
-    250.0,
+    215.0,
     -462.574
    ],
    "rot_y_deg": 137.189,
@@ -18609,7 +18609,7 @@
    "asset": "condensery/cond_shed_b.glb",
    "pos": [
     2001.241,
-    250.0,
+    215.0,
     -429.738
    ],
    "rot_y_deg": 137.189,
@@ -18639,7 +18639,7 @@
    "asset": "condensery/cond_shed_a.glb",
    "pos": [
     2032.16,
-    250.0,
+    215.0,
     -398.369
    ],
    "rot_y_deg": 137.189,
@@ -18669,7 +18669,7 @@
    "asset": "condensery/cond_shed_b.glb",
    "pos": [
     2064.222,
-    250.0,
+    215.0,
     -374.12
    ],
    "rot_y_deg": 137.189,
@@ -18699,7 +18699,7 @@
    "asset": "condensery/cond_flare_mast.glb",
    "pos": [
     2000.673,
-    250.0,
+    215.0,
     -555.673
    ],
    "rot_y_deg": 0.0,
@@ -18722,7 +18722,7 @@
    "asset": "condensery/cond_crane.glb",
    "pos": [
     2099.412,
-    250.0,
+    215.0,
     -360.605
    ],
    "rot_y_deg": -60.0,
@@ -18752,7 +18752,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1945.238,
-    254.0,
+    219.0,
     -515.697
    ],
    "rot_y_deg": 154.714,
@@ -18775,7 +18775,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1927.222,
-    253.7,
+    218.7,
     -524.207
    ],
    "rot_y_deg": 154.714,
@@ -18798,7 +18798,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1909.206,
-    253.4,
+    218.4,
     -532.718
    ],
    "rot_y_deg": 154.714,
@@ -18821,7 +18821,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1891.19,
-    253.1,
+    218.1,
     -541.229
    ],
    "rot_y_deg": 154.714,
@@ -18844,7 +18844,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1873.174,
-    252.8,
+    217.8,
     -549.739
    ],
    "rot_y_deg": 154.714,
@@ -18867,7 +18867,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1855.158,
-    252.5,
+    217.5,
     -558.25
    ],
    "rot_y_deg": 154.714,
@@ -18890,7 +18890,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1837.143,
-    252.2,
+    217.2,
     -566.76
    ],
    "rot_y_deg": 154.714,
@@ -18913,7 +18913,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1819.127,
-    251.9,
+    216.9,
     -575.271
    ],
    "rot_y_deg": 154.714,
@@ -18936,7 +18936,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1801.111,
-    251.6,
+    216.6,
     -583.781
    ],
    "rot_y_deg": 154.714,
@@ -18959,7 +18959,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1783.095,
-    251.3,
+    216.3,
     -592.292
    ],
    "rot_y_deg": 154.714,
@@ -18982,7 +18982,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1765.079,
-    251.0,
+    216.0,
     -600.802
    ],
    "rot_y_deg": 154.714,
@@ -19005,7 +19005,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1747.063,
-    250.7,
+    215.7,
     -609.313
    ],
    "rot_y_deg": 154.714,
@@ -19028,7 +19028,7 @@
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1729.047,
-    250.4,
+    215.4,
     -617.824
    ],
    "rot_y_deg": 154.714,
@@ -19051,7 +19051,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1925.595,
-    250.0,
+    215.0,
     -483.457
    ],
    "rot_y_deg": 47.189,
@@ -19074,7 +19074,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1938.461,
-    250.0,
+    215.0,
     -471.538
    ],
    "rot_y_deg": 47.189,
@@ -19097,7 +19097,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1951.327,
-    250.0,
+    215.0,
     -459.619
    ],
    "rot_y_deg": 47.189,
@@ -19120,7 +19120,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1964.193,
-    250.0,
+    215.0,
     -447.7
    ],
    "rot_y_deg": 47.189,
@@ -19143,7 +19143,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1977.059,
-    250.0,
+    215.0,
     -435.781
    ],
    "rot_y_deg": 47.189,
@@ -19166,7 +19166,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1989.926,
-    250.0,
+    215.0,
     -423.863
    ],
    "rot_y_deg": 47.189,
@@ -19189,7 +19189,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2002.792,
-    250.0,
+    215.0,
     -411.944
    ],
    "rot_y_deg": 47.189,
@@ -19212,7 +19212,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2015.658,
-    250.0,
+    215.0,
     -400.025
    ],
    "rot_y_deg": 47.189,
@@ -19235,7 +19235,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2028.524,
-    250.0,
+    215.0,
     -388.106
    ],
    "rot_y_deg": 47.189,
@@ -19258,7 +19258,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2041.39,
-    250.0,
+    215.0,
     -376.187
    ],
    "rot_y_deg": 47.189,
@@ -19281,7 +19281,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2054.256,
-    250.0,
+    215.0,
     -364.268
    ],
    "rot_y_deg": 47.189,
@@ -19304,7 +19304,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2067.123,
-    250.0,
+    215.0,
     -352.349
    ],
    "rot_y_deg": 47.189,
@@ -19327,7 +19327,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2079.989,
-    250.0,
+    215.0,
     -340.43
    ],
    "rot_y_deg": 47.189,
@@ -19350,7 +19350,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2174.405,
-    250.0,
+    215.0,
     -416.543
    ],
    "rot_y_deg": -132.811,
@@ -19373,7 +19373,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2161.539,
-    250.0,
+    215.0,
     -428.462
    ],
    "rot_y_deg": -132.811,
@@ -19396,7 +19396,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2148.673,
-    250.0,
+    215.0,
     -440.381
    ],
    "rot_y_deg": -132.811,
@@ -19419,7 +19419,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2135.807,
-    250.0,
+    215.0,
     -452.3
    ],
    "rot_y_deg": -132.811,
@@ -19442,7 +19442,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2122.941,
-    250.0,
+    215.0,
     -464.219
    ],
    "rot_y_deg": -132.811,
@@ -19465,7 +19465,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2110.074,
-    250.0,
+    215.0,
     -476.137
    ],
    "rot_y_deg": -132.811,
@@ -19488,7 +19488,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2097.208,
-    250.0,
+    215.0,
     -488.056
    ],
    "rot_y_deg": -132.811,
@@ -19511,7 +19511,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2084.342,
-    250.0,
+    215.0,
     -499.975
    ],
    "rot_y_deg": -132.811,
@@ -19534,7 +19534,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2071.476,
-    250.0,
+    215.0,
     -511.894
    ],
    "rot_y_deg": -132.811,
@@ -19557,7 +19557,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2058.61,
-    250.0,
+    215.0,
     -523.813
    ],
    "rot_y_deg": -132.811,
@@ -19580,7 +19580,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2045.744,
-    250.0,
+    215.0,
     -535.732
    ],
    "rot_y_deg": -132.811,
@@ -19603,7 +19603,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2032.877,
-    250.0,
+    215.0,
     -547.651
    ],
    "rot_y_deg": -132.811,
@@ -19626,7 +19626,7 @@
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2020.011,
-    250.0,
+    215.0,
     -559.57
    ],
    "rot_y_deg": -132.811,
@@ -37975,7 +37975,7 @@
    "asset": "_thirdparty/isles/isle_rock_b.gltf",
    "pos": [
     2050.0,
-    243.0,
+    208.0,
     -450.0
    ],
    "rot_y_deg": -32.811,
@@ -37998,7 +37998,7 @@
    "asset": "garden/root_curtain_a.glb",
    "pos": [
     2111.472,
-    174.194,
+    139.194,
     -435.265
    ],
    "rot_y_deg": 333.55,
@@ -38024,7 +38024,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     2041.51,
-    192.812,
+    157.812,
     -476.943
    ],
    "rot_y_deg": 116.468,
@@ -38050,7 +38050,7 @@
    "asset": "garden/root_curtain_a.glb",
    "pos": [
     2108.268,
-    176.034,
+    141.034,
     -463.261
    ],
    "rot_y_deg": 315.958,
@@ -38076,7 +38076,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     2037.028,
-    196.166,
+    161.166,
     -432.291
    ],
    "rot_y_deg": 80.026,
@@ -38102,7 +38102,7 @@
    "asset": "garden/root_curtain_a.glb",
    "pos": [
     2031.224,
-    190.923,
+    155.923,
     -475.662
    ],
    "rot_y_deg": 135.462,
@@ -38128,7 +38128,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     2106.182,
-    175.65,
+    140.65,
     -472.39
    ],
    "rot_y_deg": 44.942,
@@ -38154,7 +38154,7 @@
    "asset": "garden/root_curtain_a.glb",
    "pos": [
     2041.768,
-    187.984,
+    152.984,
     -413.603
    ],
    "rot_y_deg": 23.053,
@@ -38180,7 +38180,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     2083.812,
-    187.9,
+    152.9,
     -466.159
    ],
    "rot_y_deg": 240.126,
@@ -38206,7 +38206,7 @@
    "asset": "garden/root_curtain_a.glb",
    "pos": [
     2042.173,
-    182.086,
+    147.086,
     -402.244
    ],
    "rot_y_deg": 143.29,
@@ -49941,7 +49941,7 @@
    "asset": 4.549944078309213,
    "centre": [
     2050.0,
-    243.0,
+    208.0,
     -450.0
    ],
    "width_m": 330.0,
@@ -50215,7 +50215,7 @@
    "kind": "plume",
    "pos": [
     2016.966,
-    370.0,
+    335.0,
     -499.686
    ],
    "radius_m": 13.76,
@@ -50235,7 +50235,7 @@
    "kind": "plume",
    "pos": [
     2068.92,
-    398.0,
+    363.0,
     -473.367
    ],
    "radius_m": 15.52,
@@ -50255,7 +50255,7 @@
    "kind": "plume",
    "pos": [
     2089.506,
-    352.0,
+    317.0,
     -416.129
    ],
    "radius_m": 12.64,
@@ -51431,7 +51431,7 @@
    "name": "cond_stack_a_throat",
    "pos": [
     2016.966,
-    380.0,
+    345.0,
     -499.686
    ],
    "key": "cond_a",
@@ -51444,7 +51444,7 @@
    "name": "cond_stack_b_throat",
    "pos": [
     2068.92,
-    408.0,
+    373.0,
     -473.367
    ],
    "key": "cond_a",
@@ -51457,7 +51457,7 @@
    "name": "cond_stack_c_throat",
    "pos": [
     2089.506,
-    362.0,
+    327.0,
     -416.129
    ],
    "key": "cond_a",
@@ -51470,7 +51470,7 @@
    "name": "cond_flare",
    "pos": [
     2000.673,
-    416.0,
+    381.0,
     -555.673
    ],
    "key": "cond_a",
@@ -51483,7 +51483,7 @@
    "name": "cond_yard",
    "pos": [
     2050.0,
-    264.0,
+    229.0,
     -450.0
    ],
    "key": "cond_a",
@@ -51496,7 +51496,7 @@
    "name": "cond_keel",
    "pos": [
     2030.0,
-    220.0,
+    185.0,
     -450.0
    ],
    "key": "cond_b",
@@ -52509,7 +52509,7 @@
     "t": 50.5,
     "pos": [
      290,
-     175,
+     158,
      5
     ]
    },
@@ -52517,7 +52517,7 @@
     "t": 54.4,
     "pos": [
      470,
-     214,
+     186,
      -30
     ]
    },
@@ -52525,7 +52525,7 @@
     "t": 56.88,
     "pos": [
      578,
-     229,
+     206,
      -44
     ]
    },
@@ -52533,7 +52533,7 @@
     "t": 58.95,
     "pos": [
      653,
-     232.5,
+     226,
      -51
     ]
    },
@@ -52541,7 +52541,7 @@
     "t": 66.5,
     "pos": [
      819,
-     224.5,
+     220,
      -66
     ]
    },
@@ -52549,7 +52549,7 @@
     "t": 70.2,
     "pos": [
      849,
-     223,
+     219,
      -69.5
     ]
    }

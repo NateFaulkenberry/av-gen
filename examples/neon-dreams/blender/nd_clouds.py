@@ -626,7 +626,7 @@ def deball(lobes, voids):
         cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; r = l["r"]; sx, sv, sz = l["scale"]
         dx, dy = cx - ref[0], cy - ref[1]; dist = math.hypot(dx, dy) or 1.0
         gm = (sx * sv * sz) ** (1.0 / 3.0)
-        if l.get("tag") == "plug" or min(sx, sv, sz) / max(sx, sv, sz) < 0.74 or r * gm < 30.0 or dist - r * gm > 150.0:
+        if l.get("tag") in ("plug", "plug_fade") or min(sx, sv, sz) / max(sx, sv, sz) < 0.74 or r * gm < 30.0 or dist - r * gm > 150.0:
             out.append(l); continue
         n += 1
         vx, vy, vz = cx - ref[0], cy - ref[1], cz - ref[2]; vn = math.sqrt(vx * vx + vy * vy + vz * vz) or 1.0
@@ -695,11 +695,26 @@ def veil():
     #    reach into a room is left out, so the turrets stand on the rooms' roofs
     #    (their centres stand 35 m to the left of the path, the Condensery's side: more cloud between the rooms and the
     #    works, and sky to the right of the wall as the camera leaves the Quay)
-    for (sm, top, rad, seed, turrets) in ((88, 215, 95, 321, 2), (220, 345, 170, 322, 4), (385, 300, 150, 323, 3)):
-        p, d, right, t = at(sm); p = (p[0] - right[0] * 35.0, p[1] - right[1] * 35.0, p[2])
-        for l in cumulus(seed, p[0], p[1], SEA_TOP - 20, top, rad, turrets=turrets, lean=0.05, shelves=((0.46, 1.0),), kids=(2, 3), detail=1, mist=False, rich=False):
+    # Iteration 9 (owner msgs 103, 105): the three cumulus turrets (to 345 m) were "a big puffy cloud thing to end the shot
+    # on" and their faces "too blobby". The bank is now LOW AND FLAT: a field of flattened lobes of three sizes whose tops
+    # wander 0 to 30 m under the crown, overlapping, so the top is a ragged shelf with dips, and torn low-density tatters
+    # drawn out along the wind on its top and at its near (west) face. No round heads.
+    wx, wy = WIND
+    for sm in range(-10, 470, 30):
+        p, d, right, t = at(sm)
+        for lat in range(-170, 150, 36):
+            lat_ = lat + rr.uniform(-10, 10) - 25.0
+            r = rr.choice((rr.uniform(46, 62), rr.uniform(34, 46), rr.uniform(34, 46))); sy_ = rr.uniform(0.32, 0.48)
+            top = VEIL_CROWN - rr.uniform(0, 30) * (0.6 + 0.4 * rr.random())
+            l = L(p[0] + right[0] * lat_ + rr.uniform(-8, 8), p[1] + right[1] * lat_ + rr.uniform(-8, 8), top - r * sy_, r, sy_, 1.0, rr.uniform(0.45, 0.6), sx=rr.uniform(1.1, 1.6), sz=rr.uniform(0.9, 1.3))
+            l["tag"] = "bank"
             if _admit(l, voids, 0.12):
                 out.append(l)
+            if rr.random() < 0.35:                                  # a tatter on the top, drawn out downwind
+                lt = L(l["c"][0] + wx * r * 0.5, -l["c"][2] + wy * r * 0.5, top + rr.uniform(-3, 4), rr.uniform(26, 34), 0.28, rr.uniform(0.35, 0.55), 0.7, sx=rr.uniform(1.8, 2.6))
+                lt["tag"] = "bank"
+                if _admit(lt, voids, 0.1):
+                    out.append(lt)
     # 3. the floor and flanks: big low lobes under and beside the rooms, so no room is open to the sea or the sky
     for sm in range(20, 440, 46):
         p, d, right, t = at(sm)
@@ -720,12 +735,21 @@ def veil():
                 l = L(p[0] + right[0] * i * sp + d[0] * js, p[1] + right[1] * i * sp + d[1] * js, p[2] + j * sp - 2.0, r, 1.0, 1.0, 0.3)
                 if _admit(l, rooms, 0.3):
                     l["_keep"] = True; l["tag"] = "plug"; out.append(l); STATS["plug_lobes"] = STATS.get("plug_lobes", 0) + 1
+    # iteration 9 (orchestrator, after the engine's it9 render): leaving the plug at 56.5 s the frame's mean fell 0.44 -> 0.20
+    # in six frames, a pop. A tail of thinning mist past the plug's exit face (s 452-500 m, about 56.6-57.6 s at the lens's
+    # speed): each layer thinner than the last, so the plug's glow fades over a second instead of switching off. Soft and
+    # big, three abreast, centred on the lens's height (the sill lies under it).
+    for (sm_, dens) in ((446.0, 0.5), (458.0, 0.36), (471.0, 0.24), (486.0, 0.14)):          # denser (0.85 first) made the reveal a bright mist for a second: the fade went the other way
+        p, d, right, t = _ahead(at, sm_)
+        for lat in (-34.0, 0.0, 34.0):
+            l = L(p[0] + right[0] * (lat + rr.uniform(-6, 6)), p[1] + right[1] * (lat + rr.uniform(-6, 6)), p[2] + rr.uniform(-4, 6), rr.uniform(38, 46), 0.8, dens, 0.65, sx=1.15)
+            l["_keep"] = True; l["tag"] = "plug_fade"; out.append(l)
     out = deball(out, voids)
     ragged([l for l in out if not l.get("_keep")])              # the bank's big lobes, not the rooms' walls
     kept = []; n_small = 0
     for l in out:                                               # within 110 m of the journey: no small lobe, no crisp one
         if not l.get("_keep") and path_gap(l, 46.5, 58.5) < 110.0:
-            if l["r"] * min(l["scale"]) < 24.0:
+            if l["r"] * min(l["scale"]) < 24.0 and not (l.get("tag") == "bank" and path_gap(l, 46.5, 58.5) > 25.0):     # iteration 9: the flat bank's mats stay (they are flat by design), unless they touch the lens
                 n_small += 1; continue
             l["soft"] = max(l["soft"], 0.5)
         kept.append(l)
@@ -801,8 +825,8 @@ def veil_glows():
         g.append({"name": name, "position": E(c), "radius": radius, "intensity": gain, "key": key, "note": note})
     a = max(by["antechamber"], key=lambda v: v["rho"]); n = max(by["nave"], key=lambda v: v["rho"]); lr = max(by["lantern_room"], key=lambda v: v["rho"])
     add("veil_rose", (a["c"][0], a["c"][1], a["c"][2] + 8), 50.0, 1.6, "garden_a", "the antechamber: the rose light seen in the gate's mouth from the garden")
-    p, d, right, t = at(414.0)
-    add("veil_amber", (p[0] - right[0] * 5, p[1] - right[1] * 5, p[2] - 3), 58.0, 2.2, "cond_a",
+    p, d, right, t = at(398.0)                       # iteration 9: was 414 m / 2.2; the last bright pulse sat on the exit face and the frame fell 0.44 -> 0.20 behind it
+    add("veil_amber", (p[0] - right[0] * 5, p[1] - right[1] * 5, p[2] - 3), 58.0, 1.2, "cond_a",
         "inside the plug, on the journey, 414 m from the 47.0 s point (56.15 s): the second and larger warm pulse; the mouth and the first of the sill are amber at the crash (56.88 s)")
     ns = sorted(by["nave"], key=lambda v: v["s"])
     add("veil_pocket0", (a["c"][0], a["c"][1], a["c"][2] - a["rho"] + 6), 34.0, 0.7, "garden_a", "the antechamber's floor")
@@ -1133,10 +1157,10 @@ def keep_colossus():
 
 
 HEAD_TOP = 235.0           # owner msg 96 (was 365)
-VEIL_CROWN = 250.0         # owner msg 96: the Veil's outer crown is cut to this height (was up to 290); the plug keeps its body
+VEIL_CROWN = 205.0         # owner msgs 96, 103: the Veil is a low bank, its crown cut here (was up to 290); the plug may stand 30 m over it
 
 
-def crown(lobes, ceiling, keep_tags=("plug",)):
+def crown(lobes, ceiling, keep_tags=("plug_fade",), plug_over=30.0):
     """Lower a bank's crown to `ceiling` without touching its rooms: a lobe whose top is over the ceiling is flattened so
     its top sits on it (its base and centre stay), or dropped if its centre is already within 12 m of it. Lobes tagged in
     keep_tags (the plug that hides the Condensery until the crash) are left whole."""
@@ -1145,7 +1169,14 @@ def crown(lobes, ceiling, keep_tags=("plug",)):
         if l.get("tag") in keep_tags:
             out.append(l); continue
         cy_, ry = l["c"][1], l["r"] * l["scale"][1]
-        if cy_ + ry <= ceiling:
+        ceil_ = ceiling + (plug_over if l.get("tag") == "plug" else 0.0)       # the plug keeps its body round the lens; only its upper rows go
+        if cy_ + ry <= ceil_:
+            out.append(l)
+        elif l.get("tag") == "plug" and cy_ < ceil_ - 12.0:
+            l["scale"][1] = round((ceil_ - cy_) / l["r"], 3); out.append(l)
+        elif l.get("tag") == "plug":
+            continue
+        elif cy_ + ry <= ceiling:
             out.append(l)
         elif cy_ < ceiling - 12.0:
             l["scale"][1] = round((ceiling - cy_) / l["r"], 3); out.append(l)
@@ -1276,9 +1307,10 @@ def _wr(name, x, y, a, b, yaw_deg, floor, above, density, below=6.0):
 
 
 WISP_REGIONS = [
-    _wr("quay_upper", -55, 4, 34, 13, 8, 131.2, 1.2, 0.8), _wr("quay_middle", 12, 3, 38, 13, -5, 128.0, 1.2, 0.8), _wr("quay_lower", 80, -6, 34, 13, -12, 124.8, 1.2, 0.8),
+    _wr("quay_upper", -55, 4, 34, 13, 8, 131.2, 1.0, 0.6), _wr("quay_middle", 12, 3, 38, 13, -5, 128.0, 1.0, 0.6), _wr("quay_lower", 80, -6, 34, 13, -12, 124.8, 1.0, 0.6),
     _wr("plaza", -102, -6, 26, 26, 8, 131.2, 1.5, 1.0), _wr("low_walk", 0, -24, 70, 9, -8, 121.0, 2.0, 1.0),
-    _wr("steps", 66, -26, 22, 14, -15, 122.4, 1.8, 0.9), _wr("garden", GARDEN[0], GARDEN[1], 32, 32, 0, GARDEN[2], 1.6, 0.9),
+    _wr("steps", 66, -26, 22, 14, -15, 122.4, 1.8, 0.9), *[_wr("garden_rim%d" % k, GARDEN[0] + 29 * math.cos(math.radians(a)), GARDEN[1] + 29 * math.sin(math.radians(a)), 10, 5, a + 90, GARDEN[2], 1.0, 0.5)
+      for k, a in enumerate((-150, -100, -50, 0, 50, 100))],          # iteration 9: the whole terrace was one pink haze at 44.5 s; now tatters at the rim only
     _wr("plateau_gaps", 10, 30, 150, 70, 0, 129.0, 2.5, 0.6, below=10.0),
     _wr("lampmarket", LAMPMARKET["centre"][0], LAMPMARKET["centre"][1], 34, 26, 0, LAMPMARKET["deck"], 1.2, 0.8),
     _wr("lanternhill", 5, 155, 110, 50, -10, 153.0, 0.8, 0.4, below=8.0), _wr("eastreach", 215, 146, 70, 36, -5, 144.0, 0.8, 0.4, below=8.0),
