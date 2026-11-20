@@ -442,3 +442,160 @@ TEST_CASE("the lobe bins reach 128 cells along the longer side", "[renderer][clo
     CHECK(b.nx >= rendering::kMaxBinCellsPerSide - 1);
     CHECK(b.cellSize == Catch::Approx(span / 128.0f).epsilon(0.01));
 }
+
+TEST_CASE("detail erosion breaks a lobe's round silhouette, only inward, the same from two fresh renderers",
+          "[gpu][renderer][clouds][adr2106]") {
+    // ADR-2106: one sphere lobe, lit by ambient only, against black. Off: its silhouette is a circle (the outermost
+    // covered radius is nearly the same at every angle). On: the billow octaves scallop it, never past the circle.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    constexpr std::uint32_t W = 200, H = 200;
+    FrameTime t{};
+    auto make = [](float erosion) {
+        scene::Scene s = seaScene();
+        s.clouds.sea.enabled = false;
+        s.clouds.extinction = 0.15f;
+        s.clouds.hazeColor = {0.0f, 0.0f, 0.0f};
+        s.clouds.hazeDistance = 100000.0f;
+        s.clouds.noiseAmount = 0.0f;
+        s.clouds.detailAmount = 0.0f;
+        s.clouds.minStep = 1.0f;
+        s.clouds.stepGrowth = 0.002f;
+        s.clouds.steps = 256;
+        s.clouds.resolution = 1.0f;
+        s.clouds.erosion = erosion;
+        s.clouds.erosionScale = 50.0f;
+        s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+        s.camera.position = {0.0f, 300.0f, 0.0f};
+        s.camera.target = {0.0f, 300.0f, -1000.0f};
+        s.camera.fovYRadians = 0.5f;
+        scene::CloudLobe l;
+        l.centre = {0.0f, 300.0f, -1000.0f};
+        l.radius = 150.0f;
+        l.soft = 0.05f;
+        s.clouds.lobes = {l};
+        return s;
+    };
+    // per angle, the outermost covered pixel's distance from the centre
+    auto radii = [&](const gpu::Image8& img) {
+        std::vector<double> out;
+        for (int a = 0; a < 90; ++a) {
+            const double th = a * 6.283185307 / 90.0;
+            double rmax = 0;
+            for (double r = 1; r < 99; r += 0.5) {
+                const auto x = static_cast<std::uint32_t>(100.0 + r * std::cos(th));
+                const auto y = static_cast<std::uint32_t>(100.0 + r * std::sin(th));
+                const auto* p = img.pixel(x, y);
+                if (p[0] + p[1] + p[2] > 40) rmax = r;
+            }
+            out.push_back(rmax);
+        }
+        return out;
+    };
+    auto spread = [](const std::vector<double>& v) {
+        double m = 0, q = 0;
+        for (double x : v) m += x;
+        m /= static_cast<double>(v.size());
+        for (double x : v) q += (x - m) * (x - m);
+        return std::sqrt(q / static_cast<double>(v.size())) / std::max(m, 1e-6);
+    };
+    std::vector<gpu::Image8> imgs;
+    for (float e : {0.0f, 1.0f, 1.0f}) {
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto img = renderer.renderToImage(make(e), t, W, H);
+        REQUIRE(img.has_value());
+        imgs.push_back(std::move(*img));
+    }
+    const auto r0 = radii(imgs[0]);
+    const auto r1 = radii(imgs[1]);
+    const double s0 = spread(r0);
+    const double s1 = spread(r1);
+    double outward = 0;
+    for (std::size_t i = 0; i < r0.size(); ++i) outward = std::max(outward, r1[i] - r0[i]);
+    INFO("round spread " << s0 << ", eroded " << s1 << ", worst outward " << outward << " px");
+    CHECK(s0 < 0.02);     // a circle
+    CHECK(s1 > 2.0 * s0); // scalloped
+    CHECK(s1 > 0.03);
+    CHECK(outward <= 1.5); // never past the lobe
+    // seek-safe: a pure function of the scene and the second (no history here)
+    std::size_t differ = 0;
+    for (std::uint32_t y = 0; y < H; ++y) {
+        for (std::uint32_t x = 0; x < W; ++x) {
+            const auto* a = imgs[1].pixel(x, y);
+            const auto* b = imgs[2].pixel(x, y);
+            differ += (a[0] != b[0] || a[1] != b[1] || a[2] != b[2]) ? 1 : 0;
+        }
+    }
+    CHECK(differ == 0);
+    CHECK(ctx->errorCount() == 0);
+}
+
+TEST_CASE("six squared light taps find the shadow that two even taps miss", "[gpu][renderer][clouds][adr2106]") {
+    // ADR-2106: a slab of cloud lit from straight above, with a lobe 80 to 160 m over it. Two even taps of 130 m (the
+    // Neon Dreams iteration 6 setting) step over the lobe for some samples and land in it for others: the shadow is
+    // missed or cut as a hard silhouette (the dark blotches). Six taps spaced by the square of their index land within
+    // a few percent of a 32-tap reference.
+    auto ctx = makeContext();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    constexpr std::uint32_t W = 160, H = 160;
+    FrameTime t{};
+    auto make = [](int steps, int spacing) {
+        scene::Scene s = seaScene();
+        s.clouds.sea.enabled = false;
+        s.clouds.extinction = 0.15f;
+        s.clouds.ambientTop = {0.0f, 0.0f, 0.0f};
+        s.clouds.ambientBottom = {0.0f, 0.0f, 0.0f};
+        s.clouds.hazeColor = {0.0f, 0.0f, 0.0f};
+        s.clouds.hazeDistance = 100000.0f;
+        s.clouds.noiseAmount = 0.0f;
+        s.clouds.detailAmount = 0.0f;
+        s.clouds.lightIntensity = 1.0f;
+        s.clouds.lightDirection = {0.0f, 1.0f, 0.0f}; // straight down: the lobe's shadow is its own disc
+        s.clouds.lightDistance = 260.0f;
+        s.clouds.lightSteps = steps;
+        s.clouds.lightSpacing = spacing;
+        s.clouds.resolution = 1.0f;
+        s.clouds.minStep = 1.0f;
+        s.clouds.stepGrowth = 0.002f;
+        s.clouds.steps = 256;
+        s.environment.backgroundColor = {0.0f, 0.0f, 0.0f};
+        s.camera.position = {0.0f, 800.0f, 300.0f};
+        s.camera.target = {0.0f, 0.0f, 0.0f}; // looking down at the slab
+        s.camera.fovYRadians = 0.6f;
+        scene::CloudLobe slab;
+        slab.centre = {0.0f, 0.0f, 0.0f};
+        slab.radius = 400.0f;
+        slab.scale = {1.0f, 0.2f, 1.0f};
+        slab.soft = 0.05f;
+        scene::CloudLobe above;
+        above.centre = {60.0f, 200.0f, 0.0f};
+        above.radius = 40.0f;
+        above.soft = 0.05f;
+        s.clouds.lobes = {slab, above};
+        return s;
+    };
+    std::vector<gpu::Image8> imgs;
+    for (auto [steps, spacing] : {std::pair{32, 1}, std::pair{2, 1}, std::pair{6, 2}}) {
+        rendering::SceneRenderer renderer(*ctx, shaders);
+        REQUIRE(renderer.init().has_value());
+        auto img = renderer.renderToImage(make(steps, spacing), t, W, H);
+        REQUIRE(img.has_value());
+        imgs.push_back(std::move(*img));
+    }
+    auto meanDiff = [&](const gpu::Image8& a, const gpu::Image8& b) {
+        double d = 0;
+        for (std::uint32_t y = 0; y < H; ++y) {
+            for (std::uint32_t x = 0; x < W; ++x) {
+                for (int c = 0; c < 3; ++c) d += std::abs(int(a.pixel(x, y)[c]) - int(b.pixel(x, y)[c]));
+            }
+        }
+        return d / (W * H * 3.0);
+    };
+    const double even = meanDiff(imgs[1], imgs[0]);
+    const double squared = meanDiff(imgs[2], imgs[0]);
+    INFO("mean difference from 32 even taps: 2 even " << even << ", 6 squared " << squared);
+    CHECK(even > 1.0);           // the lobe's shadow is missing or wrong
+    CHECK(squared < 0.5 * even); // and found
+    CHECK(ctx->errorCount() == 0);
+}

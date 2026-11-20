@@ -321,3 +321,53 @@ TEST_CASE("clouds: far lobes and the glow shape read, validate and round-trip", 
     CHECK(live.glowShadow == 2.0f);
     CHECK(live.farLobes.size() == 2);
 }
+
+// ADR-2106: detail erosion and the key's light taps: read, validate, round-trip, live knobs.
+TEST_CASE("clouds: the erosion and the light taps read, validate and round-trip", "[unit][clouds][adr2106]") {
+    const json j = {{"lobes", json::array({{{"c", {0, 100, 0}}, {"r", 50.0}}})},
+                    {"erosion", 0.8}, {"erosionScale", 60.0}, {"erosionDetail", 1.2}, {"erosionCurl", 8.0},
+                    {"erosionFlatten", 0.3}, {"erosionOctaves", 2}, {"lightSpacing", 2}, {"multiScatter", 0.6}};
+    auto c = scene::Clouds::fromJson(j, fs::temp_directory_path());
+    REQUIRE(c.has_value());
+    CHECK(c->erosion == 0.8f);
+    CHECK(c->erosionScale == 60.0f);
+    CHECK(c->erosionOctaves == 2);
+    CHECK(c->lightSpacing == 2);
+    CHECK(c->multiScatter == 0.6f);
+    auto again = scene::Clouds::fromJson(c->toJson(), fs::temp_directory_path());
+    REQUIRE(again.has_value());
+    CHECK(again->erosionCurl == 8.0f);
+    CHECK(again->erosionFlatten == 0.3f);
+    CHECK(again->erosionDetail == 1.2f);
+    CHECK(again->lightSpacing == 2);
+
+    // off by default and not written
+    auto plain = scene::Clouds::fromJson({{"lobes", json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}})}}, fs::temp_directory_path());
+    REQUIRE(plain.has_value());
+    CHECK(plain->erosion == 0.0f);
+    CHECK(plain->lightSpacing == 1);
+    CHECK_FALSE(plain->toJson().contains("erosion"));
+    CHECK_FALSE(plain->toJson().contains("lightSpacing"));
+
+    for (const auto& [key, value] : {std::pair{"erosion", json(1.5)}, std::pair{"erosionOctaves", json(4)},
+                                     std::pair{"lightSpacing", json(3)}, std::pair{"erosionScale", json(0.0)}}) {
+        json bad = j;
+        bad[key] = value;
+        INFO(key);
+        CHECK_FALSE(scene::Clouds::fromJson(bad, fs::temp_directory_path()).has_value());
+    }
+
+    // strength, scale, detail, curl and multiple scattering are live knobs
+    params::ParameterSet ps;
+    const scene::CloudParameters p = scene::registerCloudParameters(ps, *c, "clouds/");
+    for (const char* k : {"clouds/erosion", "clouds/erosionScale", "clouds/erosionDetail", "clouds/erosionCurl",
+                          "clouds/multiScatter"}) {
+        INFO(k);
+        REQUIRE(ps.findAs<float>(k) != nullptr);
+    }
+    ps.findAs<float>("clouds/erosion")->setFinalComponent(0, 0.25f);
+    scene::Clouds live;
+    scene::applyCloudParameters(p, *c, live);
+    CHECK(live.erosion == 0.25f);
+    CHECK(live.erosionScale == 60.0f);
+}

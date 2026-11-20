@@ -57,8 +57,12 @@ struct CloudUniformGpu {
     glm::vec4 farGrid;
     glm::vec4 farGrid2;
     glm::vec4 heroSpan;
+    // ADR-2106: (strength, coarse wavelength m, fine detail, curl m), (octaves, light spacing, multiple scattering,
+    // base flattening)
+    glm::vec4 erosion;
+    glm::vec4 erosion2;
 };
-static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 7) * 16);
+static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 9) * 16);
 
 struct LobeGpu {
     glm::vec4 centreRadius;
@@ -611,6 +615,9 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.farGrid = glm::vec4(farBins_.origin, farBins_.cellSize, static_cast<float>(farBins_.nx));
     u.farGrid2 = glm::vec4(static_cast<float>(farBins_.nz), farBins_.yLo, farBins_.yHi, farOn_ ? 1.0f : 0.0f);
     u.heroSpan = glm::vec4(heroYLo_, heroYHi_, static_cast<float>(farWordBase_), 0.0f);
+    u.erosion = glm::vec4(c.erosion, c.erosionScale, c.erosionDetail, c.erosionCurl); // ADR-2106
+    u.erosion2 = glm::vec4(static_cast<float>(c.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
+                           c.erosionFlatten);
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
     const auto bufferEntry = [](std::uint32_t binding, const wgpu::Buffer& b) {

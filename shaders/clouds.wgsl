@@ -52,6 +52,9 @@ struct CloudUniforms {
     farGrid: vec4<f32>,   // ADR-2104: the far lobe set's grid: origin xz, cell size, cells along x
     farGrid2: vec4<f32>,  // cells along z, its lobes' lowest bottom, highest top, 1 when there is a far set
     heroSpan: vec4<f32>,  // the hero grid's own height range (x, y), z = where the far grid's cell words start
+    erosion: vec4<f32>,   // ADR-2106: x = strength (0 = off), y = the coarse billow's wavelength (m), z = fine detail, w = curl (m)
+    erosion2: vec4<f32>,  // ADR-2106: x = octaves (1..3), y = light tap spacing (1 = even, 2 = squared + jitter),
+                          // z = multiple scattering (0..1), w = base flattening (0..1)
 };
 
 struct Lobe {
@@ -88,17 +91,70 @@ fn noiseTap(p: vec3<f32>, cyclesPerMetre: f32) -> vec4<f32> {
     return textureSampleLevel(cloudNoise, cloudSampler, p * (cyclesPerMetre * 0.25), 0.0);
 }
 
+// ADR-2106: the erosion noise at one point, shared by every lobe there: three octaves of billow noise (0..1, high =
+// the lobe's own surface kept, low = eaten), each a world-space tap of the shared volume, the coarse two distorted by
+// a curl-like offset (tatters). `fine` is the third octave's weight after the pixel-footprint fade (no shimmer far off).
+struct Ero {
+    c: f32,
+    m: f32,
+    f: f32,
+    on: f32,
+    fp: f32, // metres: the larger of a pixel's footprint and half the march step here (no edge or octave finer)
+};
+
+fn noErosion() -> Ero {
+    return Ero(1.0, 1.0, 1.0, 0.0, 0.0);
+}
+
+fn erosionAt(p: vec3<f32>, octaves: u32, footprint: f32) -> Ero {
+    var e: Ero;
+    e.c = 1.0;
+    e.m = 1.0;
+    e.f = 1.0;
+    e.on = 0.0;
+    e.fp = footprint;
+    if (cu.erosion.x <= 0.0) {
+        return e;
+    }
+    e.on = 1.0;
+    let lam = max(cu.erosion.y, 1.0);
+    // seek-safe: a pure function of position and the drift offset (itself a function of the timeline second); the
+    // octaves move at different fractions of the wind so the billows evolve slowly instead of sliding as one sheet
+    var q = p + cu.drift.xyz * 0.35;
+    if (cu.erosion.w > 0.0) {
+        let w = noiseTap(q * 0.37 + vec3<f32>(-71.0, 13.0, 29.0), 1.0 / lam);
+        q = q + (vec3<f32>(w.r, w.a, w.g) - vec3<f32>(0.5, 0.5, 0.45)) * (2.0 * cu.erosion.w);
+    }
+    // the volume's G channel is inverted Worley (4/8/16 features a tile): rounded heads where it is high
+    let nc = noiseTap(q, 1.0 / lam);
+    e.c = nc.g * 0.8 + nc.r * 0.2;
+    if (octaves > 1u) {
+        let nm = noiseTap(q * 1.0 + cu.drift.xyz * 0.25 + vec3<f32>(37.0, -11.0, 5.0), 3.3 / lam);
+        let lm = lam / 3.3;
+        e.m = mix(1.0, nm.b * 0.75 + nm.g * 0.25, 1.0 - smoothstep(0.7 * lm, 2.2 * lm, footprint));
+    }
+    if (octaves > 2u) {
+        let lf = lam / 10.0;
+        let fade = 1.0 - smoothstep(0.25 * lf, 0.9 * lf, footprint);
+        if (fade > 0.0) {
+            let nf = noiseTap(p + cu.drift.xyz * 0.6 + vec3<f32>(-3.0, 19.0, 61.0), 1.0 / lf);
+            e.f = mix(1.0, nf.b, fade);
+        }
+    }
+    return e;
+}
+
 // The union of the binned lobes at `p`: x = density, y = the lobes' own height fraction (0 base .. 1 top).
 // x = the union's density, y = metres of that lobe still above the sample (the analytic light's depth)
-fn lobeBase(p: vec3<f32>) -> vec2<f32> {
+fn lobeBase(p: vec3<f32>, e: Ero) -> vec2<f32> {
     if (cu.boxMin.w < 0.5 || any(p < cu.boxMin.xyz) || any(p > cu.boxMax.xyz)) {
         return vec2<f32>(0.0);
     }
     var r = lobeGrid(p, cu.grid.xy, cu.grid.z, i32(cu.grid.w + 0.5), i32(cu.grid2.x + 0.5), cu.heroSpan.x,
-                     cu.heroSpan.y, 0u);
+                     cu.heroSpan.y, 0u, e);
     if (cu.farGrid2.w > 0.5) { // ADR-2104: the far set on its own grid
         let f = lobeGrid(p, cu.farGrid.xy, cu.farGrid.z, i32(cu.farGrid.w + 0.5), i32(cu.farGrid2.x + 0.5),
-                         cu.farGrid2.y, cu.farGrid2.z, u32(cu.heroSpan.z + 0.5));
+                         cu.farGrid2.y, cu.farGrid2.z, u32(cu.heroSpan.z + 0.5), e);
         r = vec2<f32>(max(r.x, f.x), max(r.y, f.y));
     }
     return r;
@@ -106,7 +162,8 @@ fn lobeBase(p: vec3<f32>) -> vec2<f32> {
 
 // One grid's lobes at p (ADR-2100 bins; ADR-2104: the hero and the far set each have one). yLo/yHi are the range the
 // grid's column extents are quantised over.
-fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yLo: f32, yHi: f32, base0: u32) -> vec2<f32> {
+fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yLo: f32, yHi: f32, base0: u32,
+            e: Ero) -> vec2<f32> {
     let cell = vec2<i32>(floor((p.xz - origin) / cellSize));
     if (cell.x < 0 || cell.y < 0 || cell.x >= nx || cell.y >= nz) {
         return vec2<f32>(0.0);
@@ -127,12 +184,42 @@ fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yL
     for (var i = 0u; i < count; i = i + 1u) {
         let l = lobes[bins[offset + i]];
         let ry = l.centreRadius.w * l.scaleDensity.y;
-        let d = (p - l.centreRadius.xyz) / (l.centreRadius.w * l.scaleDensity.xyz);
+        var d = (p - l.centreRadius.xyz) / (l.centreRadius.w * l.scaleDensity.xyz);
         let r2 = dot(d, d);
         if (r2 >= 1.0) {
             continue;
         }
-        let shape = (1.0 - smoothstep(1.0 - l.soft.x, 1.0, sqrt(r2))) * l.scaleDensity.w;
+        var shape = 0.0;
+        if (e.on > 0.0) {
+            // ADR-2106: the lobe's surface eaten in metres by the billow octaves, so it is no longer a sphere. Only
+            // ever inward (the bins hold the lobe's own bounds). The lower half is flattened and its noise inverted
+            // (wisps and tatters under a base, cauliflower heads over a crown), and its edge is softer.
+            let k = cu.erosion.x;
+            let hl = clamp(0.5 + 0.5 * d.y, 0.0, 1.0);
+            if (d.y < 0.0) {
+                d.y = d.y * (1.0 + cu.erosion2.w * k);
+            }
+            let rr = sqrt(dot(d, d));
+            if (rr >= 1.0) {
+                continue;
+            }
+            let rm = l.centreRadius.w * min(min(l.scaleDensity.x, l.scaleDensity.y), l.scaleDensity.z);
+            let lam = cu.erosion.y;
+            let crown = smoothstep(0.2, 0.65, hl);
+            let c = smoothstep(0.15, 0.85, mix(1.0 - e.c, e.c, crown));
+            let m = mix(1.0 - e.m, e.m, crown);
+            let f = mix(1.0 - e.f, e.f, crown);
+            // each octave's depth follows the lobe's size, so a head 15 m across is broken by the mid and fine
+            // octaves and a 200 m tower by the coarse one
+            let eaten = min(0.38 * rm, 0.6 * lam) * (1.0 - c) + min(0.3 * rm, 0.18 * lam) * (1.0 - m) * cu.erosion.z +
+                        min(0.2 * rm, 0.06 * lam) * (1.0 - f) * cu.erosion.z;
+            let re = rr + k * eaten / rm;
+            // the edge: the authored softness, toward a few metres (crisp heads, softer bases) as the erosion rises
+            let edgeM = mix(l.soft.x * rm, max(lam * mix(0.28, 0.07, crown), e.fp), k);
+            shape = (1.0 - smoothstep(1.0 - clamp(edgeM / rm, 0.02, 1.0), 1.0, re)) * l.scaleDensity.w;
+        } else {
+            shape = (1.0 - smoothstep(1.0 - l.soft.x, 1.0, sqrt(r2))) * l.scaleDensity.w;
+        }
         // the chord of this ellipsoid above the sample, vertically
         let chord = ry * (sqrt(max(1.0 - d.x * d.x - d.z * d.z, 0.0)) - d.y);
         if (shape > base) {
@@ -205,7 +292,7 @@ struct Density {
     above: f32,  // metres of cloud above the sample, roughly (the analytic light when lightSteps is 0)
 };
 
-fn densityBase(p: vec3<f32>) -> Density {
+fn densityBase(p: vec3<f32>, e: Ero) -> Density {
     var out: Density;
     out.base = 0.0;
     out.height = 0.0;
@@ -217,7 +304,7 @@ fn densityBase(p: vec3<f32>) -> Density {
     if (cu.sea2.y > 0.5) {
         seaH = (p.y - cu.sea.x) / max(cu.sea.y - cu.sea.x, 1.0);
     }
-    let lobeAbove = lobeBase(p);
+    let lobeAbove = lobeBase(p, e);
     let lobe = lobeAbove.x;
     let inSea = seaH >= 0.0 && seaH <= 1.0;
     if (!inSea && lobe <= 0.0) {
@@ -414,6 +501,8 @@ fn fs_clouds(in: VsOut) -> MarchOut {
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     let ro = frame.cameraPos.xyz;
     let rd = cameraViewRay(ndc); // ADR-1807
+    // ADR-2106: the angle one march pixel spans (the erosion's finest octave fades out below it)
+    let pixAngle = length(cameraViewRay(ndc + vec2<f32>(2.0 / cu.frameInfo.z, 0.0)) - rd);
     let fwd = max(dot(rd, frame.cameraForward.xyz), 1e-3);
 
     // the scene depth under this pixel: the nearest or the farthest of its full-resolution footprint, alternating
@@ -512,7 +601,9 @@ fn fs_clouds(in: VsOut) -> MarchOut {
             break;
         }
         let p = ro + rd * t;
-        let db = densityBase(p);
+        let octaves = u32(clamp(cu.erosion2.x, 1.0, 3.0) + 0.5);
+        let ero = erosionAt(p, octaves, max(t * pixAngle, 0.5 * max(minStep, t * growth)));
+        let db = densityBase(p, ero);
         dt = max(minStep, t * growth);
         if (db.base > 0.0) {
             let dens = detailErode(p, db.base);
@@ -528,10 +619,39 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                         od = db.above / max(L.y, 0.25);
                     }
                 }
-                for (var j = 0u; j < lightSteps; j = j + 1u) {
-                    od = od + densityBase(p + L * ((f32(j) + 0.5) * lightDt)).base * lightDt;
+                if (cu.erosion2.y > 1.5) {
+                    // ADR-2106: taps spaced by the square of their index (dense near the sample, where a billow
+                    // shadows its neighbour; sparse far out), jittered per pixel and frame so the temporal resolve
+                    // integrates between them. Even taps of tens of metres read the shadow as hard silhouettes of
+                    // whole lobes cast on the cloud below (the dark blotches of Neon Dreams iteration 6).
+                    let lj = 0.5 + 0.35 * (fract(cu.frameInfo.x * 2.0 + 0.37) - 0.5); // per frame only: a per-pixel jitter left a screen-door
+                    let n = f32(lightSteps);
+                    var prevS = 0.0;
+                    for (var j = 0u; j < lightSteps; j = j + 1u) {
+                        let u1 = (f32(j) + 1.0) / n;
+                        let s1 = cu.march.z * u1 * u1;
+                        let sm = mix(prevS, s1, lj);
+                        let lp = p + L * sm;
+                        let le = erosionAt(lp, min(octaves, 2u), 4.0); // a light tap keeps a crisp edge (the shadow shapes the heads)
+                        od = od + densityBase(lp, le).base * (s1 - prevS);
+                        prevS = s1;
+                    }
+                } else {
+                    for (var j = 0u; j < lightSteps; j = j + 1u) {
+                        od = od + densityBase(p + L * ((f32(j) + 0.5) * lightDt), noErosion()).base * lightDt;
+                    }
                 }
-                let shadow = exp(-ext * od * 0.7);
+                var shadow = exp(-ext * od * 0.7);
+                var keyLight = shadow * phase;
+                if (cu.erosion2.z > 0.0) {
+                    // ADR-2106: multiple scattering (Wrenninge's octaves): light that scattered more than once is
+                    // attenuated less and spread more evenly, so a body in its own shadow is dim, not black
+                    let ms = cu.erosion2.z;
+                    keyLight = keyLight + 0.5 * ms * exp(-ext * od * 0.7 * 0.35) *
+                                   (mix(cPhase(cosT, cu.lightColor.w * 0.5), cPhase(cosT, -0.1), 0.25) * 12.566371);
+                    keyLight = keyLight + 0.25 * ms * exp(-ext * od * 0.7 * 0.12);
+                    shadow = max(shadow, 0.5 * ms * exp(-ext * od * 0.7 * 0.35));
+                }
                 let powder = mix(1.0, 1.0 - exp(-ext * dens * 160.0), cu.ambientBottom.w * (1.0 - max(cosT, 0.0)));
                 let ambient = mix(cu.ambientBottom.rgb, cu.ambientTop.rgb, db.height);
                 // warm: low in the sky (by height) and toward the glow (by the ray's own heading)
@@ -574,7 +694,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                     if (cu.glowShape.y > 0.0) {
                         // ADR-2105: the lobes alone (no sea relief, no noise): the glows sit among the lobes, and the
                         // full density cost ~25 ms a frame in the Neon Dreams Veil
-                        let toward = min(lobeBase(p + glowTo * cu.glowShape.w).x, 1.0);
+                        let toward = min(lobeBase(p + glowTo * cu.glowShape.w, noErosion()).x, 1.0);
                         glow = glow * exp(-cu.glowShape.y * toward * 3.0);
                     }
                 }
@@ -582,7 +702,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 for (var k = 0u; k < arms; k = k + 1u) {
                     glow = glow + beamOnCloud(p, k) * cu.beamInfo.z;
                 }
-                var radiance = cu.lightColor.rgb * cu.light.w * shadow * phase * powder + ambient + warm + glow;
+                var radiance = cu.lightColor.rgb * cu.light.w * keyLight * powder + ambient + warm + glow;
                 let hz = 1.0 - exp(-t / max(cu.haze.w, 1.0));
                 radiance = mix(radiance, cu.haze.rgb, hz);
                 var a = 1.0 - exp(-ext * dens * dt);

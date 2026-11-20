@@ -135,6 +135,15 @@ Result<void> Clouds::validate() const {
     if (!(swell >= 0.0f && swell <= 1.0f)) return fail("clouds: swell must be in [0, 1]");
     if (!(detailScale > 0.0f && detailScale <= 4.0f)) return fail("clouds: detailScale must be in (0, 4]");
     if (!(detailAmount >= 0.0f && detailAmount <= 1.0f)) return fail("clouds: detailAmount must be in [0, 1]");
+    // ADR-2106
+    if (!(erosion >= 0.0f && erosion <= 1.0f)) return fail("clouds: erosion must be in [0, 1]");
+    if (!(erosionScale >= 1.0f && erosionScale <= 2000.0f)) return fail("clouds: erosionScale must be in [1, 2000]");
+    if (!(erosionDetail >= 0.0f && erosionDetail <= 2.0f)) return fail("clouds: erosionDetail must be in [0, 2]");
+    if (!(erosionCurl >= 0.0f && erosionCurl <= 200.0f)) return fail("clouds: erosionCurl must be in [0, 200]");
+    if (!(erosionFlatten >= 0.0f && erosionFlatten <= 1.0f)) return fail("clouds: erosionFlatten must be in [0, 1]");
+    if (erosionOctaves < 1 || erosionOctaves > 3) return fail("clouds: erosionOctaves must be in [1, 3]");
+    if (lightSpacing < 1 || lightSpacing > 2) return fail("clouds: lightSpacing must be 1 or 2");
+    if (!(multiScatter >= 0.0f && multiScatter <= 1.0f)) return fail("clouds: multiScatter must be in [0, 1]");
     if (!(resolution >= 0.25f && resolution <= 1.0f)) return fail("clouds: resolution must be in [0.25, 1]");
     if (!(temporal >= 0.0f && temporal <= 0.97f)) return fail("clouds: temporal must be in [0, 0.97]");
     if (!(minStep > 0.0f && minStep <= 1000.0f)) return fail("clouds: minStep must be in (0, 1000] metres");
@@ -199,7 +208,10 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
                         std::pair{"swell", &c.swell}, std::pair{"detailScale", &c.detailScale},
                         std::pair{"detailAmount", &c.detailAmount}, std::pair{"resolution", &c.resolution},
                         std::pair{"temporal", &c.temporal}, std::pair{"minStep", &c.minStep},
-                        std::pair{"stepGrowth", &c.stepGrowth}, std::pair{"maxDistance", &c.maxDistance}}) {
+                        std::pair{"stepGrowth", &c.stepGrowth}, std::pair{"maxDistance", &c.maxDistance},
+                        std::pair{"erosion", &c.erosion}, std::pair{"erosionScale", &c.erosionScale},
+                        std::pair{"erosionDetail", &c.erosionDetail}, std::pair{"erosionCurl", &c.erosionCurl},
+                        std::pair{"erosionFlatten", &c.erosionFlatten}, std::pair{"multiScatter", &c.multiScatter}}) {
         if (auto r = num(k, *t); !r) return std::unexpected(r.error());
     }
     for (auto [k, t] : {std::pair{"lightDirection", &c.lightDirection}, std::pair{"lightColor", &c.lightColor},
@@ -210,6 +222,8 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
     }
     if (j.contains("steps")) c.steps = j.at("steps").get<int>();
     if (j.contains("lightSteps")) c.lightSteps = j.at("lightSteps").get<int>();
+    if (j.contains("erosionOctaves")) c.erosionOctaves = j.at("erosionOctaves").get<int>(); // ADR-2106
+    if (j.contains("lightSpacing")) c.lightSpacing = j.at("lightSpacing").get<int>();
     if (j.contains("seed")) c.seed = j.at("seed").get<std::uint32_t>();
     // ADR-2100: the sea and the glows
     if (j.contains("sea")) {
@@ -374,6 +388,18 @@ json Clouds::toJson() const {
         j["glowBreakupScale"] = glowBreakupScale;
         j["glowShadowDistance"] = glowShadowDistance;
     }
+    if (erosion > 0.0f) { // ADR-2106: written only when used
+        j["erosion"] = erosion;
+        j["erosionScale"] = erosionScale;
+        j["erosionDetail"] = erosionDetail;
+        j["erosionCurl"] = erosionCurl;
+        j["erosionFlatten"] = erosionFlatten;
+        j["erosionOctaves"] = erosionOctaves;
+    }
+    if (lightSpacing != 1 || multiScatter > 0.0f) {
+        j["lightSpacing"] = lightSpacing;
+        j["multiScatter"] = multiScatter;
+    }
     if (sea.enabled) {
         j["sea"] = {{"enabled", true}, {"base", sea.base}, {"top", sea.top}, {"coverage", sea.coverage},
                     {"coverageScale", sea.coverageScale}, {"density", sea.density}};
@@ -461,6 +487,11 @@ constexpr CloudFloat kCloudFloats[] = {
     {"glowShadow", &Clouds::glowShadow, 0.0f, 4.0f, 0.0f, 2.0f},
     {"noiseAmount", &Clouds::noiseAmount, 0.0f, 1.0f, 0.0f, 1.0f},
     {"detailAmount", &Clouds::detailAmount, 0.0f, 1.0f, 0.0f, 1.0f},
+    {"erosion", &Clouds::erosion, 0.0f, 1.0f, 0.0f, 1.0f},                 // ADR-2106
+    {"erosionScale", &Clouds::erosionScale, 1.0f, 2000.0f, 5.0f, 200.0f},
+    {"erosionDetail", &Clouds::erosionDetail, 0.0f, 2.0f, 0.0f, 2.0f},
+    {"erosionCurl", &Clouds::erosionCurl, 0.0f, 200.0f, 0.0f, 40.0f},
+    {"multiScatter", &Clouds::multiScatter, 0.0f, 1.0f, 0.0f, 1.0f},
     {"hazeDistance", &Clouds::hazeDistance, 1.0f, 200000.0f, 1000.0f, 40000.0f},
     {"powder", &Clouds::powder, 0.0f, 1.0f, 0.0f, 1.0f},
 };

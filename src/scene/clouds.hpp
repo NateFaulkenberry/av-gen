@@ -154,6 +154,20 @@ struct Clouds {
     float swell = 0.0f;               // 0..1: raises the sea's top and fattens the lobes (a bass target)
     float detailScale = 0.02f;        // cycles per metre of the edge-detail noise
     float detailAmount = 0.35f;       // how much of a thin edge the detail noise erodes (0..1)
+    // ADR-2106: detail erosion in metres. Each lobe's surface is eaten inward by up to three octaves of billow noise
+    // (inverted Worley: rounded heads) whose amplitude follows the lobe's size, the coarse two distorted by a curl-like
+    // offset; under a lobe's middle the noise is inverted (wisps) and the edge softer, over it crisp cauliflower.
+    // `erosion` 0 = off (the ADR-1289 soft ellipsoids).
+    float erosion = 0.0f;             // 0..1: strength
+    float erosionScale = 40.0f;       // metres: the coarse billow's wavelength (the mid octave is 1/3.3, the fine 1/10)
+    float erosionDetail = 1.0f;       // 0..2: the mid and fine octaves' share
+    float erosionCurl = 6.0f;         // metres: the distortion of the coarse octaves (tatters)
+    float erosionFlatten = 0.4f;      // 0..1: lobes' lower halves squashed (flatter bases), times `erosion`
+    int erosionOctaves = 3;           // 1..3: the offline-quality knob (3 = the fine octave too)
+    // ADR-2106: the key's light. `lightSpacing` 1 = even taps (as before); 2 = taps spaced by the square of their
+    // index and jittered (no hard lobe-silhouette shadows). `multiScatter` 0..1 adds Wrenninge-style multiple scattering.
+    int lightSpacing = 1;
+    float multiScatter = 0.0f;
     float resolution = 0.5f;          // the march's resolution, a fraction of the frame's (0.25..1)
     float temporal = 0.85f;           // the weight of the accumulated history (0 = none; up to 0.97)
     float minStep = 4.0f;             // metres: the shortest step
