@@ -50,14 +50,14 @@ def cauliflower(rr, out, x, y, z, r, depth, soft, dens=1.0, up=0.25, n=(5, 7), s
 def shelf(rr, out, x, y, z, length, width, thick, yaw, dens=0.6, soft=0.5, scraps=3):
     """A shelf reaching out along yaw from inside a turret: a ragged mat of small flattened lobes, two or three abreast,
     narrowing and thinning toward the end. (One wide flat lobe reads as a saucer; a mat of small ones reads as cloud.)"""
-    cs, sn = math.cos(yaw), math.sin(yaw); rows = max(3, int(length / (width * 0.3)))
+    cs, sn = math.cos(yaw), math.sin(yaw); rows = max(3, int(length / (width * 0.42)))
     for i in range(rows):
         t = (i + 0.2) / rows; w = width * (1.0 - 0.55 * t)
-        for j in range(rr.randint(2, 3)):
-            off = rr.uniform(-0.5, 0.5) * w; r = w * rr.uniform(0.2, 0.32)
+        for j in range(2):
+            off = (j - 0.5) * w * rr.uniform(0.5, 0.9) + rr.uniform(-0.12, 0.12) * w; r = w * rr.uniform(0.24, 0.36)
             px, py = x + cs * length * t - sn * off, y + sn * length * t + cs * off
             out.append(L(px, py, z + rr.uniform(-0.5, 0.5) * thick, r, min(0.7, max(0.24, thick / r * rr.uniform(0.7, 1.2))), dens * (1.0 - 0.4 * t), soft, sx=rr.uniform(1.0, 1.5), sz=rr.uniform(0.9, 1.2)))
-        if rr.random() < 0.6:                                                   # a small dome on the mat
+        if rr.random() < 0.4:                                                   # a small dome on the mat
             off = rr.uniform(-0.3, 0.3) * w
             out.append(L(x + cs * length * t - sn * off, y + sn * length * t + cs * off, z + thick * 0.8, max(12.0, w * rr.uniform(0.12, 0.2)), 0.8, dens + 0.2, 0.35))
     for k in range(scraps):                                                     # detached scraps just beyond the end
@@ -84,17 +84,18 @@ def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42,
                                                                                    for a in [rr.uniform(0, 6.283) for _ in range(turrets - 1)]]
     cores = []
     for ti, (frac, (ox, oy)) in enumerate(zip(tops, spots)):
-        th = H * frac; r = radius * (0.62 if ti == 0 else rr.uniform(0.36, 0.5)); z = base + r * 0.5; px, py = x + ox, y + oy
+        th = H * frac; r = radius * (0.5 if ti == 0 else rr.uniform(0.32, 0.44)); z = base + r * 0.5; px, py = x + ox, y + oy
         while True:
             out.append(L(px, py, z, r, rr.uniform(0.88, 1.0), dens, soft)); cores.append((px, py, z, r))
             cauliflower(rr, out, px, py, z, r, detail, soft, dens, n=kids)
-            if r > radius * 0.16:                                               # a sibling beside each core: a crown is a cluster of heads, never a spire
+            if r > radius * 0.16 and (z - base) > th * 0.42:                    # a sibling beside each core of the upper half: a crown is a cluster of heads, never a spire
                 a = rr.uniform(0, 6.283); sr = r * rr.uniform(0.68, 0.85)
                 qx, qy_, qz_ = px + math.cos(a) * r * 0.85, py + math.sin(a) * r * 0.85, z - r * rr.uniform(0.05, 0.3)
                 out.append(L(qx, qy_, qz_, sr, rr.uniform(0.85, 1.0), dens, soft))
                 if rich:
-                    cauliflower(rr, out, qx, qy_, qz_, sr, 1, soft, dens, n=(2, 4))
-            nz = z + r * rr.uniform(0.55, 0.75); nr = r * rr.uniform(0.76, 0.9)
+                    cauliflower(rr, out, qx, qy_, qz_, sr, 1, soft, dens, n=(2, 3))
+            low = (z - base) < th * 0.55                                         # a tower keeps its girth and bulges on the way up, and narrows only near its top: not a cone
+            nz = z + r * rr.uniform(0.55, 0.75); nr = r * (rr.uniform(0.88, 1.08) if low else rr.uniform(0.72, 0.86))
             if nz + nr * 0.8 > base + th or nr < radius * 0.1:
                 break
             px += WIND[0] * r * lean * rr.uniform(0.5, 1.5) + rr.uniform(-0.2, 0.2) * r; py += WIND[1] * r * lean * rr.uniform(0.5, 1.5) + rr.uniform(-0.2, 0.2) * r
@@ -205,7 +206,7 @@ def bins_report(lobes):
 
 def build():
     masses = {"mooring_mound": mooring_mound()}
-    masses["head"] = cumulus(21, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 5))
+    masses["head"] = cumulus(21, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 4))
     masses["veil"] = cumulus(22, VEIL[0], VEIL[1], SEA_TOP - 20, 290, 185, turrets=3, lean=0.06, shelves=((0.5, 1.0), (0.74, 0.6)), kids=(3, 4))      # upright and broad: it must hide the Condensery from the Mooring
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
     for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
@@ -218,14 +219,14 @@ def build():
     lx, ly, lz = LONE_LAMP
     masses["lone_lamp"] = rock(50, lx, ly, lz - 9.0, 48)
     mid = []
-    for i, (x, y, top, rad) in enumerate(((760, 430, 300, 170), (1250, 620, 240, 150), (1180, -520, 210, 140), (520, -620, 170, 120), (-560, 420, 230, 150), (1560, -260, 150, 110))):
+    for i, (x, y, top, rad) in enumerate(((760, 430, 270, 190), (1250, 620, 220, 170), (1180, -520, 190, 160), (520, -620, 160, 130), (-560, 420, 210, 170), (1560, -260, 140, 125))):
         mid += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=3, shelves=((0.45, 1.2), (0.7, 0.6)), detail=1, kids=(3, 5), rich=False)
     masses["mid_field"] = mid
     far = []
     for i, (fx, fy, fh, fr) in enumerate(((-900, 1500, 500, 420), (1200, 2600, 700, 520), (3400, 2200, 900, 600), (4200, -300, 600, 520), (2600, -1500, 450, 420), (5200, 3800, 1300, 800),
                                           (7600, 900, 1100, 900), (300, 4600, 1000, 800), (8200, 4800, 1600, 1000), (-2800, 3200, 800, 700), (6200, -2600, 900, 800), (9800, 2000, 1400, 1100))):
         rr = random.Random(80 + i); f = []
-        far += [l for l in cumulus(80 + i, fx, fy, SEA_TOP - 40, fh, fr * 0.6, turrets=3, shelves=((0.5, 1.2),), mist=False, detail=1, kids=(3, 4), rich=False) if l["r"] > fr * 0.11]
+        far += [l for l in cumulus(80 + i, fx, fy, SEA_TOP - 40, fh * 0.85, fr * 0.75, turrets=4, shelves=((0.5, 1.2),), mist=False, detail=1, kids=(3, 4), rich=False) if l["r"] > fr * 0.11]
     return masses, far
 
 

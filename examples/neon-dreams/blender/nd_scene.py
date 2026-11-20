@@ -254,7 +254,7 @@ for k in range(0, 71):
     if prev is not None:
         AR.beam(prev, q, 110.0, t2=60.0)
         if k % 2 == 0:
-            ARL.box(q + Vector((0, 0, 90)), (40, 40, 40))
+            ARL.box(q + Vector((0, 0, 70)), (24, 24, 24))
     prev = q
 
 
@@ -264,7 +264,7 @@ def emit_mat(name, key, strength):
     return m
 
 
-AR.build("long_arc", emit_mat("arc", "win_c", 0.5)); ARL.build("long_arc_lights", emit_mat("arc_l", "win_a", 18.0))
+AR.build("long_arc", emit_mat("arc", "win_c", 1.6)); ARL.build("long_arc_lights", emit_mat("arc_l", "win_a", 3.0))   # the line must carry it: lights alone read as UFOs (seen twice)
 
 w = bpy.data.worlds.new("sky"); scene.world = w; w.use_nodes = True; nt = w.node_tree
 for n in list(nt.nodes):
