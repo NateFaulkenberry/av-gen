@@ -12,11 +12,16 @@ What a formation is here (the round-1 clouds were thumbs: a few big balls under 
     and a few detached scraps;
   * ROCKS (the lighthouse outcrops, the Condensery's column): the same recipe, compact and dense, steep sides, crisp
     edges (soft 0.16 to 0.24), a calm top, mist lobes round the foot.
-The plateau under the Mooring follows nd_world.town_top: about 9 m under every deck, so stilts vanish into it.
+The plateau under the Mooring follows nd_world.town_top plus SEAT: level with the decks as authored, never over them.
 
 Output: lobes in the ADR-1289 shape {c, r, scale, density, soft}, ENGINE coordinates, plus a ready `clouds` block for
 the engine (sea, glows with palette keys, light direction, noise) and a replica of the renderer's lobe binning so the
-file can be checked against its limits (64 lobes per cell, cells of half the median radius or span / 64).
+file can be checked against its limits (64 lobes per cell, cells of half the median radius or span / 128).
+
+Iteration 6 (version 4 of the file): the far field is a composed cloudscape (far_field); the Veil's walls are wall masses
+only and its plug is one layer of big lobes (veil); the reveal has a foreground (reveal_fore); the ocean break lies under
+the Condensery's pedestal; the cloud that decks stand in is lifted by SEAT. What the engine's ADR-2106 erosion does to a
+lobe, and what that costs, is written where it bit: SEAT, VEIL_WALLS, veil().
 """
 import json, math, os, random, sys
 
@@ -25,6 +30,22 @@ sys.path.insert(0, HERE)
 from nd_world import *  # noqa
 
 WIND = (0.86, -0.5)            # plan direction the wind blows toward (east-south-east): leans, shelves and the plume follow it
+# Iteration 6, after the engine's ADR-2106 (erosion in metres): every lobe's surface is now eaten inward by up to 0.88 of
+# its smallest semi-axis (about 0.3 to 0.45 on average), in every direction. Measured in AV Gen with erosion 1 and a 60 m
+# wavelength: the plateau under the Mooring and the heads under the Condensery's deck, authored 5 m under the decks, sat
+# 15 to 30 m under them, and every stilt stood in the open. SEAT lifts the authored tops of the cloud that decks stand
+# in. At 5 m they are level with the decks and never over them (the erosion only goes inward), so no street is under
+# cloud if the erosion is turned down; with erosion 1 the surface is then 5 to 15 m under the decks. Lobes whose
+# surface has to stay where it is authored carry "tag": "seat" (and the plug's walls "plug"): a per-lobe erosion factor
+# in the engine, if there is to be one, belongs on those.
+SEAT = 5.0
+_town_top0 = town_top
+
+
+def town_top(x, y):          # noqa: F811
+    return _town_top0(x, y) + SEAT
+
+
 SEA_TOP, SEA_BASE = -38.0, -260.0
 
 
@@ -157,7 +178,7 @@ def town():
     cells = {}
     for i in lay["instances"]:
         fam = i["asset"].split("/")[0]
-        if fam not in ("decks", "buildings") or i["zone"] in ("condensery", "lone_lamp", "lighthouse", "gangway") or "rail" in i["asset"] or "stair" in i["asset"]:
+        if fam not in ("decks", "buildings") or i["zone"] in ("condensery", "lone_lamp", "lighthouse", "gangway", "highwater") or "rail" in i["asset"] or "stair" in i["asset"]:
             continue
         b = man[i["asset"]]["bounds_m"]; sx, sy, sz = i["scale"]; yaw = math.radians(i["rot_y_deg"])
         px, py, pz = i["pos"][0], -i["pos"][2], i["pos"][1]
@@ -269,13 +290,14 @@ def bins_grid(lobes):
     return bins_report(lobes)
 
 
-_PATH = [cam_at(t / 5.0) for t in range(0, 352)]          # the journey every 0.2 s (plan coordinates)
+_J = Journey()                                            # the journey as the engine flies it (nd_world.Journey)
+_PATH = [_J.at(t / 10.0) for t in range(0, 703)]          # every 0.1 s (plan coordinates)
 
 
 def path_gap(l, t0=0.0, t1=70.2):
     """Metres of clear air between a lobe (engine coordinates) and the journey between t0 and t1 (negative: inside)."""
     cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; rx, rz, ry = (l["r"] * v for v in l["scale"]); best = 1e9
-    for k in range(int(t0 * 5), min(len(_PATH), int(t1 * 5) + 1)):
+    for k in range(int(t0 * 10), min(len(_PATH), int(t1 * 10) + 1)):
         px, py, pz = _PATH[k]
         q = math.sqrt(((px - cx) / rx) ** 2 + ((py - cy) / rz) ** 2 + ((pz - cz) / ry) ** 2)
         best = min(best, (q - 1.0) * min(rx, ry, rz))
@@ -433,27 +455,37 @@ VEIL_BEADS = [(20, 22, 0, 0, "gate"), (40, 22, 0, 1, "gate"), (58, 28, 0, 2, "an
               (128, 15, 0, 0, "throat1"),
               (152, 30, 0, 2, "nave"), (182, 46, 4, 6, "nave"), (216, 52, 0, 8, "nave"), (250, 44, -4, 6, "nave"), (200, 34, 6, 44, "nave"), (234, 32, -6, 46, "nave"),
               (278, 22, 0, 0, "nave"), (294, 14, 0, 0, "throat2"),
-              (310, 20, 0, 1, "lantern_room"), (328, 30, 0, 3, "lantern_room")]
-# The PLUG: from the lantern room's far wall (about 350 m) to 448 m the bank is solid at full density. It is the only
-# cloud between the rooms and the Condensery, which stands 3 degrees off the camera's own heading, so nothing beside
-# the path can hide it: about 100 m at an extinction of 0.15 is an optical depth near 10. The camera is blind from
-# 54.9 s to the crash at 56.85 s and comes out with it. After it the air is kept clear for the reveal.
-VEIL_PLUG = (376, 388, 400, 412)
+              (316, 18, 0, 1, "lantern_room")]
+# The PLUG: the bank is solid from the lantern room's far wall to the mouth. It is the only cloud between the rooms and
+# the Condensery and the moon, which stand 10 and 17 degrees to the left of the camera's own heading there.
+# Iteration 6 tried two things here in AV Gen and kept neither:
+#   * two walls of discs (lobes flattened along the journey) with a small "ember room" between them: without the
+#     engine's erosion it broke the 2.5 s of one colour into wall, room, wall;
+#   * the same as two layers of 30 m lobes on a 34 m grid.
+# The engine's ADR-2106 (erosion in metres, strength 1, wavelength 60 m) opens both: the erosion is taken off a lobe's
+# normalised radius by up to 0.88 of its smallest semi-axis for a lobe under 18 m and 0.8 for one of 30 m, so a disc
+# loses its width with its thickness and a 30 m lobe is 6 m in the deepest bays. The Condensery and the moon stood in
+# the gaps from 54.4 s, two and a half seconds before the crash. Only big lobes survive a bay: one of 60 m keeps 23 m.
+# So the plug is ONE layer of 60 m lobes on a 40 m grid across the journey, centred 396 m from the 47.0 s point:
+# 336 to 456 m as authored, about 355 to 437 m once eroded on average (54.85 to 56.7 s), never less than 373 to 419 m.
+# What it shows from inside is the engine's and the glows'. A glow inside solid cloud is occluded within about 20 m
+# (glowOcclusion 0.8 at this extinction), so one that stands beside the journey lights nothing the lens can see: the
+# first test was 1.3 s of flat dark blue. veil_pocket5 (372 m, 55.2 s) and veil_amber (414 m, 56.15 s) therefore stand
+# ON the journey: the lens flies through each, a warm pulse of about a second, the second larger: dark, ember, dark,
+# ember, and the works coming up through the last of the cloud. The Condensery's own light is held at a tenth until 56.03 s by the
+# engine's timeline. (The toms rest from 48.3 to 69.1 s: there is no tom hit to hang a flash on in the plug.)
+VEIL_WALLS = [(396.0, 60.0, 40.0, "plug")]          # (centre along the journey, lobe radius, grid spacing, name)
+VEIL_EXIT_S = 444.0
 VEIL_EXIT = [(474, 30, 0, 0), (492, 44, 0, 0), (520, 60, 0, 0), (552, 76, 0, 0), (592, 92, 0, 0), (640, 112, 0, 0)]
+_S47 = _J.s_at(VEIL_T0)
 
 
 def _veil_axis():
-    ts = [VEIL_T0 + k * 0.05 for k in range(0, 300)]; P = [cam_at(t) for t in ts]; cum = [0.0]
-    for k in range(1, len(P)):
-        cum.append(cum[-1] + math.dist(P[k - 1], P[k]))
-
+    """at(metres from the journey's place at 47.0 s) -> (position, unit tangent, unit right, time), on the engine's path."""
     def at(sm):
-        k = max(1, min(len(cum) - 1, next((i for i in range(1, len(cum)) if cum[i] >= sm), len(cum) - 1)))
-        u = (sm - cum[k - 1]) / max(cum[k] - cum[k - 1], 1e-6); u = max(-2.0, min(1.0, u))
-        p = [P[k - 1][j] + (P[k][j] - P[k - 1][j]) * u for j in range(3)]
-        d = [P[k][j] - P[k - 1][j] for j in range(3)]; n = math.sqrt(sum(v * v for v in d)); d = [v / n for v in d]
-        right = (d[1], -d[0], 0.0); rn = math.hypot(right[0], right[1]); right = (right[0] / rn, right[1] / rn, 0.0)
-        return p, d, right, ts[k - 1] + (ts[k] - ts[k - 1]) * u
+        s_ = _S47 + sm; p = _J.at_s(s_); d = _J.fwd_s(s_)
+        rn = math.hypot(d[1], d[0]) or 1.0
+        return p, d, (d[1] / rn, -d[0] / rn, 0.0), _J.t_at(s_)
     return at
 
 
@@ -483,35 +515,46 @@ def _admit(l, voids, bulge):
     return True
 
 
+def _tangents(u):
+    """Two unit vectors square to u and to each other."""
+    ref = (0.0, 0.0, 1.0) if abs(u[2]) < 0.9 else (1.0, 0.0, 0.0)
+    t1 = (u[1] * ref[2] - u[2] * ref[1], u[2] * ref[0] - u[0] * ref[2], u[0] * ref[1] - u[1] * ref[0]); n = math.sqrt(sum(q * q for q in t1)); t1 = tuple(q / n for q in t1)
+    return t1, (u[1] * t1[2] - u[2] * t1[1], u[2] * t1[0] - u[0] * t1[2], u[0] * t1[1] - u[1] * t1[0])
+
+
 def veil():
-    """The bank: three turrets over a chain of rooms (gate, antechamber, nave, lantern room), a plug, and tatters."""
+    """The bank: three turrets over a chain of rooms (gate, antechamber, nave, lantern room), the plug and the mouth. Iteration 6: what a room's wall is made of. In iteration 5 every shell lobe was 12 to 60 m with a crisp
+    edge, and from inside the walls read as clustered spheres. The cause, found in AV Gen: the renderer's noise has
+    features of about 55 m (shape) and 14 m (detail) and only works inside a lobe's soft edge, so a lobe whose soft band
+    (radius x soft) is under about 12 m stays a smooth ellipsoid however many of them there are, and a cluster of them
+    is a cluster of balls. So within 110 m of the journey the Veil is built of WALL MASSES only: 30 to 85 m, in three
+    sizes, soft 0.5 to 0.6 (a band of 15 to 45 m). The noise takes bays and shreds out of them: that is the billowing.
+    Nothing small stands on them, and the bank's own lobes are held to the same rule there.
+    (Tried in AV Gen and dropped this iteration: clusters of flattened billows of 14 to 26 m on the masses, crisp or
+    soft: lit from inside the room they read as rimmed discs, like blood cells. Wisps of 7 to 13 m at low density:
+    clean translucent ellipses.)"""
     rr = random.Random(47); out = []; at = _veil_axis()
     rooms, exits = veil_voids(); voids = rooms + exits
-    # 1. shells: billows round every bead, bulging into it by 0.28 of their radius
+    n_mass = 0
     for v in rooms:
-        rb = max(18.0, min(40.0, 0.78 * v["rho"])); n = max(12, int(5.5 * ((v["rho"] + 0.6 * rb) / rb) ** 2))
+        rho = v["rho"]; c0 = v["c"]
+        ra = max(28.0, min(58.0, 1.25 * rho)); n = max(10, int(4.4 * ((rho + 0.8 * ra) / ra) ** 2))
         for k in range(n):
-            zf = 1.0 - 2.0 * (k + 0.5) / n; ph = k * 2.39996 + rr.uniform(-0.25, 0.25); sf = math.sqrt(max(0.0, 1.0 - zf * zf))
-            u = (sf * math.cos(ph), sf * math.sin(ph), zf); r = rb * (rr.uniform(1.05, 1.5) if k % 3 else rr.uniform(0.6, 0.85))
-            c = [v["c"][j] + u[j] * (v["rho"] + r * 0.72) for j in range(3)]
-            l = L(c[0], c[1], c[2], r, rr.uniform(0.8, 1.0), 1.0, 0.34, sx=rr.uniform(0.9, 1.2), sz=rr.uniform(0.9, 1.2))
-            if _admit(l, voids, 0.32):
-                out.append(l)
-                l["_keep"] = True; l["tag"] = "wall"
-                for j_ in range(rr.randint(0, 2)):                            # small billows on its face, toward the room
-                    a1, a2 = rr.uniform(-0.9, 0.9), rr.uniform(-0.9, 0.9); cr = r * rr.uniform(0.32, 0.46)
-                    w = (-u[0] + a1 * u[1] + a2 * u[2] * 0.3, -u[1] - a1 * u[0], -u[2] + a2 * (1.0 - abs(u[2])))
-                    wn = math.sqrt(sum(q * q for q in w)) or 1.0
-                    cc = [c[j] + w[j] / wn * (r * 0.82) for j in range(3)]
-                    lc = L(cc[0], cc[1], cc[2], cr, rr.uniform(0.8, 1.0), 1.0, 0.3)
-                    if cr >= 7.0 and _admit(lc, voids, 0.5):
-                        out.append(lc)
-                if rr.random() < 0.34:                                      # a second, bigger billow behind it: the wall's thickness
-                    r2 = rr.uniform(42, 64); c2 = [v["c"][j] + u[j] * (v["rho"] + r * 1.3 + r2 * 0.7) for j in range(3)]
-                    l2 = L(c2[0], c2[1], c2[2], r2, rr.uniform(0.85, 1.0), 1.0, 0.26)
-                    if _admit(l2, voids, 0.05):
-                        out.append(l2)
+            zf = 1.0 - 2.0 * (k + 0.5) / n; ph = k * 2.39996 + rr.uniform(-0.3, 0.3); sf = math.sqrt(max(0.0, 1.0 - zf * zf))
+            u = (sf * math.cos(ph), sf * math.sin(ph), zf)
+            r = ra * (rr.uniform(1.15, 1.45) if k % 3 == 0 else rr.uniform(0.75, 1.05))                     # one in three is a size bigger
+            c = [c0[j] + u[j] * (rho + r * 0.8) for j in range(3)]
+            l = L(c[0], c[1], c[2], r, rr.uniform(0.8, 1.0), 1.0, rr.uniform(0.5, 0.6), sx=rr.uniform(0.95, 1.3), sz=rr.uniform(0.95, 1.2))
+            if not _admit(l, voids, 0.32):
+                continue
+            l["_keep"] = True; l["tag"] = "wall"; out.append(l); n_mass += 1
+            if rr.random() < 0.3:                                         # a second mass behind it: the wall's thickness
+                r2 = rr.uniform(46, 68); c2 = [c0[j] + u[j] * (rho + r * 1.3 + r2 * 0.7) for j in range(3)]
+                l2 = L(c2[0], c2[1], c2[2], r2, rr.uniform(0.85, 1.0), 1.0, 0.3)
+                if _admit(l2, voids, 0.05):
+                    out.append(l2)
     n_shell = len(out)
+    STATS.update(veil_wall_masses=n_mass)
     # 2. the bank outside: three cumulus masses on the axis, the widest and tallest over the nave; whatever would
     #    reach into a room is left out, so the turrets stand on the rooms' roofs
     #    (their centres stand 35 m to the left of the path, the Condensery's side: more cloud between the rooms and the
@@ -530,30 +573,88 @@ def veil():
                   p[2] + up_ + rr.uniform(-14, 14), r * rr.uniform(0.85, 1.15), rr.uniform(0.85, 1.05), 1.0, 0.26)
             if l["c"][1] + l["r"] * l["scale"][1] < 372 and _admit(l, voids, 0.08):
                 out.append(l)
-    # 4. the plug: solid, full density, on the axis and round it
-    for sm in VEIL_PLUG:
-        p, d, right, t = at(sm)
-        l = L(p[0], p[1], p[2] - 3.0, rr.uniform(38, 42), 1.0, 1.0, 0.22); l["_keep"] = True; l["tag"] = "plug"; out.append(l)
-        for k in range(5):
-            a = k / 5.0 * 6.283 + rr.uniform(-0.4, 0.4); off = rr.uniform(34, 52); r = rr.uniform(34, 48)
-            l = L(p[0] + right[0] * off * math.cos(a), p[1] + right[1] * off * math.cos(a), p[2] + off * math.sin(a) - 3.0, r, rr.uniform(0.9, 1.0), 1.0, 0.24)
-            if _admit(l, rooms, 0.25):
-                l["tag"] = "plug"; out.append(l)
-    # 5. tatters in the clear air after it: a few thin scraps beside the path until the reveal at 58.95 s
-    for sm in (462, 472, 484, 498, 514, 532):
-        p, d, right, t = at(sm)
-        for k in range(2):
-            side = rr.choice((-1, 1)); off = rr.uniform(16, 46) * (1 + (sm - 450) / 90.0)
-            out.append(L(p[0] + right[0] * side * off, p[1] + right[1] * side * off, p[2] + rr.uniform(-26, 22), rr.uniform(9, 17), rr.uniform(0.4, 0.6), rr.uniform(0.35, 0.5), 0.65, sx=rr.uniform(1.4, 2.2)))
+    # 4. the plug: one layer of big lobes on a grid across the journey, corners left off
+    for (sc, r0, sp, name) in VEIL_WALLS:
+        p, d, right, t = at(sc)
+        for i in range(-2, 3):
+            for j in range(-2, 3):
+                if abs(i) == 2 and abs(j) == 2:
+                    continue
+                r = r0 * rr.uniform(0.96, 1.1); js = rr.uniform(-4.0, 4.0)
+                l = L(p[0] + right[0] * i * sp + d[0] * js, p[1] + right[1] * i * sp + d[1] * js, p[2] + j * sp - 2.0, r, 1.0, 1.0, 0.3)
+                if _admit(l, rooms, 0.3):
+                    l["_keep"] = True; l["tag"] = "plug"; out.append(l); STATS["plug_lobes"] = STATS.get("plug_lobes", 0) + 1
     ragged([l for l in out if not l.get("_keep")])              # the bank's big lobes, not the rooms' walls
+    kept = []; n_small = 0
+    for l in out:                                               # within 110 m of the journey: no small lobe, no crisp one
+        if not l.get("_keep") and path_gap(l, 46.5, 58.5) < 110.0:
+            if l["r"] * min(l["scale"]) < 24.0:
+                n_small += 1; continue
+            l["soft"] = max(l["soft"], 0.5)
+        kept.append(l)
+    out = kept; STATS.update(veil_small_lobes_dropped_near_journey=n_small)
     # a curtain across the second throat: one thin scrap the camera passes through at about 53.6 s
     p, d, right, t = at(294)
     out.append(L(p[0], p[1], p[2] + 3, 13.0, 0.9, 0.3, 0.8))
     return out, n_shell, rooms, exits
 
 
+def _ahead(at, sm):
+    """The journey's point at sm metres from 47.0 s, carried on in a straight line past its end (for cloud laid ahead of
+    the last frame)."""
+    end = _J.total - _S47
+    if sm <= end:
+        return at(sm)
+    p, d, right, t = at(end)
+    return tuple(p[i] + d[i] * (sm - end) for i in range(3)), d, right, t
+
+
+def reveal_fore():
+    """Iteration 6: the foreground of the reveal. The iteration-5 reveal had nothing between the lens and the Condensery
+    1.4 km away: no parallax, and the whole view arrived at once.
+      * THE SILL: the bank's east shoulder under the journey, from the plug's mouth (56.88 s, the first crash) to a lip
+        under the lens at 58.95 s (the second crash): 10 m under the lens at the mouth, 6 m at the lip, lower on the
+        left, with a SPUR on the right that rises above the lens and ends at the lip. From the mouth the Condensery and
+        the moon stand clear on the left; the right of the frame is behind the spur. At the lip both fall away: the
+        ocean break opens under the lens and the far field on the right. Two crashes, two reveals.
+      * SKERRIES: a few low tufts over the sea after the lip, 60 to 140 m off the journey and 45 to 100 m under it,
+        passing under the frame as the lens sinks toward the break.
+    Close to the lens a crisp lobe is a smooth ball (see veil()), so these are few, 22 to 46 m, with soft 0.55 to 0.6:
+    the noise makes their surface. Nothing comes within 5 m of the journey; nothing on the left stands above the lens."""
+    rr = random.Random(59); out = []; at = _veil_axis()
+    s_lip = _J.s_at(58.95) - _S47; s0 = VEIL_EXIT_S + 8.0
+
+    def put(sm_, lat, top, r, sy_, gap, tag="sill", soft=0.58):
+        p, d, right, t = _ahead(at, sm_)
+        l = L(p[0] + right[0] * lat, p[1] + right[1] * lat, p[2] + top - r * sy_, r, sy_, 1.0, soft, sx=rr.uniform(1.0, 1.25), sz=rr.uniform(0.95, 1.15))
+        if path_gap(l, 56.3, 61.0) >= gap:
+            l["tag"] = tag; l["_keep"] = True; out.append(l)
+    sm = s0
+    while sm < s_lip - 6.0:                                       # the floor
+        f = (sm - s0) / (s_lip - s0); clear = 10.0 - 4.0 * f
+        for lat in (-44, -14, 16):
+            la = lat + rr.uniform(-6, 6)
+            put(sm + rr.uniform(-4, 4), la, -clear - abs(la) * 0.08 - rr.uniform(0, 3) - (8.0 if la < -26 else 0.0), rr.uniform(24, 32), rr.uniform(0.5, 0.62), 5.0)
+        sm += rr.uniform(17, 21)
+    for sm_ in (466, 496):                                        # its body: the floor is the top of a bank, not a raft
+        put(sm_, 4, -14, rr.uniform(46, 52), 0.85, 5.0, soft=0.45)
+    sm = 468.0
+    while sm < s_lip - 2.0:                                       # the spur: rising to the right, its tip about 10 m from the lens
+        for (lat, rise, r) in ((36, 6, 24), (62, 20, 32), (92, 30, 40)):
+            put(sm + rr.uniform(-4, 4), lat + rr.uniform(-3, 5), rise * rr.uniform(0.75, 1.15), r * rr.uniform(0.9, 1.12), rr.uniform(0.7, 0.9), 7.0)
+        sm += rr.uniform(14, 18)
+    n_sill = len(out)
+    for (sm_, lat, drop, r) in ((600, 96, 48, 26), (640, -110, 60, 30), (700, 140, 70, 28), (760, -84, 86, 30), (850, 120, 96, 34), (930, -140, 100, 36)):
+        put(sm_, lat, -drop, r, 0.62, 30.0, tag="skerry", soft=0.6)
+        put(sm_ + rr.uniform(-18, 18), lat + rr.uniform(-22, 22), -drop + rr.uniform(2, 10), r * 0.6, 0.75, 30.0, tag="skerry", soft=0.7)
+    STATS.update(sill_lobes=n_sill, skerry_lobes=len(out) - n_sill, sill_lip_m_from_47s=round(s_lip, 1))
+    return out
+
+
 def veil_glows():
-    """The light in the rooms, under the names the engine's routes already use (veil_rose, veil_amber, veil_pocket0..5)."""
+    """The light in the rooms, under the names the engine's routes already use (veil_rose, veil_amber, veil_pocket0..5).
+    Iteration 6: pocket 5 and veil_amber stand inside the plug on the journey itself, so its two seconds are two warm
+    pulses in the dark and not one colour."""
     rooms, exits = veil_voids(); at = _veil_axis(); by = {}
     for v in rooms:
         by.setdefault(v["room"], []).append(v)
@@ -563,19 +664,167 @@ def veil_glows():
         g.append({"name": name, "position": E(c), "radius": radius, "intensity": gain, "key": key, "note": note})
     a = max(by["antechamber"], key=lambda v: v["rho"]); n = max(by["nave"], key=lambda v: v["rho"]); lr = max(by["lantern_room"], key=lambda v: v["rho"])
     add("veil_rose", (a["c"][0], a["c"][1], a["c"][2] + 8), 50.0, 1.6, "garden_a", "the antechamber: the rose light seen in the gate's mouth from the garden")
-    add("veil_amber", at(360)[0], 62.0, 3.0, "cond_a", "in the plug's near face: the first amber, on the lantern room's far wall at 54.4 s, then all round the camera")
+    p, d, right, t = at(414.0)
+    add("veil_amber", (p[0] - right[0] * 5, p[1] - right[1] * 5, p[2] - 3), 58.0, 2.2, "cond_a",
+        "inside the plug, on the journey, 414 m from the 47.0 s point (56.15 s): the second and larger warm pulse; the mouth and the first of the sill are amber at the crash (56.88 s)")
     ns = sorted(by["nave"], key=lambda v: v["s"])
     add("veil_pocket0", (a["c"][0], a["c"][1], a["c"][2] - a["rho"] + 6), 34.0, 0.7, "garden_a", "the antechamber's floor")
     add("veil_pocket1", (ns[1]["c"][0], ns[1]["c"][1], ns[1]["c"][2] - ns[1]["rho"] + 8), 46.0, 0.9, "garden_b", "the nave's floor, west")
     add("veil_pocket2", (n["c"][0], n["c"][1], n["c"][2] + 62), 44.0, 0.8, "garden_a", "the nave's clerestory")
     add("veil_pocket3", (ns[4]["c"][0], ns[4]["c"][1], ns[4]["c"][2] - ns[4]["rho"] + 8), 46.0, 0.9, "garden_b", "the nave's floor, east")
-    p, d, right, t = at(328)
-    add("veil_pocket4", (lr["c"][0] + right[0] * 20, lr["c"][1] + right[1] * 20, lr["c"][2] - 8), 30.0, 0.7, "garden_a", "the lantern room, right")
-    add("veil_pocket5", (lr["c"][0] - right[0] * 20, lr["c"][1] - right[1] * 20, lr["c"][2] + 12), 30.0, 0.7, "garden_b", "the lantern room, left")
+    p, d, right, t = at(316)
+    add("veil_pocket4", (lr["c"][0] + right[0] * 14, lr["c"][1] + right[1] * 14, lr["c"][2] - 6), 34.0, 0.8, "garden_a", "the lantern room: the last room before the plug")
+    p, d, right, t = at(372.0)
+    add("veil_pocket5", (p[0], p[1], p[2] - 4), 40.0, 1.6, "cond_a", "inside the plug, on the journey, 372 m from the 47.0 s point (55.2 s): the first amber, a pulse as the lens passes it")
     return g
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# The far field (iteration 6). Until now it was twelve cumulus of one recipe, each about as tall as it was wide, at 2 to
+# 10 km: in the engine's reveal, four similar puffs on an empty horizon. It is now composed for the two views that show
+# it (the approach, 3 to 25 s, looking about 30 degrees north of east from the south-west; the reveal, 57 to 70 s,
+# looking about 4 degrees north of east from (650, 50)):
+#   * COLOSSAL BANKS: ranges kilometres long with a ridge line that rises and falls (far_bank);
+#   * LONG LOW SWELLS: bands 2 to 4 km long and 150 to 250 m thick lying on the horizon at 5 to 9 km, one behind the
+#     other, so the horizon is ridgelines in haze instead of a line (far_swell);
+#   * ONE TALL TOWER with an anvil, 9 km out on the right of the reveal (far_tower): the only thing in the sky as tall
+#     as the moon;
+#   * a few true cumulus of unlike sizes between them;
+#   * the cloud island of Highwater Mooring (the settlement glimpsed on the right of the reveal), with a taller cumulus
+#     behind it and a low bank across its near side that veils part of its lights.
+# The moon's sector as seen from the reveal (plan headings 10 to 33 degrees) holds nothing taller than 1.5 degrees over
+# the horizon: whatever stood there would hide the disc, which is at infinity.
+# Lobes are sized for the distance: the march steps about 2 % of the distance, so nothing under 55 m at 2 km, 80 m at
+# 4 km or 150 m at 9 km.
+def _axis_scale(dx, dy, k):
+    """A stretch of k along the nearer world axis of a plan direction (lobes are axis-aligned ellipsoids)."""
+    a = abs(math.degrees(math.atan2(dy, dx))) % 180.0
+    if a < 30.0 or a > 150.0:
+        return k, 1.0
+    if 60.0 < a < 120.0:
+        return 1.0, k
+    return 1.0 + (k - 1.0) * 0.45, 1.0 + (k - 1.0) * 0.45
+
+
+def far_bank(seed, a, b, heights, width, rmin=75.0, base=SEA_TOP - 40, shelves=2):
+    """A range from a to b (plan). heights: altitudes of the ridge line along it; width: across.
+    A BODY of big overlapping lobes carries a continuous ridge to about two thirds of the profile, DOMES of two sizes
+    stand on it to the profile's height, one or two a core, and a few heads stand on the domes. (The first version
+    stacked a column of lobes at every core: from 4 km the North Wall was a row of thumbs.)"""
+    rr = random.Random(seed); out = []
+    dx, dy = b[0] - a[0], b[1] - a[1]; length = math.hypot(dx, dy); nx, ny = -dy / length, dx / length
+    ex, ey = _axis_scale(dx, dy, 1.5)
+
+    def H(t):
+        k = t * (len(heights) - 1); i = min(int(k), len(heights) - 2)
+        return heights[i] + (heights[i + 1] - heights[i]) * (k - i)
+    n = max(4, int(length / (width * 0.42))); domes = []
+    for i in range(n + 1):
+        t = i / n; top = H(t) * rr.uniform(0.9, 1.06); hb = (top - base) * rr.uniform(0.58, 0.7)
+        off = rr.uniform(-0.2, 0.2) * width; x, y = a[0] + dx * t + nx * off, a[1] + dy * t + ny * off
+        r = width * rr.uniform(0.56, 0.72)
+        out.append(L(x, y, base + hb * 0.5, r, min(1.25, hb * 0.56 / r), 1.0, 0.4, sx=ex, sz=ey))            # the body
+        if i % 2 == 0:
+            out.append(L(x + nx * rr.uniform(-0.5, 0.5) * width, y + ny * rr.uniform(-0.5, 0.5) * width, base + 40 + r * 0.3, r * 1.2, 0.3, 1.0, 0.5, sx=ex, sz=ey))      # the foot
+        for j in range(rr.randint(1, 2)):                                                              # domes on the ridge
+            rd = width * (rr.uniform(0.34, 0.48) if j == 0 else rr.uniform(0.2, 0.3))
+            if rd < rmin:
+                continue
+            sy_ = rr.uniform(0.75, 0.95); tj = top * (1.0 if j == 0 else rr.uniform(0.78, 0.92))
+            px, py = x + nx * rr.uniform(-0.3, 0.3) * width + dx / length * rr.uniform(-0.2, 0.2) * width, y + ny * rr.uniform(-0.3, 0.3) * width + dy / length * rr.uniform(-0.2, 0.2) * width
+            zc = max(base + hb * 0.8, tj - rd * sy_)
+            out.append(L(px, py, zc, rd, sy_, 1.0, 0.3)); domes.append((px, py, zc, rd))
+            if rd * 0.45 >= rmin and rr.random() < 0.6:
+                ph = rr.uniform(0, 6.283); cr = rd * rr.uniform(0.4, 0.5)
+                out.append(L(px + rd * 0.7 * math.cos(ph), py + rd * 0.7 * math.sin(ph), zc + rd * sy_ * rr.uniform(0.3, 0.6), cr, 0.9, 1.0, 0.28))
+    wyaw = math.atan2(WIND[1], WIND[0])
+    for k in range(shelves):                                                                          # a shelf out of its lee side
+        c = rr.choice(domes)
+        shelf(rr, out, c[0], c[1], c[2], width * rr.uniform(1.3, 1.9), width * rr.uniform(0.7, 1.0), max(40.0, width * 0.09), wyaw + rr.uniform(-0.4, 0.4), dens=0.7, soft=0.5, scraps=2)
+    return ragged([l for l in out if l["r"] >= rmin * 0.8])
+
+
+def far_swell(seed, a, b, top, thick, width, dens=0.9):
+    """A long low band from a to b: flattened lobes two abreast, a few low domes on it, thinning at both ends."""
+    rr = random.Random(seed); out = []
+    dx, dy = b[0] - a[0], b[1] - a[1]; length = math.hypot(dx, dy); nx, ny = -dy / length, dx / length
+    ex, ey = _axis_scale(dx, dy, 1.7); n = max(4, int(length / (width * 0.55)))
+    for i in range(n + 1):
+        t = i / n; taper = 0.55 + 0.45 * math.sin(math.pi * min(1.0, max(0.0, t * 0.9 + 0.05)))
+        for j in (-1, 1):
+            off = j * width * rr.uniform(0.15, 0.4); r = width * rr.uniform(0.5, 0.72) * taper; th = thick * taper * rr.uniform(0.75, 1.15)
+            out.append(L(a[0] + dx * t + nx * off, a[1] + dy * t + ny * off, top - th * 0.5 - rr.uniform(0, 0.25) * thick, r, max(0.12, th * 0.5 / r), dens * taper, 0.55, sx=ex, sz=ey))
+        if rr.random() < 0.45:
+            r = width * rr.uniform(0.2, 0.32)
+            out.append(L(a[0] + dx * t + nx * rr.uniform(-0.3, 0.3) * width, a[1] + dy * t + ny * rr.uniform(-0.3, 0.3) * width, top - r * 0.25, r, 0.6, 1.0, 0.35))
+    return out
+
+
+def far_tower(seed, x, y, top, radius, base=SEA_TOP - 40):
+    """The one tall tower: a column that keeps its girth, heads on its flanks, and an anvil drawn out downwind."""
+    rr = random.Random(seed); out = []
+    for k in range(6):                                                                                # the foot
+        a = k / 6.0 * 6.283 + rr.uniform(-0.3, 0.3)
+        out.append(L(x + radius * 0.8 * math.cos(a), y + radius * 0.8 * math.sin(a), base + radius * 0.3, radius * rr.uniform(0.55, 0.75), 0.5, 1.0, 0.45))
+    z = base + radius * 0.6; r = radius; px, py = x, y
+    while z + r * 0.6 < top * 0.86:
+        out.append(L(px, py, z, r, rr.uniform(0.9, 1.05), 1.0, 0.3))
+        for j in range(rr.randint(3, 4)):
+            ph = rr.uniform(0, 6.283); cr = r * rr.uniform(0.36, 0.5)
+            out.append(L(px + r * 0.82 * math.cos(ph), py + r * 0.82 * math.sin(ph), z + r * rr.uniform(-0.2, 0.6), cr, rr.uniform(0.8, 1.0), 1.0, 0.28))
+        z += r * rr.uniform(0.62, 0.78); r *= rr.uniform(0.9, 1.0); px += WIND[0] * r * 0.1; py += WIND[1] * r * 0.1
+    za = top - radius * 0.2                                                                           # the anvil
+    for k in range(9):
+        t = k / 8.0; d = radius * (0.2 + 3.4 * t); w = radius * (1.25 + 0.5 * math.sin(t * 3.0)) * (1.0 - 0.3 * t)
+        off = rr.uniform(-0.3, 0.3) * radius
+        out.append(L(px + WIND[0] * d - WIND[1] * off, py + WIND[1] * d + WIND[0] * off, za + rr.uniform(-0.05, 0.05) * radius, w, rr.uniform(0.15, 0.2), 1.0 - 0.45 * t, 0.5 + 0.2 * t, sx=1.25))
+    out.append(L(px - WIND[0] * radius * 0.5, py - WIND[1] * radius * 0.5, za, radius * 1.1, 0.2, 0.9, 0.5))       # a little upwind too
+    out.append(L(px, py, top - radius * 0.3, radius * 0.5, 0.75, 1.0, 0.3))                                         # the overshooting top
+    return out
+
+
+def far_cumulus(seed, x, y, top, radius, rmin, turrets=3):
+    return [l for l in cumulus(seed, x, y, SEA_TOP - 40, top, radius, turrets=turrets, shelves=((0.5, 1.2),), mist=False, detail=1, kids=(3, 4), rich=False) if l["r"] >= rmin]
+
+
+def highwater_island():
+    """The cloud Highwater Mooring stands in: a low island whose heads come up to the decks, a broad low cumulus behind it
+    (north-east), and a bank across its west side, the side the reveal sees, that covers part of the town."""
+    rr = random.Random(71); x, y, z = HIGHWATER; out = []
+    out.append(L(x, y, z - 150, 270, 0.52, 1.0, 0.45, sx=1.15))
+    for k in range(11):
+        a = k / 11.0 * 6.283 + rr.uniform(-0.25, 0.25); d = rr.uniform(70, 230); r = rr.uniform(55, 82)
+        east = math.cos(a) > 0.2
+        heads(rr, out, x + d * math.cos(a), y + d * math.sin(a), z + SEAT + (rr.uniform(8, 44) if east else rr.uniform(-16, 2)), r, soft=0.24, kids=(1, 2))
+    out += [l for l in cumulus(72, x + 270, y + 210, SEA_TOP - 40, z + 105, 250, turrets=2, shelves=((0.5, 1.0),), mist=False, detail=1, kids=(2, 3), rich=False) if l["r"] >= 50.0]       # low and broad: at z + 250 it was a thumb beside the town
+    for (dx, dy, dz, r, sy_) in ((-250, 60, 8, 95, 0.34), (-215, -70, 14, 80, 0.4), (-285, -10, -8, 110, 0.32)):       # the veil across its near side
+        out.append(L(x + dx, y + dy, z + dz, r, sy_, 0.8, 0.6, sz=1.5))
+    return out
+
+
+def far_field():
+    f = {}
+    f["far_banks"] = (far_bank(81, (600, 3950), (3900, 1800), (480, 820, 1000, 700, 880, 600, 430), 520)          # the North Wall: behind the Mooring from the approach; its east shoulder stops under the moon's left limb in the reveal
+                      + far_bank(82, (4250, -1500), (4750, 900), (260, 380, 300, 240, 330, 260), 420, shelves=1)   # the South Reef: low, 4.4 km out, behind the break and Highwater in the reveal
+                      + far_bank(83, (-2600, 2400), (-1300, 4300), (500, 900, 1250, 800), 600, rmin=90.0))         # north-west, for the turn at the arrival
+    f["far_swells"] = (far_swell(91, (6400, -2900), (7300, -100), 420, 200, 700)
+                       + far_swell(92, (8900, 200), (8500, 2000), 380, 180, 650)
+                       + far_swell(93, (7500, 1500), (6500, 3800), 400, 190, 700)                                # under the moon: the disc sinks into it
+                       + far_swell(94, (5300, 150), (4600, 2400), 320, 150, 520)
+                       + far_swell(95, (2500, 5600), (-200, 6300), 450, 200, 700)
+                       + far_swell(96, (3000, -4200), (5200, -3400), 400, 190, 650)
+                       + far_swell(97, (600, -5200), (2400, -4800), 380, 180, 650)
+                       + far_swell(98, (-3200, -1500), (-2600, 800), 360, 170, 600))
+    f["far_tower"] = far_tower(101, 9200.0, -2730.0, 2100.0, 720.0)
+    f["far_cumulus"] = (far_cumulus(111, -300, 2600, 760, 520, 95.0, turrets=4) + far_cumulus(112, 3100, -1500, 520, 380, 75.0)
+                        + far_cumulus(113, 2300, -1150, 300, 200, 55.0, turrets=2)
+                        + far_cumulus(115, 6000, -4300, 1100, 700, 150.0, turrets=4) + far_cumulus(116, -1900, -2600, 620, 430, 90.0))
+    f["highwater"] = highwater_island()
+    return f
+
+
 STATS = {}
+BIN_SIDE = 128.0          # ADR-2105: the renderer's bin grid is at most 128 cells a side (was 64); a cell still holds 64 lobes
 
 
 def fit_bins(masses, limit=62):
@@ -587,7 +836,7 @@ def fit_bins(masses, limit=62):
     ext = [l["r"] * max(l["scale"][0], l["scale"][2]) for k, l in items]
     lo = (min(l["c"][0] - e for (k, l), e in zip(items, ext)), min(l["c"][2] - e for (k, l), e in zip(items, ext)))
     hi = (max(l["c"][0] + e for (k, l), e in zip(items, ext)), max(l["c"][2] + e for (k, l), e in zip(items, ext)))
-    rs = sorted(ext); cell = max(0.5 * rs[len(rs) // 2], max(hi[0] - lo[0], hi[1] - lo[1]) / 64.0, 1.0)
+    rs = sorted(ext); cell = max(0.5 * rs[len(rs) // 2], max(hi[0] - lo[0], hi[1] - lo[1]) / BIN_SIDE, 1.0)
     cells = {}; where = []
     for n, ((k, l), e) in enumerate(zip(items, ext)):
         cs = [(x, z) for z in range(int((l["c"][2] - e - lo[1]) // cell), int((l["c"][2] + e - lo[1]) // cell) + 1)
@@ -638,14 +887,14 @@ def prune_hidden(lobes):
 def bins_report(lobes):
     """The renderer's binning (cloud_renderer.cpp binCloudLobes), replicated: cell size and the worst cell. A lobe's
     footprint is the square of its larger horizontal radius; the cell is the larger of half the median of those and
-    span / 64."""
+    span / 128 (ADR-2105; span / 64 before)."""
     if not lobes:
         return {}
     ext = [l["r"] * max(l["scale"][0], l["scale"][2]) for l in lobes]
     lo = (min(l["c"][0] - e for l, e in zip(lobes, ext)), min(l["c"][2] - e for l, e in zip(lobes, ext)))
     hi = (max(l["c"][0] + e for l, e in zip(lobes, ext)), max(l["c"][2] + e for l, e in zip(lobes, ext)))
     span = max(hi[0] - lo[0], hi[1] - lo[1]); rs = sorted(ext)
-    cell = max(0.5 * rs[len(rs) // 2], span / 64.0, 1.0)
+    cell = max(0.5 * rs[len(rs) // 2], span / BIN_SIDE, 1.0)
     nx, nz = max(1, math.ceil((hi[0] - lo[0]) / cell)), max(1, math.ceil((hi[1] - lo[1]) / cell)); cells = {}
     for l, e in zip(lobes, ext):
         for z in range(max(0, int((l["c"][2] - e - lo[1]) // cell)), min(nz - 1, int((l["c"][2] + e - lo[1]) // cell)) + 1):
@@ -669,44 +918,85 @@ def build():
     STATS.update(veil_shell_lobes=n_shell, veil_dropped_over_decks=len(v_lobes) - len(masses["veil"]))
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
     for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
-        masses["rock_" + name] = rock(31 + i, x, y, z - 8.0, (54, 60, 50)[i])
+        masses["rock_" + name] = rock(31 + i, x, y, z - 8.0 + SEAT, (54, 60, 50)[i])
     cx, cy, cz = CONDENSERY
-    col = mesa(40, cx, cy, cz - 5.0, 205)
-    col += cumulus(42, cx - 190, cy + 140, SEA_TOP - 20, 300, 150, turrets=3, shelves=((0.45, 1.1),), detail=1, kids=(3, 5), rich=False) + cumulus(43, cx + 180, cy - 80, SEA_TOP - 20, 190, 130, turrets=2, shelves=((0.55, 0.9),), detail=1, kids=(3, 5), rich=False)
+    col = mesa(40, cx, cy, cz - 5.0 + SEAT, 205)
+    # its two flank cumulus (iteration 6: the left one stood 3 degrees over the horizon in front of the moon's lower
+    # half and was one of the reveal's four similar puffs: it is lower and broader now, a shoulder of the pedestal)
+    col += cumulus(42, cx - 190, cy + 140, SEA_TOP - 20, 262, 175, turrets=2, shelves=((0.45, 1.1),), detail=1, kids=(3, 5), rich=False) + cumulus(43, cx + 180, cy - 80, SEA_TOP - 20, 190, 130, turrets=2, shelves=((0.55, 0.9),), detail=1, kids=(3, 5), rich=False)
+    # a tongue of the pedestal under the conveyor pier (iteration 6): the pier runs 260 m out from the platform toward the
+    # Mooring and the mesa ends 170 m short of its tip, so from the reveal's lower path its stilts stood in the open as
+    # a fence. Heads under it, their tops 5 to 14 m under its deck, falling away toward the tip.
+    rr_ = random.Random(44); c_, s_ = math.cos(CONDENSERY_YAW), math.sin(CONDENSERY_YAW)
+    ax, ay = cx + (-112) * c_ - (-20) * s_, cy + (-112) * s_ + (-20) * c_; ux, uy = -0.95 * c_ + 0.3 * s_, -0.95 * s_ - 0.3 * c_
+    for k in range(9):
+        dd = 70 + 34 * k; off = rr_.uniform(-16, 16); r = rr_.uniform(34, 46) * (1.0 - 0.03 * k)
+        heads(rr_, col, ax + ux * dd - uy * off, ay + uy * dd + ux * off, cz + 4.0 + SEAT - 0.3 * (dd / 20.0) - rr_.uniform(5, 12) - 1.2 * k, r, soft=0.24, kids=(2, 4))
+    for k in range(3):
+        dd = 110 + 100 * k
+        col.append(L(ax + ux * dd, ay + uy * dd, cz - 95 - 14 * k, 92 - 9 * k, 0.95, 1.0, 0.4))
     masses["condensery_column"] = col
     masses["condensery_plume"] = plume()
     lx, ly, lz = LONE_LAMP
-    masses["lone_lamp"] = rock(50, lx, ly, lz - 9.0, 48)
+    # the Lone Lamp (iteration 6): at 1.4 km, level with the sea's crests and 2 degrees from the Outer Light, one window was
+    # nothing. It now stands 110 m higher and 11 degrees to the right of the Outer Light as the approach sees it, on a
+    # cloudlet of its own, 100 m deep, that touches neither the sea nor anything else, with a small cumulus beside the
+    # house rising 105 m over its deck for the lamp to light (glow `lone_lamp`): what reads from the approach is a
+    # small warm cloud with a house on it.
+    ll = rock(50, lx, ly, lz - 9.0 + SEAT, 44, base=lz - 110.0)
+    ll += [l for l in cumulus(51, lx + 38, ly - 32, lz - 70, lz + 105, 56, turrets=2, lean=0.1, shelves=(), skirt=False, mist=False, detail=1, kids=(3, 4), rich=False)]
+    masses["lone_lamp"] = ll
+    masses["reveal_fore"] = reveal_fore()
+    # the mid field (iteration 6): it was six cumulus of one recipe (tops 140 to 270, radii 125 to 190). Now a long low
+    # reef north-east of the Mooring (behind the town from the approach), and a tower and its satellite on the right of the
+    # approach. (Heads along the rim of the ocean break were tried: seen from above, moonlit against the dark of the break,
+    # they were cotton balls.)
     mid = []
-    for i, (x, y, top, rad) in enumerate(((760, 430, 270, 190), (1250, 620, 220, 170), (1180, -520, 190, 160), (520, -620, 160, 130), (-560, 420, 210, 170), (1560, -260, 140, 125))):
-        mid += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=3, shelves=((0.45, 1.2), (0.7, 0.6)), detail=1, kids=(3, 5), rich=False)
+    for i, (x, y, top, rad, tur) in enumerate(((700, 520, 200, 150, 2), (930, 590, 245, 135, 3), (1150, 640, 180, 150, 2), (1360, 690, 150, 120, 2))):          # the reef
+        mid += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=tur, shelves=((0.5, 1.1),), detail=1, kids=(3, 4), rich=False)
+    mid += cumulus(64, 380, -800, SEA_TOP - 20, 240, 150, turrets=3, shelves=((0.45, 1.2), (0.7, 0.6)), detail=1, kids=(3, 5), rich=False)
+    mid += cumulus(65, 1180, -520, SEA_TOP - 20, 175, 125, turrets=2, shelves=((0.5, 1.0),), detail=1, kids=(3, 4), rich=False)
+    mid += cumulus(66, 1345, -630, SEA_TOP - 20, 110, 75, turrets=2, shelves=(), detail=1, kids=(2, 3), rich=False)
     masses["mid_field"] = mid
     for k_ in ("head", "fore"):
         masses[k_] = [l for l in masses[k_] if not on_open_deck(cells, l)]
+    n_seat = 0                                                     # the cloud that decks stand in (see SEAT)
+    for l in masses["mooring_mound"]:
+        x_, y_, top_ = l["c"][0], -l["c"][2], l["c"][1] + l["r"] * l["scale"][1]
+        if abs(top_ - (_town_top0(x_, y_) + 5.0)) < 13.0 and town_near(cells, x_, y_, 60.0)[0] is not None:
+            l["tag"] = "seat"; n_seat += 1
+    for l in masses["condensery_column"]:
+        x_, y_, top_ = l["c"][0], -l["c"][2], l["c"][1] + l["r"] * l["scale"][1]
+        if math.hypot(x_ - cx, y_ - cy) < 230.0 and -16.0 < top_ - cz < 8.0:
+            l["tag"] = "seat"; n_seat += 1
+    STATS.update(seat_lobes=n_seat, seat_lift_m=SEAT)
     n0 = sum(len(m) for m in masses.values())
     for k_ in masses:
         masses[k_] = prune_hidden(masses[k_])
     STATS.update(hidden_lobes_dropped=n0 - sum(len(m) for m in masses.values()))
     STATS.update(dropped_to_fit_bins=fit_bins(masses))
-    far = []
-    for i, (fx, fy, fh, fr) in enumerate(((-900, 1500, 500, 420), (1200, 2600, 700, 520), (3400, 2200, 900, 600), (4200, -300, 600, 520), (2600, -1500, 450, 420), (5200, 3800, 1300, 800),
-                                          (7600, 900, 1100, 900), (300, 4600, 1000, 800), (8200, 4800, 1600, 1000), (-2800, 3200, 800, 700), (6200, -2600, 900, 800), (9800, 2000, 1400, 1100))):
-        rr = random.Random(80 + i); f = []
-        far += [l for l in cumulus(80 + i, fx, fy, SEA_TOP - 40, fh * 0.85, fr * 0.75, turrets=4, shelves=((0.5, 1.2),), mist=False, detail=1, kids=(3, 4), rich=False) if l["r"] > fr * 0.11]
+    far = far_field()
+    for k_ in far:
+        far[k_] = prune_hidden(far[k_])
+    STATS.update(far_dropped_to_fit_bins=fit_bins(far))
     return masses, far
 
 
 def glows():
+    """Iteration 6: `stacks` and `station_pier` (the two dimmest) make room for the Lone Lamp's cloud and Highwater's, so the
+    count the engine receives is unchanged: 13 here once it drops the three lighthouse stand-ins, and 8 in the Veil."""
     g = lambda name, p, radius, key, gain: {"name": name, "position": E(p), "radius": radius, "intensity": gain, "key": key}
-    cx, cy, cz = CONDENSERY; lh = LIGHTHOUSES
+    cx, cy, cz = CONDENSERY; lh = LIGHTHOUSES; hx, hy, hz = HIGHWATER
     return [g("quay_west", (-55, qy(-55), qz(-55) + 4.5), 46, "bounce_b", 1.0), g("quay_mid", (10, qy(10), qz(10) + 4.5), 48, "bounce_b", 1.0), g("quay_east", (80, qy(80), qz(80) + 4.5), 46, "bounce_b", 0.9),
             g("keel_west", (-50, -12, 116), 70, "bounce_a", 1.2), g("keel_east", (50, -18, 110), 75, "bounce_a", 1.2),
             g("great_lantern", (GREAT_LANTERN[0], GREAT_LANTERN[1], GREAT_LANTERN[2] + 36), 105, "landmark", 1.6),
-            g("gardens", (112, -30, 127), 60, "garden_a", 0.9), g("stacks", (10, 60, 150), 110, "bounce_b", 0.4), g("station_pier", (-150, -45, 134), 65, "win_a", 0.6),
+            g("gardens", (112, -30, 127), 60, "garden_a", 0.9),
+            g("lone_lamp", (LONE_LAMP[0] + 10, LONE_LAMP[1] - 8, LONE_LAMP[2] + 16), 80, "amber", 6.0),                 # one house, and its lamp on its own cloud
+            g("highwater", (hx - 20, hy, hz + 10), 240, "bounce_b", 5.0),                                     # the far town's light in its cloud: what reads at 2 km when its windows are points
             g("harbour_light", (lh[0][2], lh[0][3], lh[0][4] + 8), 70, "moon_disc", 0.7), g("outer_light", (lh[1][2], lh[1][3], lh[1][4] + 8), 80, "moon_disc", 0.7),
             g("break_light", (lh[2][2], lh[2][3], lh[2][4] + 8), 80, "moon_disc", 0.7),
             g("condensery_throats", (cx, cy, cz + 150), 150, "cond_a", 2.2), g("condensery_yard", (cx, cy, cz + 14), 85, "cond_a", 0.8),       # the yard lit the old cap into a white plate at 130 m / 1.2
-            g("condensery_keel", (cx, cy, cz - 40), 170, "cond_b", 1.0), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -210), 420, "ocean_b", 1.8)]
+            g("condensery_keel", (cx, cy, cz - 40), 170, "cond_b", 1.0), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -150), 600, "ocean_b", 3.0)]      # iteration 6: 420 m / 1.8 at -210 left the break's walls dark from the reveal
 
 
 if __name__ == "__main__":
@@ -719,12 +1009,12 @@ if __name__ == "__main__":
         g_["color"] = uv[g_["key"]]
     mb = math.radians(MOON["light_from_bearing_deg"]); me = math.radians(MOON["light_elevation_deg"])
     ldir = [round(math.cos(mb) * math.cos(me), 4), round(math.sin(me), 4), round(-math.sin(mb) * math.cos(me), 4)]
-    allhero = [l for m in masses.values() for l in m]
+    allhero = [l for m in masses.values() for l in m]; allfar = [l for m in far.values() for l in m]
     out = {
-        "version": 3,
+        "version": 4,
         "units": "metres, Y-up (x east, y up, z = -north): the frame of art/layout.json; the journey runs toward +x, the Mooring is at the origin",
         "masses": masses,
-        "far_masses": {"far_towers": far},
+        "far_masses": far,
         "clouds_block": {
             "note": "a starting point for the scene's `clouds` block (ADR-2100); colours are palette keys, to be driven by the palette moods (values shown are Ultraviolet Dream)",
             "source_masses": list(masses.keys()),
@@ -733,7 +1023,7 @@ if __name__ == "__main__":
                     "breaks": [{"centre": [BREAK["centre"][0], -BREAK["centre"][1]], "radius": BREAK["radius"], "elongation": BREAK["elongation"], "yaw": -BREAK["yaw"]}]},
             "lightDirection": ldir, "lightColor_key": "moon_light", "lightIntensity": 0.16, "anisotropy": 0.5,
             "ambientTop_key": "sky_horizon", "ambientBottom_key": "haze", "hazeColor_key": "haze", "warmColor_key": "horizon_glow",
-            "warmDirection": [round(math.cos(math.radians(19)), 3), 0.0, round(-math.sin(math.radians(19)), 3)],
+            "warmDirection": [round(math.cos(math.radians(MOON["disc_bearing_deg"])), 3), 0.0, round(-math.sin(math.radians(MOON["disc_bearing_deg"])), 3)],
             "noiseScale": 0.0034, "noiseAmount": 0.42, "detailScale": 0.02, "detailAmount": 0.45, "extinction": 0.012,
             "glowGain": 1.0, "glowOcclusion": 2.5, "drift": [round(WIND[0] * 3.5, 2), 0.0, round(-WIND[1] * 3.5, 2)],
             "glows": gl},
@@ -745,19 +1035,27 @@ if __name__ == "__main__":
                  "t0": VEIL_T0, "rooms": [{"room": v["room"], "t": v["t"], "centre": E(v["c"]), "radius": v["rho"]} for v in veil_voids()[0]],
                  "tags": "lobes of masses.veil carry \"tag\": \"wall\" (a room's shell) or \"plug\" (the solid before the crash); if lobes may be denser than 1 (ADR-2105), the plug is where to use it",
                  "wells": "condensery_column leaves a well 60 m across under each stack (plan offsets in the works' frame (-58, 14), (-2, 30), (52, 2), turned by the Condensery's yaw): a glow in each lights the heads round it from below",
-                 "plug": {"from_t": 54.9, "to_t": 56.9, "note": "solid: the camera is blind from the lantern room's far wall to the crash at 56.85 s"},
-                 "clear_after_t": 56.9, "glows": vg},
+                 "plug": {"from_t": 54.9, "to_t": 56.88, "walls": [{"name": n_, "centre_m_from_47s": c_, "lobe_radius_m": r_, "grid_m": g_} for (c_, r_, g_, n_) in VEIL_WALLS],
+                          "note": "iteration 6: one layer of 60 m lobes (tag plug), built to stay shut under ADR-2106's erosion at 1.0 / 60 m: 54.85 to about 56.7 s (to about 57.0 s with the erosion off). Lobes under about 50 m open in the erosion's bays: do not thin it, and keep the Condensery's light held at a tenth until 56.03 s. veil_pocket5 and veil_amber stand inside it."},
+                 "sill": "masses.reveal_fore: a floor under the journey from the mouth (56.88 s) to a lip at 58.95 s and a spur on its right; at the lip the ocean break opens below and the far field on the right. Keep the air clear of anything else from 56.88 s.",
+                 "clear_after_t": 56.88, "glows": vg},
         "sea_design": {"top_mean": SEA_TOP, "top_range": [-85, 60], "base": SEA_BASE,
                        "break": {"centre": [BREAK["centre"][0], -BREAK["centre"][1]], "radius": BREAK["radius"], "elongation": BREAK["elongation"], "yaw_rad": -BREAK["yaw"],
+                                 "ocean_plane": {"y": BREAK["ocean_y"], "semi_axes": BREAK["ocean_semi_axes"], "yaw_rad": -BREAK["yaw"],
+                                                 "note": "iteration 6: where the cosmic ocean's surface has to be for the reveal to see it (the lens looks 9 to 20 degrees down at the break). At y = -900 with a radius of 900 the reveal sees only the break's dark far wall. Tested in AV Gen at -130 and -110 (art artifacts, iteration 6). An ellipse a little larger than the break, not a wider disc: at a radius of 1,400 m its rim showed through the troughs of the sea 800 m away."},
                                  "note": "placed by design beside the Condensery, under the reveal; ADR-2101 sea.breaks takes it as it is (clouds_block.sea.breaks)"}},
         "wind": {"toward": [WIND[0], 0.0, -WIND[1]], "note": "leans, shelves, the plume and `drift` share it"},
+        "far_design": {"note": "iteration 6: far_masses is a composed cloudscape in five named groups (all of them belong in clouds.farLobes): far_banks (ranges kilometres long), far_swells (low bands on the horizon at 5 to 9 km), far_tower (one tower with an anvil 9 km out, on the right of the reveal), far_cumulus, highwater (the cloud island of Highwater Mooring).",
+                       "moon_sector": "from the reveal the plan headings 10 to 33 degrees hold nothing taller than 1.5 degrees over the horizon: cloud there would hide the moon",
+                       "needs": "the march must still be sampling at 9 km with hazeDistance near 9000: if the tower and the swells do not show, raise `steps` or `maxDistance` before changing the lobes",
+                       "highwater": {"centre": E(HIGHWATER), "note": "a third settlement, never reached (layout zone `highwater`); glow `highwater` is its light in its cloud"}},
         "moon": MOON,
-        "bins": {"hero_masses": bins_report(allhero), "far_towers": bins_report(far),
+        "bins": {"hero_masses": bins_report(allhero), "far_masses": bins_report(allfar),
                  "note": "replica of binCloudLobes, one grid per set (ADR-2104: clouds.lobes and clouds.farLobes): a cell holds at most 64 lobes and keeps the biggest."},
-        "counts": {k: len(v) for k, v in masses.items()},
+        "counts": {k: len(v) for k, v in masses.items()}, "far_counts": {k: len(v) for k, v in far.items()},
         "stats": STATS,
     }
     dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "art", "cloud_design.json")
     json.dump(out, open(dst, "w"), indent=None, separators=(",", ":"))
-    print("cloud design:", out["counts"], "total", len(allhero), "far", len(far))
-    print("bins hero:", out["bins"]["hero_masses"]); print("bins far:", out["bins"]["far_towers"]); print("stats:", STATS)
+    print("cloud design:", out["counts"], "total", len(allhero), "far", out["far_counts"], len(allfar), "all", len(allhero) + len(allfar))
+    print("bins hero:", out["bins"]["hero_masses"]); print("bins far:", out["bins"]["far_masses"]); print("stats:", STATS)

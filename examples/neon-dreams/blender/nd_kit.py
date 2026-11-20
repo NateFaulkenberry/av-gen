@@ -1,7 +1,7 @@
 """Neon Dreams -- the kit (iteration 2): every original asset of the POC, regenerated headless.
 
   Blender -b --factory-startup -P examples/neon-dreams/blender/nd_kit.py -- --out examples/neon-dreams/meshes \
-          --atlas examples/neon-dreams/meshes/signs [--only buildings,garden,...]
+          --atlas examples/neon-dreams/meshes/signs [--only buildings,garden,... [--merge-manifest <kit_manifest.json>]]
 
 GLB, metres, origin at the base centre at deck level, Blender Z-up exported Y-up (front of a building = +z in the GLB).
 One mesh per asset; materials are named by light role so the scene can drive each (see kit_manifest.json "materials").
@@ -9,7 +9,7 @@ THE WINDOW RULE (nd_kitcore.py) is audited on every asset; the result is written
 loudly (exit code 3) if any pane breaks it.
 
 Modules: nd_kitcore (materials, wall primitives, the rule and its audit), nd_kit_mooring (buildings, Great Lantern,
-lighthouses, decks, street, craft), nd_kit_garden (plants and garden pieces), nd_kit_condensery.
+lighthouses, decks, street, craft), nd_kit_garden (plants and garden pieces), nd_kit_condensery, nd_kit_far (the Long Arc).
 """
 import bpy, sys, os, json, math
 import numpy as np
@@ -20,6 +20,7 @@ from nd_kitcore import *  # noqa
 import nd_kit_mooring as M
 import nd_kit_garden as G
 import nd_kit_condensery as C
+import nd_kit_far as F
 
 ONLY = [x for x in arg("--only", "").split(",") if x]
 
@@ -123,6 +124,7 @@ fam("street", lambda: M.street_kit() + [M.gondola_pylon()])
 fam("garden", G.garden_kit)
 fam("vehicles", M.craft)
 fam("condensery", C.condensery_kit)
+fam("far", F.far_kit)
 signs = None
 if not ONLY or "signs" in ONLY:
     signs, sign_dir = sign_kit()
@@ -163,6 +165,11 @@ if not ONLY:
                                     "gallery_depth_m": 1.5, "gangway_width_m": 2.0, "bench_seat_m": 0.43},
                "assets": manifest}, open(os.path.join(OUT, "kit_manifest.json"), "w"), indent=1)
     json.dump({"rule": "see nd_kitcore.py", "assets_with_panes": len(audit_out), "violations": n_bad, "assets": audit_out}, open(os.path.join(OUT, "window_audit.json"), "w"), indent=1)
+if ONLY and arg("--merge-manifest", ""):                       # a partial run: put its assets into an existing manifest (replacing those of the same name)
+    mp = arg("--merge-manifest", ""); doc = json.load(open(mp)); names = {m["asset"] for m in manifest}
+    doc["assets"] = [a for a in doc["assets"] if a["asset"] not in names] + manifest
+    json.dump(doc, open(mp, "w"), indent=1)
+    print("MERGED", sorted(names), "into", mp, "->", len(doc["assets"]), "assets")
 print("KIT assets", len(manifest), "tris", sum(m["tris"] for m in manifest), "audit: assets with panes", len(audit_out), "violations", n_bad)
 print("KITSUMMARY", json.dumps([[m["asset"], m["tris"]] for m in manifest]))
 if arg("--blend", ""):

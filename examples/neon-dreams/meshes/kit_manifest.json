@@ -3513,6 +3513,50 @@
     2.2
    ],
    "brand": "Mooring Seven"
+  },
+  {
+   "asset": "far/long_arc.glb",
+   "tris": 2796,
+   "height_m": 3964.1,
+   "bounds_m": [
+    -145.89,
+    -291.27,
+    -20.0,
+    6222.33,
+    3964.13,
+    20.0
+   ],
+   "materials": [
+    "arc_light",
+    "arc_line"
+   ],
+   "what": "the Long Arc: a broken span 5.9 km long standing 22 km east of the journey",
+   "frame": "origin where it leaves the sea, +x along the ground under it, y up in the GLB",
+   "circle": {
+    "radius_m": 9061.0,
+    "centre_m": [
+     7551.0,
+     -5010.0,
+     -0.0
+    ],
+    "from_deg": 33.6,
+    "to_deg": 71.0,
+    "detached_deg": [
+     [
+      73.0,
+      75.6
+     ],
+     [
+      77.2,
+      78.6
+     ],
+     [
+      80.3,
+      81.0
+     ]
+    ]
+   },
+   "materials_note": "arc_line and arc_light keep the emission baked into the GLB (0.22 and 0.9): the scene has no role for them. At 0.55 and 9 (first test in AV Gen) it was a string of fairy lights brighter than the Condensery, and showed through the Veil"
   }
  ]
 }

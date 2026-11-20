@@ -3367,9 +3367,9 @@
     "id": "spot_139",
     "kind": "rail",
     "pos": [
-     1152.7,
+     1502.7,
      109.9,
-     40.0
+     70.0
     ],
     "facing_deg": 0.0,
     "forward": [
@@ -16915,9 +16915,9 @@
    "id": "break_light",
    "asset": "landmarks/lighthouse_c.glb",
    "pos": [
-    1150.0,
+    1500.0,
     66.0,
-    40.0
+    70.0
    ],
    "rot_y_deg": 60.0,
    "quat": [
@@ -16943,9 +16943,9 @@
    "id": "cloud_skiff_555",
    "asset": "vehicles/cloud_skiff.glb",
    "pos": [
-    1159.0,
+    1509.0,
     57.0,
-    46.0
+    76.0
    ],
    "rot_y_deg": 34.377,
    "quat": [
@@ -18133,16 +18133,16 @@
    "id": "lone_lamp_house",
    "asset": "buildings/lone_lamp_house.glb",
    "pos": [
-    900.0,
-    96.0,
-    300.0
+    746.0,
+    205.0,
+    563.0
    ],
-   "rot_y_deg": 28.648,
+   "rot_y_deg": -130.0,
    "quat": [
     0.0,
-    0.247404,
+    -0.906308,
     -0.0,
-    0.968912
+    0.422618
    ],
    "scale": [
     1.0,
@@ -18158,16 +18158,16 @@
    "id": "deck_pad_6m_608",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    898.57,
-    96.0,
-    309.897
+    743.728,
+    205.0,
+    553.261
    ],
-   "rot_y_deg": 28.648,
+   "rot_y_deg": -130.0,
    "quat": [
     0.0,
-    0.247404,
+    -0.906308,
     -0.0,
-    0.968912
+    0.422618
    ],
    "scale": [
     1.0,
@@ -18180,16 +18180,16 @@
    "id": "deck_pad_6m_609",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    903.835,
-    96.0,
-    307.021
+    739.872,
+    205.0,
+    557.858
    ],
-   "rot_y_deg": 28.648,
+   "rot_y_deg": -130.0,
    "quat": [
     0.0,
-    0.247404,
+    -0.906308,
     -0.0,
-    0.968912
+    0.422618
    ],
    "scale": [
     1.0,
@@ -18202,16 +18202,16 @@
    "id": "deck_pad_6m_610",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    909.101,
-    96.0,
-    304.144
+    736.015,
+    205.0,
+    562.454
    ],
-   "rot_y_deg": 28.648,
+   "rot_y_deg": -130.0,
    "quat": [
     0.0,
-    0.247404,
+    -0.906308,
     -0.0,
-    0.968912
+    0.422618
    ],
    "scale": [
     1.0,
@@ -18219,6 +18219,1498 @@
     1.0
    ],
    "zone": "lone_lamp"
+  },
+  {
+   "id": "hw_shophouse_c_611",
+   "asset": "buildings/mooring_shophouse_c.glb",
+   "pos": [
+    2805.021,
+    196.0,
+    523.749
+   ],
+   "rot_y_deg": -13.047,
+   "quat": [
+    0.0,
+    -0.113614,
+    -0.0,
+    0.993525
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_612",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2797.076,
+    196.0,
+    531.454
+   ],
+   "rot_y_deg": -13.047,
+   "quat": [
+    0.0,
+    -0.113614,
+    -0.0,
+    0.993525
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_613",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2802.921,
+    196.0,
+    532.809
+   ],
+   "rot_y_deg": -13.047,
+   "quat": [
+    0.0,
+    -0.113614,
+    -0.0,
+    0.993525
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_614",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2808.766,
+    196.0,
+    534.163
+   ],
+   "rot_y_deg": -13.047,
+   "quat": [
+    0.0,
+    -0.113614,
+    -0.0,
+    0.993525
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_shophouse_g_615",
+   "asset": "buildings/mooring_shophouse_g.glb",
+   "pos": [
+    2809.623,
+    196.0,
+    504.046
+   ],
+   "rot_y_deg": -14.145,
+   "quat": [
+    0.0,
+    -0.123126,
+    -0.0,
+    0.992391
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_b",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_616",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2801.178,
+    196.0,
+    513.004
+   ],
+   "rot_y_deg": -14.145,
+   "quat": [
+    0.0,
+    -0.123126,
+    -0.0,
+    0.992391
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_617",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2806.996,
+    196.0,
+    514.47
+   ],
+   "rot_y_deg": -14.145,
+   "quat": [
+    0.0,
+    -0.123126,
+    -0.0,
+    0.992391
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_618",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2812.814,
+    196.0,
+    515.936
+   ],
+   "rot_y_deg": -14.145,
+   "quat": [
+    0.0,
+    -0.123126,
+    -0.0,
+    0.992391
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_shophouse_a_619",
+   "asset": "buildings/mooring_shophouse_a.glb",
+   "pos": [
+    2813.088,
+    196.0,
+    481.943
+   ],
+   "rot_y_deg": -13.114,
+   "quat": [
+    0.0,
+    -0.114191,
+    -0.0,
+    0.993459
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_c",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_620",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2804.998,
+    196.0,
+    490.224
+   ],
+   "rot_y_deg": -13.114,
+   "quat": [
+    0.0,
+    -0.114191,
+    -0.0,
+    0.993459
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_621",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2810.842,
+    196.0,
+    491.585
+   ],
+   "rot_y_deg": -13.114,
+   "quat": [
+    0.0,
+    -0.114191,
+    -0.0,
+    0.993459
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_622",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2816.685,
+    196.0,
+    492.946
+   ],
+   "rot_y_deg": -13.114,
+   "quat": [
+    0.0,
+    -0.114191,
+    -0.0,
+    0.993459
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_shophouse_h_623",
+   "asset": "buildings/mooring_shophouse_h.glb",
+   "pos": [
+    2817.502,
+    196.0,
+    461.845
+   ],
+   "rot_y_deg": -14.498,
+   "quat": [
+    0.0,
+    -0.126182,
+    -0.0,
+    0.992007
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_b",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_624",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2809.065,
+    196.0,
+    470.509
+   ],
+   "rot_y_deg": -14.498,
+   "quat": [
+    0.0,
+    -0.126182,
+    -0.0,
+    0.992007
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_625",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2814.874,
+    196.0,
+    472.011
+   ],
+   "rot_y_deg": -14.498,
+   "quat": [
+    0.0,
+    -0.126182,
+    -0.0,
+    0.992007
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_626",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2820.683,
+    196.0,
+    473.513
+   ],
+   "rot_y_deg": -14.498,
+   "quat": [
+    0.0,
+    -0.126182,
+    -0.0,
+    0.992007
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "sign_roof_2_627",
+   "asset": "signs/sign_roof_2.gltf",
+   "pos": [
+    2817.502,
+    224.91,
+    461.845
+   ],
+   "rot_y_deg": -104.0,
+   "quat": [
+    0.0,
+    -0.788011,
+    -0.0,
+    0.615661
+   ],
+   "scale": [
+    2.6,
+    2.6,
+    2.6
+   ],
+   "zone": "highwater",
+   "tint": {
+    "neon_a": "sign_b"
+   }
+  },
+  {
+   "id": "hw_shophouse_e_628",
+   "asset": "buildings/mooring_shophouse_e.glb",
+   "pos": [
+    2822.624,
+    196.0,
+    442.597
+   ],
+   "rot_y_deg": -14.486,
+   "quat": [
+    0.0,
+    -0.12608,
+    -0.0,
+    0.99202
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_b",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_629",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2814.639,
+    196.0,
+    449.52
+   ],
+   "rot_y_deg": -14.486,
+   "quat": [
+    0.0,
+    -0.12608,
+    -0.0,
+    0.99202
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_630",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2820.448,
+    196.0,
+    451.021
+   ],
+   "rot_y_deg": -14.486,
+   "quat": [
+    0.0,
+    -0.12608,
+    -0.0,
+    0.99202
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_631",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2826.257,
+    196.0,
+    452.522
+   ],
+   "rot_y_deg": -14.486,
+   "quat": [
+    0.0,
+    -0.12608,
+    -0.0,
+    0.99202
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_shophouse_b_632",
+   "asset": "buildings/mooring_shophouse_b.glb",
+   "pos": [
+    2830.552,
+    196.0,
+    424.952
+   ],
+   "rot_y_deg": -15.637,
+   "quat": [
+    0.0,
+    -0.136032,
+    -0.0,
+    0.990704
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_c",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_633",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2821.944,
+    196.0,
+    433.446
+   ],
+   "rot_y_deg": -15.637,
+   "quat": [
+    0.0,
+    -0.136032,
+    -0.0,
+    0.990704
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_634",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2827.721,
+    196.0,
+    435.063
+   ],
+   "rot_y_deg": -15.637,
+   "quat": [
+    0.0,
+    -0.136032,
+    -0.0,
+    0.990704
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_635",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2833.499,
+    196.0,
+    436.68
+   ],
+   "rot_y_deg": -15.637,
+   "quat": [
+    0.0,
+    -0.136032,
+    -0.0,
+    0.990704
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_stack_c_636",
+   "asset": "buildings/mooring_stack_c.glb",
+   "pos": [
+    2838.524,
+    202.4,
+    522.296
+   ],
+   "rot_y_deg": -16.041,
+   "quat": [
+    0.0,
+    -0.139529,
+    -0.0,
+    0.990218
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_b",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_637",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2830.116,
+    202.4,
+    529.825
+   ],
+   "rot_y_deg": -16.041,
+   "quat": [
+    0.0,
+    -0.139529,
+    -0.0,
+    0.990218
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_638",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2835.883,
+    202.4,
+    531.483
+   ],
+   "rot_y_deg": -16.041,
+   "quat": [
+    0.0,
+    -0.139529,
+    -0.0,
+    0.990218
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_639",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2841.649,
+    202.4,
+    533.141
+   ],
+   "rot_y_deg": -16.041,
+   "quat": [
+    0.0,
+    -0.139529,
+    -0.0,
+    0.990218
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_stack_e_640",
+   "asset": "buildings/mooring_stack_e.glb",
+   "pos": [
+    2842.788,
+    202.4,
+    499.498
+   ],
+   "rot_y_deg": -15.009,
+   "quat": [
+    0.0,
+    -0.130607,
+    -0.0,
+    0.991434
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_c",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_641",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2834.545,
+    202.4,
+    507.071
+   ],
+   "rot_y_deg": -15.009,
+   "quat": [
+    0.0,
+    -0.130607,
+    -0.0,
+    0.991434
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_642",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2840.34,
+    202.4,
+    508.625
+   ],
+   "rot_y_deg": -15.009,
+   "quat": [
+    0.0,
+    -0.130607,
+    -0.0,
+    0.991434
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_643",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2846.136,
+    202.4,
+    510.179
+   ],
+   "rot_y_deg": -15.009,
+   "quat": [
+    0.0,
+    -0.130607,
+    -0.0,
+    0.991434
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_stack_a_644",
+   "asset": "buildings/mooring_stack_a.glb",
+   "pos": [
+    2849.251,
+    202.4,
+    478.899
+   ],
+   "rot_y_deg": -11.777,
+   "quat": [
+    0.0,
+    -0.102589,
+    -0.0,
+    0.994724
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_645",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2841.345,
+    202.4,
+    487.424
+   ],
+   "rot_y_deg": -11.777,
+   "quat": [
+    0.0,
+    -0.102589,
+    -0.0,
+    0.994724
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_646",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2847.218,
+    202.4,
+    488.649
+   ],
+   "rot_y_deg": -11.777,
+   "quat": [
+    0.0,
+    -0.102589,
+    -0.0,
+    0.994724
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_647",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2853.092,
+    202.4,
+    489.874
+   ],
+   "rot_y_deg": -11.777,
+   "quat": [
+    0.0,
+    -0.102589,
+    -0.0,
+    0.994724
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_corner_tower_648",
+   "asset": "buildings/mooring_corner_tower.glb",
+   "pos": [
+    2854.577,
+    202.4,
+    454.631
+   ],
+   "rot_y_deg": -13.805,
+   "quat": [
+    0.0,
+    -0.120177,
+    -0.0,
+    0.992753
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_649",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2846.03,
+    202.4,
+    464.27
+   ],
+   "rot_y_deg": -13.805,
+   "quat": [
+    0.0,
+    -0.120177,
+    -0.0,
+    0.992753
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_650",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2851.856,
+    202.4,
+    465.702
+   ],
+   "rot_y_deg": -13.805,
+   "quat": [
+    0.0,
+    -0.120177,
+    -0.0,
+    0.992753
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_651",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2857.683,
+    202.4,
+    467.133
+   ],
+   "rot_y_deg": -13.805,
+   "quat": [
+    0.0,
+    -0.120177,
+    -0.0,
+    0.992753
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_stack_c_652",
+   "asset": "buildings/mooring_stack_c.glb",
+   "pos": [
+    2862.431,
+    202.4,
+    429.929
+   ],
+   "rot_y_deg": -16.414,
+   "quat": [
+    0.0,
+    -0.142752,
+    -0.0,
+    0.989759
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_b",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_653",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2853.974,
+    202.4,
+    437.404
+   ],
+   "rot_y_deg": -16.414,
+   "quat": [
+    0.0,
+    -0.142752,
+    -0.0,
+    0.989759
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_654",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2859.729,
+    202.4,
+    439.099
+   ],
+   "rot_y_deg": -16.414,
+   "quat": [
+    0.0,
+    -0.142752,
+    -0.0,
+    0.989759
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_655",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2865.485,
+    202.4,
+    440.795
+   ],
+   "rot_y_deg": -16.414,
+   "quat": [
+    0.0,
+    -0.142752,
+    -0.0,
+    0.989759
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_stack_d_656",
+   "asset": "buildings/mooring_stack_d.glb",
+   "pos": [
+    2870.996,
+    208.8,
+    517.471
+   ],
+   "rot_y_deg": -16.582,
+   "quat": [
+    0.0,
+    -0.144198,
+    -0.0,
+    0.989549
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_657",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2862.42,
+    208.8,
+    525.247
+   ],
+   "rot_y_deg": -16.582,
+   "quat": [
+    0.0,
+    -0.144198,
+    -0.0,
+    0.989549
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_658",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2868.17,
+    208.8,
+    526.959
+   ],
+   "rot_y_deg": -16.582,
+   "quat": [
+    0.0,
+    -0.144198,
+    -0.0,
+    0.989549
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_659",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2873.921,
+    208.8,
+    528.671
+   ],
+   "rot_y_deg": -16.582,
+   "quat": [
+    0.0,
+    -0.144198,
+    -0.0,
+    0.989549
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "sign_roof_2_660",
+   "asset": "signs/sign_roof_2.gltf",
+   "pos": [
+    2870.996,
+    256.91,
+    517.471
+   ],
+   "rot_y_deg": -104.0,
+   "quat": [
+    0.0,
+    -0.788011,
+    -0.0,
+    0.615661
+   ],
+   "scale": [
+    2.6,
+    2.6,
+    2.6
+   ],
+   "zone": "highwater",
+   "tint": {
+    "neon_a": "sign_b"
+   }
+  },
+  {
+   "id": "hw_stack_b_661",
+   "asset": "buildings/mooring_stack_b.glb",
+   "pos": [
+    2879.043,
+    208.8,
+    492.083
+   ],
+   "rot_y_deg": -15.004,
+   "quat": [
+    0.0,
+    -0.130559,
+    -0.0,
+    0.991441
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_662",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2870.529,
+    208.8,
+    500.672
+   ],
+   "rot_y_deg": -15.004,
+   "quat": [
+    0.0,
+    -0.130559,
+    -0.0,
+    0.991441
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_663",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2876.325,
+    208.8,
+    502.225
+   ],
+   "rot_y_deg": -15.004,
+   "quat": [
+    0.0,
+    -0.130559,
+    -0.0,
+    0.991441
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_664",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2882.12,
+    208.8,
+    503.779
+   ],
+   "rot_y_deg": -15.004,
+   "quat": [
+    0.0,
+    -0.130559,
+    -0.0,
+    0.991441
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "sign_roof_2_665",
+   "asset": "signs/sign_roof_2.gltf",
+   "pos": [
+    2879.043,
+    263.31,
+    492.083
+   ],
+   "rot_y_deg": -104.0,
+   "quat": [
+    0.0,
+    -0.788011,
+    -0.0,
+    0.615661
+   ],
+   "scale": [
+    2.6,
+    2.6,
+    2.6
+   ],
+   "zone": "highwater",
+   "tint": {
+    "neon_a": "sign_b"
+   }
+  },
+  {
+   "id": "hw_capsule_tower_666",
+   "asset": "buildings/mooring_capsule_tower.glb",
+   "pos": [
+    2885.494,
+    208.8,
+    469.273
+   ],
+   "rot_y_deg": -15.048,
+   "quat": [
+    0.0,
+    -0.130943,
+    -0.0,
+    0.99139
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_667",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2877.051,
+    208.8,
+    477.566
+   ],
+   "rot_y_deg": -15.048,
+   "quat": [
+    0.0,
+    -0.130943,
+    -0.0,
+    0.99139
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_668",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2882.845,
+    208.8,
+    479.123
+   ],
+   "rot_y_deg": -15.048,
+   "quat": [
+    0.0,
+    -0.130943,
+    -0.0,
+    0.99139
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_669",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2888.64,
+    208.8,
+    480.681
+   ],
+   "rot_y_deg": -15.048,
+   "quat": [
+    0.0,
+    -0.130943,
+    -0.0,
+    0.99139
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "hw_stack_a_670",
+   "asset": "buildings/mooring_stack_a.glb",
+   "pos": [
+    2890.673,
+    208.8,
+    443.359
+   ],
+   "rot_y_deg": -13.274,
+   "quat": [
+    0.0,
+    -0.115581,
+    -0.0,
+    0.993298
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater",
+   "tint": {
+    "win_warm": "win_d",
+    "win_cool": "win_a",
+    "strip": "eave"
+   }
+  },
+  {
+   "id": "deck_pad_6m_671",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2882.546,
+    208.8,
+    451.675
+   ],
+   "rot_y_deg": -13.274,
+   "quat": [
+    0.0,
+    -0.115581,
+    -0.0,
+    0.993298
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_672",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2888.386,
+    208.8,
+    453.053
+   ],
+   "rot_y_deg": -13.274,
+   "quat": [
+    0.0,
+    -0.115581,
+    -0.0,
+    0.993298
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "deck_pad_6m_673",
+   "asset": "decks/deck_pad_6m.glb",
+   "pos": [
+    2894.226,
+    208.8,
+    454.43
+   ],
+   "rot_y_deg": -13.274,
+   "quat": [
+    0.0,
+    -0.115581,
+    -0.0,
+    0.993298
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "highwater"
+  },
+  {
+   "id": "long_arc",
+   "asset": "far/long_arc.glb",
+   "pos": [
+    22500.0,
+    -38.0,
+    -2351.0
+   ],
+   "rot_y_deg": -90.0,
+   "quat": [
+    0.0,
+    -0.707107,
+    -0.0,
+    0.707107
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "anomaly"
   }
  ],
  "splines": {
@@ -18628,9 +20120,9 @@
   {
    "name": "break_light",
    "origin": [
-    1150.0,
+    1500.0,
     112.02,
-    40.0
+    70.0
    ],
    "count": 2,
    "rpm": 4.3,
@@ -19858,9 +21350,9 @@
   {
    "name": "break_light_lamp",
    "pos": [
-    1150.0,
+    1500.0,
     112.02,
-    40.0
+    70.0
    ],
    "key": "moon_disc",
    "radius_m": 60.0,
@@ -19942,9 +21434,9 @@
   {
    "name": "light_102",
    "pos": [
-    900.0,
-    104.0,
-    300.0
+    746.0,
+    213.0,
+    563.0
    ],
    "key": "amber",
    "radius_m": 30.0,
@@ -20135,32 +21627,40 @@
     "t": 54.4,
     "pos": [
      470,
-     215,
-     -40
+     214,
+     -30
+    ]
+   },
+   {
+    "t": 56.88,
+    "pos": [
+     578,
+     229,
+     -44
     ]
    },
    {
     "t": 58.95,
     "pos": [
-     660,
-     245,
-     -95
+     653,
+     232.5,
+     -51
     ]
    },
    {
     "t": 66.5,
     "pos": [
-     835,
-     256,
-     -144
+     819,
+     224.5,
+     -66
     ]
    },
    {
     "t": 70.2,
     "pos": [
-     865,
-     258,
-     -152
+     849,
+     223,
+     -69.5
     ]
    }
   ]
@@ -20181,8 +21681,8 @@
   "at_t": 43.4
  },
  "stats": {
-  "instances": 611,
-  "triangles": 662061,
+  "instances": 675,
+  "triangles": 862997,
   "by_zone": {
    "quay_deck": 33,
    "quay_north": 12,
@@ -20207,7 +21707,9 @@
    "garden": 48,
    "lighthouse": 6,
    "condensery": 51,
-   "lone_lamp": 4
+   "lone_lamp": 4,
+   "highwater": 63,
+   "anomaly": 1
   },
   "spots": 143,
   "paths": 15,

@@ -660,11 +660,52 @@ def condensery():
 
 
 def lone_lamp():
-    x, y, z = LONE_LAMP
-    inst("buildings/lone_lamp_house.glb", x, y, z, 0.5, 1.0, "lone_lamp", tint={"win_warm": "amber"}, iid="lone_lamp_house")
+    """One house on a cloud of its own. Its lit window (front, third floor) faces the Quay's east end, 850 m off."""
+    x, y, z = LONE_LAMP; yaw = math.radians(-130.0)
+    inst("buildings/lone_lamp_house.glb", x, y, z, yaw, 1.0, "lone_lamp", tint={"win_warm": "amber"}, iid="lone_lamp_house")
     for k in (-1, 0, 1):
-        dx, dy = rot(0.5, k * 6.0, -8.0); inst("decks/deck_pad_6m.glb", x + dx, y + dy, z, 0.5, 1.0, "lone_lamp", env=False)
+        dx, dy = rot(yaw, k * 6.0, -8.0); inst("decks/deck_pad_6m.glb", x + dx, y + dy, z, yaw, 1.0, "lone_lamp", env=False)
     light(x, y, z + 8, "amber", 30.0, 1.0, "lone_lamp")
+
+
+def highwater():
+    """Highwater Mooring (iteration 6): a third settlement, never reached, glimpsed on the right of the reveal 2.2 km out
+    with its decks at the horizon. Built to be read at that distance and from that side: three terraces stepping up
+    away from the reveal, every building turned so its west side (the always-lit stairwell and an eave line) faces the
+    camera, the tallest stacks at the back, three roof signs at two and a half times life size. It uses the Mooring's
+    own assets with tints the Mooring already uses, so the scene gains instances, not nodes. Its own random source:
+    nothing earlier in the layout moves."""
+    rr = random.Random(606); x0, y0, z0 = HIGHWATER; yaw = HIGHWATER_YAW
+    seen = {}
+    for i in INST:
+        if i["asset"].startswith("buildings/") and "tint" in i and i["zone"] in ("quay_north", "quay_south", "stacks"):
+            seen.setdefault(i["asset"], i["tint"])
+    rows = [(0.0, 34.0, [("mooring_shophouse_c", -52), ("mooring_shophouse_g", -32), ("mooring_shophouse_a", -12), ("mooring_shophouse_h", 9), ("mooring_shophouse_e", 30), ("mooring_shophouse_b", 50)]),
+            (6.4, 2.0, [("mooring_stack_c", -44), ("mooring_stack_e", -21), ("mooring_stack_a", 2), ("mooring_corner_tower", 27), ("mooring_stack_c", 52)]),
+            (12.8, -30.0, [("mooring_stack_d", -30), ("mooring_stack_b", -6), ("mooring_capsule_tower", 19), ("mooring_stack_a", 44)])]
+    top = None
+    for (dz, u, lst) in rows:                                   # u: metres toward the reveal (west of the centre), v: along the row
+        for (nm, v) in lst:
+            a = "buildings/%s.glb" % nm
+            if a not in MAN:
+                continue
+            lx, ly = -u + rr.uniform(-2, 2), v + rr.uniform(-1.5, 1.5); dx, dy = rot(yaw, lx, ly)
+            byaw = yaw + rr.uniform(-0.05, 0.05)
+            inst(a, x0 + dx, y0 + dy, z0 + dz, byaw, 1.0, "highwater", tint=seen.get(a) or tint_for(nm), iid="hw_%s_%d" % (nm.replace("mooring_", ""), len(INST)))
+            m = MAN[a]; fy = -m["bounds_m"][5]
+            for k in (-1, 0, 1):
+                ddx, ddy = rot(byaw, k * 6.0, fy - 3.4); inst("decks/deck_pad_6m.glb", x0 + dx + ddx, y0 + dy + ddy, z0 + dz, byaw, 1.0, "highwater", env=False)
+            if nm in ("mooring_stack_b", "mooring_stack_d", "mooring_shophouse_h") and "roof_y_m" in m:
+                inst("signs/sign_roof_2.gltf", x0 + dx, y0 + dy, z0 + dz + m["roof_y_m"], yaw + math.radians(-90.0), 2.6, "highwater", tint={"neon_a": "sign_b"}, env=False)
+    return len([i for i in INST if i["zone"] == "highwater"])
+
+
+def anomalies():
+    """The Long Arc (iteration 6: it existed only in the Blender concept frames). It stands 22 km east of the journey and
+    leaves the sea 6 degrees north of east as the reveal sees it, bending over to the south: in the reveal it climbs out
+    of the horizon between the Condensery and the far tower; from the approach it is a hairline low on the right, beyond
+    the Outer Light. Never reached, never explained."""
+    inst("far/long_arc.glb", LONG_ARC[0], LONG_ARC[1], LONG_ARC[2], math.radians(-90.0), 1.0, "anomaly", iid="long_arc", env=False)
 
 
 # ============================================================================================ checks and output
@@ -710,6 +751,8 @@ east_garden()
 beams = lighthouses()
 emitters = condensery()
 lone_lamp()
+n_highwater = highwater()
+anomalies()
 bad, worst = checks()
 
 tris = sum(MAN[i["asset"]]["tris"] for i in INST)
