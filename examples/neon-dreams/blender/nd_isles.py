@@ -50,14 +50,14 @@ px = np.array(base_img.pixels[:], dtype=np.float32).reshape(h, w, 4)
 r, g, b = px[..., 0], px[..., 1], px[..., 2]
 green = np.clip((g - np.maximum(r, b)) * 6.0, 0.0, 1.0)                 # the moss seams
 lum = 0.3 * r + 0.55 * g + 0.15 * b
-stone = np.stack([lum * 1.05 + 0.02, lum * 0.92 + 0.02, lum * 1.30 + 0.035], -1)   # violet slate (the image is sRGB). Draft 1 at 0.62x read as black cut-outs at night
+stone = np.stack([lum * 1.35 + 0.03, lum * 1.18 + 0.03, lum * 1.65 + 0.05], -1)   # violet slate (the image is sRGB). Draft 1 at 0.62x read as black cut-outs at night
 seam = green[..., None]
 stone = stone * (1.0 - 0.6 * seam) + seam * np.array([0.10, 0.07, 0.16])         # the seams dark and wet under their glow
 night = bpy.data.images.new("isle_stone_base", w, h, alpha=False)
 night.pixels[:] = np.concatenate([np.clip(stone, 0, 1), np.ones((h, w, 1), np.float32)], -1).ravel()
 rng = np.random.default_rng(78)
 blot = np.kron(rng.random((h // 64, w // 64)), np.ones((64, 64)))[:h, :w]           # the glow comes in patches, not every seam
-glowv = green * (0.35 + 0.65 * (blot > 0.45))
+glowv = green * (0.45 + 0.55 * (blot > 0.35))   # msg 90: more of the seams glow (islands read as dark cups at night)
 hue = np.kron(rng.random((h // 128, w // 128)), np.ones((128, 128)))[:h, :w][..., None]
 col = (1 - hue) * np.array([0.62, 0.42, 1.0]) + hue * np.array([1.0, 0.45, 0.85])     # garden_b violet to garden_a pink
 emis = bpy.data.images.new("isle_stone_glow", w, h, alpha=False)
@@ -68,7 +68,7 @@ for n in nt.nodes:
     if n.type == 'TEX_IMAGE' and n.image == base_img:
         n.image = night
 te = nt.nodes.new('ShaderNodeTexImage'); te.image = emis
-nt.links.new(te.outputs[0], bsdf.inputs['Emission Color']); bsdf.inputs['Emission Strength'].default_value = 3.0          # the veins: faint at 1.0 from 300 m
+nt.links.new(te.outputs[0], bsdf.inputs['Emission Color']); bsdf.inputs['Emission Strength'].default_value = 5.0          # the veins: faint at 1.0 from 300 m
 mat.name = "isle_stone"
 
 # ---- normalise: 1 unit across, top at 0
@@ -104,10 +104,31 @@ bpy.context.scene.collection.objects.unlink(rock) if rock.name in bpy.context.sc
 for c in list(rock.users_collection):
     c.objects.unlink(rock)
 made = []
+def stacked(name, pieces=((1.0, 0.0, 0.0, 0.0), (0.72, 0.06, -0.05, 1.9), (0.5, -0.05, 0.04, 3.4), (0.32, 0.03, 0.02, 4.6), (0.2, -0.02, -0.03, 0.8))):
+    """A tall island WITHOUT stretching the rock (owner msg 90: the stretched spire smeared its plates into streaks):
+    uniformly scaled copies of the rock hung one under another, each top sunk into the underside of the piece above,
+    turned so no two show the same face. (scale, dx, dy, yaw) per piece, top piece first."""
+    c0 = base_co.copy(); depth0 = -c0[:, 2].min(); parts = []; z = 0.0
+    for k, (sc, dx, dy, yaw) in enumerate(pieces):
+        c = c0 * sc; cs, sn = math.cos(yaw), math.sin(yaw)
+        c = np.stack([c[:, 0] * cs - c[:, 1] * sn + dx, c[:, 0] * sn + c[:, 1] * cs + dy, c[:, 2] + z], -1)
+        parts.append(c); z -= depth0 * sc * 0.62                      # the next piece's top sits 38 % up inside this one's keel
+    ob = rock.copy(); ob.data = rock.data.copy(); ob.name = name; ob.data.name = name
+    bpy.context.scene.collection.objects.link(ob)
+    bm = bmesh.new(); bm.from_mesh(rock.data); src = bm.copy(); bm.clear()
+    for c in parts:
+        tmp = src.copy()
+        for v, p in zip(tmp.verts, c):
+            v.co = p
+        me_ = bpy.data.meshes.new("tmp"); tmp.to_mesh(me_); bm.from_mesh(me_); bpy.data.meshes.remove(me_); tmp.free()
+    bm.to_mesh(ob.data); bm.free(); src.free(); ob.data.update()
+    co_ = np.array([v.co[:] for v in ob.data.vertices]); return ob, float(-co_[:, 2].min())
+
+
 for (nm, kw) in (("isle_rock_a", dict(deep=1.3, flat=1.0, taper=0.15, wobble=0.04, seed=1)),
                  ("isle_rock_b", dict(deep=0.75, flat=1.25, taper=0.45, wobble=0.06, seed=2)),
-                 ("isle_rock_c", dict(deep=2.6, flat=0.9, taper=0.72, wobble=0.12, seed=3))):
-    ob, depth = variant(nm, **kw)
+                 ("isle_rock_c", None)):
+    ob, depth = variant(nm, **kw) if kw else stacked(nm)
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, nm + ".gltf"), export_format='GLTF_SEPARATE', use_selection=True, export_yup=True,
                               export_apply=True, export_texture_dir="", export_image_format='AUTO')

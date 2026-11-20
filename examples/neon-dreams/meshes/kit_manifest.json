@@ -4515,11 +4515,11 @@
   },
   {
    "asset": "_thirdparty/isles/isle_rock_c.gltf",
-   "tris": 25242,
+   "tris": 126210,
    "height_m": 0.0,
    "bounds_m": [
     -0.5,
-    -2.09,
+    -1.226,
     -0.5,
     0.5,
     0.0,

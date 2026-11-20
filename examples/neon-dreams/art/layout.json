@@ -37949,7 +37949,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     1500.0,
-    42.41,
+    51.914,
     70.0
    ],
    "rot_y_deg": 324.875,
@@ -38555,7 +38555,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     640.0,
-    152.69,
+    160.466,
     350.0
    ],
    "rot_y_deg": 264.204,
@@ -39694,7 +39694,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     -252.0,
-    126.415,
+    132.031,
     40.0
    ],
    "rot_y_deg": 342.888,
@@ -40626,7 +40626,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     -40.0,
-    92.505,
+    97.257,
     110.0
    ],
    "rot_y_deg": 356.472,
@@ -43043,7 +43043,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     178.0,
-    118.325,
+    124.805,
     95.0
    ],
    "rot_y_deg": 319.536,
@@ -49933,7 +49933,7 @@
     70.0
    ],
    "width_m": 44.0,
-   "depth_m": 92.0,
+   "depth_m": 53.9,
    "zone": "lighthouse_isle"
   },
   {
@@ -50005,7 +50005,7 @@
     350.0
    ],
    "width_m": 36.0,
-   "depth_m": 75.2,
+   "depth_m": 44.1,
    "zone": "watch_isle"
   },
   {
@@ -50041,7 +50041,7 @@
     40.0
    ],
    "width_m": 26.0,
-   "depth_m": 54.3,
+   "depth_m": 31.9,
    "zone": "isle_west2_isle"
   },
   {
@@ -50065,7 +50065,7 @@
     110.0
    ],
    "width_m": 22.0,
-   "depth_m": 46.0,
+   "depth_m": 27.0,
    "zone": "isle_inner2_isle"
   },
   {
@@ -50113,7 +50113,7 @@
     95.0
    ],
    "width_m": 30.0,
-   "depth_m": 62.7,
+   "depth_m": 36.8,
    "zone": "isle_exit_isle"
   }
  ],
@@ -52587,7 +52587,7 @@
  },
  "stats": {
   "instances": 1821,
-  "triangles": 3100844,
+  "triangles": 3605684,
   "by_zone": {
    "quay_deck": 33,
    "quay_north": 12,
