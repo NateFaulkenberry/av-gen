@@ -561,10 +561,17 @@ CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseA
 CLOUD_QUALITY = {
     "offline": {"steps": 72, "lightSteps": 6, "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02,
                 "erosionOctaves": 3},
-    "live": {"steps": 72, "lightSteps": 6, "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02,
-             "erosionOctaves": 3},
+    # iteration 8, measured (--live-profile headless, 1080p, Medium): 31-42 ms against 80-115 ms for the offline preset
+    # at Ultra. The march at 0.4 resolution, 40 steps growing 3.5 % of the distance, three light taps, two erosion octaves
+    "live": {"steps": 40, "lightSteps": 3, "resolution": 0.4, "temporal": 0.9, "minStep": 3.0, "stepGrowth": 0.035,
+             "erosionOctaves": 2},
 }
 CLOUD_Q = dict(CLOUD_QUALITY["offline"])
+# live: no air march (8 ms; the air has no in-scatter, so the closed-form surface fog alone is within 1/255)
+ENV_QUALITY = {"offline": {}, "live": {"volumeMaxDistance": 0.0}}   # environment keys by quality (merged over scene_doc's env)
+ENV_Q = {}
+KEY_SHADOW = {"offline": True, "live": False}   # live: the moon's shadow map is 12.7 ms of a 33 ms frame   # the moon key's shadow map, by quality
+KEY_Q = {"shadow": True}
 AIR = {"density": 0.0003, "scattering": 0.0, "fogSky": 0.5}   # extinction = density x volumeAbsorption 0.5
 WELL_GLOW = {"radius": 95.0, "intensity": 6.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
 LOBE_ERODE = {"plug": 0.3, "seat": 0.3}
@@ -744,11 +751,12 @@ def scene_doc(state="uv", sky_map=None):
         # scene's own air (ADR-705), thin, with no in-scatter of its own (the cloud pass owns the visible air)
         "volumeDensity": AIR["density"], "volumeScattering": AIR["scattering"],
     }
+    env.update(ENV_Q)
     if sky_map:
         env["map"] = sky_map
         env["rotation"] = 0.0
     lights = [{"name": "moon", "type": "directional", "role": "key", "direction": r3([-v for v in LIGHT_DIR]),
-               "color": pal("moon_light", state), "intensity": 0.35, "castsShadow": True, "volumetric": 0.0},
+               "color": pal("moon_light", state), "intensity": 0.35, "castsShadow": KEY_Q["shadow"], "volumetric": 0.0},
               {"name": "skyfill", "type": "directional", "role": "fill", "direction": [0.3, -0.6, 0.4],
                "color": [0.25, 0.15, 0.7], "intensity": 0.08, "castsShadow": False, "volumetric": 0.0}]
     lights += light_nodes(state)
@@ -1022,12 +1030,21 @@ def main():
                     help="the cloud march's cost preset; 'live' writes <name>-live.* unless --name is given")
     ap.add_argument("--cloud", action="append", default=[], metavar="KEY=VALUE",
                     help="override one cloud quality knob (for measuring a preset); repeatable")
+    ap.add_argument("--no-key-shadow", action="store_true", help="the moon key casts no shadow (measuring a preset)")
+    ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
+                    help="override one environment key (number); repeatable")
     a = ap.parse_args()
     CLOUD_Q.clear()
     CLOUD_Q.update(CLOUD_QUALITY[a.quality])
     for kv in a.cloud:
         k, v = kv.split("=", 1)
         CLOUD_Q[k] = int(v) if k in ("steps", "lightSteps", "erosionOctaves") else float(v)
+    KEY_Q["shadow"] = KEY_SHADOW[a.quality] and not a.no_key_shadow
+    ENV_Q.clear()
+    ENV_Q.update(ENV_QUALITY[a.quality])
+    for kv in a.env:
+        k, v = kv.split("=", 1)
+        ENV_Q[k] = float(v)
     if a.quality != "offline" and a.name == "neon-dreams":
         a.name = "neon-dreams-" + a.quality
     os.makedirs(a.out, exist_ok=True)
