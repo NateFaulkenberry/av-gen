@@ -178,14 +178,16 @@ CELL = 4.0
 def town():
     """The Mooring's decks and buildings as plan cells of 4 m, from art/layout.json and the kit manifest:
     {(i, j): (deck height, True under a building)}. The plateau is built under them, the heads and wisps beside them."""
-    lay = json.load(open(os.path.join(ROOT, "art", "layout.json")))
-    man = {a_["asset"]: a_ for a_ in json.load(open(os.path.join(ROOT, "meshes", "kit_manifest.json")))["assets"]}
+    lay = json.load(open(os.environ.get("ND_LAYOUT", os.path.join(ROOT, "art", "layout.json"))))          # ND_LAYOUT / ND_MANIFEST: a scratch run
+    man = {a_["asset"]: a_ for a_ in json.load(open(os.environ.get("ND_MANIFEST", os.path.join(ROOT, "meshes", "kit_manifest.json"))))["assets"]}
     cells = {}
     for i in lay["instances"]:
         fam = i["asset"].split("/")[0]
         if fam not in ("decks", "buildings") or i["zone"] in ("condensery", "lone_lamp", "lighthouse", "gangway", "highwater") or "rail" in i["asset"] or "stair" in i["asset"]:
             continue
         b = man[i["asset"]]["bounds_m"]; sx, sy, sz = i["scale"]; yaw = math.radians(i["rot_y_deg"])
+        if "deck_round" in i["asset"]:                                    # the round decks count by their radius (iteration 8 hung crescents outside the large one: the cloud may lie on those)
+            rd = 27.0 if "27m" in i["asset"] else 14.0; b = [-rd, b[1], -rd, rd, b[4], rd]
         px, py, pz = i["pos"][0], -i["pos"][2], i["pos"][1]
         x0, x1, z0, z1 = b[0] * sx, b[3] * sx, b[2] * sz, b[5] * sz
         nx, nz = max(2, int((x1 - x0) / 2.0) + 1), max(2, int((z1 - z0) / 2.0) + 1)
@@ -324,6 +326,41 @@ def heads(rr, out, x, y, top, r, soft=0.22, kids=(3, 5), dens=1.0, sy=0.72):
         if cr > 13.0 and rr.random() < 0.7:
             ph2 = rr.uniform(0, 6.283); g = cr * rr.uniform(0.42, 0.55)
             out.append(L(cx + cr * 0.6 * math.cos(ph2), cy + cr * 0.6 * math.sin(ph2), cz + cr * 0.5, g, 0.88, dens, soft))
+
+
+def garden_seat():
+    """Iteration 8: the garden terrace seated in cloud. In the engine's 44.5 s frame the terrace was a clean disc over
+    a hollow: the plateau lies under it, and nothing stood beside it (on_open_deck clears the whole square of its
+    bounds). Cauliflower heads stand all round its rim except on the town's side, their tops from two metres under the
+    promenade to two over it: cloud up to the balustrade and over the lower crescents, never on the paving. Small
+    lobes, so they are tagged "seat" by build() and keep their body (0.3 of the erosion)."""
+    rr = random.Random(86); out = []; gx, gy, gz = GARDEN; n = 0
+    small = ((gx - 22.0, gy + 16.0, 14.0), (gx - 42.0, gy, 14.0))
+
+    def clear(l):
+        cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; rh = l["r"] * max(l["scale"][0], l["scale"][2]); top = cz + l["r"] * l["scale"][1]
+        if top < gz - 1.6:
+            return True                                                    # under the decks: anywhere
+        if math.hypot(cx - gx, cy - gy) - rh < 25.8:                        # the promenade's outer metre may be lapped, the paving not
+            return False
+        return all(math.hypot(cx - sx, cy - sy) - rh > sr - 0.5 for (sx, sy, sr) in small)
+    for k in range(28):
+        a = math.radians(-150 + k * 300 / 27 + rr.uniform(-4, 4))
+        r = rr.uniform(9.0, 14.5); d = 27.0 + r * rr.uniform(0.95, 1.35)
+        top = gz - 0.4 + rr.uniform(-2.2, 2.2)
+        grp = []; heads(rr, grp, gx + d * math.cos(a), gy + d * math.sin(a), top, r, soft=0.22, kids=(1, 3))
+        grp = [l for l in grp if clear(l) and path_gap(l, 0.0, 47.4) >= 11.0]
+        if grp:
+            out += grp; n += 1
+    for k in range(10):                                                    # mist at the rail
+        a = math.radians(-140 + k * 280 / 9 + rr.uniform(-8, 8)); d = 27.0 + rr.uniform(6, 12)
+        l = L(gx + d * math.cos(a), gy + d * math.sin(a), gz + rr.uniform(-1.5, 1.0), rr.uniform(8, 12), rr.uniform(0.3, 0.42), 0.4, 0.7, sx=rr.uniform(1.4, 2.0))
+        if clear(l) and path_gap(l, 0.0, 47.4) >= 11.0:
+            out.append(l)
+    for l in out:
+        l["tag"] = "seat"
+    STATS["garden_seat_heads"] = n
+    return out
 
 
 def mooring_mound():
@@ -532,6 +569,92 @@ def _tangents(u):
     return t1, (u[1] * t1[2] - u[2] * t1[1], u[2] * t1[0] - u[0] * t1[2], u[0] * t1[1] - u[1] * t1[0])
 
 
+GARDEN_SEAT = []            # garden_seat()'s lobes, placed the same way
+
+
+def add_where_room(masses, extra, limit=62):
+    """Add lobes without pushing any other out of the renderer's bins: the grid of fit_bins, and a lobe goes in only
+    if every cell it touches is still under the limit. extra: {mass: [lobe, ...]}. Returns how many went in per mass."""
+    items = [l for m in masses.values() for l in m]
+    ext = lambda l: l["r"] * max(l["scale"][0], l["scale"][2])
+    lo = (min(l["c"][0] - ext(l) for l in items), min(l["c"][2] - ext(l) for l in items))
+    hi = (max(l["c"][0] + ext(l) for l in items), max(l["c"][2] + ext(l) for l in items))
+    rs = sorted(ext(l) for l in items); cell = max(0.5 * rs[len(rs) // 2], max(hi[0] - lo[0], hi[1] - lo[1]) / BIN_SIDE, 1.0)
+    cs_of = lambda l: [(x, z) for z in range(int((l["c"][2] - ext(l) - lo[1]) // cell), int((l["c"][2] + ext(l) - lo[1]) // cell) + 1)
+                       for x in range(int((l["c"][0] - ext(l) - lo[0]) // cell), int((l["c"][0] + ext(l) - lo[0]) // cell) + 1)]
+    cells = {}
+    for l in items:
+        for c in cs_of(l):
+            cells[c] = cells.get(c, 0) + 1
+    added = {}
+    for k, ls in extra.items():
+        for l in ls:
+            cs = cs_of(l)
+            if all(cells.get(c, 0) < limit for c in cs):
+                for c in cs:
+                    cells[c] = cells.get(c, 0) + 1
+                masses[k].append(l); added[k] = added.get(k, 0) + 1
+    return added
+
+
+def deball(lobes, voids):
+    """Iteration 8: no single round lobe on the Veil's face. With the engine's erosion (ADR-2106) a lobe of 40 to 80 m
+    seen from the garden at 60 to 250 m is still one ball: the erosion takes bays of metres out of a surface whose
+    outline is one arc, and the gate's glow shades it as one sphere (the round pink spheres of the 44.5 and 46.8 s
+    frames). Every near-round lobe of 30 m and more whose surface is within 150 m of the garden's edge is therefore
+    SPLIT into two or three unlike bodies (0.56 to 0.84 of its radius) set round its centre in the plane the lens sees
+    (wider than tall), at different depths: the outline becomes two or three arcs of different sizes with saddles
+    between them, each body keeping a soft edge of 0.5 or more for the erosion to bite into. None reaches into a room
+    (else the lobe stays whole) and none is under 24.5 m (the Veil drops smaller lobes within 110 m of the journey).
+    Tried in AV Gen and dropped (iteration 8, stills in work/art/it8/av):
+      * FLATTENING the lobe on its own footprint (0.66 as high, the largest as two flattened bodies): every one read
+        as a puck with a crisp, sky-lit underside at 46.8 s (under the erosion a flattened lobe loses its width with
+        its thickness);
+      * DRESSING the bodies with cauliflower heads of 14 to 24 m on the side the lens sees (offered after the bins,
+        where a cell had room): seen against the sky they were stacks of smooth flat discs at 44.5 and 46.8 s, and
+        from the Quay at 35.75 s a row of balloons on the bank's crown;
+      * a soft edge of 0.48 on the bank's lobes of 18 to 45 m: no visible change (the smooth white puffs left on the
+        bank's crown at 44.5 s are bodies of 30 to 45 m seen at 140 to 220 m against the sky);
+      * one smaller flattened billow beside each lobe and a cap on the largest (a lone lobe of 15 to 25 m with a soft
+        edge is a smooth lozenge at 100 m), and, when the bins were 64 a side, three or four lobes per lobe (it pushed
+        64 small heads beside the town out of the bins)."""
+    rr = random.Random(88); ref = _J.at(46.0); out = []; n = 0; n_split = 0
+    for l in lobes:
+        cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; r = l["r"]; sx, sv, sz = l["scale"]
+        dx, dy = cx - ref[0], cy - ref[1]; dist = math.hypot(dx, dy) or 1.0
+        gm = (sx * sv * sz) ** (1.0 / 3.0)
+        if l.get("tag") == "plug" or min(sx, sv, sz) / max(sx, sv, sz) < 0.74 or r * gm < 30.0 or dist - r * gm > 150.0:
+            out.append(l); continue
+        n += 1
+        vx, vy, vz = cx - ref[0], cy - ref[1], cz - ref[2]; vn = math.sqrt(vx * vx + vy * vy + vz * vz) or 1.0
+        fwd = (vx / vn, vy / vn, vz / vn)
+        tx, ty = -fwd[1], fwd[0]; tn = math.hypot(tx, ty) or 1.0; tx, ty = tx / tn, ty / tn          # across the view, level
+        ux, uy, uz = (fwd[1] * 0 - fwd[2] * ty, fwd[2] * tx - fwd[0] * 0, fwd[0] * ty - fwd[1] * tx)   # up in the view plane
+        if uz < 0:
+            ux, uy, uz = -ux, -uy, -uz
+        k = 3 if r * gm >= 52.0 else 2
+        sizes = [0.84, 0.66] if k == 2 else [0.74, 0.62, 0.56]
+        rr.shuffle(sizes)
+        ph0 = rr.uniform(0, 2 * math.pi); made = []
+        for i in range(k):
+            ph = ph0 + i * 2 * math.pi / k + rr.uniform(-0.4, 0.4)
+            off = (0.5 if k == 2 else 0.56) * r * gm * rr.uniform(0.9, 1.1)
+            a_, b_ = math.cos(ph) * off, math.sin(ph) * off * 0.7                                    # wider than tall
+            dep = rr.uniform(-0.2, 0.2) * r * gm
+            ri = max(24.5, r * sizes[i]); ri = min(ri, 0.88 * r)
+            px = cx + tx * a_ + ux * b_ + fwd[0] * dep; py = cy + ty * a_ + uy * b_ + fwd[1] * dep; pz = cz + uz * b_ + fwd[2] * dep
+            m = dict(l); m["r"] = round(ri, 1); m["scale"] = [round(sx * rr.uniform(0.95, 1.12), 2), round(sv * rr.uniform(0.84, 1.0), 2), round(sz * rr.uniform(0.95, 1.12), 2)]
+            m["c"] = [round(px, 1), round(pz, 1), round(-py, 1)]; m["soft"] = round(max(l["soft"], rr.uniform(0.5, 0.6)), 2)
+            if _admit(m, voids, 0.32):
+                made.append(m)
+        if len(made) < 2:                                                 # cannot split without reaching into a room: keep it whole
+            out.append(l); continue
+        n_split += 1
+        out += made
+    STATS["veil_lobes_round"] = n; STATS["veil_lobes_split"] = n_split
+    return out
+
+
 def veil():
     """The bank: three turrets over a chain of rooms (gate, antechamber, nave, lantern room), the plug and the mouth. Iteration 6: what a room's wall is made of. In iteration 5 every shell lobe was 12 to 60 m with a crisp
     edge, and from inside the walls read as clustered spheres. The cause, found in AV Gen: the renderer's noise has
@@ -594,6 +717,7 @@ def veil():
                 l = L(p[0] + right[0] * i * sp + d[0] * js, p[1] + right[1] * i * sp + d[1] * js, p[2] + j * sp - 2.0, r, 1.0, 1.0, 0.3)
                 if _admit(l, rooms, 0.3):
                     l["_keep"] = True; l["tag"] = "plug"; out.append(l); STATS["plug_lobes"] = STATS.get("plug_lobes", 0) + 1
+    out = deball(out, voids)
     ragged([l for l in out if not l.get("_keep")])              # the bank's big lobes, not the rooms' walls
     kept = []; n_small = 0
     for l in out:                                               # within 110 m of the journey: no small lobe, no crisp one
@@ -922,6 +1046,7 @@ def build():
     cells = town()
     dress, n_heads, n_wisps = mound_dressing(cells)
     masses = {"mooring_mound": mooring_mound() + dress}
+    GARDEN_SEAT[:] = garden_seat()
     STATS.update(town_heads=n_heads, town_wisps=n_wisps)
     masses["head"] = cumulus(23, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 4))
     # the Veil (iteration 5): a bank on the journey's own line with rooms in it (see veil()); nothing of it stands on
@@ -1001,6 +1126,8 @@ def build():
         masses[k_] = prune_hidden(masses[k_])
     STATS.update(hidden_lobes_dropped=n0 - sum(len(m) for m in masses.values()))
     STATS.update(dropped_to_fit_bins=fit_bins(masses))
+    # iteration 8: the garden's seat goes in last, and only where a bin cell has room
+    STATS.update(added_where_room=add_where_room(masses, {"mooring_mound": GARDEN_SEAT}), offered={"mooring_mound": len(GARDEN_SEAT)})
     far = far_field()
     for k_ in far:
         far[k_] = prune_hidden(far[k_])
