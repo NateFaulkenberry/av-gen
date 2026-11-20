@@ -6819,6 +6819,63 @@ void Composition::addDefaultRoutes(params::Modulator& modulator) {
 
 // ---- flattening --------------------------------------------------------------------------------
 
+// ADR-2112: a formation's offset at this second, by name (zero for a name the clouds do not have). The lift is the
+// live one (this frame's or the last's: the routes move it over seconds), the bob a function of the second.
+glm::vec3 Composition::cloudBobFor(const std::string& name) const {
+    for (std::size_t i = 0; i < clouds_.bobs.size(); ++i) {
+        if (clouds_.bobs[i].name != name) continue;
+        CloudBob b = clouds_.bobs[i];
+        if (i < scene_.clouds.bobs.size() && scene_.clouds.bobs[i].name == name) b.lift = scene_.clouds.bobs[i].lift;
+        return cloudBobOffset(b, currentTime_);
+    }
+    return glm::vec3(0.0f);
+}
+
+// ADR-2113: the wisps' wake points: the nodes the block names (a trailing '*' a prefix), the 16 nearest the camera,
+// with their velocity from the last frame (zero after a seek or a jump in time).
+void Composition::updateCloudWakes() {
+    CloudWisps& w = scene_.clouds.wisps;
+    w.wakePoints.clear();
+    w.wakeVelocities.clear();
+    if (!w.enabled || w.wakes.empty()) return;
+    const auto matches = [&](const std::string& n) {
+        for (const std::string& pat : w.wakes) {
+            if (!pat.empty() && pat.back() == '*') {
+                if (n.compare(0, pat.size() - 1, pat, 0, pat.size() - 1) == 0) return true;
+            } else if (n == pat) {
+                return true;
+            }
+        }
+        return false;
+    };
+    const Transform root = rootFold();
+    struct Wake {
+        float d2;
+        glm::vec3 p;
+        glm::vec3 v;
+    };
+    std::vector<Wake> found;
+    for (const auto& np : nodes_) {
+        const CompositionNode& n = *np;
+        if (!matches(n.name) || !nodeVisible(n)) continue;
+        const glm::vec3 p = compose(root, nodeWorldTransform(n)).position;
+        glm::vec3 v(0.0f);
+        auto it = wakePrev_.find(n.name);
+        if (it != wakePrev_.end()) {
+            const double dt = currentTime_ - it->second.second;
+            if (dt > 1e-4 && dt < 0.25) v = (p - it->second.first) / static_cast<float>(dt);
+        }
+        wakePrev_[n.name] = {p, currentTime_};
+        const glm::vec3 d = p - scene_.camera.position;
+        found.push_back({glm::dot(d, d), p, v});
+    }
+    std::sort(found.begin(), found.end(), [](const Wake& a, const Wake& b) { return a.d2 < b.d2; });
+    for (std::size_t k = 0; k < found.size() && k < kMaxCloudWakes; ++k) {
+        w.wakePoints.emplace_back(found[k].p, 0.0f);
+        w.wakeVelocities.emplace_back(found[k].v, 0.0f);
+    }
+}
+
 Transform Composition::nodeTransform(const CompositionNode& node) const {
     Transform t = node.transform;
     if (node.positionParam != nullptr) {
@@ -6829,6 +6886,9 @@ Transform Composition::nodeTransform(const CompositionNode& node) const {
     }
     if (node.scaleParam != nullptr) {
         t.scale = node.scaleParam->value();
+    }
+    if (!node.bob.empty()) {
+        t.position += cloudBobFor(node.bob); // ADR-2112
     }
     if (node.journeyAnchor && journey_) {
         // ADR-1042: on the journey, wrapped with the camera (one reference for the whole frame), facing
@@ -10229,6 +10289,7 @@ void Composition::applyParameters() {
     } else {
         scene_.clouds = clouds_;
     }
+    updateCloudWakes(); // ADR-2113
     applyEcosystemParameters(ecosystemParams_, ecosystem_, scene_.ecosystem);
     updateAstral(); // ADR-1221: before the camera, which it may place
     updateAttractorWorld(); // ADR-1850: likewise
@@ -11992,6 +12053,7 @@ nlohmann::json Composition::toJson() const {
             const glm::vec3 t = node.tintParam != nullptr ? node.tintParam->base() : *node.tint;
             n["tint"] = {t.x, t.y, t.z};
         }
+        if (!node.bob.empty()) n["bob"] = node.bob; // ADR-2112
         if (node.journeyAnchor) { // ADR-1042
             n["journey"] = {{"distance", node.journeyDistanceParam != nullptr ? node.journeyDistanceParam->base()
                                                                              : *node.journeyAnchor}};
@@ -13920,6 +13982,10 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("node '{}': 'journey' must be an object with a numeric 'distance'", node.name);
                 }
                 node.journeyAnchor = jn.value("distance", 0.0f);
+            }
+            if (item.contains("bob")) { // ADR-2112
+                if (!item.at("bob").is_string()) return fail("node '{}': 'bob' must be a cloud formation's name", node.name);
+                node.bob = item.at("bob").get<std::string>();
             }
             auto position = readVec<3>(item, "position", node.transform.position);
             auto rotation = readVec<3>(item, "rotation", glm::vec3(0.0f));

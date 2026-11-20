@@ -61,8 +61,24 @@ struct CloudUniformGpu {
     // base flattening)
     glm::vec4 erosion;
     glm::vec4 erosion2;
+    // ADR-2112: each formation's offset at this second (xyz, metres)
+    std::array<glm::vec4, scene::kMaxCloudBobs> bobs;
+    // ADR-2113: the wisps: (on, base, top, density), (scale, coverage, tatter, stretch), (drift offset xyz m, wake
+    // count), (wake radius, strength, swirl, height), (zone count, 0, 0, 0)
+    glm::vec4 wisp0;
+    glm::vec4 wisp1;
+    glm::vec4 wisp2;
+    glm::vec4 wisp3;
+    glm::vec4 wisp4;
+    std::array<glm::vec4, scene::kMaxCloudWakes> wakes;      // position, 0
+    std::array<glm::vec4, scene::kMaxCloudWakes> wakeVel;    // velocity m/s, 0
+    // per zone: (centre x, floor, centre z at this second, bounding radius), (radius a, radius b, yaw, density),
+    // (below, above, 0, 0)
+    std::array<glm::vec4, 3 * scene::kMaxCloudWispZones> zones;
 };
-static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 9) * 16);
+static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 9 +
+                                          scene::kMaxCloudBobs + 5 + 2 * scene::kMaxCloudWakes +
+                                          3 * scene::kMaxCloudWispZones) * 16);
 
 struct LobeGpu {
     glm::vec4 centreRadius;
@@ -229,22 +245,31 @@ glm::vec2 cloudFrameJitter(std::uint32_t frameNonce) {
             static_cast<float>(std::fmod(n * (3.5698402910 / 8.0) + 0.37, 1.0))};
 }
 
-CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes) {
+CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach) {
     CloudLobeBins bins;
     if (lobes.empty()) {
         return bins;
     }
+    // ADR-2112: a lobe that rides a formation is binned over everywhere the formation can take it
+    const auto reachOf = [&](const scene::CloudLobe& l) {
+        return l.bobIndex >= 0 && static_cast<std::size_t>(l.bobIndex) < bobReach.size()
+                   ? bobReach[static_cast<std::size_t>(l.bobIndex)]
+                   : glm::vec3(0.0f);
+    };
+    const auto yBottom = [&](const scene::CloudLobe& l) { return l.centre.y - l.radius * l.scale.y - reachOf(l).y; };
+    const auto yTop = [&](const scene::CloudLobe& l) { return l.centre.y + l.radius * l.scale.y + reachOf(l).y; };
     glm::vec2 lo(1e30f), hi(-1e30f);
     bins.yLo = 1e30f;
     bins.yHi = -1e30f;
     for (const scene::CloudLobe& l : lobes) {
-        bins.yLo = std::min(bins.yLo, l.centre.y - l.radius * l.scale.y);
-        bins.yHi = std::max(bins.yHi, l.centre.y + l.radius * l.scale.y);
+        bins.yLo = std::min(bins.yLo, yBottom(l));
+        bins.yHi = std::max(bins.yHi, yTop(l));
     }
     std::vector<float> extents;
     extents.reserve(lobes.size());
     for (const scene::CloudLobe& l : lobes) {
-        const float e = l.radius * std::max(l.scale.x, l.scale.z);
+        const glm::vec3 r = reachOf(l);
+        const float e = l.radius * std::max(l.scale.x, l.scale.z) + std::max(r.x, r.z);
         extents.push_back(e);
         lo = glm::min(lo, glm::vec2(l.centre.x, l.centre.z) - e);
         hi = glm::max(hi, glm::vec2(l.centre.x, l.centre.z) + e);
@@ -283,8 +308,8 @@ CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes) {
         // ADR-2101: the column's vertical extent, so the march can skip the air above and below its lobes
         float y0 = 1e30f, y1 = -1e30f;
         for (const std::uint32_t i : list) {
-            y0 = std::min(y0, lobes[i].centre.y - lobes[i].radius * lobes[i].scale.y);
-            y1 = std::max(y1, lobes[i].centre.y + lobes[i].radius * lobes[i].scale.y);
+            y0 = std::min(y0, yBottom(lobes[i]));
+            y1 = std::max(y1, yTop(lobes[i]));
         }
         const float span = std::max(bins.yHi - bins.yLo, 1.0f);
         const auto q = [&](float y, bool up) {
@@ -484,10 +509,16 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         key = mixKey(key, static_cast<float>(set->size()));
         for (const scene::CloudLobe& l : *set) {
             for (float v : {l.centre.x, l.centre.y, l.centre.z, l.radius, l.scale.x, l.scale.y, l.scale.z, l.density,
-                            l.soft, l.erode}) {
+                            l.soft, l.erode, static_cast<float>(l.bobIndex)}) {
                 key = mixKey(key, v);
             }
         }
+    }
+    // ADR-2112: the formations' reach (the bins' margin), not their motion: the bins hold still while they bob
+    std::vector<glm::vec3> bobReach;
+    for (const scene::CloudBob& b : c.bobs) {
+        bobReach.push_back(scene::cloudBobReach(b));
+        for (float v : {bobReach.back().x, bobReach.back().y, bobReach.back().z}) key = mixKey(key, v);
     }
     if (key != lobesKey_ || !lobes_) {
         std::vector<LobeGpu> rows;
@@ -495,9 +526,11 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         glm::vec3 lo(1e30f), hi(-1e30f);
         for (const auto* set : {&c.lobes, &c.farLobes}) { // ADR-2104: the far set after the hero set
             for (const scene::CloudLobe& l : *set) {
-                rows.push_back(
-                    {glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density), glm::vec4(l.soft, l.erode, 0, 0)}); // ADR-2107: y = erode
-                const glm::vec3 ext = l.radius * l.scale;
+                // ADR-2107: y = erode; ADR-2112: z = the formation's index + 1 (0 = none)
+                rows.push_back({glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density),
+                                glm::vec4(l.soft, l.erode, static_cast<float>(l.bobIndex + 1), 0)});
+                const glm::vec3 ext =
+                    l.radius * l.scale + (l.bobIndex >= 0 ? bobReach[static_cast<std::size_t>(l.bobIndex)] : glm::vec3(0.0f));
                 lo = glm::min(lo, l.centre - ext);
                 hi = glm::max(hi, l.centre + ext);
             }
@@ -512,14 +545,14 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         bd.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         lobes_ = device.CreateBuffer(&bd);
         context_->queue().WriteBuffer(lobes_, 0, rows.data(), rows.size() * sizeof(LobeGpu));
-        bins_cpu_ = binCloudLobes(c.lobes);
+        bins_cpu_ = binCloudLobes(c.lobes, bobReach);
         if (bins_cpu_.truncated > 0) {
             log::warn("clouds: {} of {} lobe bins held more than {} lobes; the smallest were dropped there",
                       bins_cpu_.truncated, bins_cpu_.nx * bins_cpu_.nz, kMaxLobesPerCell);
         }
         std::vector<std::uint32_t> words = bins_cpu_.words;
         // ADR-2104: the far set's grid after the hero grid's words; its offsets and lobe indices shifted to match
-        farBins_ = binCloudLobes(c.farLobes);
+        farBins_ = binCloudLobes(c.farLobes, bobReach);
         farWordBase_ = static_cast<std::uint32_t>(words.size());
         if (!c.farLobes.empty()) {
             if (farBins_.truncated > 0) {
@@ -606,16 +639,53 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.frameInfo = glm::vec4(jitter.x, historyUsable ? std::clamp(c.temporal, 0.0f, 0.97f) : 0.0f,
                             static_cast<float>(mw), static_cast<float>(mh));
     u.prevViewProj = historyUsable ? lastViewProj_ : f.viewProj;
+    // ADR-2112: every formation's offset at this second
+    std::array<glm::vec3, scene::kMaxCloudBobs> bobOff{};
+    for (std::size_t b = 0; b < std::min(c.bobs.size(), scene::kMaxCloudBobs); ++b) {
+        bobOff[b] = scene::cloudBobOffset(c.bobs[b], now);
+        u.bobs[b] = glm::vec4(bobOff[b], 0.0f);
+    }
+    u.wisp4.y = static_cast<float>(std::min(c.bobs.size(), scene::kMaxCloudBobs)); // ADR-2112: formations exist
+    const auto bobAt = [&](int index) {
+        return index >= 0 && static_cast<std::size_t>(index) < scene::kMaxCloudBobs ? bobOff[static_cast<std::size_t>(index)]
+                                                                                       : glm::vec3(0.0f);
+    };
+    // ADR-2113: the wisps
+    if (c.wisps.enabled) {
+        const scene::CloudWisps& w = c.wisps;
+        const std::size_t wakes = std::min({w.wakePoints.size(), w.wakeVelocities.size(), scene::kMaxCloudWakes});
+        const std::size_t zones = std::min(w.zones.size(), scene::kMaxCloudWispZones);
+        u.wisp0 = glm::vec4(1.0f, w.base, w.top, w.density);
+        u.wisp1 = glm::vec4(w.scale, w.coverage, w.tatter, w.stretch);
+        u.wisp2 = glm::vec4(w.drift * static_cast<float>(std::fmod(now, 100000.0)), static_cast<float>(wakes));
+        u.wisp3 = glm::vec4(w.wakeRadius, w.wakeStrength, w.wakeSwirl, w.wakeHeight);
+        u.wisp4.z = w.wakeTrail;
+        u.wisp4.w = w.top > w.base ? 1.0f : 0.0f; // the band is on
+        u.wisp4.x = static_cast<float>(zones);
+        for (std::size_t k = 0; k < wakes; ++k) {
+            u.wakes[k] = w.wakePoints[k];
+            u.wakeVel[k] = w.wakeVelocities[k];
+        }
+        for (std::size_t k = 0; k < zones; ++k) {
+            const scene::CloudWispZone& z = w.zones[k];
+            const glm::vec3 c = glm::vec3(z.centre.x, z.floor, z.centre.y) + bobAt(z.bobIndex);
+            const float bound = std::sqrt(std::max(z.radii.x, z.radii.y) * std::max(z.radii.x, z.radii.y) +
+                                          std::max(z.below, z.above + 1.0f) * std::max(z.below, z.above + 1.0f));
+            u.zones[3 * k] = glm::vec4(c, bound);
+            u.zones[3 * k + 1] = glm::vec4(z.radii, z.yaw, z.density);
+            u.zones[3 * k + 2] = glm::vec4(z.below, z.above, 0.0f, 0.0f);
+        }
+    }
     for (std::size_t i = 0; i < glowCount; ++i) {
         const scene::CloudGlow& g = c.glows[i];
-        u.glows[2 * i] = glm::vec4(g.position, g.radius);
+        u.glows[2 * i] = glm::vec4(g.position + bobAt(g.bobIndex), g.radius); // ADR-2112
         u.glows[2 * i + 1] = glm::vec4(g.color * g.intensity, g.shadow); // ADR-2107: w = shadow share
     }
     // ADR-2102: the beams' arms at this timeline second
     std::size_t arms = 0;
     for (const scene::CloudBeam& b : c.beams) {
         for (int a = 0; a < b.count && arms < scene::kMaxCloudBeamArms; ++a, ++arms) {
-            u.beams[3 * arms] = glm::vec4(b.origin, b.length);
+            u.beams[3 * arms] = glm::vec4(b.origin + bobAt(b.bobIndex), b.length); // ADR-2112
             u.beams[3 * arms + 1] = glm::vec4(scene::cloudBeamDirection(b, a, now),
                                               std::tan(glm::radians(b.halfAngle)));
             u.beams[3 * arms + 2] = glm::vec4(b.color * b.intensity, std::max(b.radius, 0.05f));

@@ -55,6 +55,15 @@ struct CloudUniforms {
     erosion: vec4<f32>,   // ADR-2106: x = strength (0 = off), y = the coarse billow's wavelength (m), z = fine detail, w = curl (m)
     erosion2: vec4<f32>,  // ADR-2106: x = octaves (1..3), y = light tap spacing (1 = even, 2 = squared + jitter),
                           // z = multiple scattering (0..1), w = base flattening (0..1)
+    bobs: array<vec4<f32>, 32>, // ADR-2112: each formation's offset at this second (xyz m)
+    wisp0: vec4<f32>,     // ADR-2113: on, base, top, density
+    wisp1: vec4<f32>,     // scale (m), coverage, tatter, stretch
+    wisp2: vec4<f32>,     // drift offset (m), wake count
+    wisp3: vec4<f32>,     // wake radius, strength, swirl (rad), height
+    wisp4: vec4<f32>,     // zone count, formation count, wake trail (s), 1 when the band is on
+    wakes: array<vec4<f32>, 16>,
+    wakeVel: array<vec4<f32>, 16>,
+    zones: array<vec4<f32>, 72>, // per zone: (centre x, floor, z, bound), (radius a, b, yaw, density), (below, above)
 };
 
 struct Lobe {
@@ -146,6 +155,117 @@ fn erosionAt(p: vec3<f32>, octaves: u32, footprint: f32) -> Ero {
     return e;
 }
 
+// ADR-2112: a formation's offset by its stored index + 1 (0 = none)
+fn bobOffset(k: f32) -> vec3<f32> {
+    let i = u32(k + 0.5);
+    if (i == 0u) {
+        return vec3<f32>(0.0);
+    }
+    return cu.bobs[min(i - 1u, 31u)].xyz;
+}
+
+// ADR-2112: the offset of the formation the lobes at p ride (the first lobe of p's hero cell), so a bobbing body's
+// erosion and detail move with it instead of the noise sliding through it
+fn cellBob(p: vec3<f32>) -> vec3<f32> {
+    if (cu.boxMin.w < 0.5) {
+        return vec3<f32>(0.0);
+    }
+    let cell = vec2<i32>(floor((p.xz - cu.grid.xy) / cu.grid.z));
+    let nx = i32(cu.grid.w + 0.5);
+    if (cell.x < 0 || cell.y < 0 || cell.x >= nx || cell.y >= i32(cu.grid2.x + 0.5)) {
+        return vec3<f32>(0.0);
+    }
+    let k = u32(cell.y * nx + cell.x);
+    if ((bins[2u * k + 1u] & 0xFFu) == 0u) {
+        return vec3<f32>(0.0);
+    }
+    return bobOffset(lobes[bins[bins[2u * k]]].soft.z);
+}
+
+// ADR-2113: the wisps' density at p (0..): a band low over the sea and authored zones, filled with warped Worley sheets
+// cut by coverage and torn at the edges, parted and twisted round the wakes. `cheap` skips the tearing octave (light).
+fn wispDensity(p: vec3<f32>, cheap: bool) -> f32 {
+    if (cu.wisp0.x < 0.5) {
+        return 0.0;
+    }
+    var m = 0.0;
+    if (cu.wisp4.w > 0.5) {
+        let h = max(cu.wisp0.z - cu.wisp0.y, 0.1);
+        let u = (p.y - cu.wisp0.y) / h;
+        if (u > 0.0 && u < 1.0) {
+            m = smoothstep(0.0, 0.3, u) * (1.0 - smoothstep(0.45, 1.0, u));
+        }
+    }
+    let nz = u32(cu.wisp4.x + 0.5);
+    for (var z = 0u; z < nz; z = z + 1u) {
+        let zc = cu.zones[3u * z];
+        let v = p - zc.xyz;
+        if (dot(v, v) >= zc.w * zc.w) {
+            continue;
+        }
+        let zr = cu.zones[3u * z + 1u];
+        let zv = cu.zones[3u * z + 2u];
+        let c = cos(zr.z);
+        let sn = sin(zr.z);
+        let lx = (c * v.x - sn * v.z) / zr.x;
+        let lz = (sn * v.x + c * v.z) / zr.y;
+        let plan = 1.0 - smoothstep(0.7, 1.0, length(vec2<f32>(lx, lz)));
+        // the layer peaks a metre under the floor: thin over the deck, pooled in the gaps beneath it
+        let dy = v.y + 1.0;
+        var vert = 0.0;
+        if (dy >= 0.0) {
+            vert = 1.0 - smoothstep(0.0, zv.y + 1.0, dy);
+        } else {
+            vert = 1.0 - smoothstep(0.0, max(zv.x - 1.0, 0.5), -dy);
+        }
+        m = max(m, plan * vert * zr.w);
+    }
+    if (m <= 0.0) {
+        return 0.0;
+    }
+    var q = p - cu.wisp2.xyz;
+    // the wakes: a figure parts the wisps round it and twists them about its vertical axis, and drags them behind it
+    let nw = u32(cu.wisp2.w + 0.5);
+    var part = 0.0;
+    for (var k = 0u; k < nw; k = k + 1u) {
+        let wp = cu.wakes[k].xyz;
+        let dy = p.y - wp.y;
+        if (dy < -1.0 || dy > cu.wisp3.w + 2.0) {
+            continue;
+        }
+        // the body and the trail behind it (the last `wakeTrail` seconds of its path), refilling toward the tail
+        let vel = cu.wakeVel[k].xz;
+        let tail = -vel * cu.wisp4.z;
+        let v = p.xz - wp.xz;
+        let tl2 = dot(tail, tail);
+        let along = select(0.0, clamp(dot(v, tail) / tl2, 0.0, 1.0), tl2 > 1e-4);
+        let r = length(v - tail * along) / (cu.wisp3.x * (1.0 + 0.8 * along));
+        if (r >= 2.5) {
+            continue;
+        }
+        let f = exp(-r * r) * (1.0 - 0.75 * along) * (1.0 - smoothstep(cu.wisp3.w * 0.6, cu.wisp3.w + 2.0, dy));
+        part = max(part, f);
+        // a slight curl about the vertical and a drag after the walker
+        let a = cu.wisp3.z * f;
+        let c = cos(a);
+        let sn = sin(a);
+        let vr = vec2<f32>(c * v.x - sn * v.y, sn * v.x + c * v.y);
+        q = vec3<f32>(q.x + (vr.x - v.x), q.y, q.z + (vr.y - v.y)) - vec3<f32>(vel.x, 0.0, vel.y) * (0.6 * f);
+    }
+    let lam = cu.wisp1.x;
+    let qs = vec3<f32>(q.x, q.y * cu.wisp1.w, q.z);
+    let w = noiseTap(qs * 0.43 + vec3<f32>(91.0, 7.0, -33.0), 1.0 / lam);
+    let q2 = qs + (vec3<f32>(w.a, w.r, w.g) - vec3<f32>(0.5, 0.5, 0.45)) * (0.9 * lam);
+    let n = noiseTap(q2, 1.0 / lam);
+    let sheet = n.g * 0.65 + n.a * 0.35;
+    var d = remap01(sheet, 1.0 - cu.wisp1.y, 1.0 - cu.wisp1.y + 0.2);
+    if (!cheap && cu.wisp1.z > 0.0) {
+        let t = noiseTap(q2 * 1.0 + vec3<f32>(-13.0, 41.0, 5.0), 3.7 / lam);
+        d = remap01(d, cu.wisp1.z * (1.0 - t.b) * 0.85, 1.0);
+    }
+    return d * m * cu.wisp0.w * (1.0 - cu.wisp3.y * part);
+}
+
 // The union of the binned lobes at `p`: x = density, y = the lobes' own height fraction (0 base .. 1 top).
 // x = the union's density, y = metres of that lobe still above the sample (the analytic light's depth)
 fn lobeBase(p: vec3<f32>, e: Ero) -> vec2<f32> {
@@ -186,7 +306,7 @@ fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yL
     for (var i = 0u; i < count; i = i + 1u) {
         let l = lobes[bins[offset + i]];
         let ry = l.centreRadius.w * l.scaleDensity.y;
-        var d = (p - l.centreRadius.xyz) / (l.centreRadius.w * l.scaleDensity.xyz);
+        var d = (p - l.centreRadius.xyz - bobOffset(l.soft.z)) / (l.centreRadius.w * l.scaleDensity.xyz);
         let r2 = dot(d, d);
         if (r2 >= 1.0) {
             continue;
@@ -309,7 +429,12 @@ fn densityBase(p: vec3<f32>, e: Ero) -> Density {
     let lobeAbove = lobeBase(p, e);
     let lobe = lobeAbove.x;
     let inSea = seaH >= 0.0 && seaH <= 1.0;
+    let wisp = wispDensity(p, e.on < 0.5); // ADR-2113 (the light taps pass no erosion: the cheap wisp)
     if (!inSea && lobe <= 0.0) {
+        if (wisp > 0.0) {
+            out.base = wisp;
+            out.height = 0.35;
+        }
         return out;
     }
     let seed = vec3<f32>(cu.grid2.y * 7.13, 0.0, cu.grid2.y * 3.71);
@@ -339,7 +464,7 @@ fn densityBase(p: vec3<f32>, e: Ero) -> Density {
     if (lobe > 0.0) {
         lob = clamp(lobe * (1.0 + 0.5 * swell) - cu.warmColor.w * (1.0 - sn), 0.0, 1.0);
     }
-    out.base = max(sea, lob);
+    out.base = max(max(sea, lob), wisp);
     out.above = select(max(out.above, lobeAbove.y * 0.6), -1.0 - lobeAbove.y * 0.6, out.above < 0.0 && sea >= lob);
     if (lob > sea) {
         // ADR-2105: over the hero lobes' own height range (the box also holds the far set, which put every hero
@@ -429,12 +554,45 @@ fn slab(ro: vec3<f32>, rd: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>, box: bool) -
 // ADR-2101: how far an empty sample can jump. Above the sea band, a sample in a bin column with no lobes (or outside the
 // lobes' box) can go straight to the nearer of the sea's top, the column's exit and the box's entry: the march spent
 // its whole budget crossing kilometres of empty air before the sea when the eye was inside the lobes' box.
+// ADR-2113: the wisps' regions along the ray: where it next enters one after t (t itself when inside one; 1e30 none)
+fn wispNext(ro: vec3<f32>, rd: vec3<f32>, t: f32) -> f32 {
+    if (cu.wisp0.x < 0.5) {
+        return 1e30;
+    }
+    var best = 1e30;
+    if (cu.wisp4.w > 0.5) {
+        let s = slab(ro, rd, vec3<f32>(0.0, cu.wisp0.y, 0.0), vec3<f32>(0.0, cu.wisp0.z, 0.0), false);
+        if (s.y > s.x && s.y > t) {
+            best = max(s.x, t);
+        }
+    }
+    let nz = u32(cu.wisp4.x + 0.5);
+    for (var z = 0u; z < nz; z = z + 1u) {
+        let zc = cu.zones[3u * z];
+        let r = zc.w;
+        let oc = ro - zc.xyz;
+        let b = dot(oc, rd);
+        let disc = b * b - (dot(oc, oc) - r * r);
+        if (disc > 0.0) {
+            let sq = sqrt(disc);
+            let t1 = -b + sq;
+            if (t1 > t) {
+                best = min(best, max(-b - sq, t));
+            }
+        }
+    }
+    return best;
+}
+
 fn emptySkip(ro: vec3<f32>, rd: vec3<f32>, t: f32, seaEntry: f32, boxEntry: f32) -> f32 {
     let p = ro + rd * t;
     if (cu.sea2.y > 0.5 && p.y <= cu.sea.y) {
         return t;
     }
-    var goal = seaEntry;
+    var goal = min(seaEntry, wispNext(ro, rd, t)); // ADR-2113: never jump into or across the wisps
+    if (goal <= t) {
+        return t;
+    }
     let inBox = cu.boxMin.w > 0.5 && all(p >= cu.boxMin.xyz) && all(p <= cu.boxMax.xyz);
     if (inBox) {
         goal = skipGrid(ro, rd, p, goal, cu.grid.xy, cu.grid.z, i32(cu.grid.w + 0.5), i32(cu.grid2.x + 0.5),
@@ -593,6 +751,27 @@ fn fs_clouds(in: VsOut) -> MarchOut {
             boxEntry = s.x;
         }
     }
+    if (cu.wisp0.x > 0.5) { // ADR-2113: the wisps' band and zones
+        if (cu.wisp4.w > 0.5) {
+            let s = slab(ro, rd, vec3<f32>(0.0, cu.wisp0.y, 0.0), vec3<f32>(0.0, cu.wisp0.z, 0.0), false);
+            if (s.y > s.x) {
+                tA = min(tA, s.x);
+                tB = max(tB, min(s.y, 6000.0));
+            }
+        }
+        let nz = u32(cu.wisp4.x + 0.5);
+        for (var z = 0u; z < nz; z = z + 1u) {
+            let zc = cu.zones[3u * z];
+            let r = zc.w;
+            let oc = ro - zc.xyz;
+            let b = dot(oc, rd);
+            let disc = b * b - (dot(oc, oc) - r * r);
+            if (disc > 0.0 && -b + sqrt(disc) > 0.0) {
+                tA = min(tA, max(-b - sqrt(disc), 0.0));
+                tB = max(tB, -b + sqrt(disc));
+            }
+        }
+    }
     let reach = min(sceneT, cu.march2.z);
     tB = min(tB, reach);
     // ADR-2102: the beams' air scatter waits at its distance along the ray for the march to say how much cloud is in
@@ -656,7 +835,9 @@ fn fs_clouds(in: VsOut) -> MarchOut {
         }
         let p = ro + rd * t;
         let octaves = u32(clamp(cu.erosion2.x, 1.0, 3.0) + 0.5);
-        let ero = erosionAt(p, octaves, max(t * pixAngle, 0.5 * max(minStep, t * growth)));
+        // ADR-2112: the erosion and detail of a bobbing formation move with it
+        let cb = select(vec3<f32>(0.0), cellBob(p), cu.wisp4.y > 0.5);
+        let ero = erosionAt(p - cb, octaves, max(t * pixAngle, 0.5 * max(minStep, t * growth)));
         var db = densityBase(p, ero);
         dt = select(max(minStep, t * growth), evenDt, even);
         if (even && db.base > 0.0) {
@@ -665,7 +846,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
         if (db.base > 0.0) {
             // ADR-2111: the cloud within two minimum steps of the eye fades out: there the reprojection has nothing to
             // hold (parallax of metres a frame) and a fast camera leaving a cloud saw its last metres as a stipple
-            let dens = select(detailErode(p, db.base), db.base, even) *
+            let dens = select(detailErode(p - cb, db.base), db.base, even) *
                        select(smoothstep(0.0, 2.0 * minStep, t), 1.0, even);
             if (dens > 0.003) {
                 // the key's light reaching this point (the light march reads the undetailed density)
@@ -703,7 +884,7 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                         let s1 = cu.march.z * u1 * u1;
                         let sm = mix(prevS, s1, lj);
                         let lp = p + L * sm;
-                        let le = erosionAt(lp, min(octaves, 2u), 4.0); // a light tap keeps a crisp edge (the shadow shapes the heads)
+                        let le = erosionAt(lp - cb, min(octaves, 2u), 4.0); // a light tap keeps a crisp edge (the shadow shapes the heads)
                         od = od + densityBase(lp, le).base * (s1 - prevS);
                         prevS = s1;
                     }

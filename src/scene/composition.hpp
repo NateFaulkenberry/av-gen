@@ -443,6 +443,10 @@ struct CompositionNode {
     // rotation turns it after it faces along the path. Unset: an ordinary node.
     std::optional<float> journeyAnchor;
     params::Parameter<float>* journeyDistanceParam = nullptr;
+    // ADR-2112: the node rides a bobbing cloud formation (`"bob": "<name>"`, a name in the scene's `clouds.bobs`): its
+    // position moves by exactly the formation's offset, so an island, its buildings (children) and its cloud move as
+    // one. Empty: an ordinary node.
+    std::string bob;
     // ADR-1044: an opt-in colour multiplier on every surface the node draws (`"tint": [r, g, b]` in the
     // node), a parameter `nodes/<name>/tint` a palette can bind (a figure's wooden tone made a silhouette).
     std::optional<glm::vec3> tint;
@@ -2540,6 +2544,10 @@ private:
     EcosystemParameters ecosystemParams_;     // its live knobs, while attached
     AstralForge astral_;                      // ADR-1221: the authored block (rest values)
     Clouds clouds_;                          // ADR-1289
+    // ADR-2113: each wake node's last position and second, for the wisps' wake velocity
+    std::unordered_map<std::string, std::pair<glm::vec3, double>> wakePrev_;
+    void updateCloudWakes();
+    [[nodiscard]] glm::vec3 cloudBobFor(const std::string& name) const; // ADR-2112
     AttractorWorldBlock attractorWorld_;     // ADR-1850: the authored block (rest values) and the generated world
     std::optional<AttractorWorldParameters> attractorParams_; // its live knobs, while attached
     MeshWire meshWire_;                      // ADR-1862: the authored block (rest values)

@@ -260,11 +260,11 @@ def kit_nodes(state="uv"):
     for inst in LAYOUT["instances"]:
         tint = inst.get("tint", {})
         color = json.dumps(inst.get("color", {}), sort_keys=True)
-        key = (inst["asset"], tuple(sorted(tint.items())), color, zclass_of(inst.get("zone", "")))
+        key = (inst["asset"], tuple(sorted(tint.items())), color, zclass_of(inst.get("zone", "")), inst.get("bob", ""))
         groups.setdefault(key, []).append(inst)
     nodes = []
     used = set()
-    for (asset, tint, color, zclass), insts in sorted(groups.items()):
+    for (asset, tint, color, zclass, bob), insts in sorted(groups.items()):
         base = os.path.splitext(os.path.basename(asset))[0]
         name = base
         k = 1
@@ -281,6 +281,8 @@ def kit_nodes(state="uv"):
             "distribution": {"kind": "points", "points": pts},
             "castsShadow": shadow,
             "partMaterials": part_materials(dict(tint), state, json.loads(color), zclass, asset)}})
+        if bob:
+            nodes[-1]["bob"] = bob   # ADR-2112: buildings on a bobbing island move with it and its cloud
     return nodes
 
 
@@ -292,7 +294,15 @@ def light_nodes(state="uv"):
         out.append({"name": l["name"], "type": "point", "position": r3(l["pos"]), "color": pal(l["key"], state),
                     "intensity": round(0.45 * rad * rad * l.get("intensity", 1.0), 2), "range": rad * 2.5,
                     "castsShadow": False, "volumetric": 0.0})
+        if l.get("bob"):
+            out[-1]["node"] = "bob_" + l["bob"]   # ADR-2112: a lamp on a bobbing island rides its formation's group
     return out
+
+
+def bob_nodes():
+    """ADR-2112: one empty group node per formation, at the origin, riding it (lights ride these)."""
+    return [{"name": "bob_" + b["name"], "kind": "group", "position": [0.0, 0.0, 0.0], "bob": b["name"]}
+            for b in DESIGN.get("bobs", [])]
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -307,8 +317,8 @@ def inhabitant_nodes(max_spots=14, scale=None):
     nodes, tracks = [], []
     k = 0
 
-    def node(name, pos, yaw_deg, state):
-        return {"name": name, "kind": "gltf", "asset": ALIENS + CAST[k % len(CAST)] + ".glb", "position": r3(pos),
+    def node(name, pos, yaw_deg, state, bob=None):
+        return {**({"bob": bob} if bob else {}), "name": name, "kind": "gltf", "asset": ALIENS + CAST[k % len(CAST)] + ".glb", "position": r3(pos),
                 "rotation": [0.0, round(yaw_deg, 1), 0.0], "scale": [s, s, s],
                 "animation": {"state": state, "blend": 0.3, "speed": round(r.uniform(0.85, 1.1), 3), "updateHz": 30,
                               "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 300.0}}
@@ -317,7 +327,7 @@ def inhabitant_nodes(max_spots=14, scale=None):
     for sp in spots[::step][:max_spots]:
         f = sp["forward"]
         nodes.append(node("alien%02d" % k, sp["pos"], math.degrees(math.atan2(f[0], f[2])),
-                          r.choice(sp.get("clips", ["Idle"]))))
+                          r.choice(sp.get("clips", ["Idle"])), sp.get("bob")))
         k += 1
     for p in inh["paths"]:
         if p["priority"] != 1:
@@ -355,7 +365,7 @@ def inhabitant_nodes(max_spots=14, scale=None):
             if rk and rk[0]["time"] > 0:
                 prev = [kk for kk in sorted(rk, key=lambda kk: kk["time"])]
                 rk.insert(0, {"time": 0.0, "value": prev[0]["value"], "interp": "step"})
-            nodes.append(node(name, pk[0]["value"], rk[0]["value"][1] if rk else 0.0, p.get("clip", "Walking")))
+            nodes.append(node(name, pk[0]["value"], rk[0]["value"][1] if rk else 0.0, p.get("clip", "Walking"), p.get("bob")))
             tracks.append({"target": "nodes/%s/position" % name, "component": -1, "enabled": True,
                            "timeBase": "seconds", "mode": "replace", "loopLength": 0.0, "keys": pk})
             tracks.append({"target": "nodes/%s/rotation" % name, "component": -1, "enabled": True,
@@ -432,6 +442,8 @@ def cloud_beams(state="uv"):
                     "yaw": round(b.get("phase", 0.0) * 360.0, 2), "elevation": b["elevation_deg"], "rpm": b["rpm"],
                     "length": b["length_m"], "halfAngle": max(b["half_angle_deg"], 1.8), "radius": 1.2,
                     "color": col, "intensity": round(BEAM_GAIN * b.get("intensity", 1.0), 3)})
+        if b.get("bob"):
+            out[-1]["bob"] = b["bob"]   # ADR-2112: a lighthouse on a floating island rides it
     return out
 
 
@@ -440,17 +452,30 @@ def cloud_beams(state="uv"):
 # glows the beams replace (the layout's cloud_glow stand-ins for the lighthouse beams)
 BEAM_STANDINS = {"harbour_light", "outer_light", "break_light"}
 # the Condensery's keel glow lit one lobe of its column into a pink ball under the platform at the reveal
+# ADR-2112: the design's glows that stand on a bobbing formation but do not say so themselves (art request, it9)
+GLOW_BOB = {"condensery_throats": "condensery", "condensery_yard": "condensery", "condensery_keel": "condensery",
+            "lone_lamp": "lone_lamp", "highwater": "highwater"}
 GLOW_SCALE = {"condensery_keel": 0.35, "condensery_throats": 2.2, "veil_pocket5": 0.6, "veil_amber": 0.6}
 GLOW_SHADOW = {"veil_pocket5": 0.15, "veil_amber": 0.15}   # ADR-2107: the art's pulses on the journey inside the plug
 
 
 def clouds_block(state="uv", moon_dir=None):
+    # ADR-2112: the art's bobbing formations ({name: {amplitude, period, phase, liftMax, masses}}); every lobe of a
+    # listed mass rides it (a lobe's own "bob" wins)
+    forms = DESIGN.get("formations", {})
+    mass_bob = {m: f for f, d in forms.items() for m in d.get("masses", [])}
     lobes = []
     for name, ls in DESIGN["masses"].items():
         lobes += [dict(l, erode=MASS_ERODE[name]) if name in MASS_ERODE else dict(l) for l in ls]
+        if name in mass_bob:
+            for l in lobes[len(lobes) - len(ls):]:
+                l.setdefault("bob", mass_bob[name])
     far = []   # ADR-2104: the far towers on their own grid (in one set they overflowed 18 hero cells)
     for name, ls in DESIGN.get("far_masses", {}).items():
         far += [dict(l) for l in ls]
+        if name in mass_bob:
+            for l in far[len(far) - len(ls):]:
+                l.setdefault("bob", mass_bob[name])
     # iteration 7 (ADR-2107): the erosion eats every lobe inward; the plug that hides the Condensery until the crash
     # keeps most of its body (eroded fully it opened at 56.4 s, half a second early)
     for l in lobes + far:
@@ -460,8 +485,13 @@ def clouds_block(state="uv", moon_dir=None):
             l["density"] = round(l.get("density", 1.0) * LOBE_DENSITY[l["tag"]], 3)
     cb = DESIGN["clouds_block"]
     glows = [{"name": g["name"], "position": g["position"], "color": pal(g["key"], state), "radius": g["radius"],
-              "intensity": g["intensity"] * GLOW_SCALE.get(g["name"], 1.0)} for g in cb["glows"]
-             if g["name"] not in BEAM_STANDINS]
+              "intensity": g["intensity"] * GLOW_SCALE.get(g["name"], 1.0),
+              **({"bob": g.get("bob") or GLOW_BOB[g["name"]]} if (g.get("bob") or g["name"] in GLOW_BOB) else {})}
+             for g in cb["glows"] if g["name"] not in BEAM_STANDINS]
+    known = {b["name"] for b in DESIGN.get("bobs", [])}
+    for g in glows:   # a formation the design does not (yet) have: the glow stays put
+        if g.get("bob") and g["bob"] not in known:
+            g.pop("bob")
     # iteration 6: the Veil is the art's (cloud design v3: rooms built as absences in masses.veil, a plug before the
     # reveal); its glows come from the design under the names the routes use. The generated passage is gone.
     veil_glows = DESIGN.get("veil", {}).get("glows", [])
@@ -477,6 +507,7 @@ def clouds_block(state="uv", moon_dir=None):
                                     key=lambda i: i["asset"])):
         x, y, z = inst["pos"]
         glows.append({"name": "condensery_well_%s" % "abc"[k], "position": [x, y + WELL_GLOW["lift"], z],
+                      **({"bob": inst["bob"]} if inst.get("bob") else {}),
                       "radius": WELL_GLOW["radius"],
                       "color": pal("cond_a", state), "intensity": WELL_GLOW["intensity"], "key": "cond_a",
                       "shadow": WELL_GLOW["shadow"]})
@@ -538,6 +569,23 @@ def clouds_block(state="uv", moon_dir=None):
         # ADR-2102: the lighthouses
         "beams": cloud_beams(state), "beamAir": CLOUD_LOOK["beamAir"], "beamCloud": CLOUD_LOOK["beamCloud"],
     }
+    bobs = [{"name": f, "amplitude": d.get("amplitude", [0.0, 2.0, 0.0]), "period": d.get("period", 8.0),
+             "phase": d.get("phase", 0.0), "liftMax": d.get("liftMax", 0.0)} for f, d in sorted(forms.items())]
+    bobs += [{k: b[k] for k in ("name", "amplitude", "period", "phase", "liftMax") if k in b}
+             for b in DESIGN.get("bobs", [])]   # ADR-2112: the art's table (it9)
+    if bobs:
+        out["bobs"] = bobs
+        names = {b["name"] for b in bobs}
+        for l in lobes + far:
+            if l.get("bob") and l["bob"] not in names:
+                l.pop("bob")
+    # ADR-2113: the wisp layer (the engine's first setting, under the art's `wisps` from the cloud design when it has one)
+    w = dict(WISPS, **DESIGN.get("wisps", {}))
+    if DESIGN.get("wisp_regions"):   # it9: the art's regions over the town replace the engine's first lens
+        w["zones"] = [{k: r[k] for k in ("name", "centre", "radii", "yaw", "floor", "below", "above", "density", "bob")
+                       if k in r} for r in DESIGN["wisp_regions"]]
+    if w.get("enabled") and not NO_WISPS:
+        out["wisps"] = w
     if moon_dir is not None:
         out["halo"] = {"direction": r3(moon_dir), "color": [v * 0.42 for v in pal("moon_disc", state)],
                        "radius": 3.0, "intensity": CLOUD_LOOK["halo"]}
@@ -575,7 +623,8 @@ ENV_Q = {}
 KEY_SHADOW = {"offline": True, "live": False}   # live: the moon's shadow map is 12.7 ms of a 33 ms frame   # the moon key's shadow map, by quality
 KEY_Q = {"shadow": True}
 AIR = {"density": 0.0003, "scattering": 0.0, "fogSky": 0.5}   # extinction = density x volumeAbsorption 0.5
-WELL_GLOW = {"radius": 95.0, "intensity": 6.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
+# iteration 9: the Condensery stands on a rock island; 6 m under the deck is inside the rock, so the wells sit 20 m over it
+WELL_GLOW = {"radius": 95.0, "intensity": 6.0, "lift": 20.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
 LOBE_ERODE = {"plug": 0.3, "seat": 0.3}
 MASS_ERODE = {"condensery_plume": 0.25}   # iteration 7: fully eroded, the stacks' thin plumes were eaten away   # ADR-2107: a lobe's share of the erosion, by the art's tag
 # iteration 7: inside an opaque cloud the camera sees ~7 m of uniform colour (the flat card at 55-56.5 s). At 0.45 of
@@ -585,6 +634,17 @@ LOBE_DENSITY = {"plug": 1.0}
 # (t, side m, up m). Iteration 7: none -- glows inside the plug lit it uniformly from within a few metres and the
 # bloom made it a flat bright card; the art's two pulses on the journey (veil_pocket5, veil_amber) are kept, dimmed
 PLUG_POCKETS = []
+# ADR-2113: the wisp layer's first setting (iteration 9). Density multiplies the cloud's extinction (0.15/m) where the
+# torn sheets are; between them it is clear, so it reads as strands, not a grey medium (density 0.04-0.25 on 70 m sheets
+# was a flat veil). The band sits over the sea's mean top; the walking cast are its wakes. The art's cloud design `wisps` (same keys, plus zones round island rims) overrides any of it.
+WISPS = {"enabled": True, "base": 0.0, "top": 0.0, "density": 1.8, "scale": 10.0, "coverage": 0.55, "tatter": 0.65,
+         "stretch": 3.0, "drift": [0.9, 0.0, 0.5], "wakeRadius": 1.2, "wakeStrength": 0.8, "wakeSwirl": 1.4,
+         "wakeHeight": 2.2, "wakeTrail": 2.6, "wakes": ["alien*"],
+         # no band (the art: nowhere over open sea); the first lens, used when the design has no wisp_regions
+         "zones": [{"name": "mooring", "centre": [0.0, 10.0], "floor": 131.0, "radii": [330.0, 280.0], "yaw": 0.0,
+                    "below": 30.0, "above": 6.0, "density": 1.0}]}
+NO_WISPS = False
+PLUG_FADE = (55.7, 56.45, 0.3)   # iteration 9: the plug's light dims from 55.7 s to 30 % by 56.45 s, back by 57.95
 PLUG_GLOW = {"radius": 20.0, "intensity": 3.0, "shadow": 0.1}   # ADR-2107: shadow 0.1, they sit in solid cloud
 
 
@@ -737,7 +797,7 @@ def scene_doc(state="uv", sky_map=None):
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
     aliens, alien_tracks = inhabitant_nodes()
     vehicles, vehicle_tracks = vehicle_nodes(state)
-    nodes += aliens + vehicles
+    nodes += aliens + vehicles + bob_nodes()
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
@@ -837,18 +897,22 @@ def reactivity():
     for n, info in PROGS.items():
         if info["group"] == "lantern":
             routes.append(R("stem.toms.onset", info["prog"].path("toms"), 1.0, attackMs=10.0, decayMs=420.0))
-    routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_rose"], 6.0, attackMs=10.0,
-                    decayMs=380.0))
+    # iteration 9 (owner msg 73: pops that do not read as music): the rose light no longer snaps the whole Veil pink
+    # in one frame -- a softer swell (70 ms attack, lower peak) and the pockets after it in a slower travelling wave
+    routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_rose"], 3.5, attackMs=70.0,
+                    decayMs=650.0))
     for i in range(6):
-        routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_pocket%d" % i], 3.0 + 0.6 * i,
-                        attackMs=8.0, decayMs=300.0, delayMs=45.0 * i))
+        routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_pocket%d" % i], 2.4 + 0.5 * i,
+                        attackMs=45.0, decayMs=450.0, delayMs=80.0 * i))
     for i in range(len(PLUG_POCKETS)):   # iteration 7: the plug's pockets answer the toms too
         routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_plug%d" % i], 3.0,
                         attackMs=8.0, decayMs=320.0, delayMs=30.0 * i))
     # --- crash: the sky's horizon lift and the lighthouses flaring (the palette steps are the tracks below)
-    routes.append(R("stem.crash.onset", "env/skyIntensity", 0.16, attackMs=30.0, decayMs=2600.0))
+    # iteration 9: the crash's sky lift and the lighthouse flare swell in (350 / 200 ms) instead of stepping the whole
+    # frame up in one frame (the 2.8 s jump, owner msg 73)
+    routes.append(R("stem.crash.onset", "env/skyIntensity", 0.16, attackMs=350.0, decayMs=2600.0))
     for i in range(len(LAYOUT["beams"])):
-        routes.append(R("stem.crash.onset", "clouds/beam/%d/intensity" % i, 1.6, attackMs=40.0, decayMs=3200.0))
+        routes.append(R("stem.crash.onset", "clouds/beam/%d/intensity" % i, 1.6, attackMs=200.0, decayMs=3200.0))
         routes.append(R("stem.cloud.level", "clouds/beam/%d/intensity" % i, 0.25, attackMs=800.0, decayMs=2500.0))
     # --- Moog: the windows (lit fraction +10 points, the tint mix, brightness)
     panes = PROGS["ndPanes"]["prog"]
@@ -976,6 +1040,16 @@ def reactivity():
     for name, i in sorted(GLOW_INDEX.items()):
         if name.startswith("condensery_") or name == "veil_amber":   # it7: art round 4, request 5
             tracks.append(AU.track("clouds/glow/%d/intensity" % i, held(GLOW_BASE[name])))
+    # iteration 9 (owner msg 73): leaving the plug the frame fell from 0.44 to 0.20 mean luma in four frames. The glows
+    # that light it dim over the last half second before the exit, so the camera comes out of a fading cloud
+    for name in ("veil_pocket5", "veil_rose"):
+        if name in GLOW_INDEX:
+            b = GLOW_BASE[name]
+            tracks.append(AU.track("clouds/glow/%d/intensity" % GLOW_INDEX[name],
+                                   [{"time": 0.0, "value": b, "interp": "linear"},
+                                    {"time": PLUG_FADE[0], "value": b, "interp": "linear"},
+                                    {"time": PLUG_FADE[1], "value": round(b * PLUG_FADE[2], 4), "interp": "linear"},
+                                    {"time": PLUG_FADE[1] + 1.5, "value": b, "interp": "linear"}]))
     return routes, tracks, sources
 
 
@@ -1028,6 +1102,9 @@ def main():
     ap.add_argument("--sky", default="sky/sky_uv.hdr", help="equirect sky map relative to this folder ('' = analytic)")
     ap.add_argument("--no-clouds", action="store_true", help="the cloud block disabled (for an A/B of its cost)")
     ap.add_argument("--no-arc", action="store_true", help="hold the starting palette (no palette arc tracks)")
+    ap.add_argument("--no-wisps", action="store_true", help="ADR-2113 A/B: leave the wisp layer out")
+    ap.add_argument("--wisp", action="append", default=[], metavar="KEY=VALUE",
+                    help="override one wisp key (a number, or JSON); repeatable")
     ap.add_argument("--quality", default="offline", choices=sorted(CLOUD_QUALITY),
                     help="the cloud march's cost preset; 'live' writes <name>-live.* unless --name is given")
     ap.add_argument("--cloud", action="append", default=[], metavar="KEY=VALUE",
@@ -1036,6 +1113,11 @@ def main():
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="override one environment key (number); repeatable")
     a = ap.parse_args()
+    global NO_WISPS
+    NO_WISPS = a.no_wisps
+    for kv in a.wisp:
+        k, v = kv.split("=", 1)
+        WISPS[k] = json.loads(v)
     CLOUD_Q.clear()
     CLOUD_Q.update(CLOUD_QUALITY[a.quality])
     for kv in a.cloud:

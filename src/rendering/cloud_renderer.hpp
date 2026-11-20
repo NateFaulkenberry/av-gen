@@ -45,7 +45,10 @@ struct CloudLobeBins {
 inline constexpr std::uint32_t kMaxLobesPerCell = 64;
 inline constexpr std::uint32_t kMaxBinCellsPerSide = 128; // ADR-2105 (was 64)
 inline constexpr std::uint32_t kBinCountMask = 0xFFu;
-[[nodiscard]] CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes);
+// ADR-2112: `bobReach` (per formation, metres) widens a riding lobe's footprint and height range by how far its
+// formation can move, so the bins built once still hold it wherever it bobs.
+[[nodiscard]] CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes,
+                                          const std::vector<glm::vec3>& bobReach = {});
 
 // ADR-2111: the march's per-frame jitters from FrameTime::frameNonce (x = the step offset, y = the light taps'),
 // each a low-discrepancy sequence per FRAME at 24, 30 and 60 fps (public for the unit test).

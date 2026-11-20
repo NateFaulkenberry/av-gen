@@ -39,6 +39,10 @@ Result<CloudLobe> lobeOf(const json& l) {
     if (l.contains("density")) lobe.density = l.at("density").get<float>();
     if (l.contains("soft")) lobe.soft = l.at("soft").get<float>();
     if (l.contains("erode")) lobe.erode = l.at("erode").get<float>(); // ADR-2107
+    if (l.contains("bob")) { // ADR-2112: resolved against the block's bobs by Clouds::fromJson
+        if (!l.at("bob").is_string()) return fail("clouds: a lobe's 'bob' must be a formation name");
+        lobe.bob = l.at("bob").get<std::string>();
+    }
     if (!(lobe.erode >= 0.0f && lobe.erode <= 1.0f)) return fail("clouds: a lobe's erode must be in [0, 1]");
     if (!(lobe.radius > 0.0f) || !(lobe.scale.x > 0.0f && lobe.scale.y > 0.0f && lobe.scale.z > 0.0f) ||
         !(lobe.density >= 0.0f && lobe.density <= 1.0f) || !(lobe.soft > 0.0f && lobe.soft <= 1.0f) ||
@@ -173,6 +177,35 @@ Result<void> Clouds::validate() const {
     if (!(beamAir >= 0.0f && beamAir <= 100.0f) || !(beamCloud >= 0.0f && beamCloud <= 100.0f)) {
         return fail("clouds: beamAir and beamCloud must be in [0, 100]");
     }
+    // ADR-2112
+    if (bobs.size() > kMaxCloudBobs) return fail("clouds: {} bobs, more than the {}", bobs.size(), kMaxCloudBobs);
+    for (const CloudBob& b : bobs) {
+        if (b.name.empty()) return fail("clouds: a bob needs a 'name'");
+        if (!(b.period >= 0.5f && b.period <= 600.0f) || !(b.liftMax >= 0.0f && b.liftMax <= 500.0f) ||
+            !(glm::all(glm::lessThanEqual(glm::abs(b.amplitude), glm::vec3(500.0f)))) || !std::isfinite(b.phase)) {
+            return fail("clouds: bob '{}' needs a period in [0.5, 600] s, amplitudes and liftMax within 500 m", b.name);
+        }
+    }
+    // ADR-2113
+    if (wisps.enabled) {
+        if (!(wisps.top >= wisps.base)) return fail("clouds: wisps.top must not be below wisps.base");
+        if (!(wisps.density >= 0.0f && wisps.density <= 8.0f) || !(wisps.scale >= 1.0f && wisps.scale <= 5000.0f) ||
+            !(wisps.coverage >= 0.0f && wisps.coverage <= 1.0f) || !(wisps.tatter >= 0.0f && wisps.tatter <= 1.0f) ||
+            !(wisps.stretch >= 1.0f && wisps.stretch <= 10.0f) || !(wisps.wakeRadius > 0.0f) ||
+            !(wisps.wakeTrail >= 0.0f && wisps.wakeTrail <= 30.0f) ||
+            !(wisps.wakeStrength >= 0.0f && wisps.wakeStrength <= 1.0f) || !(wisps.wakeHeight > 0.0f)) {
+            return fail("clouds: wisps need density in [0, 8], scale in [1, 5000] m, coverage, tatter and wakeStrength "
+                        "in [0, 1], stretch in [1, 10], and a positive wakeRadius and wakeHeight");
+        }
+        if (wisps.zones.size() > kMaxCloudWispZones) return fail("clouds: at most {} wisp zones", kMaxCloudWispZones);
+        for (const CloudWispZone& z : wisps.zones) {
+            if (!(z.radii.x > 0.0f && z.radii.y > 0.0f) || !(z.below > 0.0f) || !(z.above > 0.0f) ||
+                !(z.density >= 0.0f && z.density <= 4.0f)) {
+                return fail("clouds: wisp zone '{}' needs positive radii, below and above, and a density in [0, 4]",
+                            z.name);
+            }
+        }
+    }
     if (halo.enabled && (glm::length(halo.direction) < 1e-6f || !(halo.radius > 0.0f && halo.radius <= 90.0f) ||
                          !(halo.intensity >= 0.0f))) {
         return fail("clouds: a halo needs a non-zero direction, a radius in (0, 90] degrees and a non-negative "
@@ -286,6 +319,7 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
             if (g.contains("intensity")) glow.intensity = g.at("intensity").get<float>();
             if (g.contains("shadow")) glow.shadow = g.at("shadow").get<float>(); // ADR-2107
             if (g.contains("name")) glow.name = g.at("name").get<std::string>();
+            if (g.contains("bob")) glow.bob = g.at("bob").get<std::string>(); // ADR-2112
             c.glows.push_back(glow);
         }
     }
@@ -302,6 +336,8 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
                 if (key == "origin") continue;
                 if (key == "name") {
                     beam.name = value.get<std::string>();
+                } else if (key == "bob") { // ADR-2112
+                    beam.bob = value.get<std::string>();
                 } else if (key == "color") {
                     auto col = vec3Of(value, "color");
                     if (!col) return std::unexpected(col.error());
@@ -377,6 +413,95 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
         if (!far) return fail("clouds: farLobes: {}", far.error().message);
         c.farLobes = std::move(*far);
     }
+    if (j.contains("bobs")) { // ADR-2112
+        const json& bj = j.at("bobs");
+        if (!bj.is_array()) return fail("clouds: 'bobs' must be an array");
+        for (const json& b : bj) {
+            if (!b.is_object() || !b.contains("name")) return fail("clouds: a bob needs a 'name'");
+            CloudBob bob;
+            bob.name = b.at("name").get<std::string>();
+            if (b.contains("amplitude")) {
+                auto a = vec3Of(b.at("amplitude"), "amplitude");
+                if (!a) return std::unexpected(a.error());
+                bob.amplitude = *a;
+            }
+            bob.period = b.value("period", bob.period);
+            bob.phase = b.value("phase", bob.phase);
+            bob.liftMax = b.value("liftMax", bob.liftMax);
+            c.bobs.push_back(bob);
+        }
+    }
+    if (j.contains("wisps")) { // ADR-2113
+        const json& wj = j.at("wisps");
+        if (!wj.is_object()) return fail("clouds: 'wisps' must be an object");
+        CloudWisps& w = c.wisps;
+        w.enabled = wj.value("enabled", true);
+        for (auto [k, t] : {std::pair{"base", &w.base}, std::pair{"top", &w.top}, std::pair{"density", &w.density},
+                            std::pair{"scale", &w.scale}, std::pair{"coverage", &w.coverage},
+                            std::pair{"tatter", &w.tatter}, std::pair{"stretch", &w.stretch},
+                            std::pair{"wakeRadius", &w.wakeRadius}, std::pair{"wakeStrength", &w.wakeStrength},
+                            std::pair{"wakeSwirl", &w.wakeSwirl}, std::pair{"wakeHeight", &w.wakeHeight},
+                            std::pair{"wakeTrail", &w.wakeTrail}}) {
+            if (!wj.contains(k)) continue;
+            if (!wj.at(k).is_number()) return fail("clouds: 'wisps.{}' must be a number", k);
+            *t = wj.at(k).get<float>();
+        }
+        if (wj.contains("drift")) {
+            auto d = vec3Of(wj.at("drift"), "wisps.drift");
+            if (!d) return std::unexpected(d.error());
+            w.drift = *d;
+        }
+        if (wj.contains("wakes")) w.wakes = wj.at("wakes").get<std::vector<std::string>>();
+        if (wj.contains("zones")) {
+            if (!wj.at("zones").is_array()) return fail("clouds: 'wisps.zones' must be an array");
+            for (const json& z : wj.at("zones")) {
+                if (!z.is_object() || !z.contains("centre") || !z.contains("radii") || !z.contains("floor") ||
+                    !z.at("centre").is_array() || z.at("centre").size() != 2 || !z.at("radii").is_array() ||
+                    z.at("radii").size() != 2) {
+                    return fail("clouds: a wisp zone needs 'centre': [x, z], 'radii': [a, b] and 'floor'");
+                }
+                CloudWispZone zone;
+                zone.centre = {z.at("centre")[0].get<float>(), z.at("centre")[1].get<float>()};
+                zone.radii = {z.at("radii")[0].get<float>(), z.at("radii")[1].get<float>()};
+                zone.floor = z.at("floor").get<float>();
+                zone.name = z.value("name", std::string());
+                zone.yaw = z.value("yaw", zone.yaw);
+                zone.below = z.value("below", zone.below);
+                zone.above = z.value("above", zone.above);
+                zone.density = z.value("density", zone.density);
+                if (z.contains("bob")) zone.bob = z.at("bob").get<std::string>();
+                w.zones.push_back(zone);
+            }
+        }
+    }
+    // ADR-2112: every "bob" names one of the block's formations
+    {
+        const auto resolve = [&](const std::string& name, int& index, const char* what) -> Result<void> {
+            index = -1;
+            if (name.empty()) return {};
+            for (std::size_t b = 0; b < c.bobs.size(); ++b) {
+                if (c.bobs[b].name == name) {
+                    index = static_cast<int>(b);
+                    return {};
+                }
+            }
+            return fail("clouds: {} names bob '{}', which the block's 'bobs' do not have", what, name);
+        };
+        for (auto* set : {&c.lobes, &c.farLobes}) {
+            for (CloudLobe& l : *set) {
+                if (auto r = resolve(l.bob, l.bobIndex, "a lobe"); !r) return std::unexpected(r.error());
+            }
+        }
+        for (CloudGlow& g : c.glows) {
+            if (auto r = resolve(g.bob, g.bobIndex, "a glow"); !r) return std::unexpected(r.error());
+        }
+        for (CloudBeam& b : c.beams) {
+            if (auto r = resolve(b.bob, b.bobIndex, "a beam"); !r) return std::unexpected(r.error());
+        }
+        for (CloudWispZone& z : c.wisps.zones) {
+            if (auto r = resolve(z.bob, z.bobIndex, "a wisp zone"); !r) return std::unexpected(r.error());
+        }
+    }
     if (auto ok = c.validate(); !ok) return std::unexpected(ok.error());
     c.lightDirection = glm::normalize(c.lightDirection);
     c.warmDirection = glm::normalize(c.warmDirection);
@@ -442,6 +567,7 @@ json Clouds::toJson() const {
                        {"intensity", g.intensity}};
             if (!g.name.empty()) gj["name"] = g.name;
             if (g.shadow != 1.0f) gj["shadow"] = g.shadow; // ADR-2107
+            if (!g.bob.empty()) gj["bob"] = g.bob;           // ADR-2112
             gs.push_back(std::move(gj));
         }
         j["glows"] = std::move(gs);
@@ -454,6 +580,7 @@ json Clouds::toJson() const {
                        {"halfAngle", b.halfAngle}, {"radius", b.radius},     {"color", v3(b.color)},
                        {"intensity", b.intensity}};
             if (!b.name.empty()) bj["name"] = b.name;
+            if (!b.bob.empty()) bj["bob"] = b.bob; // ADR-2112
             bs.push_back(std::move(bj));
         }
         j["beams"] = std::move(bs);
@@ -464,6 +591,35 @@ json Clouds::toJson() const {
         j["halo"] = {{"enabled", true}, {"direction", v3(halo.direction)}, {"color", v3(halo.color)},
                      {"radius", halo.radius}, {"intensity", halo.intensity}};
     }
+    if (!bobs.empty()) { // ADR-2112
+        json bs = json::array();
+        for (const CloudBob& b : bobs) {
+            bs.push_back({{"name", b.name}, {"amplitude", v3(b.amplitude)}, {"period", b.period}, {"phase", b.phase},
+                          {"liftMax", b.liftMax}});
+        }
+        j["bobs"] = std::move(bs);
+    }
+    if (wisps.enabled) { // ADR-2113
+        const CloudWisps& w = wisps;
+        json wj = {{"enabled", true}, {"base", w.base}, {"top", w.top}, {"density", w.density}, {"scale", w.scale},
+                   {"coverage", w.coverage}, {"tatter", w.tatter}, {"stretch", w.stretch}, {"drift", v3(w.drift)},
+                   {"wakeRadius", w.wakeRadius}, {"wakeStrength", w.wakeStrength}, {"wakeSwirl", w.wakeSwirl},
+                   {"wakeHeight", w.wakeHeight}, {"wakeTrail", w.wakeTrail}};
+        if (!w.wakes.empty()) wj["wakes"] = w.wakes;
+        if (!w.zones.empty()) {
+            json zs = json::array();
+            for (const CloudWispZone& z : w.zones) {
+                json zj = {{"centre", json::array({z.centre.x, z.centre.y})}, {"floor", z.floor},
+                           {"radii", json::array({z.radii.x, z.radii.y})}, {"yaw", z.yaw}, {"below", z.below},
+                           {"above", z.above}, {"density", z.density}};
+                if (!z.name.empty()) zj["name"] = z.name;
+                if (!z.bob.empty()) zj["bob"] = z.bob;
+                zs.push_back(std::move(zj));
+            }
+            wj["zones"] = std::move(zs);
+        }
+        j["wisps"] = std::move(wj);
+    }
     if (!masses.empty()) j["masses"] = masses;
     if (!source.empty()) {
         j["lobes"] = source; // by reference, as authored
@@ -473,6 +629,7 @@ json Clouds::toJson() const {
             arr.push_back({{"c", v3(l.centre)}, {"r", l.radius}, {"scale", v3(l.scale)}, {"density", l.density},
                            {"soft", l.soft}});
             if (l.erode != 1.0f) arr.back()["erode"] = l.erode; // ADR-2107
+            if (!l.bob.empty()) arr.back()["bob"] = l.bob;      // ADR-2112
         }
         j["lobes"] = std::move(arr);
     }
@@ -482,6 +639,7 @@ json Clouds::toJson() const {
             arr.push_back({{"c", v3(l.centre)}, {"r", l.radius}, {"scale", v3(l.scale)}, {"density", l.density},
                            {"soft", l.soft}});
             if (l.erode != 1.0f) arr.back()["erode"] = l.erode; // ADR-2107
+            if (!l.bob.empty()) arr.back()["bob"] = l.bob;      // ADR-2112
         }
         j["farLobes"] = std::move(arr);
     }
@@ -584,6 +742,15 @@ CloudParameters registerCloudParameters(params::ParameterSet& params, const Clou
         addFloat(prefix + "beam/" + std::to_string(i) + "/intensity", rest.beams[i].intensity, 0.0f, 1000.0f, 0.0f,
                  20.0f);
     }
+    // ADR-2112: per formation, its lift (metres; clamped to +-liftMax where it is applied)
+    for (std::size_t i = 0; i < rest.bobs.size(); ++i) {
+        const float m = std::max(rest.bobs[i].liftMax, 0.01f);
+        addFloat(prefix + "bob/" + std::to_string(i) + "/lift", rest.bobs[i].lift, -500.0f, 500.0f, -m, m);
+    }
+    // ADR-2113: the wisps' density, coverage and tatter
+    addFloat(prefix + "wisps/density", rest.wisps.density, 0.0f, 8.0f, 0.0f, 1.0f);
+    addFloat(prefix + "wisps/coverage", rest.wisps.coverage, 0.0f, 1.0f, 0.0f, 1.0f);
+    addFloat(prefix + "wisps/tatter", rest.wisps.tatter, 0.0f, 1.0f, 0.0f, 1.0f);
     return out;
 }
 
@@ -625,6 +792,32 @@ void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& 
     for (std::size_t i = 0; i < live.beams.size(); ++i) {
         if (const auto* q = f(beam0 + 3 + i)) live.beams[i].intensity = q->value();
     }
+    const std::size_t bob0 = beam0 + 3 + rest.beams.size(); // ADR-2112
+    for (std::size_t i = 0; i < live.bobs.size(); ++i) {
+        if (const auto* q = f(bob0 + i)) {
+            live.bobs[i].lift = std::clamp(q->value(), -live.bobs[i].liftMax, live.bobs[i].liftMax);
+        }
+    }
+    const std::size_t wisp0 = bob0 + rest.bobs.size(); // ADR-2113
+    if (const auto* q = f(wisp0)) live.wisps.density = q->value();
+    if (const auto* q = f(wisp0 + 1)) live.wisps.coverage = q->value();
+    if (const auto* q = f(wisp0 + 2)) live.wisps.tatter = q->value();
+}
+
+glm::vec3 cloudBobOffset(const CloudBob& bob, double seconds) {
+    constexpr double kTau = 6.283185307179586;
+    const double ph = static_cast<double>(bob.phase);
+    const double p = std::max(static_cast<double>(bob.period), 0.5);
+    const double y = std::sin(kTau * (seconds / p + ph));
+    const double x = std::sin(kTau * (seconds / (p * 1.618) + ph * 0.7 + 0.31));
+    const double z = std::sin(kTau * (seconds / (p * 1.83) + ph * 1.3 + 0.67));
+    return glm::vec3(static_cast<float>(x) * bob.amplitude.x,
+                     static_cast<float>(y) * bob.amplitude.y + std::clamp(bob.lift, -bob.liftMax, bob.liftMax),
+                     static_cast<float>(z) * bob.amplitude.z);
+}
+
+glm::vec3 cloudBobReach(const CloudBob& bob) {
+    return glm::abs(bob.amplitude) + glm::vec3(0.0f, bob.liftMax, 0.0f);
 }
 
 } // namespace avgen::scene

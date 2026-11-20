@@ -43,7 +43,69 @@ struct CloudLobe {
     float density = 1.0f; // 0..1
     float soft = 0.35f;   // edge softness, a fraction of the radius
     float erode = 1.0f;   // ADR-2107: this lobe's share of the block's `erosion` (0 = kept whole: a wall that must hide)
+    std::string bob;      // ADR-2112: the bobbing formation this lobe rides ("" = none); resolved to `bobIndex`
+    int bobIndex = -1;
 };
+
+// ADR-2112: a bobbing formation -- a group of lobes (and the glows, beams and scene nodes that name it) that rises and
+// sinks as one, as if floating on a swell. y moves by amplitude.y over `period` seconds; x and z drift by amplitude.x/z
+// over 1.618 and 1.83 periods (never a closed orbit). `lift` (metres, clamped to +-liftMax) is added to y: the route
+// target (`clouds/bob/<i>/lift`). The offset is a pure function of the timeline second and the lift, so a seek lands
+// where play would.
+struct CloudBob {
+    std::string name;
+    glm::vec3 amplitude{0.0f, 2.0f, 0.0f}; // metres
+    float period = 8.0f;                   // seconds of the vertical bob
+    float phase = 0.0f;                    // 0..1 of a period
+    float liftMax = 0.0f;                  // metres the routed lift may reach either way (the bins' margin)
+    float lift = 0.0f;                     // metres (a live value; 0 at rest)
+};
+inline constexpr std::size_t kMaxCloudBobs = 32;
+[[nodiscard]] glm::vec3 cloudBobOffset(const CloudBob& bob, double seconds);
+// the largest offset a formation can reach on each axis (the bins and the box grow by it)
+[[nodiscard]] glm::vec3 cloudBobReach(const CloudBob& bob);
+
+// ADR-2113: the wisp layer -- thin, tattered, drifting cloud-fog low over the sea (and round authored zones, e.g. a
+// floating island's rim), marched and lit with the rest of the cloud. Density is warped Worley noise squashed into
+// sheets, thresholded by `coverage` and torn by a finer octave (`tatter`). Walking figures part and swirl it: `wakes`
+// names scene nodes (a trailing '*' matches a prefix); each frame the composition writes up to 16 of them (nearest the
+// camera) into `wakePoints` with their velocity.
+// A wisp region: a soft-edged ellipse in plan (fading over its outer 30 %) at a floor height; the layer peaks 1 m
+// under the floor and thins to nothing `above` metres over it and `below` metres under it.
+struct CloudWispZone {
+    std::string name;
+    glm::vec2 centre{0.0f};   // x, z
+    float floor = 0.0f;       // metres (y)
+    glm::vec2 radii{50.0f};   // metres along the ellipse's own x and z
+    float yaw = 0.0f;         // radians about +y
+    float below = 6.0f;       // metres
+    float above = 1.5f;       // metres
+    float density = 1.0f;     // 0..1, times the layer's density
+    std::string bob;          // a formation to ride ("" = none)
+    int bobIndex = -1;
+};
+struct CloudWisps {
+    bool enabled = false;
+    float base = 0.0f;         // metres: the band's floor; no band unless top > base (zones only)
+    float top = 0.0f;          // metres: its ceiling
+    float density = 0.3f;      // a multiplier (thin: 0.1-0.6)
+    float scale = 60.0f;       // metres: the wavelength of the main sheets
+    float coverage = 0.45f;    // 0..1: the fraction of the band that holds wisps
+    float tatter = 0.6f;       // 0..1: how much the fine octave tears the edges
+    float stretch = 2.5f;      // >= 1: horizontal sheets (vertical frequency x this)
+    glm::vec3 drift{1.5f, 0.0f, 0.6f}; // m/s of its own wind
+    float wakeRadius = 1.2f;   // metres round a figure that it parts
+    float wakeStrength = 0.8f; // 0..1: how much it clears there
+    float wakeSwirl = 1.5f;    // radians of twist at a figure
+    float wakeHeight = 3.0f;   // metres above a figure's feet that it reaches
+    float wakeTrail = 2.5f;    // seconds of a walker's path behind it that stays parted (refilling along it)
+    std::vector<std::string> wakes;          // node names (or prefixes ending in '*')
+    std::vector<CloudWispZone> zones;        // at most 16
+    std::vector<glm::vec4> wakePoints;       // runtime: (position, 0) per wake, written by the composition
+    std::vector<glm::vec4> wakeVelocities;   // runtime: (velocity m/s, 0)
+};
+inline constexpr std::size_t kMaxCloudWispZones = 24;
+inline constexpr std::size_t kMaxCloudWakes = 16;
 
 // ADR-2100: the analytic sea of cloud. Unbounded in x and z; between `base` and `top` in y.
 struct CloudSea {
@@ -79,6 +141,8 @@ struct CloudGlow {
     float intensity = 1.0f;
     float shadow = 1.0f;           // ADR-2107: this glow's share of the block's `glowShadow` (0 = a glow deep in cloud
                                    // that must still light the cloud round it)
+    std::string bob;               // ADR-2112: a formation to ride ("" = none)
+    int bobIndex = -1;
 };
 
 inline constexpr std::size_t kMaxCloudGlows = 32; // ADR-2104: 16 -> 24 (the Veil's inner pockets); ADR-2107: 32
@@ -99,6 +163,8 @@ struct CloudBeam {
     float radius = 1.0f;           // metres: the half-width at the lamp
     glm::vec3 color{1.0f};
     float intensity = 1.0f;
+    std::string bob;               // ADR-2112: a formation to ride ("" = none)
+    int bobIndex = -1;
 };
 inline constexpr std::size_t kMaxCloudBeamArms = 8;
 
@@ -185,6 +251,8 @@ struct Clouds {
     float beamAir = 1.0f;             // the beams' scatter in clear air (a multiplier; 0 = none)
     float beamCloud = 1.0f;           // the beams' light on the cloud they pass through (a multiplier)
     CloudHalo halo;
+    std::vector<CloudBob> bobs;       // ADR-2112
+    CloudWisps wisps;                 // ADR-2113
 
     [[nodiscard]] bool active() const { return enabled && (!lobes.empty() || sea.enabled); }
     [[nodiscard]] Result<void> validate() const;
@@ -197,7 +265,7 @@ struct Clouds {
 [[nodiscard]] Result<std::vector<CloudLobe>> readCloudLobes(const nlohmann::json& j,
                                                             const std::vector<std::string>& masses);
 
-inline constexpr std::size_t kMaxCloudLobes = 4096;
+inline constexpr std::size_t kMaxCloudLobes = 8192; // ADR-2112 (was 4096)
 
 // ADR-2100: the block's live knobs (`clouds/<leaf>`, `clouds/glow/<i>/intensity|color`; ADR-2102 adds
 // `clouds/beam/<i>/intensity`, `clouds/beamAir`, `clouds/beamCloud`, `clouds/halo/intensity`). Each default is the block's
