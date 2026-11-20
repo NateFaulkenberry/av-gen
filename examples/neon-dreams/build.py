@@ -555,7 +555,8 @@ CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseA
               # iteration 6: the art's cloud design v3 is built for 0.15 ("designed_for"); at 0.02 every formation
               # read as fog
               "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
-WELL_GLOW = {"radius": 85.0, "intensity": 3.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
+AIR = {"density": 0.0003, "scattering": 0.0, "fogSky": 0.5}   # extinction = density x volumeAbsorption 0.5
+WELL_GLOW = {"radius": 95.0, "intensity": 6.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
 LOBE_ERODE = {"plug": 0.3, "seat": 0.3}   # ADR-2107: a lobe's share of the erosion, by the art's tag
 # iteration 7: inside an opaque cloud the camera sees ~7 m of uniform colour (the flat card at 55-56.5 s). At 0.45 of
 # its density the plug still holds an optical depth of ~5 over its 100 m, but the eye sees 20 to 40 m into it: its
@@ -725,8 +726,12 @@ def scene_doc(state="uv", sky_map=None):
     env = {
         "background": [0.001, 0.001, 0.004],
         "intensity": 0.15, "skyIntensity": 0.35, "lightFromEnvironment": False,
-        "fogColor": pal("haze", state), "fogSky": 0.0, "fogSkyDistance": 20000.0,
-        "volumeDensity": 0.0,
+        "fogColor": pal("haze", state), "fogSky": AIR["fogSky"], "fogSkyDistance": 20000.0,
+        "fogSkyBeyond": 40000.0,   # ADR-2108: the moon (a mesh 60 km out) is sky, not fogged
+        # iteration 7 (art round 4, request 7): aerial perspective on the meshes -- the Condensery at 1.4 km, Highwater
+        # at 2.2 km and the Long Arc at 22 km drew at full contrast beside cloud that fades with its hazeDistance. The
+        # scene's own air (ADR-705), thin, with no in-scatter of its own (the cloud pass owns the visible air)
+        "volumeDensity": AIR["density"], "volumeScattering": AIR["scattering"],
     }
     if sky_map:
         env["map"] = sky_map
@@ -912,6 +917,7 @@ def reactivity():
                                                      "air", SONG)),
         AU.track("clouds/warmColor", AU.arc_keys(lambda st: [v * L["warm"] for v in pal("horizon_glow", st)], "air", SONG)),
         AU.track("clouds/hazeColor", AU.arc_keys(P("haze"), "air", SONG)),
+        AU.track("scene/fogColor", AU.arc_keys(P("haze"), "air", SONG)),   # iteration 7: the meshes' air
     ]
     # the far field: the nebula (the sky map is the Ultraviolet bake: a per-channel tint moves its hue), the moon's
     # disc, the cosmic ocean
