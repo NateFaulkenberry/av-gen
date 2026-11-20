@@ -417,6 +417,7 @@ struct FrameUniforms {
     glm::vec4 ballFx{0.0f};
     glm::vec4 ballFx2{0.0f};
     std::array<glm::vec4, 16> ballImpacts{};
+    glm::vec4 skyTint{1.0f};     // ADR-2103: rgb multiplies the visible sky (Environment::skyTint), w = 0
     glm::vec4 portalClip{0.0f};  // Gate C 2: scene::Scene::portalClip (last: the shadow views zero it)
 };
 // 192 matrices + 368 of vec4 blocks + 64 wind + 512 lights + 16 + 16x144 surface waves (ADR-981). The middle
@@ -443,6 +444,7 @@ static_assert(sizeof(FrameUniforms) == 192 + 384 + 64 + 512 + 16 + 224 * world::
                                        16 + // ADR-1960: the landing glow
                                        48 + // ADR-1967: the key light (direction, colour) and the sky ambient
                                        64 + 256 + // ADR-2008: the beach balls' impacts
+                                       16 + // ADR-2103: the visible sky's tint
                                        16); // Gate C 2: the portal clip plane, last
 static_assert(offsetof(FrameUniforms, portalClip) == sizeof(FrameUniforms) - 16); // ShadowRenderer zeroes it
 static_assert(offsetof(FrameUniforms, viewProj) == 0);

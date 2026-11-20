@@ -865,3 +865,41 @@ TEST_CASE("Sources modulate other sources through ordinary routes", "[sources][r
     frame(rack, modulator, f, at(0.1, 0.016));
     CHECK_THAT(d(f.signal("lfo.b")), WithinAbs(0.5, 1e-5));
 }
+
+// ADR-2103: a cycle instead of a random draw -- two groups answering a snare in turn.
+TEST_CASE("Random with a cycle steps evenly and alternates at a cycle of 2", "[sources][random][adr2103]") {
+    Fixture f;
+    const SignalId onset = f.bus.declare("audio.onset", 0.0f, 1.0f, true);
+    RandomSource turn("turn", "audio.onset", 1);
+    REQUIRE(turn.settingsFromJson(json{{"trigger", "audio.onset"}, {"seed", 1}, {"cycle", 2}}).has_value());
+    turn.attach(f.bus, f.params);
+    auto fire = [&](bool on) {
+        f.bus.setEvent(onset, on);
+        turn.update(f.bus, at(0.0, 0.016));
+        f.bus.clearEvents();
+        return f.signal("random.turn");
+    };
+    CHECK(fire(true) == 0.0f);
+    CHECK(fire(false) == 0.0f);
+    CHECK(fire(true) == 1.0f);
+    CHECK(fire(true) == 0.0f);
+    CHECK(fire(true) == 1.0f);
+    CHECK(turn.settingsToJson().at("cycle").get<int>() == 2);
+
+    RandomSource step("step", "audio.onset", 1);
+    REQUIRE(step.settingsFromJson(json{{"cycle", 4}}).has_value());
+    step.attach(f.bus, f.params);
+    std::vector<float> got;
+    for (int i = 0; i < 5; ++i) {
+        f.bus.setEvent(onset, true);
+        step.update(f.bus, at(0.0, 0.016));
+        f.bus.clearEvents();
+        got.push_back(f.signal("random.step"));
+    }
+    CHECK(got[0] == 0.0f);
+    CHECK_THAT(got[1], WithinAbs(1.0 / 3.0, 1e-6));
+    CHECK(got[3] == 1.0f);
+    CHECK(got[4] == 0.0f);
+    CHECK_FALSE(step.settingsFromJson(json{{"cycle", -1}}).has_value());
+    CHECK_FALSE(RandomSource("x").settingsToJson().contains("cycle"));
+}

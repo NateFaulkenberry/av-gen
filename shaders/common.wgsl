@@ -216,6 +216,7 @@ struct FrameUniforms {
     ballFx: vec4<f32>,
     ballFx2: vec4<f32>,
     ballImpacts: array<vec4<f32>, 16>,
+    skyTint: vec4<f32>,    // ADR-2103: rgb multiplies the visible sky (Environment::skyTint)
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 

@@ -188,3 +188,41 @@ TEST_CASE("environment settings survive a scene-file round trip", "[scene][compo
     CHECK((*again)->scene().environment.environmentRotation == -1.25f);
     CHECK((*again)->scene().environment.skyIntensity == 0.06f);
 }
+
+// ADR-2103: the visible sky's brightness and tint are parameters (a route or a track moves them), and the tint is a
+// scene-file key that round-trips, written only when set.
+TEST_CASE("the visible sky's intensity and tint are parameters and round-trip", "[scene][composition][sky][adr2103]") {
+    assets::AssetRegistry registry;
+    registry.setBaseDirectory(std::filesystem::temp_directory_path());
+    const auto scenePath = writeText("avgen_sky_tint.json", R"({"format": "avgen-scene", "version": 1,
+        "name": "sky", "environment": {"skyIntensity": 0.5, "skyTint": [1.2, 0.8, 0.4]},
+        "nodes": [{"name": "orb", "kind": "orb"}]})");
+    auto loaded = scene::Composition::loadFile(scenePath, registry);
+    REQUIRE(loaded.has_value());
+    scene::Composition& comp = **loaded;
+    params::ParameterSet params;
+    params::Modulator modulator;
+    comp.attach(params, modulator);
+    params.resetFinals();
+    comp.update(FrameTime{});
+    CHECK(comp.scene().environment.skyIntensity == 0.5f);
+    CHECK(comp.scene().environment.skyTint == glm::vec3(1.2f, 0.8f, 0.4f));
+    REQUIRE(params.findAs<float>("env/skyIntensity") != nullptr);
+    REQUIRE(params.findAs<glm::vec3>("env/skyTint") != nullptr);
+    params.findAs<float>("env/skyIntensity")->setFinalComponent(0, 0.9f);
+    params.findAs<glm::vec3>("env/skyTint")->setFinalComponent(2, 1.5f);
+    comp.update(FrameTime{});
+    CHECK(comp.scene().environment.skyIntensity == 0.9f);
+    CHECK(comp.scene().environment.skyTint.z == 1.5f);
+
+    const nlohmann::json j = comp.toJson();
+    REQUIRE(j.at("environment").contains("skyTint"));
+    CHECK(j.at("environment").at("skyTint").at(0).get<float>() == 1.2f);
+
+    const auto plain = writeText("avgen_sky_notint.json", R"({"format": "avgen-scene", "version": 1,
+        "name": "sky", "environment": {}, "nodes": [{"name": "orb", "kind": "orb"}]})");
+    auto untinted = scene::Composition::loadFile(plain, registry);
+    REQUIRE(untinted.has_value());
+    CHECK_FALSE((*untinted)->toJson().at("environment").contains("skyTint"));
+    CHECK((*untinted)->scene().environment.skyTint == glm::vec3(1.0f));
+}

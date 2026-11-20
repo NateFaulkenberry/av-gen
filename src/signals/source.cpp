@@ -543,11 +543,15 @@ void RandomSource::update(SignalBus& bus, const SourceContext& context) {
     if (triggerResolved_ && bus.event(triggerId_)) {
         // The k-th trigger since reset yields the k-th value of the seeded sequence, whatever
         // happened in between (replayed from the seed; triggers are sparse so O(k) is fine).
-        Rng rng(seed_);
-        for (std::uint32_t i = 0; i < count_; ++i) {
-            rng.nextFloat();
+        if (cycle_ > 1) { // ADR-2103: a cycle, not a random value
+            target_ = static_cast<float>(count_ % cycle_) / static_cast<float>(cycle_ - 1);
+        } else {
+            Rng rng(seed_);
+            for (std::uint32_t i = 0; i < count_; ++i) {
+                rng.nextFloat();
+            }
+            target_ = rng.nextFloat();
         }
-        target_ = rng.nextFloat();
         ++count_;
     }
     const float slew = slewMs_->value();
@@ -560,7 +564,11 @@ void RandomSource::update(SignalBus& bus, const SourceContext& context) {
 }
 
 json RandomSource::settingsToJson() const {
-    return json{{"trigger", trigger_}, {"seed", seed_}};
+    json j{{"trigger", trigger_}, {"seed", seed_}};
+    if (cycle_ > 1) {
+        j["cycle"] = cycle_; // ADR-2103
+    }
+    return j;
 }
 
 Result<void> RandomSource::settingsFromJson(const json& j) {
@@ -575,10 +583,19 @@ Result<void> RandomSource::settingsFromJson(const json& j) {
     if (auto r = readSeed(j, "seed", seed); !r) {
         return fail("random '{}': {}", name_, r.error().message);
     }
+    std::uint32_t cycle = 0; // ADR-2103
+    if (j.contains("cycle")) {
+        const json& c = j["cycle"];
+        if (!c.is_number_integer() || c.get<std::int64_t>() < 0 || c.get<std::int64_t>() > 64) {
+            return fail("random '{}': 'cycle' must be an integer in [0, 64]", name_);
+        }
+        cycle = static_cast<std::uint32_t>(c.get<std::int64_t>());
+    }
     if (trigger != trigger_) {
         setTrigger(std::move(trigger));
     }
     seed_ = seed;
+    cycle_ = cycle;
     return {};
 }
 

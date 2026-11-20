@@ -86,6 +86,17 @@ int runSonicTraceCommand(const std::filesystem::path& project, const std::filesy
                         targets.emplace(r.targetParam->path(), r.targetParam);
                     }
                 }
+                // ADR-2103: and every parameter a timeline track keys (a palette arc, a fade), except node
+                // transforms (walkers and vehicles key hundreds of them and no one charts them from here).
+                for (const params::Track& tr : engine.timeline().tracks()) {
+                    if (tr.target.starts_with("nodes/") && (tr.target.ends_with("/position") ||
+                                                           tr.target.ends_with("/rotation"))) {
+                        continue;
+                    }
+                    if (params::IParameter* p = engine.params().find(tr.target); p != nullptr) {
+                        targets.emplace(p->path(), p);
+                    }
+                }
                 for (const auto& [path, param] : targets) {
                     for (std::size_t c = 0; c < param->componentCount(); ++c) {
                         finalColumns.emplace_back(param, c);

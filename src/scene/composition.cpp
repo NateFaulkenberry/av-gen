@@ -71,7 +71,7 @@ constexpr std::string_view kSceneKeys[] = {
 constexpr std::string_view kEnvironmentKeys[] = {
     "map", "lightRig", "intensity", "stylized", "rotation", "skyIntensity",
     "dayNight",
-    "skyBloom", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "ecologyPoolReach",
+    "skyBloom", "skyTint", "ecologyLight", "ecologyLightRange", "ecologyGlowCell", "ecologyPoolReach",
     "ecologyPoolFaintest", "skybox",
     "proceduralSkyBackground",
     "lightFromEnvironment", "fallbackAmbient", "fogColor", "fogSky", "fogSkyDistance", "background", "fogHeightAmount", "styledSkyAmbient",
@@ -5333,6 +5333,15 @@ void Composition::attach(params::ParameterSet& params, params::Modulator& modula
         lightFromEnvironment_ =
             &params.add(boolDesc(prefix_ + "env/lightFromEnvironment", lightFromEnvironmentSetting_));
         skyBloom_ = &params.add(floatDesc(prefix_ + "env/skyBloom", skyBloomSetting_, 0.0f, 1.0f, 0.0f, 1.0f));
+        // ADR-2103: the visible sky's brightness and tint (the background pass only; `env/intensity` is the lighting),
+        // so a route or a timeline track can breathe a nebula or move its hue.
+        skyVisibleIntensity_ =
+            &params.add(floatDesc(prefix_ + "env/skyIntensity", skyIntensitySetting_, 0.0f, 20.0f, 0.0f, 4.0f));
+        {
+            params::ParamDesc<glm::vec3> tint = vec3Desc(prefix_ + "env/skyTint", skyTintSetting_, 0.0f, 16.0f, 0.0f, 2.0f);
+            tint.isColor = true;
+            skyTint_ = &params.add(std::move(tint));
+        }
         skyHaze_ = &params.add(floatDesc(prefix_ + "env/sky/haze", sky.hazeWidth, 0.001f, 4.0f, 0.02f, 1.0f));
         skySunIntensity_ = &params.add(
             floatDesc(prefix_ + "env/sky/sunIntensity", sky.sunIntensity, 0.0f, 200.0f, 0.0f, 40.0f));
@@ -6767,6 +6776,8 @@ void Composition::detach() {
     proceduralSkyBackground_ = nullptr;
     lightFromEnvironment_ = nullptr;
     skyBloom_ = nullptr;
+    skyVisibleIntensity_ = nullptr;
+    skyTint_ = nullptr;
     shadowRange_ = nullptr;
     dayNightParams_ = {};
     authoredLightParams_.clear();
@@ -10700,7 +10711,9 @@ void Composition::applyParameters() {
     scene_.environment.proceduralSkyBackground = proceduralSkyBackground_ != nullptr
                                                      ? proceduralSkyBackground_->value()
                                                      : proceduralSkyBackgroundSetting_;
-    scene_.environment.skyIntensity = skyIntensitySetting_;
+    scene_.environment.skyIntensity =
+        skyVisibleIntensity_ != nullptr ? skyVisibleIntensity_->value() : skyIntensitySetting_; // ADR-2103
+    scene_.environment.skyTint = skyTint_ != nullptr ? skyTint_->value() : skyTintSetting_;
     scene_.environment.skyBloom = skyBloom_ != nullptr ? skyBloom_->value() : skyBloomSetting_;
     scene_.environment.lightFromEnvironment =
         lightFromEnvironment_ != nullptr ? lightFromEnvironment_->value() : lightFromEnvironmentSetting_;
@@ -11637,6 +11650,9 @@ nlohmann::json Composition::toJson() const {
         environment["dayNight"] = std::move(d);
     }
     environment["skyBloom"] = skyBloomSetting_;
+    if (skyTintSetting_ != glm::vec3(1.0f)) { // ADR-2103: written only when set
+        environment["skyTint"] = {skyTintSetting_.x, skyTintSetting_.y, skyTintSetting_.z};
+    }
     // ADR-905: the parameter's base, as the volumetric block below does, so a save keeps what the
     // user set on `scene/ecologyLight` rather than the value the file was loaded with.
     if (const float ecologyLight = ecologyLight_ != nullptr ? ecologyLight_->base() : ecologyLightGain_;
@@ -13102,6 +13118,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(value.error());
             }
             *key.second = *value;
+        }
+        if (e.contains("skyTint")) { // ADR-2103
+            const json& t = e["skyTint"];
+            if (!t.is_array() || t.size() != 3 || !t[0].is_number() || !t[1].is_number() || !t[2].is_number()) {
+                return fail("'skyTint' must be [r, g, b]");
+            }
+            comp->skyTintSetting_ = glm::vec3(t[0].get<float>(), t[1].get<float>(), t[2].get<float>());
         }
         // `showSkybox` is the other Environment field that had no scene-file key: a scene could
         // light itself from a map but not choose whether to stand it behind the world.

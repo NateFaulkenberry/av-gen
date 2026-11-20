@@ -1790,6 +1790,7 @@ private:
     float envRotationSetting_ = 0.0f;      // radians about +Y
     float skyIntensitySetting_ = 1.0f;     // the visible sky only
     float skyBloomSetting_ = 0.0f;         // how much of the sky the bloom mask sees
+    glm::vec3 skyTintSetting_{1.0f};       // ADR-2103: the visible sky's tint
     bool showSkyboxSetting_ = true;        // draw the environment behind the world at all
     bool proceduralSkyBackgroundSetting_ = false; // ADR-345; analytic sky behind an HDRI
     // ADR-346: an environment-map change resolves on its own rather than re-flattening the world.
@@ -1913,6 +1914,8 @@ private:
     params::Parameter<bool>* proceduralSkyBackground_ = nullptr;    // ADR-350
     params::Parameter<bool>* lightFromEnvironment_ = nullptr;       // ADR-350
     params::Parameter<float>* skyBloom_ = nullptr;                  // ADR-350
+    params::Parameter<float>* skyVisibleIntensity_ = nullptr;       // ADR-2103: env/skyIntensity
+    params::Parameter<glm::vec3>* skyTint_ = nullptr;               // ADR-2103: env/skyTint
     bool dayNightNightMap_ = false;       // which map is currently bound
     Scene scene_;
     std::vector<std::unique_ptr<CompositionNode>> nodes_;

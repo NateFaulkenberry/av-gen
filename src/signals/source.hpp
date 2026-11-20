@@ -204,6 +204,9 @@ public:
 private:
     std::string trigger_;
     std::uint32_t seed_;
+    // ADR-2103: > 1 = not random: the k-th trigger gives step (k mod cycle) of `cycle` even steps over [0, 1], so a
+    // cycle of 2 alternates 0, 1, 0, 1 (two groups answering a snare in turn). 0 = the seeded sequence.
+    std::uint32_t cycle_ = 0;
     std::uint32_t count_ = 0;
     float target_ = 0.0f;
     float value_ = 0.0f;

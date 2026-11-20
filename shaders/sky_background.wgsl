@@ -115,6 +115,7 @@ fn skyBackgroundAt(dir: vec3<f32>, equirectLod: f32, minRadius: f32) -> vec3<f32
         // ADR-049: the visible sky's own intensity. Shading multiplies by params.w instead, so a
         // dark sky can still cast a useful amount of light and vice versa.
         color *= frame.skyExtra.z;
+        color *= frame.skyTint.rgb; // ADR-2103
     }
     return color;
 }

@@ -741,6 +741,9 @@ struct Environment {
     // rock off black. `skyIntensity` scales only the background pass; `environmentIntensity` only
     // the shading. One number cannot be both, and before this it was one number.
     float skyIntensity = 1.0f;
+    // ADR-2103: a per-channel multiplier on the visible sky (the background pass and the fog's view of the sky), after
+    // `skyIntensity`. White is the sky as authored. Lets a palette arc move an equirect nebula's hue slowly.
+    glm::vec3 skyTint{1.0f};
     // How much of the sky reaches the selective-bloom mask (ADR-039's emission target). 0 is the
     // pre-ADR-049 behaviour -- a bright environment never glows -- and is still the default,
     // because on a sky with a real sun in it anything else blows out the frame. A moon wants
