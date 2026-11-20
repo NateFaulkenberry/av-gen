@@ -157,7 +157,8 @@ def front_piers(bid, zrel):
             nb = int(blk["w"] / BAY + 1e-6); mg = (blk["w"] - nb * BAY) / 2
             piers = []
             for b in range(nb + 1):
-                if blk["front_balcony_bay"] in (b - 1, b) or blk.get("stair_slot_bay", -9) in (b - 1, b):
+                bb, sb = blk["front_balcony_bay"], blk.get("stair_slot_bay", -1)
+                if (bb >= 0 and bb in (b - 1, b)) or (sb >= 0 and sb in (b - 1, b)):      # not beside a balcony or the stair slot
                     continue
                 lx = blk["c"][0] - blk["w"] / 2 + mg + b * BAY; ly = blk["c"][1] - blk["d"] / 2
                 piers.append(building_point(bid, lx, ly)[:2] + (lx, ly))
@@ -277,7 +278,8 @@ def lantern_strings(north, south):
     while x < 46.0:
         zc = min(cam_at(t / 10.0)[2] for t in range(290, 450) if abs(cam_at(t / 10.0)[0] - x) < 6.0)
         pair = None
-        for za in (zc + R.uniform(2.7, 3.6), qz(x) + R.uniform(4.3, 4.8)):
+        R.uniform(2.7, 3.6)                                          # (keeps the layout's random stream where it was)
+        for za in [zc + 3.0 + 0.4 * k_ for k_ in range(7)] + [qz(x) + R.uniform(4.3, 4.8)]:      # overhead first (the lowest height that works), else low over the shop fronts
             a = piers_at(north, za, x)
             b = piers_at(south, za, a[0], 1.9) if a else None
             if a and not b and za > zc:                               # the mast of a south roof terrace, if it reaches this height
@@ -288,7 +290,7 @@ def lantern_strings(north, south):
                         mp = building_point(bs, rc[0] - rs[0] / 2 + 0.6, rc[1] + rs[1] / 2 - 0.6, 0.0)
                         if abs(mp[0] - a[0]) < 4.0 and BLD[bs][3] + m["roof_y_m"] + 3.6 < za < BLD[bs][3] + m["roof_y_m"] + 6.8:
                             b = (mp[0], mp[1], za)
-            if a and b and (za > zc + 2.5 or za < zc - 1.6):
+            if a and b and (za > zc + 2.5 or za < zc - 1.3):
                 pair = (a, b); break
         if pair:
             a, b = pair
@@ -316,7 +318,8 @@ def quay_south_side(south, gS):
             inst("garden/terrace_step_6m.glb", x, y, z, qyaw(x), [L / 6.0, 1, 1], "steps", env=False, tint={"garden": "garden_b" if (i + k) % 3 == 0 else "garden_a"})
             if (i + 2 * k) % 3 == 1:
                 inst("garden/tree_pit.glb", x - 0.8, y + 0.9, z, 0.0, 0.8, "steps", env=False)
-                inst(R.choice(["garden/umbel_tree_s.glb", "garden/umbel_tree_s.glb", "garden/umbel_tree_b.glb"]), x - 0.8, y + 0.9, z + 0.28, R.uniform(0, 6.28), R.uniform(0.85, 1.1), "steps", env=False,
+                tree = R.choice(["garden/umbel_tree_s.glb", "garden/umbel_tree_s.glb", "garden/umbel_tree_b.glb"])
+                inst(tree if k >= 2 else "garden/umbel_tree_s.glb", x - 0.8, y + 0.9, z + 0.28, R.uniform(0, 6.28), R.uniform(0.85, 1.1), "steps", env=False,      # the journey crosses the upper terraces: saplings there
                      tint={"garden": "garden_a" if (i + k) % 2 else "garden_b"})
                 light(x - 0.8, y + 0.9, z + 4.0, "garden_a", 10.0, 0.6, "steps")
             elif (i + 2 * k) % 3 == 2:

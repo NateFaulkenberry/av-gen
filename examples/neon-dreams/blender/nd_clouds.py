@@ -84,7 +84,7 @@ def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42,
                                                                                    for a in [rr.uniform(0, 6.283) for _ in range(turrets - 1)]]
     cores = []
     for ti, (frac, (ox, oy)) in enumerate(zip(tops, spots)):
-        th = H * frac; r = radius * (0.5 if ti == 0 else rr.uniform(0.32, 0.44)); z = base + r * 0.5; px, py = x + ox, y + oy
+        th = H * frac; r = radius * ((0.56 if rich else 0.5) if ti == 0 else rr.uniform(0.32, 0.44)); z = base + r * 0.5; px, py = x + ox, y + oy
         while True:
             out.append(L(px, py, z, r, rr.uniform(0.88, 1.0), dens, soft)); cores.append((px, py, z, r))
             cauliflower(rr, out, px, py, z, r, detail, soft, dens, n=kids)
@@ -95,7 +95,8 @@ def cumulus(seed, x, y, base, top, radius, turrets=3, lean=0.22, shelves=((0.42,
                 if rich:
                     cauliflower(rr, out, qx, qy_, qz_, sr, 1, soft, dens, n=(2, 3))
             low = (z - base) < th * 0.55                                         # a tower keeps its girth and bulges on the way up, and narrows only near its top: not a cone
-            nz = z + r * rr.uniform(0.55, 0.75); nr = r * (rr.uniform(0.88, 1.08) if low else rr.uniform(0.72, 0.86))
+            nz = z + r * rr.uniform(0.55, 0.75)
+            nr = r * ((rr.uniform(0.8, 0.94) if rich else rr.uniform(0.88, 1.08)) if low else rr.uniform(0.72, 0.86))   # hero formations step in a little: fat all the way up, the Head was one dome
             if nz + nr * 0.8 > base + th or nr < radius * 0.1:
                 break
             px += WIND[0] * r * lean * rr.uniform(0.5, 1.5) + rr.uniform(-0.2, 0.2) * r; py += WIND[1] * r * lean * rr.uniform(0.5, 1.5) + rr.uniform(-0.2, 0.2) * r
@@ -206,7 +207,7 @@ def bins_report(lobes):
 
 def build():
     masses = {"mooring_mound": mooring_mound()}
-    masses["head"] = cumulus(21, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 4))
+    masses["head"] = cumulus(23, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 4))
     masses["veil"] = cumulus(22, VEIL[0], VEIL[1], SEA_TOP - 20, 290, 185, turrets=3, lean=0.06, shelves=((0.5, 1.0), (0.74, 0.6)), kids=(3, 4))      # upright and broad: it must hide the Condensery from the Mooring
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
     for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
