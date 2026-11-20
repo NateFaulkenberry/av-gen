@@ -205,34 +205,30 @@ def _smooth(vals, k):
 
 
 def plume_program(name):
-    """A hot blue-white core shading to amber and a dull red tip, soft at the edges (facing) and fading down its length,
-    with a turbulent flicker running down it. The plume is a tapered tube from local (0,0,0) to (0,-1,0)."""
-    ops = [
+    """A hot blue-white core shading to amber and a dull red tip, fading down its length with a turbulent flicker running
+    down it; a thin tapered tube from local (0,0,0) to (0,-1,0), cut where it has faded (mask: the procedural pass has no
+    blending), its softness from the bloom round a thin bright core."""
+    ops = [   # eight registers (0..7)
         {"kind": "input", "input": "localPosition", "dst": 0},
         {"kind": "gradient", "dst": 1, "srcA": 0, "constant": [0.0, -1.0, 0.0, 0.0], "value": 1.0},      # v: 0 nozzle, 1 tip
         {"kind": "input", "input": "time", "dst": 2},
         {"kind": "constant", "dst": 3, "constant": [0.0, 9.0, 0.0, 0.0]},
         {"kind": "multiply", "dst": 2, "srcA": 2, "srcB": 3},
-        {"kind": "add", "dst": 4, "srcA": 0, "srcB": 2},                                                  # flows down
-        {"kind": "noise", "dst": 5, "srcA": 4, "value": 9.0, "seed": 3},
-        {"kind": "gradient", "dst": 6, "srcA": 1, "constant": [1.0, 0.0, 0.0, 0.0], "value": 1.0},
-        {"kind": "mix", "dst": 6, "srcA": 6, "srcB": 5, "value": 0.25},                                    # a ragged length
-        {"kind": "oklabRamp", "dst": 7, "srcA": 6, "constant": [0.75, 0.88, 1.0, 1.0], "constant2": [1.0, 0.9, 0.62, 1.0],
+        {"kind": "add", "dst": 2, "srcA": 0, "srcB": 2},                                                  # flows down
+        {"kind": "noise", "dst": 3, "srcA": 2, "value": 9.0, "seed": 3},
+        {"kind": "mix", "dst": 1, "srcA": 1, "srcB": 3, "value": 0.25},                                    # a ragged length
+        {"kind": "oklabRamp", "dst": 4, "srcA": 1, "constant": [0.75, 0.88, 1.0, 1.0], "constant2": [1.0, 0.9, 0.62, 1.0],
          "constant3": [1.0, 0.48, 0.12, 1.0], "constant4": [0.55, 0.1, 0.02, 1.0], "value": 1.0},
-        {"kind": "gradient", "dst": 8, "srcA": 6, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},      # 1 - v
-        {"kind": "smoothstep", "dst": 8, "srcA": 8, "constant": [0.0, 1.0, 0, 0]},
-        {"kind": "power", "dst": 8, "srcA": 8, "value": 1.6},
-        {"kind": "fresnel", "dst": 9, "value": 1.5},
-        {"kind": "gradient", "dst": 9, "srcA": 9, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},      # facing: soft edge
-        {"kind": "smoothstep", "dst": 9, "srcA": 9, "constant": [0.05, 0.85, 0, 0]},
-        {"kind": "multiply", "dst": 10, "srcA": 8, "srcB": 9},
-        {"kind": "gradient", "dst": 11, "srcA": 5, "constant": [0.6, 0.0, 0.0, 0.7], "value": 1.0},      # flicker 0.7-1.3
-        {"kind": "multiply", "dst": 10, "srcA": 10, "srcB": 11},
-        {"kind": "multiply", "dst": 12, "srcA": 7, "srcB": 10},
-        {"kind": "constant", "dst": 13, "constant": [0.0, 0.0, 0.0, 1.0]},
+        {"kind": "gradient", "dst": 5, "srcA": 1, "constant": [-1.0, 0.0, 0.0, 1.0], "value": 1.0},      # 1 - v
+        {"kind": "smoothstep", "dst": 5, "srcA": 5, "constant": [0.0, 1.0, 0, 0]},
+        {"kind": "power", "dst": 5, "srcA": 5, "value": 2.2},
+        {"kind": "gradient", "dst": 6, "srcA": 3, "constant": [0.6, 0.0, 0.0, 0.7], "value": 1.0},       # flicker 0.7-1.3
+        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
+        {"kind": "multiply", "dst": 4, "srcA": 4, "srcB": 5},
+        {"kind": "constant", "dst": 7, "constant": [0.0, 0.0, 0.0, 1.0]},
     ]
-    return {"name": name, "ops": ops, "baseColor": 13, "metallic": -1, "roughness": -1, "emission": 12,
-            "emissionIntensity": 30.0, "opacity": 10}
+    return {"name": name, "ops": ops, "baseColor": 7, "metallic": -1, "roughness": -1, "emission": 4,
+            "emissionIntensity": 16.0, "opacity": 5}
 
 
 def flight(f, r3, song, light_color, flame_color):
@@ -371,7 +367,7 @@ def flight(f, r3, song, light_color, flame_color):
             width = 0.0 if th <= 0 else 1.0 + 0.08 * _noise1(seed + side * 5, 1.7 * t)
             sk[n].append({"time": round(t, 3), "value": r3([width, max(length, 0.0), width]), "interp": "linear"})
             fpk[n].append({"time": round(t, 3), "value": r3([nz[0] + side * PLUME_SPLIT, nz[1], nz[2]]), "interp": "linear"})
-        lk.append({"time": round(t, 3), "value": round(f.get("light", 16.0) * th * (0.85 + 0.15 * _noise1(seed, 2 * t))
+        lk.append({"time": round(t, 3), "value": round(f.get("light", 30.0) * th * (0.85 + 0.15 * _noise1(seed, 2 * t))
                                                        * (1.0 + PUFF[0] * env * hover), 3), "interp": "linear"})
         lpk.append({"time": round(t, 3), "value": r3([nz[i] + 0.6 * dr[i] for i in range(3)]), "interp": "linear"})
         t += 1.0 / 30.0
@@ -388,14 +384,14 @@ def flight(f, r3, song, light_color, flame_color):
     for side, n in zip((-1, 1), flames):
         nodes.append({"name": n, "kind": "procedural", "parent": name, "position": NOZZLE["Jumping"][0],
                       "scale": [0.0, 0.0, 0.0], "procedural": {
-                          "source": {"kind": "tube", "tubeRadius": 0.055, "tubeTaper": 1.0, "tubeSides": 10,
+                          "source": {"kind": "tube", "tubeRadius": 0.045, "tubeTaper": 0.1, "tubeSides": 10,
                                      "tubeSegments": 12, "tubeTwist": 0.0, "tubeCaps": False,
                                      "curve": {"kind": "catmullRom", "generator": "points", "closed": False,
                                                "points": [{"position": [0.0, -0.01 * k, 0.0]} for k in (0, 50, 100)]}},
                           "distribution": {"kind": "points", "points": [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]},
                           "castsShadow": False,
                           "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndJetPlume",
-                                       "alphaMode": "blend"}}})
+                                       "alphaMode": "mask", "alphaCutoff": 0.06}}})
         tracks += [track("nodes/%s/scale" % n, sk0 + sk[n] + [{"time": end, "value": [0.0, 0.0, 0.0], "interp": "linear"}]),
                    track("nodes/%s/position" % n, fpk[n]), track("nodes/%s/rotation" % n, frk)]
     lights = [{"name": lamp, "type": "point", "node": name, "position": NOZZLE["Jumping"][0],
