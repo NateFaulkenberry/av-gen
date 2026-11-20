@@ -440,7 +440,8 @@ def cloud_beams(state="uv"):
 # glows the beams replace (the layout's cloud_glow stand-ins for the lighthouse beams)
 BEAM_STANDINS = {"harbour_light", "outer_light", "break_light"}
 # the Condensery's keel glow lit one lobe of its column into a pink ball under the platform at the reveal
-GLOW_SCALE = {"condensery_keel": 0.35, "condensery_throats": 2.2}
+GLOW_SCALE = {"condensery_keel": 0.35, "condensery_throats": 2.2, "veil_pocket5": 0.6, "veil_amber": 0.6}
+GLOW_SHADOW = {"veil_pocket5": 0.15, "veil_amber": 0.15}   # ADR-2107: the art's pulses on the journey inside the plug
 
 
 def clouds_block(state="uv", moon_dir=None):
@@ -450,6 +451,13 @@ def clouds_block(state="uv", moon_dir=None):
     far = []   # ADR-2104: the far towers on their own grid (in one set they overflowed 18 hero cells)
     for name, ls in DESIGN.get("far_masses", {}).items():
         far += [dict(l) for l in ls]
+    # iteration 7 (ADR-2107): the erosion eats every lobe inward; the plug that hides the Condensery until the crash
+    # keeps most of its body (eroded fully it opened at 56.4 s, half a second early)
+    for l in lobes + far:
+        if l.get("tag") in LOBE_ERODE:
+            l["erode"] = LOBE_ERODE[l["tag"]]
+        if l.get("tag") in LOBE_DENSITY:
+            l["density"] = round(l.get("density", 1.0) * LOBE_DENSITY[l["tag"]], 3)
     cb = DESIGN["clouds_block"]
     glows = [{"name": g["name"], "position": g["position"], "color": pal(g["key"], state), "radius": g["radius"],
               "intensity": g["intensity"] * GLOW_SCALE.get(g["name"], 1.0)} for g in cb["glows"]
@@ -459,7 +467,31 @@ def clouds_block(state="uv", moon_dir=None):
     veil_glows = DESIGN.get("veil", {}).get("glows", [])
     for g in veil_glows:
         glows.append({"name": g["name"], "position": g["position"], "color": pal(g["key"], state), "radius": g["radius"],
-                      "intensity": g["intensity"]})
+                      "intensity": g["intensity"] * GLOW_SCALE.get(g["name"], 1.0),
+                      "shadow": GLOW_SHADOW.get(g["name"], 1.0)})
+    # iteration 7: the Condensery's underglow. A glow in the well under each stack (the art's `veil.wells`, at the
+    # stacks' own plan positions from the layout), a little under the deck: it lights the heads round the well from
+    # inside and below, so the pedestal reads lit by the works and not as one ember. Named condensery_* so they take
+    # the ember route and the hold until the crash.
+    for k, inst in enumerate(sorted((i for i in LAYOUT["instances"] if "cond_stack_" in i.get("asset", "")),
+                                    key=lambda i: i["asset"])):
+        x, y, z = inst["pos"]
+        glows.append({"name": "condensery_well_%s" % "abc"[k], "position": [x, y + WELL_GLOW["lift"], z],
+                      "radius": WELL_GLOW["radius"],
+                      "color": pal("cond_a", state), "intensity": WELL_GLOW["intensity"], "key": "cond_a",
+                      "shadow": WELL_GLOW["shadow"]})
+    # iteration 7: the plug (54.9-56.9 s) was 1.5 s of flat colour, which is what the inside of an opaque cloud is. Lit
+    # pockets placed beside the journey through it, alternating sides: as the camera passes them their light moves
+    # across the cloud's billows (glowBreakup/glowShadow), giving the blind stretch depth and motion.
+    for k, (t, side, up) in enumerate(PLUG_POCKETS):
+        pos, fwd = cam_at(t)
+        lat = [-fwd[2], 0.0, fwd[0]]
+        n = math.hypot(lat[0], lat[2]) or 1.0
+        glows.append({"name": "veil_plug%d" % k, "key": "garden_b" if k % 2 else "garden_a",
+                      "position": [round(pos[0] + side * lat[0] / n, 2), round(pos[1] + up, 2),
+                                   round(pos[2] + side * lat[2] / n, 2)],
+                      "radius": PLUG_GLOW["radius"], "intensity": PLUG_GLOW["intensity"], "shadow": PLUG_GLOW["shadow"],
+                      "color": pal("garden_b" if k % 2 else "garden_a", state)})
     GLOW_INDEX.clear()
     GLOW_BASE.clear()
     GLOW_BASE.update({g["name"]: g["intensity"] for g in glows})
@@ -467,6 +499,9 @@ def clouds_block(state="uv", moon_dir=None):
     GLOW_KEYS.clear()
     GLOW_KEYS.update({g["name"]: g["key"] for g in cb["glows"]})
     GLOW_KEYS.update({g["name"]: g["key"] for g in veil_glows})
+    GLOW_KEYS.update({g["name"]: g["key"] for g in glows if "key" in g})
+    for g in glows:
+        g.pop("key", None)
     sea = DESIGN["sea_design"]
     br = sea["break"]
     lo, hi = sea["top_range"]
@@ -483,7 +518,7 @@ def clouds_block(state="uv", moon_dir=None):
         "glowBreakup": CLOUD_LOOK["glowBreakup"], "glowShadow": CLOUD_LOOK["glowShadow"],
         "glowBreakupScale": 0.014, "glowShadowDistance": 16.0,
         "extinction": CLOUD_LOOK["extinction"], "density": 1.0, "swell": 0.0,
-        "steps": 72, "lightSteps": 2, "lightDistance": CLOUD_LOOK["lightDistance"],
+        "steps": 72, "lightSteps": 6, "lightDistance": CLOUD_LOOK["lightDistance"],
         "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02, "maxDistance": 24000.0,
         "lightDirection": r3(LIGHT_DIR), "lightColor": pal("moon_light", state),
         "lightIntensity": CLOUD_LOOK["lightIntensity"], "anisotropy": CLOUD_LOOK["anisotropy"],
@@ -491,7 +526,12 @@ def clouds_block(state="uv", moon_dir=None):
         "ambientBottom": [v * CLOUD_LOOK["ambientBottom"] for v in pal("haze", state)],
         "warmColor": [v * CLOUD_LOOK["warm"] for v in pal("horizon_glow", state)], "warmDirection": r3(cb["warmDirection"]),
         "warmHeight": 900.0,
-        "noiseScale": 0.018, "noiseAmount": 0.72, "detailScale": 0.07, "detailAmount": 0.6,
+        "noiseScale": 0.018, "noiseAmount": CLOUD_LOOK["noiseAmount"], "detailScale": 0.07, "detailAmount": 0.6,
+        # ADR-2106: each lobe's surface eaten by billow octaves (cauliflower crowns, wispy flat bases); the key's light
+        # through six squared taps with multiple scattering (two even taps cast every lobe as a black stencil)
+        "erosion": CLOUD_LOOK["erosion"], "erosionScale": CLOUD_LOOK["erosionScale"], "erosionDetail": 1.0,
+        "erosionCurl": 6.0, "erosionFlatten": 0.4, "erosionOctaves": 3,
+        "lightSpacing": 2, "multiScatter": CLOUD_LOOK["multiScatter"],
         "drift": r3([v * 0.7 for v in cb["drift"]]),
         "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": CLOUD_LOOK["powder"], "seed": 7,
         # ADR-2102: the lighthouses
@@ -504,7 +544,9 @@ def clouds_block(state="uv", moon_dir=None):
 
 
 # the cloud look (iteration 4: dark indigo bodies, rims toward the key, the city's light on them)
-CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.35, "lightDistance": 260.0, "ambientTop": 0.25,
+# iteration 7: key 0.11 -> 0.22 with six squared light taps (the two even taps let most crowns see the key unshadowed)
+CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 60.0, "multiScatter": 0.7, "noiseAmount": 0.72,
+              "lightIntensity": 0.22, "anisotropy": 0.35, "lightDistance": 260.0, "ambientTop": 0.25,
               "ambientBottom": 0.06, "warm": 0.15, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
               "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2,
               # iteration 6: occlusion is per metre of extinction, so at 7.5x the extinction 1.6 buried every glow
@@ -513,6 +555,31 @@ CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.35, "lightDistance": 260.0
               # iteration 6: the art's cloud design v3 is built for 0.15 ("designed_for"); at 0.02 every formation
               # read as fog
               "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
+WELL_GLOW = {"radius": 85.0, "intensity": 3.0, "lift": 6.0, "shadow": 0.35}   # iteration 7: the Condensery's wells
+LOBE_ERODE = {"plug": 0.3, "seat": 0.3}   # ADR-2107: a lobe's share of the erosion, by the art's tag
+# iteration 7: inside an opaque cloud the camera sees ~7 m of uniform colour (the flat card at 55-56.5 s). At 0.45 of
+# its density the plug still holds an optical depth of ~5 over its 100 m, but the eye sees 20 to 40 m into it: its
+# eroded billows and the pockets' light pass by
+LOBE_DENSITY = {"plug": 1.0}
+# (t, side m, up m). Iteration 7: none -- glows inside the plug lit it uniformly from within a few metres and the
+# bloom made it a flat bright card; the art's two pulses on the journey (veil_pocket5, veil_amber) are kept, dimmed
+PLUG_POCKETS = []
+PLUG_GLOW = {"radius": 20.0, "intensity": 3.0, "shadow": 0.1}   # ADR-2107: shadow 0.1, they sit in solid cloud
+
+
+def cam_at(t):
+    """The journey's camera position at timeline second t and its unit heading (from the same spline the camera follows)."""
+    dense, _, total, s_at = journey()
+    s = s_at(t)
+    acc = 0.0
+    for k in range(1, len(dense)):
+        d = math.dist(dense[k - 1], dense[k])
+        if acc + d >= s or k == len(dense) - 1:
+            u = (s - acc) / d if d > 0 else 0.0
+            p = [dense[k - 1][i] + (dense[k][i] - dense[k - 1][i]) * u for i in range(3)]
+            f = [(dense[k][i] - dense[k - 1][i]) / max(d, 1e-6) for i in range(3)]
+            return p, f
+        acc += d
 GLOW_INDEX = {}   # glow name -> index in clouds.glows (route targets)
 GLOW_KEYS = {}    # glow name -> palette key
 GLOW_BASE = {}    # glow name -> its rest intensity
@@ -634,10 +701,18 @@ def scene_doc(state="uv", sky_map=None):
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndMoon",
                      "alphaMode": "mask", "alphaCutoff": 0.5}}})
     # the cosmic ocean far under the break
-    br = DESIGN["sea_design"]["break"]["centre"]
-    nodes.append({"name": "cosmicOcean", "kind": "procedural", "position": [br[0], -900, br[1]], "procedural": {
-        "source": {"kind": "cylinder", "radius": 900.0, "height": 40.0, "radialSegments": 64, "caps": True},
-        "distribution": {"kind": "single"}, "castsShadow": False,
+    # iteration 7 (art round 4): where the art's `ocean_plane` puts it -- an ellipse a little larger than the break, just
+    # under the sea's floor, so the reveal (looking 9 to 20 degrees down) sees the ocean in the break, not its far wall
+    brk = DESIGN["sea_design"]["break"]
+    br = brk["centre"]
+    op = brk.get("ocean_plane", {"y": -900.0, "semi_axes": [900.0, 900.0], "yaw_rad": 0.0})
+    ya = op.get("yaw_rad", 0.0)
+    nodes.append({"name": "cosmicOcean", "kind": "procedural", "position": [0, 0, 0], "procedural": {
+        "source": {"kind": "cylinder", "radius": 1.0, "height": 40.0, "radialSegments": 96, "caps": True},
+        "distribution": {"kind": "points", "points": [[br[0], op["y"] - 20.0, br[1], 0.0, round(math.sin(ya / 2), 5), 0.0,
+                                                       round(math.cos(ya / 2), 5), op["semi_axes"][0], 1.0,
+                                                       op["semi_axes"][1]]]},
+        "castsShadow": False,
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
     aliens, alien_tracks = inhabitant_nodes()
     vehicles, vehicle_tracks = vehicle_nodes(state)
@@ -741,6 +816,9 @@ def reactivity():
     for i in range(6):
         routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_pocket%d" % i], 3.0 + 0.6 * i,
                         attackMs=8.0, decayMs=300.0, delayMs=45.0 * i))
+    for i in range(len(PLUG_POCKETS)):   # iteration 7: the plug's pockets answer the toms too
+        routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_plug%d" % i], 3.0,
+                        attackMs=8.0, decayMs=320.0, delayMs=30.0 * i))
     # --- crash: the sky's horizon lift and the lighthouses flaring (the palette steps are the tracks below)
     routes.append(R("stem.crash.onset", "env/skyIntensity", 0.16, attackMs=30.0, decayMs=2600.0))
     for i in range(len(LAYOUT["beams"])):
@@ -861,7 +939,7 @@ def reactivity():
     # Veil (C_FAR, 56.88 s) and comes up over 0.85 s on it: the works lights up as the plug opens, and nothing of it can
     # show through the plug's last metres before then
     lit_at = AU.C_FAR
-    hold = [(0.0, 0.1), (round(lit_at - 0.85, 3), 0.1), (round(lit_at, 3), 1.0)]
+    hold = [(0.0, 0.1), (round(lit_at - 0.35, 3), 0.1), (round(lit_at, 3), 1.0)]  # it7: 0.85 -> 0.35 s (it glowed through the plug's last metres)
 
     def held(base):
         return [{"time": t, "value": round(base * f, 4), "interp": "linear"} for t, f in hold]
@@ -869,7 +947,7 @@ def reactivity():
         if info["group"] == "cond":
             tracks.append(AU.track("material/%s/emissionIntensity" % n, held(info["doc"]["emissionIntensity"])))
     for name, i in sorted(GLOW_INDEX.items()):
-        if name.startswith("condensery_"):
+        if name.startswith("condensery_") or name == "veil_amber":   # it7: art round 4, request 5
             tracks.append(AU.track("clouds/glow/%d/intensity" % i, held(GLOW_BASE[name])))
     return routes, tracks, sources
 
