@@ -21,6 +21,7 @@ import nd_kit_mooring as M
 import nd_kit_garden as G
 import nd_kit_condensery as C
 import nd_kit_far as F
+import nd_kit_it9 as K9
 
 ONLY = [x for x in arg("--only", "").split(",") if x]
 
@@ -112,19 +113,20 @@ def buildings():
     for name, seed, kw in specs:
         out.append(M.shophouse(name, seed, **kw))
     out += [M.gallery_slab(), M.corner_tower(), M.capsule_tower(), M.station(), M.kiosk(), M.lone_lamp_house()]
+    out += K9.towers()                                                      # iteration 9 (owner msg 85): tower variety
     return out
 
 
 fam("buildings", buildings)
 fam("landmarks", lambda: list(M.great_lantern()) + [M.lighthouse("lighthouse_a", 301, height=58.0, house_floors=3, base_w=7.2, lattice=20.0),
                                                      M.lighthouse("lighthouse_b", 302, height=41.0, house_floors=4, base_w=7.2, lattice=12.0),
-                                                     M.lighthouse("lighthouse_c", 303, height=50.0, house_floors=2, base_w=4.8, lattice=24.0), M.beam_cone()])
+                                                     M.lighthouse("lighthouse_c", 303, height=50.0, house_floors=2, base_w=4.8, lattice=24.0), M.beam_cone(), K9.mooring_mast()])
 fam("decks", M.deck_kit)
 fam("street", lambda: M.street_kit() + [M.gondola_pylon()])
-fam("garden", G.garden_kit)
+fam("garden", lambda: G.garden_kit() + K9.garden_extra())
 fam("vehicles", M.craft)
 fam("condensery", C.condensery_kit)
-fam("far", F.far_kit)
+fam("far", lambda: F.far_kit() + [K9.drowned_mast()])
 signs = None
 if not ONLY or "signs" in ONLY:
     signs, sign_dir = sign_kit()

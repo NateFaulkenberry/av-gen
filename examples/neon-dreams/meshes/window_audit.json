@@ -1,6 +1,6 @@
 {
  "rule": "see nd_kitcore.py",
- "assets_with_panes": 30,
+ "assets_with_panes": 37,
  "violations": 0,
  "assets": {
   "mooring_shophouse_a": {
@@ -106,6 +106,41 @@
   "lone_lamp_house": {
    "openings": 36,
    "pane_polygons": 67,
+   "violations": []
+  },
+  "tower_spire": {
+   "openings": 150,
+   "pane_polygons": 259,
+   "violations": []
+  },
+  "tower_setback": {
+   "openings": 190,
+   "pane_polygons": 332,
+   "violations": []
+  },
+  "tower_twin": {
+   "openings": 191,
+   "pane_polygons": 343,
+   "violations": []
+  },
+  "tower_lean": {
+   "openings": 168,
+   "pane_polygons": 299,
+   "violations": []
+  },
+  "tower_crowned": {
+   "openings": 143,
+   "pane_polygons": 259,
+   "violations": []
+  },
+  "tower_mast": {
+   "openings": 127,
+   "pane_polygons": 212,
+   "violations": []
+  },
+  "tower_hanging": {
+   "openings": 167,
+   "pane_polygons": 302,
    "violations": []
   },
   "lighthouse_a": {

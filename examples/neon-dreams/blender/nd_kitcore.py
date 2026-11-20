@@ -57,6 +57,10 @@ SCHEME = {"_default": dict(color=INK, rows=[0, 1], deck=STEEL),
           "mooring_station": dict(color=RUST, rows=[2], deck=TIMBER), "kiosk": dict(color=BONE, rows=[2]), "lone_lamp_house": dict(color=INK, rows=[1]),
           "lighthouse_a": dict(color=BONE, rows=[0]), "lighthouse_b": dict(color=BONE, rows=[0]), "lighthouse_c": dict(color=BONE, rows=[0]),
           "pavilion": dict(color=PLUM, rows=[1], deck=TIMBER),
+          # iteration 9 (owner msg 85): the tower types
+          "tower_spire": dict(color=SLATE, rows=[1, 0, 2]), "tower_setback": dict(color=BONE, rows=[0, 2, 0, 1]), "tower_twin": dict(color=PLUM, rows=[0, 1, 2]),
+          "tower_lean": dict(color=RUST, rows=[2, 0, 1]), "tower_crowned": dict(color=SLATE, rows=[0, 1]), "tower_mast": dict(color=INK, rows=[1, 2]),
+          "tower_hanging": dict(color=BONE, rows=[0, 1]),
           "deck_quay_6m": dict(deck=TIMBER), "deck_stair_3m2": dict(deck=TIMBER), "gangway_10m": dict(deck=TIMBER), "gangway_garden_10m": dict(deck=TIMBER),
           "catwalk_stair": dict(deck=STEEL), "alley_stair": dict(deck=STEEL), "pier_span_22m": dict(deck=TIMBER), "deck_lowwalk_6m": dict(deck=TIMBER),
           "deck_pad_6m": dict(deck=STEEL), "deck_round_27m": dict(deck=STONE), "deck_round_14m": dict(deck=STONE), "terrace_step_6m": dict(deck=STONE)}

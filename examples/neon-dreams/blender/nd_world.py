@@ -180,3 +180,52 @@ def town_top(x, y):
     t = 123.6 - 0.0474 * max(-110.0, min(125.0, x))
     t += min(11.0, 0.115 * dy) if dy > 0 else max(-13.0, 0.36 * dy)
     return t
+
+
+# ---- iteration 9 (owner msg 73: "it doesn't feel colossal yet ... build out from here, add more floating cloud
+# structures, make them bob up and down (floating in the ocean)"). The Mooring grows three districts and the sea around it
+# carries formations that float. Plan coordinates, as above.
+# The Lampmarket: a market court west of the Great Lantern, one floor above the plaza, open to the south-west (the
+# approach looks into it from 2.8 to 12 s, left of the Lantern).
+LAMPMARKET = dict(centre=(-262.0, 82.0), deck=134.4, court=(46.0, 34.0))
+# Lanternhill: the town climbing the Head's south flank behind the Stacks, four terraces two floors apart.
+LANTERNHILL = dict(rows=[(147.2, 116.0), (153.6, 142.0), (160.0, 168.0), (166.4, 194.0)], x=(-100.0, 112.0), yaw_deg=-18.0)
+MOORING_MAST = (12.0, 224.0, 166.4)        # the observation mast at the hill's crest
+# Eastreach: garden roofs on two terraces east of the Stacks, north of the Veil (left of the journey at 41 to 47 s).
+EASTREACH = dict(rows=[(137.6, 120.0, (150.0, 262.0)), (144.0, 146.0, (160.0, 276.0)), (150.4, 172.0, (176.0, 270.0))], yaw_deg=-8.0)
+# owner msg 83: small floating islands in the gaps round the town. (bob, rock variant, x, y, top z, width, yaw, content)
+SMALL_ISLES = [("isle_west", "a", -215.0, 5.0, 127.0, 50.0, 20.0, "grove"), ("isle_west2", "c", -252.0, -40.0, 140.0, 26.0, -30.0, "house:mooring_shophouse_j"),
+               ("isle_inner", "b", -72.0, -72.0, 117.0, 36.0, 60.0, "tea"), ("isle_inner2", "c", -40.0, -110.0, 104.0, 22.0, 10.0, "tree"),
+               ("isle_south", "b", 25.0, -88.0, 112.0, 58.0, -15.0, "houses"), ("isle_south2", "a", 95.0, -108.0, 124.0, 36.0, 35.0, "tower:tower_hanging"),
+               ("isle_east", "a", 130.0, 62.0, 152.0, 32.0, 0.0, "tower:tower_spire"), ("isle_exit", "c", 178.0, -95.0, 134.0, 30.0, -20.0, "tower:tower_mast")]
+# Floating formations (they bob: cloud_design.json "bobs"). (name, plan x, y, deck z or top, foot radius)
+ISLE_LAMPWICK = (235.0, -165.0, 140.0, 62.0)     # (owner msg 83: moved in toward the town, was (300, -255)) a hamlet on its own cloud, reached by gondola from the garden; right of the approach, right of the Quay's exit at 41-46 s
+ISLE_WATCH = (640.0, -350.0, 172.0, 44.0)        # one tall house on a tall cloud stack
+KEEP = (560.0, 2080.0, 1060.0, 430.0)            # the colossus on the left of the approach: a massif 1.1 km high with a town on a shelf at KEEP_SHELF
+KEEP_SHELF = (430.0, 1890.0, 392.0)
+DROWNED_MAST = (7330.0, 5690.0, -60.0)           # the enormous silhouette: 9.3 km out, behind the town from the approach (2.8 to 35 s), never in the reveal
+# What floats, and how (owner msg 73: "make them bob up and down (floating in the ocean)"; msg 78: what floats stands on a
+# rock island). The engine's ADR-2112 shape: amplitude [x, y, z] m (y bobs at `period`, x and z drift at 1.618 x it),
+# period s, phase 0..1. Calm buoyancy, not a pulse: bigger and farther = slower and larger. The Mooring, its districts, the
+# Head, the Veil and the sill do not bob. liftMax 0: no audio on the bob (yet). Cloud masses of the same name carry it.
+BOBS = {
+    "isle_lampwick": dict(amplitude=[1.0, 3.5, 0.8], period=13.0, phase=0.10, note="the hamlet south-east of the garden; seen 2.8-12 s and 41-46 s"),
+    "isle_watch":    dict(amplitude=[0.8, 3.0, 0.8], period=15.5, phase=0.55, note="one tall house on a deep rock"),
+    "lone_lamp":     dict(amplitude=[0.8, 2.8, 0.6], period=12.0, phase=0.30, note="one house on its own small rock"),
+    "harbour_light": dict(amplitude=[0.4, 1.6, 0.4], period=17.0, phase=0.80, note="its beams pass over the journey at 5-14 s: keep it small"),
+    "outer_light":   dict(amplitude=[0.4, 1.8, 0.4], period=16.0, phase=0.20, note=""),
+    "break_light":   dict(amplitude=[0.4, 1.8, 0.4], period=18.5, phase=0.65, note="on the rim of the ocean break, in the reveal"),
+    "condensery":    dict(amplitude=[0.5, 2.2, 0.5], period=37.0, phase=0.40, note="the reveal's subject: slow and small; its plume emitters and glows ride it"),
+    "highwater":     dict(amplitude=[2.0, 6.0, 2.0], period=27.0, phase=0.15, note="2.2 km out in the reveal"),
+    "keep":          dict(amplitude=[3.0, 12.0, 3.0], period=34.0, phase=0.70, note="the colossus 2.7 km out on the left of the approach, its town on a rock in its shelf"),
+    "reef":          dict(amplitude=[2.0, 8.0, 2.0], period=29.0, phase=0.35, note="floating cumulus north-east and south-east of the Mooring"),
+    # owner msg 83: the gaps round the town filled with small floating islands (gardens, houses, towers), at varied heights
+    "isle_west":     dict(amplitude=[0.6, 2.4, 0.6], period=11.5, phase=0.05, note="the garden isle west of the Great Lantern"),
+    "isle_west2":    dict(amplitude=[0.5, 1.9, 0.5], period=9.5, phase=0.62, note="a one-house rock beside it"),
+    "isle_inner":    dict(amplitude=[0.5, 2.0, 0.5], period=12.5, phase=0.33, note="the tea garden inside the journey's curve, under the lens at 26-29 s"),
+    "isle_inner2":   dict(amplitude=[0.4, 1.6, 0.4], period=10.0, phase=0.88, note="one umbel tree on a small rock"),
+    "isle_south":    dict(amplitude=[0.7, 2.6, 0.7], period=14.0, phase=0.47, note="two houses and a garden south of the Low Walk"),
+    "isle_south2":   dict(amplitude=[0.6, 2.2, 0.6], period=13.0, phase=0.15, note="the hanging-garden tower south of the Steps"),
+    "isle_east":     dict(amplitude=[0.6, 2.4, 0.6], period=15.0, phase=0.72, note="the lantern spire between the Stacks and Eastreach"),
+    "isle_exit":     dict(amplitude=[0.6, 2.4, 0.6], period=12.0, phase=0.25, note="the mast tower right of the journey as it leaves the Quay (45 s)"),
+}

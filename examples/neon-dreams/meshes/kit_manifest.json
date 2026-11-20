@@ -95,6 +95,13 @@
    "pavilion",
    "pier_span_22m",
    "terrace_step_6m",
+   "tower_crowned",
+   "tower_hanging",
+   "tower_lean",
+   "tower_mast",
+   "tower_setback",
+   "tower_spire",
+   "tower_twin",
    "tree_pit"
   ]
  },
@@ -1762,6 +1769,759 @@
    ]
   },
   {
+   "asset": "buildings/tower_spire.glb",
+   "tris": 16210,
+   "height_m": 97.6,
+   "bounds_m": [
+    -4.7,
+    -14.0,
+    -4.7,
+    4.7,
+    97.6,
+    4.88
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 21,
+   "footprint_m": [
+    7.2,
+    7.2
+   ],
+   "roof": "crown",
+   "roof_y_m": 67.31,
+   "roof_centre_m": [
+    0,
+    0
+   ],
+   "roof_size_m": [
+    4.8,
+    4.8
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 3.2,
+     "floors": 5,
+     "w": 4.8,
+     "d": 4.8,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      0.0,
+      0.0
+     ],
+     "z0": 19.2,
+     "floors": 6,
+     "w": 4.8,
+     "d": 4.8,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      0,
+      -0.6
+     ],
+     "z0": 38.4,
+     "floors": 5,
+     "w": 4.8,
+     "d": 4.8,
+     "shop": false,
+     "front_balcony_bay": 0
+    },
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 54.4,
+     "floors": 4,
+     "w": 4.8,
+     "d": 4.8,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "tower": true,
+   "kind": "slender lantern spire",
+   "crown_m": 30,
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/tower_setback.glb",
+   "tris": 23720,
+   "height_m": 60.3,
+   "bounds_m": [
+    -7.7,
+    -14.0,
+    -7.7,
+    7.7,
+    60.31,
+    7.7
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "lantern",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 16,
+   "footprint_m": [
+    12.0,
+    12.0
+   ],
+   "roof": "crown",
+   "roof_y_m": 51.31,
+   "roof_centre_m": [
+    0,
+    3.0
+   ],
+   "roof_size_m": [
+    4.8,
+    4.8
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 12.0,
+     "d": 12.0,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 3.2,
+     "floors": 4,
+     "w": 12.0,
+     "d": 12.0,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      1.2
+     ],
+     "z0": 16.0,
+     "floors": 4,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": 3
+    },
+    {
+     "c": [
+      0,
+      2.4
+     ],
+     "z0": 28.8,
+     "floors": 4,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      0,
+      3.0
+     ],
+     "z0": 41.6,
+     "floors": 3,
+     "w": 4.8,
+     "d": 4.8,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "tower": true,
+   "kind": "setback tower with garden terraces",
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/tower_twin.glb",
+   "tris": 25932,
+   "height_m": 59.7,
+   "bounds_m": [
+    -13.1,
+    -14.0,
+    -5.3,
+    13.1,
+    59.71,
+    5.49
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "lantern",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 16,
+   "footprint_m": [
+    22.8,
+    7.2
+   ],
+   "roof": "kit",
+   "roof_y_m": 38.51,
+   "roof_centre_m": [
+    7.8,
+    0.6
+   ],
+   "roof_size_m": [
+    4.8,
+    4.8
+   ],
+   "blocks": [
+    {
+     "c": [
+      -7.8,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -7.8,
+      0
+     ],
+     "z0": 3.2,
+     "floors": 5,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -7.8,
+      0.6
+     ],
+     "z0": 19.2,
+     "floors": 5,
+     "w": 7.2,
+     "d": 6.0,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      -7.8,
+      0
+     ],
+     "z0": 35.2,
+     "floors": 5,
+     "w": 4.8,
+     "d": 6.0,
+     "shop": false,
+     "front_balcony_bay": -1
+    }
+   ],
+   "tower": true,
+   "kind": "twin towers with sky-bridges",
+   "blocks_note": "blocks of the left tower only (the right tower's piers are not listed)"
+  },
+  {
+   "asset": "buildings/tower_lean.glb",
+   "tris": 20150,
+   "height_m": 60.6,
+   "bounds_m": [
+    -4.7,
+    -14.0,
+    -5.9,
+    10.1,
+    60.57,
+    5.9
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 16,
+   "footprint_m": [
+    7.2,
+    8.4
+   ],
+   "roof": "kit",
+   "roof_y_m": 51.31,
+   "roof_centre_m": [
+    5.4,
+    0
+   ],
+   "roof_size_m": [
+    7.2,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0.6,
+      0
+     ],
+     "z0": 3.2,
+     "floors": 3,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    },
+    {
+     "c": [
+      1.8,
+      0
+     ],
+     "z0": 12.8,
+     "floors": 3,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 1
+    },
+    {
+     "c": [
+      3.0,
+      0
+     ],
+     "z0": 22.4,
+     "floors": 3,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      4.2,
+      0
+     ],
+     "z0": 32.0,
+     "floors": 3,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      5.4,
+      0
+     ],
+     "z0": 41.6,
+     "floors": 3,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 2
+    }
+   ],
+   "tower": true,
+   "kind": "leaning tower: each block steps 1.2 m out",
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/tower_crowned.glb",
+   "tris": 14968,
+   "height_m": 60.4,
+   "bounds_m": [
+    -8.02,
+    -14.0,
+    -8.02,
+    8.02,
+    60.4,
+    8.02
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "lantern",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 15,
+   "footprint_m": [
+    8.4,
+    8.4
+   ],
+   "roof": "crown",
+   "roof_y_m": 48.11,
+   "roof_centre_m": [
+    0,
+    0
+   ],
+   "roof_size_m": [
+    7.2,
+    7.2
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 8.4,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 3.2,
+     "floors": 5,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 19.2,
+     "floors": 5,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": false,
+     "front_balcony_bay": 0
+    },
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 35.2,
+     "floors": 4,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": false,
+     "front_balcony_bay": 1
+    }
+   ],
+   "tower": true,
+   "kind": "lighthouse-crowned tower",
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/tower_mast.glb",
+   "tris": 17622,
+   "height_m": 70.8,
+   "bounds_m": [
+    -6.5,
+    -14.0,
+    -5.3,
+    5.9,
+    70.85,
+    5.9
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 12,
+   "footprint_m": [
+    9.6,
+    8.4
+   ],
+   "roof": "crown",
+   "roof_y_m": 38.51,
+   "roof_centre_m": [
+    0,
+    0.6
+   ],
+   "roof_size_m": [
+    7.2,
+    7.2
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 3.2,
+     "floors": 4,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 0
+    },
+    {
+     "c": [
+      -1.2,
+      0
+     ],
+     "z0": 16.0,
+     "floors": 4,
+     "w": 7.2,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.6
+     ],
+     "z0": 28.8,
+     "floors": 3,
+     "w": 7.2,
+     "d": 7.2,
+     "shop": false,
+     "front_balcony_bay": 2
+    }
+   ],
+   "tower": true,
+   "kind": "mast tower with dishes and a beacon",
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
+   "asset": "buildings/tower_hanging.glb",
+   "tris": 32208,
+   "height_m": 49.0,
+   "bounds_m": [
+    -6.5,
+    -14.0,
+    -6.2,
+    6.5,
+    48.96,
+    6.8
+   ],
+   "materials": [
+    "beacon",
+    "cloth",
+    "facade",
+    "foliage",
+    "garden",
+    "glass",
+    "metal",
+    "strip",
+    "trim",
+    "win_cool",
+    "win_stair",
+    "win_warm"
+   ],
+   "floors": 13,
+   "footprint_m": [
+    9.6,
+    9.6
+   ],
+   "roof": "garden",
+   "roof_y_m": 41.71,
+   "roof_centre_m": [
+    0,
+    0.3
+   ],
+   "roof_size_m": [
+    9.6,
+    8.4
+   ],
+   "blocks": [
+    {
+     "c": [
+      0,
+      0
+     ],
+     "z0": 0.0,
+     "floors": 1,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": true,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.3
+     ],
+     "z0": 3.2,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.3
+     ],
+     "z0": 9.6,
+     "floors": 2,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.3
+     ],
+     "z0": 16.0,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      0.3
+     ],
+     "z0": 22.4,
+     "floors": 2,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": -1
+    },
+    {
+     "c": [
+      0,
+      -0.3
+     ],
+     "z0": 28.8,
+     "floors": 2,
+     "w": 9.6,
+     "d": 9.6,
+     "shop": false,
+     "front_balcony_bay": 3
+    },
+    {
+     "c": [
+      0,
+      0.3
+     ],
+     "z0": 35.2,
+     "floors": 2,
+     "w": 9.6,
+     "d": 8.4,
+     "shop": false,
+     "front_balcony_bay": 3
+    }
+   ],
+   "tower": true,
+   "kind": "hanging-garden tower",
+   "blocks_note": "building-local plan coordinates: x along the front, y = depth (the front faces -y), z up; GLB = (x, z, -y)"
+  },
+  {
    "asset": "landmarks/great_lantern_frame.glb",
    "tris": 6092,
    "height_m": 110.5,
@@ -1908,6 +2668,34 @@
    ],
    "materials": [
     "beam"
+   ]
+  },
+  {
+   "asset": "landmarks/mooring_mast.glb",
+   "tris": 9316,
+   "height_m": 141.0,
+   "bounds_m": [
+    -9.64,
+    -0.73,
+    -9.62,
+    9.64,
+    141.2,
+    9.62
+   ],
+   "materials": [
+    "beacon",
+    "foliage",
+    "garden",
+    "lantern",
+    "metal",
+    "strip",
+    "trim"
+   ],
+   "what": "the Mooring Mast: Lanternhill's observation landmark",
+   "galleries_m": [
+    44,
+    82,
+    112
    ]
   },
   {
@@ -2780,6 +3568,46 @@
    ]
   },
   {
+   "asset": "garden/root_curtain_a.glb",
+   "tris": 12438,
+   "height_m": 0.6,
+   "bounds_m": [
+    -15.18,
+    -23.32,
+    -16.74,
+    16.93,
+    0.57,
+    18.07
+   ],
+   "materials": [
+    "foliage",
+    "garden"
+   ],
+   "what": "hanging roots and tidevine for the underside of a floating rock island, sized for a 60 m island; scale with it",
+   "patch_m": 34.0,
+   "depth_m": 30.0
+  },
+  {
+   "asset": "garden/root_curtain_b.glb",
+   "tris": 8814,
+   "height_m": 0.5,
+   "bounds_m": [
+    -11.15,
+    -14.8,
+    -11.28,
+    10.05,
+    0.55,
+    9.07
+   ],
+   "materials": [
+    "foliage",
+    "garden"
+   ],
+   "what": "hanging roots and tidevine for the underside of a floating rock island, sized for a 60 m island; scale with it",
+   "patch_m": 24.0,
+   "depth_m": 18.0
+  },
+  {
    "asset": "vehicles/gondola_cabin.glb",
    "tris": 380,
    "height_m": 3.7,
@@ -3119,6 +3947,25 @@
     ]
    },
    "materials_note": "arc_line and arc_light keep the emission baked into the GLB (0.22 and 0.9): the scene has no role for them. At 0.55 and 9 (first test in AV Gen) it was a string of fairy lights brighter than the Condensery, and showed through the Veil"
+  },
+  {
+   "asset": "far/drowned_mast.glb",
+   "tris": 2372,
+   "height_m": 3200.0,
+   "bounds_m": [
+    -305.4,
+    -263.2,
+    -1322.31,
+    709.72,
+    2926.33,
+    1702.91
+   ],
+   "materials": [
+    "drown_light",
+    "drown_line"
+   ],
+   "what": "the drowned mast: the enormous unidentified silhouette 9 km out",
+   "materials_note": "drown_line and drown_light keep their baked emission (0.08, 0.6): no scene role"
   },
   {
    "asset": "signs/sign_blade_0.gltf",
@@ -3629,6 +4476,60 @@
     2.2
    ],
    "brand": "Mooring Seven"
+  },
+  {
+   "asset": "_thirdparty/isles/isle_rock_a.gltf",
+   "tris": 25242,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.5,
+    -0.906,
+    -0.5,
+    0.5,
+    0.0,
+    0.5
+   ],
+   "materials": [
+    "isle_stone"
+   ],
+   "what": "a floating rock island, 1 unit across, top at 0 (scale = width in metres)",
+   "third_party": "derived by blender/nd_isles.py from assets/treeisle/floating-isle-bare.glb (owner-supplied, no licence recorded): gitignored, never committed"
+  },
+  {
+   "asset": "_thirdparty/isles/isle_rock_b.gltf",
+   "tris": 25242,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.5,
+    -0.426,
+    -0.5,
+    0.5,
+    0.0,
+    0.5
+   ],
+   "materials": [
+    "isle_stone"
+   ],
+   "what": "a floating rock island, 1 unit across, top at 0 (scale = width in metres)",
+   "third_party": "derived by blender/nd_isles.py from assets/treeisle/floating-isle-bare.glb (owner-supplied, no licence recorded): gitignored, never committed"
+  },
+  {
+   "asset": "_thirdparty/isles/isle_rock_c.gltf",
+   "tris": 25242,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.5,
+    -2.09,
+    -0.5,
+    0.5,
+    0.0,
+    0.5
+   ],
+   "materials": [
+    "isle_stone"
+   ],
+   "what": "a floating rock island, 1 unit across, top at 0 (scale = width in metres)",
+   "third_party": "derived by blender/nd_isles.py from assets/treeisle/floating-isle-bare.glb (owner-supplied, no licence recorded): gitignored, never committed"
   }
  ]
 }

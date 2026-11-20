@@ -175,6 +175,9 @@ ROOT = os.path.join(HERE, "..")
 CELL = 4.0
 
 
+NEW_ZONES = ("lanternhill", "lampmarket", "eastreach", "roof")      # iteration 9's districts: their cells are marked, so the cloud designed before them is made exactly as before
+
+
 def town():
     """The Mooring's decks and buildings as plan cells of 4 m, from art/layout.json and the kit manifest:
     {(i, j): (deck height, True under a building)}. The plateau is built under them, the heads and wisps beside them."""
@@ -183,7 +186,7 @@ def town():
     cells = {}
     for i in lay["instances"]:
         fam = i["asset"].split("/")[0]
-        if fam not in ("decks", "buildings") or i["zone"] in ("condensery", "lone_lamp", "lighthouse", "gangway", "highwater") or "rail" in i["asset"] or "stair" in i["asset"]:
+        if fam not in ("decks", "buildings") or i["zone"] in ("condensery", "lone_lamp", "lighthouse", "gangway", "highwater") or i.get("bob") or "rail" in i["asset"] or "stair" in i["asset"]:
             continue
         b = man[i["asset"]]["bounds_m"]; sx, sy, sz = i["scale"]; yaw = math.radians(i["rot_y_deg"])
         if "deck_round" in i["asset"]:                                    # the round decks count by their radius (iteration 8 hung crescents outside the large one: the cloud may lie on those)
@@ -196,8 +199,8 @@ def town():
                 lx, ly = x0 + (x1 - x0) * a_ / nx, -(z0 + (z1 - z0) * c_ / nz)          # GLB (x, z) -> building-local plan (x, -z)
                 wx, wy = px + lx * math.cos(yaw) - ly * math.sin(yaw), py + lx * math.sin(yaw) + ly * math.cos(yaw)
                 k = (int(math.floor(wx / CELL)), int(math.floor(wy / CELL)))
-                z0_, b0_ = cells.get(k, (-1e9, False))
-                cells[k] = (max(z0_, pz), b0_ or fam == "buildings")
+                z0_, b0_, n0_ = cells.get(k, (-1e9, False, True))
+                cells[k] = (max(z0_, pz), b0_ or fam == "buildings", n0_ and i["zone"].split("_")[0] in NEW_ZONES)
     return cells
 
 
@@ -956,7 +959,10 @@ def far_field():
     f["far_cumulus"] = (far_cumulus(111, -300, 2600, 760, 520, 95.0, turrets=4) + far_cumulus(112, 3100, -1500, 520, 380, 75.0)
                         + far_cumulus(113, 2300, -1150, 300, 200, 55.0, turrets=2)
                         + far_cumulus(115, 6000, -4300, 1100, 700, 150.0, turrets=4) + far_cumulus(116, -1900, -2600, 620, 430, 90.0))
-    f["highwater"] = highwater_island()
+    f["highwater"] = tag_bob(highwater_island()[1:], "highwater")           # iteration 9: no body lobe; the town stands on its rock island
+    isl = islands_cloud()
+    f["highwater"] += tag_bob(isl.get("highwater", []), "highwater")
+    f["keep"] = tag_bob(keep_colossus() + isl.get("keep", []), "keep")
     return f
 
 
@@ -1042,9 +1048,94 @@ def bins_report(lobes):
             "worst_cell_at": [round(lo[0] + (wk[0] + 0.5) * cell), round(lo[1] + (wk[1] + 0.5) * cell)], "cells_over_64": sum(1 for v in cells.values() if v > 64)}
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# Iteration 9 (owner msgs 73, 78, 80). What floats stands on a rock island (meshes/_thirdparty/isles, placed by the layout,
+# listed in layout.json "islands"): its cloud is no longer a body under it but a WRAP round the rim (heads level with the
+# island's top to a few metres under it, so the decks' edges are lost in cloud while the sculpted underside and its roots
+# show), a few tatters drawn out along the wind, and sparse mist far under the keel. Every lobe of a floating formation
+# carries "bob": <name> (nd_world.BOBS; ADR-2112), and its mass has the same name.
+def _layout():
+    return json.load(open(os.environ.get("ND_LAYOUT", os.path.join(ROOT, "art", "layout.json"))))
+
+
+def rim_wrap(seed, x, y, top, width, depth, n=None, rmin=8.0, inner=0.44):
+    rr = random.Random(seed); out = []; R = width / 2.0; n = n or max(9, int(width / 7.0))
+    for k in range(n):
+        a = k / n * 6.283 + rr.uniform(-0.2, 0.2); d = R * rr.uniform(inner + 0.04, 1.05)
+        r = max(rmin, width * rr.uniform(0.07, 0.13))
+        heads(rr, out, x + d * math.cos(a), y + d * math.sin(a), top + rr.uniform(-4.0, 1.5), r, soft=0.24, kids=(1, 3))
+    wx, wy = WIND
+    for k in range(max(4, n // 3)):                                     # tatters at the rim, drawn out downwind
+        a = rr.uniform(0, 6.283); d = R * rr.uniform(0.8, 1.3)
+        out.append(L(x + d * math.cos(a) + wx * R * 0.3, y + d * math.sin(a) + wy * R * 0.3, top - rr.uniform(2, 10), max(rmin, width * rr.uniform(0.08, 0.14)),
+                     rr.uniform(0.32, 0.45), rr.uniform(0.4, 0.6), 0.65, sx=rr.uniform(1.6, 2.4)))
+    for k in range(max(3, n // 4)):                                     # sparse mist well under the keel: the island floats in cloud, it does not stand on it
+        a = rr.uniform(0, 6.283); d = R * rr.uniform(0.3, 1.2)
+        out.append(L(x + d * math.cos(a), y + d * math.sin(a), top - depth * rr.uniform(1.1, 1.6), max(rmin, width * rr.uniform(0.12, 0.2)), 0.3, 0.35, 0.75, sx=1.6))
+    for l in out:
+        l["tag"] = "seat"
+    return out
+
+
+def tag_bob(lobes, name):
+    for l in lobes:
+        l["bob"] = name
+    return lobes
+
+
+def district_seat():
+    """The cloud the new districts stand in: Lanternhill climbing the Head, the Lampmarket west of the Lantern, Eastreach
+    north of the Veil. A body of big flattened lobes under each terrace whose top is 6 m under its decks, and heads at the
+    terraces' front edges whose tops reach from 4 m under to 2 m over the deck, so each terrace steps out of cloud."""
+    lay = _layout(); rr = random.Random(909); out = []
+    groups = {}
+    for i in lay["instances"]:
+        if i["zone"] in ("lanternhill", "lanternhill_deck", "lampmarket", "lampmarket_deck", "eastreach", "eastreach_deck") and (i["asset"].startswith("decks/") or i["asset"].startswith("buildings/")):
+            z = round(i["pos"][1], 1); groups.setdefault((i["zone"].split("_")[0], z), []).append((i["pos"][0], -i["pos"][2]))
+    for (zone, z), pts in sorted(groups.items()):
+        xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+        x0, x1, y0, y1 = min(xs) - 8, max(xs) + 8, min(ys) - 8, max(ys) + 8
+        nx = max(1, int((x1 - x0) / 46.0) + 1); ny = max(1, int((y1 - y0) / 40.0) + 1)
+        for a in range(nx):
+            for b in range(ny):
+                px, py = x0 + (x1 - x0) * (a + 0.5) / nx, y0 + (y1 - y0) * (b + 0.5) / ny
+                r = rr.uniform(34, 46); sy_ = rr.uniform(0.32, 0.42)
+                out.append(L(px + rr.uniform(-6, 6), py + rr.uniform(-6, 6), z - 6.0 - r * sy_, r, sy_, 1.0, 0.3, sx=rr.uniform(1.0, 1.3)))
+        front = sorted(pts, key=lambda p: p[1])[:max(3, len(pts) // 3)]          # the south (front) edge of the terrace
+        for (px, py) in front[::2]:
+            heads(rr, out, px + rr.uniform(-4, 4), py - rr.uniform(6, 12), z + rr.uniform(-4.0, 2.0), rr.uniform(10, 16), soft=0.22, kids=(1, 3))
+    for l in out:
+        l["tag"] = "seat"
+    return out
+
+
+def islands_cloud():
+    """Rim wraps for every rock island of the layout, by its bob name."""
+    lay = _layout(); out = {}
+    for k, isl in enumerate(lay.get("islands", [])):
+        x, top, y = isl["centre"][0], isl["centre"][1], -isl["centre"][2]
+        out.setdefault(isl["bob"], []).extend(rim_wrap(700 + k, x, y, top, isl["width_m"], isl["depth_m"], rmin=8.0 if isl["width_m"] < 120 else 14.0))
+    return out
+
+
+def keep_colossus():
+    """The Keep (far set): a cumulus massif 1.1 km high, 2.7 km out on the left of the approach, with a bay on its south-west
+    face where its town stands on a rock island (layout zone keep). Big lobes: at that range nothing under 60 m reads."""
+    x, y, top, rad = KEEP; sx, sy, sz = KEEP_SHELF
+    lobes = [l for l in cumulus(121, x, y, SEA_TOP - 40, top, rad, turrets=4, shelves=((0.3, 1.2), (0.62, 0.8)), mist=False, detail=1, kids=(3, 4), rich=False) if l["r"] >= 60.0]
+    keep = []
+    for l in lobes:                                                     # the bay: nothing within 120 m of the town, between 40 m under and 140 m over it
+        cx, cy, cz = l["c"][0], -l["c"][2], l["c"][1]; rh = l["r"] * max(l["scale"][0], l["scale"][2])
+        if math.hypot(cx - sx, cy - sy) - rh < 125.0 and cz - l["r"] * l["scale"][1] < sz + 140.0 and cz + l["r"] * l["scale"][1] > sz - 40.0:
+            continue
+        keep.append(l)
+    return keep
+
+
 def build():
     cells = town()
-    dress, n_heads, n_wisps = mound_dressing(cells)
+    old = {k: v for k, v in cells.items() if not v[2]}               # the town before iteration 9: the near-city cloud is built from it, unchanged
+    dress, n_heads, n_wisps = mound_dressing(old)
     masses = {"mooring_mound": mooring_mound() + dress}
     GARDEN_SEAT[:] = garden_seat()
     STATS.update(town_heads=n_heads, town_wisps=n_wisps)
@@ -1052,11 +1143,10 @@ def build():
     # the Veil (iteration 5): a bank on the journey's own line with rooms in it (see veil()); nothing of it stands on
     # the garden's decks
     v_lobes, n_shell, rooms, exits = veil()
-    masses["veil"] = [l for l in v_lobes if not on_open_deck(cells, l, under=1.0, over=160.0)]       # nothing of it hangs over the garden either: the gate opens beyond the terrace's edge
+    masses["veil"] = [l for l in v_lobes if not on_open_deck(old, l, under=1.0, over=160.0)]       # nothing of it hangs over the garden either: the gate opens beyond the terrace's edge
     STATS.update(veil_shell_lobes=n_shell, veil_dropped_over_decks=len(v_lobes) - len(masses["veil"]))
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
-    for i, (name, asset, x, y, z, yawd, rpm, ph, bl) in enumerate(LIGHTHOUSES):
-        masses["rock_" + name] = rock(31 + i, x, y, z - 8.0 + SEAT, (54, 60, 50)[i])
+    # iteration 9: the lighthouses stand on rock islands (their cloud: islands_cloud(), below); no cloud-rock under them
     cx, cy, cz = CONDENSERY
     col = mesa(40, cx, cy, cz - 5.0 + SEAT, 205)
     # its two flank cumulus (iteration 6: the left one stood 3 degrees over the horizon in front of the moon's lower
@@ -1073,8 +1163,18 @@ def build():
     for k in range(3):
         dd = 110 + 100 * k
         col.append(L(ax + ux * dd, ay + uy * dd, cz - 95 - 14 * k, 92 - 9 * k, 0.95, 1.0, 0.4))
-    masses["condensery_column"] = col
-    masses["condensery_plume"] = plume()
+    # iteration 9: the works stands on a rock island 330 m across; the mesa's body and buttresses under its rim go, so the
+    # sculpted underside shows. What is left of the pedestal near the works (the heads round the platform's edge and the
+    # pier's tongue) floats with it; the flank cumulus stay where they are.
+    ride, stay = [], []
+    for l in col:
+        cxl, cyl, czl = l["c"][0], -l["c"][2], l["c"][1]; topl = czl + l["r"] * l["scale"][1]; dd = math.hypot(cxl - cx, cyl - cy)
+        if dd < 205.0 and topl < cz - 16.0:
+            continue
+        (ride if dd < 400.0 and topl > cz - 40.0 else stay).append(l)
+    masses["condensery_column"] = stay
+    masses["condensery"] = tag_bob(ride, "condensery")
+    masses["condensery_plume"] = tag_bob(plume(), "condensery")
     lx, ly, lz = LONE_LAMP
     # the Lone Lamp (iteration 6): at 1.4 km, level with the sea's crests and 2 degrees from the Outer Light, one window was
     # nothing. It now stands 110 m higher and 11 degrees to the right of the Outer Light as the approach sees it, on a
@@ -1094,27 +1194,35 @@ def build():
     for k in range(4):                                             # mist under it: it touches nothing
         a_ = rl.uniform(0, 6.283); d_ = rl.uniform(30, 70)
         ll.append(L(lx + d_ * math.cos(a_), ly + d_ * math.sin(a_), lz - rl.uniform(70, 100), rl.uniform(30, 40), 0.4, 0.5, 0.6, sx=1.4))
+    # iteration 9: the house stands on a rock island 40 m across now: no core under it; the cumulus beside the house (the
+    # lamp's light-catcher) stays, lifted off the sea so it floats with the rock
+    ll = [l for l in ll[5:] if l["c"][1] - l["r"] * l["scale"][1] > lz - 70.0 or l["density"] < 0.6]
     for l in ll:
         l["tag"] = "seat"
-    masses["lone_lamp"] = ll
+    masses["lone_lamp"] = tag_bob(ll, "lone_lamp")
     masses["reveal_fore"] = reveal_fore()
     # the mid field (iteration 6): it was six cumulus of one recipe (tops 140 to 270, radii 125 to 190). Now a long low
     # reef north-east of the Mooring (behind the town from the approach), and a tower and its satellite on the right of the
     # approach. (Heads along the rim of the ocean break were tried: seen from above, moonlit against the dark of the break,
     # they were cotton balls.)
-    mid = []
-    for i, (x, y, top, rad, tur) in enumerate(((700, 520, 200, 150, 2), (930, 590, 245, 135, 3), (1150, 640, 180, 150, 2), (1360, 690, 150, 120, 2))):          # the reef
-        mid += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=tur, shelves=((0.5, 1.1),), detail=1, kids=(3, 4), rich=False)
-    mid += cumulus(64, 380, -800, SEA_TOP - 20, 240, 150, turrets=3, shelves=((0.45, 1.2), (0.7, 0.6)), detail=1, kids=(3, 5), rich=False)
-    mid += cumulus(65, 1180, -520, SEA_TOP - 20, 175, 125, turrets=2, shelves=((0.5, 1.0),), detail=1, kids=(3, 4), rich=False)
-    mid += cumulus(66, 1345, -630, SEA_TOP - 20, 110, 75, turrets=2, shelves=(), detail=1, kids=(2, 3), rich=False)
-    masses["mid_field"] = mid
+    # iteration 9: the generic mid field (seven cumulus of one recipe, 507 lobes) becomes two floating reefs that bob
+    reef_a = []
+    for i, (x, y, top, rad, tur) in enumerate(((700, 520, 200, 150, 2), (930, 590, 245, 135, 3))):
+        reef_a += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=tur, shelves=((0.5, 1.1),), detail=1, kids=(3, 4), rich=False)
+    reef_b = cumulus(65, 1180, -520, SEA_TOP - 20, 175, 125, turrets=2, shelves=((0.5, 1.0),), detail=1, kids=(3, 4), rich=False) + \
+        cumulus(66, 1345, -630, SEA_TOP - 20, 110, 75, turrets=2, shelves=(), detail=1, kids=(2, 3), rich=False)
+    masses["reef"] = tag_bob([l for l in reef_a + reef_b if l["r"] >= 14.0], "reef")
+    masses["districts"] = [l for l in district_seat() if path_gap(l, 0.0, 47.4) >= 14.0 and not on_open_deck(cells, l, under=1.0, over=40.0)]
+    for name, ls in islands_cloud().items():
+        if name in ("highwater", "keep"):
+            continue                                                   # far set (far_field)
+        masses[name] = tag_bob(ls, name) if name not in masses else masses[name] + tag_bob(ls, name)
     for k_ in ("head", "fore"):
         masses[k_] = [l for l in masses[k_] if not on_open_deck(cells, l)]
     n_seat = 0                                                     # the cloud that decks stand in (see SEAT)
     for l in masses["mooring_mound"]:
         x_, y_, top_ = l["c"][0], -l["c"][2], l["c"][1] + l["r"] * l["scale"][1]
-        if abs(top_ - (_town_top0(x_, y_) + 5.0)) < 13.0 and town_near(cells, x_, y_, 60.0)[0] is not None:
+        if abs(top_ - (_town_top0(x_, y_) + 5.0)) < 13.0 and town_near(old, x_, y_, 60.0)[0] is not None:
             l["tag"] = "seat"; n_seat += 1
     for l in masses["condensery_column"]:
         x_, y_, top_ = l["c"][0], -l["c"][2], l["c"][1] + l["r"] * l["scale"][1]
@@ -1125,14 +1233,31 @@ def build():
     for k_ in masses:
         masses[k_] = prune_hidden(masses[k_])
     STATS.update(hidden_lobes_dropped=n0 - sum(len(m) for m in masses.values()))
+    late = {"districts": masses.pop("districts")}                  # iteration 9: the new districts' seat competes with nothing designed before it
     STATS.update(dropped_to_fit_bins=fit_bins(masses))
     # iteration 8: the garden's seat goes in last, and only where a bin cell has room
     STATS.update(added_where_room=add_where_room(masses, {"mooring_mound": GARDEN_SEAT}), offered={"mooring_mound": len(GARDEN_SEAT)})
+    masses["districts"] = []
+    STATS.update(districts_added_where_room=add_where_room(masses, late), districts_offered=len(late["districts"]))
     far = far_field()
     for k_ in far:
         far[k_] = prune_hidden(far[k_])
     STATS.update(far_dropped_to_fit_bins=fit_bins(far))
     return masses, far
+
+
+def _wr(name, x, y, a, b, yaw_deg, floor, above, density, below=6.0):
+    return {"name": name, "centre": [x, -y], "radii": [a, b], "yaw": round(-math.radians(yaw_deg), 4), "floor": floor, "below": below, "above": above, "density": density}
+
+
+WISP_REGIONS = [
+    _wr("quay_upper", -55, 4, 34, 13, 8, 131.2, 1.2, 0.8), _wr("quay_middle", 12, 3, 38, 13, -5, 128.0, 1.2, 0.8), _wr("quay_lower", 80, -6, 34, 13, -12, 124.8, 1.2, 0.8),
+    _wr("plaza", -102, -6, 26, 26, 8, 131.2, 1.5, 1.0), _wr("low_walk", 0, -24, 70, 9, -8, 121.0, 2.0, 1.0),
+    _wr("steps", 66, -26, 22, 14, -15, 122.4, 1.8, 0.9), _wr("garden", GARDEN[0], GARDEN[1], 32, 32, 0, GARDEN[2], 1.6, 0.9),
+    _wr("plateau_gaps", 10, 30, 150, 70, 0, 129.0, 2.5, 0.6, below=10.0),
+    _wr("lampmarket", LAMPMARKET["centre"][0], LAMPMARKET["centre"][1], 34, 26, 0, LAMPMARKET["deck"], 1.2, 0.8),
+    _wr("lanternhill", 5, 155, 110, 50, -10, 153.0, 0.8, 0.4, below=8.0), _wr("eastreach", 215, 146, 70, 36, -5, 144.0, 0.8, 0.4, below=8.0),
+]
 
 
 def glows():
@@ -1149,7 +1274,12 @@ def glows():
             g("harbour_light", (lh[0][2], lh[0][3], lh[0][4] + 8), 70, "moon_disc", 0.7), g("outer_light", (lh[1][2], lh[1][3], lh[1][4] + 8), 80, "moon_disc", 0.7),
             g("break_light", (lh[2][2], lh[2][3], lh[2][4] + 8), 80, "moon_disc", 0.7),
             g("condensery_throats", (cx, cy, cz + 150), 150, "cond_a", 2.2), g("condensery_yard", (cx, cy, cz + 14), 85, "cond_a", 0.8),       # the yard lit the old cap into a white plate at 130 m / 1.2
-            g("condensery_keel", (cx, cy, cz - 40), 170, "cond_b", 1.0), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -150), 600, "ocean_b", 3.0)]      # iteration 6: 420 m / 1.8 at -210 left the break's walls dark from the reveal
+            g("condensery_keel", (cx, cy, cz - 40), 170, "cond_b", 1.0),
+            # iteration 9: the new districts' light in their cloud, and the floating settlements' (these ride their formation)
+            dict(g("lampmarket", (LAMPMARKET["centre"][0], LAMPMARKET["centre"][1], LAMPMARKET["deck"] - 6), 75, "sign_a", 1.1)),
+            g("lanternhill", (10, 150, 146), 95, "bounce_b", 0.9),
+            dict(g("lampwick", (ISLE_LAMPWICK[0], ISLE_LAMPWICK[1], ISLE_LAMPWICK[2] - 4), 60, "amber", 2.0), bob="isle_lampwick"),
+            dict(g("keep_town", (KEEP_SHELF[0], KEEP_SHELF[1], KEEP_SHELF[2] + 10), 220, "amber", 4.0), bob="keep"), g("ocean_break", (BREAK["centre"][0], BREAK["centre"][1], -150), 600, "ocean_b", 3.0)]      # iteration 6: 420 m / 1.8 at -210 left the break's walls dark from the reveal
 
 
 if __name__ == "__main__":
@@ -1203,6 +1333,13 @@ if __name__ == "__main__":
                        "needs": "the march must still be sampling at 9 km with hazeDistance near 9000: if the tower and the swells do not show, raise `steps` or `maxDistance` before changing the lobes",
                        "highwater": {"centre": E(HIGHWATER), "note": "a third settlement, never reached (layout zone `highwater`); glow `highwater` is its light in its cloud"}},
         "moon": MOON,
+        # iteration 9 (owner msg 73): the formations that float, in the shape of the engine's ADR-2112 clouds.bobs. A lobe,
+        # glow or mass with "bob": <name> moves by that formation's offset; so do the layout's instances with the same name.
+        "bobs": [dict(name=k, liftMax=0.0, set="far" if k in far else "hero", **v) for k, v in BOBS.items()],
+        # iteration 9 (owner msg 73): where the wispy low fog lies (the engine's ADR-2113 wisp layer, masked to these
+        # soft-edged ellipses). Engine plan coordinates [x, z]; floor = the deck height (engine y); inside a region the
+        # density peaks 1 m under the floor and is 0 at floor + above. See notes/00-coordination.md, "Art: iteration 9".
+        "wisp_regions": WISP_REGIONS,
         "bins": {"hero_masses": bins_report(allhero), "far_masses": bins_report(allfar),
                  "note": "replica of binCloudLobes, one grid per set (ADR-2104: clouds.lobes and clouds.farLobes): a cell holds at most 64 lobes and keeps the biggest."},
         "counts": {k: len(v) for k, v in masses.items()}, "far_counts": {k: len(v) for k, v in far.items()},

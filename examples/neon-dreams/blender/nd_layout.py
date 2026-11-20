@@ -773,6 +773,12 @@ emitters = condensery()
 lone_lamp()
 n_highwater = highwater()
 anomalies()
+import nd_city9                                                    # iteration 9 (owner msg 73): the city built out, the floating settlements
+city9, splines9 = nd_city9.build(sys.modules[__name__])
+for b_ in beams:                                                   # what floats carries its formation's name (nd_world.BOBS)
+    b_["bob"] = b_["name"]
+for e_ in emitters:
+    e_["bob"] = "condensery"
 bad, worst = checks()
 
 tris = sum(MAN[i["asset"]]["tris"] for i in INST)
@@ -801,10 +807,16 @@ out = {
     "splines": {"quay_centre": [E((x, qy(x), qz(x))) for x in [QUAY_X0 + (QUAY_X1 - QUAY_X0) * k / 40 for k in range(41)]],
                 "gondola_out": [E(p) for p in west["cable_out"]], "gondola_back": [E(p) for p in reversed(west["cable_back"])],
                 "pier": [E((PIER_ROOT[0] + PIER_DIR[0] * s, PIER_ROOT[1] + PIER_DIR[1] * s, PIER_ROOT[2])) for s in (0, 60, 120, 180, 242)],
-                "skiff_route": [E(p) for p in ((-300, -330, 112), (-240, -250, 111), (-150, -150, 112), (-90, -60, 113), (-40, -32, 113.5))]},
+                "skiff_route": [E(p) for p in ((-300, -330, 112), (-240, -250, 111), (-150, -150, 112), (-90, -60, 113), (-40, -32, 113.5))],
+                **{k: [E(p) for p in v] for k, v in splines9.items()}},
     "vehicles": [{"asset": "vehicles/gondola_cabin.glb", "spline": "gondola_out", "hang_below_m": 3.6, "speed_mps": 3.0, "phase": 0.42, "instance": "gondola_0"},
                  {"asset": "vehicles/gondola_cabin.glb", "spline": "gondola_back", "hang_below_m": 3.6, "speed_mps": 3.0, "phase": 0.26, "instance": "gondola_1"},
-                 {"asset": "vehicles/cloud_skiff.glb", "spline": "skiff_route", "speed_mps": 2.2, "phase": 0.3, "tint": {"win_warm": "amber", "lantern": "amber"}}],
+                 {"asset": "vehicles/cloud_skiff.glb", "spline": "skiff_route", "speed_mps": 2.2, "phase": 0.3, "tint": {"win_warm": "amber", "lantern": "amber"}},
+                 {"asset": "vehicles/gondola_cabin.glb", "spline": "gondola_lampwick_out", "hang_below_m": 3.6, "speed_mps": 3.5, "phase": 0.35, "instance": "gondola_lampwick_cabin_0"},
+                 {"asset": "vehicles/gondola_cabin.glb", "spline": "gondola_lampwick_back", "hang_below_m": 3.6, "speed_mps": 3.5, "phase": 0.68, "instance": "gondola_lampwick_cabin_1"}],
+    "bobs": [dict(name=k, liftMax=0.0, **v) for k, v in BOBS.items()],
+    "bobs_doc": "ADR-2112: a formation bobs as one: every instance, light, spot, beam and emitter with \"bob\": <name>, and the cloud mass of that name (art/cloud_design.json), move by its offset. Instances with no bob stay put.",
+    "islands": nd_city9.ISLANDS,
     "beams": beams,
     "emitters": emitters,
     "lights": LIGHTS,
