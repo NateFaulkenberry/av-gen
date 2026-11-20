@@ -2124,6 +2124,26 @@
    "bulbs": 9
   },
   {
+   "asset": "street/lantern_string_16m.glb",
+   "tris": 1944,
+   "height_m": 0.0,
+   "bounds_m": [
+    -8.0,
+    -1.36,
+    -0.17,
+    8.0,
+    0.01,
+    0.17
+   ],
+   "materials": [
+    "lantern",
+    "metal"
+   ],
+   "span_m": 16.0,
+   "sag_m": 0.9,
+   "bulbs": 15
+  },
+  {
    "asset": "street/awning_1bay.glb",
    "tris": 224,
    "height_m": 0.3,

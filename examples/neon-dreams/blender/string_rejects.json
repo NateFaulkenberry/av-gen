@@ -1,0 +1,6 @@
+{
+ "note": "lantern-string anchor pairs (north x, y, south x, y, height; plan metres) that nd_check_strings.py refused; nd_layout.py skips them",
+ "rejects": [
+  "-41.2,12.1,-40.1,3.4,135.6"
+ ]
+}

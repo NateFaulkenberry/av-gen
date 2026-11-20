@@ -7614,19 +7614,19 @@
    "id": "lantern_string_02",
    "asset": "street/lantern_string_9m.glb",
    "pos": [
-    -46.093,
+    -41.856,
     135.616,
-    -5.437
+    -7.674
    ],
-   "rot_y_deg": -94.767,
+   "rot_y_deg": -97.953,
    "quat": [
     0.0,
-    -0.735899,
+    -0.754443,
     -0.0,
-    0.677091
+    0.656366
    ],
    "scale": [
-    1.244559871891375,
+    0.9842033091403278,
     1,
     1
    ],
@@ -7637,6 +7637,56 @@
   },
   {
    "id": "lantern_string_03",
+   "asset": "street/lantern_string_16m.glb",
+   "pos": [
+    -37.154,
+    141.571,
+    -4.011
+   ],
+   "rot_y_deg": -78.29,
+   "quat": [
+    0.0,
+    -0.631286,
+    -0.0,
+    0.77555
+   ],
+   "scale": [
+    1.0418347930719796,
+    1,
+    1
+   ],
+   "zone": "lantern_strings",
+   "tint": {
+    "lantern": "win_b"
+   }
+  },
+  {
+   "id": "lantern_string_04",
+   "asset": "street/lantern_string_9m.glb",
+   "pos": [
+    -5.174,
+    132.559,
+    -4.951
+   ],
+   "rot_y_deg": -104.744,
+   "quat": [
+    0.0,
+    -0.791989,
+    -0.0,
+    0.610535
+   ],
+   "scale": [
+    1.0555637227686363,
+    1,
+    1
+   ],
+   "zone": "lantern_strings",
+   "tint": {
+    "lantern": "amber"
+   }
+  },
+  {
+   "id": "lantern_string_05",
    "asset": "street/lantern_string_9m.glb",
    "pos": [
     2.865,
@@ -7657,12 +7707,12 @@
    ],
    "zone": "lantern_strings",
    "tint": {
-    "lantern": "win_b"
+    "lantern": "amber"
    }
   },
   {
-   "id": "lantern_string_04",
-   "asset": "street/lantern_string_9m.glb",
+   "id": "lantern_string_06",
+   "asset": "street/lantern_string_16m.glb",
    "pos": [
     32.618,
     138.179,
@@ -7676,17 +7726,17 @@
     0.750058
    ],
    "scale": [
-    1.8932144517274496,
+    1.0649331290966904,
     1,
     1
    ],
    "zone": "lantern_strings",
    "tint": {
-    "lantern": "amber"
+    "lantern": "win_b"
    }
   },
   {
-   "id": "rail_6m_151",
+   "id": "rail_6m_153",
    "asset": "decks/rail_6m.glb",
    "pos": [
     41.2,
@@ -7708,7 +7758,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_152",
+   "id": "rail_6m_154",
    "asset": "decks/rail_6m.glb",
    "pos": [
     47.2,
@@ -7730,7 +7780,7 @@
    "zone": "promenade"
   },
   {
-   "id": "catwalk_stair_153",
+   "id": "catwalk_stair_155",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     57.0,
@@ -7752,7 +7802,7 @@
    "zone": "steps"
   },
   {
-   "id": "catwalk_stair_154",
+   "id": "catwalk_stair_156",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     69.0,
@@ -7774,7 +7824,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_155",
+   "id": "terrace_step_6m_157",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     55.8,
@@ -7799,7 +7849,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_156",
+   "id": "sprig_bed_3m_158",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     55.3,
@@ -7824,7 +7874,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_157",
+   "id": "terrace_step_6m_159",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     61.4,
@@ -7849,7 +7899,7 @@
    }
   },
   {
-   "id": "tree_pit_158",
+   "id": "tree_pit_160",
    "asset": "garden/tree_pit.glb",
    "pos": [
     60.6,
@@ -7871,7 +7921,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_159",
+   "id": "umbel_tree_s_161",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     60.6,
@@ -7896,7 +7946,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_160",
+   "id": "terrace_step_6m_162",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     67.0,
@@ -7921,7 +7971,7 @@
    }
   },
   {
-   "id": "garden_bench_161",
+   "id": "garden_bench_163",
    "asset": "garden/garden_bench.glb",
    "pos": [
     67.5,
@@ -7943,7 +7993,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_162",
+   "id": "terrace_step_6m_164",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     72.6,
@@ -7968,7 +8018,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_163",
+   "id": "sprig_bed_3m_165",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     72.1,
@@ -7993,7 +8043,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_164",
+   "id": "terrace_step_6m_166",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     78.2,
@@ -8018,7 +8068,7 @@
    }
   },
   {
-   "id": "tree_pit_165",
+   "id": "tree_pit_167",
    "asset": "garden/tree_pit.glb",
    "pos": [
     77.4,
@@ -8040,7 +8090,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_166",
+   "id": "umbel_tree_s_168",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     77.4,
@@ -8065,7 +8115,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_167",
+   "id": "terrace_step_6m_169",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     55.8,
@@ -8090,7 +8140,7 @@
    }
   },
   {
-   "id": "garden_bench_168",
+   "id": "garden_bench_170",
    "asset": "garden/garden_bench.glb",
    "pos": [
     56.3,
@@ -8112,7 +8162,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_169",
+   "id": "terrace_step_6m_171",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     61.4,
@@ -8137,7 +8187,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_170",
+   "id": "sprig_bed_3m_172",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     60.9,
@@ -8162,7 +8212,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_171",
+   "id": "terrace_step_6m_173",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     67.0,
@@ -8187,7 +8237,7 @@
    }
   },
   {
-   "id": "tree_pit_172",
+   "id": "tree_pit_174",
    "asset": "garden/tree_pit.glb",
    "pos": [
     66.2,
@@ -8209,7 +8259,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_173",
+   "id": "umbel_tree_s_175",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     66.2,
@@ -8234,7 +8284,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_174",
+   "id": "terrace_step_6m_176",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     72.6,
@@ -8259,7 +8309,7 @@
    }
   },
   {
-   "id": "garden_bench_175",
+   "id": "garden_bench_177",
    "asset": "garden/garden_bench.glb",
    "pos": [
     73.1,
@@ -8281,7 +8331,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_176",
+   "id": "terrace_step_6m_178",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     78.2,
@@ -8306,7 +8356,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_177",
+   "id": "sprig_bed_3m_179",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     77.7,
@@ -8331,7 +8381,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_178",
+   "id": "terrace_step_6m_180",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     55.8,
@@ -8356,7 +8406,7 @@
    }
   },
   {
-   "id": "tree_pit_179",
+   "id": "tree_pit_181",
    "asset": "garden/tree_pit.glb",
    "pos": [
     55.0,
@@ -8378,7 +8428,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_180",
+   "id": "umbel_tree_s_182",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     55.0,
@@ -8403,7 +8453,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_181",
+   "id": "terrace_step_6m_183",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     61.4,
@@ -8428,7 +8478,7 @@
    }
   },
   {
-   "id": "garden_bench_182",
+   "id": "garden_bench_184",
    "asset": "garden/garden_bench.glb",
    "pos": [
     61.9,
@@ -8450,7 +8500,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_183",
+   "id": "terrace_step_6m_185",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     67.0,
@@ -8475,7 +8525,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_184",
+   "id": "sprig_bed_3m_186",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     66.5,
@@ -8500,7 +8550,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_185",
+   "id": "terrace_step_6m_187",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     72.6,
@@ -8525,7 +8575,7 @@
    }
   },
   {
-   "id": "tree_pit_186",
+   "id": "tree_pit_188",
    "asset": "garden/tree_pit.glb",
    "pos": [
     71.8,
@@ -8547,7 +8597,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_187",
+   "id": "umbel_tree_s_189",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     71.8,
@@ -8572,7 +8622,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_188",
+   "id": "terrace_step_6m_190",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     78.2,
@@ -8597,7 +8647,7 @@
    }
   },
   {
-   "id": "garden_bench_189",
+   "id": "garden_bench_191",
    "asset": "garden/garden_bench.glb",
    "pos": [
     78.7,
@@ -8619,7 +8669,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_190",
+   "id": "terrace_step_6m_192",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     55.8,
@@ -8644,7 +8694,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_191",
+   "id": "sprig_bed_3m_193",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     55.3,
@@ -8669,7 +8719,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_192",
+   "id": "terrace_step_6m_194",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     61.4,
@@ -8694,7 +8744,7 @@
    }
   },
   {
-   "id": "tree_pit_193",
+   "id": "tree_pit_195",
    "asset": "garden/tree_pit.glb",
    "pos": [
     60.6,
@@ -8716,7 +8766,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_194",
+   "id": "umbel_tree_s_196",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     60.6,
@@ -8741,7 +8791,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_195",
+   "id": "terrace_step_6m_197",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     67.0,
@@ -8766,7 +8816,7 @@
    }
   },
   {
-   "id": "garden_bench_196",
+   "id": "garden_bench_198",
    "asset": "garden/garden_bench.glb",
    "pos": [
     67.5,
@@ -8788,7 +8838,7 @@
    "zone": "steps"
   },
   {
-   "id": "terrace_step_6m_197",
+   "id": "terrace_step_6m_199",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     72.6,
@@ -8813,7 +8863,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_198",
+   "id": "sprig_bed_3m_200",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     72.1,
@@ -8838,7 +8888,7 @@
    }
   },
   {
-   "id": "terrace_step_6m_199",
+   "id": "terrace_step_6m_201",
    "asset": "garden/terrace_step_6m.glb",
    "pos": [
     78.2,
@@ -8863,7 +8913,7 @@
    }
   },
   {
-   "id": "tree_pit_200",
+   "id": "tree_pit_202",
    "asset": "garden/tree_pit.glb",
    "pos": [
     77.4,
@@ -8885,7 +8935,7 @@
    "zone": "steps"
   },
   {
-   "id": "umbel_tree_s_201",
+   "id": "umbel_tree_s_203",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     77.4,
@@ -8910,7 +8960,7 @@
    }
   },
   {
-   "id": "rail_6m_202",
+   "id": "rail_6m_204",
    "asset": "decks/rail_6m.glb",
    "pos": [
     84.0,
@@ -8932,7 +8982,7 @@
    "zone": "promenade"
   },
   {
-   "id": "street_lamp_203",
+   "id": "street_lamp_205",
    "asset": "street/street_lamp.glb",
    "pos": [
     86.0,
@@ -8954,7 +9004,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_204",
+   "id": "rail_6m_206",
    "asset": "decks/rail_6m.glb",
    "pos": [
     90.0,
@@ -8976,7 +9026,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_205",
+   "id": "rail_6m_207",
    "asset": "decks/rail_6m.glb",
    "pos": [
     96.0,
@@ -8998,7 +9048,7 @@
    "zone": "promenade"
   },
   {
-   "id": "street_lamp_206",
+   "id": "street_lamp_208",
    "asset": "street/street_lamp.glb",
    "pos": [
     98.0,
@@ -9020,7 +9070,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_207",
+   "id": "rail_6m_209",
    "asset": "decks/rail_6m.glb",
    "pos": [
     102.0,
@@ -9042,7 +9092,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_208",
+   "id": "rail_6m_210",
    "asset": "decks/rail_6m.glb",
    "pos": [
     108.0,
@@ -9064,7 +9114,7 @@
    "zone": "promenade"
   },
   {
-   "id": "street_lamp_209",
+   "id": "street_lamp_211",
    "asset": "street/street_lamp.glb",
    "pos": [
     110.0,
@@ -9086,7 +9136,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_210",
+   "id": "rail_6m_212",
    "asset": "decks/rail_6m.glb",
    "pos": [
     -30.4,
@@ -9108,7 +9158,7 @@
    "zone": "promenade"
   },
   {
-   "id": "rail_6m_211",
+   "id": "rail_6m_213",
    "asset": "decks/rail_6m.glb",
    "pos": [
     -21.2,
@@ -9130,7 +9180,7 @@
    "zone": "promenade"
   },
   {
-   "id": "planter_trough_b_212",
+   "id": "planter_trough_b_214",
    "asset": "garden/planter_trough_b.glb",
    "pos": [
     -22.6,
@@ -9152,7 +9202,7 @@
    "zone": "promenade"
   },
   {
-   "id": "deck_lowwalk_6m_213",
+   "id": "deck_lowwalk_6m_215",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -75.4,
@@ -9174,7 +9224,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "keel_lantern_16m_214",
+   "id": "keel_lantern_16m_216",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -73.4,
@@ -9196,7 +9246,7 @@
    "zone": "keel"
   },
   {
-   "id": "deck_lowwalk_6m_215",
+   "id": "deck_lowwalk_6m_217",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -69.4,
@@ -9218,7 +9268,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_216",
+   "id": "mooring_post_218",
    "asset": "street/mooring_post.glb",
    "pos": [
     -69.4,
@@ -9266,7 +9316,7 @@
    }
   },
   {
-   "id": "deck_lowwalk_6m_218",
+   "id": "deck_lowwalk_6m_220",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -63.4,
@@ -9288,7 +9338,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_219",
+   "id": "deck_lowwalk_6m_221",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -57.4,
@@ -9310,7 +9360,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_220",
+   "id": "deck_lowwalk_6m_222",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -51.4,
@@ -9332,7 +9382,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_221",
+   "id": "mooring_post_223",
    "asset": "street/mooring_post.glb",
    "pos": [
     -51.4,
@@ -9380,7 +9430,7 @@
    }
   },
   {
-   "id": "keel_lantern_16m_223",
+   "id": "keel_lantern_16m_225",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -49.4,
@@ -9402,7 +9452,7 @@
    "zone": "keel"
   },
   {
-   "id": "deck_lowwalk_6m_224",
+   "id": "deck_lowwalk_6m_226",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -45.4,
@@ -9424,7 +9474,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_225",
+   "id": "deck_lowwalk_6m_227",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -39.4,
@@ -9446,7 +9496,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_226",
+   "id": "deck_lowwalk_6m_228",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -33.4,
@@ -9468,7 +9518,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_227",
+   "id": "mooring_post_229",
    "asset": "street/mooring_post.glb",
    "pos": [
     -33.4,
@@ -9516,7 +9566,7 @@
    }
   },
   {
-   "id": "keel_lantern_16m_229",
+   "id": "keel_lantern_16m_231",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -25.4,
@@ -9538,7 +9588,7 @@
    "zone": "keel"
   },
   {
-   "id": "deck_lowwalk_6m_230",
+   "id": "deck_lowwalk_6m_232",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -21.4,
@@ -9560,7 +9610,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_231",
+   "id": "deck_lowwalk_6m_233",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -15.4,
@@ -9582,7 +9632,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_232",
+   "id": "mooring_post_234",
    "asset": "street/mooring_post.glb",
    "pos": [
     -15.4,
@@ -9630,7 +9680,7 @@
    }
   },
   {
-   "id": "deck_lowwalk_6m_234",
+   "id": "deck_lowwalk_6m_236",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -9.4,
@@ -9652,7 +9702,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_235",
+   "id": "deck_lowwalk_6m_237",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -3.4,
@@ -9674,7 +9724,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "keel_lantern_16m_236",
+   "id": "keel_lantern_16m_238",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -1.4,
@@ -9696,7 +9746,7 @@
    "zone": "keel"
   },
   {
-   "id": "deck_lowwalk_6m_237",
+   "id": "deck_lowwalk_6m_239",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     2.6,
@@ -9718,7 +9768,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_238",
+   "id": "mooring_post_240",
    "asset": "street/mooring_post.glb",
    "pos": [
     2.6,
@@ -9766,7 +9816,7 @@
    }
   },
   {
-   "id": "deck_lowwalk_6m_240",
+   "id": "deck_lowwalk_6m_242",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     8.6,
@@ -9788,7 +9838,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_241",
+   "id": "deck_lowwalk_6m_243",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     14.6,
@@ -9810,7 +9860,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_242",
+   "id": "deck_lowwalk_6m_244",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     20.6,
@@ -9832,7 +9882,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_243",
+   "id": "mooring_post_245",
    "asset": "street/mooring_post.glb",
    "pos": [
     20.6,
@@ -9880,7 +9930,7 @@
    }
   },
   {
-   "id": "keel_lantern_16m_245",
+   "id": "keel_lantern_16m_247",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     22.6,
@@ -9902,7 +9952,7 @@
    "zone": "keel"
   },
   {
-   "id": "deck_lowwalk_6m_246",
+   "id": "deck_lowwalk_6m_248",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     26.6,
@@ -9924,7 +9974,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_247",
+   "id": "deck_lowwalk_6m_249",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     32.6,
@@ -9946,7 +9996,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "deck_lowwalk_6m_248",
+   "id": "deck_lowwalk_6m_250",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     38.6,
@@ -9968,7 +10018,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "mooring_post_249",
+   "id": "mooring_post_251",
    "asset": "street/mooring_post.glb",
    "pos": [
     38.6,
@@ -10016,7 +10066,7 @@
    }
   },
   {
-   "id": "catwalk_stair_251",
+   "id": "catwalk_stair_253",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     -25.0,
@@ -10038,7 +10088,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "catwalk_stair_252",
+   "id": "catwalk_stair_254",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     -20.8,
@@ -10060,7 +10110,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "catwalk_stair_253",
+   "id": "catwalk_stair_255",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     -20.8,
@@ -10082,7 +10132,7 @@
    "zone": "low_walk"
   },
   {
-   "id": "keel_lantern_26m_254",
+   "id": "keel_lantern_26m_256",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     -77.4,
@@ -10104,7 +10154,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_255",
+   "id": "keel_lantern_16m_257",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -59.4,
@@ -10126,7 +10176,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_256",
+   "id": "keel_lantern_16m_258",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -50.4,
@@ -10148,7 +10198,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_257",
+   "id": "keel_lantern_16m_259",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -32.4,
@@ -10170,7 +10220,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_258",
+   "id": "keel_lantern_16m_260",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -23.4,
@@ -10192,7 +10242,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_259",
+   "id": "keel_lantern_16m_261",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -5.4,
@@ -10214,7 +10264,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_8m_260",
+   "id": "keel_lantern_8m_262",
    "asset": "street/keel_lantern_8m.glb",
    "pos": [
     3.6,
@@ -10236,7 +10286,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_8m_261",
+   "id": "keel_lantern_8m_263",
    "asset": "street/keel_lantern_8m.glb",
    "pos": [
     21.6,
@@ -10258,7 +10308,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_262",
+   "id": "keel_lantern_16m_264",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     30.6,
@@ -10280,7 +10330,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_8m_263",
+   "id": "keel_lantern_8m_265",
    "asset": "street/keel_lantern_8m.glb",
    "pos": [
     48.6,
@@ -10302,7 +10352,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_264",
+   "id": "keel_lantern_16m_266",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     57.6,
@@ -10324,7 +10374,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_8m_265",
+   "id": "keel_lantern_8m_267",
    "asset": "street/keel_lantern_8m.glb",
    "pos": [
     75.6,
@@ -10346,7 +10396,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_266",
+   "id": "keel_lantern_16m_268",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     84.6,
@@ -10368,7 +10418,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_26m_267",
+   "id": "keel_lantern_26m_269",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     102.6,
@@ -10390,7 +10440,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_8m_268",
+   "id": "keel_lantern_8m_270",
    "asset": "street/keel_lantern_8m.glb",
    "pos": [
     111.6,
@@ -10439,7 +10489,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_270",
+   "id": "deck_pad_6m_272",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -76.033,
@@ -10461,7 +10511,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_271",
+   "id": "deck_pad_6m_273",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -70.033,
@@ -10483,7 +10533,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_272",
+   "id": "deck_pad_6m_274",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -64.033,
@@ -10505,7 +10555,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_273",
+   "id": "deck_pad_6m_275",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -58.033,
@@ -10527,7 +10577,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_274",
+   "id": "deck_pad_6m_276",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -52.033,
@@ -10549,7 +10599,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_275",
+   "id": "street_lamp_277",
    "asset": "street/street_lamp.glb",
    "pos": [
     -59.828,
@@ -10571,7 +10621,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_276",
+   "id": "planter_round_278",
    "asset": "garden/planter_round.glb",
    "pos": [
     -68.427,
@@ -10620,7 +10670,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_278",
+   "id": "deck_pad_6m_280",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -41.853,
@@ -10642,7 +10692,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_279",
+   "id": "deck_pad_6m_281",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -35.854,
@@ -10664,7 +10714,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_280",
+   "id": "deck_pad_6m_282",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -29.855,
@@ -10686,7 +10736,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_281",
+   "id": "deck_pad_6m_283",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -23.855,
@@ -10708,7 +10758,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_282",
+   "id": "deck_pad_6m_284",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -17.856,
@@ -10730,7 +10780,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_283",
+   "id": "street_lamp_285",
    "asset": "street/street_lamp.glb",
    "pos": [
     -25.677,
@@ -10752,7 +10802,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_284",
+   "id": "planter_round_286",
    "asset": "garden/planter_round.glb",
    "pos": [
     -34.282,
@@ -10801,7 +10851,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_286",
+   "id": "deck_pad_6m_288",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -13.538,
@@ -10823,7 +10873,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_287",
+   "id": "deck_pad_6m_289",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -7.544,
@@ -10845,7 +10895,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_288",
+   "id": "deck_pad_6m_290",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -1.55,
@@ -10867,7 +10917,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_289",
+   "id": "deck_pad_6m_291",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     4.444,
@@ -10889,7 +10939,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_290",
+   "id": "deck_pad_6m_292",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     10.438,
@@ -10911,7 +10961,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_291",
+   "id": "deck_pad_6m_293",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     16.432,
@@ -10933,7 +10983,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_292",
+   "id": "deck_pad_6m_294",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     22.426,
@@ -10955,7 +11005,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_293",
+   "id": "street_lamp_295",
    "asset": "street/street_lamp.glb",
    "pos": [
     8.578,
@@ -10977,7 +11027,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_294",
+   "id": "planter_round_296",
    "asset": "garden/planter_round.glb",
    "pos": [
     -0.032,
@@ -11026,7 +11076,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_296",
+   "id": "deck_pad_6m_298",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     23.366,
@@ -11048,7 +11098,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_297",
+   "id": "deck_pad_6m_299",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     29.351,
@@ -11070,7 +11120,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_298",
+   "id": "deck_pad_6m_300",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     35.336,
@@ -11092,7 +11142,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_299",
+   "id": "deck_pad_6m_301",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     41.321,
@@ -11114,7 +11164,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_300",
+   "id": "deck_pad_6m_302",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     47.306,
@@ -11136,7 +11186,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_301",
+   "id": "street_lamp_303",
    "asset": "street/street_lamp.glb",
    "pos": [
     39.624,
@@ -11158,7 +11208,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_302",
+   "id": "planter_round_304",
    "asset": "garden/planter_round.glb",
    "pos": [
     31.073,
@@ -11207,7 +11257,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_304",
+   "id": "deck_pad_6m_306",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     53.752,
@@ -11229,7 +11279,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_305",
+   "id": "deck_pad_6m_307",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     59.749,
@@ -11251,7 +11301,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_306",
+   "id": "deck_pad_6m_308",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     65.747,
@@ -11273,7 +11323,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_307",
+   "id": "deck_pad_6m_309",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     71.745,
@@ -11295,7 +11345,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_308",
+   "id": "deck_pad_6m_310",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     77.743,
@@ -11317,7 +11367,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_309",
+   "id": "street_lamp_311",
    "asset": "street/street_lamp.glb",
    "pos": [
     69.983,
@@ -11339,7 +11389,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_310",
+   "id": "planter_round_312",
    "asset": "garden/planter_round.glb",
    "pos": [
     61.396,
@@ -11388,7 +11438,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_312",
+   "id": "deck_pad_6m_314",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -64.378,
@@ -11410,7 +11460,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_313",
+   "id": "deck_pad_6m_315",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -58.388,
@@ -11432,7 +11482,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_314",
+   "id": "deck_pad_6m_316",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -52.399,
@@ -11454,7 +11504,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_315",
+   "id": "deck_pad_6m_317",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -46.41,
@@ -11476,7 +11526,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_316",
+   "id": "deck_pad_6m_318",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -40.42,
@@ -11498,7 +11548,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_317",
+   "id": "deck_pad_6m_319",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -34.431,
@@ -11520,7 +11570,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_318",
+   "id": "deck_pad_6m_320",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -28.442,
@@ -11542,7 +11592,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_319",
+   "id": "street_lamp_321",
    "asset": "street/street_lamp.glb",
    "pos": [
     -42.301,
@@ -11564,7 +11614,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_320",
+   "id": "planter_round_322",
    "asset": "garden/planter_round.glb",
    "pos": [
     -50.909,
@@ -11613,7 +11663,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_322",
+   "id": "deck_pad_6m_324",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -31.653,
@@ -11635,7 +11685,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_323",
+   "id": "deck_pad_6m_325",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -25.666,
@@ -11657,7 +11707,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_324",
+   "id": "deck_pad_6m_326",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -19.679,
@@ -11679,7 +11729,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_325",
+   "id": "deck_pad_6m_327",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -13.692,
@@ -11701,7 +11751,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_326",
+   "id": "deck_pad_6m_328",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -7.705,
@@ -11723,7 +11773,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_327",
+   "id": "deck_pad_6m_329",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -1.718,
@@ -11745,7 +11795,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_328",
+   "id": "deck_pad_6m_330",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     4.269,
@@ -11767,7 +11817,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_329",
+   "id": "street_lamp_331",
    "asset": "street/street_lamp.glb",
    "pos": [
     -9.409,
@@ -11789,7 +11839,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_330",
+   "id": "planter_round_332",
    "asset": "garden/planter_round.glb",
    "pos": [
     -17.963,
@@ -11838,7 +11888,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_332",
+   "id": "deck_pad_6m_334",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     2.552,
@@ -11860,7 +11910,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_333",
+   "id": "deck_pad_6m_335",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     8.546,
@@ -11882,7 +11932,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_334",
+   "id": "deck_pad_6m_336",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     14.539,
@@ -11904,7 +11954,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_335",
+   "id": "deck_pad_6m_337",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     20.532,
@@ -11926,7 +11976,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_336",
+   "id": "deck_pad_6m_338",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     26.526,
@@ -11948,7 +11998,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_337",
+   "id": "deck_pad_6m_339",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     32.519,
@@ -11970,7 +12020,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_338",
+   "id": "deck_pad_6m_340",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     38.513,
@@ -11992,7 +12042,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_339",
+   "id": "street_lamp_341",
    "asset": "street/street_lamp.glb",
    "pos": [
     24.793,
@@ -12014,7 +12064,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_340",
+   "id": "planter_round_342",
    "asset": "garden/planter_round.glb",
    "pos": [
     16.222,
@@ -12063,7 +12113,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_342",
+   "id": "deck_pad_6m_344",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     37.652,
@@ -12085,7 +12135,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_343",
+   "id": "deck_pad_6m_345",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     43.648,
@@ -12107,7 +12157,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_344",
+   "id": "deck_pad_6m_346",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     49.645,
@@ -12129,7 +12179,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_345",
+   "id": "deck_pad_6m_347",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     55.641,
@@ -12151,7 +12201,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_346",
+   "id": "deck_pad_6m_348",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     61.637,
@@ -12173,7 +12223,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_347",
+   "id": "deck_pad_6m_349",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     67.633,
@@ -12195,7 +12245,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_348",
+   "id": "deck_pad_6m_350",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     73.629,
@@ -12217,7 +12267,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_349",
+   "id": "street_lamp_351",
    "asset": "street/street_lamp.glb",
    "pos": [
     59.889,
@@ -12239,7 +12289,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_350",
+   "id": "planter_round_352",
    "asset": "garden/planter_round.glb",
    "pos": [
     51.309,
@@ -12288,7 +12338,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_352",
+   "id": "deck_pad_6m_354",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -52.228,
@@ -12310,7 +12360,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_353",
+   "id": "deck_pad_6m_355",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -46.23,
@@ -12332,7 +12382,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_354",
+   "id": "deck_pad_6m_356",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -40.231,
@@ -12354,7 +12404,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_355",
+   "id": "deck_pad_6m_357",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -34.233,
@@ -12376,7 +12426,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_356",
+   "id": "deck_pad_6m_358",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -28.234,
@@ -12398,7 +12448,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_357",
+   "id": "deck_pad_6m_359",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -22.236,
@@ -12420,7 +12470,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_358",
+   "id": "deck_pad_6m_360",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -16.237,
@@ -12442,7 +12492,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_359",
+   "id": "street_lamp_361",
    "asset": "street/street_lamp.glb",
    "pos": [
     -30.002,
@@ -12464,7 +12514,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_360",
+   "id": "planter_round_362",
    "asset": "garden/planter_round.glb",
    "pos": [
     -38.59,
@@ -12513,7 +12563,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_362",
+   "id": "deck_pad_6m_364",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -20.508,
@@ -12535,7 +12585,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_363",
+   "id": "deck_pad_6m_365",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -14.515,
@@ -12557,7 +12607,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_364",
+   "id": "deck_pad_6m_366",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -8.523,
@@ -12579,7 +12629,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_365",
+   "id": "deck_pad_6m_367",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -2.53,
@@ -12601,7 +12651,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_366",
+   "id": "deck_pad_6m_368",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     3.462,
@@ -12623,7 +12673,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_367",
+   "id": "deck_pad_6m_369",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     9.454,
@@ -12645,7 +12695,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_368",
+   "id": "deck_pad_6m_370",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     15.447,
@@ -12667,7 +12717,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_369",
+   "id": "street_lamp_371",
    "asset": "street/street_lamp.glb",
    "pos": [
     1.735,
@@ -12689,7 +12739,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_370",
+   "id": "planter_round_372",
    "asset": "garden/planter_round.glb",
    "pos": [
     -6.834,
@@ -12738,7 +12788,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_372",
+   "id": "deck_pad_6m_374",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     14.953,
@@ -12760,7 +12810,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_373",
+   "id": "deck_pad_6m_375",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     20.93,
@@ -12782,7 +12832,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_374",
+   "id": "deck_pad_6m_376",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     26.907,
@@ -12804,7 +12854,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_375",
+   "id": "deck_pad_6m_377",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     32.884,
@@ -12826,7 +12876,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_376",
+   "id": "deck_pad_6m_378",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     38.862,
@@ -12848,7 +12898,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_377",
+   "id": "deck_pad_6m_379",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     44.839,
@@ -12870,7 +12920,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_378",
+   "id": "deck_pad_6m_380",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     50.816,
@@ -12892,7 +12942,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_379",
+   "id": "deck_pad_6m_381",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     56.793,
@@ -12914,7 +12964,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_380",
+   "id": "deck_pad_6m_382",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     62.771,
@@ -12936,7 +12986,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_381",
+   "id": "deck_pad_6m_383",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     68.748,
@@ -12958,7 +13008,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_382",
+   "id": "deck_pad_6m_384",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     74.725,
@@ -12980,7 +13030,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_383",
+   "id": "street_lamp_385",
    "asset": "street/street_lamp.glb",
    "pos": [
     48.901,
@@ -13002,7 +13052,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_384",
+   "id": "planter_round_386",
    "asset": "garden/planter_round.glb",
    "pos": [
     40.299,
@@ -13051,7 +13101,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_386",
+   "id": "deck_pad_6m_388",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -96.555,
@@ -13073,7 +13123,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_387",
+   "id": "deck_pad_6m_389",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -90.566,
@@ -13095,7 +13145,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_388",
+   "id": "deck_pad_6m_390",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -84.577,
@@ -13117,7 +13167,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_389",
+   "id": "deck_pad_6m_391",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -78.588,
@@ -13139,7 +13189,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "deck_pad_6m_390",
+   "id": "deck_pad_6m_392",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -72.599,
@@ -13161,7 +13211,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "street_lamp_391",
+   "id": "street_lamp_393",
    "asset": "street/street_lamp.glb",
    "pos": [
     -80.3,
@@ -13183,7 +13233,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "planter_round_392",
+   "id": "planter_round_394",
    "asset": "garden/planter_round.glb",
    "pos": [
     -88.86,
@@ -13205,7 +13255,7 @@
    "zone": "stacks_deck"
   },
   {
-   "id": "sign_roof_2_393",
+   "id": "sign_roof_2_395",
    "asset": "signs/sign_roof_2.gltf",
    "pos": [
     38.0,
@@ -13230,7 +13280,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_394",
+   "id": "deck_pad_6m_396",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -116.403,
@@ -13252,7 +13302,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_395",
+   "id": "deck_pad_6m_397",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -117.258,
@@ -13274,7 +13324,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_396",
+   "id": "deck_pad_6m_398",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -118.113,
@@ -13296,7 +13346,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_397",
+   "id": "deck_pad_6m_399",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -118.967,
@@ -13318,7 +13368,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_398",
+   "id": "deck_pad_6m_400",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -119.822,
@@ -13340,7 +13390,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_399",
+   "id": "deck_pad_6m_401",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -120.677,
@@ -13362,7 +13412,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_400",
+   "id": "deck_pad_6m_402",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -121.532,
@@ -13384,7 +13434,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_401",
+   "id": "deck_pad_6m_403",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -110.747,
@@ -13406,7 +13456,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_402",
+   "id": "deck_pad_6m_404",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -111.602,
@@ -13428,7 +13478,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_403",
+   "id": "deck_pad_6m_405",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -112.457,
@@ -13450,7 +13500,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_404",
+   "id": "deck_pad_6m_406",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -113.312,
@@ -13472,7 +13522,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_405",
+   "id": "deck_pad_6m_407",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -114.166,
@@ -13494,7 +13544,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_406",
+   "id": "deck_pad_6m_408",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -115.021,
@@ -13516,7 +13566,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_407",
+   "id": "deck_pad_6m_409",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -115.876,
@@ -13538,7 +13588,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_408",
+   "id": "deck_pad_6m_410",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -105.091,
@@ -13560,7 +13610,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_409",
+   "id": "deck_pad_6m_411",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -105.946,
@@ -13582,7 +13632,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_410",
+   "id": "deck_pad_6m_412",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -106.801,
@@ -13604,7 +13654,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_411",
+   "id": "deck_pad_6m_413",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -107.656,
@@ -13626,7 +13676,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_412",
+   "id": "deck_pad_6m_414",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -108.511,
@@ -13648,7 +13698,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_413",
+   "id": "deck_pad_6m_415",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -109.365,
@@ -13670,7 +13720,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_414",
+   "id": "deck_pad_6m_416",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -110.22,
@@ -13692,7 +13742,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_415",
+   "id": "deck_pad_6m_417",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -99.436,
@@ -13714,7 +13764,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_416",
+   "id": "deck_pad_6m_418",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -100.29,
@@ -13736,7 +13786,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_417",
+   "id": "deck_pad_6m_419",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -101.145,
@@ -13758,7 +13808,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_418",
+   "id": "deck_pad_6m_420",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -102.0,
@@ -13780,7 +13830,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_419",
+   "id": "deck_pad_6m_421",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -102.855,
@@ -13802,7 +13852,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_420",
+   "id": "deck_pad_6m_422",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -103.71,
@@ -13824,7 +13874,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_421",
+   "id": "deck_pad_6m_423",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -104.564,
@@ -13846,7 +13896,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_422",
+   "id": "deck_pad_6m_424",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -93.78,
@@ -13868,7 +13918,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_423",
+   "id": "deck_pad_6m_425",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -94.635,
@@ -13890,7 +13940,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_424",
+   "id": "deck_pad_6m_426",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -95.489,
@@ -13912,7 +13962,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_425",
+   "id": "deck_pad_6m_427",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -96.344,
@@ -13934,7 +13984,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_426",
+   "id": "deck_pad_6m_428",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -97.199,
@@ -13956,7 +14006,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_427",
+   "id": "deck_pad_6m_429",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -98.054,
@@ -13978,7 +14028,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_428",
+   "id": "deck_pad_6m_430",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -98.909,
@@ -14000,7 +14050,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_429",
+   "id": "deck_pad_6m_431",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -88.124,
@@ -14022,7 +14072,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_430",
+   "id": "deck_pad_6m_432",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -88.979,
@@ -14044,7 +14094,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_431",
+   "id": "deck_pad_6m_433",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -89.834,
@@ -14066,7 +14116,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_432",
+   "id": "deck_pad_6m_434",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -90.688,
@@ -14088,7 +14138,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_433",
+   "id": "deck_pad_6m_435",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -91.543,
@@ -14110,7 +14160,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_434",
+   "id": "deck_pad_6m_436",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -92.398,
@@ -14132,7 +14182,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_435",
+   "id": "deck_pad_6m_437",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -93.253,
@@ -14154,7 +14204,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_436",
+   "id": "deck_pad_6m_438",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -82.468,
@@ -14176,7 +14226,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_437",
+   "id": "deck_pad_6m_439",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -83.323,
@@ -14198,7 +14248,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_438",
+   "id": "deck_pad_6m_440",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -84.178,
@@ -14220,7 +14270,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_439",
+   "id": "deck_pad_6m_441",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -85.033,
@@ -14242,7 +14292,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_440",
+   "id": "deck_pad_6m_442",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -85.887,
@@ -14264,7 +14314,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_441",
+   "id": "deck_pad_6m_443",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -86.742,
@@ -14286,7 +14336,7 @@
    "zone": "plaza"
   },
   {
-   "id": "deck_pad_6m_442",
+   "id": "deck_pad_6m_444",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     -87.597,
@@ -14335,7 +14385,7 @@
    }
   },
   {
-   "id": "sign_roof_1_444",
+   "id": "sign_roof_1_446",
    "asset": "signs/sign_roof_1.gltf",
    "pos": [
     -114.65,
@@ -14360,7 +14410,7 @@
    }
   },
   {
-   "id": "sign_roundel_2_445",
+   "id": "sign_roundel_2_447",
    "asset": "signs/sign_roundel_2.gltf",
    "pos": [
     -105.746,
@@ -14710,7 +14760,7 @@
    }
   },
   {
-   "id": "gondola_pylon_459",
+   "id": "gondola_pylon_461",
    "asset": "street/gondola_pylon.glb",
    "pos": [
     -150.844,
@@ -14732,7 +14782,7 @@
    "zone": "pier"
   },
   {
-   "id": "gondola_pylon_460",
+   "id": "gondola_pylon_462",
    "asset": "street/gondola_pylon.glb",
    "pos": [
     -208.321,
@@ -14754,7 +14804,7 @@
    "zone": "pier"
   },
   {
-   "id": "gondola_pylon_461",
+   "id": "gondola_pylon_463",
    "asset": "street/gondola_pylon.glb",
    "pos": [
     -265.798,
@@ -14776,7 +14826,7 @@
    "zone": "pier"
   },
   {
-   "id": "gondola_pylon_462",
+   "id": "gondola_pylon_464",
    "asset": "street/gondola_pylon.glb",
    "pos": [
     -316.706,
@@ -14798,7 +14848,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_463",
+   "id": "cable_unit_465",
    "asset": "street/cable_unit.glb",
    "pos": [
     -120.185,
@@ -14820,7 +14870,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_464",
+   "id": "cable_unit_466",
    "asset": "street/cable_unit.glb",
    "pos": [
     -149.588,
@@ -14842,7 +14892,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_465",
+   "id": "cable_unit_467",
    "asset": "street/cable_unit.glb",
    "pos": [
     -207.065,
@@ -14864,7 +14914,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_466",
+   "id": "cable_unit_468",
    "asset": "street/cable_unit.glb",
    "pos": [
     -264.542,
@@ -14886,7 +14936,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_467",
+   "id": "cable_unit_469",
    "asset": "street/cable_unit.glb",
    "pos": [
     -122.697,
@@ -14908,7 +14958,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_468",
+   "id": "cable_unit_470",
    "asset": "street/cable_unit.glb",
    "pos": [
     -152.1,
@@ -14930,7 +14980,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_469",
+   "id": "cable_unit_471",
    "asset": "street/cable_unit.glb",
    "pos": [
     -209.577,
@@ -14952,7 +15002,7 @@
    "zone": "pier"
   },
   {
-   "id": "cable_unit_470",
+   "id": "cable_unit_472",
    "asset": "street/cable_unit.glb",
    "pos": [
     -267.054,
@@ -15032,7 +15082,7 @@
    ]
   },
   {
-   "id": "street_lamp_473",
+   "id": "street_lamp_475",
    "asset": "street/street_lamp.glb",
    "pos": [
     -118.924,
@@ -15054,7 +15104,7 @@
    "zone": "plaza"
   },
   {
-   "id": "street_lamp_474",
+   "id": "street_lamp_476",
    "asset": "street/street_lamp.glb",
    "pos": [
     -85.916,
@@ -15076,7 +15126,7 @@
    "zone": "plaza"
   },
   {
-   "id": "street_lamp_475",
+   "id": "street_lamp_477",
    "asset": "street/street_lamp.glb",
    "pos": [
     -114.59,
@@ -15098,7 +15148,7 @@
    "zone": "plaza"
   },
   {
-   "id": "kiosk_476",
+   "id": "kiosk_478",
    "asset": "buildings/kiosk.glb",
    "pos": [
     -91.928,
@@ -15124,7 +15174,7 @@
    }
   },
   {
-   "id": "tree_pit_477",
+   "id": "tree_pit_479",
    "asset": "garden/tree_pit.glb",
    "pos": [
     -109.726,
@@ -15146,7 +15196,7 @@
    "zone": "plaza"
   },
   {
-   "id": "umbel_tree_a_478",
+   "id": "umbel_tree_a_480",
    "asset": "garden/umbel_tree_a.glb",
    "pos": [
     -109.726,
@@ -15219,7 +15269,7 @@
    ]
   },
   {
-   "id": "catwalk_stair_481",
+   "id": "catwalk_stair_483",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     -109.506,
@@ -15241,7 +15291,7 @@
    "zone": "great_lantern"
   },
   {
-   "id": "deck_lowwalk_6m_482",
+   "id": "deck_lowwalk_6m_484",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -108.393,
@@ -15263,7 +15313,7 @@
    "zone": "great_lantern"
   },
   {
-   "id": "deck_lowwalk_6m_483",
+   "id": "deck_lowwalk_6m_485",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -107.157,
@@ -15285,7 +15335,7 @@
    "zone": "great_lantern"
   },
   {
-   "id": "deck_lowwalk_6m_484",
+   "id": "deck_lowwalk_6m_486",
    "asset": "decks/deck_lowwalk_6m.glb",
    "pos": [
     -105.921,
@@ -15307,7 +15357,7 @@
    "zone": "great_lantern"
   },
   {
-   "id": "keel_lantern_16m_485",
+   "id": "keel_lantern_16m_487",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -109.206,
@@ -15329,7 +15379,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_26m_486",
+   "id": "keel_lantern_26m_488",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     -124.527,
@@ -15351,7 +15401,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_487",
+   "id": "keel_lantern_16m_489",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -143.321,
@@ -15373,7 +15423,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_26m_488",
+   "id": "keel_lantern_26m_490",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     -146.794,
@@ -15395,7 +15445,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_489",
+   "id": "keel_lantern_16m_491",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     -131.473,
@@ -15417,7 +15467,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_26m_490",
+   "id": "keel_lantern_26m_492",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     -112.679,
@@ -15439,7 +15489,7 @@
    "zone": "keel"
   },
   {
-   "id": "deck_round_27m_491",
+   "id": "deck_round_27m_493",
    "asset": "decks/deck_round_27m.glb",
    "pos": [
     140.0,
@@ -15461,7 +15511,7 @@
    "zone": "garden"
   },
   {
-   "id": "deck_round_14m_492",
+   "id": "deck_round_14m_494",
    "asset": "decks/deck_round_14m.glb",
    "pos": [
     118.0,
@@ -15483,7 +15533,7 @@
    "zone": "garden"
   },
   {
-   "id": "deck_round_14m_493",
+   "id": "deck_round_14m_495",
    "asset": "decks/deck_round_14m.glb",
    "pos": [
     98.0,
@@ -15505,7 +15555,7 @@
    "zone": "garden"
   },
   {
-   "id": "pool_15m_494",
+   "id": "pool_15m_496",
    "asset": "decks/pool_15m.glb",
    "pos": [
     146.0,
@@ -15527,7 +15577,7 @@
    "zone": "garden"
   },
   {
-   "id": "tree_pit_495",
+   "id": "tree_pit_497",
    "asset": "garden/tree_pit.glb",
    "pos": [
     128.0,
@@ -15549,7 +15599,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_b_496",
+   "id": "umbel_tree_b_498",
    "asset": "garden/umbel_tree_b.glb",
    "pos": [
     128.0,
@@ -15574,7 +15624,7 @@
    }
   },
   {
-   "id": "tree_pit_497",
+   "id": "tree_pit_499",
    "asset": "garden/tree_pit.glb",
    "pos": [
     136.0,
@@ -15596,7 +15646,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_a_498",
+   "id": "umbel_tree_a_500",
    "asset": "garden/umbel_tree_a.glb",
    "pos": [
     136.0,
@@ -15621,7 +15671,7 @@
    }
   },
   {
-   "id": "tree_pit_499",
+   "id": "tree_pit_501",
    "asset": "garden/tree_pit.glb",
    "pos": [
     149.0,
@@ -15643,7 +15693,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_c_500",
+   "id": "umbel_tree_c_502",
    "asset": "garden/umbel_tree_c.glb",
    "pos": [
     149.0,
@@ -15668,7 +15718,7 @@
    }
   },
   {
-   "id": "tree_pit_501",
+   "id": "tree_pit_503",
    "asset": "garden/tree_pit.glb",
    "pos": [
     157.0,
@@ -15690,7 +15740,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_b_502",
+   "id": "umbel_tree_b_504",
    "asset": "garden/umbel_tree_b.glb",
    "pos": [
     157.0,
@@ -15715,7 +15765,7 @@
    }
   },
   {
-   "id": "tree_pit_503",
+   "id": "tree_pit_505",
    "asset": "garden/tree_pit.glb",
    "pos": [
     122.0,
@@ -15737,7 +15787,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_b_504",
+   "id": "umbel_tree_b_506",
    "asset": "garden/umbel_tree_b.glb",
    "pos": [
     122.0,
@@ -15762,7 +15812,7 @@
    }
   },
   {
-   "id": "tree_pit_505",
+   "id": "tree_pit_507",
    "asset": "garden/tree_pit.glb",
    "pos": [
     142.0,
@@ -15784,7 +15834,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_s_506",
+   "id": "umbel_tree_s_508",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     142.0,
@@ -15809,7 +15859,7 @@
    }
   },
   {
-   "id": "tree_pit_507",
+   "id": "tree_pit_509",
    "asset": "garden/tree_pit.glb",
    "pos": [
     161.0,
@@ -15831,7 +15881,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_s_508",
+   "id": "umbel_tree_s_510",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     161.0,
@@ -15856,7 +15906,7 @@
    }
   },
   {
-   "id": "tree_pit_509",
+   "id": "tree_pit_511",
    "asset": "garden/tree_pit.glb",
    "pos": [
     114.0,
@@ -15878,7 +15928,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_b_510",
+   "id": "umbel_tree_b_512",
    "asset": "garden/umbel_tree_b.glb",
    "pos": [
     114.0,
@@ -15903,7 +15953,7 @@
    }
   },
   {
-   "id": "tree_pit_511",
+   "id": "tree_pit_513",
    "asset": "garden/tree_pit.glb",
    "pos": [
     137.0,
@@ -15925,7 +15975,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_s_512",
+   "id": "umbel_tree_s_514",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     137.0,
@@ -15950,7 +16000,7 @@
    }
   },
   {
-   "id": "tree_pit_513",
+   "id": "tree_pit_515",
    "asset": "garden/tree_pit.glb",
    "pos": [
     130.0,
@@ -15972,7 +16022,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_s_514",
+   "id": "umbel_tree_s_516",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     130.0,
@@ -15997,7 +16047,7 @@
    }
   },
   {
-   "id": "tree_pit_515",
+   "id": "tree_pit_517",
    "asset": "garden/tree_pit.glb",
    "pos": [
     99.0,
@@ -16019,7 +16069,7 @@
    "zone": "garden"
   },
   {
-   "id": "umbel_tree_s_516",
+   "id": "umbel_tree_s_518",
    "asset": "garden/umbel_tree_s.glb",
    "pos": [
     99.0,
@@ -16044,7 +16094,7 @@
    }
   },
   {
-   "id": "shrub_a_517",
+   "id": "shrub_a_519",
    "asset": "garden/shrub_a.glb",
    "pos": [
     142.993,
@@ -16069,7 +16119,7 @@
    }
   },
   {
-   "id": "planter_round_518",
+   "id": "planter_round_520",
    "asset": "garden/planter_round.glb",
    "pos": [
     139.003,
@@ -16094,7 +16144,7 @@
    }
   },
   {
-   "id": "shrub_b_519",
+   "id": "shrub_b_521",
    "asset": "garden/shrub_b.glb",
    "pos": [
     132.762,
@@ -16119,7 +16169,7 @@
    }
   },
   {
-   "id": "shrub_b_520",
+   "id": "shrub_b_522",
    "asset": "garden/shrub_b.glb",
    "pos": [
     119.044,
@@ -16144,7 +16194,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_521",
+   "id": "sprig_bed_3m_523",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     138.054,
@@ -16169,7 +16219,7 @@
    }
   },
   {
-   "id": "shrub_a_522",
+   "id": "shrub_a_524",
    "asset": "garden/shrub_a.glb",
    "pos": [
     126.899,
@@ -16194,7 +16244,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_523",
+   "id": "sprig_bed_3m_525",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     149.704,
@@ -16219,7 +16269,7 @@
    }
   },
   {
-   "id": "sprig_bed_3m_524",
+   "id": "sprig_bed_3m_526",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
     160.113,
@@ -16244,7 +16294,7 @@
    }
   },
   {
-   "id": "street_lamp_525",
+   "id": "street_lamp_527",
    "asset": "street/street_lamp.glb",
    "pos": [
     110.0,
@@ -16266,7 +16316,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_526",
+   "id": "street_lamp_528",
    "asset": "street/street_lamp.glb",
    "pos": [
     114.182,
@@ -16288,7 +16338,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_527",
+   "id": "street_lamp_529",
    "asset": "street/street_lamp.glb",
    "pos": [
     118.364,
@@ -16310,7 +16360,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_528",
+   "id": "street_lamp_530",
    "asset": "street/street_lamp.glb",
    "pos": [
     122.545,
@@ -16332,7 +16382,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_529",
+   "id": "street_lamp_531",
    "asset": "street/street_lamp.glb",
    "pos": [
     126.727,
@@ -16354,7 +16404,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_530",
+   "id": "street_lamp_532",
    "asset": "street/street_lamp.glb",
    "pos": [
     130.909,
@@ -16376,7 +16426,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_531",
+   "id": "street_lamp_533",
    "asset": "street/street_lamp.glb",
    "pos": [
     135.091,
@@ -16398,7 +16448,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_532",
+   "id": "street_lamp_534",
    "asset": "street/street_lamp.glb",
    "pos": [
     139.273,
@@ -16420,7 +16470,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_533",
+   "id": "street_lamp_535",
    "asset": "street/street_lamp.glb",
    "pos": [
     143.455,
@@ -16442,7 +16492,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_534",
+   "id": "street_lamp_536",
    "asset": "street/street_lamp.glb",
    "pos": [
     147.636,
@@ -16464,7 +16514,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_535",
+   "id": "street_lamp_537",
    "asset": "street/street_lamp.glb",
    "pos": [
     151.818,
@@ -16486,7 +16536,7 @@
    "zone": "garden"
   },
   {
-   "id": "street_lamp_536",
+   "id": "street_lamp_538",
    "asset": "street/street_lamp.glb",
    "pos": [
     156.0,
@@ -16508,7 +16558,7 @@
    "zone": "garden"
   },
   {
-   "id": "pavilion_537",
+   "id": "pavilion_539",
    "asset": "garden/pavilion.glb",
    "pos": [
     154.0,
@@ -16534,7 +16584,7 @@
    }
   },
   {
-   "id": "keel_lantern_26m_538",
+   "id": "keel_lantern_26m_540",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     159.696,
@@ -16556,7 +16606,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_539",
+   "id": "keel_lantern_16m_541",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     152.856,
@@ -16578,7 +16628,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_540",
+   "id": "keel_lantern_16m_542",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     140.0,
@@ -16600,7 +16650,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_26m_541",
+   "id": "keel_lantern_26m_543",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     127.144,
@@ -16622,7 +16672,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_542",
+   "id": "keel_lantern_16m_544",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     120.304,
@@ -16644,7 +16694,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_543",
+   "id": "keel_lantern_16m_545",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     122.679,
@@ -16666,7 +16716,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_26m_544",
+   "id": "keel_lantern_26m_546",
    "asset": "street/keel_lantern_26m.glb",
    "pos": [
     133.16,
@@ -16688,7 +16738,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_545",
+   "id": "keel_lantern_16m_547",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     146.84,
@@ -16710,7 +16760,7 @@
    "zone": "keel"
   },
   {
-   "id": "keel_lantern_16m_546",
+   "id": "keel_lantern_16m_548",
    "asset": "street/keel_lantern_16m.glb",
    "pos": [
     157.321,
@@ -16732,7 +16782,7 @@
    "zone": "keel"
   },
   {
-   "id": "catwalk_stair_547",
+   "id": "catwalk_stair_549",
    "asset": "decks/catwalk_stair.glb",
    "pos": [
     113.801,
@@ -16782,7 +16832,7 @@
    }
   },
   {
-   "id": "cloud_skiff_549",
+   "id": "cloud_skiff_551",
    "asset": "vehicles/cloud_skiff.glb",
    "pos": [
     -365.0,
@@ -16836,7 +16886,7 @@
    }
   },
   {
-   "id": "cloud_skiff_551",
+   "id": "cloud_skiff_553",
    "asset": "vehicles/cloud_skiff.glb",
    "pos": [
     709.0,
@@ -16890,7 +16940,7 @@
    }
   },
   {
-   "id": "cloud_skiff_553",
+   "id": "cloud_skiff_555",
    "asset": "vehicles/cloud_skiff.glb",
    "pos": [
     1159.0,
@@ -17011,7 +17061,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_sphere_tank_558",
+   "id": "cond_sphere_tank_560",
    "asset": "condensery/cond_sphere_tank.glb",
    "pos": [
     2144.566,
@@ -17033,7 +17083,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_sphere_tank_559",
+   "id": "cond_sphere_tank_561",
    "asset": "condensery/cond_sphere_tank.glb",
    "pos": [
     2138.635,
@@ -17055,7 +17105,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_shed_a_560",
+   "id": "cond_shed_a_562",
    "asset": "condensery/cond_shed_a.glb",
    "pos": [
     1971.681,
@@ -17084,7 +17134,7 @@
    }
   },
   {
-   "id": "cond_shed_b_561",
+   "id": "cond_shed_b_563",
    "asset": "condensery/cond_shed_b.glb",
    "pos": [
     2001.241,
@@ -17113,7 +17163,7 @@
    }
   },
   {
-   "id": "cond_shed_a_562",
+   "id": "cond_shed_a_564",
    "asset": "condensery/cond_shed_a.glb",
    "pos": [
     2032.16,
@@ -17142,7 +17192,7 @@
    }
   },
   {
-   "id": "cond_shed_b_563",
+   "id": "cond_shed_b_565",
    "asset": "condensery/cond_shed_b.glb",
    "pos": [
     2064.222,
@@ -17222,7 +17272,7 @@
    }
   },
   {
-   "id": "cond_conveyor_span_566",
+   "id": "cond_conveyor_span_568",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1945.238,
@@ -17244,7 +17294,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_567",
+   "id": "cond_conveyor_span_569",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1927.222,
@@ -17266,7 +17316,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_568",
+   "id": "cond_conveyor_span_570",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1909.206,
@@ -17288,7 +17338,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_569",
+   "id": "cond_conveyor_span_571",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1891.19,
@@ -17310,7 +17360,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_570",
+   "id": "cond_conveyor_span_572",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1873.174,
@@ -17332,7 +17382,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_571",
+   "id": "cond_conveyor_span_573",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1855.158,
@@ -17354,7 +17404,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_572",
+   "id": "cond_conveyor_span_574",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1837.143,
@@ -17376,7 +17426,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_573",
+   "id": "cond_conveyor_span_575",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1819.127,
@@ -17398,7 +17448,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_574",
+   "id": "cond_conveyor_span_576",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1801.111,
@@ -17420,7 +17470,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_575",
+   "id": "cond_conveyor_span_577",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1783.095,
@@ -17442,7 +17492,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_576",
+   "id": "cond_conveyor_span_578",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1765.079,
@@ -17464,7 +17514,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_577",
+   "id": "cond_conveyor_span_579",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1747.063,
@@ -17486,7 +17536,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_conveyor_span_578",
+   "id": "cond_conveyor_span_580",
    "asset": "condensery/cond_conveyor_span.glb",
    "pos": [
     1729.047,
@@ -17508,7 +17558,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_579",
+   "id": "cond_lamp_post_581",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1925.595,
@@ -17530,7 +17580,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_580",
+   "id": "cond_lamp_post_582",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1938.461,
@@ -17552,7 +17602,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_581",
+   "id": "cond_lamp_post_583",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1951.327,
@@ -17574,7 +17624,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_582",
+   "id": "cond_lamp_post_584",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1964.193,
@@ -17596,7 +17646,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_583",
+   "id": "cond_lamp_post_585",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1977.059,
@@ -17618,7 +17668,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_584",
+   "id": "cond_lamp_post_586",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     1989.926,
@@ -17640,7 +17690,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_585",
+   "id": "cond_lamp_post_587",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2002.792,
@@ -17662,7 +17712,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_586",
+   "id": "cond_lamp_post_588",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2015.658,
@@ -17684,7 +17734,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_587",
+   "id": "cond_lamp_post_589",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2028.524,
@@ -17706,7 +17756,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_588",
+   "id": "cond_lamp_post_590",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2041.39,
@@ -17728,7 +17778,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_589",
+   "id": "cond_lamp_post_591",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2054.256,
@@ -17750,7 +17800,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_590",
+   "id": "cond_lamp_post_592",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2067.123,
@@ -17772,7 +17822,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_591",
+   "id": "cond_lamp_post_593",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2079.989,
@@ -17794,7 +17844,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_592",
+   "id": "cond_lamp_post_594",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2174.405,
@@ -17816,7 +17866,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_593",
+   "id": "cond_lamp_post_595",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2161.539,
@@ -17838,7 +17888,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_594",
+   "id": "cond_lamp_post_596",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2148.673,
@@ -17860,7 +17910,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_595",
+   "id": "cond_lamp_post_597",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2135.807,
@@ -17882,7 +17932,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_596",
+   "id": "cond_lamp_post_598",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2122.941,
@@ -17904,7 +17954,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_597",
+   "id": "cond_lamp_post_599",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2110.074,
@@ -17926,7 +17976,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_598",
+   "id": "cond_lamp_post_600",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2097.208,
@@ -17948,7 +17998,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_599",
+   "id": "cond_lamp_post_601",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2084.342,
@@ -17970,7 +18020,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_600",
+   "id": "cond_lamp_post_602",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2071.476,
@@ -17992,7 +18042,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_601",
+   "id": "cond_lamp_post_603",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2058.61,
@@ -18014,7 +18064,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_602",
+   "id": "cond_lamp_post_604",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2045.744,
@@ -18036,7 +18086,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_603",
+   "id": "cond_lamp_post_605",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2032.877,
@@ -18058,7 +18108,7 @@
    "zone": "condensery"
   },
   {
-   "id": "cond_lamp_post_604",
+   "id": "cond_lamp_post_606",
    "asset": "condensery/cond_lamp_post.glb",
    "pos": [
     2020.011,
@@ -18105,7 +18155,7 @@
    }
   },
   {
-   "id": "deck_pad_6m_606",
+   "id": "deck_pad_6m_608",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     898.57,
@@ -18127,7 +18177,7 @@
    "zone": "lone_lamp"
   },
   {
-   "id": "deck_pad_6m_607",
+   "id": "deck_pad_6m_609",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     903.835,
@@ -18149,7 +18199,7 @@
    "zone": "lone_lamp"
   },
   {
-   "id": "deck_pad_6m_608",
+   "id": "deck_pad_6m_610",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
     909.101,
@@ -18956,9 +19006,9 @@
   {
    "name": "light_024",
    "pos": [
-    -46.093,
+    -41.856,
     134.416,
-    -5.437
+    -7.674
    ],
    "key": "amber",
    "radius_m": 8.0,
@@ -18967,6 +19017,30 @@
   },
   {
    "name": "light_025",
+   "pos": [
+    -37.154,
+    140.371,
+    -4.011
+   ],
+   "key": "amber",
+   "radius_m": 8.0,
+   "intensity": 0.5,
+   "zone": "quay"
+  },
+  {
+   "name": "light_026",
+   "pos": [
+    -5.174,
+    131.359,
+    -4.951
+   ],
+   "key": "amber",
+   "radius_m": 8.0,
+   "intensity": 0.5,
+   "zone": "quay"
+  },
+  {
+   "name": "light_027",
    "pos": [
     2.865,
     131.263,
@@ -18978,7 +19052,7 @@
    "zone": "quay"
   },
   {
-   "name": "light_026",
+   "name": "light_028",
    "pos": [
     32.618,
     136.979,
@@ -18990,7 +19064,7 @@
    "zone": "quay"
   },
   {
-   "name": "light_027",
+   "name": "light_029",
    "pos": [
     60.6,
     128.0,
@@ -19002,7 +19076,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_028",
+   "name": "light_030",
    "pos": [
     77.4,
     128.0,
@@ -19014,7 +19088,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_029",
+   "name": "light_031",
    "pos": [
     66.2,
     127.2,
@@ -19026,7 +19100,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_030",
+   "name": "light_032",
    "pos": [
     55.0,
     126.4,
@@ -19038,7 +19112,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_031",
+   "name": "light_033",
    "pos": [
     71.8,
     126.4,
@@ -19050,7 +19124,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_032",
+   "name": "light_034",
    "pos": [
     60.6,
     125.6,
@@ -19062,7 +19136,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_033",
+   "name": "light_035",
    "pos": [
     77.4,
     125.6,
@@ -19074,7 +19148,7 @@
    "zone": "steps"
   },
   {
-   "name": "light_034",
+   "name": "light_036",
    "pos": [
     86.0,
     128.4,
@@ -19086,7 +19160,7 @@
    "zone": "promenade"
   },
   {
-   "name": "light_035",
+   "name": "light_037",
    "pos": [
     98.0,
     128.4,
@@ -19098,7 +19172,7 @@
    "zone": "promenade"
   },
   {
-   "name": "light_036",
+   "name": "light_038",
    "pos": [
     110.0,
     128.4,
@@ -19110,7 +19184,7 @@
    "zone": "promenade"
   },
   {
-   "name": "light_037",
+   "name": "light_039",
    "pos": [
     12.397,
     146.31,
@@ -19122,7 +19196,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_038",
+   "name": "light_040",
    "pos": [
     85.01,
     139.91,
@@ -19134,7 +19208,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_039",
+   "name": "light_041",
    "pos": [
     -63.022,
     139.91,
@@ -19146,7 +19220,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_040",
+   "name": "light_042",
    "pos": [
     -50.036,
     149.51,
@@ -19158,7 +19232,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_041",
+   "name": "light_043",
    "pos": [
     -38.65,
     139.91,
@@ -19170,7 +19244,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_042",
+   "name": "light_044",
    "pos": [
     -9.472,
     143.11,
@@ -19182,7 +19256,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_043",
+   "name": "light_045",
    "pos": [
     5.15,
     136.71,
@@ -19194,7 +19268,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_044",
+   "name": "light_046",
    "pos": [
     15.403,
     139.91,
@@ -19206,7 +19280,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_045",
+   "name": "light_047",
    "pos": [
     30.379,
     136.71,
@@ -19218,7 +19292,7 @@
    "zone": "roof_terrace"
   },
   {
-   "name": "light_046",
+   "name": "light_048",
    "pos": [
     -71.52,
     123.612,
@@ -19230,7 +19304,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_047",
+   "name": "light_049",
    "pos": [
     -54.254,
     123.707,
@@ -19242,7 +19316,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_048",
+   "name": "light_050",
    "pos": [
     -36.023,
     123.326,
@@ -19254,7 +19328,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_049",
+   "name": "light_051",
    "pos": [
     -17.066,
     120.205,
@@ -19266,7 +19340,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_050",
+   "name": "light_052",
    "pos": [
     0.207,
     120.485,
@@ -19278,7 +19352,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_051",
+   "name": "light_053",
    "pos": [
     18.067,
     120.603,
@@ -19290,7 +19364,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_052",
+   "name": "light_054",
    "pos": [
     36.088,
     119.69,
@@ -19302,7 +19376,7 @@
    "zone": "low_walk"
   },
   {
-   "name": "light_053",
+   "name": "light_055",
    "pos": [
     -59.828,
     138.2,
@@ -19314,7 +19388,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_054",
+   "name": "light_056",
    "pos": [
     -25.677,
     138.2,
@@ -19326,7 +19400,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_055",
+   "name": "light_057",
    "pos": [
     8.578,
     138.2,
@@ -19338,7 +19412,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_056",
+   "name": "light_058",
    "pos": [
     39.624,
     138.2,
@@ -19350,7 +19424,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_057",
+   "name": "light_059",
    "pos": [
     69.983,
     138.2,
@@ -19362,7 +19436,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_058",
+   "name": "light_060",
    "pos": [
     -42.301,
     141.4,
@@ -19374,7 +19448,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_059",
+   "name": "light_061",
    "pos": [
     -9.409,
     141.4,
@@ -19386,7 +19460,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_060",
+   "name": "light_062",
    "pos": [
     24.793,
     141.4,
@@ -19398,7 +19472,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_061",
+   "name": "light_063",
    "pos": [
     59.889,
     141.4,
@@ -19410,7 +19484,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_062",
+   "name": "light_064",
    "pos": [
     -30.002,
     144.6,
@@ -19422,7 +19496,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_063",
+   "name": "light_065",
    "pos": [
     1.735,
     144.6,
@@ -19434,7 +19508,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_064",
+   "name": "light_066",
    "pos": [
     48.901,
     144.6,
@@ -19446,7 +19520,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_065",
+   "name": "light_067",
    "pos": [
     -80.3,
     144.6,
@@ -19458,7 +19532,7 @@
    "zone": "stacks"
   },
   {
-   "name": "light_066",
+   "name": "light_068",
    "pos": [
     -114.926,
     135.8,
@@ -19470,7 +19544,7 @@
    "zone": "station"
   },
   {
-   "name": "light_067",
+   "name": "light_069",
    "pos": [
     -127.032,
     133.2,
@@ -19482,7 +19556,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_068",
+   "name": "light_070",
    "pos": [
     -163.161,
     133.2,
@@ -19494,7 +19568,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_069",
+   "name": "light_071",
    "pos": [
     -199.289,
     133.2,
@@ -19506,7 +19580,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_070",
+   "name": "light_072",
    "pos": [
     -235.417,
     133.2,
@@ -19518,7 +19592,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_071",
+   "name": "light_073",
    "pos": [
     -271.546,
     133.2,
@@ -19530,7 +19604,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_072",
+   "name": "light_074",
    "pos": [
     -307.674,
     133.2,
@@ -19542,7 +19616,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_073",
+   "name": "light_075",
    "pos": [
     -392.247,
     122.2,
@@ -19554,7 +19628,7 @@
    "zone": "pier"
   },
   {
-   "name": "light_074",
+   "name": "light_076",
    "pos": [
     -118.924,
     135.0,
@@ -19566,7 +19640,7 @@
    "zone": "plaza"
   },
   {
-   "name": "light_075",
+   "name": "light_077",
    "pos": [
     -85.916,
     135.0,
@@ -19578,7 +19652,7 @@
    "zone": "plaza"
   },
   {
-   "name": "light_076",
+   "name": "light_078",
    "pos": [
     -114.59,
     135.0,
@@ -19590,7 +19664,7 @@
    "zone": "plaza"
   },
   {
-   "name": "light_077",
+   "name": "light_079",
    "pos": [
     -109.726,
     137.2,
@@ -19614,7 +19688,7 @@
    "zone": "great_lantern"
   },
   {
-   "name": "light_079",
+   "name": "light_081",
    "pos": [
     128.0,
     127.6,
@@ -19626,7 +19700,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_080",
+   "name": "light_082",
    "pos": [
     136.0,
     127.6,
@@ -19638,7 +19712,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_081",
+   "name": "light_083",
    "pos": [
     149.0,
     127.6,
@@ -19650,7 +19724,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_082",
+   "name": "light_084",
    "pos": [
     157.0,
     127.6,
@@ -19662,7 +19736,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_083",
+   "name": "light_085",
    "pos": [
     122.0,
     127.6,
@@ -19674,7 +19748,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_084",
+   "name": "light_086",
    "pos": [
     142.0,
     127.6,
@@ -19686,7 +19760,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_085",
+   "name": "light_087",
    "pos": [
     161.0,
     127.6,
@@ -19698,7 +19772,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_086",
+   "name": "light_088",
    "pos": [
     114.0,
     127.6,
@@ -19710,7 +19784,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_087",
+   "name": "light_089",
    "pos": [
     137.0,
     127.6,
@@ -19722,7 +19796,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_088",
+   "name": "light_090",
    "pos": [
     130.0,
     127.6,
@@ -19734,7 +19808,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_089",
+   "name": "light_091",
    "pos": [
     99.0,
     127.6,
@@ -19746,7 +19820,7 @@
    "zone": "garden"
   },
   {
-   "name": "light_090",
+   "name": "light_092",
    "pos": [
     154.0,
     123.6,
@@ -19866,7 +19940,7 @@
    "zone": "condensery"
   },
   {
-   "name": "light_100",
+   "name": "light_102",
    "pos": [
     900.0,
     104.0,
@@ -20092,14 +20166,23 @@
   ]
  },
  "checks": {
+  "lantern_string_anchor_keys": [
+   "-73.8,6.4,-74.1,-3.3,135.6",
+   "-65.4,10.4,-66.3,-0.7,135.7",
+   "-41.2,12.1,-42.5,3.3,135.6",
+   "-38.8,12.2,-35.5,-4.1,141.6",
+   "-4.0,9.5,-6.4,0.4,132.6",
+   "3.1,7.9,2.7,-1.0,132.5",
+   "31.6,0.0,33.7,-16.9,138.2"
+  ],
   "envelope_overlaps": [],
   "camera_min_clearance_m": 1.41,
   "nearest": "shophouse_h_n09",
   "at_t": 43.4
  },
  "stats": {
-  "instances": 609,
-  "triangles": 658173,
+  "instances": 611,
+  "triangles": 662061,
   "by_zone": {
    "quay_deck": 33,
    "quay_north": 12,
@@ -20110,7 +20193,7 @@
    "pocket_n1": 10,
    "pocket_n2": 10,
    "gangway": 7,
-   "lantern_strings": 5,
+   "lantern_strings": 7,
    "promenade": 13,
    "steps": 49,
    "low_walk": 36,
@@ -20128,6 +20211,6 @@
   },
   "spots": 143,
   "paths": 15,
-  "lights": 101
+  "lights": 103
  }
 }

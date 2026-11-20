@@ -615,24 +615,25 @@ def deck_kit():
 def street_kit():
     """What the Quay close pass sees at 5 to 15 m: lantern strings, awnings, lamps, keel lanterns, clutter."""
     out = []
-    A = Asset("lantern_string_9m"); r = random.Random(21)      # anchors at (+-4.5, 0, 0); sags 0.9 m; scale x to fit a span
-    prev = None
-    for k in range(25):
-        t = k / 24; x = -4.5 + 9.0 * t; z = -0.9 * math.sin(t * math.pi)
-        if prev:
-            A.m("metal").beam(prev, (x, 0, z), 0.018)
-        prev = (x, 0, z)
-    for k in range(9):
-        t = (k + 0.5) / 9; x = -4.5 + 9.0 * t; z = -0.9 * math.sin(t * math.pi); big = k % 3 == 1
-        hh, rr_ = (0.34, 0.17) if big else (0.24, 0.12)
-        A.m("metal").box((x, 0, z - 0.06), (0.012, 0.012, 0.12))
-        mb = A.m("lantern"); b0 = len(mb.uv)
-        mb.cyl((x, 0, z - 0.12 - hh), rr_ * 0.7, hh / 2, n=8, r_top=rr_, cap=True); mb.cyl((x, 0, z - 0.12 - hh / 2), rr_, hh / 2, n=8, r_top=rr_ * 0.7, cap=True)
-        u = (lvl(r.uniform(0.5, 1.0)), (k + 0.5) / 9.0)
-        for i in range(b0, len(mb.uv)):
-            mb.uv[i] = u
-        A.m("metal").cyl((x, 0, z - 0.13), rr_ * 0.72, 0.03, n=8)
-    A.meta = dict(span_m=9.0, sag_m=0.9, bulbs=9); A.finish(); out.append(A)
+    for (nm, span, sag, nb, seed) in (("lantern_string_9m", 9.0, 0.9, 9, 21), ("lantern_string_16m", 16.0, 0.9, 15, 22)):
+        A = Asset(nm); r = random.Random(seed)                # anchors at (+-span/2, 0, 0); scale x to fit a span (0.75 to 1.4: beyond that the lanterns stretch, use the other length)
+        prev = None; nseg = int(span / 9.0 * 24); h = span / 2
+        for k in range(nseg + 1):
+            t = k / nseg; x = -h + span * t; z = -sag * math.sin(t * math.pi)
+            if prev:
+                A.m("metal").beam(prev, (x, 0, z), 0.018)
+            prev = (x, 0, z)
+        for k in range(nb):
+            t = (k + 0.5) / nb; x = -h + span * t; z = -sag * math.sin(t * math.pi); big = k % 3 == 1
+            hh, rr_ = (0.34, 0.17) if big else (0.24, 0.12)
+            A.m("metal").box((x, 0, z - 0.06), (0.012, 0.012, 0.12))
+            mb = A.m("lantern"); b0 = len(mb.uv)
+            mb.cyl((x, 0, z - 0.12 - hh), rr_ * 0.7, hh / 2, n=8, r_top=rr_, cap=True); mb.cyl((x, 0, z - 0.12 - hh / 2), rr_, hh / 2, n=8, r_top=rr_ * 0.7, cap=True)
+            u = (lvl(r.uniform(0.5, 1.0)), (k + 0.5) / float(nb))
+            for i in range(b0, len(mb.uv)):
+                mb.uv[i] = u
+            A.m("metal").cyl((x, 0, z - 0.13), rr_ * 0.72, 0.03, n=8)
+        A.meta = dict(span_m=span, sag_m=sag, bulbs=nb); A.finish(); out.append(A)
     for nm, w_ in (("awning_1bay", 2.4), ("awning_2bay", 4.8), ("awning_3bay", 7.2)):
         A = Asset(nm); r = random.Random(int(w_ * 10))          # mounts on the wall above a shop bay: origin at the wall, 2.62 m above the deck
         dep, drop = 1.7, 0.5

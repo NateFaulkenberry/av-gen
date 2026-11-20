@@ -20,6 +20,7 @@ ROOT = os.path.join(HERE, "..")
 MAN = {a["asset"]: a for a in json.load(open(os.path.join(ROOT, "meshes", "kit_manifest.json")))["assets"]}
 R = random.Random(20261119)
 INST, SPOTS, PATHS, LIGHTS, ENV, BOX = [], [], [], [], [], []
+STRING_KEYS = []          # the anchor pair of each lantern string, in order (for the mesh check to refuse one)
 SIGN_KEYS = ["sign_a", "sign_a", "sign_b", "sign_c", "sign_a", "sign_b"]
 WIN_COOL = ["win_a", "win_a", "win_a", "win_b", "win_b", "win_c"]
 
@@ -263,44 +264,90 @@ def the_quay():
 
 
 def lantern_strings(north, south):
-    """Strings cross the Quay from a pier of a north block to the nearest pier of a south block: never in front of a
-    window, and always clear of the camera (2.6 m or more above it where both sides are tall enough, else low over the
-    shop fronts, where the camera looks down on them)."""
-    def piers_at(ids, za, x, near=2.6):
-        best = None
+    """Strings cross the Quay from a pier of a north block to a pier of a south block: never in front of a window, and
+    always clear of the camera (2.6 m or more above it where both sides are tall enough, else low over the shop
+    fronts, where the camera looks down on them). Iteration 5: a candidate that finds no pier pair straight across now
+    looks up to 4.2 m along the street for its north pier and lets the string run up to 3.6 m askew to its south pier
+    (17 candidates gave 5 strings; the rest ended nowhere and were dropped). A pier that carries a blade or roundel at
+    that height is not an anchor, a string never passes within 2.5 m of a gangway, and two strings keep 4.5 m apart."""
+    signs = [i for i in INST if i["zone"] == "signs"]
+    gangways = [i for i in INST if i["id"].startswith("gangway_")]
+    # anchors the mesh check refused (blender/nd_check_strings.py: an end that does not touch a wall or a mast, or a span
+    # within 0.15 m of a sign, a vine, a parapet or a neighbour); the generator then takes its next candidate
+    rj = os.path.join(HERE, "string_rejects.json")
+    rejects = set(json.load(open(rj))["rejects"]) if os.path.exists(rj) else set()
+    key = lambda a, b: "%.1f,%.1f,%.1f,%.1f,%.1f" % (a[0], a[1], b[0], b[1], a[2])
+
+    def free(p):
+        for s in signs:                                              # engine pos = (x, z, -y); a sign's box from the manifest
+            bb = MAN[s["asset"]]["bounds_m"]; sc = s["scale"][1]
+            if math.hypot(s["pos"][0] - p[0], -s["pos"][2] - p[1]) < 1.2 and s["pos"][1] + bb[1] * sc - 0.6 < p[2] < s["pos"][1] + bb[4] * sc + 0.6:
+                return False
+        return True
+
+    def piers_near(ids, za, x, near):
+        out = []
         for b in ids:
             piers, blk = front_piers(b, za - BLD[b][3])
-            for (px, py, lx, ly) in piers:
-                if abs(px - x) < near and (best is None or abs(px - x) < abs(best[0] - x)):
-                    best = (px, py, za)
-        return best
-    x = QUAY_X0 + 7.0; k = 0
+            out += [(px, py, za) for (px, py, lx, ly) in piers if abs(px - x) < near]
+        return sorted(out, key=lambda q: abs(q[0] - x))
+
+    def masts(a, za):
+        out = []
+        for bs in south:                                             # the mast of a south roof terrace, if it reaches this height
+            m = MAN[BLD[bs][0]]
+            if m.get("roof") == "garden":
+                rc, rs = m["roof_centre_m"], m["roof_size_m"]
+                mp = building_point(bs, rc[0] - rs[0] / 2 + 0.6, rc[1] + rs[1] / 2 - 0.6, 0.0)
+                if abs(mp[0] - a[0]) < 4.0 and BLD[bs][3] + m["roof_y_m"] + 3.6 < za < BLD[bs][3] + m["roof_y_m"] + 6.8:
+                    out.append((mp[0], mp[1], za))
+        return out
+
+    def clear_of_gangways(a, b):
+        for g in gangways:
+            gx, gz = g["pos"][0], g["pos"][1]
+            if min(abs(a[0] - gx), abs(b[0] - gx), abs((a[0] + b[0]) / 2 - gx)) < 2.5 and abs(a[2] - gz) < 3.0:
+                return False
+        return True
+
+    x = QUAY_X0 + 7.0; k = 0; placed = []
     while x < 46.0:
         zc = min(cam_at(t / 10.0)[2] for t in range(290, 450) if abs(cam_at(t / 10.0)[0] - x) < 6.0)
         pair = None
         R.uniform(2.7, 3.6)                                          # (keeps the layout's random stream where it was)
-        for za in [zc + 3.0 + 0.4 * k_ for k_ in range(7)] + [qz(x) + R.uniform(4.3, 4.8)]:      # overhead first (the lowest height that works), else low over the shop fronts
-            a = piers_at(north, za, x)
-            b = piers_at(south, za, a[0], 1.9) if a else None
-            if a and not b and za > zc:                               # the mast of a south roof terrace, if it reaches this height
-                for bs in south:
-                    m = MAN[BLD[bs][0]]
-                    if m.get("roof") == "garden":
-                        rc, rs = m["roof_centre_m"], m["roof_size_m"]
-                        mp = building_point(bs, rc[0] - rs[0] / 2 + 0.6, rc[1] + rs[1] / 2 - 0.6, 0.0)
-                        if abs(mp[0] - a[0]) < 4.0 and BLD[bs][3] + m["roof_y_m"] + 3.6 < za < BLD[bs][3] + m["roof_y_m"] + 6.8:
-                            b = (mp[0], mp[1], za)
-            if a and b and (za > zc + 2.5 or za < zc - 1.3):
-                pair = (a, b); break
+        heights = [zc + 3.0 + 0.4 * k_ for k_ in range(7)] + [qz(x) + R.uniform(4.3, 4.8)]      # overhead first (the lowest height that works), else low over the shop fronts
+        for (near_n, near_s) in ((2.6, 1.9), (4.2, 3.6)):            # straight across first; then along the street and askew
+            for za in heights:
+                if not (za > zc + 2.5 or za < zc - 1.3):
+                    continue
+                best = None
+                for a in piers_near(north, za, x, near_n):
+                    if not free(a):
+                        continue
+                    cands = [b for b in piers_near(south, za, a[0], near_s) if free(b)]
+                    if za > zc:
+                        cands += masts(a, za)
+                    for b in cands:
+                        cost = abs(b[0] - a[0]) + 0.6 * abs(a[0] - x)
+                        if key(a, b) not in rejects and clear_of_gangways(a, b) and all(abs((a[0] + b[0]) / 2 - px) >= 4.5 for px in placed) and (best is None or cost < best[0]):
+                            best = (cost, a, b)
+                    if best and near_n < 3.0:
+                        break                                        # the first pass keeps the nearest north pier, as before
+                if best:
+                    pair = (best[1], best[2]); break
+            if pair:
+                break
         if pair:
             a, b = pair
             L = math.sqrt(sum((a[i] - b[i]) ** 2 for i in range(3))); yaw = math.atan2(b[1] - a[1], b[0] - a[0])
-            inst("street/lantern_string_9m.glb", (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, a[2], yaw, [L / 9.0, 1, 1], "lantern_strings", env=False,
+            span = 9.0 if L <= 12.5 else 16.0                        # the 9 m string stretched to 17 m had lanterns twice as long as wide
+            STRING_KEYS.append(key(a, b))
+            inst("street/lantern_string_%dm.glb" % span, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, a[2], yaw, [L / span, 1, 1], "lantern_strings", env=False,
                  tint={"lantern": "amber" if k % 3 else "win_b"}, iid="lantern_string_%02d" % k)
             light((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, a[2] - 1.2, "amber", 8.0, 0.5, "quay")
+            placed.append((a[0] + b[0]) / 2)
             k += 1
         x += R.uniform(6.0, 8.5)
-
 
 def quay_south_side(south, gS):
     """South of the lower Quay there is no row: the Steps fall away to the garden, then a promenade rail with lamps."""
@@ -699,7 +746,7 @@ out = {
     "emitters": emitters,
     "lights": LIGHTS,
     "camera": {"note": "the 70.2 s journey of art-direction section 11, moved a little where the layout needed room; the camera looks along its path", "waypoints": cam},
-    "checks": {"envelope_overlaps": bad, "camera_min_clearance_m": round(worst[0], 2), "nearest": worst[1], "at_t": worst[2]},
+    "checks": {"lantern_string_anchor_keys": STRING_KEYS, "envelope_overlaps": bad, "camera_min_clearance_m": round(worst[0], 2), "nearest": worst[1], "at_t": worst[2]},
     "stats": {"instances": len(INST), "triangles": tris, "by_zone": by_zone, "spots": len(SPOTS), "paths": len(PATHS), "lights": len(LIGHTS)},
 }
 dst = os.path.join(ROOT, "art", "layout.json")
