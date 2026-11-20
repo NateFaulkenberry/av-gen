@@ -137,9 +137,11 @@ otherwise.
 
 ---
 
-## `kMaxRigs` — 64 skinned rigs per frame
+## `kMaxRigs` — 1024 skinned rigs per frame (64 until ADR-2116)
 
-- **Value:** 64
+- **Value:** 1024 (ADR-2116: Neon Dreams' 500-alien probe drew 436 of them in the bind pose at 64; a
+  90-joint slice is 11.5 KB, so the full buffer is 11.8 MB). Rigs that adopt another rig's pose and
+  palette (a crowd in step) are drawn from that rig's slice and upload nothing.
 - **Source:** `src/rendering/skinning.cpp:23`
 - **Why it exists:** each skinned rig's joint palette (this frame's and the previous frame's, for
   velocity) occupies one slice of a shared buffer, addressed the same way object uniforms are — by
@@ -230,7 +232,7 @@ otherwise.
 | `kMaxSceneLights` | 256 | `light_data.hpp:63` | Quality setting (fixed light buffer) | No |
 | `kMaxLightsPerCluster` | 32 | `light_data.hpp:62` | Quality setting (fixed froxel index width) | Overflow only, no log |
 | `kMaxShadowViews` | 8 | `shadow_math.hpp:17` | Quality setting via fixed uniform array | No |
-| `kMaxRigs` | 64 | `skinning.cpp:23` | Architectural (fixed joint-palette slots) | Yes — log warning, bind pose |
+| `kMaxRigs` | 1024 (ADR-2116) | `skinning.cpp:25` | Architectural (fixed joint-palette slots) | Yes — log warning, bind pose |
 | `kMaxLodLevels` | 4 | `scene/procedural.hpp:434` | Architectural (shared with a WGSL constant) | No — silent clamp |
 | `kMaxGpuSplines` | 16 | `spline_buffers.hpp:33` | Architectural (fixed, positional table) | **Yes — firing on Glowmere today** |
 

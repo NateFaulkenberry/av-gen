@@ -184,6 +184,10 @@ struct NodeAnimation {
     std::string state;        // the state to enter ("" = leave the rig on its default)
     float blend = -1.0f;      // cross-fade seconds; < 0 = the state's own blendIn
     float speed = 1.0f;       // clip seconds per timeline second
+    // ADR-2116: clip seconds the authored state has already played at timeline second 0, so a crowd on
+    // one clip is not in step. Only the scene file's opening state has it; a state a behaviour, a cue or
+    // the sequencer asks for later starts when it is asked for, as before.
+    float phase = 0.0f;
     // ---- the distance ladder, all four rungs authorable ----------------------------------------
     float updateHz = 0.0f;       // pose rate ceiling; 0 = every frame when near the camera
     float nearDistance = 15.0f;  // nearer than this: posed every frame (subject to updateHz)
@@ -225,7 +229,7 @@ struct NodeAnimation {
     // Empty is the default and 163 of the 168 clips this project loads will keep it.
     std::vector<RootMotionSpec> rootMotion;
     [[nodiscard]] bool authored() const {
-        return !state.empty() || blend >= 0.0f || speed != 1.0f || updateHz != 0.0f ||
+        return !state.empty() || blend >= 0.0f || speed != 1.0f || phase != 0.0f || updateHz != 0.0f ||
                nearDistance != 15.0f || farHz != 20.0f || cullDistance != 120.0f ||
                !layers.empty() || !rootMotion.empty();
     }

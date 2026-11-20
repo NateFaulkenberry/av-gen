@@ -8947,7 +8947,12 @@ void Composition::updateCharacters(const FrameTime& time) {
             // sequencer -- still starts when it was requested, which is what those mean.
             const bool authoredFromTheStart = node.animationApplied.empty();
             node.animationApplied = node.animation.state;
-            node.animationAppliedAt = authoredFromTheStart ? 0.0 : time.renderTime;
+            // ADR-2116: the opening state's phase is where its clip already was at second 0.
+            node.animationAppliedAt =
+                authoredFromTheStart
+                    ? -static_cast<double>(node.animation.phase) /
+                          static_cast<double>(node.animation.speed > 0.0f ? node.animation.speed : 1.0f)
+                    : time.renderTime;
             node.animationPushed = false;
         }
         if (node.animationPushed) {
@@ -12169,6 +12174,9 @@ nlohmann::json Composition::toJson() const {
             if (node.animation.speed != 1.0f) {
                 anim["speed"] = node.animation.speed;
             }
+            if (node.animation.phase != 0.0f) {
+                anim["phase"] = node.animation.phase; // ADR-2116
+            }
             if (node.animation.updateHz != 0.0f) {
                 anim["updateHz"] = node.animation.updateHz;
             }
@@ -14208,6 +14216,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 auto state = readString(anim, "state", "");
                 auto blend = readFloat(anim, "blend", -1.0f);
                 auto speed = readFloat(anim, "speed", 1.0f);
+                auto phase = readFloat(anim, "phase", 0.0f); // ADR-2116
                 auto hz = readFloat(anim, "updateHz", 0.0f);
                 auto near = readFloat(anim, "nearDistance", 15.0f);
                 auto farHz = readFloat(anim, "farHz", 20.0f);
@@ -14215,6 +14224,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 if (!state) return std::unexpected(state.error());
                 if (!blend) return std::unexpected(blend.error());
                 if (!speed) return std::unexpected(speed.error());
+                if (!phase) return std::unexpected(phase.error());
                 if (!hz) return std::unexpected(hz.error());
                 if (!near) return std::unexpected(near.error());
                 if (!farHz) return std::unexpected(farHz.error());
@@ -14224,7 +14234,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 // ladder read as configured in the file while being a single rung in the engine.
                 // ADR-278 generalised this loop out of here; what is left is the key list.
                 static constexpr std::string_view kAnimationKeys[] = {
-                    "state", "blend",        "speed",  "updateHz",  "nearDistance",
+                    "state", "blend",        "speed",  "phase", "updateHz",  "nearDistance",
                     "farHz",   "cullDistance", "layers",    "rootMotion",
                     "bodyCompensation", "contacts", "contactMode", "matchPhase", "inertialize"};
                 json_keys::warnUnknownKeys(anim, kAnimationKeys,
@@ -14232,6 +14242,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 node.animation.state = *state;
                 node.animation.blend = *blend;
                 node.animation.speed = *speed;
+                node.animation.phase = *phase;
                 node.animation.updateHz = *hz;
                 node.animation.nearDistance = *near;
                 node.animation.farHz = *farHz;

@@ -40,6 +40,7 @@ struct SkinningStats {
     std::uint32_t joints = 0;      // joint matrices uploaded this frame (0 when nothing moved)
     std::uint32_t uploadBytes = 0; // bytes written to the joint buffer this frame
     std::uint32_t draws = 0;       // skinned draws recorded this frame, across every pass
+    std::uint32_t sharedSlices = 0; // ADR-2116: rigs drawn from another rig's slice (same palettes)
 };
 
 class SkinningRenderer {

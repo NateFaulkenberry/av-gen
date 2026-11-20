@@ -22,7 +22,9 @@ constexpr std::uint32_t kOffsetAlignment = 256;
 constexpr std::uint32_t kMatrixBytes = 64;
 // A ceiling on how many rigs a frame may draw. Beyond it the extra rigs simply do not get a
 // palette, and their entities render in the bind pose rather than the frame failing.
-constexpr std::uint32_t kMaxRigs = 64;
+// ADR-2116: 64 -> 1024. At 64 a crowd's 65th character stood in the bind pose (Neon Dreams' 500-alien
+// probe: 436 T-poses); a slice is 11.5 KB for the 90-joint alien, so 1024 of them is 11.8 MB.
+constexpr std::uint32_t kMaxRigs = 1024;
 
 std::uint32_t alignUp(std::uint32_t value, std::uint32_t alignment) {
     return (value + alignment - 1) / alignment * alignment;
@@ -384,6 +386,7 @@ void SkinningRenderer::update(const scene::Scene& scene) {
     stats_.rigs = 0;
     stats_.joints = 0;
     stats_.uploadBytes = 0;
+    stats_.sharedSlices = 0;
     slices_.assign(scene.rigs.size(), Slice{});
     if (scene.rigs.empty()) {
         return;
@@ -417,6 +420,22 @@ void SkinningRenderer::update(const scene::Scene& scene) {
                 log::warn("skinned rig '{}' has a non-finite joint palette; skipping GPU upload", rig.name);
             }
             continue;
+        }
+        // ADR-2116: a rig that adopted an earlier rig's pose (a crowd on one clip, in phase) and was
+        // drawn with the same palette last frame too reads that rig's slice; nothing is uploaded.
+        if (rig.sharedFrom >= 0 && static_cast<std::uint32_t>(rig.sharedFrom) < i) {
+            const scene::SkinnedRig& src = scene.rigs[static_cast<std::size_t>(rig.sharedFrom)];
+            const Slice shared = slices_[static_cast<std::size_t>(rig.sharedFrom)];
+            if (shared.valid() && shared.jointCount == joints && src.palette.size() == joints &&
+                src.previousPalette.size() == joints && rig.previousPalette.size() == joints &&
+                std::memcmp(src.palette.data(), rig.palette.data(), joints * kMatrixBytes) == 0 &&
+                std::memcmp(src.previousPalette.data(), rig.previousPalette.data(), joints * kMatrixBytes) == 0) {
+                slices_[i] = shared;
+                ++stats_.rigs;
+                ++stats_.sharedSlices;
+                uploadedVersions_[i] = ~0ULL; // its own slot is stale: re-upload if it stops sharing
+                continue;
+            }
         }
         slices_[i] = Slice{sliceBytes * i, joints};
         ++stats_.rigs;

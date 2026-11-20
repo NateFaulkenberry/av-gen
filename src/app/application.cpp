@@ -7216,6 +7216,17 @@ int Application::runHeadless() {
                 // ADR-351: the entity LOD line, printed only when a scene actually has a chain. A
                 // diagnostic that prints "entityLod: 0 of 0" on every frame of every scene that
                 // does not use the feature is a line people learn to skip past.
+                // ADR-2116: what posing the skinned cast cost, beside what drawing it cost. Printed only
+                // when the scene has rigs, so a crowd A/B reads its CPU and GPU halves off one frame.
+                if (const scene::Composition* comp = engine_->composition();
+                    comp != nullptr && comp->rigStats().rigs > 0) {
+                    const scene::RigStats& rs = comp->rigStats();
+                    log::info("             rigs: {} posed {} rate-limited {} culled {} joints {} "
+                              "(shared {}) cpu {:.2f} ms | skinned draws {} palettes {} (shared slices {}, upload {} KB)",
+                              rs.rigs, rs.posed, rs.rateLimited, rs.culled, rs.joints, rs.shared, rs.cpuMs,
+                              st.skinning.draws, st.skinning.rigs, st.skinning.sharedSlices,
+                              st.skinning.uploadBytes / 1024);
+                }
                 if (st.entityLod.drawables > 0) {
                     log::info("             entityLod: {}/{} demoted, tris {} -> {} ({:.1f}% of LOD0), "
                               "rungs {}/{}/{}/{}/{}, changed {} held {}",

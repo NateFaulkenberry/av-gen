@@ -418,6 +418,17 @@ struct SkinnedRig {
     // always ends up holding what the rig was last drawn with, so a rig that did not move this
     // frame reports no motion rather than a stale frame of it. Returns true when it re-posed.
     bool evaluate(double now, float hz = 0.0f);
+    // ADR-2116: a crowd's shared pose. What `evaluate` would compute, taken from `source` instead:
+    // a rig of the same asset (the same clip pack) playing the same clip at the same clip second
+    // with nothing on top of the clip has, by construction, the same pose and the same palette.
+    // `poseKey` is that identity (0 = this rig's pose is its own: layers, root motion, an external
+    // pose or a cross-fade make it so); `adoptPose` copies the evaluated half of `source` and
+    // keeps this rig's own previous palette, so its motion vectors stay its own.
+    [[nodiscard]] std::uint64_t poseKey(double now, float hz) const;
+    bool adoptPose(const SkinnedRig& source, double now, float hz);
+    // ADR-2116: set by `updateRigs` to the rig whose palette this one adopted this frame (-1: its own).
+    // The skinning renderer draws both from one slice when their palettes are also equal last frame.
+    std::int32_t sharedFrom = -1;
     // Declares a transport discontinuity: the next `evaluate` reports no motion rather than motion
     // across the jump. Idempotent, and cheap enough to call on every rig at every seek.
     void reseedAfterDiscontinuity() { reseedPrevious = true; }
@@ -443,6 +454,7 @@ struct RigStats {
     // taken out of the pose this frame. Zero on every scene in this repository but the Character
     // Intelligence Lab, which is the number that says the opt-in is an opt-in.
     std::uint32_t rootMotion = 0;
+    std::uint32_t shared = 0;    // ADR-2116: posed by copying an identical rig's pose (in `posed`)
     double cpuMs = 0.0;          // wall time spent posing (this is the only clock in here, and it
                                  // reports, it never drives)
 };

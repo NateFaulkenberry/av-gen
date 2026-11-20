@@ -374,6 +374,57 @@ def inhabitant_nodes(max_spots=14, scale=None):
     return nodes, tracks
 
 
+CROWD_TEST = 0   # --crowd-test N: a capacity probe (N aliens at every spot, then clones beside them); not the film
+
+
+PHASES = 8                        # ADR-2116: a crowd's phases (clip length / 8), so rigs in step can share a pose
+SPEEDS = (0.92, 1.0, 1.08)        # and its few clip rates, for the same reason
+
+
+def clip_lengths():
+    """Clip seconds per clip name, read from one cast GLB (the pack is shared); {} without the assets."""
+    import struct
+    try:
+        with open(os.path.join(HERE, "scene", ALIENS, CAST[0] + ".glb"), "rb") as f:
+            b = f.read()
+    except OSError:
+        return {}
+    n = struct.unpack("<I", b[12:16])[0]
+    j = json.loads(b[20:20 + n])
+    return {a["name"]: max(j["accessors"][sm["input"]]["max"][0] for sm in a["samplers"]) for a in j.get("animations", [])}
+
+
+CLIP_LEN = clip_lengths()
+
+
+def crowd_phase(r, clip):
+    return round(CLIP_LEN.get(clip, 2.0) * r.randrange(PHASES) / PHASES, 4)
+
+
+def crowd_test_nodes(n):
+    """Iteration 10 capacity probe (msg 112): every spot, two walkers a path, then clones 1.1 m beside spots."""
+    inh = LAYOUT["inhabitants"]
+    nodes, tracks = inhabitant_nodes(max_spots=10 ** 6)
+    spots = sorted(inh["spots"], key=lambda sp: (sp["priority"], sp["id"]))
+    r = random.Random(5)
+    k = 0
+    while len(nodes) < n:
+        sp = spots[k % len(spots)]
+        ring = 1 + k // len(spots)
+        f = sp["forward"]
+        side = [f[2], 0.0, -f[0]]
+        a = r.uniform(0, 2 * math.pi)
+        pos = [sp["pos"][0] + 1.1 * ring * (math.cos(a) * side[0] + math.sin(a) * f[0]), sp["pos"][1],
+               sp["pos"][2] + 1.1 * ring * (math.cos(a) * side[2] + math.sin(a) * f[2])]
+        nodes.append({**({"bob": sp["bob"]} if sp.get("bob") else {}), "name": "alienc%03d" % k, "kind": "gltf",
+                      "asset": ALIENS + CAST[k % len(CAST)] + ".glb", "position": r3(pos),
+                      "rotation": [0.0, round(r.uniform(-180, 180), 1), 0.0], "scale": [1.0, 1.0, 1.0],
+                      "animation": dict(nodes[0]["animation"], state=(c := r.choice(sp.get("clips", ["Idle"]))),
+                                        speed=r.choice(SPEEDS), phase=crowd_phase(r, c), updateHz=0)})
+        k += 1
+    return nodes, tracks
+
+
 def clip_keys(keys):
     """Linear keys trimmed to start at t = 0 (the first key interpolated there)."""
     out = [kk for kk in keys if kk["time"] >= 0]
@@ -799,7 +850,7 @@ def scene_doc(state="uv", sky_map=None):
                                                        op["semi_axes"][1]]]},
         "castsShadow": False,
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
-    aliens, alien_tracks = inhabitant_nodes()
+    aliens, alien_tracks = inhabitant_nodes() if not CROWD_TEST else crowd_test_nodes(CROWD_TEST)
     vehicles, vehicle_tracks = vehicle_nodes(state)
     nodes += aliens + vehicles + bob_nodes()
     programs = [
@@ -1116,8 +1167,10 @@ def main():
     ap.add_argument("--no-key-shadow", action="store_true", help="the moon key casts no shadow (measuring a preset)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="override one environment key (number); repeatable")
+    ap.add_argument("--crowd-test", type=int, default=0, help="capacity probe: N aliens (not the film)")
     a = ap.parse_args()
-    global NO_WISPS
+    global NO_WISPS, CROWD_TEST
+    CROWD_TEST = a.crowd_test
     NO_WISPS = a.no_wisps
     for kv in a.wisp:
         k, v = kv.split("=", 1)

@@ -5,6 +5,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <algorithm>
+#include <unordered_map>
 #include <bit>
 #include <chrono>
 #include <cmath>
@@ -583,6 +584,54 @@ RootMotionSample SkinnedRig::rootMotionAt(double now) const {
     return sample;
 }
 
+std::uint64_t SkinnedRig::poseKey(double now, float hz) const {
+    if (!semanticsCache || !layers.empty() || !rootMotion.empty() || hasExternalPose || !player.active() ||
+        reseedPrevious) {
+        return 0;
+    }
+    const double t = sampleTime(now, hz);
+    if (player.blending(t)) {
+        return 0;
+    }
+    const int state = player.currentStateIndex();
+    if (state < 0) {
+        return 0;
+    }
+    const double local = player.stateTime(clips, t);
+    // FNV-1a over (the clip pack, the state, the clip second's bits): equal keys are equal poses,
+    // and a collision between two different ones is checked away by `updateRigs` comparing the parts.
+    std::uint64_t h = 1469598103934665603ull;
+    const auto mix = [&h](std::uint64_t v) {
+        for (int i = 0; i < 8; ++i) {
+            h ^= (v >> (8 * i)) & 0xffu;
+            h *= 1099511628211ull;
+        }
+    };
+    mix(reinterpret_cast<std::uintptr_t>(semanticsCache.get()));
+    mix(static_cast<std::uint64_t>(state));
+    mix(std::bit_cast<std::uint64_t>(local));
+    return h == 0 ? 1 : h;
+}
+
+bool SkinnedRig::adoptPose(const SkinnedRig& source, double now, float hz) {
+    const double t = sampleTime(now, hz);
+    if (!palette.empty() && paletteTime >= 0.0 && t == paletteTime) {
+        hold();
+        return false;
+    }
+    previousPalette = palette;
+    pose = source.pose;
+    palette = source.palette;
+    if (previousPalette.size() != palette.size()) {
+        previousPalette = palette;
+    }
+    layerStats = {};
+    rootMotionApplied = false;
+    paletteTime = t;
+    ++paletteVersion;
+    return true;
+}
+
 bool SkinnedRig::evaluate(double now, float hz) {
     if (!skeleton.valid()) {
         return false;
@@ -668,6 +717,7 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
     // ADR-1109: a rig any hero entity is skinned by keeps its authored rates under the live draw-distance lever.
     std::vector<std::uint8_t> heroRig(scene.rigs.size(), 0);
     const glm::vec3 eye = scene.camera.position;
+    std::unordered_map<std::uint64_t, std::size_t> posedBy; // ADR-2116: pose key -> the rig that posed it
     for (const Entity& entity : scene.entities) {
         if (entity.rig >= scene.rigs.size()) {
             continue;
@@ -700,7 +750,33 @@ RigStats updateRigs(Scene& scene, const FrameTime& time) {
             ++stats.culled;
             continue;
         }
+        // ADR-2116: a rig whose pose is the same as one already posed this frame adopts it.
+        rig.sharedFrom = -1;
+        const std::uint64_t key = rig.poseKey(time.renderTime, hz);
+        if (key != 0) {
+            const auto found = posedBy.find(key);
+            if (found != posedBy.end()) {
+                const SkinnedRig& source = scene.rigs[found->second];
+                const double t = SkinnedRig::sampleTime(time.renderTime, hz);
+                if (source.semanticsCache == rig.semanticsCache && source.paletteTime == t &&
+                    source.player.currentStateIndex() == rig.player.currentStateIndex() &&
+                    source.player.stateTime(source.clips, t) == rig.player.stateTime(rig.clips, t)) {
+                    if (rig.adoptPose(source, time.renderTime, hz)) {
+                        rig.sharedFrom = static_cast<std::int32_t>(found->second);
+                        ++stats.posed;
+                        ++stats.shared;
+                        stats.joints += static_cast<std::uint32_t>(rig.skeleton.jointCount());
+                    } else {
+                        ++stats.rateLimited;
+                    }
+                    continue;
+                }
+            }
+        }
         if (rig.evaluate(time.renderTime, hz)) {
+            if (key != 0) {
+                posedBy.emplace(key, i);
+            }
             ++stats.posed;
             stats.joints += static_cast<std::uint32_t>(rig.skeleton.jointCount());
             stats.layers += rig.layerStats.applied;
