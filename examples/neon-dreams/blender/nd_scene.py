@@ -343,8 +343,9 @@ VIEWS = {   # name: (position, heading deg (0 = +x, counter-clockwise), pitch de
     "reveal": ((600, 78, 305), 7.0, -7.0, 32, 62.0),
     "top": ((20, 20, 900), 90.0, -89.0, 50, 0.0),
     "aerial": ((-260, -330, 330), 52.0, -27.0, 35, 20.0),
+    "gardens": ((112, -86, 170), 139.0, -19.5, 28, 44.0),      # from above the east garden back along the Quay: the Steps, roof terraces, pocket gardens, gangways
 }
-EXPO = {"approach": 0.3, "reveal": 0.25, "top": 0.0, "aerial": 0.4}
+EXPO = {"approach": 0.3, "reveal": 0.25, "top": 0.0, "aerial": 0.4, "gardens": 0.1}
 
 
 def view(name):
