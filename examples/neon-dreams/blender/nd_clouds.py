@@ -658,6 +658,9 @@ def deball(lobes, voids):
     return out
 
 
+PLUG_SOFT = 0.55
+
+
 def veil():
     """The bank: three turrets over a chain of rooms (gate, antechamber, nave, lantern room), the plug and the mouth. Iteration 6: what a room's wall is made of. In iteration 5 every shell lobe was 12 to 60 m with a crisp
     edge, and from inside the walls read as clustered spheres. The cause, found in AV Gen: the renderer's noise has
@@ -731,8 +734,11 @@ def veil():
             for j in range(-2, 3):
                 if abs(i) == 2 and abs(j) == 2:
                     continue
-                r = r0 * rr.uniform(0.96, 1.1); js = rr.uniform(-4.0, 4.0)
-                l = L(p[0] + right[0] * i * sp + d[0] * js, p[1] + right[1] * i * sp + d[1] * js, p[2] + j * sp - 2.0, r, 1.0, 1.0, 0.3)
+                # iteration 10 (it9b open item, 46.8 s): with a crisp edge (soft 0.3) the plug's top row stood in the bank's
+                # opening as two dark balls against the amber room. A soft edge (0.55) gives the erosion a 34 m band to break
+                # the silhouette; the radius is 8 % larger so the plug stays as opaque on the journey's line
+                r = r0 * rr.uniform(0.96, 1.1) * 1.08; js = rr.uniform(-4.0, 4.0)
+                l = L(p[0] + right[0] * i * sp + d[0] * js, p[1] + right[1] * i * sp + d[1] * js, p[2] + j * sp - 2.0, r, 1.0, 1.0, PLUG_SOFT)
                 if _admit(l, rooms, 0.3):
                     l["_keep"] = True; l["tag"] = "plug"; out.append(l); STATS["plug_lobes"] = STATS.get("plug_lobes", 0) + 1
     # iteration 9 (orchestrator, after the engine's it9 render): leaving the plug at 56.5 s the frame's mean fell 0.44 -> 0.20
@@ -754,6 +760,23 @@ def veil():
             l["soft"] = max(l["soft"], 0.5)
         kept.append(l)
     out = kept; STATS.update(veil_small_lobes_dropped_near_journey=n_small)
+    # iteration 10 (it9b open item, 46.8-51 s): seen from outside through the bank's gate, the gate room's wall masses
+    # stood against the amber room as two dark balls (found by removing lobes in AV Gen: the left ball is the two masses
+    # 30-70 m left of the axis at s 300-340; the right one is the small wall mass on the axis there and the small round
+    # bank mat in front of it). Those go; the rest of the gate's walls and their second masses are flattened (0.6 in
+    # height) with a wider soft band (0.7), so the noise tears their outlines into the bank's layered look instead of
+    # drawing a round edge
+    kept, n_gone, n_flat = [], 0, 0
+    for l in out:
+        x_, y_, z_ = l["c"]
+        if l.get("tag") == "bank" and 430.0 < x_ < 446.0 and 30.0 < z_ < 50.0 and l["r"] < 40.0:
+            n_gone += 1; continue
+        if l.get("tag") in ("wall", None) and 380.0 < x_ < 500.0 and -80.0 < z_ < 60.0 and y_ > 100.0:
+            if 440.0 < x_ < 470.0 and -75.0 < z_ < 10.0 and l.get("tag") == "wall" or 470.0 <= x_ < 490.0 and -75.0 < z_ < -30.0 and l.get("tag") == "wall":
+                n_gone += 1; continue
+            l["scale"] = [l["scale"][0], round(l["scale"][1] * 0.6, 3), l["scale"][2]]; l["soft"] = max(l["soft"], 0.7); n_flat += 1
+        kept.append(l)
+    out = kept; STATS.update(gate_walls_dropped=n_gone, gate_walls_flattened=n_flat)
     # a curtain across the second throat: one thin scrap the camera passes through at about 53.6 s
     p, d, right, t = at(294)
     out.append(L(p[0], p[1], p[2] + 3, 13.0, 0.9, 0.3, 0.8))
@@ -1184,6 +1207,27 @@ def crown(lobes, ceiling, keep_tags=("plug_fade",), plug_over=30.0):
     return out
 
 
+def pier_seat():
+    """Iteration 10 (it9b open item, 26-27 s): with the engine's finer billows (ADR-2115, 40 m) the cloud under the pier's
+    first spans sank and their A-frame stilts stood in the open beside the plaza. A tongue of flattened seat lobes under
+    the first 110 m of the pier, its top 2 m under the deck at the root and falling 0.7 m every 10 m, so the stilts sink
+    into cloud near the town and the outer pier still crosses its hollow (the intended drama, 12-22 s)."""
+    rr = random.Random(71); out = []
+    px, py, pz = PIER_ROOT; dx, dy = PIER_DIR
+    for k in range(9):
+        d = 6.0 + 13.0 * k
+        for side in (-1, 0, 1):
+            off = side * rr.uniform(7.0, 11.0)
+            x, y = px + dx * d - dy * off, py + dy * d + dx * off
+            r = rr.uniform(26.0, 34.0); sy = rr.uniform(0.42, 0.52)
+            top = pz - 2.0 - 0.07 * d - rr.uniform(0.0, 2.0)
+            l = L(x, y, top - r * sy, r, sy, 1.0, 0.45, sx=rr.uniform(1.2, 1.6))
+            l["tag"] = "seat"
+            if path_gap(l, 0.0, 47.4) >= 3.0:                   # its top is 2 m under the deck; the lens is never lower than the deck
+                out.append(l)
+    return out
+
+
 def build():
     cells = town()
     old = {k: v for k, v in cells.items() if not v[2]}               # the town before iteration 9: the near-city cloud is built from it, unchanged
@@ -1295,6 +1339,8 @@ def build():
     STATS.update(added_where_room=add_where_room(masses, {"mooring_mound": GARDEN_SEAT}), offered={"mooring_mound": len(GARDEN_SEAT)})
     masses["districts"] = []
     STATS.update(districts_added_where_room=add_where_room(masses, late), districts_offered=len(late["districts"]))
+    ps = pier_seat()
+    STATS.update(pier_seat_added=add_where_room(masses, {"mooring_mound": ps}), pier_seat_offered=len(ps))
     far = far_field()
     for k_ in far:
         far[k_] = prune_hidden(far[k_])

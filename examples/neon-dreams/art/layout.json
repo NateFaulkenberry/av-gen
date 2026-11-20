@@ -50159,7 +50159,7 @@
    "rpm": 3.75,
    "phase": 0.37,
    "elevation_deg": -1.5,
-   "length_m": 1100.0,
+   "length_m": 480.0,
    "half_angle_deg": 1.0,
    "key": "moon_disc",
    "intensity": 1.0,
@@ -50170,7 +50170,7 @@
    ],
    "cloud_glow": {
     "radius_m": 110.0,
-    "orbit_radius_m": 605.0,
+    "orbit_radius_m": 264.0,
     "y": 98.0,
     "intensity": 0.6
    },

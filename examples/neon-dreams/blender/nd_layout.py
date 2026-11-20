@@ -636,6 +636,12 @@ def lighthouses():
         a = "landmarks/%s.glb" % asset; m = MAN[a]
         inst(a, x, y, z, math.radians(yawd), 1.0, "lighthouse", tint={"win_warm": "amber", "win_cool": "win_a", "strip": "eave", "beam_lamp": "moon_disc"}, iid=name)
         lm = m["lamp_m"]; dx, dy = rot(math.radians(yawd), lm[0], -lm[2]); lamp_p = (x + dx, y + dy, z + lm[1])
+        # iteration 10 (it9b open item, 48.97 s): the Outer Light's beam, 1.1 km long, reached the lens 530 m out on the lower
+        # dive and its bloom crossed the frame. Tilting it down (-4) only moved the hit onto the cloud beside the lens, a
+        # bright patch sweeping the frame (AV Gen A/B). It is now 480 m long: from 40 s on the lens is always farther
+        # than that (560-710 m), and from the approach (1.0-1.3 km) it still draws its sweep on the sea
+        if name == "outer_light":
+            blen = 480.0
         beams.append({"name": name, "origin": E(lamp_p), "count": 2, "rpm": rpm, "phase": phase, "elevation_deg": -1.5, "length_m": blen, "half_angle_deg": 1.0,
                       "key": "moon_disc", "intensity": 1.0, "spin_axis": [0, 1, 0],
                       "cloud_glow": {"radius_m": 110.0, "orbit_radius_m": round(blen * 0.55, 1), "y": round(z - 20.0, 1), "intensity": 0.6},
