@@ -3296,8 +3296,8 @@
     "id": "spot_136",
     "kind": "look",
     "pos": [
-     164.0,
-     121.6,
+     165.2,
+     121.2,
      40.0
     ],
     "facing_deg": 0.0,
@@ -3317,7 +3317,7 @@
      200,
      45.0
     ],
-    "note": "at the east edge, looking up at the Veil"
+    "note": "on the promenade at the east rail, looking up at the Veil"
    },
    {
     "id": "spot_137",
@@ -4804,6 +4804,13 @@
     "win_warm": "win_d",
     "win_cool": "win_b",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.03,
+     0.029,
+     0.046
+    ]
    }
   },
   {
@@ -4831,6 +4838,13 @@
     "win_warm": "win_d",
     "win_cool": "win_a",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.066,
+     0.036,
+     0.062
+    ]
    }
   },
   {
@@ -4885,6 +4899,13 @@
     "win_warm": "win_d",
     "win_cool": "win_a",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.094,
+     0.044,
+     0.028
+    ]
    }
   },
   {
@@ -4912,6 +4933,13 @@
     "win_warm": "win_d",
     "win_cool": "win_b",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.094,
+     0.044,
+     0.028
+    ]
    }
   },
   {
@@ -4939,6 +4967,13 @@
     "win_warm": "win_d",
     "win_cool": "win_c",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.094,
+     0.044,
+     0.028
+    ]
    }
   },
   {
@@ -5074,6 +5109,13 @@
     "win_warm": "win_d",
     "win_cool": "win_b",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.104,
+     0.094,
+     0.08
+    ]
    }
   },
   {
@@ -5128,6 +5170,13 @@
     "win_warm": "win_d",
     "win_cool": "win_c",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.104,
+     0.094,
+     0.08
+    ]
    }
   },
   {
@@ -5155,6 +5204,13 @@
     "win_warm": "win_d",
     "win_cool": "win_c",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.066,
+     0.064,
+     0.074
+    ]
    }
   },
   {
@@ -5209,6 +5265,13 @@
     "win_warm": "win_d",
     "win_cool": "win_c",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.066,
+     0.064,
+     0.074
+    ]
    }
   },
   {
@@ -11073,6 +11136,13 @@
     "win_warm": "win_d",
     "win_cool": "win_a",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.032,
+     0.047,
+     0.078
+    ]
    }
   },
   {
@@ -11254,6 +11324,13 @@
     "win_warm": "win_d",
     "win_cool": "win_a",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.094,
+     0.044,
+     0.028
+    ]
    }
   },
   {
@@ -11885,6 +11962,13 @@
     "win_warm": "win_d",
     "win_cool": "win_c",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.066,
+     0.036,
+     0.062
+    ]
    }
   },
   {
@@ -12110,6 +12194,13 @@
     "win_warm": "win_d",
     "win_cool": "win_b",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.032,
+     0.047,
+     0.078
+    ]
    }
   },
   {
@@ -12560,6 +12651,13 @@
     "win_warm": "win_d",
     "win_cool": "win_c",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.03,
+     0.029,
+     0.046
+    ]
    }
   },
   {
@@ -13098,6 +13196,13 @@
     "win_warm": "win_d",
     "win_cool": "win_b",
     "strip": "eave"
+   },
+   "color": {
+    "facade": [
+     0.066,
+     0.064,
+     0.074
+    ]
    }
   },
   {
@@ -16172,9 +16277,9 @@
    "id": "shrub_b_522",
    "asset": "garden/shrub_b.glb",
    "pos": [
-    119.044,
+    120.408,
     121.6,
-    42.663
+    42.099
    ],
    "rot_y_deg": 202.459,
    "quat": [
@@ -16272,9 +16377,9 @@
    "id": "sprig_bed_3m_526",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    160.113,
+    159.189,
     121.6,
-    24.553
+    24.987
    ],
    "rot_y_deg": 25.16,
    "quat": [
@@ -21682,7 +21787,7 @@
  },
  "stats": {
   "instances": 675,
-  "triangles": 862997,
+  "triangles": 902494,
   "by_zone": {
    "quay_deck": 33,
    "quay_north": 12,

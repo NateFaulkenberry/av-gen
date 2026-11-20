@@ -150,7 +150,7 @@ if signs:
         manifest.append({"asset": "signs/" + A.name + ".gltf", "tris": A.tris,
                          "bounds_m": [round(min(v.co.x for v in vs), 2), round(min(v.co.z for v in vs), 2), round(-max(v.co.y for v in vs), 2),
                                       round(max(v.co.x for v in vs), 2), round(max(v.co.z for v in vs), 2), round(-min(v.co.y for v in vs), 2)], **A.meta})
-mat_doc = {"facade": "dark wall", "trim": "slabs, frames, sills", "metal": "pipes, rails, stilts", "deck": "walking surfaces", "glass": "unlit panes; uv = (level, window hash)",
+mat_doc = {"facade": "walls (atlas cell tiles; the factor is the building's hue)", "trim": "slabs, frames, sills, kerbs", "metal": "pipes, rails, stilts, inlays", "deck": "walking surfaces: boards, deck plates, pavers", "glass": "unlit panes; uv = (level, window hash)",
            "cloth": "awnings, laundry (tint per instance)", "foliage": "dark leaves", "pool": "garden pool",
            "win_warm": "lit panes and shop bays; uv = (level, window hash)", "win_cool": "lit panes; uv = (level, window hash)", "win_stair": "stairwell slot windows, always lit: do not run the lit/dark pane program on it", "strip": "eave lines, soffit lines, crown",
            "beacon": "red mast lights", "landmark": "Great Lantern bell; uv = (level, panel id)", "garden": "plant light points; uv = (level, hash)",
@@ -161,6 +161,13 @@ if not ONLY:
     json.dump({"units": "metres, Y-up in the GLB, origin at base centre at deck level; a building's front (shop side) faces +z in the GLB",
                "window_rule": "every pane (glass, win_warm, win_cool, win_stair, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
                "materials": mat_doc, "emissive_strength": STRENGTH, "grid": {"floor_m": FLOOR, "bay_m": BAY},
+               "surface": {"what": "iteration 8: one shared texture set on the unlit surface roles (facade, trim, metal, deck) of the assets listed; the GLBs reference it by URI, so it is stored once",
+                           "files": ["tex/nd_surface_base.png", "tex/nd_surface_normal.png", "tex/nd_surface_orm.png"], "regions": "tex/nd_surface.json (written by blender/nd_surface_atlas.py)",
+                           "reads_as": "the atlas MULTIPLIES each material's factors: base colour (a building's hue is its facade factor; an instance's `color.facade` in layout.json replaces it), "
+                                       "roughness (G), metallic (B), occlusion (R); the normal map is tangent space, glTF convention",
+                           "facade_cells": "a wall is mapped cell by cell (2.4 m bay x 3.2 m floor = one tile): rows = finish (light render, dark painted render, corrugated sheet, glazed tile on shop floors), "
+                                           "columns = windowed / blank / the lowest floor of a block (grime rising)",
+                           "assets": sorted(SURFACED)},
                "inhabitant_scale": {"cast": "Glowmere aliens at scale 1.0 (1.66 to 1.79 m)", "door_head_m": 2.04, "rail_m": 1.05, "step_riser_m": 0.2, "balcony_depth_m": 1.05,
                                     "gallery_depth_m": 1.5, "gangway_width_m": 2.0, "bench_seat_m": 0.43},
                "assets": manifest}, open(os.path.join(OUT, "kit_manifest.json"), "w"), indent=1)

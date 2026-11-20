@@ -21,6 +21,20 @@ class MB:
 
     def __init__(self):
         self.v, self.f, self.uv, self.attr = [], [], [], {}
+        self.def_uv = (0.0, 0.0)      # the UV of every loop that is given none (emissive roles: level 0; surface roles: the atlas's neutral texel)
+        self.patch = None             # (x, y, w, h, W, H, px_per_m): the atlas rectangle this material's boxes and cylinders are mapped into
+
+    def puv(self, pts2, a, b, key):
+        """UVs for a face of a x b metres whose corners have the face coordinates pts2 (0..a, 0..b; b is up on a
+        vertical face): a window of the patch at the atlas's scale, shrunk to fit when the face is larger than the
+        patch, placed by a hash of `key` so that two faces seldom show the same piece."""
+        x, y, w, h, W, H, ppm = self.patch
+        m = 3.0
+        su, sv = min(a * ppm, w - 2 * m), min(b * ppm, h - 2 * m)
+        h1 = math.sin(key * 12.9898) * 43758.5453; h1 -= math.floor(h1)
+        h2 = math.sin(key * 78.233 + 1.7) * 12345.678; h2 -= math.floor(h2)
+        ou, ov = m + h1 * (w - 2 * m - su), m + h2 * (h - 2 * m - sv)
+        return [((x + ou + (p / a if a > 1e-9 else 0.0) * su) / W, 1.0 - (y + h - ov - (q / b if b > 1e-9 else 0.0) * sv) / H) for p, q in pts2]
 
     def _add(self, pts, faces, attrs=None, uvs=None):
         b = len(self.v)
@@ -34,7 +48,7 @@ class MB:
             col.extend([float(attrs.get(k, 0.0))] * n)
         if uvs is None:
             for f in faces:
-                self.uv.extend([(0.0, 0.0)] * len(f))
+                self.uv.extend([self.def_uv] * len(f))
         else:
             self.uv.extend(uvs)
 
@@ -49,7 +63,17 @@ class MB:
             pts = [(c[0] + x * cs - y * sn, c[1] + x * sn + y * cs, c[2] + z) for x, y, z in loc]
         else:
             pts = [tuple(Vector(c) + M @ Vector(p)) for p in loc]
-        self._add(pts, [f for i, f in enumerate(self.BOXF) if i not in skip], attrs)   # skip: 0 bottom, 1 top, 2 -y, 3 +x, 4 +y, 5 -x
+        uvs = None
+        if self.patch:                # box-projected into the material's patch: (x, y) on top and bottom, (along, z) on the sides
+            uvs = []
+            key = c[0] * 1.37 + c[1] * 2.11 + c[2] * 3.73 + size[0] * 0.31
+            for i, f in enumerate(self.BOXF):
+                if i in skip:
+                    continue
+                ax = (0, 1) if i < 2 else (0, 2) if i in (2, 4) else (1, 2)
+                hs = (hx, hy, hz)
+                uvs.extend(self.puv([(loc[k][ax[0]] + hs[ax[0]], loc[k][ax[1]] + hs[ax[1]]) for k in f], size[ax[0]], size[ax[1]], key + i * 0.917))
+        self._add(pts, [f for i, f in enumerate(self.BOXF) if i not in skip], attrs, uvs)   # skip: 0 bottom, 1 top, 2 -y, 3 +x, 4 +y, 5 -x
 
     def beam(self, p0, p1, t=0.3, attrs=None, t2=None):
         p0, p1 = Vector(p0), Vector(p1)
@@ -77,7 +101,17 @@ class MB:
         if cap:
             faces.append(tuple(range(n, 2 * n)))
             faces.append(tuple(reversed(range(n))))
-        self._add(pts, faces, attrs)
+        uvs = None
+        if self.patch:                # the wall unrolled (arc length, height); caps in plan
+            uvs = []
+            key = base[0] * 1.37 + base[1] * 2.11 + base[2] * 3.73 + r * 0.31
+            rm = max(r, rt); circ = 2 * math.pi * rm
+            for i in range(n):
+                uvs.extend(self.puv([(circ * i / n, 0.0), (circ * (i + 1) / n, 0.0), (circ * (i + 1) / n, h), (circ * i / n, h)], circ, abs(h), key))
+            if cap:
+                for ring, rr in ((range(n, 2 * n), rt), (reversed(range(n)), r)):
+                    uvs.extend(self.puv([(pts[k][0] - base[0] + rm, pts[k][1] - base[1] + rm) for k in ring], 2 * rm, 2 * rm, key + rr))
+        self._add(pts, faces, attrs, uvs)
 
     def sphere(self, c, r, n=12, m=8, attrs=None, squash=1.0):
         pts, faces = [], []

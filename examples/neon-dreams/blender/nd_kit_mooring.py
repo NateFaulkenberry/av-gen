@@ -495,10 +495,127 @@ def beam_cone():
 
 
 # ------------------------------------------------------------------------------------------- decks and street furniture
+def balustrade(A, r, z, a0, a1, step=math.radians(7.5), lamp_every=4, c=(0.0, 0.0), seed=0.0):
+    """A railing round an arc at radius r: posts, three rails as chords, a lantern on every fourth post."""
+    n = max(1, int(round((a1 - a0) / step)))
+    P = [(c[0] + r * math.cos(a0 + (a1 - a0) * i / n), c[1] + r * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n + 1)]
+    for i, (x, y) in enumerate(P):
+        t = a0 + (a1 - a0) * i / n
+        tall = lamp_every and i % lamp_every == 0
+        A.m("metal").box((x, y, z + (0.95 if tall else 0.54)), (0.07, 0.07, 1.9 if tall else 1.08), yaw=t)
+        if tall:
+            A.m("metal").box((x, y, z + 1.93), (0.34, 0.34, 0.05), yaw=t)
+            lamp(A.m("lantern"), (x, y, z + 1.76), 0.13, 0.7 + 0.3 * hh01(x, y, seed), hh01(y, x, seed, 2.0), squash=1.25)
+    for i in range(n):
+        (xa, ya), (xb, yb) = P[i], P[i + 1]
+        A.m("metal").beam((xa, ya, z + 1.05), (xb, yb, z + 1.05), 0.06, t2=0.05)
+        A.m("metal").beam((xa, ya, z + 0.58), (xb, yb, z + 0.58), 0.03); A.m("metal").beam((xa, ya, z + 0.14), (xb, yb, z + 0.14), 0.03)
+
+
+def planter_arc(A, r2, r, z, a0, a1, width=1.0, height=0.45, c=(0.0, 0.0)):
+    """A raised planter bending round an arc: a kerb of short straight boxes, soil, cushion shrubs, ferns and sprigs."""
+    n = max(1, int(round((a1 - a0) * r / 2.4)))
+    for i in range(n):
+        t0, t1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n; tm = (t0 + t1) / 2
+        ch = 2 * (r + width / 2) * math.sin((t1 - t0) / 2) + 0.02
+        x, y = c[0] + r * math.cos(tm), c[1] + r * math.sin(tm)
+        A.m("trim").box((x, y, z + height / 2), (width, ch, height), yaw=tm)
+        A.m("facade").box((x, y, z + height - 0.01), (width - 0.24, ch - 0.02, 0.04), yaw=tm)
+        k = r2.random()
+        if k < 0.5:
+            shrub(A, r2, (x, y, z + height), r2.uniform(0.32, 0.45), buds=5, h=0.8)
+        elif k < 0.8:
+            fern(A, r2, (x, y, z + height), 0.55); sprigs(A, r2, (x, y, z + height), 0.3, n=4)
+        else:
+            sprigs(A, r2, (x, y, z + height), 0.36, n=7, h=(0.2, 0.55))
+
+
+def crescent(A, r0, r1, z, a0, a1, z_from, steps_at=None, c=(0.0, 0.0), rail=True):
+    """A lower terrace hung outside a round deck: boards round the arc, a fascia, a rail on its outer edge, a short
+    flight down to it from the level above (z_from) at the angle steps_at, and two legs lost in the cloud."""
+    n = max(2, int(round((a1 - a0) / math.radians(7.5))))
+    ring_band(A, r0, r1, z, a0, a1, n, "planks", c=c)
+    wall_ring(A, "trim", r1, z - 0.7, z, a0, a1, n, c=c); wall_ring(A, "trim", r0 + 0.02, z - 0.7, z, a0, a1, n, inward=True, c=c)
+    for t in (a0, a1):                                                    # end walls
+        pa, pb = (c[0] + r0 * math.cos(t), c[1] + r0 * math.sin(t)), (c[0] + r1 * math.cos(t), c[1] + r1 * math.sin(t))
+        A.m("trim").beam((pa[0], pa[1], z - 0.35), (pb[0], pb[1], z - 0.35), 0.7, t2=0.06)
+    if rail:
+        balustrade(A, r1 - 0.12, z, a0, a1, c=c, seed=z)
+        for t in (a0, a1):                                                # the rail returns to the deck at both ends
+            pa, pb = (c[0] + (r0 + 0.1) * math.cos(t), c[1] + (r0 + 0.1) * math.sin(t)), (c[0] + (r1 - 0.12) * math.cos(t), c[1] + (r1 - 0.12) * math.sin(t))
+            A.m("metal").beam((pa[0], pa[1], z + 1.05), (pb[0], pb[1], z + 1.05), 0.06, t2=0.05); A.m("metal").beam((pa[0], pa[1], z + 0.58), (pb[0], pb[1], z + 0.58), 0.03)
+    if steps_at is not None:
+        nst = max(1, int(round((z_from - z) / 0.2)))
+        for i in range(nst - 1):
+            rr = r0 + 0.15 + i * 0.3
+            A.m("deck").box((c[0] + rr * math.cos(steps_at), c[1] + rr * math.sin(steps_at), z_from - (i + 1) * 0.2 - 0.1), (0.3, 2.6, 0.2), yaw=steps_at)
+    for t in (a0 + (a1 - a0) * 0.25, a0 + (a1 - a0) * 0.75):
+        rm = (r0 + r1) / 2
+        A.m("metal").cyl((c[0] + rm * math.cos(t), c[1] + rm * math.sin(t), z - 15.0), 0.24, 14.4, n=8, cap=False)
+
+
+def round_terrace(nm, rad, legs, full):
+    """A round garden deck with a BUILT edge (iteration 8; it was a bare disc and read as one). Paved in rings; the
+    large one steps down two risers to a boarded promenade behind a lantern balustrade, planters bend round the upper
+    edge between the ways down, and two stepped crescents hang outside it, each lower than the last, into the cloud.
+    Angles are plan angles in the asset: 0 = +x (east when unturned), counter-clockwise."""
+    A = Asset(nm); r2 = random.Random(int(rad * 31)); D = math.radians
+    r_up = rad - 2.4 if full else rad                                      # the paved upper level
+    edges = [r_up]
+    while edges[-1] - 3.2 > 1.0:
+        edges.append(edges[-1] - 3.2)
+    for k, (ro, ri) in enumerate(zip(edges[:-1], edges[1:])):            # paved in rings: slabs in half bond, every other ring a paler stone, a metal inlay between rings
+        n = 48 if ro > 16 else 36 if ro > 9 else 24
+        ring_band(A, ri + 0.1, ro - 0.1, 0.0, n=n, kind="pavers", mat="deck" if k % 2 == 0 else "trim")
+        ring_band(A, ri - 0.1, ri + 0.1, 0.0, n=n, kind="pavers", mat="metal")
+        if k == 0:
+            ring_band(A, ro - 0.1, ro, 0.0, n=n, kind="pavers", mat="metal")
+    for k in range(12):                                                    # and twelve inlaid spokes
+        a = math.radians(k * 30 + 15); r0_, r1_ = edges[-1] + 0.1, r_up - (1.3 if full else 0.4)
+        A.m("metal").box(((r0_ + r1_) / 2 * math.cos(a), (r0_ + r1_) / 2 * math.sin(a), 0.0), (r1_ - r0_, 0.2, 0.03), yaw=a)
+    A.m("deck").cyl((0, 0, -0.3), edges[-1] - 0.1, 0.3, n=24)              # the middle (under the pool on the large deck)
+    A.m("trim").cyl((0, 0, -0.75), rad - 0.6, 0.45, n=48)
+    for k in range(legs):
+        a = k / legs * 6.283
+        A.m("metal").cyl(((rad - 4) * math.cos(a), (rad - 4) * math.sin(a), -16), 0.32, 15.4, n=8, cap=False)
+        A.m("metal").beam(((rad - 9) * math.cos(a), (rad - 9) * math.sin(a), -0.8), ((rad - 0.4) * math.cos(a), (rad - 0.4) * math.sin(a), -1.3), 0.28, t2=0.5)   # a bracket to the rim
+    if not full:
+        wall_ring(A, "trim", rad, -0.75, 0.0, n=48)
+        wall_ring(A, "trim", rad, 0.0, 0.22, n=48); wall_ring(A, "trim", rad - 0.3, 0.0, 0.22, n=48, inward=True); ring_band(A, rad - 0.3, rad, 0.22, n=48, kind="pavers", mat="trim")   # a low kerb
+        for (a0, a1) in ((5, 55), (158, 188), (-140, -70)):               # rails where no stair or neighbour deck arrives (the layout's two uses)
+            balustrade(A, rad - 0.15, 0.22, D(a0), D(a1), seed=rad)
+            planter_arc(A, r2, rad - 1.0, 0.0, D(a0 + 4), D(a1 - 4), width=0.9)
+        A.finish()
+        return A
+    z1, z2 = -0.2, -0.4                                                    # tread, promenade
+    wall_ring(A, "trim", r_up, z1, 0.0, n=96); ring_band(A, r_up, r_up + 0.35, z1, n=96, kind="pavers", mat="trim")
+    wall_ring(A, "trim", r_up + 0.35, z2, z1, n=96)
+    ring_band(A, r_up + 0.35, rad, z2, n=96, kind="planks")
+    wall_ring(A, "trim", rad, -1.35, z2, n=96)                             # the rim's fascia
+    A.m("strip").cyl((0, 0, -1.33), rad + 0.03, 0.07, n=96, cap=False)    # a light line under it: the terrace's eave line
+    gaps = [(133, 156), (62, 78), (-108, -92)]                             # the neighbour deck (144 deg), the two ways down to the crescents
+    arcs = []; a = -180.0
+    for g0, g1 in sorted(gaps):
+        arcs.append((a, g0)); a = g1
+    arcs.append((a, 180.0))
+    for (a0, a1) in arcs:
+        if a1 - a0 > 4:
+            balustrade(A, rad - 0.14, z2, D(a0), D(a1), seed=1.0)
+    for (a0, a1) in ((-84, -12), (-4, 54), (86, 126), (164, 236), (244, 268)):       # planters on the upper edge; between them the two steps are open
+        planter_arc(A, r2, r_up - 0.62, 0.0, D(a0), D(a1))
+    crescent(A, rad, rad + 3.6, -1.2, D(36), D(104), z2, steps_at=D(70))             # north-east: on the left of the journey's view at 44.5 s
+    crescent(A, rad + 3.6, rad + 6.6, -2.0, D(48), D(90), -1.2, steps_at=D(64), rail=True)
+    crescent(A, rad, rad + 3.4, -1.2, D(-132), D(-68), z2, steps_at=D(-100))         # south: on its right
+    crescent(A, rad + 3.4, rad + 6.2, -2.0, D(-118), D(-86), -1.2, steps_at=D(-104))
+    A.meta = dict(upper_radius_m=round(r_up, 2), promenade_y_m=z2, crescents_deg=[[36, 104], [-132, -68]])
+    A.finish()
+    return A
+
+
 def deck_kit():
     out = []
     A = Asset("deck_quay_6m")                       # one 6 m length of the Quay, 8.6 m wide; instance along the street spline
-    A.m("deck").box((0, 0, -0.14), (6.0, 8.6, 0.28)); A.m("trim").box((0, 0, -0.42), (6.0, 8.2, 0.28))
+    deck_box(A, (0, 0, -0.14), (6.0, 8.6, 0.28), "planks", "y"); A.m("trim").box((0, 0, -0.42), (6.0, 8.2, 0.28))    # boards across the street, 8.6 m long
     A.m("trim").box((3.0, 0, -0.17), (0.7, 8.6, 0.3))                                                  # joint plate under the seam (covers the gap on curves)
     for sy in (-4.2, 4.2):
         A.m("trim").box((0, sy, -0.3), (6.0, 0.24, 0.6)); A.m("metal").box((0, sy * 0.98, 0.07), (6.0, 0.1, 0.14))
@@ -508,7 +625,7 @@ def deck_kit():
     A.finish(); out.append(A)
     A = Asset("deck_stair_3m2")                     # one floor (3.2 m) down over 4.8 m toward +x, full street width; origin at the foot centre
     for i in range(16):
-        A.m("deck").box((-2.4 + (i + 0.5) * 0.3, 0, 3.2 - (i + 0.5) * 0.2 - 0.1), (0.3, 8.6, 0.2))
+        deck_box(A, (-2.4 + (i + 0.5) * 0.3, 0, 3.2 - (i + 0.5) * 0.2 - 0.1), (0.3, 8.6, 0.2), "planks", "y")
     for sy in (-4.2, 4.2):
         A.m("trim").beam((-2.4, sy, 3.2), (2.4, sy, 0.0), 0.2, t2=0.5); A.m("metal").beam((-2.4, sy, 4.25), (2.4, sy, 1.05), 0.05)
         for k in range(5):
@@ -521,7 +638,7 @@ def deck_kit():
     A.finish(); out.append(A)
     for nm, garden in (("gangway_10m", False), ("gangway_garden_10m", True)):
         A = Asset(nm); r = random.Random(77)        # a footbridge between buildings at third-floor height (along y)
-        A.m("deck").box((0, 0, -0.1), (2.0, 10.0, 0.2)); A.m("trim").box((0, 0, -0.32), (1.5, 10.0, 0.26))
+        deck_box(A, (0, 0, -0.1), (2.0, 10.0, 0.2), "planks", "x"); A.m("trim").box((0, 0, -0.32), (1.5, 10.0, 0.26))
         for sx in (-0.95, 0.95):
             A.m("metal").box((sx, 0, 1.05), (0.05, 10.0, 0.05)); A.m("metal").box((sx, 0, 0.55), (0.03, 10.0, 0.03))
             for k in range(11):
@@ -562,7 +679,7 @@ def deck_kit():
     lamp(A.m("lantern"), (0, 0, 15.05), 0.12, 0.8, 0.5)
     A.meta = dict(top_y_m=12.8, footprint_m=[2.2, 3.4]); A.finish(); out.append(A)
     A = Asset("pier_span_22m")                      # the pier: instance end to end; drop and tilt the last ones for the broken spans
-    A.m("deck").box((0, 0, -0.2), (22.0, 5.5, 0.4)); A.m("trim").box((0, 0, -0.75), (22.0, 1.2, 0.7))
+    deck_box(A, (0, 0, -0.2), (22.0, 5.5, 0.4), "planks", "y"); A.m("trim").box((0, 0, -0.75), (22.0, 1.2, 0.7))
     for sy in (-2.65, 2.65):
         A.m("trim").box((0, sy, -0.35), (22.0, 0.2, 0.7)); A.m("metal").box((0, sy, 1.05), (22.0, 0.05, 0.05)); A.m("metal").box((0, sy, 0.55), (22.0, 0.03, 0.03))
         for k in range(12):
@@ -578,25 +695,20 @@ def deck_kit():
         A.m("metal").beam((0, -w_, z), (0, w_, z), 0.18)
     A.finish(); out.append(A)
     A = Asset("deck_lowwalk_6m")                    # the Low Walk: 2.6 m wide, a rail on the cloud side (-y)
-    A.m("deck").box((0, 0, -0.12), (6.0, 2.6, 0.24)); A.m("trim").box((0, 0, -0.36), (6.0, 2.2, 0.24))
+    deck_box(A, (0, 0, -0.12), (6.0, 2.6, 0.24), "planks", "y"); A.m("trim").box((0, 0, -0.36), (6.0, 2.2, 0.24))
     A.m("metal").box((0, -1.25, 1.05), (6.0, 0.05, 0.05)); A.m("metal").box((0, -1.25, 0.55), (6.0, 0.03, 0.03))
     for k in range(4):
         A.m("metal").box((-3.0 + k * 2.0, -1.25, 0.52), (0.04, 0.04, 1.05))
     A.m("metal").cyl((0, -1.0, -12), 0.2, 11.6, n=8, cap=False); A.m("metal").beam((0, -1.0, -1.0), (0, 1.2, 4.5), 0.08)
     A.finish(); out.append(A)
     A = Asset("deck_pad_6m")                        # a 6 x 6 m deck square: plazas, pads under the Stacks, pocket gardens
-    A.m("deck").box((0, 0, -0.14), (6.0, 6.0, 0.28)); A.m("trim").box((0, 0, -0.42), (5.7, 5.7, 0.28))
+    deck_box(A, (0, 0, -0.14), (6.0, 6.0, 0.28), "plates"); A.m("trim").box((0, 0, -0.42), (5.7, 5.7, 0.28))        # four bolted deck plates
     A.m("metal").cyl((0, 0, -14), 0.3, 13.4, n=8, cap=False)
     for (ax, ay) in ((2.6, 2.6), (-2.6, 2.6), (2.6, -2.6), (-2.6, -2.6)):
         A.m("metal").beam((0, 0, -5.0), (ax, ay, -0.5), 0.1)
     A.finish(); out.append(A)
-    for nm, rad, legs in (("deck_round_27m", 27.0, 9), ("deck_round_14m", 14.0, 6)):
-        A = Asset(nm)
-        A.m("deck").cyl((0, 0, -0.3), rad, 0.3, n=36 if rad > 20 else 24); A.m("trim").cyl((0, 0, -0.75), rad - 0.6, 0.45, n=36 if rad > 20 else 24)
-        for k in range(legs):
-            a = k / legs * 6.283
-            A.m("metal").cyl(((rad - 4) * math.cos(a), (rad - 4) * math.sin(a), -16), 0.32, 15.4, n=8, cap=False)
-        A.finish(); out.append(A)
+    out.append(round_terrace("deck_round_27m", 27.0, 9, full=True))
+    out.append(round_terrace("deck_round_14m", 14.0, 6, full=False))
     A = Asset("rail_6m")                            # a deck-edge railing along x, 1.05 m high
     A.m("metal").box((0, 0, 1.05), (6.0, 0.05, 0.05)); A.m("metal").box((0, 0, 0.55), (6.0, 0.03, 0.03)); A.m("metal").box((0, 0, 0.12), (6.0, 0.03, 0.03))
     for k in range(5):

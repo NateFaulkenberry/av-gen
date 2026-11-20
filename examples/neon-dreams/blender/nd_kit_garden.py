@@ -163,7 +163,7 @@ def garden_kit():
     A = Asset("tree_pit"); r = random.Random(95)             # a round raised bed for an umbel tree, with sprigs
     A.m("trim").cyl((0, 0, 0), 1.25, 0.4, n=12); A.m("facade").cyl((0, 0, 0.37), 1.12, 0.05, n=12); sprigs(A, r, (0, 0, 0.42), 1.0, n=14, h=(0.2, 0.5)); A.finish(); out.append(A)
     A = Asset("terrace_step_6m"); r = random.Random(97)      # the Steps: a planted tray, one of a flight of terraces 0.8 m apart
-    A.m("deck").box((0, 0, -0.2), (6.0, 6.0, 0.4)); A.m("trim").box((0, -2.95, -0.6), (6.0, 0.1, 1.2))
+    deck_box(A, (0, 0, -0.2), (6.0, 6.0, 0.4), "pavers"); A.m("trim").box((0, -2.95, -0.6), (6.0, 0.1, 1.2))
     for sx in (-2.9, 2.9):
         A.m("metal").cyl((sx * 0.9, 0, -14), 0.24, 13.6, n=8, cap=False)
     A.m("trim").box((0, -2.55, 0.2), (6.0, 0.7, 0.4)); A.m("facade").box((0, -2.55, 0.39), (5.9, 0.6, 0.04))        # the downhill raised bed
@@ -182,7 +182,7 @@ def garden_kit():
         for sy in (-1, 1):
             A.m("trim").box((sx * (w_ / 2 - 0.1), sy * (d_ / 2 - 0.1), h_ / 2), (0.16, 0.16, h_))
     A.m("trim").box((0, 0, h_ + 0.1), (w_ + 1.6, d_ + 1.6, 0.2)); A.m("strip").box((0, -d_ / 2 - 0.66, h_ - 0.05), (w_ + 1.0, 0.06, 0.05))
-    A.m("deck").box((0, 0, 0.06), (w_, d_, 0.12))
+    deck_box(A, (0, 0, 0.06), (w_, d_, 0.12), "planks", "x")
     O, T, Nn = wall((-w_ / 2, d_ / 2 - 0.2, 0), (1, 0, 0))                     # back wall of three screens, facing the garden
     for b in range(3):
         u = b * BAY

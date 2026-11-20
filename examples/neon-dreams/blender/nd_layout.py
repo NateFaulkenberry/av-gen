@@ -17,7 +17,7 @@ sys.path.insert(0, HERE)
 from nd_world import *  # noqa
 
 ROOT = os.path.join(HERE, "..")
-MAN = {a["asset"]: a for a in json.load(open(os.path.join(ROOT, "meshes", "kit_manifest.json")))["assets"]}
+MAN = {a["asset"]: a for a in json.load(open(os.environ.get("ND_MANIFEST", os.path.join(ROOT, "meshes", "kit_manifest.json"))))["assets"]}   # ND_MANIFEST, and a path as the first argument: a scratch run that writes nothing here
 R = random.Random(20261119)
 INST, SPOTS, PATHS, LIGHTS, ENV, BOX = [], [], [], [], [], []
 STRING_KEYS = []          # the anchor pair of each lantern string, in order (for the mesh check to refuse one)
@@ -94,6 +94,26 @@ def tint_for(asset, warm_share=0.3):
     return {"win_warm": "win_d", "win_cool": R.choice(WIN_COOL), "strip": "eave"}
 
 
+# Iteration 8: a building's hue is its facade's base colour factor, written in its GLB (nd_kitcore.SCHEME: muted plum,
+# slate, rust, bone, ink). The same asset stands in a row two to four times, so every repeat takes another of the
+# Lanternwright wall colours here (ADR-2102: partMaterials.facade.baseColor from an instance's "color"). Each row
+# building is already a node of its own (its window tint differs), so this adds no nodes.
+WALLS = {"plum": [0.066, 0.036, 0.062], "slate": [0.032, 0.047, 0.078], "rust": [0.094, 0.044, 0.028], "bone": [0.104, 0.094, 0.080], "ink": [0.030, 0.029, 0.046],
+         "moss": [0.038, 0.056, 0.050], "wine": [0.078, 0.032, 0.044], "ash": [0.066, 0.064, 0.074]}      # as nd_kitcore's SCHEME (second pass)
+OWN_WALL = {"shophouse_a": "plum", "shophouse_b": "slate", "shophouse_c": "bone", "shophouse_d": "rust", "shophouse_e": "slate", "shophouse_f": "plum", "shophouse_g": "bone",
+            "shophouse_h": "ink", "shophouse_i": "rust", "shophouse_j": "bone", "stack_a": "slate", "stack_b": "plum", "stack_c": "ink", "stack_d": "rust", "stack_e": "bone"}
+_WALL_SEEN = {}
+
+
+def wall_for(asset):
+    """None for the first of an asset (its own colour); for each repeat the next wall colour that is not its own."""
+    nm = os.path.basename(asset).split(".")[0].replace("mooring_", ""); k = _WALL_SEEN.get(nm, 0); _WALL_SEEN[nm] = k + 1
+    if k == 0 or nm not in OWN_WALL:
+        return None
+    order = ["rust", "ash", "slate", "wine", "bone", "moss", "plum", "ink"]; order = [c for c in order if c != OWN_WALL[nm]]
+    return {"facade": WALLS[order[(k - 1 + sum(map(ord, nm))) % len(order)]]}
+
+
 # ============================================================================================ the Quay
 ZONES = {}
 BLD = {}                                              # id -> (asset, x, y, z, yaw) of row buildings, for signs and spots
@@ -136,7 +156,7 @@ def pack_row(side, tokens, x_start):
                 break
             xc += 0.25
         prev = e
-        inst(asset, xc, yc, qz(xc), yaw, 1.0, "quay_north" if side > 0 else "quay_south", tint=tint_for(asset), iid=bid)
+        inst(asset, xc, yc, qz(xc), yaw, 1.0, "quay_north" if side > 0 else "quay_south", tint=tint_for(asset), color=wall_for(asset), iid=bid)
         BLD[bid] = (asset, xc, yc, qz(xc), yaw, side)
         out.append(bid); cur = xc + ex1 + 0.35
     return out, gaps, cur
@@ -475,7 +495,7 @@ def the_stacks():
         for (nm, x, y) in lst:
             yaw = R.uniform(-0.1, 0.1) + (0.05 if "gallery" in nm else 0.0)
             bid = "%s_k%d%d" % (nm.replace("mooring_", ""), ri, len(ids))
-            inst("buildings/%s.glb" % nm, x, y, z, yaw, 1.0, "stacks", tint=tint_for(nm), iid=bid); ids.append(bid)
+            inst("buildings/%s.glb" % nm, x, y, z, yaw, 1.0, "stacks", tint=tint_for(nm), color=wall_for(nm), iid=bid); ids.append(bid)
             BLD[bid] = ("buildings/%s.glb" % nm, x, y, z, yaw, 1)
             m = MAN["buildings/%s.glb" % nm]; fy = -m["bounds_m"][5]
             hw = int((m["bounds_m"][3] - m["bounds_m"][0]) / 2 // 6) + 2
@@ -587,7 +607,7 @@ def east_garden():
         inst("garden/umbel_tree_%s.glb" % v, gx + tx, gy + ty, gz + 0.35, R.uniform(0, 6.28), 1.0, "garden", env=False, tint={"garden": "garden_a" if i % 3 else "garden_b"})
         light(gx + tx, gy + ty, gz + 6.0, "garden_a" if i % 3 else "garden_b", 14.0, 0.7, "garden")
     for k in range(14):
-        a, rr = R.uniform(0, 6.283), 24 * math.sqrt(R.random())
+        a, rr = R.uniform(0, 6.283), min(21.2, 24 * math.sqrt(R.random()))          # inside the planters of the upper edge (iteration 8: the terrace steps down at 24.6 m)
         if math.hypot(rr * math.cos(a) - 6, rr * math.sin(a) + 4) > 9.5:
             inst(R.choice(["garden/sprig_bed_3m.glb", "garden/shrub_a.glb", "garden/shrub_b.glb", "garden/planter_round.glb"]), gx + rr * math.cos(a), gy + rr * math.sin(a), gz, a, R.uniform(0.8, 1.2), "garden",
                  env=False, tint={"garden": R.choice(["garden_a", "garden_b"])})
@@ -599,7 +619,7 @@ def east_garden():
         spot("gather", gx + tx, gy + ty, gz, f, "garden", 1, look=(gx + 6, gy - 4, gz + 0.5), note="by the pool")
     for (tx, ty) in ((-14, 4.5), (8, 12), (-27.5, 15.5)):
         spot("tend", gx + tx, gy + ty, gz, 0.0, "garden", 2, note="tending the bed under an umbel tree")
-    spot("look", gx + 24, gy - 6, gz, 0.0, "garden", 1, look=(VEIL[0], VEIL[1], 200), note="at the east edge, looking up at the Veil")
+    spot("look", gx + 25.2, gy - 6, gz - 0.4, 0.0, "garden", 1, look=(VEIL[0], VEIL[1], 200), note="on the promenade at the east rail, looking up at the Veil")
     path("garden_stroll", [(gx - 34, gy - 4, gz), (gx - 18, gy + 4, gz), (gx - 2, gy + 8, gz), (gx + 12, gy + 2, gz), (gx + 18, gy - 12, gz)], "garden", 1, 0.95, clip="Walking_low_grav", count=2)
     for k in range(9):
         a = k * 40 + 10; inst("street/keel_lantern_%s.glb" % ("26m" if k % 3 == 0 else "16m"), gx + 20 * math.cos(math.radians(a)), gy + 20 * math.sin(math.radians(a)), gz - 0.8, 0, 1.0, "keel", env=False)
@@ -792,7 +812,7 @@ out = {
     "checks": {"lantern_string_anchor_keys": STRING_KEYS, "envelope_overlaps": bad, "camera_min_clearance_m": round(worst[0], 2), "nearest": worst[1], "at_t": worst[2]},
     "stats": {"instances": len(INST), "triangles": tris, "by_zone": by_zone, "spots": len(SPOTS), "paths": len(PATHS), "lights": len(LIGHTS)},
 }
-dst = os.path.join(ROOT, "art", "layout.json")
+dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "art", "layout.json")
 json.dump(out, open(dst, "w"), indent=1)
 print("layout:", len(INST), "instances,", tris, "triangles,", len(SPOTS), "spots,", len(PATHS), "paths,", len(LIGHTS), "lights")
 print("zones:", by_zone)

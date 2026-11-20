@@ -2,10 +2,10 @@
  "units": "metres, Y-up in the GLB, origin at base centre at deck level; a building's front (shop side) faces +z in the GLB",
  "window_rule": "every pane (glass, win_warm, win_cool, win_stair, beam_lamp) sits in a modelled, recessed, framed opening inside one 2.4 x 3.2 m facade cell; see window_audit.json",
  "materials": {
-  "facade": "dark wall",
-  "trim": "slabs, frames, sills",
-  "metal": "pipes, rails, stilts",
-  "deck": "walking surfaces",
+  "facade": "walls (atlas cell tiles; the factor is the building's hue)",
+  "trim": "slabs, frames, sills, kerbs",
+  "metal": "pipes, rails, stilts, inlays",
+  "deck": "walking surfaces: boards, deck plates, pavers",
   "glass": "unlit panes; uv = (level, window hash)",
   "cloth": "awnings, laundry (tint per instance)",
   "foliage": "dark leaves",
@@ -47,6 +47,57 @@
   "floor_m": 3.2,
   "bay_m": 2.4
  },
+ "surface": {
+  "what": "iteration 8: one shared texture set on the unlit surface roles (facade, trim, metal, deck) of the assets listed; the GLBs reference it by URI, so it is stored once",
+  "files": [
+   "tex/nd_surface_base.png",
+   "tex/nd_surface_normal.png",
+   "tex/nd_surface_orm.png"
+  ],
+  "regions": "tex/nd_surface.json (written by blender/nd_surface_atlas.py)",
+  "reads_as": "the atlas MULTIPLIES each material's factors: base colour (a building's hue is its facade factor; an instance's `color.facade` in layout.json replaces it), roughness (G), metallic (B), occlusion (R); the normal map is tangent space, glTF convention",
+  "facade_cells": "a wall is mapped cell by cell (2.4 m bay x 3.2 m floor = one tile): rows = finish (light render, dark painted render, corrugated sheet, glazed tile on shop floors), columns = windowed / blank / the lowest floor of a block (grime rising)",
+  "assets": [
+   "alley_stair",
+   "catwalk_stair",
+   "deck_lowwalk_6m",
+   "deck_pad_6m",
+   "deck_quay_6m",
+   "deck_round_14m",
+   "deck_round_27m",
+   "deck_stair_3m2",
+   "gangway_10m",
+   "gangway_garden_10m",
+   "kiosk",
+   "lighthouse_a",
+   "lighthouse_b",
+   "lighthouse_c",
+   "lone_lamp_house",
+   "mooring_capsule_tower",
+   "mooring_corner_tower",
+   "mooring_gallery_slab",
+   "mooring_shophouse_a",
+   "mooring_shophouse_b",
+   "mooring_shophouse_c",
+   "mooring_shophouse_d",
+   "mooring_shophouse_e",
+   "mooring_shophouse_f",
+   "mooring_shophouse_g",
+   "mooring_shophouse_h",
+   "mooring_shophouse_i",
+   "mooring_shophouse_j",
+   "mooring_stack_a",
+   "mooring_stack_b",
+   "mooring_stack_c",
+   "mooring_stack_d",
+   "mooring_stack_e",
+   "mooring_station",
+   "pavilion",
+   "pier_span_22m",
+   "terrace_step_6m",
+   "tree_pit"
+  ]
+ },
  "inhabitant_scale": {
   "cast": "Glowmere aliens at scale 1.0 (1.66 to 1.79 m)",
   "door_head_m": 2.04,
@@ -60,7 +111,7 @@
  "assets": [
   {
    "asset": "buildings/mooring_shophouse_a.glb",
-   "tris": 5886,
+   "tris": 5984,
    "height_m": 28.6,
    "bounds_m": [
     -6.5,
@@ -151,7 +202,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_b.glb",
-   "tris": 8564,
+   "tris": 8662,
    "height_m": 35.0,
    "bounds_m": [
     -5.9,
@@ -242,7 +293,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_c.glb",
-   "tris": 4140,
+   "tris": 4190,
    "height_m": 22.2,
    "bounds_m": [
     -4.7,
@@ -321,7 +372,7 @@
   },
   {
    "asset": "buildings/mooring_stack_a.glb",
-   "tris": 13830,
+   "tris": 14072,
    "height_m": 51.0,
    "bounds_m": [
     -7.1,
@@ -436,7 +487,7 @@
   },
   {
    "asset": "buildings/mooring_stack_b.glb",
-   "tris": 16920,
+   "tris": 17258,
    "height_m": 63.8,
    "bounds_m": [
     -5.9,
@@ -577,7 +628,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_d.glb",
-   "tris": 8388,
+   "tris": 8390,
    "height_m": 17.0,
    "bounds_m": [
     -5.3,
@@ -646,7 +697,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_e.glb",
-   "tris": 9592,
+   "tris": 9642,
    "height_m": 20.2,
    "bounds_m": [
     -7.1,
@@ -727,7 +778,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_f.glb",
-   "tris": 10534,
+   "tris": 10632,
    "height_m": 23.4,
    "bounds_m": [
     -5.9,
@@ -808,7 +859,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_g.glb",
-   "tris": 7664,
+   "tris": 7762,
    "height_m": 31.8,
    "bounds_m": [
     -5.3,
@@ -901,7 +952,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_h.glb",
-   "tris": 11644,
+   "tris": 11838,
    "height_m": 38.2,
    "bounds_m": [
     -6.5,
@@ -994,7 +1045,7 @@
   },
   {
    "asset": "buildings/mooring_stack_c.glb",
-   "tris": 15606,
+   "tris": 15704,
    "height_m": 39.4,
    "bounds_m": [
     -6.56,
@@ -1099,7 +1150,7 @@
   },
   {
    "asset": "buildings/mooring_stack_d.glb",
-   "tris": 18582,
+   "tris": 18776,
    "height_m": 57.4,
    "bounds_m": [
     -6.5,
@@ -1228,7 +1279,7 @@
   },
   {
    "asset": "buildings/mooring_stack_e.glb",
-   "tris": 15500,
+   "tris": 15790,
    "height_m": 42.6,
    "bounds_m": [
     -5.3,
@@ -1333,7 +1384,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_i.glb",
-   "tris": 7818,
+   "tris": 7820,
    "height_m": 13.8,
    "bounds_m": [
     -5.9,
@@ -1401,7 +1452,7 @@
   },
   {
    "asset": "buildings/mooring_shophouse_j.glb",
-   "tris": 6278,
+   "tris": 6280,
    "height_m": 13.8,
    "bounds_m": [
     -4.7,
@@ -1469,7 +1520,7 @@
   },
   {
    "asset": "buildings/mooring_gallery_slab.glb",
-   "tris": 50139,
+   "tris": 50815,
    "height_m": 37.0,
    "bounds_m": [
     -19.5,
@@ -1503,7 +1554,7 @@
   },
   {
    "asset": "buildings/mooring_corner_tower.glb",
-   "tris": 30990,
+   "tris": 31568,
    "height_m": 83.6,
    "bounds_m": [
     -8.3,
@@ -1690,7 +1741,7 @@
   },
   {
    "asset": "buildings/lone_lamp_house.glb",
-   "tris": 3892,
+   "tris": 3990,
    "height_m": 27.2,
    "bounds_m": [
     -5.3,
@@ -1748,7 +1799,7 @@
   },
   {
    "asset": "landmarks/lighthouse_a.glb",
-   "tris": 3832,
+   "tris": 3900,
    "height_m": 60.6,
    "bounds_m": [
     -5.98,
@@ -1781,7 +1832,7 @@
   },
   {
    "asset": "landmarks/lighthouse_b.glb",
-   "tris": 4044,
+   "tris": 4162,
    "height_m": 43.6,
    "bounds_m": [
     -5.98,
@@ -1813,7 +1864,7 @@
   },
   {
    "asset": "landmarks/lighthouse_c.glb",
-   "tris": 2988,
+   "tris": 3042,
    "height_m": 52.6,
    "bounds_m": [
     -4.78,
@@ -1898,7 +1949,7 @@
   },
   {
    "asset": "decks/gangway_10m.glb",
-   "tris": 348,
+   "tris": 350,
    "height_m": 1.1,
    "bounds_m": [
     -1.0,
@@ -1917,7 +1968,7 @@
   },
   {
    "asset": "decks/gangway_garden_10m.glb",
-   "tris": 6438,
+   "tris": 6440,
    "height_m": 1.1,
    "bounds_m": [
     -1.51,
@@ -1981,7 +2032,7 @@
   },
   {
    "asset": "decks/pier_span_22m.glb",
-   "tris": 1020,
+   "tris": 1026,
    "height_m": 2.0,
    "bounds_m": [
     -11.0,
@@ -2018,7 +2069,7 @@
   },
   {
    "asset": "decks/deck_pad_6m.glb",
-   "tris": 88,
+   "tris": 94,
    "height_m": 0.0,
    "bounds_m": [
     -3.0,
@@ -2036,36 +2087,57 @@
   },
   {
    "asset": "decks/deck_round_27m.glb",
-   "tris": 424,
-   "height_m": 0.0,
+   "tris": 18857,
+   "height_m": 1.6,
    "bounds_m": [
-    -27.0,
-    -16.0,
-    -27.0,
-    27.0,
-    0.0,
-    27.0
+    -27.03,
+    -17.0,
+    -33.6,
+    27.03,
+    1.55,
+    33.18
    ],
    "materials": [
     "deck",
+    "facade",
+    "foliage",
+    "garden",
+    "lantern",
     "metal",
+    "strip",
     "trim"
+   ],
+   "upper_radius_m": 24.6,
+   "promenade_y_m": -0.4,
+   "crescents_deg": [
+    [
+     36,
+     104
+    ],
+    [
+     -132,
+     -68
+    ]
    ]
   },
   {
    "asset": "decks/deck_round_14m.glb",
-   "tris": 280,
-   "height_m": 0.0,
+   "tris": 5843,
+   "height_m": 2.2,
    "bounds_m": [
     -14.0,
     -16.0,
     -14.0,
     14.0,
-    0.0,
+    2.17,
     14.0
    ],
    "materials": [
     "deck",
+    "facade",
+    "foliage",
+    "garden",
+    "lantern",
     "metal",
     "trim"
    ]
@@ -2667,7 +2739,7 @@
   },
   {
    "asset": "garden/terrace_step_6m.glb",
-   "tris": 1980,
+   "tris": 1982,
    "height_m": 0.9,
    "bounds_m": [
     -3.0,
@@ -2907,7 +2979,7 @@
   },
   {
    "asset": "condensery/cond_shed_a.glb",
-   "tris": 3520,
+   "tris": 3616,
    "height_m": 16.3,
    "bounds_m": [
     -17.4,
@@ -2929,7 +3001,7 @@
   },
   {
    "asset": "condensery/cond_shed_b.glb",
-   "tris": 3780,
+   "tris": 3924,
    "height_m": 19.5,
    "bounds_m": [
     -14.9,
@@ -3003,6 +3075,50 @@
     "cond_lamp",
     "metal"
    ]
+  },
+  {
+   "asset": "far/long_arc.glb",
+   "tris": 2796,
+   "height_m": 3964.1,
+   "bounds_m": [
+    -145.89,
+    -291.27,
+    -20.0,
+    6222.33,
+    3964.13,
+    20.0
+   ],
+   "materials": [
+    "arc_light",
+    "arc_line"
+   ],
+   "what": "the Long Arc: a broken span 5.9 km long standing 22 km east of the journey",
+   "frame": "origin where it leaves the sea, +x along the ground under it, y up in the GLB",
+   "circle": {
+    "radius_m": 9061.0,
+    "centre_m": [
+     7551.0,
+     -5010.0,
+     -0.0
+    ],
+    "from_deg": 33.6,
+    "to_deg": 71.0,
+    "detached_deg": [
+     [
+      73.0,
+      75.6
+     ],
+     [
+      77.2,
+      78.6
+     ],
+     [
+      80.3,
+      81.0
+     ]
+    ]
+   },
+   "materials_note": "arc_line and arc_light keep the emission baked into the GLB (0.22 and 0.9): the scene has no role for them. At 0.55 and 9 (first test in AV Gen) it was a string of fairy lights brighter than the Condensery, and showed through the Veil"
   },
   {
    "asset": "signs/sign_blade_0.gltf",
@@ -3513,50 +3629,6 @@
     2.2
    ],
    "brand": "Mooring Seven"
-  },
-  {
-   "asset": "far/long_arc.glb",
-   "tris": 2796,
-   "height_m": 3964.1,
-   "bounds_m": [
-    -145.89,
-    -291.27,
-    -20.0,
-    6222.33,
-    3964.13,
-    20.0
-   ],
-   "materials": [
-    "arc_light",
-    "arc_line"
-   ],
-   "what": "the Long Arc: a broken span 5.9 km long standing 22 km east of the journey",
-   "frame": "origin where it leaves the sea, +x along the ground under it, y up in the GLB",
-   "circle": {
-    "radius_m": 9061.0,
-    "centre_m": [
-     7551.0,
-     -5010.0,
-     -0.0
-    ],
-    "from_deg": 33.6,
-    "to_deg": 71.0,
-    "detached_deg": [
-     [
-      73.0,
-      75.6
-     ],
-     [
-      77.2,
-      78.6
-     ],
-     [
-      80.3,
-      81.0
-     ]
-    ]
-   },
-   "materials_note": "arc_line and arc_light keep the emission baked into the GLB (0.22 and 0.9): the scene has no role for them. At 0.55 and 9 (first test in AV Gen) it was a string of fairy lights brighter than the Condensery, and showed through the Veil"
   }
  ]
 }

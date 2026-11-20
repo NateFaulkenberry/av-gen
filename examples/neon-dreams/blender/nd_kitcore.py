@@ -28,6 +28,66 @@ OUT = arg("--out", os.path.join(HERE, "out"))
 os.makedirs(OUT, exist_ok=True)
 FLOOR, BAY = 3.2, 2.4
 Z = Vector((0, 0, 1))
+
+# ------------------------------------------------------------------------------------------- the surface atlas (iteration 8)
+# One shared texture set (meshes/tex/nd_surface_*.png, written by nd_surface_atlas.py) on the four unlit surface roles.
+# The GLBs reference it by URI (stored once); export() attaches it and each asset's base colour factors after Blender
+# has written the file. The atlas multiplies the factor: the HUE of a building is its factor (SCHEME), the atlas carries
+# value, grime, joints and relative tint. Facade walls are mapped cell by cell (a 2.4 m bay x a 3.2 m floor is one tile).
+TEX = arg("--tex", os.path.join(OUT, "tex"))
+SURF = json.load(open(os.path.join(TEX, "nd_surface.json"))) if os.path.exists(os.path.join(TEX, "nd_surface.json")) else None
+SURF_MATS = {"facade": "roof", "trim": "trim", "metal": "metal", "deck": "plate_a"}      # role -> the patch its boxes and cylinders use
+FCTX = {"cell": None, "win": False, "row": None, "base_z": None}
+# muted: in the engine's albedo the first plum was pink. Second pass: at 27 s (60 to 200 m, violet ambient) the first
+# factors all read one mauve, so the chroma is 1.4x and bone a step lighter; the atlas rows are near neutral.
+PLUM, SLATE, RUST, BONE, INK = (0.066, 0.036, 0.062), (0.032, 0.047, 0.078), (0.094, 0.044, 0.028), (0.104, 0.094, 0.080), (0.030, 0.029, 0.046)
+TIMBER, STEEL, STONE = (0.064, 0.050, 0.046), (0.046, 0.048, 0.060), (0.060, 0.054, 0.064)
+# per asset: the facade's base colour factor (linear), the finish rows its blocks take in turn above the shop floor
+# (0 light render, 1 dark painted render, 2 corrugated sheet; the shop floor is always 3, glazed tile), the deck's factor
+SCHEME = {"_default": dict(color=INK, rows=[0, 1], deck=STEEL),
+          "mooring_shophouse_a": dict(color=PLUM, rows=[0, 1]), "mooring_shophouse_b": dict(color=SLATE, rows=[1, 2, 0]),
+          "mooring_shophouse_c": dict(color=BONE, rows=[0]), "mooring_shophouse_d": dict(color=RUST, rows=[2]),
+          "mooring_shophouse_e": dict(color=SLATE, rows=[1, 0]), "mooring_shophouse_f": dict(color=PLUM, rows=[0, 2]),
+          "mooring_shophouse_g": dict(color=BONE, rows=[2, 0, 1]), "mooring_shophouse_h": dict(color=INK, rows=[1, 0, 2]),
+          "mooring_shophouse_i": dict(color=RUST, rows=[0]), "mooring_shophouse_j": dict(color=BONE, rows=[2]),
+          "mooring_stack_a": dict(color=SLATE, rows=[1, 0, 1, 2]), "mooring_stack_b": dict(color=PLUM, rows=[0, 1, 2, 1]),
+          "mooring_stack_c": dict(color=INK, rows=[2, 1, 0]), "mooring_stack_d": dict(color=RUST, rows=[1, 2, 0, 1]),
+          "mooring_stack_e": dict(color=BONE, rows=[0, 1]), "mooring_gallery_slab": dict(color=(0.066, 0.061, 0.060), rows=[0]),
+          "mooring_corner_tower": dict(color=(0.050, 0.035, 0.050), rows=[1, 0]), "mooring_capsule_tower": dict(color=SLATE, rows=[2]),
+          "mooring_station": dict(color=RUST, rows=[2], deck=TIMBER), "kiosk": dict(color=BONE, rows=[2]), "lone_lamp_house": dict(color=INK, rows=[1]),
+          "lighthouse_a": dict(color=BONE, rows=[0]), "lighthouse_b": dict(color=BONE, rows=[0]), "lighthouse_c": dict(color=BONE, rows=[0]),
+          "pavilion": dict(color=PLUM, rows=[1], deck=TIMBER),
+          "deck_quay_6m": dict(deck=TIMBER), "deck_stair_3m2": dict(deck=TIMBER), "gangway_10m": dict(deck=TIMBER), "gangway_garden_10m": dict(deck=TIMBER),
+          "catwalk_stair": dict(deck=STEEL), "alley_stair": dict(deck=STEEL), "pier_span_22m": dict(deck=TIMBER), "deck_lowwalk_6m": dict(deck=TIMBER),
+          "deck_pad_6m": dict(deck=STEEL), "deck_round_27m": dict(deck=STONE), "deck_round_14m": dict(deck=STONE), "terrace_step_6m": dict(deck=STONE)}
+SURF_FACTORS = {"facade": dict(rough=0.95, metal=0.0), "trim": dict(color=(0.060, 0.055, 0.068), rough=0.70, metal=0.0),
+                "metal": dict(color=(0.060, 0.062, 0.070), rough=0.56, metal=0.85), "deck": dict(rough=0.56, metal=0.0)}
+
+
+def scheme(name):
+    return {**SCHEME["_default"], **SCHEME.get(name, {})}
+
+
+def hh01(*a):
+    f = math.sin(sum(x * k for x, k in zip(a, (12.9898, 78.233, 37.719, 4.581, 9.173, 21.37)))) * 43758.5453
+    return f - math.floor(f)
+
+
+def region_uv(name, a, b):
+    """Blender UV of the point (a, b) metres from the bottom-left corner of an atlas region."""
+    x, y, w, h = SURF["regions"][name]["px"]; W, H = SURF["size"]; ppm = SURF["px_per_m"]
+    return ((x + a * ppm) / W, 1.0 - (y + h - b * ppm) / H)
+
+
+def tile_rect(row, col, cell, u0, u1, v0, v1, mirror=False):
+    """(U0, V0, U1, V1) of a wall rectangle inside its facade cell on the atlas tile (row = finish, col = variant)."""
+    tw, th = SURF["cell_px"]; W, H = SURF["size"]; ppm = SURF["px_per_m"]
+    c0, c1, d0, d1 = cell
+    k = min(1.0, 2.4 / max(c1 - c0, 1e-6), 3.2 / max(d1 - d0, 1e-6)) * ppm           # a cell larger than a tile is shrunk to fit
+    e = 0.35                                                                           # stay a third of a texel inside the tile
+    U = lambda u: (col * tw + min(tw - e, max(e, (tw - (u - c0) * k) if mirror else (u - c0) * k))) / W
+    V = lambda v: 1.0 - (row * th + min(th - e, max(e, th - (v - d0) * k))) / H
+    return (U(u0), V(v0), U(u1), V(v1))
 PANE_MATS = ("glass", "win_warm", "win_cool", "win_stair", "beam_lamp")
 MATS = {}
 # Emissive strengths written into the GLBs (KHR_materials_emissive_strength). Scene-linear with white colour and the
@@ -105,7 +165,21 @@ class Asset:
         self.meta = {}
 
     def m(self, mat):
-        return self.mb.setdefault(mat, MB())
+        mb = self.mb.get(mat)
+        if mb is None:
+            mb = self.mb[mat] = MB()
+            if SURF and mat in SURF_MATS:
+                x, y, w, h = SURF["regions"][SURF_MATS[mat]]["px"]
+                mb.patch = (x, y, w, h, SURF["size"][0], SURF["size"][1], SURF["px_per_m"])
+                mb.def_uv = region_uv("neutral", 1.6, 1.6)
+        return mb
+
+    def finish_row(self, shop=False):
+        """The finish of the next block: glazed tile on a shop floor, then the asset's rows in turn."""
+        if shop:
+            return 3
+        rows = scheme(self.name)["rows"]; i = getattr(self, "_nfin", 0); self._nfin = i + 1
+        return rows[i % len(rows)]
 
     def finish(self):
         objs = []
@@ -131,10 +205,39 @@ def wq(A, mat, O, T, Nn, u0, u1, v0, v1, n=0.0, uv=None, flip=False):
     """Quad on a wall plane: origin O, tangent T, outward normal Nn; (u along wall, v up, n out)."""
     if u1 - u0 < 1e-5 or v1 - v0 < 1e-5:
         return
+    if uv is None and SURF and mat == "facade" and not flip:
+        row = FCTX["row"] if FCTX["row"] is not None else scheme(A.name)["rows"][0]
+        if FCTX["cell"] is not None:                                   # a piece of one facade cell (fill_cell)
+            pieces = [(u0, u1, v0, v1, FCTX["cell"], FCTX["win"])]
+        else:                                                           # a plain wall: cut into cells along the floors and the bays
+            pieces = []
+            vb = v0
+            while vb < v1 - 1e-5:
+                k = math.floor((vb + 1e-4) / FLOOR); vt = min(v1, (k + 1) * FLOOR)
+                ub = u0
+                while ub < u1 - 1e-5:
+                    ut = min(u1, ub + BAY)
+                    pieces.append((ub, ut, vb, vt, (ub, ub + BAY, k * FLOOR, (k + 1) * FLOOR), False))
+                    ub = ut
+                vb = vt
+        for (a0, a1, b0, b1, cell, win) in pieces:
+            base = FCTX["base_z"] is not None and abs(cell[2] - FCTX["base_z"]) < 1e-3
+            hh = hh01(O.x, O.y, cell[0], cell[2], row, T.x)
+            col = (3 if base else 0) if win else (4 if base else (1 if hh < 0.5 else 2))
+            p = [O + T * a0 + Z * b0 + Nn * n, O + T * a1 + Z * b0 + Nn * n, O + T * a1 + Z * b1 + Nn * n, O + T * a0 + Z * b1 + Nn * n]
+            A.m(mat).quad(*[tuple(q) for q in p], uv=tile_rect(row, col, cell, a0, a1, b0, b1, mirror=hh01(O.y, O.x, cell[2], cell[0], 3.3) < 0.5), double=False)
+        return
     p = [O + T * u0 + Z * v0 + Nn * n, O + T * u1 + Z * v0 + Nn * n, O + T * u1 + Z * v1 + Nn * n, O + T * u0 + Z * v1 + Nn * n]
     if flip:
         p.reverse()
-    A.m(mat).quad(*[tuple(q) for q in p], uv=uv or (u0 / 4, v0 / 4, u1 / 4, v1 / 4), double=False)
+    mb = A.m(mat)
+    if uv is None and mb.patch:
+        f2 = [(0.0, 0.0), (u1 - u0, 0.0), (u1 - u0, v1 - v0), (0.0, v1 - v0)]
+        if flip:
+            f2.reverse()
+        mb._add([tuple(q) for q in p], [(0, 1, 2, 3)], None, mb.puv(f2, u1 - u0, v1 - v0, O.x * 1.37 + O.y * 2.11 + u0 * 3.1 + v0 * 0.77))
+        return
+    mb.quad(*[tuple(q) for q in p], uv=uv or (u0 / 4, v0 / 4, u1 / 4, v1 / 4), double=False)
 
 
 def wbox(A, mat, O, T, Nn, u0, u1, v0, v1, n0, n1):
@@ -154,6 +257,9 @@ def fill_cell(A, O, T, Nn, cell, rects, mat="facade"):
     """Wall surface of a cell around any number of non-overlapping rectangular openings."""
     c0, c1, d0, d1 = cell
     xs = sorted(set([c0, c1] + [x for r_ in rects for x in r_[:2]])); ys = sorted(set([d0, d1] + [y for r_ in rects for y in r_[2:]]))
+    # the atlas tile of this cell: the windowed variant (drips under the sill ends) only where the kit's standard window stands
+    FCTX["cell"] = cell
+    FCTX["win"] = len(rects) == 1 and abs(rects[0][0] - c0 - 0.575) < 0.02 and abs(rects[0][2] - d0 - 0.95) < 0.02 and abs(c1 - c0 - BAY) < 0.02
     for i in range(len(xs) - 1):
         j0 = None
         for j in range(len(ys)):                                       # merge the free cells of a column into strips
@@ -162,6 +268,7 @@ def fill_cell(A, O, T, Nn, cell, rects, mat="facade"):
                 j0 = j
             if not free and j0 is not None:
                 wq(A, mat, O, T, Nn, xs[i], xs[i + 1], ys[j0], ys[j]); j0 = None
+    FCTX["cell"] = None; FCTX["win"] = False
 
 
 def door_leaf(A, O, T, Nn, rect, depth=0.1, mat="trim"):
@@ -305,9 +412,14 @@ def block(A, r, r2, cx, cy, z0, w, d, floors, lit_p, warm_p, wbase, balcony_side
     sides = [(Vector((cx - w / 2, cy - d / 2, 0)), Vector((1, 0, 0)), w), (Vector((cx + w / 2, cy - d / 2, 0)), Vector((0, 1, 0)), d),
              (Vector((cx + w / 2, cy + d / 2, 0)), Vector((-1, 0, 0)), w), (Vector((cx - w / 2, cy + d / 2, 0)), Vector((0, -1, 0)), d)]
     bal = {}
+    frow = A.finish_row(shop)                                           # iteration 8: this block's finish on the surface atlas
+    FCTX["row"] = frow; FCTX["base_z"] = z0
     for si, (O, T, L) in enumerate(sides):
         Nn = T.cross(Z)
         nb = int(L / BAY + 1e-6); mg = (L - nb * BAY) / 2
+        if frow in (0, 1):                                              # rendered walls carry a string course at every floor line (crisp at 3 m, where the atlas's joint is soft)
+            for fl in range(1, floors):
+                wbox(A, "trim", O, T, Nn, 0.0, L, z0 + fl * FLOOR - 0.03, z0 + fl * FLOOR + 0.03, 0.0, 0.035)
         bal_col = r.randrange(nb) if (balcony_side == si and nb > 0) else -1
         bal[si] = bal_col
         if si not in sides_on:
@@ -347,6 +459,7 @@ def block(A, r, r2, cx, cy, z0, w, d, floors, lit_p, warm_p, wbase, balcony_side
                 wbox(A, "metal", O, T, Nn, 0.15, L - 0.15, vv, vv + 0.06, 0.03, 0.09)
     A.m("facade").box((cx, cy, z0 + floors * FLOOR - 0.01), (w - 0.02, d - 0.02, 0.02))       # top cap
     A.m("facade").box((cx, cy, z0 + 0.01), (w - 0.02, d - 0.02, 0.02))                        # bottom cap
+    FCTX["row"] = None; FCTX["base_z"] = None
     return bal
 
 
@@ -397,6 +510,124 @@ def stilts(A, cx, cy, w, d, depth=14.0, nx=3):
             A.m("metal").beam((xa_, y, -1.0), (xb_, y, -6.5), 0.1); A.m("metal").beam((xb_, y, -1.0), (xa_, y, -6.5), 0.1)
             A.m("metal").beam((xa_, y, -6.8), (xb_, y, -6.8), 0.14)
     A.m("trim").box((cx, cy, -0.25), (w + 0.6, d + 0.6, 0.5))            # deck plate under the building
+
+
+# ------------------------------------------------------------------------------------------- decks on the surface atlas
+def deck_top(A, x0, x1, y0, y1, z, kind="planks", along="y", mat="deck"):
+    """The walking surface of a rectangular deck at height z, mapped onto the atlas: "planks" (0.2 m boards running
+    along `along`, cut across into bands of at most thirty boards), "plates" (3 m steel deck plates with bolted seams,
+    two designs turned four ways) or "pavers" (0.8 x 0.4 m slabs in half bond)."""
+    mb = A.m(mat)
+
+    def quad(xa, xb, ya, yb, uvs):
+        mb._add([(xa, ya, z), (xb, ya, z), (xb, yb, z), (xa, yb, z)], [(0, 1, 2, 3)], None, uvs)
+    if not SURF:
+        return quad(x0, x1, y0, y1, [mb.def_uv] * 4)
+    if kind == "planks":
+        P = (y1 - y0) if along == "y" else (x1 - x0)
+        q0, q1 = (x0, x1) if along == "y" else (y0, y1)
+        k = min(1.0, 12.6 / P); qa = q0; i = 0
+        while qa < q1 - 1e-6:
+            qb = min(q1, qa + 6.0)
+            s0 = int(hh01(x0, y0, z, i, 1.0) * (32 - math.ceil((qb - qa) / 0.2 - 1e-6) + 0.999)) * 0.2
+            pu = 0.1 + hh01(y0, x0, z, i, 2.0) * (12.6 - P * k)
+            if along == "y":
+                quad(qa, qb, y0, y1, [region_uv("planks", pu + p * k, s0 + q) for (q, p) in ((0, 0), (qb - qa, 0), (qb - qa, P), (0, P))])
+            else:
+                quad(x0, x1, qa, qb, [region_uv("planks", pu + p * k, s0 + q) for (p, q) in ((0, 0), (P, 0), (P, qb - qa), (0, qb - qa))])
+            qa = qb; i += 1
+    elif kind == "plates":
+        nx, ny = max(1, round((x1 - x0) / 3.0)), max(1, round((y1 - y0) / 3.0))
+        for i in range(nx):
+            for j in range(ny):
+                xa, xb = x0 + (x1 - x0) * i / nx, x0 + (x1 - x0) * (i + 1) / nx
+                ya, yb = y0 + (y1 - y0) * j / ny, y0 + (y1 - y0) * (j + 1) / ny
+                cs = [(0.0, 0.0), (3.2, 0.0), (3.2, 3.2), (0.0, 3.2)]; rot = int(hh01(xa, ya, z, 5.0) * 4) % 4
+                quad(xa, xb, ya, yb, [region_uv("plate_a" if (i + j) % 2 == 0 else "plate_b", *c) for c in cs[rot:] + cs[:rot]])
+    else:
+        ya = y0
+        while ya < y1 - 1e-6:
+            yb = min(y1, ya + 3.2); xa = x0
+            while xa < x1 - 1e-6:
+                xb = min(x1, xa + 6.4); ou = hh01(xa, ya, z, 7.0) * (6.4 - (xb - xa))
+                quad(xa, xb, ya, yb, [region_uv("pavers", ou + a_, b_) for (a_, b_) in ((0, 0), (xb - xa, 0), (xb - xa, yb - ya), (0, yb - ya))])
+                xa = xb
+            ya = yb
+
+
+def deck_box(A, c, size, kind="planks", along="y", mat="deck"):
+    """A deck slab: MB.box without its top, and the top as deck_top."""
+    A.m(mat).box(c, size, skip=(1,))
+    deck_top(A, c[0] - size[0] / 2, c[0] + size[0] / 2, c[1] - size[1] / 2, c[1] + size[1] / 2, c[2] + size[2] / 2, kind, along, mat)
+
+
+def ring_band(A, r0, r1, z, a0=0.0, a1=2 * math.pi, n=48, kind="pavers", mat="deck", c=(0.0, 0.0)):
+    """An annular piece of deck (r0..r1, angles a0..a1) at height z: `kind` runs round the arc, its courses radially."""
+    mb = A.m(mat); um = 0.0
+    rw, rh = SURF["regions"][kind]["m"] if SURF else (1.0, 1.0)
+    v0 = int(hh01(r0, z, a0, 3.0) * max(1, (rh - (r1 - r0)) / 0.2)) * 0.2 if kind == "planks" else 0.0
+    for i in range(n):
+        t0, t1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n
+        pts = [(c[0] + r0 * math.cos(t0), c[1] + r0 * math.sin(t0), z), (c[0] + r1 * math.cos(t0), c[1] + r1 * math.sin(t0), z),
+               (c[0] + r1 * math.cos(t1), c[1] + r1 * math.sin(t1), z), (c[0] + r0 * math.cos(t1), c[1] + r0 * math.sin(t1), z)]
+        if not SURF:
+            mb._add(pts, [(0, 1, 2, 3)]); continue
+        arc = (r0 + r1) / 2 * (t1 - t0); k = min(1.0, (rw - 0.2) / arc)
+        if um + arc * k > rw - 0.1:
+            um = 0.1 + hh01(i, r0, z, 9.0) * 0.6
+        mb._add(pts, [(0, 1, 2, 3)], None, [region_uv(kind, um, v0), region_uv(kind, um, v0 + r1 - r0), region_uv(kind, um + arc * k, v0 + r1 - r0), region_uv(kind, um + arc * k, v0)])
+        um += arc * k
+
+
+def wall_ring(A, mat, r, z0, z1, a0=0.0, a1=2 * math.pi, n=48, inward=False, c=(0.0, 0.0)):
+    """A cylindrical wall as flat quads (each mapped into the material's patch on its own, so nothing smears round it)."""
+    mb = A.m(mat)
+    for i in range(n):
+        t0, t1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n
+        pa, pb = (c[0] + r * math.cos(t0), c[1] + r * math.sin(t0)), (c[0] + r * math.cos(t1), c[1] + r * math.sin(t1))
+        L = math.hypot(pb[0] - pa[0], pb[1] - pa[1])
+        pts = [(pa[0], pa[1], z0), (pb[0], pb[1], z0), (pb[0], pb[1], z1), (pa[0], pa[1], z1)]; f2 = [(0, 0), (L, 0), (L, z1 - z0), (0, z1 - z0)]
+        if inward:
+            pts.reverse(); f2.reverse()
+        mb._add(pts, [(0, 1, 2, 3)], None, mb.puv(f2, L, z1 - z0, r * 1.7 + z0 * 3.1 + i * 0.37) if mb.patch else None)
+
+
+# ------------------------------------------------------------------------------------------- attaching the atlas to a GLB
+SURF_FAMILIES = ("buildings", "decks")
+SURF_ASSETS = ("terrace_step_6m", "pavilion", "tree_pit", "lighthouse_a", "lighthouse_b", "lighthouse_c")
+SURF_SKIP = ("rail_6m", "pool_15m")
+SURFACED = []
+
+
+def surface_attach(path, name, rel="../tex/"):
+    """Point the surface roles of an exported GLB at the shared atlas BY URI (three images stored once for the whole
+    kit, not embedded in every file) and write the asset's factors. Blender wrote plain factors; this edits the JSON
+    chunk only. The atlas multiplies the factors: base colour, roughness (G), metallic (B), occlusion (R)."""
+    import struct
+    data = open(path, "rb").read()
+    magic, ver, _total = struct.unpack_from("<III", data, 0); jlen, jtype = struct.unpack_from("<II", data, 12)
+    assert magic == 0x46546C67 and jtype == 0x4E4F534A, path
+    doc = json.loads(data[20:20 + jlen].decode("utf-8")); rest = data[20 + jlen:]
+    mats_ = [m for m in doc.get("materials", []) if m.get("name") in SURF_MATS]
+    if not mats_:
+        return
+    sch = scheme(name)
+    doc.setdefault("samplers", []).append({"magFilter": 9729, "minFilter": 9987, "wrapS": 33071, "wrapT": 33071}); si = len(doc["samplers"]) - 1
+    ids = {}
+    for k in ("base", "normal", "orm"):
+        doc.setdefault("images", []).append({"uri": rel + SURF["files"][k], "name": "nd_surface_" + k})
+        doc.setdefault("textures", []).append({"sampler": si, "source": len(doc["images"]) - 1}); ids[k] = len(doc["textures"]) - 1
+    for m in mats_:
+        f = SURF_FACTORS[m["name"]]; pbr = m.setdefault("pbrMetallicRoughness", {})
+        col = sch["color"] if m["name"] == "facade" else sch["deck"] if m["name"] == "deck" else f["color"]
+        if m["name"] == "trim":                                          # slabs and frames lean a little toward the building's own hue
+            col = tuple(0.62 * a_ + 0.38 * 1.25 * b_ for a_, b_ in zip(col, sch["color"]))
+        pbr["baseColorFactor"] = [round(c_, 4) for c_ in col] + [1.0]; pbr["roughnessFactor"] = f["rough"]; pbr["metallicFactor"] = f["metal"]
+        pbr["baseColorTexture"] = {"index": ids["base"]}; pbr["metallicRoughnessTexture"] = {"index": ids["orm"]}
+        m["normalTexture"] = {"index": ids["normal"], "scale": 1.0}; m["occlusionTexture"] = {"index": ids["orm"], "strength": 1.0}
+    js = json.dumps(doc, separators=(",", ":")).encode("utf-8"); js += b" " * ((4 - len(js) % 4) % 4)
+    open(path, "wb").write(struct.pack("<III", magic, ver, 20 + len(js) + len(rest)) + struct.pack("<II", len(js), jtype) + js + rest)
+    SURFACED.append(name)
 
 
 def lvl_uv(r, lo=0.0):
@@ -499,6 +730,8 @@ def export(ob, sub):
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
     path = os.path.join(d, ob.name + ".glb")
     bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_apply=True, export_yup=True)
+    if SURF and (sub in SURF_FAMILIES or ob.name in SURF_ASSETS) and ob.name not in SURF_SKIP:
+        surface_attach(path, ob.name)
     return path
 
 

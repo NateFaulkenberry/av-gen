@@ -83,7 +83,7 @@ def load(kit_dir, asset):
             b = _principled(slot.material)
             if b and r in ("facade", "trim", "metal", "deck", "glass", "foliage", "cloth", "pool", "figure"):
                 pass
-        else:
+        elif r not in ("facade", "trim", "metal", "deck"):     # the surface roles keep each asset's own factors (iteration 8: a building's hue is its facade factor)
             ob.data.materials[i] = _BASE[r]
     ob["roles"] = roles
     ob.hide_render = True; ob.hide_viewport = True
