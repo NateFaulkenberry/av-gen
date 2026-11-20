@@ -1132,6 +1132,27 @@ def keep_colossus():
     return keep
 
 
+HEAD_TOP = 235.0           # owner msg 96 (was 365)
+VEIL_CROWN = 250.0         # owner msg 96: the Veil's outer crown is cut to this height (was up to 290); the plug keeps its body
+
+
+def crown(lobes, ceiling, keep_tags=("plug",)):
+    """Lower a bank's crown to `ceiling` without touching its rooms: a lobe whose top is over the ceiling is flattened so
+    its top sits on it (its base and centre stay), or dropped if its centre is already within 12 m of it. Lobes tagged in
+    keep_tags (the plug that hides the Condensery until the crash) are left whole."""
+    out = []
+    for l in lobes:
+        if l.get("tag") in keep_tags:
+            out.append(l); continue
+        cy_, ry = l["c"][1], l["r"] * l["scale"][1]
+        if cy_ + ry <= ceiling:
+            out.append(l)
+        elif cy_ < ceiling - 12.0:
+            l["scale"][1] = round((ceiling - cy_) / l["r"], 3); out.append(l)
+    STATS["veil_crown_dropped"] = len(lobes) - len(out)
+    return out
+
+
 def build():
     cells = town()
     old = {k: v for k, v in cells.items() if not v[2]}               # the town before iteration 9: the near-city cloud is built from it, unchanged
@@ -1139,10 +1160,14 @@ def build():
     masses = {"mooring_mound": mooring_mound() + dress}
     GARDEN_SEAT[:] = garden_seat()
     STATS.update(town_heads=n_heads, town_wisps=n_wisps)
-    masses["head"] = cumulus(23, HEAD[0], HEAD[1], SEA_TOP - 20, 365, 215, turrets=4, lean=0.2, shelves=((0.36, 1.1), (0.62, 0.8)), kids=(3, 4))
+    # owner msg 96: the Head and the Veil's crown towered over the skyline (to 365 and 290 m) and overpowered the town.
+    # The Head is now lower and broader (top 235 m, about the height of Lanternhill's crowns; the Mooring Mast stands clear
+    # of it), its shelves lower: the skyline reads against sky, with cloud at its shoulders.
+    masses["head"] = cumulus(23, HEAD[0], HEAD[1], SEA_TOP - 20, HEAD_TOP, 250, turrets=5, lean=0.2, shelves=((0.3, 1.3), (0.5, 1.0)), kids=(3, 4))
     # the Veil (iteration 5): a bank on the journey's own line with rooms in it (see veil()); nothing of it stands on
     # the garden's decks
     v_lobes, n_shell, rooms, exits = veil()
+    v_lobes = crown(v_lobes, VEIL_CROWN)
     masses["veil"] = [l for l in v_lobes if not on_open_deck(old, l, under=1.0, over=160.0)]       # nothing of it hangs over the garden either: the gate opens beyond the terrace's edge
     STATS.update(veil_shell_lobes=n_shell, veil_dropped_over_decks=len(v_lobes) - len(masses["veil"]))
     masses["fore"] = cumulus(23, FORE[0], FORE[1], SEA_TOP - 20, 128, 105, turrets=2, lean=0.3, shelves=((0.6, 1.2),))
@@ -1207,7 +1232,7 @@ def build():
     # they were cotton balls.)
     # iteration 9: the generic mid field (seven cumulus of one recipe, 507 lobes) becomes two floating reefs that bob
     reef_a = []
-    for i, (x, y, top, rad, tur) in enumerate(((700, 520, 200, 150, 2), (930, 590, 245, 135, 3))):
+    for i, (x, y, top, rad, tur) in enumerate(((700, 520, 165, 170, 2), (930, 590, 180, 160, 3))):          # msg 96: lower, broader (were 200 and 245)
         reef_a += cumulus(60 + i, x, y, SEA_TOP - 20, top, rad, turrets=tur, shelves=((0.5, 1.1),), detail=1, kids=(3, 4), rich=False)
     reef_b = cumulus(65, 1180, -520, SEA_TOP - 20, 175, 125, turrets=2, shelves=((0.5, 1.0),), detail=1, kids=(3, 4), rich=False) + \
         cumulus(66, 1345, -630, SEA_TOP - 20, 110, 75, turrets=2, shelves=(), detail=1, kids=(2, 3), rich=False)
