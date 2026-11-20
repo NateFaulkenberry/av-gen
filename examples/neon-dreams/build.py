@@ -33,6 +33,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the palette arc)
+import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flights)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SABERTOOTH = os.path.expanduser("~/Desktop/sabertooth")
@@ -435,6 +436,37 @@ def clip_keys(keys):
         out.insert(0, {"time": 0.0, "value": r3([a["value"][j] + (b["value"][j] - a["value"][j]) * u for j in range(3)]),
                        "interp": "linear"})
     return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# iteration 10 (owner msg 117): jetpack flights. The layout's "flights" when the art has written them, else the
+# engine's prototype. Only the cast with a jetpack mesh (Backpack_Jet: alien-pilot, alien-ranger) fly.
+ENGINE_FLIGHTS = [
+    {"name": "flyer00", "cast": "alien-pilot", "from": "spot_066", "to": "spot_077", "t0": 29.6, "td": 35.9, "alt": 9.0},
+]
+SEQUENCE_ACTORS = []
+
+
+def spot_place(ref):
+    if isinstance(ref, dict):
+        return {"pos": ref["pos"], "yaw": ref.get("yaw", 0.0)}
+    sp = next(s for s in LAYOUT["inhabitants"]["spots"] if s["id"] == ref)
+    f = sp["forward"]
+    return {"pos": sp["pos"], "yaw": math.degrees(math.atan2(f[0], f[2]))}
+
+
+def flight_nodes(state="uv"):
+    nodes, lights, tracks = [], [], []
+    SEQUENCE_ACTORS.clear()
+    for fdat in LAYOUT.get("flights", ENGINE_FLIGHTS):
+        f = dict(fdat, asset=ALIENS + fdat.get("cast", "alien-pilot") + ".glb", **{"from": spot_place(fdat["from"]),
+                                                                                  "to": spot_place(fdat["to"])})
+        n, l, t, actor = FL.flight(f, r3, SONG, pal("amber", state), pal("amber", state))
+        nodes += n
+        lights += l
+        tracks += t
+        SEQUENCE_ACTORS.append(actor)
+    return nodes, lights, tracks
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -852,7 +884,9 @@ def scene_doc(state="uv", sky_map=None):
         "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndOcean"}}})
     aliens, alien_tracks = inhabitant_nodes() if not CROWD_TEST else crowd_test_nodes(CROWD_TEST)
     vehicles, vehicle_tracks = vehicle_nodes(state)
-    nodes += aliens + vehicles + bob_nodes()
+    flyers, flyer_lights, flyer_tracks = flight_nodes(state)
+    vehicle_tracks = vehicle_tracks + flyer_tracks
+    nodes += aliens + flyers + vehicles + bob_nodes()
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
@@ -876,7 +910,7 @@ def scene_doc(state="uv", sky_map=None):
                "color": pal("moon_light", state), "intensity": 0.35, "castsShadow": KEY_Q["shadow"], "volumetric": 0.0},
               {"name": "skyfill", "type": "directional", "role": "fill", "direction": [0.3, -0.6, 0.4],
                "color": [0.25, 0.15, 0.7], "intensity": 0.08, "castsShadow": False, "volumetric": 0.0}]
-    lights += light_nodes(state)
+    lights += light_nodes(state) + flyer_lights
     dense, keys, total, _ = journey()
     doc = {
         "format": "avgen-scene", "version": 1, "name": "neon-dreams",
@@ -1145,6 +1179,8 @@ def project_doc(scene_rel, audio_dir, tracks, routes, sources):
         "routes": routes,
         "timeline": {"enabled": True, "cues": [], "tracks": [trim_track(t) for t in tracks]},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4"},
+        # iteration 10: the cast's clip cues (jetpack take-offs and landings); positions are timeline tracks above
+        **({"sequence": {"name": "neon-dreams-cast", "duration": SONG, "actors": SEQUENCE_ACTORS}} if SEQUENCE_ACTORS else {}),
     }
 
 
