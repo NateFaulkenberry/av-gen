@@ -29,6 +29,10 @@ import json
 import math
 import os
 import random
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the palette arc)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SABERTOOTH = os.path.expanduser("~/Desktop/sabertooth")
@@ -65,108 +69,19 @@ def bearing_dir(bearing_deg, elev_deg):
 
 
 MOON = DESIGN["moon"]
-# Iteration 4 (orchestrator): the moon was centre-stage and too big in every shot, and the key from bearing 34 sat in
-# front of the approach, so every cloud was forward-scattered milk. The disc is now a backdrop right of the journey
-# (behind and right of the Condensery at the reveal, at the right edge on the approach), smaller, and the key comes
-# from its side, low: crowns facing it are rimmed, the flanks the camera sees stay dark.
-MOON_DISC = {"bearing": -2.0, "elevation": 2.0, "radius": 3.4}
-KEY = {"bearing": -18.0, "elevation": 12.0}
+# Iteration 5 (art, adopted by the orchestrator): the Drowned Moon is an identity element -- about 15 degrees across with
+# more than a third under the sea horizon (the art data's bearing and centre), kept dim (MOON_GAIN, the limb darkening,
+# the horizon extinction and the halo) so the lit architecture stays the brightest thing in frame. The cloud key and the
+# Condensery's turn now live in the art data (the iteration-4 overrides are gone).
+MOON_DISC = {"bearing": MOON["disc_bearing_deg"], "elevation": MOON["disc_centre_elevation_deg"], "radius": 7.5}
+MOON_GAIN = 0.14
+HORIZON_Y = 190.0   # world height of the sea horizon on the moon's sphere (the eye rides 118-258 m)
+KEY = {"bearing": MOON["light_from_bearing_deg"], "elevation": MOON["light_elevation_deg"]}
 LIGHT_DIR = bearing_dir(KEY["bearing"], KEY["elevation"])   # toward the key
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# The Condensery turned to face the reveal. Its long axis ran along +x, the journey's own direction, so from the
-# reveal every stack, the mast and the crane stood in one line and the works read as a single tower (the orchestrator
-# took it for a lighthouse). The whole family turns together about the platform's centre: the instances, the column
-# and plume lobes and the three Condensery glows. Its conveyor then points back across the journey.
-COND_CENTRE = (2050.0, -450.0)
-COND_YAW = -60.0  # degrees, counter-clockwise seen from above
-COND_MASSES = ("condensery_column", "condensery_plume")
-COND_GLOWS = ("condensery_throats", "condensery_flare", "condensery_keel")
-
-
-def cond_turn(p):
-    a = math.radians(COND_YAW)
-    x, z = p[0] - COND_CENTRE[0], p[2] - COND_CENTRE[1]
-    return [COND_CENTRE[0] + x * math.cos(a) + z * math.sin(a), p[1], COND_CENTRE[1] - x * math.sin(a) + z * math.cos(a)]
-
-
-def cond_quat(q):
-    a = math.radians(COND_YAW) / 2
-    r = [0.0, math.sin(a), 0.0, math.cos(a)]   # r * q
-    return [r[3] * q[0] + r[0] * q[3] + r[1] * q[2] - r[2] * q[1],
-            r[3] * q[1] - r[0] * q[2] + r[1] * q[3] + r[2] * q[0],
-            r[3] * q[2] + r[0] * q[1] - r[1] * q[0] + r[2] * q[3],
-            r[3] * q[3] - r[0] * q[0] - r[1] * q[1] - r[2] * q[2]]
-
-
-for _inst in LAYOUT["instances"]:
-    if _inst.get("zone") == "condensery":
-        _inst["pos"] = cond_turn(_inst["pos"])
-        _inst["quat"] = cond_quat(_inst["quat"])
-for _m in COND_MASSES:
-    for _l in DESIGN["masses"].get(_m, []):
-        _l["c"] = cond_turn(_l["c"])   # (lobes are axis-aligned ellipsoids: their x/z scales are kept)
-for _g in DESIGN["clouds_block"]["glows"]:
-    if _g["name"] in COND_GLOWS:
-        _g["position"] = cond_turn(_g["position"])
-
-
-# ---------------------------------------------------------------------------------------------------------------
 # materials
-def window_program(name, tints, intensity):
-    """Lit panes on the kit's modelled windows. Pane UV: u = brightness level (16 steps), v = a per-window hash.
-    Lit or dark per window = a hash of (v, instance, floor) under the building's own lit fraction (12-50 percent,
-    from instanceRandom), with whole wings dark from a coarser (instance, 8 m column, floor) hash. Each lit pane keeps
-    its own brightness (0.2 + 0.8 u^2) and takes one of four tints biased toward the first."""
-    ops = [
-        {"kind": "input", "input": "uv", "dst": 0},                                 # (u, v)
-        {"kind": "input", "input": "instanceRandom", "dst": 1},
-        {"kind": "input", "input": "localPosition", "dst": 2},
-        # window key: (inst * 1000, v * 1000, floor)
-        {"kind": "constant", "dst": 3, "constant": [0.0, 1000.0, 0.0, 0.0]},
-        {"kind": "multiply", "dst": 4, "srcA": 0, "srcB": 3},
-        {"kind": "constant", "dst": 3, "constant": [1000.0, 0.0, 0.0, 0.0]},
-        {"kind": "multiply", "dst": 5, "srcA": 1, "srcB": 3},                       # (inst*1000, 0, 0, 0)
-        {"kind": "add", "dst": 4, "srcA": 4, "srcB": 5},
-        {"kind": "constant", "dst": 3, "constant": [0.125, 0.3125, 0.0, 0.0]},      # (x / 8, y / 3.2)
-        {"kind": "multiply", "dst": 6, "srcA": 2, "srcB": 3},
-        {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [2.0, 0.0, 1.0, 2.0]},  # (0, x/8, y/3.2, 0)
-        {"kind": "swizzle", "dst": 7, "srcA": 6, "constant": [0.0, 3.0, 2.0, 3.0]},  # (0, 0, y/3.2, 0)
-        {"kind": "add", "dst": 7, "srcA": 4, "srcB": 7},                            # (inst, v, floor)
-        {"kind": "quantize", "dst": 7, "srcA": 7, "value": 1.0, "seed": 17},        # w = per-window hash
-        {"kind": "add", "dst": 6, "srcA": 5, "srcB": 6},                            # (inst, x/8, floor)
-        {"kind": "quantize", "dst": 6, "srcA": 6, "value": 1.0, "seed": 29},        # w = per-wing hash
-        {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [3.0, 3.0, 3.0, 3.0]},
-        {"kind": "smoothstep", "dst": 6, "srcA": 6, "constant": [0.28, 0.30, 0.0, 0.0]},  # wing on (72 %)
-        {"kind": "gradient", "dst": 6, "srcA": 6, "constant": [1.25, 0.0, 0.0, 0.12], "value": 1.0},
-        {"kind": "gradient", "dst": 5, "srcA": 1, "constant": [0.0, 0.40, 0.0, 0.10], "value": 1.0},  # lit fraction
-        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},                       # effective fraction
-        {"kind": "constant", "dst": 3, "constant": [1.0, 0.0, 0.0, 0.0]},
-        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 3},                       # (frac, 0, 0, 0)
-        {"kind": "swizzle", "dst": 6, "srcA": 7, "constant": [1.0, 3.0, 1.0, 1.0]},  # (v, hash, ...)
-        {"kind": "constant", "dst": 3, "constant": [0.0, 1.0, 0.0, 0.0]},
-        {"kind": "multiply", "dst": 6, "srcA": 6, "srcB": 3},                       # (0, hash, 0, 0)
-        {"kind": "add", "dst": 5, "srcA": 5, "srcB": 6},                            # (frac, hash)
-        {"kind": "gradient", "dst": 5, "srcA": 5, "constant": [1.0, -1.0, 0.0, 0.0], "value": 80.0},  # lit 0/1
-        # brightness from the pane's level
-        {"kind": "power", "dst": 6, "srcA": 0, "value": 2.0},
-        {"kind": "gradient", "dst": 6, "srcA": 6, "constant": [0.8, 0.0, 0.0, 0.2], "value": 1.0},
-        {"kind": "multiply", "dst": 5, "srcA": 5, "srcB": 6},
-        # tint: a second hash of the window, biased toward the first stop
-        {"kind": "swizzle", "dst": 6, "srcA": 7, "constant": [1.0, 1.0, 1.0, 1.0]},
-        {"kind": "quantize", "dst": 6, "srcA": 4, "value": 1.0, "seed": 43},
-        {"kind": "swizzle", "dst": 6, "srcA": 6, "constant": [3.0, 3.0, 3.0, 3.0]},
-        {"kind": "power", "dst": 6, "srcA": 6, "value": 1.7},
-        {"kind": "oklabRamp", "dst": 6, "srcA": 6, "constant": tints[0] + [1.0], "constant2": tints[1] + [1.0],
-         "constant3": tints[2] + [1.0], "constant4": tints[3] + [1.0], "value": 1.0},
-        {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 5},                       # emission
-        {"kind": "constant", "dst": 0, "constant": [0.012, 0.011, 0.02, 1.0]},     # dark glass
-    ]
-    return {"name": name, "ops": ops, "baseColor": 0, "metallic": -1, "roughness": -1, "emission": 7,
-            "emissionIntensity": intensity, "opacity": -1}
-
-
 def moon_program(name, disc, light_dir, scale, centre_y, radius):
     """The Drowned Moon: a soft terminator, two octaves of maria and craters, limb darkening, and extinction toward the
     sea horizon (the lower part dims and warms through the haze); the corona is the cloud block's halo (ADR-2102)."""
@@ -193,10 +108,16 @@ def moon_program(name, disc, light_dir, scale, centre_y, radius):
         {"kind": "oklabRamp", "dst": 6, "srcA": 6, "constant": deep + [1.0], "constant2": mid + [1.0],
          "constant3": disc + [1.0], "constant4": disc + [1.0], "value": 1.0},
         {"kind": "multiply", "dst": 7, "srcA": 6, "srcB": 1},
+        # iteration 5: sunk in the sea -- nothing of the disc glows below the horizon (a moon 15 degrees across showed
+        # its lower half as a bright ellipse through the thin far sea)
+        {"kind": "gradient", "dst": 5, "srcA": 2, "constant": [0.0, 1.0, 0.0, -HORIZON_Y / (0.03 * radius)],
+         "value": 1.0 / (0.03 * radius)},
+        {"kind": "multiply", "dst": 7, "srcA": 7, "srcB": 5},
         {"kind": "constant", "dst": 4, "constant": [0.0, 0.0, 0.0, 1.0]},
     ]
+    # below the horizon the disc is cut out (alpha mask on r5), so the sea and the sky show where it is sunk
     return {"name": name, "ops": ops, "baseColor": 4, "metallic": -1, "roughness": -1, "emission": 7,
-            "emissionIntensity": 1.0, "opacity": -1}
+            "emissionIntensity": 1.0, "opacity": 5}
 
 
 def ocean_program(name, deep, bright, scale, intensity):
@@ -227,37 +148,123 @@ def flat_emit_program(name, color, intensity):
 
 
 PANES = ("glass", "win_warm", "win_cool")
-TINT_DEFAULTS = {"win_warm": "win_d", "win_cool": "win_a", "strip": "eave", "beacon": "beacon", "landmark": "landmark",
+TINT_DEFAULTS = {"win_stair": "win_a", "win_warm": "win_d", "win_cool": "win_a", "strip": "eave", "beacon": "beacon", "landmark": "landmark",
                  "garden": "garden_a", "lantern": "amber", "keel": "bounce_a", "neon_a": "sign_a",
                  "beam_lamp": "moon_disc", "cond_glow": "cond_a", "cond_lamp": "cond_a", "cond_work": "cond_c"}
 # emissive strength per light role (scene-linear multipliers on the palette colour; art-direction section 3)
-ROLE_GAIN = {"strip": 7.0, "beacon": 40.0, "landmark": 6.0, "garden": 10.0, "lantern": 7.0, "keel": 7.0,
+ROLE_GAIN = {"win_stair": 3.5, "strip": 4.5, "beacon": 40.0, "landmark": 1.6, "garden": 10.0, "lantern": 7.0, "keel": 7.0,
              "neon_a": 14.0, "beam_lamp": 14.0, "cond_glow": 9.0, "cond_lamp": 18.0, "cond_work": 8.0}
 
 
-def part_materials(tint, state="uv", color=None):
-    pm = {name: {"program": "ndPanes"} for name in PANES}
+# Iteration 5: every light role runs a program of its own (nd_audio.py), so a stem reaches exactly the roles and the
+# district it should, and the palette arc keys each program's colour at its system's rate.
+NODE_OF = {}
+PROGS = {}  # name -> {"prog": Prog, "doc": program, "system": arc system or None, "key": palette key, "group": route group}
+
+
+def zclass_of(zone):
+    return "cond" if zone == "condensery" else "lone" if zone == "lone_lamp" else "town"
+
+
+def fixed_key(key):
+    return key in PALETTE["fixed"]
+
+
+def _reg(name, made, system, key, group):
+    if name not in PROGS:
+        prog, doc = made()
+        PROGS[name] = {"prog": prog, "doc": doc, "system": None if fixed_key(key) else system, "key": key,
+                       "group": group}
+    return name
+
+
+def role_program(role, key, zclass, asset, state):
+    gain = ROLE_GAIN[role]
+    col = pal(key, state)
+    if zclass == "cond":   # the Condensery answers only the bass, as a slow ember; its colours are its own
+        n = "ndCond_%s_%s" % (role, key)
+        return _reg(n, lambda: AU.emit_program(n, col, gain), None, key, "cond")
+    if zclass == "lone":   # the Lone Lamp answers only the pad
+        n = "ndLone_%s_%s" % (role, key)
+        return _reg(n, lambda: AU.emit_program(n, col, gain), None, key, "lone")
+    if role == "neon_a":
+        if "roundel" in asset:   # roundels blink with the tone block
+            n = "ndRoundel_%s" % key
+            return _reg(n, lambda: AU.emit_program(n, col, gain * 0.08, pattern=True), "sign", key, "block_roundel")
+        n = "ndSign_%s" % key    # businesses A (sign_a, sign_c) and B (sign_b) answer the snare in turn
+        return _reg(n, lambda: AU.emit_program(n, col, gain), "sign", key, "snareB" if key == "sign_b" else "snareA")
+    if role == "strip":
+        if "gangway" in asset:   # the gangway strips: the snare
+            n = "ndGang_%s" % key
+            return _reg(n, lambda: AU.emit_program(n, col, gain), "eave", key, "gangway")
+        n = "ndStrip_%s" % key   # eave lines: the kick ring
+        return _reg(n, lambda: AU.emit_program(n, col, gain, ring=1.8), "eave", key, None)
+    if role == "beacon":
+        n = "ndBeacon"
+        return _reg(n, lambda: AU.emit_program(n, col, gain * 0.02, pattern=True), None, key, "block_beacon")
+    if role == "garden":
+        n = "ndGarden_%s" % key
+        return _reg(n, lambda: AU.emit_program(n, col, gain, hh=1.4), "garden", key, "hh")
+    if role == "lantern":
+        n = "ndLantern_%s" % key
+        return _reg(n, lambda: AU.emit_program(n, col, gain, ring=1.0, hh=0.5, toms=1.6), "garden", key, "lantern")
+    if role == "keel":
+        n = "ndKeel_%s" % key
+        return _reg(n, lambda: AU.emit_program(n, col, gain, hh=0.7), "underlight", key, "hh")
+    if role == "win_stair":   # the always-lit stair slots (art iteration 5): out of the lit/dark pane program
+        n = "ndStair_%s" % key
+        return _reg(n, lambda: AU.emit_program(n, col, gain), "practical", key, None)
+    if role == "landmark":
+        n = "ndBell"
+        return _reg(n, lambda: AU.emit_program(n, col, gain), "bell", key, "bell")
+    return None   # beam_lamp and the Condensery roles outside the works keep their colour
+
+
+def pane_program(zclass, state):
+    if zclass == "cond":
+        t = [pal(k) for k in ("cond_a", "amber", "cond_c", "cond_b")]
+        return _reg("ndPanesCond", lambda: AU.window_program("ndPanesCond", t, t, 3.0), None, "cond_a", "cond")
+    if zclass == "lone":
+        t = [pal("amber")] * 4
+        return _reg("ndPanesLone", lambda: AU.window_program("ndPanesLone", t, t, 4.0), None, "amber", "lone")
+    t = [pal(k, state) for k in ("win_a", "win_b", "win_c", "win_d")]
+    return _reg("ndPanes", lambda: AU.window_program("ndPanes", t, t, 4.0, ring=0.6), "window", "win", "panes")
+
+
+with open(os.path.join(HERE, "meshes", "kit_manifest.json")) as _f:
+    KIT_MATERIALS = {a["asset"]: set(a["materials"]) for a in json.load(_f)["assets"] if a.get("materials")}
+
+
+def part_materials(tint, state="uv", color=None, zclass="town", asset=""):
+    has = KIT_MATERIALS.get(asset)   # only the roles the asset has (an unknown asset: all of them)
+    pm = {name: {"program": pane_program(zclass, state)} for name in PANES if has is None or name in has}
     for role, default in TINT_DEFAULTS.items():
-        if role in PANES:
+        if role in PANES or (has is not None and role not in has):
             continue
         key = tint.get(role, default)
-        pm[role] = {"emissiveColor": pal(key, state), "emissiveIntensity": ROLE_GAIN[role]}
+        entry = {"emissiveColor": [1.0, 1.0, 1.0], "emissiveIntensity": 1.0}
+        prog = role_program(role, key, zclass, asset, state)
+        if prog is None:
+            entry = {"emissiveColor": pal(key, state), "emissiveIntensity": ROLE_GAIN[role]}
+        else:
+            entry["program"] = prog
+        pm[role] = entry
     for role, rgb in (color or {}).items():   # ADR-2102: the layout's per-instance base colour (awning cloth)
         pm.setdefault(role, {})["baseColor"] = r3(rgb)
     return pm
 
 
 def kit_nodes(state="uv"):
-    """One procedural node per (asset, tint, colour) group of the layout's instances."""
+    """One procedural node per (asset, tint, colour, district) group of the layout's instances."""
     groups = {}
     for inst in LAYOUT["instances"]:
         tint = inst.get("tint", {})
         color = json.dumps(inst.get("color", {}), sort_keys=True)
-        key = (inst["asset"], tuple(sorted(tint.items())), color)
+        key = (inst["asset"], tuple(sorted(tint.items())), color, zclass_of(inst.get("zone", "")))
         groups.setdefault(key, []).append(inst)
     nodes = []
     used = set()
-    for (asset, tint, color), insts in sorted(groups.items()):
+    for (asset, tint, color, zclass), insts in sorted(groups.items()):
         base = os.path.splitext(os.path.basename(asset))[0]
         name = base
         k = 1
@@ -265,13 +272,15 @@ def kit_nodes(state="uv"):
             name = "%s_%d" % (base, k)
             k += 1
         used.add(name)
+        if asset.endswith("great_lantern_bell.glb"):
+            NODE_OF["bell"] = name
         pts = [r3(i["pos"]) + r3(i["quat"]) + r3(i["scale"]) for i in insts]
         shadow = asset.startswith("buildings/") or asset.startswith("landmarks/")
         nodes.append({"name": name, "kind": "procedural", "position": [0, 0, 0], "procedural": {
             "source": {"kind": "mesh", "asset": MESH + asset},
             "distribution": {"kind": "points", "points": pts},
             "castsShadow": shadow,
-            "partMaterials": part_materials(dict(tint), state, json.loads(color))}})
+            "partMaterials": part_materials(dict(tint), state, json.loads(color), zclass, asset)}})
     return nodes
 
 
@@ -461,7 +470,16 @@ def veil_passage():
         r = rnd.uniform(48.0, 70.0) * (1.0 - 0.35 * thin)
         c = [p[0] + rnd.uniform(-10, 10), p[1] + rnd.uniform(-8, 12), p[2] + rnd.uniform(-12, 12)]
         if thin < 0.95 and not (thin > 0.3 and rnd.random() < 0.35 * thin):
-            lobes.append({"c": r3(c), "r": round(r, 1), "scale": [1.0, 0.85, 1.0], "density": dens, "soft": 0.55})
+            # iteration 5: the core is no longer one even density -- denser knots and thinner voids alternate, so
+            # the passage has structure to light and the toms' pockets something to light it from
+            knot = rnd.choice((0.35, 0.6, 0.85, 1.0, 1.0))
+            lobes.append({"c": r3(c), "r": round(r, 1), "scale": [1.0, 0.85, 1.0], "density": round(min(dens * knot, 1.0), 3),
+                          "soft": round(rnd.uniform(0.4, 0.7), 2)})
+            if thin < 0.6 and rnd.random() < 0.55:   # a smaller dense knot off the axis
+                lobes.append({"c": r3([c[0] + rnd.uniform(-25, 25), c[1] + rnd.uniform(-15, 25),
+                                       c[2] + rnd.uniform(-30, 30)]),
+                              "r": round(rnd.uniform(14.0, 26.0), 1), "scale": [1.0, 0.8, 1.0],
+                              "density": 1.0, "soft": 0.35})
         if thin < 0.4:
             # the envelope: beside and above, so the turret has a silhouette
             for side in (-1, 1):
@@ -475,15 +493,23 @@ def veil_passage():
                               "r": round(rnd.uniform(60.0, 85.0), 1), "scale": [1.0, 1.0, 1.0], "density": 1.0,
                               "soft": 0.4})
         t += 0.55 if thin == 0 else 0.4
-    return lobes, {"rose": point(49.8), "amber": point(57.8)}
+    # inner-lit pockets along the passage (the toms flash them in turn; a dim rest glow keeps the interior from
+    # reading as one flat colour)
+    pockets = []
+    for i, tp in enumerate((47.6, 48.6, 49.8, 51.0, 52.2, 53.4)):
+        p = point(tp)
+        side = -1 if i % 2 else 1
+        pockets.append(r3([p[0] + rnd.uniform(10, 30), p[1] + rnd.uniform(-12, 18), p[2] + side * rnd.uniform(18, 38)]))
+    return lobes, {"rose": point(49.8), "amber": point(57.8), "pockets": pockets}
 
 
 def clouds_block(state="uv", moon_dir=None):
     lobes = []
     for name, ls in DESIGN["masses"].items():
         lobes += [dict(l) for l in ls]
+    far = []   # ADR-2104: the far towers on their own grid (in one set they overflowed 18 hero cells)
     for name, ls in DESIGN.get("far_masses", {}).items():
-        lobes += [dict(l) for l in ls]
+        far += [dict(l) for l in ls]
     passage, gp = veil_passage()
     lobes += passage
     cb = DESIGN["clouds_block"]
@@ -495,17 +521,30 @@ def clouds_block(state="uv", moon_dir=None):
                   "intensity": 0.5})
     glows.append({"name": "veil_amber", "position": r3([gp["amber"][0] + 90, gp["amber"][1] + 10, gp["amber"][2] - 25]),
                   "color": pal("cond_a", state), "radius": 55.0, "intensity": 1.2})
+    for i, pp in enumerate(gp["pockets"]):
+        glows.append({"name": "veil_pocket%d" % i, "position": pp,
+                      "color": pal("garden_b" if i % 2 else "garden_a", state), "radius": 30.0, "intensity": 0.6})
+    GLOW_INDEX.clear()
+    GLOW_INDEX.update({g["name"]: i for i, g in enumerate(glows)})
+    GLOW_KEYS.clear()
+    GLOW_KEYS.update({g["name"]: g["key"] for g in cb["glows"]})
+    GLOW_KEYS.update({"veil_rose": "garden_a", "veil_amber": "cond_a"})
+    GLOW_KEYS.update({"veil_pocket%d" % i: ("garden_b" if i % 2 else "garden_a") for i in range(len(gp["pockets"]))})
     sea = DESIGN["sea_design"]
     br = sea["break"]
     lo, hi = sea["top_range"]
     out = {
         "lobes": lobes,
+        "farLobes": far,
         "sea": {"base": sea["base"], "top": sea["top_mean"], "coverage": 1.0, "coverageScale": 0.0003,
                 "density": 1.6, "relief": round((hi - lo) / 2.4, 1), "reliefScale": 2000.0, "billow": 24.0,
                 "farFade": 0.35,
                 "breaks": [{"centre": br["centre"], "radius": br["radius"], "elongation": br["elongation"],
                             "yaw": br["yaw_rad"]}]},
         "glows": glows, "glowGain": CLOUD_LOOK["glowGain"], "glowOcclusion": 1.6,
+        # ADR-2104: the glows light the cloud's structure (pockets and the billows facing them), not spheres
+        "glowBreakup": CLOUD_LOOK["glowBreakup"], "glowShadow": CLOUD_LOOK["glowShadow"],
+        "glowBreakupScale": 0.014, "glowShadowDistance": 16.0,
         "extinction": 0.02, "density": 1.0, "swell": 0.0,
         "steps": 72, "lightSteps": 2, "lightDistance": CLOUD_LOOK["lightDistance"],
         "resolution": 0.5, "temporal": 0.85, "minStep": 3.0, "stepGrowth": 0.02, "maxDistance": 24000.0,
@@ -530,18 +569,17 @@ def clouds_block(state="uv", moon_dir=None):
 # the cloud look (iteration 4: dark indigo bodies, rims toward the key, the city's light on them)
 CLOUD_LOOK = {"lightIntensity": 0.11, "anisotropy": 0.45, "lightDistance": 260.0, "ambientTop": 0.45,
               "ambientBottom": 0.10, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
-              "halo": 0.45}
+              "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2}
+GLOW_INDEX = {}   # glow name -> index in clouds.glows (route targets)
+GLOW_KEYS = {}    # glow name -> palette key
 
 
 # ---------------------------------------------------------------------------------------------------------------
 # the journey: the layout's waypoints (engine frame)
-# The layout's waypoints up to the dive (47 s). Iteration 4 replaces its second half: the art waypoints climbed over the
-# Veil (the camera never entered cloud) and ended 1.6 km from the Condensery looking 10 degrees up. Now the camera
-# dives into the passage at 47 s, crosses 450 m of cloud at 40-50 m/s, leaves it at 57-58 s level with the Condensery's
-# throats and heading straight at it (bearing ~15 degrees), and slows to a near hover by 70 s.
-TAIL = [(50.5, [290.0, 175.0, 5.0]), (54.4, [470.0, 215.0, -40.0]), (58.95, [660.0, 245.0, -95.0]),
-        (66.5, [835.0, 256.0, -144.0]), (SONG, [865.0, 258.0, -152.0])]
-WAYPOINTS = [(w["t"], w["pos"]) for w in LAYOUT["camera"]["waypoints"] if w["t"] <= 47.0] + TAIL
+# The layout's waypoints (iteration 5: the art data now carries the iteration-4 tail through the Veil).
+WAYPOINTS = [(w["t"], w["pos"]) for w in LAYOUT["camera"]["waypoints"]]
+
+
 def catmull(p0, p1, p2, p3, t, alpha=0.5):
     def tj(ti, a, b):
         return ti + max(math.dist(a, b), 1e-6) ** alpha
@@ -619,6 +657,8 @@ def journey(full=False):
 
 # ---------------------------------------------------------------------------------------------------------------
 STILL_TIMES = [2.8, 17.0, 35.75, 50.5, 58.95, 66.0]
+MOON_ARGS = {}
+BELL_POS = next(i["pos"] for i in LAYOUT["instances"] if i["asset"].endswith("great_lantern_bell.glb"))
 
 
 def fov_track():
@@ -647,7 +687,8 @@ def scene_doc(state="uv", sky_map=None):
         "distribution": {"kind": "points", "points": [r3([md[i] * D for i in range(3)]) + [0, 0, 0, 1] +
                                                       [round(R / 1000.0, 4)] * 3]},
         "castsShadow": False,
-        "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndMoon"}}})
+        "material": {"baseColor": [0, 0, 0], "roughness": 1.0, "metallic": 0.0, "program": "ndMoon",
+                     "alphaMode": "mask", "alphaCutoff": 0.5}}})
     # the cosmic ocean far under the break
     br = DESIGN["sea_design"]["break"]["centre"]
     nodes.append({"name": "cosmicOcean", "kind": "procedural", "position": [br[0], -900, br[1]], "procedural": {
@@ -658,11 +699,10 @@ def scene_doc(state="uv", sky_map=None):
     vehicles, vehicle_tracks = vehicle_nodes(state)
     nodes += aliens + vehicles
     programs = [
-        window_program("ndPanes", [pal("win_a", state), pal("win_b", state), pal("win_c", state), pal("win_d", state)],
-                       4.0),
-        moon_program("ndMoon", [v * 0.22 for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
+        moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
-    ]
+    ] + [PROGS[n]["doc"] for n in sorted(PROGS)]
+    MOON_ARGS.update({"ml": ml, "R": R, "cy": md[1] * D})
     env = {
         "background": [0.001, 0.001, 0.004],
         "intensity": 0.15, "skyIntensity": 0.35, "lightFromEnvironment": False,
@@ -694,26 +734,173 @@ def scene_doc(state="uv", sky_map=None):
             "samplesPerSegment": 4, "points": [{"position": r3(p), "roll": 0.0, "scale": 1.0} for p in dense]}}],
         "materialPrograms": programs,
         "clouds": clouds_block(state, md),
+        # iteration 5: the kick ring leaves the Great Lantern's bell (kick stem onsets, feeds.historyOnsets)
+        "fields": [AU.kick_ring_field(BELL_POS)],
     }
     return doc, [{"target": "camera/splineT", "component": -1, "enabled": True, "timeBase": "seconds",
                   "mode": "replace", "loopLength": 0.0, "keys": keys}, fov_track()] + alien_tracks + vehicle_tracks
 
 
-def cloud_routes():
-    """The three ADR-2100 routes of iteration 2 (audio routing is iteration 4)."""
-    def r(source, target, amount, **chain):
-        out = {"source": source, "target": target, "amount": amount, "op": "add", "polarity": "unipolar"}
-        if chain:
-            out["chain"] = chain
-        return out
-    VEIL_ROSE_INDEX = len([g for g in DESIGN["clouds_block"]["glows"] if g["name"] not in BEAM_STANDINS])
-    return [
-        r("stem.bass.level", "clouds/swell", 0.25, attackMs=350.0, decayMs=1800.0),
-        r("stem.kick.onset", "clouds/glow/0/intensity", 1.2, attackMs=15.0, decayMs=450.0),
-        r("stem.snare.onset", "clouds/glow/2/intensity", 1.0, attackMs=15.0, decayMs=350.0),
-        # the Veil's rose light answers the toms (the fills at 24, 35 and the 41.75-48 build light it from inside)
-        r("stem.toms.onset", "clouds/glow/%d/intensity" % VEIL_ROSE_INDEX, 6.0, attackMs=10.0, decayMs=380.0),
+def reactivity():
+    """Iteration 5: the routes (stems -> systems) and the palette arc (timeline tracks). Returns (routes, tracks,
+    sources). See nd_audio.py for the table."""
+    R = AU.route
+    routes, tracks = [], []
+    # the bass stem's level sits at 0.4-0.8 while it plays: the routes hear the top of that range, so a phrase lifts
+    # the bell and a rest lets it settle, instead of riding high all song
+    shape = dict(gain=round(1 / 0.42, 4), offset=round(-0.38 / 0.42, 4), clampEnabled=True, clampMin=0.0, clampMax=1.0)
+    lvl_slow = dict(attackMs=350.0, decayMs=1800.0, **shape)
+    ember = dict(attackMs=600.0, decayMs=2600.0, **shape)
+    hit = dict(attackMs=8.0, decayMs=260.0)
+    G = GLOW_INDEX
+    # --- BASS: the bell lifts and brightens (slow), its cloud glow, the cloud swell; the Condensery's ember
+    routes += [
+        R("stem.bass.level", "nodes/%s/position" % NODE_OF["bell"], 1.5, component=1, **lvl_slow),
+        R("stem.bass.level", "material/ndBell/emissionIntensity", ROLE_GAIN["landmark"] * 0.25, **lvl_slow),
+        R("stem.bass.level", "clouds/glow/%d/intensity" % G["great_lantern"], 0.6, **lvl_slow),
+        R("stem.bass.level", "clouds/swell", 0.22, **lvl_slow),
     ]
+    for k in ("keel_west", "keel_east"):
+        if k in G:
+            routes.append(R("stem.bass.level", "clouds/glow/%d/intensity" % G[k], 0.35, **lvl_slow))
+    for k in sorted(G):   # the Condensery's glows (their names follow the art's cloud design)
+        if k.startswith("condensery_"):
+            routes.append(R("stem.bass.level", "clouds/glow/%d/intensity" % G[k], 0.9, **ember))
+    for n, info in PROGS.items():
+        if info["group"] == "cond":
+            routes.append(R("stem.bass.level", "material/%s/emissionIntensity" % n,
+                            0.4 * info["doc"]["emissionIntensity"], **ember))
+    # --- kick: the ring is the kickRing onset field on the kick stem's onsets (feeds.historyOnsets); no route
+    # --- snare: businesses A and B in turn (random.snareTurn cycles 0, 1 on each snare hit); the gangway strips
+    for n, info in PROGS.items():
+        g = info["group"]
+        if g in ("snareA", "snareB"):
+            r = R("stem.snare.onset", "material/%s/emissionIntensity" % n, 1.1 * info["doc"]["emissionIntensity"],
+                  attackMs=6.0, decayMs=320.0)
+            r.update({"depthSource": "random.snareTurn", "depthMin": 1.0 if g == "snareA" else 0.0,
+                      "depthMax": 0.0 if g == "snareA" else 1.0})
+            routes.append(r)
+        elif g == "gangway":
+            routes.append(R("stem.snare.onset", "material/%s/emissionIntensity" % n,
+                            1.4 * info["doc"]["emissionIntensity"], attackMs=6.0, decayMs=240.0))
+    # --- HH: sparkle on the garden, the lantern bulbs, the keel lanterns; star twinkle
+    for n, info in PROGS.items():
+        if info["group"] in ("hh", "lantern") and "hh" in info["prog"].at:
+            routes.append(R("stem.hh.onset", info["prog"].path("hh"), 1.0, **hit))
+    routes.append(R("stem.hh.onset", "fx/stars/twinkle", 0.25, attackMs=10.0, decayMs=300.0))
+    # --- toms: the lantern strings' ripple; the Veil's rose light and its pockets
+    for n, info in PROGS.items():
+        if info["group"] == "lantern":
+            routes.append(R("stem.toms.onset", info["prog"].path("toms"), 1.0, attackMs=10.0, decayMs=420.0))
+    routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_rose"], 6.0, attackMs=10.0,
+                    decayMs=380.0))
+    for i in range(6):
+        routes.append(R("stem.toms.onset", "clouds/glow/%d/intensity" % G["veil_pocket%d" % i], 3.0 + 0.6 * i,
+                        attackMs=8.0, decayMs=300.0, delayMs=45.0 * i))
+    # --- crash: the sky's horizon lift and the lighthouses flaring (the palette steps are the tracks below)
+    routes.append(R("stem.crash.onset", "env/skyIntensity", 0.16, attackMs=30.0, decayMs=2600.0))
+    for i in range(len(LAYOUT["beams"])):
+        routes.append(R("stem.crash.onset", "clouds/beam/%d/intensity" % i, 1.6, attackMs=40.0, decayMs=3200.0))
+        routes.append(R("stem.cloud.level", "clouds/beam/%d/intensity" % i, 0.25, attackMs=800.0, decayMs=2500.0))
+    # --- Moog: the windows (lit fraction +10 points, the tint mix, brightness)
+    panes = PROGS["ndPanes"]["prog"]
+    routes += [
+        R("stem.moog.level", panes.path("litfrac"), 0.10, component=3, attackMs=250.0, decayMs=1200.0),
+        R("stem.moog.level", panes.path("tintpow", "value"), -0.8, attackMs=250.0, decayMs=1500.0),
+        R("stem.moog.level", "material/ndPanes/emissionIntensity", 1.2, attackMs=150.0, decayMs=900.0),
+    ]
+    # --- Cloud Diving: the clouds' inner glow, the nebula, the cosmic ocean, the Lone Lamp
+    pad = dict(attackMs=900.0, decayMs=2400.0)
+    routes += [
+        R("stem.cloud.level", "clouds/glowGain", 0.10, **pad),
+        R("stem.cloud.level", "env/skyIntensity", 0.10, **pad),
+        R("stem.cloud.level", "material/ndOcean/emissionIntensity", 1.4, **pad),
+    ]
+    for n, info in PROGS.items():
+        if info["group"] == "lone":
+            routes.append(R("stem.cloud.level", "material/%s/emissionIntensity" % n,
+                            1.2 * info["doc"]["emissionIntensity"], **pad))
+    # --- tone block: beacons and roundels lit by the stem's level (dark while it rests), the lit quarter stepping
+    for n, info in PROGS.items():
+        if info["group"] in ("block_beacon", "block_roundel"):
+            full = ROLE_GAIN["beacon"] * 0.9 if info["group"] == "block_beacon" else ROLE_GAIN["neon_a"] * 0.9
+            routes.append(R("stem.block.level", "material/%s/emissionIntensity" % n, full, attackMs=20.0,
+                            decayMs=180.0))
+            routes.append(R("random.blockStep", info["prog"].path("chase", "value"), 0.75, op="replace"))
+    sources = [{"kind": "random", "name": "snareTurn", "settings": {"trigger": "stem.snare.onset", "seed": 1, "cycle": 2}},
+               {"kind": "random", "name": "blockStep", "settings": {"trigger": "stem.block.onset", "seed": 1, "cycle": 4}}]
+
+    # --- the palette arc
+    def P(key):
+        return lambda st: pal(key, st)
+    for n, info in sorted(PROGS.items()):
+        if info["system"] is None or n.startswith("ndPanes"):
+            continue
+        tracks.append(AU.track(info["prog"].path("colour"),
+                               AU.arc_keys(lambda st, k=info["key"]: pal(k, st) + [1.0], info["system"], SONG)))
+    # windows: from / to ramps stepped at each transition and a progress the buildings stagger on
+    tints = lambda st: [pal(k, st) + [1.0] for k in ("win_a", "win_b", "win_c", "win_d")]
+    fields = ("constant", "constant2", "constant3", "constant4")
+    frm = {f: [{"time": 0.0, "value": tints("uv")[i], "interp": "step"}] for i, f in enumerate(fields)}
+    to = {f: [{"time": 0.0, "value": tints("uv")[i], "interp": "step"}] for i, f in enumerate(fields)}
+    prog_keys = [{"time": 0.0, "value": [0.0, -0.6, 0.0, 1.6], "interp": "step"}]
+    prev = "uv"
+    for (t0, st, dur) in AU.ARC["window"]:
+        for i, f in enumerate(fields):
+            frm[f].append({"time": t0, "value": tints(prev)[i], "interp": "step"})
+            to[f].append({"time": t0, "value": tints(st)[i], "interp": "step"})
+        prog_keys.append({"time": t0, "value": [0.0, -0.6, 0.0, 0.0], "interp": "linear"})
+        for k in range(1, 7):
+            prog_keys.append({"time": round(t0 + dur * k / 6, 3),
+                              "value": [0.0, -0.6, 0.0, round(1.6 * AU.smooth(k / 6), 4)], "interp": "linear"})
+        prev = st
+    for f in fields:
+        tracks.append(AU.track(panes.path("from", f), frm[f]))
+        tracks.append(AU.track(panes.path("to", f), to[f]))
+    tracks.append(AU.track(panes.path("progress"), prog_keys))
+    # the practical lights (the windows' rate)
+    for l in LAYOUT["lights"]:
+        if not fixed_key(l["key"]):
+            tracks.append(AU.track("lights/%s/color" % l["name"], AU.arc_keys(P(l["key"]), "practical", SONG)))
+    # the cloud underlight keeps the old colour longest of the town's systems
+    for name, i in sorted(GLOW_INDEX.items()):
+        key = GLOW_KEYS.get(name)
+        if key and not fixed_key(key):
+            tracks.append(AU.track("clouds/glow/%d/color" % i, AU.arc_keys(P(key), "underlight", SONG)))
+    # the air: the moon's key, the ambient, the warm horizon, the haze
+    L = CLOUD_LOOK
+    tracks += [
+        AU.track("clouds/lightColor", AU.arc_keys(P("moon_light"), "air", SONG)),
+        AU.track("clouds/ambientTop", AU.arc_keys(lambda st: [v * L["ambientTop"] for v in pal("sky_horizon", st)],
+                                                  "air", SONG)),
+        AU.track("clouds/ambientBottom", AU.arc_keys(lambda st: [v * L["ambientBottom"] for v in pal("haze", st)],
+                                                     "air", SONG)),
+        AU.track("clouds/warmColor", AU.arc_keys(lambda st: [v * 0.10 for v in pal("horizon_glow", st)], "air", SONG)),
+        AU.track("clouds/hazeColor", AU.arc_keys(P("haze"), "air", SONG)),
+    ]
+    # the far field: the nebula (the sky map is the Ultraviolet bake: a per-channel tint moves its hue), the moon's
+    # disc, the cosmic ocean
+
+    # per-channel ratios of the states' nebula colours to the Ultraviolet bake's, with green held at or under 1 so the
+    # dark horizon never turns teal (the raw ratios lift green 2x for Electric Blue and Amber Eclipse)
+    SKY_TINT = {"uv": [1.0, 1.0, 1.0], "rose": [1.7, 0.9, 0.75], "blue": [0.35, 0.95, 1.5], "amber": [1.35, 0.7, 0.3]}
+
+    def neb(st):
+        return SKY_TINT[st]
+    tracks.append(AU.track("env/skyTint", AU.arc_keys(neb, "far", SONG)))
+
+    def moon_stops(st):
+        disc = [v * MOON_GAIN for v in pal("moon_disc", st)]
+        return [[disc[0] * 0.30, disc[1] * 0.16, disc[2] * 0.16, 1.0], [disc[0] * 0.62, disc[1] * 0.50, disc[2] * 0.62, 1.0],
+                disc + [1.0], disc + [1.0]]
+    for i, f in enumerate(fields):
+        tracks.append(AU.track("material/ndMoon/op/16/oklabRamp/%s" % f,
+                               AU.arc_keys(lambda st, i=i: moon_stops(st)[i], "far", SONG)))
+    tracks.append(AU.track("material/ndOcean/op/10/oklabRamp/constant2",
+                           AU.arc_keys(lambda st: pal("ocean_a", st) + [1.0], "far", SONG)))
+    tracks.append(AU.track("material/ndOcean/op/10/oklabRamp/constant3",
+                           AU.arc_keys(lambda st: pal("ocean_b", st) + [1.0], "far", SONG)))
+    return routes, tracks, sources
 
 
 def trim_track(track):
@@ -735,7 +922,7 @@ def interpolate_key(a, b, t):
     return {"time": round(t, 3), "value": v, "interp": b["interp"]}
 
 
-def project_doc(scene_rel, audio_dir, tracks):
+def project_doc(scene_rel, audio_dir, tracks, routes, sources):
     stems = [("kick", "Kick", "drums"), ("snare", "Snare", "drums"), ("hh", "HH", "drums"), ("bass", "BASS", "bass"),
              ("moog", "Moog", "synth"), ("cloud", "Cloud Diving", "synth"), ("crash", "Crash", "drums"),
              ("toms", "Toms", "drums"), ("block", "tone block", "other")]
@@ -746,9 +933,11 @@ def project_doc(scene_rel, audio_dir, tracks):
                    "stems": [{"key": k, "label": lbl, "role": role, "file": os.path.join(audio_dir, lbl + ".wav")}
                              for k, lbl, role in stems]},
         "sonic": {"live": False},
-        "feeds": {"beat": "stem.kick", "hits": "stem.kick", "levels": "audio"},
+        # iteration 5: the audio history's onsets (what the kick ring field reads) come from the kick stem
+        "feeds": {"beat": "stem.kick", "hits": "stem.kick", "levels": "audio", "historyOnsets": "stem.kick"},
+        "sources": sources,
         "parameters": {"camera/lookAhead": 45.0, "camera/splineBank": 5.0, "post/output/dither": 1.0},
-        "routes": cloud_routes(),
+        "routes": routes,
         "timeline": {"enabled": True, "cues": [], "tracks": [trim_track(t) for t in tracks]},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4"},
     }
@@ -762,6 +951,7 @@ def main():
     ap.add_argument("--palette", default="uv", choices=sorted(STATE_NAMES))
     ap.add_argument("--sky", default="sky/sky_uv.hdr", help="equirect sky map relative to this folder ('' = analytic)")
     ap.add_argument("--no-clouds", action="store_true", help="the cloud block disabled (for an A/B of its cost)")
+    ap.add_argument("--no-arc", action="store_true", help="hold the starting palette (no palette arc tracks)")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     sky = os.path.relpath(os.path.join(HERE, a.sky), a.out) if a.sky else None
@@ -773,7 +963,10 @@ def main():
         json.dump(doc, f, indent=1)
     proj_path = os.path.join(a.out, a.name + ".json")
     with open(proj_path, "w") as f:
-        json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio, tracks), f, indent=1)
+        routes, arc, sources = reactivity()
+        if a.palette != "uv" or a.no_arc:   # a still in one state: no arc
+            arc = []
+        json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio, tracks + arc, routes, sources), f, indent=1)
     print("wrote", scene_path, "and", proj_path)
 
 
