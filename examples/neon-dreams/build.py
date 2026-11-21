@@ -36,6 +36,7 @@ import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the pale
 import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flights)
 import nd_lights as NL  # noqa: E402  (iteration 11, owner msg 130: the city's lights play more of the song)
 import nd_cast as NC  # noqa: E402  (iteration 10, owner msg 112: the population from art/population.json)
+import nd_band as NB  # noqa: E402  (iteration 12, owner msg 149: the band, its spots and beams)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SABERTOOTH = os.path.expanduser("~/Desktop/sabertooth")
@@ -898,6 +899,37 @@ def beam_whip_keys(yaw0, bi=None, b=None):
     return keys
 
 
+BAND = {}   # it12 (msg 149): nd_band.build's results for this state (nodes, lights, beams, tracks, routes, actors)
+
+
+def glb_clip_len(path, clip):
+    import struct
+    try:
+        with open(path, "rb") as f:
+            b = f.read()
+    except OSError:
+        return 4.0
+    n = struct.unpack("<I", b[12:16])[0]
+    j = json.loads(b[20:20 + n])
+    for a in j.get("animations", []):
+        if a["name"] == clip:
+            return max(j["accessors"][sm["input"]]["max"][0] for sm in a["samplers"])
+    return 4.0
+
+
+def band(state="uv"):
+    if BAND.get("state") != state:
+        out = NB.build(LAYOUT, os.path.join(HERE, "scene"), os.path.normpath(os.path.join(HERE, "..", "..")),
+                       lambda k: pal(k, state), r3, glb_clip_len, SONG)
+        BAND.clear()
+        BAND.update(dict(zip(("nodes", "lights", "beams", "tracks", "routes", "actors", "info"), out)), state=state)
+    return BAND
+
+
+def band_beams(state="uv"):
+    return [{k: v for k, v in b.items() if not k.startswith("_")} for b in band(state)["beams"]]
+
+
 def cloud_beams(state="uv"):
     out = []
     for bi, b in enumerate(LAYOUT["beams"]):
@@ -929,7 +961,10 @@ def clouds_block(state="uv", moon_dir=None):
     forms = DESIGN.get("formations", {})
     mass_bob = {m: f for f, d in forms.items() for m in d.get("masses", [])}
     lobes = []
+    vd = vortex_design()
     for name, ls in DESIGN["masses"].items():
+        if name == "vortex" and vd:   # it12: ADR-2120 draws the funnel; the art's orbiting shelf lobes are its fallback
+            continue
         lobes += [dict(l, erode=MASS_ERODE[name]) if name in MASS_ERODE else dict(l) for l in ls]
         if name in mass_bob:
             for l in lobes[len(lobes) - len(ls):]:
@@ -987,6 +1022,10 @@ def clouds_block(state="uv", moon_dir=None):
                                    round(pos[2] + side * lat[2] / n, 2)],
                       "radius": PLUG_GLOW["radius"], "intensity": PLUG_GLOW["intensity"], "shadow": PLUG_GLOW["shadow"],
                       "color": pal("garden_b" if k % 2 else "garden_a", state)})
+    eg = (vd or {}).get("_art", {}).get("eye_glow")
+    if eg:   # it12: the art's eye glow under the vortex's throat
+        glows.append({"name": "vortex_eye", "position": eg["position"], "radius": eg["radius_m"],
+                      "intensity": eg["intensity"], "color": pal(eg["key"], state), "key": eg["key"], "shadow": 0.3})
     GLOW_INDEX.clear()
     GLOW_BASE.clear()
     GLOW_BASE.update({g["name"]: g["intensity"] for g in glows})
@@ -1035,7 +1074,7 @@ def clouds_block(state="uv", moon_dir=None):
         "drift": r3([v * 0.7 for v in cb["drift"]]),
         "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": CLOUD_LOOK["powder"], "seed": 7,
         # ADR-2102: the lighthouses
-        "beams": cloud_beams(state), "beamAir": CLOUD_LOOK["beamAir"], "beamCloud": CLOUD_LOOK["beamCloud"],
+        "beams": cloud_beams(state) + band_beams(state), "beamAir": CLOUD_LOOK["beamAir"], "beamCloud": CLOUD_LOOK["beamCloud"],
     }
     bobs = [{"name": f, "amplitude": d.get("amplitude", [0.0, 2.0, 0.0]), "period": d.get("period", 8.0),
              "phase": d.get("phase", 0.0), "liftMax": d.get("liftMax", 0.0)} for f, d in sorted(forms.items())]
@@ -1064,6 +1103,7 @@ def clouds_block(state="uv", moon_dir=None):
     v = vortex_design()
     if v:
         out["vortex"] = {k: v[k] for k in v if not k.startswith("_")}
+        out["vortex"]["wind"] = abs(out["vortex"].get("wind", 1.8))
         out["vortex"]["glowColor"] = pal(v.get("_glowKey", "ocean_b"), state)
         out["sea"]["breaks"] = []
     if moon_dir is not None:
@@ -1152,7 +1192,7 @@ MIST_LAYERS = [
 VORTEX = {"enabled": True, "radius": 620.0, "eye": 150.0, "elongation": 1.6, "depth": 175.0, "spin": 0.12,
           "twist": 0.8, "wind": 1.8, "shelves": 5, "pitch": 1.5, "arms": 3, "armDepth": 0.45, "glow": 6.0,
           "glowHeight": 90.0,
-          "pulse": 0.0, "column": 260.0, "columnDensity": 0.8, "columnPitch": 180.0,
+          "pulse": 0.0, "column": 0.0, "columnDensity": 0.8, "columnPitch": 180.0,
           "_glowKey": "ocean_b", "_oceanY": -228.0}
 
 
@@ -1163,7 +1203,22 @@ def vortex_design():
     brk = DESIGN["sea_design"]["break"]
     v = dict(VORTEX, centre=brk["centre"], yaw=brk.get("yaw_rad", 0.0))
     v.update(DESIGN.get("vortex", {}))
-    v.update(brk.get("vortex", {}))   # it12: the art's block lives under sea_design.break
+    a = brk.get("vortex")
+    if a and "rim_semi_axes" in a:   # it12: the art's design (sea_design.break.vortex), in ADR-2120's terms
+        rim, throat = a["rim_semi_axes"], a["throat_semi_axes"]
+        shear = a.get("shear_exponent", 1.5)
+        eye_dps = a.get("rotation_dps_rim", 1.2) * (rim[1] / throat[1]) ** shear   # the art's law at the throat
+        ccw = "counter" in a.get("direction", "counter")
+        v.update({"centre": a["centre"], "yaw": a.get("yaw_rad", v["yaw"]), "elongation": round(rim[0] / rim[1], 3),
+                  "radius": round(rim[1] / 0.85, 1),      # the funnel's outer edge (df = 0) at the rim
+                  "eye": throat[1], "depth": a.get("depth_m", 84.0), "shelves": a.get("shelves", 7),
+                  "arms": a.get("arms", 3), "armDepth": a.get("arm_contrast", 0.55),
+                  # ADR-2120's law spin / (1 + (r / 1.5 eye)^2) matched at the throat; ADR-2120 turns +x -> +z
+                  # (clockwise seen from above) for a positive spin
+                  "spin": round(math.radians(eye_dps) * 1.44 * (-1.0 if ccw else 1.0), 4),
+                  "_glowKey": a.get("underlight", {}).get("key", "ocean_a"),
+                  "glow": a.get("underlight", {}).get("throat_gain", 1.6) * 2.5,
+                  "glowHeight": round(0.6 * a.get("depth_m", 84.0), 1), "_oceanY": None, "_art": a})
     return v if v.get("enabled", True) else None
 PLUG_FADE = (55.7, 56.45, 0.3)   # iteration 9: the plug's light dims from 55.7 s to 30 % by 56.45 s, back by 57.95
 PLUG_GLOW = {"radius": 20.0, "intensity": 3.0, "shadow": 0.1}   # ADR-2107: shadow 0.1, they sit in solid cloud
@@ -1310,7 +1365,7 @@ def scene_doc(state="uv", sky_map=None):
     br = brk["centre"]
     op = brk.get("ocean_plane", {"y": -900.0, "semi_axes": [900.0, 900.0], "yaw_rad": 0.0})
     vd = vortex_design()
-    if vd:   # ADR-2120: the ocean lies under the vortex's eye, a little wider than it
+    if vd and vd.get("_oceanY") is not None:   # ADR-2120: the ocean under the eye (the art's plane when it designs one)
         e = vd["eye"] * 1.35
         op = {"y": vd.get("_oceanY", -228.0), "semi_axes": [round(e * vd["elongation"], 1), round(e, 1)],
               "yaw_rad": vd["yaw"]}
@@ -1325,6 +1380,11 @@ def scene_doc(state="uv", sky_map=None):
     aliens, flyer_lights, alien_tracks = cast_nodes(state)
     vehicles, vehicle_tracks = vehicle_nodes(state)
     nodes += aliens + vehicles + bob_nodes()
+    bd = band(state)   # it12 (msg 149): the band
+    nodes += bd["nodes"]
+    flyer_lights = flyer_lights + bd["lights"]
+    alien_tracks = alien_tracks + bd["tracks"]
+    SEQUENCE_ACTORS.extend(bd["actors"])
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_breathing(ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state),
@@ -1600,7 +1660,7 @@ def reactivity():
     # --- iteration 10 (owner msg 112; the art's audio ideas 2, 4, 6; ADR-2117/2118): bodies that listen
     # heads to the Lantern on each pad phrase (the bass plays all song, so its level could not make a gesture: traced
     # at 0.3-0.8 throughout), ring by ring outward one second apart (the wave runs at 60 m/s). Timeline keys: exact.
-    for ring in CROWDS:
+    for ring in [c for c in CROWDS if c.startswith("ring")]:   # it12: the band's crowd watches the stage instead
         k = int(ring[4:])
         keys = [{"time": 0.0, "value": 0.0, "interp": "linear"}]
         for i, p in enumerate(PAD_PHRASES):
@@ -1614,12 +1674,22 @@ def reactivity():
     for ring in CROWDS:
         # the groups sway on the drum bus (kick and snare levels), at two beats a period, dying in the drum breaks
         for stem in ("kick", "snare"):
-            routes.append(R("stem.%s.level" % stem, "crowds/%s/sway" % ring, 0.4, attackMs=800.0, decayMs=3000.0,
+            routes.append(R("stem.%s.level" % stem, "crowds/%s/sway" % ring, 0.8 if ring == "band" else 0.4,
+                            attackMs=800.0, decayMs=3000.0,
                             gain=1.5, clampEnabled=True, clampMin=0.0, clampMax=1.0))
     # the beams: bar-locked, whipping on the crashes (timeline tracks: exactly seek-safe)
     for bi, b in enumerate(LAYOUT["beams"]):
         tracks.append(AU.track("clouds/beam/%d/yaw" % bi, beam_whip_keys(beam_yaw0(bi, b), bi, b)))
     routes, tracks = city_lights(routes, tracks, lvl_slow)
+    # it12 (msg 149): the band's routes, the stage beams' sway and whip; the look-ahead the art keyed for the band
+    bd = band()
+    routes += bd["routes"]
+    bt, br = NB.beam_tracks(bd["beams"], len(LAYOUT["beams"]), AU.CRASH, bd["info"]["breath_keys"])
+    tracks += bt
+    routes += br
+    la = LAYOUT["camera"].get("look_ahead")
+    if la:
+        tracks.append(AU.track("camera/lookAhead", [{"time": t, "value": v, "interp": "smooth"} for t, v in la]))
     return routes, tracks, sources
 
 

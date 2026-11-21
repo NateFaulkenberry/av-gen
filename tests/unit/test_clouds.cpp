@@ -251,13 +251,13 @@ TEST_CASE("cloud beams and the halo read, validate, round-trip and turn with the
     typo["beams"][0]["speed"] = 3.0;
     CHECK_FALSE(scene::Clouds::fromJson(typo, fs::temp_directory_path()));
     json many = j;
-    many["beams"][0]["count"] = 9;
+    many["beams"][0]["count"] = 25; // ADR-2121: the renderer holds 24 arms
     CHECK_FALSE(scene::Clouds::fromJson(many, fs::temp_directory_path()));
     json wide = j;
     wide["beams"][0]["halfAngle"] = 50.0;
     CHECK_FALSE(scene::Clouds::fromJson(wide, fs::temp_directory_path()));
-    json arms = j; // five beams of two arms: ten arms, more than the renderer holds
-    for (int i = 0; i < 4; ++i) arms["beams"].push_back(j["beams"][0]);
+    json arms = j; // thirteen beams of two arms: 26 arms, more than the renderer holds (ADR-2121: 24)
+    for (int i = 0; i < 12; ++i) arms["beams"].push_back(j["beams"][0]);
     CHECK_FALSE(scene::Clouds::fromJson(arms, fs::temp_directory_path()));
 
     // the knobs: each beam's intensity, the air and cloud gains and the halo

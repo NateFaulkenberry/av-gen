@@ -171,6 +171,14 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     def listening(sp, pos):
         react = sp.get("react", [])
         layers = []
+        if sp.get("look_at"):   # it12 (msg 149): the band's audience -- heads to the stage, its own crowd
+            band_look[0] = sp["look_at"]
+            layers.append(dict(LOOK_LAYER))
+            if "sway" in react:
+                g = group_of.get(sp.get("id"))
+                half = (g % 2) * 0.5 if g is not None else 0.5 * r.randrange(2)
+                layers.append(sway_layer(beat_phase + half))
+            return ("band", layers)
         if "turn_to_lantern" in react:
             layers.append(dict(LOOK_LAYER))
         if "sway" in react:
@@ -202,6 +210,8 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             sp["bob"] = m.get("bob")
         return sp
 
+    band_look = [None]
+    band_ids = []
     # ---- spots
     for sp in pop["spots"]:
         if dropped(sp):
@@ -220,6 +230,16 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         if sp.get("bob"):
             n["bob"] = sp["bob"]
         nodes.append(n)
+        if sp.get("look_at") and not hold:
+            band_ids.append((n["name"], clip, n["animation"]["speed"]))
+
+    # it12 (msg 149): the audience erupts on the crash that ends the held breath (47.15 s): Crazy once, a little
+    # staggered, then back to its own clip
+    for name, clip, speed in band_ids:
+        d = round(r.uniform(0.0, 0.18), 3)
+        actors.append({"id": name, "node": name, "visible": True, "keys": [], "clips": [
+            {"time": round(BREATH[2] + d, 3), "clip": "Crazy", "speed": 1.0, "blend": 0.15, "playback": "once",
+             "then": clip}]})
 
     # ---- walkers: pingpong, pause (Idle) and turn at each end
     wakes = []
@@ -424,7 +444,10 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
 
     for ring in sorted(crowds):
         tracks.append(track("crowds/%s/lag" % ring, lag_keys()))
-        tracks.append(track("crowds/%s/lookTarget" % ring, [{"time": 0.0, "value": r3(bell), "interp": "linear"}]))
+        target = band_look[0] if ring == "band" and band_look[0] else bell
+        tracks.append(track("crowds/%s/lookTarget" % ring, [{"time": 0.0, "value": r3(target), "interp": "linear"}]))
+        if ring == "band":   # the audience watches the stage all song
+            tracks.append(track("crowds/band/look", [{"time": 0.0, "value": 1.0, "interp": "linear"}]))
     return nodes, tracks, lights, actors, sorted(crowds), wakes
 
 

@@ -228,7 +228,7 @@ struct CloudBeam {
     std::string bob;               // ADR-2112: a formation to ride ("" = none)
     int bobIndex = -1;
 };
-inline constexpr std::size_t kMaxCloudBeamArms = 8;
+inline constexpr std::size_t kMaxCloudBeamArms = 24; // ADR-2121: 8 -> 24 (a stage's spots beside the lighthouses)
 
 // ADR-2102: a glow in the sky around a bright body (the moon's corona), behind the cloud and the opaque scene.
 struct CloudHalo {

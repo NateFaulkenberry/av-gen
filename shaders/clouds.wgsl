@@ -44,7 +44,7 @@ struct CloudUniforms {
     frameInfo: vec4<f32>,
     prevViewProj: mat4x4<f32>,
     glows: array<vec4<f32>, 64>, // 2 x kMaxCloudGlows (ADR-2104: 24; ADR-2107: 32)
-    beams: array<vec4<f32>, 24>,
+    beams: array<vec4<f32>, 72>, // 3 x kMaxCloudBeamArms (ADR-2121: 24)
     beamInfo: vec4<f32>,
     halo: vec4<f32>,
     haloColor: vec4<f32>,
@@ -139,7 +139,7 @@ fn vortexSwirl(xz: vec2<f32>, y: f32, tau: f32) -> vec2<f32> {
     let rc = 1.5 * cu.vx1.x;
     let omega = cu.vx2.x / (1.0 + (r * r) / (rc * rc));
     // the wind: the noise wound round the axis along log spirals (0 at the rim, `wind` at the eye)
-    let wound = cu.vx5.w * clamp(log(R / max(r, 1.0)) / max(log(R / max(cu.vx3.w, 1.0)), 0.1), 0.0, 1.5);
+    let wound = sign(cu.vx2.x) * abs(cu.vx5.w) * clamp(log(R / max(r, 1.0)) / max(log(R / max(cu.vx3.w, 1.0)), 0.1), 0.0, 1.5);
     let ang = (omega * tau + cu.vx2.y * max(cu.sea3.w - y, 0.0) + wound) * (1.0 - smoothstep(R, 1.4 * R, r));
     let ca = cos(ang);
     let sa = sin(ang);
@@ -537,7 +537,8 @@ fn vortexSurface(surfaceIn: f32, l: vec2<f32>, h: f32) -> f32 {
     let arms = cu.vx3.x;
     var arm = 0.0;
     if (arms > 0.5) {
-        arm = cos(arms * (phi - cu.vx4.w) + 2.6 * log(max(r, 1.0) / max(eye, 1.0)));
+        // trailing arms: the inner part leads in the direction of the spin
+        arm = cos(arms * (phi - cu.vx4.w) + select(-2.6, 2.6, cu.vx2.x >= 0.0) * log(max(r, 1.0) / max(eye, 1.0)));
         let armW = smoothstep(eye * 0.8, eye * 1.6, r) * (1.0 - smoothstep(0.75 * R, 1.4 * R, r));
         surface = surface + cu.vx3.y * cu.sea3.x * 0.5 * (arm - 1.0) * armW;
     }
@@ -1116,9 +1117,9 @@ fn fs_clouds(in: VsOut) -> MarchOut {
     // ADR-2102: the beams' air scatter waits at its distance along the ray for the march to say how much cloud is in
     // front of it; the halo sits behind everything, where the ray reaches the sky.
     let arms = u32(cu.beamInfo.x + 0.5);
-    var airT: array<f32, 8>;
-    var airC: array<vec3<f32>, 8>;
-    for (var k = 0u; k < 8u; k = k + 1u) {
+    var airT: array<f32, 24>;
+    var airC: array<vec3<f32>, 24>;
+    for (var k = 0u; k < 24u; k = k + 1u) {
         airT[k] = 1e30;
         airC[k] = vec3<f32>(0.0);
     }

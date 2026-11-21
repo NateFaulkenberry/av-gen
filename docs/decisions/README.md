@@ -1071,3 +1071,4 @@ confirm the citation you are about to change is your own.
 | [2118](ADR-2118-a-routable-beam-yaw.md) | A cloud beam's yaw is a parameter (`clouds/beam/<i>/yaw`): the lighthouses lock to the bar and whip on crashes. avagent/neon-dreams | Accepted |
 | [2119](ADR-2119-churning-clouds-and-mist-sheets.md) | Churning clouds (every cloud noise advected on two cross-faded clocks: billows evolve in place, seek-safe), mist sheets (`wisps.layers`) and edge air (thin cloud takes the haze colour) (owner msg 149). avagent/neon-dreams | Accepted |
 | [2120](ADR-2120-a-cloud-vortex.md) | A vortex in the cloud sea: a swirled, wound, terraced funnel to an open eye lit from below, an optional spiralling column; glow, pulse and spin routable (owner msg 149). avagent/neon-dreams | Accepted |
+| [2121](ADR-2121-twenty-four-beam-arms.md) | 24 cloud beam arms (was 8): a stage's spots and searchlights beside the lighthouses (owner msg 149). avagent/neon-dreams | Accepted |
