@@ -434,3 +434,81 @@ TEST_CASE("clouds: a block written for ADR-1289's march keeps its even steps", "
     CHECK(explicitEven->evenSteps);
     CHECK(explicitEven->resolution == 0.5f);
 }
+
+// ADR-2119: churn, edge air and mist sheets; ADR-2120: the vortex.
+TEST_CASE("clouds: churn, edge air, mist sheets and the vortex read, validate, round-trip and route",
+          "[unit][clouds][adr2119][adr2120]") {
+    const json j = {
+        {"sea", {{"enabled", true}, {"base", -260.0}, {"top", -38.0}, {"relief", 60.0}}},
+        {"churn", {{"amount", 0.8}, {"period", 6.0}, {"boil", 1.5}, {"writhe", 0.5}}},
+        {"edgeAir", 0.3},
+        {"wisps", {{"enabled", true},
+                   {"layers", json::array({{{"name", "low"}, {"centre", {0, 10}}, {"radius", 500.0}, {"base", 40.0},
+                                            {"top", 90.0}, {"density", 0.6}, {"scale", 50.0}, {"coverage", 0.4},
+                                            {"stretch", 3.0}, {"drift", {2, 0, 1}}},
+                                           {{"base", 0.0}, {"top", 20.0}}})}}},
+        {"vortex", {{"centre", {2090, -20}}, {"radius", 620.0}, {"eye", 150.0}, {"elongation", 1.6}, {"depth", 175.0},
+                    {"spin", 0.12}, {"wind", 1.8}, {"shelves", 5}, {"arms", 3}, {"glow", 2.0}, {"glowColor", {0.5, 0.1, 1}},
+                    {"column", 260.0}, {"columnDensity", 0.8}, {"columnPitch", 180.0}}}};
+    auto c = scene::Clouds::fromJson(j, fs::temp_directory_path());
+    REQUIRE(c.has_value());
+    CHECK(c->churn.amount == 0.8f);
+    CHECK(c->churn.period == 6.0f);
+    CHECK(c->edgeAir == 0.3f);
+    REQUIRE(c->wisps.layers.size() == 2);
+    CHECK(c->wisps.layers[0].radius == 500.0f);
+    CHECK(c->wisps.layers[0].drift == glm::vec3(2.0f, 0.0f, 1.0f));
+    CHECK(c->wisps.layers[1].radius == 0.0f); // unbounded by default
+    REQUIRE(c->vortex.enabled);
+    CHECK(c->vortex.shelves == 5);
+    CHECK(c->vortex.wind == 1.8f);
+    CHECK(c->vortex.column == 260.0f);
+
+    auto again = scene::Clouds::fromJson(c->toJson(), fs::temp_directory_path());
+    REQUIRE(again.has_value());
+    CHECK(again->churn.writhe == 0.5f);
+    CHECK(again->edgeAir == 0.3f);
+    REQUIRE(again->wisps.layers.size() == 2);
+    CHECK(again->wisps.layers[0].name == "low");
+    CHECK(again->vortex.eye == 150.0f);
+    CHECK(again->vortex.glowColor == glm::vec3(0.5f, 0.1f, 1.0f));
+    CHECK(again->vortex.columnPitch == 180.0f);
+
+    // off by default and not written
+    auto plain = scene::Clouds::fromJson({{"lobes", json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}})}}, fs::temp_directory_path());
+    REQUIRE(plain.has_value());
+    CHECK(plain->churn.amount == 0.0f);
+    CHECK_FALSE(plain->vortex.enabled);
+    CHECK_FALSE(plain->toJson().contains("churn"));
+    CHECK_FALSE(plain->toJson().contains("vortex"));
+    CHECK_FALSE(plain->toJson().contains("edgeAir"));
+
+    // refusals
+    for (const auto& [path, value] : {std::pair{"/churn/amount", json(1.5)}, std::pair{"/edgeAir", json(-0.1)},
+                                      std::pair{"/vortex/eye", json(700.0)}, std::pair{"/vortex/shelves", json(13)},
+                                      std::pair{"/wisps/layers/1/top", json(-5.0)}}) {
+        json bad = j;
+        bad[json::json_pointer(path)] = value;
+        INFO(path);
+        CHECK_FALSE(scene::Clouds::fromJson(bad, fs::temp_directory_path()).has_value());
+    }
+
+    // live knobs: the churn, the edge air, each sheet's density, the vortex's glow, pulse and spin
+    params::ParameterSet ps;
+    const scene::CloudParameters p = scene::registerCloudParameters(ps, *c, "clouds/");
+    for (const char* k : {"clouds/churn", "clouds/edgeAir", "clouds/wisps/layer/0/density",
+                          "clouds/wisps/layer/1/density", "clouds/vortex/glow", "clouds/vortex/pulse",
+                          "clouds/vortex/spin"}) {
+        INFO(k);
+        REQUIRE(ps.findAs<float>(k) != nullptr);
+    }
+    ps.findAs<float>("clouds/vortex/pulse")->setFinalComponent(0, 0.5f);
+    ps.findAs<float>("clouds/wisps/layer/1/density")->setFinalComponent(0, 1.25f);
+    ps.findAs<float>("clouds/churn")->setFinalComponent(0, 0.2f);
+    scene::Clouds live;
+    scene::applyCloudParameters(p, *c, live);
+    CHECK(live.vortex.pulse == 0.5f);
+    CHECK(live.wisps.layers[1].density == 1.25f);
+    CHECK(live.churn.amount == 0.2f);
+    CHECK(live.vortex.glow == 2.0f);
+}

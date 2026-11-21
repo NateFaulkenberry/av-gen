@@ -103,9 +103,71 @@ struct CloudWisps {
     std::vector<CloudWispZone> zones;        // at most 16
     std::vector<glm::vec4> wakePoints;       // runtime: (position, 0) per wake, written by the composition
     std::vector<glm::vec4> wakeVelocities;   // runtime: (velocity m/s, 0)
+    // ADR-2119: mist sheets -- extra horizontal fog banks at their own heights, scales and winds (low banks blending
+    // a town's cloud into the sea, a sheet round the stilts, a high thin veil), each a disc in plan (radius 0 = the
+    // whole sky) whose density fades over its outer 30 % and over the bottom 30 % and top 55 % of its height band.
+    struct Layer {
+        std::string name;
+        glm::vec2 centre{0.0f};      // x, z
+        float radius = 0.0f;         // metres; 0 = unbounded
+        float base = 0.0f;           // metres (y)
+        float top = 10.0f;           // metres (y)
+        float density = 0.5f;        // times the layer's own noise, against the block's extinction
+        float scale = 40.0f;         // metres: the sheets' wavelength
+        float coverage = 0.5f;       // 0..1
+        float stretch = 3.0f;        // >= 1: horizontal sheets
+        glm::vec3 drift{1.0f, 0.0f, 0.4f}; // m/s
+    };
+    std::vector<Layer> layers;               // at most kMaxCloudWispLayers
 };
 inline constexpr std::size_t kMaxCloudWispZones = 24;
 inline constexpr std::size_t kMaxCloudWakes = 16;
+inline constexpr std::size_t kMaxCloudWispLayers = 6;
+
+// ADR-2119: churn -- the cloud's noise evolves in place instead of only sliding with the wind. Every erosion, billow
+// and wisp tap is read twice, advected along a slow boil (rising, turned by the curl field) by two clocks half a
+// `period` apart and cross-faded so each restarts unseen at zero weight; each restart reads a fresh region of the
+// volume. The curl field that tatters the billows drifts too (`writhe`). A pure function of the timeline second.
+struct CloudChurn {
+    float amount = 0.0f;     // 0..1: 0 = off (the ADR-2106 noise, unchanged)
+    float period = 8.0f;     // seconds of one advection clock
+    float boil = 1.5f;       // m/s the billows rise and roll along the curl field
+    float writhe = 0.6f;     // m/s the curl field's sample point moves (tatters that writhe)
+};
+
+// ADR-2120: a vortex in the cloud sea -- a whirlpool round a vertical axis. Inside `radius` the relief sea's surface
+// descends in a funnel of `shelves` helical terraces (one turn of the helix falls `pitch` shelves) to an open eye of
+// `eye` metres, where the sea is gone; the surface's noise and the billows swirl round the axis at an angular speed
+// that falls with the radius (spin / (1 + (r / core)^2), core = 1.5 eye), twisting with depth (`twist` rad per 100 m),
+// advected on the churn's two clocks so the winding stays bounded. `glow` lights the funnel from the eye below
+// (falling with height over `glowHeight` and with the distance from the eye). `pulse` (a route target) breathes the
+// funnel's depth and the eye. An optional column of mist spirals up out of the eye. Plan coordinates are the ellipse's (x / elongation after the yaw), as the breaks'.
+struct CloudVortex {
+    bool enabled = false;
+    glm::vec2 centre{0.0f};      // x, z
+    float radius = 600.0f;       // metres: the swirl's reach (along the narrow axis)
+    float eye = 160.0f;          // metres: the open eye
+    float elongation = 1.0f;
+    float yaw = 0.0f;            // radians
+    float depth = 200.0f;        // metres the funnel falls from the sea's surface to the eye's rim
+    float spin = 0.08f;          // rad/s at the eye
+    float twist = 0.6f;          // radians per 100 m of depth
+    float wind = 2.5f;           // radians the noise is wound round the axis from the rim to the eye (log-spiral
+                                 // streaks a still frame reads as a whirl)
+    int shelves = 5;             // 0..12 terraces
+    float pitch = 1.0f;          // how far (in shelves) the ledges wind in and out with the arms
+    int arms = 3;                // 0..8 spiral arms in the sea round the funnel
+    float armDepth = 0.35f;      // 0..1: how deep the arms' troughs cut (times the relief)
+    glm::vec3 glowColor{0.4f, 0.3f, 1.0f};
+    float glow = 0.0f;           // intensity (a route target)
+    float glowHeight = 120.0f;   // metres
+    float pulse = 0.0f;          // -1..1 (a route target): + deepens the funnel and widens the eye
+    // the column: a sheath of mist spiralling up out of the eye (widening as it rises), `arms` bands climbing round
+    // the axis one turn every `columnPitch` metres, lit by the glow from below. 0 = none.
+    float column = 0.0f;         // metres above the sea's mean top it reaches
+    float columnDensity = 0.6f;
+    float columnPitch = 160.0f;  // metres of rise per turn of a band
+};
 
 // ADR-2100: the analytic sea of cloud. Unbounded in x and z; between `base` and `top` in y.
 struct CloudSea {
@@ -259,6 +321,11 @@ struct Clouds {
     CloudHalo halo;
     std::vector<CloudBob> bobs;       // ADR-2112
     CloudWisps wisps;                 // ADR-2113
+    CloudChurn churn;                 // ADR-2119
+    CloudVortex vortex;               // ADR-2120
+    // ADR-2119: thin cloud takes the sky's colour -- a sample's radiance is pulled toward the haze colour by up to
+    // this share where its density is low (a silhouette that melts into the air instead of a cut-out). 0 = off.
+    float edgeAir = 0.0f;
 
     [[nodiscard]] bool active() const { return enabled && (!lobes.empty() || sea.enabled); }
     [[nodiscard]] Result<void> validate() const;

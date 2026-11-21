@@ -65,6 +65,16 @@ struct CloudUniforms {
     wakes: array<vec4<f32>, 16>,
     wakeVel: array<vec4<f32>, 16>,
     zones: array<vec4<f32>, 72>, // per zone: (centre x, floor, z, bound), (radius a, b, yaw, density), (below, above)
+    churn0: vec4<f32>,    // ADR-2119: amount, clock period (s), boil (m/s), the curl field's writhe offset (m)
+    churn1: vec4<f32>,    // the clocks: phase a, phase b (0..1), cycle a, cycle b
+    churn2: vec4<f32>,    // edge air, mist sheet count
+    layers: array<vec4<f32>, 18>, // per sheet: (centre x, z, radius, density), (base, top, scale, coverage), (drift xyz, stretch)
+    vx0: vec4<f32>,       // ADR-2120: centre x, z, radius, on
+    vx1: vec4<f32>,       // eye, elongation, yaw, depth
+    vx2: vec4<f32>,       // spin (rad/s), twist (rad/m), shelves, pitch
+    vx3: vec4<f32>,       // arms, arm depth, glow height (m), eye (with the pulse)
+    vx4: vec4<f32>,       // glow colour * intensity, the arms' phase (rad)
+    vx5: vec4<f32>,       // the column: height above the mean top (m), density, band phase per metre; the wind (rad)
 };
 
 struct Lobe {
@@ -101,6 +111,79 @@ fn noiseTap(p: vec3<f32>, cyclesPerMetre: f32) -> vec4<f32> {
     return textureSampleLevel(cloudNoise, cloudSampler, p * (cyclesPerMetre * 0.25), 0.0);
 }
 
+// ADR-2120: p's position in the vortex's own plan frame (x / elongation after the yaw), as the breaks'
+fn vortexLocal(xz: vec2<f32>) -> vec2<f32> {
+    let v = xz - cu.vx0.xy;
+    let c = cos(cu.vx1.z);
+    let sn = sin(cu.vx1.z);
+    return vec2<f32>((c * v.x - sn * v.y) / max(cu.vx1.y, 0.1), sn * v.x + c * v.y);
+}
+
+fn vortexNear(xz: vec2<f32>) -> bool {
+    if (cu.vx0.w < 0.5) {
+        return false;
+    }
+    let l = vortexLocal(xz);
+    return dot(l, l) < 2.56 * cu.vx0.z * cu.vx0.z;
+}
+
+// ADR-2120: where the noise at (xz, y) came from `tau` seconds ago on the swirl: turned back about the axis by the
+// angular speed at its radius (spin / (1 + (r / core)^2)), plus a fixed twist that grows with depth under the surface
+fn vortexSwirl(xz: vec2<f32>, y: f32, tau: f32) -> vec2<f32> {
+    let l = vortexLocal(xz);
+    let r = length(l);
+    let R = cu.vx0.z;
+    if (cu.vx0.w < 0.5 || r >= 1.6 * R) {
+        return xz;
+    }
+    let rc = 1.5 * cu.vx1.x;
+    let omega = cu.vx2.x / (1.0 + (r * r) / (rc * rc));
+    // the wind: the noise wound round the axis along log spirals (0 at the rim, `wind` at the eye)
+    let wound = cu.vx5.w * clamp(log(R / max(r, 1.0)) / max(log(R / max(cu.vx3.w, 1.0)), 0.1), 0.0, 1.5);
+    let ang = (omega * tau + cu.vx2.y * max(cu.sea3.w - y, 0.0) + wound) * (1.0 - smoothstep(R, 1.4 * R, r));
+    let ca = cos(ang);
+    let sa = sin(ang);
+    let rx = (ca * l.x + sa * l.y) * max(cu.vx1.y, 0.1);
+    let rz = -sa * l.x + ca * l.y;
+    let c = cos(cu.vx1.z);
+    let sn = sin(cu.vx1.z);
+    return cu.vx0.xy + vec2<f32>(c * rx + sn * rz, -sn * rx + c * rz);
+}
+
+// ADR-2119: a tap of the noise at q (= world + an offset: the wind, a seed, a warp), animated: advected along `flow`
+// (m/s, times the churn's amount) and swirled by the vortex on two clocks half a period apart, cross-faded so each
+// restarts at zero weight on a fresh region of the volume, and re-contrasted so the blend keeps the noise's spread.
+// With no churn and no vortex at `world` it is one plain tap.
+fn animTap(q: vec3<f32>, world: vec3<f32>, freq: f32, flow: vec3<f32>) -> vec4<f32> {
+    let churn = cu.churn0.x > 0.0;
+    let inV = vortexNear(world.xz);
+    if (!churn && !inV) {
+        return noiseTap(q, freq);
+    }
+    let T = cu.churn0.y;
+    let fa = cu.churn1.x;
+    let fb = cu.churn1.y;
+    let off = q - world;
+    var pa = world;
+    var pb = world;
+    if (inV) {
+        let sa = vortexSwirl(world.xz, world.y, fa * T);
+        let sb = vortexSwirl(world.xz, world.y, fb * T);
+        pa = vec3<f32>(sa.x, world.y, sa.y);
+        pb = vec3<f32>(sb.x, world.y, sb.y);
+    }
+    let fl = select(vec3<f32>(0.0), flow * cu.churn0.x, churn);
+    let tile = 4.0 / freq;
+    let oa = fract(cu.churn1.z * vec3<f32>(0.6180339, 0.4142136, 0.7320508)) * tile;
+    let ob = fract(cu.churn1.w * vec3<f32>(0.6180339, 0.4142136, 0.7320508) + 0.5) * tile;
+    let a = noiseTap(pa + off - fl * (fa * T) + oa, freq);
+    let b = noiseTap(pb + off - fl * (fb * T) + ob, freq);
+    let wa = 1.0 - abs(2.0 * fa - 1.0);
+    let wb = 1.0 - wa;
+    let k = inverseSqrt(max(wa * wa + wb * wb, 0.5));
+    return clamp(vec4<f32>(0.5) + (a * wa + b * wb - vec4<f32>(0.5)) * k, vec4<f32>(0.0), vec4<f32>(1.0));
+}
+
 // ADR-2106: the erosion noise at one point, shared by every lobe there: three octaves of billow noise (0..1, high =
 // the lobe's own surface kept, low = eaten), each a world-space tap of the shared volume, the coarse two distorted by
 // a curl-like offset (tatters). `fine` is the third octave's weight after the pixel-footprint fade (no shimmer far off).
@@ -131,17 +214,21 @@ fn erosionAt(p: vec3<f32>, octaves: u32, footprint: f32) -> Ero {
     // seek-safe: a pure function of position and the drift offset (itself a function of the timeline second); the
     // octaves move at different fractions of the wind so the billows evolve slowly instead of sliding as one sheet
     var q = p + cu.drift.xyz * 0.35;
+    // ADR-2119: the boil -- billows rise and roll along the curl field (zero unless the churn is on)
+    var flow = vec3<f32>(0.0, cu.churn0.z, 0.0);
     if (cu.erosion.w > 0.0) {
-        let w = noiseTap(q * 0.37 + vec3<f32>(-71.0, 13.0, 29.0), 1.0 / lam);
+        // ADR-2119: the curl field's sample point moves (writhe), so the tatters twist over time
+        let w = noiseTap(q * 0.37 + vec3<f32>(-71.0, 13.0, 29.0) + cu.churn0.w * vec3<f32>(0.3, 1.0, -0.2), 1.0 / lam);
         q = q + (vec3<f32>(w.r, w.a, w.g) - vec3<f32>(0.5, 0.5, 0.45)) * (2.0 * cu.erosion.w);
+        flow = cu.churn0.z * vec3<f32>((w.r - 0.5) * 1.6, 0.55 + 0.45 * w.a, (w.g - 0.45) * 1.6);
     }
     // the volume's G channel is inverted Worley (4/8/16 features a tile): rounded heads where it is high
-    let nc = noiseTap(q, 1.0 / lam);
+    let nc = animTap(q, p, 1.0 / lam, flow);
     // far off, the march's steps (a fiftieth of the distance) outgrow even the coarse octave: fade it there too, or it
     // aliases into diagonal stripes on the far towers
     e.c = mix(1.0, nc.g * 0.8 + nc.r * 0.2, 1.0 - smoothstep(0.6 * lam, 1.6 * lam, footprint));
     if (octaves > 1u) {
-        let nm = noiseTap(q * 1.0 + cu.drift.xyz * 0.25 + vec3<f32>(37.0, -11.0, 5.0), 3.3 / lam);
+        let nm = animTap(q * 1.0 + cu.drift.xyz * 0.25 + vec3<f32>(37.0, -11.0, 5.0), p, 3.3 / lam, flow * 1.4);
         let lm = lam / 3.3;
         e.m = mix(1.0, nm.b * 0.75 + nm.g * 0.25, 1.0 - smoothstep(0.7 * lm, 2.2 * lm, footprint));
     }
@@ -149,7 +236,7 @@ fn erosionAt(p: vec3<f32>, octaves: u32, footprint: f32) -> Ero {
         let lf = lam / 10.0;
         let fade = 1.0 - smoothstep(0.25 * lf, 0.9 * lf, footprint);
         if (fade > 0.0) {
-            let nf = noiseTap(p + cu.drift.xyz * 0.6 + vec3<f32>(-3.0, 19.0, 61.0), 1.0 / lf);
+            let nf = animTap(p + cu.drift.xyz * 0.6 + vec3<f32>(-3.0, 19.0, 61.0), p, 1.0 / lf, flow * 2.0);
             e.f = mix(1.0, nf.b, fade);
         }
     }
@@ -189,6 +276,50 @@ fn wispDensity(p: vec3<f32>, cheap: bool) -> f32 {
     if (cu.wisp0.x < 0.5) {
         return 0.0;
     }
+    return max(wispMain(p, cheap), wispLayers(p, cheap));
+}
+
+// ADR-2119: the mist sheets -- horizontal banks at their own heights, scales and winds, each a disc in plan (or the
+// whole sky), churned and swirled like the rest
+fn wispLayers(p: vec3<f32>, cheap: bool) -> f32 {
+    let n = u32(cu.churn2.y + 0.5);
+    var best = 0.0;
+    for (var i = 0u; i < n; i = i + 1u) {
+        let l0 = cu.layers[3u * i];
+        let l1 = cu.layers[3u * i + 1u];
+        if (p.y <= l1.x || p.y >= l1.y) {
+            continue;
+        }
+        var plan = 1.0;
+        if (l0.z > 0.0) {
+            let d = length(p.xz - l0.xy);
+            if (d >= l0.z) {
+                continue;
+            }
+            plan = 1.0 - smoothstep(0.7 * l0.z, l0.z, d);
+        }
+        let u = (p.y - l1.x) / max(l1.y - l1.x, 0.1);
+        let vert = smoothstep(0.0, 0.3, u) * (1.0 - smoothstep(0.45, 1.0, u));
+        let l2 = cu.layers[3u * i + 2u];
+        let lam = l1.z;
+        let q = p - l2.xyz;
+        let qs = vec3<f32>(q.x, q.y * l2.w, q.z);
+        let w = noiseTap(qs * 0.43 + vec3<f32>(-17.0 + 23.0 * f32(i), 3.0, 51.0) + cu.churn0.w * vec3<f32>(0.2, 0.0, 0.3),
+                         1.0 / lam);
+        let q2 = qs + (vec3<f32>(w.a, w.r, w.g) - vec3<f32>(0.5, 0.5, 0.45)) * (0.9 * lam);
+        let nn = animTap(q2, p, 1.0 / lam, cu.churn0.z * vec3<f32>((w.r - 0.5) * 1.4, 0.15, (w.g - 0.45) * 1.4));
+        let sheet = nn.g * 0.65 + nn.a * 0.35;
+        var d = remap01(sheet, 1.0 - l1.w, 1.0 - l1.w + 0.25);
+        if (!cheap && cu.wisp1.z > 0.0) {
+            let t = noiseTap(q2 + vec3<f32>(-13.0, 41.0, 5.0), 3.7 / lam);
+            d = remap01(d, cu.wisp1.z * (1.0 - t.b) * 0.85, 1.0);
+        }
+        best = max(best, d * plan * vert * l0.w);
+    }
+    return best;
+}
+
+fn wispMain(p: vec3<f32>, cheap: bool) -> f32 {
     var m = 0.0;
     if (cu.wisp4.w > 0.5) {
         let h = max(cu.wisp0.z - cu.wisp0.y, 0.1);
@@ -255,9 +386,10 @@ fn wispDensity(p: vec3<f32>, cheap: bool) -> f32 {
     }
     let lam = cu.wisp1.x;
     let qs = vec3<f32>(q.x, q.y * cu.wisp1.w, q.z);
-    let w = noiseTap(qs * 0.43 + vec3<f32>(91.0, 7.0, -33.0), 1.0 / lam);
+    let w = noiseTap(qs * 0.43 + vec3<f32>(91.0, 7.0, -33.0) + cu.churn0.w * vec3<f32>(0.2, 0.0, 0.3), 1.0 / lam);
     let q2 = qs + (vec3<f32>(w.a, w.r, w.g) - vec3<f32>(0.5, 0.5, 0.45)) * (0.9 * lam);
-    let n = noiseTap(q2, 1.0 / lam);
+    // ADR-2119: the sheets churn (curling sideways more than rising)
+    let n = animTap(q2, p, 1.0 / lam, cu.churn0.z * vec3<f32>((w.r - 0.5) * 1.4, 0.15, (w.g - 0.45) * 1.4));
     let sheet = n.g * 0.65 + n.a * 0.35;
     var d = remap01(sheet, 1.0 - cu.wisp1.y, 1.0 - cu.wisp1.y + 0.2);
     if (!cheap && cu.wisp1.z > 0.0) {
@@ -359,6 +491,126 @@ fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yL
 // ADR-2101: the relief sea's top surface (metres) at xz: one rounded swell plus up to three octaves of billow noise
 // (|n| inverted: rounded tops, creased troughs), lowered to the floor inside the breaks and where the coverage is thin.
 fn seaSurface(xz: vec2<f32>, octaves: u32) -> f32 {
+    // ADR-2120: inside the vortex the surface's noise swirls round the axis on the churn's two clocks, cross-faded
+    // (its own position is the world's: xz less the wind's offset)
+    let world = xz - cu.drift.xz;
+    var h = 0.0;
+    var vl = vec2<f32>(0.0);
+    var vortex = false;
+    if (cu.vx0.w > 0.5) {
+        vl = vortexLocal(world);
+        vortex = dot(vl, vl) < 2.56 * cu.vx0.z * cu.vx0.z;
+    }
+    if (vortex) {
+        let T = cu.churn0.y;
+        let fa = cu.churn1.x;
+        let wa = 1.0 - abs(2.0 * fa - 1.0);
+        let wb = 1.0 - wa;
+        let ha = seaNoise(vortexSwirl(world, cu.sea3.w, fa * T) + cu.drift.xz, octaves);
+        let hb = seaNoise(vortexSwirl(world, cu.sea3.w, cu.churn1.y * T) + cu.drift.xz, octaves);
+        h = (ha * wa + hb * wb) * inverseSqrt(max(wa * wa + wb * wb, 0.5));
+    } else {
+        h = seaNoise(xz, octaves);
+    }
+    var surface = cu.sea3.w + cu.sea3.x * h;
+    surface = seaCuts(xz, surface, h);
+    if (vortex) {
+        surface = vortexSurface(surface, vl, h);
+    }
+    return surface;
+}
+
+// ADR-2120: the funnel. Round it, spiral arms (log spirals turning as a pattern) cut troughs into the sea; inside, the
+// surface falls in terraced shelves (wound round with the arms by `pitch` shelves) to the eye, where the sea is gone,
+// its rim torn by the surface's own noise. The pulse has already scaled the depth and the eye.
+fn vortexSurface(surfaceIn: f32, l: vec2<f32>, h: f32) -> f32 {
+    let r = length(l);
+    let R = cu.vx0.z;
+    let eye = cu.vx3.w;
+    if (r >= 1.4 * R) {
+        return surfaceIn;
+    }
+    // the funnel's walls keep a third of the sea's relief, so the shelves read through it
+    let inF = 1.0 - smoothstep(0.6 * R, 0.9 * R, r);
+    var surface = surfaceIn - 0.65 * inF * cu.sea3.x * h;
+    let phi = atan2(l.y, l.x);
+    let arms = cu.vx3.x;
+    var arm = 0.0;
+    if (arms > 0.5) {
+        arm = cos(arms * (phi - cu.vx4.w) + 2.6 * log(max(r, 1.0) / max(eye, 1.0)));
+        let armW = smoothstep(eye * 0.8, eye * 1.6, r) * (1.0 - smoothstep(0.75 * R, 1.4 * R, r));
+        surface = surface + cu.vx3.y * cu.sea3.x * 0.5 * (arm - 1.0) * armW;
+    }
+    let u = clamp((r - eye) / max(0.85 * R - eye, 1.0), 0.0, 1.0);
+    var df = pow(1.0 - u, 1.6);
+    let shelves = cu.vx2.z;
+    if (shelves > 0.5) {
+        let k = df * shelves + cu.vx2.w * 0.5 * (arm + 1.0) + 0.15 * h;
+        let terr = (floor(k) + smoothstep(0.55, 0.92, fract(k))) / shelves;
+        df = clamp(mix(df, terr, 0.85), 0.0, 1.0);
+    }
+    surface = surface - cu.vx1.w * df;
+    let rim = smoothstep(eye * 0.85, eye * 1.12, r + 0.1 * eye * h);
+    return mix(cu.sea.x - 40.0, surface, rim);
+}
+
+// ADR-2120: the vortex's light from the eye below: falling with height over `glowHeight` above the eye's rim and with
+// the distance outside the eye
+fn vortexGlow(p: vec3<f32>) -> vec3<f32> {
+    if (cu.vx0.w < 0.5 || dot(cu.vx4.rgb, vec3<f32>(1.0)) <= 0.0) {
+        return vec3<f32>(0.0);
+    }
+    let l = vortexLocal(p.xz);
+    let r = length(l);
+    let eye = cu.vx3.w;
+    let rimY = cu.sea3.w - cu.vx1.w;
+    let out = max(r - 0.8 * eye, 0.0) / (0.7 * eye);
+    // over the eye (the column) the light reaches four times as high
+    let axial = 1.0 - smoothstep(1.2 * eye, 2.4 * eye, r);
+    return cu.vx4.rgb * (exp(-max(p.y - rimY, 0.0) / (max(cu.vx3.z, 1.0) * (1.0 + 3.0 * axial))) / (1.0 + out * out));
+}
+
+// ADR-2120: the column -- a sheath of mist spiralling up out of the eye, widening and thickening as it rises; `arms`
+// bands climb round the axis (turning with the arms' phase, 2.5 times as fast), torn by the churned noise
+fn vortexColumnBounds() -> vec4<f32> { // centre (x, mid y, z), bounding radius
+    let y0 = cu.sea3.w - cu.vx1.w;
+    let y1 = cu.sea3.w + cu.vx5.x;
+    let r = 2.4 * cu.vx3.w * max(cu.vx1.y, 1.0);
+    return vec4<f32>(cu.vx0.x, 0.5 * (y0 + y1), cu.vx0.y, sqrt(r * r + 0.25 * (y1 - y0) * (y1 - y0)));
+}
+
+fn vortexColumn(p: vec3<f32>) -> f32 {
+    if (cu.vx0.w < 0.5 || cu.vx5.x <= 0.0 || cu.vx5.y <= 0.0) {
+        return 0.0;
+    }
+    let y0 = cu.sea3.w - cu.vx1.w;
+    let y1 = cu.sea3.w + cu.vx5.x;
+    if (p.y <= y0 || p.y >= y1) {
+        return 0.0;
+    }
+    let u = (p.y - y0) / (y1 - y0);
+    let l = vortexLocal(p.xz);
+    let r = length(l);
+    let eye = cu.vx3.w;
+    let rc = eye * mix(0.7, 1.7, u);
+    let th = eye * mix(0.22, 0.55, u);
+    let x = (r - rc) / th;
+    let radial = exp(-x * x);
+    if (radial < 0.03) {
+        return 0.0;
+    }
+    let phi = atan2(l.y, l.x);
+    let band = 0.5 + 0.5 * cos(max(cu.vx3.x, 1.0) * (phi - 2.5 * cu.vx4.w) - (p.y - y0) * cu.vx5.z);
+    let bandS = smoothstep(0.2, 0.85, band);
+    let n = animTap(p + cu.drift.xyz * 0.3 + vec3<f32>(29.0, -7.0, 13.0), p, 1.0 / 45.0,
+                    vec3<f32>(0.0, 2.0, 0.0) * cu.churn0.z);
+    let d = remap01(n.g * 0.6 + n.r * 0.4, 0.15 + 0.45 * (1.0 - bandS), 1.0);
+    let vert = smoothstep(0.0, 0.1, u) * (1.0 - smoothstep(0.55, 1.0, u));
+    return d * radial * vert * cu.vx5.y;
+}
+
+// The relief sea's noise: one rounded swell plus up to three octaves of billow noise
+fn seaNoise(xz: vec2<f32>, octaves: u32) -> f32 {
     let f = cu.sea3.y;
     let s0 = (noiseTap(vec3<f32>(xz.x, 211.0, xz.y), f).a - 0.5) * 2.5;
     var h = 0.55 * s0;
@@ -374,7 +626,12 @@ fn seaSurface(xz: vec2<f32>, octaves: u32) -> f32 {
         let s3 = 1.0 - abs((noiseTap(vec3<f32>(xz.x * 26.0 + 7.0, 877.0, xz.y * 26.0 + 3.0), f).a - 0.5) * 3.0);
         h = h + 0.09 * (s3 * 2.0 - 1.0);
     }
-    var surface = cu.sea3.w + cu.sea3.x * h;
+    return h;
+}
+
+// the breaks and the thin coverage lower the surface to the floor
+fn seaCuts(xz: vec2<f32>, surfaceIn: f32, h: f32) -> f32 {
+    var surface = surfaceIn;
     // the breaks
     let floorY = cu.sea.x - 40.0;
     let nb = u32(cu.sea6.z + 0.5);
@@ -433,7 +690,7 @@ fn densityBase(p: vec3<f32>, e: Ero) -> Density {
     let lobeAbove = lobeBase(p, e);
     let lobe = lobeAbove.x;
     let inSea = seaH >= 0.0 && seaH <= 1.0;
-    let wisp = wispDensity(p, e.on < 0.5); // ADR-2113 (the light taps pass no erosion: the cheap wisp)
+    let wisp = max(wispDensity(p, e.on < 0.5), vortexColumn(p)); // ADR-2113 (the light taps: the cheap wisp); ADR-2120
     if (!inSea && lobe <= 0.0) {
         if (wisp > 0.0) {
             out.base = wisp;
@@ -442,7 +699,8 @@ fn densityBase(p: vec3<f32>, e: Ero) -> Density {
         return out;
     }
     let seed = vec3<f32>(cu.grid2.y * 7.13, 0.0, cu.grid2.y * 3.71);
-    let shape = noiseTap(q + seed, cu.march.w);
+    // ADR-2119/2120: the billows boil in place and swirl in the vortex
+    let shape = animTap(q + seed, p, cu.march.w, vec3<f32>(0.3, 1.0, -0.2) * cu.churn0.z);
     // Perlin-Worley, sharpened by its own cells
     let sn = remap01(shape.r, (shape.g * 0.625 + shape.b * 0.25) * 0.35, 1.0);
     if (inSea && cu.sea3.x > 0.0) {
@@ -530,7 +788,7 @@ fn legacyDensity(p: vec3<f32>, detail: u32) -> f32 {
 
 fn detailErode(p: vec3<f32>, base: f32) -> f32 {
     let q = p + cu.drift.xyz * 1.7;
-    let d = noiseTap(q, cu.march2.w);
+    let d = animTap(q, p, cu.march2.w, vec3<f32>(0.2, 1.6, -0.1) * cu.churn0.z); // ADR-2119
     let dn = d.b * 0.7 + d.g * 0.3;
     // thin, low-density edges lose most; the solid interior keeps its density
     return remap01(base, dn * cu.sea2.z, 1.0);
@@ -560,10 +818,14 @@ fn slab(ro: vec3<f32>, rd: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>, box: bool) -
 // its whole budget crossing kilometres of empty air before the sea when the eye was inside the lobes' box.
 // ADR-2113: the wisps' regions along the ray: where it next enters one after t (t itself when inside one; 1e30 none)
 fn wispNext(ro: vec3<f32>, rd: vec3<f32>, t: f32) -> f32 {
-    if (cu.wisp0.x < 0.5) {
-        return 1e30;
-    }
     var best = 1e30;
+    if (cu.wisp0.x < 0.5) {
+        let cs = columnSpan(ro, rd); // ADR-2120
+        if (cs.y > cs.x && cs.y > t) {
+            best = max(cs.x, t);
+        }
+        return best;
+    }
     if (cu.wisp4.w > 0.5) {
         let s = slab(ro, rd, vec3<f32>(0.0, cu.wisp0.y, 0.0), vec3<f32>(0.0, cu.wisp0.z, 0.0), false);
         if (s.y > s.x && s.y > t) {
@@ -585,7 +847,64 @@ fn wispNext(ro: vec3<f32>, rd: vec3<f32>, t: f32) -> f32 {
             }
         }
     }
+    let nl = u32(cu.churn2.y + 0.5); // ADR-2119: the mist sheets
+    for (var i = 0u; i < nl; i = i + 1u) {
+        let s = layerSpan(ro, rd, i, t);
+        if (s.y > s.x) {
+            best = min(best, s.x);
+        }
+    }
+    let cs = columnSpan(ro, rd); // ADR-2120: the vortex's column
+    if (cs.y > cs.x && cs.y > t) {
+        best = min(best, max(cs.x, t));
+    }
     return best;
+}
+
+// ADR-2120: the ray's span through the column's bounding sphere (empty when there is no column)
+fn columnSpan(ro: vec3<f32>, rd: vec3<f32>) -> vec2<f32> {
+    if (cu.vx0.w < 0.5 || cu.vx5.x <= 0.0 || cu.vx5.y <= 0.0) {
+        return vec2<f32>(1.0, 0.0);
+    }
+    let b4 = vortexColumnBounds();
+    let oc = ro - b4.xyz;
+    let b = dot(oc, rd);
+    let disc = b * b - (dot(oc, oc) - b4.w * b4.w);
+    if (disc <= 0.0) {
+        return vec2<f32>(1.0, 0.0);
+    }
+    let sq = sqrt(disc);
+    return vec2<f32>(max(-b - sq, 0.0), -b + sq);
+}
+
+// ADR-2119: the ray's [t0, t1] (t0 >= tMin) through mist sheet i: its height band, cut to its disc (when bounded)
+// and to 6 km (unbounded)
+fn layerSpan(ro: vec3<f32>, rd: vec3<f32>, i: u32, tMin: f32) -> vec2<f32> {
+    let l0 = cu.layers[3u * i];
+    let l1 = cu.layers[3u * i + 1u];
+    var s = slab(ro, rd, vec3<f32>(0.0, l1.x, 0.0), vec3<f32>(0.0, l1.y, 0.0), false);
+    s.y = min(s.y, 6000.0);
+    if (l0.z > 0.0) {
+        // the vertical cylinder of the disc
+        let o = ro.xz - l0.xy;
+        let a = dot(rd.xz, rd.xz);
+        let b = dot(o, rd.xz);
+        let c = dot(o, o) - l0.z * l0.z;
+        if (a < 1e-8) {
+            if (c > 0.0) {
+                return vec2<f32>(1.0, 0.0);
+            }
+        } else {
+            let disc = b * b - a * c;
+            if (disc <= 0.0) {
+                return vec2<f32>(1.0, 0.0);
+            }
+            let sq = sqrt(disc);
+            s = vec2<f32>(max(s.x, (-b - sq) / a), min(s.y, (-b + sq) / a));
+        }
+    }
+    s.x = max(s.x, tMin);
+    return s;
 }
 
 fn emptySkip(ro: vec3<f32>, rd: vec3<f32>, t: f32, seaEntry: f32, boxEntry: f32) -> f32 {
@@ -775,6 +1094,22 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 tB = max(tB, -b + sqrt(disc));
             }
         }
+        // ADR-2119: the mist sheets
+        let nl = u32(cu.churn2.y + 0.5);
+        for (var i = 0u; i < nl; i = i + 1u) {
+            let s = layerSpan(ro, rd, i, 0.0);
+            if (s.y > s.x) {
+                tA = min(tA, s.x);
+                tB = max(tB, s.y);
+            }
+        }
+    }
+    {
+        let cs = columnSpan(ro, rd); // ADR-2120: the vortex's column
+        if (cs.y > cs.x) {
+            tA = min(tA, cs.x);
+            tB = max(tB, cs.y);
+        }
     }
     let reach = min(sceneT, cu.march2.z);
     tB = min(tB, reach);
@@ -938,6 +1273,16 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                         glowTo = v * inverseSqrt(max(d2, 1e-4));
                     }
                 }
+                // ADR-2120: the vortex's eye lights the funnel from below, as one more glow (shaped like the others)
+                let vg = vortexGlow(p);
+                glow = glow + vg;
+                let vgw = dot(vg, vec3<f32>(0.3, 0.5, 0.2));
+                if (vgw > glowBest) {
+                    glowBest = vgw;
+                    glowBestShadow = 1.0;
+                    let ec = vec3<f32>(cu.vx0.x, cu.sea3.w - cu.vx1.w - 30.0, cu.vx0.y);
+                    glowTo = normalize(ec - p + vec3<f32>(0.0, 1e-3, 0.0));
+                }
                 glow = glow * cu.grid2.z;
                 // ADR-2104: a glow lights the cloud's own structure, not a sphere around itself. Breakup: pockets of
                 // the cloud's coarse noise take more of it and the gaps between them less (inner-lit pockets);
@@ -963,6 +1308,8 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 var radiance = cu.lightColor.rgb * cu.light.w * keyLight * powder + ambient + warm + glow;
                 let hz = 1.0 - exp(-t / max(cu.haze.w, 1.0));
                 radiance = mix(radiance, cu.haze.rgb, hz);
+                // ADR-2119: thin cloud takes the air's colour, so a silhouette melts into the sky
+                radiance = mix(radiance, cu.haze.rgb, cu.churn2.x * (1.0 - smoothstep(0.0, 0.35, dens)));
                 var a = 1.0 - exp(-ext * dens * dt);
                 if (cu.sea6.w > 0.0) {
                     a = a * (1.0 - smoothstep(cu.sea6.w, cu.march2.z, t)); // ADR-2101: the far sea fades out

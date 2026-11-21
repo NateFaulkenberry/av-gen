@@ -76,10 +76,28 @@ struct CloudUniformGpu {
     // per zone: (centre x, floor, centre z at this second, bounding radius), (radius a, radius b, yaw, density),
     // (below, above, 0, 0)
     std::array<glm::vec4, 3 * scene::kMaxCloudWispZones> zones;
+    // ADR-2119: the churn: (amount, clock period s, boil m/s, the curl field's writhe offset m), the two clocks'
+    // (phase a, phase b, cycle a, cycle b), (edge air, mist sheet count, 0, 0)
+    glm::vec4 churn0;
+    glm::vec4 churn1;
+    glm::vec4 churn2;
+    // ADR-2119: per mist sheet: (centre x, z, radius (0 = unbounded), density), (base, top, scale m, coverage),
+    // (drift offset xyz m, stretch)
+    std::array<glm::vec4, 3 * scene::kMaxCloudWispLayers> layers;
+    // ADR-2120: the vortex: (centre x, z, radius, on), (eye, elongation, yaw, depth with the pulse), (spin rad/s,
+    // twist rad/m, shelves, pitch), (arms, arm depth, glow height m, eye with the pulse), (glow colour * intensity,
+    // the arms' turning phase rad)
+    glm::vec4 vx0;
+    glm::vec4 vx1;
+    glm::vec4 vx2;
+    glm::vec4 vx3;
+    glm::vec4 vx4;
+    glm::vec4 vx5; // the column: height above the mean top (m), density, band phase per metre (rad); the wind (rad)
 };
 static_assert(sizeof(CloudUniformGpu) == (21 + 4 + 2 * scene::kMaxCloudGlows + 3 * scene::kMaxCloudBeamArms + 10 +
                                           scene::kMaxCloudBobs + 5 + 2 * scene::kMaxCloudWakes +
-                                          3 * scene::kMaxCloudWispZones) * 16);
+                                          3 * scene::kMaxCloudWispZones + 3 + 3 * scene::kMaxCloudWispLayers + 6) *
+                                             16);
 
 struct LobeGpu {
     glm::vec4 centreRadius;
@@ -720,6 +738,41 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.erosion2 = glm::vec4(static_cast<float>(c.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
                            c.erosionFlatten);
     u.erosion3 = glm::vec4(c.erosionEdge, c.erosionDetailFloor, 0.0f, 0.0f);
+    // ADR-2119: the churn's two clocks, half a period apart (each restarts, on a fresh region of the volume, when its
+    // weight is zero); all of it a pure function of the timeline second. The vortex (ADR-2120) swirls on them too.
+    {
+        const double period = std::max(static_cast<double>(c.churn.period), 0.5);
+        const double ca = now / period;
+        const double cb = ca + 0.5;
+        const bool churning = c.churn.amount > 0.0f;
+        u.churn0 = glm::vec4(c.churn.amount, static_cast<float>(period), c.churn.boil,
+                             churning ? static_cast<float>(std::fmod(static_cast<double>(c.churn.writhe) * now, 40000.0))
+                                      : 0.0f);
+        u.churn1 = glm::vec4(static_cast<float>(ca - std::floor(ca)), static_cast<float>(cb - std::floor(cb)),
+                             static_cast<float>(std::fmod(std::floor(ca), 4096.0)),
+                             static_cast<float>(std::fmod(std::floor(cb), 4096.0)));
+        const std::size_t layers = c.wisps.enabled ? std::min(c.wisps.layers.size(), scene::kMaxCloudWispLayers) : 0;
+        u.churn2 = glm::vec4(c.edgeAir, static_cast<float>(layers), 0.0f, 0.0f);
+        for (std::size_t k = 0; k < layers; ++k) {
+            const scene::CloudWisps::Layer& l = c.wisps.layers[k];
+            u.layers[3 * k] = glm::vec4(l.centre, l.radius, l.density);
+            u.layers[3 * k + 1] = glm::vec4(l.base, l.top, l.scale, l.coverage);
+            u.layers[3 * k + 2] = glm::vec4(l.drift * static_cast<float>(std::fmod(now, 100000.0)), l.stretch);
+        }
+        if (c.vortex.enabled && c.sea.enabled) {
+            const scene::CloudVortex& v = c.vortex;
+            const float pulse = std::clamp(v.pulse, -1.0f, 1.0f);
+            u.vx0 = glm::vec4(v.centre, v.radius, 1.0f);
+            u.vx1 = glm::vec4(v.eye, v.elongation, v.yaw, v.depth * (1.0f + 0.35f * pulse));
+            u.vx2 = glm::vec4(v.spin, v.twist / 100.0f, static_cast<float>(v.shelves), v.pitch);
+            u.vx3 = glm::vec4(static_cast<float>(v.arms), v.armDepth, v.glowHeight,
+                              std::min(v.eye * (1.0f + 0.15f * pulse), 0.95f * v.radius));
+            // the arms turn rigidly at 0.4 of the eye's spin (a pattern speed: no winding up)
+            const double armPhase = std::fmod(0.4 * static_cast<double>(v.spin) * now, 6.283185307179586);
+            u.vx4 = glm::vec4(v.glowColor * v.glow, static_cast<float>(armPhase));
+            u.vx5 = glm::vec4(v.column, v.columnDensity, 6.283185307f / std::max(v.columnPitch, 1.0f), v.wind);
+        }
+    }
     context_->queue().WriteBuffer(uniforms_, 0, &u, sizeof(u));
 
     const auto bufferEntry = [](std::uint32_t binding, const wgpu::Buffer& b) {

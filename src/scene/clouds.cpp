@@ -208,6 +208,36 @@ Result<void> Clouds::validate() const {
             }
         }
     }
+    // ADR-2119
+    if (wisps.layers.size() > kMaxCloudWispLayers) return fail("clouds: at most {} wisp layers", kMaxCloudWispLayers);
+    for (const CloudWisps::Layer& l : wisps.layers) {
+        if (!(l.top > l.base) || !(l.radius >= 0.0f) || !(l.density >= 0.0f && l.density <= 8.0f) ||
+            !(l.scale >= 1.0f && l.scale <= 5000.0f) || !(l.coverage >= 0.0f && l.coverage <= 1.0f) ||
+            !(l.stretch >= 1.0f && l.stretch <= 10.0f)) {
+            return fail("clouds: wisp layer '{}' needs top above base, a radius >= 0, density in [0, 8], scale in "
+                        "[1, 5000] m, coverage in [0, 1] and stretch in [1, 10]", l.name);
+        }
+    }
+    if (!(churn.amount >= 0.0f && churn.amount <= 1.0f) || !(churn.period >= 0.5f && churn.period <= 600.0f) ||
+        !(std::abs(churn.boil) <= 100.0f) || !(std::abs(churn.writhe) <= 100.0f)) {
+        return fail("clouds: churn needs amount in [0, 1], period in [0.5, 600] s, boil and writhe within 100 m/s");
+    }
+    if (!(edgeAir >= 0.0f && edgeAir <= 1.0f)) return fail("clouds: edgeAir must be in [0, 1]");
+    // ADR-2120
+    if (vortex.enabled) {
+        const CloudVortex& v = vortex;
+        if (!(v.radius > 0.0f) || !(v.eye > 0.0f && v.eye < v.radius) || !(v.elongation >= 0.1f && v.elongation <= 10.0f) ||
+            !(v.depth >= 0.0f && v.depth <= 5000.0f) || !(std::abs(v.spin) <= 10.0f) || !(std::abs(v.twist) <= 20.0f) || !(std::abs(v.wind) <= 30.0f) ||
+            !(v.shelves >= 0 && v.shelves <= 12) || !(v.pitch >= 0.0f && v.pitch <= 12.0f) ||
+            !(v.arms >= 0 && v.arms <= 8) || !(v.armDepth >= 0.0f && v.armDepth <= 1.0f) || !(v.glow >= 0.0f) ||
+            !(v.glowHeight > 0.0f) || !(v.pulse >= -1.0f && v.pulse <= 1.0f) || !(v.column >= 0.0f && v.column <= 5000.0f) ||
+            !(v.columnDensity >= 0.0f && v.columnDensity <= 8.0f) || !(v.columnPitch > 1.0f)) {
+            return fail("clouds: a vortex needs 0 < eye < radius, elongation in [0.1, 10], depth in [0, 5000] m, "
+                        "|spin| <= 10 rad/s, |twist| <= 20, shelves in [0, 12], pitch in [0, 12], arms in [0, 8], "
+                        "armDepth in [0, 1], glow >= 0, glowHeight > 0, pulse in [-1, 1], column in [0, 5000] m, "
+                        "columnDensity in [0, 8] and columnPitch > 1 m");
+        }
+    }
     if (halo.enabled && (glm::length(halo.direction) < 1e-6f || !(halo.radius > 0.0f && halo.radius <= 90.0f) ||
                          !(halo.intensity >= 0.0f))) {
         return fail("clouds: a halo needs a non-zero direction, a radius in (0, 90] degrees and a non-negative "
@@ -476,6 +506,79 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
                 w.zones.push_back(zone);
             }
         }
+        if (wj.contains("layers")) { // ADR-2119
+            if (!wj.at("layers").is_array()) return fail("clouds: 'wisps.layers' must be an array");
+            for (const json& lj : wj.at("layers")) {
+                if (!lj.is_object() || !lj.contains("base") || !lj.contains("top")) {
+                    return fail("clouds: a wisp layer needs 'base' and 'top'");
+                }
+                CloudWisps::Layer l;
+                l.name = lj.value("name", std::string());
+                if (lj.contains("centre")) {
+                    if (!lj.at("centre").is_array() || lj.at("centre").size() != 2) {
+                        return fail("clouds: a wisp layer's 'centre' must be [x, z]");
+                    }
+                    l.centre = {lj.at("centre")[0].get<float>(), lj.at("centre")[1].get<float>()};
+                }
+                for (auto [k, t] : {std::pair{"radius", &l.radius}, std::pair{"base", &l.base}, std::pair{"top", &l.top},
+                                    std::pair{"density", &l.density}, std::pair{"scale", &l.scale},
+                                    std::pair{"coverage", &l.coverage}, std::pair{"stretch", &l.stretch}}) {
+                    if (!lj.contains(k)) continue;
+                    if (!lj.at(k).is_number()) return fail("clouds: 'wisps.layers[].{}' must be a number", k);
+                    *t = lj.at(k).get<float>();
+                }
+                if (lj.contains("drift")) {
+                    auto d = vec3Of(lj.at("drift"), "wisps.layers[].drift");
+                    if (!d) return std::unexpected(d.error());
+                    l.drift = *d;
+                }
+                w.layers.push_back(l);
+            }
+        }
+    }
+    if (j.contains("churn")) { // ADR-2119
+        const json& cj = j.at("churn");
+        if (!cj.is_object()) return fail("clouds: 'churn' must be an object");
+        for (auto [k, t] : {std::pair{"amount", &c.churn.amount}, std::pair{"period", &c.churn.period},
+                            std::pair{"boil", &c.churn.boil}, std::pair{"writhe", &c.churn.writhe}}) {
+            if (!cj.contains(k)) continue;
+            if (!cj.at(k).is_number()) return fail("clouds: 'churn.{}' must be a number", k);
+            *t = cj.at(k).get<float>();
+        }
+    }
+    if (j.contains("edgeAir")) {
+        if (!j.at("edgeAir").is_number()) return fail("clouds: 'edgeAir' must be a number");
+        c.edgeAir = j.at("edgeAir").get<float>();
+    }
+    if (j.contains("vortex")) { // ADR-2120
+        const json& vj = j.at("vortex");
+        if (!vj.is_object() || !vj.contains("centre") || !vj.at("centre").is_array() || vj.at("centre").size() != 2) {
+            return fail("clouds: 'vortex' must be an object with 'centre': [x, z]");
+        }
+        CloudVortex& v = c.vortex;
+        v.enabled = vj.value("enabled", true);
+        v.centre = {vj.at("centre")[0].get<float>(), vj.at("centre")[1].get<float>()};
+        for (auto [k, t] : {std::pair{"radius", &v.radius}, std::pair{"eye", &v.eye},
+                            std::pair{"elongation", &v.elongation}, std::pair{"yaw", &v.yaw},
+                            std::pair{"depth", &v.depth}, std::pair{"spin", &v.spin}, std::pair{"twist", &v.twist}, std::pair{"wind", &v.wind},
+                            std::pair{"pitch", &v.pitch}, std::pair{"armDepth", &v.armDepth},
+                            std::pair{"glow", &v.glow}, std::pair{"glowHeight", &v.glowHeight},
+                            std::pair{"pulse", &v.pulse}, std::pair{"column", &v.column},
+                            std::pair{"columnDensity", &v.columnDensity}, std::pair{"columnPitch", &v.columnPitch}}) {
+            if (!vj.contains(k)) continue;
+            if (!vj.at(k).is_number()) return fail("clouds: 'vortex.{}' must be a number", k);
+            *t = vj.at(k).get<float>();
+        }
+        for (auto [k, t] : {std::pair{"shelves", &v.shelves}, std::pair{"arms", &v.arms}}) {
+            if (!vj.contains(k)) continue;
+            if (!vj.at(k).is_number_integer()) return fail("clouds: 'vortex.{}' must be an integer", k);
+            *t = vj.at(k).get<int>();
+        }
+        if (vj.contains("glowColor")) {
+            auto col = vec3Of(vj.at("glowColor"), "vortex.glowColor");
+            if (!col) return std::unexpected(col.error());
+            v.glowColor = *col;
+        }
     }
     // ADR-2112: every "bob" names one of the block's formations
     {
@@ -623,7 +726,32 @@ json Clouds::toJson() const {
             }
             wj["zones"] = std::move(zs);
         }
+        if (!w.layers.empty()) { // ADR-2119
+            json ls = json::array();
+            for (const CloudWisps::Layer& l : w.layers) {
+                json lj = {{"centre", json::array({l.centre.x, l.centre.y})}, {"radius", l.radius}, {"base", l.base},
+                           {"top", l.top}, {"density", l.density}, {"scale", l.scale}, {"coverage", l.coverage},
+                           {"stretch", l.stretch}, {"drift", v3(l.drift)}};
+                if (!l.name.empty()) lj["name"] = l.name;
+                ls.push_back(std::move(lj));
+            }
+            wj["layers"] = std::move(ls);
+        }
         j["wisps"] = std::move(wj);
+    }
+    if (churn.amount > 0.0f) { // ADR-2119
+        j["churn"] = {{"amount", churn.amount}, {"period", churn.period}, {"boil", churn.boil},
+                      {"writhe", churn.writhe}};
+    }
+    if (edgeAir > 0.0f) j["edgeAir"] = edgeAir;
+    if (vortex.enabled) { // ADR-2120
+        const CloudVortex& v = vortex;
+        j["vortex"] = {{"enabled", true}, {"centre", json::array({v.centre.x, v.centre.y})}, {"radius", v.radius},
+                       {"eye", v.eye}, {"elongation", v.elongation}, {"yaw", v.yaw}, {"depth", v.depth},
+                       {"spin", v.spin}, {"twist", v.twist}, {"wind", v.wind}, {"shelves", v.shelves}, {"pitch", v.pitch},
+                       {"arms", v.arms}, {"armDepth", v.armDepth}, {"glowColor", v3(v.glowColor)},
+                       {"glow", v.glow}, {"glowHeight", v.glowHeight}, {"pulse", v.pulse}, {"column", v.column},
+                       {"columnDensity", v.columnDensity}, {"columnPitch", v.columnPitch}};
     }
     if (!masses.empty()) j["masses"] = masses;
     if (!source.empty()) {
@@ -760,6 +888,17 @@ CloudParameters registerCloudParameters(params::ParameterSet& params, const Clou
     addFloat(prefix + "wisps/density", rest.wisps.density, 0.0f, 8.0f, 0.0f, 1.0f);
     addFloat(prefix + "wisps/coverage", rest.wisps.coverage, 0.0f, 1.0f, 0.0f, 1.0f);
     addFloat(prefix + "wisps/tatter", rest.wisps.tatter, 0.0f, 1.0f, 0.0f, 1.0f);
+    // ADR-2119: the churn's amount, the edge's air, each mist sheet's density
+    addFloat(prefix + "churn", rest.churn.amount, 0.0f, 1.0f, 0.0f, 1.0f);
+    addFloat(prefix + "edgeAir", rest.edgeAir, 0.0f, 1.0f, 0.0f, 1.0f);
+    for (std::size_t i = 0; i < rest.wisps.layers.size(); ++i) {
+        addFloat(prefix + "wisps/layer/" + std::to_string(i) + "/density", rest.wisps.layers[i].density, 0.0f, 8.0f,
+                 0.0f, 2.0f);
+    }
+    // ADR-2120: the vortex's glow, pulse and spin
+    addFloat(prefix + "vortex/glow", rest.vortex.glow, 0.0f, 1000.0f, 0.0f, 10.0f);
+    addFloat(prefix + "vortex/pulse", rest.vortex.pulse, -1.0f, 1.0f, -1.0f, 1.0f);
+    addFloat(prefix + "vortex/spin", rest.vortex.spin, -10.0f, 10.0f, -0.5f, 0.5f);
     return out;
 }
 
@@ -812,6 +951,16 @@ void applyCloudParameters(const CloudParameters& p, const Clouds& rest, Clouds& 
     if (const auto* q = f(wisp0)) live.wisps.density = q->value();
     if (const auto* q = f(wisp0 + 1)) live.wisps.coverage = q->value();
     if (const auto* q = f(wisp0 + 2)) live.wisps.tatter = q->value();
+    const std::size_t churn0 = wisp0 + 3; // ADR-2119
+    if (const auto* q = f(churn0)) live.churn.amount = q->value();
+    if (const auto* q = f(churn0 + 1)) live.edgeAir = q->value();
+    for (std::size_t i = 0; i < live.wisps.layers.size(); ++i) {
+        if (const auto* q = f(churn0 + 2 + i)) live.wisps.layers[i].density = q->value();
+    }
+    const std::size_t vortex0 = churn0 + 2 + rest.wisps.layers.size(); // ADR-2120
+    if (const auto* q = f(vortex0)) live.vortex.glow = q->value();
+    if (const auto* q = f(vortex0 + 1)) live.vortex.pulse = q->value();
+    if (const auto* q = f(vortex0 + 2)) live.vortex.spin = q->value();
 }
 
 glm::vec3 cloudBobOffset(const CloudBob& bob, double seconds) {
