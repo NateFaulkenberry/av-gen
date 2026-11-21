@@ -396,10 +396,12 @@ def lone_lamp_lights(lay):
     lights.append({"name": "it12_lone_roof", "pos": R3([hx, deck_y + 12.0, hz]), "key": "amber", "radius_m": 18.0,
                    "intensity": 1.0, "zone": "lone_lamp", "bob": LONE})
     # the ocean's light from below: violet, wide, under the rock
-    lights.append({"name": "it12_lone_under", "pos": R3([cx + 6.0, cy - 30.0, cz + 4.0]), "key": "ocean_a",
-                   "radius_m": 40.0, "intensity": 1.6, "zone": "lone_lamp", "bob": LONE})
-    lights.append({"name": "it12_lone_rim", "pos": R3([cx + 22.0, cy - 12.0, cz + 10.0]), "key": "ocean_b",
-                   "radius_m": 30.0, "intensity": 1.3, "zone": "lone_lamp", "bob": LONE})
+    lights.append({"name": "it12_lone_under", "pos": R3([cx - 4.0, cy - 16.0, cz + 2.0]), "key": "ocean_a",
+                   "radius_m": 34.0, "intensity": 4.0, "zone": "lone_lamp", "bob": LONE})
+    lights.append({"name": "it12_lone_rim", "pos": R3([cx + 24.0, cy - 6.0, cz + 6.0]), "key": "ocean_b",
+                   "radius_m": 30.0, "intensity": 3.0, "zone": "lone_lamp", "bob": LONE})
+    lights.append({"name": "it12_lone_facade", "pos": R3([hx - 9.0, deck_y + 4.0, hz + 1.0]), "key": "amber",
+                   "radius_m": 14.0, "intensity": 1.8, "zone": "lone_lamp", "bob": LONE})
     # garden on the deck: shrubs and sprigs (garden role) round the house
     for k, (dx, dz, a) in enumerate([(-11.0, -6.0, "garden/shrub_a.glb"), (-8.0, -11.5, "garden/sprig_bed_3m.glb"),
                                      (6.0, 8.0, "garden/shrub_b.glb"), (-13.0, 0.5, "garden/sprig_bed_3m.glb")]):
@@ -414,11 +416,12 @@ def end_clouds(des):
     rnd = random.Random(1201)
     lobes = []
     # (centre x, y, z), (spread x, z), n, radius, scale y, density, soft
-    layers = [((760, 196, -30), (90, 70), 14, 30, 0.22, 0.55, 0.7),     # under the lens's drift, low and torn
-              ((830, 205, 10), (70, 60), 10, 26, 0.2, 0.5, 0.75),       # right of the drift, under the Lone Lamp's view
-              ((1000, 170, -120), (160, 90), 14, 44, 0.25, 0.6, 0.7),   # between the isles, left of the Lone Lamp
-              ((1150, 150, 40), (180, 110), 14, 48, 0.22, 0.55, 0.72),  # the mid-distance layer over the vortex's near rim
-              ((1350, 130, -60), (200, 120), 12, 55, 0.2, 0.5, 0.75)]   # the far layer, toward the works
+    layers = [((770, 197, -20), (80, 55), 12, 22, 0.2, 0.4, 0.78),     # under the lens's drift: torn, low
+              ((860, 203, -25), (40, 40), 8, 16, 0.22, 0.45, 0.75),     # a collar of strands round the Lone Lamp's rock
+              ((1020, 175, -150), (150, 70), 12, 40, 0.22, 0.55, 0.72),  # left, between the lens and the works' rock
+              ((1250, 160, 200), (180, 80), 12, 44, 0.2, 0.5, 0.72),    # right of the break, framing it
+              ((1700, 175, -330), (220, 80), 10, 50, 0.2, 0.5, 0.72),   # under the works, a stratum it floats on
+              ((2800, 110, -40), (220, 200), 12, 60, 0.18, 0.5, 0.75)]  # beyond the break's far rim: the far layer
     for (cx, cy, cz), (sx, sz), n, r, syy, dens, soft in layers:
         for k in range(n):
             lobes.append({"c": R3([cx + rnd.uniform(-sx, sx), cy + rnd.uniform(-6, 6), cz + rnd.uniform(-sz, sz)]),
@@ -436,13 +439,13 @@ def vortex(des):
     ya = br["yaw_rad"]
     rim = [br["radius"] * br["elongation"], br["radius"]]        # semi-axes along the break's yaw (x) and across (z)
     top, floor = des["sea_design"]["top_mean"] + 18.0, br["ocean_plane"]["y"] + 6.0
-    shelves = 7
+    shelves = 6
     params = {
         "centre": [cx, cz], "yaw_rad": ya, "rim_semi_axes": rim, "throat_semi_axes": [round(rim[0] * 0.34, 1), round(rim[1] * 0.34, 1)],
         "top_y": round(top, 1), "floor_y": round(floor, 1), "depth_m": round(top - floor, 1),
-        "shelves": shelves, "shelf_thickness_m": 16.0, "shelf_overhang_m": 30.0,
+        "shelves": shelves, "shelf_thickness_m": 18.0, "shelf_overhang_m": 30.0, "lip": "two rings of torn lobes over the cut edge",
         "rotation_dps_rim": 1.2, "shear_exponent": 1.5, "direction": "counter-clockwise seen from above",
-        "arms": 3, "arm_pitch_deg": 16.0, "arm_contrast": 0.55,
+        "arms": 3, "arm_wind_deg": 300.0, "arm_pitch_deg": 16.0, "arm_contrast": 0.55,
         "rim_softness_m": 60.0,
         "underlight": {"key": "ocean_a", "rim_gain": 0.15, "throat_gain": 1.6, "falloff": "with depth below top_y, squared"},
         "eye_glow": {"position": [cx, round(floor + 10.0, 1), cz], "radius_m": 240.0, "key": "ocean_b", "intensity": 2.5},
@@ -455,22 +458,40 @@ def vortex(des):
     rnd = random.Random(1203)
     lobes = []
     cy_, sy_ = math.cos(ya), math.sin(ya)
-    for s in range(shelves):
-        u = s / (shelves - 1)                                   # 0 rim .. 1 throat
-        k = 1.06 - 0.72 * u                                     # semi-axis scale of the shelf's middle
-        y = top - (top - floor) * (u ** 0.85) - 6.0
-        dps = params["rotation_dps_rim"] * (1.0 / k) ** params["shear_exponent"]
-        n = int(46 * k) + 10
-        for j in range(n):
-            a = 2 * math.pi * j / n + rnd.uniform(-0.04, 0.04)
-            arm = 0.5 + 0.5 * math.cos(params["arms"] * (a + math.radians(params["arm_pitch_deg"]) * 8.0 * u))
-            ex, ez = rim[0] * k * math.cos(a), rim[1] * k * math.sin(a)
-            x, z = cx + ex * cy_ - ez * sy_, cz + ex * sy_ + ez * cy_
-            r = (30.0 + 26.0 * (1 - u)) * (0.75 + 0.45 * arm) * rnd.uniform(0.85, 1.15)
-            lobes.append({"c": R3([x, y + rnd.uniform(-4, 4), z]), "r": round(r, 1),
-                          "scale": [round(rnd.uniform(1.6, 2.4), 2), round(0.26 + 0.1 * arm, 2), round(rnd.uniform(1.0, 1.4), 2)],
-                          "density": round(0.5 + 0.4 * arm, 2), "soft": 0.62, "tag": "vortex",
-                          "orbit": {"centre": [cx, cz], "dps": round(dps, 3)}})
+
+    def at(k, a):
+        ex, ez = rim[0] * k * math.cos(a), rim[1] * k * math.sin(a)
+        return cx + ex * cy_ - ez * sy_, cz + ex * sy_ + ez * cy_
+
+    # three spiral arms of cloud winding down from the rim to the throat (seen from 1.5 km at 8-18 degrees down, a
+    # static still reads arms of cloud over the glowing ocean; turning, the shear winds them tighter)
+    for arm in range(params["arms"]):
+        a0 = 2 * math.pi * arm / params["arms"]
+        u = 0.0
+        while u <= 1.0:
+            k = 0.95 - 0.62 * u
+            a = a0 + u * math.radians(params["arm_wind_deg"])
+            y = top - (top - floor) * (u ** 0.8) - 4.0
+            r = 56.0 - 26.0 * u
+            dps = params["rotation_dps_rim"] * (0.95 / k) ** params["shear_exponent"]
+            for side in (-1, 1):                               # each arm two lobes wide, the inner one lower
+                kk = k + side * 0.035
+                x, z = at(kk, a + rnd.uniform(-0.03, 0.03))
+                lobes.append({"c": R3([x, y + (0 if side > 0 else -6) + rnd.uniform(-3, 3), z]), "r": round(r * rnd.uniform(0.85, 1.1), 1),
+                              "scale": [1.25, 0.32, 1.25], "density": round(0.85 - 0.3 * u, 2), "soft": 0.6, "tag": "vortex",
+                              "orbit": {"centre": [cx, cz], "dps": round(dps, 3)}})
+            per = 2 * math.pi * math.sqrt((rim[0] ** 2 + rim[1] ** 2) / 2) * k
+            u += (r * 0.75) / (per * math.radians(params["arm_wind_deg"]) / (2 * math.pi) + 1e-6)
+    # the lip: torn lobes straddling the break's cut edge at the sea's top, all round (the 59.6 s "too CG" edge is a
+    # straight cut through the sea layer; these lie over it and spill in, turning with the rim shelf)
+    n = 56
+    for j in range(n):
+        a = 2 * math.pi * j / n + rnd.uniform(-0.02, 0.02)
+        for k, dy, rr in ((1.03, 0.0, 58.0), (0.97, -12.0, 46.0)):
+            x, z = at(k + rnd.uniform(-0.025, 0.025), a)
+            lobes.append({"c": R3([x, top - 12.0 + dy + rnd.uniform(-5, 5), z]), "r": round(rr * rnd.uniform(0.8, 1.2), 1),
+                          "scale": [1.3, round(rnd.uniform(0.45, 0.7), 2), 1.3], "density": round(rnd.uniform(0.55, 0.85), 2),
+                          "soft": 0.7, "tag": "vortex", "orbit": {"centre": [cx, cz], "dps": params["rotation_dps_rim"]}})
     return params, lobes
 
 
@@ -484,6 +505,37 @@ def end_wisps():
 
 
 # ------------------------------------------------------------------------------------------------ the pylons
+def support_legs(lay):
+    """msg 149's audit (blender/nd_support_audit.py --write-fixes -> art/support_fixes.json): every other support the
+    journey sees ending in clear air (1.5 px wide or more) is continued 55 m down, the leg's feet clustered into legs."""
+    p = os.path.join(ART, "support_fixes.json")
+    if not os.path.exists(p):
+        return []
+    by = {}
+    for f in json.load(open(p))["feet"]:
+        if f["seen"] and f["seen"][2] >= 1.5 and f["asset"] != "street/gondola_pylon.glb":
+            by.setdefault(f["instance"], []).append(f)
+    ids = {i["id"]: i for i in lay["instances"]}
+    out = []
+    for iid, fs in sorted(by.items()):
+        legs = []
+        for f in fs:
+            for L in legs:
+                if math.hypot(L[0][0] - f["foot"][0], L[0][2] - f["foot"][2]) < 0.9:
+                    L.append(f["foot"]); break
+            else:
+                legs.append([f["foot"]])
+        inst = ids.get(iid, {})
+        for k, L in enumerate(legs):
+            c = [sum(p[0] for p in L) / len(L), max(p[1] for p in L), sum(p[2] for p in L) / len(L)]
+            spread = max([math.hypot(p[0] - c[0], p[2] - c[2]) for p in L] + [0.25]) * 2
+            sc = round(max(0.55, min(1.4, spread / 0.68)), 2)
+            out.append({"id": "it12_leg_%s_%d" % (iid, k), "asset": "stage/pylon_leg_ext.glb", "pos": R3(c), "rot_y_deg": 0.0,
+                        "quat": [0.0, 0.0, 0.0, 1.0], "scale": [sc, 1.0, sc], "zone": inst.get("zone", "support"),
+                        **({"bob": inst["bob"]} if inst.get("bob") else {})})
+    return out
+
+
 def pylon_legs(lay):
     out = []
     for i in lay["instances"]:
@@ -619,7 +671,7 @@ def main():
                              "Veil; it11's opening and end as before")
 
     # ---- D. the pylons' legs into the cloud
-    lay["instances"] += pylon_legs(lay)
+    lay["instances"] += pylon_legs(lay) + support_legs(lay)
 
     # ---- E. the end
     dy = BREAK_LIGHT_DY
@@ -659,7 +711,7 @@ def main():
 
     rec["applied"] = {"removed": {"instances": len(orig["inst"]), "lights": len(orig["lights"]), "spots": len(orig["spots"]),
                                   "paths": len(orig["paths"]), "groups": len(orig["groups"])},
-                      "audience": len(sp), "flights": [f["id"] for f in fl], "pylon_legs": sum(1 for i in lay["instances"] if i["id"].startswith("it12_leg_")),
+                      "audience": len(sp), "flights": [f["id"] for f in fl], "support_legs": sum(1 for i in lay["instances"] if i["id"].startswith("it12_leg_")),
                       "vortex_lobes": len(vl), "end_lobes": len(des["masses"]["end_layers"])}
     json.dump(lay, open(os.path.join(ART, "layout.json"), "w"), indent=1)
     json.dump(des, open(os.path.join(ART, "cloud_design.json"), "w"), indent=None, separators=(",", ":"))
