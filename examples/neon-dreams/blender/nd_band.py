@@ -177,26 +177,31 @@ def cleared(p):
 # Into the Quay (31 s) and the close pass (35.75 s) as before; then faster to the Steps (it was 12 m/s, now up to 22),
 # so it can slow to 7-8 m/s low over the plaza from 44.4 to 46.25 s with the band ahead-right at 14-24 m; up into
 # the Veil at 47.0 s and the reveal (56.88 / 58.95 s) as before.
-CAM_BAND = [
+CAM_BAND = [   # it12b (orchestrator, msg 149 "spend a bit more time"): a 7 s dwell at the band, gentle speeds after
     (36.85, [-15, 136.25, -7.0]),
-    (37.75, [0, 135.5, -4.11]),
-    (38.45, [15, 134.75, -0.3]),
-    (39.05, [28, 134.1, 3.03]),
-    (39.6, [40, 133.5, 5.59]),
-    (40.3, [55, 133.05, 7.46]),
-    (41.0, [70, 132.6, 7.46]),
-    (41.75, [85, 130.9, 13.2]),
-    (42.5, [98.5, 129.0, 19.0]),
-    (43.25, [109.0, 127.7, 23.4]),
-    (44.05, [118.5, 126.9, 27.6]),
-    (44.95, [127.1, 126.5, 30.15]),
-    (45.75, [132.9, 126.3, 31.9]),
-    (46.3, [136.5, 126.4, 32.4]),
-    (46.75, [145.5, 129.2, 26.8]),
+    (37.7, [0, 135.5, -4.11]),
+    (38.35, [15, 134.75, -0.3]),
+    (38.9, [28, 134.1, 3.03]),
+    (39.4, [40, 133.5, 5.59]),
+    (40.05, [55, 133.05, 7.46]),
+    (40.7, [70, 132.6, 7.46]),
+    (41.45, [85, 130.9, 13.2]),
+    (42.3, [98.5, 129.0, 19.0]),
+    (43.3, [109.0, 127.7, 23.4]),
+    (44.4, [122.9, 126.8, 28.9]),      # the pianist 24 m ahead
+    (45.6, [128.6, 126.6, 30.6]),      # 18 m
+    (46.8, [132.0, 126.5, 31.6]),      # 14.5 m
+    (47.9, [134.2, 126.4, 32.2]),      # 12 m
+    (48.9, [136.5, 126.5, 32.9]),      # 10.5 m: the closest
+    (49.8, [139.0, 128.0, 29.0]),      # turning away left and up
+    (50.7, [146.5, 131.0, 24.5]),
+    (51.6, [160.0, 135.5, 20.0]),
+    (52.5, [178.0, 140.0, 15.5]),
+    (53.4, [205.0, 149.5, 6.5]),       # into the Veil's gate (it is shortened: see VEIL_CUT)
+    (55.1, [266.0, 187.0, -28.0]),     # inside, the plug from 54.6 s
 ]
-CAM_VEIL = (47.6, [173.6, 142.6, 25.8])  # on it11's line into the Veil
-                                            # gently past the band (11 m off) instead of climbing 13 m straight up
-LOOK_AHEAD = [(0.0, 45.0), (42.6, 45.0), (43.6, 12.0), (44.8, 6.0), (45.3, 3.5), (46.3, 3.5), (46.9, 14.0), (47.7, 45.0), (70.2, 45.0)]
+CAM_VEIL = None
+LOOK_AHEAD = [(0.0, 45.0), (42.3, 45.0), (43.5, 12.0), (44.6, 5.0), (45.6, 2.5), (46.6, 1.5), (48.7, 1.5), (49.6, 6.0), (50.6, 20.0), (52.0, 45.0), (70.2, 45.0)]
 
 
 # ------------------------------------------------------------------------------------------------ the audience
@@ -320,7 +325,7 @@ def flights(pop, lay):
     top = 150.0
     rt = [lerp(A, B, 0.15), lerp(A, B, 0.5), lerp(A, B, 0.85)]
     rt = [[p[0], top, p[2]] for p in rt]
-    out.append(flight("fly_band_in_east", "alien-ranger", A, B, 36.6, 44.37, top, rt,
+    out.append(flight("fly_band_in_east", "alien-ranger", A, B, 37.3, 45.78, top, rt,
                       "it12 (msg 149): from the east isle's spire down onto the band's terrace, ahead of the lens as it slows",
                       bob_a="isle_east", da="isle:isle_east", db="band"))
     # 2. out of the crowd: lifts off the front rows as the lens closes on the band, climbs over the halo and away
@@ -330,7 +335,7 @@ def flights(pop, lay):
     top = 152.0
     rt = [[A[0], 140.0, A[2]], [C[0] - 1.0, 149.0, C[2] - 2.0], lerp([C[0], top, C[2]], [B[0], top, B[2]], 0.5),
           [B[0] + 4.0, top + 6.0, B[2] + 10.0]]
-    out.append(flight("fly_band_out", "alien-pilot", A, B, 44.37, 52.6, top + 6.0, rt,
+    out.append(flight("fly_band_out", "alien-pilot", A, B, 46.48, 54.4, top + 6.0, rt,
                       "it12 (msg 149): a pilot jets out of the front rows as the lens closes on the band, over the halo "
                       "and away to the east isle's spire", bob_b="isle_east", da="band", db="isle:isle_east"))
     # 3. in from the hanging-garden isle south of the Steps, across the frame right to left, down at the crowd's back
@@ -338,14 +343,14 @@ def flights(pop, lay):
     B = polar(-140.0, 16.0)
     rt = [lerp(A, B, 0.2), lerp(A, B, 0.55), lerp(A, B, 0.85)]
     rt = [[p[0], 133.0, p[2]] for p in rt]
-    out.append(flight("fly_band_in_south", "alien-pilot", A, B, 38.0, 45.78, 133.0, rt,
+    out.append(flight("fly_band_in_south", "alien-pilot", A, B, 39.4, 47.14, 133.0, rt,
                       "it12 (msg 149): from the hanging-garden isle across the lens's view (right to left) and down at "
                       "the back of the crowd", bob_a="isle_south2", da="isle:isle_south2", db="band"))
     # 4. a Quay roof to the band: leads the lens down the Quay from the close pass and lands at the crowd's west edge
     A = [30.4, 134.51, 14.76]                                   # a roof on the Quay's south side (open sky: --open-near)
     B = polar(-175.0, 15.2)
     rt = [[40.0, 146.0, 14.0], [62.0, 146.0, 15.0], [90.0, 140.0, 22.0], [B[0] - 8.0, 132.0, B[2] - 2.0]]
-    out.append(flight("fly_quay_band", "alien-ranger", A, B, 33.55, 43.62, 147.0, rt,
+    out.append(flight("fly_quay_band", "alien-ranger", A, B, 34.6, 44.37, 147.0, rt,
                       "it12 (msg 149): off a Quay roof garden on the snare before the close pass, ahead of the lens down "
                       "the Quay and over the Steps to the band", da="roof", db="band"))
     # 5. the pier: off the inner2 isle as the lens comes up the pier, along it ahead, down on the deck near the root
@@ -506,6 +511,78 @@ def end_wisps():
              "below": 8.0, "above": 4.0, "density": 0.5}]
 
 
+# ------------------------------------------------------------------------------------------------ the Veil, shortened
+# it12b (orchestrator review of msg 149): the band takes 7 s more, and the plug must still end on the 56.88 s crash with
+# the reveal at 58.95 s. From the band to the plug's mouth was 450 m: at gentle speeds that cannot fit, so the Veil's
+# middle goes. Its lobes between x 250 and 494 (the antechamber and the long rooms; the gate before them stays) are
+# removed and everything of the passage, the reveal and the end east of 494 moves 244 m west: the plug, the sill, the
+# Outer Light, the watch isle, the Lone Lamp, the reef there, the end's strata and the journey's last 13 s. The far field
+# (the Condensery, the moon, the break and vortex, Highwater, the Keep) stays: from the reveal the works are 15 % further.
+VEIL_CUT = (250.0, 494.0)
+VEIL_DX = -244.0
+SHIFT_BOBS = {"lone_lamp", "outer_light", "isle_watch"}
+SHIFT_MASSES = {"veil", "reveal_fore", "lone_lamp", "outer_light", "isle_watch", "reef", "end_layers"}
+
+
+def shortened_veil(lay, des, pop, gf):
+    lo, hi = VEIL_CUT
+    east = lambda p: p[0] > hi and p[0] < 1400.0
+    mv = lambda p: R3([p[0] + VEIL_DX, p[1], p[2]])
+    n_cut = n_moved = 0
+    for name in SHIFT_MASSES:
+        ls = des["masses"].get(name)
+        if not isinstance(ls, list):
+            continue
+        keep = []
+        for lb in ls:
+            if name == "veil" and lo < lb["c"][0] <= hi:
+                n_cut += 1
+                continue
+            if east(lb["c"]) and (name != "reef" or lb["c"][1] > 0) and (name not in ("veil",) or True):
+                lb["c"] = mv(lb["c"]); n_moved += 1
+            keep.append(lb)
+        des["masses"][name] = keep
+    vg = des["veil"]["glows"]
+    for g in vg:                                   # the glows keep their names (routes); those in the cut close up
+        x = g["position"][0]
+        if lo < x <= hi:
+            g["position"] = R3([lo - 20.0 + (x - lo) / (hi - lo) * 60.0, g["position"][1], g["position"][2]])
+        elif east(g["position"]):
+            g["position"] = mv(g["position"])
+    for g in des["clouds_block"]["glows"]:
+        if g.get("bob") in SHIFT_BOBS or (g["name"] in ("lone_lamp", "outer_light", "isle_watch") and east(g["position"])):
+            g["position"] = mv(g["position"])
+    des["veil"]["note_it12"] = ("it12b: the middle of the Veil (x 250-494) is gone and its east part moved %.0f m west "
+                                "(blender/nd_band.py VEIL_CUT); rooms, plug and sill metres above are it11's" % VEIL_DX)
+    for w in des["wisp_regions"]:
+        if w["name"].startswith("end_"):
+            w["centre"] = [round(w["centre"][0] + VEIL_DX, 3), w["centre"][1]]
+    for i in lay["instances"]:
+        if i.get("bob") in SHIFT_BOBS:
+            i["pos"] = mv(i["pos"])
+    for l in lay["lights"]:
+        if l.get("bob") in SHIFT_BOBS:
+            l["pos"] = mv(l["pos"])
+    for il in lay["islands"]:
+        if il.get("bob") in SHIFT_BOBS:
+            il["centre"] = mv(il["centre"])
+    for b in lay["beams"]:
+        if b.get("bob") in SHIFT_BOBS or b["name"] == "outer_light":
+            b["origin"] = mv(b["origin"])
+            if b.get("cloud_glow"):
+                cg = b["cloud_glow"]
+                if "centre" in cg:
+                    cg["centre"] = mv(cg["centre"])
+    for x in pop["spots"]:
+        if x.get("bob") in SHIFT_BOBS or (east(x["pos"]) and str(x.get("district", "")).startswith(("isle:lone", "isle:watch", "lighthouse"))):
+            fx = gf.get(x["id"])
+            p0 = fx["pos"] if fx and math.dist(fx.get("from", [0, 0, 0]), x["pos"]) < 0.01 else x["pos"]
+            x["pos"] = mv(p0)
+            if x.get("look_at"):
+                x["look_at"] = mv(x["look_at"])
+    return {"veil_lobes_cut": n_cut, "lobes_moved": n_moved, "dx": VEIL_DX}
+
+
 # ------------------------------------------------------------------------------------------------ the pylons
 def support_legs(lay):
     """msg 149's audit (blender/nd_support_audit.py --write-fixes -> art/support_fixes.json): every other support the
@@ -550,11 +627,25 @@ def pylon_legs(lay):
 
 
 # ------------------------------------------------------------------------------------------------ main
+BASE = "bd7f99fb"     # it11's art data (6a429e53 + the engine's it11 flight fixes): every run starts from it
+
+
+def load_base(name):
+    """The it11 file from git (this tool is a pure function of it, so a second run gives the same files)."""
+    import subprocess
+    if "--here" in argv:
+        return json.load(open(os.path.join(ART, name)))
+    top = argv[argv.index("--repo") + 1] if "--repo" in argv else subprocess.run(
+        ["git", "-C", HERE, "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
+    rel = "examples/neon-dreams/art/" + name
+    return json.loads(subprocess.run(["git", "-C", top, "show", "%s:%s" % (BASE, rel)], capture_output=True, text=True,
+                                     check=True).stdout)
+
+
 def main():
-    lay = json.load(open(os.path.join(ART, "layout.json")))
-    des = json.load(open(os.path.join(ART, "cloud_design.json")))
-    pop = json.load(open(os.path.join(ART, "population.json")))
-    rec = next((e for e in pop.get("edits", []) if e.get("it") == 12), None)
+    lay, des, pop = load_base("layout.json"), load_base("cloud_design.json"), load_base("population.json")
+    pop["edits"] = [e for e in pop.get("edits", []) if e.get("it") != 12]
+    rec = None
     if rec is None:
         rec = {"it": 12, "msg": 149, "by": "art", "script": "blender/nd_band.py", "orig": {
             "waypoints": lay["camera"]["waypoints"], "inst": [], "lights": [], "spots": [], "paths": [], "groups": [],
@@ -663,14 +754,21 @@ def main():
     pop["flyers"] += fl
 
     # ---- B. the camera
-    keep = [w for w in orig["waypoints"] if w["t"] <= 35.75 or w["t"] > 47.0]
+    keep = [dict(w, pos=R3([w["pos"][0] + VEIL_DX, w["pos"][1], w["pos"][2]])) if w["t"] >= 56.88 else w
+            for w in orig["waypoints"] if w["t"] <= 35.75 or w["t"] >= 56.88]
     lay["camera"]["waypoints"] = sorted(keep + [{"t": t, "pos": p} for t, p in CAM_BAND + ([CAM_VEIL] if CAM_VEIL else [])], key=lambda w: w["t"])
     lay["camera"]["look_ahead"] = [[t, v] for t, v in LOOK_AHEAD]
+    # the reveal is 244 m further from the works than it11's: multiply build.py's fov track by this (linear keys) so the
+    # Condensery keeps its size in the frame (1470 -> 1690 m: x 0.87)
+    lay["camera"]["fov_scale"] = [[0.0, 1.0], [54.5, 1.0], [56.5, 0.87], [70.2, 0.87]]
     lay["camera"]["note"] = ("the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down "
                              "the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-"
                              "right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) "
                              "shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the "
-                             "Veil; it11's opening and end as before")
+                             "Veil; it11's opening and end as before. it12b: a 7 s dwell at the band (approach 42-44.5 s, "
+                             "a 2-4 m/s creep to 10 m from the pianist 44.6-48.9 s), out at <= 22 m/s to the Veil's gate "
+                             "(53 s); the Veil's middle removed (VEIL_CUT) so the plug still ends on 56.88 s, the reveal and "
+                             "end 244 m west; `fov_scale` multiplies the fov track")
 
     # ---- D. the pylons' legs into the cloud
     lay["instances"] += pylon_legs(lay) + support_legs(lay)
@@ -711,10 +809,12 @@ def main():
     des["sea_design"]["break"]["vortex"] = vp
     des["wisp_regions"] += end_wisps()
 
+    gfx = json.load(open(os.path.join(ART, "ground_fixes.json"))).get("spots", {}) if os.path.exists(os.path.join(ART, "ground_fixes.json")) else {}
+    veil = shortened_veil(lay, des, pop, gfx)
     rec["applied"] = {"removed": {"instances": len(orig["inst"]), "lights": len(orig["lights"]), "spots": len(orig["spots"]),
                                   "paths": len(orig["paths"]), "groups": len(orig["groups"])},
                       "audience": len(sp), "flights": [f["id"] for f in fl], "support_legs": sum(1 for i in lay["instances"] if i["id"].startswith("it12_leg_")),
-                      "vortex_lobes": len(vl), "end_lobes": len(des["masses"]["end_layers"])}
+                      "vortex_lobes": len(vl), "end_lobes": len(des["masses"]["end_layers"]), "veil": veil}
     json.dump(lay, open(os.path.join(ART, "layout.json"), "w"), indent=1)
     json.dump(des, open(os.path.join(ART, "cloud_design.json"), "w"), indent=None, separators=(",", ":"))
     json.dump(pop, open(os.path.join(ART, "population.json"), "w"), indent=None, separators=(",", ":"))

@@ -17832,7 +17832,7 @@
    "id": "outer_light",
    "asset": "landmarks/lighthouse_b.glb",
    "pos": [
-    700.0,
+    456.0,
     118.0,
     250.0
    ],
@@ -17861,7 +17861,7 @@
    "id": "cloud_skiff_553",
    "asset": "vehicles/cloud_skiff.glb",
    "pos": [
-    709.0,
+    465.0,
     109.0,
     256.0
    ],
@@ -19159,7 +19159,7 @@
    "id": "lone_lamp_house",
    "asset": "buildings/lone_lamp_house.glb",
    "pos": [
-    890.0,
+    646.0,
     214.4,
     -49.0
    ],
@@ -19185,7 +19185,7 @@
    "id": "deck_pad_6m_608",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    887.728,
+    643.728,
     214.4,
     -58.739
    ],
@@ -19208,7 +19208,7 @@
    "id": "deck_pad_6m_609",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    883.872,
+    639.872,
     214.4,
     -54.142
    ],
@@ -19231,7 +19231,7 @@
    "id": "deck_pad_6m_610",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    880.015,
+    636.015,
     214.4,
     -49.546
    ],
@@ -35782,7 +35782,7 @@
    "id": "stack_b_watch",
    "asset": "buildings/mooring_stack_b.glb",
    "pos": [
-    640.0,
+    396.0,
     172.0,
     350.0
    ],
@@ -35813,7 +35813,7 @@
    "id": "deck_pad_6m_1299",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    649.696,
+    405.696,
     172.0,
     345.206
    ],
@@ -35836,7 +35836,7 @@
    "id": "deck_pad_6m_1300",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    644.5,
+    400.5,
     172.0,
     342.206
    ],
@@ -35859,7 +35859,7 @@
    "id": "deck_pad_6m_1301",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    639.304,
+    395.304,
     172.0,
     339.206
    ],
@@ -37387,7 +37387,7 @@
    "id": "isle_outer_light",
    "asset": "_thirdparty/isles/isle_rock_a.gltf",
    "pos": [
-    700.0,
+    456.0,
     117.4,
     250.0
    ],
@@ -37410,7 +37410,7 @@
    "id": "root_curtain_b_1363",
    "asset": "garden/root_curtain_b.glb",
    "pos": [
-    700.0,
+    456.0,
     108.34,
     250.0
    ],
@@ -37742,7 +37742,7 @@
    "id": "isle_lone_lamp",
    "asset": "_thirdparty/isles/isle_rock_a.gltf",
    "pos": [
-    890.0,
+    646.0,
     214.0,
     -49.0
    ],
@@ -37765,7 +37765,7 @@
    "id": "root_curtain_b_1377",
    "asset": "garden/root_curtain_b.glb",
    "pos": [
-    890.0,
+    646.0,
     204.94,
     -49.0
    ],
@@ -38042,7 +38042,7 @@
    "id": "isle_isle_watch",
    "asset": "_thirdparty/isles/isle_rock_c.gltf",
    "pos": [
-    640.0,
+    396.0,
     171.5,
     350.0
    ],
@@ -38065,7 +38065,7 @@
    "id": "root_curtain_b_1389",
    "asset": "garden/root_curtain_b.glb",
    "pos": [
-    640.0,
+    396.0,
     160.466,
     350.0
    ],
@@ -49601,7 +49601,7 @@
    "id": "it12_lone_lamp_post0",
    "asset": "street/street_lamp.glb",
    "pos": [
-    880.5,
+    636.5,
     214.4,
     -58.0
    ],
@@ -49624,7 +49624,7 @@
    "id": "it12_lone_lamp_post1",
    "asset": "street/street_lamp.glb",
    "pos": [
-    878.0,
+    634.0,
     214.4,
     -52.5
    ],
@@ -49647,7 +49647,7 @@
    "id": "it12_lone_lamp_post2",
    "asset": "street/street_lamp.glb",
    "pos": [
-    883.5,
+    639.5,
     214.4,
     -62.0
    ],
@@ -49670,7 +49670,7 @@
    "id": "it12_lone_lamp_post3",
    "asset": "street/street_lamp.glb",
    "pos": [
-    897.0,
+    653.0,
     214.4,
     -43.0
    ],
@@ -49693,7 +49693,7 @@
    "id": "it12_lone_lamp_post4",
    "asset": "street/street_lamp.glb",
    "pos": [
-    894.0,
+    650.0,
     214.4,
     -59.5
    ],
@@ -49716,7 +49716,7 @@
    "id": "it12_lone_garden0",
    "asset": "garden/shrub_a.glb",
    "pos": [
-    879.0,
+    635.0,
     214.4,
     -55.0
    ],
@@ -49739,7 +49739,7 @@
    "id": "it12_lone_garden1",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    882.0,
+    638.0,
     214.4,
     -60.5
    ],
@@ -49762,7 +49762,7 @@
    "id": "it12_lone_garden2",
    "asset": "garden/shrub_b.glb",
    "pos": [
-    896.0,
+    652.0,
     214.4,
     -41.0
    ],
@@ -49785,7 +49785,7 @@
    "id": "it12_lone_garden3",
    "asset": "garden/sprig_bed_3m.glb",
    "pos": [
-    877.0,
+    633.0,
     214.4,
     -48.5
    ],
@@ -50426,7 +50426,7 @@
    "bob": "outer_light",
    "asset": 0.5563376642118506,
    "centre": [
-    700.0,
+    456.0,
     117.4,
     250.0
    ],
@@ -50462,7 +50462,7 @@
    "bob": "lone_lamp",
    "asset": 2.572843297428054,
    "centre": [
-    890.0,
+    646.0,
     214.0,
     -49.0
    ],
@@ -50510,7 +50510,7 @@
    "bob": "isle_watch",
    "asset": 1.2779826105477936,
    "centre": [
-    640.0,
+    396.0,
     171.5,
     350.0
    ],
@@ -50661,7 +50661,7 @@
   {
    "name": "outer_light",
    "origin": [
-    699.853,
+    455.853,
     155.02,
     249.164
    ],
@@ -51854,7 +51854,7 @@
   {
    "name": "outer_light_lamp",
    "pos": [
-    699.853,
+    455.853,
     155.02,
     249.164
    ],
@@ -51958,7 +51958,7 @@
   {
    "name": "light_102",
    "pos": [
-    890.0,
+    646.0,
     222.4,
     -49.0
    ],
@@ -52656,7 +52656,7 @@
   {
    "name": "watch_lamp",
    "pos": [
-    640.0,
+    396.0,
     180.0,
     350.0
    ],
@@ -52846,7 +52846,7 @@
   {
    "name": "it12_lone_deck0",
    "pos": [
-    880.8,
+    636.8,
     216.6,
     -58.0
    ],
@@ -52859,7 +52859,7 @@
   {
    "name": "it12_lone_deck1",
    "pos": [
-    878.3,
+    634.3,
     216.6,
     -52.5
    ],
@@ -52872,7 +52872,7 @@
   {
    "name": "it12_lone_deck2",
    "pos": [
-    883.8,
+    639.8,
     216.6,
     -62.0
    ],
@@ -52885,7 +52885,7 @@
   {
    "name": "it12_lone_deck3",
    "pos": [
-    897.3,
+    653.3,
     216.6,
     -43.0
    ],
@@ -52898,7 +52898,7 @@
   {
    "name": "it12_lone_deck4",
    "pos": [
-    894.3,
+    650.3,
     216.6,
     -59.5
    ],
@@ -52911,7 +52911,7 @@
   {
    "name": "it12_lone_door",
    "pos": [
-    890.0,
+    646.0,
     217.4,
     -44.4
    ],
@@ -52924,7 +52924,7 @@
   {
    "name": "it12_lone_garden",
    "pos": [
-    882.0,
+    638.0,
     215.6,
     -55.0
    ],
@@ -52937,7 +52937,7 @@
   {
    "name": "it12_lone_roof",
    "pos": [
-    890.0,
+    646.0,
     226.4,
     -49.0
    ],
@@ -52950,7 +52950,7 @@
   {
    "name": "it12_lone_under",
    "pos": [
-    886.0,
+    642.0,
     198.0,
     -47.0
    ],
@@ -52963,7 +52963,7 @@
   {
    "name": "it12_lone_rim",
    "pos": [
-    914.0,
+    670.0,
     208.0,
     -43.0
    ],
@@ -52976,7 +52976,7 @@
   {
    "name": "it12_lone_facade",
    "pos": [
-    881.0,
+    637.0,
     218.4,
     -48.0
    ],
@@ -52988,7 +52988,7 @@
   }
  ],
  "camera": {
-  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before",
+  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before. it12b: a 7 s dwell at the band (approach 42-44.5 s, a 2-4 m/s creep to 10 m from the pianist 44.6-48.9 s), out at <= 22 m/s to the Veil's gate (53 s); the Veil's middle removed (VEIL_CUT) so the plug still ends on 56.88 s, the reveal and end 244 m west; `fov_scale` multiplies the fov track",
   "waypoints": [
    {
     "t": 0.0,
@@ -53127,7 +53127,7 @@
     ]
    },
    {
-    "t": 37.75,
+    "t": 37.7,
     "pos": [
      0,
      135.5,
@@ -53135,7 +53135,7 @@
     ]
    },
    {
-    "t": 38.45,
+    "t": 38.35,
     "pos": [
      15,
      134.75,
@@ -53143,7 +53143,7 @@
     ]
    },
    {
-    "t": 39.05,
+    "t": 38.9,
     "pos": [
      28,
      134.1,
@@ -53151,7 +53151,7 @@
     ]
    },
    {
-    "t": 39.6,
+    "t": 39.4,
     "pos": [
      40,
      133.5,
@@ -53159,7 +53159,7 @@
     ]
    },
    {
-    "t": 40.3,
+    "t": 40.05,
     "pos": [
      55,
      133.05,
@@ -53167,7 +53167,7 @@
     ]
    },
    {
-    "t": 41.0,
+    "t": 40.7,
     "pos": [
      70,
      132.6,
@@ -53175,7 +53175,7 @@
     ]
    },
    {
-    "t": 41.75,
+    "t": 41.45,
     "pos": [
      85,
      130.9,
@@ -53183,7 +53183,7 @@
     ]
    },
    {
-    "t": 42.5,
+    "t": 42.3,
     "pos": [
      98.5,
      129.0,
@@ -53191,7 +53191,7 @@
     ]
    },
    {
-    "t": 43.25,
+    "t": 43.3,
     "pos": [
      109.0,
      127.7,
@@ -53199,73 +53199,97 @@
     ]
    },
    {
-    "t": 44.05,
+    "t": 44.4,
     "pos": [
-     118.5,
-     126.9,
-     27.6
+     122.9,
+     126.8,
+     28.9
     ]
    },
    {
-    "t": 44.95,
+    "t": 45.6,
     "pos": [
-     127.1,
+     128.6,
+     126.6,
+     30.6
+    ]
+   },
+   {
+    "t": 46.8,
+    "pos": [
+     132.0,
      126.5,
-     30.15
+     31.6
     ]
    },
    {
-    "t": 45.75,
+    "t": 47.9,
     "pos": [
-     132.9,
-     126.3,
-     31.9
+     134.2,
+     126.4,
+     32.2
     ]
    },
    {
-    "t": 46.3,
+    "t": 48.9,
     "pos": [
      136.5,
-     126.4,
-     32.4
+     126.5,
+     32.9
     ]
    },
    {
-    "t": 46.75,
+    "t": 49.8,
     "pos": [
-     145.5,
-     129.2,
-     26.8
+     139.0,
+     128.0,
+     29.0
     ]
    },
    {
-    "t": 47.6,
+    "t": 50.7,
     "pos": [
-     173.6,
-     142.6,
-     25.8
+     146.5,
+     131.0,
+     24.5
     ]
    },
    {
-    "t": 50.5,
+    "t": 51.6,
     "pos": [
-     290,
-     158,
-     5
+     160.0,
+     135.5,
+     20.0
     ]
    },
    {
-    "t": 54.4,
+    "t": 52.5,
     "pos": [
-     470,
-     186,
-     -30
+     178.0,
+     140.0,
+     15.5
+    ]
+   },
+   {
+    "t": 53.4,
+    "pos": [
+     205.0,
+     149.5,
+     6.5
+    ]
+   },
+   {
+    "t": 55.1,
+    "pos": [
+     266.0,
+     187.0,
+     -28.0
     ]
    },
    {
     "t": 56.88,
     "pos": [
-     578,
+     334.0,
      206,
      -44
     ]
@@ -53273,7 +53297,7 @@
    {
     "t": 58.95,
     "pos": [
-     653,
+     409.0,
      226,
      -51
     ]
@@ -53281,7 +53305,7 @@
    {
     "t": 62.5,
     "pos": [
-     728,
+     484.0,
      223.5,
      -56.0
     ]
@@ -53289,7 +53313,7 @@
    {
     "t": 66.5,
     "pos": [
-     792,
+     548.0,
      221.0,
      -62.0
     ]
@@ -53297,7 +53321,7 @@
    {
     "t": 70.2,
     "pos": [
-     836,
+     592.0,
      219.5,
      -66.0
     ]
@@ -53309,36 +53333,62 @@
     45.0
    ],
    [
-    42.6,
+    42.3,
     45.0
    ],
    [
-    43.6,
+    43.5,
     12.0
    ],
    [
-    44.8,
+    44.6,
+    5.0
+   ],
+   [
+    45.6,
+    2.5
+   ],
+   [
+    46.6,
+    1.5
+   ],
+   [
+    48.7,
+    1.5
+   ],
+   [
+    49.6,
     6.0
    ],
    [
-    45.3,
-    3.5
+    50.6,
+    20.0
    ],
    [
-    46.3,
-    3.5
-   ],
-   [
-    46.9,
-    14.0
-   ],
-   [
-    47.7,
+    52.0,
     45.0
    ],
    [
     70.2,
     45.0
+   ]
+  ],
+  "fov_scale": [
+   [
+    0.0,
+    1.0
+   ],
+   [
+    54.5,
+    1.0
+   ],
+   [
+    56.5,
+    0.87
+   ],
+   [
+    70.2,
+    0.87
    ]
   ]
  },
