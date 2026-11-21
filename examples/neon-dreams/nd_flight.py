@@ -150,6 +150,26 @@ def _clip_weights(cues, t):
 # ---- iteration 10b (owner msg 121: "the flight path looks crazy", "make the exhaust glow look more realistic") ----
 G = 9.81
 BANK_MAX = 20.0
+# iteration 11 (msg 130): the plume's soft envelope and the deck's sparks and dust (additive / alpha particles)
+SOFT = {"rate": 420.0}
+SOFT_SYSTEM = {"enabled": True, "capacity": 512, "shape": "sphere", "position": [0.0, 0.0, 0.0],
+               "extent": [0.07, 0.07, 0.07], "spawnRate": 0.0, "burst": 0.0, "lifetimeMin": 0.12, "lifetimeMax": 0.26,
+               "direction": [0.0, -1.0, 0.0], "spread": 0.06, "speedMin": 3.2, "speedMax": 5.5, "gravity": [0.0, 0.0, 0.0],
+               "drag": 2.5, "turbulence": 0.9, "turbulenceScale": 2.5, "turbulenceSpeed": 1.5, "sizeStart": 0.06,
+               "sizeEnd": 0.2, "colorStart": [0.62, 0.78, 1.0, 0.85], "colorEnd": [1.0, 0.32, 0.07, 0.0],
+               "emissive": 4.0, "blend": "additive", "softness": 1.0}
+SPARKS = {"_rate": 520.0, "enabled": True, "capacity": 512, "shape": "disc", "position": [0.0, 0.0, 0.0],
+          "extent": [0.25, 0.25, 0.25], "spawnRate": 0.0, "burst": 0.0, "lifetimeMin": 0.35, "lifetimeMax": 0.9,
+          "direction": [0.0, 1.0, 0.0], "spread": 0.75, "speedMin": 1.5, "speedMax": 4.2, "gravity": [0.0, -9.8, 0.0],
+          "drag": 0.6, "turbulence": 0.0, "sizeStart": 0.022, "sizeEnd": 0.008, "colorStart": [1.0, 0.82, 0.5, 1.0],
+          "colorEnd": [1.0, 0.28, 0.05, 0.0], "emissive": 9.0, "blend": "additive", "velocityStretch": 0.7,
+          "stretchMax": 0.12}
+DUST = {"_rate": 260.0, "enabled": True, "capacity": 512, "shape": "disc", "position": [0.0, 0.0, 0.0],
+        "extent": [0.35, 0.35, 0.35], "spawnRate": 0.0, "burst": 0.0, "lifetimeMin": 0.7, "lifetimeMax": 1.5,
+        "direction": [0.0, 1.0, 0.0], "spread": 0.95, "speedMin": 0.8, "speedMax": 2.4, "gravity": [0.0, 0.25, 0.0],
+        "drag": 2.2, "turbulence": 0.5, "turbulenceScale": 1.5, "turbulenceSpeed": 0.6, "sizeStart": 0.12,
+        "sizeEnd": 0.55, "colorStart": [0.42, 0.36, 0.5, 0.32], "colorEnd": [0.3, 0.26, 0.4, 0.0], "emissive": 0.6,
+        "blend": "alpha", "softness": 1.0}
 PLUME_SPLIT = 0.095        # each nozzle's offset from the pack's centre line (m, the jet mesh: +-0.163 wide)
 
 
@@ -345,6 +365,8 @@ def flight(f, r3, song, light_color, flame_color):
     frk, lk, lpk = [], [], []
     t = max(0.0, t_lift - 0.4)
     sk0 = [{"time": 0.0, "value": [0.0, 0.0, 0.0], "interp": "linear"}]
+    rate = [{"time": 0.0, "value": 0.0, "interp": "linear"}]   # it11: the soft plume's particles a second
+    npk = []
     lk0 = [{"time": 0.0, "value": 0.0, "interp": "linear"}]
     seed = sum(ord(c) for c in name)
     while t < td + 0.6:
@@ -370,6 +392,9 @@ def flight(f, r3, song, light_color, flame_color):
         lk.append({"time": round(t, 3), "value": round(f.get("light", 30.0) * th * (0.85 + 0.15 * _noise1(seed, 2 * t))
                                                        * (1.0 + PUFF[0] * env * hover), 3), "interp": "linear"})
         lpk.append({"time": round(t, 3), "value": r3([nz[i] + 0.6 * dr[i] for i in range(3)]), "interp": "linear"})
+        rate.append({"time": round(t, 3), "value": round(SOFT["rate"] * min(th, 1.6) * (1.0 + PUFF[1] * env * hover), 1),
+                     "interp": "linear"})
+        npk.append({"time": round(t, 3), "value": r3([nz[i] + 0.05 * dr[i] for i in range(3)]), "interp": "linear"})
         t += 1.0 / 30.0
     end = round(td + 0.7, 3)
 
@@ -394,6 +419,32 @@ def flight(f, r3, song, light_color, flame_color):
                                        "alphaMode": "mask", "alphaCutoff": 0.06}}})
         tracks += [track("nodes/%s/scale" % n, sk0 + sk[n] + [{"time": end, "value": [0.0, 0.0, 0.0], "interp": "linear"}]),
                    track("nodes/%s/position" % n, fpk[n]), track("nodes/%s/rotation" % n, frk)]
+    # iteration 11 (msg 130): the soft plume -- additive particles from the nozzles (soft-edged, they fade and widen
+    # down the jet; the thin core tube stays the hot line), and sparks and dust kicked off the deck at the push-off
+    # and at touchdown. The flight motion is unchanged (owner msg 132).
+    soft = name + "_soft"
+    nodes.append({"name": soft, "kind": "particles", "parent": name, "position": npk[0]["value"] if npk else [0, 1, 0],
+                  "particles": dict(SOFT_SYSTEM, seed=seed % 997)})
+    tracks += [track("nodes/%s/position" % soft, npk),
+               track("particles/%s/spawnRate" % soft, rate + [{"time": end, "value": 0.0, "interp": "linear"}])]
+    for tag, P0, tt, bob in (("off", A, t_lift, f.get("bob_from")), ("on", B, td, f.get("bob_to"))):
+        for kind, sysd in (("spark", SPARKS), ("dust", DUST)):
+            n = "%s_%s%s" % (name, kind, tag)
+            ps = dict(sysd, seed=(seed + len(n)) % 997)
+            if kind == "spark" and not bob:
+                ps.update({"collision": "bounce", "collisionHeight": round(P0[1] + 0.02, 3), "collisionRestitution": 0.35})
+            node = {"name": n, "kind": "particles", "position": r3([P0[0], P0[1] + 0.06, P0[2]]), "particles": ps}
+            if bob:
+                node["parent"] = "bob_" + bob   # a deck on a bobbing isle: the burst rides it (ADR-2112's group node)
+            nodes.append(node)
+            a0, a1 = (tt - 0.12, tt + 0.28) if tag == "off" else (tt - 0.22, tt + 0.12)
+            peak = sysd["_rate"]
+            tracks.append(track("particles/%s/spawnRate" % n, [
+                {"time": 0.0, "value": 0.0, "interp": "linear"}, {"time": round(a0, 3), "value": 0.0, "interp": "linear"},
+                {"time": round(a0 + 0.05, 3), "value": peak, "interp": "linear"},
+                {"time": round(a1 - 0.05, 3), "value": peak * 0.6, "interp": "linear"},
+                {"time": round(a1, 3), "value": 0.0, "interp": "linear"}]))
+            node["particles"].pop("_rate", None)
     lights = [{"name": lamp, "type": "point", "node": name, "position": NOZZLE["Jumping"][0],
                "color": light_color, "intensity": 0.0, "range": 8.0, "castsShadow": False, "volumetric": 0.0}]
     tracks += [track("lights/%s/intensity" % lamp, lk0 + lk + [{"time": end, "value": 0.0, "interp": "linear"}]),

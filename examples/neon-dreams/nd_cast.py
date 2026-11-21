@@ -158,11 +158,21 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
 
     # msg 130: the ground check's fixes (art/ground_fixes.json): spots moved or dropped, paths re-laid, riders on the floor
     gfix = gfix or {}
-    gdrop = set(gfix.get("drop", []))
+
+    def same(a, b):   # a fix applies only to the figure it was made for (an art edit since makes it stale)
+        if a is None or b is None:
+            return False
+        if isinstance(a[0], list):
+            return len(a) == len(b) and all(same(x, y) for x, y in zip(a, b))
+        return math.dist(a, b) < 0.01
+
+    def dropped(x, key="pos"):
+        d = gfix.get("drop", {}).get(x["id"])
+        return d is not None and same(d.get("from"), x.get(key))
 
     def moved(sp, table):
         m = gfix.get(table, {}).get(sp["id"])
-        if not m:
+        if not m or not same(m.get("from"), sp.get("pos" if table == "spots" else "local_pos")):
             return sp
         sp = dict(sp, pos=m["pos"], local_pos=m["pos"])
         if table == "spots":
@@ -171,7 +181,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
 
     # ---- spots
     for sp in pop["spots"]:
-        if sp["id"] in gdrop:
+        if dropped(sp):
             continue
         sp = moved(sp, "spots")
         clips = sp.get("clips") or ["Idle"]
@@ -191,10 +201,12 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     # ---- walkers: pingpong, pause (Idle) and turn at each end
     wakes = []
     for p in pop["paths"]:
-        if p["id"] in gfix.get("drop_paths", []):
+        dp = gfix.get("drop_paths", {}).get(p["id"])
+        if dp is not None and same(dp.get("from"), p["points"]):
             continue
-        if p["id"] in gfix.get("paths", {}):
-            p = dict(p, points=gfix["paths"][p["id"]]["points"])
+        fp = gfix.get("paths", {}).get(p["id"])
+        if fp is not None and same(fp.get("from"), p["points"]):
+            p = dict(p, points=fp["points"])
         pts = p["points"]
         clip = p.get("clip", "Walking")
         speed = p.get("speed_mps", 1.2)
@@ -286,7 +298,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     # ---- riders, in their cabins
     vehicle_of = {v["spline"]: i for i, v in enumerate(layout["vehicles"])}
     for rd in pop.get("riders", []):
-        if rd["id"] in gdrop:
+        if dropped(rd, "local_pos"):
             continue
         rd = moved(rd, "riders")
         vi = vehicle_of.get(rd["vehicle_spline"])
@@ -324,7 +336,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
              "from": {"pos": ta["pos"], "yaw": keys[0].get("yaw_deg", 0.0)},
              "to": {"pos": tb["pos"], "yaw": keys[-1].get("yaw_deg")},
              "t0": fdat["t_takeoff"], "td": td, "alt": max(4.0, fdat.get("cruise_height_m", 0) - max(ta["pos"][1], tb["pos"][1])),
-             "via": via, "kicks": kicks}
+             "via": via, "kicks": kicks, "bob_from": ta.get("bob"), "bob_to": tb.get("bob")}
         n, l, t, actor = flight_fn(f)
         # ride the formations: still at A's, blending to B's over the flight, B's after it
         ba, bb = bobs.get(ta.get("bob")), bobs.get(tb.get("bob"))

@@ -128,7 +128,7 @@ def gain_term(p, src_reg, dst, amount):
     p.op(kind="remap", dst=dst, srcA=src_reg, constant=[0.0, 1.0, 1.0, 1.0 + amount], value=0.0)
 
 
-def emit_program(name, colour, intensity, ring=0.0, hh=0.0, toms=0.0, pattern=False):
+def emit_program(name, colour, intensity, ring=0.0, hh=0.0, toms=0.0, pattern=False, ring_field="kickRing", extra=()):
     """Emission = colour x the product of its audio terms (the GLB's emissive texture still multiplies after).
     ring: the kick ring field; hh: a sparkle on a moving noise subset scaled by a routed constant;
     toms: a ripple running along +x scaled by a routed constant; pattern: the tone-block beacon chase."""
@@ -136,9 +136,11 @@ def emit_program(name, colour, intensity, ring=0.0, hh=0.0, toms=0.0, pattern=Fa
     p.op("colour", kind="constant", dst=0, constant=list(colour) + [1.0])
     p.op(kind="constant", dst=1, constant=[1.0, 1.0, 1.0, 1.0])
     if ring:
-        p.op(kind="field", dst=2, field="kickRing")
+        p.op(kind="field", dst=2, field=ring_field)
         gain_term(p, 2, 2, ring)
         p.op(kind="multiply", dst=1, srcA=1, srcB=2)
+    for fn in extra:   # iteration 11 (msg 130, nd_lights.py): terms multiplying reg 1; regs 2-6 are free here
+        fn(p)
     if hh or toms:
         p.op(kind="input", input="worldPosition", dst=3)
         p.op(kind="input", input="time", dst=4)
@@ -180,7 +182,7 @@ def emit_program(name, colour, intensity, ring=0.0, hh=0.0, toms=0.0, pattern=Fa
     return p, p.doc(7, intensity)
 
 
-def window_program(name, tints_from, tints_to, intensity, ring=0.0):
+def window_program(name, tints_from, tints_to, intensity, ring=0.0, extra=()):
     """Lit panes on the kit's modelled windows (iteration 3's rule: the pane's own UV hash, its floor, its building),
     now with the palette arc's crossfade (every building starts within 4 s of the next), the Moog's lit fraction and
     tint mix, and the kick ring. Pane UV: u = brightness level (16 steps), v = a per-window hash."""
@@ -221,6 +223,8 @@ def window_program(name, tints_from, tints_to, intensity, ring=0.0):
         o(kind="field", dst=3, field="kickRing")
         gain_term(p, 3, 3, ring)
         o(kind="multiply", dst=5, srcA=5, srcB=3)
+    for fn in extra:   # iteration 11 (msg 130, nd_lights.py): terms on the lit level (reg 5); regs 0, 2, 3, 6, 7 free
+        fn(p)
     # the tint: a second hash of the window, biased toward the first stop (the Moog lowers the bias)
     o(kind="quantize", dst=6, srcA=4, value=1.0, seed=43)
     o(kind="swizzle", dst=6, srcA=6, constant=[3.0, 3.0, 3.0, 3.0])

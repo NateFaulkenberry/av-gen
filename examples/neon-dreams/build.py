@@ -34,6 +34,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the palette arc)
 import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flights)
+import nd_lights as NL  # noqa: E402  (iteration 11, owner msg 130: the city's lights play more of the song)
 import nd_cast as NC  # noqa: E402  (iteration 10, owner msg 112: the population from art/population.json)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -141,6 +142,18 @@ def ocean_program(name, deep, bright, scale, intensity):
             "emissionIntensity": intensity, "opacity": -1}
 
 
+CITY_OFF = False   # --city-off: A/B of iteration 11's light systems
+OCEAN_RING = {}   # it11 (msg 130): ndOcean's ring op indices and its radius, for the tracks in reactivity()
+
+
+def ocean_breathing(prog, centre, radius):
+    """Iteration 11 (msg 130, the art's audio idea 8): the cosmic ocean breathes -- a ring from the break's centre on
+    each pad phrase (nd_lights.ocean_ops)."""
+    ops, ri, ai = NL.ocean_ops(prog["ops"], (centre[0], centre[1]), radius)
+    OCEAN_RING.update({"radius_op": ri, "amount_op": ai, "radius": radius})
+    return dict(prog, ops=ops)
+
+
 def flat_emit_program(name, color, intensity):
     return {"name": name, "ops": [{"kind": "constant", "dst": 0, "constant": color + [1.0]},
                                   {"kind": "constant", "dst": 1, "constant": [0.0, 0.0, 0.0, 1.0]}],
@@ -164,7 +177,7 @@ NODE_OF = {}
 PROGS = {}  # name -> {"prog": Prog, "doc": program, "system": arc system or None, "key": palette key, "group": route group}
 
 
-def zclass_of(zone):
+def zclass_of(zone, asset=""):
     return "cond" if zone == "condensery" else "lone" if zone == "lone_lamp" else "town"
 
 
@@ -180,6 +193,21 @@ def _reg(name, made, system, key, group):
     return name
 
 
+def _moog(gain, isle=False):
+    """reg 4 sums the district masks (the town) for the isle ring's term after it."""
+    if isle:
+        return lambda p: (NL.moog_term(p, 1, 3, 2, 5, 6, gain, msum=4), NL.isle_term(p, 1, 4, 5, 6))
+    return lambda p: NL.moog_term(p, 1, 3, 2, 5, 6, gain)
+
+
+def _isle():
+    return lambda p: (NL.town_mask(p, 3, 4, 5), NL.isle_term(p, 1, 4, 5, 6))
+
+
+def _chase(label, space, cfg):
+    return lambda p: NL.chase_term(p, 1, 5, 6, label, space, cfg["period"], cfg["gain"], cfg.get("power", 6.0))
+
+
 def role_program(role, key, zclass, asset, state):
     gain = ROLE_GAIN[role]
     col = pal(key, state)
@@ -193,23 +221,30 @@ def role_program(role, key, zclass, asset, state):
         if "roundel" in asset:   # roundels blink with the tone block
             n = "ndRoundel_%s" % key
             return _reg(n, lambda: AU.emit_program(n, col, gain * 0.08, pattern=True), "sign", key, "block_roundel")
-        n = "ndSign_%s" % key    # businesses A (sign_a, sign_c) and B (sign_b) answer the snare in turn
-        return _reg(n, lambda: AU.emit_program(n, col, gain), "sign", key, "snareB" if key == "sign_b" else "snareA")
+        # it11: signs answer the Moog by district and chase down the street on the snare (it5-10: A/B in turn)
+        n = "ndSign_%s" % key
+        return _reg(n, lambda: AU.emit_program(n, col, gain, extra=(
+            _moog(NL.MOOG_GAIN["sign"]), _chase("snare", "worldPosition", NL.SNARE_CHASE))), "sign", key, "sign")
     if role == "strip":
         if "gangway" in asset:   # the gangway strips: the snare
             n = "ndGang_%s" % key
             return _reg(n, lambda: AU.emit_program(n, col, gain), "eave", key, "gangway")
-        n = "ndStrip_%s" % key   # eave lines: the kick ring
-        return _reg(n, lambda: AU.emit_program(n, col, gain, ring=1.8), "eave", key, None)
+        # eave lines: the kick ring; it11: the crowns' strips answer the Moog by district, the isles' the second ring.
+        # sign_c strips are only the landmark crowns (the Great Lantern's frame, the Mooring Mast): the bass swells them
+        n = "ndStrip_%s" % key
+        return _reg(n, lambda: AU.emit_program(n, col, gain, ring=NL.TOWN_RING_GAIN["strip"], extra=(
+            _moog(NL.MOOG_GAIN["strip"], isle=True),)), "eave", key, "crown" if key == "sign_c" else "strip")
     if role == "beacon":
         n = "ndBeacon"
         return _reg(n, lambda: AU.emit_program(n, col, gain * 0.02, pattern=True), None, key, "block_beacon")
     if role == "garden":
-        n = "ndGarden_%s" % key
-        return _reg(n, lambda: AU.emit_program(n, col, gain, hh=1.4), "garden", key, "hh")
-    if role == "lantern":
+        n = "ndGarden_%s" % key   # it11: the isles' garden lamps answer the second kick ring
+        return _reg(n, lambda: AU.emit_program(n, col, gain, hh=1.4, extra=(_isle(),)), "garden", key, "hh")
+    if role == "lantern":   # it11: the strings chase on the hats (a lamp group a hat along each string)
         n = "ndLantern_%s" % key
-        return _reg(n, lambda: AU.emit_program(n, col, gain, ring=1.0, hh=0.5, toms=1.6), "garden", key, "lantern")
+        return _reg(n, lambda: AU.emit_program(n, col, gain, ring=NL.TOWN_RING_GAIN["lantern"], hh=0.5, toms=1.6,
+                                               extra=(_chase("hh", "localPosition", NL.HH_CHASE),)),
+                    "garden", key, "lantern")
     if role == "keel":
         n = "ndKeel_%s" % key
         return _reg(n, lambda: AU.emit_program(n, col, gain, hh=0.7), "underlight", key, "hh")
@@ -230,7 +265,11 @@ def pane_program(zclass, state):
         t = [pal("amber")] * 4
         return _reg("ndPanesLone", lambda: AU.window_program("ndPanesLone", t, t, 4.0), None, "amber", "lone")
     t = [pal(k, state) for k in ("win_a", "win_b", "win_c", "win_d")]
-    return _reg("ndPanes", lambda: AU.window_program("ndPanes", t, t, 4.0, ring=0.6), "window", "win", "panes")
+    # it11 (msg 130): the windows answer the Moog by district and flick floor by floor on the pad's phrase changes
+    return _reg("ndPanes", lambda: AU.window_program(
+        "ndPanes", t, t, 4.0, ring=NL.TOWN_RING_GAIN["panes"],
+        extra=(lambda p: NL.moog_term(p, 5, 2, 0, 3, 6, NL.MOOG_GAIN["panes"]), lambda p: NL.flick_term(p, 5, 3, 6))),
+        "window", "win", "panes")
 
 
 with open(os.path.join(HERE, "meshes", "kit_manifest.json")) as _f:
@@ -262,7 +301,8 @@ def kit_nodes(state="uv"):
     for inst in LAYOUT["instances"]:
         tint = inst.get("tint", {})
         color = json.dumps(inst.get("color", {}), sort_keys=True)
-        key = (inst["asset"], tuple(sorted(tint.items())), color, zclass_of(inst.get("zone", "")), inst.get("bob", ""))
+        key = (inst["asset"], tuple(sorted(tint.items())), color, zclass_of(inst.get("zone", ""), inst["asset"]),
+               inst.get("bob", ""))
         groups.setdefault(key, []).append(inst)
     nodes = []
     used = set()
@@ -679,33 +719,37 @@ def check_ground(doc, tracks, scene_dir, tag="ground_check"):
 def fixes_from_ground(rep):
     """msg 130: the check's fixes into art/ground_fixes.json: spots moved (and the formation they then ride) or dropped,
     walkers' paths re-laid on the floor (the longest standing run; a path shorter than 2 m is dropped), riders set on
-    their cabin's floor."""
+    their cabin's floor. Each fix records what it fixed (`from`): nd_cast applies it only while the population still
+    has that, so an art edit of the same figure is never overridden by a stale fix (the check then sees the new one)."""
     g = GROUND_FIXES
+    pop = POPULATION or {}
+    src = {"spot": {x["id"]: x["pos"] for x in pop.get("spots", [])},
+           "rider": {x["id"]: x["local_pos"] for x in pop.get("riders", [])}}
+    paths = {x["id"]: x["points"] for x in pop.get("paths", [])}
     for r in rep["figures"]:
         fx = r.get("fix")
         if r["ok"] or not fx:
             continue
         if r["kind"] in ("spot", "rider"):
             key = r["id"][len("alien_"):]
+            frm = src[r["kind"]].get(key)
             if fx.get("drop"):
-                g.setdefault("drop", [])
-                if key not in g["drop"]:
-                    g["drop"].append(key)
+                g.setdefault("drop", {})[key] = {"from": frm, "why": r["reasons"]}
             else:
                 g.setdefault("spots" if r["kind"] == "spot" else "riders", {})[key] = {
-                    "pos": fx["move"], "bob": fx.get("bob"), "why": r["reasons"]}
+                    "pos": fx["move"], "bob": fx.get("bob"), "why": r["reasons"], "from": frm}
         elif r["kind"] == "walker":
             pid = r["id"].split("_", 1)[1].rsplit("_", 1)[0]
             pts = fx["path"]
             L = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
             if L < 2.0:
-                g.setdefault("drop_paths", [])
-                if pid not in g["drop_paths"]:
-                    g["drop_paths"].append(pid)
+                g.setdefault("drop_paths", {})[pid] = {"from": paths.get(pid), "why": r["reasons"]}
             else:
-                g.setdefault("paths", {})[pid] = {"points": pts, "why": r["reasons"], "lost": fx["lost"], "of": fx["of"]}
+                g.setdefault("paths", {})[pid] = {"points": pts, "why": r["reasons"], "lost": fx["lost"], "of": fx["of"],
+                                                  "from": paths.get(pid)}
     g["_note"] = ("msg 130, build.py --check-ground --fix-ground (blender/nd_ground_check.py): spots moved to the nearest "
-                  "standing point (and the formation under it) or dropped; walker paths re-laid every 0.5 m on the floor")
+                  "standing point (and the formation under it) or dropped; walker paths re-laid every 0.3 m on the floor; "
+                  "riders on the cabin floor. `from`: what was fixed (a fix whose `from` no longer matches is ignored)")
 
 
 BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
@@ -797,15 +841,57 @@ def beam_yaw0(i, b):
     return round(b.get("phase", 0.0) * 360.0 + i * 360.0 / 32.0, 2)
 
 
-def beam_whip_keys(yaw0):
+WHIP_SKIPPED = []   # it11 (msg 130): (beam, crash) whips left out because an arm would sweep the lens
+
+
+def whip_sweeps_lens(i, b, yaw_at, t0, t1, near=160.0, view=40.0):
+    """Iteration 11 (msg 130, the 2.8 s glare): does an arm of beam i pass within `near` m of the lens, at a point in
+    front of it (within `view` degrees of the heading), between t0 and t1? yaw_at(t): the beam's yaw track. Measured on
+    the it10b path: the Harbour Light at 2.8 s (145 m, 35 deg) and the Outer Light at 47.0 s (101 m, 20 deg); every other
+    whip passes 290 m or more away or behind the camera."""
+    o = b["origin"]
+    el = math.radians(b["elevation_deg"])
+    t = t0
+    while t <= t1:
+        c, hd = cam_at(t)
+        v = [c[k] - o[k] for k in range(3)]
+        for arm in range(b["count"]):
+            a = math.radians(yaw_at(t) + BAR_RPM * 6.0 * t + 360.0 * arm / b["count"])
+            dv = [math.cos(el) * math.cos(a), math.sin(el), -math.cos(el) * math.sin(a)]
+            s = max(0.0, min(b["length_m"], sum(v[k] * dv[k] for k in range(3))))
+            w = [o[k] + dv[k] * s - c[k] for k in range(3)]
+            d = math.sqrt(sum(x * x for x in w))
+            if d < near:
+                ang = math.degrees(math.acos(max(-1.0, min(1.0, sum(w[k] * hd[k] for k in range(3)) / max(d, 1e-6)))))
+                if ang < view:
+                    return True
+        t += 1.0 / 60.0
+    return False
+
+
+def beam_whip_keys(yaw0, bi=None, b=None):
+    """The beams keep the bar and whip half a turn on each section crash (it10, ADR-2118). Iteration 11 (msg 130): a
+    whip that would sweep an arm across the lens is left out (with two arms half a turn apart, a skipped whip leaves
+    the sweep in the same phase afterwards); the 2.8 s crash's whip of the Harbour Light was one."""
     keys = [{"time": 0.0, "value": yaw0, "interp": "linear"}]
     turned = 0.0
     for c in AU.CRASH:
         a, d = c - WHIP[0], c + WHIP[1]
+        cand = []
         for k in range(9):
             u = k / 8
             e = u * u * (3 - 2 * u)
-            keys.append({"time": round(a + (d - a) * u, 3), "value": round(yaw0 + turned + WHIP[2] * e, 2), "interp": "linear"})
+            cand.append((a + (d - a) * u, yaw0 + turned + WHIP[2] * e))
+        if b is not None and b.get("count", 1) == 2:
+            def yaw_at(t, cand=cand):
+                for (ta, va), (tb, vb) in zip(cand, cand[1:]):
+                    if ta <= t <= tb:
+                        return va + (vb - va) * (t - ta) / max(tb - ta, 1e-6)
+                return cand[-1][1]
+            if whip_sweeps_lens(bi, b, yaw_at, a, d):
+                WHIP_SKIPPED.append((b["name"], round(c, 2)))
+                continue
+        keys += [{"time": round(t, 3), "value": round(v, 2), "interp": "linear"} for t, v in cand]
         turned += WHIP[2]
     return keys
 
@@ -903,6 +989,8 @@ def clouds_block(state="uv", moon_dir=None):
     GLOW_BASE.clear()
     GLOW_BASE.update({g["name"]: g["intensity"] for g in glows})
     GLOW_INDEX.update({g["name"]: i for i, g in enumerate(glows)})
+    GLOW_POS.clear()
+    GLOW_POS.update({g["name"]: g["position"] for g in glows})
     GLOW_KEYS.clear()
     GLOW_KEYS.update({g["name"]: g["key"] for g in cb["glows"]})
     GLOW_KEYS.update({g["name"]: g["key"] for g in veil_glows})
@@ -1044,6 +1132,7 @@ def cam_at(t):
 GLOW_INDEX = {}   # glow name -> index in clouds.glows (route targets)
 GLOW_KEYS = {}    # glow name -> palette key
 GLOW_BASE = {}    # glow name -> its rest intensity
+GLOW_POS = {}     # glow name -> its position (it11: the isle ring's delays)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1180,7 +1269,8 @@ def scene_doc(state="uv", sky_map=None):
     nodes += aliens + vehicles + bob_nodes()
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
-        ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5),
+        ocean_breathing(ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5), br,
+                        max(op["semi_axes"])),
         FL.plume_program("ndJetPlume"),   # iteration 10b (msg 121): the jet plumes
     ] + [PROGS[n]["doc"] for n in sorted(PROGS)]
     MOON_ARGS.update({"ml": ml, "R": R, "cy": md[1] * D})
@@ -1221,7 +1311,7 @@ def scene_doc(state="uv", sky_map=None):
         "materialPrograms": programs,
         "clouds": clouds_block(state, md),
         # iteration 5: the kick ring leaves the Great Lantern's bell (kick stem onsets, feeds.historyOnsets)
-        "fields": [AU.kick_ring_field(BELL_POS)],
+        "fields": [AU.kick_ring_field(BELL_POS), NL.isle_ring_field(BELL_POS)],
     }
     return doc, [{"target": "camera/splineT", "component": -1, "enabled": True, "timeBase": "seconds",
                   "mode": "replace", "loopLength": 0.0, "keys": keys}, fov_track()] + alien_tracks + vehicle_tracks
@@ -1272,7 +1362,13 @@ def reactivity():
     # --- HH: sparkle on the garden, the lantern bulbs, the keel lanterns; star twinkle
     for n, info in PROGS.items():
         if info["group"] in ("hh", "lantern") and "hh" in info["prog"].at:
-            routes.append(R("stem.hh.onset", info["prog"].path("hh"), 1.0, **hit))
+            r = R("stem.hh.onset", info["prog"].path("hh"), 1.0, **hit)
+            if not CITY_OFF:
+                # it11 (msg 130): in the town the strings chase on the hats instead (one hat system at a time there);
+                # the gardens' sparkle rests to a third
+                r.update({"depthSource": "timeline.outsideTown", "depthMin": 0.0 if info["group"] == "lantern" else 0.3,
+                          "depthMax": 1.0})
+            routes.append(r)
     routes.append(R("stem.hh.onset", "fx/stars/twinkle", 0.25, attackMs=10.0, decayMs=300.0))
     # --- toms: the lantern strings' ripple; the Veil's rose light and its pockets
     for n, info in PROGS.items():
@@ -1317,8 +1413,10 @@ def reactivity():
     for n, info in PROGS.items():
         if info["group"] in ("block_beacon", "block_roundel"):
             full = ROLE_GAIN["beacon"] * 0.9 if info["group"] == "block_beacon" else ROLE_GAIN["neon_a"] * 0.9
-            routes.append(R("stem.block.level", "material/%s/emissionIntensity" % n, full, attackMs=20.0,
-                            decayMs=180.0))
+            r = R("stem.block.level", "material/%s/emissionIntensity" % n, full, attackMs=20.0, decayMs=180.0)
+            if not CITY_OFF:   # it11 (msg 130): the beacons rest to a third in the town, where the new systems play
+                r.update({"depthSource": "timeline.outsideTown", "depthMin": 0.35, "depthMax": 1.0})
+            routes.append(r)
             routes.append(R("timeline.blockStep", info["prog"].path("chase", "value"), 0.75, op="replace"))
     # iteration 6: the alternation is a step timeline over the onsets AV Gen itself detects (audio/
     # sabertooth_engine_onsets.json), not a counting source: a count restarts at 0 on a seek, a timeline is a function of
@@ -1333,7 +1431,12 @@ def reactivity():
         for k, t in enumerate(times):
             keys.append({"time": round(max(t - half, 0.0), 4), "value": round((k % n) / (n - 1), 4), "interp": "step"})
         return keys
-    sources = [{"kind": "timeline", "name": "snareTurn", "settings": {"loopLength": 0.0, "keys": steps(eng["snare"], 2)}},
+    a, b = NL.TOWN
+    sources = [{"kind": "timeline", "name": "outsideTown", "settings": {"loopLength": 0.0, "keys": [
+                   {"time": 0.0, "value": 1.0, "interp": "linear"}, {"time": a - 0.3, "value": 1.0, "interp": "linear"},
+                   {"time": a, "value": 0.0, "interp": "linear"}, {"time": b, "value": 0.0, "interp": "linear"},
+                   {"time": b + 0.3, "value": 1.0, "interp": "linear"}]}},
+               {"kind": "timeline", "name": "snareTurn", "settings": {"loopLength": 0.0, "keys": steps(eng["snare"], 2)}},
                {"kind": "timeline", "name": "blockStep", "settings": {"loopLength": 0.0, "keys": steps(eng["block"], 4)}}]
 
     # --- the palette arc
@@ -1452,8 +1555,67 @@ def reactivity():
                             gain=1.5, clampEnabled=True, clampMin=0.0, clampMax=1.0))
     # the beams: bar-locked, whipping on the crashes (timeline tracks: exactly seek-safe)
     for bi, b in enumerate(LAYOUT["beams"]):
-        tracks.append(AU.track("clouds/beam/%d/yaw" % bi, beam_whip_keys(beam_yaw0(bi, b))))
+        tracks.append(AU.track("clouds/beam/%d/yaw" % bi, beam_whip_keys(beam_yaw0(bi, b), bi, b)))
+    routes, tracks = city_lights(routes, tracks, lvl_slow)
     return routes, tracks, sources
+
+
+def city_lights(routes, tracks, lvl_slow):
+    """Iteration 11 (owner msg 130: "the lights in the city could react more"): nd_lights.py's systems, as timeline
+    tracks from the measured onsets (exactly seek-safe) and two bass routes."""
+    R = AU.route
+    if CITY_OFF:   # A/B: the it11 systems' envelopes left at 0 (the programs and the stronger rings stay)
+        return routes, tracks
+    turns = NL.moog_turns()
+    hh_phase = NL.step_keys(NL.ONSETS["hh"], NL.HH_CHASE["steps"], gate=NL.TOWN)
+    hh_amt = NL.env_keys([t for t in NL.ONSETS["hh"] if not NL.in_fill(t)], *NL.HH_CHASE["ad"], gate=NL.TOWN)
+    sn_phase = NL.step_keys(NL.ONSETS["snare"], NL.SNARE_CHASE["steps"], gate=NL.TOWN)
+    sn_amt = NL.env_keys(NL.ONSETS["snare"], *NL.SNARE_CHASE["ad"], gate=NL.TOWN)
+    moog = {d: NL.env_keys(ts, *NL.MOOG_AD) for d, ts in turns.items()}
+    for n, info in sorted(PROGS.items()):
+        at = info["prog"].at
+        if "moog_quay" in at:
+            for d, keys in moog.items():
+                tracks.append(AU.track(info["prog"].path("moog_" + d), keys))
+        if "hh_phase" in at:
+            tracks += [AU.track(info["prog"].path("hh_phase", "value"), hh_phase),
+                       AU.track(info["prog"].path("hh_amt"), hh_amt)]
+        if "snare_phase" in at:
+            tracks += [AU.track(info["prog"].path("snare_phase", "value"), sn_phase),
+                       AU.track(info["prog"].path("snare_amt"), sn_amt)]
+        if "flick" in at:
+            # the phrases the camera spends in the town (the approach: the Moog's skyline; the reveal: the ocean)
+            # (25.3 and 36.6 sit on the arrival and Quay crashes with the toms' fills: left to them)
+            tracks += NL.flick_tracks(info["prog"].path, NL.FLICK_PHRASES)
+        if info["group"] == "crown":   # the landmark crowns swell on the bass's swells (its top: 0.7-0.9)
+            routes.append(R("stem.bass.level", "material/%s/emissionIntensity" % n,
+                            NL.CROWN_BASS * info["doc"]["emissionIntensity"], attackMs=350.0, decayMs=1800.0,
+                            gain=5.0, offset=-3.5, clampEnabled=True, clampMin=0.0, clampMax=1.0))
+    # the Lantern's bell itself: +25 % -> +70 %
+    routes.append(R("stem.bass.level", "material/ndBell/emissionIntensity", ROLE_GAIN["landmark"] * 0.45, **lvl_slow))
+    # the isles' cloud glow answers the second ring as it passes (240 m/s from the bell, fading to 0 by 450 m)
+    for name in ("lampwick", "gardens"):
+        if name in GLOW_INDEX:
+            gp = GLOW_POS[name]
+            d = math.dist([gp[0], gp[2]], [BELL_POS[0], BELL_POS[2]])
+            w = max(0.0, 1.0 - d / NL.ISLE_RING["outer"])
+            if w > 0:
+                routes.append(R("stem.kick.onset", "clouds/glow/%d/intensity" % GLOW_INDEX[name],
+                                round(1.2 * w * GLOW_BASE[name], 3), attackMs=20.0, decayMs=400.0,
+                                delayMs=round(1000.0 * d / NL.ISLE_RING["speed"], 1)))
+    # the cosmic ocean: a ring on the reveal's phrases, the break's rim glow swelling with it
+    if OCEAN_RING:
+        tracks += NL.ocean_tracks("ndOcean", OCEAN_RING["radius_op"], OCEAN_RING["amount_op"], OCEAN_RING["radius"],
+                                  [p for p in PAD_PHRASES if p > 56.0])
+    if "ocean_break" in GLOW_INDEX:
+        b = GLOW_BASE["ocean_break"]
+        keys = [{"time": 0.0, "value": b, "interp": "linear"}]
+        for p in [p for p in PAD_PHRASES if p > 56.0]:
+            keys += [{"time": p, "value": b, "interp": "smooth"}, {"time": p + 0.9, "value": round(b * 1.8, 3),
+                                                                     "interp": "smooth"},
+                     {"time": p + 3.3, "value": b, "interp": "smooth"}]
+        tracks.append(AU.track("clouds/glow/%d/intensity" % GLOW_INDEX["ocean_break"], keys))
+    return routes, tracks
 
 
 def trim_track(track):
@@ -1524,12 +1686,14 @@ def main():
     ap.add_argument("--check-ground", action="store_true",
                     help="msg 130: every figure on a floor, not in a wall (Blender); --fix-ground writes the fixes")
     ap.add_argument("--fix-ground", action="store_true", help="with --check-ground: move/drop failing figures, re-check")
+    ap.add_argument("--city-off", action="store_true", help="A/B: iteration 11's city light envelopes off")
     ap.add_argument("--proto-flight", action="store_true", help="add the prototype flight (flyer00) to the cast")
     ap.add_argument("--crowd-test", type=int, default=0, help="capacity probe: N aliens (not the film)")
     a = ap.parse_args()
     global NO_WISPS, CROWD_TEST, PLUG_FADE
     CROWD_TEST = a.crowd_test
-    global PROTO_FLIGHT
+    global PROTO_FLIGHT, CITY_OFF
+    CITY_OFF = a.city_off
     PROTO_FLIGHT = a.proto_flight
     if a.plug_fade:
         PLUG_FADE = tuple(float(v) for v in a.plug_fade.split(","))
