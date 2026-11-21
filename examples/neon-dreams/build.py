@@ -266,7 +266,13 @@ def pane_program(zclass, state):
         return _reg("ndPanesCond", lambda: AU.window_program("ndPanesCond", t, t, 3.0), None, "cond_a", "cond")
     if zclass == "lone":
         t = [pal("amber")] * 4
-        return _reg("ndPanesLone", lambda: AU.window_program("ndPanesLone", t, t, 4.0), None, "amber", "lone")
+
+        def lone():   # it12 (msg 149: the Lone Lamp "too dark"): every pane lit, warm, brighter
+            prog, doc = AU.window_program("ndPanesLone", t, t, 6.0)
+            i, _ = prog.at["litfrac"]
+            prog.ops[i - 1]["constant"] = [0.0, 0.0, 0.0, 1.0]
+            return prog, doc
+        return _reg("ndPanesLone", lone, None, "amber", "lone")
     t = [pal(k, state) for k in ("win_a", "win_b", "win_c", "win_d")]
     # it11 (msg 130): the windows answer the Moog by district and flick floor by floor on the pad's phrase changes
     return _reg("ndPanes", lambda: AU.window_program(
