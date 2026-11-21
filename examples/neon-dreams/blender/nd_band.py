@@ -519,6 +519,7 @@ def end_wisps():
 # Outer Light, the watch isle, the Lone Lamp, the reef there, the end's strata and the journey's last 13 s. The far field
 # (the Condensery, the moon, the break and vortex, Highwater, the Keep) stays: from the reveal the works are 15 % further.
 VEIL_CUT = (250.0, 494.0)
+VORTEX_DX = -400.0
 VEIL_DX = -244.0
 SHIFT_BOBS = {"lone_lamp", "outer_light", "isle_watch"}
 SHIFT_MASSES = {"veil", "reveal_fore", "lone_lamp", "outer_light", "isle_watch", "reef", "end_layers"}
@@ -787,7 +788,7 @@ def main():
     for b in lay["beams"]:
         if b["name"] == "break_light":
             b["origin"] = R3([b["origin"][0], b["origin"][1] + dy, b["origin"][2]])
-    gf = json.load(open(os.path.join(ART, "ground_fixes.json"))).get("spots", {}) if os.path.exists(os.path.join(ART, "ground_fixes.json")) else {}
+    gf = load_base("ground_fixes.json").get("spots", {})   # it11's fixes (a fix made since is keyed to the new place)
     for x in pop["spots"]:
         if near_break(x):
             x["bob"] = "break_light"
@@ -804,12 +805,20 @@ def main():
     li, ll = lone_lamp_lights(lay)
     lay["instances"] += li; lay["lights"] += ll
     des["masses"]["end_layers"] = end_clouds(des)
+    # it12b: the vortex nearer the end's lens (the reveal and the end moved 244 m west, the funnel was mostly hidden by
+    # its own near rim from 1.4-1.6 km): the break, its ocean and the ocean's glow 400 m west; the Break Light isle then
+    # floats over the funnel's east half, the works stay on the left
+    brk = des["sea_design"]["break"]
+    brk["centre"] = [round(brk["centre"][0] + VORTEX_DX, 3), brk["centre"][1]]
+    for g in des["clouds_block"]["glows"]:
+        if g["name"] == "ocean_break":
+            g["position"] = R3([g["position"][0] + VORTEX_DX, g["position"][1], g["position"][2]])
     vp, vl = vortex(des)
     des["masses"]["vortex"] = vl
     des["sea_design"]["break"]["vortex"] = vp
     des["wisp_regions"] += end_wisps()
 
-    gfx = json.load(open(os.path.join(ART, "ground_fixes.json"))).get("spots", {}) if os.path.exists(os.path.join(ART, "ground_fixes.json")) else {}
+    gfx = load_base("ground_fixes.json").get("spots", {})
     veil = shortened_veil(lay, des, pop, gfx)
     rec["applied"] = {"removed": {"instances": len(orig["inst"]), "lights": len(orig["lights"]), "spots": len(orig["spots"]),
                                   "paths": len(orig["paths"]), "groups": len(orig["groups"])},
