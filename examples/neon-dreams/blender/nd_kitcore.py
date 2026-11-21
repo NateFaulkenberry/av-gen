@@ -598,8 +598,9 @@ def wall_ring(A, mat, r, z0, z1, a0=0.0, a1=2 * math.pi, n=48, inward=False, c=(
 
 # ------------------------------------------------------------------------------------------- attaching the atlas to a GLB
 SURF_FAMILIES = ("buildings", "decks")
-SURF_ASSETS = ("terrace_step_6m", "pavilion", "tree_pit", "lighthouse_a", "lighthouse_b", "lighthouse_c")
+SURF_ASSETS = ("terrace_step_6m", "pavilion", "tree_pit", "lighthouse_a", "lighthouse_b", "lighthouse_c", "band_stage", "band_terrace")
 SURF_SKIP = ("rail_6m", "pool_15m")
+LENS_ASSETS = ("spot_head",)
 SURFACED = []
 
 
@@ -667,7 +668,8 @@ def audit(A):
     polys = [tuple(p.vertices) for p in me.polygons]
     bvh = BVHTree.FromPolygons(verts, polys)
     names = [s.material.name if s.material else "" for s in ob.material_slots]
-    pm = [names[p.material_index] in PANE_MATS for p in me.polygons]
+    lens = A.name in LENS_ASSETS                 # it12: a spotlight's lens is a lamp, not a window: out of the rule
+    pm = [(not lens) and names[p.material_index] in PANE_MATS for p in me.polygons]
     bad = []
     planes = {}
     for i, o in enumerate(A.open):

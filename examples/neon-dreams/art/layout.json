@@ -17013,28 +17013,6 @@
    "zone": "garden"
   },
   {
-   "id": "pool_15m_496",
-   "asset": "decks/pool_15m.glb",
-   "pos": [
-    146.0,
-    121.6,
-    38.0
-   ],
-   "rot_y_deg": 0.0,
-   "quat": [
-    0.0,
-    0.0,
-    -0.0,
-    1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden"
-  },
-  {
    "id": "tree_pit_497",
    "asset": "garden/tree_pit.glb",
    "pos": [
@@ -17082,147 +17060,6 @@
    }
   },
   {
-   "id": "tree_pit_499",
-   "asset": "garden/tree_pit.glb",
-   "pos": [
-    136.0,
-    121.6,
-    48.0
-   ],
-   "rot_y_deg": 0.0,
-   "quat": [
-    0.0,
-    0.0,
-    -0.0,
-    1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "umbel_tree_a_500",
-   "asset": "garden/umbel_tree_a.glb",
-   "pos": [
-    136.0,
-    121.95,
-    48.0
-   ],
-   "rot_y_deg": 223.312,
-   "quat": [
-    0.0,
-    0.929417,
-    -0.0,
-    -0.36903
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_a"
-   }
-  },
-  {
-   "id": "tree_pit_501",
-   "asset": "garden/tree_pit.glb",
-   "pos": [
-    149.0,
-    121.6,
-    52.0
-   ],
-   "rot_y_deg": 0.0,
-   "quat": [
-    0.0,
-    0.0,
-    -0.0,
-    1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "umbel_tree_c_502",
-   "asset": "garden/umbel_tree_c.glb",
-   "pos": [
-    149.0,
-    121.95,
-    52.0
-   ],
-   "rot_y_deg": 164.244,
-   "quat": [
-    0.0,
-    0.990562,
-    -0.0,
-    0.137068
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_a"
-   }
-  },
-  {
-   "id": "tree_pit_503",
-   "asset": "garden/tree_pit.glb",
-   "pos": [
-    157.0,
-    121.6,
-    43.0
-   ],
-   "rot_y_deg": 0.0,
-   "quat": [
-    0.0,
-    0.0,
-    -0.0,
-    1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "umbel_tree_b_504",
-   "asset": "garden/umbel_tree_b.glb",
-   "pos": [
-    157.0,
-    121.95,
-    43.0
-   ],
-   "rot_y_deg": 83.951,
-   "quat": [
-    0.0,
-    0.668812,
-    -0.0,
-    0.743432
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_b"
-   }
-  },
-  {
    "id": "tree_pit_505",
    "asset": "garden/tree_pit.glb",
    "pos": [
@@ -17258,53 +17095,6 @@
     0.661625,
     -0.0,
     -0.749835
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_a"
-   }
-  },
-  {
-   "id": "tree_pit_507",
-   "asset": "garden/tree_pit.glb",
-   "pos": [
-    142.0,
-    121.6,
-    28.0
-   ],
-   "rot_y_deg": 0.0,
-   "quat": [
-    0.0,
-    0.0,
-    -0.0,
-    1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "umbel_tree_s_508",
-   "asset": "garden/umbel_tree_s.glb",
-   "pos": [
-    142.0,
-    121.95,
-    28.0
-   ],
-   "rot_y_deg": 56.518,
-   "quat": [
-    0.0,
-    0.47346,
-    -0.0,
-    0.880815
    ],
    "scale": [
     1.0,
@@ -17458,53 +17248,6 @@
    }
   },
   {
-   "id": "tree_pit_515",
-   "asset": "garden/tree_pit.glb",
-   "pos": [
-    130.0,
-    121.6,
-    30.0
-   ],
-   "rot_y_deg": 0.0,
-   "quat": [
-    0.0,
-    0.0,
-    -0.0,
-    1.0
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "umbel_tree_s_516",
-   "asset": "garden/umbel_tree_s.glb",
-   "pos": [
-    130.0,
-    121.95,
-    30.0
-   ],
-   "rot_y_deg": 160.167,
-   "quat": [
-    0.0,
-    0.98506,
-    -0.0,
-    0.172212
-   ],
-   "scale": [
-    1.0,
-    1.0,
-    1.0
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_b"
-   }
-  },
-  {
    "id": "tree_pit_517",
    "asset": "garden/tree_pit.glb",
    "pos": [
@@ -17552,31 +17295,6 @@
    }
   },
   {
-   "id": "shrub_a_519",
-   "asset": "garden/shrub_a.glb",
-   "pos": [
-    142.993,
-    121.6,
-    52.043
-   ],
-   "rot_y_deg": 279.418,
-   "quat": [
-    0.0,
-    0.646667,
-    -0.0,
-    -0.762772
-   ],
-   "scale": [
-    1.1478327189722477,
-    1.1478327189722477,
-    1.1478327189722477
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_a"
-   }
-  },
-  {
    "id": "planter_round_520",
    "asset": "garden/planter_round.glb",
    "pos": [
@@ -17602,31 +17320,6 @@
    }
   },
   {
-   "id": "shrub_b_521",
-   "asset": "garden/shrub_b.glb",
-   "pos": [
-    132.762,
-    121.6,
-    32.414
-   ],
-   "rot_y_deg": 167.643,
-   "quat": [
-    0.0,
-    0.994192,
-    -0.0,
-    0.107625
-   ],
-   "scale": [
-    0.8431585353649915,
-    0.8431585353649915,
-    0.8431585353649915
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_a"
-   }
-  },
-  {
    "id": "shrub_b_522",
    "asset": "garden/shrub_b.glb",
    "pos": [
@@ -17645,31 +17338,6 @@
     0.8112651024515491,
     0.8112651024515491,
     0.8112651024515491
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_b"
-   }
-  },
-  {
-   "id": "sprig_bed_3m_523",
-   "asset": "garden/sprig_bed_3m.glb",
-   "pos": [
-    138.054,
-    121.6,
-    50.768
-   ],
-   "rot_y_deg": 263.378,
-   "quat": [
-    0.0,
-    0.746763,
-    -0.0,
-    -0.66509
-   ],
-   "scale": [
-    1.152617047148062,
-    1.152617047148062,
-    1.152617047148062
    ],
    "zone": "garden",
    "tint": {
@@ -17699,31 +17367,6 @@
    "zone": "garden",
    "tint": {
     "garden": "garden_b"
-   }
-  },
-  {
-   "id": "sprig_bed_3m_525",
-   "asset": "garden/sprig_bed_3m.glb",
-   "pos": [
-    149.704,
-    121.6,
-    49.961
-   ],
-   "rot_y_deg": 301.301,
-   "quat": [
-    0.0,
-    0.490139,
-    -0.0,
-    -0.871644
-   ],
-   "scale": [
-    1.1681200975118837,
-    1.1681200975118837,
-    1.1681200975118837
-   ],
-   "zone": "garden",
-   "tint": {
-    "garden": "garden_a"
    }
   },
   {
@@ -17853,138 +17496,6 @@
     0.977511,
     -0.0,
     -0.210882
-   ],
-   "scale": [
-    0.42,
-    0.42,
-    0.42
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "street_lamp_532",
-   "asset": "street/street_lamp.glb",
-   "pos": [
-    130.909,
-    121.6,
-    32.714
-   ],
-   "rot_y_deg": 259.626,
-   "quat": [
-    0.0,
-    0.768138,
-    -0.0,
-    -0.640285
-   ],
-   "scale": [
-    0.42,
-    0.42,
-    0.42
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "street_lamp_533",
-   "asset": "street/street_lamp.glb",
-   "pos": [
-    135.091,
-    121.6,
-    37.927
-   ],
-   "rot_y_deg": 31.202,
-   "quat": [
-    0.0,
-    0.268938,
-    -0.0,
-    0.963157
-   ],
-   "scale": [
-    0.42,
-    0.42,
-    0.42
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "street_lamp_534",
-   "asset": "street/street_lamp.glb",
-   "pos": [
-    139.273,
-    121.6,
-    42.949
-   ],
-   "rot_y_deg": 99.103,
-   "quat": [
-    0.0,
-    0.760991,
-    -0.0,
-    0.648762
-   ],
-   "scale": [
-    0.42,
-    0.42,
-    0.42
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "street_lamp_535",
-   "asset": "street/street_lamp.glb",
-   "pos": [
-    143.455,
-    121.6,
-    47.063
-   ],
-   "rot_y_deg": 8.291,
-   "quat": [
-    0.0,
-    0.072287,
-    -0.0,
-    0.997384
-   ],
-   "scale": [
-    0.42,
-    0.42,
-    0.42
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "street_lamp_536",
-   "asset": "street/street_lamp.glb",
-   "pos": [
-    147.636,
-    121.6,
-    49.813
-   ],
-   "rot_y_deg": 343.997,
-   "quat": [
-    0.0,
-    0.139198,
-    -0.0,
-    -0.990265
-   ],
-   "scale": [
-    0.42,
-    0.42,
-    0.42
-   ],
-   "zone": "garden"
-  },
-  {
-   "id": "street_lamp_537",
-   "asset": "street/street_lamp.glb",
-   "pos": [
-    151.818,
-    121.6,
-    51.14
-   ],
-   "rot_y_deg": 295.359,
-   "quat": [
-    0.0,
-    0.534658,
-    -0.0,
-    -0.845069
    ],
    "scale": [
     0.42,
@@ -18378,7 +17889,7 @@
    "asset": "landmarks/lighthouse_c.glb",
    "pos": [
     1500.0,
-    66.0,
+    161.0,
     70.0
    ],
    "rot_y_deg": 60.0,
@@ -18407,7 +17918,7 @@
    "asset": "vehicles/cloud_skiff.glb",
    "pos": [
     1509.0,
-    57.0,
+    152.0,
     76.0
    ],
    "rot_y_deg": 34.377,
@@ -37926,7 +37437,7 @@
    "asset": "_thirdparty/isles/isle_rock_c.gltf",
    "pos": [
     1500.0,
-    65.4,
+    160.4,
     70.0
    ],
    "rot_y_deg": 80.0,
@@ -37949,7 +37460,7 @@
    "asset": "garden/root_curtain_b.glb",
    "pos": [
     1500.0,
-    51.914,
+    146.914,
     70.0
    ],
    "rot_y_deg": 324.875,
@@ -49293,6 +48804,873 @@
     1.0
    ],
    "zone": "anomaly"
+  },
+  {
+   "id": "band_stage",
+   "asset": "stage/band_stage.glb",
+   "pos": [
+    146.0,
+    121.6,
+    38.0
+   ],
+   "rot_y_deg": -110.0,
+   "quat": [
+    0.0,
+    -0.819152,
+    0.0,
+    0.573576
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band",
+   "tint": {
+    "strip": "sign_a",
+    "lantern": "amber"
+   }
+  },
+  {
+   "id": "band_terrace",
+   "asset": "stage/band_terrace.glb",
+   "pos": [
+    146.0,
+    121.6,
+    38.0
+   ],
+   "rot_y_deg": -110.0,
+   "quat": [
+    0.0,
+    -0.819152,
+    0.0,
+    0.573576
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band",
+   "tint": {
+    "lantern": "amber"
+   }
+  },
+  {
+   "id": "band_spotbase0",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    139.807,
+    121.6,
+    32.325
+   ],
+   "rot_y_deg": 51.68,
+   "quat": [
+    0.0,
+    0.435875,
+    0.0,
+    0.900007
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead0",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    139.807,
+    122.55,
+    32.325
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.082532,
+    0.434039,
+    0.03997,
+    0.896215
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_a"
+   }
+  },
+  {
+   "id": "band_spotbase1",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    137.608,
+    121.6,
+    38.366
+   ],
+   "rot_y_deg": 107.76,
+   "quat": [
+    0.0,
+    0.807789,
+    0.0,
+    0.589471
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead1",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    137.608,
+    122.55,
+    38.366
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.056923,
+    0.804014,
+    0.078005,
+    0.586716
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "moon_disc"
+   }
+  },
+  {
+   "id": "band_spotbase2",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    145.634,
+    121.6,
+    29.608
+   ],
+   "rot_y_deg": 13.64,
+   "quat": [
+    0.0,
+    0.118756,
+    0.0,
+    0.992923
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead2",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    145.634,
+    122.55,
+    29.608
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.099654,
+    0.118156,
+    0.011919,
+    0.98791
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_b"
+   }
+  },
+  {
+   "id": "band_spotbase3",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    140.325,
+    121.6,
+    44.193
+   ],
+   "rot_y_deg": 146.79,
+   "quat": [
+    0.0,
+    0.958291,
+    0.0,
+    0.285793
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead3",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    140.325,
+    122.55,
+    44.193
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.023735,
+    0.954981,
+    0.079585,
+    0.284806
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "moon_disc"
+   }
+  },
+  {
+   "id": "band_spotbase4",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    151.675,
+    121.6,
+    31.807
+   ],
+   "rot_y_deg": -29.26,
+   "quat": [
+    0.0,
+    -0.252551,
+    0.0,
+    0.967584
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead4",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    151.675,
+    122.55,
+    31.807
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.114433,
+    -0.250778,
+    -0.029868,
+    0.960793
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_a"
+   }
+  },
+  {
+   "id": "band_spotbase5",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    146.366,
+    121.6,
+    46.392
+   ],
+   "rot_y_deg": -177.35,
+   "quat": [
+    0.0,
+    -0.999733,
+    0.0,
+    0.023096
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead5",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    146.366,
+    122.55,
+    46.392
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.00182,
+    -0.996624,
+    -0.078791,
+    0.023024
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "moon_disc"
+   }
+  },
+  {
+   "id": "band_spotbase6",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    154.392,
+    121.6,
+    37.634
+   ],
+   "rot_y_deg": -81.05,
+   "quat": [
+    0.0,
+    -0.649765,
+    0.0,
+    0.760135
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead6",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    154.392,
+    122.55,
+    37.634
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.105568,
+    -0.643468,
+    -0.09024,
+    0.752769
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_b"
+   }
+  },
+  {
+   "id": "band_spotbase7",
+   "asset": "stage/spot_base.glb",
+   "pos": [
+    152.193,
+    121.6,
+    43.675
+   ],
+   "rot_y_deg": -141.54,
+   "quat": [
+    0.0,
+    -0.944195,
+    0.0,
+    0.329388
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band"
+  },
+  {
+   "id": "band_spothead7",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    152.193,
+    122.55,
+    43.675
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.027271,
+    -0.940953,
+    -0.078172,
+    0.328257
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "moon_disc"
+   }
+  },
+  {
+   "id": "band_spothead8",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    139.384,
+    131.2,
+    41.085
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.222741,
+    0.776097,
+    0.440571,
+    0.392374
+   ],
+   "scale": [
+    1.7,
+    1.7,
+    1.7
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_a"
+   }
+  },
+  {
+   "id": "band_spothead9",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    142.915,
+    131.2,
+    31.384
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.469033,
+    0.271333,
+    0.154029,
+    0.826234
+   ],
+   "scale": [
+    1.7,
+    1.7,
+    1.7
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_b"
+   }
+  },
+  {
+   "id": "band_spothead10",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    149.085,
+    131.2,
+    44.616
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.154029,
+    -0.826234,
+    -0.469033,
+    0.271333
+   ],
+   "scale": [
+    1.7,
+    1.7,
+    1.7
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_a"
+   }
+  },
+  {
+   "id": "band_spothead11",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    152.616,
+    131.2,
+    34.915
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    -0.440571,
+    -0.392374,
+    -0.222741,
+    0.776097
+   ],
+   "scale": [
+    1.7,
+    1.7,
+    1.7
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_b"
+   }
+  },
+  {
+   "id": "it12_leg_gondola_pylon_461",
+   "asset": "stage/pylon_leg_ext.glb",
+   "pos": [
+    -150.844,
+    119.2,
+    48.832
+   ],
+   "rot_y_deg": -145.194,
+   "quat": [
+    0.0,
+    -0.954226,
+    -0.0,
+    0.299088
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "pier"
+  },
+  {
+   "id": "it12_leg_gondola_pylon_462",
+   "asset": "stage/pylon_leg_ext.glb",
+   "pos": [
+    -208.321,
+    119.2,
+    88.788
+   ],
+   "rot_y_deg": -145.194,
+   "quat": [
+    0.0,
+    -0.954226,
+    -0.0,
+    0.299088
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "pier"
+  },
+  {
+   "id": "it12_leg_gondola_pylon_463",
+   "asset": "stage/pylon_leg_ext.glb",
+   "pos": [
+    -265.798,
+    119.2,
+    128.744
+   ],
+   "rot_y_deg": -145.194,
+   "quat": [
+    0.0,
+    -0.954226,
+    -0.0,
+    0.299088
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "pier"
+  },
+  {
+   "id": "it12_leg_gondola_pylon_464",
+   "asset": "stage/pylon_leg_ext.glb",
+   "pos": [
+    -316.706,
+    119.2,
+    164.134
+   ],
+   "rot_y_deg": -145.194,
+   "quat": [
+    0.0,
+    -0.954226,
+    -0.0,
+    0.299088
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "pier"
+  },
+  {
+   "id": "it12_leg_gondola_pylon_1291",
+   "asset": "stage/pylon_leg_ext.glb",
+   "pos": [
+    158.0,
+    109.6,
+    56.0
+   ],
+   "rot_y_deg": -51.934,
+   "quat": [
+    0.0,
+    -0.437856,
+    -0.0,
+    0.899045
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "garden"
+  },
+  {
+   "id": "it12_leg_gondola_pylon_1292",
+   "asset": "stage/pylon_leg_ext.glb",
+   "pos": [
+    223.0,
+    128.0,
+    139.0
+   ],
+   "rot_y_deg": -51.934,
+   "quat": [
+    0.0,
+    -0.437856,
+    -0.0,
+    0.899045
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "lampwick",
+   "bob": "isle_lampwick"
+  },
+  {
+   "id": "it12_lone_lamp_post0",
+   "asset": "street/street_lamp.glb",
+   "pos": [
+    880.5,
+    214.4,
+    -58.0
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_lamp_post1",
+   "asset": "street/street_lamp.glb",
+   "pos": [
+    878.0,
+    214.4,
+    -52.5
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_lamp_post2",
+   "asset": "street/street_lamp.glb",
+   "pos": [
+    883.5,
+    214.4,
+    -62.0
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_lamp_post3",
+   "asset": "street/street_lamp.glb",
+   "pos": [
+    897.0,
+    214.4,
+    -43.0
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_lamp_post4",
+   "asset": "street/street_lamp.glb",
+   "pos": [
+    894.0,
+    214.4,
+    -59.5
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": [
+    0.55,
+    0.55,
+    0.55
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_garden0",
+   "asset": "garden/shrub_a.glb",
+   "pos": [
+    879.0,
+    214.4,
+    -55.0
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_garden1",
+   "asset": "garden/sprig_bed_3m.glb",
+   "pos": [
+    882.0,
+    214.4,
+    -60.5
+   ],
+   "rot_y_deg": 30.0,
+   "quat": [
+    0.0,
+    0.258819,
+    0.0,
+    0.965926
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_garden2",
+   "asset": "garden/shrub_b.glb",
+   "pos": [
+    896.0,
+    214.4,
+    -41.0
+   ],
+   "rot_y_deg": 60.0,
+   "quat": [
+    0.0,
+    0.5,
+    0.0,
+    0.866025
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "id": "it12_lone_garden3",
+   "asset": "garden/sprig_bed_3m.glb",
+   "pos": [
+    877.0,
+    214.4,
+    -48.5
+   ],
+   "rot_y_deg": 90.0,
+   "quat": [
+    0.0,
+    0.707107,
+    0.0,
+    0.707107
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
   }
  ],
  "splines": {
@@ -49929,7 +50307,7 @@
    "asset": 4.866166339739255,
    "centre": [
     1500.0,
-    65.4,
+    160.4,
     70.0
    ],
    "width_m": 44.0,
@@ -50182,7 +50560,7 @@
    "name": "break_light",
    "origin": [
     1500.0,
-    112.02,
+    207.02,
     70.0
    ],
    "count": 2,
@@ -51257,59 +51635,11 @@
    "zone": "garden"
   },
   {
-   "name": "light_082",
-   "pos": [
-    136.0,
-    127.6,
-    48.0
-   ],
-   "key": "garden_a",
-   "radius_m": 14.0,
-   "intensity": 0.7,
-   "zone": "garden"
-  },
-  {
-   "name": "light_083",
-   "pos": [
-    149.0,
-    127.6,
-    52.0
-   ],
-   "key": "garden_a",
-   "radius_m": 14.0,
-   "intensity": 0.7,
-   "zone": "garden"
-  },
-  {
-   "name": "light_084",
-   "pos": [
-    157.0,
-    127.6,
-    43.0
-   ],
-   "key": "garden_b",
-   "radius_m": 14.0,
-   "intensity": 0.7,
-   "zone": "garden"
-  },
-  {
    "name": "light_085",
    "pos": [
     122.0,
     127.6,
     41.0
-   ],
-   "key": "garden_a",
-   "radius_m": 14.0,
-   "intensity": 0.7,
-   "zone": "garden"
-  },
-  {
-   "name": "light_086",
-   "pos": [
-    142.0,
-    127.6,
-    28.0
    ],
    "key": "garden_a",
    "radius_m": 14.0,
@@ -51348,18 +51678,6 @@
     57.0
    ],
    "key": "garden_a",
-   "radius_m": 14.0,
-   "intensity": 0.7,
-   "zone": "garden"
-  },
-  {
-   "name": "light_090",
-   "pos": [
-    130.0,
-    127.6,
-    30.0
-   ],
-   "key": "garden_b",
    "radius_m": 14.0,
    "intensity": 0.7,
    "zone": "garden"
@@ -51418,7 +51736,7 @@
    "name": "break_light_lamp",
    "pos": [
     1500.0,
-    112.02,
+    207.02,
     70.0
    ],
    "key": "moon_disc",
@@ -52332,10 +52650,200 @@
    "intensity": 0.9,
    "zone": "isle_exit",
    "bob": "isle_exit"
+  },
+  {
+   "name": "band_halo0",
+   "pos": [
+    141.114,
+    128.8,
+    36.221
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.1,
+   "zone": "band"
+  },
+  {
+   "name": "band_halo1",
+   "pos": [
+    144.221,
+    128.8,
+    42.886
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.1,
+   "zone": "band"
+  },
+  {
+   "name": "band_halo2",
+   "pos": [
+    150.886,
+    128.8,
+    39.779
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.1,
+   "zone": "band"
+  },
+  {
+   "name": "band_halo3",
+   "pos": [
+    147.779,
+    128.8,
+    33.114
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.1,
+   "zone": "band"
+  },
+  {
+   "name": "band_wash",
+   "pos": [
+    142.711,
+    124.8,
+    36.803
+   ],
+   "key": "sign_a",
+   "radius_m": 11.0,
+   "intensity": 1.0,
+   "zone": "band"
+  },
+  {
+   "name": "it12_lone_deck0",
+   "pos": [
+    880.8,
+    216.6,
+    -58.0
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.4,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_deck1",
+   "pos": [
+    878.3,
+    216.6,
+    -52.5
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.4,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_deck2",
+   "pos": [
+    883.8,
+    216.6,
+    -62.0
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.4,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_deck3",
+   "pos": [
+    897.3,
+    216.6,
+    -43.0
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.4,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_deck4",
+   "pos": [
+    894.3,
+    216.6,
+    -59.5
+   ],
+   "key": "amber",
+   "radius_m": 9.0,
+   "intensity": 1.4,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_door",
+   "pos": [
+    890.0,
+    217.4,
+    -44.4
+   ],
+   "key": "amber",
+   "radius_m": 14.0,
+   "intensity": 1.6,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_garden",
+   "pos": [
+    882.0,
+    215.6,
+    -55.0
+   ],
+   "key": "garden_a",
+   "radius_m": 12.0,
+   "intensity": 1.2,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_roof",
+   "pos": [
+    890.0,
+    226.4,
+    -49.0
+   ],
+   "key": "amber",
+   "radius_m": 18.0,
+   "intensity": 1.0,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_under",
+   "pos": [
+    896.0,
+    184.0,
+    -45.0
+   ],
+   "key": "ocean_a",
+   "radius_m": 40.0,
+   "intensity": 1.6,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
+  },
+  {
+   "name": "it12_lone_rim",
+   "pos": [
+    912.0,
+    202.0,
+    -39.0
+   ],
+   "key": "ocean_b",
+   "radius_m": 30.0,
+   "intensity": 1.3,
+   "zone": "lone_lamp",
+   "bob": "lone_lamp"
   }
  ],
  "camera": {
-  "note": "the 70.2 s journey; it11 (owner msgs 130, 132, 136): the opening slowed and brought down to the pier's rail, low over the garden, a slow drift past the Lone Lamp isle at the end; the Quay and the Veil as before; the camera looks along its path",
+  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before",
   "waypoints": [
    {
     "t": 0.0,
@@ -52466,7 +52974,7 @@
     ]
    },
    {
-    "t": 37.04,
+    "t": 36.85,
     "pos": [
      -15,
      136.25,
@@ -52474,7 +52982,7 @@
     ]
    },
    {
-    "t": 38.32,
+    "t": 37.75,
     "pos": [
      0,
      135.5,
@@ -52482,7 +52990,7 @@
     ]
    },
    {
-    "t": 39.61,
+    "t": 38.45,
     "pos": [
      15,
      134.75,
@@ -52490,7 +52998,7 @@
     ]
    },
    {
-    "t": 40.72,
+    "t": 39.05,
     "pos": [
      28,
      134.1,
@@ -52498,7 +53006,7 @@
     ]
    },
    {
-    "t": 41.75,
+    "t": 39.6,
     "pos": [
      40,
      133.5,
@@ -52506,7 +53014,7 @@
     ]
    },
    {
-    "t": 42.67,
+    "t": 40.3,
     "pos": [
      55,
      133.05,
@@ -52514,7 +53022,7 @@
     ]
    },
    {
-    "t": 43.6,
+    "t": 41.0,
     "pos": [
      70,
      132.6,
@@ -52522,27 +53030,75 @@
     ]
    },
    {
-    "t": 45.0,
+    "t": 41.75,
     "pos": [
-     96,
-     128.5,
-     22.0
+     85,
+     130.9,
+     13.2
     ]
    },
    {
-    "t": 46.2,
+    "t": 42.5,
     "pos": [
-     126,
-     131.5,
-     31.0
+     98.5,
+     129.0,
+     19.0
     ]
    },
    {
-    "t": 47.0,
+    "t": 43.25,
     "pos": [
-     150,
-     139.5,
-     30
+     109.0,
+     127.7,
+     23.4
+    ]
+   },
+   {
+    "t": 44.05,
+    "pos": [
+     118.5,
+     126.9,
+     27.6
+    ]
+   },
+   {
+    "t": 44.95,
+    "pos": [
+     127.1,
+     126.5,
+     30.15
+    ]
+   },
+   {
+    "t": 45.75,
+    "pos": [
+     132.9,
+     126.3,
+     31.9
+    ]
+   },
+   {
+    "t": 46.3,
+    "pos": [
+     136.5,
+     126.4,
+     32.4
+    ]
+   },
+   {
+    "t": 46.75,
+    "pos": [
+     145.5,
+     129.2,
+     26.8
+    ]
+   },
+   {
+    "t": 47.6,
+    "pos": [
+     173.6,
+     142.6,
+     25.8
     ]
    },
    {
@@ -52601,6 +53157,44 @@
      -66.0
     ]
    }
+  ],
+  "look_ahead": [
+   [
+    0.0,
+    45.0
+   ],
+   [
+    42.6,
+    45.0
+   ],
+   [
+    43.6,
+    12.0
+   ],
+   [
+    44.8,
+    6.0
+   ],
+   [
+    45.3,
+    3.5
+   ],
+   [
+    46.3,
+    3.5
+   ],
+   [
+    46.9,
+    14.0
+   ],
+   [
+    47.7,
+    45.0
+   ],
+   [
+    70.2,
+    45.0
+   ]
   ]
  },
  "checks": {
@@ -52714,5 +53308,366 @@
   "spots": 196,
   "paths": 20,
   "lights": 170
+ },
+ "band": {
+  "msg": 149,
+  "note": "it12 (owner msg 149): the band on a round stage where the garden's pool was. The stage, terrace and fixtures are kit instances (zone 'band'); this block is what the engine places and drives: the two astronaut musicians (gitignored GLBs from the main checkout, never committed; each with its props on one transform), the floor spots as spot lights, the halo's four searchlights as cloud beams, the audio intent.",
+  "stage": {
+   "centre": [
+    146.0,
+    121.6,
+    38.0
+   ],
+   "yaw_deg": -110.0,
+   "radius_m": 6.0,
+   "deck_y": 122.6,
+   "riser": {
+    "centre": [
+     147.41,
+     122.9,
+     38.513
+    ],
+    "radius_m": 1.75
+   },
+   "halo_y": 130.4,
+   "front_dir": [
+    -0.94,
+    0.0,
+    -0.342
+   ]
+  },
+  "musicians": [
+   {
+    "name": "band_drums",
+    "asset": "assets/musicians/astronaut_drums.glb",
+    "props": "assets/musicians/drum_kit.glb",
+    "pos": [
+     147.832,
+     122.9,
+     38.667
+    ],
+    "yaw_deg": -110.0,
+    "clip": "Drums",
+    "chest": [
+     147.832,
+     123.95,
+     38.667
+    ]
+   },
+   {
+    "name": "band_keys",
+    "asset": "assets/musicians/astronaut_keys.glb",
+    "props": "assets/musicians/keyboard_set.glb",
+    "pos": [
+     145.873,
+     122.6,
+     35.719
+    ],
+    "yaw_deg": -92.0,
+    "clip": "Piano",
+    "chest": [
+     145.873,
+     123.75,
+     35.719
+    ]
+   }
+  ],
+  "spots": [
+   {
+    "name": "band_spot0",
+    "pos": [
+     140.154,
+     122.632,
+     32.599
+    ],
+    "direction": [
+     0.771,
+     0.183,
+     0.61
+    ],
+    "aim": [
+     147.832,
+     124.45,
+     38.667
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "sign_a",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [139.807, 122.55, 32.325]"
+   },
+   {
+    "name": "band_spot1",
+    "pos": [
+     138.029,
+     122.637,
+     38.232
+    ],
+    "direction": [
+     0.935,
+     0.192,
+     -0.299
+    ],
+    "aim": [
+     145.873,
+     124.25,
+     35.719
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "moon_disc",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [137.608, 122.55, 38.366]"
+   },
+   {
+    "name": "band_spot2",
+    "pos": [
+     145.738,
+     122.64,
+     30.036
+    ],
+    "direction": [
+     0.231,
+     0.2,
+     0.952
+    ],
+    "aim": [
+     147.832,
+     124.45,
+     38.667
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "sign_b",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [145.634, 122.55, 29.608]"
+   },
+   {
+    "name": "band_spot3",
+    "pos": [
+     140.568,
+     122.624,
+     43.822
+    ],
+    "direction": [
+     0.54,
+     0.166,
+     -0.825
+    ],
+    "aim": [
+     145.873,
+     124.25,
+     35.719
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "moon_disc",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [140.325, 122.55, 44.193]"
+   },
+   {
+    "name": "band_spot4",
+    "pos": [
+     151.461,
+     122.656,
+     32.188
+    ],
+    "direction": [
+     -0.475,
+     0.235,
+     0.848
+    ],
+    "aim": [
+     147.832,
+     124.45,
+     38.667
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "sign_a",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [151.675, 122.55, 31.807]"
+   },
+   {
+    "name": "band_spot5",
+    "pos": [
+     146.346,
+     122.621,
+     45.948
+    ],
+    "direction": [
+     -0.046,
+     0.157,
+     -0.987
+    ],
+    "aim": [
+     145.873,
+     124.25,
+     35.719
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "moon_disc",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [146.366, 122.55, 46.392]"
+   },
+   {
+    "name": "band_spot6",
+    "pos": [
+     153.965,
+     122.674,
+     37.701
+    ],
+    "direction": [
+     -0.95,
+     0.275,
+     0.15
+    ],
+    "aim": [
+     147.832,
+     124.45,
+     38.667
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "sign_b",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [154.392, 122.55, 37.634]"
+   },
+   {
+    "name": "band_spot7",
+    "pos": [
+     151.917,
+     122.624,
+     43.327
+    ],
+    "direction": [
+     -0.613,
+     0.165,
+     -0.772
+    ],
+    "aim": [
+     145.873,
+     124.25,
+     35.719
+    ],
+    "outer_deg": 15.0,
+    "inner_deg": 8.0,
+    "key": "moon_disc",
+    "intensity_cd": 900.0,
+    "range_m": 30.0,
+    "volumetric": 0.6,
+    "fixture": "spot_base + spot_head at [152.193, 122.55, 43.675]"
+   }
+  ],
+  "sky_beams": [
+   {
+    "name": "band_sky0",
+    "origin": [
+     139.384,
+     131.2,
+     41.085
+    ],
+    "yaw_deg": 36.36,
+    "elevation_deg": 59.17,
+    "direction": [
+     0.413,
+     0.859,
+     -0.304
+    ],
+    "length_m": 170.0,
+    "half_angle_deg": 2.2,
+    "key": "sign_a",
+    "intensity": 1.0,
+    "count": 1,
+    "rpm": 0.0
+   },
+   {
+    "name": "band_sky1",
+    "origin": [
+     142.915,
+     131.2,
+     31.384
+    ],
+    "yaw_deg": -53.64,
+    "elevation_deg": 59.17,
+    "direction": [
+     0.304,
+     0.859,
+     0.413
+    ],
+    "length_m": 170.0,
+    "half_angle_deg": 2.2,
+    "key": "sign_b",
+    "intensity": 1.0,
+    "count": 1,
+    "rpm": 0.0
+   },
+   {
+    "name": "band_sky2",
+    "origin": [
+     149.085,
+     131.2,
+     44.616
+    ],
+    "yaw_deg": 126.36,
+    "elevation_deg": 59.17,
+    "direction": [
+     -0.304,
+     0.859,
+     -0.413
+    ],
+    "length_m": 170.0,
+    "half_angle_deg": 2.2,
+    "key": "sign_a",
+    "intensity": 1.0,
+    "count": 1,
+    "rpm": 0.0
+   },
+   {
+    "name": "band_sky3",
+    "origin": [
+     152.616,
+     131.2,
+     34.915
+    ],
+    "yaw_deg": -143.64,
+    "elevation_deg": 59.17,
+    "direction": [
+     -0.413,
+     0.859,
+     0.304
+    ],
+    "length_m": 170.0,
+    "half_angle_deg": 2.2,
+    "key": "sign_b",
+    "intensity": 1.0,
+    "count": 1,
+    "rpm": 0.0
+   }
+  ],
+  "audio": {
+   "drums": "the drummer's clip on the song's beat (171.4 BPM); the Drums clip is 4.7 s",
+   "keys": "the pianist on the Moog/pad phrases",
+   "floor_spots": "kick: +60 % 15/250 ms; the four colours swap on each crash (a quarter turn of the key order)",
+   "sky_beams": "sway +-12 deg in yaw over two bars, whip with the lighthouses on the crashes; snare: +40 % 10/180 ms",
+   "halo": "the halo's lanterns chase round the ring on the hats (the kit's lantern role already chases on hh)",
+   "stage_ring": "the inlaid ring (strip) on the bass; the footlights on the toms",
+   "held_breath": "45.5-47.15 s: the floor spots dim to 30 %, the sky beams hold still; all back on the 47.15 s crash"
+  }
  }
 }

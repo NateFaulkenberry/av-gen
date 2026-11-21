@@ -4561,6 +4561,178 @@
     "note": "cast variants alien-pilot and alien-ranger (Backpack_Jet); GLB -Y along the joint's +Y"
    },
    "note": "iteration 10 (msg 117): lantern-bulb exhaust for the jet-pack flyers; emissive roles jet_flame / jet_collar"
+  },
+  {
+   "asset": "stage/band_stage.glb",
+   "tris": 11252,
+   "height_m": 10.9,
+   "bounds_m": [
+    -6.78,
+    0.0,
+    -7.62,
+    6.78,
+    10.86,
+    6.78
+   ],
+   "materials": [
+    "beacon",
+    "deck",
+    "lantern",
+    "metal",
+    "strip",
+    "trim"
+   ],
+   "radius_m": 6.0,
+   "deck_m": 1.0,
+   "riser": {
+    "centre_xz": [
+     0.0,
+     -1.5
+    ],
+    "radius_m": 1.75,
+    "top_m": 1.3
+   },
+   "halo_m": 8.8,
+   "masts_xz": [
+    [
+     4.773,
+     4.773
+    ],
+    [
+     -4.773,
+     4.773
+    ],
+    [
+     4.773,
+     -4.773
+    ],
+    [
+     -4.773,
+     -4.773
+    ]
+   ],
+   "mast_top_m": 10.6,
+   "spot_pivots_xyz": [
+    [
+     5.162,
+     9.6,
+     5.162
+    ],
+    [
+     -5.162,
+     9.6,
+     5.162
+    ],
+    [
+     5.162,
+     9.6,
+     -5.162
+    ],
+    [
+     -5.162,
+     9.6,
+     -5.162
+    ]
+   ],
+   "front": "+z in the GLB (Blender -Y): the band faces it"
+  },
+  {
+   "asset": "stage/band_terrace.glb",
+   "tris": 4832,
+   "height_m": 3.3,
+   "bounds_m": [
+    -14.93,
+    0.0,
+    -15.89,
+    14.94,
+    3.27,
+    -3.72
+   ],
+   "materials": [
+    "deck",
+    "lantern",
+    "metal",
+    "trim"
+   ],
+   "tiers": [
+    {
+     "r0": 11.5,
+     "r1": 12.83,
+     "top_m": 0.45
+    },
+    {
+     "r0": 12.83,
+     "r1": 14.16,
+     "top_m": 0.9
+    },
+    {
+     "r0": 14.16,
+     "r1": 15.49,
+     "top_m": 1.35
+    }
+   ],
+   "arc_deg": [
+    20.0,
+    160.0
+   ],
+   "note": "plan angles in the asset (0 = +x, CCW in Blender; +90 = behind the band)"
+  },
+  {
+   "asset": "stage/spot_base.glb",
+   "tris": 136,
+   "height_m": 1.0,
+   "bounds_m": [
+    -0.31,
+    0.0,
+    -0.28,
+    0.31,
+    0.97,
+    0.28
+   ],
+   "materials": [
+    "lantern",
+    "metal",
+    "trim"
+   ],
+   "pivot_m": 0.95
+  },
+  {
+   "asset": "stage/spot_head.glb",
+   "tris": 148,
+   "height_m": 0.2,
+   "bounds_m": [
+    -0.27,
+    -0.25,
+    -0.36,
+    0.27,
+    0.25,
+    0.48
+   ],
+   "materials": [
+    "beam_lamp",
+    "metal",
+    "trim"
+   ],
+   "pivot": "origin",
+   "looks": "+z in the GLB (Blender -Y)",
+   "lens_m": 0.47
+  },
+  {
+   "asset": "stage/pylon_leg_ext.glb",
+   "tris": 112,
+   "height_m": 0.0,
+   "bounds_m": [
+    -0.46,
+    -55.0,
+    -0.46,
+    0.46,
+    0.0,
+    0.46
+   ],
+   "materials": [
+    "metal"
+   ],
+   "place": "at a gondola pylon's position 12 m lower (its mast's foot), same rotation"
   }
  ]
 }

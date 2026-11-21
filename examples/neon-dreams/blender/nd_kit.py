@@ -22,6 +22,7 @@ import nd_kit_garden as G
 import nd_kit_condensery as C
 import nd_kit_far as F
 import nd_kit_it9 as K9
+import nd_kit_stage as K12   # iteration 12 (owner msg 149): the band stage, its lights, the pylon's leg
 
 ONLY = [x for x in arg("--only", "").split(",") if x]
 
@@ -123,6 +124,7 @@ fam("landmarks", lambda: list(M.great_lantern()) + [M.lighthouse("lighthouse_a",
                                                      M.lighthouse("lighthouse_c", 303, height=50.0, house_floors=2, base_w=4.8, lattice=24.0), M.beam_cone(), K9.mooring_mast()])
 fam("decks", M.deck_kit)
 fam("street", lambda: M.street_kit() + [M.gondola_pylon()])
+fam("stage", lambda: K12.stage_kit() + K12.street_ext())
 fam("garden", lambda: G.garden_kit() + K9.garden_extra())
 fam("vehicles", M.craft)
 fam("condensery", C.condensery_kit)
