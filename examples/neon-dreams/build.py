@@ -194,10 +194,12 @@ def _reg(name, made, system, key, group):
 
 
 def _moog(gain, isle=False):
-    """reg 4 sums the district masks (the town) for the isle ring's term after it."""
+    """it12 (msg 149): the Moog's travelling pulse (it11: the districts in turn); reg 4 sums the district masks (the
+    town) for the isle ring's term after it."""
     if isle:
-        return lambda p: (NL.moog_term(p, 1, 3, 2, 5, 6, gain, msum=4), NL.isle_term(p, 1, 4, 5, 6))
-    return lambda p: NL.moog_term(p, 1, 3, 2, 5, 6, gain)
+        return lambda p: (NL.moog_pulse_term(p, 1, 3, 2, 5, 6, gain), NL.town_mask(p, 3, 4, 5),
+                          NL.isle_term(p, 1, 4, 5, 6))
+    return lambda p: NL.moog_pulse_term(p, 1, 3, 2, 5, 6, gain)
 
 
 def _isle():
@@ -268,7 +270,7 @@ def pane_program(zclass, state):
     # it11 (msg 130): the windows answer the Moog by district and flick floor by floor on the pad's phrase changes
     return _reg("ndPanes", lambda: AU.window_program(
         "ndPanes", t, t, 4.0, ring=NL.TOWN_RING_GAIN["panes"],
-        extra=(lambda p: NL.moog_term(p, 5, 2, 0, 3, 6, NL.MOOG_GAIN["panes"]), lambda p: NL.flick_term(p, 5, 3, 6))),
+        extra=(lambda p: NL.moog_pulse_term(p, 5, 2, 0, 3, 6, NL.MOOG_GAIN["panes"]), lambda p: NL.flick_term(p, 5, 3, 6))),
         "window", "win", "panes")
 
 
@@ -1050,8 +1052,20 @@ def clouds_block(state="uv", moon_dir=None):
     if DESIGN.get("wisp_regions"):   # it9: the art's regions over the town replace the engine's first lens
         w["zones"] = [{k: r[k] for k in ("name", "centre", "radii", "yaw", "floor", "below", "above", "density", "bob")
                        if k in r} for r in DESIGN["wisp_regions"]]
+    # ADR-2119 (msg 149): mist sheets at their own heights and winds (the art's `mist_layers` replace mine)
+    if not NO_MIST:
+        w["layers"] = [dict(l) for l in DESIGN.get("mist_layers", MIST_LAYERS)]
     if w.get("enabled") and not NO_WISPS:
         out["wisps"] = w
+    # ADR-2119 (msg 149): the clouds churn in place; their thin edges take the air's colour
+    out["churn"] = dict(CHURN, **DESIGN.get("churn", {}))
+    out["edgeAir"] = DESIGN.get("edgeAir", EDGE_AIR)
+    # ADR-2120 (msg 149): the ocean break becomes a vortex (the art's `vortex` over my first setting)
+    v = vortex_design()
+    if v:
+        out["vortex"] = {k: v[k] for k in v if not k.startswith("_")}
+        out["vortex"]["glowColor"] = pal(v.get("_glowKey", "ocean_b"), state)
+        out["sea"]["breaks"] = []
     if moon_dir is not None:
         out["halo"] = {"direction": r3(moon_dir), "color": [v * 0.42 for v in pal("moon_disc", state)],
                        "radius": 3.0, "intensity": CLOUD_LOOK["halo"]}
@@ -1112,6 +1126,45 @@ WISPS = {"enabled": True, "base": 0.0, "top": 0.0, "density": 1.8, "scale": 10.0
          "zones": [{"name": "mooring", "centre": [0.0, 10.0], "floor": 131.0, "radii": [330.0, 280.0], "yaw": 0.0,
                     "below": 30.0, "above": 6.0, "density": 1.0}]}
 NO_WISPS = False
+NO_MIST = False
+NO_VORTEX = False
+# ADR-2119 (owner msg 149: "clouds all around more animated ... fog layers or distortion/movement"): the billows boil in
+# place over 7 s clocks (1.2 m/s, rising and rolling along the curl field) and their tatters writhe; thin edges take
+# 35 % of the air's colour (59.6 s: the edge "too CG")
+CHURN = {"amount": 1.0, "period": 7.0, "boil": 1.2, "writhe": 0.8}
+EDGE_AIR = 0.35
+# ADR-2119 (msg 149: "clouds around the city more dynamic, blended with layers of fog"; 62 s: "more cloud layers / fog
+# layers"): mist sheets. The town's decks are at 121-153 m; the stilts' sheet lies under them, a wider low bank blends
+# the town's cloud into the sea, and two banks over the open sea and round the vortex give the reveal its layers.
+MIST_LAYERS = [
+    {"name": "stilts", "centre": [0.0, 10.0], "radius": 520.0, "base": 92.0, "top": 121.0, "density": 0.9,
+     "scale": 26.0, "coverage": 0.5, "stretch": 3.5, "drift": [1.4, 0.0, 0.5]},
+    {"name": "harbour_low", "centre": [0.0, 10.0], "radius": 1400.0, "base": 40.0, "top": 95.0, "density": 0.6,
+     "scale": 60.0, "coverage": 0.45, "stretch": 3.0, "drift": [2.2, 0.0, 0.8]},
+    {"name": "open_sea", "centre": [1300.0, -30.0], "radius": 1300.0, "base": 15.0, "top": 75.0, "density": 0.5,
+     "scale": 80.0, "coverage": 0.42, "stretch": 3.0, "drift": [2.5, 0.0, 1.0]},
+    {"name": "vortex_shelf", "centre": [2090.0, -20.0], "radius": 950.0, "base": -25.0, "top": 45.0, "density": 0.7,
+     "scale": 55.0, "coverage": 0.5, "stretch": 3.0, "drift": [0.4, 0.0, 0.2]},
+]
+# ADR-2120 (msg 149: "turn the ocean break into a CLOUD VORTEX"): my first setting, under the art's `vortex` from the
+# cloud design. Centred on the break, the eye a little narrower than the break was, the funnel down to the cosmic
+# ocean, which moves down under the eye (`_oceanY`).
+VORTEX = {"enabled": True, "radius": 620.0, "eye": 150.0, "elongation": 1.6, "depth": 175.0, "spin": 0.12,
+          "twist": 0.8, "wind": 1.8, "shelves": 5, "pitch": 1.5, "arms": 3, "armDepth": 0.45, "glow": 6.0,
+          "glowHeight": 90.0,
+          "pulse": 0.0, "column": 260.0, "columnDensity": 0.8, "columnPitch": 180.0,
+          "_glowKey": "ocean_b", "_oceanY": -228.0}
+
+
+def vortex_design():
+    """The vortex block (centre and yaw from the break unless the art's design names them), or None."""
+    if NO_VORTEX:
+        return None
+    brk = DESIGN["sea_design"]["break"]
+    v = dict(VORTEX, centre=brk["centre"], yaw=brk.get("yaw_rad", 0.0))
+    v.update(DESIGN.get("vortex", {}))
+    v.update(brk.get("vortex", {}))   # it12: the art's block lives under sea_design.break
+    return v if v.get("enabled", True) else None
 PLUG_FADE = (55.7, 56.45, 0.3)   # iteration 9: the plug's light dims from 55.7 s to 30 % by 56.45 s, back by 57.95
 PLUG_GLOW = {"radius": 20.0, "intensity": 3.0, "shadow": 0.1}   # ADR-2107: shadow 0.1, they sit in solid cloud
 
@@ -1256,6 +1309,11 @@ def scene_doc(state="uv", sky_map=None):
     brk = DESIGN["sea_design"]["break"]
     br = brk["centre"]
     op = brk.get("ocean_plane", {"y": -900.0, "semi_axes": [900.0, 900.0], "yaw_rad": 0.0})
+    vd = vortex_design()
+    if vd:   # ADR-2120: the ocean lies under the vortex's eye, a little wider than it
+        e = vd["eye"] * 1.35
+        op = {"y": vd.get("_oceanY", -228.0), "semi_axes": [round(e * vd["elongation"], 1), round(e, 1)],
+              "yaw_rad": vd["yaw"]}
     ya = op.get("yaw_rad", 0.0)
     nodes.append({"name": "cosmicOcean", "kind": "procedural", "position": [0, 0, 0], "procedural": {
         "source": {"kind": "cylinder", "radius": 1.0, "height": 40.0, "radialSegments": 96, "caps": True},
@@ -1269,7 +1327,8 @@ def scene_doc(state="uv", sky_map=None):
     nodes += aliens + vehicles + bob_nodes()
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
-        ocean_breathing(ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state), 0.0012, 2.5), br,
+        ocean_breathing(ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state),
+                                      0.004 if vd else 0.0012, 3.5 if vd else 2.5), br,
                         max(op["semi_axes"])),
         FL.plume_program("ndJetPlume"),   # iteration 10b (msg 121): the jet plumes
     ] + [PROGS[n]["doc"] for n in sorted(PROGS)]
@@ -1405,6 +1464,10 @@ def reactivity():
         R("stem.cloud.level", "env/skyIntensity", 0.10, **pad),
         R("stem.cloud.level", "material/ndOcean/emissionIntensity", 1.4, **pad),
     ]
+    vd = vortex_design()
+    if vd:   # ADR-2120 (msg 149): the vortex's eye glows with the pad and its funnel breathes on the bass
+        routes += [R("stem.cloud.level", "clouds/vortex/glow", round(vd["glow"] * 0.9, 3), **pad),
+                   R("stem.bass.level", "clouds/vortex/pulse", 0.6, **lvl_slow)]
     for n, info in PROGS.items():
         if info["group"] == "lone":
             routes.append(R("stem.cloud.level", "material/%s/emissionIntensity" % n,
@@ -1577,6 +1640,8 @@ def city_lights(routes, tracks, lvl_slow):
         if "moog_quay" in at:
             for d, keys in moog.items():
                 tracks.append(AU.track(info["prog"].path("moog_" + d), keys))
+        if "mpulse_front0" in at:   # it12 (msg 149): the Moog's pulse down the town from the lens
+            tracks += NL.moog_pulse_tracks(info["prog"].path, cam_at)
         if "hh_phase" in at:
             tracks += [AU.track(info["prog"].path("hh_phase", "value"), hh_phase),
                        AU.track(info["prog"].path("hh_amt"), hh_amt)]
@@ -1670,6 +1735,9 @@ def main():
     ap.add_argument("--no-clouds", action="store_true", help="the cloud block disabled (for an A/B of its cost)")
     ap.add_argument("--no-arc", action="store_true", help="hold the starting palette (no palette arc tracks)")
     ap.add_argument("--no-wisps", action="store_true", help="ADR-2113 A/B: leave the wisp layer out")
+    ap.add_argument("--no-mist", action="store_true", help="ADR-2119 A/B: no mist sheets")
+    ap.add_argument("--no-churn", action="store_true", help="ADR-2119 A/B: no churn, no edge air")
+    ap.add_argument("--no-vortex", action="store_true", help="ADR-2120 A/B: the ocean break as it was")
     ap.add_argument("--wisp", action="append", default=[], metavar="KEY=VALUE",
                     help="override one wisp key (a number, or JSON); repeatable")
     ap.add_argument("--quality", default="offline", choices=sorted(CLOUD_QUALITY),
@@ -1690,7 +1758,7 @@ def main():
     ap.add_argument("--proto-flight", action="store_true", help="add the prototype flight (flyer00) to the cast")
     ap.add_argument("--crowd-test", type=int, default=0, help="capacity probe: N aliens (not the film)")
     a = ap.parse_args()
-    global NO_WISPS, CROWD_TEST, PLUG_FADE
+    global NO_WISPS, CROWD_TEST, PLUG_FADE, EDGE_AIR
     CROWD_TEST = a.crowd_test
     global PROTO_FLIGHT, CITY_OFF
     CITY_OFF = a.city_off
@@ -1698,6 +1766,12 @@ def main():
     if a.plug_fade:
         PLUG_FADE = tuple(float(v) for v in a.plug_fade.split(","))
     NO_WISPS = a.no_wisps
+    global NO_MIST, NO_VORTEX
+    NO_MIST = a.no_mist
+    NO_VORTEX = a.no_vortex
+    if a.no_churn:
+        CHURN["amount"] = 0.0
+        globals()["EDGE_AIR"] = 0.0
     for kv in a.wisp:
         k, v = kv.split("=", 1)
         WISPS[k] = json.loads(v)

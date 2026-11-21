@@ -21,7 +21,9 @@ JUMP_TAKEOFF = 0.567      # Jumping: the feet leave the ground
 JUMP_TO_HOVER = 0.62      # the cue into Floating (an upright hover, the body 0.4 m up) just after the feet leave
 LAND_TOUCHDOWN = 0.267    # Landing: the feet reach the ground
 LAND_LEN = 1.067
-KEY_HZ = 15.0             # flight keys a second (linear between: smooth at 30 fps)
+KEY_HZ = 30.0             # flight keys a second (it12: 30, one a frame; 15 kinked the path every second frame)
+# it12 (msg 149): the loops on the song's grid (171.4 BPM): Floating 6.5 s = 18 beats, Flying_jet 2.9 s = 8 beats
+BEAT_RATE = {"Floating": round(6.5 / (18 * 60.0 / 171.4), 4), "Flying_jet": round(2.9 / (8 * 60.0 / 171.4), 4)}
 # The jet's nozzle (the bottom of Backpack_Jet, through the Backpack joint) and its thrust direction in the flyer's
 # own frame, per clip, measured from alien-pilot.glb's clips (work/engine/it10/fly/nozzle.py in the studio project):
 # Jumping and Landing upright, Floating upright and raised, Flying_jet prone (the jet blows back along -z).
@@ -348,7 +350,7 @@ def flight(f, r3, song, light_color, flame_color):
         rolls.append(max(-BANK_MAX, min(BANK_MAX, math.degrees(math.atan2(a_side, G)))))
     pitches, rolls = _smooth(pitches, 5), _smooth(rolls, 5)
     pk, rk = [], []
-    for i in range(0, len(ts), 2):                     # 15 Hz keys
+    for i in range(0, len(ts), 1):                     # it12 (msg 149): 30 Hz keys (it10: 15 Hz, a kink every 2nd frame)
         pk.append({"time": round(ts[i], 3), "value": r3(P[i]), "interp": "linear"})
         rk.append({"time": round(ts[i], 3), "value": [round(v, 2) for v in _euler_zyx(yaws[i], pitches[i], rolls[i])],
                    "interp": "linear"})
@@ -363,6 +365,20 @@ def flight(f, r3, song, light_color, flame_color):
     rk = [{"time": 0.0, "value": rot_a, "interp": "linear"}, {"time": round(t_lift - 1e-3, 3), "value": rot_a, "interp": "linear"}] + \
         rk[1:] + [{"time": t_end, "value": rot_b, "interp": "linear"}]
     rk = sorted({k["time"]: k for k in rk}.values(), key=lambda k: k["time"])
+    # it12 (msg 149, the 4.09 s "glitching/skipping"): the ZYX decomposition flips a component between +180 and -180
+    # (fly_pier_isle at 3.92 s: X 180 -> -179.99); keys interpolate component-wise, so the body spun through a whole
+    # turn in one frame. Unwrap each component to the nearest equivalent of the key before.
+    # Each key also has a second solution, (x + 180, 180 - y, z + 180): the one nearer the key before is taken (the
+    # take-off key (0, 157, 0) and the first flight key (-180, 23, -180) are one rotation, not a half turn apart).
+    for q in range(1, len(rk)):
+        pv, v = rk[q - 1]["value"], rk[q]["value"]
+        best = None
+        for cand in (v, [v[0] + 180.0, 180.0 - v[1], v[2] + 180.0]):
+            u = [pv[c] + ((cand[c] - pv[c] + 180.0) % 360.0 - 180.0) for c in range(3)]
+            dist = sum(abs(u[c] - pv[c]) for c in range(3))
+            if best is None or dist < best[0]:
+                best = (dist, u)
+        rk[q]["value"] = [round(x, 2) for x in best[1]]
     cues = [(t0, "Jumping", 0.25), (t0 + JUMP_TO_HOVER, "Floating", 0.45), (t_land, "Landing", 0.25)]
 
     # ---- the thrust: what the jets must do to make this motion (gravity plus the vertical acceleration), so the plumes
@@ -422,7 +438,7 @@ def flight(f, r3, song, light_color, flame_color):
     nodes = [{"name": name, "kind": "gltf", "asset": f["asset"], "position": r3(A), "rotation": rot_a,
               "scale": [1.0, 1.0, 1.0],
               "animation": {"state": "Idle", "blend": 0.3, "phase": f.get("phase", 0.0), "updateHz": 0,
-                            "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 300.0}}]
+                            "nearDistance": 40.0, "farHz": 0.0, "cullDistance": 300.0}}]   # it12: posed every frame
     tracks = [track("nodes/%s/position" % name, pk), track("nodes/%s/rotation" % name, rk)]
     for side, n in zip((-1, 1), flames):
         nodes.append({"name": n, "kind": "procedural", "parent": name, "position": NOZZLE["Jumping"][0],
@@ -469,7 +485,7 @@ def flight(f, r3, song, light_color, flame_color):
                track("lights/%s/position" % lamp, lpk)]
     clips = []
     for time, clip, blend in cues:
-        c = {"time": round(time, 3), "clip": clip, "speed": 1.0, "blend": blend,
+        c = {"time": round(time, 3), "clip": clip, "speed": BEAT_RATE.get(clip, 1.0), "blend": blend,
              "playback": "once" if clip in ("Jumping", "Landing") else "loop"}
         if clip == "Landing":
             c["then"] = "Idle"

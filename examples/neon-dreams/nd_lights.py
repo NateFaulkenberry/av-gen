@@ -147,6 +147,78 @@ def moog_term(p, out, pos, acc, t1, t2, gain, msum=None):
     p.op(kind="multiply", dst=out, srcA=out, srcB=acc)
 
 
+# it12 (owner msg 149: "lights pulse to the Moog down through the city away from the camera"): each Moog note
+# launches a front of light from just ahead of the lens, travelling along the lens's heading (horizontal) through the
+# town and fading as it goes; signs, eave strips and windows light as it passes them, receding into depth. A corridor
+# PULSE["corridor"] m either side of the heading keeps it "down the street". Notes take turns on PULSE["channels"]
+# fronts, so one runs its whole course while the next starts. The fronts and corridors are op constants keyed per note
+# from the camera path (exactly seek-safe). The program's gradient saturates, so each is an offset ramp:
+# g = 0.5 + (dot(p, dir) - front) / (2 W), then x = 2 g - 1 is the signed distance over W (W > the band's width).
+PULSE = {"speed": 150.0, "travel": 1.7, "start": 12.0, "width": 9.0, "ramp": 30.0, "corridor": 140.0, "channels": 3,
+         "ad": (0.03, 1.4), "gate": (0.0, 47.6)}
+
+
+def moog_pulse_term(p, out, pos, acc, t1, t2, gain):
+    """out x= 1 + gain x sum over the channels of band(front) x corridor x envelope."""
+    p.op(kind="input", input="worldPosition", dst=pos)
+    b2 = (PULSE["width"] / PULSE["ramp"]) ** 2
+    for i in range(PULSE["channels"]):
+        p.op("mpulse_front%d" % i, kind="gradient", dst=t1, srcA=pos, constant=[0.0, 0.0, 0.0, 0.0], value=1.0)
+        p.op(kind="remap", dst=t1, srcA=t1, constant=[0.0, 1.0, -1.0, 1.0], value=0.0)      # 2 g - 1
+        p.op(kind="multiply", dst=t1, srcA=t1, srcB=t1)
+        p.op(kind="remap", dst=t1, srcA=t1, constant=[0.0, b2, 1.0, 0.0], value=1.0)        # the band
+        p.op("mpulse_side%d" % i, kind="gradient", dst=t2, srcA=pos, constant=[0.0, 0.0, 0.0, 0.5], value=1.0)
+        p.op(kind="remap", dst=t2, srcA=t2, constant=[0.0, 1.0, -1.0, 1.0], value=0.0)
+        p.op(kind="multiply", dst=t2, srcA=t2, srcB=t2)
+        p.op(kind="remap", dst=t2, srcA=t2, constant=[0.0, 1.0, 1.0, 0.0], value=1.0)       # the corridor
+        p.op(kind="multiply", dst=t1, srcA=t1, srcB=t2)
+        p.op("mpulse_amt%d" % i, kind="constant", dst=t2, constant=[0.0, 0.0, 0.0, 0.0])
+        if i == 0:
+            p.op(kind="multiply", dst=acc, srcA=t1, srcB=t2)
+        else:
+            p.op(kind="multiply", dst=t1, srcA=t1, srcB=t2)
+            p.op(kind="add", dst=acc, srcA=acc, srcB=t1)
+    AU.gain_term(p, acc, acc, gain)
+    p.op(kind="multiply", dst=out, srcA=out, srcB=acc)
+
+
+def moog_pulse_tracks(prog_path, cam_at, song=70.18):
+    """Per channel: the front's ramp constant, the corridor's and the envelope, keyed on the Moog's onsets inside the
+    gate (each note's heading is the lens's at that note)."""
+    sp, tr, d0, W, C = PULSE["speed"], PULSE["travel"], PULSE["start"], PULSE["ramp"], PULSE["corridor"]
+    n = PULSE["channels"]
+    fw, fc = 1.0 / (2.0 * W), 1.0 / (2.0 * C)
+    front = [[{"time": 0.0, "value": [0.0, 0.0, 0.0, 0.0], "interp": "step"}] for _ in range(n)]
+    side = [[{"time": 0.0, "value": [0.0, 0.0, 0.0, 0.5], "interp": "step"}] for _ in range(n)]
+    notes = [t for t in ONSETS["moog"] if PULSE["gate"][0] <= t <= PULSE["gate"][1]]
+    per = [[] for _ in range(n)]
+    for k, tn in enumerate(notes):
+        per[k % n].append(tn)
+    amt = []
+    for i in range(n):
+        for j, tn in enumerate(per[i]):
+            pos, fwd = cam_at(tn)
+            te = min(tn + tr, per[i][j + 1] - 0.01) if j + 1 < len(per[i]) else tn + tr   # before the channel's next note
+            h = math.hypot(fwd[0], fwd[2]) or 1.0
+            dx, dz = fwd[0] / h, fwd[2] / h
+            base = dx * pos[0] + dz * pos[2]
+            t0 = round(max(tn - 0.002, 0.0), 4)
+
+            def fr(s):
+                return [round(dx * fw, 7), 0.0, round(dz * fw, 7), round(0.5 - (base + d0 + s) * fw, 6)]
+            front[i] += [{"time": t0, "value": fr(0.0), "interp": "linear"},
+                         {"time": round(te, 4), "value": fr(sp * (te - t0)), "interp": "step"}]
+            lat0 = -dz * pos[0] + dx * pos[2]
+            side[i].append({"time": t0, "value": [round(-dz * fc, 7), 0.0, round(dx * fc, 7), round(0.5 - lat0 * fc, 6)],
+                            "interp": "step"})
+        amt.append(env_keys(per[i], PULSE["ad"][0], PULSE["ad"][1], song=song))
+    tracks = []
+    for i in range(n):
+        tracks += [AU.track(prog_path("mpulse_front%d" % i), front[i]), AU.track(prog_path("mpulse_side%d" % i), side[i]),
+                   AU.track(prog_path("mpulse_amt%d" % i), amt[i])]
+    return tracks
+
+
 def town_mask(p, pos, msum, t1):
     """msum = the sum of the district masks (1 in the town's districts, 0 out over the isles)."""
     p.op(kind="input", input="worldPosition", dst=pos)

@@ -25,10 +25,17 @@ WALK_STRIDE = {"Walking": 1.34, "Walking_low_grav": 1.0}   # m/s a stance foot s
 TURN_RATE = 225.0
 SPEEDS = (0.92, 1.0, 1.08)
 PHASES = 8
-TIER_HZ = {"A": 0, "B": 15.0, "C": 4.0}
+TIER_HZ = {"A": 0, "B": 0, "C": 0}   # it12 (msg 149): every figure posed every frame (it10: B 15 Hz, C 4 Hz stepped)
+FAR_HZ = 0.0           # it12 (msg 149, the 4.09 s flyer "glitching/skipping"): no distance rate either (it10: 15 Hz past 40 m)
+# it12 (owner msg 149: "time animations to quarter notes, this looks too slow motion"): the clips run on the song's
+# grid. Sabertooth is 171.4 BPM (the kick every 0.70 s from 0.05 s): a looping clip plays a whole number of beats a
+# cycle at a rate of at least 1 (never slower than authored); its opening phase puts a cycle's start on a beat; a walk
+# steps on every quarter note (Walking: 2 steps a cycle = 2 beats, 2.04 m/s) and a low-gravity bound on every bar.
+BEAT = 60.0 / 171.4
+WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8}
 RING_M = 60.0          # a crowd ring's width (m) and the head wave's speed (m/s): one ring a second
 RINGS = 6
-BEAT2 = 1.32           # two beats (s): the sway's period
+BEAT2 = 4 * 60.0 / 171.4   # it12: four beats (s), a lean each way on alternate kicks (it10: 1.32 s, off the tempo)
 LOOK_LAYER = {"name": "crowd-look", "kind": "aim", "drive": "manual",
               "joints": ["head.x", "Eye_L", "Eye_R", "Mouth", "Antenna"],
               "pivot": "head.x", "maxYaw": 35.0, "maxPitch": 20.0}
@@ -127,17 +134,33 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         for m in g["members"]:
             group_of[m] = gi
 
-    def phase_for(clip):
-        return round(clip_len.get(clip, 2.0) * r.randrange(PHASES) / PHASES, 4)
+    def beat_rate(clip):
+        """(rate, beats a cycle): a whole number of beats, never slower than authored."""
+        L = clip_len.get(clip, 2.0)
+        n = max(1, int(L / BEAT + 1e-6))
+        return round(L / (n * BEAT), 4), n
+
+    def phase_for(clip, rate=None):
+        """Clip seconds at timeline 0 so that a cycle starts on a beat of the grid (kick0 + k BEAT), on one of its beats."""
+        L = clip_len.get(clip, 2.0)
+        rr, n = beat_rate(clip)
+        rate = rate or rr
+        m = r.randrange(PHASES) % n   # (the same draws as it11's buckets: the spots keep their clips)
+        return round((rate * (m * BEAT - kick0)) % L, 4)
+
+    def on_grid(t):
+        return kick0 + round((t - kick0) / BEAT) * BEAT
 
     def ring_of(pos):
         d = math.dist([pos[0], pos[2]], [bell[0], bell[2]])
         return "ring%d" % min(RINGS - 1, int(d // RING_M))
 
     def anim(clip, tier, listen=None, speed=None, phase=None):
-        a = {"state": clip, "blend": 0.3, "speed": speed if speed is not None else r.choice(SPEEDS),
-             "phase": phase if phase is not None else phase_for(clip), "updateHz": TIER_HZ.get(tier, 0),
-             "nearDistance": 40.0, "farHz": 15.0, "cullDistance": 600.0}
+        if speed is None:
+            r.choice(SPEEDS)   # it11's rate draw, kept so the random stream (and every spot's clip) is unchanged
+        a = {"state": clip, "blend": 0.3, "speed": speed if speed is not None else beat_rate(clip)[0],
+             "phase": phase if phase is not None else phase_for(clip, speed), "updateHz": TIER_HZ.get(tier, 0),
+             "nearDistance": 40.0, "farHz": FAR_HZ, "cullDistance": 600.0}
         if listen:
             ring, layers = listen
             a["crowd"] = ring
@@ -209,8 +232,10 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             p = dict(p, points=fp["points"])
         pts = p["points"]
         clip = p.get("clip", "Walking")
-        speed = p.get("speed_mps", 1.2)
-        rate = round(speed / WALK_STRIDE.get(clip, 1.34), 3)
+        # it12 (msg 149): the walk on the grid -- its rate from the beats a cycle, the speed from its stride
+        rate = round(clip_len.get(clip, 1.0667) / (WALK_BEATS.get(clip, 2) * BEAT), 4)
+        speed = WALK_STRIDE.get(clip, 1.34) * rate
+        idle_rate = beat_rate("Idle")[0]
         pause = p.get("pause_s", 2.5)
         seg = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
         out_t = sum(seg) / speed
@@ -225,14 +250,20 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                     u = (target - acc) / L
                     q = [out_pts[i][j] + (out_pts[i + 1][j] - out_pts[i][j]) * u for j in range(3)]
                     out_pts.insert(i + 1, q)
+                    # it12: the walk resumes on a beat (the stop lengthened to the next one)
+                    walked = (acc + (target - acc)) / speed
+                    dur = math.ceil((walked + dur) / BEAT - 1e-6) * BEAT - walked
                     stop_at[i + 1] = (dur, syaw)
                     break
                 acc += L
         out_t += sum(d for d, _ in stop_at.values())
+        # it12: each leg starts on a beat (the pause at the end lengthened to the next one)
+        pause = math.ceil((out_t + pause) / BEAT - 1e-6) * BEAT - out_t
         lap = 2 * (out_t + pause)
         for w in range(max(1, int(p.get("walkers", 1)))):
             cast = (p.get("cast") or ["alien-scout"])[w % len(p.get("cast") or ["x"])]
             offset = (p.get("phases_s") or [0.0])[w % len(p.get("phases_s") or [0.0])] % lap
+            offset = -on_grid(-offset)   # it12: t0 = -offset on the grid
             tier = p.get("tier", "B")
             name = ("walkA_" if tier == "A" else "walk_") + "%s_%d" % (p["id"], w)
             if tier == "A":
@@ -242,18 +273,42 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             while t0 < song + 1:
                 for leg, (a_pts, start) in enumerate(((out_pts, t0), (pts[::-1], t0 + out_t + pause))):
                     tt = start
+                    yaw = None
+                    cum = [0.0]
                     for i in range(len(a_pts) - 1):
-                        d = [a_pts[i + 1][j] - a_pts[i][j] for j in range(3)]
-                        yaw = math.degrees(math.atan2(d[0], d[2]))
+                        cum.append(cum[-1] + math.dist(a_pts[i], a_pts[i + 1]))
+
+                    def at_s(sv, a_pts=a_pts, cum=cum):
+                        sv = max(0.0, min(cum[-1], sv))
+                        for k in range(len(cum) - 1):
+                            if cum[k + 1] >= sv:
+                                u = (sv - cum[k]) / max(cum[k + 1] - cum[k], 1e-9)
+                                return [a_pts[k][j] + (a_pts[k + 1][j] - a_pts[k][j]) * u for j in range(3)]
+                        return a_pts[-1]
+                    for i in range(len(a_pts) - 1):
+                        # it12: the heading over 1.6 m of the path round the segment's middle, so the ground check's
+                        # small detours (walk_007: 0.2 m zigzags) do not spin the walker
+                        sm = 0.5 * (cum[i] + cum[i + 1])
+                        qa, qb = at_s(sm - 0.8), at_s(sm + 0.8)
+                        d = [qb[j] - qa[j] for j in range(3)]
+                        # it12: a zero-length segment (a stop's split point) keeps the heading (it read as yaw 0: a
+                        # snap); each corner turns inside both segments' own time, so the keys stay in order at the
+                        # quicker quarter-note walk (it11's fixed 0.15 s ran keys backwards on short segments)
+                        if math.hypot(d[0], d[2]) > 1e-3 or yaw is None:
+                            yaw = math.degrees(math.atan2(d[0], d[2]))
                         if i == 0:
                             pk.append({"time": round(tt, 3), "value": r3(a_pts[0]), "interp": "linear"})
-                        rk.append({"time": round(tt, 3), "value": yaw, "interp": "linear"})
-                        tt += math.dist(a_pts[i], a_pts[i + 1]) / speed
-                        pk.append({"time": round(tt, 3), "value": r3(a_pts[i + 1]), "interp": "linear"})
-                        rk.append({"time": round(tt - 0.15, 3), "value": yaw, "interp": "linear"})
+                        dur_seg = math.dist(a_pts[i], a_pts[i + 1]) / speed
+                        win = min(0.15, 0.45 * dur_seg)
+                        if dur_seg > 1e-3 or i == 0:   # it12: no keys for a zero-length segment (one time, many yaws)
+                            rk.append({"time": round(tt + (win if i > 0 else 0.0), 3), "value": yaw, "interp": "linear"})
+                        tt += dur_seg
+                        if dur_seg > 1e-3 or i == 0:
+                            pk.append({"time": round(tt, 3), "value": r3(a_pts[i + 1]), "interp": "linear"})
+                            rk.append({"time": round(tt - win, 3), "value": yaw, "interp": "linear"})
                         if leg == 0 and (i + 1) in stop_at:
                             dur, syaw = stop_at[i + 1]
-                            cues.append({"time": round(tt, 3), "clip": "Idle", "speed": 1.0, "blend": 0.4})
+                            cues.append({"time": round(tt, 3), "clip": "Idle", "speed": idle_rate, "blend": 0.4})
                             rk.append({"time": round(tt + 0.6, 3), "value": syaw, "interp": "linear"})
                             rk.append({"time": round(tt + dur - 0.5, 3), "value": syaw, "interp": "linear"})
                             tt += dur
@@ -261,8 +316,9 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                             cues.append({"time": round(tt - 0.3, 3), "clip": clip, "speed": rate, "blend": 0.35})
                     # the end: Idle, and a turn on the spot in its last 0.8 s
                     cues.append({"time": round(start, 3), "clip": clip, "speed": rate, "blend": 0.35})
-                    cues.append({"time": round(tt, 3), "clip": "Idle", "speed": 1.0, "blend": 0.4})
-                    back = math.degrees(math.atan2(a_pts[-2][0] - a_pts[-1][0], a_pts[-2][2] - a_pts[-1][2]))
+                    cues.append({"time": round(tt, 3), "clip": "Idle", "speed": idle_rate, "blend": 0.4})
+                    qe, qf = at_s(cum[-1]), at_s(cum[-1] - 1.6)   # it12: back along the smoothed path (no 0,0 heading)
+                    back = math.degrees(math.atan2(qf[0] - qe[0], qf[2] - qe[2]))
                     rk.append({"time": round(tt + pause - 0.8, 3), "value": rk[-1]["value"], "interp": "linear"})
                     rk.append({"time": round(tt + pause, 3), "value": back, "interp": "linear"})
                 t0 += lap
@@ -272,14 +328,21 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                 y, py = rk[q]["value"], rk[q - 1]["value"]
                 rk[q]["value"] = py + ((y - py + 180) % 360 - 180)
             # keep yaw inside the parameter's +-360 range: shift the whole track by whole turns where it drifts
+            rk = _rate_limited(rk, 0.1, 320.0)   # it12: no walker turns faster than 320 deg/s
+            # it12: when the shift changes, the key before is repeated (same instant) in the new turn, so the segment
+            # between interpolates the short way (it11 jumped 348 deg across one segment: a whole spin in 0.3 s)
             shift = 0.0
+            out_rk = []
             for k in rk:
                 v = k["value"] + shift
-                if v > 300:
-                    shift -= 360
-                elif v < -300:
-                    shift += 360
-                k["value"] = [0.0, round(k["value"] + shift, 1), 0.0]
+                if v > 300 or v < -300:
+                    shift += -360 if v > 300 else 360
+                    if out_rk:
+                        pv = out_rk[-1]
+                        out_rk.append({"time": pv["time"], "value": [0.0, round(pv["value"][1] + (-360 if v > 300 else 360), 1),
+                                                                     0.0], "interp": "linear"})
+                out_rk.append(dict(k, value=[0.0, round(k["value"] + shift, 1), 0.0]))
+            rk = out_rk
             pk = _clip_start(pk)
             rk = _clip_start(rk)
             cues = sorted([c for c in cues if c["time"] < song], key=lambda c: c["time"])
@@ -287,7 +350,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             cues = ([dict(before[-1], time=0.0)] if before else []) + [c for c in cues if c["time"] > 0]
             n = {"name": name, "kind": "gltf", "asset": aliens + cast + ".glb", "position": pk[0]["value"],
                  "rotation": rk[0]["value"], "scale": [pop.get("scale", 1.0)] * 3,
-                 "animation": anim(cues[0]["clip"] if cues else clip, tier, speed=rate, phase=phase_for(clip))}
+                 "animation": anim(cues[0]["clip"] if cues else clip, tier, speed=rate, phase=phase_for(clip, rate))}
             if p.get("bob"):
                 n["bob"] = p["bob"]
             nodes.append(n)
@@ -352,7 +415,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                 oa, ob = bob_offset(ba, s), bob_offset(bb, s)
                 out.append({"time": round(s, 3), "value": r3([v[i] + oa[i] * (1 - w) + ob[i] * w for i in range(3)]),
                             "interp": "linear"})
-                s += 1.0 / 15.0
+                s += 1.0 / 30.0   # it12: 30 Hz (it10: 15)
             ptrack["keys"] = out
         nodes += n
         lights += l
@@ -363,6 +426,34 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         tracks.append(track("crowds/%s/lag" % ring, lag_keys()))
         tracks.append(track("crowds/%s/lookTarget" % ring, [{"time": 0.0, "value": r3(bell), "interp": "linear"}]))
     return nodes, tracks, lights, actors, sorted(crowds), wakes
+
+
+def _rate_limited(keys, step, rate):
+    """it12 (msg 149): a scalar yaw track resampled every `step` s and limited to `rate` deg/s (a forward and a
+    backward pass, averaged, so a turn is neither late nor early): a path's tight wiggles no longer spin a walker."""
+    if len(keys) < 2:
+        return keys
+    t0, t1 = keys[0]["time"], keys[-1]["time"]
+    ts, t = [], t0
+    while t < t1:
+        ts.append(t)
+        t += step
+    ts.append(t1)
+    vals, j = [], 0
+    for t in ts:
+        while j + 1 < len(keys) - 1 and keys[j + 1]["time"] <= t:
+            j += 1
+        a, b = keys[j], keys[min(j + 1, len(keys) - 1)]
+        u = 0.0 if b["time"] <= a["time"] else min(1.0, max(0.0, (t - a["time"]) / (b["time"] - a["time"])))
+        vals.append(a["value"] + (b["value"] - a["value"]) * u)
+    f, bk = list(vals), list(vals)
+    for i in range(1, len(f)):
+        m = rate * (ts[i] - ts[i - 1])
+        f[i] = min(max(f[i], f[i - 1] - m), f[i - 1] + m)
+    for i in range(len(bk) - 2, -1, -1):
+        m = rate * (ts[i + 1] - ts[i])
+        bk[i] = min(max(bk[i], bk[i + 1] - m), bk[i + 1] + m)
+    return [{"time": round(t, 3), "value": round(0.5 * (x + y), 2), "interp": "linear"} for t, x, y in zip(ts, f, bk)]
 
 
 def _clip_start(keys):
