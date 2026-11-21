@@ -206,6 +206,24 @@ def _poly_at(pts, cum, s):
     return [pts[lo][i] + (pts[hi][i] - pts[lo][i]) * u for i in range(len(pts[0]))]
 
 
+def _cruise(u, length):
+    """Iteration 11 (art request 5, msg 136): the share of the route covered at time share u. A short hop keeps the
+    smootherstep (peak 1.9x its mean speed: the motion msg 132 liked); a long cruise (> 40 m) eases in and out over its
+    first and last 18 % and flies the middle at a constant speed (peak 1.22x the mean), so a flyer keeps pace with the
+    camera instead of racing ahead in the middle."""
+    u = max(0.0, min(1.0, u))
+    if length <= 40.0:
+        return _S(u)
+    e = 0.18
+    v = 1.0 / (1.0 - e)                 # the middle's speed (area under the trapezoid = 1)
+    if u < e:
+        return 0.5 * v * u * u / e
+    if u > 1.0 - e:
+        w = 1.0 - u
+        return 1.0 - 0.5 * v * w * w / e
+    return 0.5 * v * e + v * (u - e)
+
+
 def _S(u):
     u = max(0.0, min(1.0, u))
     return u * u * u * (u * (6 * u - 15) + 10)
@@ -284,7 +302,7 @@ def flight(f, r3, song, light_color, flame_color):
     h1 = t_desc + 0.3 * T_dn                           # and is over the deck early in the descent: it comes down upright
 
     def pos_at(t):
-        u = _S((t - h0) / max(h1 - h0, 1e-3))
+        u = _cruise((t - h0) / max(h1 - h0, 1e-3), L)
         r = _poly_at(hp, hc, L * u)
         c = _S((t - t_lift) / T_up)
         d = _S((t - t_desc) / T_dn)
@@ -389,7 +407,7 @@ def flight(f, r3, song, light_color, flame_color):
             width = 0.0 if th <= 0 else 1.0 + 0.08 * _noise1(seed + side * 5, 1.7 * t)
             sk[n].append({"time": round(t, 3), "value": r3([width, max(length, 0.0), width]), "interp": "linear"})
             fpk[n].append({"time": round(t, 3), "value": r3([nz[0] + side * PLUME_SPLIT, nz[1], nz[2]]), "interp": "linear"})
-        lk.append({"time": round(t, 3), "value": round(f.get("light", 30.0) * th * (0.85 + 0.15 * _noise1(seed, 2 * t))
+        lk.append({"time": round(t, 3), "value": round(f.get("light", 55.0) * th * (0.85 + 0.15 * _noise1(seed, 2 * t))
                                                        * (1.0 + PUFF[0] * env * hover), 3), "interp": "linear"})
         lpk.append({"time": round(t, 3), "value": r3([nz[i] + 0.6 * dr[i] for i in range(3)]), "interp": "linear"})
         rate.append({"time": round(t, 3), "value": round(SOFT["rate"] * min(th, 1.6) * (1.0 + PUFF[1] * env * hover), 1),
@@ -446,7 +464,7 @@ def flight(f, r3, song, light_color, flame_color):
                 {"time": round(a1, 3), "value": 0.0, "interp": "linear"}]))
             node["particles"].pop("_rate", None)
     lights = [{"name": lamp, "type": "point", "node": name, "position": NOZZLE["Jumping"][0],
-               "color": light_color, "intensity": 0.0, "range": 8.0, "castsShadow": False, "volumetric": 0.0}]
+               "color": light_color, "intensity": 0.0, "range": 12.0, "castsShadow": False, "volumetric": 0.0}]
     tracks += [track("lights/%s/intensity" % lamp, lk0 + lk + [{"time": end, "value": 0.0, "interp": "linear"}]),
                track("lights/%s/position" % lamp, lpk)]
     clips = []
