@@ -315,7 +315,7 @@ def flights(pop, lay):
     sp = {s["id"]: s for s in pop["spots"]}
     out = []
     # 1. in from the east isle's lantern spire, down onto the terrace's top tier behind the band (seen ahead, 42-44.5 s)
-    A = sp["pop_0396"]["pos"]                                   # isle_east's deck (rides isle_east)
+    A = [156.5, 156.0, -33.0]                                   # isle_east's deck, open sky (--open-near), 3.6 m from its people
     B = polar(118.0, TERR["r0"] + 2.5 * TERR["depth"], 3 * TERR["rise"])
     top = 150.0
     rt = [lerp(A, B, 0.15), lerp(A, B, 0.5), lerp(A, B, 0.85)]
@@ -323,16 +323,18 @@ def flights(pop, lay):
     out.append(flight("fly_band_in_east", "alien-ranger", A, B, 36.6, 44.37, top, rt,
                       "it12 (msg 149): from the east isle's spire down onto the band's terrace, ahead of the lens as it slows",
                       bob_a="isle_east", da="isle:isle_east", db="band"))
-    # 2. out of the crowd: lifts off the plaza's south side as the lens arrives, climbs over the band and away east
-    A = polar(-32.0, 15.6)
-    B = sp["pop_0402"]["pos"]                                   # isle_exit's deck (rides isle_exit)
-    rt = [lerp(A, B, 0.2), lerp(A, B, 0.55), lerp(A, B, 0.9)]
-    rt = [[rt[0][0], 140.0, rt[0][2]], [rt[1][0], 146.0, rt[1][2]], [rt[2][0], 142.0, rt[2][2]]]
-    out.append(flight("fly_band_out", "alien-pilot", A, B, 43.65, 53.0, 146.0, rt,
-                      "it12 (msg 149): a pilot jets out of the audience as the lens slows into the plaza (43.6 s) and "
-                      "climbs away to the exit isle's mast", bob_b="isle_exit", da="band", db="isle:isle_exit"))
+    # 2. out of the crowd: lifts off the front rows as the lens closes on the band, climbs over the halo and away
+    #    north-east to the east isle's spire (crossing the frame right to left and up, 44.4-46 s)
+    A = polar(-62.0, 14.9)
+    B = [163.5, 156.0, -42.0]                                   # isle_east's deck, open sky (--open-near)
+    top = 152.0
+    rt = [[A[0], 140.0, A[2]], [C[0] - 1.0, 149.0, C[2] - 2.0], lerp([C[0], top, C[2]], [B[0], top, B[2]], 0.5),
+          [B[0] + 4.0, top + 6.0, B[2] + 10.0]]
+    out.append(flight("fly_band_out", "alien-pilot", A, B, 44.37, 52.6, top + 6.0, rt,
+                      "it12 (msg 149): a pilot jets out of the front rows as the lens closes on the band, over the halo "
+                      "and away to the east isle's spire", bob_b="isle_east", da="band", db="isle:isle_east"))
     # 3. in from the hanging-garden isle south of the Steps, across the frame right to left, down at the crowd's back
-    A = sp["pop_0420"]["pos"]
+    A = [96.5, 122.623, 98.0]                                   # isle_south2, open sky (--open-near)
     B = polar(-140.0, 16.0)
     rt = [lerp(A, B, 0.2), lerp(A, B, 0.55), lerp(A, B, 0.85)]
     rt = [[p[0], 133.0, p[2]] for p in rt]
@@ -347,7 +349,7 @@ def flights(pop, lay):
                       "it12 (msg 149): off a Quay roof garden on the snare before the close pass, ahead of the lens down "
                       "the Quay and over the Steps to the band", da="roof", db="band"))
     # 5. the pier: off the inner2 isle as the lens comes up the pier, along it ahead, down on the deck near the root
-    A = sp["pop_0408"]["pos"]
+    A = [-165.5, 125.957, 88.0]                                 # isle_inner2, open sky (--open-near)
     O, D, N = (-317.0, -164.0), (0.8216, 0.5698), (0.5698, -0.8216)
 
     def pier(s, n, z):
