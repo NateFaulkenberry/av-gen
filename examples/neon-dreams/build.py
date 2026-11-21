@@ -1340,6 +1340,16 @@ def fov_track():
     """The lens closes from 52 to 36 degrees as the camera leaves the Veil, so the Condensery (1.2-1.6 km out, the
     reveal's subject) fills the frame without flying closer than the song allows; it eases in over the thinning."""
     keys = [(0.0, 52.0), (54.0, 52.0), (55.5, 50.5), (57.0, 45.0), (58.95, 39.0), (62.0, 36.5), (SONG, 35.0)]
+    fs = LAYOUT["camera"].get("fov_scale")
+    if fs:   # it12b: the art's scale on the lens (the works are further from the reveal), keyed at both sets' times
+
+        def at(ks, t):
+            for (a, va), (b, vb) in zip(ks, ks[1:]):
+                if a <= t <= b:
+                    return va + (vb - va) * (t - a) / max(b - a, 1e-9)
+            return ks[-1][1] if t > ks[-1][0] else ks[0][1]
+        ts = sorted({t for t, _ in keys} | {t for t, _ in fs if t <= SONG})
+        keys = [(t, round(at(keys, t) * at(fs, t), 3)) for t in ts]
     return {"target": "camera/fov", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
             "loopLength": 0.0, "keys": [{"time": t, "value": v, "interp": "linear"} for t, v in keys]}
 
