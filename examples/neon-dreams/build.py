@@ -570,7 +570,7 @@ def cast_nodes(state="uv"):
     amber = pal("amber", state)
     nodes, tracks, lights, actors, crowds, wakes = NC.build(
         POPULATION, LAYOUT, DESIGN, ALIENS, CLIP_LEN, BELL_POS, SONG, r3, logged_flight(amber), kick_onsets(),
-        FLIGHT_FIXES)
+        FLIGHT_FIXES, GROUND_FIXES)
     SEQUENCE_ACTORS.extend(actors)
     CROWDS[:] = crowds
     if PROTO_FLIGHT:   # the msg 117/121 close-up's prototype flight, beside the population's
@@ -612,7 +612,106 @@ def check_flights(scene_dir):
     return bad
 
 
+def ground_request(doc, tracks):
+    """msg 130: every figure as the scene places it, for blender/nd_ground_check.py."""
+    tk = {t["target"]: t["keys"] for t in tracks}
+    figs = []
+    for n in doc["nodes"]:
+        nm = n["name"]
+        if n.get("kind") != "gltf" or "aliens/" not in n.get("asset", ""):
+            continue
+        if nm.startswith("flyer"):
+            continue   # the flights' ends come from the population below
+        if n.get("parent", "").startswith("vehicle"):
+            vi = int(n["parent"][len("vehicle"):])
+            figs.append({"id": nm, "kind": "rider", "cabin": LAYOUT["vehicles"][vi]["asset"],
+                         "samples": [[n["position"], n["rotation"][1]]]})
+            continue
+        pk = tk.get("nodes/%s/position" % nm)
+        if not pk:
+            figs.append({"id": nm, "kind": "spot", "bob": n.get("bob"), "samples": [[n["position"], n["rotation"][1]]]})
+            continue
+        # a walker: every leg its keys run (the whole song), resampled every 0.3 m; each distinct leg once
+        segs, samples = set(), []
+        for a, b in zip(pk, pk[1:]):
+            pa, pb = a["value"], b["value"]
+            L = math.dist(pa, pb)
+            key = (tuple(round(v, 2) for v in pa), tuple(round(v, 2) for v in pb))
+            if L < 1e-3 or key in segs or key[::-1] in segs:
+                continue
+            segs.add(key)
+            yaw = math.degrees(math.atan2(pb[0] - pa[0], pb[2] - pa[2]))
+            for s in range(int(L / 0.3) + 1):
+                u = min(1.0, s * 0.3 / L)
+                samples.append([r3([pa[i] + (pb[i] - pa[i]) * u for i in range(3)]), round(yaw, 1)])
+            samples.append([r3(pb), round(yaw, 1)])
+        pid = nm.split("_", 1)[1].rsplit("_", 1)[0]
+        path = next((q for q in (POPULATION or {}).get("paths", []) if q["id"] == pid), None)
+        figs.append({"id": nm, "kind": "walker", "bob": n.get("bob"), "samples": samples, "path_id": pid,
+                     "path": path["points"] if path else None})
+    for fd in (POPULATION or {}).get("flyers", []):
+        if "flyer_" + fd["id"] in FLIGHT_FIXES.get("_drop", []):
+            continue
+        k = fd["keys"]
+        for end, key in (("takeoff", k[0]), ("landing", k[-1])):
+            figs.append({"id": "flyer_%s@%s" % (fd["id"], end), "kind": "flyer", "bob": fd[end].get("bob"),
+                         "samples": [[fd[end]["pos"], key.get("yaw_deg") or 0.0]]})
+    return {"figures": figs}
+
+
+def check_ground(doc, tracks, scene_dir, tag="ground_check"):
+    """Owner msg 130: every figure stands on something (Blender BVH, blender/nd_ground_check.py). Returns the report."""
+    import subprocess
+    a, b = os.path.join(scene_dir, tag + "_in.json"), os.path.join(scene_dir, tag + ".json")
+    json.dump(ground_request(doc, tracks), open(a, "w"))
+    subprocess.run([BLENDER, "-b", "--factory-startup", "-P", os.path.join(HERE, "blender", "nd_ground_check.py"), "--",
+                    a, b], check=True, stdout=subprocess.DEVNULL)
+    rep = json.load(open(b))
+    for r in rep["figures"]:
+        if not r["ok"]:
+            w = r["worst"] or {}
+            print("ground check: %-30s %-6s %-14s gap %s on %s inside %s  fix %s" % (
+                r["id"], r["kind"], ",".join(r["reasons"]), w.get("gap_m"), w.get("on"), w.get("inside"), r.get("fix")))
+    print("ground check:", json.dumps(rep["summary"]))
+    return rep
+
+
+def fixes_from_ground(rep):
+    """msg 130: the check's fixes into art/ground_fixes.json: spots moved (and the formation they then ride) or dropped,
+    walkers' paths re-laid on the floor (the longest standing run; a path shorter than 2 m is dropped), riders set on
+    their cabin's floor."""
+    g = GROUND_FIXES
+    for r in rep["figures"]:
+        fx = r.get("fix")
+        if r["ok"] or not fx:
+            continue
+        if r["kind"] in ("spot", "rider"):
+            key = r["id"][len("alien_"):]
+            if fx.get("drop"):
+                g.setdefault("drop", [])
+                if key not in g["drop"]:
+                    g["drop"].append(key)
+            else:
+                g.setdefault("spots" if r["kind"] == "spot" else "riders", {})[key] = {
+                    "pos": fx["move"], "bob": fx.get("bob"), "why": r["reasons"]}
+        elif r["kind"] == "walker":
+            pid = r["id"].split("_", 1)[1].rsplit("_", 1)[0]
+            pts = fx["path"]
+            L = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+            if L < 2.0:
+                g.setdefault("drop_paths", [])
+                if pid not in g["drop_paths"]:
+                    g["drop_paths"].append(pid)
+            else:
+                g.setdefault("paths", {})[pid] = {"points": pts, "why": r["reasons"], "lost": fx["lost"], "of": fx["of"]}
+    g["_note"] = ("msg 130, build.py --check-ground --fix-ground (blender/nd_ground_check.py): spots moved to the nearest "
+                  "standing point (and the formation under it) or dropped; walker paths re-laid every 0.5 m on the floor")
+
+
 BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
+# msg 130: spot moves and drops the ground check found (art/ground_fixes.json), applied by nd_cast
+GFIX_PATH = os.path.join(ART, "ground_fixes.json")
+GROUND_FIXES = json.load(open(GFIX_PATH)) if os.path.exists(GFIX_PATH) else {}
 # msg 123: pushes the clearance check found it needed (nearest surface, push vector), applied to the flights' via points
 FIX_PATH = os.path.join(ART, "flight_fixes.json")
 FLIGHT_FIXES = json.load(open(FIX_PATH)) if os.path.exists(FIX_PATH) else {}
@@ -1422,6 +1521,9 @@ def main():
     ap.add_argument("--check-flights", action="store_true", help="msg 123: test every flight against the town (Blender)")
     ap.add_argument("--open-near", action="append", default=[], metavar="ID:X,Y,Z:R",
                     help="with --check-flights: find the nearest open-sky floor point")
+    ap.add_argument("--check-ground", action="store_true",
+                    help="msg 130: every figure on a floor, not in a wall (Blender); --fix-ground writes the fixes")
+    ap.add_argument("--fix-ground", action="store_true", help="with --check-ground: move/drop failing figures, re-check")
     ap.add_argument("--proto-flight", action="store_true", help="add the prototype flight (flyer00) to the cast")
     ap.add_argument("--crowd-test", type=int, default=0, help="capacity probe: N aliens (not the film)")
     a = ap.parse_args()
@@ -1463,6 +1565,21 @@ def main():
             arc = []
         json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio, tracks + arc, routes, sources), f, indent=1)
     print("wrote", scene_path, "and", proj_path)
+    if a.check_ground:
+        rep = check_ground(doc, tracks, a.out)
+        if rep["summary"]["fail"] and a.fix_ground:
+            fixes_from_ground(rep)
+            json.dump(GROUND_FIXES, open(GFIX_PATH, "w"), indent=1)
+            doc, tracks = scene_doc(a.palette, sky)
+            with open(scene_path, "w") as f:
+                json.dump(doc, f, indent=1)
+            with open(proj_path, "w") as f:
+                routes, arc, sources = reactivity()
+                json.dump(project_doc(os.path.relpath(scene_path, a.out), a.audio, tracks + arc, routes, sources), f, indent=1)
+            rep = check_ground(doc, tracks, a.out, "ground_check_after")
+        if rep["summary"]["fail"]:
+            print("WARNING: %d figure(s) fail the ground check" % rep["summary"]["fail"])
+            sys.exit(4)
     if a.check_flights:
         for q in a.open_near:
             i, p, r = q.split(":")

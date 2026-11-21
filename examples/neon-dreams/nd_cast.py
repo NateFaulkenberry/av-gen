@@ -114,7 +114,7 @@ def apply_fixes(via, fixes):
     return out
 
 
-def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kicks, fixes=None):
+def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kicks, fixes=None, gfix=None):
     """Returns (nodes, tracks, lights, sequence actors, crowd names, wake names)."""
     r = random.Random(1012)
     bobs = {b["name"]: b for b in design.get("bobs", [])}
@@ -156,8 +156,24 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             layers.append(sway_layer(beat_phase + half))
         return (ring_of(pos), layers) if layers else (ring_of(pos), [])
 
+    # msg 130: the ground check's fixes (art/ground_fixes.json): spots moved or dropped, paths re-laid, riders on the floor
+    gfix = gfix or {}
+    gdrop = set(gfix.get("drop", []))
+
+    def moved(sp, table):
+        m = gfix.get(table, {}).get(sp["id"])
+        if not m:
+            return sp
+        sp = dict(sp, pos=m["pos"], local_pos=m["pos"])
+        if table == "spots":
+            sp["bob"] = m.get("bob")
+        return sp
+
     # ---- spots
     for sp in pop["spots"]:
+        if sp["id"] in gdrop:
+            continue
+        sp = moved(sp, "spots")
         clips = sp.get("clips") or ["Idle"]
         clip = clips[0] if r.random() < 0.6 else r.choice(clips)
         hold = sp.get("pose_hold")
@@ -175,6 +191,10 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     # ---- walkers: pingpong, pause (Idle) and turn at each end
     wakes = []
     for p in pop["paths"]:
+        if p["id"] in gfix.get("drop_paths", []):
+            continue
+        if p["id"] in gfix.get("paths", {}):
+            p = dict(p, points=gfix["paths"][p["id"]]["points"])
         pts = p["points"]
         clip = p.get("clip", "Walking")
         speed = p.get("speed_mps", 1.2)
@@ -266,6 +286,9 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     # ---- riders, in their cabins
     vehicle_of = {v["spline"]: i for i, v in enumerate(layout["vehicles"])}
     for rd in pop.get("riders", []):
+        if rd["id"] in gdrop:
+            continue
+        rd = moved(rd, "riders")
         vi = vehicle_of.get(rd["vehicle_spline"])
         if vi is None:
             continue
