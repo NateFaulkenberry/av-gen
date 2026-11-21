@@ -46,7 +46,7 @@ DISTRICTS = [
     ("lanternhill", (5.0, -160.0), (115.0, 75.0)),
     ("eastreach", (211.0, -140.0), (80.0, 55.0)),
 ]
-MOOG_GAIN = {"sign": 3.0, "strip": 5.0, "panes": 3.5}   # x the district's envelope (peak 1)
+MOOG_GAIN = {"sign": 3.0, "strip": 3.0, "panes": 3.5}   # x the envelope (peak 1); it12: strip 5 -> 3 (the pulse passing an eave near the lens flared)
 MOOG_AD = (0.03, 0.55)                                  # the art's 30 ms attack, 500 ms decay (to 5 %)
 TOWN = (23.0, 47.2)                                     # the town section (arrival crash -> the dive)
 HH_CHASE = {"period": 4.0, "steps": 4, "gain": 2.4, "ad": (0.012, 0.22)}

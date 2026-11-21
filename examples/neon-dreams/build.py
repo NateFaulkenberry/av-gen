@@ -1223,7 +1223,7 @@ def vortex_design():
                   # (clockwise seen from above) for a positive spin
                   "spin": round(math.radians(eye_dps) * 1.44 * (-1.0 if ccw else 1.0), 4),
                   "_glowKey": a.get("underlight", {}).get("key", "ocean_a"),
-                  "glow": a.get("underlight", {}).get("throat_gain", 1.6) * 2.5,
+                  "glow": a.get("underlight", {}).get("throat_gain", 1.6) * 4.0,
                   "glowHeight": round(0.6 * a.get("depth_m", 84.0), 1), "_oceanY": None, "_art": a})
     return v if v.get("enabled", True) else None
 PLUG_FADE = (55.7, 56.45, 0.3)   # iteration 9: the plug's light dims from 55.7 s to 30 % by 56.45 s, back by 57.95
