@@ -69,11 +69,12 @@ TAIL_END = [                           # after the lip: a slow drift toward the 
 MOVES = {
     "isle_west2": ("pier", (12.0, 24.0), 124.5),      # ahead right of the rise from the trough (0-11 s)
     "isle_inner2": ("pier", (165.0, 27.0), 126.5),    # beside the pier run at 22-24 s
-    "lone_lamp": ("plan", (868.0, 47.0), 219.0),      # right of the end drift at the lens's height: the last frame's right third
+    "lone_lamp": ("plan", (890.0, 49.0), 214.0),      # right of the end drift, 5 m under the lens: the last frame's right third
 }
 
 
 SEAT_R = 30.0                          # lobes of a moved isle's bob within this of its centre are its seat
+SEAT_SOFT = {"lone_lamp": (0.45, 0.7)}   # density, soft of the moved seat lobes (a thin collar, not balls)
 
 
 def target_centre(spec):
@@ -114,6 +115,8 @@ def move_all(lay, des, pop, orig):
                     # Lamp's cumulus, 50-90 m away) stays where it was: moved, it stood beside the reveal as a column
                     if math.hypot(oc[0] - c0[0], oc[2] - c0[2]) <= SEAT_R:
                         lb["c"] = mv(oc)
+                        if bob in SEAT_SOFT:          # seen at 20-60 m the seat's dense balls read as white blobs
+                            lb["density"], lb["soft"] = SEAT_SOFT[bob]
                     else:
                         lb["c"] = list(oc)
         for s in pop["spots"]:

@@ -19648,9 +19648,9 @@
    "id": "lone_lamp_house",
    "asset": "buildings/lone_lamp_house.glb",
    "pos": [
-    868.0,
-    219.4,
-    -47.0
+    890.0,
+    214.4,
+    -49.0
    ],
    "rot_y_deg": -130.0,
    "quat": [
@@ -19674,9 +19674,9 @@
    "id": "deck_pad_6m_608",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    865.728,
-    219.4,
-    -56.739
+    887.728,
+    214.4,
+    -58.739
    ],
    "rot_y_deg": -130.0,
    "quat": [
@@ -19697,9 +19697,9 @@
    "id": "deck_pad_6m_609",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    861.872,
-    219.4,
-    -52.142
+    883.872,
+    214.4,
+    -54.142
    ],
    "rot_y_deg": -130.0,
    "quat": [
@@ -19720,9 +19720,9 @@
    "id": "deck_pad_6m_610",
    "asset": "decks/deck_pad_6m.glb",
    "pos": [
-    858.015,
-    219.4,
-    -47.546
+    880.015,
+    214.4,
+    -49.546
    ],
    "rot_y_deg": -130.0,
    "quat": [
@@ -38231,9 +38231,9 @@
    "id": "isle_lone_lamp",
    "asset": "_thirdparty/isles/isle_rock_a.gltf",
    "pos": [
-    868.0,
-    219.0,
-    -47.0
+    890.0,
+    214.0,
+    -49.0
    ],
    "rot_y_deg": 30.0,
    "quat": [
@@ -38254,9 +38254,9 @@
    "id": "root_curtain_b_1377",
    "asset": "garden/root_curtain_b.glb",
    "pos": [
-    868.0,
-    209.94,
-    -47.0
+    890.0,
+    204.94,
+    -49.0
    ],
    "rot_y_deg": 209.117,
    "quat": [
@@ -49952,9 +49952,9 @@
    "bob": "lone_lamp",
    "asset": 2.572843297428054,
    "centre": [
-    868.0,
-    219.0,
-    -47.0
+    890.0,
+    214.0,
+    -49.0
    ],
    "width_m": 40.0,
    "depth_m": 36.2,
@@ -51508,9 +51508,9 @@
   {
    "name": "light_102",
    "pos": [
-    868.0,
-    227.4,
-    -47.0
+    890.0,
+    222.4,
+    -49.0
    ],
    "key": "amber",
    "radius_m": 30.0,
