@@ -1386,6 +1386,14 @@ def fade_tracks():
     keys.append({"time": round(SONG + 0.5, 3), "value": [vb] * 3, "interp": "linear"})
     out = [{"target": "post/grade/gain", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
             "loopLength": 0.0, "keys": keys}]
+    # it14 (owner msgs 208/210: the Condensery's stacks flicker at ~62 s): z-fighting -- the crowns' glowing lids and
+    # their shells lie closer than the depth buffer resolves at 1.6 km with the near plane at 0.3 m (~0.5 m a step).
+    # Nothing comes within 15 m of the lens after the band, so the near plane opens to 4 m inside the Veil (13x the
+    # precision): the stacks' frame-to-frame flicker fell 81 % (static-camera A/B, work/engine/it14/flick)
+    out.append({"target": "camera/near", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
+                "loopLength": 0.0, "keys": [{"time": 0.0, "value": 0.3, "interp": "step"},
+                                             {"time": 54.6, "value": 0.3, "interp": "linear"},
+                                             {"time": 56.0, "value": 4.0, "interp": "linear"}]})
     # the light from the ocean eye rises as the lens dives at it: the eye glow and the funnel's underlight swell
     vd = vortex_design()
     sw = [(0.0, 1.0), (66.0, 1.0), (68.5, 1.8), (70.2, 3.0)]

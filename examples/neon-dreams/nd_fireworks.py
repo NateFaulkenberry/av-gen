@@ -34,7 +34,7 @@ RISE = 1.05            # s from launch to burst
 STARS_PER_SYSTEM = 420  # three systems a shell
 POOLS = 2
 SITES = 5              # per pool
-LIGHT = {"intensity": 2400.0, "range": 190.0}
+LIGHT = {"intensity": 4000.0, "range": 200.0}
 STAR = {
     "capacity": 2048, "shape": "sphere", "extent": [0.4, 0.4, 0.4], "spawnRate": 0.0, "burst": 0.0,
     "lifetimeMin": 1.6, "lifetimeMax": 2.7, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
@@ -51,10 +51,10 @@ ROCKET = {
     "blend": "additive", "softness": 0.0, "pulseRate": 14.0, "pulseDepth": 0.6}
 FLASH = {
     "capacity": 256, "shape": "sphere", "extent": [0.5, 0.5, 0.5], "spawnRate": 0.0, "burst": 0.0,
-    "lifetimeMin": 0.16, "lifetimeMax": 0.28, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
+    "lifetimeMin": 0.08, "lifetimeMax": 0.16, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
     "speedMin": 0.5, "speedMax": 2.0, "gravity": [0.0, 0.0, 0.0], "drag": 0.5, "turbulence": 0.0,
-    "sizeStart": 9.0, "sizeEnd": 14.0, "colorStart": [1.0, 0.97, 0.92, 1.0], "colorEnd": [1.0, 0.8, 0.9, 0.0],
-    "emissive": 10.0, "blend": "additive", "softness": 0.0}
+    "sizeStart": 2.6, "sizeEnd": 4.5, "colorStart": [1.0, 0.97, 0.92, 0.8], "colorEnd": [1.0, 0.8, 0.9, 0.0],
+    "emissive": 5.0, "blend": "additive", "softness": 0.0}
 
 
 def hue(h, s=1.0, v=1.0):
@@ -172,7 +172,7 @@ def build(cam_at, layout, song=70.18):
             sp.append({"time": round(tb - 0.5, 4), "value": B, "interp": "step"})
             # one frame of burst (the window holds exactly one 30 fps frame's instant)
             one = 1.0 / 30.0 - 0.002
-            fb += [{"time": round(tb, 4), "value": 40.0, "interp": "step"},
+            fb += [{"time": round(tb, 4), "value": 12.0, "interp": "step"},
                    {"time": round(tb + one, 4), "value": 0.0, "interp": "step"}]
             sb += [{"time": round(tb, 4), "value": float(STARS_PER_SYSTEM), "interp": "step"},
                    {"time": round(tb + one, 4), "value": 0.0, "interp": "step"}]
