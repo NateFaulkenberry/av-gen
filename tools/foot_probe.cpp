@@ -87,6 +87,12 @@ struct Options {
     std::string feetOut; // every character's feet, in the world, every frame, to a file (comparing two builds)
     std::string cameraOut; // the drawn camera's eye and target, every frame (play against seek)
     std::vector<std::string> track; // with --camera-out: these entities' positions on each camera line
+    // --node-joints LIST --joints-out FILE [--joint-match a,b]: plain composition nodes (a gltf node with a rig, not
+    // an entity: a band member, a scripted walker), each matching joint in the world every frame, plus the clip
+    // playing and its local second -- foot contacts and stick hits read off the drawn pose (Neon Dreams, msg 178)
+    std::vector<std::string> nodeJoints;
+    std::vector<std::string> jointMatch;
+    std::string jointsOut;
     int renderWidth = 0;   // --render-clock WxH: step as `RenderJob` does (its warm-up, its clock, its viewport)
     int renderHeight = 0;
     // The three things --render-clock does, one at a time (which of them changes the film), and two spellings of
@@ -169,6 +175,18 @@ bool parse(int argc, char** argv, Options& o) {
         } else if (a == "--viewport") {
             const char* v = next();
             if (v == nullptr || std::sscanf(v, "%dx%d", &o.viewWidth, &o.viewHeight) != 2) return false;
+        } else if (a == "--node-joints" || a == "--joint-match") {
+            const char* v = next();
+            if (v == nullptr) return false;
+            std::stringstream ss(v);
+            std::string item;
+            while (std::getline(ss, item, ',')) {
+                (a == "--node-joints" ? o.nodeJoints : o.jointMatch).push_back(item);
+            }
+        } else if (a == "--joints-out") {
+            const char* v = next();
+            if (v == nullptr) return false;
+            o.jointsOut = v;
         } else if (a == "--feet-out") {
             const char* v = next();
             if (v == nullptr) return false;
@@ -357,6 +375,10 @@ int main(int argc, char** argv) {
     if (!o.cameraOut.empty()) {
         cameraFile.open(o.cameraOut);
     }
+    std::ofstream jointsFile;
+    if (!o.jointsOut.empty()) {
+        jointsFile.open(o.jointsOut);
+    }
     for (std::uint64_t i = first; i < first + frames; ++i) {
         FrameTime time;
         if (clock) {
@@ -383,6 +405,44 @@ int main(int argc, char** argv) {
                 }
             }
             cameraFile << '\n';
+        }
+        if (jointsFile.is_open()) {
+            // one line per node per frame: t node clip clipTime then "joint x y z" for each matching joint
+            for (const std::string& name : o.nodeJoints) {
+                const scene::CompositionNode* node = comp->findNode(name);
+                if (node == nullptr || node->rigs.empty() || node->rigs.front() >= scene.rigs.size()) {
+                    continue;
+                }
+                const scene::RigId id = node->rigs.front();
+                const scene::SkinnedRig& rig = scene.rigs[id];
+                world::NodeView view;
+                if (!comp->nodeView(name, view)) {
+                    continue;
+                }
+                glm::mat4 toWorld = view.world;
+                for (std::uint32_t k = view.firstEntity; k < view.firstEntity + view.entityCount && k < scene.entities.size(); ++k) {
+                    if (scene.entities[k].rig == id) {
+                        toWorld = scene.entities[k].transform.matrix();
+                        break;
+                    }
+                }
+                scene::poseToModel(rig.skeleton, rig.pose, model);
+                jointsFile << time.renderTime << ' ' << name << ' ' << rig.player.currentState() << ' '
+                           << rig.player.stateTime(rig.clips, time.renderTime);
+                for (std::size_t j = 0; j < rig.skeleton.joints.size() && j < model.size(); ++j) {
+                    const std::string& jn = rig.skeleton.joints[j].name;
+                    bool want = o.jointMatch.empty();
+                    for (const std::string& m : o.jointMatch) {
+                        want = want || jn.find(m) != std::string::npos;
+                    }
+                    if (!want) {
+                        continue;
+                    }
+                    const glm::vec3 p(toWorld * glm::vec4(glm::vec3(model[j][3]), 1.0f));
+                    jointsFile << ' ' << jn << ' ' << p.x << ' ' << p.y << ' ' << p.z;
+                }
+                jointsFile << '\n';
+            }
         }
         for (Character& c : cast) {
             const entity::Entity* e = comp->entityWorld().find(c.name);
