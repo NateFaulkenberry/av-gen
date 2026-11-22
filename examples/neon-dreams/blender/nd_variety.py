@@ -377,7 +377,7 @@ def main():
             sp.pop(k, None)
 
     # ================================================================== the town
-    R_TOWN = 4.0
+    R_TOWN = 9.0     # the lens takes in a stretch of pier or street at once: no repeats within 7 m
     group_of = {}
     for g in pop.get("groups", []):
         for m in g["members"]:
