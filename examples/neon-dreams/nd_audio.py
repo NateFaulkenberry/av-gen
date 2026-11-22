@@ -35,8 +35,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(HERE, "audio", "sabertooth_events.json")) as _f:
     EVENTS = json.load(_f)
 
-# the section crashes, at their leading edge (the picker reports the envelope's peak, ~0.12 s after the hit)
-CRASH = [round(t - 0.12, 2) for t, _ in EVENTS["stems"]["crash"]["onsets"]]
+# the section crashes, at their leading edge (it13, msg 178: the analysis now reports the attack itself; it12's
+# "- 0.12" made up for the envelope peak and the drifting hop, which no longer exist)
+CRASH = [round(t, 2) for t, _ in EVENTS["stems"]["crash"]["onsets"]]
+# it13 (msg 178): the song's measured beat. The kick stem's attacks fit a half-beat grid of 0.175486 s from 0.0021 s
+# (121 kicks, least squares): 0.35097 s a beat, 170.95 BPM. The 171.4 BPM the scene used before ran 0.26 % fast, so
+# anything on that grid drifted early against the music: 0.12 s (a third of a beat) by the band at 45 s.
+BEAT = 0.35097
+KICK0 = 0.0021
 C_FIRST, C_PRE, C_ARRIVAL, C_CLOSE, C_VEIL, C_FAR, C_REVEAL = CRASH[:7]
 
 # when each palette state begins, per system: (start second, state, seconds to cross)

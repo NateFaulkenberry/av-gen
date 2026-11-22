@@ -17,11 +17,16 @@ from __future__ import annotations
 
 import json
 import math
+
+import nd_audio as AU
 import os
 import random
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-WALK_STRIDE = {"Walking": 1.34, "Walking_low_grav": 1.0}   # m/s a stance foot sweeps back at clip rate 1
+# m/s a stance foot sweeps back at clip rate 1. it13 (msg 178, "feet don't slide"): Walking measured on the drawn feet
+# (the planted foot joints of ~110 walkers over 5 s, avgen_foot_probe --node-joints, two builds): at 1.34 a planted foot
+# slid back 0.15 m/s under the body, at 1.49 forward 0.08 m/s; both fit a sweep of 1.435 m/s at rate 1
+WALK_STRIDE = {"Walking": 1.435, "Walking_low_grav": 1.0}
 TURN_RATE = 225.0
 SPEEDS = (0.92, 1.0, 1.08)
 PHASES = 8
@@ -32,11 +37,22 @@ FAR_HZ = 0.0           # it12 (msg 149, the 4.09 s flyer "glitching/skipping"): 
 # grid. Sabertooth is 171.4 BPM (the kick every 0.70 s from 0.05 s): a looping clip plays a whole number of beats a
 # cycle at a rate of at least 1 (never slower than authored); its opening phase puts a cycle's start on a beat; a walk
 # steps on every quarter note (Walking: 2 steps a cycle = 2 beats, 2.04 m/s) and a low-gravity bound on every bar.
-BEAT = 60.0 / 171.4
+BEAT = AU.BEAT   # it13 (msg 178): measured, 170.95 BPM (was 60 / 171.4)
 WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8}
+# it13 (owner msg 178: "time each footstep with each beat -- quarter note steps"): the clip second (from the clip's
+# first key) at which the LEFT foot plants, measured on the drawn feet (avgen_foot_probe --node-joints, 1146 contacts
+# of 113 walkers: left 0.358, right 0.886, 0.53 s apart in a 1.033 s cycle). Every walking cue starts at the phase that
+# puts that plant on a beat of the song's measured grid (AU.KICK0 + n * BEAT), so with 2 beats a cycle the left foot
+# lands on every other beat and the right on the ones between. it12 started each leg at clip second 0 on a beat (the
+# plant fell 0.24 s after it) and timed the cycle from the clip's last key (1.067 s), not its length (1.033 s): the
+# steps came every 0.339 s against the 0.351 s beat and walked off it by a beat every 3.4 s.
+WALK_CONTACT = {"Walking": 0.358}
+# The art's audience clips (blender/nd_poses.py) are whole kicks of 2 * 60 / 171.4 s from the it12 events' first kick
+# (0.05 s); on the measured grid their rate is scaled and their phase moved so each clip second keeps its kick.
+ART_KICK, ART_KICK0 = 2 * 60.0 / 171.4, 0.05
 RING_M = 60.0          # a crowd ring's width (m) and the head wave's speed (m/s): one ring a second
 RINGS = 6
-BEAT2 = 4 * 60.0 / 171.4   # it12: four beats (s), a lean each way on alternate kicks (it10: 1.32 s, off the tempo)
+BEAT2 = 4 * BEAT   # it12: four beats (s), a lean each way on alternate kicks (it10: 1.32 s, off the tempo)
 LOOK_LAYER = {"name": "crowd-look", "kind": "aim", "drive": "manual",
               "joints": ["head.x", "Eye_L", "Eye_R", "Mouth", "Antenna"],
               "pivot": "head.x", "maxYaw": 35.0, "maxPitch": 20.0}
@@ -140,7 +156,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     bobs = {b["name"]: b for b in design.get("bobs", [])}
     nodes, tracks, lights, actors = [], [], [], []
     crowds = set()
-    kick0 = kicks[0] if kicks else 0.0
+    kick0 = AU.KICK0   # it13: the measured grid's origin (the first kick's attack; the events' was its envelope peak)
     beat_phase = (-kick0 / BEAT2) % 1.0
     group_of = {}
     for gi, g in enumerate(pop.get("groups", [])):
@@ -162,6 +178,13 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         L = clip_len.get(clip, 2.0)
         r.randrange(PHASES)   # (the same draws as it11's buckets: the spots keep their clips)
         return round(rv.random() * L, 4)
+
+    def on_measured_grid(sp, clip, speed, phase):
+        """it13: an art clip on the kick (nd_grid kick / off) keeps each clip second on its kick of the measured grid."""
+        if sp.get("nd_grid") not in ("kick", "off") or speed is None:
+            return speed, phase
+        r2 = speed * ART_KICK / (2 * BEAT)
+        return round(r2, 5), round((phase + speed * ART_KICK0 - r2 * kick0) % clip_len.get(clip, 2.8), 4)
 
     def on_grid(t):
         return kick0 + round((t - kick0) / BEAT) * BEAT
@@ -256,6 +279,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         if nd:
             hold = None
             clip, speed, phase = sp["nd_clip"], sp.get("nd_rate"), round(sp.get("nd_phase", 0.0), 4)
+            speed, phase = on_measured_grid(sp, clip, speed, phase)
         n = {"name": "alien_" + sp["id"], "kind": "gltf", "asset": aliens + sp["cast"] + SUFFIX + ".glb",
              "position": r3(sp["pos"]), "rotation": [0.0, round(sp["facing_deg"], 2), 0.0],
              "scale": [round(pop.get("scale", 1.0) * sp.get("scale", 1.0), 3)] * 3,
@@ -303,7 +327,12 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         pts = p["points"]
         clip = p.get("clip", "Walking")
         # it12 (msg 149): the walk on the grid -- its rate from the beats a cycle, the speed from its stride
-        rate = round(clip_len.get(clip, 1.0667) / (WALK_BEATS.get(clip, 2) * BEAT), 4)
+        rate = round(clip_len.get(clip, 1.0333) / (WALK_BEATS.get(clip, 2) * BEAT), 4)
+        L_walk = clip_len.get(clip, 1.0333)
+
+        def walk_phase(t, rate=rate, L_walk=L_walk, clip=clip):
+            """it13: the clip second at timeline t that puts the left foot's plant on the beat grid."""
+            return round((WALK_CONTACT.get(clip, 0.0) + rate * (t - kick0)) % L_walk, 4)
         speed = WALK_STRIDE.get(clip, 1.34) * rate
         idle_rate = beat_rate("Idle")[0]
         pause = p.get("pause_s", 2.5)
@@ -391,9 +420,11 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                             rk.append({"time": round(tt + dur - 0.5, 3), "value": syaw, "interp": "linear"})
                             tt += dur
                             pk.append({"time": round(tt, 3), "value": r3(a_pts[i + 1]), "interp": "linear"})
-                            cues.append({"time": round(tt - 0.3, 3), "clip": clip, "speed": rate, "blend": 0.35})
+                            cues.append({"time": round(tt - 0.3, 3), "clip": clip, "speed": rate, "blend": 0.35,
+                                         "offset": walk_phase(tt - 0.3)})
                     # the end: Idle, and a turn on the spot in its last 0.8 s
-                    cues.append({"time": round(start, 3), "clip": clip, "speed": rate, "blend": 0.35})
+                    cues.append({"time": round(start, 3), "clip": clip, "speed": rate, "blend": 0.35,
+                                 "offset": walk_phase(start)})
                     cues.append({"time": round(tt, 3), "clip": p_clip, "speed": p_rate, "blend": 0.4,
                                  "offset": round(rv.uniform(0.0, clip_len.get(p_clip, 2.0)), 3)})
                     qe, qf = at_s(cum[-1]), at_s(cum[-1] - 1.6)   # it12: back along the smoothed path (no 0,0 heading)
@@ -429,7 +460,8 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             cues = ([dict(before[-1], time=0.0)] if before else []) + [c for c in cues if c["time"] > 0]
             n = {"name": name, "kind": "gltf", "asset": aliens + cast + SUFFIX + ".glb", "position": pk[0]["value"],
                  "rotation": rk[0]["value"], "scale": [pop.get("scale", 1.0)] * 3,
-                 "animation": anim(cues[0]["clip"] if cues else clip, tier, speed=rate, phase=phase_for(clip, rate))}
+                 "animation": anim(cues[0]["clip"] if cues else clip, tier, speed=rate,
+                                   phase=walk_phase(0.0) if (not cues or cues[0]["clip"] == clip) else phase_for(clip, rate))}
             if p.get("bob"):
                 n["bob"] = p["bob"]
             nodes.append(n)

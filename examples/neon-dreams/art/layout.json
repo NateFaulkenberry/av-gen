@@ -53152,7 +53152,7 @@
   }
  ],
  "camera": {
-  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before. it12b: a 7 s dwell at the band (approach 42-44.5 s, a 2-4 m/s creep to 10 m from the pianist 44.6-48.9 s), out at <= 22 m/s to the Veil's gate (53 s); the Veil's middle removed (VEIL_CUT) so the plug still ends on 56.88 s, the reveal and end 244 m west; `fov_scale` multiplies the fov track",
+  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before. it12b: a 7 s dwell at the band (approach 42-44.5 s, a 2-4 m/s creep to 10 m from the pianist 44.6-48.9 s), out at <= 22 m/s to the Veil's gate (53 s); the Veil's middle removed (VEIL_CUT) so the plug still ends on 56.88 s, the reveal and end 244 m west; `fov_scale` multiplies the fov track it13 (owner msgs 178/184, engine): the band dwell 3.1 s longer -- the Quay run from 36.85 s 0.8 s quicker, the creep at the band 43.6-51.2 s (was 44.4-48.9), the lift and the Veil 2.3 s quicker; 35.75, 56.88 and 58.95 unchanged. The engine bakes the camera C2-smooth from these (build.py smooth_camera). The waypoint at x 109 moved to 42.2 s so the approach only slows (20 -> 16 -> 11 m/s), no bump.",
   "waypoints": [
    {
     "t": 0.0,
@@ -53291,7 +53291,7 @@
     ]
    },
    {
-    "t": 37.7,
+    "t": 37.575,
     "pos": [
      0,
      135.5,
@@ -53299,7 +53299,7 @@
     ]
    },
    {
-    "t": 38.35,
+    "t": 38.13,
     "pos": [
      15,
      134.75,
@@ -53307,7 +53307,7 @@
     ]
    },
    {
-    "t": 38.9,
+    "t": 38.599,
     "pos": [
      28,
      134.1,
@@ -53315,7 +53315,7 @@
     ]
    },
    {
-    "t": 39.4,
+    "t": 39.026,
     "pos": [
      40,
      133.5,
@@ -53323,7 +53323,7 @@
     ]
    },
    {
-    "t": 40.05,
+    "t": 39.58,
     "pos": [
      55,
      133.05,
@@ -53331,7 +53331,7 @@
     ]
    },
    {
-    "t": 40.7,
+    "t": 40.135,
     "pos": [
      70,
      132.6,
@@ -53339,7 +53339,7 @@
     ]
    },
    {
-    "t": 41.45,
+    "t": 40.775,
     "pos": [
      85,
      130.9,
@@ -53347,7 +53347,7 @@
     ]
    },
    {
-    "t": 42.3,
+    "t": 41.5,
     "pos": [
      98.5,
      129.0,
@@ -53355,7 +53355,7 @@
     ]
    },
    {
-    "t": 43.3,
+    "t": 42.2,
     "pos": [
      109.0,
      127.7,
@@ -53363,7 +53363,7 @@
     ]
    },
    {
-    "t": 44.4,
+    "t": 43.6,
     "pos": [
      122.9,
      126.8,
@@ -53371,7 +53371,7 @@
     ]
    },
    {
-    "t": 45.6,
+    "t": 45.627,
     "pos": [
      128.6,
      126.6,
@@ -53379,7 +53379,7 @@
     ]
    },
    {
-    "t": 46.8,
+    "t": 47.653,
     "pos": [
      132.0,
      126.5,
@@ -53387,7 +53387,7 @@
     ]
    },
    {
-    "t": 47.9,
+    "t": 49.511,
     "pos": [
      134.2,
      126.4,
@@ -53395,7 +53395,7 @@
     ]
    },
    {
-    "t": 48.9,
+    "t": 51.2,
     "pos": [
      136.5,
      126.5,
@@ -53403,7 +53403,7 @@
     ]
    },
    {
-    "t": 49.8,
+    "t": 51.95,
     "pos": [
      139.0,
      128.0,
@@ -53411,7 +53411,7 @@
     ]
    },
    {
-    "t": 50.7,
+    "t": 52.7,
     "pos": [
      146.5,
      131.0,
@@ -53419,7 +53419,7 @@
     ]
    },
    {
-    "t": 51.6,
+    "t": 53.4,
     "pos": [
      160.0,
      135.5,
@@ -53427,7 +53427,7 @@
     ]
    },
    {
-    "t": 52.5,
+    "t": 54.05,
     "pos": [
      178.0,
      140.0,
@@ -53435,7 +53435,7 @@
     ]
    },
    {
-    "t": 53.4,
+    "t": 54.65,
     "pos": [
      205.0,
      149.5,
@@ -53443,7 +53443,7 @@
     ]
    },
    {
-    "t": 55.1,
+    "t": 55.8,
     "pos": [
      266.0,
      187.0,
@@ -53497,39 +53497,39 @@
     45.0
    ],
    [
-    42.3,
+    41.5,
     45.0
    ],
    [
-    43.5,
+    42.7,
     12.0
    ],
    [
-    44.6,
+    43.938,
     5.0
    ],
    [
-    45.6,
+    45.627,
     2.5
    ],
    [
-    46.6,
+    47.316,
     1.5
    ],
    [
-    48.7,
+    50.862,
     1.5
    ],
    [
-    49.6,
+    51.783,
     6.0
    ],
    [
-    50.6,
+    52.617,
     20.0
    ],
    [
-    52.0,
+    53.689,
     45.0
    ],
    [

@@ -21,7 +21,7 @@ import os
 
 import nd_audio as AU
 
-BEAT = 60.0 / 171.4
+BEAT = AU.BEAT   # it13 (msg 178): measured, 170.95 BPM (was 60 / 171.4)
 E = AU.EVENTS["stems"]
 ONSETS = {k: [t for t, _ in v["onsets"]] for k, v in E.items()}
 BREATH = (45.5, 46.1, 47.15, 47.55)
@@ -95,22 +95,24 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                       "animation": {"state": m["clip"], "blend": 0.3, "speed": rate,
                                     "phase": round((rate * (-kick0)) % L, 4), "updateHz": 0, "farHz": 0.0,
                                     "cullDistance": 0.0, "crowd": crowd,
-                                    "layers": [performer_layer(7.0 if drums else 4.0, kick0)]}})
+                                    "layers": [performer_layer(3.0 if drums else 4.0, kick0)]}})
         nodes.append({"name": m["name"] + "_props", "kind": "gltf", "asset": props, "position": r3(m["pos"]),
                       "rotation": [0.0, m["yaw_deg"], 0.0], "scale": [1.0, 1.0, 1.0]})
         info["crowds"].append(crowd)
         if drums:
-            hits = sorted(ONSETS["kick"] + ONSETS["snare"] + ONSETS["toms"] + ONSETS["hh"])
-            sp = active_speed(hits, 0.2, 0.9)
             for stem, g in (("kick", 1.0), ("snare", 0.9), ("toms", 0.8)):
-                routes.append(AU.route("stem.%s.onset" % stem, "crowds/%s/sway" % crowd, g, attackMs=6.0,
-                                       decayMs=220.0))
-            # a flail on each crash, back to the kit a second later
-            clips = []
-            for c in ONSETS["crash"]:
-                clips += [{"time": round(c - 0.04, 3), "clip": "Flail", "speed": 1.0, "blend": 0.12, "playback": "loop"},
-                          {"time": round(c + 1.0, 3), "clip": m["clip"], "speed": rate, "blend": 0.35, "playback": "loop"}]
+                # it13 (msg 178): a 3 deg lean with a 45 ms rise (it12: 7 deg in 6 ms jerked the arms up on every
+                # note, 10 cm in a frame, over the clip's own strokes)
+                routes.append(AU.route("stem.%s.onset" % stem, "crowds/%s/sway" % crowd, g, attackMs=45.0,
+                                       decayMs=260.0))
+            # it13 (owner msg 178: "drummer animation playing too fast"): the kit clip is time-warped so each of its
+            # stick strokes lands on a played note (drum_warp), no longer looped at 1.03 whatever the drums did (13
+            # strokes every 4.55 s through rests and fills alike) with a 5 s Flail thrown in on each crash.
+            clips, info["drum_strokes"] = drum_warp(m["clip"], L)
             actors.append({"id": m["name"], "node": m["name"], "visible": True, "keys": [], "clips": clips})
+            # no lag track for the drummer (its crowd keeps the sway): the warp's cues are timeline seconds
+            nodes[-2]["animation"]["speed"], nodes[-2]["animation"]["phase"] = 1.0, 0.0
+            continue
         else:
             sp = active_speed(ONSETS["moog"], 0.35, 1.4, rest=0.2)
             routes.append(AU.route("stem.moog.onset", "crowds/%s/sway" % crowd, 1.0, attackMs=10.0, decayMs=420.0))
@@ -192,6 +194,68 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                        if not (BREATH[0] <= t < BREATH[2] - 0.05)]
     info["breath_keys"] = breath_keys
     return nodes, lights, beams, tracks, routes, actors, info
+
+
+# it13 (msg 178): the Drums clip's stick strokes, clip seconds: the lowest points (4 cm or more) of both hands' mean
+# height, read off the drawn rig playing the clip alone at rate 1 with no sway layer (avgen_foot_probe --node-joints
+# band_drums, two cycles at 1/60 s); 13 a cycle. DRUM_UP: the hands' highest point between each stroke and the next,
+# where a wait holds the sticks up.
+DRUM_STROKES = [0.167, 0.733, 1.333, 1.533, 1.9, 2.5, 2.7, 3.09, 3.3, 3.667, 3.9, 4.267, 4.5]
+DRUM_UP = [0.533, 0.9, 1.467, 1.733, 2.033, 2.6, 2.9, 3.2, 3.467, 3.833, 4.1, 4.4, 4.68]
+STROKE_MIN_GAP = 0.24   # s between two strokes: no faster than 1.4x the clip's own pace (its strokes are ~0.34 s apart)
+STROKE_HOLD = 1.25      # a note further off than this x the clip's stroke: up stroke, a wait with sticks up, down on it
+
+
+def drum_notes(min_gap=STROKE_MIN_GAP):
+    """The notes the drummer plays: every crash, then kicks and snares, then toms, each where it is at least min_gap
+    from those already taken; hi-hats are not strokes (the clip has no hat hand)."""
+    sel = []
+
+    def fits(t):
+        return all(abs(t - u) >= min_gap for u in sel)
+    for group in (ONSETS["crash"], sorted(ONSETS["kick"] + ONSETS["snare"]), ONSETS["toms"]):
+        for t in group:
+            if fits(t):
+                sel.append(t)
+    return sorted(sel)
+
+
+def drum_warp(clip, L, song=70.18):
+    """Clip cues that put stroke k of the clip on note k: between two notes the clip covers one stroke interval, at
+    the rate that takes (never under 1 / STROKE_HOLD); a longer gap plays the up stroke at rate 1, waits with the sticks
+    up (rate 0.04) and comes down at rate 1 onto the note. Returns (cues, the note times the strokes land on)."""
+    notes = [t for t in drum_notes() if t < song]
+    H = DRUM_STROKES
+    n = len(H)
+    cues = []
+
+    def cue(t, off, rate):
+        cues.append({"time": round(t, 4), "clip": clip, "speed": round(rate, 4), "blend": 0.0, "playback": "loop",
+                     "offset": round(off % L, 4)})
+    # into the first note at the clip's own pace
+    k = 0
+    pos = H[0]          # unwrapped clip position at notes[0]
+    cue(max(0.0, notes[0] - pos), 0.0, 1.0)
+    for j in range(len(notes)):
+        t0 = notes[j]
+        t1 = notes[j + 1] if j + 1 < len(notes) else song + 1.0
+        nxt = H[(k + 1) % n] + (L if (k + 1) % n == 0 else 0.0)
+        h = nxt - H[k % n]
+        G = t1 - t0
+        if G <= STROKE_HOLD * h:
+            cue(t0, pos, h / G)
+        else:
+            # up to the top of the backswing at rate 1, a wait there, down at rate 1 onto the note
+            eps = 0.04
+            up = DRUM_UP[k % n] - H[k % n]
+            down = h - up
+            hold = (G - h) / (1.0 - eps)
+            cue(t0, pos, 1.0)
+            cue(t0 + up, pos + up, eps)
+            cue(t0 + up + hold, pos + up + eps * hold, (down - eps * hold) / max(G - up - hold, 1e-3))
+        pos += h
+        k += 1
+    return [c for c in cues if c["time"] < song], notes
 
 
 PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}

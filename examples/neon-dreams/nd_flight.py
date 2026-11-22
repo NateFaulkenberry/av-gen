@@ -17,13 +17,15 @@ from __future__ import annotations
 
 import math
 
+import nd_audio as AU
+
 JUMP_TAKEOFF = 0.567      # Jumping: the feet leave the ground
 JUMP_TO_HOVER = 0.62      # the cue into Floating (an upright hover, the body 0.4 m up) just after the feet leave
 LAND_TOUCHDOWN = 0.267    # Landing: the feet reach the ground
 LAND_LEN = 1.067
 KEY_HZ = 30.0             # flight keys a second (it12: 30, one a frame; 15 kinked the path every second frame)
 # it12 (msg 149): the loops on the song's grid (171.4 BPM): Floating 6.5 s = 18 beats, Flying_jet 2.9 s = 8 beats
-BEAT_RATE = {"Floating": round(6.5 / (18 * 60.0 / 171.4), 4), "Flying_jet": round(2.9 / (8 * 60.0 / 171.4), 4)}
+BEAT_RATE = {"Floating": round(6.5 / (18 * AU.BEAT), 4), "Flying_jet": round(2.9 / (8 * AU.BEAT), 4)}   # it13: measured beat
 # The jet's nozzle (the bottom of Backpack_Jet, through the Backpack joint) and its thrust direction in the flyer's
 # own frame, per clip, measured from alien-pilot.glb's clips (work/engine/it10/fly/nozzle.py in the studio project):
 # Jumping and Landing upright, Floating upright and raised, Flying_jet prone (the jet blows back along -z).

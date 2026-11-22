@@ -37,6 +37,7 @@ import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flig
 import nd_lights as NL  # noqa: E402  (iteration 11, owner msg 130: the city's lights play more of the song)
 import nd_cast as NC  # noqa: E402  (iteration 10, owner msg 112: the population from art/population.json)
 import nd_band as NB  # noqa: E402  (iteration 12, owner msg 149: the band, its spots and beams)
+import nd_camera as NCAM  # noqa: E402  (iteration 13, owner msg 178: the journey camera baked C2-smooth)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SABERTOOTH = os.path.expanduser("~/Desktop/sabertooth")
@@ -450,7 +451,14 @@ def clip_lengths():
         return {}
     n = struct.unpack("<I", b[12:16])[0]
     j = json.loads(b[20:20 + n])
-    return {a["name"]: max(j["accessors"][sm["input"]]["max"][0] for sm in a["samplers"]) for a in j.get("animations", [])}
+    # it13 (msg 178): the engine loops a clip over its keys' span (gltf_loader: from the first key, which Blender
+    # leaves at 1/30 s), so the length is last key - first key; it12 read the last key alone (Walking 1.067 for 1.033)
+    return {a["name"]: _span(j, a) for a in j.get("animations", [])}
+
+
+def _span(j, a):
+    acc = [j["accessors"][sm["input"]] for sm in a["samplers"]]
+    return round(max(x["max"][0] for x in acc) - min(x["min"][0] for x in acc), 6)
 
 
 CLIP_LEN = clip_lengths()
@@ -927,7 +935,7 @@ def glb_clip_len(path, clip):
     j = json.loads(b[20:20 + n])
     for a in j.get("animations", []):
         if a["name"] == clip:
-            return max(j["accessors"][sm["input"]]["max"][0] for sm in a["samplers"])
+            return _span(j, a)   # it13: the keys' span, as the engine loops it
     return 4.0
 
 
@@ -1084,6 +1092,9 @@ def clouds_block(state="uv", moon_dir=None):
         "erosionCurl": 6.0, "erosionFlatten": 0.4, "erosionOctaves": CLOUD_Q["erosionOctaves"],
         # ADR-2115 (owner msg 105: the wall behind the garden "too blobby"): a crisper eroded edge
         "erosionEdge": CLOUD_LOOK["erosionEdge"],
+        # it13 (msg 178, "too blobby"; ADR-2123): the lobes' soft union and the mist between them
+        "lobeBlend": CLOUD_LOOK["lobeBlend"], "lobeMist": CLOUD_LOOK["lobeMist"],
+        "lobeMistReach": CLOUD_LOOK["lobeMistReach"],
         "lightSpacing": 2, "multiScatter": CLOUD_LOOK["multiScatter"],
         "drift": r3([v * 0.7 for v in cb["drift"]]),
         "hazeColor": pal("haze", state), "hazeDistance": 9000.0, "powder": CLOUD_LOOK["powder"], "seed": 7,
@@ -1130,13 +1141,17 @@ def clouds_block(state="uv", moon_dir=None):
 # iteration 7: key 0.11 -> 0.22 with six squared light taps (the two even taps let most crowns see the key unshadowed)
 # iteration 9b (ADR-2115, owner msg 105): billows 60 -> 40 m and the eroded edge at half its width: at 50-150 m a 40 m
 # lobe read as a soft round ball. The seat lobes keep their 0.3 share (no detail floor): a floor sank the decks' cloud.
-CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 40.0, "erosionEdge": 0.5, "multiScatter": 0.7, "noiseAmount": 0.72,
+# it13 (owner msg 178, 39.8 s "too blobby, need a bit more blending"): the eroded edge 1.6x wider (0.5 -> 0.8: heads
+# fade over ~2.2 m instead of 1.4 m, bases over 9 m), and ADR-2123's soft union (0.5) and mist between the lobes (0.15
+# of a lobe's density out to half its radius past it), on the art's it13 data (660d699e); stills A/B at the it12 39.8 s
+# lens in work/engine/it13/cl
+CLOUD_LOOK = {"erosion": 1.0, "erosionScale": 40.0, "erosionEdge": 0.8, "multiScatter": 0.7, "noiseAmount": 0.72,
               "lightIntensity": 0.22, "anisotropy": 0.35, "lightDistance": 260.0, "ambientTop": 0.25,
               "ambientBottom": 0.06, "warm": 0.15, "powder": 0.85, "glowGain": 0.30, "beamAir": 0.06, "beamCloud": 0.9,
               "halo": 0.45, "glowBreakup": 0.75, "glowShadow": 1.2,
               # iteration 6: occlusion is per metre of extinction, so at 7.5x the extinction 1.6 buried every glow
               # inside its own cloud (the Condensery's wells read black); 0.8 lets the throats underlight the pedestal and keeps the Veil dark
-              "glowOcclusion": 0.8,
+              "glowOcclusion": 0.8, "lobeBlend": 0.5, "lobeMist": 0.15, "lobeMistReach": 0.5,
               # iteration 6: the art's cloud design v3 is built for 0.15 ("designed_for"); at 0.02 every formation
               # read as fog
               "extinction": DESIGN.get("designed_for", {}).get("extinction", 0.02)}
@@ -1238,19 +1253,24 @@ PLUG_FADE = (55.7, 56.45, 0.3)   # iteration 9: the plug's light dims from 55.7 
 PLUG_GLOW = {"radius": 20.0, "intensity": 3.0, "shadow": 0.1}   # ADR-2107: shadow 0.1, they sit in solid cloud
 
 
+_CAMERA = []
+
+
+def camera():
+    """it13 (msg 178): the baked journey camera (nd_camera.Camera), built once."""
+    if not _CAMERA:
+        dense, _, total, s_at = journey()
+        _CAMERA.append(NCAM.Camera(dense, total, s_at, LAYOUT["camera"].get("look_ahead"), fov_keys(), SONG))
+    return _CAMERA[0]
+
+
 def cam_at(t):
-    """The journey's camera position at timeline second t and its unit heading (from the same spline the camera follows)."""
-    dense, _, total, s_at = journey()
-    s = s_at(t)
-    acc = 0.0
-    for k in range(1, len(dense)):
-        d = math.dist(dense[k - 1], dense[k])
-        if acc + d >= s or k == len(dense) - 1:
-            u = (s - acc) / d if d > 0 else 0.0
-            p = [dense[k - 1][i] + (dense[k][i] - dense[k - 1][i]) * u for i in range(3)]
-            f = [(dense[k][i] - dense[k - 1][i]) / max(d, 1e-6) for i in range(3)]
-            return p, f
-        acc += d
+    """The journey's camera position at timeline second t and its unit heading. it13: the baked camera's eye and the
+    direction of its travel (the smoothed path's tangent), as the film draws them."""
+    cam = camera()
+    tt = min(max(t, 0.0), SONG)
+    s = NCAM.lerp_table(cam.ts, cam.s, tt)
+    return cam.pos_s(s), cam.tangent_s(s)
 GLOW_INDEX = {}   # glow name -> index in clouds.glows (route targets)
 GLOW_KEYS = {}    # glow name -> palette key
 GLOW_BASE = {}    # glow name -> its rest intensity
@@ -1344,7 +1364,7 @@ MOON_ARGS = {}
 BELL_POS = next(i["pos"] for i in LAYOUT["instances"] if i["asset"].endswith("great_lantern_bell.glb"))
 
 
-def fov_track():
+def fov_keys():
     """The lens closes from 52 to 36 degrees as the camera leaves the Veil, so the Condensery (1.2-1.6 km out, the
     reveal's subject) fills the frame without flying closer than the song allows; it eases in over the thinning."""
     keys = [(0.0, 52.0), (54.0, 52.0), (55.5, 50.5), (57.0, 45.0), (58.95, 39.0), (62.0, 36.5), (SONG, 35.0)]
@@ -1358,8 +1378,7 @@ def fov_track():
             return ks[-1][1] if t > ks[-1][0] else ks[0][1]
         ts = sorted({t for t, _ in keys} | {t for t, _ in fs if t <= SONG})
         keys = [(t, round(at(keys, t) * at(fs, t), 3)) for t in ts]
-    return {"target": "camera/fov", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
-            "loopLength": 0.0, "keys": [{"time": t, "value": v, "interp": "linear"} for t, v in keys]}
+    return keys   # it13: nd_camera smooths and bakes it with the rest of the camera
 
 
 def scene_doc(state="uv", sky_map=None):
@@ -1440,7 +1459,10 @@ def scene_doc(state="uv", sky_map=None):
     doc = {
         "format": "avgen-scene", "version": 1, "name": "neon-dreams",
         "_note": "Generated by examples/neon-dreams/build.py from art/layout.json. Do not edit.",
-        "camera": {"mode": 2, "spline": "ride", "fov": 52.0, "orbitSpeed": 0.0, "near": 0.3, "far": 120000.0},
+        # it13 (msg 178): the free camera on baked per-frame tracks (nd_camera); the "ride" spline stays as a node
+        "camera": {"mode": 1, "position": r3(camera().at(0.0)[0]),
+                   "target": r3([camera().at(0.0)[0][c] + camera().at(0.0)[1][c] * NCAM.AIM_DIST for c in range(3)]),
+                   "fov": 52.0, "orbitSpeed": 0.0, "near": 0.3, "far": 120000.0},
         "environment": env,
         "lights": lights,
         "effects": [{"id": "stars", "name": "stars", "type": "stars", "owner": {"kind": "world"}, "enabled": True,
@@ -1456,8 +1478,7 @@ def scene_doc(state="uv", sky_map=None):
         # iteration 5: the kick ring leaves the Great Lantern's bell (kick stem onsets, feeds.historyOnsets)
         "fields": [AU.kick_ring_field(BELL_POS), NL.isle_ring_field(BELL_POS)],
     }
-    return doc, [{"target": "camera/splineT", "component": -1, "enabled": True, "timeBase": "seconds",
-                  "mode": "replace", "loopLength": 0.0, "keys": keys}, fov_track()] + alien_tracks + vehicle_tracks
+    return doc, camera().tracks() + alien_tracks + vehicle_tracks
 
 
 def reactivity():
@@ -1711,9 +1732,7 @@ def reactivity():
     bt, br = NB.beam_tracks(bd["beams"], len(LAYOUT["beams"]), AU.CRASH, bd["info"]["breath_keys"])
     tracks += bt
     routes += br
-    la = LAYOUT["camera"].get("look_ahead")
-    if la:
-        tracks.append(AU.track("camera/lookAhead", [{"time": t, "value": v, "interp": "smooth"} for t, v in la]))
+    # it13: the look-ahead is baked into the camera's aim (nd_camera), no longer a camera/lookAhead track
     return routes, tracks, sources
 
 
@@ -1810,7 +1829,7 @@ def project_doc(scene_rel, audio_dir, tracks, routes, sources):
         # iteration 5: the audio history's onsets (what the kick ring field reads) come from the kick stem
         "feeds": {"beat": "stem.kick", "hits": "stem.kick", "levels": "audio", "historyOnsets": "stem.kick"},
         "sources": sources,
-        "parameters": {"camera/lookAhead": 45.0, "camera/splineBank": 5.0, "post/output/dither": 1.0},
+        "parameters": {"post/output/dither": 1.0},   # it13: no spline camera (lookAhead / splineBank are baked)
         "routes": routes,
         "timeline": {"enabled": True, "cues": [], "tracks": [trim_track(t) for t in tracks]},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4",
@@ -1841,6 +1860,8 @@ def main():
                     help="the cloud march's cost preset; 'live' writes <name>-live.* unless --name is given")
     ap.add_argument("--cloud", action="append", default=[], metavar="KEY=VALUE",
                     help="override one cloud quality knob (for measuring a preset); repeatable")
+    ap.add_argument("--look", action="append", default=[], metavar="KEY=VALUE",
+                    help="it13: override a CLOUD_LOOK value (erosionEdge, lobeBlend, lobeMist, lobeMistReach, ...)")
     ap.add_argument("--no-key-shadow", action="store_true", help="the moon key casts no shadow (measuring a preset)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="override one environment key (number); repeatable")
@@ -1874,6 +1895,9 @@ def main():
         WISPS[k] = json.loads(v)
     CLOUD_Q.clear()
     CLOUD_Q.update(CLOUD_QUALITY[a.quality])
+    for kv in a.look:   # it13: A/B of the cloud look (CLOUD_LOOK keys)
+        k, v = kv.split("=", 1)
+        CLOUD_LOOK[k] = float(v)
     for kv in a.cloud:
         k, v = kv.split("=", 1)
         CLOUD_Q[k] = int(v) if k in ("steps", "lightSteps", "erosionOctaves") else float(v)

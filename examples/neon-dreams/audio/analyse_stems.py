@@ -13,8 +13,13 @@ import argparse, json, os, subprocess
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SR = 22050
+# it13 (owner msg 178: "the pulse waves from the speakers don't seem lined up with the beat"): at 22050 Hz a 10 ms hop
+# is 220.5 samples; the envelope used 220 (0.009977 s) and stamped each one 0.01 s, so every onset drifted late by
+# 0.23 % of its time (102 ms at 45 s, on top of the envelope peak's ~50 ms). 24 kHz makes the hop exactly 240 samples,
+# and each onset is moved back to its attack's leading edge on a 1 ms envelope (`leading_edge`).
+SR = 24000
 HOP = 0.01
+HOP_N = 240
 STEMS = {"kick": "Kick", "snare": "Snare", "hh": "HH", "toms": "Toms", "crash": "Crash", "bass": "BASS",
          "moog": "Moog", "cloud": "Cloud Diving", "block": "tone block"}
 # onset picking: (relative threshold over the stem's 99th percentile, minimum gap in s)
@@ -29,9 +34,22 @@ def load(path):
 
 
 def envelope(x):
-    h = int(SR * HOP)
+    h = HOP_N
     n = len(x) // h
     return np.sqrt((x[: n * h].reshape(n, h) ** 2).mean(1) + 1e-12)
+
+
+def leading_edge(x, t, back=0.07, ahead=0.02, frac=0.1):
+    """The attack's leading edge near a picked onset `t` (an envelope peak on the 10 ms grid): the strongest 1 ms RMS
+    in [t - back, t + ahead], then back from it to where the envelope first stood under `frac` of that peak."""
+    a, b = max(0, int((t - back) * SR)), min(len(x), int((t + ahead) * SR))
+    if b - a < 48:
+        return t
+    w = 24
+    e = np.sqrt(np.convolve(x[a:b] ** 2, np.ones(w) / w, "same"))
+    k = int(np.argmax(e))
+    below = np.where(e[:k] < frac * e[k])[0]
+    return (a + (below[-1] + 1 if len(below) else 0)) / SR
 
 
 def onsets(env, rel, gap):
@@ -55,14 +73,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--audio", default=os.path.expanduser("~/Desktop/sabertooth"))
     a = ap.parse_args()
-    res = {"source": "Sabertooth stems", "hop": HOP, "fps": 30, "stems": {}}
+    res = {"source": "Sabertooth stems", "hop": HOP, "fps": 30, "stems": {},
+           "note": "it13 (msg 178): exact 10 ms hop at 24 kHz; onsets at each attack's leading edge"}
     for key, label in STEMS.items():
-        env = envelope(load(os.path.join(a.audio, label + ".wav")))
+        x = load(os.path.join(a.audio, label + ".wav"))
+        env = envelope(x)
         top = np.percentile(env, 99.5)
         lvl = np.clip((20 * np.log10(env / top + 1e-9) + 48) / 48, 0, 1)   # 0 at -48 dB under the stem's peak
         k = int(round(1 / 30 / HOP * 1000))
         fr = [round(float(lvl[int(i * (1 / 30) / HOP)]), 3) for i in range(int(len(lvl) * HOP * 30))]
-        res["stems"][key] = {"label": label, "onsets": onsets(env, *PICK[key]), "level30": fr}
+        on = []
+        for t, v in onsets(env, *PICK[key]):
+            te = round(float(leading_edge(x, float(t))), 3)
+            if on and te - on[-1][0] < 0.5 * PICK[key][1]:   # two picks on one attack: keep the stronger
+                if v > on[-1][1]:
+                    on[-1] = (on[-1][0], float(v))
+                continue
+            on.append((te, float(v)))
+        res["stems"][key] = {"label": label, "onsets": on, "level30": fr}
     # silent bars of the tone block (rms under -40 dB for >= 0.5 s inside the song)
     env = np.array(res["stems"]["block"]["level30"])
     quiet, start = [], None
