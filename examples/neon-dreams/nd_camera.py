@@ -12,10 +12,10 @@ What it12 did, and what each part cost (measured per frame from `avgen_cast_trac
 - the fov track was linear (its rate stepped at each key).
 
 What this does instead: the path is the same centripetal Catmull-Rom through the layout's waypoints, resampled every
-0.25 m and smoothed along its length (Gaussian, sigma 3 m: corners become arcs, nothing moves more than a few
+0.25 m and smoothed along its length (Gaussian, sigma 1 m: corners become arcs, nothing moves more than a few
 centimetres on the straights); the distance over time is the same monotone cubic smoothed in time (sigma 0.3 s), so
 speed and acceleration are continuous; the aim is the direction toward the path `look_ahead` metres on (the look-ahead
-itself smoothed), and that direction is smoothed in time again (sigma 0.3 s) so no bend can turn the lens faster than
+itself smoothed), and that direction is smoothed in time again (sigma 0.7 s) so no bend can turn the lens faster than
 the camera can turn; the bank is the engine's (ADR-1166: 5 deg per radian of turn over the look-ahead) on the smoothed
 path; the fov is smoothed (sigma 0.4 s). All of it is sampled at every frame of a 30 fps film into free-camera
 (mode 1) tracks: camera/position, camera/target, camera/roll, camera/fov, keyed at each frame's instant, so the render
@@ -27,10 +27,10 @@ import math
 
 FPS = 30.0
 PATH_STEP = 0.25        # m between path samples
-PATH_SIGMA = 3.0        # m, the path's smoothing along its length
+PATH_SIGMA = 1.0        # m, the path's smoothing along its length (3 m turned the lens off the band 1.2 s early)
 S_HZ = 120.0            # samples a second of the distance curve
 S_SIGMA = 0.3           # s, the distance curve's smoothing
-AIM_SIGMA = 0.3         # s, the aim direction's smoothing
+AIM_SIGMA = 0.7         # s, the aim direction's smoothing
 LA_SIGMA = 0.4          # s, the look-ahead's smoothing
 FOV_SIGMA = 0.4         # s
 BANK = 5.0              # deg of roll per radian the heading turns over the look-ahead (the engine's camera/splineBank)
