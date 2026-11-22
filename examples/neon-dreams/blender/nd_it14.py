@@ -118,7 +118,9 @@ def flights(pop):
 # ------------------------------------------------------------------------------------------------ the vortex
 VX = {
     # ADR-2120's column: a sheath of mist that spirals up out of the eye, banded by the arms (it was never switched on)
-    "column": 50.0, "columnDensity": 0.45, "columnPitch": 60.0,
+    # 50 m over the sea's mean top; density 0.65 (0.45 was a haze that only softened the lip, 0.9 veiled the eye from
+    # the reveal); a band climbs one turn in 45 m, so three bands lie over one another inside the throat
+    "column": 50.0, "columnDensity": 0.65, "columnPitch": 45.0,
     "depth": 84.0, "ocean_y": -110.0,          # the funnel's depth and the cosmic ocean's disc (it12's values)
     # the bank that lies on the ocean's disc: [metres under the disc, metres over it, density, scale, coverage]
     "floor": [4.0, 26.0, 0.55, 28.0, 0.5],
@@ -141,8 +143,9 @@ def vortex(des):
                    `vortex_shelf`: the engine's bank round the vortex, re-centred on it (it stayed 400 m east when
                    the vortex moved in it12b, so the west half of the bowl, where the dive comes in, had none) and
                    thinned: tatters over the bowl that the funnel's swirl winds inward.
-      vortex       column / columnDensity / columnPitch: the sheath of mist that spirals up out of the eye. It softens
-                   the throat's lip and gives the eye a second, turning layer over the floor.
+      vortex       column / columnDensity / columnPitch: the sheath of mist that spirals up out of the eye: turning
+                   veils round the throat, one over another, with the eye's light inside them. The throat's lip is no
+                   longer a cut-out and the eye is a glowing core instead of a lit plate.
     Tried and dropped (stills in the studio project, work/art/it14): wisp zones over the bowl (the wisp layer's 10 m
     grain is a milky film at this distance and hides the terraces); a deeper funnel.
     """
