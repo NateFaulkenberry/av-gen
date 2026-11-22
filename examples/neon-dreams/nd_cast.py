@@ -41,10 +41,10 @@ LOOK_LAYER = {"name": "crowd-look", "kind": "aim", "drive": "manual",
               "pivot": "head.x", "maxYaw": 35.0, "maxPitch": 20.0}
 
 
-def sway_layer(phase):
+def sway_layer(phase, degrees=3.0):
     return {"name": "crowd-sway", "kind": "secondary", "drive": "manual",
             "joints": ["spine_01.x", "spine_02.x", "spine_03.x", "spine_04.x", "spine_05.x", "neck.x"],
-            "degrees": 3.0, "period": BEAT2, "phase": round(phase % 1.0, 4), "spread": 0.04, "stillness": 0.0,
+            "degrees": round(degrees, 2), "period": BEAT2, "phase": round(phase % 1.0, 4), "spread": 0.04, "stillness": 0.0,
             "weight": 0.0, "axis": [0.0, 0.0, 1.0]}
 
 
@@ -140,13 +140,15 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         n = max(1, int(L / BEAT + 1e-6))
         return round(L / (n * BEAT), 4), n
 
+    rv = random.Random(170)   # it12 (owner msg 170): pose variety, on its own stream
+
     def phase_for(clip, rate=None):
-        """Clip seconds at timeline 0 so that a cycle starts on a beat of the grid (kick0 + k BEAT), on one of its beats."""
+        """Clip seconds at timeline 0. msg 170: anywhere in the cycle (it12 first put every cycle's start on one of the
+        clip's n beats, so a crowd on one clip held at most n poses -- the band's audience moved as one). The rate
+        still makes a cycle a whole number of beats."""
         L = clip_len.get(clip, 2.0)
-        rr, n = beat_rate(clip)
-        rate = rate or rr
-        m = r.randrange(PHASES) % n   # (the same draws as it11's buckets: the spots keep their clips)
-        return round((rate * (m * BEAT - kick0)) % L, 4)
+        r.randrange(PHASES)   # (the same draws as it11's buckets: the spots keep their clips)
+        return round(rv.random() * L, 4)
 
     def on_grid(t):
         return kick0 + round((t - kick0) / BEAT) * BEAT
@@ -177,14 +179,14 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             if "sway" in react:
                 g = group_of.get(sp.get("id"))
                 half = (g % 2) * 0.5 if g is not None else 0.5 * r.randrange(2)
-                layers.append(sway_layer(beat_phase + half))
+                layers.append(sway_layer(beat_phase + half + rv.uniform(-0.08, 0.08), rv.uniform(2.2, 4.0)))
             return ("band", layers)
         if "turn_to_lantern" in react:
             layers.append(dict(LOOK_LAYER))
         if "sway" in react:
             g = group_of.get(sp.get("id"))
             half = (g % 2) * 0.5 if g is not None else 0.5 * r.randrange(2)
-            layers.append(sway_layer(beat_phase + half))
+            layers.append(sway_layer(beat_phase + half + rv.uniform(-0.08, 0.08), rv.uniform(2.2, 4.0)))
         return (ring_of(pos), layers) if layers else (ring_of(pos), [])
 
     # msg 130: the ground check's fixes (art/ground_fixes.json): spots moved or dropped, paths re-laid, riders on the floor
@@ -224,6 +226,13 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         if hold:
             clip, speed = hold["clip"], 0.001
             phase = round(clip_len.get(clip, 1.0) * hold.get("phase", 0.3), 4)
+        # msg 170: the art's per-figure overrides (clip seconds at 0, clip rate), when it sets them
+        if sp.get("anim_clip") and not hold:
+            clip = sp["anim_clip"]
+        if sp.get("anim_rate") is not None and not hold:
+            speed = sp["anim_rate"]
+        if sp.get("anim_phase") is not None and not hold:
+            phase = round(sp["anim_phase"], 4)
         n = {"name": "alien_" + sp["id"], "kind": "gltf", "asset": aliens + sp["cast"] + ".glb", "position": r3(sp["pos"]),
              "rotation": [0.0, round(sp["facing_deg"], 2), 0.0], "scale": [pop.get("scale", 1.0)] * 3,
              "animation": anim(clip, sp.get("tier", "B"), listening(sp, sp["pos"]), speed, phase)}
@@ -236,7 +245,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
     # it12 (msg 149): the audience erupts on the crash that ends the held breath (47.15 s): Crazy once, a little
     # staggered, then back to its own clip
     for name, clip, speed in band_ids:
-        d = round(r.uniform(0.0, 0.18), 3)
+        d = round(r.uniform(0.0, 0.18), 3) + round(rv.uniform(0.0, 0.3), 3)   # msg 170: a looser eruption
         actors.append({"id": name, "node": name, "visible": True, "keys": [], "clips": [
             {"time": round(BREATH[2] + d, 3), "clip": "Crazy", "speed": 1.0, "blend": 0.15, "playback": "once",
              "then": clip}]})
