@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Neon Dreams, iteration 13 (owner msgs 178, 180): the Veil's faces blended; the end's rocks solid.
+"""Neon Dreams, iteration 13 (owner msgs 178, 180, 188): the Veil's faces blended; the end's rocks solid; dark sky behind the band.
 
     python3 blender/nd_clouds13.py [--root examples/neon-dreams] [--base-dir DIR] [--out FILE]
                                                              (plain Python, no Blender; idempotent)
@@ -45,6 +45,9 @@ So the hierarchy is of kinds, not of ball sizes:
      takes this iteration's own lobes out until every cell fits, so the renderer never drops one of the town's.
 Untouched: the plug and its fade (the Condensery stays hidden until 56.88 s; stills at 55, 56.5 and 56.9 s), the
 crown's height (msgs 96/103), the sill and the reveal, the town's own cloud.
+
+msg 188 (39.8 s, "can we remove / alter these blobs": the pale masses above and behind the band): open_band_sky()
+takes out the four dense lobes of the gate's south side that stood behind the stage's sky beams (see BAND_SKY).
 
 msg 180 (60-70 s: the Lone Lamp's and the Break Light's rocks "partly see-through"). Found by switching things off in
 AV Gen: it is my it12 wisp zones `end_lone_lamp` (rim height, 46 x 40 m round the rock) and `end_drift` (under the
@@ -278,6 +281,28 @@ def blend_veil(des, path, islands, stats):
     stats["veil"] = dict(n, lobes_before=len(veil), lobes_after=len(out))
 
 
+# ------------------------------------------------------------------------------------------------ msg 188: the sky behind the band
+# owner msg 188 (on the 39.8 s still): "can we remove / alter these blobs" -- the pale rounded masses above and behind the
+# band, left of the isle's tower: the stage's sky beams should stand against dark sky. Named by projecting the lobes into
+# the owner's box: the antechamber's south wall masses and the two roof slabs south of the lens's line (dense, so no
+# share of the erosion tears them), 60-140 m behind the stage as the Quay's end and the garden see it. They go. The rooms
+# keep their north walls, their roof over the lens's line and the plug: the lens still dives into cloud, with a window on
+# the south sky beside it. BAND_SKY: x0, x1, y0, y1, z0, z1 (engine metres) of the centres that go.
+BAND_SKY = (195.0, 300.0, 125.0, 185.0, 30.0, 100.0)
+
+
+def open_band_sky(des, stats):
+    x0, x1, y0, y1, z0, z1 = BAND_SKY
+    keep, gone = [], []
+    for l in des["masses"]["veil"]:
+        c = l["c"]
+        if l.get("tag") not in ("plug", "plug_fade") and l["density"] >= 0.9 and x0 <= c[0] <= x1 and y0 <= c[1] <= y1 and z0 <= c[2] <= z1:
+            gone.append([l.get("tag"), c, l["r"]]); continue
+        keep.append(l)
+    des["masses"]["veil"] = keep
+    stats["band_sky_removed"] = gone
+
+
 # ------------------------------------------------------------------------------------------------ msg 178: two rim wraps
 WRAP_ISLES = ("isle_exit", "isle_lampwick")
 
@@ -399,12 +424,14 @@ def main():
     des = load_base("cloud_design.json"); lay = load_base("layout.json")
     path = lens_path(lay); islands = lay["islands"]; stats = {}
     blend_veil(des, path, islands, stats)
+    if "--no-band-sky" not in argv:
+        open_band_sky(des, stats)
     soften_wraps(des, islands, stats)
     solid_rocks(des, path, islands, stats)
     fit_bins(des, stats)
     stats["veil"]["lobes_after_fit"] = len(des["masses"]["veil"])
     des["counts"] = {k: len(v) for k, v in des["masses"].items()}
-    des["it13"] = {"msgs": [178, 180], "script": "blender/nd_clouds13.py", "base": BASE, "stats": stats,
+    des["it13"] = {"msgs": [178, 180, 188], "script": "blender/nd_clouds13.py", "base": BASE, "stats": stats,
                    "note": "msg 178: the Veil's outside rebuilt as torn envelopes round solid hearts, mist halos, bridges and strata (tags "
                            "blend_envelope / blend_heart / blend_mist / blend_bridge / blend_strata; each carries its own `erode` share), one mist "
                            "sheet at its shoulder (mist_layers: the engine's four repeated, veil_shoulder added), soft rim wraps and rim "
