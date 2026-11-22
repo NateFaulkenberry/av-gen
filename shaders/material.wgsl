@@ -57,13 +57,13 @@ struct MaterialProgramBlock {
     pad0: u32,
     pad1: u32,
     pad2: u32,
-    programs: array<MaterialProgramGpu, 32>,
+    programs: array<MaterialProgramGpu, 64>, // ADR-2122
 };
 
 const MAT_MAX_OPS: u32 = 96u;
 const MAT_MAX_LAYERS: u32 = 4u;
 const MAT_MAX_FIELDS: u32 = 4u;   // scene::kMaxMaterialFields
-const MAT_MAX_PROGRAMS: i32 = 32; // ADR-1675 (was 16, ADR-1290; 8 before that)
+const MAT_MAX_PROGRAMS: i32 = 64; // ADR-2122 (32 since ADR-1675) (was 16, ADR-1290; 8 before that)
 const MAT_REGISTERS: i32 = 8;
 
 const MAT_OP_INPUT: u32 = 0u;

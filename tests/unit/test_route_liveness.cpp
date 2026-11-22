@@ -550,11 +550,12 @@ TEST_CASE("liveness: program-unused and program-not-uploaded", "[liveness][scene
     SceneWorld w;
     CHECK(has(w.target("material/orphan/emissionIntensity"), "program-unused"));
     CHECK_FALSE(has(w.target("material/glowing/emissionIntensity"), "program-unused"));
-    // Four programs in the scene, then twenty-nine more: the thirty-third and later are past the GPU's table (32
-    // slots since ADR-1675, 16 since ADR-1290).
-    SceneWorld thirtyThree(29);
-    CHECK(has(thirtyThree.target("material/extra28/emissionIntensity"), "program-not-uploaded")); // the 33rd
-    CHECK_FALSE(has(thirtyThree.target("material/extra27/emissionIntensity"), "program-not-uploaded")); // the 32nd
+    // Four programs in the scene, then sixty-one more: the sixty-fifth and later are past the GPU's table (64
+    // slots since ADR-2122, 32 since ADR-1675, 16 since ADR-1290).
+    SceneWorld thirtyThree(61);
+    CHECK(has(thirtyThree.target("material/extra60/emissionIntensity"), "program-not-uploaded")); // the 65th
+    CHECK_FALSE(has(thirtyThree.target("material/extra59/emissionIntensity"), "program-not-uploaded")); // the 64th
+    CHECK_FALSE(has(thirtyThree.target("material/extra28/emissionIntensity"), "program-not-uploaded")); // the 33rd
     CHECK_FALSE(has(thirtyThree.target("material/extra12/emissionIntensity"), "program-not-uploaded")); // the 17th
     CHECK_FALSE(has(thirtyThree.target("material/glowing/emissionIntensity"), "program-not-uploaded"));
 }

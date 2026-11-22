@@ -1552,8 +1552,9 @@ TEST_CASE("the ninth to thirty-second material programs render; the thirty-third
     };
     scene::Scene base = baseScene();
     base.camera.position = {0.0f, 0.0f, 12.0f};
-    for (int i = 0; i < 33; ++i) {
-        const glm::vec3 c = i < 8 ? glm::vec3(0.5f) : (i < 32 ? glm::vec3(0.9f, 0.05f, 0.05f) : glm::vec3(0.05f, 0.9f, 0.05f));
+    // ADR-2122: 64 slots -- sixty-five programs, the sixty-fifth green
+    for (int i = 0; i < 65; ++i) {
+        const glm::vec3 c = i < 8 ? glm::vec3(0.5f) : (i < 64 ? glm::vec3(0.9f, 0.05f, 0.05f) : glm::vec3(0.05f, 0.9f, 0.05f));
         base.materialPrograms.push_back(flat("p" + std::to_string(i), c));
     }
     auto wallWith = [&](const scene::Scene& from, const std::string& program) {
@@ -1567,7 +1568,9 @@ TEST_CASE("the ninth to thirty-second material programs render; the thirty-third
     const auto sixteenth = wallWith(base, "p15");
     const auto seventeenth = wallWith(base, "p16");
     const auto thirtySecond = wallWith(base, "p31");
-    const auto thirtyThird = wallWith(base, "p32");
+    const auto thirtyThird = wallWith(base, "p32");   // ADR-2122: now inside the table
+    const auto sixtyFourth = wallWith(base, "p63");
+    const auto sixtyFifth = wallWith(base, "p64");
     // ... and the table shrinking: only the header and the programs in use are uploaded (ADR-1675), so after the
     // full scene a scene of two programs, the second now red, must draw with the new second, not the old grey one
     scene::Scene two = base;
@@ -1579,15 +1582,15 @@ TEST_CASE("the ninth to thirty-second material programs render; the thirty-third
         const std::uint8_t* p = img.pixel(80, 80);
         return std::array<int, 3>{p[0], p[1], p[2]};
     };
-    for (const auto* img : {&ninth, &sixteenth, &seventeenth, &thirtySecond, &shrunk}) {
+    for (const auto* img : {&ninth, &sixteenth, &seventeenth, &thirtySecond, &thirtyThird, &sixtyFourth, &shrunk}) {
         const auto c = rgb(*img);
         INFO("program slot pixel " << c[0] << "," << c[1] << "," << c[2]);
         CHECK(c[0] > c[1] + 30); // red: the program ran
         CHECK(c[0] > c[2] + 30);
     }
-    // the thirty-third is not uploaded: the wall shades with its own (grey) material, not green
-    const auto g = rgb(thirtyThird);
-    INFO("thirty-third pixel " << g[0] << "," << g[1] << "," << g[2]);
+    // the sixty-fifth is not uploaded: the wall shades with its own (grey) material, not green
+    const auto g = rgb(sixtyFifth);
+    INFO("sixty-fifth pixel " << g[0] << "," << g[1] << "," << g[2]);
     CHECK(std::abs(g[1] - g[0]) < 12);
     CHECK(std::abs(g[1] - g[2]) < 12);
 }

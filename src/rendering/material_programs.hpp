@@ -35,7 +35,7 @@ class FieldUniforms;
 
 // ADR-1290: 16 (was 8). A world of eight surface programs plus a sky object (the moon's phase) ran out of slots, and
 // the ninth program was dropped with one log line -- its surfaces shading as though they had none.
-constexpr int kMaxGpuMaterialPrograms = 32; // ADR-1675 (was 16, ADR-1290)
+constexpr int kMaxGpuMaterialPrograms = 64; // ADR-2122 (32 since ADR-1675, 16 since ADR-1290)
 
 // Mirrors `MaterialProgramBlock` in shaders/material.wgsl (91,920 bytes since ADR-1642's texture-op lane; 91,664 since
 // ADR-1290; 45,840 since ADR-904's header flags; past the uniform limit since ADR-036, which is why it is a read-only storage buffer).
