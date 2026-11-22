@@ -36,6 +36,7 @@ import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the pale
 import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flights)
 import nd_lights as NL  # noqa: E402  (iteration 11, owner msg 130: the city's lights play more of the song)
 import nd_cast as NC  # noqa: E402  (iteration 10, owner msg 112: the population from art/population.json)
+import nd_fireworks as NFW  # noqa: E402  (iteration 14, owner msg 206: fireworks on the crashes)
 import nd_band as NB  # noqa: E402  (iteration 12, owner msg 149: the band, its spots and beams)
 import nd_camera as NCAM  # noqa: E402  (iteration 13, owner msg 178: the journey camera baked C2-smooth)
 
@@ -1197,6 +1198,8 @@ WISPS = {"enabled": True, "base": 0.0, "top": 0.0, "density": 1.8, "scale": 10.0
 NO_WISPS = False
 NO_MIST = False
 NO_VORTEX = False
+NO_FIREWORKS = False
+FW_INFO = {}
 # ADR-2119 (owner msg 149: "clouds all around more animated ... fog layers or distortion/movement"): the billows boil in
 # place over 7 s clocks (1.2 m/s, rising and rolling along the curl field) and their tatters writhe; thin edges take
 # 35 % of the air's colour (59.6 s: the edge "too CG")
@@ -1260,7 +1263,8 @@ def camera():
     """it13 (msg 178): the baked journey camera (nd_camera.Camera), built once."""
     if not _CAMERA:
         dense, _, total, s_at = journey()
-        _CAMERA.append(NCAM.Camera(dense, total, s_at, LAYOUT["camera"].get("look_ahead"), fov_keys(), SONG))
+        _CAMERA.append(NCAM.Camera(dense, total, s_at, LAYOUT["camera"].get("look_ahead"), fov_keys(), SONG,
+                                   LAYOUT["camera"].get("roll_extra")))
     return _CAMERA[0]
 
 
@@ -1364,6 +1368,40 @@ MOON_ARGS = {}
 BELL_POS = next(i["pos"] for i in LAYOUT["instances"] if i["asset"].endswith("great_lantern_bell.glb"))
 
 
+def fade_tracks():
+    """it14 (owner msg 195: "finish the scene off by diving into this vortex and fading out"): the picture's gain
+    (post/grade/gain, rgb) from 1 to 0 over the layout's `camera.fade` keys, eased (smoothstep), black on the last
+    note."""
+    fk = LAYOUT["camera"].get("fade")
+    if not fk:
+        return []
+    (a, va), (b, vb) = fk[0], fk[-1]
+    keys = [{"time": 0.0, "value": [va] * 3, "interp": "linear"}]
+    n = 24
+    for i in range(n + 1):
+        u = i / n
+        e = u * u * (3 - 2 * u)
+        v = round(va + (vb - va) * e, 4)
+        keys.append({"time": round(a + (b - a) * u, 4), "value": [v] * 3, "interp": "linear"})
+    keys.append({"time": round(SONG + 0.5, 3), "value": [vb] * 3, "interp": "linear"})
+    out = [{"target": "post/grade/gain", "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
+            "loopLength": 0.0, "keys": keys}]
+    # the light from the ocean eye rises as the lens dives at it: the eye glow and the funnel's underlight swell
+    vd = vortex_design()
+    sw = [(0.0, 1.0), (66.0, 1.0), (68.5, 1.8), (70.2, 3.0)]
+
+    def swell(base):
+        return [{"time": t, "value": round(base * k, 3), "interp": "smooth"} for t, k in sw]
+    if vd:
+        out.append({"target": "clouds/vortex/glow", "component": -1, "enabled": True, "timeBase": "seconds",
+                    "mode": "replace", "loopLength": 0.0, "keys": swell(vd["glow"])})
+    if "vortex_eye" in GLOW_INDEX:
+        out.append({"target": "clouds/glow/%d/intensity" % GLOW_INDEX["vortex_eye"], "component": -1, "enabled": True,
+                    "timeBase": "seconds", "mode": "replace", "loopLength": 0.0,
+                    "keys": swell(GLOW_BASE["vortex_eye"])})
+    return out
+
+
 def fov_keys():
     """The lens closes from 52 to 36 degrees as the camera leaves the Veil, so the Condensery (1.2-1.6 km out, the
     reveal's subject) fills the frame without flying closer than the song allows; it eases in over the thinning."""
@@ -1428,6 +1466,12 @@ def scene_doc(state="uv", sky_map=None):
     flyer_lights = flyer_lights + bd["lights"]
     alien_tracks = alien_tracks + bd["tracks"]
     SEQUENCE_ACTORS.extend(bd["actors"])
+    if not NO_FIREWORKS:   # it14 (owner msg 206): shells bursting on the crashes, lighting the town
+        fw_nodes, fw_lights, fw_tracks, FIREWORKS = NFW.build(lambda t: camera().at(t), LAYOUT, SONG)
+        nodes += fw_nodes
+        flyer_lights = flyer_lights + fw_lights
+        alien_tracks = alien_tracks + fw_tracks
+        FW_INFO.update(FIREWORKS)
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_breathing(ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state),
@@ -1478,7 +1522,7 @@ def scene_doc(state="uv", sky_map=None):
         # iteration 5: the kick ring leaves the Great Lantern's bell (kick stem onsets, feeds.historyOnsets)
         "fields": [AU.kick_ring_field(BELL_POS), NL.isle_ring_field(BELL_POS)],
     }
-    return doc, camera().tracks() + alien_tracks + vehicle_tracks
+    return doc, camera().tracks() + fade_tracks() + alien_tracks + vehicle_tracks
 
 
 def reactivity():
@@ -1853,6 +1897,7 @@ def main():
     ap.add_argument("--no-wisps", action="store_true", help="ADR-2113 A/B: leave the wisp layer out")
     ap.add_argument("--no-mist", action="store_true", help="ADR-2119 A/B: no mist sheets")
     ap.add_argument("--no-churn", action="store_true", help="ADR-2119 A/B: no churn, no edge air")
+    ap.add_argument("--no-fireworks", action="store_true", help="it14 A/B: no fireworks")
     ap.add_argument("--no-vortex", action="store_true", help="ADR-2120 A/B: the ocean break as it was")
     ap.add_argument("--wisp", action="append", default=[], metavar="KEY=VALUE",
                     help="override one wisp key (a number, or JSON); repeatable")
@@ -1887,6 +1932,7 @@ def main():
     global NO_MIST, NO_VORTEX
     NO_MIST = a.no_mist
     NO_VORTEX = a.no_vortex
+    globals()["NO_FIREWORKS"] = a.no_fireworks
     if a.no_churn:
         CHURN["amount"] = 0.0
         globals()["EDGE_AIR"] = 0.0

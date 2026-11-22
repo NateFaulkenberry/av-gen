@@ -3583,6 +3583,16 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.corruption9 = corruption[9];
         frame.portalClip = scene.portalClip; // Gate C 2
         frame.skyTint = glm::vec4(scene.environment.skyTint, 0.0f); // ADR-2103
+        // ADR-2124: the fronts through the world (zero count: every consumer's branch is skipped)
+        frame.pulseInfo = glm::vec4(static_cast<float>(std::min<std::size_t>(scene.pulses.count, world::kMaxPulseFronts)),
+                                    0.0f, 0.0f, 0.0f);
+        for (std::size_t i = 0; i < world::kMaxPulseFronts; ++i) {
+            const world::PulseFront& f = scene.pulses.fronts[i];
+            frame.pulses[4 * i] = f.centreRadius;
+            frame.pulses[4 * i + 1] = f.motion;
+            frame.pulses[4 * i + 2] = f.flash;
+            frame.pulses[4 * i + 3] = f.shape;
+        }
         const bool liveBackground = (liveSky_.enabled || resolved.cirrus.amount > 0.0f) && skyIbl &&
                                     scene.environment.skyboxBlur <= 0.0f;
         frame.skyLive = liveBackground

@@ -24,6 +24,7 @@
 #include "spatial/spline.hpp"
 #include "world/atmospherics.hpp"
 #include "world/effects/distortion_frame.hpp"
+#include "world/effects/world_pulse.hpp"
 #include "world/effects/entity_fx.hpp"
 #include "world/terrain_height.hpp"
 #include "world/wave_effect.hpp"
@@ -151,6 +152,9 @@ struct Scene {
     //   `distortion`   RenderStage::ScreenSpace -- DF proxies (Space Warp), resolved after the
     //                  volumetric composite; `count == 0` touches nothing (ADR-703)
     world::DistortionFrame distortion;
+    //   `pulses`       ADR-2124: a Shockwave's fronts through the world -- read by the vertex stages, the
+    //                  surface shading and the cloud march (`count == 0` changes nothing)
+    world::PulseFrame pulses;
     //   `entityFx`     RenderStage::Material   -- ADR-703's per-entity lanes (FXL): Glow, Pulse, Bloom
     //                  Source; `entityFx.lights` is LIGHTMOD's pool (a Glow's spill light)
     world::EntityFxFrame entityFx;

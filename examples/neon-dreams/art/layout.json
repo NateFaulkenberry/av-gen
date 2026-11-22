@@ -53152,7 +53152,7 @@
   }
  ],
  "camera": {
-  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before. it12b: a 7 s dwell at the band (approach 42-44.5 s, a 2-4 m/s creep to 10 m from the pianist 44.6-48.9 s), out at <= 22 m/s to the Veil's gate (53 s); the Veil's middle removed (VEIL_CUT) so the plug still ends on 56.88 s, the reveal and end 244 m west; `fov_scale` multiplies the fov track it13 (owner msgs 178/184, engine): the band dwell 3.1 s longer -- the Quay run from 36.85 s 0.8 s quicker, the creep at the band 43.6-51.2 s (was 44.4-48.9), the lift and the Veil 2.3 s quicker; 35.75, 56.88 and 58.95 unchanged. The engine bakes the camera C2-smooth from these (build.py smooth_camera). The waypoint at x 109 moved to 42.2 s so the approach only slows (20 -> 16 -> 11 m/s), no bump.",
+  "note": "the 70.2 s journey; it12 (owner msg 149): from the Quay's close pass (35.75 s) faster down the Quay, then slow (7-8 m/s) and low over the band's plaza 44.4-46.25 s with the band ahead-right at 14-24 m, up into the Veil at 47.0 s as before; `look_ahead` (m along the path, keyed) shortens to 16 m over the plaza so the lens keeps looking where it travels, not up into the Veil; it11's opening and end as before. it12b: a 7 s dwell at the band (approach 42-44.5 s, a 2-4 m/s creep to 10 m from the pianist 44.6-48.9 s), out at <= 22 m/s to the Veil's gate (53 s); the Veil's middle removed (VEIL_CUT) so the plug still ends on 56.88 s, the reveal and end 244 m west; `fov_scale` multiplies the fov track it13 (owner msgs 178/184, engine): the band dwell 3.1 s longer -- the Quay run from 36.85 s 0.8 s quicker, the creep at the band 43.6-51.2 s (was 44.4-48.9), the lift and the Veil 2.3 s quicker; 35.75, 56.88 and 58.95 unchanged. The engine bakes the camera C2-smooth from these (build.py smooth_camera). The waypoint at x 109 moved to 42.2 s so the approach only slows (20 -> 16 -> 11 m/s), no bump. it14 (owner msg 195, engine): after the reveal the lens gathers speed toward the vortex (1.1 km east), tips over its rim and dives into the funnel, banking with its counter-clockwise turn (roll_extra, deg, added to the bank) as the lens widens (fov_scale) and the frame fades to black over the last 1.8 s (fade: post/grade/gain keys) on the last note (70.18 s).",
   "waypoints": [
    {
     "t": 0.0,
@@ -53475,19 +53475,59 @@
     ]
    },
    {
-    "t": 66.5,
+    "t": 64.4,
     "pos": [
-     548.0,
-     221.0,
-     -62.0
+     562.0,
+     232.0,
+     -60.0
+    ]
+   },
+   {
+    "t": 65.9,
+    "pos": [
+     705.0,
+     254.0,
+     -66.0
+    ]
+   },
+   {
+    "t": 67.1,
+    "pos": [
+     900.0,
+     240.0,
+     -55.0
+    ]
+   },
+   {
+    "t": 68.1,
+    "pos": [
+     1115.0,
+     186.0,
+     -38.0
+    ]
+   },
+   {
+    "t": 68.9,
+    "pos": [
+     1290.0,
+     128.0,
+     -24.0
+    ]
+   },
+   {
+    "t": 69.55,
+    "pos": [
+     1415.0,
+     45.0,
+     0.0
     ]
    },
    {
     "t": 70.2,
     "pos": [
-     592.0,
-     219.5,
-     -66.0
+     1495.0,
+     -72.0,
+     32.0
     ]
    }
   ],
@@ -53551,8 +53591,40 @@
     0.87
    ],
    [
-    70.2,
+    65.5,
     0.87
+   ],
+   [
+    68.5,
+    1.15
+   ],
+   [
+    70.2,
+    1.4
+   ]
+  ],
+  "roll_extra": [
+   [
+    0.0,
+    0.0
+   ],
+   [
+    67.6,
+    0.0
+   ],
+   [
+    70.2,
+    38.0
+   ]
+  ],
+  "fade": [
+   [
+    68.4,
+    1.0
+   ],
+   [
+    70.18,
+    0.0
    ]
   ]
  },

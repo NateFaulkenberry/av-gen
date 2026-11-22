@@ -188,10 +188,37 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                        "ease": 0, "rimColor": pal(PULSE["key"]), "rimEmission": PULSE["rim"],
                                        "chroma": 0.25, "radiusDecay": 0.6, "maxConcurrent": 2.0,
                                        "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
+    # it14 (owner msg 195: "way more visible and impactful -- the wave should pulsate through the entire scene /
+    # geometry / characters", visible down the Quay): ADR-2124's Shockwave through the world, released from the
+    # stage on each marker -- it pushes the town and the crowd it passes, lights a band on every surface, ripples
+    # the clouds and bends the air where it meets the town and along its silhouette.
+    c = st.get("halo_y") and [st["centre"][0], st["deck_y"] + 2.5, st["centre"][2]] or st["centre"]
+    effects.append({"id": "kick_wave", "name": "kick wave (through the town)", "type": "shockwave",
+                    "owner": {"kind": "world"}, "enabled": True, "order": 20, "activation": "trigger",
+                    "trigger": {"source": "marker", "name": "kick"},
+                    "parameters": {"travel": "world", "strength": WAVE["haze"], "maxRadius": WAVE["reach"],
+                                   "duration": round(WAVE["reach"] / WAVE["speed"], 3), "thickness": WAVE["half"],
+                                   "ease": 3, "rimColor": pal(WAVE["key"]), "rimEmission": WAVE["rim"],
+                                   "chroma": 0.12, "radiusDecay": WAVE["decay"], "refRadius": WAVE["ref"],
+                                   "maxConcurrent": 8.0, "push": WAVE["push"], "lift": WAVE["lift"],
+                                   "flashColor": [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])], "flash": WAVE["flash"], "flare": WAVE["flare"],
+                                   "clouds": WAVE["clouds"],
+                                   "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     info["effects"] = effects
-    # the held breath silences the pulse (45.5 s to the 47.15 s crash, which brings it back)
-    info["markers"] = [{"time": round(t, 4), "name": "kick"} for t in ONSETS["kick"]
-                       if not (BREATH[0] <= t < BREATH[2] - 0.05)]
+    # the held breath silences the wave in flight too (its four amounts dip to 0 with the spots' breath)
+    for leaf in ("push", "flash", "clouds", "strength"):
+        v = WAVE[{"strength": "haze"}.get(leaf, leaf)]
+        tracks.append(track("fx/kick_wave/%s" % leaf, breath_keys(v, 0.0)))
+    # it14 (owner msg 204: "make sure the speaker pulse is on quarter notes -- it's following the kick right now"):
+    # one front per quarter note of the measured grid (AU.KICK0 + n x AU.BEAT, 170.95 BPM), the whole song but the
+    # held breath (45.5 s to the 47.15 s crash, which brings it back)
+    grid, n = [], 0
+    while AU.KICK0 + n * BEAT < 70.18:
+        t = AU.KICK0 + n * BEAT
+        if not (BREATH[0] <= t < BREATH[2] - 0.05):
+            grid.append(t)
+        n += 1
+    info["markers"] = [{"time": round(t, 4), "name": "kick"} for t in grid]
     info["breath_keys"] = breath_keys
     return nodes, lights, beams, tracks, routes, actors, info
 
@@ -258,6 +285,11 @@ def drum_warp(clip, L, song=70.18):
     return [c for c in cues if c["time"] < song], notes
 
 
+# it14 (msg 195): the wave through the town (ADR-2124). 160 m/s: the Quay's lens (130 m) sees it 0.8 s after it leaves
+# the stage, eight fronts in the air; a 7 m half-width band so a building takes ~0.15 s to cross it (a thump, not one
+# frame); push and flash keep full strength to 25 m and weaken as (25 / r) ^ 0.5 (0.44 at the Quay, 0.23 at 470 m).
+WAVE = {"speed": 160.0, "reach": 450.0, "half": 7.0, "haze": 1.0, "rim": 0.15, "decay": 0.5, "ref": 25.0,
+        "push": 0.9, "lift": 0.45, "flash": 0.55, "flare": 2.0, "clouds": 0.6, "key": "sign_a"}
 PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
 
 

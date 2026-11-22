@@ -1207,8 +1207,12 @@ fn fs_clouds(in: VsOut) -> MarchOut {
         if (db.base > 0.0) {
             // ADR-2111: the cloud within two minimum steps of the eye fades out: there the reprojection has nothing to
             // hold (parallax of metres a frame) and a fast camera leaving a cloud saw its last metres as a stipple
-            let dens = select(detailErode(p - cb, db.base), db.base, even) *
+            var dens = select(detailErode(p - cb, db.base), db.base, even) *
                        select(smoothstep(0.0, 2.0 * minStep, t), 1.0, even);
+            // ADR-2124: ... and thickens it in the band (a ripple of density through the cloud)
+            if (frame.pulseInfo.x > 0.5) {
+                dens = dens * (1.0 + pulseCloud(p).x);
+            }
             if (dens > 0.003) {
                 // the key's light reaching this point (the light march reads the undetailed density)
                 var od = 0.0;
@@ -1326,6 +1330,10 @@ fn fs_clouds(in: VsOut) -> MarchOut {
                 // ADR-2102: the beams on the cloud
                 for (var k = 0u; k < arms; k = k + 1u) {
                     glow = glow + beamOnCloud(p, k) * cu.beamInfo.z;
+                }
+                // ADR-2124: a Shockwave's front through the world lights the cloud it passes
+                if (frame.pulseInfo.x > 0.5) {
+                    glow = glow + pulseCloud(p).yzw;
                 }
                 var radiance = cu.lightColor.rgb * cu.light.w * keyLight * powder + ambient + warm + glow;
                 let hz = 1.0 - exp(-t / max(cu.haze.w, 1.0));

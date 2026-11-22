@@ -44,7 +44,13 @@ fn vs_skinned(in: SkinnedVertexIn) -> VertexOut {
 
     var out: VertexOut;
     let posed = skin * vec4<f32>(in.position, 1.0);
-    let world = object.model * posed;
+    var world = object.model * posed;
+    var prevWorld = object.prevModel * (prevSkin * vec4<f32>(in.position, 1.0));
+    // ADR-2124: a Shockwave's fronts through the world push the character too (uniform branch)
+    if (frame.pulseInfo.x > 0.5) {
+        world = vec4<f32>(world.xyz + pulseOffset(world.xyz, false), world.w);
+        prevWorld = vec4<f32>(prevWorld.xyz + pulseOffset(prevWorld.xyz, true), prevWorld.w);
+    }
     out.clip = frame.viewProj * world;
     out.worldPos = world.xyz;
     // The joint blend is affine and, for a rig without non-uniform scale in it, rigid: its upper
@@ -56,6 +62,6 @@ fn vs_skinned(in: SkinnedVertexIn) -> VertexOut {
     // authored on the surface should travel with the surface, not swim through it as the character
     // moves.
     out.localPos = in.position;
-    out.prevClip = frame.prevViewProj * (object.prevModel * (prevSkin * vec4<f32>(in.position, 1.0)));
+    out.prevClip = frame.prevViewProj * prevWorld;
     return out;
 }

@@ -84,7 +84,7 @@ class Camera:
     """The baked journey. `dense`, `total`, `s_at` are build.py's journey(): the Catmull-Rom points every ~4 m, their
     length and the monotone cubic s(t). `look_ahead` and `fov` are [[t, value], ...] (linear keys)."""
 
-    def __init__(self, dense, total, s_at, look_ahead, fov, song):
+    def __init__(self, dense, total, s_at, look_ahead, fov, song, roll_extra=None):
         self.song = song
         # the path, every PATH_STEP metres along the Catmull-Rom polyline, smoothed along its length
         cum = [0.0]
@@ -126,6 +126,9 @@ class Camera:
         for d in dirs:
             ln = math.sqrt(sum(v * v for v in d)) or 1.0
             self.dirs.append([v / ln for v in d])
+        # it14 (msg 195): an authored roll added to the bank (the dive banks with the vortex's turn)
+        if roll_extra:
+            turns = [turns[i] + piecewise(roll_extra, t) for i, t in enumerate(self.ts)]
         self.roll = smooth(turns, AIM_SIGMA * S_HZ)
         self.fov = smooth([piecewise(fov, t) for t in self.ts], FOV_SIGMA * S_HZ)
 

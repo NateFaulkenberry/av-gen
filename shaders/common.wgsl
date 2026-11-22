@@ -217,6 +217,11 @@ struct FrameUniforms {
     ballFx2: vec4<f32>,
     ballImpacts: array<vec4<f32>, 16>,
     skyTint: vec4<f32>,    // ADR-2103: rgb multiplies the visible sky (Environment::skyTint)
+    // ADR-2124: a Shockwave's fronts through the world. x = count. Front i is pulses[4i..4i+3]:
+    //   [0] xyz centre, w radius (m); [1] x radius a frame earlier, y half-width (m), z push (m), w push a frame earlier;
+    //   [2] rgb the surface band's radiance; [3] x lift share, y cloud ripple, z emissive flare.
+    pulseInfo: vec4<f32>,
+    pulses: array<vec4<f32>, 48>, // 4 x world::kMaxPulseFronts
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
 };
 
@@ -607,6 +612,86 @@ fn materialTierLocalLights(tier: u32) -> u32 {
 }
 
 @group(0) @binding(0) var<uniform> frame: FrameUniforms;
+
+// ---- ADR-2124: the travelling fronts ----------------------------------------------------------------
+// A front is a sphere of radius R growing from its centre. At a point a distance r from the centre, u = (r - R) / h
+// (h the band's half-width) runs from +3 to -3 as the front passes. Every consumer below is a sum over the live
+// fronts, a pure function of the point and of the frame block; `pulseInfo.x == 0` is a uniform branch that skips it.
+
+fn pulseCount() -> u32 {
+    return min(u32(frame.pulseInfo.x + 0.5), 12u);
+}
+
+// The push at world point `p`: a shove out from the centre (and up, by the lift share) as the band arrives, then a
+// smaller recoil behind it -- a pressure wave through the solid. `prev` evaluates the front a frame earlier (the
+// velocity target's previous position).
+fn pulseOffset(p: vec3<f32>, prev: bool) -> vec3<f32> {
+    var off = vec3<f32>(0.0);
+    let n = pulseCount();
+    for (var i = 0u; i < n; i = i + 1u) {
+        let a = frame.pulses[4u * i];
+        let b = frame.pulses[4u * i + 1u];
+        let amp = select(b.z, b.w, prev);
+        if (amp <= 0.0) {
+            continue;
+        }
+        let v = p - a.xyz;
+        let r = length(v);
+        let u = (r - select(a.w, b.x, prev)) / max(b.y, 1e-3);
+        if (u > 3.0 || u < -5.0 || r < 1e-3) {
+            continue;
+        }
+        let hz = vec2<f32>(v.x, v.z);
+        let fl = length(hz);
+        let outward = select(vec3<f32>(0.0), vec3<f32>(hz.x / fl, 0.0, hz.y / fl), fl > 1e-3);
+        let lift = frame.pulses[4u * i + 3u].x;
+        let dir = outward * (1.0 - lift) + vec3<f32>(0.0, lift, 0.0);
+        let w = exp(-u * u) - 0.45 * exp(-(u + 1.8) * (u + 1.8));
+        off = off + dir * (amp * w);
+    }
+    return off;
+}
+
+// The band's light at a surface point: rgb to add as emission; `emissive` is the surface's own emission, which flares.
+fn pulseFlash(p: vec3<f32>, emissive: vec3<f32>) -> vec3<f32> {
+    var c = vec3<f32>(0.0);
+    let n = pulseCount();
+    for (var i = 0u; i < n; i = i + 1u) {
+        let a = frame.pulses[4u * i];
+        let h = max(frame.pulses[4u * i + 1u].y, 1e-3);
+        let u = (length(p - a.xyz) - a.w) / h;
+        if (abs(u) > 3.0) {
+            continue;
+        }
+        // a bright leading edge and a softer glow just behind it
+        let g = exp(-3.0 * u * u) + 0.25 * exp(-(u + 1.2) * (u + 1.2));
+        c = c + g * (frame.pulses[4u * i + 2u].rgb + emissive * frame.pulses[4u * i + 3u].z);
+    }
+    return c;
+}
+
+// The cloud the band passes: x = the density gain (multiply by 1 + x), yzw = light to add (per unit of density).
+fn pulseCloud(p: vec3<f32>) -> vec4<f32> {
+    var g = 0.0;
+    var c = vec3<f32>(0.0);
+    let n = pulseCount();
+    for (var i = 0u; i < n; i = i + 1u) {
+        let a = frame.pulses[4u * i];
+        let k = frame.pulses[4u * i + 3u].y;
+        if (k <= 0.0) {
+            continue;
+        }
+        let h = 1.6 * max(frame.pulses[4u * i + 1u].y, 1e-3); // clouds are soft: a wider band
+        let u = (length(p - a.xyz) - a.w) / h;
+        if (abs(u) > 3.0) {
+            continue;
+        }
+        let e = exp(-u * u);
+        g = g + k * 0.6 * (e - 0.4 * exp(-(u + 1.5) * (u + 1.5)));
+        c = c + frame.pulses[4u * i + 2u].rgb * (k * e);
+    }
+    return vec4<f32>(max(g, -0.5), c);
+}
 @group(1) @binding(0) var<uniform> object: ObjectUniforms;
 // ADR-715: the terrain's baked height (RG32F since ADR-717: r = the ground, g = the low-passed basin;
 // vertex-aligned grid, read by texel fetch through

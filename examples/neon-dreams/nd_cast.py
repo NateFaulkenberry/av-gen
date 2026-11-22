@@ -26,7 +26,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # m/s a stance foot sweeps back at clip rate 1. it13 (msg 178, "feet don't slide"): Walking measured on the drawn feet
 # (the planted foot joints of ~110 walkers over 5 s, avgen_foot_probe --node-joints, two builds): at 1.34 a planted foot
 # slid back 0.15 m/s under the body, at 1.49 forward 0.08 m/s; both fit a sweep of 1.435 m/s at rate 1
-WALK_STRIDE = {"Walking": 1.435, "Walking_low_grav": 1.0}
+WALK_STRIDE = {"Walking": 1.435, "Walking_low_grav": 1.0, "Running": float(os.environ.get("ND_RUN_STRIDE", "3.59"))}
+# it14 (owner msg 195: "all running aliens should be moving at a quarter-note pulse -- each quarter note is a
+# footstep"): Running measured on the drawn feet (avgen_foot_probe, 4 runners, two builds: planted slide -0.59 m/s at
+# 3.0, +0.90 at 4.5 -> 3.59 m/s at rate 1; the left heel strikes at clip second 0.287, the right at 0.630). The low-gravity bound planted a foot every FOUR beats (1.4 s); its figures now run (the pack's Running,
+# 0.7 s a cycle, two steps: at rate 0.997 one step a beat)
+RUN_FOR = {"Walking_low_grav": "Running"}
 TURN_RATE = 225.0
 SPEEDS = (0.92, 1.0, 1.08)
 PHASES = 8
@@ -38,7 +43,7 @@ FAR_HZ = 0.0           # it12 (msg 149, the 4.09 s flyer "glitching/skipping"): 
 # cycle at a rate of at least 1 (never slower than authored); its opening phase puts a cycle's start on a beat; a walk
 # steps on every quarter note (Walking: 2 steps a cycle = 2 beats, 2.04 m/s) and a low-gravity bound on every bar.
 BEAT = AU.BEAT   # it13 (msg 178): measured, 170.95 BPM (was 60 / 171.4)
-WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8}
+WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8, "Running": 2}
 # it13 (owner msg 178: "time each footstep with each beat -- quarter note steps"): the clip second (from the clip's
 # first key) at which the LEFT foot plants, measured on the drawn feet (avgen_foot_probe --node-joints, 1146 contacts
 # of 113 walkers: left 0.358, right 0.886, 0.53 s apart in a 1.033 s cycle). Every walking cue starts at the phase that
@@ -46,7 +51,10 @@ WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8}
 # lands on every other beat and the right on the ones between. it12 started each leg at clip second 0 on a beat (the
 # plant fell 0.24 s after it) and timed the cycle from the clip's last key (1.067 s), not its length (1.033 s): the
 # steps came every 0.339 s against the 0.351 s beat and walked off it by a beat every 3.4 s.
-WALK_CONTACT = {"Walking": 0.358}
+WALK_CONTACT = {"Walking": 0.317, "Running": float(os.environ.get("ND_RUN_CONTACT", "0.239"))}
+# it14: re-measured as the first frame of each planted interval (low and still for 4+ frames, 1,050 plants of 75 figures
+# in shot at 8-14 and 30-40 s): Walking planted 28 ms before the beat at 0.358 (it13 timed the speed threshold), Running
+# 48 ms at 0.287 -- both moved so the plant lands on the beat
 # The art's audience clips (blender/nd_poses.py) are whole kicks of 2 * 60 / 171.4 s from the it12 events' first kick
 # (0.05 s); on the measured grid their rate is scaled and their phase moved so each clip second keeps its kick.
 ART_KICK, ART_KICK0 = 2 * 60.0 / 171.4, 0.05
@@ -326,6 +334,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             p = dict(p, points=fp["points"])
         pts = p["points"]
         clip = p.get("clip", "Walking")
+        clip = RUN_FOR.get(clip, clip) if RUN_FOR.get(clip) in clip_len else clip
         # it12 (msg 149): the walk on the grid -- its rate from the beats a cycle, the speed from its stride
         rate = round(clip_len.get(clip, 1.0333) / (WALK_BEATS.get(clip, 2) * BEAT), 4)
         L_walk = clip_len.get(clip, 1.0333)
@@ -512,12 +521,19 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             via = [[v[0], top, v[2]] for v in via]
         ta, tb = fdat["takeoff"], fdat["landing"]
         td = fdat.get("on_beat", {}).get("touchdown_kick_s", fdat["t_land"])
-        f = {"name": "flyer_" + fdat["id"], "asset": aliens + fdat["cast"] + ".glb",
+        # it14 (msg 200): a flyer with `after` cues (what it does once it is down: the art's ND_* clips) is built from
+        # its -nd cast file, which carries the pack's flight clips unchanged
+        nd_after = [c for c in fdat.get("after", []) if SUFFIX and c["clip"] in clip_len]
+        f = {"name": "flyer_" + fdat["id"], "asset": aliens + fdat["cast"] + (SUFFIX if nd_after else "") + ".glb",
              "from": {"pos": ta["pos"], "yaw": keys[0].get("yaw_deg", 0.0)},
              "to": {"pos": tb["pos"], "yaw": keys[-1].get("yaw_deg")},
              "t0": fdat["t_takeoff"], "td": td, "alt": max(4.0, fdat.get("cruise_height_m", 0) - max(ta["pos"][1], tb["pos"][1])),
              "via": via, "kicks": kicks, "bob_from": ta.get("bob"), "bob_to": tb.get("bob")}
         n, l, t, actor = flight_fn(f)
+        for c in nd_after:   # after Landing has played out: looping cues, the clip second the art means at each
+            actor["clips"].append({"time": round(c["t"], 3), "clip": c["clip"], "speed": c.get("rate", 1.0),
+                                   "blend": c.get("blend", 0.3), "playback": "loop",
+                                   "offset": round(c.get("offset", 0.0) % clip_len[c["clip"]], 4)})
         # ride the formations: still at A's, blending to B's over the flight, B's after it
         ba, bb = bobs.get(ta.get("bob")), bobs.get(tb.get("bob"))
         if ba or bb:

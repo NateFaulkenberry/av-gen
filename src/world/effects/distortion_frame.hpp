@@ -68,6 +68,11 @@ enum class DistortionShape : std::uint8_t {
     // (a surface in front of the column is not bent at all; one inside it only by the part in front
     // of it). The hull is the proxy sphere grown by sqrt(2), which circumscribes the unit cylinder.
     Cylinder = 5,
+    // ADR-2124. A sphere shell of radius `shape.x` round the centre (a Shockwave through the world). The shader finds
+    // where the view ray crosses the shell in front of the scene surface, and how near the scene surface itself is to
+    // the shell, so the air bends along the front's silhouette and where the front meets the scene. Hull: the sphere
+    // of the axes (radius + three half-widths).
+    Shell = 6,
 };
 
 // How much larger than the axes the hull of `shape` is drawn, over the unit sphere's: 1 for every
@@ -88,6 +93,10 @@ enum class DistortionField : std::uint8_t {
     // Wave 3 (the lens slice). Lanes as `DistortionProxy` documents per field.
     Shimmer = 4, // rising, temporally coherent turbulence through a hot column (Heat Shimmer)
     Lens = 5,    // a thin-lens REMAP around a mass, with an optional horizon (Gravitational Lens)
+    // ADR-2124: a travelling front's haze (Shell): terms.w = peak displacement (m); shape.x = the front's radius,
+    // shape.y its half-width (m), shape.w the haze's eddy frequency (1/m); noise.x the eddies' phase, noise.y chroma,
+    // noise.w seed; rim.rgb the glow along the front (HDR). terms.y/z and shape.z stay zero (the rect bound).
+    Front = 6,
 };
 
 // One proxy, exactly as `shaders/distortion.wgsl` reads it (`DfProxy`, 144 bytes, nine vec4s).

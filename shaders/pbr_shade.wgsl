@@ -947,6 +947,11 @@ fn shadeSurface(worldPos: vec3<f32>, normalIn: vec3<f32>, uv: vec2<f32>, frontFa
     } else {
         emissive = emissionLane(emissive, ownHue + laneHue, ownGain * laneGain);
     }
+    // ADR-2124: a Shockwave's front through the world lights a band on every surface it crosses, and what already
+    // glows flares (uniform branch: no front, no change)
+    if (frame.pulseInfo.x > 0.5) {
+        emissive = emissive + pulseFlash(worldPos, emissive);
+    }
 
     if (object.flags.z > 0.5) { // unlit
         // ADR-207: additive, even here. An unlit surface is one the lighting does not reach, not one

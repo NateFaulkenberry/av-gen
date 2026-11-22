@@ -30,6 +30,7 @@
 #include "world/effects/effect_registry.hpp"
 #include "world/effects/effect_trigger.hpp"
 #include "world/effects/kinds/stored_rows.hpp"
+#include "world/effects/world_pulse.hpp"
 
 #include <glm/glm.hpp>
 
@@ -45,6 +46,8 @@ using E = EffectInstance;
 using kinds::smooth01;
 
 constexpr const char* kEases[] = {"outCubic", "outQuad", "outExpo", "linear"};
+// ADR-2124: a ring on screen (the original), or a front that travels through the world
+constexpr const char* kTravels[] = {"ring", "world"};
 enum class Ease : int { OutCubic = 0, OutQuad = 1, OutExpo = 2, Linear = 3 };
 
 constexpr EffectField kFields[] = {
@@ -69,7 +72,7 @@ constexpr EffectField kFields[] = {
     storedFloat("radiusDecay", "Weakens with size", 0.7f, 0.0f, 2.0f, 0.0f, 2.0f).sec("Shape")
         .tooltip("How fast the front weakens as it grows (the exponent on 1/R). 0 keeps full strength\n"
                  "to the edge; 2 is energy spread over a sphere."),
-    storedFloat("maxConcurrent", "Overlapping fronts", 3.0f, 1.0f, 4.0f, 1.0f, 4.0f).fmt("%.0f")
+    storedFloat("maxConcurrent", "Overlapping fronts", 3.0f, 1.0f, 8.0f, 1.0f, 8.0f).fmt("%.0f")
         .tooltip("How many fronts may be in the air at once when triggers come faster than a front\n"
                  "lives. The oldest is the one left out."),
     storedFloat("offsetX", "Offset X", 0.0f, -100000.0f, 100000.0f, -50.0f, 50.0f).fmt("%.2f m").sec("Placement")
@@ -77,9 +80,30 @@ constexpr EffectField kFields[] = {
                  "of the owner's bounds, in world metres."),
     storedFloat("offsetY", "Offset Y", 0.0f, -100000.0f, 100000.0f, -50.0f, 50.0f).fmt("%.2f m"),
     storedFloat("offsetZ", "Offset Z", 0.0f, -100000.0f, 100000.0f, -50.0f, 50.0f).fmt("%.2f m"),
+    // ---- ADR-2124: through the world ----------------------------------------------------------------
+    storedChoice("travel", "Travels", 0, kTravels).sec("Through the world")
+        .tooltip("ring: a refracting ring on screen (the original).\n"
+                 "world: a front that travels through the scene -- it pushes what it passes, lights the\n"
+                 "surfaces it crosses, ripples the clouds and bends the air where it meets the scene.\n"
+                 "Thickness is then the band's half-width, Strength the haze."),
+    storedFloat("push", "Push", 0.0f, 0.0f, 10.0f, 0.0f, 2.0f).fmt("%.2f m")
+        .tooltip("How far the front shoves geometry and characters it passes (at the reference radius)."),
+    storedFloat("lift", "Lift", 0.4f, 0.0f, 1.0f, 0.0f, 1.0f)
+        .tooltip("The share of the push that is upward (0 straight out from the centre, 1 straight up)."),
+    storedColor("flashColor", "Flash colour", glm::vec3(1.0f, 0.5f, 0.9f)),
+    storedFloat("flash", "Flash", 0.0f, 0.0f, 80.0f, 0.0f, 10.0f)
+        .tooltip("A band of light on every surface the front crosses (HDR, at the reference radius)."),
+    storedFloat("flare", "Emissive flare", 0.0f, 0.0f, 10.0f, 0.0f, 4.0f)
+        .tooltip("How much brighter already-glowing surfaces (windows, strips) flare as it passes, x their own."),
+    storedFloat("clouds", "Cloud ripple", 0.0f, 0.0f, 4.0f, 0.0f, 2.0f)
+        .tooltip("How much the cloud the front passes through brightens and thickens."),
+    storedFloat("refRadius", "Reference radius", 0.0f, 0.0f, 5000.0f, 0.0f, 200.0f).fmt("%.0f m")
+        .tooltip("The radius up to which a front keeps full strength (0: 12 % of the reach). Past it\n"
+                 "everything weakens as (reference / radius) ^ Weakens with size."),
 };
 
 constexpr kinds::StoredRows kRows{"shockwave", kFields};
+constexpr std::size_t kMaxProxiesPerInstanceWorld = 8;
 
 float ease(Ease kind, float x) {
     x = std::clamp(x, 0.0f, 1.0f);
@@ -226,11 +250,17 @@ float shockwaveHistorySeconds(const EffectInstance& e) {
     return std::max(kRows.f(e, "duration"), 0.05f) + static_cast<float>(e.timing.delay) + 0.1f;
 }
 
+std::size_t shockwaveShellProxies(const EffectInstance& e, const EffectContext& ctx, float envelope,
+                                  std::span<DistortionProxy> out);
+
 // The producer (declared in distortion_frame.cpp's table). One sphere per live front.
 std::size_t shockwaveProxies(const EffectInstance& e, const EffectContext& ctx, float envelope,
                              std::span<DistortionProxy> out) {
     if (out.empty() || envelope <= 0.0f) {
         return 0;
+    }
+    if (kRows.choice(e, "travel") == 1) {
+        return shockwaveShellProxies(e, ctx, envelope, out);
     }
     std::array<double, 4> starts{};
     const std::size_t want = std::min<std::size_t>(
@@ -314,6 +344,117 @@ std::size_t shockwaveProxies(const EffectInstance& e, const EffectContext& ctx, 
         p.rim = glm::vec4(rim * rimFade, 0.0f);
     }
     return made;
+}
+
+
+// ---- ADR-2124: the front through the world --------------------------------------------------------
+
+namespace {
+
+// One live world front: where it is, how big, and how strong (decay, life and envelope folded in).
+struct WorldFront {
+    glm::vec3 centre{0.0f};
+    float radius = 0.0f;
+    float radiusPrev = 0.0f;
+    float gain = 0.0f;     // decay x life x envelope, now
+    float gainPrev = 0.0f; // the same a frame earlier
+};
+
+float worldLife(float x) {
+    // born in a few hundredths of the life, gone over its last fifth
+    return smooth01(0.0f, 0.02f, x) * (1.0f - smooth01(0.8f, 1.0f, x));
+}
+
+std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float envelope, std::span<WorldFront> out) {
+    if (out.empty() || envelope <= 0.0f || e.owner.kind != EffectTarget::World) {
+        return 0;
+    }
+    std::array<double, kMaxProxiesPerInstanceWorld> starts{};
+    const std::size_t want = std::min<std::size_t>(
+        {out.size(), starts.size(), static_cast<std::size_t>(std::clamp(kRows.f(e, "maxConcurrent"), 1.0f, 8.0f) + 0.5f)});
+    const std::size_t fronts = effectEventTimes(e, ctx, std::span(starts).first(want));
+    const glm::vec3 centre(kRows.f(e, "offsetX"), kRows.f(e, "offsetY"), kRows.f(e, "offsetZ"));
+    const float duration = std::max(kRows.f(e, "duration"), 0.05f);
+    const float maxRadius = std::max(kRows.f(e, "maxRadius"), 0.2f);
+    const float decay = std::clamp(kRows.f(e, "radiusDecay"), 0.0f, 2.0f);
+    const auto easeKind = static_cast<Ease>(kRows.choice(e, "ease"));
+    const float refSet = kRows.f(e, "refRadius");
+    const float refRadius = refSet > 0.0f ? refSet : std::max(0.12f * maxRadius, kRows.f(e, "thickness"));
+    std::size_t made = 0;
+    for (std::size_t i = 0; i < fronts && made < out.size(); ++i) {
+        const double age = ctx.seconds - starts[i];
+        if (age < 0.0 || age >= static_cast<double>(duration)) {
+            continue;
+        }
+        const float x = static_cast<float>(age / static_cast<double>(duration));
+        const float xp = static_cast<float>(std::max(age - kPulsePrevSeconds, 0.0) / static_cast<double>(duration));
+        WorldFront& f = out[made];
+        f.centre = centre;
+        f.radius = std::max(maxRadius * ease(easeKind, x), 1e-3f);
+        f.radiusPrev = std::max(maxRadius * ease(easeKind, xp), 1e-3f);
+        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x) * envelope;
+        f.gainPrev = std::pow(refRadius / std::max(f.radiusPrev, refRadius), decay) * worldLife(xp) * envelope;
+        if (f.gain <= 1e-4f && f.gainPrev <= 1e-4f) {
+            continue;
+        }
+        ++made;
+    }
+    return made;
+}
+
+} // namespace
+
+std::size_t shockwaveShellProxies(const EffectInstance& e, const EffectContext& ctx, float envelope,
+                                  std::span<DistortionProxy> out) {
+    std::array<WorldFront, kMaxProxiesPerInstanceWorld> fronts{};
+    const std::size_t n = worldFronts(e, ctx, envelope, std::span(fronts).first(std::min(out.size(), fronts.size())));
+    const float half = std::max(kRows.f(e, "thickness"), 0.05f);
+    const float strength = std::max(kRows.f(e, "strength"), 0.0f);
+    const glm::vec3 rim = kRows.rgb(e, "rimColor") * std::max(kRows.f(e, "rimEmission"), 0.0f);
+    const float chroma = std::clamp(kRows.f(e, "chroma"), 0.0f, 1.0f);
+    const float seed = kinds::seedOf(e.id);
+    std::size_t made = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+        const WorldFront& f = fronts[i];
+        if (f.gain <= 1e-4f) {
+            continue;
+        }
+        const float outer = f.radius + 3.0f * half;
+        DistortionProxy& p = out[made++];
+        p.centre = glm::vec4(f.centre, 0.0f);
+        p.axis0 = glm::vec4(outer, 0.0f, 0.0f, static_cast<float>(DistortionShape::Shell));
+        p.axis1 = glm::vec4(0.0f, outer, 0.0f, static_cast<float>(DistortionField::Front));
+        p.axis2 = glm::vec4(0.0f, 0.0f, outer, half);
+        // the haze: half the band's half-width at strength 1, weakening as the front spreads
+        p.terms = glm::vec4(1.0f, 0.0f, 0.0f, strength * 0.5f * half * f.gain);
+        p.motion = glm::vec4(0.0f);
+        p.shape = glm::vec4(f.radius, half, 0.0f, 1.0f / std::max(1.5f * half, 0.1f));
+        p.noise = glm::vec4(static_cast<float>(std::fmod(ctx.seconds, 1000.0)) * 0.8f, chroma, 0.0f, seed);
+        p.rim = glm::vec4(rim * f.gain, 0.0f);
+    }
+    return made;
+}
+
+std::size_t shockwavePulseFronts(const EffectInstance& e, const EffectContext& ctx, float envelope,
+                                 std::span<PulseFront> out) {
+    if (kRows.choice(e, "travel") != 1) {
+        return 0;
+    }
+    std::array<WorldFront, kMaxProxiesPerInstanceWorld> fronts{};
+    const std::size_t n = worldFronts(e, ctx, envelope, std::span(fronts).first(std::min(out.size(), fronts.size())));
+    const float half = std::max(kRows.f(e, "thickness"), 0.05f);
+    const float push = std::max(kRows.f(e, "push"), 0.0f);
+    const glm::vec3 flash = kRows.rgb(e, "flashColor") * std::max(kRows.f(e, "flash"), 0.0f);
+    for (std::size_t i = 0; i < n; ++i) {
+        const WorldFront& f = fronts[i];
+        PulseFront& p = out[i];
+        p.centreRadius = glm::vec4(f.centre, f.radius);
+        p.motion = glm::vec4(f.radiusPrev, half, push * f.gain, push * f.gainPrev);
+        p.flash = glm::vec4(flash * f.gain, 0.0f);
+        p.shape = glm::vec4(std::clamp(kRows.f(e, "lift"), 0.0f, 1.0f), std::max(kRows.f(e, "clouds"), 0.0f) * f.gain,
+                            std::max(kRows.f(e, "flare"), 0.0f) * f.gain, 0.0f);
+    }
+    return n;
 }
 
 const EffectSchema& shockwaveSchema() {

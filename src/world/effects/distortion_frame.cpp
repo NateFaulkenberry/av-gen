@@ -38,7 +38,8 @@ constexpr std::size_t kWakeSegments = 6;
 
 constexpr DistortionProducer kProducers[] = {
     {EffectKind::SpaceWarp, &spaceWarpProxies, 1, nullptr},
-    {EffectKind::Shockwave, &shockwaveProxies, kMaxFronts, &shockwaveHistorySeconds},
+    // ADR-2124: a Shockwave through the world keeps up to eight fronts in the air (the ring mode still clamps to four)
+    {EffectKind::Shockwave, &shockwaveProxies, kMaxProxiesPerInstance, &shockwaveHistorySeconds},
     {EffectKind::Ripple, &rippleProxies, kMaxFronts, nullptr},
     {EffectKind::VelocityDistortion, &velocityDistortionProxies, kWakeSegments, &velocityDistortionHistorySeconds},
     {EffectKind::HeatShimmer, &heatShimmerProxies, 1, nullptr},

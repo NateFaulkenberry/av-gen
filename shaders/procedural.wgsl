@@ -974,6 +974,17 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
             }
         }
     }
+    // ADR-2124: a Shockwave's fronts through the world push the instance's vertices (uniform branch), on all three
+    // points so the rebuilt normal leans with the push
+    let pulsing = frame.pulseInfo.x > 0.5;
+    let p0Pulse = p0;
+    if (pulsing) {
+        p0 = p0 + pulseOffset(p0, false);
+        if (needNormal) {
+            p1 = p1 + pulseOffset(p1, false);
+            p2 = p2 + pulseOffset(p2, false);
+        }
+    }
     // ADR-1021. cross(J t1, J t2) = det(J) J^-T n: the rebuilt normal is the outward one times the
     // sign of the chain's Jacobian determinant. The deformers are continuous from the identity and
     // do not change that sign; only a mirror does -- the instance scale, the object matrix, or a path
@@ -1006,6 +1017,9 @@ fn procVertex(in: VertexIn, instanceIndex: u32, depthOnly: bool) -> ProcVertexOu
     if (fxMoves) {
         // At the same point of the owner, at last frame's time: the velocity sees the swell.
         pPrev = pPrev + fxVertexOffset(p0Rest, nRef, proc.prevInfo.x, fxFlags, fxLanes);
+    }
+    if (pulsing) {
+        pPrev = pPrev + pulseOffset(p0Pulse, true);
     }
     out.prevClip = frame.prevViewProj * vec4<f32>(pPrev, 1.0);
     return out;

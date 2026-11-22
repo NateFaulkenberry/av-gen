@@ -426,6 +426,60 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
         // The lens plane is where this ray ENTERS the column: a surface in front of that is never a
         // tap, and one inside the column bends by the air in front of it (`thick`), not by a gate.
         lensZ = cosF * tIn + p.centre.w;
+    } else if (shape == 6u) {
+        // ADR-2124: Shell -- a front through the world. Two places the air bends: where the SCENE SURFACE lies in the
+        // band (the front meeting the town: a contour sweeping over decks and walls), and where the view ray crosses
+        // the shell in front of the surface, most where it grazes it (the front's silhouette against the sky).
+        let c = p.centre.xyz;
+        let R = p.shape.x;
+        let h = max(p.shape.y, 1e-3);
+        let cosF = max(dot(dir, fwd), 1e-4);
+        let tEnd = select(sceneZ / cosF, 1.0e6, sceneZ >= DF_FAR * 0.5);
+        let oc = cam - c;
+        let tc = -dot(oc, dir);
+        let d2 = max(dot(oc, oc) - tc * tc, 0.0);
+        var wSurf = 0.0;
+        var uSurf = 0.0;
+        if (sceneZ < DF_FAR * 0.5) {
+            uSurf = (length(cam + dir * tEnd - c) - R) / h;
+            wSurf = exp(-uSurf * uSurf);
+        }
+        var wAir = 0.0;
+        var tAir = 0.0;
+        let disc = R * R - d2;
+        if (disc > 0.0) {
+            let sq = sqrt(disc);
+            let cosI = sq / max(R, 1e-3); // the crossing's angle to the shell's normal
+            let graze = 0.15 + 0.85 * pow(1.0 - saturate(cosI), 3.0);
+            let t0 = tc - sq;
+            let t1 = tc + sq;
+            if (t0 > near && t0 < tEnd) {
+                wAir = graze;
+                tAir = t0;
+            } else if (t1 > near && t1 < tEnd) {
+                wAir = graze;
+                tAir = t1;
+            }
+        } else if (tc > near && tc < tEnd) {
+            // just outside the silhouette: the band's own soft edge
+            let u = (sqrt(d2) - R) / h;
+            wAir = exp(-u * u);
+            tAir = tc;
+        }
+        if (max(wSurf, wAir) < 1e-3) {
+            discard;
+        }
+        var lensT = tEnd;
+        if (wAir > wSurf) {
+            q = cam + dir * tAir;
+            lensT = tAir;
+            bl = vec3<f32>(0.0, wAir, 0.0);
+        } else {
+            q = cam + dir * tEnd;
+            bl = vec3<f32>(uSurf, wSurf, 1.0);
+        }
+        r = 0.0;
+        lensZ = cosF * lensT * 0.98;
     } else {
         discard; // not an extended shape: `fs_offset` draws it
     }
@@ -486,6 +540,17 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
         glow = exp(-e * e) * win;
     }
 
+    if (field == 6u) {
+        // Front: a push across the band (out ahead of it, back behind) plus heat-haze eddies, scaled by the weight
+        let wgt = bl.y;
+        let u = bl.x;
+        let radial = normalize(q - p.centre.xyz + vec3<f32>(0.0, 1e-4, 0.0));
+        let eddy = flowCurl(q * p.shape.w, p.noise.x, u32(p.noise.w));
+        let push = select(0.6, u * exp(0.5 * (1.0 - u * u)), bl.z > 0.5);
+        d = (radial * push + eddy / (1.0 + length(eddy)) * 0.8) * (p.terms.w * wgt);
+        win = wgt;
+        glow = wgt;
+    }
     var offset = (dfToUv(q + d) - dfToUv(q)) * depthGate;
     // The lens remap is bounded by construction (2 tE) and must not be clipped: a clipped remap draws
     // a false ring where the clip starts. The shimmer keeps DF's safety bound.

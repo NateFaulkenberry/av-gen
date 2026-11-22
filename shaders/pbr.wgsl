@@ -59,6 +59,11 @@ fn vs_entity(in: VertexIn) -> VertexOut {
             prevWorld = vec4<f32>(prevWorld.xyz + offPrev, prevWorld.w);
         }
     }
+    // ADR-2124: a Shockwave's fronts through the world push the vertex (a uniform branch: no front, no change)
+    if (frame.pulseInfo.x > 0.5) {
+        world = vec4<f32>(world.xyz + pulseOffset(world.xyz, false), world.w);
+        prevWorld = vec4<f32>(prevWorld.xyz + pulseOffset(prevWorld.xyz, true), prevWorld.w);
+    }
     // ADR-1873: the world-space data mosh. A uniform branch: an entity the scene's corruption does not target, or a
     // frame without one, runs the arithmetic above unchanged.
     if (object.corrupt.x > 0.5 && crOn()) {

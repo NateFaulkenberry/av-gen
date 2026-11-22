@@ -5120,6 +5120,7 @@ void Engine::updateEffects(EffectPhase phase) {
         live.waves = world::WaveFrame{};
         live.atmospherics = world::AtmosphericFrame{};
         live.distortion.count = 0; // ADR-703: DF's gate -- no producer, nothing touched
+        live.pulses.count = 0;     // ADR-2124
         live.distortion.dropped = 0;
         // An emitter's system lives in the scene's particle list, so "no effects" has to take it
         // back out; the builder removes every `fx:` system whose instance is gone.
@@ -5152,6 +5153,8 @@ void Engine::updateEffects(EffectPhase phase) {
     // RenderStage::ScreenSpace -- DF distortion proxies (Space Warp).
     world::buildDistortionFrame(effects_, ctx, live.distortion, effectOrder_, effectStatus_,
                                 effectStatusReason_);
+    // ADR-2124: the Shockwaves that travel through the world, for the vertex stages, the surfaces and the clouds.
+    world::buildPulseFrame(effects_, ctx, live.pulses, effectOrder_);
     // RenderStage::Particles -- effect-owned particle systems (EMIT, ADR-703).
     world::buildParticleFrame(effects_, ctx, live.particles, effectOrder_, effectStatus_, effectStatusReason_);
     // RenderStage::Material -- per-entity lanes (FXL), and the spill lights they request (LIGHTMOD).
