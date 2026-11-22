@@ -435,6 +435,33 @@ TEST_CASE("clouds: a block written for ADR-1289's march keeps its even steps", "
     CHECK(explicitEven->resolution == 0.5f);
 }
 
+// ADR-2123: the lobes' soft union and mist read, validate, round-trip, and are off (and unwritten) by default.
+TEST_CASE("clouds: lobe blend and lobe mist read, validate and round-trip", "[unit][clouds][adr2123]") {
+    const json lobe = json::array({{{"c", {0, 0, 0}}, {"r", 5.0}}});
+    auto c = scene::Clouds::fromJson({{"lobes", lobe}, {"lobeBlend", 0.6}, {"lobeMist", 0.2}, {"lobeMistReach", 0.4}},
+                                     fs::temp_directory_path());
+    REQUIRE(c.has_value());
+    CHECK(c->lobeBlend == 0.6f);
+    CHECK(c->lobeMist == 0.2f);
+    CHECK(c->lobeMistReach == 0.4f);
+    auto again = scene::Clouds::fromJson(c->toJson(), fs::temp_directory_path());
+    REQUIRE(again.has_value());
+    CHECK(again->lobeBlend == 0.6f);
+    CHECK(again->lobeMist == 0.2f);
+    CHECK(again->lobeMistReach == 0.4f);
+    auto plain = scene::Clouds::fromJson({{"lobes", lobe}}, fs::temp_directory_path());
+    REQUIRE(plain.has_value());
+    CHECK(plain->lobeBlend == 0.0f);
+    CHECK(plain->lobeMist == 0.0f);
+    CHECK_FALSE(plain->toJson().contains("lobeBlend"));
+    CHECK_FALSE(plain->toJson().contains("lobeMist"));
+    for (const auto& [k, v] : {std::pair{"lobeBlend", 1.5}, std::pair{"lobeMist", -0.1}, std::pair{"lobeMistReach", 3.0}}) {
+        INFO(k);
+        CHECK_FALSE(scene::Clouds::fromJson({{"lobes", lobe}, {k, v}}, fs::temp_directory_path()).has_value());
+    }
+    CHECK_FALSE(scene::Clouds::fromJson({{"lobes", lobe}, {"lobeMist", "lots"}}, fs::temp_directory_path()).has_value());
+}
+
 // ADR-2119: churn, edge air and mist sheets; ADR-2120: the vortex.
 TEST_CASE("clouds: churn, edge air, mist sheets and the vortex read, validate, round-trip and route",
           "[unit][clouds][adr2119][adr2120]") {

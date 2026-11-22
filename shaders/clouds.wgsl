@@ -55,7 +55,8 @@ struct CloudUniforms {
     erosion: vec4<f32>,   // ADR-2106: x = strength (0 = off), y = the coarse billow's wavelength (m), z = fine detail, w = curl (m)
     erosion2: vec4<f32>,  // ADR-2106: x = octaves (1..3), y = light tap spacing (1 = even, 2 = squared + jitter),
                           // z = multiple scattering (0..1), w = base flattening (0..1)
-    erosion3: vec4<f32>,  // ADR-2115: x = the eroded edge's width factor, y = the detail share's floor
+    erosion3: vec4<f32>,  // ADR-2115: x = the eroded edge's width factor, y = the detail share's floor;
+                          // ADR-2123: z = the lobes' soft union, w = their mist
     bobs: array<vec4<f32>, 32>, // ADR-2112: each formation's offset at this second (xyz m)
     wisp0: vec4<f32>,     // ADR-2113: on, base, top, density
     wisp1: vec4<f32>,     // scale (m), coverage, tatter, stretch
@@ -436,13 +437,27 @@ fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yL
     }
     var base = 0.0;
     var above = 0.0;
+    var h1 = 0.0; // ADR-2123: the two strongest mist halos at p
+    var h2 = 0.0;
     for (var i = 0u; i < count; i = i + 1u) {
         let l = lobes[bins[offset + i]];
         let ry = l.centreRadius.w * l.scaleDensity.y;
         var d = (p - l.centreRadius.xyz - bobOffset(l.soft.z)) / (l.centreRadius.w * l.scaleDensity.xyz);
         let r2 = dot(d, d);
-        if (r2 >= 1.0) {
+        // ADR-2123: with mist the lobe reaches soft.w of its radius (its bins are that much bigger)
+        let grow = max(l.soft.w, 1.0);
+        if (r2 >= grow * grow) {
             continue;
+        }
+        if (cu.erosion3.w > 0.0 && grow > 1.0) {
+            // the lobe's halo: from its body out to soft.w of its radius
+            let h = (1.0 - smoothstep(0.7, grow, sqrt(r2))) * l.scaleDensity.w;
+            if (h > h1) {
+                h2 = h1;
+                h1 = h;
+            } else if (h > h2) {
+                h2 = h;
+            }
         }
         var shape = 0.0;
         if (e.on > 0.0 && l.soft.y > 0.0) {
@@ -480,10 +495,16 @@ fn lobeGrid(p: vec3<f32>, origin: vec2<f32>, cellSize: f32, nx: i32, nz: i32, yL
         }
         // the chord of this ellipsoid above the sample, vertically
         let chord = ry * (sqrt(max(1.0 - d.x * d.x - d.z * d.z, 0.0)) - d.y);
-        if (shape > base) {
-            base = shape;
-        }
+        // ADR-2123: the union, from the hard max (lobeBlend 0, as before) toward the soft sum
+        base = mix(max(base, shape), base + shape - base * shape, cu.erosion3.z);
         above = max(above, chord * shape);
+    }
+    if (h1 > 0.0) {
+        // ADR-2123: the mist lies BETWEEN lobes -- mostly where two halos overlap (the geometric mean of the two
+        // strongest), a little round a lone lobe -- in patches and threads of the coarse and mid billows, not a shell
+        let breakup = smoothstep(0.3, 0.75, e.c * 0.5 + e.m * 0.5);
+        let mist = cu.erosion3.w * (0.15 * h1 + 0.85 * sqrt(h1 * h2)) * breakup;
+        base = mix(max(base, mist), base + mist - base * mist, cu.erosion3.z);
     }
     return vec2<f32>(base, above);
 }

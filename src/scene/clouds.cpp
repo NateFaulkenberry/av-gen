@@ -223,6 +223,10 @@ Result<void> Clouds::validate() const {
         return fail("clouds: churn needs amount in [0, 1], period in [0.5, 600] s, boil and writhe within 100 m/s");
     }
     if (!(edgeAir >= 0.0f && edgeAir <= 1.0f)) return fail("clouds: edgeAir must be in [0, 1]");
+    if (!(lobeBlend >= 0.0f && lobeBlend <= 1.0f) || !(lobeMist >= 0.0f && lobeMist <= 1.0f) ||
+        !(lobeMistReach >= 0.0f && lobeMistReach <= 2.0f)) {
+        return fail("clouds: lobeBlend and lobeMist must be in [0, 1], lobeMistReach in [0, 2]"); // ADR-2123
+    }
     // ADR-2120
     if (vortex.enabled) {
         const CloudVortex& v = vortex;
@@ -550,6 +554,14 @@ Result<Clouds> Clouds::fromJson(const json& j, const std::filesystem::path& base
         if (!j.at("edgeAir").is_number()) return fail("clouds: 'edgeAir' must be a number");
         c.edgeAir = j.at("edgeAir").get<float>();
     }
+    for (const auto& [k, t] : {std::pair<const char*, float*>{"lobeBlend", &c.lobeBlend}, // ADR-2123
+                               std::pair<const char*, float*>{"lobeMist", &c.lobeMist},
+                               std::pair<const char*, float*>{"lobeMistReach", &c.lobeMistReach}}) {
+        if (j.contains(k)) {
+            if (!j.at(k).is_number()) return fail("clouds: '{}' must be a number", k);
+            *t = j.at(k).get<float>();
+        }
+    }
     if (j.contains("vortex")) { // ADR-2120
         const json& vj = j.at("vortex");
         if (!vj.is_object() || !vj.contains("centre") || !vj.at("centre").is_array() || vj.at("centre").size() != 2) {
@@ -744,6 +756,9 @@ json Clouds::toJson() const {
                       {"writhe", churn.writhe}};
     }
     if (edgeAir > 0.0f) j["edgeAir"] = edgeAir;
+    if (lobeBlend > 0.0f) j["lobeBlend"] = lobeBlend; // ADR-2123
+    if (lobeMist > 0.0f) j["lobeMist"] = lobeMist;
+    if (lobeMistReach > 0.0f) j["lobeMistReach"] = lobeMistReach;
     if (vortex.enabled) { // ADR-2120
         const CloudVortex& v = vortex;
         j["vortex"] = {{"enabled", true}, {"centre", json::array({v.centre.x, v.centre.y})}, {"radius", v.radius},

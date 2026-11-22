@@ -326,6 +326,15 @@ struct Clouds {
     // ADR-2119: thin cloud takes the sky's colour -- a sample's radiance is pulled toward the haze colour by up to
     // this share where its density is low (a silhouette that melts into the air instead of a cut-out). 0 = off.
     float edgeAir = 0.0f;
+    // ADR-2123 (Neon Dreams msg 178, "too blobby"): how the lobes meet. `lobeBlend` (0..1) mixes the union from the
+    // hard max of the lobes' densities (0, as before: each lobe a separate ball, creased where two meet) toward their
+    // soft sum (a + b - ab: two soft edges that overlap fill the crease between them). `lobeMist` (0..1, a share of the
+    // lobe's density) is a thin, noise-broken mist round every lobe and through its eroded hollows, out to
+    // `lobeMistReach` (a fraction of the radius) past its surface, so neighbouring lobes are joined by air with some
+    // cloud in it instead of clear sky. 0 = off (the default; scenes without it draw as before).
+    float lobeBlend = 0.0f;
+    float lobeMist = 0.0f;
+    float lobeMistReach = 0.0f;
 
     [[nodiscard]] bool active() const { return enabled && (!lobes.empty() || sea.enabled); }
     [[nodiscard]] Result<void> validate() const;

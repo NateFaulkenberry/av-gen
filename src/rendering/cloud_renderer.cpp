@@ -550,6 +550,10 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
             }
         }
     }
+    // ADR-2123: the lobes' mist reaches past their surface, so they are binned (and boxed) that much bigger; the row
+    // keeps the true radius and carries the inflation in soft.w
+    const float mistGrow = c.lobeMist > 0.0f ? 1.0f + c.lobeMistReach : 1.0f;
+    key = mixKey(key, mistGrow);
     // ADR-2112: the formations' reach (the bins' margin), not their motion: the bins hold still while they bob
     std::vector<glm::vec3> bobReach;
     for (const scene::CloudBob& b : c.bobs) {
@@ -564,9 +568,9 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
             for (const scene::CloudLobe& l : *set) {
                 // ADR-2107: y = erode; ADR-2112: z = the formation's index + 1 (0 = none)
                 rows.push_back({glm::vec4(l.centre, l.radius), glm::vec4(l.scale, l.density),
-                                glm::vec4(l.soft, l.erode, static_cast<float>(l.bobIndex + 1), 0)});
+                                glm::vec4(l.soft, l.erode, static_cast<float>(l.bobIndex + 1), mistGrow)});
                 const glm::vec3 ext =
-                    l.radius * l.scale + (l.bobIndex >= 0 ? bobReach[static_cast<std::size_t>(l.bobIndex)] : glm::vec3(0.0f));
+                    l.radius * mistGrow * l.scale + (l.bobIndex >= 0 ? bobReach[static_cast<std::size_t>(l.bobIndex)] : glm::vec3(0.0f));
                 lo = glm::min(lo, l.centre - ext);
                 hi = glm::max(hi, l.centre + ext);
             }
@@ -581,14 +585,19 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         bd.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         lobes_ = device.CreateBuffer(&bd);
         context_->queue().WriteBuffer(lobes_, 0, rows.data(), rows.size() * sizeof(LobeGpu));
-        bins_cpu_ = binCloudLobes(c.lobes, bobReach);
+        const auto grown = [&](const std::vector<scene::CloudLobe>& set) {
+            std::vector<scene::CloudLobe> out = set;
+            for (scene::CloudLobe& l : out) l.radius *= mistGrow;
+            return out;
+        };
+        bins_cpu_ = binCloudLobes(grown(c.lobes), bobReach);
         if (bins_cpu_.truncated > 0) {
             log::warn("clouds: {} of {} lobe bins held more than {} lobes; the smallest were dropped there",
                       bins_cpu_.truncated, bins_cpu_.nx * bins_cpu_.nz, kMaxLobesPerCell);
         }
         std::vector<std::uint32_t> words = bins_cpu_.words;
         // ADR-2104: the far set's grid after the hero grid's words; its offsets and lobe indices shifted to match
-        farBins_ = binCloudLobes(c.farLobes, bobReach);
+        farBins_ = binCloudLobes(grown(c.farLobes), bobReach);
         farWordBase_ = static_cast<std::uint32_t>(words.size());
         if (!c.farLobes.empty()) {
             if (farBins_.truncated > 0) {
@@ -737,7 +746,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.erosion = glm::vec4(c.erosion, c.erosionScale, c.erosionDetail, c.erosionCurl); // ADR-2106
     u.erosion2 = glm::vec4(static_cast<float>(c.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
                            c.erosionFlatten);
-    u.erosion3 = glm::vec4(c.erosionEdge, c.erosionDetailFloor, 0.0f, 0.0f);
+    u.erosion3 = glm::vec4(c.erosionEdge, c.erosionDetailFloor, c.lobeBlend, c.lobeMist); // ADR-2123: z, w
     // ADR-2119: the churn's two clocks, half a period apart (each restarts, on a fresh region of the volume, when its
     // weight is zero); all of it a pure function of the timeline second. The vortex (ADR-2120) swirls on them too.
     {

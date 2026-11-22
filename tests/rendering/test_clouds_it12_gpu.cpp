@@ -215,3 +215,55 @@ TEST_CASE("the vortex opens an eye in the relief sea, lights its funnel and turn
     CHECK(meanAbsDiff12(whirl, later) > 0.2);  // and it turns
     CHECK(ctx->errorCount() == 0);
 }
+
+// ADR-2123 (Neon Dreams iteration 13, owner msg 178: "clouds are looking a little too blobby"): lobe mist fills the
+// clear air between neighbouring lobes, the soft union thickens where two soft edges overlap, and both off draw
+// exactly what the block drew before.
+TEST_CASE("lobe mist joins neighbouring lobes, the soft union fills their crease, and off is the old picture",
+          "[gpu][renderer][clouds][adr2123]") {
+    auto ctx = makeContext12();
+    gpu::ShaderLibrary shaders(*ctx, {fs::path(AVGEN_SHADER_SOURCE_DIR)});
+    constexpr std::uint32_t W = 192, H = 96;
+    scene::Scene s = greyClouds12();
+    s.camera.fovYRadians = 0.6f;
+    s.clouds.erosion = 1.0f;
+    s.clouds.erosionScale = 30.0f;
+    // three heads 40 m across with 12 m of clear air between them, 160 m out
+    for (int i = -1; i <= 1; ++i) {
+        scene::CloudLobe l;
+        l.centre = {52.0f * static_cast<float>(i), 0.0f, -160.0f};
+        l.radius = 20.0f;
+        s.clouds.lobes.push_back(l);
+    }
+    scene::Scene misted = s;
+    misted.clouds.lobeMist = 0.6f;
+    misted.clouds.lobeMistReach = 0.8f;
+    scene::Scene blended = misted; // the mists of two neighbours overlap in the gap
+    blended.clouds.lobeBlend = 1.0f;
+    scene::Scene zero = s; // explicitly off
+    zero.clouds.lobeBlend = 0.0f;
+    zero.clouds.lobeMist = 0.0f;
+    zero.clouds.lobeMistReach = 0.5f; // a reach without mist changes nothing
+
+    const gpu::Image8 off = renderAt(*ctx, shaders, s, 2.0, W, H, "lobemist_off");
+    const gpu::Image8 on = renderAt(*ctx, shaders, misted, 2.0, W, H, "lobemist_on");
+    const gpu::Image8 onAgain = renderAt(*ctx, shaders, misted, 2.0, W, H);
+    const gpu::Image8 soft = renderAt(*ctx, shaders, blended, 2.0, W, H, "lobeblend_on");
+    const gpu::Image8 same = renderAt(*ctx, shaders, zero, 2.0, W, H);
+    // the gap between the middle head and its right-hand neighbour: world x 20..32 at 160 m, in screen columns
+    const double tanX = std::tan(0.3) * static_cast<double>(W) / H;
+    const auto col = [&](double x) { return static_cast<std::uint32_t>((0.5 + 0.5 * x / 160.0 / tanX) * W); };
+    const std::uint32_t g0 = col(22.0), g1 = col(30.0), c0 = col(-6.0), c1 = col(6.0);
+    const double gapOff = meanLuma12(off, g0, H / 2 - 4, g1, H / 2 + 4);
+    const double gapOn = meanLuma12(on, g0, H / 2 - 4, g1, H / 2 + 4);
+    const double coreOff = meanLuma12(off, c0, H / 2 - 4, c1, H / 2 + 4);
+    const double coreOn = meanLuma12(on, c0, H / 2 - 4, c1, H / 2 + 4);
+    INFO("gap off " << gapOff << " on " << gapOn << "; core off " << coreOff << " on " << coreOn
+                    << "; soft union vs max " << meanAbsDiff12(on, soft));
+    CHECK(gapOn > gapOff + 4.0);                     // cloud in the air between the heads
+    CHECK(std::fabs(coreOn - coreOff) < 0.25 * std::max(std::fabs(gapOn - gapOff), 1.0) + 6.0); // the heads stay heads
+    CHECK(meanAbsDiff12(on, onAgain) == 0.0);       // a pure function of the second
+    CHECK(meanAbsDiff12(off, same) == 0.0);         // off is the old picture
+    CHECK(meanAbsDiff12(on, soft) > 0.05); // the soft union thickens where the heads' soft edges meet their mist
+    CHECK(ctx->errorCount() == 0);
+}
