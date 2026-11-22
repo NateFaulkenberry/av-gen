@@ -432,11 +432,19 @@ PHASES = 8                        # ADR-2116: a crowd's phases (clip length / 8)
 SPEEDS = (0.92, 1.0, 1.08)        # and its few clip rates, for the same reason
 
 
+# msg 170: the art's derived cast files (blender/nd_poses.py: the pack's clips + mirrored copies + authored ones), when
+# every one of them has been made; else the pack's own files and each figure's stock `anim_clip`
+ND_SUFFIX = "" if os.environ.get("ND_STOCK") else ("-nd" if all(
+    os.path.exists(os.path.join(HERE, "scene", ALIENS, c + "-nd.glb")) for c in
+    ("alien-scout", "alien-elder", "alien-diver", "alien-pilot", "alien-ranger", "alien-trooper")) else "")
+NC.SUFFIX = ND_SUFFIX
+
+
 def clip_lengths():
     """Clip seconds per clip name, read from one cast GLB (the pack is shared); {} without the assets."""
     import struct
     try:
-        with open(os.path.join(HERE, "scene", ALIENS, CAST[0] + ".glb"), "rb") as f:
+        with open(os.path.join(HERE, "scene", ALIENS, CAST[0] + ND_SUFFIX + ".glb"), "rb") as f:
             b = f.read()
     except OSError:
         return {}

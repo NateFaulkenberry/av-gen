@@ -25,6 +25,7 @@ WALK_STRIDE = {"Walking": 1.34, "Walking_low_grav": 1.0}   # m/s a stance foot s
 TURN_RATE = 225.0
 SPEEDS = (0.92, 1.0, 1.08)
 PHASES = 8
+SUFFIX = ""           # msg 170: "-nd" where the art's derived cast files exist (blender/nd_poses.py; build.py sets it)
 TIER_HZ = {"A": 0, "B": 0, "C": 0}   # it12 (msg 149): every figure posed every frame (it10: B 15 Hz, C 4 Hz stepped)
 FAR_HZ = 0.0           # it12 (msg 149, the 4.09 s flyer "glitching/skipping"): no distance rate either (it10: 15 Hz past 40 m)
 # it12 (owner msg 149: "time animations to quarter notes, this looks too slow motion"): the clips run on the song's
@@ -63,6 +64,18 @@ def breath_speed(t):
         return lo
     u = (t - c) / (d - c)
     return lo + (1.0 - lo) * u * u * (3 - 2 * u)
+
+
+def lag_at(t):
+    """The crowds' lag (s) at timeline second t: the integral of (1 - speed)."""
+    a, _, _, d, _ = BREATH
+    if t <= a:
+        return 0.0
+    lag, s, dt = 0.0, a, 1.0 / 240.0
+    while s < min(t, d):
+        lag += (1.0 - breath_speed(s + 0.5 * dt)) * min(dt, min(t, d) - s)
+        s += dt
+    return lag
 
 
 def lag_keys():
@@ -179,14 +192,18 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             if "sway" in react:
                 g = group_of.get(sp.get("id"))
                 half = (g % 2) * 0.5 if g is not None else 0.5 * r.randrange(2)
-                layers.append(sway_layer(beat_phase + half + rv.uniform(-0.08, 0.08), rv.uniform(2.2, 4.0)))
+                lay = sway_layer(beat_phase + half + rv.uniform(-0.08, 0.08), rv.uniform(2.2, 4.0))
+                if not SUFFIX or sp.get("sway", True):   # msg 170: not where the art's clip already carries the beat
+                    layers.append(lay)
             return ("band", layers)
         if "turn_to_lantern" in react:
             layers.append(dict(LOOK_LAYER))
         if "sway" in react:
             g = group_of.get(sp.get("id"))
             half = (g % 2) * 0.5 if g is not None else 0.5 * r.randrange(2)
-            layers.append(sway_layer(beat_phase + half + rv.uniform(-0.08, 0.08), rv.uniform(2.2, 4.0)))
+            lay = sway_layer(beat_phase + half + rv.uniform(-0.08, 0.08), rv.uniform(2.2, 4.0))
+            if not SUFFIX or sp.get("sway", True):
+                layers.append(lay)
         return (ring_of(pos), layers) if layers else (ring_of(pos), [])
 
     # msg 130: the ground check's fixes (art/ground_fixes.json): spots moved or dropped, paths re-laid, riders on the floor
@@ -233,13 +250,37 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             speed = sp["anim_rate"]
         if sp.get("anim_phase") is not None and not hold:
             phase = round(sp["anim_phase"], 4)
-        n = {"name": "alien_" + sp["id"], "kind": "gltf", "asset": aliens + sp["cast"] + ".glb", "position": r3(sp["pos"]),
-             "rotation": [0.0, round(sp["facing_deg"], 2), 0.0], "scale": [pop.get("scale", 1.0)] * 3,
+        # msg 170: with the art's derived cast files (SUFFIX), its own clip for this figure -- the pack's, a mirrored
+        # copy or an authored ND_* one -- at its rate and phase; a sitter sits (ND_Sit) instead of holding a crouch
+        nd = bool(SUFFIX) and sp.get("nd_clip") in clip_len
+        if nd:
+            hold = None
+            clip, speed, phase = sp["nd_clip"], sp.get("nd_rate"), round(sp.get("nd_phase", 0.0), 4)
+        n = {"name": "alien_" + sp["id"], "kind": "gltf", "asset": aliens + sp["cast"] + SUFFIX + ".glb",
+             "position": r3(sp["pos"]), "rotation": [0.0, round(sp["facing_deg"], 2), 0.0],
+             "scale": [round(pop.get("scale", 1.0) * sp.get("scale", 1.0), 3)] * 3,
              "animation": anim(clip, sp.get("tier", "B"), listening(sp, sp["pos"]), speed, phase)}
+        if sp.get("look_weight") is not None and n["animation"].get("crowd"):
+            n["animation"]["crowdWeight"] = sp["look_weight"]
         if sp.get("bob"):
             n["bob"] = sp["bob"]
         nodes.append(n)
-        if sp.get("look_at") and not hold:
+        if sp.get("nd_cues") is not None:
+            # msg 170: the art's later changes of clip (the crash's cheer rippling out from the stage, a wave at the
+            # passing lens, the way back to its loop). `offset` is the clip second it means at the cue; the crowd's
+            # lag is added here, because a crowd member's clock runs that far behind the timeline (without it a cue
+            # waits out the lag on its first frame: 1.3 s after the held breath)
+            cl = []
+            for c in sp["nd_cues"]:
+                name_c = c["clip"] if (nd and c["clip"] in clip_len) else c.get("stock", clip)
+                rate_c = c["rate"] if name_c == c["clip"] else beat_rate(name_c)[0]
+                off_c = c.get("offset", 0.0) if name_c == c["clip"] else 0.0
+                lag = lag_at(c["t"]) if n["animation"].get("crowd") else 0.0
+                cl.append({"time": round(c["t"], 3), "clip": name_c, "speed": rate_c, "blend": c.get("blend", 0.25),
+                           "playback": "loop", "offset": round((off_c + rate_c * lag) % clip_len.get(name_c, 2.0), 4)})
+            if cl:
+                actors.append({"id": n["name"], "node": n["name"], "visible": True, "keys": [], "clips": cl})
+        elif sp.get("look_at") and not hold:
             band_ids.append((n["name"], clip, n["animation"]["speed"]))
 
     # it12 (msg 149): the audience erupts on the crash that ends the held breath (47.15 s): Crazy once, a little
@@ -298,6 +339,13 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             if tier == "A":
                 wakes.append(name)
             pk, rk, cues = [], [], []
+            # msg 170: the art's pause and stop clips (in the derived files), else Idle
+            p_clip = (p.get("pause_clips") or ["Idle"])[w % len(p.get("pause_clips") or ["Idle"])]
+            s_clip = p.get("stop_clip", "Idle")
+            p_clip = p_clip if (SUFFIX and p_clip in clip_len) else "Idle"
+            s_clip = s_clip if (SUFFIX and s_clip in clip_len) else "Idle"
+            p_rate = idle_rate if p_clip == "Idle" else round(rv.uniform(1.0, 1.12), 3)
+            s_rate = idle_rate if s_clip == "Idle" else round(rv.uniform(1.0, 1.12), 3)
             t0 = -offset
             while t0 < song + 1:
                 for leg, (a_pts, start) in enumerate(((out_pts, t0), (pts[::-1], t0 + out_t + pause))):
@@ -337,7 +385,8 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                             rk.append({"time": round(tt - win, 3), "value": yaw, "interp": "linear"})
                         if leg == 0 and (i + 1) in stop_at:
                             dur, syaw = stop_at[i + 1]
-                            cues.append({"time": round(tt, 3), "clip": "Idle", "speed": idle_rate, "blend": 0.4})
+                            cues.append({"time": round(tt, 3), "clip": s_clip, "speed": s_rate, "blend": 0.4,
+                                         "offset": round(rv.uniform(0.0, clip_len.get(s_clip, 2.0)), 3)})
                             rk.append({"time": round(tt + 0.6, 3), "value": syaw, "interp": "linear"})
                             rk.append({"time": round(tt + dur - 0.5, 3), "value": syaw, "interp": "linear"})
                             tt += dur
@@ -345,7 +394,8 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
                             cues.append({"time": round(tt - 0.3, 3), "clip": clip, "speed": rate, "blend": 0.35})
                     # the end: Idle, and a turn on the spot in its last 0.8 s
                     cues.append({"time": round(start, 3), "clip": clip, "speed": rate, "blend": 0.35})
-                    cues.append({"time": round(tt, 3), "clip": "Idle", "speed": idle_rate, "blend": 0.4})
+                    cues.append({"time": round(tt, 3), "clip": p_clip, "speed": p_rate, "blend": 0.4,
+                                 "offset": round(rv.uniform(0.0, clip_len.get(p_clip, 2.0)), 3)})
                     qe, qf = at_s(cum[-1]), at_s(cum[-1] - 1.6)   # it12: back along the smoothed path (no 0,0 heading)
                     back = math.degrees(math.atan2(qf[0] - qe[0], qf[2] - qe[2]))
                     rk.append({"time": round(tt + pause - 0.8, 3), "value": rk[-1]["value"], "interp": "linear"})
@@ -377,7 +427,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             cues = sorted([c for c in cues if c["time"] < song], key=lambda c: c["time"])
             before = [c for c in cues if c["time"] <= 0]
             cues = ([dict(before[-1], time=0.0)] if before else []) + [c for c in cues if c["time"] > 0]
-            n = {"name": name, "kind": "gltf", "asset": aliens + cast + ".glb", "position": pk[0]["value"],
+            n = {"name": name, "kind": "gltf", "asset": aliens + cast + SUFFIX + ".glb", "position": pk[0]["value"],
                  "rotation": rk[0]["value"], "scale": [pop.get("scale", 1.0)] * 3,
                  "animation": anim(cues[0]["clip"] if cues else clip, tier, speed=rate, phase=phase_for(clip, rate))}
             if p.get("bob"):
@@ -397,10 +447,16 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         if vi is None:
             continue
         clip = (rd.get("clips") or ["Idle"])[0]
+        speed = phase = None
+        if SUFFIX and rd.get("nd_clip") in clip_len:   # msg 170
+            clip, speed, phase = rd["nd_clip"], rd.get("nd_rate"), rd.get("nd_phase")
+        elif rd.get("anim_clip"):
+            clip, speed, phase = rd["anim_clip"], rd.get("anim_rate"), rd.get("anim_phase")
         nodes.append({"name": "alien_" + rd["id"], "kind": "gltf", "parent": "vehicle%d" % vi,
-                      "asset": aliens + rd["cast"] + ".glb", "position": r3(rd["local_pos"]),
-                      "rotation": [0.0, round(rd["local_yaw_deg"], 2), 0.0], "scale": [pop.get("scale", 1.0)] * 3,
-                      "animation": anim(clip, rd.get("tier", "B"))})
+                      "asset": aliens + rd["cast"] + SUFFIX + ".glb", "position": r3(rd["local_pos"]),
+                      "rotation": [0.0, round(rd["local_yaw_deg"], 2), 0.0],
+                      "scale": [round(pop.get("scale", 1.0) * rd.get("scale", 1.0), 3)] * 3,
+                      "animation": anim(clip, rd.get("tier", "B"), speed=speed, phase=phase)})
 
     # ---- flyers
     for fdat in pop.get("flyers", []):
