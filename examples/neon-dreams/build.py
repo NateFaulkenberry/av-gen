@@ -1439,7 +1439,7 @@ def scene_doc(state="uv", sky_map=None):
                      "order": 0, "activation": "always",
                      "parameters": {"brightness": 1.6, "density": 0.45, "magnitudeSlope": 5.5, "colorSpread": 0.35,
                                     "twinkle": 0.2, "twinkleRate": 1.0, "horizonFade": 0.5, "band": 0.25,
-                                    "bandTilt": 40.0, "daylight": 0.0}}],
+                                    "bandTilt": 40.0, "daylight": 0.0}}] + bd["info"].get("effects", []),
         "nodes": nodes + [{"name": "ride", "kind": "spline", "spline": {
             "name": "ride", "kind": "catmullRom", "closed": False, "tension": 0.5, "generator": "points",
             "samplesPerSegment": 4, "points": [{"position": r3(p), "roll": 0.0, "scale": 1.0} for p in dense]}}],
@@ -1805,9 +1805,12 @@ def project_doc(scene_rel, audio_dir, tracks, routes, sources):
         "parameters": {"camera/lookAhead": 45.0, "camera/splineBank": 5.0, "post/output/dither": 1.0},
         "routes": routes,
         "timeline": {"enabled": True, "cues": [], "tracks": [trim_track(t) for t in tracks]},
-        "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4"},
+        "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4",
+                   "backend": "ffmpeg"},   # it12: the native writer failed with -17691 on 2026-11-22
         # iteration 10: the cast's clip cues (jetpack take-offs and landings); positions are timeline tracks above
-        **({"sequence": {"name": "neon-dreams-cast", "duration": SONG, "actors": SEQUENCE_ACTORS}} if SEQUENCE_ACTORS else {}),
+        **({"sequence": {"name": "neon-dreams-cast", "duration": SONG, "actors": SEQUENCE_ACTORS,
+                         # it12c (msg 161): the kick's onsets as markers, for the speakers' pulse triggers
+                         "markers": band()["info"].get("markers", [])}} if SEQUENCE_ACTORS else {}),
     }
 
 

@@ -117,8 +117,8 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
         tracks.append(track("crowds/%s/lag" % crowd, lag_keys(sp, song)))
 
     # the spot lights on the band, and their beams in the air
-    a, b, c, d = BREATH
     def breath_keys(base, floor):
+        a, b, c, d = BREATH
         return [{"time": 0.0, "value": base, "interp": "linear"}, {"time": a, "value": base, "interp": "smooth"},
                 {"time": b, "value": round(base * floor, 3), "interp": "smooth"},
                 {"time": c, "value": round(base * floor, 3), "interp": "smooth"},
@@ -143,8 +143,67 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                       "elevation": s["elevation_deg"], "rpm": s.get("rpm", 0.0), "length": s["length_m"],
                       "halfAngle": s["half_angle_deg"], "radius": 0.25, "color": pal(s["key"]),
                       "intensity": round(1.6 * s.get("intensity", 1.0), 3), "_kind": "sky"})
+    # it12c (owner msg 161: "get the drum illuminated as well as the synth player"): a key light on each performer
+    # from the halo, above and in front, unless the art's data names its own (`band.key_lights`)
+    st = band["stage"]
+    fd = st.get("front_dir", [-0.94, 0.0, -0.342])
+    art_keys = any("drumkey" in sp["name"] for sp in band["spots"])   # the art's own drummer spots (msg 165)
+    for m in band["musicians"]:
+        if art_keys or any(k.get("musician") == m["name"] for k in band.get("key_lights", [])):
+            continue
+        ch = m.get("chest", [m["pos"][0], m["pos"][1] + 1.1, m["pos"][2]])
+        src = [ch[0] + fd[0] * 3.5, st.get("halo_y", ch[1] + 6.5), ch[2] + fd[2] * 3.5]
+        d = [ch[i] - src[i] for i in range(3)]
+        n = math.sqrt(sum(v * v for v in d)) or 1.0
+        name = m["name"] + "_key"
+        drums = "drum" in m["asset"]
+        inten = 1500.0 if drums else 1100.0
+        lights.append({"name": name, "type": "spot", "position": r3(src), "direction": r3([v / n for v in d]),
+                       "color": pal("moon_disc"), "intensity": inten, "range": 16.0, "innerCone": 9.0,
+                       "outerCone": 18.0, "castsShadow": False, "volumetric": 0.0})
+        tracks.append(track("lights/%s/intensity" % name, breath_keys(inten, 0.55)))
+        stem = "kick" if drums else "moog"
+        routes.append(AU.route("stem.%s.onset" % stem, "lights/%s/intensity" % name, round(0.5 * inten, 1),
+                               attackMs=10.0, decayMs=220.0))
+    for k in band.get("key_lights", []):   # the art's own, when it adds them
+        lights.append({"name": k["name"], "type": "spot", "position": r3(k["pos"]), "direction": r3(k["direction"]),
+                       "color": pal(k.get("key", "moon_disc")), "intensity": k.get("intensity_cd", 1500.0),
+                       "range": k.get("range_m", 16.0), "innerCone": k.get("inner_deg", 9.0),
+                       "outerCone": k.get("outer_deg", 18.0), "castsShadow": False, "volumetric": 0.0})
+    # it12c (owner msg 161: "speakers and a beat-pulse visual wave effect (visual distortion)"): on every kick a
+    # front leaves each speaker stack -- an expanding ring of refraction (the engine's Shockwave, DF) with a faint
+    # emissive edge, gone in ~0.3 s. Triggered by sequence markers named "kick" at the kick stem's onsets (TRIGGER's
+    # marker source: a pure function of the second, so a seek draws the fronts a play does).
+    effects = []
+    speakers = band.get("speakers") or _default_speakers(st)
+    for i, sp in enumerate(speakers):
+        c = sp.get("pulse_centre", sp.get("emitter", sp.get("pos")))
+        effects.append({"id": "kick_pulse_%d" % i, "name": "kick pulse %s" % sp.get("name", i), "type": "shockwave",
+                        "owner": {"kind": "world"}, "enabled": True, "order": 10 + i, "activation": "trigger",
+                        "trigger": {"source": "marker", "name": "kick"},
+                        "parameters": {"strength": PULSE["strength"], "maxRadius": PULSE["reach"],
+                                       "duration": PULSE["duration"], "thickness": PULSE["thickness"],
+                                       "ease": 0, "rimColor": pal(PULSE["key"]), "rimEmission": PULSE["rim"],
+                                       "chroma": 0.25, "radiusDecay": 0.6, "maxConcurrent": 2.0,
+                                       "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
+    info["effects"] = effects
+    # the held breath silences the pulse (45.5 s to the 47.15 s crash, which brings it back)
+    info["markers"] = [{"time": round(t, 4), "name": "kick"} for t in ONSETS["kick"]
+                       if not (BREATH[0] <= t < BREATH[2] - 0.05)]
     info["breath_keys"] = breath_keys
     return nodes, lights, beams, tracks, routes, actors, info
+
+
+PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
+
+
+def _default_speakers(st):
+    """Until the art's stacks land: one either side of the stage, 2 m outside its rim, 2.5 m over the deck."""
+    c, fd, R = st["centre"], st.get("front_dir", [-0.94, 0.0, -0.342]), st.get("radius_m", 6.0)
+    side = [-fd[2], 0.0, fd[0]]
+    y = st.get("deck_y", c[1] + 1.0) + 2.5
+    return [{"name": n, "emitter": [c[0] + k * side[0] * (R + 2.0) + fd[0] * 1.0, y, c[2] + k * side[2] * (R + 2.0)
+                                     + fd[2] * 1.0]} for n, k in (("left", 1.0), ("right", -1.0))]
 
 
 def beam_tracks(beams, base_index, crashes, breath_keys, song=70.18):
