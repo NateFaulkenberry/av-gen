@@ -41,15 +41,18 @@ struct CloudLobeBins {
     float yLo = 0.0f;                 // the lobes' vertical extent, as the renderer's box has it
     float yHi = 0.0f;
     std::uint32_t truncated = 0;      // cells that held more lobes than the renderer reads (the extra are dropped)
+    std::uint32_t halosDropped = 0;   // ADR-2123: mist halo entries a full cell had no room for (bodies always first)
 };
-inline constexpr std::uint32_t kMaxLobesPerCell = 64;
+inline constexpr std::uint32_t kMaxLobesPerCell = 128; // ADR-2123 (was 64): room for the mist halos
 inline constexpr std::uint32_t kMaxBinCellsPerSide = 128; // ADR-2105 (was 64)
 inline constexpr std::uint32_t kMaxBinCellsPerSideSplit = 512; // ADR-2114: the finest grid an overfull cell splits to
 inline constexpr std::uint32_t kBinCountMask = 0xFFu;
 // ADR-2112: `bobReach` (per formation, metres) widens a riding lobe's footprint and height range by how far its
 // formation can move, so the bins built once still hold it wherever it bobs.
+// ADR-2123: `grow` (>= 1) is the lobes' mist halo as a multiple of their radius; a cell lists the lobes whose bodies
+// cover it first (split per ADR-2114 until they fit) and then, in the room left, the lobes only their halo reaches.
 [[nodiscard]] CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes,
-                                          const std::vector<glm::vec3>& bobReach = {});
+                                          const std::vector<glm::vec3>& bobReach = {}, float grow = 1.0f);
 
 // ADR-2111: the march's per-frame jitters from FrameTime::frameNonce (x = the step offset, y = the light taps'),
 // each a low-discrepancy sequence per FRAME at 24, 30 and 60 fps (public for the unit test).

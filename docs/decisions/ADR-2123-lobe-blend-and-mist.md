@@ -26,7 +26,12 @@ Two block values, both 0 (off) by default:
   radius out to `1 + reach`; the mist at a point is `lobeMist x (0.15 h1 + 0.85 sqrt(h1 h2))` of the two strongest
   halos there, broken into patches and threads by the coarse and mid erosion billows (`smoothstep(0.3, 0.75, ...)`).
   The geometric mean puts the mist mostly BETWEEN lobes, where two halos overlap, and only a trace round a lone one.
-  The bins and the block's box grow by the reach so the march finds it; `heroSpan` follows the grown bins.
+  The block's box and the columns' height ranges grow by the reach so the march finds it; `heroSpan` follows them.
+  A cell lists the lobes whose BODIES cover it first (ADR-2114 still splits until they fit), then, in the room left,
+  the lobes only a halo reaches (`binCloudLobes(..., grow)`), so the mist never pushes a body out of a cell: with the
+  halos binned as bodies, Neon Dreams' it13 data overfilled 512 cells and the smallest lobes were dropped. The cap is
+  128 a cell (was 64; the count is 8 bits); the halo entries a full cell cannot hold are counted (`halosDropped`, one
+  info line) -- 0 in Neon Dreams at 128, 11,518 at 64.
 
 ## Consequences
 

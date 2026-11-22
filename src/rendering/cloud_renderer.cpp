@@ -267,7 +267,7 @@ glm::vec2 cloudFrameJitter(std::uint32_t frameNonce) {
 namespace {
 
 CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach,
-                                std::uint32_t maxCellsPerSide) {
+                                std::uint32_t maxCellsPerSide, float grow) {
     CloudLobeBins bins;
     if (lobes.empty()) {
         return bins;
@@ -278,8 +278,9 @@ CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, cons
                    ? bobReach[static_cast<std::size_t>(l.bobIndex)]
                    : glm::vec3(0.0f);
     };
-    const auto yBottom = [&](const scene::CloudLobe& l) { return l.centre.y - l.radius * l.scale.y - reachOf(l).y; };
-    const auto yTop = [&](const scene::CloudLobe& l) { return l.centre.y + l.radius * l.scale.y + reachOf(l).y; };
+    // ADR-2123: the mist's halo reaches `grow` of the radius; bounds and columns are the halo's
+    const auto yBottom = [&](const scene::CloudLobe& l) { return l.centre.y - grow * l.radius * l.scale.y - reachOf(l).y; };
+    const auto yTop = [&](const scene::CloudLobe& l) { return l.centre.y + grow * l.radius * l.scale.y + reachOf(l).y; };
     glm::vec2 lo(1e30f), hi(-1e30f);
     bins.yLo = 1e30f;
     bins.yHi = -1e30f;
@@ -288,13 +289,16 @@ CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, cons
         bins.yHi = std::max(bins.yHi, yTop(l));
     }
     std::vector<float> extents;
+    std::vector<float> outer; // ADR-2123: the halo's extent (== extents without mist)
     extents.reserve(lobes.size());
+    outer.reserve(lobes.size());
     for (const scene::CloudLobe& l : lobes) {
         const glm::vec3 r = reachOf(l);
         const float e = l.radius * std::max(l.scale.x, l.scale.z) + std::max(r.x, r.z);
         extents.push_back(e);
-        lo = glm::min(lo, glm::vec2(l.centre.x, l.centre.z) - e);
-        hi = glm::max(hi, glm::vec2(l.centre.x, l.centre.z) + e);
+        outer.push_back(e + (grow - 1.0f) * l.radius * std::max(l.scale.x, l.scale.z));
+        lo = glm::min(lo, glm::vec2(l.centre.x, l.centre.z) - outer.back());
+        hi = glm::max(hi, glm::vec2(l.centre.x, l.centre.z) + outer.back());
     }
     std::vector<float> sorted = extents;
     std::nth_element(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(sorted.size() / 2), sorted.end());
@@ -306,13 +310,18 @@ CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, cons
     bins.nx = std::max(1u, static_cast<std::uint32_t>(std::ceil((hi.x - lo.x) / bins.cellSize)));
     bins.nz = std::max(1u, static_cast<std::uint32_t>(std::ceil((hi.y - lo.y) / bins.cellSize)));
     std::vector<std::vector<std::uint32_t>> cells(static_cast<std::size_t>(bins.nx) * bins.nz);
+    // ADR-2123: cells only a lobe's mist halo reaches, apart: they take the room the bodies leave
+    std::vector<std::vector<std::uint32_t>> halos(grow > 1.0f ? cells.size() : 0);
     for (std::size_t i = 0; i < lobes.size(); ++i) {
         const glm::vec2 c(lobes[i].centre.x, lobes[i].centre.z);
-        const glm::ivec2 a = glm::ivec2(glm::floor((c - extents[i] - bins.origin) / bins.cellSize));
-        const glm::ivec2 b = glm::ivec2(glm::floor((c + extents[i] - bins.origin) / bins.cellSize));
+        const glm::ivec2 a = glm::ivec2(glm::floor((c - outer[i] - bins.origin) / bins.cellSize));
+        const glm::ivec2 b = glm::ivec2(glm::floor((c + outer[i] - bins.origin) / bins.cellSize));
+        const glm::ivec2 ca = glm::ivec2(glm::floor((c - extents[i] - bins.origin) / bins.cellSize));
+        const glm::ivec2 cb = glm::ivec2(glm::floor((c + extents[i] - bins.origin) / bins.cellSize));
         for (int z = std::max(a.y, 0); z <= std::min(b.y, static_cast<int>(bins.nz) - 1); ++z) {
             for (int x = std::max(a.x, 0); x <= std::min(b.x, static_cast<int>(bins.nx) - 1); ++x) {
-                cells[static_cast<std::size_t>(z) * bins.nx + x].push_back(static_cast<std::uint32_t>(i));
+                const bool core = x >= ca.x && x <= cb.x && z >= ca.y && z <= cb.y;
+                (core ? cells : halos)[static_cast<std::size_t>(z) * bins.nx + x].push_back(static_cast<std::uint32_t>(i));
             }
         }
     }
@@ -325,6 +334,17 @@ CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, cons
                               [&](std::uint32_t p, std::uint32_t q) { return extents[p] > extents[q]; });
             list.resize(kMaxLobesPerCell);
             ++bins.truncated;
+        }
+        if (!halos.empty() && !halos[k].empty()) {
+            std::vector<std::uint32_t>& h = halos[k];
+            const std::size_t room = kMaxLobesPerCell - list.size();
+            if (h.size() > room) {
+                std::partial_sort(h.begin(), h.begin() + static_cast<std::ptrdiff_t>(room), h.end(),
+                                  [&](std::uint32_t p, std::uint32_t q) { return outer[p] > outer[q]; });
+                bins.halosDropped += static_cast<std::uint32_t>(h.size() - room);
+                h.resize(room);
+            }
+            list.insert(list.end(), h.begin(), h.end());
         }
         bins.words[2 * k] = static_cast<std::uint32_t>(bins.words.size());
         // ADR-2101: the column's vertical extent, so the march can skip the air above and below its lobes
@@ -347,14 +367,15 @@ CloudLobeBins binCloudLobesOnce(const std::vector<scene::CloudLobe>& lobes, cons
 
 } // namespace
 
-CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach) {
+CloudLobeBins binCloudLobes(const std::vector<scene::CloudLobe>& lobes, const std::vector<glm::vec3>& bobReach,
+                            float grow) {
     // ADR-2114: a cell over kMaxLobesPerCell is split, not trimmed: the grid is rebuilt with cells half the size
     // (up to kMaxBinCellsPerSideSplit along the longer side) until every cell fits. Only past that are the smallest
     // lobes dropped. A finer grid also costs the march less per sample, so the split is never a slowdown.
-    CloudLobeBins bins = binCloudLobesOnce(lobes, bobReach, kMaxBinCellsPerSide);
+    CloudLobeBins bins = binCloudLobesOnce(lobes, bobReach, kMaxBinCellsPerSide, grow);
     for (std::uint32_t side = 2 * kMaxBinCellsPerSide; bins.truncated > 0 && side <= kMaxBinCellsPerSideSplit;
          side *= 2) {
-        bins = binCloudLobesOnce(lobes, bobReach, side);
+        bins = binCloudLobesOnce(lobes, bobReach, side, grow);
     }
     return bins;
 }
@@ -585,19 +606,19 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         bd.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst;
         lobes_ = device.CreateBuffer(&bd);
         context_->queue().WriteBuffer(lobes_, 0, rows.data(), rows.size() * sizeof(LobeGpu));
-        const auto grown = [&](const std::vector<scene::CloudLobe>& set) {
-            std::vector<scene::CloudLobe> out = set;
-            for (scene::CloudLobe& l : out) l.radius *= mistGrow;
-            return out;
-        };
-        bins_cpu_ = binCloudLobes(grown(c.lobes), bobReach);
+        // ADR-2123: the bodies are binned first, as without mist; the halos fill the room left in each cell
+        bins_cpu_ = binCloudLobes(c.lobes, bobReach, mistGrow);
         if (bins_cpu_.truncated > 0) {
             log::warn("clouds: {} of {} lobe bins held more than {} lobes; the smallest were dropped there",
                       bins_cpu_.truncated, bins_cpu_.nx * bins_cpu_.nz, kMaxLobesPerCell);
         }
         std::vector<std::uint32_t> words = bins_cpu_.words;
         // ADR-2104: the far set's grid after the hero grid's words; its offsets and lobe indices shifted to match
-        farBins_ = binCloudLobes(grown(c.farLobes), bobReach);
+        farBins_ = binCloudLobes(c.farLobes, bobReach, mistGrow);
+        if (bins_cpu_.halosDropped + farBins_.halosDropped > 0) {
+            log::info("clouds: {} lobe mist halo bin entries had no room (full cells keep their lobes' bodies)",
+                      bins_cpu_.halosDropped + farBins_.halosDropped);
+        }
         farWordBase_ = static_cast<std::uint32_t>(words.size());
         if (!c.farLobes.empty()) {
             if (farBins_.truncated > 0) {
