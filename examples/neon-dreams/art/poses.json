@@ -1,0 +1,293 @@
+{
+ "_note": "Written by blender/nd_poses.py (it12, owner msg 170). The clips each cast file carries once `/usr/bin/python3 examples/neon-dreams/blender/nd_poses.py` has made assets/aliens/<cast>-nd.glb (gitignored, never committed): the pack's 26 (`stock`), mirrored copies of its standing clips (`mirrored_stock`, *_m) and the authored ND_* clips (`authored`; kicks of 0.70 s = 2 beats at 171.4 BPM, so a rate of 1 sits on the grid; clip second 0 is ON a kick).",
+ "suffix": "-nd",
+ "kick_s": 0.70012,
+ "stock": {
+  "Button_push": 1.5,
+  "Crazy": 2.6667,
+  "Dying_1_backpack": 3.3333,
+  "Dying_1_no_backpack": 3.3333,
+  "Dying_forward": 4.1667,
+  "Fall_loop": 0.7333,
+  "Fight_head_hit": 1.4667,
+  "Fight_idle": 2.2333,
+  "Fight_Jab": 0.7333,
+  "Fight_leg_kick_1": 1.6333,
+  "Fight_leg_kick_2": 1.6333,
+  "Fight_punch": 1.8,
+  "Floating": 6.5,
+  "Flying_jet": 2.9,
+  "Idle": 2.0,
+  "Idle_turn": 4.0333,
+  "Jump_running": 1.0333,
+  "Jumping": 1.9333,
+  "Landing": 1.1,
+  "Running": 0.7333,
+  "Take_from_floor": 2.3333,
+  "Take_from_table": 1.6667,
+  "Walking": 1.0667,
+  "Walking_crouch": 1.0667,
+  "Walking_injured": 1.6667,
+  "Walking_low_grav": 4.6667
+ },
+ "authored": {
+  "ND_Clap": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "claps at its chest on every kick, knees dipping, head nodding",
+   "use": "audience"
+  },
+  "ND_Clap_b": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "a big slow clap on every second kick, arms flung wide between, leaning back, rocking",
+   "use": "audience"
+  },
+  "ND_Arms_up": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "both arms up in a V, pumping on the kick; bounces from the knees",
+   "use": "audience"
+  },
+  "ND_Fist_pump": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "one fist punching the air on every kick, body turned a quarter, the other arm low",
+   "use": "audience"
+  },
+  "ND_Wave": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "arms high, swaying side to side like a lighter wave",
+   "use": "audience"
+  },
+  "ND_Sway": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "a two-step: weight from foot to foot on the kick, elbows bent, shoulders rolling",
+   "use": "audience"
+  },
+  "ND_Nod": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "arms folded, weight on one leg, nodding on the kick, a toe tapping",
+   "use": "audience"
+  },
+  "ND_Jump": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "pogo: off the ground between kicks with its arms thrown up, landing on each one",
+   "use": "audience"
+  },
+  "ND_Groove": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "knees bouncing, fists pumping in turn at its chest, shoulders twisting",
+   "use": "audience"
+  },
+  "ND_Twist": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "the twist: hips one way, shoulders the other, down low and up again over four kicks",
+   "use": "audience"
+  },
+  "ND_Headbang": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "a wide stance, fists low, the whole upper body thrown down on every kick",
+   "use": "audience"
+  },
+  "ND_Point": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "points at the stage, jabbing on the kick, then turns to the one beside it and back; a hand on its hip",
+   "use": "audience"
+  },
+  "ND_Film": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "holds both hands up before its face (filming the stage), steadying, peeking round them",
+   "use": "audience"
+  },
+  "ND_Cheer": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "a cheer: both fists thrown up and shaken, hopping",
+   "use": "audience, a crash"
+  },
+  "ND_Stand": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "upright and easy: weight on one leg, arms loose, a slow look round, then the weight to the other leg",
+   "use": "anywhere"
+  },
+  "ND_Talk_a": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "talking: its hands open and close the points it makes, head tilting, weight shifting",
+   "use": "pairs and groups"
+  },
+  "ND_Talk_b": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "listening: a hand on its hip, nodding now and then, laughing back once",
+   "use": "pairs and groups"
+  },
+  "ND_Watch": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "arms folded, weight on one leg, looking slowly from one side to the other",
+   "use": "anywhere"
+  },
+  "ND_Hips": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "hands on its hips, feet apart, looking round and up, rocking on its heels",
+   "use": "anywhere"
+  },
+  "ND_Look_up": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "head back, a hand shading its eyes, following something across the sky",
+   "use": "moon, lantern and mast watchers"
+  },
+  "ND_Stretch": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "a long stretch: arms up and back, on its toes, then down, and a look round",
+   "use": "anywhere, sparingly"
+  },
+  "ND_Hello": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "waves a raised hand at whoever is passing, the other on its hip, rising on its toes",
+   "use": "near the lens's path"
+  },
+  "ND_Lean": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "leaning on a rail (its forearms 1.0 m up, 0.35 m ahead of its spot), a knee slack; looks along the water",
+   "use": "rails"
+  },
+  "ND_Sit": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "sitting on the ground, knees up, hands on them, rocking a little, looking about",
+   "use": "edges, quiet corners"
+  },
+  "ND_Squat": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "squatting on its heels, forearms on its knees, poking at something on the ground now and then",
+   "use": "gardeners, fishers, kids at the front"
+  },
+  "ND_Fish": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "fishing: both hands hold a line out ahead, a slow lift, two tugs, a look down at the water",
+   "use": "fishers at an edge"
+  },
+  "ND_Fist_pump_m": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "one fist punching the air on every kick, body turned a quarter, the other arm low (mirrored: the other hand, the other foot)",
+   "use": "audience"
+  },
+  "ND_Point_m": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "points at the stage, jabbing on the kick, then turns to the one beside it and back; a hand on its hip (mirrored: the other hand, the other foot)",
+   "use": "audience"
+  },
+  "ND_Nod_m": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "arms folded, weight on one leg, nodding on the kick, a toe tapping (mirrored: the other hand, the other foot)",
+   "use": "audience"
+  },
+  "ND_Stand_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "upright and easy: weight on one leg, arms loose, a slow look round, then the weight to the other leg (mirrored: the other hand, the other foot)",
+   "use": "anywhere"
+  },
+  "ND_Talk_a_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "talking: its hands open and close the points it makes, head tilting, weight shifting (mirrored: the other hand, the other foot)",
+   "use": "pairs and groups"
+  },
+  "ND_Talk_b_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "listening: a hand on its hip, nodding now and then, laughing back once (mirrored: the other hand, the other foot)",
+   "use": "pairs and groups"
+  },
+  "ND_Watch_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "arms folded, weight on one leg, looking slowly from one side to the other (mirrored: the other hand, the other foot)",
+   "use": "anywhere"
+  },
+  "ND_Look_up_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "head back, a hand shading its eyes, following something across the sky (mirrored: the other hand, the other foot)",
+   "use": "moon, lantern and mast watchers"
+  },
+  "ND_Hello_m": {
+   "seconds": 5.6009,
+   "kicks": 8,
+   "about": "waves a raised hand at whoever is passing, the other on its hip, rising on its toes (mirrored: the other hand, the other foot)",
+   "use": "near the lens's path"
+  },
+  "ND_Lean_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "leaning on a rail (its forearms 1.0 m up, 0.35 m ahead of its spot), a knee slack; looks along the water (mirrored: the other hand, the other foot)",
+   "use": "rails"
+  },
+  "ND_Fish_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "fishing: both hands hold a line out ahead, a slow lift, two tugs, a look down at the water (mirrored: the other hand, the other foot)",
+   "use": "fishers at an edge"
+  },
+  "ND_Squat_m": {
+   "seconds": 11.2019,
+   "kicks": 16,
+   "about": "squatting on its heels, forearms on its knees, poking at something on the ground now and then (mirrored: the other hand, the other foot)",
+   "use": "gardeners, fishers, kids at the front"
+  }
+ },
+ "mirrored_stock": {
+  "Idle_m": {
+   "seconds": 2.0,
+   "about": "the pack's Idle, mirrored"
+  },
+  "Idle_turn_m": {
+   "seconds": 4.0333,
+   "about": "the pack's Idle_turn, mirrored"
+  },
+  "Fight_idle_m": {
+   "seconds": 2.2333,
+   "about": "the pack's Fight_idle, mirrored"
+  },
+  "Crazy_m": {
+   "seconds": 2.6667,
+   "about": "the pack's Crazy, mirrored"
+  },
+  "Button_push_m": {
+   "seconds": 1.5,
+   "about": "the pack's Button_push, mirrored"
+  },
+  "Take_from_table_m": {
+   "seconds": 1.6667,
+   "about": "the pack's Take_from_table, mirrored"
+  },
+  "Take_from_floor_m": {
+   "seconds": 2.3333,
+   "about": "the pack's Take_from_floor, mirrored"
+  }
+ }
+}

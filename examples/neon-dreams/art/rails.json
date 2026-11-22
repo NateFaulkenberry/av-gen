@@ -1,0 +1,135 @@
+{
+ "_note": "Written by blender/nd_rail_probe.py (it12, owner msg 170): spots with a rail ahead (metres ahead, its top over the spot's floor, the turn of its facing that meets it).",
+ "rails": {
+  "pop_0015": {
+   "dist": 0.382,
+   "top": 1.075,
+   "yaw": 0.0
+  },
+  "pop_0016": {
+   "dist": 0.382,
+   "top": 1.075,
+   "yaw": 0.0
+  },
+  "pop_0032": {
+   "dist": 0.449,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0037": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0038": {
+   "dist": 0.45,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0039": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0040": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0041": {
+   "dist": 0.431,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0042": {
+   "dist": 0.45,
+   "top": 0.95,
+   "yaw": 0.0
+  },
+  "pop_0048": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0049": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0050": {
+   "dist": 0.45,
+   "top": 0.95,
+   "yaw": 0.0
+  },
+  "pop_0051": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0053": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0063": {
+   "dist": 0.43,
+   "top": 0.944,
+   "yaw": 0.0
+  },
+  "pop_0095": {
+   "dist": 0.555,
+   "top": 0.994,
+   "yaw": 0.0
+  },
+  "pop_0097": {
+   "dist": 0.511,
+   "top": 0.9,
+   "yaw": 0.0
+  },
+  "pop_0100": {
+   "dist": 0.512,
+   "top": 0.9,
+   "yaw": 0.0
+  },
+  "pop_0111": {
+   "dist": 0.554,
+   "top": 0.994,
+   "yaw": 0.0
+  },
+  "pop_0206": {
+   "dist": 0.805,
+   "top": 1.069,
+   "yaw": -20.0
+  },
+  "pop_0212": {
+   "dist": 0.387,
+   "top": 1.069,
+   "yaw": 20.0
+  },
+  "pop_0215": {
+   "dist": 0.826,
+   "top": 1.038,
+   "yaw": -20.0
+  },
+  "pop_0273": {
+   "dist": 0.757,
+   "top": 0.9,
+   "yaw": 0.0
+  },
+  "pop_0438": {
+   "dist": 0.682,
+   "top": 0.831,
+   "yaw": 20.0
+  },
+  "it11_000": {
+   "dist": 0.831,
+   "top": 1.075,
+   "yaw": 20.0
+  },
+  "it11_011": {
+   "dist": 0.64,
+   "top": 1.075,
+   "yaw": 20.0
+  }
+ }
+}
