@@ -43,7 +43,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 ALIENS = os.path.join(ROOT, "assets", "aliens")
-ART = os.path.join(HERE, "..", "art")
+ART = os.environ.get("ND_ART", os.path.join(HERE, "..", "art"))   # ND_ART: a scratch copy
 CAST = ["alien-scout", "alien-elder", "alien-pilot", "alien-ranger", "alien-diver", "alien-trooper"]
 SUFFIX = "-nd"
 BEAT = 60.0 / 171.4
@@ -649,20 +649,24 @@ def nd_nod(t):
     return p
 
 
-@clip("ND_Jump", 4, about="pogo: off the ground between kicks with its arms thrown up, landing on each one", use="audience")
+@clip("ND_Jump", 4, about="a bounce: a small hop between kicks, landing on each one, its arms up and loose", use="audience")
 def nd_jump(t):
+    # it14 (owner msgs 195, 202): the hop is 0.15 m (was 0.24) and the arms stay up and ride it on a raised cosine; it12
+    # threw them from the waist to over the head in 0.11 s of every jump (hands 11 m/s), which read as a twitch
     p = stand(new(t, 4), width=0.24)
     u = (t / KICK) % 1.0                          # 0 = the kick (the landing's deepest point)
     air = math.sin(math.pi * (u - 0.2) / 0.62) if 0.2 < u < 0.82 else 0.0
     crouch = (1 - smooth(u / 0.2) if u < 0.2 else 0.0) + (smooth((u - 0.82) / 0.18) if u > 0.82 else 0.0)
-    p.hips_t[1] += 0.24 * air - 0.11 * crouch
-    p.spine = [9.0 * crouch - 5.0 * air, 0.0, 0.0]
-    p.head = [-9.0 * air + 4.0 * crouch, 0.0, 0.0]
+    up = bump(t, KICK, 0.5, 1.0)                  # highest between kicks
+    p.hips_t[1] += 0.15 * air - 0.07 * crouch
+    soft = air * air                              # the head and back ease into the hop (no kink at the push-off)
+    p.spine = [6.0 * crouch - 3.0 * soft, 0.0, 0.0]
+    p.head = [-6.0 * soft + 3.0 * crouch, 0.0, 0.0]
     for s in "lr":
-        p.leg[s]["at"][1] = 0.19 * air
-        p.leg[s]["pitch"] = 30.0 * air
-        p.arm[s] = {"at": lerp([0.10, -0.26, 0.16], [0.18, 0.38, 0.02], smooth(air * 1.4)), "pole": [1.0, -0.4, -0.3]}
-    p.antenna = -16.0 * air + 12.0 * crouch
+        p.leg[s]["at"][1] = 0.12 * air
+        p.leg[s]["pitch"] = 24.0 * soft
+        p.arm[s] = {"at": lerp([0.15, 0.16, 0.10], [0.19, 0.36, 0.03], up), "pole": [1.0, -0.4, -0.3]}
+    p.antenna = -10.0 * soft + 8.0 * crouch
     return p
 
 
@@ -688,29 +692,57 @@ def nd_twist(t):
     p = stand(new(t, 8), width=0.30, toe=4.0)
     tw = wave(t, KICK)
     low = 0.5 - 0.5 * math.cos(2 * math.pi * t / (4 * KICK))
-    p.hips_t[1] -= 0.02 + 0.10 * low
-    p.hips_r = [0.0, 18.0 * tw, 0.0]
-    p.spine = [5.0 + 8.0 * low, -34.0 * tw, 0.0]
-    p.head = [-4.0 * low, 14.0 * tw, 0.0]
+    # it14 (msgs 195, 202): three quarters of the it12 twist (shoulders 26 deg either way, was 34) and a shallower dip
+    p.hips_t[1] -= 0.02 + 0.07 * low
+    p.hips_r = [0.0, 13.0 * tw, 0.0]
+    p.spine = [5.0 + 6.0 * low, -26.0 * tw, 0.0]
+    p.head = [-3.0 * low, 11.0 * tw, 0.0]
     for s in "lr":
         sg = 1 if s == "l" else -1
-        p.leg[s]["yaw"] = 4.0 + sg * 16.0 * tw
+        p.leg[s]["yaw"] = 4.0 + sg * 12.0 * tw
         p.arm[s] = {"at": [0.14, -0.22, 0.16 - 0.10 * sg * tw], "pole": [0.9, -0.2, -0.7]}
     return p
 
 
-@clip("ND_Headbang", 4, about="a wide stance, fists low, the whole upper body thrown down on every kick", use="audience")
+def accent(t):
+    """1 on every second kick, 0.6 on the ones between (a bar's strong and weak kick), smoothly."""
+    return 0.8 + 0.2 * math.cos(2 * math.pi * t / (2 * KICK))
+
+
+@clip("ND_Headbang", 4, about="a wide stance, fists low, bowing from the waist on every kick: a full bow, then a lighter one; smooth",
+      use="audience")
 def nd_headbang(t):
-    p = stand(new(t, 4), width=0.46, toe=22.0, drop=0.07)
-    hit = bump(t, KICK, 0.02, 2.2)
-    p.hips_t[1] -= 0.03 * hit
-    p.hips_t[2] = -0.03 * hit
-    p.spine = [-6.0 + 34.0 * hit, 0.0, 0.0]
-    p.neck = [10.0 * hit, 0.0, 0.0]
-    p.head = [-6.0 + 20.0 * hit, 0.0, 3.0 * wave(t, 2 * KICK)]
+    # it14 (owner msg 195's mark at 44.1 s, msg 202 "excessive twitchiness in the headbanging"): a plain raised cosine
+    # (it12 sharpened it to a snap), half the bow (33 deg head to waist on the strong kick, 20 on the weak; was 64 on
+    # every kick): the head's peak speed is 150 deg/s (was 390)
+    p = stand(new(t, 4), width=0.44, toe=20.0, drop=0.06)
+    hit = bump(t, KICK, 0.02, 1.0) * accent(t)
+    p.hips_t[1] -= 0.02 * hit
+    p.hips_t[2] = -0.02 * hit
+    p.spine = [-4.0 + 15.0 * hit, 0.0, 0.0]
+    p.neck = [6.0 * hit, 0.0, 0.0]
+    p.head = [-4.0 + 12.0 * hit, 0.0, 2.0 * wave(t, 2 * KICK)]
     for s in "lr":
-        p.arm[s] = {"at": [0.12, -0.30 + 0.05 * hit, 0.14 + 0.06 * hit], "pole": [1.0, 0.0, -0.6]}
-    p.antenna = -22.0 * hit + 8.0
+        p.arm[s] = {"at": [0.12, -0.30 + 0.03 * hit, 0.14 + 0.04 * hit], "pole": [1.0, 0.0, -0.6]}
+    p.antenna = -9.0 * hit + 3.0
+    return p
+
+
+@clip("ND_Rock", 4, about="rocks out: one fist held high and pulsing on the kick, the head nodding with it, the other fist low",
+      use="audience")
+def nd_rock(t):
+    # it14 (msg 200 "aliens headbanging ..."; msg 202): a second, lighter headbanger for the figures the pack's Crazy
+    # and Fight_idle had (Crazy is not a loop: it snaps every cycle)
+    p = stand(new(t, 4), width=0.40, stagger=0.12, toe=18.0, drop=0.05)
+    hit = bump(t, KICK, 0.02, 1.0) * accent(t)
+    p.hips_t[1] -= 0.03 * hit
+    p.hips_r = [0.0, -8.0, 0.0]
+    p.spine = [-2.0 + 9.0 * hit, 5.0, -2.0]
+    p.neck = [5.0 * hit, 0.0, 0.0]
+    p.head = [-5.0 + 11.0 * hit, 6.0, 0.0]
+    p.arm["l"] = {"at": [0.14, 0.34 - 0.06 * hit, 0.06 + 0.05 * hit], "pole": [1.0, -0.4, -0.3]}
+    p.arm["r"] = {"at": [0.12, -0.28 + 0.03 * hit, 0.14], "pole": [0.8, 0.0, -0.8]}
+    p.antenna = -7.0 * hit + 3.0
     return p
 
 
@@ -741,20 +773,23 @@ def nd_film(t):
     return p
 
 
-@clip("ND_Cheer", 4, about="a cheer: both fists thrown up and shaken, hopping", use="audience, a crash")
+@clip("ND_Cheer", 4, about="a cheer: both fists up, punching the air in turn, rising on its toes between kicks", use="audience, a crash")
 def nd_cheer(t):
+    # it14 (msgs 195, 202): it12 shook the fists, the shoulders and the head at 5.7 Hz and hopped 9 cm on every kick
+    # (a jitter at 30 fps); now the fists go up in turn over two kicks and the body rises 4 cm between kicks
     p = stand(new(t, 4), width=0.34, toe=16.0)
-    u = (t / KICK) % 1.0
-    hop = max(0.0, math.sin(math.pi * u))
-    sh = wave(t, KICK / 4)
-    p.hips_t[1] += 0.09 * hop - 0.03
-    p.spine = [-9.0, 4.0 * sh, 0.0]
-    p.head = [-14.0, 0.0, 3.0 * sh]
+    up = bump(t, KICK, 0.5, 1.0)                  # highest between kicks, down on the kick
+    sw = wave(t, 2 * KICK, 0.25)                  # full to one side on each kick
+    p.hips_t[1] += 0.04 * up - 0.03
+    p.hips_t[0] = 0.02 * sw
+    p.spine = [-8.0, 0.0, 3.0 * sw]
+    p.head = [-12.0, 0.0, 2.0 * sw]
     for s in "lr":
-        p.leg[s]["at"][1] = 0.05 * hop
-        p.leg[s]["pitch"] = 12.0 * hop
-        p.arm[s] = {"at": [0.21 + 0.02 * sh, 0.36 + 0.03 * hop, 0.0], "pole": [1.0, -0.4, -0.2]}
-    p.antenna = -8.0 * hop
+        sg = 1 if s == "l" else -1
+        k = 0.5 + 0.5 * sg * sw                   # this fist highest when the body leans its way
+        p.leg[s]["pitch"] = 10.0 * up
+        p.arm[s] = {"at": [0.20, 0.28 + 0.10 * k, 0.02], "pole": [1.0, -0.4, -0.2]}
+    p.antenna = -5.0 * up
     return p
 
 
@@ -944,7 +979,7 @@ def nd_fish(t):
 MIRRORED_STOCK = ["Idle", "Idle_turn", "Fight_idle", "Crazy", "Button_push", "Take_from_table", "Take_from_floor"]
 # authored clips that are one-sided: a mirrored copy each ("_m")
 MIRRORED_ND = ["ND_Fist_pump", "ND_Point", "ND_Nod", "ND_Stand", "ND_Talk_a", "ND_Talk_b", "ND_Watch", "ND_Look_up", "ND_Hello",
-               "ND_Lean", "ND_Fish", "ND_Squat"]
+               "ND_Lean", "ND_Fish", "ND_Squat", "ND_Rock"]
 
 
 def continuous(Rk):

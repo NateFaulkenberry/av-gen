@@ -42,7 +42,7 @@ import random
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ART = os.path.join(HERE, "..", "art")
+ART = os.environ.get("ND_ART", os.path.join(HERE, "..", "art"))   # ND_ART: a scratch copy (stills before a commit)
 AUDIO = os.path.join(HERE, "..", "audio")
 BEAT = 60.0 / 171.4
 KICK = 2 * BEAT
@@ -50,7 +50,7 @@ SEED = 170
 
 # silhouette classes: two neighbours of one class read alike even on different clips
 SIL = {"ND_Arms_up": "up", "ND_Wave": "up", "ND_Cheer": "up", "ND_Jump": "up", "ND_Stretch": "up", "ND_Hello": "oneup",
-       "ND_Fist_pump": "oneup", "ND_Look_up": "oneup", "ND_Clap": "front", "ND_Clap_b": "front", "ND_Film": "front",
+       "ND_Fist_pump": "oneup", "ND_Look_up": "oneup", "ND_Rock": "oneup", "ND_Clap": "front", "ND_Clap_b": "front", "ND_Film": "front",
        "ND_Point": "front", "ND_Fish": "front", "ND_Groove": "front", "ND_Talk_a": "front", "ND_Nod": "fold",
        "ND_Watch": "fold", "ND_Stand": "low", "ND_Sway": "low", "ND_Twist": "low", "ND_Talk_b": "hip", "ND_Hips": "hip",
        "Idle": "stride", "Idle_turn": "stride", "Fight_idle": "crouch", "Crazy": "crouch", "ND_Headbang": "crouch",
@@ -58,11 +58,12 @@ SIL = {"ND_Arms_up": "up", "ND_Wave": "up", "ND_Cheer": "up", "ND_Jump": "up", "
        "Take_from_table": "stride"}
 # the clips that carry the beat (rate on the grid); the others run free
 ON_GRID = {"ND_Clap", "ND_Clap_b", "ND_Arms_up", "ND_Fist_pump", "ND_Wave", "ND_Sway", "ND_Nod", "ND_Jump", "ND_Groove",
-           "ND_Twist", "ND_Headbang", "ND_Point", "ND_Cheer", "Fight_idle", "Crazy", "Jumping", "Fight_Jab"}
+           "ND_Twist", "ND_Headbang", "ND_Point", "ND_Cheer", "Fight_idle", "Crazy", "Jumping", "Fight_Jab", "ND_Rock"}
 # where the -nd cast files are missing: the nearest thing the pack has
-STOCK = {"ND_Clap": "Fight_idle", "ND_Clap_b": "Fight_idle", "ND_Arms_up": "Crazy", "ND_Fist_pump": "Fight_Jab",
+STOCK = {"ND_Clap": "Fight_idle", "ND_Clap_b": "Fight_idle", "ND_Arms_up": "Fight_idle", "ND_Fist_pump": "Fight_Jab",
          "ND_Wave": "Idle_turn", "ND_Sway": "Fight_idle", "ND_Nod": "Idle", "ND_Jump": "Jumping", "ND_Groove": "Fight_idle",
-         "ND_Twist": "Crazy", "ND_Headbang": "Crazy", "ND_Point": "Button_push", "ND_Film": "Take_from_table",
+         "ND_Twist": "Fight_idle", "ND_Headbang": "Fight_idle", "ND_Rock": "Fight_idle", "Crazy": "Fight_idle",
+         "Crazy_m": "Fight_idle_m", "ND_Point": "Button_push", "ND_Film": "Take_from_table",
          "ND_Cheer": "Jumping", "ND_Stand": "Idle", "ND_Talk_a": "Idle_turn", "ND_Talk_b": "Idle", "ND_Watch": "Idle",
          "ND_Hips": "Idle_turn", "ND_Look_up": "Idle_turn", "ND_Stretch": "Idle_turn", "ND_Hello": "Button_push",
          "ND_Lean": "Idle", "ND_Sit": "Idle", "ND_Squat": "Take_from_floor", "ND_Fish": "Take_from_table"}
@@ -116,6 +117,10 @@ TURN = {"watch_band": 12, "dance": 14, "gather": 6, "look_sea": 9, "fish": 5, "t
         "wait": 13, "stand": 13, "sit_edge": 10, "keep": 10, "look_lantern": 6, "look_moon": 6, "look_mast": 6, "look_sign": 6,
         "ride": 8}
 PAUSES = {"ND_Stand": 3, "ND_Hips": 2, "ND_Look_up": 1.2, "ND_Stretch": 0.8, "ND_Watch": 1.5, "Idle": 1.5, "Idle_turn": 1.5}
+# it14 (msg 202, "a light variety top-up where a patch looks uniform"): figure -> clip family, chosen on the plan
+# (band_029 and band_012 took ND_Rock from Fight_idle beside two headbangers each, right before the lens: seven of the
+# crowd's ten headbangers stood in one stretch of the front rows; band_076's four nearest all stood and watched)
+TOPUP_14 = {"band_029": "ND_Clap", "band_012": "ND_Sway", "band_076": "ND_Sway"}
 
 
 def family(c):
@@ -516,10 +521,107 @@ def main():
         if p.get("stops"):
             p["stop_clip"] = rng.choice(["ND_Point", "ND_Hips", "Take_from_table", "ND_Watch", "Button_push"])
 
+    # ================================================================== it14 (owner msgs 195, 200, 202)
+    # msg 195 marked band_026 at 44.1 s ("going a little too hard"), msg 202: "the crowd has pretty good reactions
+    # already ... excessive twitchiness in the headbanging". band_026 looped the pack's Crazy, which is not a loop (its
+    # last pose is 45 deg at the head and half a metre from its first: a snap every 2.46 s) and whips the head 16 deg a
+    # frame. Everything above is the it12 cast draw for draw; this pass only (a) takes Crazy out of the band's loops
+    # and crash answers, Fight_idle (a boxer's guard) and Idle_turn (a head whip) out of its loops, (b) softens the
+    # crash's blends, (c) tops up the few uniform patches, (d) opens the gaps the crowd's flyers land in (msg 200).
+    rng = random.Random(SEED + 14)
+    band = [sp for sp in pop["spots"] if sp.get("district") == "band"]
+    entry = {id(q[0]): i for i, q in enumerate(placed)}
+    log14 = {"loops": collections.Counter(), "answers": collections.Counter(), "topup": [], "gaps": {}}
+
+    def reloop(sp, fam):
+        old = family(sp["nd_clip"])
+        off = KICK / 2 if sp.get("nd_grid") == "off" else 0.0
+        i = entry.get(id(sp["pos"]))
+        if i is not None:   # its own old entry must not count as a neighbour
+            placed[i] = (placed[i][0], None, False, 0.0, placed[i][4])
+        mir = apply(sp, fam, R_BAND, off, rng.randrange(4))
+        if i is not None:
+            placed[i] = (sp["pos"], fam, mir, sp["nd_phase"] / LEN[sp["nd_clip"]], placed[i][4])
+        sp["look_weight"] = 0.0 if fam in ("ND_Headbang", "ND_Rock", "ND_Twist") else (0.5 if fam in ("ND_Watch", "ND_Point") else 1.0)
+        for q in sp.get("nd_cues", [])[1:]:   # the way back from the crash's answer is to the new loop
+            if family(q["clip"]) == old:
+                q.update({"clip": sp["nd_clip"], "rate": sp["nd_rate"], "offset": offset_at(sp, q["t"]), "stock": sp["anim_clip"]})
+        log14["loops"]["%s -> %s" % (old, fam)] += 1
+
+    def fams_near(sp, radius=R_BAND):
+        return {f2 for _, f2, _, _, _ in near(sp["pos"], radius) if f2}
+
+    for sp in sorted(band, key=lambda s: s["id"]):
+        fam = family(sp["nd_clip"])
+        if fam == "Crazy":
+            reloop(sp, "ND_Headbang" if "ND_Headbang" not in fams_near(sp) else "ND_Rock")
+        elif fam == "Fight_idle":
+            reloop(sp, "ND_Rock" if "ND_Rock" not in fams_near(sp) else "ND_Headbang")
+        elif fam == "Idle_turn":
+            reloop(sp, "ND_Watch")
+    # (c) a light top-up (msg 202): figures picked by eye on the plan (work/art/it14/plan_types.py), where three or
+    # four neighbours in a row did the same kind of thing
+    for sid, fam in TOPUP_14.items():
+        sp = next((x for x in band if x["id"] == sid), None)
+        if sp is not None and family(sp["nd_clip"]) != fam:
+            log14["topup"].append("%s %s -> %s" % (sid, sp["nd_clip"], fam))
+            reloop(sp, fam)
+    # (b) the crash: nobody answers with Crazy; the answers come in over 0.28 s (was 0.14) and go back over 0.45 s
+    answer = {sp["id"]: family(sp["nd_cues"][0]["clip"]) for sp in band if sp.get("nd_cues")}
+    for sp in sorted(band, key=lambda s: s["id"]):
+        cues = sp.get("nd_cues") or []
+        if not cues:
+            continue
+        if family(cues[0]["clip"]) == "Crazy":
+            own = family(sp["nd_clip"])
+            close = [answer.get(o["id"]) for o in band if o is not sp and abs(o["pos"][1] - sp["pos"][1]) < 1.6
+                     and math.hypot(o["pos"][0] - sp["pos"][0], o["pos"][2] - sp["pos"][2]) < R_BAND]
+            opts = [f for f in ("ND_Cheer", "ND_Arms_up", "ND_Rock", "ND_Fist_pump", "ND_Clap_b") if f != own]
+            fam = min(opts, key=lambda f: (close.count(f), rng.random()))
+            clip = fam + ("_m" if has_mirror(fam) and rng.random() < 0.5 else "")
+            cues[0].update({"clip": clip, "rate": 1.0, "offset": 0.0, "stock": stock_of(clip)})
+            answer[sp["id"]] = fam
+            log14["answers"]["Crazy -> %s" % fam] += 1
+        cues[0]["blend"] = 0.28
+        for q in cues[1:]:
+            q["blend"] = 0.45
+    # (d) msg 200: a flyer that lands in the crowd needs room. Figures inside `gap_m` of its landing step back to the
+    # gap's edge (pos0 keeps the place they had), then anyone they now crowd makes room in turn.
+    for fl in pop.get("flyers", []):
+        gap = fl.get("landing", {}).get("gap_m")
+        if not gap:
+            continue
+        L = fl["landing"]["pos"]
+        moved = []
+        for sp in band:
+            d = math.hypot(sp["pos"][0] - L[0], sp["pos"][2] - L[2])
+            if abs(sp["pos"][1] - L[1]) < 0.3 and d < gap:
+                ux, uz = ((sp["pos"][0] - L[0]) / d, (sp["pos"][2] - L[2]) / d) if d > 1e-3 else (-front[0], -front[2])
+                sp.setdefault("pos0", list(sp["pos"]))
+                sp["pos"] = [round(L[0] + ux * gap, 3), sp["pos"][1], round(L[2] + uz * gap, 3)]
+                moved.append(sp)
+        for _ in range(6):
+            again = False
+            for sp in list(moved):
+                for o in band:
+                    if o is sp or abs(o["pos"][1] - sp["pos"][1]) > 0.3:
+                        continue
+                    d = math.hypot(o["pos"][0] - sp["pos"][0], o["pos"][2] - sp["pos"][2])
+                    if d < 0.8 and math.hypot(o["pos"][0] - L[0], o["pos"][2] - L[2]) < gap + 2.0:
+                        ux, uz = ((o["pos"][0] - sp["pos"][0]) / d, (o["pos"][2] - sp["pos"][2]) / d) if d > 1e-3 else (0.0, 1.0)
+                        o.setdefault("pos0", list(o["pos"]))
+                        o["pos"] = [round(sp["pos"][0] + ux * 0.85, 3), o["pos"][1], round(sp["pos"][2] + uz * 0.85, 3)]
+                        if o not in moved:
+                            moved.append(o)
+                        again = True
+            if not again:
+                break
+        log14["gaps"][fl["id"]] = [sp["id"] for sp in moved]
+
     # ---- the record
     spots = pop["spots"]
     fam_count = collections.Counter(family(sp["nd_clip"]) for sp in spots)
-    edits = [e for e in pop.get("edits", []) if e.get("script") != "blender/nd_variety.py"]
+    edits = [e for e in pop.get("edits", []) if e.get("script") != "blender/nd_variety.py"]   # (the it12 and it14 records)
     edits.append({"it": 12, "msg": 170, "by": "art", "script": "blender/nd_variety.py",
                   "what": "every spot and rider: nd_clip / nd_rate / nd_phase / nd_grid / nd_cues (+ anim_clip / anim_rate / anim_phase for the pack's own files), "
                           "look_weight, sway, scale, facing (facing0_deg keeps the original); rail leaners moved to their "
@@ -527,6 +629,12 @@ def main():
                   "families": dict(fam_count.most_common()), "talk_pairs_band": len(pairs), "children_band": len(kids),
                   "rail_leaners": sum(1 for sp in spots if sp.get("rail")), "waves_at_lens": n_wave,
                   "crash_reactors_band": sum(1 for sp in band if sp.get("nd_cues"))})
+    edits.append({"it": 14, "msg": [195, 200, 202], "by": "art", "script": "blender/nd_variety.py",
+                  "what": "the band's audience: the pack's Crazy (not a loop; msg 195's marked figure band_026) out of the loops "
+                          "and the crash answers, Fight_idle and Idle_turn out of the loops; the crash's blends 0.28 s in / "
+                          "0.45 s back; a light top-up; room made where a flyer lands in the crowd (pos0 keeps the old place)",
+                  "loops": dict(log14["loops"]), "answers": dict(log14["answers"]), "topup": log14["topup"],
+                  "gaps": log14["gaps"]})
     pop["edits"] = edits
     if "--dry" not in sys.argv:
         json.dump(pop, open(pop_path, "w"), indent=None, separators=(",", ":"))
@@ -551,9 +659,8 @@ def report(pop, LEN=None):
         print("%s: %d figures, %d clip families; neighbours within %.1f m: %d pairs, %d on one family, %d of those on one clip "
               "within a tenth of its loop" % (name, len(sel), len(fam), radius, pairs, same, samephase))
         print("   ", ", ".join("%s %d" % kv for kv in fam.most_common()))
-    e = [x for x in pop.get("edits", []) if x.get("script") == "blender/nd_variety.py"]
-    if e:
-        print("   ", {k: v for k, v in e[-1].items() if k not in ("what", "families", "script", "by")})
+    for e in [x for x in pop.get("edits", []) if x.get("script") == "blender/nd_variety.py"]:
+        print("   ", {k: v for k, v in e.items() if k not in ("what", "families", "script", "by")})
 
 
 if __name__ == "__main__":

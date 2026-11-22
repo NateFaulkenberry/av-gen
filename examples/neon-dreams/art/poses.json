@@ -76,7 +76,7 @@
   "ND_Jump": {
    "seconds": 2.8005,
    "kicks": 4,
-   "about": "pogo: off the ground between kicks with its arms thrown up, landing on each one",
+   "about": "a bounce: a small hop between kicks, landing on each one, its arms up and loose",
    "use": "audience"
   },
   "ND_Groove": {
@@ -94,7 +94,13 @@
   "ND_Headbang": {
    "seconds": 2.8005,
    "kicks": 4,
-   "about": "a wide stance, fists low, the whole upper body thrown down on every kick",
+   "about": "a wide stance, fists low, bowing from the waist on every kick: a full bow, then a lighter one; smooth",
+   "use": "audience"
+  },
+  "ND_Rock": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "rocks out: one fist held high and pulsing on the kick, the head nodding with it, the other fist low",
    "use": "audience"
   },
   "ND_Point": {
@@ -112,7 +118,7 @@
   "ND_Cheer": {
    "seconds": 2.8005,
    "kicks": 4,
-   "about": "a cheer: both fists thrown up and shaken, hopping",
+   "about": "a cheer: both fists up, punching the air in turn, rising on its toes between kicks",
    "use": "audience, a crash"
   },
   "ND_Stand": {
@@ -258,6 +264,12 @@
    "kicks": 16,
    "about": "squatting on its heels, forearms on its knees, poking at something on the ground now and then (mirrored: the other hand, the other foot)",
    "use": "gardeners, fishers, kids at the front"
+  },
+  "ND_Rock_m": {
+   "seconds": 2.8005,
+   "kicks": 4,
+   "about": "rocks out: one fist held high and pulsing on the kick, the head nodding with it, the other fist low (mirrored: the other hand, the other foot)",
+   "use": "audience"
   }
  },
  "mirrored_stock": {
