@@ -12,6 +12,7 @@
       both with one transform): the crowd behind the band, raised so the lens sees it over the band.
   stage/spot_base: a floor fixture's plinth and yoke (pivot 0.95 m up). stage/spot_head: its lamp, a ribbed can with a
       lens (`beam_lamp`) looking along +z in the GLB; origin at the pivot, so an instance's rotation aims it.
+  stage/speaker_stack: (it12, owner msg 161) a Lanternwright speaker stack for each side of the band; see its doc.
   stage/pylon_leg_ext: the gondola pylon's mast continued 55 m down (it stopped 12 m under the deck, in the air: owner
       msg 149, the 1.05 s frame). Place at a pylon's position, 12 m lower, same yaw.
 
@@ -192,8 +193,76 @@ def pylon_leg_ext():
     return A
 
 
+def _ring_front(mb, cx, y, cz, r0, r1, n=20, uv=None):
+    """An annulus facing -Y (the front) at depth y, centre (cx, cz): r0 inner, r1 outer."""
+    for i in range(n):
+        a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+        pts = [(cx + r0 * math.cos(a0), y, cz + r0 * math.sin(a0)), (cx + r1 * math.cos(a0), y, cz + r1 * math.sin(a0)),
+               (cx + r1 * math.cos(a1), y, cz + r1 * math.sin(a1)), (cx + r0 * math.cos(a1), y, cz + r0 * math.sin(a1))]
+        mb._add(pts, [(0, 1, 2, 3)], None, [uv] * 4 if uv else None)
+
+
+def _disc_front(mb, cx, y, cz, r, n=20, depth=0.0):
+    """A cone: a shallow funnel facing -Y, its apex pushed back by depth."""
+    for i in range(n):
+        a0, a1 = 2 * math.pi * i / n, 2 * math.pi * (i + 1) / n
+        mb._add([(cx + r * math.cos(a0), y, cz + r * math.sin(a0)), (cx, y + depth, cz),
+                 (cx + r * math.cos(a1), y, cz + r * math.sin(a1))], [(0, 1, 2)])
+
+
+def speaker_stack():
+    """it12 (owner msg 161): a speaker stack in the Lanternwright way -- cabinets stacked and shifted like the Stacks,
+    each driver ringed with a light line (strip: the kick swells it), lantern bulbs on the cabinet corners, a slim
+    rigging frame behind with a lamp bar and a red beacon. Front = -Y in Blender (+z in the GLB); base on the deck.
+    The meta gives the pulse emitter's centre (the stack's middle driver) for the engine's kick distortion."""
+    A = Asset("speaker_stack")
+    r = random.Random(161)
+    cabs = [  # (width, depth, height, x shift, yaw deg, drivers: [(dx, dz, radius)])
+        (1.5, 1.0, 0.95, 0.00, 0.0, [(-0.36, 0.47, 0.34), (0.36, 0.47, 0.34)]),
+        (1.4, 0.92, 0.85, 0.07, 3.0, [(0.0, 0.43, 0.36)]),
+        (1.36, 0.9, 0.8, -0.05, -2.5, [(-0.34, 0.4, 0.22), (0.34, 0.4, 0.22)]),
+        (1.2, 0.82, 0.5, 0.04, 2.0, []),   # the horn box
+    ]
+    z = 0.0
+    drivers = []
+    for k, (w, d, h, sx, yaw, drv) in enumerate(cabs):
+        c = (sx, 0.0, z + h / 2)
+        A.m("trim").box(c, (w, d, h), yaw=math.radians(yaw))
+        A.m("metal").box((sx, 0.0, z + h - 0.02), (w + 0.04, d + 0.04, 0.04), yaw=math.radians(yaw))   # a lip on each
+        yf = -d / 2 - 0.005
+        for dx, dz, rr in drv:   # a dark cone, a light ring round it (strip), a dust cap
+            _disc_front(A.m("metal"), sx + dx, yf - 0.004, z + dz, rr * 0.86, depth=0.12)
+            _ring_front(A.m("strip"), sx + dx, yf - 0.006, z + dz, rr * 0.86, rr, n=24)
+            A.m("trim").sphere((sx + dx, yf - 0.02, z + dz), rr * 0.18, n=8, m=4, squash=1.0)
+            drivers.append((sx + dx, yf, z + dz, rr))
+        if not drv:              # the horn: a flared mouth with a light line along its lip
+            for i in range(5):
+                hx = sx - 0.42 + i * 0.21
+                A.m("metal").box((hx, yf - 0.01, z + h / 2), (0.16, 0.04, h * 0.62))
+            A.m("strip").box((sx, yf - 0.03, z + h - 0.06), (w * 0.86, 0.03, 0.035))
+        for cx in (-w / 2 + 0.06, w / 2 - 0.06):   # lantern bulbs at the front corners
+            lamp(A.m("lantern"), (sx + cx, yf - 0.05, z + h - 0.08), 0.05, 0.85, hh01(k, cx, 3.0), n=6, m=4)
+        z += h
+    top = z
+    # the rigging: two posts behind the stack up past it, a cross bar with a row of lamps, a beacon
+    for px in (-0.62, 0.62):
+        A.m("metal").cyl((px, 0.62, 0.0), 0.05, top + 1.1, n=6)
+        for zz in (0.9, 1.8, 2.7):
+            A.m("metal").beam((px, 0.62, zz), (px * 0.2, 0.5, zz), 0.03)   # ties back to the cabinets
+    A.m("metal").beam((-0.7, 0.62, top + 1.05), (0.7, 0.62, top + 1.05), 0.07)
+    for i in range(5):
+        lamp(A.m("lantern"), (-0.5 + i * 0.25, 0.55, top + 0.93), 0.06, 0.9, hh01(i, 9.0), n=6, m=4, squash=1.3)
+    lamp(A.m("beacon"), (0.0, 0.62, top + 1.2), 0.08, 1.0, 0.5, n=6, m=4)
+    mid = drivers[2]   # the middle cabinet's big driver
+    A.meta = dict(front="+z in the GLB (Blender -Y)", height_m=round(top + 1.25, 2), cabinets=len(cabs),
+                  pulse_centre_local=[round(mid[0], 3), round(mid[2], 3), round(-mid[1], 3)],
+                  drivers_local=[[round(x, 3), round(zz, 3), round(-y, 3), rr] for x, y, zz, rr in drivers])
+    A.finish()
+    return A
+
+
 def stage_kit():
-    return [band_stage(), band_terrace(), spot_base(), spot_head()]
+    return [band_stage(), band_terrace(), spot_base(), spot_head(), speaker_stack()]
 
 
 def street_ext():

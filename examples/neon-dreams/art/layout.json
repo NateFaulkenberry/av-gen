@@ -49333,6 +49333,158 @@
    }
   },
   {
+   "id": "band_drumhead0",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    141.524,
+    130.05,
+    33.923
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.277045,
+    0.424679,
+    -0.138296,
+    0.850746
+   ],
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "moon_disc"
+   }
+  },
+  {
+   "id": "band_drumhead1",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    139.951,
+    130.05,
+    38.246
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.224718,
+    0.654174,
+    -0.213034,
+    0.690054
+   ],
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "moon_disc"
+   }
+  },
+  {
+   "id": "band_drumhead2",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    151.832,
+    127.8,
+    35.281
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.263254,
+    -0.402521,
+    0.122051,
+    0.868204
+   ],
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_b"
+   }
+  },
+  {
+   "id": "band_drumhead3",
+   "asset": "stage/spot_head.glb",
+   "pos": [
+    148.719,
+    127.8,
+    43.832
+   ],
+   "rot_y_deg": 0.0,
+   "quat": [
+    0.024659,
+    -0.953509,
+    0.289136,
+    0.08132
+   ],
+   "scale": [
+    0.8,
+    0.8,
+    0.8
+   ],
+   "zone": "band",
+   "tint": {
+    "beam_lamp": "sign_a"
+   }
+  },
+  {
+   "id": "band_speaker_l",
+   "asset": "stage/speaker_stack.glb",
+   "pos": [
+    147.894,
+    122.6,
+    34.113
+   ],
+   "rot_y_deg": -100.0,
+   "quat": [
+    0.0,
+    -0.766044,
+    0.0,
+    0.642788
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band",
+   "tint": {
+    "strip": "sign_a",
+    "lantern": "amber"
+   }
+  },
+  {
+   "id": "band_speaker_r",
+   "asset": "stage/speaker_stack.glb",
+   "pos": [
+    144.952,
+    122.6,
+    42.195
+   ],
+   "rot_y_deg": -120.0,
+   "quat": [
+    0.0,
+    -0.866025,
+    0.0,
+    0.5
+   ],
+   "scale": [
+    1,
+    1,
+    1
+   ],
+   "zone": "band",
+   "tint": {
+    "strip": "sign_a",
+    "lantern": "amber"
+   }
+  },
+  {
    "id": "it12_leg_gondola_pylon_461",
    "asset": "stage/pylon_leg_ext.glb",
    "pos": [
@@ -52784,6 +52936,18 @@
    "bob": "isle_exit"
   },
   {
+   "name": "band_drum_fill",
+   "pos": [
+    146.461,
+    125.1,
+    38.487
+   ],
+   "key": "moon_disc",
+   "radius_m": 5.5,
+   "intensity": 1.6,
+   "zone": "band"
+  },
+  {
    "name": "band_halo0",
    "pos": [
     141.114,
@@ -53767,6 +53931,106 @@
     "range_m": 30.0,
     "volumetric": 0.6,
     "fixture": "spot_base + spot_head at [152.193, 122.55, 43.675]"
+   },
+   {
+    "name": "band_drumkey0",
+    "pos": [
+     141.815,
+     129.785,
+     34.142
+    ],
+    "direction": [
+     0.646,
+     -0.589,
+     0.486
+    ],
+    "aim": [
+     147.832,
+     124.3,
+     38.667
+    ],
+    "outer_deg": 13.0,
+    "inner_deg": 7.0,
+    "key": "moon_disc",
+    "intensity_cd": 1300.0,
+    "range_m": 22.0,
+    "volumetric": 0.5,
+    "fixture": "spot_head at [141.524, 130.05, 33.923] (key light on the drummer, msg 161)"
+   },
+   {
+    "name": "band_drumkey1",
+    "pos": [
+     140.314,
+     129.785,
+     38.265
+    ],
+    "direction": [
+     0.807,
+     -0.589,
+     0.043
+    ],
+    "aim": [
+     147.832,
+     124.3,
+     38.667
+    ],
+    "outer_deg": 13.0,
+    "inner_deg": 7.0,
+    "key": "moon_disc",
+    "intensity_cd": 1300.0,
+    "range_m": 22.0,
+    "volumetric": 0.5,
+    "fixture": "spot_head at [139.951, 130.05, 38.246] (key light on the drummer, msg 161)"
+   },
+   {
+    "name": "band_drumrim2",
+    "pos": [
+     151.546,
+     127.55,
+     35.522
+    ],
+    "direction": [
+     -0.635,
+     -0.555,
+     0.537
+    ],
+    "aim": [
+     147.832,
+     124.3,
+     38.667
+    ],
+    "outer_deg": 16.0,
+    "inner_deg": 7.0,
+    "key": "sign_b",
+    "intensity_cd": 900.0,
+    "range_m": 22.0,
+    "volumetric": 0.5,
+    "fixture": "spot_head at [151.832, 127.8, 35.281] (rim light on the drummer, msg 161)"
+   },
+   {
+    "name": "band_drumrim3",
+    "pos": [
+     148.656,
+     127.55,
+     43.463
+    ],
+    "direction": [
+     -0.141,
+     -0.555,
+     -0.82
+    ],
+    "aim": [
+     147.832,
+     124.3,
+     38.667
+    ],
+    "outer_deg": 16.0,
+    "inner_deg": 7.0,
+    "key": "sign_a",
+    "intensity_cd": 900.0,
+    "range_m": 22.0,
+    "volumetric": 0.5,
+    "fixture": "spot_head at [148.719, 127.8, 43.832] (rim light on the drummer, msg 161)"
    }
   ],
   "sky_beams": [
@@ -53853,6 +54117,52 @@
     "intensity": 1.0,
     "count": 1,
     "rpm": 0.0
+   }
+  ],
+  "speakers": [
+   {
+    "name": "band_speaker_l",
+    "asset": "stage/speaker_stack.glb",
+    "pos": [
+     147.894,
+     122.6,
+     34.113
+    ],
+    "yaw_deg": -100.0,
+    "front_dir": [
+     -0.985,
+     0.0,
+     -0.174
+    ],
+    "pulse_centre": [
+     147.423,
+     123.98,
+     34.101
+    ],
+    "height_m": 4.35,
+    "pulse": "kick (msg 161): a ripple of screen-space distortion leaving pulse_centre along front_dir (a widening ring ~30 deg either side, ~14 m reach, 20 ms in / 280 ms out), its driver rings (strip) +80 % on the same envelope"
+   },
+   {
+    "name": "band_speaker_r",
+    "asset": "stage/speaker_stack.glb",
+    "pos": [
+     144.952,
+     122.6,
+     42.195
+    ],
+    "yaw_deg": -120.0,
+    "front_dir": [
+     -0.866,
+     0.0,
+     -0.5
+    ],
+    "pulse_centre": [
+     144.514,
+     123.98,
+     42.023
+    ],
+    "height_m": 4.35,
+    "pulse": "kick (msg 161): a ripple of screen-space distortion leaving pulse_centre along front_dir (a widening ring ~30 deg either side, ~14 m reach, 20 ms in / 280 ms out), its driver rings (strip) +80 % on the same envelope"
    }
   ],
   "audio": {

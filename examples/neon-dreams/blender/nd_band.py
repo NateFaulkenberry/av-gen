@@ -31,6 +31,9 @@ YAW = -110.0                      # the stage's front (+z of the GLB) faces the 
 DECK_TOP = C[1] + 1.0
 MAST_R, MAST_A, HALO_Z, SPOT_Z = 6.75, (-45.0, -135.0, 45.0, 135.0), 8.8, 9.6
 TERR = dict(r0=11.5, depth=1.33, rise=0.45, tiers=3, a0=20.0, a1=160.0)
+SPEAKERS = [("band_speaker_l", -4.3, 0.45, 10.0), ("band_speaker_r", 4.3, 0.45, -10.0)]   # msg 161: (name, x, y, toe-in yaw) on the deck
+# the speaker's middle driver in its own GLB frame (meshes/kit_manifest.json speaker_stack.pulse_centre_local)
+SPEAKER_PULSE = (0.07, 1.38, 0.465)
 FIX_R, FIX_PHI = 8.4, (-112.5, -67.5, -157.5, -22.5, 157.5, 22.5, 112.5, 67.5)
 
 
@@ -135,6 +138,37 @@ def band_block():
                     "direction": R3(d), "length_m": 170.0, "half_angle_deg": 2.2, "key": ("sign_a", "sign_b")[i % 2],
                     "intensity": 1.0, "count": 1, "rpm": 0.0})
         heads.append((None, piv, d, a, ("sign_a", "sign_b")[i % 2]))
+    # msg 161: the drummer read dark beside the pianist (he sits behind his kit, the floor spots light the kit's shells):
+    # two key spots hung under the halo's front, a rim spot on each back mast, all on the drummer
+    drum = mus[0]
+    dhead = [drum["chest"][0], drum["chest"][1] + 0.35, drum["chest"][2]]
+    drum_spots, drum_heads = [], []
+    for k, (bx, by, bz, key, cd, nm) in enumerate([(-2.3, -5.6, 8.45, "moon_disc", 1300.0, "key"),
+                                                   (2.3, -5.6, 8.45, "moon_disc", 1300.0, "key"),
+                                                   (-4.55, 4.55, 6.2, "sign_b", 900.0, "rim"),
+                                                   (4.55, 4.55, 6.2, "sign_a", 900.0, "rim")]):
+        piv = b2e(bx, by, bz)
+        d = norm([dhead[i] - piv[i] for i in range(3)])
+        lens = [piv[i] + d[i] * 0.45 for i in range(3)]
+        drum_spots.append({"name": "band_drum%s%d" % (nm, k), "pos": R3(lens), "direction": R3(d), "aim": R3(dhead),
+                           "outer_deg": 13.0 if nm == "key" else 16.0, "inner_deg": 7.0, "key": key, "intensity_cd": cd,
+                           "range_m": 22.0, "volumetric": 0.5,
+                           "fixture": "spot_head at %s (%s light on the drummer, msg 161)" % (R3(piv), nm)})
+        drum_heads.append((piv, d, key))
+    spots += drum_spots
+    speakers = []
+    for nm, x, y, toe in SPEAKERS:
+        p = b2e(x, y, 1.0)
+        yaw = YAW + toe
+        t = math.radians(yaw)
+        f = [math.sin(t), 0.0, math.cos(t)]
+        px, py, pz = SPEAKER_PULSE
+        c = [p[0] + px * math.cos(t) + pz * math.sin(t), p[1] + py, p[2] - px * math.sin(t) + pz * math.cos(t)]
+        speakers.append({"name": nm, "asset": "stage/speaker_stack.glb", "pos": R3(p), "yaw_deg": round(yaw, 2),
+                         "front_dir": R3(f), "pulse_centre": R3(c), "height_m": 4.35,
+                         "pulse": "kick (msg 161): a ripple of screen-space distortion leaving pulse_centre along front_dir "
+                                  "(a widening ring ~30 deg either side, ~14 m reach, 20 ms in / 280 ms out), its driver "
+                                  "rings (strip) +80 % on the same envelope"})
     blk = {
         "msg": 149,
         "note": "it12 (owner msg 149): the band on a round stage where the garden's pool was. The stage, terrace and "
@@ -148,6 +182,7 @@ def band_block():
         "musicians": mus,
         "spots": spots,
         "sky_beams": sky,
+        "speakers": speakers,
         "audio": {
             "drums": "the drummer's clip on the song's beat (171.4 BPM); the Drums clip is 4.7 s",
             "keys": "the pianist on the Moog/pad phrases",
@@ -157,7 +192,7 @@ def band_block():
             "stage_ring": "the inlaid ring (strip) on the bass; the footlights on the toms",
             "held_breath": "45.5-47.15 s: the floor spots dim to 30 %, the sky beams hold still; all back on the 47.15 s crash"},
     }
-    return blk, heads
+    return blk, heads, drum_heads
 
 
 # ------------------------------------------------------------------------------------------------ the plaza cleared
@@ -725,7 +760,7 @@ def main():
     for g in pop["groups"]:
         g["members"] = [m for m in g["members"] if m not in gone_ids]
 
-    blk, heads = band_block()
+    blk, heads, drum_heads = band_block()
     q = quat_yaw(YAW)
     lay["instances"].append({"id": "band_stage", "asset": "stage/band_stage.glb", "pos": R3(C), "rot_y_deg": YAW, "quat": q,
                              "scale": [1, 1, 1], "zone": "band", "tint": {"strip": "sign_a", "lantern": "amber"}})
@@ -739,6 +774,16 @@ def main():
         lay["instances"].append({"id": "band_spothead%d" % k, "asset": "stage/spot_head.glb", "pos": R3(piv),
                                  "rot_y_deg": 0.0, "quat": quat_aim(d), "scale": [1.0, 1.0, 1.0] if base is not None else [1.7, 1.7, 1.7],
                                  "zone": "band", "tint": {"beam_lamp": key}})
+    for k, (piv, d, key) in enumerate(drum_heads):          # msg 161: the drummer's key and rim spots
+        lay["instances"].append({"id": "band_drumhead%d" % k, "asset": "stage/spot_head.glb", "pos": R3(piv), "rot_y_deg": 0.0,
+                                 "quat": quat_aim(d), "scale": [0.8, 0.8, 0.8], "zone": "band", "tint": {"beam_lamp": key}})
+    for sp in blk["speakers"]:                               # msg 161: the speaker stacks either side of the band
+        lay["instances"].append({"id": sp["name"], "asset": sp["asset"], "pos": sp["pos"], "rot_y_deg": sp["yaw_deg"],
+                                 "quat": quat_yaw(sp["yaw_deg"]), "scale": [1, 1, 1], "zone": "band",
+                                 "tint": {"strip": "sign_a", "lantern": "amber"}})
+    # a soft white fill over the kit's front, so the drummer reads before the engine's spots are in (msg 161)
+    lay["lights"].append({"name": "band_drum_fill", "pos": R3(b2e(0.3, 0.6, 3.5)), "key": "moon_disc", "radius_m": 5.5,
+                          "intensity": 1.6, "zone": "band"})
     # the halo's lanterns and the stage ring cast a little light of their own (the spot lights are the engine's)
     for k, a in enumerate((-90.0, 0.0, 90.0, 180.0)):
         lay["lights"].append({"name": "band_halo%d" % k, "pos": R3(polar(a, 5.2, HALO_Z - 1.6)), "key": "amber",
