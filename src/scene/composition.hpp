@@ -438,6 +438,10 @@ struct CompositionNode {
     std::vector<RigId> rigs;       // ADR-086: this node's rigs in the flattened scene
     std::string animationApplied;  // the state `animationAppliedAt` refers to
     double animationAppliedAt = 0.0; // the timeline second the request was made (kept across rebuilds)
+    // ADR-2129: the second the cross-fade into the request starts, when that is not `animationAppliedAt` -- a
+    // sequencer cue with an offset (ADR-823) has its phase origin before its own time, and a fade begun at the
+    // origin was already over when the cue was reached (a snap). NaN: the fade starts at `animationAppliedAt`.
+    double animationBlendFrom = std::numeric_limits<double>::quiet_NaN();
     bool animationPushed = false;  // cleared by a rebuild: push the same request at the same second
     bool animationRebase = false;  // ADR-089: force the phase origin, even re-entering the same state
     // ADR-821: the request's looping, when it said (a sequencer cue's `playback`); unset keeps the
@@ -818,9 +822,11 @@ public:
     // ADR-821: what the first rig on `nodeName` measures its clips as, computed on first request and
     // shared across every node instancing the same asset. Null for a node with no rig.
     [[nodiscard]] const ClipSemanticsTable* clipSemanticsFor(const std::string& nodeName) const;
+    // ADR-2129: `blendFrom` is the second the cross-fade starts when it is not `now` (the phase origin): a cue
+    // with an offset. Unset: `now`.
     bool setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
                           float blend = -1.0f, float speed = 1.0f, bool rebase = false,
-                          std::optional<bool> loop = std::nullopt);
+                          std::optional<bool> loop = std::nullopt, std::optional<double> blendFrom = std::nullopt);
     // What the last update() spent on posing, and how many rigs it skipped.
     [[nodiscard]] const RigStats& rigStats() const { return rigStats_; }
 

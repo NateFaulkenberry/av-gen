@@ -260,6 +260,17 @@ TEST_CASE("a cue plays once when asked, or when the clip says so, and hands the 
         CHECK(next->startSeconds == Catch::Approx(6.0));
         CHECK(next->loop == true);
     }
+    SECTION("ADR-2129: an offset cue fades in from its own second; a `then` from the one-shot's end") {
+        seq::AnimationCue c = cue("Jumping", 10.0, seq::ClipPlayback::Loop, "");
+        c.offsetSeconds = 0.8f;
+        const auto r = seq::resolveCue(c, 10.1, lookup);
+        REQUIRE(r.has_value());
+        CHECK(r->startSeconds == Catch::Approx(9.2));      // the phase origin (ADR-823)
+        CHECK(r->blendFromSeconds == Catch::Approx(10.0)); // the fade: at the cue
+        const auto next = seq::resolveCue(cue("Landing", 5.0, seq::ClipPlayback::Auto, "Jumping"), 6.5, lookup);
+        REQUIRE(next.has_value());
+        CHECK(next->blendFromSeconds == Catch::Approx(6.0));
+    }
     SECTION("control: a loop never reaches its `then`") {
         const auto c = cue("Jumping", 2.0, seq::ClipPlayback::Loop, "gait");
         CHECK_FALSE(seq::resolveCue(c, 60.0, lookup)->gait);

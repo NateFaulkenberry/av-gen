@@ -126,6 +126,7 @@ std::optional<ResolvedCue> resolveCue(const AnimationCue& cue, double seconds, c
     ResolvedCue out;
     out.clip = cue.clip;
     out.startSeconds = cue.originSeconds(); // ADR-823: the phase origin, offset included
+    out.blendFromSeconds = cue.startSeconds; // ADR-2129: the fade starts at the cue, not at its origin
     out.speed = cue.speed;
     out.blendSeconds = cue.blendSeconds;
     switch (cue.playback) {
@@ -147,6 +148,7 @@ std::optional<ResolvedCue> resolveCue(const AnimationCue& cue, double seconds, c
                 out.gait = true;
                 out.clip.clear();
                 out.startSeconds = end;
+                out.blendFromSeconds = end;
                 return out;
             }
             AnimationCue next{.node = cue.node, .clip = cue.then, .startSeconds = end};
@@ -206,7 +208,7 @@ void applyAnimation(const Sequence& sequence, std::span<const ScheduledClip> sch
         // the second walk with the first one's phase, and a scrub backwards would be worse.
         (void)composition.setNodeAnimation(cue.node, resolved->clip, resolved->startSeconds,
                                            resolved->blendSeconds, resolved->speed, /*rebase=*/true,
-                                           resolved->loop);
+                                           resolved->loop, resolved->blendFromSeconds);
     }
 }
 

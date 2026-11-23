@@ -8975,7 +8975,10 @@ void Composition::updateCharacters(const FrameTime& time) {
             // ADR-547: phase-matched when the target state asks for it and this rig has been
             // analysed. The overload falls back to frame zero on its own when either is missing,
             // so this is the only call site and there is no second code path to keep in step.
-            if (rig.player.play(node.animation.state, node.animationAppliedAt, blend, rig.phaseMatch())) {
+            // ADR-2129: the fade starts at the cue's own second, not at its phase origin
+            const double fadeFrom =
+                std::isnan(node.animationBlendFrom) ? node.animationAppliedAt : node.animationBlendFrom;
+            if (rig.player.play(node.animation.state, fadeFrom, blend, rig.phaseMatch())) {
                 if (node.animationRebase) {
                     // play() returns true without restarting a state it is already in, which is
                     // exactly right for a behaviour and exactly wrong for a timeline cue (ADR-089).
@@ -9106,7 +9109,8 @@ const ClipSemanticsTable* Composition::clipSemanticsFor(const std::string& nodeN
 }
 
 bool Composition::setNodeAnimation(const std::string& nodeName, const std::string& state, double now,
-                                   float blend, float speed, bool rebase, std::optional<bool> loop) {
+                                   float blend, float speed, bool rebase, std::optional<bool> loop,
+                                   std::optional<double> blendFrom) {
     CompositionNode* node = findNode(nodeName);
     if (node == nullptr) {
         return false;
@@ -9115,9 +9119,11 @@ bool Composition::setNodeAnimation(const std::string& nodeName, const std::strin
     // with the same rate is already in force and re-pushing it would restart the cross-fade.
     if (node->animationPushed && node->animation.state == state && node->animationApplied == state &&
         node->animationAppliedAt == now && node->animation.blend == blend &&
-        node->animation.speed == speed && node->animationRebase == rebase && node->animationLoop == loop) {
+        node->animation.speed == speed && node->animationRebase == rebase && node->animationLoop == loop &&
+        (blendFrom ? node->animationBlendFrom == *blendFrom : std::isnan(node->animationBlendFrom))) {
         return true;
     }
+    node->animationBlendFrom = blendFrom ? *blendFrom : std::numeric_limits<double>::quiet_NaN(); // ADR-2129
     node->animationLoop = loop;
     node->animation.state = state;
     node->animation.blend = blend;

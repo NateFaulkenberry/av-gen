@@ -541,6 +541,28 @@ TEST_CASE("a scene file declares an animated character end to end", "[scene][com
     CHECK(composition.scene().rigs[0].player.currentState() == "Run");
     CHECK(composition.scene().rigs[0].player.blendWeight(0.45) < 1.0f); // mid cross-fade, not a cut
 
+    // ADR-2129: a cue with an offset has its phase origin BEFORE its own second. The cross-fade starts at the cue
+    // (`blendFrom`), not at the origin -- from the origin it was over before the cue was reached: a snap.
+    REQUIRE(composition.setNodeAnimation("walk", "Idle", 0.0, 0.2f, 1.0f, /*rebase=*/true, std::nullopt, 0.6));
+    REQUIRE(composition.setNodeAnimation("run", "Walk", 0.0, 0.2f, 1.0f, /*rebase=*/true)); // control: no blendFrom
+    time.renderTime = 0.65;
+    composition.update(time);
+    const auto rigOf = [&](const char* state) -> const scene::SkinnedRig* {
+        for (const scene::SkinnedRig& rig : composition.scene().rigs) {
+            if (rig.player.currentState() == state) {
+                return &rig;
+            }
+        }
+        return nullptr;
+    };
+    const scene::SkinnedRig* offsetCue = rigOf("Idle");
+    const scene::SkinnedRig* plainCue = rigOf("Walk");
+    REQUIRE(offsetCue != nullptr);
+    REQUIRE(plainCue != nullptr);
+    CHECK(offsetCue->player.blendWeight(0.65) == Catch::Approx(0.25f).margin(1e-3)); // 0.05 s into a 0.2 s fade
+    CHECK(offsetCue->player.stateTime(0.65) == Catch::Approx(0.65f).margin(1e-3));   // the phase from the origin
+    CHECK(plainCue->player.blendWeight(0.65) == 1.0f);                                // faded from the origin: done
+
     auto* idlePosition = parameters.findAs<glm::vec3>("nodes/idle/position");
     REQUIRE(idlePosition != nullptr);
     idlePosition->setBase({100.0f, 0.0f, 0.0f});

@@ -106,6 +106,7 @@ using ClipLookup = std::function<const scene::ClipSemantics*(std::string_view cl
 struct ResolvedCue {
     std::string clip;                // the state to be in; empty when `gait`
     double startSeconds = 0.0;       // its phase origin: the cue's time less its offset, or the one-shot's end
+    double blendFromSeconds = 0.0;   // ADR-2129: where the cross-fade into it starts: the cue's time, or the end
     float speed = 1.0f;
     float blendSeconds = -1.0f;
     std::optional<bool> loop;        // unset: the state's own
