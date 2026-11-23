@@ -286,10 +286,10 @@ def drum_warp(clip, L, song=70.18):
 
 
 # it14 (msg 195): the wave through the town (ADR-2124). 160 m/s: the Quay's lens (130 m) sees it 0.8 s after it leaves
-# the stage, eight fronts in the air; a 7 m half-width band so a building takes ~0.15 s to cross it (a thump, not one
-# frame); push and flash keep full strength to 25 m and weaken as (25 / r) ^ 0.5 (0.44 at the Quay, 0.23 at 470 m).
-WAVE = {"speed": 160.0, "reach": 450.0, "half": 7.0, "haze": 1.0, "rim": 0.15, "decay": 0.5, "ref": 25.0,
-        "push": 0.9, "lift": 0.45, "flash": 0.55, "flare": 2.0, "clouds": 0.6, "key": "sign_a"}
+# the stage, eight fronts in the air; a 12 m half-width band so a building takes ~0.2 s to cross it (a thump, not one
+# frame; msg 218: 12 m, every front caught alike at 30 fps); push and flash keep full strength to 25 m and weaken as (25 / r) ^ 0.5 (0.44 at the Quay, 0.23 at 470 m).
+WAVE = {"speed": 160.0, "reach": 450.0, "half": 12.0, "haze": 1.0, "rim": 0.1, "decay": 0.5, "ref": 25.0,
+        "push": 0.9, "lift": 0.45, "flash": 0.45, "flare": 2.0, "clouds": 0.6, "key": "sign_a"}
 PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
 
 

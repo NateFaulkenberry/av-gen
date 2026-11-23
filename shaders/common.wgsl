@@ -660,11 +660,13 @@ fn pulseFlash(p: vec3<f32>, emissive: vec3<f32>) -> vec3<f32> {
         let a = frame.pulses[4u * i];
         let h = max(frame.pulses[4u * i + 1u].y, 1e-3);
         let u = (length(p - a.xyz) - a.w) / h;
-        if (abs(u) > 3.0) {
+        if (u > 3.0 || u < -7.0) {
             continue;
         }
-        // a bright leading edge and a softer glow just behind it
-        let g = exp(-3.0 * u * u) + 0.25 * exp(-(u + 1.2) * (u + 1.2));
+        // a sharp attack as the front arrives (u > 0) and a decay ~2.2 half-widths long behind it: at 160 m/s and a
+        // 12 m half-width a point stays lit ~5 frames, so every front is caught by the 30 fps film alike (msg 218: a
+        // one-frame flash was sampled strong or weak by turns, which read as a pulse about every second)
+        let g = select(exp(-u * u / 4.84), exp(-4.0 * u * u), u > 0.0);
         c = c + g * (frame.pulses[4u * i + 2u].rgb + emissive * frame.pulses[4u * i + 3u].z);
     }
     return c;

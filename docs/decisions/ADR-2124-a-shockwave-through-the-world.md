@@ -35,8 +35,12 @@ Per point, `u = (|p - c| - R) / h`:
 - the vertex stages add `pulseOffset`: `(exp(-u^2) - 0.45 exp(-(u + 1.8)^2))` x push along the horizontal outward
   direction blended toward up by `lift` -- a shove and a smaller recoil behind it, continuous in space so a mesh never
   cracks; the previous position uses the previous radius and push, so the velocity target sees it;
-- the surface adds `pulseFlash`: a bright leading edge and a softer glow behind, plus `flare` x the surface's own
-  emission (windows, strips flare);
+- the surface adds `pulseFlash`: a sharp attack as the front arrives (`exp(-4u^2)`, u > 0) and a decay 2.2
+  half-widths long behind it (`exp(-u^2/4.84)`), plus `flare` x the surface's own emission (windows, strips flare).
+  The decay matters as much as the look: a band a point crosses in one frame is SAMPLED by the film -- caught bright
+  on one front and half-missed on the next as the front's phase against the 30 fps frames drifts -- and the uneven
+  fronts read as a separate pulse about once a second (Neon Dreams msg 218; the per-beat swing's spread across beats
+  was 26 %). Keep a point lit for several frames: half-width >= speed x 2.5 frames;
 - the cloud march brightens (`pulseCloud`, the band's radiance per unit density) and thickens (density x (1 + g))
   over a band 1.6 x wider;
 - DF: `Shell` x `Front` -- where the scene surface lies in the band (the front meeting the town), and where the view

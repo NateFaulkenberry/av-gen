@@ -9,7 +9,8 @@ arcing down (gravity), cooling from white through the look's colours, crackling 
 GPU particle systems, which already have every term: a one-frame `burst`, full-sphere `spread`, `drag`, `gravity`,
 colour and size over life (`colorCurve`, `sizeCurve`), `pulseRate` (the crackle) and `velocityStretch` (streaks).
 
-Per crash (the Crash stem's onsets at their attacks, AU.EVENTS): 3-5 shells, each BURSTING on the crash; the rocket
+Per crash (the Crash stem's onsets at their attacks, AU.EVENTS): ONE shell (owner msg 218), BURSTING on the crash, of
+its own type (msg 220: peony, chrysanthemum, willow, crossette, strobe, palm, ring -- TYPES); the rocket
 leaves the town (the highest layout instance under it) 1.05 s before, its emitter rising on an ease-out with a trail
 of sparks. Each shell is three star systems (three hue runs through the rainbow, so one shell holds every colour, and
 each star's own colour walks the spectrum as it falls), a white flash core, and a point light at the burst (a fast
@@ -75,6 +76,52 @@ def star_curves(h0):
     return {"colorCurve": col, "opacityCurve": opa, "sizeCurve": size}
 
 
+def ramp(*cols):
+    """A colour curve through `cols` (white-hot first), evenly over the life."""
+    n = len(cols)
+    return [{"t": round(i / (n - 1), 3), "color": list(c)} for i, c in enumerate(cols)]
+
+
+WHITE = (1.0, 0.97, 0.94)
+# it14 (owner msg 220: "make the fireworks different colours too -- they all look too similar"): seven shell types,
+# one per crash. Each: its star systems (overrides on STAR, a colour curve, `count` stars, `delay` s after the burst),
+# the burst light's colour, and a name. Deterministic: the order is a seeded shuffle (Random(220)).
+TYPES = [
+    {"name": "magenta peony", "light": [1.0, 0.25, 0.75], "systems": [
+        {"count": 900, "colorCurve": ramp(WHITE, (1.0, 0.45, 0.85), (1.0, 0.1, 0.65), (0.75, 0.0, 0.45)),
+         "speedMin": 18.0, "speedMax": 24.0, "velocityStretch": 0.3}]},
+    {"name": "electric-blue chrysanthemum", "light": [0.3, 0.55, 1.0], "systems": [
+        {"count": 1100, "colorCurve": ramp(WHITE, (0.55, 0.8, 1.0), (0.15, 0.45, 1.0), (0.05, 0.2, 0.9)),
+         "speedMin": 20.0, "speedMax": 28.0, "velocityStretch": 1.6, "stretchMax": 6.0, "drag": 0.9}]},
+    {"name": "gold willow", "light": [1.0, 0.72, 0.3], "systems": [
+        {"count": 700, "colorCurve": ramp(WHITE, (1.0, 0.85, 0.45), (1.0, 0.6, 0.15), (0.7, 0.3, 0.05)),
+         "speedMin": 12.0, "speedMax": 17.0, "lifetimeMin": 3.2, "lifetimeMax": 4.4, "drag": 2.0,
+         "gravity": [0.0, -5.0, 0.0], "velocityStretch": 2.5, "stretchMax": 8.0, "pulseRate": 3.0, "pulseDepth": 0.2,
+         "sizeCurve": [{"t": 0.0, "value": 0.8}, {"t": 1.0, "value": 0.35}]}]},
+    {"name": "violet-to-pink crossette", "light": [0.8, 0.4, 1.0], "systems": [
+        {"count": 420, "colorCurve": ramp(WHITE, (0.7, 0.45, 1.0), (0.55, 0.2, 1.0)), "speedMin": 22.0,
+         "speedMax": 26.0, "lifetimeMin": 0.5, "lifetimeMax": 0.75, "drag": 0.6},
+        {"count": 900, "delay": 0.55, "colorCurve": ramp(WHITE, (1.0, 0.55, 0.85), (1.0, 0.3, 0.7), (0.8, 0.15, 0.5)),
+         "speedMin": 9.0, "speedMax": 16.0, "extent": [9.0, 9.0, 9.0], "lifetimeMin": 1.4, "lifetimeMax": 2.2}]},
+    {"name": "cyan/white strobe crackle", "light": [0.6, 0.95, 1.0], "systems": [
+        {"count": 1000, "colorCurve": ramp(WHITE, (0.85, 1.0, 1.0), (0.4, 0.95, 1.0), (0.9, 1.0, 1.0)),
+         "speedMin": 16.0, "speedMax": 24.0, "pulseRate": 16.0, "pulseDepth": 1.0, "pulseSharpness": 4.0,
+         "velocityStretch": 0.1}]},
+    {"name": "red/amber palm", "light": [1.0, 0.35, 0.12], "systems": [
+        {"count": 90, "colorCurve": ramp(WHITE, (1.0, 0.65, 0.2), (1.0, 0.25, 0.08), (0.8, 0.1, 0.03)),
+         "speedMin": 26.0, "speedMax": 32.0, "spread": 0.75, "lifetimeMin": 2.2, "lifetimeMax": 2.8, "drag": 1.4,
+         "velocityStretch": 2.2, "stretchMax": 9.0, "sizeCurve": [{"t": 0.0, "value": 1.6}, {"t": 1.0, "value": 0.5}]},
+        {"count": 500, "colorCurve": ramp(WHITE, (1.0, 0.5, 0.15), (0.9, 0.18, 0.05)), "speedMin": 6.0,
+         "speedMax": 12.0, "lifetimeMin": 1.2, "lifetimeMax": 1.8}]},
+    {"name": "rainbow ring", "light": [0.9, 0.8, 1.0], "systems": [
+        dict({"count": 500, "speedMin": 21.0, "speedMax": 23.0, "spread": 0.06, "direction": [0.0, 0.0, 1.0]},
+             **star_curves(0.0)),
+        dict({"count": 500, "speedMin": 21.0, "speedMax": 23.0, "spread": 0.06, "direction": [0.0, 0.0, -1.0]},
+             **star_curves(0.33)),
+        dict({"count": 500, "speedMin": 15.0, "speedMax": 23.0, "spread": 1.0}, **star_curves(0.66))]},
+]
+
+
 def _track(target, keys):
     return {"target": target, "component": -1, "enabled": True, "timeBase": "seconds", "mode": "replace",
             "loopLength": 0.0, "keys": keys}
@@ -94,10 +141,11 @@ def ground_at(layout, x, z, r=26.0):
     return best
 
 
-def sites_for(t, strength, cam_at, layout, rng):
+def sites_for(t, strength, cam_at, layout, rng, n=None):
     """Burst points in view of the lens at second t."""
     eye, d, _roll, fov = cam_at(t)
-    n = 5 if strength >= 1.3 else (4 if strength >= 1.0 else 3)
+    if n is None:
+        n = 5 if strength >= 1.3 else (4 if strength >= 1.0 else 3)
     yaw = math.atan2(d[2], d[0])
     pitch = math.asin(max(-1.0, min(1.0, d[1])))
     half_v = math.radians(fov) * 0.5
@@ -109,7 +157,7 @@ def sites_for(t, strength, cam_at, layout, rng):
         tries += 1
         k = len(out)
         az = (-1.0 + 2.0 * (k + 0.5) / n) * 0.62 * half_h + rng.uniform(-0.06, 0.06) * half_h
-        dist = rng.uniform(240.0, 330.0) if veil else rng.uniform(110.0, 240.0)
+        dist = rng.uniform(240.0, 330.0) if veil else rng.uniform(130.0, 200.0)
         # in the plug the lens is still climbing: its bursts sit level with it, where it looks once out of the cloud
         el = (rng.uniform(0.05, 0.3) * half_v) if veil else (pitch + rng.uniform(0.25, 0.68) * half_v)
         hx, hz = math.cos(yaw + az), math.sin(yaw + az)
@@ -127,74 +175,59 @@ def sites_for(t, strength, cam_at, layout, rng):
 
 
 def build(cam_at, layout, song=70.18):
-    """(nodes, lights, tracks, info) -- the pools' particle nodes and lights, and their keyed tracks."""
+    """(nodes, lights, tracks, info). it14 (owner msg 218: "only shoot up ONE firework each cymbal hit, and time the
+    EXPLOSION with the cymbal hit"): one shell per crash, bursting on its attack; msg 220: each its own type."""
     rng = random.Random(206)
+    order = list(range(len(TYPES)))
+    random.Random(220).shuffle(order)
     nodes, lights, tracks, shells = [], [], [], []
-    plan = {}   # (pool, site) -> list of shells
+    one = 1.0 / 30.0 - 0.002   # a burst window holding exactly one 30 fps frame's instant
     for k, (t, v) in enumerate(crashes()):
-        for s, site in enumerate(sites_for(t, v, cam_at, layout, rng)):
-            sh = dict(site, t=round(t, 4), crash=k, hue=round(rng.random(), 3))
-            plan.setdefault((k % POOLS, s), []).append(sh)
-            shells.append(sh)
-    for (pool, s), uses in sorted(plan.items()):
-        tag = "fw%d%d" % (pool, s)
-        first = uses[0]
-        # the rocket: its emitter rides the climb, a trail of sparks while it rises
-        nodes.append({"name": tag + "_rocket", "kind": "particles", "position": first["launch"],
-                      "particles": dict(ROCKET, seed=11 + 7 * pool + s)})
-        nodes.append({"name": tag + "_flash", "kind": "particles", "position": first["burst"],
-                      "particles": dict(FLASH, seed=13 + 7 * pool + s)})
-        stars = []
-        for j in range(3):
+        site = sites_for(t, 0.0, cam_at, layout, rng, n=1)[0]
+        ty = TYPES[order[k % len(TYPES)]]
+        tag = "fw%d" % k
+        L, B, tb = site["launch"], site["burst"], round(t, 4)
+        shells.append(dict(site, t=tb, type=ty["name"]))
+        t0 = tb - RISE
+        rocket = tag + "_rocket"
+        nodes.append({"name": rocket, "kind": "particles", "position": L, "particles": dict(ROCKET, seed=11 + k)})
+        rp = []
+        for i in range(13):
+            x = i / 12.0
+            e = 1.0 - (1.0 - x) ** 2   # fast off the roof, slowing into the burst
+            rp.append({"time": round(t0 + RISE * x, 4), "value": [round(L[c] + (B[c] - L[c]) * e, 3) for c in range(3)],
+                       "interp": "linear"})
+        tracks.append(_track("nodes/%s/position" % rocket, rp))
+        tracks.append(_track("particles/%s/spawnRate" % rocket, [
+            {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": round(t0, 4), "value": 260.0, "interp": "step"},
+            {"time": round(tb - 0.02, 4), "value": 0.0, "interp": "step"}]))
+        flash = tag + "_flash"
+        nodes.append({"name": flash, "kind": "particles", "position": B,
+                      "particles": dict(FLASH, seed=13 + k, colorStart=[min(1.0, 0.6 + 0.4 * c) for c in ty["light"]] + [0.8])})
+        tracks.append(_track("particles/%s/burst" % flash, [
+            {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": tb, "value": 12.0, "interp": "step"},
+            {"time": round(tb + one, 4), "value": 0.0, "interp": "step"}]))
+        for j, sysd in enumerate(ty["systems"]):
             nm = "%s_star%d" % (tag, j)
-            stars.append(nm)
-            nodes.append({"name": nm, "kind": "particles", "position": first["burst"],
-                          "particles": dict(STAR, seed=101 + 31 * pool + 7 * s + j, **star_curves(first["hue"] + j / 3.0))})
+            ps = dict(STAR, seed=101 + 7 * k + j)
+            ps.update({kk: vv for kk, vv in sysd.items() if kk not in ("count", "delay")})
+            ps.setdefault("opacityCurve", [{"t": 0.0, "value": 1.0}, {"t": 0.6, "value": 0.85}, {"t": 1.0, "value": 0.0}])
+            if "sizeCurve" not in ps:
+                ps["sizeCurve"] = [{"t": 0.0, "value": 0.9}, {"t": 0.12, "value": 0.6}, {"t": 1.0, "value": 0.12}]
+            ps["capacity"] = max(2048, int(sysd["count"] * 1.5))
+            nodes.append({"name": nm, "kind": "particles", "position": B, "particles": ps})
+            tj = round(tb + sysd.get("delay", 0.0), 4)
+            tracks.append(_track("particles/%s/burst" % nm, [
+                {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": tj, "value": float(sysd["count"]), "interp": "step"},
+                {"time": round(tj + one, 4), "value": 0.0, "interp": "step"}]))
         light = tag + "_light"
-        lights.append({"name": light, "type": "point", "position": first["burst"], "color": [1.0, 0.85, 0.95],
-                       "intensity": LIGHT["intensity"], "range": LIGHT["range"], "castsShadow": False, "volumetric": 0.0})
-        rp, rr, sp, lp, li, lc, fb, sb = [], [], [], [], [], [], [], []
-        lp.append({"time": 0.0, "value": first["burst"], "interp": "step"})
-        rr.append({"time": 0.0, "value": 0.0, "interp": "step"})
-        li.append({"time": 0.0, "value": 0.0, "interp": "linear"})
-        for u in uses:
-            tb, L, B = u["t"], u["launch"], u["burst"]
-            t0 = tb - RISE
-            # the climb: ease-out (fast off the roof, slowing into the burst)
-            for i in range(13):
-                x = i / 12.0
-                e = 1.0 - (1.0 - x) ** 2
-                p = [round(L[c] + (B[c] - L[c]) * e, 3) for c in range(3)]
-                rp.append({"time": round(t0 + RISE * x, 4), "value": p, "interp": "linear"})
-            rr += [{"time": round(t0 - 0.001, 4), "value": 0.0, "interp": "step"},
-                   {"time": round(t0, 4), "value": 260.0, "interp": "step"},
-                   {"time": round(tb - 0.02, 4), "value": 0.0, "interp": "step"}]
-            sp.append({"time": round(tb - 0.5, 4), "value": B, "interp": "step"})
-            # one frame of burst (the window holds exactly one 30 fps frame's instant)
-            one = 1.0 / 30.0 - 0.002
-            fb += [{"time": round(tb, 4), "value": 12.0, "interp": "step"},
-                   {"time": round(tb + one, 4), "value": 0.0, "interp": "step"}]
-            sb += [{"time": round(tb, 4), "value": float(STARS_PER_SYSTEM), "interp": "step"},
-                   {"time": round(tb + one, 4), "value": 0.0, "interp": "step"}]
-            col = [round(sum(hue(u["hue"] + j / 3.0)[c] for j in range(3)) / 3.0 * 0.6 + 0.4, 3) for c in range(3)]
-            lp.append({"time": round(tb - 0.5, 4), "value": B, "interp": "step"})
-            lc.append({"time": round(tb - 0.5, 4), "value": col, "interp": "step"})
-            I = LIGHT["intensity"]
-            li += [{"time": round(tb - 0.002, 4), "value": 0.0, "interp": "linear"},
-                   {"time": round(tb + 0.05, 4), "value": I, "interp": "linear"},
-                   {"time": round(tb + 0.35, 4), "value": round(0.45 * I, 1), "interp": "linear"},
-                   {"time": round(tb + 1.0, 4), "value": round(0.15 * I, 1), "interp": "linear"},
-                   {"time": round(tb + 1.9, 4), "value": 0.0, "interp": "linear"}]
-        rp.sort(key=lambda k: k["time"])
-        tracks.append(_track("nodes/%s_rocket/position" % tag, rp))
-        tracks.append(_track("particles/%s_rocket/spawnRate" % tag, [{"time": 0.0, "value": 0.0, "interp": "step"}] + rr))
-        tracks.append(_track("nodes/%s_flash/position" % tag, [{"time": 0.0, "value": first["burst"], "interp": "step"}] + sp))
-        tracks.append(_track("particles/%s_flash/burst" % tag, [{"time": 0.0, "value": 0.0, "interp": "step"}] + fb))
-        for nm in stars:
-            tracks.append(_track("nodes/%s/position" % nm, [{"time": 0.0, "value": first["burst"], "interp": "step"}] + sp))
-            tracks.append(_track("particles/%s/burst" % nm, [{"time": 0.0, "value": 0.0, "interp": "step"}] + sb))
-        tracks.append(_track("lights/%s/position" % light, lp))
-        if lc:
-            tracks.append(_track("lights/%s/color" % light, [{"time": 0.0, "value": lc[0]["value"], "interp": "step"}] + lc))
-        tracks.append(_track("lights/%s/intensity" % light, li))
+        I = LIGHT["intensity"]
+        lights.append({"name": light, "type": "point", "position": B, "color": ty["light"], "intensity": I,
+                       "range": LIGHT["range"], "castsShadow": False, "volumetric": 0.0})
+        tracks.append(_track("lights/%s/intensity" % light, [
+            {"time": 0.0, "value": 0.0, "interp": "linear"}, {"time": round(tb - 0.002, 4), "value": 0.0, "interp": "linear"},
+            {"time": round(tb + 0.05, 4), "value": I, "interp": "linear"},
+            {"time": round(tb + 0.35, 4), "value": round(0.45 * I, 1), "interp": "linear"},
+            {"time": round(tb + 1.0, 4), "value": round(0.15 * I, 1), "interp": "linear"},
+            {"time": round(tb + 1.9, 4), "value": 0.0, "interp": "linear"}]))
     return nodes, lights, tracks, {"shells": shells}
