@@ -942,6 +942,7 @@ def glb_clip_len(path, clip):
 
 def band(state="uv"):
     if BAND.get("state") != state:
+        NB.CAM_AT = lambda t: camera().at(t)[0]   # it14 (msg 222): the wave seen only near the stage
         out = NB.build(LAYOUT, os.path.join(HERE, "scene"), os.path.normpath(os.path.join(HERE, "..", "..")),
                        lambda k: pal(k, state), r3, glb_clip_len, SONG)
         BAND.clear()

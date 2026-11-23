@@ -126,3 +126,19 @@ TEST_CASE("World pulse: a disabled or muted wave leaves the frame block empty", 
     CHECK(pulses(e, 2.0).count == 0);
     CHECK(pulses(wave(0.35), 0.2).count == 0); // before the first release
 }
+
+TEST_CASE("World pulse: the range fade takes a front out past fadeEnd", "[adr2124]") {
+    world::EffectInstance e = wave(0.35);
+    setRow(e, "fadeStart", 100.0f);
+    setRow(e, "fadeEnd", 200.0f);
+    const world::PulseFrame f = pulses(e, 2.0); // fronts at 16, 72, 128, 184, 240 m
+    REQUIRE(f.count >= 4);
+    CHECK(f.fronts[0].motion.z == Approx(0.9f * std::sqrt(25.0f / 25.0f) * 1.0f).epsilon(0.05)); // 16 m: untouched
+    CHECK(f.fronts[2].motion.z < 0.9f * std::sqrt(25.0f / 128.0f));                            // 128 m: fading
+    for (std::uint32_t i = 0; i < f.count; ++i) {
+        if (f.fronts[i].centreRadius.w >= 200.0f) {
+            CHECK(f.fronts[i].motion.z == 0.0f);
+            CHECK(f.fronts[i].flash == glm::vec4(0.0f));
+        }
+    }
+}

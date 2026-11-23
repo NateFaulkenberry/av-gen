@@ -97,6 +97,10 @@ constexpr EffectField kFields[] = {
         .tooltip("How much brighter already-glowing surfaces (windows, strips) flare as it passes, x their own."),
     storedFloat("clouds", "Cloud ripple", 0.0f, 0.0f, 4.0f, 0.0f, 2.0f)
         .tooltip("How much the cloud the front passes through brightens and thickens."),
+    storedFloat("fadeStart", "Fades from", 0.0f, 0.0f, 5000.0f, 0.0f, 500.0f).fmt("%.0f m")
+        .tooltip("The radius past which a front fades out, whatever its strength (0: no range fade)."),
+    storedFloat("fadeEnd", "Gone by", 0.0f, 0.0f, 5000.0f, 0.0f, 500.0f).fmt("%.0f m")
+        .tooltip("The radius by which the fade is complete: nothing of the front shows past it."),
     storedFloat("refRadius", "Reference radius", 0.0f, 0.0f, 5000.0f, 0.0f, 200.0f).fmt("%.0f m")
         .tooltip("The radius up to which a front keeps full strength (0: 12 % of the reach). Past it\n"
                  "everything weakens as (reference / radius) ^ Weakens with size."),
@@ -380,6 +384,12 @@ std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float
     const auto easeKind = static_cast<Ease>(kRows.choice(e, "ease"));
     const float refSet = kRows.f(e, "refRadius");
     const float refRadius = refSet > 0.0f ? refSet : std::max(0.12f * maxRadius, kRows.f(e, "thickness"));
+    // the range fade (msg 222): a front is gone by `fadeEnd` metres, whatever the reach
+    const float fadeStart = std::max(kRows.f(e, "fadeStart"), 0.0f);
+    const float fadeEnd = kRows.f(e, "fadeEnd");
+    const auto rangeFade = [&](float r) {
+        return fadeEnd > fadeStart ? 1.0f - smooth01(fadeStart, fadeEnd, r) : 1.0f;
+    };
     std::size_t made = 0;
     for (std::size_t i = 0; i < fronts && made < out.size(); ++i) {
         const double age = ctx.seconds - starts[i];
@@ -392,8 +402,9 @@ std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float
         f.centre = centre;
         f.radius = std::max(maxRadius * ease(easeKind, x), 1e-3f);
         f.radiusPrev = std::max(maxRadius * ease(easeKind, xp), 1e-3f);
-        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x) * envelope;
-        f.gainPrev = std::pow(refRadius / std::max(f.radiusPrev, refRadius), decay) * worldLife(xp) * envelope;
+        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x) * envelope * rangeFade(f.radius);
+        f.gainPrev = std::pow(refRadius / std::max(f.radiusPrev, refRadius), decay) * worldLife(xp) * envelope *
+                     rangeFade(f.radiusPrev);
         if (f.gain <= 1e-4f && f.gainPrev <= 1e-4f) {
             continue;
         }

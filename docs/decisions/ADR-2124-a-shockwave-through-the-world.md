@@ -5,7 +5,7 @@
   pulsate through the entire scene / geometry / characters"; msg 204: one front per quarter note)
 - Code: `world/effects/world_pulse.{hpp,cpp}` (`PulseFront`, `PulseFrame`, `buildPulseFrame`); the Shockwave's
   `travel` row and its "Through the world" rows (`kinds/shockwave_effect.cpp`: `push`, `lift`, `flashColor`, `flash`,
-  `flare`, `clouds`, `refRadius`; `shockwaveShellProxies`, `shockwavePulseFronts`); `DistortionShape::Shell` /
+  `flare`, `clouds`, `fadeStart`, `fadeEnd`, `refRadius`; `shockwaveShellProxies`, `shockwavePulseFronts`); `DistortionShape::Shell` /
   `DistortionField::Front` (`distortion_frame.hpp`, `shaders/distortion.wgsl` `fs_offset_ext`); `Scene::pulses`,
   `Engine` (built after the DF frame); `FrameUniforms::pulseInfo` / `pulses` (`scene_renderer.hpp/.cpp`,
   `shaders/common.wgsl`: `pulseOffset`, `pulseFlash`, `pulseCloud`); consumers in `pbr.wgsl` (`vs_entity`),
@@ -29,7 +29,9 @@ A Shockwave gets a `travel` choice: `ring` (the original, the default) or `world
 (the same TRIGGER fronts, a pure function of `age = t - t0`, now up to eight a instance) is, besides its DF proxy, a
 `PulseFront` in the frame block: centre, radius, the radius a frame (1/30 s) earlier, the band's half-width
 (`thickness`), the push (m), the surface band's radiance, the lift share, the cloud ripple and the emissive flare --
-strength folded as `(refRadius / max(r, refRadius)) ^ radiusDecay x life x envelope`.
+strength folded as `(refRadius / max(r, refRadius)) ^ radiusDecay x life x envelope x range fade` (the range fade:
+`1 - smoothstep(fadeStart, fadeEnd, r)`, off when fadeEnd <= fadeStart; msg 222: a wave seen from 470 m away was
+"way too strong").
 
 Per point, `u = (|p - c| - R) / h`:
 - the vertex stages add `pulseOffset`: `(exp(-u^2) - 0.45 exp(-(u + 1.8)^2))` x push along the horizontal outward

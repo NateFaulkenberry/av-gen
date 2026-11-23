@@ -202,13 +202,30 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                    "chroma": 0.12, "radiusDecay": WAVE["decay"], "refRadius": WAVE["ref"],
                                    "maxConcurrent": 8.0, "push": WAVE["push"], "lift": WAVE["lift"],
                                    "flashColor": [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])], "flash": WAVE["flash"], "flare": WAVE["flare"],
-                                   "clouds": WAVE["clouds"],
+                                   "clouds": WAVE["clouds"], "fadeStart": WAVE["fade"][0], "fadeEnd": WAVE["fade"][1],
                                    "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     info["effects"] = effects
-    # the held breath silences the wave in flight too (its four amounts dip to 0 with the spots' breath)
+    # the held breath silences the wave in flight too, and (msg 222: "way too strong -- should not be visible till we
+    # get closer") the lens's distance from the stage gates it: nothing while the lens is past CAM_FADE[1] m (the
+    # pier and the approach, <= ~30 s), full from CAM_FADE[0] m in (the Quay from ~35 s, the band)
+    a, b, c, d = BREATH
+
+    def gate(t):
+        def sm(u):
+            u = max(0.0, min(1.0, u))
+            return u * u * (3 - 2 * u)
+        br = 1.0 - sm((t - a) / (b - a)) + sm((t - c) / (d - c)) if t < d else 1.0
+        br = min(1.0, br) if t >= a else 1.0
+        g = 1.0
+        if CAM_AT is not None:
+            g = 1.0 - sm((math.dist(CAM_AT(t), c_stage) - CAM_FADE[0]) / (CAM_FADE[1] - CAM_FADE[0]))
+        return br * g
+    c_stage = st["centre"]
+    gk = [(round(i * 0.25, 2), gate(i * 0.25)) for i in range(int(70.2 / 0.25) + 2)]
     for leaf in ("push", "flash", "clouds", "strength"):
         v = WAVE[{"strength": "haze"}.get(leaf, leaf)]
-        tracks.append(track("fx/kick_wave/%s" % leaf, breath_keys(v, 0.0)))
+        tracks.append(track("fx/kick_wave/%s" % leaf, [{"time": t, "value": round(v * g, 4), "interp": "linear"}
+                                                        for t, g in gk]))
     # it14 (owner msg 204: "make sure the speaker pulse is on quarter notes -- it's following the kick right now"):
     # one front per quarter note of the measured grid (AU.KICK0 + n x AU.BEAT, 170.95 BPM), the whole song but the
     # held breath (45.5 s to the 47.15 s crash, which brings it back)
@@ -288,7 +305,11 @@ def drum_warp(clip, L, song=70.18):
 # it14 (msg 195): the wave through the town (ADR-2124). 160 m/s: the Quay's lens (130 m) sees it 0.8 s after it leaves
 # the stage, eight fronts in the air; a 12 m half-width band so a building takes ~0.2 s to cross it (a thump, not one
 # frame; msg 218: 12 m, every front caught alike at 30 fps); push and flash keep full strength to 25 m and weaken as (25 / r) ^ 0.5 (0.44 at the Quay, 0.23 at 470 m).
-WAVE = {"speed": 160.0, "reach": 450.0, "half": 12.0, "haze": 1.0, "rim": 0.1, "decay": 0.5, "ref": 25.0,
+# msg 222: a front fades out between 140 and 215 m from the stage (the Quay's lens at 38 s is 132 m out) and the lens
+# only sees it from CAM_FADE: full within 190 m of the stage, nothing past 260 m (the pier at 10 s is 470 m out)
+CAM_FADE = (190.0, 260.0)
+CAM_AT = None   # build.py: the baked lens's eye at t
+WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 1.0, "rim": 0.1, "decay": 0.5, "ref": 25.0,
         "push": 0.9, "lift": 0.45, "flash": 0.45, "flare": 2.0, "clouds": 0.6, "key": "sign_a"}
 PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
 
