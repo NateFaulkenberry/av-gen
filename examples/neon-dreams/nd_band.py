@@ -329,6 +329,27 @@ WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "h
 # light none -- a coherent shift of everything near reads as the lens moving. So 1.5 px, and the young front clears
 # the lens by 20 m before it bends anything.
 CALM = {"shift": 1.5, "near": 8.0, "clear": 20.0, "ring_near": 4.0, "ring_clear": 6.0}
+# it18 (owner msg 264 on it17: "now the wave doesn't feel strong enough, and too fast"; msg 267: "there can be a
+# little camera distortion, I don't mind -- just not as radical as before"). it17's front ran 160 m/s with a 12 m
+# half-width: a point sat in its band ~0.15 s and the front crossed the frame in a few frames (a flick). Slower, a
+# wider band (a point takes ~0.5 s to rise and fall: a roll, not a snap), a harder push and a brighter band in the
+# scene, the band's colour the palette's violet (eave) not sign_a's pink, and the per-front cap 1.5 -> 3.5-5 px (it16
+# was 22.9 px worst). Variants for the owner (ND_WAVE=A|B|C at build time); the default is the recommended one.
+WAVE_VARIANTS = {
+    "A": {"wave": {"speed": 70.0, "half": 18.0, "push": 1.1, "flash": 0.09, "flare": 0.6, "clouds": 0.15,
+                   "rim": 0.07, "haze": 0.2, "key": "eave"},
+          "calm": {"shift": 3.5, "near": 8.0, "clear": 14.0}},
+    "B": {"wave": {"speed": 70.0, "half": 20.0, "push": 1.6, "flash": 0.13, "flare": 0.9, "clouds": 0.22,
+                   "rim": 0.1, "haze": 0.28, "chroma": 0.08, "key": "eave"},
+          "calm": {"shift": 5.0, "near": 6.0, "clear": 10.0}},
+    "C": {"wave": {"speed": 110.0, "half": 16.0, "push": 1.6, "flash": 0.13, "flare": 0.9, "clouds": 0.22,
+                   "rim": 0.1, "haze": 0.28, "chroma": 0.08, "key": "eave"},
+          "calm": {"shift": 5.0, "near": 6.0, "clear": 10.0}},
+}
+WAVE_VARIANT = os.environ.get("ND_WAVE", "B")
+if WAVE_VARIANT in WAVE_VARIANTS:
+    WAVE.update(WAVE_VARIANTS[WAVE_VARIANT]["wave"])
+    CALM.update(WAVE_VARIANTS[WAVE_VARIANT]["calm"])
 PULSE = {"strength": 0.8, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.45, "chroma": 0.12, "key": "sign_a"}
 
 
