@@ -240,10 +240,21 @@ fn fs_offset(in: ProxyOut) -> OffsetOut {
         // Nothing at the very centre: while the front is young its inner lobe reaches r = 0, where
         // the radial direction is undefined and the band would pinch the image into a knot.
         let core = smoothstep(0.0, 2.0 * hw, r);
-        d = bn * (dfShockBand(u) * p.terms.x * p.terms.w * win * core);
+        // ADR-2126: the lens calm, as for a front through the world (motion.x near, motion.y clear; 0 off): a ring
+        // whose sphere holds the lens is drawn across the whole picture, so it fades as its radius nears the lens's
+        // distance, and nothing within motion.x of the lens bends or glows.
+        var calm = 1.0;
+        if (p.motion.x > 0.0) {
+            calm = smoothstep(p.motion.x, 2.0 * p.motion.x, length(q - cam));
+        }
+        if (p.motion.y > 0.0) {
+            let outer = length(p.axis0.xyz);
+            calm = calm * smoothstep(0.0, p.motion.y, abs(p.shape.x * outer - length(cam - p.centre.xyz)));
+        }
+        d = bn * (dfShockBand(u) * p.terms.x * p.terms.w * win * core * calm);
         // The leading edge: a thin Gaussian just outside the front, where the compression is.
         let e = (u - 0.5) / 0.35;
-        glow = exp(-e * e) * win;
+        glow = exp(-e * e) * win * calm;
     } else if (field == 2u) {
         // Ripple: a damped train inside the front, in the disc's plane along the radius.
         let cycles = p.shape.x;
@@ -313,6 +324,9 @@ fn fs_offset(in: ProxyOut) -> OffsetOut {
     if (len > df.misc.x) {
         offset = offset * (df.misc.x / len);
     }
+    if (field == 1u) {
+        offset = dfCapShift(offset, p.rim.w); // ADR-2126: Shock's cap rides in rim.w
+    }
 
     // The emission sits at the sampled point -- so it is hidden by whatever stands in front of that
     // point, and only by that.
@@ -324,6 +338,17 @@ fn fs_offset(in: ProxyOut) -> OffsetOut {
     out.offset = vec4<f32>(offset, win * lensZ, win);
     out.aux = vec4<f32>(rim, win * depthGate * p.noise.y);
     return out;
+}
+
+// ADR-2126: a front's shift capped at `px` pixels at 1080p (scaled with the frame's height), measured in pixels
+// so a horizontal and a vertical shift are capped alike. 0: no cap.
+fn dfCapShift(offset: vec2<f32>, px: f32) -> vec2<f32> {
+    if (px <= 0.0) {
+        return offset;
+    }
+    let lim = px * df.viewport.y / 1080.0;
+    let pix = length(offset * df.viewport.xy);
+    return select(offset, offset * (lim / pix), pix > lim);
 }
 
 // ---- pass 1, Wave 3: the extended offset field ---------------------------------------------------
@@ -450,7 +475,13 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
         if (disc > 0.0) {
             let sq = sqrt(disc);
             let cosI = sq / max(R, 1e-3); // the crossing's angle to the shell's normal
-            let graze = 0.15 + 0.85 * pow(1.0 - saturate(cosI), 3.0);
+            var graze = 0.15 + 0.85 * pow(1.0 - saturate(cosI), 3.0);
+            // ADR-2126: from INSIDE the shell (the front has passed the lens) every ray leaves through it, so the
+            // 0.15 floor bent the whole picture -- sky and all -- until the front was far: a global wobble, read as
+            // the camera jolting. With the calm on, only a grazing crossing bends from inside.
+            if (p.motion.y > 0.0 && dot(oc, oc) < R * R) {
+                graze = pow(1.0 - saturate(cosI), 3.0);
+            }
             let t0 = tc - sq;
             let t1 = tc + sq;
             if (t0 > near && t0 < tEnd) {
@@ -547,9 +578,20 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
         let radial = normalize(q - p.centre.xyz + vec3<f32>(0.0, 1e-4, 0.0));
         let eddy = flowCurl(q * p.shape.w, p.noise.x, u32(p.noise.w));
         let push = select(0.6, u * exp(0.5 * (1.0 - u * u)), bl.z > 0.5);
-        d = (radial * push + eddy / (1.0 + length(eddy)) * 0.8) * (p.terms.w * wgt);
-        win = wgt;
-        glow = wgt;
+        // ADR-2126 (Neon Dreams msg 253: "the shockwaves still feel like they're jerking the camera"): nothing within
+        // motion.x of the lens bends or glows (full from twice it), and the whole front fades as its radius comes
+        // within motion.y of the lens's own distance from the centre -- a front passing the lens is the whole frame
+        // at once, which reads as the camera jolting, not as a ring in the scene.
+        var calm = 1.0;
+        if (p.motion.x > 0.0) {
+            calm = smoothstep(p.motion.x, 2.0 * p.motion.x, length(q - cam));
+        }
+        if (p.motion.y > 0.0) {
+            calm = calm * smoothstep(0.0, p.motion.y, abs(p.shape.x - length(cam - p.centre.xyz)));
+        }
+        d = (radial * push + eddy / (1.0 + length(eddy)) * 0.8) * (p.terms.w * wgt * calm);
+        win = wgt * calm;
+        glow = wgt * calm;
     }
     var offset = (dfToUv(q + d) - dfToUv(q)) * depthGate;
     // The lens remap is bounded by construction (2 tE) and must not be clipped: a clipped remap draws
@@ -557,6 +599,9 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
     let len = length(offset);
     if (field != 5u && len > df.misc.x) {
         offset = offset * (df.misc.x / len);
+    }
+    if (field == 6u) {
+        offset = dfCapShift(offset, p.motion.z); // ADR-2126
     }
 
     // The emission and the cover sit at the sampled point: hidden by whatever stands in front of it.

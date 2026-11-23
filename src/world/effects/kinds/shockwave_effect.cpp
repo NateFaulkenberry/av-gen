@@ -105,6 +105,17 @@ constexpr EffectField kFields[] = {
     storedFloat("refRadius", "Reference radius", 0.0f, 0.0f, 5000.0f, 0.0f, 200.0f).fmt("%.0f m")
         .tooltip("The radius up to which a front keeps full strength (0: 12 % of the reach). Past it\n"
                  "everything weakens as (reference / radius) ^ Weakens with size."),
+    // ---- ADR-2126: a front never shakes the camera ------------------------------------------------------------
+    storedFloat("maxShift", "Largest shift", 0.0f, 0.0f, 200.0f, 0.0f, 40.0f).fmt("%.1f px").sec("Near the lens")
+        .tooltip("The most a front may move the picture at any pixel, in pixels at 1080p (scaled with the\n"
+                 "frame's height). 0: only the distortion pass's own safety bound."),
+    storedFloat("lensNear", "Calm near the lens", 0.0f, 0.0f, 500.0f, 0.0f, 60.0f).fmt("%.0f m")
+        .tooltip("Nothing within this distance of the lens is bent or glows (through the world: or is pushed);\n"
+                 "full effect from twice it. Stops a front shoving the whole foreground (0: off)."),
+    storedFloat("lensClear", "Clear of the lens", 0.0f, 0.0f, 500.0f, 0.0f, 100.0f).fmt("%.0f m")
+        .tooltip("The bend and edge glow fade out as the front's radius comes within this\n"
+                 "many metres of the lens's own distance from the centre, so a front passing the lens never\n"
+                 "warps the whole frame (0: off)."),
 };
 
 constexpr kinds::StoredRows kRows{"shockwave", kFields};
@@ -117,6 +128,11 @@ float frontFade(const E& e, double age) {
         return 1.0f;
     }
     return timingEnvelope(e.timing, age, std::numeric_limits<double>::infinity());
+}
+
+// ADR-2126: the per-pixel cap on a front's shift, in pixels at 1080p (0: none)
+float maxShiftPx(const E& e) {
+    return std::max(kRows.f(e, "maxShift"), 0.0f);
 }
 
 float ease(Ease kind, float x) {
@@ -350,12 +366,13 @@ std::size_t shockwaveProxies(const EffectInstance& e, const EffectContext& ctx, 
         // ground plane cutting the sphere has no seam.
         p.axis2 = glm::vec4(0.0f, 0.0f, outer, std::max(thickness, 0.05f));
         p.terms = glm::vec4(1.0f, 0.0f, 0.0f, amplitude);
-        p.motion = glm::vec4(0.0f);
+        // ADR-2126: the lens calm (x near, y clear; 0 off), as for a front through the world
+        p.motion = glm::vec4(std::max(kRows.f(e, "lensNear"), 0.0f), std::max(kRows.f(e, "lensClear"), 0.0f), 0.0f, 0.0f);
         p.shape = glm::vec4(radius / outer, thickness / outer, 0.0f, 0.0f);
         p.noise = glm::vec4(0.0f, chroma, thickness / outer, seed);
         // The edge dims as the front spreads, faster than the bend does: a flash, then a ring.
         const float rimFade = life * (1.0f - x) * (1.0f - x) * envelope;
-        p.rim = glm::vec4(rim * rimFade, 0.0f);
+        p.rim = glm::vec4(rim * rimFade, maxShiftPx(e)); // ADR-2126: rim.w = the cap (px at 1080p, 0 none)
     }
     return made;
 }
@@ -451,7 +468,9 @@ std::size_t shockwaveShellProxies(const EffectInstance& e, const EffectContext& 
         p.axis2 = glm::vec4(0.0f, 0.0f, outer, half);
         // the haze: half the band's half-width at strength 1, weakening as the front spreads
         p.terms = glm::vec4(1.0f, 0.0f, 0.0f, strength * 0.5f * half * f.gain);
-        p.motion = glm::vec4(0.0f);
+        // ADR-2126: x = calm near the lens (m), y = clear of the lens (m), z = the shift cap (px at 1080p)
+        p.motion = glm::vec4(std::max(kRows.f(e, "lensNear"), 0.0f), std::max(kRows.f(e, "lensClear"), 0.0f),
+                             maxShiftPx(e), 0.0f);
         p.shape = glm::vec4(f.radius, half, 0.0f, 1.0f / std::max(1.5f * half, 0.1f));
         p.noise = glm::vec4(static_cast<float>(std::fmod(ctx.seconds, 1000.0)) * 0.8f, chroma, 0.0f, seed);
         p.rim = glm::vec4(rim * f.gain, 0.0f);
@@ -474,9 +493,10 @@ std::size_t shockwavePulseFronts(const EffectInstance& e, const EffectContext& c
         PulseFront& p = out[i];
         p.centreRadius = glm::vec4(f.centre, f.radius);
         p.motion = glm::vec4(f.radiusPrev, half, push * f.gain, push * f.gainPrev);
-        p.flash = glm::vec4(flash * f.gain, 0.0f);
+        p.flash = glm::vec4(flash * f.gain, maxShiftPx(e)); // ADR-2126: w = the push's on-screen cap
         p.shape = glm::vec4(std::clamp(kRows.f(e, "lift"), 0.0f, 1.0f), std::max(kRows.f(e, "clouds"), 0.0f) * f.gain,
-                            std::max(kRows.f(e, "flare"), 0.0f) * f.gain, 0.0f);
+                            std::max(kRows.f(e, "flare"), 0.0f) * f.gain,
+                            std::max(kRows.f(e, "lensNear"), 0.0f)); // ADR-2126: no push near the lens
     }
     return n;
 }

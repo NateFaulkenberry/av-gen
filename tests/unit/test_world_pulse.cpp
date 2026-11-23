@@ -171,3 +171,36 @@ TEST_CASE("World pulse: fronts on the quarter grid keep their strength through e
                                      (1.0f - 0.0f)).epsilon(0.12));
     }
 }
+
+// ADR-2126 (Neon Dreams msg 253: "the shockwaves still feel like they're jerking the camera"): the lens calm reaches
+// the shaders in the documented lanes, and every lane is 0 -- the ADR-2124 picture -- when nothing asks for it.
+TEST_CASE("World pulse: the lens calm reaches the shell, the ring and the push; off by default", "[adr2126]") {
+    world::EffectInstance e = wave(0.35);
+    {
+        const world::DistortionFrame d = proxies(e, 2.0);
+        REQUIRE(d.count > 0);
+        CHECK(d.proxies[0].motion == glm::vec4(0.0f));
+        const world::PulseFrame f = pulses(e, 2.0);
+        REQUIRE(f.count > 0);
+        CHECK(f.fronts[0].flash.w == 0.0f);
+        CHECK(f.fronts[0].shape.w == 0.0f);
+    }
+    setRow(e, "maxShift", 1.5f);
+    setRow(e, "lensNear", 8.0f);
+    setRow(e, "lensClear", 20.0f);
+    const world::DistortionFrame d = proxies(e, 2.0);
+    REQUIRE(d.count > 0);
+    CHECK(d.proxies[0].motion.x == Approx(8.0f));  // calm near the lens (m)
+    CHECK(d.proxies[0].motion.y == Approx(20.0f)); // clear of the lens (m)
+    CHECK(d.proxies[0].motion.z == Approx(1.5f));  // the shift cap (px at 1080p)
+    const world::PulseFrame f = pulses(e, 2.0);
+    REQUIRE(f.count > 0);
+    CHECK(f.fronts[0].flash.w == Approx(1.5f)); // the push's on-screen cap
+    CHECK(f.fronts[0].shape.w == Approx(8.0f)); // no push near the lens
+    setRow(e, "travel", 0.0f);                  // the ring: the calm in motion.xy, the cap in rim.w
+    const world::DistortionFrame ring = proxies(e, 2.0);
+    REQUIRE(ring.count > 0);
+    CHECK(ring.proxies[0].motion.x == Approx(8.0f));
+    CHECK(ring.proxies[0].motion.y == Approx(20.0f));
+    CHECK(ring.proxies[0].rim.w == Approx(1.5f));
+}

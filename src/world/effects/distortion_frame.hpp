@@ -96,6 +96,9 @@ enum class DistortionField : std::uint8_t {
     // ADR-2124: a travelling front's haze (Shell): terms.w = peak displacement (m); shape.x = the front's radius,
     // shape.y its half-width (m), shape.w the haze's eddy frequency (1/m); noise.x the eddies' phase, noise.y chroma,
     // noise.w seed; rim.rgb the glow along the front (HDR). terms.y/z and shape.z stay zero (the rect bound).
+    // ADR-2126: motion.x = calm near the lens (m: nothing bends or glows nearer, full from twice it), motion.y = clear
+    // of the lens (m: the bend fades as |radius - the lens's distance| falls under it), motion.z = the shift cap (px
+    // at 1080p); 0 is off for each. Shock reads the same calm from motion.x/y and keeps its cap in rim.w.
     Front = 6,
 };
 

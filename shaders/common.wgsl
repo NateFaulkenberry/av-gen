@@ -219,7 +219,8 @@ struct FrameUniforms {
     skyTint: vec4<f32>,    // ADR-2103: rgb multiplies the visible sky (Environment::skyTint)
     // ADR-2124: a Shockwave's fronts through the world. x = count. Front i is pulses[4i..4i+3]:
     //   [0] xyz centre, w radius (m); [1] x radius a frame earlier, y half-width (m), z push (m), w push a frame earlier;
-    //   [2] rgb the surface band's radiance; [3] x lift share, y cloud ripple, z emissive flare.
+    //   [2] rgb the surface band's radiance, w the shift cap (px at 1080p, ADR-2126); [3] x lift share, y cloud ripple, z emissive flare, w calm near the lens (m,
+    //   ADR-2126).
     pulseInfo: vec4<f32>,
     pulses: array<vec4<f32>, 48>, // 4 x world::kMaxPulseFronts
     portalClip: vec4<f32>, // Gate C 2: n.p + w < 0 is behind a portal's exit wall (not drawn by camera passes)
@@ -646,8 +647,22 @@ fn pulseOffset(p: vec3<f32>, prev: bool) -> vec3<f32> {
         let outward = select(vec3<f32>(0.0), vec3<f32>(hz.x / fl, 0.0, hz.y / fl), fl > 1e-3);
         let lift = frame.pulses[4u * i + 3u].x;
         let dir = outward * (1.0 - lift) + vec3<f32>(0.0, lift, 0.0);
-        let w = exp(-u * u) - 0.45 * exp(-(u + 1.8) * (u + 1.8));
-        off = off + dir * (amp * w);
+        var w = exp(-u * u) - 0.45 * exp(-(u + 1.8) * (u + 1.8));
+        // ADR-2126: no push within `calm` metres of the lens, full from twice it (a shoved foreground sweeps half
+        // the frame and reads as the camera jolting)
+        let calm = frame.pulses[4u * i + 3u].w;
+        let dist = distance(p, frame.cameraPos.xyz);
+        if (calm > 0.0) {
+            w = w * smoothstep(calm, 2.0 * calm, dist);
+        }
+        // and the shove never moves a point more than the front's shift cap on screen (pulses[4i+2].w, px at 1080p)
+        var shove = amp * w;
+        let capPx = frame.pulses[4u * i + 2u].w;
+        if (capPx > 0.0 && frame.cameraUp.w > 0.0) {
+            let lim = dist * capPx * 2.0 * frame.cameraUp.w / 1080.0;
+            shove = clamp(shove, -lim, lim);
+        }
+        off = off + dir * shove;
     }
     return off;
 }

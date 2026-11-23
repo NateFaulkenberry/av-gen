@@ -37,9 +37,11 @@ struct PulseFront {
     glm::vec4 centreRadius{0.0f}; // xyz = the centre (world), w = the radius now (m)
     glm::vec4 motion{0.0f};       // x = the radius a frame earlier (1/30 s), y = the band's half-width (m),
                                   // z = the push now (m, decay and envelope folded in), w = the push a frame earlier
-    glm::vec4 flash{0.0f};        // rgb = the surface band's radiance (HDR, decay and envelope folded in), w = 0
+    glm::vec4 flash{0.0f};        // rgb = the surface band's radiance (HDR, decay and envelope folded in), w = the
+                                  // shift cap (px at 1080p, ADR-2126): a pushed point never moves further on screen
     glm::vec4 shape{0.0f};        // x = the share of the push that is UP (0 radial .. 1 vertical), y = the cloud
-                                  // ripple (0..), z = how much brighter an emissive surface flares (x its own), w = 0
+                                  // ripple (0..), z = how much brighter an emissive surface flares (x its own), w = calm
+                                  // near the lens (m, ADR-2126): no push within it, full from twice it (0 off)
 };
 static_assert(sizeof(PulseFront) == 64);
 
