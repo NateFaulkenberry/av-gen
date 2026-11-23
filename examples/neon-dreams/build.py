@@ -854,12 +854,13 @@ def vehicle_nodes(state="uv"):
 BEAM_GAIN = 1.0
 
 
-# iteration 10 (the art's audio idea 4): the lighthouses keep the bar -- one turn per 8 bars of the 1.4 s bar clock,
-# a quarter bar apart -- and whip half a turn (to the next arm) on each section crash, 120 ms in and 700 ms out
-BAR = 1.4
+# iteration 10 (the art's audio idea 4): the lighthouses keep the bar -- one turn per 4 bars (it15: of the true 2.807 s
+# bar, 11.23 s a turn; it10-14 said 8 bars of a 1.4 s "bar", a half bar of the song: the same speed within 0.3 %) --
+# and whip half a turn (to the next arm) on each section crash, 120 ms in and 700 ms out
+BAR = AU.BAR
 # the pad's (Cloud Diving) phrases, about 4 s every 5.6 s (the art's measure, notes/audio-ideas-it10.md)
 PAD_PHRASES = [2.8, 8.5, 14.1, 19.7, 25.3, 30.9, 36.6, 42.2, 47.8, 59.1, 63.3]
-BAR_RPM = round(60.0 / (8 * BAR), 4)
+BAR_RPM = round(60.0 / (4 * BAR), 4)
 WHIP = (0.12, 0.7, 180.0)
 
 
@@ -1770,7 +1771,8 @@ def reactivity():
                      {"time": round(end, 3), "value": 0.0, "interp": "smooth"}]
         tracks.append(AU.track("crowds/%s/look" % ring, keys))
     for ring in CROWDS:
-        # the groups sway on the drum bus (kick and snare levels), at two beats a period, dying in the drum breaks
+        # the groups sway on the drum bus (kick and snare levels), two beats a period (a lean each way on each kick,
+        # nd_cast BEAT2), dying in the drum breaks
         for stem in ("kick", "snare"):
             routes.append(R("stem.%s.level" % stem, "crowds/%s/sway" % ring, 0.8 if ring == "band" else 0.4,
                             attackMs=800.0, decayMs=3000.0,

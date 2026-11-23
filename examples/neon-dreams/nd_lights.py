@@ -16,7 +16,7 @@ town never flashes all at once (rule 1 of notes/audio-ideas-it10.md; the trace s
 | lantern chase               | HH onsets (step timeline)  | lantern strings: a lamp group a hat       | the town, not  |
 |                             |                            | (the strings' sparkle rests there)        | in tom fills   |
 | sign chase                  | snare onsets (step)        | signs: a band steps down the street       | the town       |
-| window flicks               | the pad's phrases 30.9,    | every building: floors / columns flip in  | 2 bars each    |
+| window flicks               | the pad's phrases 30.9,    | every building: floors / columns flip in  | 1 bar each     |
 |                             | 42.2 s                     | eighth notes (a wipe up, alternate floors)|                |
 | landmark crowns             | bass level (its top)       | ndStrip_sign_c = the Great Lantern's frame| all song       |
 |                             |                            | and the Mooring Mast; the bell +70 %      |                |
@@ -59,7 +59,8 @@ def in_fill(t):
     return any(a - 0.1 <= t <= b + 0.3 for a, b in TOM_FILLS)
 
 
-FLICK = {"beat": 0.66 / 2, "bars": 2, "gain": 1.0}
+FLICK = {"beat": AU.BEAT / 2, "bars": 1, "gain": 1.0}   # it15: true eighths (0.351 s) over one 2.81 s bar,
+# from the eighth nearest the phrase (it11-14: 0.33 s steps over "2 bars" of 1.4 s -- 2.64 s, drifting off the grid)
 ISLE_RING = {"speed": 240.0, "outer": 450.0, "inner": 55.0, "gain": 4.0}   # x (1 - the town mask)
 TOWN_RING_GAIN = {"strip": 4.5, "panes": 2.0, "lantern": 2.4}   # it10: 1.8 / 0.6 / 1.0
 CROWN_BASS = 2.2       # x the crown's own emission at full bass (it10: the bell +25 %)
@@ -290,12 +291,13 @@ FLICK_PATTERNS = [
 
 def flick_tracks(prog_path, phrases, song=70.18):
     beat8 = FLICK["beat"]
-    n = int(FLICK["bars"] * 1.4 / beat8)
+    n = int(round(FLICK["bars"] * AU.BAR / beat8))
     amt = [{"time": 0.0, "value": [0.0] * 4, "interp": "linear"}]
     ph = [{"time": 0.0, "value": 0.0, "interp": "step"}]
     sc = [{"time": 0.0, "value": [64.0 / 12.0] * 4, "interp": "step"}]
     ax = [{"time": 0.0, "value": [0.0, 0.3125, 0.0, 0.0], "interp": "step"}]
     for i, t0 in enumerate(phrases):
+        t0 = AU.on_grid(t0, 2)
         axis, scale, dphi = FLICK_PATTERNS[i % len(FLICK_PATTERNS)]
         ax.append({"time": round(t0 - 0.05, 3), "value": [0.0, 0.3125, 0.0, 0.0] if axis == "floors" else
                    [1.0 / 2.4, 0.0, 0.0, 0.0], "interp": "step"})

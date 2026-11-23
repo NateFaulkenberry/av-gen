@@ -11,7 +11,7 @@
 - Listening (ADR-2117): standing figures with `turn_to_lantern` carry a `crowd-look` Aim layer (head, 35 deg), those
   with `sway` a `crowd-sway` Secondary layer (spine, 1.32 s = two beats, on the beat); they are in crowds `ring0..5`
   by distance from the Lantern, so one bass route delayed per ring turns heads outward as a wave. The held breath
-  (tone-block rest 45.5 s, released on the 47.15 s crash) is the crowds' `lag` track.
+  (tone-block rest 45.5 s, released on the 47.03 s crash) is the crowds' `lag` track.
 """
 from __future__ import annotations
 
@@ -31,7 +31,9 @@ WALK_STRIDE = {"Walking": 1.435, "Walking_low_grav": 1.0, "Running": float(os.en
 # footstep"): Running measured on the drawn feet (avgen_foot_probe, 4 runners, two builds: planted slide -0.59 m/s at
 # 3.0, +0.90 at 4.5 -> 3.59 m/s at rate 1; the left heel strikes at clip second 0.287, the right at 0.630). The low-gravity bound planted a foot every FOUR beats (1.4 s); its figures now run (the pack's Running,
 # 0.7 s a cycle, two steps: at rate 0.997 one step a beat)
-RUN_FOR = {"Walking_low_grav": "Running"}
+# it15 (msgs 235/238): one step a TRUE quarter (0.702 s) is Running at rate 0.50 -- a run in slow motion -- so the
+# low-gravity figures walk instead (Walking, one step a beat, like everyone else)
+RUN_FOR = {"Walking_low_grav": "Walking"}
 TURN_RATE = 225.0
 SPEEDS = (0.92, 1.0, 1.08)
 PHASES = 8
@@ -39,11 +41,13 @@ SUFFIX = ""           # msg 170: "-nd" where the art's derived cast files exist 
 TIER_HZ = {"A": 0, "B": 0, "C": 0}   # it12 (msg 149): every figure posed every frame (it10: B 15 Hz, C 4 Hz stepped)
 FAR_HZ = 0.0           # it12 (msg 149, the 4.09 s flyer "glitching/skipping"): no distance rate either (it10: 15 Hz past 40 m)
 # it12 (owner msg 149: "time animations to quarter notes, this looks too slow motion"): the clips run on the song's
-# grid. Sabertooth is 171.4 BPM (the kick every 0.70 s from 0.05 s): a looping clip plays a whole number of beats a
-# cycle at a rate of at least 1 (never slower than authored); its opening phase puts a cycle's start on a beat; a walk
-# steps on every quarter note (Walking: 2 steps a cycle = 2 beats, 2.04 m/s) and a low-gravity bound on every bar.
-BEAT = AU.BEAT   # it13 (msg 178): measured, 170.95 BPM (was 60 / 171.4)
-WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8, "Running": 2}
+# grid (nd_audio: 83 BPM x 1.03 varispeed = 85.49 BPM, the kick on every quarter, 0.702 s): a looping clip plays a whole
+# number of beats a cycle (beat_rate); a walk steps on every quarter note (it15, msg 235; it12-14 stepped on the eighth).
+BEAT = AU.BEAT   # it15 (msgs 232/235/238): the true quarter, 85.49 BPM (it13-14: 0.351 s, the eighth note)
+# beats a walk cycle: a cycle is two steps, so 2 / STEPS_PER_BEAT (msg 235: one footstep per quarter note; Walking at
+# rate 0.736, 1.06 m/s, 0.74 m steps -- a stroll; it14 stepped on the eighth at rate 1.47, 2.11 m/s)
+WALK_BEATS = {c: 2.0 / AU.STEPS_PER_BEAT for c in ("Walking", "Running")}
+WALK_BEATS["Walking_low_grav"] = 4.0
 # it13 (owner msg 178: "time each footstep with each beat -- quarter note steps"): the clip second (from the clip's
 # first key) at which the LEFT foot plants, measured on the drawn feet (avgen_foot_probe --node-joints, 1146 contacts
 # of 113 walkers: left 0.358, right 0.886, 0.53 s apart in a 1.033 s cycle). Every walking cue starts at the phase that
@@ -51,16 +55,18 @@ WALK_BEATS = {"Walking": 2, "Walking_low_grav": 8, "Running": 2}
 # lands on every other beat and the right on the ones between. it12 started each leg at clip second 0 on a beat (the
 # plant fell 0.24 s after it) and timed the cycle from the clip's last key (1.067 s), not its length (1.033 s): the
 # steps came every 0.339 s against the 0.351 s beat and walked off it by a beat every 3.4 s.
-WALK_CONTACT = {"Walking": 0.317, "Running": float(os.environ.get("ND_RUN_CONTACT", "0.239"))}
+# it15: at rate 0.736 (one step a true quarter) the plants measured 30 ms early (median of 553 in shot): 22 ms of clip
+# time, so the contact moves 0.317 -> 0.295 (at it14's rate 1.47 the same 22 ms was 15 ms, under the probe's 17 ms frame)
+WALK_CONTACT = {"Walking": 0.295, "Running": float(os.environ.get("ND_RUN_CONTACT", "0.239"))}
 # it14: re-measured as the first frame of each planted interval (low and still for 4+ frames, 1,050 plants of 75 figures
 # in shot at 8-14 and 30-40 s): Walking planted 28 ms before the beat at 0.358 (it13 timed the speed threshold), Running
 # 48 ms at 0.287 -- both moved so the plant lands on the beat
 # The art's audience clips (blender/nd_poses.py) are whole kicks of 2 * 60 / 171.4 s from the it12 events' first kick
 # (0.05 s); on the measured grid their rate is scaled and their phase moved so each clip second keeps its kick.
-ART_KICK, ART_KICK0 = 2 * 60.0 / 171.4, 0.05
+ART_KICK, ART_KICK0 = 2 * 60.0 / 171.4, 0.05   # one kick = one TRUE quarter (0.700 s); now the measured 0.7018 s
 RING_M = 60.0          # a crowd ring's width (m) and the head wave's speed (m/s): one ring a second
 RINGS = 6
-BEAT2 = 4 * BEAT   # it12: four beats (s), a lean each way on alternate kicks (it10: 1.32 s, off the tempo)
+BEAT2 = 2 * BEAT   # it15: two quarters (1.404 s), a lean each way on each kick (unchanged in seconds: it12-14 wrote 4 eighths)
 LOOK_LAYER = {"name": "crowd-look", "kind": "aim", "drive": "manual",
               "joints": ["head.x", "Eye_L", "Eye_R", "Mouth", "Antenna"],
               "pivot": "head.x", "maxYaw": 35.0, "maxPitch": 20.0}
@@ -74,7 +80,8 @@ def sway_layer(phase, degrees=3.0):
 
 
 # the held breath: clip speed 1 -> 0.15 over 0.6 s from the tone block's rest, back over 0.4 s on the crash
-BREATH = (45.5, 46.1, 47.15, 47.55, 0.15)
+FLIGHT_SNAP = []   # it15: (flight, lift-off shift s, touchdown shift s)
+BREATH = AU.BREATH + (0.15,)   # it15: released ON the 47.03 s crash (beat 67), was 47.15
 
 
 def breath_speed(t):
@@ -172,9 +179,12 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             group_of[m] = gi
 
     def beat_rate(clip):
-        """(rate, beats a cycle): a whole number of beats, never slower than authored."""
+        """(rate, beats a cycle): a whole number of beats. it15: the nearest whole number while the clip runs at 0.9 or
+        more of its authored pace (on the 0.702 s quarter, 'never slower' made Idle 1.40x), else one beat fewer."""
         L = clip_len.get(clip, 2.0)
-        n = max(1, int(L / BEAT + 1e-6))
+        n = max(1, int(round(L / BEAT)))
+        if L / (n * BEAT) < 0.9 and n > 1:
+            n -= 1
         return round(L / (n * BEAT), 4), n
 
     rv = random.Random(170)   # it12 (owner msg 170): pose variety, on its own stream
@@ -191,11 +201,11 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         """it13: an art clip on the kick (nd_grid kick / off) keeps each clip second on its kick of the measured grid."""
         if sp.get("nd_grid") not in ("kick", "off") or speed is None:
             return speed, phase
-        r2 = speed * ART_KICK / (2 * BEAT)
+        r2 = speed * ART_KICK / BEAT   # it15: an art kick is one beat (it13-14 divided by two eighths)
         return round(r2, 5), round((phase + speed * ART_KICK0 - r2 * kick0) % clip_len.get(clip, 2.8), 4)
 
     def on_grid(t):
-        return kick0 + round((t - kick0) / BEAT) * BEAT
+        return AU.on_grid(t)
 
     def ring_of(pos):
         d = math.dist([pos[0], pos[2]], [bell[0], bell[2]])
@@ -315,7 +325,7 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
         elif sp.get("look_at") and not hold:
             band_ids.append((n["name"], clip, n["animation"]["speed"]))
 
-    # it12 (msg 149): the audience erupts on the crash that ends the held breath (47.15 s): Crazy once, a little
+    # it12 (msg 149): the audience erupts on the crash that ends the held breath (47.03 s): Crazy once, a little
     # staggered, then back to its own clip
     for name, clip, speed in band_ids:
         d = round(r.uniform(0.0, 0.18), 3) + round(rv.uniform(0.0, 0.3), 3)   # msg 170: a looser eruption
@@ -521,17 +531,23 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
             via = [[v[0], top, v[2]] for v in via]
         ta, tb = fdat["takeoff"], fdat["landing"]
         td = fdat.get("on_beat", {}).get("touchdown_kick_s", fdat["t_land"])
+        # it15 (msg 238): lift-off (the Jumping cue's feet leaving, t0 + 0.567) and touchdown on beats of the true
+        # grid; the art's "kick" seconds came from the it12 events (envelope peaks, up to 0.23 s off the beat)
+        t0_f = AU.on_grid(fdat["t_takeoff"] + 0.567) - 0.567
+        td_f = AU.on_grid(td)
+        d_td, td = td_f - td, td_f
+        FLIGHT_SNAP.append((fdat["id"], round(t0_f - fdat["t_takeoff"], 3), round(d_td, 3)))
         # it14 (msg 200): a flyer with `after` cues (what it does once it is down: the art's ND_* clips) is built from
         # its -nd cast file, which carries the pack's flight clips unchanged
         nd_after = [c for c in fdat.get("after", []) if SUFFIX and c["clip"] in clip_len]
         f = {"name": "flyer_" + fdat["id"], "asset": aliens + fdat["cast"] + (SUFFIX if nd_after else "") + ".glb",
              "from": {"pos": ta["pos"], "yaw": keys[0].get("yaw_deg", 0.0)},
              "to": {"pos": tb["pos"], "yaw": keys[-1].get("yaw_deg")},
-             "t0": fdat["t_takeoff"], "td": td, "alt": max(4.0, fdat.get("cruise_height_m", 0) - max(ta["pos"][1], tb["pos"][1])),
+             "t0": round(t0_f, 4), "td": round(td, 4), "alt": max(4.0, fdat.get("cruise_height_m", 0) - max(ta["pos"][1], tb["pos"][1])),
              "via": via, "kicks": kicks, "bob_from": ta.get("bob"), "bob_to": tb.get("bob")}
         n, l, t, actor = flight_fn(f)
         for c in nd_after:   # after Landing has played out: looping cues, the clip second the art means at each
-            actor["clips"].append({"time": round(c["t"], 3), "clip": c["clip"], "speed": c.get("rate", 1.0),
+            actor["clips"].append({"time": round(c["t"] + d_td, 3), "clip": c["clip"], "speed": c.get("rate", 1.0),
                                    "blend": c.get("blend", 0.3), "playback": "loop",
                                    "offset": round(c.get("offset", 0.0) % clip_len[c["clip"]], 4)})
         # ride the formations: still at A's, blending to B's over the flight, B's after it

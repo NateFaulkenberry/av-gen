@@ -1,16 +1,16 @@
 """Neon Dreams iteration 12 (owner msg 149): the band in the garden plaza, from the art's art/layout.json `band` block.
 
 - The astronaut musicians (assets/musicians: gitignored, the owner's licences forbid redistribution; never commit),
-  each performer and its props on one transform. Their clips run on the song's grid (171.4 BPM: Drums 13 beats a
-  cycle, Piano 47) and play only while their part does: a crowd `lag` track slows the drummer's clip to 0.15 when the
+  each performer and its props on one transform. Their clips run on the song's grid (85.49 BPM since it15: the Piano
+  clip a whole number of beats a cycle; the Drums time-warped onto the played notes) and play only while their part does: a crowd `lag` track slows the drummer's clip to 0.15 when the
   drums rest and the pianist's between the Moog's phrases (ADR-2117: a seek-safe change of speed). A one-beat
   `crowd-sway` Secondary layer on the spine, neck and head is pumped by the drum hits (the drummer) and the Moog notes
   (the pianist), so the bodies hit with the music. The drummer flails on each crash.
 - The stage spots: real spot lights on the band (the art's 8) and, for the beams in the air, ADR-2102 cloud beams --
   the 8 floor spots (short, wide) and the 4 halo searchlights (`sky_beams`) -- which scatter in the air and the wisps.
   Floor spots +60 % on the kick, sky beams +40 % on the snare and swaying +-12 deg over two bars, whipping a quarter
-  turn on the crashes; the held breath (45.5-47.15 s) dims the floor spots to 30 % and holds the sky beams still.
-- The audience: the art's `band_*` spots (nd_cast.py: crowd `band`, heads to the stage) erupt (Crazy) on the 47.15 s
+  turn on the crashes; the held breath (45.5-47.03 s) dims the floor spots to 30 % and holds the sky beams still.
+- The audience: the art's `band_*` spots (nd_cast.py: crowd `band`, heads to the stage) erupt (Crazy) on the 47.03 s
   crash after the held breath.
 Every envelope is a timeline track from the measured onsets or a route on a stem: seek-safe.
 """
@@ -21,10 +21,10 @@ import os
 
 import nd_audio as AU
 
-BEAT = AU.BEAT   # it13 (msg 178): measured, 170.95 BPM (was 60 / 171.4)
+BEAT = AU.BEAT   # it15 (msgs 232/238): the true quarter, 0.7018 s, 85.49 BPM (it13-14: 0.351 s, the eighth note)
 E = AU.EVENTS["stems"]
 ONSETS = {k: [t for t, _ in v["onsets"]] for k, v in E.items()}
-BREATH = (45.5, 46.1, 47.15, 47.55)
+BREATH = AU.BREATH   # it15: (45.5, 46.1, 47.03, 47.43) -- released on the crash
 PERFORMER_JOINTS = ["spine_01", "spine_02", "spine_03", "neck_01", "head"]
 
 
@@ -227,10 +227,11 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
         tracks.append(track("fx/kick_wave/%s" % leaf, [{"time": t, "value": round(v * g, 4), "interp": "linear"}
                                                         for t, g in gk]))
     # it14 (owner msg 204: "make sure the speaker pulse is on quarter notes -- it's following the kick right now"):
-    # one front per quarter note of the measured grid (AU.KICK0 + n x AU.BEAT, 170.95 BPM), the whole song but the
-    # held breath (45.5 s to the 47.15 s crash, which brings it back)
+    # one front per quarter note of the song's grid (AU.KICK0 + n x AU.BEAT; it15, msg 232: the TRUE quarter, 0.702 s,
+    # 85.49 BPM -- it14's 0.351 s fired on every eighth, twice the beat), the whole song but the
+    # held breath (45.5 s to the 47.03 s crash, which brings it back)
     grid, n = [], 0
-    while AU.KICK0 + n * BEAT < 70.18:
+    while AU.KICK0 + n * BEAT < 70.18:   # 100 fronts (it14: 200)
         t = AU.KICK0 + n * BEAT
         if not (BREATH[0] <= t < BREATH[2] - 0.05):
             grid.append(t)
@@ -336,8 +337,8 @@ def beam_tracks(beams, base_index, crashes, breath_keys, song=70.18):
                                    attackMs=15.0, decayMs=250.0))
             continue
         keys, t, whip = [], 0.0, 0.0
-        period = 8 * BEAT
-        ph = i * 0.25
+        period = 2 * AU.BAR   # it15: two bars, 5.61 s (it12-14: 8 eighths = 2.81 s, one bar), from the downbeat
+        ph = i * 0.25 - AU.KICK0 / period
         while t <= song:
             # a quarter turn on each crash, over 0.82 s from 120 ms before it (AU.CRASH is already the onset - 0.12)
             w = sum(90.0 * _ease((t - cr) / 0.82) for cr in crashes)

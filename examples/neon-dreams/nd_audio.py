@@ -38,12 +38,60 @@ with open(os.path.join(HERE, "audio", "sabertooth_events.json")) as _f:
 # the section crashes, at their leading edge (it13, msg 178: the analysis now reports the attack itself; it12's
 # "- 0.12" made up for the envelope peak and the drifting hop, which no longer exist)
 CRASH = [round(t, 2) for t, _ in EVENTS["stems"]["crash"]["onsets"]]
-# it13 (msg 178): the song's measured beat. The kick stem's attacks fit a half-beat grid of 0.175486 s from 0.0021 s
-# (121 kicks, least squares): 0.35097 s a beat, 170.95 BPM. The 171.4 BPM the scene used before ran 0.26 % fast, so
-# anything on that grid drifted early against the music: 0.12 s (a third of a beat) by the band at 45 s.
-BEAT = 0.35097
-KICK0 = 0.0021
+# THE SONG'S GRID -- the one tempo definition every system reads (it15, owner msgs 232/235/238).
+# The stems carry the session tempo: Logic Pro writes a cue at sample 0 labelled "Tempo: 83.0" in each WAV's
+# LIST/adtl chunk (and BASS.mid has a 722,892 us quarter = 83.000 BPM, 4/4). The owner bounced it with a +3 % varispeed,
+# so the audio runs at 83 x 1.03 = 85.49 BPM. Measured: the 99 on-beat kicks of the kick stem fit 0.701813 s from
+# 0.0061 s (least squares, mean residual 1.2 ms) = 85.4929 BPM = 83 x 1.03003; the analysed beat clock (avgen, the
+# kick stem) reads 85.47 BPM, with its bar on the same grid. Kick on every quarter (four on the floor, plus ghost
+# kicks a sixteenth before beats 2-4), snare on beats 2 and 4 (41/40 of 81), the section crashes on beats 1 or 4.
+# Beat 0 (0.0061 s) is a downbeat: bar n starts at KICK0 + 4 n BEAT (the crash at 2.807 s is bar 1's downbeat).
+# it13's 0.35097 s "beat" (170.95 BPM) was the EIGHTH note: double time, the error msg 232 caught.
+def _session_bpm(default=83.0):
+    """The tempo label Logic writes into the stems (LIST/adtl/labl "Tempo: N"); `default` without the stems."""
+    import re
+    import struct
+    path = os.path.expanduser("~/Desktop/sabertooth/Kick.wav")
+    try:
+        with open(path, "rb") as f:
+            f.seek(12)
+            while True:
+                h = f.read(8)
+                if len(h) < 8:
+                    break
+                cid, size = h[:4], struct.unpack("<I", h[4:])[0]
+                if cid == b"LIST" and size < 1 << 16:
+                    m = re.search(rb"Tempo: ([0-9.]+)", f.read(size + (size & 1)))
+                    if m:
+                        return float(m.group(1))
+                else:
+                    f.seek(size + (size & 1), 1)
+    except OSError:
+        pass
+    return default
+
+
+SESSION_BPM = _session_bpm()          # 83.0, from the stems
+VARISPEED = 1.03                      # the owner's bounce (msg 232); the kick fit gives 1.03003
+BPM = SESSION_BPM * VARISPEED         # 85.49
+BEAT = 60.0 / BPM                     # 0.701836 s: a quarter note
+KICK0 = 0.0061                        # beat 0, a downbeat (the kick fit's origin)
+BAR = 4 * BEAT                        # 2.807 s
+STEPS_PER_BEAT = 1                    # msg 235: one footstep per quarter note (it14 stepped on the eighth: 2)
+
+
+def on_grid(t, div=1):
+    """The nearest grid time to t, the grid being 1/div of a beat."""
+    q = BEAT / div
+    return KICK0 + round((t - KICK0) / q) * q
 C_FIRST, C_PRE, C_ARRIVAL, C_CLOSE, C_VEIL, C_FAR, C_REVEAL = CRASH[:7]
+
+# the held breath (it10): from the tone block's rest (45.5 s, after its last hit at 44.75 s, before beat 65's kick and
+# snare) to the section crash on beat 67 (47.03 s), which releases it. it10-14 released at 47.15 s, 0.12 s after the
+# crash (the envelope-peak era's onset + 0.12).
+BREATH_IN = 45.5
+BREATH_OUT = round(on_grid(CRASH[4]), 3)   # 47.029: beat 67 (the "4" of bar 16), the crash
+BREATH = (BREATH_IN, BREATH_IN + 0.6, BREATH_OUT, BREATH_OUT + 0.4)
 
 # when each palette state begins, per system: (start second, state, seconds to cross)
 ARC = {
