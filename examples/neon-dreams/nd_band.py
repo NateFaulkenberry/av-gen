@@ -187,6 +187,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                        "duration": PULSE["duration"], "thickness": PULSE["thickness"],
                                        "ease": 0, "rimColor": pal(PULSE["key"]), "rimEmission": PULSE["rim"],
                                        "chroma": PULSE["chroma"], "radiusDecay": 0.6, "maxConcurrent": 2.0,
+                                       "maxShift": CALM["shift"], "lensNear": CALM["ring_near"], "lensClear": CALM["ring_clear"],
                                        "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     # it14 (owner msg 195: "way more visible and impactful -- the wave should pulsate through the entire scene /
     # geometry / characters", visible down the Quay): ADR-2124's Shockwave through the world, released from the
@@ -203,6 +204,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                    "maxConcurrent": 8.0, "push": WAVE["push"], "lift": WAVE["lift"],
                                    "flashColor": [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])], "flash": WAVE["flash"], "flare": WAVE["flare"],
                                    "clouds": WAVE["clouds"], "fadeStart": WAVE["fade"][0], "fadeEnd": WAVE["fade"][1],
+                                   "maxShift": CALM["shift"], "lensNear": CALM["near"], "lensClear": CALM["clear"],
                                    "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     info["effects"] = effects
     # the held breath silences the wave in flight too, and (msg 222: "way too strong -- should not be visible till we
@@ -214,8 +216,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
         def sm(u):
             u = max(0.0, min(1.0, u))
             return u * u * (3 - 2 * u)
-        br = 1.0 - sm((t - a) / (b - a)) + sm((t - c) / (d - c)) if t < d else 1.0
-        br = min(1.0, br) if t >= a else 1.0
+        br = 1.0   # it17 (msg 253: "a shockwave is missed here", 46.17 s): the held breath no longer silences the wave
         g = 1.0
         if CAM_AT is not None:
             g = 1.0 - sm((math.dist(CAM_AT(t), c_stage) - CAM_FADE[0]) / (CAM_FADE[1] - CAM_FADE[0]))
@@ -230,11 +231,11 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
     # one front per quarter note of the song's grid (AU.KICK0 + n x AU.BEAT; it15, msg 232: the TRUE quarter, 0.702 s,
     # 85.49 BPM -- it14's 0.351 s fired on every eighth, twice the beat), the whole song but the
     # held breath (45.5 s to the 47.03 s crash, which brings it back)
+    # it17 (owner msg 253: "a shockwave is missed here" at 46.17 s, inside the held breath): every quarter of the song
+    # gets its front -- the breath keeps the crowd still and the spots dim, but no longer skips the wave
     grid, n = [], 0
-    while AU.KICK0 + n * BEAT < 70.18:   # 100 fronts (it14: 200)
-        t = AU.KICK0 + n * BEAT
-        if not (BREATH[0] <= t < BREATH[2] - 0.05):
-            grid.append(t)
+    while AU.KICK0 + n * BEAT < 70.18:
+        grid.append(AU.KICK0 + n * BEAT)
         n += 1
     info["markers"] = [{"time": round(t, 4), "name": "kick"} for t in grid]
     info["breath_keys"] = breath_keys
@@ -316,6 +317,18 @@ CAM_AT = None   # build.py: the baked lens's eye at t
 # 0.2 -> 0.1, edge glow 0.1 -> 0.05; the speakers' pink arcs 0.9 -> 0.45); the shove a little less (0.9 -> 0.75 m)
 WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 0.15, "rim": 0.05, "decay": 0.5,
         "ref": 25.0, "push": 0.75, "lift": 0.45, "flash": 0.06, "flare": 0.4, "clouds": 0.1, "chroma": 0.06, "key": "sign_a"}
+# it17 (owner msg 253: "the shockwaves still feel like they're jerking the camera way too much"): ADR-2126's calm.
+# A front shifts no pixel more than CALM["shift"] px (1080p) -- the bend, and the shove of what it passes as seen from
+# the lens; nothing within 8 m of the lens bends, glows or is pushed (full from 16 m); and the bend fades as the front's
+# radius comes within CALM["clear"] m of the lens's distance from the stage, so a front passing the lens never warps
+# the whole frame.
+# A/B at 44-51 s (work/engine/it17/jolt): mean tile shift 3.47 px (max 22.9, 83 % of the frame moved) before.
+# The speakers' rings (14 m) hold the band's lens: they fade as they pass within 6 m of it, and within 4 m of it.
+# it17 attribution at 48.4-48.8 s (one component on at a time vs none; work/engine/it17/look): the shove of the stage
+# and the crowd and the haze each moved half the frame by ~2.5 px under a 3 px cap, the speakers' rings ~1 px, the
+# light none -- a coherent shift of everything near reads as the lens moving. So 1.5 px, and the young front clears
+# the lens by 20 m before it bends anything.
+CALM = {"shift": 1.5, "near": 8.0, "clear": 20.0, "ring_near": 4.0, "ring_clear": 6.0}
 PULSE = {"strength": 0.8, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.45, "chroma": 0.12, "key": "sign_a"}
 
 

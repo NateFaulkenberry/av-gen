@@ -17,7 +17,11 @@ each star's own colour walks the spectrum as it falls), a white flash core, and 
 attack, a 1.6 s decay) that lights the roofs, decks, clouds and crowd below. The sites are chosen where the lens looks
 at that second; it16 (msg 243: "some of the fireworks are clipped behind clouds") each is tested against the cloud
 lobes, the mist sheets and the town's boxes along the sight lines over the stars' life, and the clearest wins
-(sites_for, CloudModel).
+(sites_for, CloudModel). it17 (msgs 253/258: "still clipping behind clouds" at 59.27 and ~37 s): the cause was not the
+cloud in front -- the model found none -- but the cloud BEHIND: the stars write no depth and the clouds are marched
+after them against the depth buffer, so a cloud bank behind a burst was composited over it. The shells are drawn over
+the clouds now (ADR-2127, `overClouds`); the sight lines follow the falling stars down (DROP) over their whole bright
+life (samples_for), and a heart sits CLEAR_ABOVE m over the local cloud tops.
 
 Everything is a timeline track keyed on the measured times: the render steps the particle simulation frame by frame
 from the start, so a play and a full render agree; a still started in the middle of a shell's life does not have the
@@ -36,6 +40,7 @@ RISE = 1.05            # s from launch to burst
 STARS_PER_SYSTEM = 420  # three systems a shell
 LIGHT = {"intensity": 4000.0, "range": 200.0}
 STAR = {
+    "overClouds": True,  # it17 (msg 253): drawn over the cloud march (ADR-2127), not sunk into the cloud behind
     "capacity": 2048, "shape": "sphere", "extent": [0.4, 0.4, 0.4], "spawnRate": 0.0, "burst": 0.0,
     "lifetimeMin": 1.6, "lifetimeMax": 2.7, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
     "speedMin": 15.0, "speedMax": 27.0, "gravity": [0.0, -7.5, 0.0], "drag": 1.15, "turbulence": 0.6,
@@ -43,6 +48,7 @@ STAR = {
     "blend": "additive", "softness": 0.0, "pulseRate": 7.0, "pulseDepth": 0.55, "velocityStretch": 0.8,
     "stretchMax": 3.5, "stretchMin": 0.05}
 ROCKET = {
+    "overClouds": True,  # it17 (msg 253): drawn over the cloud march (ADR-2127), not sunk into the cloud behind
     "capacity": 1024, "shape": "sphere", "extent": [0.15, 0.15, 0.15], "spawnRate": 0.0, "burst": 0.0,
     "lifetimeMin": 0.35, "lifetimeMax": 0.7, "direction": [0.0, -1.0, 0.0], "spread": 0.25,
     "speedMin": 1.5, "speedMax": 4.0, "gravity": [0.0, -3.0, 0.0], "drag": 1.5, "turbulence": 0.4,
@@ -50,6 +56,7 @@ ROCKET = {
     "colorStart": [1.0, 0.82, 0.55, 1.0], "colorEnd": [1.0, 0.35, 0.1, 0.0], "emissive": 14.0,
     "blend": "additive", "softness": 0.0, "pulseRate": 14.0, "pulseDepth": 0.6}
 FLASH = {
+    "overClouds": True,  # it17 (msg 253): drawn over the cloud march (ADR-2127), not sunk into the cloud behind
     "capacity": 256, "shape": "sphere", "extent": [0.5, 0.5, 0.5], "spawnRate": 0.0, "burst": 0.0,
     "lifetimeMin": 0.08, "lifetimeMax": 0.16, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
     "speedMin": 0.5, "speedMax": 2.0, "gravity": [0.0, 0.0, 0.0], "drag": 0.5, "turbulence": 0.0,
@@ -66,10 +73,15 @@ FLASH = {
 # its chord. A burst is seen when the sight lines to its heart and to six points 16 m round it all stay under TAU_MAX.
 EXTINCTION = 0.15
 TAU_MAX = 0.35          # transmittance >= 0.70 to the burst's heart
-RING_TAU_MAX = 0.9      # and >= 0.4 to its sides and top
+RING_TAU_MAX = 0.5      # and >= 0.6 to its sides, top and the falling stars (it17: 0.9; the stars are drawn over the
+                        # clouds now (ADR-2127), so a cloud IN FRONT of them must be thin)
 BURST_R = 16.0          # the stars' reach (speed / drag ~ 15-20 m) for the ring of sight lines
 MIST_SHARE = 0.15       # the lobes' mist (lobeMist) between the body and the halo
 HALO_MAX = 12.0         # m: the halo reaches 1.5 radii, but a big lobe's mist is patches near its skin, not a shell
+DROP = 34.0             # it17: m below the heart the falling stars reach by the end of their bright life (the sight
+                        # lines follow them down: at a sample dt the lowest stars are DROP x dt / bright life down)
+CLEAR_ABOVE = 60.0      # it17 (msg 253): the heart at least this far over the highest cloud top within CLEAR_R of it
+CLEAR_R = 60.0
 SHEET_SHARE = 0.04      # a mist sheet's tattered share of its density (the sheets read as thin threads in the film: the it16 shells seen through them)
 
 
@@ -105,6 +117,18 @@ class CloudModel:
         self.bound = self.halo.max(1)
         w = clouds.get("wisps") or {}
         self.sheets = [l for l in w.get("layers", [])] if w.get("enabled", True) else []
+        self.top = self.c[:, 1] + self.body[:, 1]
+
+    def top_near(self, x, z, r):
+        """The highest cloud body top (m) over the disc of radius r round (x, z); -inf over clear air."""
+        lim = r + self.body[:, 0]
+        near = (np.abs(self.c[:, 0] - x) < lim) & (np.abs(self.c[:, 2] - z) < lim)
+        if not near.any():
+            return -np.inf
+        dx = (self.c[near, 0] - x) / (self.body[near, 0] + r)
+        dz = (self.c[near, 2] - z) / (self.body[near, 2] + r)
+        inside = dx * dx + dz * dz < 1.0
+        return float(self.top[near][inside].max()) if inside.any() else -np.inf
 
     def taus(self, a, pts):
         """The optical depth of the sight lines from a to each of pts."""
@@ -339,13 +363,21 @@ def _ring(burst, dirs=UP_RING):
     return [[burst[0] + BURST_R * o[0], burst[1] + BURST_R * o[1], burst[2] + BURST_R * o[2]] for o in dirs]
 
 
-def visibility(t, burst, cam_at, clouds, boxes, heart_only=False):
+def samples_for(life):
+    """it17 (msg 253: "the stars must not fall into cloud while still bright"): the seconds after the burst the lens
+    must see the shell, over its stars' bright life (0.85 of the longest; the opacity curve is past 0.85 by 0.6)."""
+    return tuple(round(0.1 + 0.4 * i, 2) for i in range(16) if 0.1 + 0.4 * i <= max(0.85 * life, SAMPLES[-1]))
+
+
+def visibility(t, burst, cam_at, clouds, boxes, heart_only=False, samples=SAMPLES, life=2.7):
     """Per sample second after the burst: (dt, the optical depth to the heart, the worst over the five points BURST_R
-    round it (sides and top: the stars rain down, into cloud if they like), how many of the sight lines a town box
+    round it (sides and top) and, it17 (msg 253), the falling stars below it (DROP, followed down over the bright
+    life: they no longer rain into cloud unseen), how many of the sight lines a town box
     cuts (the heart's counts 10), the frame fraction the burst and its ring (below too) reach, the lens inside cloud)."""
     rows = []
-    pts = [burst] + _ring(burst)
-    for dt in SAMPLES:
+    for dt in samples:
+        fall = DROP * min(1.0, dt / (0.85 * life))
+        pts = [burst] + _ring(burst) + [[burst[0], burst[1] - h, burst[2]] for h in (0.5 * fall, fall)]
         eye, fx, fy = _view(cam_at, t + dt, burst)
         ring = [_view(cam_at, t + dt, q) for q in _ring(burst, UP_RING + ((0, -1, 0),))]
         frame = max([fx / FRAME_KEEP, fy / FRAME_KEEP] + ([] if heart_only else [max(r[1], r[2]) for r in ring]))
@@ -355,7 +387,7 @@ def visibility(t, burst, cam_at, clouds, boxes, heart_only=False):
         if boxes is not None and len(boxes[0]):
             le = _local(boxes, eye)
             out = ~((boxes[3] <= le).all(1) & (le <= boxes[4]).all(1))
-        cut = sum((10 if j == 0 else 1) for j, q in enumerate(pts) if _hits_boxes(eye, q, boxes, out))
+        cut = sum((10 if j == 0 else 1) for j, q in enumerate(pts[:len(UP_RING) + 1]) if _hits_boxes(eye, q, boxes, out))
         rows.append((dt, float(taus[0]), float(taus[1:].max()), cut, frame, clouds.inside(eye) if clouds else False))
     return rows
 
@@ -364,7 +396,8 @@ def seen(rows):
     return [r for r in rows if r[1] <= TAU_MAX and r[2] <= RING_TAU_MAX and r[3] <= OCCLUDED_MAX and r[4] <= 1.0]
 
 
-CANDIDATES = 500
+REFINE = 400        # it17: candidates jittered round the best
+CANDIDATES = 1500   # it17: 500 -> 1500 (the falling stars' sight lines and the cloud-top clearance narrow the field)
 
 
 # msg 248 ("make sure the fireworks are in the background of the band when we focus on them"): a crash in the band
@@ -373,7 +406,7 @@ CANDIDATES = 500
 BAND_DWELL = (43.6, 51.2)
 
 
-def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=None):
+def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=None, life=2.7):
     """it16 (msg 243): the burst point in clear air and in the lens's view. Candidates spread over the frame (azimuth
     within 62 % of the half-width, 10-85 % of the half-height over the lens's pitch, 55-240 m out, a few to 340 m); each is scored by
     the samples SAMPLES after the burst in which every sight line to the burst and its ring is clear of cloud and town
@@ -386,17 +419,25 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
         out = [t + dt for dt in SAMPLES + (2.9, 3.3) if not clouds.inside(cam_at(t + dt)[0])]
         views = out[:2] or views
     best = None
-    for k in range(CANDIDATES):
+    for k in range(CANDIDATES + REFINE):
         eye, d, _roll, fov = cam_at(views[k % len(views)])
+        if k >= CANDIDATES:   # it17: then a local search round the best so far (a narrow sky slit is easily missed)
+            p = [best[1][0] + rng.gauss(0.0, 12.0), best[1][1] + rng.gauss(0.0, 10.0), best[1][2] + rng.gauss(0.0, 12.0)]
+            dist = math.dist(p, eye)
+            k = -1
+        else:
+            p = None
         yaw = math.atan2(d[2], d[0])
         pitch = math.asin(max(-1.0, min(1.0, d[1])))
         half_v = math.radians(fov) * 0.5
         half_h = math.atan(math.tan(half_v) * 16.0 / 9.0)
-        if focus is not None:   # behind the band: on the bearing to the stage, past it, over its halo
+        if p is not None:
+            pass
+        elif focus is not None:   # behind the band: on the bearing to the stage, past it, over its halo
             fx, fz = focus[0] - eye[0], focus[2] - eye[2]
             fd = math.hypot(fx, fz)
-            b = math.atan2(fz, fx) + rng.uniform(-0.2, 0.2) * half_h
-            horiz = fd + rng.uniform(15.0, 80.0)
+            b = math.atan2(fz, fx) + rng.uniform(-0.3, 0.3) * half_h   # it17: 0.2 -> 0.3
+            horiz = fd + rng.uniform(15.0, 80.0 if k < CANDIDATES // 2 else 200.0)   # it17: and further, over the cloud behind
             dist = horiz
             # in the frame: from just over the halo's own height in the picture to 90 % of the half-height
             u0 = math.atan2(focus[1] - eye[1], fd) - pitch
@@ -405,7 +446,7 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
         else:
             az = rng.uniform(-0.62, 0.62) * half_h
             el = pitch + rng.uniform(0.1, 0.85) * half_v
-            dist = rng.uniform(40.0, 240.0) if k < 400 else rng.uniform(240.0, 340.0)
+            dist = rng.uniform(40.0, 240.0) if k < 0.8 * CANDIDATES else rng.uniform(240.0, 340.0)
             hx, hz = math.cos(yaw + az), math.sin(yaw + az)
             horiz = dist * math.cos(el)
             p = [eye[0] + hx * horiz, eye[1] + dist * math.sin(el), eye[2] + hz * horiz]
@@ -415,7 +456,10 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
         base = (g + 4.0) if g is not None else p[1] - 75.0
         if p[1] - base < 30.0:   # at least a 30 m climb
             p[1] = base + 30.0 + rng.uniform(0.0, 20.0)
-        rows = visibility(t, p, cam_at, clouds, boxes, heart_only=focus is not None)
+        # it17 (msg 253): well over the local cloud tops -- the heart CLEAR_ABOVE m over the highest within CLEAR_R
+        over = p[1] - clouds.top_near(p[0], p[2], CLEAR_R) if clouds is not None else np.inf
+        rows = visibility(t, p, cam_at, clouds, boxes, heart_only=focus is not None, samples=samples_for(life),
+                          life=life)
         counted = [r for r in rows if not r[5]] or rows
         ok = seen(counted)
         frames = [r[4] for r in counted if r[4] != float("inf")]
@@ -424,11 +468,11 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
         haze = sum(min(r[1], 5.0) + 0.5 * min(r[2], 5.0) + 0.5 * r[3] + 2.0 * min(max(r[4] - 1.0, 0.0), 3.0)
                    for r in counted) / len(counted)
         score = len(ok) / len(counted) + (0.5 if ok and ok[0] is counted[0] else 0.0) - 0.2 * haze \
-            - dist / 4000.0 - (0.1 * max(frames) if frames else 9.0)
+            - dist / 4000.0 - (0.1 * max(frames) if frames else 9.0) - 1.0 * min(1.0, max(CLEAR_ABOVE - over, 0.0) / CLEAR_ABOVE)
         if best is None or score > best[0]:
-            best = (score, p, base, rows)
-    _, p, base, rows = best
-    return {"burst": [round(v, 2) for v in p],
+            best = (score, p, base, rows, over)
+    _, p, base, rows, over = best
+    return {"burst": [round(v, 2) for v in p], "over_cloud": round(float(min(over, 9999.0)), 1),
             "launch": [round(p[0] + rng.uniform(-4, 4), 2), round(base, 2), round(p[2] + rng.uniform(-4, 4), 2)],
             "visibility": [[r[0], round(r[1], 3), round(r[2], 3), r[3], round(min(r[4], 99.0), 3), r[5]] for r in rows]}
 
@@ -453,8 +497,9 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
         focus = None
         if st and BAND_DWELL[0] <= t <= BAND_DWELL[1]:
             focus = [st["centre"][0], st.get("halo_y", st["centre"][1] + 8.0), st["centre"][2]]
-        site = sites_for(t, cam_at, layout, rng, model, boxes, taken, focus)
         ty = TYPES[order[k % len(TYPES)]]
+        life = max(sd.get("lifetimeMax", STAR["lifetimeMax"]) + sd.get("delay", 0.0) for sd in ty["systems"])
+        site = sites_for(t, cam_at, layout, rng, model, boxes, taken, focus, life)
         tag = "fw%d" % k
         L, B, tb = site["launch"], site["burst"], round(t, 4)
         shells.append(dict(site, t=tb, type=ty["name"]))

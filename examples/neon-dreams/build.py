@@ -36,6 +36,7 @@ import nd_audio as AU  # noqa: E402  (iteration 5: audio reactivity and the pale
 import nd_flight as FL  # noqa: E402  (iteration 10, owner msg 117: jetpack flights)
 import nd_lights as NL  # noqa: E402  (iteration 11, owner msg 130: the city's lights play more of the song)
 import nd_cast as NC  # noqa: E402  (iteration 10, owner msg 112: the population from art/population.json)
+import nd_ufo as NU  # noqa: E402  (iteration 17, owner msg 258: UFO fly-bys)
 import nd_fireworks as NFW  # noqa: E402  (iteration 14, owner msg 206: fireworks on the crashes)
 import nd_band as NB  # noqa: E402  (iteration 12, owner msg 149: the band, its spots and beams)
 import nd_camera as NCAM  # noqa: E402  (iteration 13, owner msg 178: the journey camera baked C2-smooth)
@@ -1376,6 +1377,9 @@ MOON_ARGS = {}
 BELL_POS = next(i["pos"] for i in LAYOUT["instances"] if i["asset"].endswith("great_lantern_bell.glb"))
 
 
+FADE_IN = 2.0   # it17 (msg 256): seconds from black at the start
+
+
 def fade_tracks():
     """it14 (owner msg 195: "finish the scene off by diving into this vortex and fading out"): the picture's gain
     (post/grade/gain, rgb) from 1 to 0 over the layout's `camera.fade` keys, eased (smoothstep), black on the last
@@ -1384,8 +1388,13 @@ def fade_tracks():
     if not fk:
         return []
     (a, va), (b, vb) = fk[0], fk[-1]
-    keys = [{"time": 0.0, "value": [va] * 3, "interp": "linear"}]
+    # it17 (owner msg 256: "start the video with a 2-second fade-in too"): from black over 0-2 s, the same smoothstep
+    # as the fade-out; the first crash (2.8 s, its shell) lands in full picture
+    keys = []
     n = 24
+    for i in range(n + 1):
+        u = i / n
+        keys.append({"time": round(FADE_IN * u, 4), "value": [round(va * u * u * (3 - 2 * u), 4)] * 3, "interp": "linear"})
     for i in range(n + 1):
         u = i / n
         e = u * u * (3 - 2 * u)
@@ -1492,6 +1501,14 @@ def scene_doc(state="uv", sky_map=None):
         flyer_lights = flyer_lights + fw_lights
         alien_tracks = alien_tracks + fw_tracks
         FW_INFO.update(FIREWORKS)
+    # it17 (owner msg 258: "use our UFO asset and shoot some UFOs across the sky at various points in the video")
+    with open(os.path.join(HERE, "meshes", "kit_manifest.json")) as kf:
+        kit = json.load(kf)
+    u_nodes, u_lights, u_tracks, u_info = NU.build(lambda t: camera().at(t), clouds_block(state), LAYOUT, kit)
+    nodes += u_nodes
+    flyer_lights = flyer_lights + u_lights
+    alien_tracks = alien_tracks + u_tracks
+    FW_INFO.update(u_info)
     programs = [
         moon_program("ndMoon", [v * MOON_GAIN for v in pal("moon_disc", state)], ml, 3.0 / R, md[1] * D, R),
         ocean_breathing(ocean_program("ndOcean", pal("ocean_a", state), pal("ocean_b", state),
