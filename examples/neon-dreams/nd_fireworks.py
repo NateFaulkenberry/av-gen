@@ -40,7 +40,7 @@ STAR = {
     "capacity": 2048, "shape": "sphere", "extent": [0.4, 0.4, 0.4], "spawnRate": 0.0, "burst": 0.0,
     "lifetimeMin": 1.6, "lifetimeMax": 2.7, "direction": [0.0, 1.0, 0.0], "spread": 1.0,
     "speedMin": 15.0, "speedMax": 27.0, "gravity": [0.0, -7.5, 0.0], "drag": 1.15, "turbulence": 0.6,
-    "turbulenceScale": 0.08, "turbulenceSpeed": 0.4, "sizeStart": 0.7, "sizeEnd": 0.12, "emissive": 16.0,
+    "turbulenceScale": 0.08, "turbulenceSpeed": 0.4, "sizeStart": 0.7, "sizeEnd": 0.12, "emissive": 7.0,
     "blend": "additive", "softness": 0.0, "pulseRate": 7.0, "pulseDepth": 0.55, "velocityStretch": 0.8,
     "stretchMax": 3.5, "stretchMin": 0.05}
 ROCKET = {
@@ -77,9 +77,12 @@ def star_curves(h0):
 
 
 def ramp(*cols):
-    """A colour curve through `cols` (white-hot first), evenly over the life."""
-    n = len(cols)
-    return [{"t": round(i / (n - 1), 3), "color": list(c)} for i, c in enumerate(cols)]
+    """A colour curve: white-hot only at ignition (to 6 % of the life), then `cols[1:]` evenly over the rest."""
+    rest = cols[1:]
+    keys = [{"t": 0.0, "color": list(cols[0])}]
+    for i, c in enumerate(rest):
+        keys.append({"t": round(0.06 + 0.94 * i / max(len(rest) - 1, 1), 3), "color": list(c)})
+    return keys
 
 
 WHITE = (1.0, 0.97, 0.94)

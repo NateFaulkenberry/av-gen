@@ -310,7 +310,7 @@ def drum_warp(clip, L, song=70.18):
 CAM_FADE = (190.0, 260.0)
 CAM_AT = None   # build.py: the baked lens's eye at t
 WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 1.0, "rim": 0.1, "decay": 0.5, "ref": 25.0,
-        "push": 0.9, "lift": 0.45, "flash": 0.45, "flare": 2.0, "clouds": 0.6, "key": "sign_a"}
+        "push": 0.9, "lift": 0.45, "flash": 0.25, "flare": 1.4, "clouds": 0.35, "key": "sign_a"}
 PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
 
 
