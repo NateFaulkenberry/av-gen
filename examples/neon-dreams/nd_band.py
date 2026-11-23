@@ -202,7 +202,8 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                    "ease": 3, "rimColor": pal(WAVE["key"]), "rimEmission": WAVE["rim"],
                                    "chroma": WAVE["chroma"], "radiusDecay": WAVE["decay"], "refRadius": WAVE["ref"],
                                    "maxConcurrent": 8.0, "push": WAVE["push"], "lift": WAVE["lift"],
-                                   "flashColor": [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])], "flash": WAVE["flash"], "flare": WAVE["flare"],
+                                   "flashColor": (pal(WAVE["key"]) if WAVE.get("flash_sat") else
+                                                  [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])]), "flash": WAVE["flash"], "flare": WAVE["flare"],
                                    "clouds": WAVE["clouds"], "fadeStart": WAVE["fade"][0], "fadeEnd": WAVE["fade"][1],
                                    "maxShift": CALM["shift"], "lensNear": CALM["near"], "lensClear": CALM["clear"],
                                    "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
@@ -346,7 +347,18 @@ WAVE_VARIANTS = {
                    "rim": 0.1, "haze": 0.28, "chroma": 0.08, "key": "eave"},
           "calm": {"shift": 5.0, "near": 6.0, "clear": 10.0}},
 }
-WAVE_VARIANT = os.environ.get("ND_WAVE", "B")
+# it19 (owner msg 283 at 38.2 s: "the shockwaves are causing too much colour washout of the scene -- reduce this part
+# of the effect"). Attribution, wave on vs off at 37-40 s (the Quay) and 45-48 s (the band), 960x540, frame means
+# (work/engine/it19/ab): B lifted the luma +68 % / +47 % and cut the saturation -29 % / -32 %. With every light term
+# off (push, bend and chroma kept) the change is +0.6 % / +0.7 % luma: all of the wash is light. The surface band
+# (flash, its colour a pale violet) was most of it and the shell's glow (rimEmission) the rest -- at 0.06 the rim alone
+# still lifted the Quay +16 %, a veil wherever the sight line crosses the shell. Now the flash is a trace in the
+# palette's own saturated violet, the rim a faint tinted edge, the clouds and the flare a touch: +6.1 % / +4.7 % luma,
+# +0.2 % / -2.6 % saturation. The push and the bend (strength, chroma, maxShift) are B's: the wave reads by motion.
+WAVE_VARIANTS["D"] = {"wave": dict(WAVE_VARIANTS["B"]["wave"], flash=0.0052, flare=0.18, clouds=0.022, rim=0.015,
+                                   flash_sat=True),
+                      "calm": dict(WAVE_VARIANTS["B"]["calm"])}
+WAVE_VARIANT = os.environ.get("ND_WAVE", "D")
 if WAVE_VARIANT in WAVE_VARIANTS:
     WAVE.update(WAVE_VARIANTS[WAVE_VARIANT]["wave"])
     CALM.update(WAVE_VARIANTS[WAVE_VARIANT]["calm"])
