@@ -356,6 +356,55 @@ def _view(cam_at, t, p):
     return eye, abs(x) / (tv * 16.0 / 9.0), abs(y) / tv
 
 
+def _screen(cam_at, t, p):
+    """it19 (msg 283): p in the lens at t, signed, in half-HEIGHT units (x scaled by the aspect), after the roll;
+    (x, y, depth); None behind the lens."""
+    eye, d, roll, fov = cam_at(t)
+    v = [p[i] - eye[i] for i in range(3)]
+    z = sum(v[i] * d[i] for i in range(3))
+    if z <= 1.0:
+        return None
+    rgt = [-d[2], 0.0, d[0]]
+    ln = math.hypot(rgt[0], rgt[2]) or 1.0
+    rgt = [c / ln for c in rgt]
+    up = [rgt[1] * d[2] - rgt[2] * d[1], rgt[2] * d[0] - rgt[0] * d[2], rgt[0] * d[1] - rgt[1] * d[0]]
+    x = sum(v[i] * rgt[i] for i in range(3)) / z
+    y = sum(v[i] * up[i] for i in range(3)) / z
+    r = math.radians(roll)
+    x, y = x * math.cos(r) + y * math.sin(r), -x * math.sin(r) + y * math.cos(r)
+    tv = math.tan(math.radians(fov) * 0.5)
+    return x / tv, y / tv, z, tv
+
+
+# it19 (owner msg 283 at 25.4 s: "spread these out in the sky more so they aren't all in the same place" -- the 23.16,
+# 24.57 and 25.26 s shells burst in one patch of sky). Each shell is kept clear, ON SCREEN, of every earlier shell
+# whose stars still glow (its 1.3 x BURST_R disc against theirs, at the burst and over the next 1.5 s, SPREAD_GAP
+# half-heights apart at least), and is drawn away from where the last two shells burst in the picture (the lens
+# barely moves between crashes 0.7 s apart, so "the same patch of sky" is the same screen patch).
+SPREAD_GAP = 0.12       # half-heights of clear sky between two live shells' discs
+SPREAD_FAR = 0.9        # half-heights: the distance from the last shells' screen spots worth more score
+SPREAD_SAMPLES = (0.0, 0.5, 1.0, 1.5)
+
+
+def spread(t, p, cam_at, prior):
+    """(overlap, far): overlap > 0 when p's disc meets a live earlier shell's on screen (the worst, in half-heights);
+    far = the least screen distance (half-heights, capped at SPREAD_FAR) from the recent shells' bursts."""
+    overlap, far = 0.0, SPREAD_FAR
+    for tp, q, life in prior:
+        for dt in SPREAD_SAMPLES:
+            tau = t + dt
+            a, b = _screen(cam_at, tau, p), _screen(cam_at, tau, q)
+            if a is None or b is None:
+                continue
+            gap = math.hypot(a[0] - b[0], a[1] - b[1])
+            if dt == 0.0:
+                far = min(far, gap)
+            if tau - tp < 0.85 * life:
+                ra, rb = 1.3 * BURST_R / (a[2] * a[3]), 1.3 * BURST_R / (b[2] * b[3])
+                overlap = max(overlap, ra + rb + SPREAD_GAP - gap)
+    return overlap, far
+
+
 UP_RING = ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, 0, 1), (0, 0, -1))   # the stars fall: below the heart may be cloud
 
 
@@ -406,7 +455,7 @@ CANDIDATES = 1500   # it17: 500 -> 1500 (the falling stars' sight lines and the 
 BAND_DWELL = (43.6, 51.2)
 
 
-def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=None, life=2.7):
+def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=None, life=2.7, prior=()):
     """it16 (msg 243): the burst point in clear air and in the lens's view. Candidates spread over the frame (azimuth
     within 62 % of the half-width, 10-85 % of the half-height over the lens's pitch, 55-240 m out, a few to 340 m); each is scored by
     the samples SAMPLES after the burst in which every sight line to the burst and its ring is clear of cloud and town
@@ -436,7 +485,7 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
         elif focus is not None:   # behind the band: on the bearing to the stage, past it, over its halo
             fx, fz = focus[0] - eye[0], focus[2] - eye[2]
             fd = math.hypot(fx, fz)
-            b = math.atan2(fz, fx) + rng.uniform(-0.3, 0.3) * half_h   # it17: 0.2 -> 0.3
+            b = math.atan2(fz, fx) + rng.uniform(-0.45, 0.45) * half_h   # it17: 0.2 -> 0.3; it19 (msg 283): 0.45, room to spread
             horiz = fd + rng.uniform(15.0, 80.0 if k < CANDIDATES // 2 else 200.0)   # it17: and further, over the cloud behind
             dist = horiz
             # in the frame: from just over the halo's own height in the picture to 90 % of the half-height
@@ -469,6 +518,10 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
                    for r in counted) / len(counted)
         score = len(ok) / len(counted) + (0.5 if ok and ok[0] is counted[0] else 0.0) - 0.2 * haze \
             - dist / 4000.0 - (0.1 * max(frames) if frames else 9.0) - 1.0 * min(1.0, max(CLEAR_ABOVE - over, 0.0) / CLEAR_ABOVE)
+        if prior:   # it19 (msg 283): never over a live shell on screen; away from the last ones' spots
+            ov, far = spread(t, p, cam_at, prior)
+            score += -2.0 - 4.0 * ov if ov > 0.0 else 0.0
+            score += 0.6 * far / SPREAD_FAR
         if best is None or score > best[0]:
             best = (score, p, base, rows, over)
     _, p, base, rows, over = best
@@ -505,7 +558,8 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
             focus = [st["centre"][0], st.get("halo_y", st["centre"][1] + 8.0), st["centre"][2]]
         ty = TYPES[order[k % len(TYPES)]]
         life = max(sd.get("lifetimeMax", STAR["lifetimeMax"]) + sd.get("delay", 0.0) for sd in ty["systems"])
-        site = sites_for(t, cam_at, layout, rng, model, boxes, taken, focus, life)
+        prior = [(q["t"], q["burst"], q["life"]) for q in shells if 0.0 <= t - q["t"] < 6.0][-3:]
+        site = sites_for(t, cam_at, layout, rng, model, boxes, taken, focus, life, prior)
         pin = next((q for tp, q in PINNED.items() if abs(tp - t) < 0.01), None)
         if pin is not None:   # the search's pick replaced, its rng draws kept (the other shells stay where they were)
             site = dict(site, burst=list(pin), launch=[pin[0] + 2.0, site["launch"][1], pin[2] - 2.0],
@@ -514,7 +568,8 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
                                                         life=life)], pinned=True)
         tag = "fw%d" % k
         L, B, tb = site["launch"], site["burst"], round(t, 4)
-        shells.append(dict(site, t=tb, type=ty["name"]))
+        ov, far = spread(t, site["burst"], cam_at, prior) if prior else (0.0, SPREAD_FAR)
+        shells.append(dict(site, t=tb, type=ty["name"], life=life, screen_overlap=round(ov, 3), screen_far=round(far, 3)))
         t0 = tb - RISE
         rocket = tag + "_rocket"
         nodes.append({"name": rocket, "kind": "particles", "position": L, "particles": dict(ROCKET, seed=11 + k)})

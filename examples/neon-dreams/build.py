@@ -2006,6 +2006,8 @@ def main():
         doc["clouds"]["enabled"] = False
     with open(scene_path, "w") as f:
         json.dump(doc, f, indent=1)
+    with open(os.path.join(a.out, a.name + ".fx_info.json"), "w") as f:   # it19: the shells' and fly-bys' placement
+        json.dump(FW_INFO, f, indent=1, default=lambda o: o.item() if hasattr(o, "item") else str(o))
     proj_path = os.path.join(a.out, a.name + ".json")
     with open(proj_path, "w") as f:
         routes, arc, sources = reactivity()
