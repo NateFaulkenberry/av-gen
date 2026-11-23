@@ -92,7 +92,7 @@ def score(cam_at, pts, clouds, boxes, diam):
     seen, haze, inframe = 0, 0.0, 0
     for k, (t, p) in enumerate(pts[::3]):
         eye, fx, fy = NFW._view(cam_at, t, list(p))
-        if fx > 1.0 or fy > 1.0:
+        if fx > 0.95 or fy > 0.8:   # the whole saucer in the picture, not its belly under the top edge
             continue
         inframe += 1
         tau = clouds.tau(eye, list(p)) if clouds else 0.0
@@ -165,10 +165,10 @@ def build(cam_at, clouds_doc=None, layout=None, kit=None):
                 {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": round(t0, 4), "value": 9000.0, "interp": "step"},
                 {"time": round(t1, 4), "value": 0.0, "interp": "step"}]))
             halo = name + "_halo"
-            hs = 0.45 * f["diam"]
+            hs = 0.22 * f["diam"]   # it17 render check: at 0.45-0.9 x the saucer it read as a lit ball
             nodes.append({"name": halo, "kind": "particles", "position": park, "particles": dict(
                 HALO, seed=401 + 7 * k + j, sizeStart=hs, sizeEnd=hs,
-                colorStart=list(f["glow"]) + [0.18], colorEnd=list(f["glow"]) + [0.0])})
+                colorStart=list(f["glow"]) + [0.12], colorEnd=list(f["glow"]) + [0.0])})
             tracks.append(_track("nodes/%s/position" % halo, under))
             tracks.append(_track("particles/%s/spawnRate" % halo, [
                 {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": round(t0, 4), "value": 240.0, "interp": "step"},
