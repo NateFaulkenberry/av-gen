@@ -239,3 +239,36 @@ TEST_CASE("World pulse: a front grows in over rampIn and the source clearance re
     REQUIRE(d.count > 0);
     CHECK(d.proxies[0].motion.w == Approx(30.0f));
 }
+
+TEST_CASE("World pulse: the source clearance's edge and column shape reach the block and the shell; off by default",
+          "[adr2130]") {
+    world::EffectInstance e = wave(10.0); // one release, at 0.5 s
+    {
+        const world::PulseFrame f = pulses(e, 1.0);
+        REQUIRE(f.count == 1);
+        CHECK(f.sourceEdge == 0.0f);
+        CHECK_FALSE(f.sourceColumn);
+        const world::DistortionFrame d = proxies(e, 1.0);
+        REQUIRE(d.count > 0);
+        CHECK(d.proxies[0].rim.w == 0.0f);
+        CHECK(d.proxies[0].noise.z == 0.0f);
+    }
+    setRow(e, "sourceClear", 8.5f);
+    setRow(e, "sourceEdge", 2.0f);
+    setRow(e, "sourceShape", 1.0f); // column
+    const world::PulseFrame f = pulses(e, 1.0);
+    CHECK(f.sourceClear == Approx(8.5f));
+    CHECK(f.sourceEdge == Approx(2.0f));
+    CHECK(f.sourceColumn);
+    const world::DistortionFrame d = proxies(e, 1.0);
+    REQUIRE(d.count > 0);
+    CHECK(d.proxies[0].motion.w == Approx(8.5f));
+    CHECK(d.proxies[0].rim.w == Approx(2.0f));
+    CHECK(d.proxies[0].noise.z == 1.0f);
+    // the edge never exceeds the clearance
+    setRow(e, "sourceEdge", 50.0f);
+    CHECK(pulses(e, 1.0).sourceEdge == Approx(8.5f));
+    // a ring-mode Shockwave has no clearance at all
+    setRow(e, "travel", 0.0f);
+    CHECK(world::shockwaveSourceClear(e) == 0.0f);
+}

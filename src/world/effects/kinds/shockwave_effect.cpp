@@ -49,6 +49,9 @@ using kinds::smooth01;
 constexpr const char* kEases[] = {"outCubic", "outQuad", "outExpo", "linear"};
 // ADR-2124: a ring on screen (the original), or a front that travels through the world
 constexpr const char* kTravels[] = {"ring", "world"};
+// ADR-2130: the source clearance's shape -- a ball round the centre, or an upright column through it (a stage: deck,
+// players, masts and halo, whatever their height)
+constexpr const char* kSourceShapes[] = {"sphere", "column"};
 enum class Ease : int { OutCubic = 0, OutQuad = 1, OutExpo = 2, Linear = 3 };
 
 constexpr EffectField kFields[] = {
@@ -125,6 +128,13 @@ constexpr EffectField kFields[] = {
     storedFloat("rampIn", "Grows in over", 0.0f, 0.0f, 5.0f, 0.0f, 2.0f).fmt("%.2f s")
         .tooltip("The seconds a new front takes to reach full strength (eased); 0: the original (2 % of a world\n"
                  "front's life, 3 % of a ring's)."),
+    // ---- ADR-2130: the source clearance's edge and shape ---------------------------------------------------------
+    storedFloat("sourceEdge", "Clearance edge", 0.0f, 0.0f, 500.0f, 0.0f, 20.0f).fmt("%.1f m")
+        .tooltip("Through the world: the width of the clearance's soft edge -- untouched within (clear - edge),\n"
+                 "full from the clear distance (0: the original, half the clear distance)."),
+    storedChoice("sourceShape", "Clearance shape", 0, kSourceShapes)
+        .tooltip("sphere: the distance from the centre. column: the distance from the upright line through the\n"
+                 "centre, so a stage is clear to its masts' tops and the crowd round it is not."),
 };
 
 constexpr kinds::StoredRows kRows{"shockwave", kFields};
@@ -484,14 +494,24 @@ std::size_t shockwaveShellProxies(const EffectInstance& e, const EffectContext& 
         p.motion = glm::vec4(std::max(kRows.f(e, "lensNear"), 0.0f), std::max(kRows.f(e, "lensClear"), 0.0f),
                              maxShiftPx(e), shockwaveSourceClear(e)); // w: ADR-2128
         p.shape = glm::vec4(f.radius, half, 0.0f, 1.0f / std::max(1.5f * half, 0.1f));
-        p.noise = glm::vec4(static_cast<float>(std::fmod(ctx.seconds, 1000.0)) * 0.8f, chroma, 0.0f, seed);
-        p.rim = glm::vec4(rim * f.gain, 0.0f);
+        // ADR-2130: noise.z = the clearance is a column (1) or a sphere (0); rim.w = its edge (m, 0: half the clear)
+        p.noise = glm::vec4(static_cast<float>(std::fmod(ctx.seconds, 1000.0)) * 0.8f, chroma,
+                            shockwaveSourceColumn(e) ? 1.0f : 0.0f, seed);
+        p.rim = glm::vec4(rim * f.gain, shockwaveSourceEdge(e));
     }
     return made;
 }
 
 float shockwaveSourceClear(const EffectInstance& e) {
     return kRows.choice(e, "travel") == 1 ? std::max(kRows.f(e, "sourceClear"), 0.0f) : 0.0f;
+}
+
+float shockwaveSourceEdge(const EffectInstance& e) {
+    return std::clamp(kRows.f(e, "sourceEdge"), 0.0f, shockwaveSourceClear(e));
+}
+
+bool shockwaveSourceColumn(const EffectInstance& e) {
+    return kRows.choice(e, "sourceShape") == 1;
 }
 
 std::size_t shockwavePulseFronts(const EffectInstance& e, const EffectContext& ctx, float envelope,

@@ -51,6 +51,9 @@ struct PulseFrame {
     // smoothstep(clear / 2, clear, its distance from the front's centre); 0 off. One value for the frame (the
     // block's pulseInfo.y): scenes send their fronts from one source.
     float sourceClear = 0.0f;
+    // ADR-2130: that instance's clearance edge (m; 0: half the clear) and shape (the block's pulseInfo.z, .w)
+    float sourceEdge = 0.0f;
+    bool sourceColumn = false;
     std::array<PulseFront, kMaxPulseFronts> fronts{};
 };
 
@@ -69,5 +72,8 @@ std::size_t shockwavePulseFronts(const EffectInstance& instance, const EffectCon
 
 // ADR-2128: an instance's source clearance (m; 0 off, and 0 for a ring-mode Shockwave).
 float shockwaveSourceClear(const EffectInstance& instance);
+// ADR-2130: its clearance edge (m, at most the clearance; 0 = half of it) and whether the clearance is a column.
+float shockwaveSourceEdge(const EffectInstance& instance);
+bool shockwaveSourceColumn(const EffectInstance& instance);
 
 } // namespace avgen::world

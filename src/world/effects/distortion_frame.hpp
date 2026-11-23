@@ -99,6 +99,8 @@ enum class DistortionField : std::uint8_t {
     // ADR-2126: motion.x = calm near the lens (m: nothing bends or glows nearer, full from twice it), motion.y = clear
     // of the lens (m: the bend fades as |radius - the lens's distance| falls under it), motion.z = the shift cap (px
     // at 1080p); 0 is off for each. Shock reads the same calm from motion.x/y and keeps its cap in rim.w.
+    // ADR-2128/2130: motion.w = the source clearance (m), rim.w its soft edge (m, 0: half of it), noise.z > 0.5 when
+    // it is a column (the distance from the upright line through the centre) rather than a sphere.
     Front = 6,
 };
 

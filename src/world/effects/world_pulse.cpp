@@ -12,6 +12,8 @@ void buildPulseFrame(std::span<const EffectInstance> effects, const EffectContex
                      std::span<const std::uint32_t> order) {
     out.count = 0;
     out.sourceClear = 0.0f;
+    out.sourceEdge = 0.0f;
+    out.sourceColumn = false;
     const std::size_t n = order.empty() ? effects.size() : order.size();
     for (std::size_t walk = 0; walk < n && out.count < kMaxPulseFronts; ++walk) {
         const std::size_t at = order.empty() ? walk : order[walk];
@@ -27,8 +29,10 @@ void buildPulseFrame(std::span<const EffectInstance> effects, const EffectContex
             continue;
         }
         const std::size_t made = shockwavePulseFronts(e, ctx, envelope, std::span(out.fronts).subspan(out.count));
-        if (made > 0) {
-            out.sourceClear = std::max(out.sourceClear, shockwaveSourceClear(e)); // ADR-2128
+        if (made > 0 && shockwaveSourceClear(e) > out.sourceClear) {
+            out.sourceClear = shockwaveSourceClear(e); // ADR-2128
+            out.sourceEdge = shockwaveSourceEdge(e);   // ADR-2130: the edge and shape go with the clearance
+            out.sourceColumn = shockwaveSourceColumn(e);
         }
         out.count += static_cast<std::uint32_t>(made);
     }

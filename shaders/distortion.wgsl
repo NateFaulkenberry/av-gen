@@ -467,10 +467,14 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
         var uSurf = 0.0;
         // ADR-2128: the source clearance (motion.w, m): nothing within half of it from the centre bends, full from it
         let srcC = p.motion.w;
+        // ADR-2130: rim.w = the clearance's edge (0: half of it), noise.z > 0.5 = a column
+        let srcE = select(0.5 * srcC, min(p.rim.w, srcC), p.rim.w > 0.0);
         if (sceneZ < DF_FAR * 0.5) {
-            let rS = length(cam + dir * tEnd - c);
+            let vS = cam + dir * tEnd - c;
+            let rS = length(vS);
             uSurf = (rS - R) / h;
-            wSurf = exp(-uSurf * uSurf) * select(1.0, smoothstep(0.5 * srcC, srcC, rS), srcC > 0.0);
+            let rC = select(rS, length(vS.xz), p.noise.z > 0.5);
+            wSurf = exp(-uSurf * uSurf) * select(1.0, smoothstep(srcC - srcE, srcC, rC), srcC > 0.0);
         }
         var wAir = 0.0;
         var tAir = 0.0;
@@ -500,7 +504,7 @@ fn fs_offset_ext(in: ProxyOut) -> OffsetExtOut {
             wAir = exp(-u * u);
             tAir = tc;
         }
-        wAir = wAir * select(1.0, smoothstep(0.5 * srcC, srcC, R), srcC > 0.0); // the shell itself grows in
+        wAir = wAir * select(1.0, smoothstep(srcC - srcE, srcC, R), srcC > 0.0); // the shell itself grows in
         if (max(wSurf, wAir) < 1e-3) {
             discard;
         }
