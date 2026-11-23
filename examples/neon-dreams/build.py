@@ -1957,6 +1957,8 @@ def main():
                     help="with --check-flights: find the nearest open-sky floor point")
     ap.add_argument("--check-ground", action="store_true",
                     help="msg 130: every figure on a floor, not in a wall (Blender); --fix-ground writes the fixes")
+    ap.add_argument("--check-separation", action="store_true",
+                    help="msg 271: no two figures too close all song (blender/nd_separation.py)")
     ap.add_argument("--fix-ground", action="store_true", help="with --check-ground: move/drop failing figures, re-check")
     ap.add_argument("--city-off", action="store_true", help="A/B: iteration 11's city light envelopes off")
     ap.add_argument("--proto-flight", action="store_true", help="add the prototype flight (flyer00) to the cast")
@@ -2026,6 +2028,14 @@ def main():
         if rep["summary"]["fail"]:
             print("WARNING: %d figure(s) fail the ground check" % rep["summary"]["fail"])
             sys.exit(4)
+    if a.check_separation:   # it18 (owner msg 271): the art's figure-to-figure separation over the whole song
+        sys.path.insert(0, os.path.join(HERE, "blender"))
+        import nd_separation as SEP
+        rep = SEP.check_figures(SEP.figures_from(doc["nodes"], tracks), SONG)
+        json.dump(rep, open(os.path.join(a.out, "separation_check.json"), "w"), indent=1)
+        print("separation check:", json.dumps(rep["summary"]))
+        if rep["summary"]["pairs"]:
+            sys.exit(5)
     if a.check_flights:
         for q in a.open_near:
             i, p, r = q.split(":")
