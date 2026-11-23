@@ -19,6 +19,14 @@ soft additive light round its underside and, for the ones with `trail`, a trail 
 dots: the trail's sparks leave along the travel at 0..v and stop within ~3 steps (drag 10 at 30 fps: the velocity keeps
 two thirds a step), filling each step's gap.
 Everything is a timeline track keyed every frame: deterministic, a seek draws what a play draws.
+
+it19 (owner msg 283): "remove UFO trail" -- no trails; "the glowing underneath the UFOs looks a little CG" -- the halo
+sprites are gone and the asset's flat light-grey belly disc (lit by a 9000 point light 8 m under it, it read as a
+white plate) is covered by a modelled belly (meshes/vehicles/ufo_belly_<colour>.glb, blender/nd_ufo_belly.py): a
+gunmetal plate, a ring of small emissive panels, a dim frosted lens and a thin rim strip, so the light comes from
+fittings in the hull; the point light (BELLY_LIGHT) sits well under the craft, a quarter as strong, lighting the cloud
+tops it skims, not the hull. "this UFO disappears before it's fully off screen" (63.4 s) -- the chord is extended at
+both ends, frame by frame against the lens at that second, until the whole saucer is out of the picture (extend()).
 """
 from __future__ import annotations
 
@@ -31,25 +39,18 @@ import nd_fireworks as NFW
 UFO_ASSET = "../../../assets/imported/ufo.gltf"   # from the scene folder
 RADIUS = 2.3 * 100.0                               # m at node scale 1 (the glTF root's x100)
 CLEAR_ABOVE = 40.0
-# (middle second, crossing seconds, +1 left to right / -1 right to left, saucer diameter (m), trail, glow colour, count)
+# (middle second, crossing seconds, +1 left to right / -1 right to left, saucer diameter (m), glow colour, count)
 FLYBYS = [
-    {"t": 12.0, "dur": 2.6, "dir": 1, "diam": 46.0, "trail": True, "glow": [0.35, 0.85, 1.0], "n": 1},     # msg 258's arrows
-    {"t": 20.3, "dur": 2.2, "dir": 1, "diam": 34.0, "trail": False, "glow": [1.0, 0.45, 0.9], "n": 1},     # the Moog at 19.32
-    {"t": 26.0, "dur": 2.0, "dir": -1, "diam": 30.0, "trail": True, "glow": [0.6, 1.0, 0.7], "n": 1},      # the Moog at 25.98
-    {"t": 62.2, "dur": 2.8, "dir": 1, "diam": 40.0, "trail": True, "glow": [0.35, 0.85, 1.0], "n": 2},     # the reveal, a pair
-    {"t": 66.2, "dur": 2.6, "dir": -1, "diam": 50.0, "trail": False, "glow": [1.0, 0.7, 0.35], "n": 1},
+    {"t": 12.0, "dur": 2.6, "dir": 1, "diam": 46.0, "glow": [0.35, 0.85, 1.0], "n": 1},     # msg 258's arrows
+    {"t": 20.3, "dur": 2.2, "dir": 1, "diam": 34.0, "glow": [1.0, 0.45, 0.9], "n": 1},     # the Moog at 19.32
+    {"t": 26.0, "dur": 2.0, "dir": -1, "diam": 30.0, "glow": [0.6, 1.0, 0.7], "n": 1},      # the Moog at 25.98
+    {"t": 62.2, "dur": 2.8, "dir": 1, "diam": 40.0, "glow": [0.35, 0.85, 1.0], "n": 2},     # the reveal, a pair
+    {"t": 66.2, "dur": 2.6, "dir": -1, "diam": 50.0, "glow": [1.0, 0.7, 0.35], "n": 1},
 ]
-HALO = {
-    "capacity": 512, "shape": "sphere", "extent": [2.0, 0.6, 2.0], "spawnRate": 0.0, "burst": 0.0,
-    "lifetimeMin": 0.07, "lifetimeMax": 0.1, "direction": [0.0, -1.0, 0.0], "spread": 1.0, "speedMin": 0.0,
-    "speedMax": 1.0, "gravity": [0.0, 0.0, 0.0], "drag": 0.0, "turbulence": 0.0, "sizeStart": 1.0, "sizeEnd": 1.0,
-    "emissive": 2.2, "blend": "additive", "softness": 1.0, "overClouds": True}
-TRAIL = {
-    "capacity": 8192, "shape": "sphere", "extent": [1.0, 1.0, 1.0], "spawnRate": 0.0, "burst": 0.0,
-    "lifetimeMin": 0.5, "lifetimeMax": 0.9, "spread": 0.03, "gravity": [0.0, -2.0, 0.0], "turbulence": 0.3,
-    "turbulenceScale": 0.05, "turbulenceSpeed": 0.5, "emissive": 1.6, "blend": "additive", "softness": 0.3,
-    "pulseRate": 9.0, "pulseDepth": 0.3, "overClouds": True,
-    "opacityCurve": [{"t": 0.0, "value": 1.0}, {"t": 0.4, "value": 0.6}, {"t": 1.0, "value": 0.0}]}
+BELLY = {(0.35, 0.85, 1.0): "cyan", (1.0, 0.45, 0.9): "pink", (0.6, 1.0, 0.7): "green", (1.0, 0.7, 0.35): "amber"}
+BELLY_ASSET = "../meshes/vehicles/ufo_belly_%s.glb"
+BELLY_LIGHT = {"intensity": 2200.0, "range": 120.0, "below": 0.7}   # x 9000 / 0.25 diam before
+EXTEND_MAX = 8.0   # s added at most at either end
 
 
 def _track(target, keys):
@@ -124,6 +125,37 @@ def place(cam_at, f, clouds, boxes):
     return best
 
 
+def _in_picture(cam_at, t, p, diam):
+    """Any of the saucer (its disc's reach, diam / 2 round the centre) inside the frame at t."""
+    s = NFW._screen(cam_at, t, list(p))
+    if s is None:
+        return False
+    x, y, z, tv = s
+    r = 0.75 * diam / (z * tv)   # half-heights, half again over the half-diameter (the bank, the dome, motion blur)
+    if diam / (z * tv) * 540.0 < 5.0:   # under 5 px across at 1080: gone into the distance
+        return False
+    return abs(x) - r < 16.0 / 9.0 and abs(y) - r < 1.0
+
+
+def extend(cam_at, pts, diam):
+    """it19 (msg 283: "this UFO disappears before it's fully off screen"): the crossing carried on along its end
+    tangents, a frame at a time, until the whole saucer is out of the picture at that second (at most EXTEND_MAX s
+    either side)."""
+    step = 1.0 / 30.0
+    (ta, pa), (ta2, pa2) = pts[0], pts[1]
+    (tb, pb), (tb2, pb2) = pts[-1], pts[-2]
+    va = (pa2 - pa) / (ta2 - ta)   # forward, as vb
+    vb = (pb - pb2) / (tb - tb2)
+    head, tail = [], []
+    for out, (t, p, v, sgn) in ((head, (ta, pa, va, -1.0)), (tail, (tb, pb, vb, 1.0))):
+        clear = 0   # it19 render check: out of the picture for six frames running (a sliver showed at the edge)
+        while clear < 6 and abs(t - (ta if sgn < 0 else tb)) < EXTEND_MAX:
+            t, p = t + sgn * step, p + sgn * v * step
+            out.append((round(t, 4), p))
+            clear = 0 if _in_picture(cam_at, t, p, diam) else clear + 1
+    return head[::-1] + pts + tail
+
+
 def build(cam_at, clouds_doc=None, layout=None, kit=None):
     """(nodes, lights, tracks, info)."""
     clouds = NFW.CloudModel(clouds_doc) if clouds_doc else None
@@ -131,15 +163,18 @@ def build(cam_at, clouds_doc=None, layout=None, kit=None):
     nodes, lights, tracks, info = [], [], [], []
     for k, f in enumerate(FLYBYS):
         _, fy, dist, s, haze, over, inf, _mid = place(cam_at, f, clouds, boxes)
-        info.append({"t": f["t"], "fy": fy, "dist": dist, "seen": round(s, 2), "haze": round(haze, 3),
-                     "over_cloud": round(float(min(over, 9999.0)), 1), "in_frame": round(inf, 2)})
+        row = {"t": f["t"], "fy": fy, "dist": dist, "seen": round(s, 2), "haze": round(haze, 3),
+               "over_cloud": round(float(min(over, 9999.0)), 1), "in_frame": round(inf, 2), "life": []}
+        info.append(row)
         for j in range(f["n"]):
             name = "ufo%d%s" % (k, "abc"[j])
-            pts = path(cam_at, f, fy, dist, lane=j * f["diam"] * 1.4)
+            core = path(cam_at, f, fy, dist, lane=j * f["diam"] * 1.4)
+            pts = extend(cam_at, core, f["diam"])
             t0, t1 = pts[0][0], pts[-1][0]
-            vel = (pts[-1][1] - pts[0][1]) / (t1 - t0)
-            speed = float(np.linalg.norm(vel))
-            fwd = vel / speed
+            row["life"].append([t0, t1, _in_picture(cam_at, t0, pts[0][1], f["diam"]),
+                                _in_picture(cam_at, t1, pts[-1][1], f["diam"])])
+            vel = (core[-1][1] - core[0][1]) / (core[-1][0] - core[0][0])
+            fwd = vel / float(np.linalg.norm(vel))
             yaw = math.degrees(math.atan2(-fwd[2], fwd[0]))
             bank = -10.0 * f["dir"]
             scale = f["diam"] / (2.0 * RADIUS)
@@ -148,41 +183,25 @@ def build(cam_at, clouds_doc=None, layout=None, kit=None):
                   {"time": round(t0 - 0.002, 4), "value": park, "interp": "step"}]
             pk += [{"time": t, "value": [round(v, 2) for v in p], "interp": "linear"} for t, p in pts]
             pk += [{"time": round(t1 + 0.002, 4), "value": park, "interp": "step"}]
-            nodes.append({"name": name, "kind": "gltf", "asset": UFO_ASSET, "position": park,
-                          "rotation": [0.0, round(yaw, 2), round(bank, 2)], "scale": [round(scale, 4)] * 3})
-            tracks.append(_track("nodes/%s/position" % name, pk))
-            # a spin about its axis while it crosses (a saucer turns)
-            tracks.append(_track("nodes/%s/rotation" % name, [
-                {"time": round(t0, 4), "value": [0.0, round(yaw, 2), round(bank, 2)], "interp": "linear"},
-                {"time": round(t1, 4), "value": [0.0, round(yaw + 140.0 * f["dir"], 2), round(bank, 2)], "interp": "linear"}]))
-            under = [{"time": k2["time"], "value": [k2["value"][0], round(k2["value"][1] - 0.25 * f["diam"], 2),
+            # a spin about its axis while it crosses (a saucer turns), at the it17 rate over the longer life
+            spin = 140.0 * f["dir"] * (t1 - t0) / f["dur"]
+            rot = [{"time": round(t0, 4), "value": [0.0, round(yaw, 2), round(bank, 2)], "interp": "linear"},
+                   {"time": round(t1, 4), "value": [0.0, round(yaw + spin, 2), round(bank, 2)], "interp": "linear"}]
+            belly = name + "_belly"   # it19 (msg 283): the lit fittings under the hull (the asset's own disc covered)
+            for nm, asset in ((name, UFO_ASSET), (belly, BELLY_ASSET % BELLY[tuple(f["glow"])])):
+                nodes.append({"name": nm, "kind": "gltf", "asset": asset, "position": park,
+                              "rotation": [0.0, round(yaw, 2), round(bank, 2)], "scale": [round(scale, 4)] * 3})
+                tracks.append(_track("nodes/%s/position" % nm, pk))
+                tracks.append(_track("nodes/%s/rotation" % nm, rot))
+            drop = BELLY_LIGHT["below"] * f["diam"]
+            under = [{"time": k2["time"], "value": [k2["value"][0], round(k2["value"][1] - drop, 2),
                                                     k2["value"][2]], "interp": k2["interp"]} for k2 in pk]
             light = name + "_glow"
             lights.append({"name": light, "type": "point", "position": park, "color": f["glow"], "intensity": 0.0,
-                           "range": 90.0, "castsShadow": False, "volumetric": 0.0})
+                           "range": BELLY_LIGHT["range"], "castsShadow": False, "volumetric": 0.0})
             tracks.append(_track("lights/%s/position" % light, under))
             tracks.append(_track("lights/%s/intensity" % light, [
-                {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": round(t0, 4), "value": 9000.0, "interp": "step"},
+                {"time": 0.0, "value": 0.0, "interp": "step"},
+                {"time": round(t0, 4), "value": BELLY_LIGHT["intensity"], "interp": "step"},
                 {"time": round(t1, 4), "value": 0.0, "interp": "step"}]))
-            halo = name + "_halo"
-            hs = 0.22 * f["diam"]   # it17 render check: at 0.45-0.9 x the saucer it read as a lit ball
-            nodes.append({"name": halo, "kind": "particles", "position": park, "particles": dict(
-                HALO, seed=401 + 7 * k + j, sizeStart=hs, sizeEnd=hs,
-                colorStart=list(f["glow"]) + [0.12], colorEnd=list(f["glow"]) + [0.0])})
-            tracks.append(_track("nodes/%s/position" % halo, under))
-            tracks.append(_track("particles/%s/spawnRate" % halo, [
-                {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": round(t0, 4), "value": 240.0, "interp": "step"},
-                {"time": round(t1, 4), "value": 0.0, "interp": "step"}]))
-            if f["trail"]:
-                trail = name + "_trail"
-                nodes.append({"name": trail, "kind": "particles", "position": park, "particles": dict(
-                    TRAIL, seed=503 + 7 * k + j, direction=[round(v, 4) for v in fwd], speedMin=0.0,
-                    speedMax=round(speed, 1), drag=10.0,
-                    sizeStart=round(0.045 * f["diam"], 2), sizeEnd=round(0.01 * f["diam"], 2),
-                    colorStart=[round(0.5 + 0.5 * c, 3) for c in f["glow"]] + [0.8], colorEnd=list(f["glow"]) + [0.0])})
-                tracks.append(_track("nodes/%s/position" % trail, under))
-                tracks.append(_track("particles/%s/spawnRate" % trail, [
-                    {"time": 0.0, "value": 0.0, "interp": "step"},
-                    {"time": round(t0, 4), "value": 900.0, "interp": "step"},
-                    {"time": round(t1, 4), "value": 0.0, "interp": "step"}]))
     return nodes, lights, tracks, {"flybys": info}
