@@ -1916,7 +1916,7 @@ def project_doc(scene_rel, audio_dir, tracks, routes, sources):
              ("moog", "Moog", "synth"), ("cloud", "Cloud Diving", "synth"), ("crash", "Crash", "drums"),
              ("toms", "Toms", "drums"), ("block", "tone block", "other")]
     return {
-        "format": "avgen-project", "version": 4,
+        "format": "avgen-project", "version": 4, "app": {"name": "Neon Dreams"},
         "assets": {"scene": {"kind": "composition", "path": scene_rel},
                    "audio": os.path.join(audio_dir, "Sabertooth.wav"),
                    "stems": [{"key": k, "label": lbl, "role": role, "file": os.path.join(audio_dir, lbl + ".wav")}
@@ -1935,6 +1935,28 @@ def project_doc(scene_rel, audio_dir, tracks, routes, sources):
                          # it12c (msg 161): the kick's onsets as markers, for the speakers' pulse triggers
                          "markers": band()["info"].get("markers", [])}} if SEQUENCE_ACTORS else {}),
     }
+
+
+def missing_inputs(audio_dir):
+    """it21 (msg 303, a shipped example): the film's gitignored inputs that are absent on this machine, each with how
+    to make it. The build still runs without them -- the cast falls back to the pack's stock files, an absent GLB
+    loads as nothing -- but that is not the film, so it says so rather than writing a quietly different scene."""
+    root = os.path.normpath(os.path.join(HERE, "..", ".."))
+    want = []
+    for c in ("alien-scout", "alien-elder", "alien-diver", "alien-pilot", "alien-ranger", "alien-trooper"):
+        want.append((os.path.join(root, "assets", "aliens", c + "-nd.glb"),
+                     "the Glowmere alien cast (commercial, never in the repository: assets/aliens/ATTRIBUTION.md), "
+                     "then blender/nd_poses.py for the -nd clip sets"))
+    for m in ("astronaut_drums", "astronaut_keys", "drum_kit", "keyboard_set"):
+        want.append((os.path.join(root, "assets", "musicians", m + ".glb"),
+                     "the band (tools/make_astronaut_musicians.py from the owner's sources; assets/musicians/ATTRIBUTION.md)"))
+    for v in "abc":
+        want.append((os.path.join(HERE, "meshes", "_thirdparty", "isles", "isle_rock_%s.gltf" % v),
+                     "the island rocks (blender/nd_isles.py from assets/treeisle/floating-isle-bare.glb, the owner's)"))
+    want.append((os.path.join(root, "assets", "imported", "ufo.gltf"), "the UFO (assets/imported, CC0)"))
+    for f in ("Sabertooth", "Kick", "Snare", "HH", "BASS", "Moog", "Cloud Diving", "Crash", "Toms", "tone block"):
+        want.append((os.path.join(audio_dir, f + ".wav"), "the Sabertooth mix and its stems (the owner's; --audio DIR)"))
+    return [(p, how) for p, how in want if not os.path.exists(p)]
 
 
 def main():
@@ -2009,6 +2031,12 @@ def main():
         ENV_Q[k] = float(v)
     if a.quality != "offline" and a.name == "neon-dreams":
         a.name = "neon-dreams-" + a.quality
+    miss = missing_inputs(a.audio)
+    for p, how in miss:
+        print("MISSING %s -- %s" % (p, how), file=sys.stderr)
+    if miss:
+        print("WARNING: %d of the film's inputs are missing; the scene written is not Neon Dreams as shot" % len(miss),
+              file=sys.stderr)
     os.makedirs(a.out, exist_ok=True)
     sky = os.path.relpath(os.path.join(HERE, a.sky), a.out) if a.sky else None
     scene_path = os.path.join(a.out, a.name + ".scene.json")

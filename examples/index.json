@@ -760,6 +760,13 @@
       "generate": "python3 examples/musical-geography/build.py --release   (writes both scenes into examples/musical-geography/scene/; needs the six Glowmere aliens in assets/aliens -- commercial, not in the repository, see assets/aliens/ATTRIBUTION.md -- and, for the offline project, assets/audio/feline-footwear.wav and its three stems in assets/audio/stems)"
     },
     {
+      "category": "Worlds",
+      "description": "Neon Dreams: a 70-second flight through a neon harbour town floating on a sea of cloud at night, on Sabertooth (83 bpm). From a fade-in over the Lowlight Mooring the lens runs down the Quay past shopfronts, stalls and a crowd of aliens going about their evening, slows over the plaza where an astronaut band plays to a crowd, climbs into the Veil, a passage of lit cloud, and comes out over the open sea, then dives into a cloud vortex toward its glowing eye and fades to black on the last note. The song plays the town through its stems: the kick rings out over the islands, the tone block blinks the roundels, the toms light the Veil, each crash bursts a firework high over the cloud, and from the Quay to the stage a shockwave rolls out of the band's speakers through the crowd and the air. Built for offline renders (Cloud Environment v2 at full quality). Run examples/neon-dreams/build.py first (it writes the scene). See the docstring of examples/neon-dreams/build.py and ADR-2100..2130.",
+      "name": "Neon Dreams",
+      "project": "neon-dreams/scene/neon-dreams.json",
+      "generate": "python3 examples/neon-dreams/build.py [--audio DIR]   (writes examples/neon-dreams/scene/neon-dreams.json and its scene; needs the six Glowmere aliens in assets/aliens with their -nd clip sets -- commercial, not in the repository, see assets/aliens/ATTRIBUTION.md --, the astronaut band in assets/musicians, the island rocks in examples/neon-dreams/meshes/_thirdparty/isles (blender/nd_isles.py), and the Sabertooth mix and its nine stems in DIR, by default ~/Desktop/sabertooth; the build lists anything missing)"
+    },
+    {
       "category": "Diagnostics",
       "name": "Audio Response Lab",
       "description": "An engineering instrument, not a show: a fixed board of meters, lamps, a beat dial and probes, each a route from a real production signal (response.*, audio.*Level, beat.*, stem.<key>.* for sources keyed drums/bass/synth/pad, control.labCC1 on MIDI CC 1). Play live audio (and optionally map input sources with those keys) to see what the analysis publishes, when, and where. A red lamp under a source means it is not configured or not sending. Fixtures and the measured report: tools/audio_lab, docs/prototypes/audio-response-lab.",
