@@ -263,13 +263,12 @@ def window_program(name, tints_from, tints_to, intensity, ring=0.0, extra=()):
     o(kind="gradient", dst=6, srcA=6, constant=[1.25, 0.0, 0.0, 0.12], value=1.0)
     o("litfrac", kind="gradient", dst=5, srcA=1, constant=[0.0, 0.40, 0.0, 0.10], value=1.0)   # Moog adds to w
     o(kind="multiply", dst=5, srcA=5, srcB=6)
-    o(kind="constant", dst=3, constant=[1.0, 0.0, 0.0, 0.0])
-    o(kind="multiply", dst=5, srcA=5, srcB=3)
-    o(kind="swizzle", dst=6, srcA=7, constant=[1.0, 3.0, 1.0, 1.0])
-    o(kind="constant", dst=3, constant=[0.0, 1.0, 0.0, 0.0])
-    o(kind="multiply", dst=6, srcA=6, srcB=3)
+    # lit = saturate(80 (r5.x - r7.w)); it16: as -r7.w added to r5 (4 ops; it3-15 zeroed the other lanes in 7), so
+    # the town's pane program has room for the beat (nd_lights.beat_dim_term) under the 96-op cap
+    o(kind="swizzle", dst=6, srcA=7, constant=[3.0, 3.0, 3.0, 3.0])
+    o(kind="remap", dst=6, srcA=6, constant=[0.0, 1.0, 0.0, -1.0], value=0.0)
     o(kind="add", dst=5, srcA=5, srcB=6)
-    o(kind="gradient", dst=5, srcA=5, constant=[1.0, -1.0, 0.0, 0.0], value=80.0)
+    o(kind="gradient", dst=5, srcA=5, constant=[1.0, 0.0, 0.0, 0.0], value=80.0)
     o(kind="power", dst=6, srcA=0, value=2.0)
     o(kind="gradient", dst=6, srcA=6, constant=[0.8, 0.0, 0.0, 0.2], value=1.0)
     o(kind="multiply", dst=5, srcA=5, srcB=6)

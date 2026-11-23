@@ -186,7 +186,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                         "parameters": {"strength": PULSE["strength"], "maxRadius": PULSE["reach"],
                                        "duration": PULSE["duration"], "thickness": PULSE["thickness"],
                                        "ease": 0, "rimColor": pal(PULSE["key"]), "rimEmission": PULSE["rim"],
-                                       "chroma": 0.25, "radiusDecay": 0.6, "maxConcurrent": 2.0,
+                                       "chroma": PULSE["chroma"], "radiusDecay": 0.6, "maxConcurrent": 2.0,
                                        "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     # it14 (owner msg 195: "way more visible and impactful -- the wave should pulsate through the entire scene /
     # geometry / characters", visible down the Quay): ADR-2124's Shockwave through the world, released from the
@@ -199,7 +199,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                     "parameters": {"travel": "world", "strength": WAVE["haze"], "maxRadius": WAVE["reach"],
                                    "duration": round(WAVE["reach"] / WAVE["speed"], 3), "thickness": WAVE["half"],
                                    "ease": 3, "rimColor": pal(WAVE["key"]), "rimEmission": WAVE["rim"],
-                                   "chroma": 0.12, "radiusDecay": WAVE["decay"], "refRadius": WAVE["ref"],
+                                   "chroma": WAVE["chroma"], "radiusDecay": WAVE["decay"], "refRadius": WAVE["ref"],
                                    "maxConcurrent": 8.0, "push": WAVE["push"], "lift": WAVE["lift"],
                                    "flashColor": [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])], "flash": WAVE["flash"], "flare": WAVE["flare"],
                                    "clouds": WAVE["clouds"], "fadeStart": WAVE["fade"][0], "fadeEnd": WAVE["fade"][1],
@@ -310,9 +310,13 @@ def drum_warp(clip, L, song=70.18):
 # only sees it from CAM_FADE: full within 190 m of the stage, nothing past 260 m (the pier at 10 s is 470 m out)
 CAM_FADE = (190.0, 260.0)
 CAM_AT = None   # build.py: the baked lens's eye at t
-WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 0.3, "rim": 0.1, "decay": 0.5, "ref": 25.0,
-        "push": 0.9, "lift": 0.45, "flash": 0.12, "flare": 0.8, "clouds": 0.2, "key": "sign_a"}
-PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
+# it16 (owner msg 243: "tone down the colour FX and the shockwave screen distortion itself -- probably 50 % of what it
+# is now in terms of screen distortion"): the bend halved (haze 0.3 -> 0.15, chroma 0.12 -> 0.06; the speakers' rings
+# 1.6 -> 0.8, chroma 0.25 -> 0.12) and the colour halved with it (flash 0.12 -> 0.06, flare 0.8 -> 0.4, cloud glow
+# 0.2 -> 0.1, edge glow 0.1 -> 0.05; the speakers' pink arcs 0.9 -> 0.45); the shove a little less (0.9 -> 0.75 m)
+WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 0.15, "rim": 0.05, "decay": 0.5,
+        "ref": 25.0, "push": 0.75, "lift": 0.45, "flash": 0.06, "flare": 0.4, "clouds": 0.1, "chroma": 0.06, "key": "sign_a"}
+PULSE = {"strength": 0.8, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.45, "chroma": 0.12, "key": "sign_a"}
 
 
 def _default_speakers(st):

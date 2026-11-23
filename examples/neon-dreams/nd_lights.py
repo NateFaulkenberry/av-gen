@@ -279,6 +279,64 @@ def flick_term(p, lit, a, b):
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# it16 (owner msg 243: "make the city lights feel a little more beat pulsed -- dim them on the tempo perhaps, and let
+# other musical FX continue to move through them"): the town's own architectural light (windows, eave strips, crowns,
+# signs, stair slots) swells on every true quarter (AU.BEAT, 0.702 s) and sags BEAT_DIM["depth"] below its level by the
+# next, a multiplier under every musical term (the Moog fronts, the kick rings, the chases and flicks multiply on top).
+# A half-plane keeps it on the town: full north of z = edge[0] (the districts lie at z < 60), none south of edge[1]
+# (the pier, the southern isles, the lighthouses, Highwater) -- not a global flicker. Held at full through the held
+# breath (AU.BREATH: 45.5 s to the 47.03 s crash). Fireworks, beams, the band's spots and lanterns are not in it.
+BEAT_DIM = {"depth": 0.2, "attack": (0.02, 0.01), "decay": 3.2, "edge": (5.0, 45.0)}
+
+
+def beat_dim_term(p, out, pos, t1, load_pos=True):
+    """out x= 1 - dip(t) x town(p): town = saturate((edge1 - z) / (edge1 - edge0)); the dip is the `beatdim` remap's
+    constant [0, 1, 1, 1 - dip] (a timeline track, beat_dim_keys). 3 ops (4 with the position)."""
+    if load_pos:
+        p.op(kind="input", input="worldPosition", dst=pos)
+    e0, e1 = BEAT_DIM["edge"]
+    w = e1 - e0
+    p.op(kind="gradient", dst=t1, srcA=pos, constant=[0.0, 0.0, -1.0 / w, e1 / w], value=1.0)
+    p.op("beatdim", kind="remap", dst=t1, srcA=t1, constant=[0.0, 1.0, 1.0, 1.0], value=0.0)
+    p.op(kind="multiply", dst=out, srcA=out, srcB=t1)
+
+
+def beat_dim_value(t, song=70.18):
+    """The town's level at t (1 on the beat, 1 - depth just before the next)."""
+    a, b, c, d = AU.BREATH
+    if a <= t < d:
+        return 1.0
+    pre, post = BEAT_DIM["attack"]
+    D, k = BEAT_DIM["depth"], BEAT_DIM["decay"]
+    n = math.floor((t - AU.KICK0 + pre) / AU.BEAT)
+    b0 = AU.KICK0 + n * AU.BEAT               # the beat whose swell we are in (its rise starts `pre` before it)
+    u = t - b0
+    low = 1.0 - D * (1.0 - math.exp(-k))      # the level just before a beat
+    if u < post:                              # the rise: from `pre` before the beat to `post` after it
+        x = (u + pre) / (pre + post)
+        return low + (1.0 - low) * max(0.0, min(1.0, x))
+    return 1.0 - D * (1.0 - math.exp(-k * (u - post) / (AU.BEAT - post - pre)))
+
+
+def beat_dim_keys(song=70.18):
+    """Linear keys of the remap constant [0, 1, 1, level(t)]: per beat its rise, and the sag sampled at 8 points."""
+    pre, post = BEAT_DIM["attack"]
+    times = {0.0, song}
+    n = 0
+    while AU.KICK0 + n * AU.BEAT < song + AU.BEAT:
+        b = AU.KICK0 + n * AU.BEAT
+        span = AU.BEAT - post - pre
+        for dt in [-pre, post] + [post + span * f for f in (0.06, 0.14, 0.25, 0.4, 0.58, 0.8, 0.999)]:
+            if 0.0 <= b + dt <= song:
+                times.add(round(b + dt, 4))
+        n += 1
+    a, _, _, d = AU.BREATH
+    times.update({round(a, 4), round(a - 0.001, 4), round(d, 4)})
+    return [{"time": t, "value": [0.0, 1.0, 1.0, round(beat_dim_value(t, song), 4)], "interp": "linear"}
+            for t in sorted(times)]
+
+
+# ---------------------------------------------------------------------------------------------------------------
 # the window flicks' patterns, one per pad phrase, in eighth notes over two bars
 FLICK_PATTERNS = [
     # (axis, scale (cycles per unit of the comb input: floors or columns), phase per eighth note)

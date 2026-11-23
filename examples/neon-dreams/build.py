@@ -209,6 +209,11 @@ def _isle():
     return lambda p: (NL.town_mask(p, 3, 4, 5), NL.isle_term(p, 1, 4, 5, 6))
 
 
+def _beat():
+    """it16 (msg 243): the town's light swells on each true quarter (nd_lights.beat_dim_term); regs 2-3."""
+    return lambda p: NL.beat_dim_term(p, 1, 2, 3)
+
+
 def _chase(label, space, cfg):
     return lambda p: NL.chase_term(p, 1, 5, 6, label, space, cfg["period"], cfg["gain"], cfg.get("power", 6.0))
 
@@ -229,7 +234,7 @@ def role_program(role, key, zclass, asset, state):
         # it11: signs answer the Moog by district and chase down the street on the snare (it5-10: A/B in turn)
         n = "ndSign_%s" % key
         return _reg(n, lambda: AU.emit_program(n, col, gain, extra=(
-            _moog(NL.MOOG_GAIN["sign"]), _chase("snare", "worldPosition", NL.SNARE_CHASE))), "sign", key, "sign")
+            _beat(), _moog(NL.MOOG_GAIN["sign"]), _chase("snare", "worldPosition", NL.SNARE_CHASE))), "sign", key, "sign")
     if role == "strip":
         if "gangway" in asset:   # the gangway strips: the snare
             n = "ndGang_%s" % key
@@ -238,7 +243,7 @@ def role_program(role, key, zclass, asset, state):
         # sign_c strips are only the landmark crowns (the Great Lantern's frame, the Mooring Mast): the bass swells them
         n = "ndStrip_%s" % key
         return _reg(n, lambda: AU.emit_program(n, col, gain, ring=NL.TOWN_RING_GAIN["strip"], extra=(
-            _moog(NL.MOOG_GAIN["strip"], isle=True),)), "eave", key, "crown" if key == "sign_c" else "strip")
+            _beat(), _moog(NL.MOOG_GAIN["strip"], isle=True),)), "eave", key, "crown" if key == "sign_c" else "strip")
     if role == "beacon":
         n = "ndBeacon"
         return _reg(n, lambda: AU.emit_program(n, col, gain * 0.02, pattern=True), None, key, "block_beacon")
@@ -255,7 +260,7 @@ def role_program(role, key, zclass, asset, state):
         return _reg(n, lambda: AU.emit_program(n, col, gain, hh=0.7), "underlight", key, "hh")
     if role == "win_stair":   # the always-lit stair slots (art iteration 5): out of the lit/dark pane program
         n = "ndStair_%s" % key
-        return _reg(n, lambda: AU.emit_program(n, col, gain), "practical", key, None)
+        return _reg(n, lambda: AU.emit_program(n, col, gain, extra=(_beat(),)), "practical", key, None)
     if role == "landmark":
         n = "ndBell"
         return _reg(n, lambda: AU.emit_program(n, col, gain), "bell", key, "bell")
@@ -279,7 +284,8 @@ def pane_program(zclass, state):
     # it11 (msg 130): the windows answer the Moog by district and flick floor by floor on the pad's phrase changes
     return _reg("ndPanes", lambda: AU.window_program(
         "ndPanes", t, t, 4.0, ring=NL.TOWN_RING_GAIN["panes"],
-        extra=(lambda p: NL.moog_pulse_term(p, 5, 2, 0, 3, 6, NL.MOOG_GAIN["panes"]), lambda p: NL.flick_term(p, 5, 3, 6))),
+        extra=(lambda p: NL.moog_pulse_term(p, 5, 2, 0, 3, 6, NL.MOOG_GAIN["panes"]), lambda p: NL.flick_term(p, 5, 3, 6),
+               lambda p: NL.beat_dim_term(p, 5, 2, 3, load_pos=False))),   # it16: reg 2 still holds worldPosition
         "window", "win", "panes")
 
 
@@ -1477,7 +1483,11 @@ def scene_doc(state="uv", sky_map=None):
     alien_tracks = alien_tracks + bd["tracks"]
     SEQUENCE_ACTORS.extend(bd["actors"])
     if not NO_FIREWORKS:   # it14 (owner msg 206): shells bursting on the crashes, lighting the town
-        fw_nodes, fw_lights, fw_tracks, FIREWORKS = NFW.build(lambda t: camera().at(t), LAYOUT, SONG)
+        # it16 (msg 243): the sites are tested against the clouds (the same block the scene gets) and the town's boxes
+        with open(os.path.join(HERE, "meshes", "kit_manifest.json")) as kf:
+            kit = json.load(kf)
+        fw_nodes, fw_lights, fw_tracks, FIREWORKS = NFW.build(lambda t: camera().at(t), LAYOUT, SONG,
+                                                              clouds=clouds_block(state), kit=kit)
         nodes += fw_nodes
         flyer_lights = flyer_lights + fw_lights
         alien_tracks = alien_tracks + fw_tracks
@@ -1803,6 +1813,7 @@ def city_lights(routes, tracks, lvl_slow):
     sn_phase = NL.step_keys(NL.ONSETS["snare"], NL.SNARE_CHASE["steps"], gate=NL.TOWN)
     sn_amt = NL.env_keys(NL.ONSETS["snare"], *NL.SNARE_CHASE["ad"], gate=NL.TOWN)
     moog = {d: NL.env_keys(ts, *NL.MOOG_AD) for d, ts in turns.items()}
+    beat_keys = NL.beat_dim_keys(SONG)
     for n, info in sorted(PROGS.items()):
         at = info["prog"].at
         if "moog_quay" in at:
@@ -1820,6 +1831,8 @@ def city_lights(routes, tracks, lvl_slow):
             # the phrases the camera spends in the town (the approach: the Moog's skyline; the reveal: the ocean)
             # (25.3 and 36.6 sit on the arrival and Quay crashes with the toms' fills: left to them)
             tracks += NL.flick_tracks(info["prog"].path, NL.FLICK_PHRASES)
+        if "beatdim" in at:   # it16 (msg 243): the town's light on the true quarter
+            tracks.append(AU.track(info["prog"].path("beatdim"), beat_keys))
         if info["group"] == "crown":   # the landmark crowns swell on the bass's swells (its top: 0.7-0.9)
             routes.append(R("stem.bass.level", "material/%s/emissionIntensity" % n,
                             NL.CROWN_BASS * info["doc"]["emissionIntensity"], attackMs=350.0, decayMs=1800.0,
