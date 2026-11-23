@@ -546,9 +546,13 @@ def build(pop, layout, design, aliens, clip_len, bell, song, r3, flight_fn, kick
              "t0": round(t0_f, 4), "td": round(td, 4), "alt": max(4.0, fdat.get("cruise_height_m", 0) - max(ta["pos"][1], tb["pos"][1])),
              "via": via, "kicks": kicks, "bob_from": ta.get("bob"), "bob_to": tb.get("bob")}
         n, l, t, actor = flight_fn(f)
-        for c in nd_after:   # after Landing has played out: looping cues, the clip second the art means at each
+        for k, c in enumerate(nd_after):   # after Landing has played out: looping cues, the clip second the art means
+            # it20 (owner msg 297 at 46.9 s: "land alien snaps directly from landing animation into another animation"):
+            # the snap was the engine's (ADR-2129: an offset cue's fade began at its phase origin, 0.8 s early, so it
+            # was over before the cue); the first cue out of the landing now also eases over at least 0.45 s
             actor["clips"].append({"time": round(c["t"] + d_td, 3), "clip": c["clip"], "speed": c.get("rate", 1.0),
-                                   "blend": c.get("blend", 0.3), "playback": "loop",
+                                   "blend": max(c.get("blend", 0.3), 0.45) if k == 0 else c.get("blend", 0.3),
+                                   "playback": "loop",
                                    "offset": round(c.get("offset", 0.0) % clip_len[c["clip"]], 4)})
         # ride the formations: still at A's, blending to B's over the flight, B's after it
         ba, bb = bobs.get(ta.get("bob")), bobs.get(tb.get("bob"))

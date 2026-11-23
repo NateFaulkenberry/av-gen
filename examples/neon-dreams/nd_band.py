@@ -200,7 +200,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                     "trigger": {"source": "marker", "name": "kick"},
                     "parameters": {"travel": "world", "strength": WAVE["haze"], "maxRadius": WAVE["reach"],
                                    "duration": round(WAVE["reach"] / WAVE["speed"], 3), "thickness": WAVE["half"],
-                                   "ease": 3, "rimColor": pal(WAVE["key"]), "rimEmission": WAVE["rim"],
+                                   "ease": WAVE.get("ease", 3), "rimColor": pal(WAVE["key"]), "rimEmission": WAVE["rim"],
                                    "chroma": WAVE["chroma"], "radiusDecay": WAVE["decay"], "refRadius": WAVE["ref"],
                                    "maxConcurrent": 8.0, "push": WAVE["push"], "lift": WAVE["lift"],
                                    "flashColor": (pal(WAVE["key"]) if WAVE.get("flash_sat") else
@@ -208,6 +208,8 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                    "clouds": WAVE["clouds"], "fadeStart": WAVE["fade"][0], "fadeEnd": WAVE["fade"][1],
                                    "maxShift": CALM["shift"], "lensNear": CALM["near"], "lensClear": CALM["clear"],
                                    "sourceClear": WAVE.get("source_clear", 0.0), "rampIn": WAVE.get("ramp_in", 0.0),
+                                   "sourceEdge": WAVE.get("source_edge", 0.0),
+                                   "sourceShape": WAVE.get("source_shape", 0),
                                    "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     info["effects"] = effects
     # the held breath silences the wave in flight too, and (msg 222: "way too strong -- should not be visible till we
@@ -222,14 +224,34 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
         br = 1.0   # it17 (msg 253: "a shockwave is missed here", 46.17 s): the held breath no longer silences the wave
         g = 1.0
         if CAM_AT is not None:
-            g = 1.0 - sm((math.dist(CAM_AT(t), c_stage) - CAM_FADE[0]) / (CAM_FADE[1] - CAM_FADE[0]))
+            g = 1.0 - sm((math.dist(CAM_AT(t), c_stage) - fade[0]) / (fade[1] - fade[0]))
         return br * g
     c_stage = st["centre"]
-    gk = [(round(i * 0.25, 2), gate(i * 0.25)) for i in range(int(70.2 / 0.25) + 2)]
-    for leaf in ("push", "flash", "clouds", "strength", "rimEmission"):
-        v = WAVE[{"strength": "haze", "rimEmission": "rim"}.get(leaf, leaf)]
-        tracks.append(track("fx/kick_wave/%s" % leaf, [{"time": t, "value": round(v * g, 4), "interp": "linear"}
-                                                        for t, g in gk]))
+    # it20 (owner msg 297 at 39.2 s: "make the speaker wave pulses start to have an effect on the camera about here;
+    # before this it just looks too wobbly"): the gate's distances are the lens's own at CAM_GATE_T -- nothing while
+    # the lens is further from the stage than at 38.7 s, full from where it is at 39.7 s (a 1 s ramp round 39.2 s)
+    fade = CAM_FADE
+    if CAM_AT is not None and CAM_GATE_T:
+        fade = (math.dist(CAM_AT(CAM_GATE_T[1]), c_stage), math.dist(CAM_AT(CAM_GATE_T[0]), c_stage))
+        info["wave_gate_m"] = [round(fade[0], 1), round(fade[1], 1)]
+    gk = [(round(i * 0.1, 2), gate(i * 0.1)) for i in range(int(70.2 / 0.1) + 2)]
+    # it20 (msg 297: "keep the intensity as you get closer"): near the band most of the frame is crowd within a few
+    # metres of the lens, where ADR-2126's calm holds the shove back and each front's shift is capped -- measured, the
+    # screen shift per front still fell ~35 % from 40 m to 14 m with the clearance fixed. The shove, the bend and the
+    # cap rise by up to NEAR_LIFT as the lens closes from NEAR_LIFT_M[0] to NEAR_LIFT_M[1] m, so it stays level.
+    def lift(t):
+        if CAM_AT is None:
+            return 1.0
+        u = (NEAR_LIFT_M[0] - math.dist(CAM_AT(t), c_stage)) / (NEAR_LIFT_M[0] - NEAR_LIFT_M[1])
+        u = max(0.0, min(1.0, u))
+        return 1.0 + NEAR_LIFT * u * u * (3 - 2 * u)
+    gl = [(t, g, lift(t)) for t, g in gk]
+    for leaf in ("push", "flash", "clouds", "strength", "rimEmission", "maxShift"):
+        v = WAVE[{"strength": "haze", "rimEmission": "rim"}.get(leaf, leaf)] if leaf != "maxShift" else CALM["shift"]
+        lifted = leaf in ("push", "strength", "maxShift")
+        tracks.append(track("fx/kick_wave/%s" % leaf, [
+            {"time": t, "value": round(v * (l if lifted else 1.0) * (g if leaf != "maxShift" else 1.0), 4),
+             "interp": "linear"} for t, g, l in gl]))
     # it14 (owner msg 204: "make sure the speaker pulse is on quarter notes -- it's following the kick right now"):
     # one front per quarter note of the song's grid (AU.KICK0 + n x AU.BEAT; it15, msg 232: the TRUE quarter, 0.702 s,
     # 85.49 BPM -- it14's 0.351 s fired on every eighth, twice the beat), the whole song but the
@@ -241,6 +263,45 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
         grid.append(AU.KICK0 + n * BEAT)
         n += 1
     info["markers"] = [{"time": round(t, 4), "name": "kick"} for t in grid]
+    # it20 (owner msg 297 at 43.2 s: "make the waves appear as though they are coming from the speakers"): on every
+    # front each stack's driver caps pump forward (a glowing cap on each of the five drivers, thrown SPEAKER_PUMP
+    # ["throw"] m along the stack's front in `attack` s and back over `decay` s) and a short pink flash lights the deck
+    # in front of it -- the burst its ring leaves from. Keys on the same grid as the markers: a pure function of the
+    # second.
+    sp_meta = None
+    for sp in speakers:
+        if sp.get("asset") and sp_meta is None:
+            sp_meta = _speaker_drivers(sp["asset"])
+    P = SPEAKER_PUMP
+    for i, sp in enumerate(speakers if sp_meta else []):
+        fd = sp.get("front_dir", [0.0, 0.0, 1.0])
+        base = sp["pos"]
+        cap = "speaker_caps_%d" % i
+        nodes.append({"name": cap, "kind": "procedural", "position": r3(base), "rotation": [0.0, sp.get("yaw_deg", 0.0), 0.0],
+                      "scale": [1.0, 1.0, 1.0], "castsShadow": False, "procedural": {
+                          "source": {"kind": "sphere", "radius": 1.0},
+                          "distribution": {"kind": "points", "points": [
+                              [round(x, 3), round(y, 3), round(z + 0.02, 3), 0, 0, 0, 1,
+                               round(0.2 * r, 3), round(0.2 * r, 3), round(0.12 * r, 3)] for x, y, z, r in sp_meta]},
+                          "castsShadow": False,
+                          "material": {"baseColor": [0.02, 0.02, 0.025], "roughness": 0.35, "metallic": 0.0,
+                                       "emissiveColor": pal(PULSE["key"]), "emissiveIntensity": P["cap_glow"]}}})
+        pk = [{"time": 0.0, "value": r3(base), "interp": "linear"}]
+        lk = [{"time": 0.0, "value": 0.0, "interp": "linear"}]
+        fpos = [base[0] + fd[0] * 1.2, base[1] + 1.4, base[2] + fd[2] * 1.2]
+        for t in grid:
+            out = [base[k] + fd[k] * P["throw"] for k in range(3)]
+            pk += [{"time": round(t - 0.005, 4), "value": r3(base), "interp": "linear"},
+                   {"time": round(t + P["attack"], 4), "value": r3(out), "interp": "smooth"},
+                   {"time": round(t + P["attack"] + P["decay"], 4), "value": r3(base), "interp": "linear"}]
+            lk += [{"time": round(t - 0.005, 4), "value": 0.0, "interp": "linear"},
+                   {"time": round(t + 0.03, 4), "value": P["flash_cd"], "interp": "smooth"},
+                   {"time": round(t + 0.03 + P["flash_decay"], 4), "value": 0.0, "interp": "linear"}]
+        tracks.append(track("nodes/%s/position" % cap, pk))
+        name = "speaker_flash_%d" % i
+        lights.append({"name": name, "type": "point", "position": r3(fpos), "color": pal(PULSE["key"]),
+                       "intensity": 0.0, "range": P["flash_range"], "castsShadow": False, "volumetric": 0.0})
+        tracks.append(track("lights/%s/intensity" % name, lk))
     info["breath_keys"] = breath_keys
     return nodes, lights, beams, tracks, routes, actors, info
 
@@ -314,6 +375,10 @@ def drum_warp(clip, L, song=70.18):
 # only sees it from CAM_FADE: full within 190 m of the stage, nothing past 260 m (the pier at 10 s is 470 m out)
 CAM_FADE = (190.0, 260.0)
 CAM_AT = None   # build.py: the baked lens's eye at t
+# it20 (msg 297): the gate from the lens's distance at these seconds (zero at the first, full at the second); None keeps
+# CAM_FADE
+CAM_GATE_T = (38.7, 39.7)
+NEAR_LIFT, NEAR_LIFT_M = 0.9, (32.0, 13.0)
 # it16 (owner msg 243: "tone down the colour FX and the shockwave screen distortion itself -- probably 50 % of what it
 # is now in terms of screen distortion"): the bend halved (haze 0.3 -> 0.15, chroma 0.12 -> 0.06; the speakers' rings
 # 1.6 -> 0.8, chroma 0.25 -> 0.12) and the colour halved with it (flash 0.12 -> 0.06, flare 0.8 -> 0.4, cloud glow
@@ -376,6 +441,42 @@ if WAVE_VARIANT in WAVE_VARIANTS:
 PULSE = {"strength": 0.8, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.45, "chroma": 0.12, "key": "sign_a"}
 if WAVE_VARIANT == "D":   # it19 (msg 287): see above
     PULSE.update(strength=0.4, duration=0.6, rim=0.11, chroma=0.05, ramp_in=0.2)
+# it20 (owner msg 297: "keep the intensity as you get closer" -- "the camera gets less distorted and looks less intense
+# when we're nearer to the band"). Measured on it19 (work/engine/it20/meas, the wave's screen shift per front against
+# the lens's distance from the stage): ~6.5 px at 60-95 m, falling to ~2 px at 14-18 m. The cause was it19's own fix
+# for the stage's ghosting: nothing within 15 m of the stage's centre was touched and nothing full before 30 m, and a
+# front took 0.6 s (42 m at 70 m/s) to grow in -- so near the band every front passing the lens was a fraction of
+# itself. ADR-2130: the clearance is now the stage itself -- an upright COLUMN round its centre, untouched within
+# 6.5 m (the deck is 6 m, the players and the speaker stacks inside it; the masts' feet 6.75), full from 8.5 m (the
+# crowd's front row) -- and a front grows in over 0.15 s (10 m), so it leaves the stacks at full strength.
+# And the front's pace: the effect reads a choice by NAME, so it14-19's `"ease": 3` (meant linear) was dropped and
+# every front ran out-cubic -- 210 m/s leaving the stage, ~140 m/s at the Quay, 40 m/s at 200 m. Past the lens near
+# the band a front was a 0.15 s flick, at the Quay a 0.3 s roll: another share of the drop. Now linear at 150 m/s,
+# the pace the owner has been watching at the Quay (40-110 m), the same everywhere.
+if WAVE_VARIANT == "D":
+    WAVE.update(source_clear=8.5, source_edge=2.0, source_shape="column", ramp_in=0.15, ease="linear", speed=150.0)
+# it20 (owner msg 297 at 43.2 s: "make the waves appear as though they are coming from the speakers"): each stack's
+# ring is a burst out of its cones -- born in 50 ms, out to 16 m and gone in 0.7 s (slowing as it spreads), a clear
+# bend and a pink edge that fades as it widens; the stacks' caps pump forward and a short pink flash lights the
+# deck in front of each on every front (SPEAKER_PUMP).
+if WAVE_VARIANT == "D":
+    PULSE.update(strength=0.9, reach=16.0, duration=0.7, thickness=1.0, rim=0.28, chroma=0.08, ramp_in=0.05)
+SPEAKER_PUMP = {"throw": 0.09, "attack": 0.035, "decay": 0.22, "cap_glow": 3.0, "flash_cd": 260.0, "flash_range": 9.0,
+                "flash_decay": 0.25}
+
+
+def _speaker_drivers(asset):
+    """it20: the stack's drivers in its own frame (x, y up, z front, radius), from the kit manifest's meta."""
+    import json
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "meshes", "kit_manifest.json")
+    try:
+        man = json.load(open(path))
+    except OSError:
+        return None
+    for a in (man if isinstance(man, list) else man.get("assets", [])):
+        if a.get("asset") == asset and a.get("drivers_local"):
+            return [tuple(d) for d in a["drivers_local"]]
+    return None
 
 
 def _default_speakers(st):
