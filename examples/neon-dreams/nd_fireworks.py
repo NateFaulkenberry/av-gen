@@ -70,7 +70,7 @@ RING_TAU_MAX = 0.9      # and >= 0.4 to its sides and top
 BURST_R = 16.0          # the stars' reach (speed / drag ~ 15-20 m) for the ring of sight lines
 MIST_SHARE = 0.15       # the lobes' mist (lobeMist) between the body and the halo
 HALO_MAX = 12.0         # m: the halo reaches 1.5 radii, but a big lobe's mist is patches near its skin, not a shell
-SHEET_SHARE = 0.08      # a mist sheet's tattered share of its density (the sheets read as thin threads in the film)
+SHEET_SHARE = 0.04      # a mist sheet's tattered share of its density (the sheets read as thin threads in the film: the it16 shells seen through them)
 
 
 def _chords(a, d, ln, c, rad):
@@ -258,7 +258,9 @@ def ground_at(layout, x, z, r=26.0):
     return best
 
 
-SOLID = ("buildings/", "landmarks/", "condensery/", "far/")
+# it16 render check: the 2.81 s shell hid behind a gondola pylon (street/) and the 35.79 s one behind the street's
+# overhead gangway (decks/): those are solid too
+SOLID = ("buildings/", "landmarks/", "condensery/", "far/", "decks/", "street/")
 OCCLUDED_MAX = 3        # a town box may cut 3 of the 5 sight lines round the heart (a street's walls frame a burst), never the heart's (it counts 10)
 
 
@@ -438,7 +440,11 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
     order = list(range(len(TYPES)))
     random.Random(220).shuffle(order)
     nodes, lights, tracks, shells = [], [], [], []
-    one = 1.0 / 30.0 - 0.002   # a burst window holding exactly one 30 fps frame's instant
+    # a burst window holding exactly one 30 fps frame's instant: [tb - 0.5 ms, tb - 0.5 ms + 1/30) (it14-16a used
+    # [tb, tb + 1/30 - 2 ms), which held none when tb sat less than 2 ms after an instant -- the 24.567 s shell never
+    # burst: 24.5667 < tb and 24.6 past the window)
+    one = 1.0 / 30.0
+    lead = 0.0005
     model = CloudModel(clouds) if clouds else None
     boxes = occluders(layout, kit) if kit else None
     for k, (t, v) in enumerate(crashes()):
@@ -469,8 +475,8 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
         nodes.append({"name": flash, "kind": "particles", "position": B,
                       "particles": dict(FLASH, seed=13 + k, colorStart=[min(1.0, 0.6 + 0.4 * c) for c in ty["light"]] + [0.8])})
         tracks.append(_track("particles/%s/burst" % flash, [
-            {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": tb, "value": 12.0, "interp": "step"},
-            {"time": round(tb + one, 4), "value": 0.0, "interp": "step"}]))
+            {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": round(tb - lead, 5), "value": 12.0, "interp": "step"},
+            {"time": round(tb - lead + one, 5), "value": 0.0, "interp": "step"}]))
         for j, sysd in enumerate(ty["systems"]):
             nm = "%s_star%d" % (tag, j)
             ps = dict(STAR, seed=101 + 7 * k + j)
@@ -482,8 +488,9 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
             nodes.append({"name": nm, "kind": "particles", "position": B, "particles": ps})
             tj = round(tb + sysd.get("delay", 0.0), 4)
             tracks.append(_track("particles/%s/burst" % nm, [
-                {"time": 0.0, "value": 0.0, "interp": "step"}, {"time": tj, "value": float(sysd["count"]), "interp": "step"},
-                {"time": round(tj + one, 4), "value": 0.0, "interp": "step"}]))
+                {"time": 0.0, "value": 0.0, "interp": "step"},
+                {"time": round(tj - lead, 5), "value": float(sysd["count"]), "interp": "step"},
+                {"time": round(tj - lead + one, 5), "value": 0.0, "interp": "step"}]))
         light = tag + "_light"
         I = LIGHT["intensity"]
         lights.append({"name": light, "type": "point", "position": B, "color": ty["light"], "intensity": I,
