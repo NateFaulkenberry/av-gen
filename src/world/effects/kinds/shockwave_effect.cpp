@@ -121,7 +121,7 @@ constexpr EffectField kFields[] = {
                  "warps the whole frame (0: off)."),
     // ---- ADR-2128: a front grows in, and leaves its source clear ------------------------------------------------
     storedFloat("sourceClear", "Clear of the source", 0.0f, 0.0f, 500.0f, 0.0f, 100.0f).fmt("%.0f m")
-        .sec("Through the world")
+        .sec("Clear of the source")
         .tooltip("Through the world: nothing within half this distance of the centre is pushed, lit, rippled or\n"
                  "bent, full from this distance -- the source (a stage) stays crisp, and each front grows in as\n"
                  "it leaves it instead of appearing at full strength (0: off)."),
