@@ -477,6 +477,12 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=N
             "visibility": [[r[0], round(r[1], 3), round(r[2], 3), r[3], round(min(r[4], 99.0), 3), r[5]] for r in rows]}
 
 
+# it17 render check: the Quay's 35.79 s shell -- the street's slit of sky is narrower than the search's boxes allow,
+# and its pick (85, 171, 20) was hidden behind the street's roofs in the film. It keeps it16's site, the one the owner
+# saw in the slit at 36.97 s (msg 258) -- sunk then only into the cloud BEHIND it, which ADR-2127 now draws it over.
+PINNED = {35.794: (102.3, 175.6, 21.75)}
+
+
 def build(cam_at, layout, song=70.18, clouds=None, kit=None):
     """(nodes, lights, tracks, info). it14 (owner msg 218: "only shoot up ONE firework each cymbal hit, and time the
     EXPLOSION with the cymbal hit"): one shell per crash, bursting on its attack; msg 220: each its own type."""
@@ -500,6 +506,12 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
         ty = TYPES[order[k % len(TYPES)]]
         life = max(sd.get("lifetimeMax", STAR["lifetimeMax"]) + sd.get("delay", 0.0) for sd in ty["systems"])
         site = sites_for(t, cam_at, layout, rng, model, boxes, taken, focus, life)
+        pin = next((q for tp, q in PINNED.items() if abs(tp - t) < 0.01), None)
+        if pin is not None:   # the search's pick replaced, its rng draws kept (the other shells stay where they were)
+            site = dict(site, burst=list(pin), launch=[pin[0] + 2.0, site["launch"][1], pin[2] - 2.0],
+                        visibility=[[r[0], round(r[1], 3), round(r[2], 3), r[3], round(min(r[4], 99.0), 3), r[5]]
+                                    for r in visibility(t, list(pin), cam_at, model, boxes, samples=samples_for(life),
+                                                        life=life)], pinned=True)
         tag = "fw%d" % k
         L, B, tb = site["launch"], site["burst"], round(t, 4)
         shells.append(dict(site, t=tb, type=ty["name"]))
