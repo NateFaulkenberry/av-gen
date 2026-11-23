@@ -623,6 +623,13 @@ fn pulseCount() -> u32 {
     return min(u32(frame.pulseInfo.x + 0.5), 12u);
 }
 
+// ADR-2128: the source clearance -- a point within half `pulseInfo.y` metres of a front's centre is untouched, full
+// from `pulseInfo.y` (the stage the fronts leave stays crisp; each front grows in as it leaves it). 1 when off.
+fn pulseSourceClear(r: f32) -> f32 {
+    let c = frame.pulseInfo.y;
+    return select(1.0, smoothstep(0.5 * c, c, r), c > 0.0);
+}
+
 // The push at world point `p`: a shove out from the centre (and up, by the lift share) as the band arrives, then a
 // smaller recoil behind it -- a pressure wave through the solid. `prev` evaluates the front a frame earlier (the
 // velocity target's previous position).
@@ -647,7 +654,7 @@ fn pulseOffset(p: vec3<f32>, prev: bool) -> vec3<f32> {
         let outward = select(vec3<f32>(0.0), vec3<f32>(hz.x / fl, 0.0, hz.y / fl), fl > 1e-3);
         let lift = frame.pulses[4u * i + 3u].x;
         let dir = outward * (1.0 - lift) + vec3<f32>(0.0, lift, 0.0);
-        var w = exp(-u * u) - 0.45 * exp(-(u + 1.8) * (u + 1.8));
+        var w = (exp(-u * u) - 0.45 * exp(-(u + 1.8) * (u + 1.8))) * pulseSourceClear(r);
         // ADR-2126: no push within `calm` metres of the lens, full from twice it (a shoved foreground sweeps half
         // the frame and reads as the camera jolting)
         let calm = frame.pulses[4u * i + 3u].w;
@@ -674,15 +681,17 @@ fn pulseFlash(p: vec3<f32>, emissive: vec3<f32>) -> vec3<f32> {
     for (var i = 0u; i < n; i = i + 1u) {
         let a = frame.pulses[4u * i];
         let h = max(frame.pulses[4u * i + 1u].y, 1e-3);
-        let u = (length(p - a.xyz) - a.w) / h;
+        let rp = length(p - a.xyz);
+        let u = (rp - a.w) / h;
         if (u > 3.0 || u < -7.0) {
             continue;
         }
+        let sc = pulseSourceClear(rp); // ADR-2128
         // a sharp attack as the front arrives (u > 0) and a decay ~2.2 half-widths long behind it: at 160 m/s and a
         // 12 m half-width a point stays lit ~5 frames, so every front is caught by the 30 fps film alike (msg 218: a
         // one-frame flash was sampled strong or weak by turns, which read as a pulse about every second)
         let g = select(exp(-u * u / 4.84), exp(-4.0 * u * u), u > 0.0);
-        c = c + g * (frame.pulses[4u * i + 2u].rgb + emissive * frame.pulses[4u * i + 3u].z);
+        c = c + (g * sc) * (frame.pulses[4u * i + 2u].rgb + emissive * frame.pulses[4u * i + 3u].z);
     }
     return c;
 }
@@ -699,12 +708,13 @@ fn pulseCloud(p: vec3<f32>) -> vec4<f32> {
             continue;
         }
         let h = 1.6 * max(frame.pulses[4u * i + 1u].y, 1e-3); // clouds are soft: a wider band
-        let u = (length(p - a.xyz) - a.w) / h;
+        let rp = length(p - a.xyz);
+        let u = (rp - a.w) / h;
         if (abs(u) > 3.0) {
             continue;
         }
-        let e = exp(-u * u);
-        g = g + k * 0.6 * (e - 0.4 * exp(-(u + 1.5) * (u + 1.5)));
+        let e = exp(-u * u) * pulseSourceClear(rp); // ADR-2128
+        g = g + k * 0.6 * (e - 0.4 * exp(-(u + 1.5) * (u + 1.5)) * pulseSourceClear(rp));
         c = c + frame.pulses[4u * i + 2u].rgb * (k * e);
     }
     return vec4<f32>(max(g, -0.5), c);

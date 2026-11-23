@@ -204,3 +204,38 @@ TEST_CASE("World pulse: the lens calm reaches the shell, the ring and the push; 
     CHECK(ring.proxies[0].motion.y == Approx(20.0f));
     CHECK(ring.proxies[0].rim.w == Approx(1.5f));
 }
+
+TEST_CASE("World pulse: a front grows in over rampIn and the source clearance reaches the block and the shell; off by default",
+          "[adr2128]") {
+    world::EffectInstance e = wave(10.0); // one release, at 0.5 s
+    setRow(e, "refRadius", 1000.0f);      // no weakening with size: the ramp alone
+    {
+        const world::PulseFrame f = pulses(e, 0.5 + 0.1);
+        REQUIRE(f.count == 1);
+        CHECK(f.sourceClear == 0.0f);
+        CHECK(f.fronts[0].motion.z == Approx(0.9f).margin(1e-3)); // the original: full within 2 % of the life
+        const world::DistortionFrame d = proxies(e, 0.6);
+        REQUIRE(d.count > 0);
+        CHECK(d.proxies[0].motion.w == 0.0f);
+    }
+    setRow(e, "rampIn", 0.6f);
+    setRow(e, "sourceClear", 30.0f);
+    // eased in: a third of the way through the ramp it is under a third of the push, then full, never a step
+    float last = 0.0f;
+    for (int i = 1; i <= 24; ++i) {
+        const double age = 0.025 * i;
+        const world::PulseFrame f = pulses(e, 0.5 + age);
+        REQUIRE(f.count == 1);
+        const float push = f.fronts[0].motion.z;
+        CHECK(push >= last - 1e-6f);
+        CHECK(push - last < 0.12f); // no frame-sized jump (0.025 s steps; full is 0.9)
+        last = push;
+    }
+    CHECK(last == Approx(0.9f).margin(1e-3));
+    CHECK(pulses(e, 0.5 + 0.2).fronts[0].motion.z < 0.3f * 0.9f);
+    const world::PulseFrame f = pulses(e, 1.0);
+    CHECK(f.sourceClear == Approx(30.0f));
+    const world::DistortionFrame d = proxies(e, 1.0);
+    REQUIRE(d.count > 0);
+    CHECK(d.proxies[0].motion.w == Approx(30.0f));
+}

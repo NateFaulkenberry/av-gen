@@ -47,6 +47,10 @@ static_assert(sizeof(PulseFront) == 64);
 
 struct PulseFrame {
     std::uint32_t count = 0;
+    // ADR-2128: the live instances' largest `sourceClear` (m): every consumer weighs a point by
+    // smoothstep(clear / 2, clear, its distance from the front's centre); 0 off. One value for the frame (the
+    // block's pulseInfo.y): scenes send their fronts from one source.
+    float sourceClear = 0.0f;
     std::array<PulseFront, kMaxPulseFronts> fronts{};
 };
 
@@ -62,5 +66,8 @@ void buildPulseFrame(std::span<const EffectInstance> effects, const EffectContex
 // The Shockwave's own resolution (kinds/shockwave_effect.cpp): the live fronts of one instance, newest first.
 std::size_t shockwavePulseFronts(const EffectInstance& instance, const EffectContext& ctx, float envelope,
                                  std::span<PulseFront> out);
+
+// ADR-2128: an instance's source clearance (m; 0 off, and 0 for a ring-mode Shockwave).
+float shockwaveSourceClear(const EffectInstance& instance);
 
 } // namespace avgen::world

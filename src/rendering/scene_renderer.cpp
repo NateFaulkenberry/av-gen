@@ -3585,7 +3585,7 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         frame.skyTint = glm::vec4(scene.environment.skyTint, 0.0f); // ADR-2103
         // ADR-2124: the fronts through the world (zero count: every consumer's branch is skipped)
         frame.pulseInfo = glm::vec4(static_cast<float>(std::min<std::size_t>(scene.pulses.count, world::kMaxPulseFronts)),
-                                    0.0f, 0.0f, 0.0f);
+                                    scene.pulses.sourceClear, 0.0f, 0.0f); // y: ADR-2128
         for (std::size_t i = 0; i < world::kMaxPulseFronts; ++i) {
             const world::PulseFront& f = scene.pulses.fronts[i];
             frame.pulses[4 * i] = f.centreRadius;

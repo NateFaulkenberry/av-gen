@@ -116,6 +116,15 @@ constexpr EffectField kFields[] = {
         .tooltip("The bend and edge glow fade out as the front's radius comes within this\n"
                  "many metres of the lens's own distance from the centre, so a front passing the lens never\n"
                  "warps the whole frame (0: off)."),
+    // ---- ADR-2128: a front grows in, and leaves its source clear ------------------------------------------------
+    storedFloat("sourceClear", "Clear of the source", 0.0f, 0.0f, 500.0f, 0.0f, 100.0f).fmt("%.0f m")
+        .sec("Through the world")
+        .tooltip("Through the world: nothing within half this distance of the centre is pushed, lit, rippled or\n"
+                 "bent, full from this distance -- the source (a stage) stays crisp, and each front grows in as\n"
+                 "it leaves it instead of appearing at full strength (0: off)."),
+    storedFloat("rampIn", "Grows in over", 0.0f, 0.0f, 5.0f, 0.0f, 2.0f).fmt("%.2f s")
+        .tooltip("The seconds a new front takes to reach full strength (eased); 0: the original (2 % of a world\n"
+                 "front's life, 3 % of a ring's)."),
 };
 
 constexpr kinds::StoredRows kRows{"shockwave", kFields};
@@ -335,7 +344,9 @@ std::size_t shockwaveProxies(const EffectInstance& e, const EffectContext& ctx, 
         const float x = static_cast<float>(age / static_cast<double>(duration));
         const float radius = std::max(maxRadius * ease(easeKind, x), 1e-3f);
         // Born in a few hundredths of the life (no pop), gone over the last third.
-        const float life = smooth01(0.0f, 0.03f, x) * (1.0f - smooth01(0.68f, 1.0f, x)) * frontFade(e, age);
+        // ADR-2128: or over `rampIn` seconds, eased
+        const float born = std::clamp(std::max(kRows.f(e, "rampIn"), 0.0f) / duration, 0.03f, 0.6f);
+        const float life = smooth01(0.0f, born, x) * (1.0f - smooth01(0.68f, 1.0f, x)) * frontFade(e, age);
         if (life <= 1e-4f) {
             continue;
         }
@@ -391,9 +402,9 @@ struct WorldFront {
     float gainPrev = 0.0f; // the same a frame earlier
 };
 
-float worldLife(float x) {
-    // born in a few hundredths of the life, gone over its last fifth
-    return smooth01(0.0f, 0.02f, x) * (1.0f - smooth01(0.8f, 1.0f, x));
+float worldLife(float x, float born) {
+    // born over `born` of the life (a few hundredths, or ADR-2128's rampIn), gone over its last fifth
+    return smooth01(0.0f, born, x) * (1.0f - smooth01(0.8f, 1.0f, x));
 }
 
 std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float envelope, std::span<WorldFront> out) {
@@ -414,6 +425,7 @@ std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float
     // the range fade (msg 222): a front is gone by `fadeEnd` metres, whatever the reach
     const float fadeStart = std::max(kRows.f(e, "fadeStart"), 0.0f);
     const float fadeEnd = kRows.f(e, "fadeEnd");
+    const float born = std::clamp(std::max(kRows.f(e, "rampIn"), 0.0f) / duration, 0.02f, 0.8f); // ADR-2128
     const auto rangeFade = [&](float r) {
         return fadeEnd > fadeStart ? 1.0f - smooth01(fadeStart, fadeEnd, r) : 1.0f;
     };
@@ -431,9 +443,9 @@ std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float
         f.radiusPrev = std::max(maxRadius * ease(easeKind, xp), 1e-3f);
         const float fade = frontFade(e, age);
         const float fadePrev = frontFade(e, std::max(age - kPulsePrevSeconds, 0.0));
-        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x) * envelope * fade *
+        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x, born) * envelope * fade *
                  rangeFade(f.radius);
-        f.gainPrev = std::pow(refRadius / std::max(f.radiusPrev, refRadius), decay) * worldLife(xp) * envelope *
+        f.gainPrev = std::pow(refRadius / std::max(f.radiusPrev, refRadius), decay) * worldLife(xp, born) * envelope *
                      fadePrev * rangeFade(f.radiusPrev);
         if (f.gain <= 1e-4f && f.gainPrev <= 1e-4f) {
             continue;
@@ -470,12 +482,16 @@ std::size_t shockwaveShellProxies(const EffectInstance& e, const EffectContext& 
         p.terms = glm::vec4(1.0f, 0.0f, 0.0f, strength * 0.5f * half * f.gain);
         // ADR-2126: x = calm near the lens (m), y = clear of the lens (m), z = the shift cap (px at 1080p)
         p.motion = glm::vec4(std::max(kRows.f(e, "lensNear"), 0.0f), std::max(kRows.f(e, "lensClear"), 0.0f),
-                             maxShiftPx(e), 0.0f);
+                             maxShiftPx(e), shockwaveSourceClear(e)); // w: ADR-2128
         p.shape = glm::vec4(f.radius, half, 0.0f, 1.0f / std::max(1.5f * half, 0.1f));
         p.noise = glm::vec4(static_cast<float>(std::fmod(ctx.seconds, 1000.0)) * 0.8f, chroma, 0.0f, seed);
         p.rim = glm::vec4(rim * f.gain, 0.0f);
     }
     return made;
+}
+
+float shockwaveSourceClear(const EffectInstance& e) {
+    return kRows.choice(e, "travel") == 1 ? std::max(kRows.f(e, "sourceClear"), 0.0f) : 0.0f;
 }
 
 std::size_t shockwavePulseFronts(const EffectInstance& e, const EffectContext& ctx, float envelope,
