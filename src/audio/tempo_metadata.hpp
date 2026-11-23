@@ -128,6 +128,7 @@ inline constexpr float kSeededPriorWidthOctaves = 0.15f;
 // `tmpo` and Ogg/Opus Vorbis comments are deliberately absent).
 //   MP3   ID3v2.2/2.3/2.4 TBPM (TBP in v2.2)
 //   WAV   RIFF 'id3 '/'ID3 ' chunk -> the same ID3v2 reader
+//         a Logic Pro cue label "Tempo: N" in LIST/adtl (ADR-2125; after the audio: the chunk headers are walked)
 //   AIFF  'ID3 ' chunk -> the same ID3v2 reader
 //   FLAC  VORBIS_COMMENT block, BPM or TEMPO (either, case-insensitive)
 //

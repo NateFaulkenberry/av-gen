@@ -355,6 +355,51 @@ struct VorbisHit {
     return std::nullopt;
 }
 
+// ADR-2125: Logic Pro's session tempo in a bounced WAV. Logic writes a cue point at sample 0 and, in the RIFF
+// 'LIST' chunk of type 'adtl', a 'labl' (cue id, then a NUL-terminated text) reading exactly "Tempo: 83.0". It is a
+// convention, not a standard field, so only that exact form counts: the label must BEGIN "Tempo: " and the rest must
+// be a number parseBpmString accepts ("Tempo: fast", "Old tempo: 83", a marker named "Tempo: 83 (half time)" are not
+// tempos). Validated on ten real Logic Pro 11 bounces (the Sabertooth stems, 2026-10-24), each carrying "Tempo: 83.0";
+// the chunk sits after the audio, which is why readEmbeddedTempo(path) walks a WAV's chunk headers.
+[[nodiscard]] std::optional<Id3Hit> riffLogicTempoLabel(Bytes bytes) {
+    if (!fourcc(bytes, 0, "RIFF") || !fourcc(bytes, 8, "WAVE")) {
+        return std::nullopt;
+    }
+    constexpr std::string_view kPrefix = "Tempo: ";
+    std::size_t at = 12;
+    while (at + 8 <= bytes.size()) {
+        const std::uint32_t size = leU32(bytes, at + 4);
+        const std::size_t payload = at + 8;
+        if (size > bytes.size() - payload) {
+            break;
+        }
+        if (fourcc(bytes, at, "LIST") && size >= 4 && fourcc(bytes, payload, "adtl")) {
+            const std::size_t end = payload + size;
+            std::size_t sub = payload + 4;
+            while (sub + 8 <= end) {
+                const std::uint32_t subSize = leU32(bytes, sub + 4);
+                const std::size_t data = sub + 8;
+                if (subSize > end - data) {
+                    break;
+                }
+                if (fourcc(bytes, sub, "labl") && subSize > 4) {
+                    const auto* text = reinterpret_cast<const char*>(bytes.data() + data + 4);
+                    const std::size_t len = ::strnlen(text, subSize - 4);
+                    const std::string_view label(text, len);
+                    if (label.starts_with(kPrefix)) {
+                        return Id3Hit{.value = std::string(label.substr(kPrefix.size())),
+                                      .key = "labl \"Tempo:\"",
+                                      .format = "Logic Pro cue label (RIFF LIST/adtl)"};
+                    }
+                }
+                sub = data + subSize + (subSize & 1u);
+            }
+        }
+        at = payload + size + (size & 1u);
+    }
+    return std::nullopt;
+}
+
 // AIFF/AIFC: "FORM" size "AIFF"/"AIFC" then chunks of (fourcc, BE u32 size, payload, pad to even).
 // The ID3v2 spec names the 'ID3 ' chunk as the AIFF carrier.
 [[nodiscard]] std::optional<Id3Hit> aiffId3Bpm(Bytes bytes) {
@@ -528,6 +573,11 @@ AudioTempo readEmbeddedTempo(Bytes bytes, std::string_view name) {
     if (auto hit = riffId3Bpm(bytes)) {
         return accept(hit->value, std::move(hit->key), hit->format + " (RIFF 'id3 ' chunk)", true);
     }
+    if (auto hit = riffLogicTempoLabel(bytes)) {
+        // ADR-2125: a session tempo -- what the DAW's grid said, not what a varispeed bounce plays at; the beat
+        // tracker's prior reads it (an octave hint), the analysis still measures the grid.
+        return accept(hit->value, std::move(hit->key), std::move(hit->format), false);
+    }
     if (auto hit = aiffId3Bpm(bytes)) {
         return accept(hit->value, std::move(hit->key), hit->format + " (AIFF 'ID3 ' chunk)", true);
     }
@@ -558,6 +608,37 @@ Result<AudioTempo> readEmbeddedTempo(const std::filesystem::path& path) {
     std::vector<std::uint8_t> head(want);
     in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(want));
     head.resize(static_cast<std::size_t>(in.gcount()));
+    // ADR-2125: a WAV's metadata chunks may follow its audio (Logic writes LIST/adtl after 'data'). Walk the chunk
+    // headers through the whole file with seeks and gather every chunk but 'data' (each at most the probe size, the
+    // total too) into a compact RIFF the byte reader walks as it walks the head. Never reads a sample.
+    const Bytes headBytes(head);
+    if (!ec && size > want && fourcc(headBytes, 0, "RIFF") && fourcc(headBytes, 8, "WAVE")) {
+        std::vector<std::uint8_t> compact(head.begin(), head.begin() + 12);
+        std::uint64_t at = 12;
+        while (at + 8 <= size && compact.size() < kTempoMetadataProbeBytes) {
+            std::array<std::uint8_t, 8> h{};
+            in.clear();
+            in.seekg(static_cast<std::streamoff>(at));
+            if (!in.read(reinterpret_cast<char*>(h.data()), 8)) {
+                break;
+            }
+            const Bytes hb(h);
+            const std::uint32_t chunkSize = leU32(hb, 4);
+            if (chunkSize > size - at - 8) {
+                break;
+            }
+            if (!fourcc(hb, 0, "data") && compact.size() + 8 + chunkSize <= kTempoMetadataProbeBytes) {
+                compact.insert(compact.end(), h.begin(), h.end());
+                const std::size_t from = compact.size();
+                compact.resize(from + chunkSize + (chunkSize & 1u));
+                if (!in.read(reinterpret_cast<char*>(compact.data() + from), chunkSize)) {
+                    break;
+                }
+            }
+            at += 8 + chunkSize + (chunkSize & 1u);
+        }
+        return readEmbeddedTempo(compact, path.filename().string());
+    }
     if (head.empty()) {
         return fail("'{}' is empty", path.string());
     }

@@ -167,6 +167,43 @@ Bytes wav(Bytes tag, const char* chunkId = "id3 ") {
     return out;
 }
 
+// ADR-2125: Logic Pro's bounce layout -- fmt, `dataBytes` of audio, then a cue list and a LIST/adtl whose labl
+// texts are `labels` (Logic writes "Tempo: 83.0" on cue 1 and "Marker 1" on cue 2). The labels follow the audio.
+Bytes logicWav(const std::vector<std::string>& labels, std::size_t dataBytes = 8) {
+    Bytes chunks;
+    appendAscii(chunks, "fmt ");
+    appendLeU32(chunks, 16);
+    Bytes fmt{0x01, 0x00, 0x02, 0x00, 0x80, 0xBB, 0x00, 0x00,
+              0x00, 0x65, 0x04, 0x00, 0x06, 0x00, 0x18, 0x00};
+    chunks.insert(chunks.end(), fmt.begin(), fmt.end());
+    appendAscii(chunks, "data");
+    appendLeU32(chunks, static_cast<std::uint32_t>(dataBytes));
+    chunks.resize(chunks.size() + dataBytes + (dataBytes & 1u), 0);
+    Bytes adtl;
+    appendAscii(adtl, "adtl");
+    std::uint32_t id = 1;
+    for (const std::string& text : labels) {
+        appendAscii(adtl, "labl");
+        const std::uint32_t n = static_cast<std::uint32_t>(4 + text.size() + 1);
+        appendLeU32(adtl, n);
+        appendLeU32(adtl, id++);
+        appendAscii(adtl, text);
+        adtl.push_back(0);
+        if (n % 2 != 0) {
+            adtl.push_back(0);
+        }
+    }
+    appendAscii(chunks, "LIST");
+    appendLeU32(chunks, static_cast<std::uint32_t>(adtl.size()));
+    chunks.insert(chunks.end(), adtl.begin(), adtl.end());
+    Bytes out;
+    appendAscii(out, "RIFF");
+    appendLeU32(out, static_cast<std::uint32_t>(chunks.size() + 4));
+    appendAscii(out, "WAVE");
+    out.insert(out.end(), chunks.begin(), chunks.end());
+    return out;
+}
+
 Bytes aiff(Bytes tag) {
     Bytes chunks;
     appendAscii(chunks, "COMM");
@@ -392,6 +429,23 @@ TEST_CASE("a WAV carries tempo only in a genuine ID3 chunk", "[tempo][metadata]"
     REQUIRE_FALSE(readBytes(wav({}), "MySong_128BPM.wav").available);
 }
 
+TEST_CASE("a Logic Pro bounce's cue label \"Tempo: N\" is embedded tempo, nothing looser is", "[tempo][metadata][adr2125]") {
+    const AudioTempo logic = readBytes(logicWav({"Tempo: 83.0", "Marker 1"}), "Kick.wav");
+    REQUIRE(logic.available);
+    REQUIRE(logic.bpm == Approx(83.0));
+    REQUIRE(logic.source == avgen::audio::TempoProvenance::EmbeddedMetadata);
+    REQUIRE(logic.metadataFormat == "Logic Pro cue label (RIFF LIST/adtl)");
+    REQUIRE_FALSE(logic.integerSemantics);
+    // the label may come second
+    REQUIRE(readBytes(logicWav({"Marker 1", "Tempo: 112.5"}), "b.wav").bpm == Approx(112.5));
+    // only the exact form: a marker that mentions a tempo, a word, a suffix, no marker at all
+    for (const char* text : {"Old tempo: 83", "Tempo: fast", "Tempo: 83 (half time)", "tempo: 83", "Tempo 83"}) {
+        INFO("label: " << text);
+        REQUIRE_FALSE(readBytes(logicWav({text}), "c.wav").available);
+    }
+    REQUIRE_FALSE(readBytes(logicWav({}), "d.wav").available);
+}
+
 TEST_CASE("a filename is never metadata", "[tempo][metadata]") {
     // The brief's explicit non-goal, made a test so it cannot be quietly added later.
     for (const char* name : {"MySong_128BPM.wav", "track-174bpm.mp3", "90 BPM loop.flac"}) {
@@ -475,6 +529,14 @@ TEST_CASE("embedded tempo is read from a file on disk, not only from a buffer",
     const auto b = avgen::audio::readEmbeddedTempo(plain);
     REQUIRE(b.has_value());   // not an error
     REQUIRE_FALSE(b->available); // just no tempo
+
+    // ADR-2125: Logic writes the label AFTER the audio; with 3 MiB of samples it is past the head probe, so the
+    // path reader has to walk the chunk headers to find it.
+    const auto logic = write("logic.wav", logicWav({"Tempo: 83.0", "Marker 1"}, 3u << 20));
+    const auto c = avgen::audio::readEmbeddedTempo(logic);
+    REQUIRE(c.has_value());
+    REQUIRE(c->available);
+    REQUIRE(c->bpm == Approx(83.0));
 
     // A file that is not there IS an error, unlike a file with no tempo.
     REQUIRE_FALSE(avgen::audio::readEmbeddedTempo(dir / "absent.wav").has_value());
