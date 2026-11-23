@@ -222,8 +222,8 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
         return br * g
     c_stage = st["centre"]
     gk = [(round(i * 0.25, 2), gate(i * 0.25)) for i in range(int(70.2 / 0.25) + 2)]
-    for leaf in ("push", "flash", "clouds", "strength"):
-        v = WAVE[{"strength": "haze"}.get(leaf, leaf)]
+    for leaf in ("push", "flash", "clouds", "strength", "rimEmission"):
+        v = WAVE[{"strength": "haze", "rimEmission": "rim"}.get(leaf, leaf)]
         tracks.append(track("fx/kick_wave/%s" % leaf, [{"time": t, "value": round(v * g, 4), "interp": "linear"}
                                                         for t, g in gk]))
     # it14 (owner msg 204: "make sure the speaker pulse is on quarter notes -- it's following the kick right now"):
@@ -309,8 +309,8 @@ def drum_warp(clip, L, song=70.18):
 # only sees it from CAM_FADE: full within 190 m of the stage, nothing past 260 m (the pier at 10 s is 470 m out)
 CAM_FADE = (190.0, 260.0)
 CAM_AT = None   # build.py: the baked lens's eye at t
-WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 1.0, "rim": 0.1, "decay": 0.5, "ref": 25.0,
-        "push": 0.9, "lift": 0.45, "flash": 0.25, "flare": 1.4, "clouds": 0.35, "key": "sign_a"}
+WAVE = {"fade": (140.0, 215.0), "speed": 160.0, "reach": 230.0, "half": 12.0, "haze": 0.3, "rim": 0.1, "decay": 0.5, "ref": 25.0,
+        "push": 0.9, "lift": 0.45, "flash": 0.12, "flare": 0.8, "clouds": 0.2, "key": "sign_a"}
 PULSE = {"strength": 1.6, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.9, "key": "sign_a"}
 
 
