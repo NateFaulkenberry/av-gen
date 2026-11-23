@@ -436,6 +436,12 @@ struct ParticleSystem {
     // the dust around them; the coupling is one-directional (the volume never affects the sim).
     float fogCoupling = 1.0f;
     float volumeGlow = 0.0f;
+    // ADR-2127: drawn AFTER the Environment renderers (the cloud march), still depth-tested against the opaque scene.
+    // A particle writes no depth, so the clouds -- marched later against the depth buffer -- composite a cloud BEHIND
+    // a spark over it as if the spark were not there (Neon Dreams' fireworks sank into the cloud bank behind them).
+    // On, the system is drawn over the clouds: right for sparks in clear air in front of cloud, wrong for a system
+    // inside or behind cloud (it would show through). Off (the default) is the old order.
+    bool overClouds = false;
     // ADR-1140 / ADR-1141.
     ParticleLatent latent;
     ParticleDensity density;

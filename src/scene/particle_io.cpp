@@ -230,6 +230,9 @@ json particlesToJson(const ParticleSystem& s) {
     if (!s.emitMaskField.empty()) {
         j["emitMaskField"] = s.emitMaskField;
     }
+    if (s.overClouds) { // ADR-2127: only written when on
+        j["overClouds"] = true;
+    }
     if (s.fogCoupling != 1.0f) {
         j["fogCoupling"] = s.fogCoupling;
     }
@@ -419,6 +422,7 @@ Result<ParticleSystem> particlesFromJson(const json& j) {
     AVGEN_READ(trailFade, readFloat);
     AVGEN_READ(trailTint, readVec<3>);
     AVGEN_READ(fogCoupling, readFloat);
+    AVGEN_READ(overClouds, readBool); // ADR-2127
     AVGEN_READ(volumeGlow, readFloat);
     // ---- ADR-520 ----
     AVGEN_READ(volumeFollow, readVec<3>);

@@ -1557,13 +1557,25 @@ Result<std::vector<float>> ParticleRenderer::readVolumeR(const wgpu::Texture& te
     return out;
 }
 
-void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene) {
+bool ParticleRenderer::anyOverClouds(const scene::Scene& scene) const {
+    if (!initialised_) {
+        return false;
+    }
+    for (std::size_t i = 0; i < scene.particles.size() && i < pools_.size(); ++i) {
+        if (scene.particles[i].enabled && scene.particles[i].overClouds && pools_[i].particles) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ParticleRenderer::draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene, bool overClouds) {
     if (!initialised_) {
         return;
     }
     for (std::size_t i = 0; i < scene.particles.size() && i < pools_.size(); ++i) {
         const auto& sys = scene.particles[i];
-        if (!sys.enabled || !pools_[i].particles) {
+        if (!sys.enabled || !pools_[i].particles || sys.overClouds != overClouds) {
             continue;
         }
         Pool& pool = pools_[i];

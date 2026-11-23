@@ -5536,6 +5536,35 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
         }
     }
 
+    // ---- ADR-2127: the particle systems drawn over the clouds ----
+    // The scene pass's targets, loaded, and its depth (read only: the particles write none). Nothing at all unless a
+    // system asks for it, so every other frame is as it was.
+    if (toggles_.particles && particles_->anyOverClouds(scene)) {
+        std::array<wgpu::RenderPassColorAttachment, kSceneTargetCount> attachments{};
+        attachments[0].view = hdr_.colorView();
+        const std::array<wgpu::TextureView, kAuxTargetCount> auxViews = {normalRough_.view, velocity_.view,
+                                                                         emission_.view, ids_.view};
+        for (std::uint32_t i = 0; i < kAuxTargetCount; ++i) {
+            attachments[i + 1].view = auxViews[i];
+        }
+        for (auto& a : attachments) {
+            a.loadOp = wgpu::LoadOp::Load;
+            a.storeOp = wgpu::StoreOp::Store;
+        }
+        wgpu::RenderPassDepthStencilAttachment depth{};
+        depth.view = hdr_.depthView();
+        depth.depthLoadOp = wgpu::LoadOp::Load;
+        depth.depthStoreOp = wgpu::StoreOp::Store;
+        wgpu::RenderPassDescriptor pass{};
+        pass.label = "particles-over-clouds";
+        pass.colorAttachmentCount = kSceneTargetCount;
+        pass.colorAttachments = attachments.data();
+        pass.depthStencilAttachment = &depth;
+        wgpu::RenderPassEncoder rp = encoder.BeginRenderPass(&pass);
+        particles_->draw(rp, scene, true);
+        rp.End();
+    }
+
     // ---- volumetric atmosphere (ADR-032): raymarch + depth-aware composite ----
     // ADR-139: at `QualitySettings::volumeResolutionScale` of the scene's resolution, not a
     // hard-coded half. ADR-140: the two passes are timed separately as `volume.march` and

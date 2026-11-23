@@ -352,3 +352,18 @@ TEST_CASE("a malformed particles object is refused, naming the key", "[scene][pa
         CHECK_FALSE(scene::particlesFromJson(j));
     }
 }
+
+TEST_CASE("ADR-2127: overClouds round-trips and is written only when on", "[scene][particles][io][adr2127]") {
+    scene::ParticleSystem s;
+    CHECK_FALSE(s.overClouds);
+    CHECK_FALSE(scene::particlesToJson(s).contains("overClouds")); // a file that does not ask is unchanged
+    s.overClouds = true;
+    const json j = scene::particlesToJson(s);
+    CHECK(j.at("overClouds") == true);
+    const auto back = scene::particlesFromJson(j);
+    REQUIRE(back);
+    CHECK(back->overClouds);
+    const auto absent = scene::particlesFromJson(json::object());
+    REQUIRE(absent);
+    CHECK_FALSE(absent->overClouds);
+}

@@ -267,8 +267,11 @@ public:
     void update(wgpu::CommandEncoder& encoder, const scene::Scene& scene, const FrameTime& time,
                 const glm::mat4& view, const glm::mat4& proj, const FieldUniforms* fields = nullptr,
                 const SplineBuffers* splines = nullptr);
-    // Draws every enabled system into the current render pass (additive/alpha, depth test only).
-    void draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene);
+    // Draws every enabled system into the current render pass (additive/alpha, depth test only). ADR-2127: the systems
+    // whose `overClouds` equals `overClouds` -- the scene pass draws the others, the pass after the Environments these.
+    void draw(wgpu::RenderPassEncoder& pass, const scene::Scene& scene, bool overClouds = false);
+    // ADR-2127: true when an enabled system with a pool is drawn after the Environments.
+    bool anyOverClouds(const scene::Scene& scene) const;
     // Resets all pools (kills every particle); used on seek/offline restarts. The next update()
     // then runs the warm-up, if ParticleFrameContext::warmUpFrames asked for one.
     void resetAll();
