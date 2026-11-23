@@ -308,6 +308,7 @@ def _hits_boxes(a, b, boxes, keep=None):
 
 SAMPLES = (0.1, 0.5, 0.9, 1.3, 1.7, 2.1, 2.5)   # s after the burst: the stars' life the lens must see
 FRAME_KEEP = 0.8        # the burst's heart inside 80 % of the frame's half-width and half-height, its 16 m ring inside it
+                        # (behind the band, msg 248: the heart only -- a near shell may fill the sky over the stage)
 
 
 def _view(cam_at, t, p):
@@ -336,7 +337,7 @@ def _ring(burst, dirs=UP_RING):
     return [[burst[0] + BURST_R * o[0], burst[1] + BURST_R * o[1], burst[2] + BURST_R * o[2]] for o in dirs]
 
 
-def visibility(t, burst, cam_at, clouds, boxes):
+def visibility(t, burst, cam_at, clouds, boxes, heart_only=False):
     """Per sample second after the burst: (dt, the optical depth to the heart, the worst over the five points BURST_R
     round it (sides and top: the stars rain down, into cloud if they like), how many of the sight lines a town box
     cuts (the heart's counts 10), the frame fraction the burst and its ring (below too) reach, the lens inside cloud)."""
@@ -345,7 +346,7 @@ def visibility(t, burst, cam_at, clouds, boxes):
     for dt in SAMPLES:
         eye, fx, fy = _view(cam_at, t + dt, burst)
         ring = [_view(cam_at, t + dt, q) for q in _ring(burst, UP_RING + ((0, -1, 0),))]
-        frame = max([fx / FRAME_KEEP, fy / FRAME_KEEP] + [max(r[1], r[2]) for r in ring])
+        frame = max([fx / FRAME_KEEP, fy / FRAME_KEEP] + ([] if heart_only else [max(r[1], r[2]) for r in ring]))
         taus = clouds.taus(eye, pts) if clouds else np.zeros(len(pts))
         # a box round the lens itself is the street it flies down (a kit's bounds hold its signs and balconies), not a wall: it does not count
         out = None
@@ -364,7 +365,13 @@ def seen(rows):
 CANDIDATES = 500
 
 
-def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=()):
+# msg 248 ("make sure the fireworks are in the background of the band when we focus on them"): a crash in the band
+# dwell bursts BEHIND the stage from the lens -- on the lens-to-stage bearing (within 20 % of the half-width; 22 m apart, not 35), 15-80 m
+# past the stage, over the halo in the picture (its heart in the frame; the stars may fill it) -- so it blooms in the sky over the band and lights it from behind
+BAND_DWELL = (43.6, 51.2)
+
+
+def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=(), focus=None):
     """it16 (msg 243): the burst point in clear air and in the lens's view. Candidates spread over the frame (azimuth
     within 62 % of the half-width, 10-85 % of the half-height over the lens's pitch, 55-240 m out, a few to 340 m); each is scored by
     the samples SAMPLES after the burst in which every sight line to the burst and its ring is clear of cloud and town
@@ -383,19 +390,30 @@ def sites_for(t, cam_at, layout, rng, clouds=None, boxes=None, taken=()):
         pitch = math.asin(max(-1.0, min(1.0, d[1])))
         half_v = math.radians(fov) * 0.5
         half_h = math.atan(math.tan(half_v) * 16.0 / 9.0)
-        az = rng.uniform(-0.62, 0.62) * half_h
-        el = pitch + rng.uniform(0.1, 0.85) * half_v
-        dist = rng.uniform(40.0, 240.0) if k < 400 else rng.uniform(240.0, 340.0)
-        hx, hz = math.cos(yaw + az), math.sin(yaw + az)
-        horiz = dist * math.cos(el)
-        p = [eye[0] + hx * horiz, eye[1] + dist * math.sin(el), eye[2] + hz * horiz]
-        if any(math.dist(p, q) < 35.0 for q in taken):
+        if focus is not None:   # behind the band: on the bearing to the stage, past it, over its halo
+            fx, fz = focus[0] - eye[0], focus[2] - eye[2]
+            fd = math.hypot(fx, fz)
+            b = math.atan2(fz, fx) + rng.uniform(-0.2, 0.2) * half_h
+            horiz = fd + rng.uniform(15.0, 80.0)
+            dist = horiz
+            # in the frame: from just over the halo's own height in the picture to 90 % of the half-height
+            u0 = math.atan2(focus[1] - eye[1], fd) - pitch
+            el = pitch + rng.uniform(u0 / half_v + 0.1, 0.9) * half_v
+            p = [eye[0] + math.cos(b) * horiz, eye[1] + horiz * math.tan(el), eye[2] + math.sin(b) * horiz]
+        else:
+            az = rng.uniform(-0.62, 0.62) * half_h
+            el = pitch + rng.uniform(0.1, 0.85) * half_v
+            dist = rng.uniform(40.0, 240.0) if k < 400 else rng.uniform(240.0, 340.0)
+            hx, hz = math.cos(yaw + az), math.sin(yaw + az)
+            horiz = dist * math.cos(el)
+            p = [eye[0] + hx * horiz, eye[1] + dist * math.sin(el), eye[2] + hz * horiz]
+        if any(math.dist(p, q) < (22.0 if focus is not None else 35.0) for q in taken):
             continue
         g = ground_at(layout, p[0], p[2])
         base = (g + 4.0) if g is not None else p[1] - 75.0
         if p[1] - base < 30.0:   # at least a 30 m climb
             p[1] = base + 30.0 + rng.uniform(0.0, 20.0)
-        rows = visibility(t, p, cam_at, clouds, boxes)
+        rows = visibility(t, p, cam_at, clouds, boxes, heart_only=focus is not None)
         counted = [r for r in rows if not r[5]] or rows
         ok = seen(counted)
         frames = [r[4] for r in counted if r[4] != float("inf")]
@@ -425,7 +443,11 @@ def build(cam_at, layout, song=70.18, clouds=None, kit=None):
     boxes = occluders(layout, kit) if kit else None
     for k, (t, v) in enumerate(crashes()):
         taken = [q["burst"] for q in shells if abs(q["t"] - t) < 4.0]
-        site = sites_for(t, cam_at, layout, rng, model, boxes, taken)
+        st = (layout.get("band") or {}).get("stage")
+        focus = None
+        if st and BAND_DWELL[0] <= t <= BAND_DWELL[1]:
+            focus = [st["centre"][0], st.get("halo_y", st["centre"][1] + 8.0), st["centre"][2]]
+        site = sites_for(t, cam_at, layout, rng, model, boxes, taken, focus)
         ty = TYPES[order[k % len(TYPES)]]
         tag = "fw%d" % k
         L, B, tb = site["launch"], site["burst"], round(t, 4)
