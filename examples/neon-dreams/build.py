@@ -1208,6 +1208,17 @@ NO_WISPS = False
 NO_MIST = False
 NO_VORTEX = False
 NO_FIREWORKS = False
+# it19 (owner msg 291: "if we don't have any post-processing on the video clip, just do a bit of a saturated film
+# look"). The chain was AV Gen's defaults (AgX, bloom 0.2, a neutral grade, no grain or vignette). A restrained
+# film grade in AV Gen's own post: a little richer colour, a soft S (contrast about mid-grey), AgX's shoulder kept and
+# a quarter of the hue held in bright neon (chroma retention, so signs stay coloured instead of clipping white), a
+# faint warm halation round the brightest lights, fine grain (seeded per frame: an offline render repeats) and a
+# gentle vignette. msg 289 ("a bit of motion blur on the UFOs"): the post chain's velocity motion blur at half the
+# physical shutter, clamped to 40 px (at 720 lines).
+FILM_LOOK = {"post/grade/saturation": 1.14, "post/grade/contrast": 1.06, "post/tonemap/chroma-retention": 0.25,
+             "post/halation/enabled": True, "post/halation/intensity": 0.22, "post/halation/threshold": 3.0,
+             "post/halation/warmth": 0.5, "post/output/grain": 0.05, "post/output/vignette": 0.22,
+             "post/motionBlur/amount": 0.5, "post/motionBlur/maxRadius": 40.0}
 FW_INFO = {}
 # ADR-2119 (owner msg 149: "clouds all around more animated ... fog layers or distortion/movement"): the billows boil in
 # place over 7 s clocks (1.2 m/s, rising and rolling along the curl field) and their tatters writhe; thin edges take
@@ -1914,7 +1925,7 @@ def project_doc(scene_rel, audio_dir, tracks, routes, sources):
         # iteration 5: the audio history's onsets (what the kick ring field reads) come from the kick stem
         "feeds": {"beat": "stem.kick", "hits": "stem.kick", "levels": "audio", "historyOnsets": "stem.kick"},
         "sources": sources,
-        "parameters": {"post/output/dither": 1.0},   # it13: no spline camera (lookAhead / splineBank are baked)
+        "parameters": dict({"post/output/dither": 1.0}, **FILM_LOOK),   # it13: no spline camera (lookAhead / splineBank are baked)
         "routes": routes,
         "timeline": {"enabled": True, "cues": [], "tracks": [trim_track(t) for t in tracks]},
         "render": {"width": 1920, "height": 1080, "fps": 30, "output": "video", "path": "renders/neon-dreams.mp4",

@@ -187,6 +187,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                        "duration": PULSE["duration"], "thickness": PULSE["thickness"],
                                        "ease": 0, "rimColor": pal(PULSE["key"]), "rimEmission": PULSE["rim"],
                                        "chroma": PULSE["chroma"], "radiusDecay": 0.6, "maxConcurrent": 2.0,
+                                       "rampIn": PULSE.get("ramp_in", 0.0),
                                        "maxShift": CALM["shift"], "lensNear": CALM["ring_near"], "lensClear": CALM["ring_clear"],
                                        "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     # it14 (owner msg 195: "way more visible and impactful -- the wave should pulsate through the entire scene /
@@ -206,6 +207,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
                                                   [round(0.5 + 0.5 * v, 3) for v in pal(WAVE["key"])]), "flash": WAVE["flash"], "flare": WAVE["flare"],
                                    "clouds": WAVE["clouds"], "fadeStart": WAVE["fade"][0], "fadeEnd": WAVE["fade"][1],
                                    "maxShift": CALM["shift"], "lensNear": CALM["near"], "lensClear": CALM["clear"],
+                                   "sourceClear": WAVE.get("source_clear", 0.0), "rampIn": WAVE.get("ramp_in", 0.0),
                                    "offsetX": round(c[0], 3), "offsetY": round(c[1], 3), "offsetZ": round(c[2], 3)}})
     info["effects"] = effects
     # the held breath silences the wave in flight too, and (msg 222: "way too strong -- should not be visible till we
@@ -358,11 +360,22 @@ WAVE_VARIANTS = {
 WAVE_VARIANTS["D"] = {"wave": dict(WAVE_VARIANTS["B"]["wave"], flash=0.0052, flare=0.18, clouds=0.022, rim=0.015,
                                    flash_sat=True),
                       "calm": dict(WAVE_VARIANTS["B"]["calm"])}
+# it19 (owner msg 287 at 49.5 s: "visual bug from the shock wave" over the stage -- the floor's tiles and reflections
+# smeared away, the players ghosted, cymbals gone; and "make the screen distortion come on and off smoother; right now
+# it feels like a bit of an on/off switch"). One cause for both: every front is released AT the stage and was born at
+# full strength in two frames, so the stage and everything round it always sat in a young front's band -- bent,
+# eddied and shoved at full strength, switched on with every beat. ADR-2128: `sourceClear` (nothing within 15 m of
+# the stage's centre is pushed, lit, rippled or bent, full from 30 m; each front's shell grows in as it leaves) and
+# `rampIn` (a front reaches full strength over 0.6 s, eased). The speakers' rings (PULSE) grow in over 0.2 s and live
+# 0.6 s (0.3 s and 18 ms before), at half the bend and a quarter of the pink rim.
+WAVE_VARIANTS["D"]["wave"].update(source_clear=30.0, ramp_in=0.6)
 WAVE_VARIANT = os.environ.get("ND_WAVE", "D")
 if WAVE_VARIANT in WAVE_VARIANTS:
     WAVE.update(WAVE_VARIANTS[WAVE_VARIANT]["wave"])
     CALM.update(WAVE_VARIANTS[WAVE_VARIANT]["calm"])
 PULSE = {"strength": 0.8, "reach": 14.0, "duration": 0.3, "thickness": 0.7, "rim": 0.45, "chroma": 0.12, "key": "sign_a"}
+if WAVE_VARIANT == "D":   # it19 (msg 287): see above
+    PULSE.update(strength=0.4, duration=0.6, rim=0.11, chroma=0.05, ramp_in=0.2)
 
 
 def _default_speakers(st):

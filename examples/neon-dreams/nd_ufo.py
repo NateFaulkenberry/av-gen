@@ -40,12 +40,12 @@ UFO_ASSET = "../../../assets/imported/ufo.gltf"   # from the scene folder
 RADIUS = 2.3 * 100.0                               # m at node scale 1 (the glTF root's x100)
 CLEAR_ABOVE = 40.0
 # (middle second, crossing seconds, +1 left to right / -1 right to left, saucer diameter (m), glow colour, count)
-FLYBYS = [
-    {"t": 12.0, "dur": 2.6, "dir": 1, "diam": 46.0, "glow": [0.35, 0.85, 1.0], "n": 1},     # msg 258's arrows
-    {"t": 20.3, "dur": 2.2, "dir": 1, "diam": 34.0, "glow": [1.0, 0.45, 0.9], "n": 1},     # the Moog at 19.32
-    {"t": 26.0, "dur": 2.0, "dir": -1, "diam": 30.0, "glow": [0.6, 1.0, 0.7], "n": 1},      # the Moog at 25.98
-    {"t": 62.2, "dur": 2.8, "dir": 1, "diam": 40.0, "glow": [0.35, 0.85, 1.0], "n": 2},     # the reveal, a pair
-    {"t": 66.2, "dur": 2.6, "dir": -1, "diam": 50.0, "glow": [1.0, 0.7, 0.35], "n": 1},
+FLYBYS = [   # it19 (owner msg 289: "make it move by much faster"): each crosses in 1.1-1.3 s (it17: 2.0-2.8 s)
+    {"t": 12.0, "dur": 1.3, "dir": 1, "diam": 46.0, "glow": [0.35, 0.85, 1.0], "n": 1},     # msg 258's arrows
+    {"t": 20.3, "dur": 1.2, "dir": 1, "diam": 34.0, "glow": [1.0, 0.45, 0.9], "n": 1},     # the Moog at 19.32
+    {"t": 26.0, "dur": 1.1, "dir": -1, "diam": 30.0, "glow": [0.6, 1.0, 0.7], "n": 1},      # the Moog at 25.98
+    {"t": 62.2, "dur": 1.2, "dir": 1, "diam": 40.0, "glow": [0.35, 0.85, 1.0], "n": 1},     # the reveal (msg 289: one, not a pair)
+    {"t": 66.2, "dur": 1.1, "dir": -1, "diam": 50.0, "glow": [1.0, 0.7, 0.35], "n": 1},
 ]
 BELLY = {(0.35, 0.85, 1.0): "cyan", (1.0, 0.45, 0.9): "pink", (0.6, 1.0, 0.7): "green", (1.0, 0.7, 0.35): "amber"}
 BELLY_ASSET = "../meshes/vehicles/ufo_belly_%s.glb"
