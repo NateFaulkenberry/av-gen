@@ -142,3 +142,32 @@ TEST_CASE("World pulse: the range fade takes a front out past fadeEnd", "[adr212
         }
     }
 }
+
+// msgs 218/222/224: the newest release must not re-fade the fronts already in flight. With the Timing defaults a
+// scene file gets (fadeIn 0.35 s) the instance envelope used to restart at every release: the frame after each
+// quarter note drew NO front and the whole wave pumped on the beat.
+TEST_CASE("World pulse: fronts on the quarter grid keep their strength through each new release", "[adr2124]") {
+    const double beat = 0.35097, k0 = 0.0021;
+    world::EffectInstance e = wave(beat);
+    e.timing.trigger.phase = k0;
+    e.timing.fadeIn = 0.35; // what a scene file without a "timing" block gets
+    e.timing.fadeOut = 0.9;
+    for (const double t : {10.0 * beat + k0 + 0.001, 10.0 * beat + k0 + 0.17, 10.0 * beat + k0 + 0.34}) {
+        INFO("t = " << t);
+        const world::PulseFrame f = pulses(e, t);
+        REQUIRE(f.count >= 7);
+        // every front's release time is on the grid: R / 160 m/s = t - (k0 + n beat)
+        for (std::uint32_t i = 0; i < f.count; ++i) {
+            const double age = f.fronts[i].centreRadius.w / 160.0;
+            const double n = (t - age - k0) / beat;
+            CHECK(std::abs(n - std::round(n)) < 1e-3);
+            if (i > 1) { // (the newest is still in its own fade-in)
+                CHECK(f.fronts[i].motion.z < f.fronts[i - 1].motion.z); // weaker the further out
+            }
+        }
+        // a front 128 m out has (25 / r)^0.5 of the push, whatever the newest release's age (only the oldest fades)
+        const world::PulseFront& mid = f.fronts[2];
+        CHECK(mid.motion.z == Approx(0.9f * std::sqrt(25.0f / mid.centreRadius.w) *
+                                     (1.0f - 0.0f)).epsilon(0.12));
+    }
+}

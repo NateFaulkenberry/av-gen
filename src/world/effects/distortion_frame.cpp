@@ -95,6 +95,15 @@ float distortionEnvelope(const EffectInstance& e, const EffectContext& ctx) {
     if (local < 0.0) {
         return 0.0f;
     }
+    // ADR-2124 (Neon Dreams msgs 218/222/224): a Trigger-activated Shockwave keeps several fronts in the air, and its
+    // window restarts at EVERY event. Its fade-in and fade-out applied here multiplied ALL the fronts by the newest
+    // event's ramp: at each release every front in flight dropped to 0 and came back over `fadeIn` (0.35 s by
+    // default) -- with fronts every 0.351 s the whole wave pumped on the beat, and the frame after a release drew no
+    // front at all. The fade belongs to each front's own age; the producer applies it (`shockwaveFrontFade`), so
+    // here the window only gates.
+    if (e.kind == EffectKind::Shockwave && e.activation == Activation::Trigger) {
+        return 1.0f;
+    }
     const double windowLength = window->end - window->start - e.timing.delay;
     // `repeatSeconds` restarts the envelope, which is what a beat-synced warp flash is; `fmod`
     // rather than a counter so a scrub lands the same phase.

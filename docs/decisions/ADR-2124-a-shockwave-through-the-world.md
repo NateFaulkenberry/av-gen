@@ -58,3 +58,14 @@ Every consumer is a uniform branch on `pulseInfo.x`: a frame without a world fro
 - The push is per vertex: a large flat wall with four vertices tilts rather than ripples; dense meshes (characters,
   lanterns, signs) wobble. That is the intended read ("subtle per object but unmistakable as a wave").
 - Cost: a loop over at most 12 fronts per vertex and per lit fragment and cloud sample, only while fronts live.
+
+## Amendment (msgs 218/222/224): each front fades on its own age
+
+A Trigger-activated instance's window restarts at every event, and `distortionEnvelope` applied the Timing fade-in
+(0.35 s for any scene file without a `timing` block) from the NEWEST event to EVERY front: at each release all the
+fronts in flight dropped to zero and climbed back over 0.35 s. With fronts every 0.351 s the whole wave pumped on the
+beat, the frame after each release drew no front at all, and the pumping beat against the 30 fps frames into an
+uneven pulse the owner read as "something going off about every second". (The it12-it13 speaker rings had the same
+fault.) Now a Trigger-activated Shockwave's envelope only gates (1 inside the window), and each front takes the
+instance's fade from its OWN release (`frontFade`). Test: `[adr2124]` "fronts on the quarter grid keep their strength
+through each new release" (release times on the grid, strength falling with distance, with the default fade-in).

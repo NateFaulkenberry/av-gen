@@ -181,7 +181,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
     for i, sp in enumerate(speakers):
         c = sp.get("pulse_centre", sp.get("emitter", sp.get("pos")))
         effects.append({"id": "kick_pulse_%d" % i, "name": "kick pulse %s" % sp.get("name", i), "type": "shockwave",
-                        "owner": {"kind": "world"}, "enabled": True, "order": 10 + i, "activation": "trigger",
+                        "owner": {"kind": "world"}, "enabled": True, "timing": {"fadeIn": 0.0, "fadeOut": 0.0}, "order": 10 + i, "activation": "trigger",
                         "trigger": {"source": "marker", "name": "kick"},
                         "parameters": {"strength": PULSE["strength"], "maxRadius": PULSE["reach"],
                                        "duration": PULSE["duration"], "thickness": PULSE["thickness"],
@@ -194,7 +194,7 @@ def build(layout, scene_dir, root, pal, r3, clip_len_of, song=70.18):
     # the clouds and bends the air where it meets the town and along its silhouette.
     c = st.get("halo_y") and [st["centre"][0], st["deck_y"] + 2.5, st["centre"][2]] or st["centre"]
     effects.append({"id": "kick_wave", "name": "kick wave (through the town)", "type": "shockwave",
-                    "owner": {"kind": "world"}, "enabled": True, "order": 20, "activation": "trigger",
+                    "owner": {"kind": "world"}, "enabled": True, "timing": {"fadeIn": 0.0, "fadeOut": 0.0}, "order": 20, "activation": "trigger",
                     "trigger": {"source": "marker", "name": "kick"},
                     "parameters": {"travel": "world", "strength": WAVE["haze"], "maxRadius": WAVE["reach"],
                                    "duration": round(WAVE["reach"] / WAVE["speed"], 3), "thickness": WAVE["half"],

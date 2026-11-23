@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace avgen::world {
@@ -108,6 +109,15 @@ constexpr EffectField kFields[] = {
 
 constexpr kinds::StoredRows kRows{"shockwave", kFields};
 constexpr std::size_t kMaxProxiesPerInstanceWorld = 8;
+
+// ADR-2124: a Trigger-activated front's own fade (the instance's fadeIn / fadeOut / lifetime taken from ITS release,
+// not from the newest event's: see distortionEnvelope). 1 for any other activation, whose envelope is global.
+float frontFade(const E& e, double age) {
+    if (e.activation != Activation::Trigger) {
+        return 1.0f;
+    }
+    return timingEnvelope(e.timing, age, std::numeric_limits<double>::infinity());
+}
 
 float ease(Ease kind, float x) {
     x = std::clamp(x, 0.0f, 1.0f);
@@ -309,7 +319,7 @@ std::size_t shockwaveProxies(const EffectInstance& e, const EffectContext& ctx, 
         const float x = static_cast<float>(age / static_cast<double>(duration));
         const float radius = std::max(maxRadius * ease(easeKind, x), 1e-3f);
         // Born in a few hundredths of the life (no pop), gone over the last third.
-        const float life = smooth01(0.0f, 0.03f, x) * (1.0f - smooth01(0.68f, 1.0f, x));
+        const float life = smooth01(0.0f, 0.03f, x) * (1.0f - smooth01(0.68f, 1.0f, x)) * frontFade(e, age);
         if (life <= 1e-4f) {
             continue;
         }
@@ -402,9 +412,12 @@ std::size_t worldFronts(const EffectInstance& e, const EffectContext& ctx, float
         f.centre = centre;
         f.radius = std::max(maxRadius * ease(easeKind, x), 1e-3f);
         f.radiusPrev = std::max(maxRadius * ease(easeKind, xp), 1e-3f);
-        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x) * envelope * rangeFade(f.radius);
+        const float fade = frontFade(e, age);
+        const float fadePrev = frontFade(e, std::max(age - kPulsePrevSeconds, 0.0));
+        f.gain = std::pow(refRadius / std::max(f.radius, refRadius), decay) * worldLife(x) * envelope * fade *
+                 rangeFade(f.radius);
         f.gainPrev = std::pow(refRadius / std::max(f.radiusPrev, refRadius), decay) * worldLife(xp) * envelope *
-                     rangeFade(f.radiusPrev);
+                     fadePrev * rangeFade(f.radiusPrev);
         if (f.gain <= 1e-4f && f.gainPrev <= 1e-4f) {
             continue;
         }
