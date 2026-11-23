@@ -740,7 +740,7 @@ const std::vector<Pairing>& pairings() {
          // or the audit cannot resolve the element types -- and an unresolved type stops the audit
          // rather than being skipped, which is how this test caught ADR-230 adding three.
          {"rendering/scene_renderer.hpp", "core/wind.hpp", "world/wave_effect.hpp",
-          "world/atmospherics.hpp"},
+          "world/atmospherics.hpp", "world/effects/world_pulse.hpp"}, // ADR-2124: kMaxPulseFronts
          "FrameUniforms",
          // The wind field is one nested struct on the C++ side and four loose vec4s in the shader.
          // That is deliberate: `wind::packWind` builds the block once and the shaders read it
