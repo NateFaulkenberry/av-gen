@@ -47,6 +47,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <vector>
 
 namespace avgen::scene {
@@ -841,6 +842,25 @@ struct ClampedAuthoredValue {
     float high = 0.0f;
 };
 
+// ADR-2140: `applyProceduralParameterValues`'s path lookups, resolved once. Each entry holds what the
+// linear scan of `all` that the function used to run on every call returned, nullptr included
+// (about 190 scans per object per frame: 21 ms of CPU on Neon Dreams' 1,758 procedurals). The
+// pointers are exactly as safe as `all`'s own: a `ParameterSet` owns each parameter through a
+// unique_ptr, so registering others never moves one, and unregistering resets the whole
+// `ProceduralParameters`. `resolvedFor`/`resolvedSize` name the `all` the entries were resolved
+// against, so a copy (new storage) or a changed `all` resolves again. Filled by the apply only.
+struct ProceduralParameterLookups {
+    struct Entry {
+        const char* rel = nullptr;            // the call site's path (a literal)
+        const std::type_info* type = nullptr; // the Parameter<T> it was cast to
+        params::IParameter* param = nullptr;  // the scan's answer (nullptr: none of that path and type)
+    };
+    const params::IParameter* const* resolvedFor = nullptr;
+    std::size_t resolvedSize = 0;
+    std::vector<Entry> fixed;                 // the unconditional lookups, in call order
+    std::vector<Entry> deform, ops, effector; // per slot: slot * fields + field
+};
+
 struct ProceduralParameters {
     std::string prefix;
     std::vector<params::IParameter*> all; // everything registered (for unregister)
@@ -893,6 +913,7 @@ struct ProceduralParameters {
     params::Parameter<float>* lodSpread = nullptr;          // lod/spread
     params::Parameter<float>* lodHysteresis = nullptr;      // lod/hysteresis
     std::array<params::Parameter<float>*, 3> lodDistance{}; // lod/distance1..3
+    mutable ProceduralParameterLookups lookups;             // ADR-2140: the apply's resolved paths
 };
 
 // How many procedural clouds this process has actually regenerated, counted inside

@@ -4231,28 +4231,6 @@ params::Parameter<T>* findRel(const ProceduralParameters& p, const std::string& 
     return nullptr;
 }
 
-template <typename T>
-void copyValue(const ProceduralParameters& p, const std::string& rel, T& target) {
-    if (auto* param = findRel<T>(p, rel)) {
-        target = param->value();
-    }
-}
-
-template <typename Enum>
-void copyEnum(const ProceduralParameters& p, const std::string& rel, Enum& target, int maxValue) {
-    if (auto* param = findRel<int>(p, rel)) {
-        target = static_cast<Enum>(std::clamp(param->value(), 0, maxValue));
-    }
-}
-
-void copyTransform(const ProceduralParameters& p, const std::string& base, Transform& t) {
-    copyValue(p, base + "position", t.position);
-    if (auto* rot = findRel<glm::vec3>(p, base + "rotation")) {
-        t.rotation = quatFromEulerDegrees(rot->value());
-    }
-    copyValue(p, base + "scale", t.scale);
-}
-
 } // namespace
 
 ProceduralParameters registerProceduralParameters(params::ParameterSet& params, const ProceduralGeometry& rest,
@@ -4556,40 +4534,133 @@ bool applyProceduralParameters(const ProceduralParameters& p, const ProceduralGe
     return live.rebuild();
 }
 
+namespace {
+
+// ADR-2140: the apply's lookups, each answered by `findRel` once and then from
+// `ProceduralParameters::lookups`. The unconditional lookups are keyed by call order (checked against
+// the path and the type on every use, so a call sequence that ever changed would resolve again rather
+// than read a neighbour's answer); the per-slot ones by slot and field, because the slot counts come
+// from `rest`, which differs between a node's parts.
+class ResolvedLookups {
+public:
+    enum class Group { Deform, Ops, Effector };
+
+    explicit ResolvedLookups(const ProceduralParameters& p) : p_(p), c_(p.lookups) {
+        if (c_.resolvedFor != p.all.data() || c_.resolvedSize != p.all.size()) {
+            c_ = ProceduralParameterLookups{};
+            c_.resolvedFor = p.all.data();
+            c_.resolvedSize = p.all.size();
+        }
+    }
+
+    template <typename T>
+    params::Parameter<T>* find(const char* rel) {
+        std::vector<ProceduralParameterLookups::Entry>& fixed = c_.fixed;
+        if (next_ < fixed.size()) {
+            const ProceduralParameterLookups::Entry& e = fixed[next_];
+            if (e.type == &typeid(params::Parameter<T>) && (e.rel == rel || std::strcmp(e.rel, rel) == 0)) {
+                ++next_;
+                return static_cast<params::Parameter<T>*>(e.param);
+            }
+            fixed.resize(next_); // the sequence changed: everything from here resolves again
+        }
+        params::Parameter<T>* found = findRel<T>(p_, rel);
+        fixed.push_back({rel, &typeid(params::Parameter<T>), found});
+        ++next_;
+        return found;
+    }
+
+    template <typename T>
+    params::Parameter<T>* findSlot(Group group, std::size_t slot, std::size_t field, const char* name) {
+        const std::size_t fields = group == Group::Deform ? 13 : group == Group::Ops ? 2 : 3;
+        std::vector<ProceduralParameterLookups::Entry>& table =
+            group == Group::Deform ? c_.deform : group == Group::Ops ? c_.ops : c_.effector;
+        const std::size_t i = slot * fields + field;
+        if (table.size() <= i) {
+            table.resize((slot + 1) * fields);
+        }
+        ProceduralParameterLookups::Entry& e = table[i];
+        if (e.type == &typeid(params::Parameter<T>) && std::strcmp(e.rel, name) == 0) {
+            return static_cast<params::Parameter<T>*>(e.param);
+        }
+        const char* base = group == Group::Deform ? "deform/" : group == Group::Ops ? "ops/" : "effector/";
+        params::Parameter<T>* found = findRel<T>(p_, base + std::to_string(slot + 1) + "/" + name);
+        e = {name, &typeid(params::Parameter<T>), found};
+        return found;
+    }
+
+    template <typename T>
+    void copy(const char* rel, T& target) {
+        if (auto* param = find<T>(rel)) {
+            target = param->value();
+        }
+    }
+
+    template <typename Enum>
+    void copyEnum(const char* rel, Enum& target, int maxValue) {
+        if (auto* param = find<int>(rel)) {
+            target = static_cast<Enum>(std::clamp(param->value(), 0, maxValue));
+        }
+    }
+
+    void copyTransform(const char* position, const char* rotation, const char* scale, Transform& t) {
+        copy(position, t.position);
+        if (auto* rot = find<glm::vec3>(rotation)) {
+            t.rotation = quatFromEulerDegrees(rot->value());
+        }
+        copy(scale, t.scale);
+    }
+
+    template <typename T>
+    void copySlot(Group group, std::size_t slot, std::size_t field, const char* name, T& target) {
+        if (auto* param = findSlot<T>(group, slot, field, name)) {
+            target = param->value();
+        }
+    }
+
+private:
+    const ProceduralParameters& p_;
+    ProceduralParameterLookups& c_;
+    std::size_t next_ = 0;
+};
+
+} // namespace
+
 bool applyProceduralParameterValues(const ProceduralParameters& p, const ProceduralGeometry& rest,
                                     ProceduralGeometry& live) {
     if (p.all.empty()) {
         return false;
     }
+    ResolvedLookups at(p); // ADR-2140
     // Source
     SourceSpec& s = live.source;
-    copyEnum(p, "source/kind", s.kind, 10);
-    copyValue(p, "source/fiberLength", s.fiberLength);
-    copyValue(p, "source/fiberWidth", s.fiberWidth);
-    copyValue(p, "source/fiberTaper", s.fiberTaper);
-    copyValue(p, "source/fiberSegments", s.fiberSegments);
-    copyValue(p, "source/fiberMinPixels", s.fiberMinPixels);
-    copyValue(p, "source/size", s.size);
-    copyValue(p, "source/subdivisions", s.subdivisions);
-    copyValue(p, "source/bevel", s.bevel);
-    copyValue(p, "source/bevelSegments", s.bevelSegments);
-    copyValue(p, "source/radius", s.radius);
-    copyValue(p, "source/height", s.height);
-    copyValue(p, "source/radialSegments", s.radialSegments);
-    copyValue(p, "source/heightSegments", s.heightSegments);
-    copyValue(p, "source/caps", s.caps);
-    copyValue(p, "source/segments", s.segments);
-    copyValue(p, "source/rings", s.rings);
-    copyValue(p, "source/majorRadius", s.majorRadius);
-    copyValue(p, "source/minorRadius", s.minorRadius);
-    copyValue(p, "source/majorSegments", s.majorSegments);
-    copyValue(p, "source/minorSegments", s.minorSegments);
-    copyValue(p, "source/pointSize", s.pointSize);
-    copyTransform(p, "source/", live.sourceTransform);
+    at.copyEnum("source/kind", s.kind, 10);
+    at.copy("source/fiberLength", s.fiberLength);
+    at.copy("source/fiberWidth", s.fiberWidth);
+    at.copy("source/fiberTaper", s.fiberTaper);
+    at.copy("source/fiberSegments", s.fiberSegments);
+    at.copy("source/fiberMinPixels", s.fiberMinPixels);
+    at.copy("source/size", s.size);
+    at.copy("source/subdivisions", s.subdivisions);
+    at.copy("source/bevel", s.bevel);
+    at.copy("source/bevelSegments", s.bevelSegments);
+    at.copy("source/radius", s.radius);
+    at.copy("source/height", s.height);
+    at.copy("source/radialSegments", s.radialSegments);
+    at.copy("source/heightSegments", s.heightSegments);
+    at.copy("source/caps", s.caps);
+    at.copy("source/segments", s.segments);
+    at.copy("source/rings", s.rings);
+    at.copy("source/majorRadius", s.majorRadius);
+    at.copy("source/minorRadius", s.minorRadius);
+    at.copy("source/majorSegments", s.majorSegments);
+    at.copy("source/minorSegments", s.minorSegments);
+    at.copy("source/pointSize", s.pointSize);
+    at.copyTransform("source/position", "source/rotation", "source/scale", live.sourceTransform);
 
     // Distribution
     Distribution& d = live.distribution;
-    copyEnum(p, "distribution/kind", d.kind, static_cast<int>(DistributionKind::Points));
+    at.copyEnum("distribution/kind", d.kind, static_cast<int>(DistributionKind::Points));
     // ADR-1117/1118: the generator's numbers (registered only for a generator) and the list (a pointer).
     d.generator.name = rest.distribution.generator.name;
     d.generator.version = rest.distribution.generator.version;
@@ -4597,65 +4668,66 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
     d.generator.groundSeed = rest.distribution.generator.groundSeed;
     d.generator.regionMin = rest.distribution.generator.regionMin;
     d.generator.regionMax = rest.distribution.generator.regionMax;
-    copyValue(p, "distribution/generator/cellSize", d.generator.cellSize);
-    copyValue(p, "distribution/generator/viewDistance", d.generator.viewDistance);
-    copyValue(p, "distribution/generator/presence", d.generator.presence);
-    copyValue(p, "distribution/generator/clusterSize", d.generator.clusterSize);
-    copyValue(p, "distribution/generator/clusterContrast", d.generator.clusterContrast);
-    copyValue(p, "distribution/generator/jitter", d.generator.jitter);
-    copyValue(p, "distribution/generator/sizeMin", d.generator.sizeMin);
-    copyValue(p, "distribution/generator/sizeMax", d.generator.sizeMax);
-    copyValue(p, "distribution/generator/tilt", d.generator.tilt);
-    copyValue(p, "distribution/generator/regionRadius", d.generator.regionRadius);
-    copyValue(p, "distribution/generator/groundHeight", d.generator.groundHeight);
-    copyValue(p, "distribution/generator/groundAmplitude", d.generator.groundAmplitude);
-    copyValue(p, "distribution/generator/groundFrequency", d.generator.groundFrequency);
-    copyValue(p, "distribution/generator/omitBelow", d.generator.omitBelow); // ADR-1966 (tiles only)
+    at.copy("distribution/generator/cellSize", d.generator.cellSize);
+    at.copy("distribution/generator/viewDistance", d.generator.viewDistance);
+    at.copy("distribution/generator/presence", d.generator.presence);
+    at.copy("distribution/generator/clusterSize", d.generator.clusterSize);
+    at.copy("distribution/generator/clusterContrast", d.generator.clusterContrast);
+    at.copy("distribution/generator/jitter", d.generator.jitter);
+    at.copy("distribution/generator/sizeMin", d.generator.sizeMin);
+    at.copy("distribution/generator/sizeMax", d.generator.sizeMax);
+    at.copy("distribution/generator/tilt", d.generator.tilt);
+    at.copy("distribution/generator/regionRadius", d.generator.regionRadius);
+    at.copy("distribution/generator/groundHeight", d.generator.groundHeight);
+    at.copy("distribution/generator/groundAmplitude", d.generator.groundAmplitude);
+    at.copy("distribution/generator/groundFrequency", d.generator.groundFrequency);
+    at.copy("distribution/generator/omitBelow", d.generator.omitBelow); // ADR-1966 (tiles only)
     d.points = rest.distribution.points;
     d.pointsHash = rest.distribution.pointsHash;
-    copyValue(p, "distribution/count", d.count);
-    copyValue(p, "distribution/start", d.start);
-    copyValue(p, "distribution/end", d.end);
-    copyValue(p, "distribution/orientAlong", d.orientAlong);
-    copyValue(p, "distribution/spacing", d.spacing);
-    copyValue(p, "distribution/gridCountX", d.gridCount.x);
-    copyValue(p, "distribution/gridCountY", d.gridCount.y);
-    copyValue(p, "distribution/gridCountZ", d.gridCount.z);
-    copyValue(p, "distribution/gridSpacing", d.gridSpacing);
-    copyValue(p, "distribution/radius", d.radius);
-    copyValue(p, "distribution/startAngle", d.startAngle);
-    copyValue(p, "distribution/endAngle", d.endAngle);
-    copyEnum(p, "distribution/plane", d.plane, 2);
-    copyValue(p, "distribution/center", d.center);
-    copyEnum(p, "distribution/orientation", d.orientation, 3);
-    copyValue(p, "distribution/radiusGrowth", d.radiusGrowth);
-    copyValue(p, "distribution/turns", d.turns);
-    copyValue(p, "distribution/spiralHeight", d.spiralHeight);
-    copyValue(p, "distribution/spiralAngle", d.spiralAngle);
+    at.copy("distribution/count", d.count);
+    at.copy("distribution/start", d.start);
+    at.copy("distribution/end", d.end);
+    at.copy("distribution/orientAlong", d.orientAlong);
+    at.copy("distribution/spacing", d.spacing);
+    at.copy("distribution/gridCountX", d.gridCount.x);
+    at.copy("distribution/gridCountY", d.gridCount.y);
+    at.copy("distribution/gridCountZ", d.gridCount.z);
+    at.copy("distribution/gridSpacing", d.gridSpacing);
+    at.copy("distribution/radius", d.radius);
+    at.copy("distribution/startAngle", d.startAngle);
+    at.copy("distribution/endAngle", d.endAngle);
+    at.copyEnum("distribution/plane", d.plane, 2);
+    at.copy("distribution/center", d.center);
+    at.copyEnum("distribution/orientation", d.orientation, 3);
+    at.copy("distribution/radiusGrowth", d.radiusGrowth);
+    at.copy("distribution/turns", d.turns);
+    at.copy("distribution/spiralHeight", d.spiralHeight);
+    at.copy("distribution/spiralAngle", d.spiralAngle);
     d.spline = rest.distribution.spline;
-    copyValue(p, "distribution/splineStart", d.splineStart);
-    copyValue(p, "distribution/splineEnd", d.splineEnd);
-    copyValue(p, "distribution/alignToSpline", d.alignToSpline);
-    copyValue(p, "distribution/roll", d.roll);
-    copyValue(p, "distribution/splineOffset", d.splineOffset);
-    copyTransform(p, "transform/", live.distributionTransform);
+    at.copy("distribution/splineStart", d.splineStart);
+    at.copy("distribution/splineEnd", d.splineEnd);
+    at.copy("distribution/alignToSpline", d.alignToSpline);
+    at.copy("distribution/roll", d.roll);
+    at.copy("distribution/splineOffset", d.splineOffset);
+    at.copyTransform("transform/position", "transform/rotation", "transform/scale",
+                     live.distributionTransform);
 
     // Variation
     Variation& v = live.variation;
-    if (auto* seed = findRel<int>(p, "variation/seed")) {
+    if (auto* seed = at.find<int>("variation/seed")) {
         v.seed = static_cast<std::uint32_t>(std::max(seed->value(), 0));
     }
-    copyValue(p, "variation/position", v.randomPosition);
-    copyValue(p, "variation/rotation", v.randomRotation);
-    copyValue(p, "variation/scale", v.randomScale);
-    copyValue(p, "variation/uniformScale", v.randomUniformScale);
+    at.copy("variation/position", v.randomPosition);
+    at.copy("variation/rotation", v.randomRotation);
+    at.copy("variation/scale", v.randomScale);
+    at.copy("variation/uniformScale", v.randomUniformScale);
 
     // Hierarchy
     HierarchySpec& hs = live.hierarchy;
-    copyValue(p, "hierarchy/depth", hs.recursionDepth);
-    copyValue(p, "hierarchy/scalePerLevel", hs.scalePerLevel);
-    copyValue(p, "hierarchy/offsetPerLevel", hs.offsetPerLevel);
-    copyValue(p, "hierarchy/rotationPerLevel", hs.rotationPerLevelDegrees);
+    at.copy("hierarchy/depth", hs.recursionDepth);
+    at.copy("hierarchy/scalePerLevel", hs.scalePerLevel);
+    at.copy("hierarchy/offsetPerLevel", hs.offsetPerLevel);
+    at.copy("hierarchy/rotationPerLevel", hs.rotationPerLevelDegrees);
 
     // Deformers: the stack shape comes from rest; per-slot fields from the parameters.
     if (live.deformers.size() != rest.deformers.size()) {
@@ -4665,24 +4737,23 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
         Deformer& def = live.deformers[slot];
         def.kind = rest.deformers[slot].kind;
         def.space = rest.deformers[slot].space;
-        const std::string base = "deform/" + std::to_string(slot + 1) + "/";
-        copyValue(p, base + "amount", def.amount);
-        copyValue(p, base + "speed", def.speed);
-        copyValue(p, base + "phase", def.phase);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 0, "amount", def.amount);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 1, "speed", def.speed);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 2, "phase", def.phase);
         // ADR-1372: a route may drive the phase without bound (an integrated wave speed); a phase is an angle, so
         // it is wrapped here, in double, and the f32 sine downstream keeps its precision however long a set runs.
         def.phase = static_cast<float>(std::remainder(static_cast<double>(def.phase), 2.0 * std::numbers::pi));
-        copyValue(p, base + "frequency", def.frequency);
-        copyValue(p, base + "scale", def.scale);
-        copyValue(p, base + "falloff", def.falloff);
-        copyValue(p, base + "center", def.center);
-        copyValue(p, base + "axis", def.axis);
-        copyValue(p, base + "enabled", def.enabled);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 3, "frequency", def.frequency);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 4, "scale", def.scale);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 5, "falloff", def.falloff);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 6, "center", def.center);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 7, "axis", def.axis);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 8, "enabled", def.enabled);
         def.spline = rest.deformers[slot].spline;
-        copyValue(p, base + "pathOffset", def.pathOffset);
-        copyValue(p, base + "pathScale", def.pathScale);
-        copyValue(p, base + "pathRoll", def.pathRoll);
-        copyValue(p, base + "tension", def.tension);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 9, "pathOffset", def.pathOffset);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 10, "pathScale", def.pathScale);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 11, "pathRoll", def.pathRoll);
+        at.copySlot(ResolvedLookups::Group::Deform, slot, 12, "tension", def.tension);
     }
 
     // Point ops and effectors: the list shapes come from rest; amount/enabled/strength/weight from
@@ -4691,56 +4762,54 @@ bool applyProceduralParameterValues(const ProceduralParameters& p, const Procedu
         live.pointOps = rest.pointOps;
     }
     for (std::size_t slot = 0; slot < live.pointOps.size(); ++slot) {
-        const std::string base = "ops/" + std::to_string(slot + 1) + "/";
         live.pointOps[slot].kind = rest.pointOps[slot].kind;
-        copyValue(p, base + "amount", live.pointOps[slot].amount);
-        copyValue(p, base + "enabled", live.pointOps[slot].enabled);
+        at.copySlot(ResolvedLookups::Group::Ops, slot, 0, "amount", live.pointOps[slot].amount);
+        at.copySlot(ResolvedLookups::Group::Ops, slot, 1, "enabled", live.pointOps[slot].enabled);
     }
     if (live.effectors.size() != rest.effectors.size()) {
         live.effectors = rest.effectors;
     }
     for (std::size_t slot = 0; slot < live.effectors.size(); ++slot) {
-        const std::string base = "effector/" + std::to_string(slot + 1) + "/";
         live.effectors[slot].op = rest.effectors[slot].op;
         live.effectors[slot].field = rest.effectors[slot].field;
-        copyValue(p, base + "strength", live.effectors[slot].strength);
-        copyValue(p, base + "weight", live.effectors[slot].weight);
-        copyValue(p, base + "enabled", live.effectors[slot].enabled);
+        at.copySlot(ResolvedLookups::Group::Effector, slot, 0, "strength", live.effectors[slot].strength);
+        at.copySlot(ResolvedLookups::Group::Effector, slot, 1, "weight", live.effectors[slot].weight);
+        at.copySlot(ResolvedLookups::Group::Effector, slot, 2, "enabled", live.effectors[slot].enabled);
     }
-    copyValue(p, "emissiveFieldAmount", live.emissiveFieldAmount);
+    at.copy("emissiveFieldAmount", live.emissiveFieldAmount);
 
     // Culling / LOD: the structural / mesh-shaping fields always come from rest.
     live.lod.lodCount = rest.lod.lodCount;
     live.lod.lodByScreenSize = rest.lod.lodByScreenSize;
     live.lod.impostorSize = rest.lod.impostorSize;
-    copyValue(p, "lod/enabled", live.lod.cull);
-    copyValue(p, "lod/maxDistance", live.lod.maxDistance);
-    copyValue(p, "lod/minScreenRadius", live.lod.minScreenRadius);
-    copyValue(p, "lod/spread", live.lod.lodSpread);
-    copyValue(p, "lod/hysteresis", live.lod.lodHysteresis);
-    copyValue(p, "lod/distance1", live.lod.lodDistances[0]);
-    copyValue(p, "lod/distance2", live.lod.lodDistances[1]);
-    copyValue(p, "lod/distance3", live.lod.lodDistances[2]);
+    at.copy("lod/enabled", live.lod.cull);
+    at.copy("lod/maxDistance", live.lod.maxDistance);
+    at.copy("lod/minScreenRadius", live.lod.minScreenRadius);
+    at.copy("lod/spread", live.lod.lodSpread);
+    at.copy("lod/hysteresis", live.lod.lodHysteresis);
+    at.copy("lod/distance1", live.lod.lodDistances[0]);
+    at.copy("lod/distance2", live.lod.lodDistances[1]);
+    at.copy("lod/distance3", live.lod.lodDistances[2]);
 
     // Material
     Material& m = live.material;
-    copyValue(p, "material/baseColor", m.baseColor);
-    copyValue(p, "material/emissiveColor", m.emissiveColor);
-    copyValue(p, "material/emissive", m.emissiveIntensity);
-    copyValue(p, "material/roughness", m.roughness);
-    copyValue(p, "material/metallic", m.metallic);
+    at.copy("material/baseColor", m.baseColor);
+    at.copy("material/emissiveColor", m.emissiveColor);
+    at.copy("material/emissive", m.emissiveIntensity);
+    at.copy("material/roughness", m.roughness);
+    at.copy("material/metallic", m.metallic);
     applyToonParameters(p.toon, m.toon); // ADR-1071
     applyWireParameters(p.wire, m.wire); // ADR-1073
     applyMaterialOpticsParameters(p.optics, m); // ADR-1143
 
     MaterialVariation& mv = live.materialVariation;
-    copyValue(p, "materialVariation/hueShift", mv.hueShift);
-    copyValue(p, "materialVariation/hueGradient", mv.hueGradient);
-    copyValue(p, "materialVariation/valueRandom", mv.valueRandom);
-    copyValue(p, "materialVariation/emissiveRandom", mv.emissiveRandom);
-    copyValue(p, "materialVariation/emissiveGradient", mv.emissiveGradient);
+    at.copy("materialVariation/hueShift", mv.hueShift);
+    at.copy("materialVariation/hueGradient", mv.hueGradient);
+    at.copy("materialVariation/valueRandom", mv.valueRandom);
+    at.copy("materialVariation/emissiveRandom", mv.emissiveRandom);
+    at.copy("materialVariation/emissiveGradient", mv.emissiveGradient);
 
-    copyValue(p, "visible", live.visible);
+    at.copy("visible", live.visible);
     return true;
 }
 
