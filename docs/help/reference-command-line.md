@@ -50,7 +50,10 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | Flag | Does |
 |---|---|
 | `--input [name]` | analyze a live capture device; the name is optional |
-| `--osc-port <n>` | override the project's OSC port |
+| `--osc-port <n>` | the OSC port (overrides the project's); in a headless or scripted run it also opens the listener |
+| `--osc-bind <addr>` | the interface OSC listens on. Default `127.0.0.1` (this machine only). `0.0.0.0` listens on every interface: anyone on the network can then set any parameter, so a warning is logged |
+| `--no-osc` | open no OSC listener, even in the editor |
+| `--midi <filter>` | MIDI sources for this run (name substring or `*`); in a headless or scripted run it also opens MIDI input |
 | `--list-audio-devices`, `--list-midi` | enumerate and exit |
 | `--play` | start playing immediately |
 | `--start-at <s>` | live editor: put the playhead at second *s* before the first frame (a diagnostic, for profiling one shot) |
@@ -84,7 +87,13 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 
 `--size <w>x<h>` sets the window size in points. **Without it the window opens maximised.**
 
-`--save-project <f>` writes the project on exit; `--export-bundle <d>` writes a bundle.
+**Live control is the editor's** (ADR-2133). The editor opens OSC on `127.0.0.1:9000` and MIDI input.
+Every other run (`--headless`, `--render`, `--capture`, `--capture-ui`, `--ui-script`, `--ai-script`,
+the audits) opens neither unless `--osc-port`/`--osc-bind` or `--midi` asks.
+
+`--save-project <f>` writes the project on exit; `--export-bundle <d>` writes a bundle. With
+`--drop-pinned-overrides` the save leaves out values that only repeat the scene's (what a save before
+ADR-2132 wrote), so scene-file edits reach them again.
 
 ## Environment variables
 

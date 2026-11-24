@@ -1779,7 +1779,9 @@ Result<void> Engine::loadScene(const std::filesystem::path& path) {
     modulator_.masterGain = masterGain;
     (*ctrl)->attach(params_, modulator_);
     installController(std::move(*ctrl));
-    return reapplyEnvironment();
+    auto applied = reapplyEnvironment();
+    resetProjectBasis(); // ADR-2132: a scene opened on its own is a new document; its values are the origins
+    return applied;
 }
 
 void Engine::newComposition() {
@@ -1795,6 +1797,7 @@ void Engine::newComposition() {
     if (auto r = reapplyEnvironment(); !r) {
         log::warn("environment: {}", r.error().message);
     }
+    resetProjectBasis(); // ADR-2132
 }
 
 Result<void> Engine::loadComposition(const std::filesystem::path& rawPath) {
@@ -1818,6 +1821,9 @@ Result<void> Engine::loadComposition(const std::filesystem::path& rawPath, const
     if (released > 0) {
         log::info("assets: released {} cached asset(s) the new scene does not use", released);
     }
+    // ADR-2132: a scene opened is a new document (installComposition is also the in-session rebuild, which must not
+    // move the origins -- hence here and not there). Inside a project load, the load takes its own basis afterwards.
+    resetProjectBasis();
     return installed;
 }
 
@@ -1960,6 +1966,7 @@ void Engine::loadOrbScene() {
     if (auto r = reapplyEnvironment(); !r) {
         log::warn("environment: {}", r.error().message);
     }
+    resetProjectBasis(); // ADR-2132
 }
 
 Result<void> Engine::reapplyEnvironment() {

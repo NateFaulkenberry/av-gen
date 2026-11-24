@@ -201,6 +201,17 @@ TEST_CASE("A project round trip loses no parameter of an effect the session adde
     session.newComposition();
     REQUIRE(session.saveComposition(dir / "scene.json").has_value());
     REQUIRE(session.setEffects({aurora("valley-aurora")}).has_value());
+    // ADR-2132: a save writes what differs from the session's starting values, so move the aurora's numbers -- every
+    // one of them -- as a person tuning it would; the round trip below must then keep each.
+    std::size_t tuned = 0;
+    for (params::IParameter* p : session.params().ordered()) {
+        if (p->path().starts_with("fx/valley-aurora/") && p->flags().serialized && p->kind() == params::ParamKind::Float &&
+            p->hardMax(0) > p->hardMin(0)) {
+            p->setBaseComponent(0, p->hardMin(0) + 0.37f * (p->hardMax(0) - p->hardMin(0)));
+            ++tuned;
+        }
+    }
+    REQUIRE(tuned > 20);
     REQUIRE(session.saveProject(dir / "once.json").has_value());
 
     const auto parametersOf = [](const fs::path& file) {

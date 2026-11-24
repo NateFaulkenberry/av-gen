@@ -59,10 +59,20 @@ the analyzer.
 
 ## OSC
 
-OSC 1.0 over UDP, IPv4, implemented in AV Gen itself. Defaults: enabled, port **9000**, bind
-`0.0.0.0`, prefix `/avgen`, direct scheme on, feedback off, feedback port 9001.
+OSC 1.0 over UDP, IPv4, implemented in AV Gen itself. Defaults: enabled, port **9000**, prefix
+`/avgen`, direct scheme on, feedback off, feedback port 9001.
 
-`--osc-port <n>` overrides the project's port.
+**It listens on this machine only** (`127.0.0.1`), and only in the editor (ADR-2133). A sender on the
+same Mac works as before. A controller on another device (a phone or tablet running TouchOSC) needs
+the editor started with `--osc-bind 0.0.0.0`, or with this Mac's address on that network. The direct
+scheme sets any parameter with no password, so do that only on a network you trust; AV Gen logs a
+warning and the Control tab shows the address in orange. The interface is a choice made per run,
+never by a project: a `control.osc.bind` key in a project is not read.
+
+Headless and scripted runs (`--render`, `--capture`, `--ai-script`, ...) open no OSC listener and no
+MIDI input unless `--osc-port`/`--osc-bind` or `--midi` is given. `--osc-port <n>` overrides the
+project's port; `--no-osc` keeps OSC shut. If the port is in use (another AV Gen session, another
+program), OSC stays off for that session and the Control tab says so. The session carries on.
 
 ### The direct scheme
 

@@ -452,18 +452,66 @@ Result<ModRoute> routeFromJson(const json& j) {
     return route;
 }
 
+json originOf(const IParameter& param, const ParameterBasis& basis) {
+    if (const auto it = basis.origins.find(param.path()); it != basis.origins.end()) {
+        return *it;
+    }
+    switch (param.kind()) {
+    case ParamKind::Float:
+        return json(static_cast<double>(param.defaultComponent(0)));
+    case ParamKind::Int:
+        return json(static_cast<int>(std::lround(param.defaultComponent(0))));
+    case ParamKind::Bool:
+        return json(param.defaultComponent(0) >= 0.5f);
+    case ParamKind::Vec2:
+    case ParamKind::Vec3:
+    case ParamKind::Vec4:
+    case ParamKind::Color: {
+        json array = json::array();
+        for (std::size_t i = 0; i < param.componentCount(); ++i) {
+            array.push_back(static_cast<double>(param.defaultComponent(i)));
+        }
+        return array;
+    }
+    }
+    return json();
+}
+
+json overrideParameters(const ParameterSet& params, const ParameterBasis& basis) {
+    json parameters = json::object();
+    for (const IParameter* param : params.ordered()) {
+        if (!param->flags().serialized) {
+            continue;
+        }
+        json value = parameterToJson(*param);
+        if (basis.loaded.contains(param->path()) || value != originOf(*param, basis)) {
+            parameters[param->path()] = std::move(value);
+        }
+    }
+    for (const auto& [path, raw] : basis.loaded.items()) {
+        if (!parameters.contains(path) && params.find(path) == nullptr && basis.unknownAtLoad.contains(path)) {
+            parameters[path] = raw; // kept, opaque: this build does not register it (ADR-2132)
+        }
+    }
+    return parameters;
+}
+
 json saveProject(const ParameterSet& params, const Modulator& modulator, const signals::SourceRack* sources,
-                 const PresetBank* presets) {
+                 const PresetBank* presets, const ParameterBasis* basis) {
     json doc;
     doc["format"] = kProjectFormatName;
     doc["version"] = kProjectFormatVersion;
-    json parameters = json::object();
-    for (const IParameter* param : params.ordered()) {
-        if (param->flags().serialized) {
-            parameters[param->path()] = parameterToJson(*param);
+    if (basis != nullptr) {
+        doc["parameters"] = overrideParameters(params, *basis);
+    } else {
+        json parameters = json::object();
+        for (const IParameter* param : params.ordered()) {
+            if (param->flags().serialized) {
+                parameters[param->path()] = parameterToJson(*param);
+            }
         }
+        doc["parameters"] = std::move(parameters);
     }
-    doc["parameters"] = std::move(parameters);
     json routes = json::array();
     for (const ModRoute& route : modulator.routes()) {
         // Routes a subsystem installed are that subsystem's to re-create: a procedural graph
@@ -632,7 +680,7 @@ Result<void> loadProject(const json& original, ParameterSet& params, Modulator& 
                 param = params.find(path);
             }
             if (param == nullptr) {
-                log::warn("project references unknown parameter '{}'; ignored", path);
+                log::warn("project references unknown parameter '{}'; not applied, kept for the next save", path);
                 continue;
             }
             if (auto check = validateParameterJson(*param, value); !check) {

@@ -14,10 +14,10 @@ TEST_CASE("an engine with live control off binds no OSC port, and leaves the edi
     control::ControlMap map;
     map.oscEnabled = true;
     map.oscPort = 47931; // not the default, so a developer's own session on 9000 cannot interfere
-    map.oscBind = "127.0.0.1";
     map.midiEnabled = false;
 
     app::Engine editor(app::EngineMode::Offline);
+    editor.setLiveControl(true); // ADR-2133: the editor is the one that asks
     editor.control().setMap(map);
     REQUIRE(editor.control().status().oscOpen);
 

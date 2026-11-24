@@ -4009,11 +4009,17 @@ void ControlPanel::drawControlTab(app::Engine& engine) {
     }
     ImGui::SameLine();
     if (status.oscOpen) {
-        ImGui::TextDisabled("listening on %u: %llu msgs, %llu errors", status.oscPort,
+        // ADR-2133: the interface too, and in the warning colour when other machines can reach it.
+        const ImVec4 colour = status.oscExposed ? ImVec4(1.0f, 0.5f, 0.3f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+        ImGui::TextColored(colour, "listening on %s:%u%s: %llu msgs, %llu errors", status.oscBind.c_str(), status.oscPort,
+                            status.oscExposed ? " (reachable from the network)" : "",
                             static_cast<unsigned long long>(status.osc.messages),
                             static_cast<unsigned long long>(status.osc.errors));
     } else {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", status.oscError.empty() ? "closed" : status.oscError.c_str());
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s",
+                           !status.oscError.empty() ? status.oscError.c_str()
+                           : hub.liveOsc()           ? "closed"
+                                                     : "off for this run (ADR-2133: --osc-port / --osc-bind opens it)");
     }
     char prefix[64];
     std::snprintf(prefix, sizeof(prefix), "%s", map.oscPrefix.c_str());

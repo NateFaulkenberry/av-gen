@@ -27,4 +27,26 @@ inline constexpr std::array<std::string_view, 5> kBatchFlags = {
     return false;
 }
 
+// ADR-2133: which runs open live control. Before it every engine opened an OSC listener on 0.0.0.0:9000 and MIDI input
+// -- headless captures and `--ai-script` runs included -- because the hub was on unless a job switched it off. Now it
+// is off unless this says otherwise:
+//   - the interactive editor (a window a person works in, not `--capture-ui`/`--ui-script`/`--ui-ab` automation) opens
+//     OSC, on 127.0.0.1, and MIDI, as the owner's live use expects;
+//   - any other run opens OSC only when the command line asks (`--osc-port` or `--osc-bind`) and MIDI only when it
+//     asks (`--midi <filter>`). A project file is not a request: every save before ADR-2133 wrote "enabled": true;
+//   - `--no-osc` keeps OSC shut in any run.
+struct LiveControlAsk {
+    bool interactive = false; // the editor, for a person
+    bool oscFlag = false;     // --osc-port or --osc-bind
+    bool midiFlag = false;    // --midi <filter>
+    bool noOsc = false;       // --no-osc
+};
+struct LiveControl {
+    bool osc = false;
+    bool midi = false;
+};
+[[nodiscard]] constexpr LiveControl liveControlFor(const LiveControlAsk& ask) {
+    return LiveControl{.osc = !ask.noOsc && (ask.interactive || ask.oscFlag), .midi = ask.interactive || ask.midiFlag};
+}
+
 } // namespace avgen::app

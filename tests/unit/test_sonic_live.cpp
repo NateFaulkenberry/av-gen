@@ -406,6 +406,7 @@ TEST_CASE("A project with sonic.live turns live input on in the live editor, and
 
     // The editor's engine (live control on). With live control off -- a render, a trace -- nothing turns on.
     app::Engine editor(app::EngineMode::Live);
+    editor.setLiveControl(true); // ADR-2133: the app turns it on for the interactive editor
     REQUIRE(editor.loadProject(liveProject).has_value());
     CHECK(editor.liveSonic());
     CHECK(editor.sonicSetup()->live);
@@ -446,6 +447,7 @@ TEST_CASE("A real CoreMIDI source reaches notes.* through the editor's MIDI inpu
         SKIP("cannot create a virtual MIDI source here: " << r.error().message);
     }
     app::Engine engine(app::EngineMode::Live);
+    engine.setLiveControl(true); // ADR-2133: the editor's engine, as the app sets it up
     auto map = engine.control().map();
     map.midiEnabled = true;
     map.midiFilter = name;

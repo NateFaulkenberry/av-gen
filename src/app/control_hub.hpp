@@ -54,12 +54,23 @@ public:
     // setMap; call after editing the map's port/filter/feedback fields from the UI).
     void applyIo();
     void closeAll();
-    // Whether this hub may open live sources at all: the OSC receiver, the feedback sender and MIDI.
-    // False for an engine that only evaluates a project -- a render, a trace, the Director's scratch
-    // copy -- which must neither take the editor's port nor be driven by what arrives on it. The
-    // map is kept (it is saved with the project); only the sockets stay shut.
+    // Whether this hub may open live sources: the OSC receiver and feedback sender (`liveOsc`), and MIDI input
+    // (`liveMidi`). ADR-2133: both OFF until something turns them on. The interactive editor does
+    // (`app::liveControlFor`); a headless run, a render, a trace, a capture, the Director's scratch copy do not, unless
+    // the run was started with --osc-port/--osc-bind or --midi. The map is kept either way (it is saved with the
+    // project); only the sockets stay shut. `setLiveIo` sets both.
     void setLiveIo(bool enabled);
-    [[nodiscard]] bool liveIo() const { return liveIo_; }
+    void setLiveOsc(bool enabled);
+    void setLiveMidi(bool enabled);
+    [[nodiscard]] bool liveIo() const { return liveOsc_ || liveMidi_; }
+    [[nodiscard]] bool liveOsc() const { return liveOsc_; }
+    [[nodiscard]] bool liveMidi() const { return liveMidi_; }
+    // ADR-2133: the interface the OSC receiver binds. This machine's choice, never a project's: 127.0.0.1 (this machine
+    // only) unless `--osc-bind` asked for another. Anything but loopback logs a warning when it opens, because the
+    // direct scheme sets any parameter by path with no authentication. Refuses a string that is not an IPv4 address
+    // (nothing changes); reopens the receiver if it was open.
+    [[nodiscard]] Result<void> setOscBind(const std::string& address);
+    [[nodiscard]] const std::string& oscBind() const { return oscBind_; }
 
     // Per-frame: drains both inboxes and applies them to the engine, advances the MIDI clock to
     // the frame time and pushes parameter feedback. Returns the number of messages applied.
@@ -136,6 +147,8 @@ public:
     struct Status {
         bool oscOpen = false;
         std::uint16_t oscPort = 0;
+        std::string oscBind;        // ADR-2133: the address the receiver is bound to ("" when closed)
+        bool oscExposed = false;    // open on an address other people's machines can reach
         std::string oscError;
         control::OscReceiver::Stats osc;
         bool midiOpen = false;
@@ -186,7 +199,9 @@ private:
     control::OscSender reply_;         // per-sender replies (opened on demand)
     std::string replyTarget_;
     std::string oscError_;
-    bool liveIo_ = true;
+    bool liveOsc_ = false;   // ADR-2133
+    bool liveMidi_ = false;  // ADR-2133
+    std::string oscBind_ = control::kOscLoopback;
     std::string midiError_;
     std::vector<control::OscMessage> oscScratch_;
     std::vector<control::MidiMessage> midiScratch_;

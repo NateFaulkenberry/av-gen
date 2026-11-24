@@ -17,7 +17,8 @@
 #include "signals/source.hpp"
 
 #include <filesystem>
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
+#include <set>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -55,12 +56,42 @@ struct MigrationReport {
 // missing/invalid version, version newer than supported. Unknown keys are preserved.
 Result<MigrationReport> migrateProject(nlohmann::json& doc);
 
-// Whole document. Sources and presets are optional (nullptr = omitted / left untouched).
+// ADR-2132: what a project's `parameters` block holds -- the overrides, not a photograph of the run.
+//
+// A project's parameters are applied over its scene, so every value a save writes is a value the scene file can no
+// longer change. Writing every registered parameter (the rule before this: a 2-parameter project became 564 after one
+// save) pinned the scene's camera, node transforms and every engine default into the project. The basis records what
+// a save compares against:
+//   - `origins`: each parameter's value at the moment the document was opened -- after the scene and its own `post`
+//     block were applied, before the project's `parameters` were -- i.e. the scene's own value. A parameter registered
+//     later (a node added in session, a shader layer) has no entry and is compared with its registered default.
+//     Origins survive an in-session rebuild of the composition, which re-registers parameters with the *live* values
+//     as their defaults (`Engine::installComposition`), so "differs from the default" alone would lose such an edit.
+//   - `loaded`: the document's own `parameters` block as read. A path it names stays written even when its value
+//     equals the scene's: the project said so.
+//   - `unknownAtLoad`: its paths that no parameter answered at the end of the load. Written back verbatim, so a
+//     project saved by a build that registers more (or by the app, where the headless path registers less) does not
+//     lose them. A path that WAS registered at load and is gone at save (its node was deleted) is not written back.
+struct ParameterBasis {
+    nlohmann::json origins = nlohmann::json::object(); // path -> parameterToJson at the moment the document opened
+    nlohmann::json loaded = nlohmann::json::object();  // the document's own `parameters` block
+    std::set<std::string> unknownAtLoad;
+};
+
+// The value a save compares `param` with: its origin, else its registered default (as parameterToJson would write it).
+[[nodiscard]] nlohmann::json originOf(const IParameter& param, const ParameterBasis& basis);
+// The `parameters` block a save writes under `basis` (see ParameterBasis).
+[[nodiscard]] nlohmann::json overrideParameters(const ParameterSet& params, const ParameterBasis& basis);
+
+// Whole document. Sources and presets are optional (nullptr = omitted / left untouched). With a `basis` the
+// `parameters` block is `overrideParameters` (what a project file holds); without one it is every serialized
+// parameter (a snapshot, which is what the assistant's rollback point needs).
 nlohmann::json saveProject(const ParameterSet& params, const Modulator& modulator,
-                           const signals::SourceRack* sources = nullptr, const PresetBank* presets = nullptr);
+                           const signals::SourceRack* sources = nullptr, const PresetBank* presets = nullptr,
+                           const ParameterBasis* basis = nullptr);
 // Migrates a copy of the document to the current version (the caller's document is untouched;
 // each step is logged), then loads in this order: sources (rack replaced and re-attached by the
-// caller), parameter values (unknown paths ignored with a warning), routes (replaced), presets
+// caller), parameter values (unknown paths not applied, with a warning; ADR-2132 keeps them for the next save), routes (replaced), presets
 // (bank replaced). The caller attaches the rack and re-binds the modulator afterwards. Nothing
 // is mutated on failure.
 Result<void> loadProject(const nlohmann::json& doc, ParameterSet& params, Modulator& modulator,

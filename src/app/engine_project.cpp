@@ -378,7 +378,8 @@ Result<ParkedDirectorsCut> parkedCutFromJson(const nlohmann::json& doc,
 // check cannot disagree about what the project is.
 
 nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
-    nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_);
+    // ADR-2132: the overrides, not every registered value (params::ParameterBasis has the rule and the measurement).
+    nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_, &parameterBasis_);
     const auto dir = std::filesystem::absolute(path).parent_path();
     doc["app"] = {{"name", "avgen"}, {"version", kAppVersion}};
     // Shader layer paths relative to the project, with size and content hash for relinking.
@@ -898,11 +899,20 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     if (liveSettings_.overrides) {
         doc["live"]["overrides"] = nlohmann::json::parse(ceilingJsonText(*liveSettings_.overrides));
     }
-    doc["control"] = controlHub_.map().toJson();
+    // ADR-2133: only what differs from the defaults, so a project that never touched live control carries no listener
+    // settings at all -- and never the interface OSC listens on, which is this machine's choice, not the file's.
+    {
+        nlohmann::json control = controlHub_.map().toJson();
+        if (tempoSource_ != TempoSource::Analysis) {
+            control["tempoSource"] = tempoSourceName(tempoSource_);
+        }
+        if (!control.empty()) {
+            doc["control"] = std::move(control);
+        }
+    }
     if (outputs_.is_array() && !outputs_.empty()) {
         doc["outputs"] = outputs_;
     }
-    doc["control"]["tempoSource"] = tempoSourceName(tempoSource_);
     // ADR-896: the meter's settings (bar 1's beat, bars per phrase, phrases per section) are
     // parameters now and are saved in `parameters` with the rest; their "detect" values are saved as
     // such, so a measurement is never written down as a decision.
@@ -970,7 +980,76 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     }
     assets["scene"] = std::move(sceneRef);
     doc["assets"] = std::move(assets);
+    // ADR-2132: what the loaded document said that this build does not read, back where it was.
+    for (const auto& [key, value] : projectExtras_.items()) {
+        if (!doc.contains(key)) {
+            doc[key] = value;
+        }
+    }
     return doc;
+}
+
+// ---- ADR-2132: the basis a save compares against --------------------------------------------------
+
+namespace {
+
+// Every top-level key this build reads or writes in a project document. A key outside it is somebody else's -- a tool's
+// (`sonicScene`, `audioLab`), a person's (`_note`), a later build's -- and is kept verbatim (`projectExtras_`). A key in
+// it is this build's to write or to leave out: an emptied timeline must not come back from the loaded copy. The two
+// pre-ADR-702 effect keys are here because the load names and refuses them (ADR-441), so they are not carried forward.
+// `tests/integration/test_project_overrides.cpp` checks that everything `projectDocument` writes is listed.
+constexpr std::string_view kProjectKeys[] = {
+    "format",        "version",         "app",           "parameters",    "routes",         "sources",
+    "presets",       "shaders",         "timeline",      "assets",        "autoDirector",   "songPlan",
+    "directingPlans", "directingEvaluations", "cameraAimFollow", "cameraContinuousTake", "cameraShotSpans",
+    "parkedDirector", "effects",        "heroes",        "sceneNodes",    "lights",         "cameraDirection",
+    "staging",       "states",          "palette",       "director",      "worldMacros",    "composition",
+    "sequence",      "render",          "pathtrace",     "transport",     "feeds",          "sonic",
+    "live",          "control",         "outputs",       "worldEffects",  "atmosphericEffects",
+};
+
+} // namespace
+
+bool Engine::isProjectKey(std::string_view key) {
+    return std::find(std::begin(kProjectKeys), std::end(kProjectKeys), key) != std::end(kProjectKeys);
+}
+
+void Engine::captureParameterOrigins() {
+    nlohmann::json origins = nlohmann::json::object();
+    for (const params::IParameter* param : params_.ordered()) {
+        if (param != nullptr && param->flags().serialized) {
+            origins[param->path()] = params::parameterToJson(*param);
+        }
+    }
+    parameterBasis_.origins = std::move(origins);
+}
+
+void Engine::resetProjectBasis() {
+    parameterBasis_ = params::ParameterBasis{};
+    projectExtras_ = nlohmann::json::object();
+    captureParameterOrigins();
+}
+
+Engine::PinnedOverrides Engine::pinnedOverrides() const {
+    PinnedOverrides out;
+    for (const auto& [path, raw] : parameterBasis_.loaded.items()) {
+        const params::IParameter* param = params_.find(path);
+        if (param == nullptr || !param->flags().serialized) {
+            continue;
+        }
+        if (params::parameterToJson(*param) == params::originOf(*param, parameterBasis_)) {
+            out.paths.push_back(path);
+        }
+    }
+    return out;
+}
+
+std::size_t Engine::dropPinnedOverrides() {
+    const PinnedOverrides pinned = pinnedOverrides();
+    for (const std::string& path : pinned.paths) {
+        parameterBasis_.loaded.erase(path);
+    }
+    return pinned.paths.size();
 }
 
 Result<void> Engine::writeProjectCopy(const std::filesystem::path& path) {
@@ -1156,6 +1235,7 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     }
     stage(1);
     const auto dir = std::filesystem::absolute(path).parent_path();
+    resetProjectBasis(); // ADR-2132: none of the last document's basis survives into this one
     projectWarnings_.clear();
     projectSceneError_.clear();
     // ADR-902: binds in the middle of the load check routes against the bus and parameters alone;
@@ -1671,6 +1751,17 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         palette_.attach(params_);
     }
 
+    // ADR-2132: the scene is applied and the project's own values are not, yet -- so this is the moment every
+    // parameter holds the scene's value. What a save compares against, and what the document itself said.
+    captureParameterOrigins();
+    if (const auto block = doc.find("parameters"); block != doc.end() && block->is_object()) {
+        parameterBasis_.loaded = *block;
+    }
+    for (const auto& [key, value] : doc.items()) {
+        if (!isProjectKey(key)) {
+            projectExtras_[key] = value;
+        }
+    }
     if (auto r = params::loadProject(doc, params_, modulator_, &sources_, &presets_); !r) {
         return r;
     }
@@ -2040,6 +2131,26 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
         rebuildChannelAnalysis(keys); // the live sources' roles under this project's feeds
     }
     reportRouteLiveness();
+    // ADR-2132: the named paths nothing answered now that everything has loaded -- kept verbatim by every save. And
+    // the named paths that only repeat the scene, which an earlier build's save wrote by the hundred: said once, with
+    // the way to clear them, and never rewritten behind the author's back.
+    for (const auto& [p, value] : parameterBasis_.loaded.items()) {
+        if (params_.find(p) == nullptr) {
+            parameterBasis_.unknownAtLoad.insert(p);
+        }
+    }
+    // Both are said in the log, not added to projectWarnings(): neither is a fault in what loaded -- the project runs
+    // exactly as its file says -- and the warnings list is what a person (and a test) reads as "this load went wrong".
+    if (!parameterBasis_.unknownAtLoad.empty()) {
+        log::info("project: {} parameter(s) this build does not register were kept, unapplied, for the next save",
+                  parameterBasis_.unknownAtLoad.size());
+    }
+    if (const std::size_t pinned = pinnedOverrides().paths.size(); pinned >= kPinnedOverridesReported) {
+        log::warn("project: {} of the project's {} parameter value(s) only repeat the scene's own value, so the scene "
+                  "file cannot change them (an older save wrote every value). They are kept; "
+                  "`avgen --project <file> --drop-pinned-overrides --save-project <file>` removes them (ADR-2132)",
+                  pinned, parameterBasis_.loaded.size());
+    }
     finishTimings();
     projectPath_ = path;
     // A loaded project is a different piece. The transport stops and parks at its start rather than
@@ -2130,6 +2241,7 @@ void Engine::newProject() {
     // A new project is clean: there is nothing in it yet to lose (ADR-440). Last, so the baseline
     // photographs the engine this function has finished resetting rather than the one it started
     // with -- taken at the top it would make File > New produce an immediately-dirty project.
+    resetProjectBasis(); // ADR-2132: and every value it holds is the new document's origin
     markProjectSaved();
 }
 

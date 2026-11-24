@@ -2,6 +2,7 @@
 #include "audio/synthetic_capture.hpp"
 #include "app/application.hpp"
 #include "control/midi_rig.hpp"
+#include "control/osc.hpp"
 
 #include "gpu/pipeline_compile.hpp"
 #include "rendering/procedural_renderer.hpp" // ADR-1493: compiledMaterialsActive
@@ -187,7 +188,8 @@ std::string usageText() {
            "  --live              turn live Sonic input on: MIDI notes and the audio input drive the Sonic\n"
            "                      Character and musical context (ADR-1025; a project with sonic.live does it)\n"
            "  --start-projection  press the Live panel's Start projection once the editor is up (ADR-1026)\n"
-           "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all\n"
+           "  --midi <filter>     MIDI sources to listen to for this run: a name substring, or * for all.\n"
+           "                      The editor opens MIDI input itself; any other run only with this flag\n"
            "  --sonic-live-log <f>  with live Sonic input: one CSV row per frame (host times, sonic.*,\n"
            "                      timbre.*, notes.*, visual.*) for latency and response measurements\n"
            "  --live-sky-rate <hz>  editor: the procedural sky's lighting rebuilds a second, at most, its\n"
@@ -196,7 +198,16 @@ std::string usageText() {
            "  --live-capture <d>  with live Sonic input: every 2nd frame (--live-capture-every <n>) re-rendered\n"
            "                      at 960x540 (--live-capture-size WxH) into <d> as PPM plus frames.csv, for a\n"
            "                      review clip; costs frame time\n"
-           "  --osc-port <n>      OSC listen port (overrides the project's control map)\n"
+           "  --osc-port <n>      OSC listen port (overrides the project's control map). The editor listens\n"
+           "                      on 127.0.0.1:9000 by default; any other run (headless, render, capture,\n"
+           "                      --ai-script) opens no OSC listener unless --osc-port or --osc-bind is given\n"
+           "  --osc-bind <addr>   the interface OSC listens on (default 127.0.0.1, this machine only).\n"
+           "                      0.0.0.0 = every interface: anyone on the network can then set any\n"
+           "                      parameter (no authentication); a warning is logged (ADR-2133)\n"
+           "  --no-osc            open no OSC listener, even in the editor\n"
+           "  --drop-pinned-overrides  with --project and --save-project: leave out the parameter values\n"
+           "                      that only repeat the scene's own value (what an older save wrote), so\n"
+           "                      scene-file edits reach them again (ADR-2132)\n"
            "  --list-audio-devices, --list-midi   enumerate inputs and exit (audio: id, channels per\n"
            "                      Core Audio stream, rate)\n"
            "  --input-sources <n>  analyse channels 1..n of the --input device as stem.in<c>.*; overrides\n"
@@ -545,6 +556,20 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
                 return fail("--osc-port expects an integer");
             }
             ++i;
+        } else if (arg == "--osc-bind") {
+            auto v = need(i, "--osc-bind");
+            if (!v) return std::unexpected(v.error());
+            if (!control::isIpv4Address(*v)) {
+                return fail("--osc-bind expects an IPv4 address (127.0.0.1 = this machine only, 0.0.0.0 = every "
+                            "interface), got '{}'",
+                            *v);
+            }
+            options.oscBind = *v;
+            ++i;
+        } else if (arg == "--no-osc") {
+            options.noOsc = true;
+        } else if (arg == "--drop-pinned-overrides") {
+            options.dropPinnedOverrides = true;
         } else if (arg == "--example") {
             auto v = need(i, "--example");
             if (!v) return std::unexpected(v.error());
@@ -1490,6 +1515,25 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     }
     options_ = options;
     engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
+    // ADR-2133: live control is off in every engine until this turns it on. Before the project loads, so the project's
+    // control map opens what it names in a session that may listen, and nothing in one that may not.
+    {
+        const LiveControl live = liveControlFor(LiveControlAsk{
+            .interactive = !options.headless && !options.captureUi && options.uiScript.empty() && options.uiAb.empty(),
+            .oscFlag = options.oscPort.has_value() || options.oscBind.has_value(),
+            .midiFlag = options.midi.has_value(),
+            .noOsc = options.noOsc});
+        if (options.oscBind) {
+            if (auto r = engine_->control().setOscBind(*options.oscBind); !r) {
+                return std::unexpected(r.error());
+            }
+        }
+        // OSC waits for the command line's port when there is one (below, after the load), so a run started with
+        // --osc-port never takes the project's port -- 9000, usually the editor's -- for the moment in between.
+        engine_->control().setLiveOsc(live.osc && !options.oscPort);
+        engine_->control().setLiveMidi(live.midi);
+        liveOscAfterLoad_ = live.osc;
+    }
     if (options.headless) {
         // A headless run gets a control plane too, so `--ai-script` and `--ai-prompt` work without
         // a window. It *reads* the settings file -- an operator who configured a provider in the
@@ -2391,12 +2435,32 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             if (panel_) panel_->setStatus(r.error().message);
         }
     }
-    if (options.oscPort) {
+    if (options.dropPinnedOverrides && options.project) {
+        // ADR-2132: the explicit cleanup of a project an older save inflated. Changes nothing on disk by itself; the
+        // `--save-project` that goes with it writes the result.
+        const std::size_t dropped = engine_->dropPinnedOverrides();
+        log::info("project: {} parameter value(s) that only repeated the scene's own value will not be written",
+                  dropped);
+        if (!options.saveProject) {
+            log::warn("--drop-pinned-overrides without --save-project changes nothing on disk");
+        }
+    }
+    if (options.oscPort || options.oscBind || options.midi) {
+        // ADR-2133: the command line's live-control requests, over whatever the project's control map said.
         auto map = engine_->control().map();
-        map.oscPort = static_cast<std::uint16_t>(std::clamp(*options.oscPort, 0, 65535));
-        map.oscEnabled = true;
+        if (options.oscPort) {
+            map.oscPort = static_cast<std::uint16_t>(std::clamp(*options.oscPort, 0, 65535));
+        }
+        if (options.oscPort || options.oscBind) {
+            map.oscEnabled = !options.noOsc;
+        }
+        if (options.midi) {
+            map.midiEnabled = true;
+            map.midiFilter = *options.midi;
+        }
         engine_->control().setMap(std::move(map));
     }
+    engine_->control().setLiveOsc(liveOscAfterLoad_); // ADR-2133: now on the port the command line asked for
     if (options.input && !options.headless) {
         if (auto r = openAudioInput(*options.input); !r) {
             log::error("audio input: {}", r.error().message);

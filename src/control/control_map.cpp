@@ -645,10 +645,26 @@ nlohmann::json ControlMap::toJson() const {
         j["inMax"] = b.inMax;
         oscJson.push_back(std::move(j));
     }
-    nlohmann::json out{{"osc", {{"enabled", oscEnabled}, {"port", oscPort}, {"bind", oscBind}, {"prefix", oscPrefix}, {"direct", directOsc},
-                                {"feedbackHost", feedbackHost}, {"feedbackPort", feedbackPort}, {"feedback", feedbackEnabled},
-                                {"bindings", std::move(oscJson)}}},
-                       {"midi", {{"enabled", midiEnabled}, {"filter", midiFilter}, {"bindings", std::move(midiJson)}}}};
+    // ADR-2133: each field only when it differs from the default, so a project that never touched live control saves no
+    // `control` block at all -- the rule the user layer below always followed. A default written into every project is
+    // a machine setting dressed as a decision: it was how "listen on 0.0.0.0" reached files nobody configured.
+    const ControlMap defaults;
+    nlohmann::json oscOut = nlohmann::json::object();
+    if (oscEnabled != defaults.oscEnabled) oscOut["enabled"] = oscEnabled;
+    if (oscPort != defaults.oscPort) oscOut["port"] = oscPort;
+    if (oscPrefix != defaults.oscPrefix) oscOut["prefix"] = oscPrefix;
+    if (directOsc != defaults.directOsc) oscOut["direct"] = directOsc;
+    if (feedbackHost != defaults.feedbackHost) oscOut["feedbackHost"] = feedbackHost;
+    if (feedbackPort != defaults.feedbackPort) oscOut["feedbackPort"] = feedbackPort;
+    if (feedbackEnabled != defaults.feedbackEnabled) oscOut["feedback"] = feedbackEnabled;
+    if (!oscJson.empty()) oscOut["bindings"] = std::move(oscJson);
+    nlohmann::json midiOut = nlohmann::json::object();
+    if (midiEnabled != defaults.midiEnabled) midiOut["enabled"] = midiEnabled;
+    if (midiFilter != defaults.midiFilter) midiOut["filter"] = midiFilter;
+    if (!midiJson.empty()) midiOut["bindings"] = std::move(midiJson);
+    nlohmann::json out = nlohmann::json::object();
+    if (!oscOut.empty()) out["osc"] = std::move(oscOut);
+    if (!midiOut.empty()) out["midi"] = std::move(midiOut);
     if (midiPickup) {
         out["midi"]["pickup"] = true; // ADR-1606: written only when on, so every existing project saves as it was
     }
@@ -700,7 +716,14 @@ Result<ControlMap> ControlMap::fromJson(const nlohmann::json& j) {
             return fail("control.osc.port {} is out of range", port);
         }
         m.oscPort = static_cast<std::uint16_t>(port);
-        m.oscBind = o.value("bind", std::string("0.0.0.0"));
+        // ADR-2133: which interface OSC listens on is this machine's choice (`--osc-bind`, default 127.0.0.1), never a
+        // file's: every save before it wrote "0.0.0.0", so honouring the key would expose every such project's session
+        // to the network. Not read, and said -- once per load, never written back.
+        if (o.contains("bind")) {
+            m.warnings.push_back(fmt::format("control.osc.bind ({}) is no longer read: OSC listens on 127.0.0.1 unless "
+                                             "the run is started with --osc-bind <address> (ADR-2133)",
+                                             o["bind"].dump()));
+        }
         m.oscPrefix = o.value("prefix", std::string("/avgen"));
         if (!m.oscPrefix.empty() && !isValidAddress(m.oscPrefix)) {
             return fail("control.osc.prefix '{}' is not a valid OSC address", m.oscPrefix);

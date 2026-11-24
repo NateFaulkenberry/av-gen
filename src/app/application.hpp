@@ -335,6 +335,11 @@ struct AppOptions {
     int liveCaptureEvery = 2;
     std::uint32_t liveCaptureWidth = 960, liveCaptureHeight = 540;
     std::optional<int> oscPort;
+    // ADR-2133: `--osc-bind <addr>` (the interface; default 127.0.0.1) and `--no-osc`.
+    std::optional<std::string> oscBind;
+    bool noOsc = false;
+    // ADR-2132: `--drop-pinned-overrides` -- with --save-project, leave out values that only repeat the scene's.
+    bool dropPinnedOverrides = false;
     bool listAudioDevices = false;
     // ADR-1522: `--input-meter <device> [seconds]` -- every input channel's level once a second, then exit. The
     // hardware check: move a signal from input to input and watch which channel answers.
@@ -875,6 +880,7 @@ private:
     // ADR-1705: the MIDI rig's file (`<preferences>/midi-rig.json`; empty in a headless run: no rig) and the hub's rig
     // revision it last saved. serviceLiveScenes saves the rig when the hub's revision moves on.
     std::filesystem::path midiRigPath_;
+    bool liveOscAfterLoad_ = false; // ADR-2133: whether this run listens for OSC (liveControlFor)
     std::uint64_t midiRigSaved_ = 0;
     std::chrono::steady_clock::time_point midiRigSavedAt_{};
     void saveMidiRig(bool force);

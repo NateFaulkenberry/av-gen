@@ -9,7 +9,12 @@ smoothing, curves, polarity and remap exactly like audio.
 
 ## OSC
 
-The receiver listens on `control.osc.port` (default 9000, UDP, IPv4; bind address configurable).
+The receiver listens on `control.osc.port` (default 9000, UDP, IPv4) on **127.0.0.1**, and only in a
+session that may listen: the interactive editor, or a run started with `--osc-port`/`--osc-bind`
+(MIDI input likewise: the editor, or `--midi`). The interface is the machine's choice, `--osc-bind
+<addr>`; `0.0.0.0` exposes the unauthenticated direct scheme to the network and logs a warning. A
+project cannot set it (ADR-2133). A port already in use leaves OSC closed with the reason in
+`ControlHub::status().oscError`; nothing else is affected.
 
 Direct scheme (no binding needed; prefix `/avgen` by default):
 
@@ -91,7 +96,7 @@ switching back is instant.
 ```json
 "control": {
   "tempoSource": "analysis",
-  "osc": { "enabled": true, "port": 9000, "bind": "0.0.0.0", "prefix": "/avgen", "direct": true,
+  "osc": { "enabled": true, "port": 9000, "prefix": "/avgen", "direct": true,
            "feedbackHost": "", "feedbackPort": 9001, "feedback": false,
            "bindings": [ { "address": "/fader/1", "signal": "fader1" },
                          { "address": "/xy", "argIndex": 1, "parameter": "orb/scale", "min": 0.5, "max": 3.0 } ] },
@@ -102,6 +107,10 @@ switching back is instant.
   "channels": [ { "name": "mod", "rest": 0.5, "pickup": true } ]
 }
 ```
+
+A save writes only the fields that differ from these defaults (ADR-2133), so a project that never
+touched live control has no `control` block. `bind` is not a project key; one in an older file is
+reported and not read.
 
 ## Live audio input
 

@@ -1066,7 +1066,6 @@
       "filter": "*"
     },
     "osc": {
-      "bind": "0.0.0.0",
       "bindings": [],
       "direct": true,
       "enabled": true,

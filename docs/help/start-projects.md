@@ -23,13 +23,26 @@ memory when it is opened; the file on disk is only rewritten when you save.
 
 | Saved | Not saved |
 |---|---|
-| Every parameter marked serialisable, as its **base** value | Final values — they are recomputed each frame |
+| The parameters you changed (your **overrides**), as base values | Parameters still at the scene's own value — the scene file keeps deciding those |
 | Modulation routes you created | Routes a procedural graph or an entity creates for itself |
 | Sources, presets, world macros, scene states | The audio you were playing at the time |
 | Timeline tracks and cues you authored | Timeline tracks the sequencer baked from your shots |
 | The sequence itself | Composition layers the sequencer made from overlay cues |
 | Composition layers you made by hand | |
 | References to the audio, scene, environment and shader files | The contents of those files |
+
+**A project saves overrides, not a snapshot** (ADR-2132). A project's parameters are applied over its
+scene, so a saved value is one the scene file can no longer change. A save therefore writes a parameter
+only when its value differs from the scene's own (or, for an engine setting, from the default), or when
+the project file already named it. Edit the scene file afterwards and the change shows, unless the
+project overrides that parameter.
+
+**What AV Gen does not understand, it keeps.** Parameters this build does not register and top-level
+keys it does not read (`sonicScene`, a `_note`, a newer version's block) are written back unchanged.
+
+**Projects saved before this** carry every parameter, so scene edits do not reach them. Opening one
+says how many values only repeat the scene. Nothing is rewritten for you; to clear them:
+`avgen --project p.json --drop-pinned-overrides --save-project p.json`.
 
 The two "not saved" rows about baked output are deliberate. A sequence *is* a set of timeline
 tracks; saving both means the next load reads the saved ones and then bakes another set, and two

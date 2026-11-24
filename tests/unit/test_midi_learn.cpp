@@ -88,7 +88,8 @@ TEST_CASE("a project without user mappings saves exactly as it was written", "[m
         INFO(entry.path().string());
         REQUIRE(map.has_value());
         CHECK(map->warnings.empty());
-        const json written = map->toJson()["midi"];
+        // ADR-2133: an all-default midi block is not written at all.
+        const json written = map->toJson().value("midi", json::object());
         const json& authored = doc["control"]["midi"];
         CHECK(sameJson(written.value("bindings", json::array()), authored.value("bindings", json::array())));
         CHECK_FALSE(written.contains("mappings"));

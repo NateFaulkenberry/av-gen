@@ -186,28 +186,60 @@ void ControlHub::setMap(control::ControlMap map) {
 }
 
 void ControlHub::setLiveIo(bool enabled) {
-    liveIo_ = enabled;
+    liveOsc_ = enabled;
+    liveMidi_ = enabled;
     applyIo();
 }
 
-void ControlHub::applyIo() {
-    if (!liveIo_) {
-        closeAll();
-        oscError_.clear();
-        midiError_.clear();
-        feedbackError_.clear();
+// A no-op when nothing changes: applyIo reopens MIDI input every time it runs, and a device reconnect at start-up for a
+// switch that was already set is churn a performer can see in the monitor.
+void ControlHub::setLiveOsc(bool enabled) {
+    if (enabled == liveOsc_ && ioApplied_) {
         return;
     }
-    // OSC
-    if (map_.oscEnabled) {
+    liveOsc_ = enabled;
+    applyIo();
+}
+
+void ControlHub::setLiveMidi(bool enabled) {
+    if (enabled == liveMidi_ && ioApplied_) {
+        return;
+    }
+    liveMidi_ = enabled;
+    applyIo();
+}
+
+Result<void> ControlHub::setOscBind(const std::string& address) {
+    if (!control::isIpv4Address(address)) {
+        return fail("OSC bind address '{}' is not an IPv4 address (127.0.0.1 = this machine only, 0.0.0.0 = every "
+                    "interface)",
+                    address);
+    }
+    oscBind_ = address;
+    if (osc_.isOpen()) {
+        osc_.close(); // reopened on the new interface below
+    }
+    applyIo();
+    return {};
+}
+
+void ControlHub::applyIo() {
+    // OSC -- ADR-2133: only on a hub that was asked to listen, and on the machine's bind address, never the map's.
+    if (liveOsc_ && map_.oscEnabled) {
         if (!osc_.isOpen() || osc_.port() != map_.oscPort) {
             osc_.close();
-            if (auto r = osc_.open(map_.oscPort, map_.oscBind); !r) {
+            if (auto r = osc_.open(map_.oscPort, oscBind_); !r) {
                 oscError_ = r.error().message;
                 log::warn("osc: {}", oscError_);
             } else {
                 oscError_.clear();
-                log::info("osc: listening on {}:{} (prefix '{}')", map_.oscBind, osc_.port(), map_.oscPrefix);
+                log::info("osc: listening on {}:{} (prefix '{}')", osc_.boundAddress(), osc_.port(), map_.oscPrefix);
+                if (!control::isLoopbackAddress(osc_.boundAddress())) {
+                    log::warn("osc: listening on {}:{} is reachable from other machines, and anyone who can reach it can "
+                              "set any parameter by path (no authentication). Use it only on a network you trust; "
+                              "without --osc-bind OSC listens on 127.0.0.1 (ADR-2133)",
+                              osc_.boundAddress(), osc_.port());
+                }
             }
         }
     } else {
@@ -215,7 +247,13 @@ void ControlHub::applyIo() {
         oscError_.clear();
     }
     // OSC feedback sender (host may be empty: replies go to the sender only).
-    if (!map_.feedbackHost.empty()) {
+    if (!liveOsc_) {
+        feedback_.close();
+        feedbackTarget_.clear();
+        feedbackError_.clear();
+        reply_.close();
+        replyTarget_.clear();
+    } else if (!map_.feedbackHost.empty()) {
         const std::string target = map_.feedbackHost + ":" + std::to_string(map_.feedbackPort);
         if (!feedback_.isOpen() || feedbackTarget_ != target) {
             feedback_.close();
@@ -235,8 +273,11 @@ void ControlHub::applyIo() {
         feedbackError_.clear();
     }
     feedbackCache_.clear(); // re-prime: nothing is pushed until a value changes from here on
-    // MIDI
-    if (map_.midiEnabled && control::hasMidiBackend()) {
+    // MIDI -- ADR-2133: likewise only on a hub that was asked to.
+    if (!liveMidi_) {
+        midi_.close();
+        midiError_.clear();
+    } else if (map_.midiEnabled && control::hasMidiBackend()) {
         midi_.close();
         if (auto r = midi_.open(map_.midiFilter); !r) {
             midiError_ = r.error().message;
@@ -635,6 +676,8 @@ ControlHub::Status ControlHub::status() const {
     Status s;
     s.oscOpen = osc_.isOpen();
     s.oscPort = osc_.port();
+    s.oscBind = osc_.boundAddress();
+    s.oscExposed = osc_.isOpen() && !control::isLoopbackAddress(s.oscBind);
     s.oscError = oscError_;
     s.osc = osc_.stats();
     s.midiOpen = midi_.isOpen();

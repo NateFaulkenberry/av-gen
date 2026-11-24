@@ -605,6 +605,20 @@ bool matchAddress(std::string_view pattern, std::string_view address) {
     return matchPattern(pattern, address, budget);
 }
 
+bool isIpv4Address(const std::string& address) {
+    in_addr parsed{};
+    return ::inet_pton(AF_INET, address.c_str(), &parsed) == 1;
+}
+
+bool isLoopbackAddress(std::string_view address) {
+    const std::string text(address);
+    in_addr parsed{};
+    if (::inet_pton(AF_INET, text.c_str(), &parsed) != 1) {
+        return false;
+    }
+    return (ntohl(parsed.s_addr) >> 24) == 127;
+}
+
 bool isValidAddress(std::string_view address) {
     if (address.empty() || address.front() != '/') {
         return false;
@@ -626,6 +640,7 @@ bool isValidAddress(std::string_view address) {
 struct OscReceiver::Impl {
     int fd = -1;
     std::uint16_t boundPort = 0;
+    std::string boundAddress; // ADR-2133: as getsockname reports it
     std::thread thread;
     std::atomic<bool> running{false};
     std::atomic<std::size_t> queueLimit{kDefaultQueueLimit};
@@ -720,13 +735,20 @@ Result<void> OscReceiver::open(std::uint16_t port, const std::string& bindAddres
     if (fd < 0) {
         return fail("OSC receiver: socket(): {}", errnoText());
     }
-    const int one = 1;
-    ::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+    // ADR-2133: no SO_REUSEADDR. With it, a second program could bind 127.0.0.1:9000 beside another's 0.0.0.0:9000 (or the
+    // reverse) and the messages split silently between the two; without it the second bind fails with "in use", which
+    // is reported. UDP has no TIME_WAIT, so nothing else needed it.
     const int receiveBuffer = 1 << 20; // best effort: absorb bursts of controller traffic
     ::setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receiveBuffer, sizeof(receiveBuffer));
     if (::bind(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) != 0) {
+        const int code = errno;
         const std::string reason = errnoText();
         ::close(fd);
+        if (code == EADDRINUSE) {
+            return fail("OSC receiver: port {} on {} is in use by another program (another AV Gen session?); OSC is off "
+                        "for this session -- choose another port (--osc-port, or the Control panel)",
+                        port, bindAddress);
+        }
         return fail("OSC receiver: cannot bind {}:{}: {}", bindAddress, port, reason);
     }
     sockaddr_in bound{};
@@ -738,6 +760,10 @@ Result<void> OscReceiver::open(std::uint16_t port, const std::string& bindAddres
     }
     impl_->fd = fd;
     impl_->boundPort = ntohs(bound.sin_port);
+    {
+        char text[INET_ADDRSTRLEN] = {};
+        impl_->boundAddress = ::inet_ntop(AF_INET, &bound.sin_addr, text, sizeof(text)) != nullptr ? text : bindAddress;
+    }
     {
         std::lock_guard lock(impl_->mutex);
         impl_->inbox.clear();
@@ -764,10 +790,15 @@ void OscReceiver::close() {
     }
     log::debug("OSC receiver on port {} closed", impl_->boundPort);
     impl_->boundPort = 0;
+    impl_->boundAddress.clear();
 }
 
 bool OscReceiver::isOpen() const {
     return impl_->fd >= 0;
+}
+
+std::string OscReceiver::boundAddress() const {
+    return impl_->boundAddress;
 }
 
 std::uint16_t OscReceiver::port() const {

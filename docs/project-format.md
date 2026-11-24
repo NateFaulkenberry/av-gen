@@ -71,7 +71,17 @@ is rejected.
 
 Rules:
 - `parameters` holds base values only (finals are derived every frame); numbers for float/int,
-  booleans for bool, arrays for vectors and colours. Only parameters flagged `serialized`. Source
+  booleans for bool, arrays for vectors and colours. Only parameters flagged `serialized`.
+- **`parameters` holds the project's overrides, not every registered value (ADR-2132).** It is applied
+  over the scene, so a save writes a parameter only when (a) its base differs from its *origin* (the
+  value it had when the document was opened, i.e. the scene's own value, or its registered default
+  for one that appeared later), or (b) the loaded document named it. A path the loaded document named
+  that this build does not register is written back verbatim. Before ADR-2132 a save wrote every
+  registered parameter (measured: 2 -> 564), pinning the scene's camera and transforms; such files are
+  kept as they are by every save, reported at load, and cleaned only on request with
+  `--drop-pinned-overrides`.
+- **Unknown top-level keys are kept (ADR-2132).** A key this build neither reads nor writes
+  (`Engine::isProjectKey`) is carried through load and save unchanged. Source
   settings that are parameters (`sources/<name>/rate`, `macros/<knob>`, ...) live here, not in
   `sources`.
 - Enums are lower-case strings: curve `linear|power|log|exp|scurve`; threshold
@@ -103,8 +113,8 @@ Rules:
   `sources` or `presets` section (e.g. version 1) leaves an empty rack / bank when the caller
   passes them; a caller that passes no rack / bank keeps its own untouched.
 - Loading validates everything first (including `sources` and `presets`, whether or not the
-  caller loads them) and changes nothing on failure. Unknown parameter paths are skipped with a
-  warning (forward compatibility); a type mismatch is an error. `version` greater than the
+  caller loads them) and changes nothing on failure. Unknown parameter paths are not applied, with a
+  warning, and are kept for the next save (forward compatibility); a type mismatch is an error. `version` greater than the
   reader's is rejected; older versions are migrated in order (see above).
 - Paths are the identity for parameters everywhere: UI, presets, OSC addresses (`/orb/scale`).
 

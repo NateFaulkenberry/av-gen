@@ -188,7 +188,7 @@ struct ChannelRest {
 struct ControlMap {
     bool oscEnabled = true;
     std::uint16_t oscPort = 9000;
-    std::string oscBind = "0.0.0.0";
+    // ADR-2133: no bind address here. The interface is the machine's choice (ControlHub::setOscBind, `--osc-bind`).
     std::string oscPrefix = "/avgen";
     bool directOsc = true;       // accept the direct scheme
     std::string feedbackHost;    // "" = replies go to the sender only, no pushed feedback

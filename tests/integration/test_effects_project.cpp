@@ -225,7 +225,9 @@ TEST_CASE("several effects and their routes round-trip through the project docum
     CHECK(fxParameters(twice) == fxParameters(once));
     // The control: the comparison had something in it.
     CHECK(fxRoutes(once).size() >= 2);
-    CHECK(fxParameters(once).size() > 50);
+    // ADR-2132: a save writes the overrides, so the one slider moved is the fx parameter the file carries.
+    CHECK(fxParameters(once).size() >= 1);
+    CHECK(fxParameters(once).count("fx/aurora/intensity") == 1);
     fs::remove_all(dir);
 }
 

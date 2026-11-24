@@ -41,6 +41,7 @@
 #include "params/palette.hpp"
 #include "params/parameter_set.hpp"
 #include "params/preset.hpp"
+#include "params/serialization.hpp"
 #include "params/timeline.hpp"
 #include "assets/asset_registry.hpp"
 #include "scene/composition.hpp"
@@ -222,9 +223,28 @@ public:
     // rest. Fails only when the document itself is invalid.
     [[nodiscard]] Result<void> loadProject(const std::filesystem::path& path);
     // Whether this engine may open live control sources (OSC, MIDI) when a project's control map
-    // asks for them. Set false BEFORE loading, on an engine that only evaluates a project -- a render,
-    // a trace, a Director scratch copy -- so it neither binds the editor's OSC port nor reacts to it.
+    // asks for them. ADR-2133: off until something turns it on -- the interactive editor does
+    // (`liveControlFor`, cli_batch.hpp); a render, a trace, a capture, an `--ai-script` run never do.
     void setLiveControl(bool enabled) { controlHub_.setLiveIo(enabled); }
+
+    // ---- ADR-2132: what a save compares against ----
+    // The basis `projectDocument` writes the `parameters` block under (params::ParameterBasis): each parameter's value
+    // when the document was opened, the paths the loaded document named, and the ones this build did not register.
+    [[nodiscard]] const params::ParameterBasis& parameterBasis() const { return parameterBasis_; }
+    // Paths the loaded document names whose value is exactly the scene's (their origin): what an earlier build's
+    // save-everything wrote. Kept by every save -- a file is never silently made into a different project -- and
+    // reported once at load; `dropPinnedOverrides` (the `--drop-pinned-overrides` flag) is the explicit cleanup.
+    struct PinnedOverrides {
+        std::vector<std::string> paths;
+    };
+    [[nodiscard]] PinnedOverrides pinnedOverrides() const;
+    // Forgets those paths, so the next save writes them only if they have since changed. Returns the count.
+    std::size_t dropPinnedOverrides();
+    // Reported at load only from this many on: a hand-written project names a few scene values on purpose, a
+    // save-everything one names hundreds.
+    static constexpr std::size_t kPinnedOverridesReported = 16;
+    // Whether `key` is a top-level project key this build reads or writes (anything else is kept verbatim).
+    [[nodiscard]] static bool isProjectKey(std::string_view key);
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
     // Why the scene the last project names did not load, or empty. Also one of projectWarnings(), but
@@ -1476,6 +1496,14 @@ private:
     // load or save, when there is nothing to compare against and nothing to lose.
     nlohmann::json projectBaseline_;
     bool projectBaselineValid_ = false;
+    // ADR-2132. `parameterBasis_`: see parameterBasis(). `projectExtras_`: the loaded document's top-level keys this
+    // build does not read (`sonicScene`, `_note`, a later build's block), written back verbatim by every save.
+    params::ParameterBasis parameterBasis_;
+    nlohmann::json projectExtras_ = nlohmann::json::object();
+    // A new document (a scene opened on its own, a new composition, a new project): no loaded block, no extras, and
+    // every parameter's origin is its value now.
+    void resetProjectBasis();
+    void captureParameterOrigins();
     bool projectDirty_ = false;
     // Appends to projectWarnings_ if it is not already there. Unresolved bindings are re-reported
     // on every rebind, and a warning list that grew a duplicate per scene swap would stop being

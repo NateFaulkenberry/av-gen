@@ -144,7 +144,6 @@ TEST_CASE("OSC over real UDP loopback reaches the engine", "[integration][contro
     app::Engine engine(app::EngineMode::Offline);
     control::ControlMap map;
     map.oscPort = 0; // any free port
-    map.oscBind = "127.0.0.1";
     map.midiEnabled = false;
     control::OscBinding fader;
     fader.address = "/fader/*";
@@ -152,6 +151,7 @@ TEST_CASE("OSC over real UDP loopback reaches the engine", "[integration][contro
     fader.target.signal = "fader";
     map.osc.push_back(fader);
     engine.control().setMap(map);
+    engine.control().setLiveOsc(true); // ADR-2133: an engine listens only when asked
     const auto status = engine.control().status();
     if (!status.oscOpen) {
         SKIP("cannot open a UDP socket here: " << status.oscError);
@@ -417,6 +417,7 @@ TEST_CASE("OSC feedback pushes parameter changes to the feedback host but never 
     map.feedbackPort = rx.port();
     map.feedbackEnabled = true;
     engine.control().setMap(map);
+    engine.control().setLiveOsc(true); // ADR-2133: the feedback sender is live OSC too
     REQUIRE(engine.control().status().feedbackOpen);
     FixedStepClock clock(60.0);
     engine.update(engine.tick(clock)); // primes the change cache: nothing is sent yet

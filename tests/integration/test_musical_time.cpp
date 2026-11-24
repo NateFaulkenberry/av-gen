@@ -342,10 +342,13 @@ TEST_CASE("The meter's settings are exposed parameters, saved as parameters; det
         engine.update(FrameTime{});
         REQUIRE(engine.saveProject(path).has_value());
         nlohmann::json doc = nlohmann::json::parse(std::ifstream(path));
-        // Nothing pinned: the "detect" values are what is written, so the next analysis decides again.
-        CHECK(doc["parameters"][app::Engine::kBar1BeatPath] == -1);
-        CHECK(doc["parameters"][app::Engine::kPhraseBarsPath] == 0);
-        CHECK(doc["parameters"][app::Engine::kSectionPhrasesPath] == 4);
+        // Nothing pinned: the "detect" values are the defaults, and ADR-2132 writes only what differs from those -- so
+        // the meter's parameters are absent and the next analysis decides again. (A measured value written here would be
+        // a measurement recorded as a decision.)
+        CHECK_FALSE(doc["parameters"].contains(app::Engine::kBar1BeatPath));
+        CHECK_FALSE(doc["parameters"].contains(app::Engine::kPhraseBarsPath));
+        CHECK_FALSE(doc["parameters"].contains(app::Engine::kSectionPhrasesPath));
+        CHECK(engine.params().find(app::Engine::kBar1BeatPath)->baseComponent(0) == -1.0f);
         // And the old control keys are gone, not aliased.
         CHECK_FALSE(doc["control"].contains("phraseBars"));
         CHECK_FALSE(doc["control"].contains("sectionPhrases"));

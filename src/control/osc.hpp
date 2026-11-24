@@ -61,6 +61,13 @@ struct OscMessage {
 // segments except the root.
 [[nodiscard]] bool isValidAddress(std::string_view address);
 
+// ADR-2133: where a receiver listens unless something explicitly asks for more.
+inline constexpr const char* kOscLoopback = "127.0.0.1";
+// Whether `address` is an IPv4 loopback address (127.0.0.0/8): reachable from this machine only.
+[[nodiscard]] bool isLoopbackAddress(std::string_view address);
+// Whether `address` is a dotted IPv4 address `OscReceiver::open` can bind.
+[[nodiscard]] bool isIpv4Address(const std::string& address);
+
 // ---- UDP receiver ----
 // Owns a socket and a thread; decoded messages are queued and drained on the caller's thread.
 class OscReceiver {
@@ -70,12 +77,15 @@ public:
     OscReceiver(const OscReceiver&) = delete;
     OscReceiver& operator=(const OscReceiver&) = delete;
 
-    // Binds `bindAddress:port` (bindAddress "0.0.0.0" = every interface, "127.0.0.1" = local only;
-    // port 0 = any free port, see port()). Starts the thread. Errors: bind/listen failures.
-    [[nodiscard]] Result<void> open(std::uint16_t port, const std::string& bindAddress = "0.0.0.0");
+    // Binds `bindAddress:port` (bindAddress "127.0.0.1" = this machine only, the default; "0.0.0.0" = every
+    // interface, ADR-2133; port 0 = any free port, see port()). Starts the thread. Errors: bind failures, a port
+    // already in use named as such.
+    [[nodiscard]] Result<void> open(std::uint16_t port, const std::string& bindAddress = kOscLoopback);
     void close();
     [[nodiscard]] bool isOpen() const;
     [[nodiscard]] std::uint16_t port() const;
+    // The address the socket is bound to, as the system reports it ("" when closed).
+    [[nodiscard]] std::string boundAddress() const;
 
     // Moves every queued message into `out` (in arrival order). Returns the count.
     std::size_t drain(std::vector<OscMessage>& out);

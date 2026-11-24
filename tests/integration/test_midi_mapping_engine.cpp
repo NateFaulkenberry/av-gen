@@ -360,6 +360,7 @@ TEST_CASE("Learn and play through a real CoreMIDI virtual source", "[integration
     map.midiEnabled = true;
     map.midiFilter = name;
     engine.control().setMap(map);
+    engine.control().setLiveMidi(true); // ADR-2133: an engine opens MIDI only when asked
     REQUIRE(engine.control().status().midiOpen);
     FixedStepClock clock(60.0);
     const auto pump = [&](auto done) {
