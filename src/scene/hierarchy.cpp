@@ -428,7 +428,11 @@ Result<void> ProceduralGeometry::validateReferences(const std::vector<Procedural
 }
 
 std::uint64_t ProceduralGeometry::contextualHash(const GenerationContext& ctx) const {
-    std::uint64_t h = structuralHash();
+    return contextualHash(ctx, true);
+}
+
+std::uint64_t ProceduralGeometry::contextualHash(const GenerationContext& ctx, bool withDistributionTransform) const {
+    std::uint64_t h = structuralHash(withDistributionTransform); // ADR-2138: false = the shape alone
     // Procedural source: the referenced object's contextual hash, recursively (a constant when
     // the reference does not resolve, so resolving it later rebuilds).
     if (source.kind == PrimitiveKind::Procedural) {

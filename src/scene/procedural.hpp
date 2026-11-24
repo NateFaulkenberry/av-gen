@@ -768,6 +768,25 @@ struct ProceduralGeometry {
     // They differ by a lot on anything that is not roughly cubic. A 0.6 x 8 x 0.6 stem has a
     // diagonal of about 4, so the conservative pair is an 8 m cube around it.
     glm::vec3 tightMin{0.0f}, tightMax{0.0f};
+    // ADR-2138: what a change to `distributionTransform` alone reuses instead of regenerating. rebuild() fills it;
+    // internal bookkeeping, never serialised or hashed. `locals` is every instance's placement * variation, the
+    // transform before `distributionTransform` is composed onto it, so the reuse does the same compose() on the same
+    // operands as a regeneration and the records come out bit-identical. Captured on the second generation of one
+    // shape (the first transform-only change), so an object that never moves never holds it. The rest are the
+    // inputs to the records that no hash covers, compared by identity or value before anything is reused.
+    struct TransformReuse {
+        std::uint64_t shape = 0;   // contextualHash(ctx, false) at the last generation; 0 = not transform-invariant
+        std::uint64_t version = 0; // structureVersion the records were left at (anyone else's bump voids the reuse)
+        bool captured = false;
+        std::vector<Transform> locals;
+        std::shared_ptr<const MeshData> assetMesh;
+        std::shared_ptr<const spatial::PointCloud> scatterCloud;
+        std::shared_ptr<const std::vector<Transform>> points;
+        glm::vec3 baseColor{0.0f}, emissiveColor{0.0f}; // the material colours the records' hue multipliers used
+        float sourceRadius = 0.0f;
+        glm::vec3 sourceCentre{0.0f}, sourceHalf{0.0f};
+    };
+    TransformReuse transformReuse;
 
     [[nodiscard]] Result<void> validate() const;
     // Scene-level check: references resolve and do not cycle (depth <= kMaxHierarchyDepth).
@@ -777,15 +796,29 @@ struct ProceduralGeometry {
     // when something was rebuilt. Pipeline: distribution + variation -> PointCloud (position,
     // rotation, scale, id, seed, index, color/emissive from material variation) -> pointOps ->
     // projectInstances(extraLane) -> bounds (+ effector strength padding).
+    //
+    // ADR-2138: when only `distributionTransform` changed and the object is transformInvariant(), the records are
+    // re-transformed from `transformReuse` instead (bit-identical to regenerating; counted by
+    // proceduralTransformReuseCount, not proceduralRebuildCount). Still returns true and bumps `structureVersion`.
     bool rebuild(const GenerationContext& ctx = {});
     // The base cloud before pointOps (pure; used by rebuild and tests). Spline distributions,
     // Procedural sources and hierarchy need the context (empty context -> identity/placeholder).
-    [[nodiscard]] spatial::PointCloud generateCloud(const GenerationContext& ctx = {}) const;
+    // ADR-2138: `locals`, when given, receives each flat placement's transform before `distributionTransform`.
+    [[nodiscard]] spatial::PointCloud generateCloud(const GenerationContext& ctx = {},
+                                                    std::vector<Transform>* locals = nullptr) const;
     // The mesh this object draws: its primitive, or the referenced object's (recursively).
     [[nodiscard]] Result<MeshData> resolveSourceMesh(const GenerationContext& ctx = {}) const;
     // Structural hash including everything the context contributes (referenced objects, splines).
     [[nodiscard]] std::uint64_t contextualHash(const GenerationContext& ctx) const;
     [[nodiscard]] std::uint64_t structuralHash() const;
+    // ADR-2138: the same two without this object's own `distributionTransform` (a referenced object's still counts).
+    [[nodiscard]] std::uint64_t contextualHash(const GenerationContext& ctx, bool withDistributionTransform) const;
+    [[nodiscard]] std::uint64_t structuralHash(bool withDistributionTransform) const;
+    // ADR-2138: whether `distributionTransform` only ever moves the generated records rigidly -- composed last onto
+    // every flat placement and read by nothing else. False for a generator (GPU records), self-recursion and a
+    // Procedural source (hierarchy.cpp's pipeline), any pointOps (they may sample fields or noise at the world
+    // position) and a hue field (sampled at the world position). Those regenerate on a move exactly as before.
+    [[nodiscard]] bool transformInvariant() const;
     // Instance world matrix within the object (distribution * placement * variation * source).
     [[nodiscard]] glm::mat4 instanceMatrix(std::uint32_t index) const;
     // ADR-1117: records come from the GPU kernel, not from `instances`.
@@ -927,6 +960,9 @@ struct ProceduralParameters {
 // Relaxed atomic because the world builder regenerates on a job worker; the increment is noise
 // beside the generation it counts.
 [[nodiscard]] std::uint64_t proceduralRebuildCount() noexcept;
+// ADR-2138: how many rebuilds were a transform-only change served from `transformReuse` -- not regenerations, so
+// not in the count above.
+[[nodiscard]] std::uint64_t proceduralTransformReuseCount() noexcept;
 
 // ADR-155 / ADR-1576: whether LOD rung `level` of an object draws at the flat material tier. `flatFromRung` < 0 = the tier
 // demotes nothing (High, Offline); an object with `flatFarRungs` false is never demoted.

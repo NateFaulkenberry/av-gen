@@ -2925,12 +2925,25 @@ Result<void> ProceduralGeometry::validate() const {
 }
 
 std::uint64_t ProceduralGeometry::structuralHash() const {
+    return structuralHash(true);
+}
+
+bool ProceduralGeometry::transformInvariant() const {
+    // ADR-2138. Every other input to the records is either hashed (and so a change of shape, not of transform) or
+    // compared by rebuild() before it reuses anything; this is the list of things that read the transform itself.
+    return !isGenerator() && hierarchy.recursionDepth <= 0 && source.kind != PrimitiveKind::Procedural &&
+           pointOps.empty() && materialVariation.hueField == 0.0f;
+}
+
+std::uint64_t ProceduralGeometry::structuralHash(bool withDistributionTransform) const {
     StructHash h;
     h.u64(source.structuralHash());
     h.u64(distribution.structuralHash());
     h.u64(variation.structuralHash());
     h.transform(sourceTransform);
-    h.transform(distributionTransform);
+    if (withDistributionTransform) { // ADR-2138: false = the shape alone
+        h.transform(distributionTransform);
+    }
     h.f32(materialVariation.hueShift);
     h.f32(materialVariation.hueGradient);
     h.f32(materialVariation.valueRandom);
@@ -2958,7 +2971,11 @@ std::uint64_t ProceduralGeometry::structuralHash() const {
     return h.value();
 }
 
-spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& ctx) const {
+spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& ctx,
+                                                      std::vector<Transform>* locals) const {
+    if (locals != nullptr) {
+        locals->clear(); // ADR-2138: filled by the flat loop below only
+    }
     // Self-recursion and procedural sources compose this flat generator (hierarchy.cpp).
     if (hierarchy.recursionDepth > 0 || source.kind == PrimitiveKind::Procedural) {
         return detail::generateHierarchicalCloud(*this, ctx);
@@ -3023,6 +3040,9 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
     auto emissives = out.emissives();
     auto indices = out.indices();
     auto extents = out.attributes.view<glm::vec3>(spatial::attr::bounds);
+    if (locals != nullptr) {
+        locals->resize(count);
+    }
 
     for (std::size_t i = 0; i < count; ++i) {
         const auto index = static_cast<std::uint32_t>(i);
@@ -3037,7 +3057,12 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
         } else {
             placement = distribution.placement(signedIndex, curve);
         }
-        const Transform t = compose(distributionTransform, compose(placement, variationTransform(variation, index)));
+        // ADR-2138: the inner compose is named so a transform-only rebuild can compose the same operands again.
+        const Transform local = compose(placement, variationTransform(variation, index));
+        if (locals != nullptr) {
+            (*locals)[i] = local;
+        }
+        const Transform t = compose(distributionTransform, local);
 
         positions[i] = t.position;
         rotations[i] = glm::vec4(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
@@ -3087,10 +3112,111 @@ spatial::PointCloud ProceduralGeometry::generateCloud(const GenerationContext& c
 
 namespace {
 std::atomic<std::uint64_t> gProceduralRebuilds{0};
+std::atomic<std::uint64_t> gProceduralTransformReuses{0};
+
+// rebuild()'s bounds pass, one instance at a time. ADR-2138: shared by the regenerating path and the transform-only
+// one, so both do the same arithmetic in the same order on the same values.
+struct InstanceBounds {
+    glm::vec3 sourcePosition{0.0f};
+    float sourceRadius = 0.0f;
+    glm::vec3 srcCentre{0.0f};
+    glm::vec3 srcHalf{0.0f};
+    glm::vec3 lo{std::numeric_limits<float>::max()};
+    glm::vec3 hi{std::numeric_limits<float>::lowest()};
+    glm::vec3 tlo{std::numeric_limits<float>::max()};
+    glm::vec3 thi{std::numeric_limits<float>::lowest()};
+
+    void add(const glm::vec3& position, const glm::vec4& rotation4, const glm::vec3& scale) {
+        const glm::quat rotation(rotation4.w, rotation4.x, rotation4.y, rotation4.z);
+        const glm::vec3 centre = position + rotation * (sourcePosition * scale);
+        const float radius = sourceRadius * std::max({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z)});
+        lo = glm::min(lo, centre - glm::vec3(radius));
+        hi = glm::max(hi, centre + glm::vec3(radius));
+        // |R * S| applied to the half-extent: the standard AABB-of-an-OBB, one row at a time. The
+        // box's own centre rides through the same rotation, which is the half that was missing.
+        const glm::mat3 basis = glm::mat3_cast(rotation);
+        const glm::vec3 scaled = srcHalf * glm::abs(scale);
+        const glm::vec3 boxCentre = centre + rotation * (srcCentre * scale);
+        glm::vec3 extent(0.0f);
+        for (int axis = 0; axis < 3; ++axis) {
+            extent[axis] = std::abs(basis[0][axis]) * scaled.x + std::abs(basis[1][axis]) * scaled.y +
+                           std::abs(basis[2][axis]) * scaled.z;
+        }
+        tlo = glm::min(tlo, boxCentre - extent);
+        thi = glm::max(thi, boxCentre + extent);
+    }
+};
+
+float positionEffectorPadding(const std::vector<spatial::Effector>& effectors) {
+    float padding = 0.0f;
+    for (const spatial::Effector& e : effectors) {
+        if (e.enabled && e.op == spatial::EffectorOp::PositionOffset) {
+            padding += std::abs(e.strength);
+        }
+    }
+    return padding;
+}
+
+// ADR-2138: a transform-only change, served from what the last generation of this shape captured. Every record
+// column but position, rotation and scale is a function of the shape (and of the inputs compared here), so it is
+// already right; those three are compose(distributionTransform, local) -- the expression generateCloud evaluates --
+// written exactly where projectInstances writes them. False (nothing touched) when anything it relies on moved.
+bool reuseForTransform(ProceduralGeometry& g, std::uint64_t shape) {
+    ProceduralGeometry::TransformReuse& r = g.transformReuse;
+    if (!r.captured || r.shape != shape || r.version != g.structureVersion || r.locals.size() != g.instances.size() ||
+        r.assetMesh != g.source.assetMesh || r.scatterCloud != g.distribution.scatterCloud ||
+        r.points != g.distribution.points || r.baseColor != g.material.baseColor ||
+        r.emissiveColor != g.material.emissiveColor) {
+        return false;
+    }
+    const std::size_t n = r.locals.size();
+    const bool keptCloud = g.cloud.count() == n && n > 0;
+    std::span<glm::vec3> cloudPositions;
+    std::span<glm::vec4> cloudRotations;
+    std::span<glm::vec3> cloudScales;
+    if (keptCloud) {
+        cloudPositions = g.cloud.positions();
+        cloudRotations = g.cloud.rotations();
+        cloudScales = g.cloud.scales();
+    }
+    InstanceBounds b;
+    b.sourcePosition = g.sourceTransform.position;
+    b.sourceRadius = r.sourceRadius;
+    b.srcCentre = r.sourceCentre;
+    b.srcHalf = r.sourceHalf;
+    for (std::size_t i = 0; i < n; ++i) {
+        const Transform t = compose(g.distributionTransform, r.locals[i]);
+        const glm::vec4 rotation(t.rotation.x, t.rotation.y, t.rotation.z, t.rotation.w);
+        spatial::InstanceRecord& rec = g.instances[i];
+        rec.position = glm::vec4(t.position, rec.position.w);
+        rec.rotation = rotation;
+        rec.scale = glm::vec4(t.scale, rec.scale.w);
+        if (keptCloud) {
+            cloudPositions[i] = t.position;
+            cloudRotations[i] = rotation;
+            cloudScales[i] = t.scale;
+        }
+        b.add(t.position, rotation, t.scale);
+    }
+    if (n == 0) {
+        b.lo = b.hi = glm::vec3(0.0f);
+        b.tlo = b.thi = glm::vec3(0.0f);
+    }
+    const float padding = positionEffectorPadding(g.effectors);
+    g.boundsMin = b.lo - glm::vec3(padding);
+    g.boundsMax = b.hi + glm::vec3(padding);
+    g.tightMin = b.tlo - glm::vec3(padding);
+    g.tightMax = b.thi + glm::vec3(padding);
+    return true;
+}
 } // namespace
 
 std::uint64_t proceduralRebuildCount() noexcept {
     return gProceduralRebuilds.load(std::memory_order_relaxed);
+}
+
+std::uint64_t proceduralTransformReuseCount() noexcept {
+    return gProceduralTransformReuses.load(std::memory_order_relaxed);
 }
 
 bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
@@ -3098,12 +3224,26 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     if (structureVersion != 0 && hash == builtHash) {
         return false;
     }
+    // ADR-2138: the hash moved. If the shape did not, only `distributionTransform` did: move the records instead.
+    const std::uint64_t shape = transformInvariant() ? contextualHash(ctx, false) : 0;
+    if (shape != 0 && structureVersion != 0 && reuseForTransform(*this, shape)) {
+        gProceduralTransformReuses.fetch_add(1, std::memory_order_relaxed);
+        builtHash = hash;
+        ++structureVersion;
+        transformReuse.version = structureVersion;
+        return true;
+    }
     gProceduralRebuilds.fetch_add(1, std::memory_order_relaxed);
     builtHash = hash;
     meshHash = detail::resolvedSourceHash(*this, ctx); // the referenced object's for a Procedural source
     ++structureVersion;
 
-    spatial::PointCloud built = generateCloud(ctx);
+    // ADR-2138: a second generation of the same shape is a transform-only change the reuse could not serve (the
+    // first, or one after an input it compares moved): capture what the next one needs. Otherwise hold nothing.
+    const bool capture = shape != 0 && shape == transformReuse.shape;
+    transformReuse = {};
+    transformReuse.shape = shape;
+    spatial::PointCloud built = generateCloud(ctx, capture ? &transformReuse.locals : nullptr);
     if (auto ok = spatial::applyPointOps(built, pointOps); !ok) {
         log::warn("procedural '{}': {}", name, ok.error().message);
     }
@@ -3124,8 +3264,6 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     detail::sourceBox(*this, ctx, srcCentre, srcHalf);
     srcCentre *= sourceTransform.scale;
     srcHalf *= glm::abs(sourceTransform.scale);
-    glm::vec3 lo(std::numeric_limits<float>::max());
-    glm::vec3 hi(std::numeric_limits<float>::lowest());
     // The tight pair, built in the same pass. `lo`/`hi` put a *sphere* of the source's diagonal
     // around every instance, which is what a cull test wants -- it may never exclude something
     // visible, and a sphere is rotation-invariant so it costs nothing to be conservative. It is the
@@ -3134,31 +3272,23 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     // box that reads as a bug, because it is one -- the box does not describe the object.
     //
     // This pair transforms the source's box by each instance's rotation and per-axis scale instead,
-    // and takes the axis-aligned extent of the result. Same loop, no second pass over the cloud.
-    glm::vec3 tlo(std::numeric_limits<float>::max());
-    glm::vec3 thi(std::numeric_limits<float>::lowest());
+    // and takes the axis-aligned extent of the result. Same loop, no second pass over the cloud
+    // (InstanceBounds::add, which the ADR-2138 transform-only path runs too).
+    InstanceBounds bounds;
+    bounds.sourcePosition = sourceTransform.position;
+    bounds.sourceRadius = sourceRadius;
+    bounds.srcCentre = srcCentre;
+    bounds.srcHalf = srcHalf;
     const auto positions = built.positions();
     const auto rotations = built.rotations();
     const auto scales = built.scales();
     for (std::size_t i = 0; i < built.count(); ++i) {
-        const glm::quat rotation(rotations[i].w, rotations[i].x, rotations[i].y, rotations[i].z);
-        const glm::vec3 centre = positions[i] + rotation * (sourceTransform.position * scales[i]);
-        const float radius = sourceRadius * std::max({std::abs(scales[i].x), std::abs(scales[i].y), std::abs(scales[i].z)});
-        lo = glm::min(lo, centre - glm::vec3(radius));
-        hi = glm::max(hi, centre + glm::vec3(radius));
-        // |R * S| applied to the half-extent: the standard AABB-of-an-OBB, one row at a time. The
-        // box's own centre rides through the same rotation, which is the half that was missing.
-        const glm::mat3 basis = glm::mat3_cast(rotation);
-        const glm::vec3 scaled = srcHalf * glm::abs(scales[i]);
-        const glm::vec3 boxCentre = centre + rotation * (srcCentre * scales[i]);
-        glm::vec3 extent(0.0f);
-        for (int axis = 0; axis < 3; ++axis) {
-            extent[axis] = std::abs(basis[0][axis]) * scaled.x + std::abs(basis[1][axis]) * scaled.y +
-                           std::abs(basis[2][axis]) * scaled.z;
-        }
-        tlo = glm::min(tlo, boxCentre - extent);
-        thi = glm::max(thi, boxCentre + extent);
+        bounds.add(positions[i], rotations[i], scales[i]);
     }
+    glm::vec3 lo = bounds.lo;
+    glm::vec3 hi = bounds.hi;
+    glm::vec3 tlo = bounds.tlo;
+    glm::vec3 thi = bounds.thi;
     if (built.count() == 0) {
         lo = hi = glm::vec3(0.0f);
         tlo = thi = glm::vec3(0.0f);
@@ -3182,12 +3312,7 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
         tlo = lo;
         thi = hi;
     }
-    float padding = 0.0f;
-    for (const spatial::Effector& e : effectors) {
-        if (e.enabled && e.op == spatial::EffectorOp::PositionOffset) {
-            padding += std::abs(e.strength);
-        }
-    }
+    const float padding = positionEffectorPadding(effectors);
     boundsMin = lo - glm::vec3(padding);
     boundsMax = hi + glm::vec3(padding);
     // The tight pair gets the same effector padding: an instance a position effector pushed outward
@@ -3201,6 +3326,20 @@ bool ProceduralGeometry::rebuild(const GenerationContext& ctx) {
     } else {
         cloud.clear();
     }
+    if (capture && transformReuse.locals.size() == instances.size()) { // ADR-2138: see reuseForTransform
+        transformReuse.captured = true;
+        transformReuse.assetMesh = source.assetMesh;
+        transformReuse.scatterCloud = distribution.scatterCloud;
+        transformReuse.points = distribution.points;
+        transformReuse.baseColor = material.baseColor;
+        transformReuse.emissiveColor = material.emissiveColor;
+        transformReuse.sourceRadius = sourceRadius;
+        transformReuse.sourceCentre = srcCentre;
+        transformReuse.sourceHalf = srcHalf;
+    } else {
+        transformReuse.locals.clear();
+    }
+    transformReuse.version = structureVersion;
     return true;
 }
 
