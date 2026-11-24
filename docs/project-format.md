@@ -209,6 +209,15 @@ Node kinds: `gltf` (a glTF 2.0 file; instances of the same file share meshes and
 particle system, every `ParticleSystem` field optional with the defaults from `docs/rendering.md`),
 `scene` (another scene file). `camera.distance` 0 means "fit to the scene bounds".
 
+A scene save keeps what it does not read (ADR-2151). A top-level key the parser does not know is warned about on
+load (ADR-278) and written back verbatim on every save, and so is every `_`-prefixed key (`_note`, the comment
+convention), at the top level and on a node. A node skipped because its asset is missing is written back as it was.
+The assistant's rollback snapshot uses the same serialisation, so it keeps them too. A key the engine writes itself
+always comes from the live scene, never from the kept copy. A few things are normalised rather than kept: a
+top-level `lightRig` is written as `environment.lightRig`, an empty list such as `"lights": []` is left out, a value
+equal to its default is left out, and numbers come back at float precision (`0.13` is written as
+`0.12999999523162842`; a second save writes the same).
+
 A `gltf` node may carry `"castsShadow": false` to keep its meshes out of the shadow maps (ADR-1547), for something
 made of light, such as a rainbow or a glow card. It defaults to true and is written only when false. Procedural
 nodes take the same key in their `procedural` block (ADR-1545).

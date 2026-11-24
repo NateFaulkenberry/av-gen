@@ -11726,6 +11726,10 @@ nlohmann::json Composition::toJson() const {
     environment["skyIntensity"] = skyIntensitySetting_;
     environment["stylized"] = stylized_ != nullptr ? stylized_->base() : stylizedSetting_;
     environment["skybox"] = showSkyboxSetting_;
+    // ADR-2151: read since ADR-345 and never written, so a save put the HDRI back behind the scene. Only when on.
+    if (proceduralSkyBackground_ != nullptr ? proceduralSkyBackground_->base() : proceduralSkyBackgroundSetting_) {
+        environment["proceduralSkyBackground"] = true;
+    }
     // ADR-350: `dayNight` was READ and never written. A scene that carried a cycle and was saved
     // lost the entire block -- curves, bindings, cycle length, all of it. That is not a missing
     // UI, it is data loss, and it is the same defect as the 94 orphaned `atmos/*` parameters this
@@ -11962,38 +11966,49 @@ nlohmann::json Composition::toJson() const {
         }
     }
     {
-        // Volumetric atmosphere (ADR-032); written only when it is on, so existing files are
-        // unchanged by a round trip.
-        const float density = volumeDensity_ != nullptr ? volumeDensity_->base() : volumeSetting_.volumeDensity;
-        if (density > 0.0f || !volumeDensityFieldSetting_.empty() || !volumeColorFieldSetting_.empty()) {
-            auto base = [](const params::Parameter<float>* p, float fallback) {
-                return p != nullptr ? p->base() : fallback;
+        // Volumetric atmosphere (ADR-032); written when it is on, so existing files are unchanged by a round trip --
+        // and (ADR-2151) when it is off but the scene set any of its values. `fogHeight`/`fogHeightFalloff` shape the
+        // surface fog (`fogHeightAmount`) with no march, `shadowCascades` is read with or without one, and a density
+        // a route or the panel raises later marches with the rest. Before this a save reset them to the defaults.
+        const auto volumeBlock = [&](const scene::Environment& s, bool live) {
+            auto base = [live](const params::Parameter<float>* p, float fallback) {
+                return live && p != nullptr ? p->base() : fallback;
             };
-            environment["volumeDensity"] = density;
-            environment["fogHeight"] = base(fogHeight_, volumeSetting_.fogHeight);
-            environment["fogHeightFalloff"] = base(fogHeightFalloff_, volumeSetting_.fogHeightFalloff);
-            environment["fogUpperDensity"] = base(fogUpperDensity_, volumeSetting_.fogUpperDensity);
-            environment["fogHeightCurve"] = base(fogHeightCurve_, volumeSetting_.fogHeightCurve);
+            json vol = json::object();
+            vol["volumeDensity"] = base(volumeDensity_, s.volumeDensity);
+            vol["fogHeight"] = base(fogHeight_, s.fogHeight);
+            vol["fogHeightFalloff"] = base(fogHeightFalloff_, s.fogHeightFalloff);
+            vol["fogUpperDensity"] = base(fogUpperDensity_, s.fogUpperDensity);
+            vol["fogHeightCurve"] = base(fogHeightCurve_, s.fogHeightCurve);
             // ADR-705: written only when set, so a file that never used it round-trips unchanged.
-            if (const float horizon = base(horizonDensity_, volumeSetting_.horizonDensity); horizon > 0.0f) {
-                environment["horizonDensity"] = horizon;
+            if (const float horizon = base(horizonDensity_, s.horizonDensity); horizon > 0.0f) {
+                vol["horizonDensity"] = horizon;
             }
-            environment["volumeScattering"] = base(volumeScattering_, volumeSetting_.volumeScattering);
-            environment["volumeAbsorption"] = base(volumeAbsorption_, volumeSetting_.volumeAbsorption);
-            environment["volumeAnisotropy"] = base(volumeAnisotropy_, volumeSetting_.volumeAnisotropy);
-            environment["volumeLocalLights"] = base(volumeLocalLights_, volumeSetting_.volumeLocalLights);
-            environment["volumeNoise"] = base(volumeNoise_, volumeSetting_.volumeNoiseAmount);
-            environment["volumeNoiseScale"] = base(volumeNoiseScale_, volumeSetting_.volumeNoiseScale);
-            environment["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, volumeSetting_.volumeNoiseSpeed);
-            environment["volumeEmission"] = base(volumeEmission_, volumeSetting_.volumeEmission);
-            environment["volumeSteps"] = volumeSteps_ != nullptr ? volumeSteps_->base() : volumeSetting_.volumeSteps;
-            environment["volumeShadowSteps"] =
-                volumeShadowSteps_ != nullptr ? volumeShadowSteps_->base() : volumeSetting_.volumeShadowSteps;
-            environment["volumeShadowStrength"] =
-                base(volumeShadowStrength_, volumeSetting_.volumeShadowStrength);
-            environment["volumeJitter"] = base(volumeJitter_, volumeSetting_.volumeJitter);
-            environment["shadowCascades"] = volumeSetting_.shadowCascades;
-            environment["volumeMaxDistance"] = base(volumeMaxDistance_, volumeSetting_.volumeMaxDistance);
+            vol["volumeScattering"] = base(volumeScattering_, s.volumeScattering);
+            vol["volumeAbsorption"] = base(volumeAbsorption_, s.volumeAbsorption);
+            vol["volumeAnisotropy"] = base(volumeAnisotropy_, s.volumeAnisotropy);
+            vol["volumeLocalLights"] = base(volumeLocalLights_, s.volumeLocalLights);
+            vol["volumeNoise"] = base(volumeNoise_, s.volumeNoiseAmount);
+            vol["volumeNoiseScale"] = base(volumeNoiseScale_, s.volumeNoiseScale);
+            vol["volumeNoiseSpeed"] = base(volumeNoiseSpeed_, s.volumeNoiseSpeed);
+            vol["volumeEmission"] = base(volumeEmission_, s.volumeEmission);
+            vol["volumeSteps"] = live && volumeSteps_ != nullptr ? volumeSteps_->base() : s.volumeSteps;
+            vol["volumeShadowSteps"] =
+                live && volumeShadowSteps_ != nullptr ? volumeShadowSteps_->base() : s.volumeShadowSteps;
+            vol["volumeShadowStrength"] =
+                base(volumeShadowStrength_, s.volumeShadowStrength);
+            vol["volumeJitter"] = base(volumeJitter_, s.volumeJitter);
+            vol["shadowCascades"] = s.shadowCascades;
+            vol["volumeMaxDistance"] = base(volumeMaxDistance_, s.volumeMaxDistance);
+            return vol;
+        };
+        const float density = volumeDensity_ != nullptr ? volumeDensity_->base() : volumeSetting_.volumeDensity;
+        const json vol = volumeBlock(volumeSetting_, true);
+        if (density > 0.0f || !volumeDensityFieldSetting_.empty() || !volumeColorFieldSetting_.empty() ||
+            vol != volumeBlock(scene::Environment{}, false)) {
+            for (const auto& [key, value] : vol.items()) {
+                environment[key] = value;
+            }
             if (!volumeDensityFieldSetting_.empty()) {
                 environment["volumeDensityField"] = volumeDensityFieldSetting_;
             }
@@ -12600,6 +12615,11 @@ nlohmann::json Composition::toJson() const {
                     n["terrain"]["water"]["reflectBlended"] = true;
                 }
             }
+        }
+        // ADR-2151: an orb draws its authored `material` too (the reader says which kinds use it), and the block was
+        // written for terrains only, so a save turned RendererQA's coloured and transparent orbs back into the default.
+        // Any other kind's block is warned about and unused, and kept all the same: unused is not ours to delete.
+        if (node.kind == NodeKind::Terrain || node.materialAuthored) {
             const Material& m = node.terrainMaterial;
             json mat{{"baseColor", vecToJson(m.baseColor)},
                      {"opacity", m.opacity},
@@ -12611,9 +12631,18 @@ nlohmann::json Composition::toJson() const {
                 mat["program"] = m.program;
             }
             writeMaterialOptics(m, mat); // ADR-1143: thinFilm, anisotropy (only when authored)
+            if (m.alphaMode != AlphaMode::Opaque) { // ADR-2151: read, never written; only when not the default
+                mat["alphaMode"] = m.alphaMode == AlphaMode::Blend ? "blend" : "mask";
+            }
             n["material"] = std::move(mat);
         }
+        for (const auto& [key, value] : node.keptKeys.items()) { // ADR-2151: the node's `_` notes
+            if (!n.contains(key)) n[key] = value;
+        }
         nodes.push_back(std::move(n));
+    }
+    for (const json& skipped : skippedNodes_) { // ADR-2151: the nodes the load could not draw, as they were written
+        nodes.push_back(skipped);
     }
     j["nodes"] = std::move(nodes);
     {
@@ -12703,10 +12732,15 @@ nlohmann::json Composition::toJson() const {
     }
     {
         // ADR-1879; ADR-1895: leg 0 as "portal", the later legs as "portals" (whichever leg is active now)
-        const auto portalJson = [](const PortalBlock& b) {
+        // ADR-2151: `setPortal`/`addPortalLeg` lift the exit onto a generated ground (its height is authored above that
+        // ground), so the file gets the height above the ground back. Writing the lifted height made every save raise
+        // the exit by the ground again (strange-attractor-flythrough: -7.4 -> -22.8 on the second save).
+        const auto portalJson = [](const PortalBlock& b, const Composition* world) {
             nlohmann::json flight = nlohmann::json::array();
             for (const glm::vec4& w : b.flight) flight.push_back({w.x, w.y, w.z, w.w});
-            nlohmann::json pj = {{"world", b.world}, {"exit", {b.exit.x, b.exit.y, b.exit.z}}, {"exitYaw", b.exitYaw}, {"flight", flight}};
+            float exitY = b.exit.y;
+            if (world != nullptr && world->lunarWorld().world) exitY -= world->lunarWorld().world->sample(b.exit.x, b.exit.z);
+            nlohmann::json pj = {{"world", b.world}, {"exit", {b.exit.x, exitY, b.exit.z}}, {"exitYaw", b.exitYaw}, {"flight", flight}};
             if (b.join.z > 0.0f) pj["join"] = {b.join.x, b.join.y, b.join.z};
             if (b.lookAhead != 1.2f) pj["lookAhead"] = b.lookAhead; // ADR-1909: written only when set
             if (b.lookDown != 0.1f) pj["lookDown"] = b.lookDown;
@@ -12730,10 +12764,13 @@ nlohmann::json Composition::toJson() const {
         const auto blockOf = [&](int k) -> const PortalBlock& {
             return k == activeLeg_ ? portal_ : legs_[static_cast<std::size_t>(k)].portal;
         };
-        if (!legs_.empty() && !blockOf(0).world.empty()) j["portal"] = portalJson(blockOf(0));
+        const auto ownedWorldOf = [&](int k) -> const Composition* { // the world the exit was lifted onto (not the root)
+            return k == activeLeg_ ? portalWorld_.get() : legs_[static_cast<std::size_t>(k)].world.get();
+        };
+        if (!legs_.empty() && !blockOf(0).world.empty()) j["portal"] = portalJson(blockOf(0), ownedWorldOf(0));
         if (legs_.size() > 1) {
             nlohmann::json more = nlohmann::json::array();
-            for (int k = 1; k < static_cast<int>(legs_.size()); ++k) more.push_back(portalJson(blockOf(k)));
+            for (int k = 1; k < static_cast<int>(legs_.size()); ++k) more.push_back(portalJson(blockOf(k), ownedWorldOf(k)));
             j["portals"] = more;
         }
     }
@@ -12752,6 +12789,33 @@ nlohmann::json Composition::toJson() const {
             programs.push_back(mp.toJson());
         }
         j["materialPrograms"] = std::move(programs);
+    }
+    if (!looks_.empty()) { // ADR-1886; written back since ADR-2151, in the form `fromJsonImpl` reads
+        json looks = json::array();
+        for (const Look& look : looks_) {
+            json params = json::object();
+            for (std::size_t i = 0; i < look.values.size(); ++i) {
+                const auto& [path, v] = look.values[i];
+                const Look::Form form = i < look.forms.size() ? look.forms[i]
+                                        : v.size() == 1      ? Look::Form::Number
+                                                             : Look::Form::List;
+                if (form == Look::Form::Bool && v.size() == 1) {
+                    params[path] = v[0] != 0.0f;
+                } else if (form == Look::Form::Number && v.size() == 1) {
+                    params[path] = v[0];
+                } else {
+                    params[path] = v;
+                }
+            }
+            looks.push_back(json{{"name", look.name}, {"from", look.fromCrossing}, {"params", std::move(params)}});
+        }
+        j["looks"] = std::move(looks);
+    }
+    // ADR-2151: what the document carried that this build does not read, last, and never over a key written above.
+    for (const auto& [key, value] : keptKeys_.items()) {
+        if (!j.contains(key)) {
+            j[key] = value;
+        }
     }
     return j;
 }
@@ -12912,6 +12976,14 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     const std::string where =
         scenePath.empty() ? ("scene '" + comp->name_ + "'") : ("scene file '" + scenePath.string() + "'");
     json_keys::warnUnknownKeys(j, kSceneKeys, where);
+    // ADR-2151: and kept. A warning says this build does not understand a key; it is not permission to delete it, and
+    // every save, assistant rollback snapshot and document edit goes through `toJson`. `_` keys are the comment
+    // convention, so they are kept as well as exempt.
+    for (const auto& [key, value] : j.items()) {
+        if (key.starts_with('_') || std::find(std::begin(kSceneKeys), std::end(kSceneKeys), key) == std::end(kSceneKeys)) {
+            comp->keptKeys_[key] = value;
+        }
+    }
     if (j.contains("environment") && j.at("environment").is_object()) {
         json_keys::warnUnknownKeys(j.at("environment"), kEnvironmentKeys, where + ": environment");
         const json& envJson = j.at("environment");
@@ -13705,6 +13777,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
         std::filesystem::path path = relative;
         if (path.is_relative() && !scenePath.empty()) {
             path = scenePath.parent_path() / path;
+        } else if (path.is_relative()) {
+            path = registry.resolve(path); // ADR-2151: a document from memory (a rollback) resolves as `graph` does
         }
         auto loaded = entity::loadProfileLibrary(path);
         if (!loaded) {
@@ -13717,7 +13791,8 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
     }
     if (j.contains("entities")) {
         auto entities =
-            entity::entitiesFromJson(j.at("entities"), scenePath.parent_path(), &profileLibrary);
+            entity::entitiesFromJson(j.at("entities"), !scenePath.empty() ? scenePath.parent_path() : registry.resolve("."),
+                                     &profileLibrary); // ADR-2151: not the process's folder for a document from memory
         if (!entities) {
             return fail("scene file '{}': {}", scenePath.string(), entities.error().message);
         }
@@ -13960,10 +14035,13 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     std::vector<float> v;
                     if (it->is_array()) {
                         for (const json& x : *it) v.push_back(x.get<float>());
+                        look.forms.push_back(Look::Form::List);
                     } else if (it->is_boolean()) {
                         v.push_back(it->get<bool>() ? 1.0f : 0.0f);
+                        look.forms.push_back(Look::Form::Bool);
                     } else {
                         v.push_back(it->get<float>());
+                        look.forms.push_back(Look::Form::Number);
                     }
                     look.values.emplace_back(it.key(), std::move(v));
                 }
@@ -14043,6 +14121,9 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                 return std::unexpected(nodeName.error());
             }
             node.name = *nodeName;
+            for (const auto& [key, value] : item.items()) { // ADR-2151: kept, as at the top level
+                if (key.starts_with('_')) node.keptKeys[key] = value;
+            }
             auto kindName = readString(item, "kind", "");
             if (!kindName) {
                 return std::unexpected(kindName.error());
@@ -15068,6 +15149,7 @@ Result<std::unique_ptr<Composition>> Composition::fromJsonImpl(const nlohmann::j
                     return fail("node '{}': {}", label, added.error().message);
                 }
                 log::warn("scene '{}': node '{}' skipped: {}", comp->name_, label, added.error().message);
+                comp->skippedNodes_.push_back(item); // ADR-2151: not drawn, but still the file's; a save writes it back
             }
         }
         for (const auto& [child, parentName] : pendingParents) {

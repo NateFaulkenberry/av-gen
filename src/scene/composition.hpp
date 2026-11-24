@@ -418,6 +418,9 @@ struct CompositionNode {
     // (see the warning in `fromJson`).
     Material terrainMaterial;      // settings for kind Terrain: shared by every chunk
     bool materialAuthored = false; // the scene wrote a `material` block, rather than this being the default
+    // ADR-2151: the node's `_`-prefixed keys (the comment convention, e.g. `_note`), verbatim, written back by
+    // `toJson`. Not copied by `cloneNodeSpec`: a duplicate is a new node, and a note describes the one it was on.
+    nlohmann::json keptKeys = nlohmann::json::object();
     world::Ecology ecology;        // settings for kind Terrain (ADR-048): what grows on it
     // Settings for kind City (ADR-100). The node carries the *description*, never the placements:
     // a scatter cloud is a runtime shared_ptr and is not serialised, exactly as a terrain's ecology
@@ -1553,6 +1556,11 @@ public:
         std::string name;
         int fromCrossing = 0;
         std::vector<std::pair<std::string, std::vector<float>>> values; // parameter path (under this prefix) -> components
+        // ADR-2151: how each entry of `values` was written (same index), so `toJson` writes `true` back as `true` and a
+        // one-component list as a list. Shorter than `values` (a look built in code): one component is a number, more
+        // is a list.
+        enum class Form : std::uint8_t { Number, Bool, List };
+        std::vector<Form> forms;
     };
     void setLooks(std::vector<Look> looks) { looks_ = std::move(looks); appliedLook_ = -2; }
     [[nodiscard]] double portalCrossingSeconds() const { return portalCrossing_; }
@@ -2596,6 +2604,16 @@ private:
     void linkPortalRoot();
     [[nodiscard]] Composition* destWorld() const { return portalTarget_ != nullptr ? portalTarget_ : portalWorld_.get(); }
     std::vector<Look> looks_;
+    // ADR-2151: the top-level keys of the document this composition was read from that `fromJson` does not read --
+    // a `_`-prefixed note, a later build's block -- verbatim, so `toJson` writes them back instead of deleting them.
+    // A key `toJson` writes itself always wins. Empty for a composition built in code (`newComposition`): there was
+    // no document, so there is nothing to keep.
+    nlohmann::json keptKeys_ = nlohmann::json::object();
+    // ADR-2151: the `nodes` entries the load skipped because their asset is missing (a gitignored pack on this machine,
+    // a moved file), verbatim and in file order. A missing asset costs the node its drawing, not its place in the
+    // file: `toJson` writes them after the live nodes. Whatever `addNode` refused it for, the next load refuses it the
+    // same way, so the file is stable rather than shortened.
+    std::vector<nlohmann::json> skippedNodes_;
     std::vector<std::pair<params::IParameter*, std::vector<float>>> lookOriginals_;
     int appliedLook_ = -2;
     [[nodiscard]] int lookIndexAt(double t) const; // -1 = authored; -2 = not yet decidable
