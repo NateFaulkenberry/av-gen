@@ -2542,11 +2542,16 @@ TEST_CASE("An untouched composition regenerates no procedural geometry", "[scene
         // vacuous if some later change makes regeneration impossible for an unrelated reason.
         comp.setLegacyProceduralGeneration(true);
         const std::uint64_t before = scene::proceduralRebuildCount();
+        const std::uint64_t reusedBefore = scene::proceduralTransformReuseCount();
         for (int frame = 0; frame < 10; ++frame) {
             params.resetFinals();
             comp.update(time);
         }
-        CHECK(scene::proceduralRebuildCount() == before + 20);
+        // ADR-2138: the two disagreeing hashes differ only by the folded node transform, so after the
+        // first round trip the old path's second rebuild is a transform-only one, served without
+        // regenerating. It is still twenty rebuilds that did work where the right answer is none.
+        CHECK((scene::proceduralRebuildCount() - before) + (scene::proceduralTransformReuseCount() - reusedBefore) ==
+              20);
     }
 
     SECTION("a parameter that moves still regenerates, exactly once") {
