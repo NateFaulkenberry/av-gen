@@ -684,6 +684,7 @@ public:
     [[nodiscard]] MaterialPrograms& materialPrograms() { return *materialPrograms_; } // ADR-030
     [[nodiscard]] SplineBuffers& splines() { return *splines_; } // the spline tables (ADR-026)
     [[nodiscard]] PostProcessor& post() { return *postProcessor_; }
+    [[nodiscard]] CloudRenderer& clouds() { return *clouds_; } // ADR-2131: for the banded-march test
     [[nodiscard]] gpu::TransientPool& transientPool() { return *pool_; }
 
     // Installs image-based lighting (normally driven automatically from scene.environment).
@@ -1172,6 +1173,7 @@ private:
     wgpu::RenderPipeline portalPipeline_;
     wgpu::BindGroupLayout portalLayout_;
     wgpu::Buffer portalParams_;
+    wgpu::Buffer executionStamp_; // ADR-2131: where renderSubmitted's frame copies its execution stamp
     wgpu::Sampler portalSampler_;
     [[nodiscard]] Result<void> ensurePortalPipeline();
     // Draws the destination into the portal target, or, `direct` given (crossed), into that target instead.

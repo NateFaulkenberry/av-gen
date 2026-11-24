@@ -76,6 +76,7 @@ private:
         std::uint32_t paddedRow = 0;
         Format format = Format::Rgba8;
         std::uint64_t index = 0;
+        std::uint64_t stamp = 0; // ADR-2131: the token the frame's command buffer copies in after the pixels
         wgpu::Future future{};
         bool inFlight = false;
         bool mapped = false;

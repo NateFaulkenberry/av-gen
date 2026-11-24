@@ -58,6 +58,15 @@ inline constexpr std::uint32_t kBinCountMask = 0xFFu;
 // each a low-discrepancy sequence per FRAME at 24, 30 and 60 fps (public for the unit test).
 [[nodiscard]] glm::vec2 cloudFrameJitter(std::uint32_t frameNonce);
 
+// ADR-2131: the march in bands of rows, each its own submission, so no command buffer runs past the macOS GPU watchdog
+// (~5 s: past it the buffer is aborted and the process's later submissions are ignored, and the frames come back
+// black with no error). A band's cost is counted as march pixels * steps * (1 + light taps); 2^30 of them took ~0.6 s
+// in Neon Dreams' heaviest measured view (Apple M-series, 192 steps, 8 taps, 3 erosion octaves), so a band has about
+// 8x headroom. A live march (half resolution, ~96 steps) is one band, as before.
+inline constexpr std::uint64_t kCloudMarchUnitsPerSubmit = 1ull << 30;
+[[nodiscard]] std::uint32_t cloudMarchBands(std::uint32_t marchWidth, std::uint32_t marchHeight, int steps,
+                                            int lightSteps, std::uint64_t unitsPerSubmit = kCloudMarchUnitsPerSubmit);
+
 // ADR-2100: the tiling shape-noise volume, kCloudNoiseSize^3 RGBA8 (R Perlin-Worley, G Worley fbm at 4/8/16 cells,
 // B at 8/16/32, A Perlin fbm). Deterministic; built once per process.
 inline constexpr std::uint32_t kCloudNoiseSize = 64;
@@ -72,6 +81,9 @@ public:
 
     [[nodiscard]] Result<void> init(gpu::Context& context, gpu::ShaderLibrary& shaders, wgpu::TextureFormat hdrFormat);
     [[nodiscard]] bool ready() const { return static_cast<bool>(march_) && static_cast<bool>(composite_); }
+    // ADR-2131: the bands the last frame's march was split into (1 = one pass, as before), and a test's budget
+    [[nodiscard]] std::uint32_t lastMarchBands() const { return lastMarchBands_; }
+    void setMarchUnitsPerSubmit(std::uint64_t units) { unitsPerSubmit_ = units; }
 
 private:
     [[nodiscard]] Result<void> createPipelines(gpu::ShaderLibrary& shaders);
@@ -112,6 +124,8 @@ private:
     wgpu::TextureView marchDepthView_;
     std::array<wgpu::Texture, 2> history_{};
     std::array<wgpu::TextureView, 2> historyView_{};
+    std::uint32_t lastMarchBands_ = 0;
+    std::uint64_t unitsPerSubmit_ = kCloudMarchUnitsPerSubmit;
     int historyIndex_ = 0;     // the one written last frame
     bool historyValid_ = false;
     glm::mat4 lastViewProj_{1.0f};

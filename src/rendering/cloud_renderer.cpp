@@ -507,6 +507,16 @@ Result<void> CloudRenderer::createPipelines(gpu::ShaderLibrary& shaders) {
     return {};
 }
 
+std::uint32_t cloudMarchBands(std::uint32_t marchWidth, std::uint32_t marchHeight, int steps, int lightSteps,
+                              std::uint64_t unitsPerSubmit) {
+    const std::uint64_t units = static_cast<std::uint64_t>(marchWidth) * marchHeight *
+                                static_cast<std::uint64_t>(std::max(steps, 1)) *
+                                static_cast<std::uint64_t>(1 + std::max(lightSteps, 0));
+    const std::uint64_t budget = std::max<std::uint64_t>(unitsPerSubmit, 1);
+    const std::uint64_t bands = (units + budget - 1) / budget;
+    return static_cast<std::uint32_t>(std::clamp<std::uint64_t>(bands, 1, std::max(marchHeight, 1u)));
+}
+
 void CloudRenderer::ensureTargets(std::uint32_t w, std::uint32_t h) {
     if (w == marchW_ && h == marchH_ && marchColor_) {
         return;
@@ -834,7 +844,8 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         return device.CreateBindGroup(&bg);
     };
     const auto pass = [&](const char* label, const std::vector<wgpu::TextureView>& targets, bool load,
-                          const wgpu::RenderPipeline& pipeline, const wgpu::BindGroup& bindGroup) {
+                          const wgpu::RenderPipeline& pipeline, const wgpu::BindGroup& bindGroup,
+                          std::uint32_t rowBegin = 0, std::uint32_t rowEnd = 0) {
         std::vector<wgpu::RenderPassColorAttachment> colours(targets.size());
         for (std::size_t k = 0; k < targets.size(); ++k) {
             colours[k].view = targets[k];
@@ -852,17 +863,39 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
         wgpu::RenderPassEncoder enc = f.encoder->BeginRenderPass(&rp);
         enc.SetPipeline(pipeline);
         enc.SetBindGroup(0, bindGroup);
+        if (rowEnd > rowBegin) {
+            enc.SetScissorRect(0, rowBegin, mw, rowEnd - rowBegin); // ADR-2131: one band of the march's rows
+        }
         enc.Draw(3);
         enc.End();
     };
 
-    // 1. the march
+    // 1. the march -- ADR-2131: in bands of rows when one pass would run long, each band but the first submitted after
+    // the work before it has finished, so no command buffer holds more than a band of march. The first band clears
+    // both targets; the rest load them. A pixel's result does not depend on the band it is drawn in.
     const wgpu::Buffer& frameBuf = *f.frameUniforms;
-    pass("clouds", {marchColorView_, marchDepthView_}, false, march_,
-         group("clouds-march", marchLayout_,
-               {bufferEntry(0, frameBuf), bufferEntry(1, uniforms_), viewEntry(2, f.linearDepth),
-                viewEntry(3, noiseView_), samplerEntryOf(4, repeatSampler_), bufferEntry(5, lobes_),
-                bufferEntry(6, bins_)}));
+    const wgpu::BindGroup marchGroup =
+        group("clouds-march", marchLayout_,
+              {bufferEntry(0, frameBuf), bufferEntry(1, uniforms_), viewEntry(2, f.linearDepth),
+               viewEntry(3, noiseView_), samplerEntryOf(4, repeatSampler_), bufferEntry(5, lobes_),
+               bufferEntry(6, bins_)});
+    const std::uint32_t bands = cloudMarchBands(mw, mh, c.steps, c.lightSteps, unitsPerSubmit_);
+    lastMarchBands_ = bands;
+    if (bands <= 1) {
+        pass("clouds", {marchColorView_, marchDepthView_}, false, march_, marchGroup);
+    } else {
+        for (std::uint32_t b = 0; b < bands; ++b) {
+            if (b > 0) {
+                wgpu::CommandBuffer done = f.encoder->Finish();
+                context_->queue().Submit(1, &done);
+                context_->waitForQueue();
+                *f.encoder = device.CreateCommandEncoder(); // the caller's encoder: the frame goes on in this one
+            }
+            const auto y0 = static_cast<std::uint32_t>(static_cast<std::uint64_t>(mh) * b / bands);
+            const auto y1 = static_cast<std::uint32_t>(static_cast<std::uint64_t>(mh) * (b + 1) / bands);
+            pass("clouds", {marchColorView_, marchDepthView_}, b > 0, march_, marchGroup, y0, y1);
+        }
+    }
 
     // 2. the temporal resolve (into the history slot not written last frame)
     wgpu::TextureView result = marchColorView_;

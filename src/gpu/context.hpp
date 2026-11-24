@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace avgen::gpu {
 
@@ -86,6 +87,18 @@ public:
     [[nodiscard]] std::uint64_t errorCount() const { return errorCount_; }
     [[nodiscard]] const std::string& lastError() const { return lastError_; }
     void clearErrors() { errorCount_ = 0; lastError_.clear(); }
+
+    // ---- ADR-2131: did the GPU run it? ----
+    // macOS aborts a command buffer that runs past its GPU watchdog (kIOGPUCommandBufferCallbackErrorTimeout) and then
+    // IGNORES the process's later submissions; Dawn surfaces neither -- no validation error, no device loss -- so the
+    // frames read back as zeros with "GPU errors: 0". A stamp is the evidence a command buffer executed: it copies a
+    // fresh token into `dst` at `dstOffset` (8 bytes, 8-aligned; `dst` needs CopyDst) as part of `encoder`'s work, and
+    // the reader compares what lands there with the returned token once the work is done. A mismatch is
+    // `reportNotExecuted`, which counts as a GPU error.
+    [[nodiscard]] std::uint64_t encodeExecutionStamp(wgpu::CommandEncoder& encoder, const wgpu::Buffer& dst,
+                                                     std::uint64_t dstOffset);
+    void reportNotExecuted(std::string_view what);
+    static constexpr std::uint64_t kExecutionStampBytes = 8;
     [[nodiscard]] bool deviceLost() const { return deviceLost_; }
 
     static std::string toString(wgpu::StringView view);
@@ -108,6 +121,9 @@ private:
     std::uint64_t errorCount_ = 0;
     std::string lastError_;
     bool deviceLost_ = false;
+    // ADR-2131: the stamps' source, a ring of 8-byte slots so an encoder still unsubmitted keeps its own token
+    wgpu::Buffer stampSource_;
+    std::uint64_t nextStamp_ = 0;
 };
 
 } // namespace avgen::gpu

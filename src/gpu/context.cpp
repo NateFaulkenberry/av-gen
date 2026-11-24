@@ -4,6 +4,8 @@
 #include "gpu/blob_cache.hpp"
 #include "gpu/surface.hpp"
 
+#include <fmt/format.h>
+
 #include <sys/sysctl.h>
 
 #include <algorithm>
@@ -354,6 +356,37 @@ void Context::processEvents() { instance_.ProcessEvents(); }
 
 bool Context::waitFor(wgpu::Future future, std::uint64_t timeoutNs) {
     return instance_.WaitAny(future, timeoutNs) == wgpu::WaitStatus::Success;
+}
+
+namespace {
+constexpr std::uint64_t kStampSlots = 256;
+} // namespace
+
+std::uint64_t Context::encodeExecutionStamp(wgpu::CommandEncoder& encoder, const wgpu::Buffer& dst,
+                                            std::uint64_t dstOffset) {
+    if (!stampSource_) {
+        wgpu::BufferDescriptor bd{};
+        bd.label = "execution-stamps";
+        bd.size = kStampSlots * kExecutionStampBytes;
+        bd.usage = wgpu::BufferUsage::CopySrc | wgpu::BufferUsage::CopyDst;
+        stampSource_ = device_.CreateBuffer(&bd);
+    }
+    // Never 0: a fresh MapRead buffer reads 0, and an unrun copy must not be able to match.
+    const std::uint64_t token = 0xA5C0'0000'0000'0000ull | ++nextStamp_;
+    const std::uint64_t slot = (nextStamp_ % kStampSlots) * kExecutionStampBytes;
+    // The write is on the queue timeline before this encoder's submission, so the copy reads this token.
+    queue_.WriteBuffer(stampSource_, slot, &token, sizeof token);
+    encoder.CopyBufferToBuffer(stampSource_, slot, dst, dstOffset, kExecutionStampBytes);
+    return token;
+}
+
+void Context::reportNotExecuted(std::string_view what) {
+    ++errorCount_;
+    lastError_ = fmt::format(
+        "{}: the GPU did not run the commands (macOS aborts a command buffer that runs past its GPU watchdog, then "
+        "ignores the process's later submissions; Console shows kIOGPUCommandBufferCallbackErrorTimeout)",
+        what);
+    log::error("[gpu] {}", lastError_);
 }
 
 void Context::waitForQueue() {

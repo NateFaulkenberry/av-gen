@@ -12,6 +12,8 @@ namespace avgen::gpu {
 
 namespace {
 
+constexpr std::uint64_t kStampBytes = 256; // keeps the buffer a whole number of 256-byte rows
+
 std::uint32_t bytesPerPixel(ReadbackRing::Format format) {
     // Rgba8, Rg16Float, R32Float and R32Uint are all four bytes; only RGBA16Float is eight.
     return format == ReadbackRing::Format::Rgba16Float ? 8u : 4u;
@@ -67,7 +69,7 @@ Result<void> ReadbackRing::record(std::size_t index, wgpu::CommandEncoder& encod
     if (slot.buffer == nullptr || slot.size != size) {
         wgpu::BufferDescriptor desc{};
         desc.label = "readback-ring";
-        desc.size = size;
+        desc.size = size + kStampBytes; // ADR-2131: the execution stamp after the pixels
         desc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
         slot.buffer = context_.device().CreateBuffer(&desc);
         if (slot.buffer == nullptr) {
@@ -95,12 +97,14 @@ Result<void> ReadbackRing::record(std::size_t index, wgpu::CommandEncoder& encod
     destination.layout.rowsPerImage = height;
     const wgpu::Extent3D extent{width, height, 1};
     encoder.CopyTextureToBuffer(&source, &destination, &extent);
+    // ADR-2131: in the frame's own command buffer, after its passes -- the token lands only if the GPU ran them
+    slot.stamp = context_.encodeExecutionStamp(encoder, slot.buffer, size);
     wgpu::CommandBuffer commands = encoder.Finish();
     context_.queue().Submit(1, &commands);
 
     // The map may only start once the copy is submitted; the callback fires from processEvents()
     // or a WaitAny, both on this thread, so the slot needs no synchronisation.
-    slot.future = slot.buffer.MapAsync(wgpu::MapMode::Read, 0, static_cast<std::size_t>(size),
+    slot.future = slot.buffer.MapAsync(wgpu::MapMode::Read, 0, static_cast<std::size_t>(size + kStampBytes),
                                        wgpu::CallbackMode::AllowProcessEvents,
                                        [s = &slot](wgpu::MapAsyncStatus status, wgpu::StringView message) {
                                            s->mapped = true;
@@ -133,11 +137,21 @@ ReadbackRing::Frame ReadbackRing::extract(Slot& slot) {
     Frame frame;
     frame.index = slot.index;
     frame.format = slot.format;
-    const auto* data =
-        static_cast<const std::uint8_t*>(slot.buffer.GetConstMappedRange(0, static_cast<std::size_t>(slot.size)));
+    const auto* data = static_cast<const std::uint8_t*>(
+        slot.buffer.GetConstMappedRange(0, static_cast<std::size_t>(slot.size + kStampBytes)));
     if (data == nullptr) {
         slot.failed = true;
         slot.message = "mapped range unavailable";
+        return frame;
+    }
+    // ADR-2131: a frame whose command buffer the GPU never ran maps fine and reads as zeros (or as the slot's last
+    // frame); without this it was written to the file as a black frame with "GPU errors: 0".
+    std::uint64_t landed = 0;
+    std::memcpy(&landed, data + slot.size, sizeof landed);
+    if (landed != slot.stamp) {
+        slot.failed = true;
+        slot.message = "the GPU did not run the frame's commands";
+        context_.reportNotExecuted(fmt::format("readback ring, frame {}", slot.index));
         return frame;
     }
     const std::size_t pixels = static_cast<std::size_t>(slot.width) * slot.height;
@@ -214,7 +228,7 @@ void ReadbackRing::harvest() {
             }
         }
         if (slot.failed && error_.empty()) {
-            error_ = fmt::format("frame {}: readback map failed: {}", slot.index, slot.message);
+            error_ = fmt::format("frame {}: readback failed: {}", slot.index, slot.message);
         }
         slot.inFlight = false;
         order_.pop_front();

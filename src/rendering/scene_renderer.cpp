@@ -6139,6 +6139,15 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     const auto elapsed = [](std::chrono::steady_clock::time_point from) {
         return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - from).count();
     };
+    // ADR-2131: the frame's last command, so a frame the GPU never ran is an error rather than a black image
+    if (!executionStamp_) {
+        wgpu::BufferDescriptor bd{};
+        bd.label = "render-execution-stamp";
+        bd.size = 256;
+        bd.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc;
+        executionStamp_ = context_.device().CreateBuffer(&bd);
+    }
+    const std::uint64_t stamp = context_.encodeExecutionStamp(encoder, executionStamp_, 0);
     auto mark = std::chrono::steady_clock::now();
     wgpu::CommandBuffer commands = encoder.Finish();
     stats_.cpu.finishMs = elapsed(mark);
@@ -6153,6 +6162,16 @@ Result<wgpu::Texture> SceneRenderer::renderSubmitted(const scene::Scene& scene, 
     // Again after the queue drained: a frame submitted two or three frames ago has landed in the
     // readback ring by now, so the numbers reported alongside this frame are only that stale.
     collectFrameTimings();
+    if (auto landed = gpu::readBuffer(context_, executionStamp_, 0, gpu::Context::kExecutionStampBytes); !landed) {
+        return std::unexpected(landed.error());
+    } else {
+        std::uint64_t value = 0;
+        std::memcpy(&value, landed->data(), sizeof value);
+        if (value != stamp) {
+            context_.reportNotExecuted("renderer frame");
+            return fail("the GPU did not run the frame's commands (ADR-2131): {}", context_.lastError());
+        }
+    }
     return texture;
 }
 
