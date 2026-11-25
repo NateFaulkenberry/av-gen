@@ -3,7 +3,7 @@
 - Status: Accepted (2026-11-25), eng/engine-api-s1b (Engine API stage S1b; 113-engine-architecture, design in
   03-phase0-api-contracts/02-session-api.md sections 3.3 and 3.4; origin 112-neon-dreams/02-ui-perf-investigation,
   fixes 7 and 8)
-- Code: `app/engine.{hpp,cpp}`, `app/engine_project.cpp` (`ProjectRevisions`, `RevisionScope`, `UnrecordedChange`,
+- Code: `app/engine.{hpp,cpp}`, `app/engine_project.cpp` (`setAuthoredBaseWithoutUndo` and its two siblings, `ProjectRevisions`, `RevisionScope`, `UnrecordedChange`,
   `SavedComparison`, `Engine::revisions`, `bumpProjectRevision`, `compareWithSaved`, `projectDirtyOnDemand`,
   `TimePolicy`, `setTimePolicy`, `effectiveTimePolicy`, `stepFrames`, `Engine::tick`; `sampleProjectDirty`,
   `projectDirty` and `projectDirtyCached` removed), `app/edit_system.{hpp,cpp}` (`attach`, the state-revision memory;
@@ -12,7 +12,8 @@
   `revisions` and `timePolicy`), `api/session_tools.cpp` (`project.diff_saved`, `transport.get_policy`,
   `transport.set_policy`, `transport.step`), `app/application.{hpp,cpp}` (the sampler, the close gate,
   `--parked-clock`), `ui/unsaved_changes.hpp` (`TouchWindow` replaces `DirtySampleSchedule`), `ai/capabilities.cpp`
-  (the `transport` domain)
+  (the `transport` domain), `ui/param_widget.{hpp,cpp}`, the Environment, Lights, Live, World and
+  Parameters panels and `app/ui_script.cpp` (the writes of decision 7)
 - Docs: `docs/api/transactions.md` (revisions), `docs/help/reference-command-line.md` (`--parked-clock`;
   `AVGEN_DIRTY_TRACE` gone with the sampler)
 - Tests: `tests/unit/test_api_revisions.cpp` (`[api][revisions]`, `[api][time]`); `test_edit_system.cpp`,
@@ -67,7 +68,29 @@ parked behaviour (`StoppedAmbient`) by default, the policy is explicit, `Stopped
 6. **The headless `--ai-script` host stays `Offline`, not `Stepped`.** Its session's engine is then ticked by
    `runHeadless`'s fixed-step loop; honouring `Stepped` there would stop the frames that run renders after the script,
    which changes headless output. `LocalHost` offers only the engine's own policy unless told otherwise; stage S2's
-   EngineHost, which has no frame loop, is where `Stepped` belongs by default.
+   EngineHost, which has no frame loop, is where `Stepped` belongs by default. (Accepted by the orchestrator.)
+7. **A panel's direct parameter write bumps the revision, through one helper.** `Engine::setAuthoredBaseWithoutUndo`
+   (and `resetAuthoredToDefaultWithoutUndo`) writes the base and, when it changed, calls
+   `noteAuthoredWriteWithoutUndo` -- a bump outside the history, which also drops what the history remembers about its
+   states. A plain slider drag therefore shows the unsaved-changes dot again, as it did under the ADR-440 sampler.
+   Sites routed through it, all still **without undo**:
+   - `ui::drawParameterValue` (now takes the `Engine`): the Parameters panel's rows and the World panel's Inspector
+     rows, deformer `enabled` and generator rows;
+   - the Parameters panel's inert-fix menu item and "Reset to default"; the Inspector's "Reset to default";
+   - the Environment panel's sliders, integer sliders and checkboxes;
+   - the Lights panel's sliders, checkboxes, colour and vector rows;
+   - the Live panel's input gain, response sliders and response reset;
+   - the World panel's frame-echo rows, macro knobs and director knobs;
+   - the `sliders` `--ui-script` arm, which models `drawParameterValue`'s write and now uses the same helper.
+
+   Left as they were, because they are already recorded: the Effects section (its `noteParamEdit` pushes one command
+   per gesture when the widget is released -- the dot appears on release, which is when the old sampler showed it) and
+   the Cameras panel's "place at viewpoint" (an `EditCapture` command).
+
+   Not routed through `EditHistory::beginDrag`/`commitDrag`: those widgets write on every frame of a drag with no
+   gesture state, and `beginDrag` needs the before-values captured before the first write (ImGui reports activation
+   after the widget has already written). Giving each of these panels a gesture record, as the Effects section has, is
+   the follow-up that adds their undo.
 
 ## Alternatives considered
 
@@ -94,17 +117,16 @@ Dreams' frame is GPU-bound (about 300 ms of GPU, most of it the cloud march, REP
 not fall to a static frame's: the renderer still draws the whole scene every frame. Other agents' CPU suites were
 running during these runs (the GPU was held), so the CPU columns are comparable with each other, not absolute.
 
-The dev assertion across 17 `--ui-script` arms (one arm per run, on `examples/hero/hero.json`): only `sliders` left an
-unrecorded difference (452 parameter paths); `edit` and `gizmo` were recorded; the rest changed nothing. The `sliders`
-arm writes parameters exactly as `ui::drawParameterValue` does, which is the bypass named below.
+The dev assertion across 17 `--ui-script` arms (one arm per run, on `examples/hero/hero.json`), before decision 7: only
+`sliders` left an unrecorded difference (452 parameter paths); `edit` and `gizmo` were recorded; the rest changed
+nothing. The `sliders` arm writes parameters exactly as `ui::drawParameterValue` does. After decision 7: see the stage
+report for the rerun.
 
 ## Consequences
 
-- **Panel writes that bypass the edit history no longer mark the title.** `ui::drawParameterValue` (the Parameters
-  panel's sliders) and the other panels that call `setBaseComponent` directly (lights, effects, environment, live,
-  world, control panel; see the stage report) bump no revision. The close gate still catches them (the widget touch
-  makes it `Adopt`), so no work is lost at Quit, but the title's dot appears only once something recorded happens.
-  Routing them through `EditHistory::beginDrag`/`commitDrag` fixes both the dot and their missing undo.
+- The panel writes of decision 7 mark the title as they did before, and still have no undo. Any other code that writes
+  a base directly for the person is an unrecorded writer: the close gate still catches it (`Adopt` on a touch), and the
+  `--ui-script` assertion names it.
 - `EditSystem` is neither copyable nor movable (its history's observer holds it).
 - `session.info` gains `revisions` and `timePolicy`; transaction results gain `revisions`; the catalogue gains four
   tools. Additive, so `kApiLevel` is unchanged.

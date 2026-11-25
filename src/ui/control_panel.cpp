@@ -2221,7 +2221,7 @@ void ControlPanel::drawParameters(app::Engine& engine) {
         ImGui::PushID(param->path().c_str());
         const std::size_t n = param->componentCount();
         // ADR-387: the one implementation, shared with the World panel's Inspector.
-        drawParameterValue(*param);
+        drawParameterValue(engine, *param);
         // Show the modulated (final) value next to the slider when it differs.
         if (n == 1 && std::abs(param->finalComponent(0) - param->baseComponent(0)) > 1e-5f) {
             ImGui::SameLine();
@@ -2270,13 +2270,13 @@ void ControlPanel::drawParameters(app::Engine& engine) {
                 const std::string label(inert.fixLabel);
                 if (ImGui::MenuItem(label.c_str())) {
                     if (params::IParameter* fix = engine.params().find(std::string(inert.fixPath))) {
-                        fix->setBaseComponent(0, inert.fixValue);
+                        engine.setAuthoredBaseWithoutUndo(*fix, 0, inert.fixValue);
                     }
                 }
                 ImGui::Separator();
             }
             if (ImGui::MenuItem("Reset to default")) {
-                param->resetToDefault();
+                engine.resetAuthoredToDefaultWithoutUndo(*param);
             }
             if (ImGui::MenuItem("Key at current time")) {
                 engine.recordKey(param->path());

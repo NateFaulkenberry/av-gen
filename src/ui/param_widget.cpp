@@ -1,5 +1,7 @@
 #include "ui/param_widget.hpp"
 
+#include "app/engine.hpp"
+
 #include <imgui.h>
 
 #include <cmath>
@@ -7,7 +9,7 @@
 
 namespace avgen::ui {
 
-bool drawParameterValue(params::IParameter& param, const char* label) {
+bool drawParameterValue(app::Engine& engine, params::IParameter& param, const char* label) {
     using namespace params;
     const char* text = label != nullptr ? label : param.label().c_str();
     const std::size_t n = param.componentCount();
@@ -47,7 +49,7 @@ bool drawParameterValue(params::IParameter& param, const char* label) {
     }
     if (changed) {
         for (std::size_t i = 0; i < n && i < 4; ++i) {
-            param.setBaseComponent(i, values[i]);
+            engine.setAuthoredBaseWithoutUndo(param, i, values[i]);
         }
     }
     return changed;

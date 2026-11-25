@@ -744,7 +744,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             float db = 20.0f * std::log10(linear);
             ImGui::SetNextItemWidth(widthBesideLabel("Input gain"));
             if (ImGui::SliderFloat("Input gain", &db, -24.0f, 18.0f, "%+.1f dB")) {
-                gain->setBaseComponent(0, std::clamp(std::pow(10.0f, db / 20.0f), 0.0f, 8.0f));
+                engine.setAuthoredBaseWithoutUndo(*gain, 0, std::clamp(std::pow(10.0f, db / 20.0f), 0.0f, 8.0f));
             }
             if (ImGui::IsItemHovered()) {
                 tooltip("The input gain before analysis (audio/inputGain). Aim for the level meter to peak "
@@ -767,7 +767,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             float v = p->baseComponent(0);
             ImGui::SetNextItemWidth(widthBesideLabel(label));
             if (ImGui::SliderFloat(label, &v, lo, hi, format, flags)) {
-                p->setBaseComponent(0, std::clamp(v, lo, hi));
+                engine.setAuthoredBaseWithoutUndo(*p, 0, std::clamp(v, lo, hi));
             }
             if (ImGui::IsItemHovered()) {
                 tooltip("%s", help);
@@ -792,7 +792,7 @@ void ControlPanel::drawLive(app::Engine& engine) {
             for (const char* path : {"sonic/response/sensitivity", "sonic/response/transient", "sonic/response/sustain",
                                      "sonic/response/attack", "sonic/response/release"}) {
                 if (auto* p = engine.params().find(path)) {
-                    p->resetToDefault();
+                    engine.resetAuthoredToDefaultWithoutUndo(*p);
                 }
             }
         }

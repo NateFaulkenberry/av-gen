@@ -1214,6 +1214,33 @@ std::uint64_t Engine::bumpProjectRevisionFromHistory(RevisionScope scope) {
     return revisions_.project;
 }
 
+void Engine::noteAuthoredWriteWithoutUndo(RevisionScope scope) { bumpProjectRevision(scope); }
+
+bool Engine::setAuthoredBaseWithoutUndo(params::IParameter& param, std::size_t component, float value) {
+    const float before = param.baseComponent(component);
+    param.setBaseComponent(component, value);
+    const float after = param.baseComponent(component);
+    if (after == before) {
+        return false;
+    }
+    noteAuthoredWriteWithoutUndo();
+    return true;
+}
+
+void Engine::resetAuthoredToDefaultWithoutUndo(params::IParameter& param) {
+    std::vector<float> before;
+    for (std::size_t i = 0; i < param.componentCount(); ++i) {
+        before.push_back(param.baseComponent(i));
+    }
+    param.resetToDefault();
+    for (std::size_t i = 0; i < param.componentCount(); ++i) {
+        if (param.baseComponent(i) != before[i]) {
+            noteAuthoredWriteWithoutUndo();
+            return;
+        }
+    }
+}
+
 void Engine::setProjectRevision(std::uint64_t project, bool sceneChanged) {
     revisions_.project = project;
     if (sceneChanged) {

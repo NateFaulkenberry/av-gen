@@ -14,13 +14,18 @@
 
 #include "params/parameter.hpp"
 
+namespace avgen::app {
+class Engine;
+}
+
 namespace avgen::ui {
 
-// Draws the value editor for one parameter and writes any change into its base value. Returns true
-// on the frame it changed. `label` overrides the parameter's own; null uses `param.label()`.
+// Draws the value editor for one parameter and writes any change into its base value, through
+// `Engine::setAuthoredBaseWithoutUndo` so the write bumps the project revision (ADR-2154: the title's
+// unsaved-changes dot; there is still no undo for it). Returns true on the frame it changed. `label` overrides the parameter's own; null uses `param.label()`.
 //
 // Does not push an id: the caller owns that, because the same parameter can legitimately be drawn
 // in two places in one frame (a panel section and the Parameters list).
-bool drawParameterValue(params::IParameter& param, const char* label = nullptr);
+bool drawParameterValue(app::Engine& engine, params::IParameter& param, const char* label = nullptr);
 
 } // namespace avgen::ui

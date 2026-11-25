@@ -42,7 +42,7 @@ bool slider(app::Engine& engine, const char* path, const char* label, const char
                            logarithmic ? ImGuiSliderFlags_Logarithmic : 0);
     ImGui::PopID();
     if (changed) {
-        p->setBaseComponent(0, v);
+        engine.setAuthoredBaseWithoutUndo(*p, 0, v);
     }
     const float f = p->finalComponent(0);
     if (std::abs(f - p->baseComponent(0)) > 1e-4f) {
@@ -67,7 +67,7 @@ bool intSlider(app::Engine& engine, const char* path, const char* label) {
                                           static_cast<int>(p->softMax(0)));
     ImGui::PopID();
     if (changed) {
-        p->setBaseComponent(0, static_cast<float>(v));
+        engine.setAuthoredBaseWithoutUndo(*p, 0, static_cast<float>(v));
     }
     return changed;
 }
@@ -82,7 +82,7 @@ bool checkbox(app::Engine& engine, const char* path, const char* label) {
     const bool changed = ImGui::Checkbox(label, &v);
     ImGui::PopID();
     if (changed) {
-        p->setBaseComponent(0, v ? 1.0f : 0.0f);
+        engine.setAuthoredBaseWithoutUndo(*p, 0, v ? 1.0f : 0.0f);
     }
     return changed;
 }

@@ -278,6 +278,50 @@ TEST_CASE("Studio's history sink: a Session call bumps once, and undo back to th
     REQUIRE(s->setTransactionSink(nullptr).has_value());
 }
 
+TEST_CASE("A panel write through the authored-write helper makes the project dirty", "[api][revisions][edits]") {
+    // ADR-2154 fix: the Parameters panel's sliders (`ui::drawParameterValue`) and the other panels that write a
+    // base directly go through `Engine::setAuthoredBaseWithoutUndo`, so a plain slider drag shows the dot again.
+    SavedProject p("panel_write");
+    params::IParameter* density = p.engine.params().find("scene/volumeDensity");
+    REQUIRE(density != nullptr);
+    const float origin = density->baseComponent(0);
+
+    // The control: writing the value it already has is not an edit.
+    CHECK_FALSE(p.engine.setAuthoredBaseWithoutUndo(*density, 0, origin));
+    CHECK_FALSE(p.engine.revisions().dirty());
+
+    CHECK(p.engine.setAuthoredBaseWithoutUndo(*density, 0, origin + 0.2f));
+    CHECK(p.engine.revisions().dirty());
+    CHECK_THAT(density->baseComponent(0), WithinAbs(origin + 0.2f, 1e-6));
+    // The close's comparison agrees: nothing it finds is unrecorded any more.
+    const app::SavedComparison c = p.engine.compareWithSaved();
+    CHECK(c.differs);
+    CHECK_FALSE(c.unrecorded);
+
+    SECTION("a reset is an authored write too") {
+        REQUIRE(p.engine.saveProject(p.file).has_value());
+        REQUIRE_FALSE(p.engine.revisions().dirty());
+        p.engine.resetAuthoredToDefaultWithoutUndo(*density);
+        CHECK(p.engine.revisions().dirty() == (density->baseComponent(0) != origin + 0.2f));
+    }
+
+    SECTION("it has no undo, so an undo of an earlier edit cannot call the project clean") {
+        REQUIRE(p.engine.saveProject(p.file).has_value());
+        app::EditSystem edits;
+        edits.attach(&p.engine);
+        ui::EditCommand command("Recorded");
+        const float before = density->baseComponent(0);
+        density->setBaseComponent(0, before + 0.1f);
+        command.params.push_back(ui::ParamChange{"scene/volumeDensity", {before}, {before + 0.1f}});
+        edits.history().push(std::move(command));
+        params::IParameter* fov = p.engine.params().find("camera/fov");
+        REQUIRE(fov != nullptr);
+        REQUIRE(p.engine.setAuthoredBaseWithoutUndo(*fov, 0, fov->baseComponent(0) + 4.0f));
+        REQUIRE(edits.execute(app::EditAction::Undo, p.engine));
+        CHECK(p.engine.revisions().dirty()); // the fov change is still there
+    }
+}
+
 // ---- the time policy ----------------------------------------------------------------------------------
 
 TEST_CASE("Under StoppedFrozen, parked ticks hold renderTime and every parameter final", "[api][time]") {

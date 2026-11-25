@@ -47,7 +47,7 @@ bool slider(app::Engine& engine, const std::string& path, const char* label, con
                                             logarithmic ? ImGuiSliderFlags_Logarithmic : 0);
     ImGui::PopID();
     if (changed) {
-        p->setBaseComponent(0, v);
+        engine.setAuthoredBaseWithoutUndo(*p, 0, v);
     }
     // Modulation is visible rather than mysterious: a light whose intensity is driven by the bass
     // shows where the slider is AND what the music is doing to it.
@@ -69,7 +69,7 @@ bool checkbox(app::Engine& engine, const std::string& path, const char* label) {
     const bool changed = ImGui::Checkbox(label, &v);
     ImGui::PopID();
     if (changed) {
-        p->setBaseComponent(0, v ? 1.0f : 0.0f);
+        engine.setAuthoredBaseWithoutUndo(*p, 0, v ? 1.0f : 0.0f);
     }
     return changed;
 }
@@ -86,7 +86,7 @@ bool colorRow(app::Engine& engine, const std::string& path, const char* label) {
     ImGui::PopID();
     if (changed) {
         for (std::size_t i = 0; i < 3; ++i) {
-            p->setBaseComponent(i, rgb[i]);
+            engine.setAuthoredBaseWithoutUndo(*p, i, rgb[i]);
         }
     }
     return changed;
@@ -104,7 +104,7 @@ bool vec3Row(app::Engine& engine, const std::string& path, const char* label, co
     ImGui::PopID();
     if (changed) {
         for (std::size_t i = 0; i < 3; ++i) {
-            p->setBaseComponent(i, v[i]);
+            engine.setAuthoredBaseWithoutUndo(*p, i, v[i]);
         }
     }
     return changed;

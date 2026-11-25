@@ -52,7 +52,7 @@ void drawFrameEcho(app::Engine& engine) {
         bool v = on->baseComponent(0) >= 0.5f;
         ImGui::PushID("echo-enabled");
         if (ImGui::Checkbox("Enabled", &v)) {
-            on->setBaseComponent(0, v ? 1.0f : 0.0f);
+            engine.setAuthoredBaseWithoutUndo(*on, 0, v ? 1.0f : 0.0f);
         }
         ImGui::PopID();
     }
@@ -88,7 +88,7 @@ void drawFrameEcho(app::Engine& engine) {
             rowLabel(label.c_str());
             if (ImGui::ColorEdit3("##c", rgb, ImGuiColorEditFlags_Float)) {
                 for (std::size_t i = 0; i < 3; ++i) {
-                    p->setBaseComponent(i, rgb[i]);
+                    engine.setAuthoredBaseWithoutUndo(*p, i, rgb[i]);
                 }
             }
         } else {
@@ -96,7 +96,7 @@ void drawFrameEcho(app::Engine& engine) {
             rowLabel(label.c_str());
             if (ImGui::SliderFloat("##v", &v, p->softMin(0), p->softMax(0), format.c_str(),
                                    r.logarithmic ? ImGuiSliderFlags_Logarithmic : 0)) {
-                p->setBaseComponent(0, v);
+                engine.setAuthoredBaseWithoutUndo(*p, 0, v);
             }
         }
         if (!r.tip.empty() && ImGui::IsItemHovered()) {
@@ -556,10 +556,10 @@ void WorldPanel::drawInspector(app::Engine& engine, EditHistory* history) {
             // label for what the viewer sees (ADR-905: `fungi/light wave`, not
             // `fungi/emissiveFieldAmount`).
             const std::string rel = ui::inspectorRowLabel(param->path(), cuts[param], param->label());
-            drawParameterValue(*param, rel.c_str());
+            drawParameterValue(engine, *param, rel.c_str());
             if (ImGui::BeginPopupContextItem("reset")) {
                 if (ImGui::MenuItem("Reset to default")) {
-                    param->resetToDefault();
+                    engine.resetAuthoredToDefaultWithoutUndo(*param);
                 }
                 if (ImGui::MenuItem("Key at current time")) {
                     engine.recordKey(param->path());
@@ -803,7 +803,7 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
         // animation gesture, not a structural one.
         if (params::IParameter* p = engine.params().find(prefix + "deform/" +
                                                          std::to_string(slot + 1) + "/enabled")) {
-            drawParameterValue(*p, "enabled");
+            drawParameterValue(engine, *p, "enabled");
         }
 
         // Kind and space are structural: registration labels every leaf by kind and
@@ -851,7 +851,7 @@ void WorldPanel::drawDeformerStack(app::Engine& engine, const scene::ProceduralG
                                    r.leaf.data());
                 continue;
             }
-            drawParameterValue(*p, std::string(r.label).c_str());
+            drawParameterValue(engine, *p, std::string(r.label).c_str());
             if (!r.tip.empty() && ImGui::IsItemHovered()) {
                 tooltipUnformatted(std::string(r.tip).c_str());
             }
@@ -1163,7 +1163,7 @@ void WorldPanel::drawMacros(app::Engine& engine) {
         params::IParameter* knob = engine.params().find("macros/" + m.name);
         float value = knob != nullptr ? knob->baseComponent(0) : m.defaultValue;
         if (ImGui::SliderFloat(m.label.empty() ? m.name.c_str() : m.label.c_str(), &value, 0.0f, 1.0f) && knob != nullptr) {
-            knob->setBaseComponent(0, value);
+            engine.setAuthoredBaseWithoutUndo(*knob, 0, value);
         }
         if (ImGui::TreeNode("targets")) {
             for (const app::WorldMacroTarget& t : m.targets) {
@@ -1307,7 +1307,7 @@ void WorldPanel::drawDirector(app::Engine& engine) {
             ImGui::PushID(name);
             float value = knob->baseComponent(0);
             if (ImGui::SliderFloat(name, &value, 0.0f, 1.0f)) {
-                knob->setBaseComponent(0, value);
+                engine.setAuthoredBaseWithoutUndo(*knob, 0, value);
             }
             if (ImGui::IsItemHovered()) {
                 tooltip("%s", app::directorKnobDescription(mapping.knob));

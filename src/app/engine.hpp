@@ -333,6 +333,18 @@ public:
     // The edit history's own bump (EditSystem): the same, without invalidating its states. Returns the
     // new `project` value.
     std::uint64_t bumpProjectRevisionFromHistory(RevisionScope scope);
+    // ---- editor writes the edit history does not record (ADR-2154) ----
+    // The panels whose controls write a parameter base directly -- the Parameters panel and the World
+    // panel's rows (`ui::drawParameterValue`), the Environment, Lights and Live panels, the World panel's
+    // echo, macro and director rows, the Parameters panel's fix and reset items -- write through these,
+    // so an authored write bumps the project revision (the title's dot) even though it has no undo. A
+    // bump made here is outside the history, so it also drops what the history remembers about its
+    // states (`unrecordedEpoch`). Never for the engine's own writebacks.
+    void noteAuthoredWriteWithoutUndo(RevisionScope scope = RevisionScope::Project);
+    // Writes one base component and, when it changed, notes the write. Returns whether it changed.
+    bool setAuthoredBaseWithoutUndo(params::IParameter& param, std::size_t component, float value);
+    // `resetToDefault`, noted when it changed anything.
+    void resetAuthoredToDefaultWithoutUndo(params::IParameter& param);
     // EditSystem: undo or redo landed on a history state whose revision it recorded. `sceneChanged`
     // moves `scene` too (the composition changed back, which is still a change to it).
     void setProjectRevision(std::uint64_t project, bool sceneChanged);

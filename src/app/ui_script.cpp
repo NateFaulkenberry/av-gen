@@ -275,7 +275,9 @@ void UiScript::step(Engine& engine, ui::ControlPanel* panel, platform::Window& w
                     const float hi = p->softMax(c);
                     const float t = 0.5f + 0.4f * std::sin(phase_ + static_cast<float>(c));
                     const float v = lo + (hi - lo) * t;
-                    p->setBaseComponent(c, v);
+                    // Through the helper `ui::drawParameterValue` writes with (ADR-2154), so the arm bumps
+                    // the project revision exactly as a dragged slider does.
+                    engine.setAuthoredBaseWithoutUndo(*p, c, v);
                     if (c == 0) {
                         lastWrites_.push_back(p->path() + "=" + std::to_string(v));
                     }
