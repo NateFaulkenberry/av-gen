@@ -61,7 +61,17 @@ took the frame to 120 ms, but nothing in the app selects it.
 
 ## Measured
 
-See the evidence folder `112-neon-dreams/03-engine-perf-fixes/clouds-quality/` (README.md).
+These are editor runs on the 5K display (canvas 3600x1914), each level pinned, 30 fps target, under the GPU lock, as an A/B of base 414d47790 against this branch. The figures are median GPU frame ms for Neon Dreams, stopped at t=0.
+
+| Level | Before | After |
+|---|---|---|
+| Ultra | 766 | 759 |
+| High | 617 | 545 |
+| Medium | 457 | 272 |
+| Low | 297 | 159 |
+| Emergency | 299 | 116 |
+
+At Emergency the clouds cost ~30 ms against the scene with the clouds block off (85 ms). Before, they cost ~214 ms. The project's own `--quality live` cloud preset costs ~84 ms. With the ladder automatic, the editor reaches Emergency in about a minute and logs ADR-2135's line, with 'clouds' at 42 ms. Offline renders of Neon Dreams (two ranges), a clouds-only Neon Dreams and the biovalley vista have identical sequence hashes and PNG md5s. The biovalley meadow differs at 1/255 on about 100 pixels a frame, but it differs that much between two runs of the same binary. The evidence is in `112-neon-dreams/03-engine-perf-fixes/clouds-quality/`.
 
 ## Consequences
 
