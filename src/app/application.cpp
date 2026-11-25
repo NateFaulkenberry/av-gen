@@ -1782,7 +1782,9 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
             // separately from writing and more widely, but it is still bounded -- without a list, an
             // import tool is an arbitrary-file-read primitive handed to a language model.
             std::vector<std::filesystem::path> roots = exampleSearchDirs(executablePath);
+#ifdef AVGEN_SOURCE_DIR // ADR-2160: a package build has no source tree to read assets from
             roots.push_back(std::filesystem::path(AVGEN_SOURCE_DIR) / "assets");
+#endif
             // Where a person keeps the file they are about to point at. Deliberate, and the narrowest
             // set that makes "import the track on my desktop" work at all: Desktop and Downloads, read
             // only, and nothing else of the home directory. The session's PathPolicy resolves `..` and

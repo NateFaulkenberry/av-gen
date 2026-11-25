@@ -247,7 +247,12 @@ std::filesystem::path repositoryRoot() {
     if (!ec && std::filesystem::is_directory(here / "examples" / "labs", ec)) {
         return here;
     }
+#ifdef AVGEN_SOURCE_DIR
     return std::filesystem::path(AVGEN_SOURCE_DIR);
+#else
+    // ADR-2160: a package build knows no source tree; the working directory is the only candidate.
+    return here;
+#endif
 }
 
 Result<LabCase> resolveCaseSpec(std::string_view spec, const std::filesystem::path& root) {

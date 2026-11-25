@@ -82,7 +82,9 @@ if(AVGEN_HAVE_OIDN)
     target_compile_definitions(avgen_core PRIVATE AVGEN_HAVE_OIDN=1)
 endif()
 avgen_set_warnings(avgen_core)
-target_compile_definitions(avgen_core PUBLIC AVGEN_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+if(AVGEN_DEV_SOURCE_PATHS) # ADR-2160: a package build bakes no source path in
+    target_compile_definitions(avgen_core PUBLIC AVGEN_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+endif()
 if(AVGEN_ALLOC_COUNTERS)
     target_compile_definitions(avgen_core PUBLIC AVGEN_ALLOC_COUNTERS)
 endif()
@@ -105,7 +107,9 @@ if(AVGEN_GPU_SOURCES)
         target_link_libraries(avgen_gpu PRIVATE syphon::syphon
             "-framework Metal" "-framework IOSurface" "-framework CoreVideo" "-framework Foundation")
     endif()
-    target_compile_definitions(avgen_gpu PUBLIC AVGEN_SHADER_SOURCE_DIR="${AVGEN_SHADER_SOURCE_DIR}")
+    if(AVGEN_DEV_SOURCE_PATHS) # ADR-2160
+        target_compile_definitions(avgen_gpu PUBLIC AVGEN_SHADER_SOURCE_DIR="${AVGEN_SHADER_SOURCE_DIR}")
+    endif()
     # ADR-1811: the persistent pipeline cache's directory is keyed by the Dawn commit it was filled by.
     target_compile_definitions(avgen_gpu PRIVATE AVGEN_DAWN_COMMIT="${AVGEN_DAWN_COMMIT}")
     avgen_set_warnings(avgen_gpu)

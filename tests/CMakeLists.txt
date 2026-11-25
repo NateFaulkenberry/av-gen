@@ -192,6 +192,8 @@ if(Python3_Interpreter_FOUND)
     add_dependencies(avgen_tests avgen_audio_lab_fixture)
 endif()
 target_compile_definitions(avgen_tests PRIVATE AVGEN_AUDIO_LAB_FIXTURE_DIR="${AVGEN_AUDIO_LAB_FIXTURE_DIR}")
+# ADR-2160: test_install_layout reads the install rules CMake generated (cmake_install.cmake) from the build tree.
+target_compile_definitions(avgen_tests PRIVATE AVGEN_BINARY_DIR="${CMAKE_BINARY_DIR}")
 if(TARGET avgen_audio_lab_replay)
     add_dependencies(avgen_tests avgen_audio_lab_replay)
     target_compile_definitions(avgen_tests PRIVATE AVGEN_AUDIO_LAB_REPLAY="$<TARGET_FILE:avgen_audio_lab_replay>")

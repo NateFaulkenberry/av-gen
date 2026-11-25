@@ -17,10 +17,39 @@
 #include "labs/lab.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <string>
 #include <filesystem>
+
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+
+namespace {
+
+// The executable this process is running, absolute and with symlinks resolved; argv[0] when the OS cannot say.
+std::filesystem::path runningExecutable(const char* argv0) {
+#if defined(__APPLE__)
+    std::uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string buffer(size, '\0');
+    if (_NSGetExecutablePath(buffer.data(), &size) == 0) {
+        std::error_code ec;
+        const std::filesystem::path path = std::filesystem::weakly_canonical(std::filesystem::path(buffer.c_str()), ec);
+        return ec ? std::filesystem::path(buffer.c_str()) : path;
+    }
+#else
+    std::error_code ec;
+    if (auto path = std::filesystem::read_symlink("/proc/self/exe", ec); !ec) {
+        return path;
+    }
+#endif
+    return std::filesystem::path(argv0);
+}
+
+} // namespace
 
 int main(int argc, char** argv) {
     // ADR-2150: the version and the published contracts need no window, GPU, engine or settings file.
@@ -35,7 +64,9 @@ int main(int argc, char** argv) {
     // gets its GPU half here, which creates a device only when the first render job starts.
     if (argc > 1 && (std::string(argv[1]) == "serve" || std::string(argv[1]) == "call")) {
         avgen::log::init(avgen::log::Level::Info); // stderr; stdout is the protocol
-        auto gpu = avgen::app::gpuRenderBackendFactory(avgen::app::GpuBackendOptions{std::filesystem::path(argv[0]), {}, true});
+        // ADR-2160: the shaders are found beside the executable (<exe>/shaders), so name the file that is running,
+        // not argv[0]: started through PATH, argv[0] is a bare "avgen" with no directory at all.
+        auto gpu = avgen::app::gpuRenderBackendFactory(avgen::app::GpuBackendOptions{runningExecutable(argv[0]), {}, true});
         return std::string(argv[1]) == "serve" ? avgen::api::runServeCommand(argc, argv, std::move(gpu))
                                                : avgen::api::runCallCommand(argc, argv, std::move(gpu));
     }

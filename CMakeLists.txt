@@ -34,6 +34,15 @@ option(AVGEN_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
 # (docs/development/ci.md, "Sanitizers"). AVGEN_ENABLE_ASAN already includes these checks.
 option(AVGEN_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer alone" OFF)
 option(AVGEN_WARNINGS_AS_ERRORS "Treat warnings as errors for engine targets" OFF)
+# ADR-2160: a development build bakes this checkout's paths into the binary (AVGEN_SOURCE_DIR,
+# AVGEN_SHADER_SOURCE_DIR) so it can find shaders, examples, help and lab cases in the working tree.
+# A package must not: OFF defines neither, and the binary finds its shaders beside itself
+# (<exe>/shaders) or in AVGEN_SHADER_DIR. tools/package_poc.sh builds with OFF. The test suites read
+# AVGEN_SOURCE_DIR in hundreds of places, so OFF needs AVGEN_BUILD_TESTS=OFF.
+option(AVGEN_DEV_SOURCE_PATHS "Bake the source tree's paths into the binary (development builds)" ON)
+if(NOT AVGEN_DEV_SOURCE_PATHS AND AVGEN_BUILD_TESTS)
+    message(FATAL_ERROR "AVGEN_DEV_SOURCE_PATHS=OFF needs AVGEN_BUILD_TESTS=OFF: the suites read AVGEN_SOURCE_DIR")
+endif()
 
 if(APPLE)
     # The prebuilt Dawn archive is built against the macOS 26 SDK with a 26.0 deployment floor.
@@ -62,6 +71,8 @@ option(AVGEN_ASTRAL_FORGE_PROTOTYPE "Build the Astral Forge scene-experiment pro
 if(AVGEN_ASTRAL_FORGE_PROTOTYPE)
     add_subdirectory(prototypes/astral-forge)
 endif()
+
+include(Install)
 
 if(AVGEN_BUILD_TESTS)
     enable_testing()
