@@ -1,3 +1,5 @@
+#include "api/describe.hpp"
+#include "api/version.hpp"
 #include "app/application.hpp"
 #include "app/reactivity_cli.hpp"
 #include "app/route_audit_cli.hpp"
@@ -18,6 +20,13 @@
 #include <filesystem>
 
 int main(int argc, char** argv) {
+    // ADR-2150: the version and the published contracts need no window, GPU, engine or settings file.
+    if (argc > 1 && std::string(argv[1]) == "--version") {
+        return avgen::api::runVersionCommand();
+    }
+    if (argc > 1 && std::string(argv[1]) == "--describe") {
+        return avgen::api::runDescribeCommand(argc, argv);
+    }
     // ADR-1051: the spatial validator has its own arguments and needs no window, GPU or engine.
     if (argc > 1 && std::string(argv[1]) == "--validate-space") {
         return avgen::app::runSpaceValidateCommand(argc, argv);
@@ -105,7 +114,7 @@ int main(int argc, char** argv) {
         return avgen::app::runSonicTraceCommand(options->project.value_or(std::filesystem::path{}), *options->sonicTrace,
                                                 options->fpsGiven ? options->offlineFps : 0.0, options->traceFinals);
     }
-    avgen::log::info("avgen 0.1.0 starting ({} mode)", options->headless ? "headless" : "live");
+    avgen::log::info("{} starting ({} mode)", avgen::api::versionLine(), options->headless ? "headless" : "live");
     // ADR-1803: an exported A/B arm changes the program; say so where every run's log starts.
     if (const std::string env = avgen::core::avgenEnvironmentLine(); !env.empty()) {
         avgen::log::warn("environment overrides: {}", env);

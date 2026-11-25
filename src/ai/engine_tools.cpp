@@ -344,6 +344,19 @@ ToolAnnotations mutatingDestructive() {
     ToolAnnotations a = mutating();
     a.destructive = true;
     a.idempotent = false;
+    a.executionClass = ExecutionClass::Structural;
+    return a;
+}
+
+// ADR-2150: the stated exceptions to the derived execution class, and the session permissions a
+// tool needs. Written where the tool is registered, so the catalogue says what the code does.
+ToolAnnotations as(ToolAnnotations a, ExecutionClass c) {
+    a.executionClass = c;
+    return a;
+}
+
+ToolAnnotations needs(ToolAnnotations a, std::vector<std::string> permissions) {
+    a.permissions = std::move(permissions);
     return a;
 }
 
@@ -391,7 +404,7 @@ void registerCapabilityTools(ToolRegistry& registry) {
             json doc = capabilityDocument(registry, ctx.engine());
             std::size_t unavailable = 0;
             for (const auto& domain : doc.value("domains", json::array())) {
-                if (!domain.value("available", true)) {
+                if (!domain.value("supported", true)) {
                     ++unavailable;
                 }
             }
@@ -399,7 +412,7 @@ void registerCapabilityTools(ToolRegistry& registry) {
             // call that moves it is unsequenced, and it reported zeros for a document that was
             // perfectly correct -- the exact "the report disagrees with reality" failure this API
             // is written against, committed in the API itself.
-            const auto summary = fmt::format("{} domain(s), {} unavailable",
+            const auto summary = fmt::format("{} domain(s), {} not supported by this build",
                                              doc.at("domains").size(), unavailable);
             return ToolResult::ok(std::move(doc), summary);
         });
@@ -515,6 +528,7 @@ void registerProjectTools(ToolRegistry& registry, SnapshotStore& snapshots) {
             ToolAnnotations a = mutating();
             a.destructive = true;
             a.idempotent = false;
+            a.executionClass = ExecutionClass::Structural; // the whole composition is reinstalled
             return a;
         }(),
         [&snapshots](const json& args, ToolContext& ctx) -> ToolResult {
@@ -554,7 +568,7 @@ void registerParameterTools(ToolRegistry& registry) {
     add(registry, "project.list", "List projects",
         "Every project in the projects folder, by name. Use this before opening one rather than "
         "guessing a name.",
-        noArgs(), readOnly(),
+        noArgs(), needs(readOnly(), {"read"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
             if (!ctx.hasProjectsRoot()) {
                 return ToolResult::failure(ToolErrorCode::Unavailable,
@@ -584,7 +598,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "Start a new empty project under this name and save it, so it exists on disk before "
         "anything is built in it. The session is replaced: anything unsaved is lost.",
         schema::object({{"name", schema::string("Project name, used as its folder and file name")}}),
-        sessionWrite(true),
+        needs(sessionWrite(true), {"write"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("name", std::string{});
             if (!safeProjectName(name)) {
@@ -626,7 +640,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "which is when project.create or project.save_as is the tool you want. Reports the path and "
         "confirms it exists afterwards, because a save that silently wrote nothing is the failure "
         "worth catching.",
-        noArgs(), sessionWrite(),
+        noArgs(), needs(sessionWrite(), {"write"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             if (engine.projectPath().empty()) {
@@ -651,7 +665,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "Write the open session to a project of this name and carry on working in it. Use it to "
         "name a session that was never saved, or to fork one.",
         schema::object({{"name", schema::string("Project name, used as its folder and file name")}}),
-        sessionWrite(),
+        needs(sessionWrite(), {"write"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("name", std::string{});
             if (!safeProjectName(name)) {
@@ -682,7 +696,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "warnings, because a project whose scene is missing still 'opens' and the warnings are how "
         "you find out.",
         schema::object({{"name", schema::string("Project name, as reported by project.list")}}),
-        sessionWrite(true),
+        needs(sessionWrite(true), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("name", std::string{});
             if (!safeProjectName(name)) {
@@ -733,7 +747,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "The world recipes this session can reach, by name. A recipe is a seed, an extent, an asset "
         "library and a set of ecology weights; generating one fills a world with what the library "
         "allows. Read this before generating rather than guessing a name.",
-        noArgs(), readOnly(),
+        noArgs(), needs(readOnly(), {"read"}),
         [](const json&, ToolContext& ctx) -> ToolResult {
             json found = json::array();
             std::error_code ec;
@@ -765,7 +779,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "which is the answer worth reading: a recipe whose library has nothing the weights ask for "
         "composes successfully and puts nothing in the world.",
         schema::object({{"recipe", schema::string("Recipe name, as reported by world.list_recipes")}}),
-        mutatingDestructive(),
+        needs(mutatingDestructive(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("recipe", std::string{});
             if (name.empty()) {
@@ -848,7 +862,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "List stable asset IDs visible to this session, including built-in and project-owned assets.",
         schema::object({{"query", schema::string("Optional name, ID or type search")},
                         {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
-        readOnly(),
+        needs(readOnly(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
@@ -867,7 +881,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "Search built-in and project asset metadata by stable ID, name or type.",
         schema::object({{"query", schema::string("Name, ID or type search")},
                         {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
-        readOnly(),
+        needs(readOnly(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string query = args.value("query", std::string{});
             if (query.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "query must not be empty");
@@ -886,7 +900,7 @@ void registerParameterTools(ToolRegistry& registry) {
     add(registry, "asset.get", "Get asset metadata",
         "Resolve one stable asset ID from asset.list or asset.search and return its ownership, type, path and tags.",
         schema::object({{"id", schema::string("Stable asset ID")}}, {"id"}),
-        readOnly(),
+        needs(readOnly(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string id = args.at("id").get<std::string>();
             const auto catalog = assets::catalogAssets(ctx.contentRoots(), ctx.engine().projectPath().parent_path());
@@ -904,7 +918,7 @@ void registerParameterTools(ToolRegistry& registry) {
     add(registry, "asset.import", "Import an asset into the project",
         "Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.",
         schema::object({{"file", schema::string("Path to a reachable model, environment or texture")}}),
-        sessionWrite(),
+        needs(sessionWrite(), {"read", "write"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string given = args.value("file", std::string{});
             if (given.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named");
@@ -1017,7 +1031,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "given is refused, and guessing produces that refusal rather than a file.",
         schema::object({{"kind", schema::string("audio, scene or environment; omit for all")},
                         {"limit", schema::integer("Maximum results (default 40)", 1, kMaxLimit)}}),
-        readOnly(),
+        needs(readOnly(), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string kind = args.value("kind", std::string{});
             const std::size_t limit = limitOf(args);
@@ -1077,7 +1091,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "failure worth catching.",
         schema::object({{"file", schema::string("Path to the audio file, as reported by "
                                                 "asset.list_importable")}}),
-        sessionWrite(),
+        needs(sessionWrite(), {"read", "write"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string given = args.value("file", std::string{});
             if (given.empty()) {
@@ -1156,7 +1170,7 @@ void registerParameterTools(ToolRegistry& registry) {
         schema::object({{"time", schema::number("Seconds from the start of the piece")},
                         {"name", schema::string("What this moment is, e.g. CHORUS")},
                         {"kind", schema::string("section (default) or cue")}}),
-        mutating(),
+        as(mutating(), ExecutionClass::Rebind),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             if (!args.contains("time") || !args.at("time").is_number()) {
                 return ToolResult::failure(ToolErrorCode::InvalidArguments, "a marker needs a time");
@@ -1202,7 +1216,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"start", schema::number("Seconds from the start of the piece")},
                         {"duration", schema::number("Seconds (default 8)")},
                         {"scene", schema::string("Scene slot id; empty inherits the previous shot's")}}),
-        mutating(),
+        as(mutating(), ExecutionClass::Rebind),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string name = args.value("name", std::string{});
             if (name.empty()) {
@@ -1264,7 +1278,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"end", schema::number("Seconds; must be after start")},
                         {"id", schema::string("Stable id; derived from the text when omitted")},
                         {"style", schema::string("A named style the composition owns")}}),
-        mutating(),
+        as(mutating(), ExecutionClass::Rebind),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string text = args.value("text", std::string{});
             if (text.empty()) {
@@ -1396,7 +1410,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"falloff", schema::string("constant, linear, smooth (default) or inverseSquare")},
                         {"tags", schema::array(schema::string("tag"),
                                                "Entity tags or profile names it governs; empty means all")}}),
-        mutating(),
+        as(mutating(), ExecutionClass::Structural),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1615,7 +1629,7 @@ void registerParameterTools(ToolRegistry& registry) {
                         {"position", schema::array(schema::number("metres"), "World position", 3, 3)},
                         {"scale", schema::number("Uniform scale (default 1)")},
                         {"rotationDegrees", schema::array(schema::number("degrees"), "Euler XYZ", 3, 3)}}),
-        mutating(),
+        needs(as(mutating(), ExecutionClass::Structural), {"read"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
@@ -1716,7 +1730,7 @@ void registerParameterTools(ToolRegistry& registry) {
     add(registry, "scene.delete_node", "Delete a node",
         "Remove a node from the scene. Its children go with it, so deleting a group deletes what it "
         "holds -- the count is reported rather than left to be discovered.",
-        schema::object({{"name", schema::string("Node name")}}), mutating(),
+        schema::object({{"name", schema::string("Node name")}}), as(mutating(), ExecutionClass::Structural),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
@@ -1763,7 +1777,7 @@ void registerParameterTools(ToolRegistry& registry) {
         "means and is worth knowing before using it to tidy a scene.",
         schema::object({{"name", schema::string("Node to move")},
                         {"parent", schema::string("New parent; empty moves it to the root")}}),
-        mutating(),
+        as(mutating(), ExecutionClass::Structural),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
@@ -2676,7 +2690,7 @@ void registerSequencerTools(ToolRegistry& registry) {
              {"mode", schema::string("How the track meets the base value",
                                      {"replace", "add", "multiply"})}},
             {"target", "time"}),
-        mutating(),
+        as(mutating(), ExecutionClass::Rebind),
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             const std::string target = args.at("target").get<std::string>();
@@ -2773,6 +2787,7 @@ void registerSequencerTools(ToolRegistry& registry) {
         [] {
             ToolAnnotations a = mutating();
             a.destructive = true;
+            a.executionClass = ExecutionClass::Rebind;
             return a;
         }(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
@@ -3168,7 +3183,7 @@ void registerModulationTools(ToolRegistry& registry) {
                                          {"none", "peakhold", "linearfall"})},
              {"envelopeFallPerSecond", schema::number("How fast the envelope falls", 0.0, 100.0)}},
             {"source", "target"}),
-        mutating(),
+        as(mutating(), ExecutionClass::Rebind),
         [routeJson](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             const std::string source = args.at("source").get<std::string>();
@@ -3269,6 +3284,7 @@ void registerModulationTools(ToolRegistry& registry) {
             ToolAnnotations a = mutating();
             a.destructive = true;
             a.idempotent = false;
+            a.executionClass = ExecutionClass::Rebind;
             return a;
         }(),
         [](const json& args, ToolContext& ctx) -> ToolResult {
@@ -3355,6 +3371,8 @@ void registerPerformanceTools(ToolRegistry& registry) {
     profiles.readOnly = true;   // a scratch copy is profiled; the project is not touched
     profiles.expensive = true;  // a child process renders seconds of the scene
     profiles.idempotent = false;
+    profiles.executionClass = ExecutionClass::Job;
+    profiles.permissions = {"subprocess"};
     add(registry, "performance.profile_scene", "Profile the scene for live performance",
         "Run the live scene profiler (avgen --live-profile) on a scratch copy of the project, in a child process, and "
         "return its record (schema avgen.liveprofile/1): frame statistics against the target's budget, the critical path "
@@ -3441,6 +3459,8 @@ void registerPerformanceTools(ToolRegistry& registry) {
         return schema::object(fields);
     };
     ToolAnnotations optimizes = sessionWrite();
+    optimizes.executionClass = ExecutionClass::Job; // a child process (avgen --live-profile)
+    optimizes.permissions = {"subprocess"};
     optimizes.expensive = true;
     optimizes.idempotent = false;
     add(registry, "performance.optimize_scene", "Optimize the scene for a frame rate",

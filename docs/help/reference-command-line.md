@@ -95,6 +95,15 @@ the audits) opens neither unless `--osc-port`/`--osc-bind` or `--midi` asks.
 `--drop-pinned-overrides` the save leaves out values that only repeat the scene's (what a save before
 ADR-2132 wrote), so scene-file edits reach them again.
 
+## Version and contracts
+
+These need no window, no GPU and no project, and print to stdout.
+
+| Command | Does |
+|---|---|
+| `--version` | one line: engine version, API level, the revision the build came from (with `-dirty` if the tree had uncommitted changes) and the build type |
+| `--describe <what> [--out <dir>]` | the published contracts as JSON: `tools` (the tool catalogue), `errors` (the error codes), `version`, `baseline` (the contract at this API level, for the breaking-change check), or `all`. With `--out` it writes the artefacts under `<dir>` instead: `schemas/tool-catalogue.json`, `docs/api/tools.md`, `docs/api/errors.md` (`tools/gen_api.sh` runs it on the repository) |
+
 ## Environment variables
 
 | Variable | Does |

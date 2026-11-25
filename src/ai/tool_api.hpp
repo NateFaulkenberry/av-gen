@@ -55,6 +55,16 @@ enum class ToolErrorCode : std::uint8_t {
     Internal,
 };
 [[nodiscard]] const char* toolErrorCodeName(ToolErrorCode code);
+// One sentence per code: what it means and what a client should do about it. Published in the
+// error catalogue (`avgen --describe errors`, docs/api/errors.md), so it is written for a client.
+[[nodiscard]] const char* toolErrorCodeMeaning(ToolErrorCode code);
+// Every code, in enum order. The error catalogue and its drift test walk this list; a code added
+// to the enum and not here fails a static_assert in tool_api.cpp.
+inline constexpr ToolErrorCode kAllToolErrorCodes[] = {
+    ToolErrorCode::InvalidArguments, ToolErrorCode::NotFound,    ToolErrorCode::OutOfRange,
+    ToolErrorCode::Unsupported,      ToolErrorCode::Unavailable, ToolErrorCode::Conflict,
+    ToolErrorCode::Cancelled,        ToolErrorCode::Internal,
+};
 
 struct ToolError {
     ToolErrorCode code = ToolErrorCode::Internal;
@@ -78,6 +88,19 @@ struct ToolResult {
 };
 
 // ---- metadata (addendum §5) -------------------------------------------------------------------
+
+// How a call is scheduled, and what a live host lets through (ADR-2150). It is derived from the
+// annotations below unless a tool states it: a read-only tool is `Read`, a project write is
+// `Instant`, a session write is `Session`. The exceptions are stated where the tool is registered:
+// `Rebind` (adds or removes a route, a key, a shot), `Structural` (rebuilds the composition:
+// a node added, removed or re-parented) and `Job` (seconds to minutes: a child process, a render).
+enum class ExecutionClass : std::uint8_t { Read, Instant, Rebind, Structural, Session, Job };
+[[nodiscard]] const char* executionClassName(ExecutionClass c);
+
+// What a session must allow before a tool may run (ADR-2150). A closed vocabulary, checked at
+// registration: "read" (reads a file or folder the caller names, or lists a content root),
+// "write" (writes files), "subprocess" (starts a child process), "gpu" (starts GPU work).
+inline constexpr std::string_view kToolPermissions[] = {"read", "write", "subprocess", "gpu"};
 
 struct ToolAnnotations {
     bool readOnly = false;
@@ -107,7 +130,11 @@ struct ToolAnnotations {
     // twice (the baked tier, ADR-091).
     bool requiresApproval = false;
     bool deterministic = false;
+    // Unset means derived; see ExecutionClass. Set only for the stated exceptions.
+    std::optional<ExecutionClass> executionClass;
+    std::vector<std::string> permissions; // from kToolPermissions; empty: none beyond calling
 
+    [[nodiscard]] ExecutionClass effectiveExecutionClass() const;
     [[nodiscard]] nlohmann::json toJson() const;
 };
 
@@ -118,6 +145,9 @@ struct ToolDefinition {
     nlohmann::json inputSchema = nlohmann::json::object();
     nlohmann::json outputSchema;                          // null when unspecified
     ToolAnnotations annotations;
+    // The API level at which this tool's current contract appeared (ADR-2150). A breaking change
+    // to a tool bumps the API level (avgen::api::kApiLevel) and sets this to it.
+    int since = 1;
 
     // The domain the name lives in ("parameter", "scene", "sequencer", ...).
     [[nodiscard]] std::string domain() const;

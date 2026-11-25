@@ -1,6 +1,7 @@
 #include "app/live_audio_policy.hpp"
 #include "audio/synthetic_capture.hpp"
 #include "app/application.hpp"
+#include "api/version.hpp"
 #include "control/midi_rig.hpp"
 #include "control/osc.hpp"
 
@@ -215,6 +216,9 @@ std::string usageText() {
            "                      synth, vocal, other; e.g. drums@2:drums: channel 2 as stem.drums.*)\n"
            "  --input-meter <device> [s]  every input channel's peak once a second for s seconds (default\n"
            "                      20), through the multichannel capture path; device = id or name\n"
+           "  --version           engine version, API level and build revision, then exit (no GPU)\n"
+           "  --describe <what> [--out <dir>]  the published contracts as JSON: tools, errors, version,\n"
+           "                      baseline or all; --out writes schemas/ and docs/api/ under <dir> (no GPU)\n"
            "  --labs                              the Engineering Lab Suite: what each lab owns,\n"
            "                                      what it does not, and where its decision is made\n"
            "  --lab-case <lab>:<n>                open a lab case: its fixture, second, size, tier,\n"
@@ -1552,7 +1556,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
 
     if (!options.headless) {
         platform::WindowDesc wdesc;
-        wdesc.title = "avgen 0.2";
+        wdesc.title = "avgen " + std::string(api::kEngineVersion);
         wdesc.width = options.width;
         wdesc.height = options.height;
         // The world is the canvas, and a canvas the size of a dialogue box is not one. An explicit
@@ -1720,7 +1724,7 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
         // renderer (ADR-1562); from here on a pipeline wait only keeps the window responsive.
         const std::filesystem::path prefs = platform::preferencesDirectory();
         gpu::setPipelineWaitHook([](const gpu::PipelineCompileProgress&) { platform::Window::pumpSystemEvents(); });
-        window_->setTitle("avgen 0.2"); // the compiling screen's title (ADR-1562) back to the window's own
+        window_->setTitle("avgen " + std::string(api::kEngineVersion)); // the compiling screen's title (ADR-1562) back to the window's own
         if (bootQuitRequested_) {
             return fail("quit while the shaders were compiling");
         }
@@ -2681,7 +2685,7 @@ void Application::loadAudio(const std::filesystem::path& path) {
         panel_->setStatus({});
     }
     if (window_) {
-        window_->setTitle("avgen 0.1 - " + path.filename().string());
+        window_->setTitle("avgen " + std::string(api::kEngineVersion) + " - " + path.filename().string());
     }
 }
 
@@ -2966,7 +2970,7 @@ void Application::refreshWindowTitle() {
     if (window_ == nullptr) {
         return;
     }
-    std::string title = "avgen " + std::string(app::Engine::kAppVersion) + " - ";
+    std::string title = "avgen " + std::string(api::kEngineVersion) + " - ";
     title += engine_->projectPath().empty() ? std::string("Untitled")
                                             : engine_->projectPath().filename().string();
     if (engine_->projectDirtyCached()) {
@@ -8141,7 +8145,7 @@ void Application::drawCompilingScreen(const gpu::PipelineCompileProgress& progre
         bootScreenStart_ = now;
     }
     const double seconds = std::chrono::duration<double>(now - bootScreenStart_).count();
-    window_->setTitle(fmt::format("avgen 0.2 -- compiling shaders ({} compiled)", progress.landed));
+    window_->setTitle(fmt::format("avgen {} -- compiling shaders ({} compiled)", api::kEngineVersion, progress.landed));
     auto view = context_->acquireSurfaceView();
     if (!view) {
         return;

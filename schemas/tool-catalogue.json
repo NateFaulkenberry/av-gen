@@ -1,0 +1,3437 @@
+{
+  "api": 1,
+  "engine": "0.3.0",
+  "format": "avgen-tool-catalogue",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The capability registry: every engine domain, whether it is reachable from here, what this particular session actually contains, and -- importantly -- the domains that are NOT exposed and why. Call this before planning anything ambitious; it will save you from trying to do something this build cannot do.",
+      "domain": "capability",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "capability_list",
+      "name": "capability.list",
+      "since": 1,
+      "title": "What AV Gen supports"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "List every operation this build of AV Gen exposes, with a one-line description. Call this when a tool name is rejected, or to discover what is available before planning.",
+      "domain": "capability",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "description": "Only tools in this namespace, e.g. 'parameter'",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "capability_list_tools",
+      "name": "capability.list_tools",
+      "since": 1,
+      "title": "List tools"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "High-level state of the open project: file, scene, audio, transport, and how much of each kind of thing exists. Start here; it is cheap and it tells you what to ask about next.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "project_get_state",
+      "name": "project.get_state",
+      "since": 1,
+      "title": "Project state"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Capture a restorable snapshot of the parameter domain (parameter values, modulation routes, presets and the timeline). Take one before substantial work. The AI task wrapper already takes one automatically; this is for a checkpoint inside a long task.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "description": "Why this point is being kept",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "project_create_snapshot",
+      "name": "project.create_snapshot",
+      "since": 1,
+      "title": "Create rollback point"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The snapshots taken this session, oldest first.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "project_list_snapshots",
+      "name": "project.list_snapshots",
+      "since": 1,
+      "title": "List rollback points"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "deterministic": false,
+        "executionClass": "structural",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Put the parameter domain back to a snapshot. Everything changed since is discarded.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Snapshot id from project.create_snapshot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "project_restore_snapshot",
+      "name": "project.restore_snapshot",
+      "since": 1,
+      "title": "Restore rollback point"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Every project in the projects folder, by name. Use this before opening one rather than guessing a name.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "project_list",
+      "name": "project.list",
+      "since": 1,
+      "title": "List projects"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "write"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Start a new empty project under this name and save it, so it exists on disk before anything is built in it. The session is replaced: anything unsaved is lost.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Project name, used as its folder and file name",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "project_create",
+      "name": "project.create",
+      "since": 1,
+      "title": "Create a project"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "write"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Write the open project back to its own file. Fails when the session has never been saved, which is when project.create or project.save_as is the tool you want. Reports the path and confirms it exists afterwards, because a save that silently wrote nothing is the failure worth catching.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "project_save",
+      "name": "project.save",
+      "since": 1,
+      "title": "Save the project"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "write"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Write the open session to a project of this name and carry on working in it. Use it to name a session that was never saved, or to fork one.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Project name, used as its folder and file name",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "project_save_as",
+      "name": "project.save_as",
+      "since": 1,
+      "title": "Save the project under a name"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Load a project by name, replacing the session. Anything unsaved is lost. Reports what came back -- parameters, routes, tracks, whether audio and a scene resolved -- and any load warnings, because a project whose scene is missing still 'opens' and the warnings are how you find out.",
+      "domain": "project",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Project name, as reported by project.list",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "project_open",
+      "name": "project.open",
+      "since": 1,
+      "title": "Open a project"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The world recipes this session can reach, by name. A recipe is a seed, an extent, an asset library and a set of ecology weights; generating one fills a world with what the library allows. Read this before generating rather than guessing a name.",
+      "domain": "world",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "world_list_recipes",
+      "name": "world.list_recipes",
+      "since": 1,
+      "title": "List world recipes"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "deterministic": false,
+        "executionClass": "structural",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Compose a world from a recipe and install it into the scene, replacing whatever ecology the terrain had. This is the same path as the Generate World button. Reports what was placed, which is the answer worth reading: a recipe whose library has nothing the weights ask for composes successfully and puts nothing in the world.",
+      "domain": "world",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "recipe": {
+            "description": "Recipe name, as reported by world.list_recipes",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "world_generate",
+      "name": "world.generate",
+      "since": 1,
+      "title": "Generate a world"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "List stable asset IDs visible to this session, including built-in and project-owned assets.",
+      "domain": "asset",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Maximum results (default 100)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Optional name, ID or type search",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "asset_list",
+      "name": "asset.list",
+      "since": 1,
+      "title": "List available assets"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Search built-in and project asset metadata by stable ID, name or type.",
+      "domain": "asset",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Maximum results (default 100)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Name, ID or type search",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "asset_search",
+      "name": "asset.search",
+      "since": 1,
+      "title": "Search available assets"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Resolve one stable asset ID from asset.list or asset.search and return its ownership, type, path and tags.",
+      "domain": "asset",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Stable asset ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "asset_get",
+      "name": "asset.get",
+      "since": 1,
+      "title": "Get asset metadata"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "read",
+          "write"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.",
+      "domain": "asset",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "description": "Path to a reachable model, environment or texture",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "asset_import",
+      "name": "asset.import",
+      "since": 1,
+      "title": "Import an asset into the project"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Audio, glTF scenes and HDR environments the session can reach, by path. Use this to find a file rather than guessing where it lives -- a path outside the folders this session was given is refused, and guessing produces that refusal rather than a file.",
+      "domain": "asset",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "audio, scene or environment; omit for all",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results (default 40)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "asset_list_importable",
+      "name": "asset.list_importable",
+      "since": 1,
+      "title": "List importable media"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "read",
+          "write"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Copy an audio file into the open project and make it the session's track, then analyze it. Copied rather than referenced on purpose: a project that points at a file on somebody's desktop stops working the day that file moves, and the project format stores a relative path and a hash precisely so it does not have to. Reports the duration, rate and channel count read back from the decoder, because an import that silently decoded nothing is the failure worth catching.",
+      "domain": "asset",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "file": {
+            "description": "Path to the audio file, as reported by asset.list_importable",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "asset_import_audio",
+      "name": "asset.import_audio",
+      "since": 1,
+      "title": "Import audio"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Put a section or cue marker on the piece. Sections are the song's structure -- INTRO, VERSE, CHORUS -- and are what a shot is placed against; cues are a point an author wants to find again. Beat markers are not authored here: they come from the analysis.",
+      "domain": "sequence",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "section (default) or cue",
+            "type": "string"
+          },
+          "name": {
+            "description": "What this moment is, e.g. CHORUS",
+            "type": "string"
+          },
+          "time": {
+            "description": "Seconds from the start of the piece",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "sequence_add_marker",
+      "name": "sequence.add_marker",
+      "since": 1,
+      "title": "Add a marker"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Add a shot to the piece: a span of time with one visual setup. `scene` names a scene slot the sequence already has; leaving it empty inherits the previous shot's. The camera is left to inherit unless a preset is named, because a shot with no camera holds the last one, which is what a cut between two angles of the same setup means.",
+      "domain": "sequence",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "duration": {
+            "description": "Seconds (default 8)",
+            "type": "number"
+          },
+          "name": {
+            "description": "Shot name",
+            "type": "string"
+          },
+          "scene": {
+            "description": "Scene slot id; empty inherits the previous shot's",
+            "type": "string"
+          },
+          "start": {
+            "description": "Seconds from the start of the piece",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "sequence_add_shot",
+      "name": "sequence.add_shot",
+      "since": 1,
+      "title": "Add a shot"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Put timed text over the frame -- a title, a lyric line, a placeholder to fill in later. This is the 2D composition layer system (ADR-083) reached through the sequence, so the text is an overlay cue that becomes a real layer on install, editable afterwards like any other.",
+      "domain": "sequence",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "description": "Seconds; must be after start",
+            "type": "number"
+          },
+          "id": {
+            "description": "Stable id; derived from the text when omitted",
+            "type": "string"
+          },
+          "start": {
+            "description": "Seconds from the start of the piece",
+            "type": "number"
+          },
+          "style": {
+            "description": "A named style the composition owns",
+            "type": "string"
+          },
+          "text": {
+            "description": "The line to show",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "sequence_add_overlay",
+      "name": "sequence.add_overlay",
+      "since": 1,
+      "title": "Add a text overlay"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The entities in the scene: what each one drives, the behaviours it runs, how many reactions it carries, and the profile it was built from. Reactions are what a music field scales, so an entity with none is one a field cannot affect.",
+      "domain": "entity",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "entity_list",
+      "name": "entity.list",
+      "since": 1,
+      "title": "List entities"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The fields in the scene and what each resolved to: where it is, how far it reaches, which entities it governs, and -- the part worth reading -- whether it follows something baked or something live. A field on a baked actor is a pure function of time and survives a scrub exactly; one on a live entity does not (ADR-091).",
+      "domain": "field",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "field_list",
+      "name": "field.list",
+      "since": 1,
+      "title": "List music influence fields"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "structural",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Put a music influence field in the scene. It scales the depth of the reactions its governed entities already have, so the same `audio.bass -> emissiveGain` an author wrote becomes spatial: full strength at the centre, nothing at the edge, smooth between. Give it a `source` to make it follow a node or entity -- a character carrying the music with them -- and `tags` to say which entities it governs.",
+      "domain": "field",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "center": {
+            "description": "World position when it follows nothing",
+            "items": {
+              "description": "metres",
+              "type": "number"
+            },
+            "type": "array"
+          },
+          "falloff": {
+            "description": "constant, linear, smooth (default) or inverseSquare",
+            "type": "string"
+          },
+          "floorGain": {
+            "description": "Gain outside the volume (default 0)",
+            "type": "number"
+          },
+          "name": {
+            "description": "Field name",
+            "type": "string"
+          },
+          "radius": {
+            "description": "Reach in metres (default 12)",
+            "type": "number"
+          },
+          "source": {
+            "description": "Node or entity whose position it follows; omit to pin it at `center`",
+            "type": "string"
+          },
+          "strength": {
+            "description": "Gain at full influence (default 1)",
+            "type": "number"
+          },
+          "tags": {
+            "description": "Entity tags or profile names it governs; empty means all",
+            "items": {
+              "description": "tag",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "field_create",
+      "name": "field.create",
+      "since": 1,
+      "title": "Create a music influence field"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "What the camera can currently see, as numbers: which nodes fall inside the frustum, where each sits in the frame, and how much of the height it fills. Use it to check a shot frames its subject before trusting that it does -- a camera pointed at nothing reports nothing rather than looking fine. It reads the camera the last frame used, the same as camera.get, so after moving the camera let a frame happen before asking what it sees.",
+      "domain": "render",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "aspect": {
+            "description": "Frame aspect ratio (default 16:9)",
+            "type": "number"
+          },
+          "limit": {
+            "description": "Maximum nodes reported (default 40)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "node": {
+            "description": "Ask about one node; omit for everything visible",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "render_probe",
+      "name": "render.probe",
+      "since": 1,
+      "title": "Look at the frame"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "structural",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [
+          "read"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Put an object in the scene: a glTF asset by file, or an empty Group to parent things to. The asset path is resolved against the folders this session may read, so a model that is not reachable is refused here rather than becoming a node that renders nothing.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "asset": {
+            "description": "Path to the .gltf/.glb, for kind gltf",
+            "type": "string"
+          },
+          "kind": {
+            "description": "gltf (default) or group",
+            "type": "string"
+          },
+          "name": {
+            "description": "Node name; must not already exist",
+            "type": "string"
+          },
+          "parent": {
+            "description": "Parent node name; omit for the root",
+            "type": "string"
+          },
+          "position": {
+            "description": "World position",
+            "items": {
+              "description": "metres",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "rotationDegrees": {
+            "description": "Euler XYZ",
+            "items": {
+              "description": "degrees",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "scale": {
+            "description": "Uniform scale (default 1)",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "scene_create_node",
+      "name": "scene.create_node",
+      "since": 1,
+      "title": "Create a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "structural",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Remove a node from the scene. Its children go with it, so deleting a group deletes what it holds -- the count is reported rather than left to be discovered.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Node name",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "scene_delete_node",
+      "name": "scene.delete_node",
+      "since": 1,
+      "title": "Delete a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "structural",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Move a node under another, or to the root. The node keeps its own local transform, so it moves with its new parent rather than staying where it looked -- which is what parenting means and is worth knowing before using it to tidy a scene.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Node to move",
+            "type": "string"
+          },
+          "parent": {
+            "description": "New parent; empty moves it to the root",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "scene_set_parent",
+      "name": "scene.set_parent",
+      "since": 1,
+      "title": "Re-parent a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The top-level parameter groups in this scene and how many parameters each holds. The cheapest way to orient yourself before searching: groups are things like 'camera', 'env', 'scene', 'nodes', 'procedural', 'post', 'layers'.",
+      "domain": "parameter",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "parameter_list_groups",
+      "name": "parameter.list_groups",
+      "since": 1,
+      "title": "Parameter groups"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Find parameters by a fragment of their path or label. This is the primary way to discover what a scene actually exposes -- node transforms, sky and sun, fog, wind, camera, post, material emission. Results carry canonical paths; never guess a path.",
+      "domain": "parameter",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "description": "Restrict to one group",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results (default 40, max 200)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "modulatableOnly": {
+            "description": "Only parameters that can be a modulation target",
+            "type": "boolean"
+          },
+          "offset": {
+            "description": "Skip this many results",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Case-insensitive fragment, e.g. 'emissive', 'sky', 'fog'",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "parameter_search",
+      "name": "parameter.search",
+      "since": 1,
+      "title": "Search parameters"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Full metadata for named parameters: current base value, the modulated value in effect this frame, default, hard and soft ranges, group and whether it can be modulated. Read before writing -- ranges here are what a set will be clamped to.",
+      "domain": "parameter",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "paths": {
+            "description": "Canonical parameter paths",
+            "items": {
+              "description": "Parameter path",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "type": "object"
+      },
+      "mcpName": "parameter_get",
+      "name": "parameter.get",
+      "since": 1,
+      "title": "Get parameters"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Set a parameter's base value. Accepts a number for a scalar, or an array with one entry per component for a vector or colour. Values outside the parameter's hard range are clamped and the result says so. If a timeline track or a modulation route is overwriting this value every frame, the result says that too -- a set that is silently overridden looks exactly like a set that worked.",
+      "domain": "parameter",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "description": "Write only this component (0-based). Omit to write all.",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Canonical parameter path",
+            "type": "string"
+          },
+          "value": {
+            "description": "Number, boolean, or array of numbers"
+          }
+        },
+        "required": [
+          "path",
+          "value"
+        ],
+        "type": "object"
+      },
+      "mcpName": "parameter_set",
+      "name": "parameter.set",
+      "since": 1,
+      "title": "Set a parameter"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Put a parameter back to the value the scene declared as its default.",
+      "domain": "parameter",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "description": "Canonical parameter path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpName": "parameter_reset",
+      "name": "parameter.reset",
+      "since": 1,
+      "title": "Reset a parameter"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "What is in the scene: the node list with kinds, the light count, the camera, the bounds, and the counts of meshes, entities, particles and procedural objects. Deliberately a summary -- use scene.find_nodes and scene.get_node for detail rather than asking for everything.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "scene_get_summary",
+      "name": "scene.get_summary",
+      "since": 1,
+      "title": "Scene summary"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Find composition nodes by a fragment of their name or by kind. Returns canonical node names and each node's parameter prefix, which is what every other tool wants.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "Restrict to one node kind",
+            "enum": [
+              "gltf",
+              "orb",
+              "grid",
+              "particles",
+              "scene",
+              "procedural",
+              "field",
+              "spline",
+              "sdf",
+              "terrain"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum results",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Case-insensitive name fragment",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "scene_find_nodes",
+      "name": "scene.find_nodes",
+      "since": 1,
+      "title": "Find nodes"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Everything about one node: transform, visibility, emissive boost, roughness scale, asset, and the parameter paths that drive it.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Node name from scene.find_nodes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "mcpName": "scene_get_node",
+      "name": "scene.get_node",
+      "since": 1,
+      "title": "Get a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Set a node's position, rotation (Euler degrees) or scale. Any field may be omitted to leave it alone. This writes the node's transform parameters, so it keyframes, modulates and saves like every other value.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Node name",
+            "type": "string"
+          },
+          "position": {
+            "description": "World position",
+            "items": {
+              "description": "metres",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "rotation": {
+            "description": "Euler XYZ",
+            "items": {
+              "description": "degrees",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "scale": {
+            "description": "Per-axis scale",
+            "items": {
+              "description": "factor",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "mcpName": "scene_set_node_transform",
+      "name": "scene.set_node_transform",
+      "since": 1,
+      "title": "Move a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Set a node's visibility. On a nested scene node this propagates through the whole subtree.",
+      "domain": "scene",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Node name",
+            "type": "string"
+          },
+          "visible": {
+            "description": "Whether the node is drawn",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "visible"
+        ],
+        "type": "object"
+      },
+      "mcpName": "scene_set_node_visible",
+      "name": "scene.set_node_visible",
+      "since": 1,
+      "title": "Show or hide a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The camera's pose, mode, field of view, and the lens, exposure and focus settings that are exposed as parameters. Read this before moving the camera: in orbit mode the position and target parameters are ignored, and the mode is part of the answer.",
+      "domain": "camera",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "camera_get",
+      "name": "camera.get",
+      "since": 1,
+      "title": "Camera state"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Place the camera. Position and target are world-space metres; fovDegrees is the vertical field of view. The camera must be in free mode for an explicit pose to have any effect, so this switches it there and tells you it did. Pass mode explicitly to override.",
+      "domain": "camera",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fovDegrees": {
+            "description": "Vertical field of view",
+            "maximum": 120.0,
+            "minimum": 5.0,
+            "type": "number"
+          },
+          "mode": {
+            "description": "Camera mode",
+            "enum": [
+              "orbit",
+              "free",
+              "spline"
+            ],
+            "type": "string"
+          },
+          "position": {
+            "description": "Eye position",
+            "items": {
+              "description": "metres",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "target": {
+            "description": "Look-at point",
+            "items": {
+              "description": "metres",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "camera_set",
+      "name": "camera.set",
+      "since": 1,
+      "title": "Move the camera"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Point the camera at a node and stand far enough back to fit it in shot. Computes the distance from the node's own world bounds and the current field of view, so it is a framing decision rather than a guessed coordinate. 'margin' widens the shot: 1.0 fits exactly, 1.5 leaves room around the subject.",
+      "domain": "camera",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "azimuthDegrees": {
+            "description": "Compass angle around the subject",
+            "maximum": 360.0,
+            "minimum": -360.0,
+            "type": "number"
+          },
+          "elevationDegrees": {
+            "description": "How far above the subject to place the camera",
+            "maximum": 80.0,
+            "minimum": -80.0,
+            "type": "number"
+          },
+          "margin": {
+            "description": "Headroom factor (default 1.4)",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "type": "number"
+          },
+          "name": {
+            "description": "Node name from scene.find_nodes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "mcpName": "camera_frame_node",
+      "name": "camera.frame_node",
+      "since": 1,
+      "title": "Frame a node"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Sky, sun, fog, volumetrics, wind and ambient brightness, as the parameters that drive them. Anything absent is absent from this scene, not zero.",
+      "domain": "environment",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "environment_get",
+      "name": "environment.get",
+      "since": 1,
+      "title": "Environment state"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Set several environment parameters at once, which is how an atmosphere is actually changed -- fog, sun and sky colour move together or the result looks wrong. Each entry is a parameter path from environment.get and its new value. Unknown paths are reported rather than ignored.",
+      "domain": "environment",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "description": "path -> value",
+            "type": "object"
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "type": "object"
+      },
+      "mcpName": "environment_set",
+      "name": "environment.set",
+      "since": 1,
+      "title": "Set environment values"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Every light in the flattened scene, with the parameter paths that control it. A light that came in with a glTF node is scaled and tinted by that node's lightIntensity and lightColor; rig lights are driven by lightrig/*; ecology lights are derived and are not editable.",
+      "domain": "lighting",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "lighting_list",
+      "name": "lighting.list",
+      "since": 1,
+      "title": "List lights"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The material parameters this scene exposes: per-node emissive boost and roughness scale, and for procedural nodes the per-part tint, emissive colour, emissive gain, roughness and opacity; for procedural nodes and SDF objects also material/thinFilm/* (oxide thickness in nm, 0 = off: about 25 straw, 48 bronze, 55 purple, 65 blue at ior 2.4) and material/anisotropy/* (strength -1..1, 0 = off; rotation in radians) (ADR-1143). Emissive colour is HDR -- values well above 1 are correct and are what makes something glow.",
+      "domain": "material",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "Maximum results",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "node": {
+            "description": "Restrict to one node",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "material_list",
+      "name": "material.list",
+      "since": 1,
+      "title": "List material controls"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The timeline: its tracks and what each one drives, its cues, the playhead in seconds and beats, the tempo, and -- important -- any track whose target parameter does not exist. An unbound track is animation that silently does nothing, so it is always reported.",
+      "domain": "sequencer",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "sequencer_get_state",
+      "name": "sequencer.get_state",
+      "since": 1,
+      "title": "Timeline state"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Key a parameter at a time, creating the track if it does not exist. Times are seconds by default, or beats -- use beats when the move has to land on the music, and read the tempo from sequencer.get_state rather than converting by hand. The target parameter must already exist: a track naming an unknown parameter animates nothing, so this refuses it.",
+      "domain": "sequencer",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "description": "Key only this component (0-based)",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "interp": {
+            "description": "Interpolation leaving this key",
+            "enum": [
+              "step",
+              "linear",
+              "smooth",
+              "easein",
+              "easeout",
+              "easeinout",
+              "bezier"
+            ],
+            "type": "string"
+          },
+          "mode": {
+            "description": "How the track meets the base value",
+            "enum": [
+              "replace",
+              "add",
+              "multiply"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "description": "Parameter path to animate",
+            "type": "string"
+          },
+          "time": {
+            "description": "Key time, in the chosen time base",
+            "type": "number"
+          },
+          "timeBase": {
+            "description": "Clock for 'time'",
+            "enum": [
+              "seconds",
+              "beats"
+            ],
+            "type": "string"
+          },
+          "value": {
+            "description": "Number or array; omit to key the current value"
+          }
+        },
+        "required": [
+          "target",
+          "time"
+        ],
+        "type": "object"
+      },
+      "mcpName": "sequencer_add_keyframe",
+      "name": "sequencer.add_keyframe",
+      "since": 1,
+      "title": "Add a keyframe"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Delete a timeline track and every key on it.",
+      "domain": "sequencer",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "description": "Which component's track",
+            "maximum": 3.0,
+            "minimum": -1.0,
+            "type": "integer"
+          },
+          "target": {
+            "description": "Parameter path the track drives",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "type": "object"
+      },
+      "mcpName": "sequencer_remove_track",
+      "name": "sequencer.remove_track",
+      "since": 1,
+      "title": "Remove a track"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Seek the transport to a time in seconds. Use this to look at a moment in the piece before or after changing it.",
+      "domain": "sequencer",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "seconds": {
+            "description": "Position, in seconds",
+            "minimum": 0.0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "seconds"
+        ],
+        "type": "object"
+      },
+      "mcpName": "sequencer_set_playhead",
+      "name": "sequencer.set_playhead",
+      "since": 1,
+      "title": "Move the playhead"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The music video itself: its shots and when each one cuts, the scenes they cut between, the actors and the animation clips they play, the text overlays, and the section markers of the song. Also the music's own shape -- tempo, how many beats were detected, and the beats themselves around a moment you name. This is what to read before placing or judging a shot; `sequencer.get_state` reports the baked tracks, not the piece.",
+      "domain": "sequence",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "beatWindow": {
+            "description": "Half-width in seconds around `beatsAround` (default 4)",
+            "type": "number"
+          },
+          "beatsAround": {
+            "description": "Return the individual beat times near this second. Omit for the summary alone, which is usually enough.",
+            "type": "number"
+          },
+          "limit": {
+            "description": "Maximum shots, actors and overlays each (default 40)",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "sequence_get_state",
+      "name": "sequence.get_state",
+      "since": 1,
+      "title": "Cinematic sequence"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "What the analyzer currently hears: loudness, the five frequency bands (auto-gained, and as long-term levels), spectral centroid, a loudness-independent energy, the onset rate, stereo width, the onset and its register, tempo and beat position in musical time (which beat of which bar), plus when each musical event (beat, downbeat, build, break, drop, impact) last fired. This is the state audio-reactive work is built on.",
+      "domain": "audio",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "audio_get_analysis",
+      "name": "audio.get_analysis",
+      "since": 1,
+      "title": "Audio analysis"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Every named control signal on the bus and its current value: audio bands, tempo, beat phase, musical events, time, MIDI/OSC control channels and any LFO or macro sources. These are the sources a modulation route can be built from -- use the exact names here.",
+      "domain": "signal",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "eventsOnly": {
+            "description": "Only momentary event signals",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum results",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Case-insensitive fragment of a name or label, e.g. 'bass', 'kick'",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "signal_list",
+      "name": "signal.list",
+      "since": 1,
+      "title": "List signals"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Every modulation route: which signal drives which parameter, how hard, with what operation, and whether it is actually bound. An unbound route is a connection that does nothing, so check that field.",
+      "domain": "modulation",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "description": "Only routes from this signal",
+            "type": "string"
+          },
+          "target": {
+            "description": "Only routes aimed at this parameter path",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "modulation_list",
+      "name": "modulation.list",
+      "since": 1,
+      "title": "List modulation routes"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Connect a signal to a parameter so it moves with the music. 'amount' is the depth and may be negative to invert. 'op' says how it meets the parameter's value: add is the usual choice, multiply scales it, replace overwrites it. Use attackMs/decayMs to smooth a jumpy source, and an envelope to turn a momentary event such as music.drop into something that decays rather than flashing for one frame. The route is bound immediately and the result says whether it resolved.",
+      "domain": "modulation",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "description": "Depth; negative inverts",
+            "maximum": 8.0,
+            "minimum": -8.0,
+            "type": "number"
+          },
+          "attackMs": {
+            "description": "Rise smoothing, milliseconds",
+            "maximum": 60000.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "component": {
+            "description": "Drive only this component (0-based)",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "decayMs": {
+            "description": "Fall smoothing, milliseconds",
+            "maximum": 60000.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "envelope": {
+            "description": "Turn an event into a falling envelope",
+            "enum": [
+              "none",
+              "peakhold",
+              "linearfall"
+            ],
+            "type": "string"
+          },
+          "envelopeFallPerSecond": {
+            "description": "How fast the envelope falls",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "op": {
+            "description": "How it combines",
+            "enum": [
+              "add",
+              "multiply",
+              "replace",
+              "min",
+              "max"
+            ],
+            "type": "string"
+          },
+          "polarity": {
+            "description": "Bipolar maps 0..1 to -1..1 first",
+            "enum": [
+              "unipolar",
+              "bipolar"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Signal name from signal.list, e.g. 'audio.bass'",
+            "type": "string"
+          },
+          "target": {
+            "description": "Parameter path from parameter.search",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "type": "object"
+      },
+      "mcpName": "modulation_create",
+      "name": "modulation.create",
+      "since": 1,
+      "title": "Create a modulation route"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "instant",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Change how hard an existing modulation route drives its target.",
+      "domain": "modulation",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "description": "New depth",
+            "maximum": 8.0,
+            "minimum": -8.0,
+            "type": "number"
+          },
+          "enabled": {
+            "description": "Turn the route on or off",
+            "type": "boolean"
+          },
+          "index": {
+            "description": "Route index from modulation.list",
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "type": "object"
+      },
+      "mcpName": "modulation_set_depth",
+      "name": "modulation.set_depth",
+      "since": 1,
+      "title": "Change a route's depth"
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "deterministic": false,
+        "executionClass": "rebind",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": true,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": true
+      },
+      "description": "Delete a modulation route by index. Indices shift afterwards, so re-read modulation.list before removing another.",
+      "domain": "modulation",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "index": {
+            "description": "Route index from modulation.list",
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "type": "object"
+      },
+      "mcpName": "modulation_remove",
+      "name": "modulation.remove",
+      "since": 1,
+      "title": "Remove a modulation route"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Frame cost and what it is spent on: frame time, GPU time where the device can measure it, draw calls, triangles, visible and culled instances, light count and per-pass GPU time. Read this before and after any change made under a frame-rate constraint. If no renderer is attached to this session the result says so rather than reporting zeros.",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "performance_get_stats",
+      "name": "performance.get_stats",
+      "since": 1,
+      "title": "Performance"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "subprocess"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Run the live scene profiler (avgen --live-profile) on a scratch copy of the project, in a child process, and return its record (schema avgen.liveprofile/1): frame statistics against the target's budget, the critical path (GPU, CPU or sync), GPU time by category, CPU time by stage, resources, and optimization candidates with ESTIMATED savings (and MEASURED ones when verifyCandidates > 0). Headless by default (deterministic, no present); \"live\" opens windows and measures the real loop. Seconds to minutes. The editor keeps rendering meanwhile, so the GPU is shared and the numbers are contended: for numbers to quote, run the command with the editor closed.",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deep": {
+            "description": "the deep mode: 5 s warm-up cap and 20 s measured (default false)",
+            "type": "boolean"
+          },
+          "height": {
+            "description": "the output height in pixels (default 1080)",
+            "maximum": 4320.0,
+            "minimum": 16.0,
+            "type": "integer"
+          },
+          "mode": {
+            "description": "headless (default) or live",
+            "enum": [
+              "headless",
+              "live"
+            ],
+            "type": "string"
+          },
+          "quality": {
+            "description": "auto, a level (ultra..emergency) or a profile (quality, balanced, performance); default auto",
+            "type": "string"
+          },
+          "start": {
+            "description": "seconds into the piece to measure from (default 0)",
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "targetFps": {
+            "description": "the live target, 24..240 (default 60)",
+            "maximum": 240.0,
+            "minimum": 24.0,
+            "type": "number"
+          },
+          "verifyCandidates": {
+            "description": "measure the top N candidates' savings by A/B (0-8)",
+            "maximum": 8.0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "width": {
+            "description": "the output width in pixels (default 1920)",
+            "maximum": 7680.0,
+            "minimum": 16.0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "performance_profile_scene",
+      "name": "performance.profile_scene",
+      "since": 1,
+      "title": "Profile the scene for live performance"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "subprocess"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Search lever combinations (avgen --live-profile --optimize, headless, on a scratch copy) for the least MEASURED visual change that reaches the target (budget x 0.9). Every single lever is measured for time (A/B) and picture (ORIGINAL vs OPTIMIZED: pixel, SSIM, edge, luminance incl. matched, temporal, inside the hero boxes); combinations are ESTIMATED from the singles and then MEASURED. Heroes are never degraded by default. With apply=true the chosen levers are added to the project's live ceilings when the answer arrives (never the scene; performance.set_live_quality clearOverrides undoes it). Minutes. The editor shares the GPU meanwhile.",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "apply": {
+            "description": "add the chosen levers to the project's ceilings (default false)",
+            "type": "boolean"
+          },
+          "critic": {
+            "description": "also ask the Creative Critic (optional; unavailable is reported, not an error)",
+            "type": "boolean"
+          },
+          "height": {
+            "description": "the output height in pixels (default 1080)",
+            "maximum": 4320.0,
+            "minimum": 16.0,
+            "type": "integer"
+          },
+          "heroPolicy": {
+            "description": "protect (default): no lever that degrades a hero; strict: no image-wide lever either",
+            "enum": [
+              "protect",
+              "strict"
+            ],
+            "type": "string"
+          },
+          "maxRisk": {
+            "description": "the riskiest lever tried (default medium)",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "type": "string"
+          },
+          "quality": {
+            "description": "the level or profile the search starts from (default ultra)",
+            "type": "string"
+          },
+          "start": {
+            "description": "seconds into the piece to measure from (default 0)",
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "targetFps": {
+            "description": "the live target, 24..240 (default 60)",
+            "maximum": 240.0,
+            "minimum": 24.0,
+            "type": "number"
+          },
+          "width": {
+            "description": "the output width in pixels (default 1920)",
+            "maximum": 7680.0,
+            "minimum": 16.0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "performance_optimize_scene",
+      "name": "performance.optimize_scene",
+      "since": 1,
+      "title": "Optimize the scene for a frame rate"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "subprocess"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Measure every low-risk, hero-safe lever on a scratch copy (time by A/B, picture by the Quality Lab) and add to the project's live ceilings only those with a saving outside the noise. Never edits the scene; heroes exempt. The answer lists what was applied with its measured saving and visual change. Minutes.",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "critic": {
+            "description": "also ask the Creative Critic (optional; unavailable is reported, not an error)",
+            "type": "boolean"
+          },
+          "height": {
+            "description": "the output height in pixels (default 1080)",
+            "maximum": 4320.0,
+            "minimum": 16.0,
+            "type": "integer"
+          },
+          "heroPolicy": {
+            "description": "protect (default): no lever that degrades a hero; strict: no image-wide lever either",
+            "enum": [
+              "protect",
+              "strict"
+            ],
+            "type": "string"
+          },
+          "quality": {
+            "description": "the level or profile the search starts from (default ultra)",
+            "type": "string"
+          },
+          "start": {
+            "description": "seconds into the piece to measure from (default 0)",
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "targetFps": {
+            "description": "the live target, 24..240 (default 60)",
+            "maximum": 240.0,
+            "minimum": 24.0,
+            "type": "number"
+          },
+          "width": {
+            "description": "the output width in pixels (default 1920)",
+            "maximum": 7680.0,
+            "minimum": 16.0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "performance_apply_low_risk_optimizations",
+      "name": "performance.apply_low_risk_optimizations",
+      "since": 1,
+      "title": "Apply the low-risk optimizations"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [
+          "subprocess"
+        ],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "ORIGINAL vs OPTIMIZED on a scratch copy (avgen --live-profile --compare): \"project\" (default) compares the project without and with its live ceilings; or name levers (\"scale85,volumequarter\"). Both are MEASURED: frame cost by counterbalanced A/B and the picture by the Quality Lab, with the self-difference floor (ORIGINAL rendered twice). Read-only.",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "critic": {
+            "description": "also ask the Creative Critic (optional; unavailable is reported, not an error)",
+            "type": "boolean"
+          },
+          "height": {
+            "description": "the output height in pixels (default 1080)",
+            "maximum": 4320.0,
+            "minimum": 16.0,
+            "type": "integer"
+          },
+          "heroPolicy": {
+            "description": "protect (default): no lever that degrades a hero; strict: no image-wide lever either",
+            "enum": [
+              "protect",
+              "strict"
+            ],
+            "type": "string"
+          },
+          "levers": {
+            "description": "\"project\" (default) or comma-separated levers",
+            "type": "string"
+          },
+          "quality": {
+            "description": "the level or profile the search starts from (default ultra)",
+            "type": "string"
+          },
+          "start": {
+            "description": "seconds into the piece to measure from (default 0)",
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "targetFps": {
+            "description": "the live target, 24..240 (default 60)",
+            "maximum": 240.0,
+            "minimum": 24.0,
+            "type": "number"
+          },
+          "width": {
+            "description": "the output width in pixels (default 1920)",
+            "maximum": 7680.0,
+            "minimum": 16.0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "performance_benchmark_before_after",
+      "name": "performance.benchmark_before_after",
+      "since": 1,
+      "title": "Benchmark before and after"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The project's live block (ADR-1084/1100): profile (QUALITY/BALANCED/PERFORMANCE), the strategy, the lowest level the controller may use, the degradation priority, and the ceilings the Optimize review applied. Unset fields are reported as null and mean the default. The frame-rate target is not the project's: it is the Live panel's, for every scene (ADR-1360).",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "performance_get_live_quality",
+      "name": "performance.get_live_quality",
+      "since": 1,
+      "title": "Read the live quality settings"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Change the project's live block. Only the fields given change; null clears one. \"applyLevers\" adds A/B levers (the candidates' \"lever\" names: volumequarter, posttaps, castercull, lodbias2, ...) to the project's ceilings -- what the Optimize review's Apply does. Never edits the scene; the quality only ever lowers what the scene asks for, and heroes are exempt. Save the project to keep it.",
+      "domain": "performance",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "applyLevers": {
+            "description": "levers to add as ceilings",
+            "items": {
+              "description": "an A/B lever",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "clearOverrides": {
+            "description": "remove every ceiling Optimize applied",
+            "type": "boolean"
+          },
+          "minimumLevel": {
+            "description": "ultra, high, medium, low, emergency (or null)",
+            "type": "string"
+          },
+          "priority": {
+            "description": "particles, shadows, volumes, post, lod, resolution, in the order to give them up; [] clears",
+            "items": {
+              "description": "a lever group",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "profile": {
+            "description": "quality, balanced, performance (or null)",
+            "type": "string"
+          },
+          "strategy": {
+            "description": "resolution_first, balanced, effects_first",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "performance_set_live_quality",
+      "name": "performance.set_live_quality",
+      "since": 1,
+      "title": "Change the live quality settings"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "What a plan can name and when things happen: every subject (characters, heroes, nodes, cameras, effects) by kind and id, the song's sections as they come round (\"chorus 2\" is the second time the chorus comes back) with what each one sounds like -- its own energy, and the audio measured under it: a level-free energy, onsets per second (kick, snare, hat), brightness in Hz and each band's level in dB -- the meter (which beat is bar 1, bars per phrase), the piece's length, and the plans this project already holds (revise one by reusing its id). Prefer this over parameter-level inspection when directing.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kinds": {
+            "description": "Only these subject kinds; omit for all",
+            "items": {
+              "description": "entity|hero|node|camera|effect",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "director_inspect_scene",
+      "name": "director.inspect_scene",
+      "since": 1,
+      "title": "Inspect the scene for directing"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Resolve a name as a person said it (\"Rook\", \"the Umbra hero mushroom\", \"the Valley Wide camera\") to one subject, or learn that it is ambiguous (with every candidate) or unknown (with the nearest names). Never guess between candidates: choose one only by writing its kind and id into the plan's subject. For a character, also returns what it can do.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "Optional hint",
+            "enum": [
+              "entity",
+              "hero",
+              "node",
+              "camera",
+              "effect",
+              "parameter",
+              "world"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "The name as said",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_inspect_subject",
+      "name": "director.inspect_subject",
+      "since": 1,
+      "title": "Inspect a subject"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The capability registry, generated from the scene: each character's activities (semantic names; whether each exists on its loaded rig and how long it plays), locomotion speeds and jump envelope; the camera vocabulary; event kinds and whether each renders deterministically; effect types and instances. Ask before planning an action -- a capability not listed does not exist.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "subject": {
+            "description": "A character's id; omit for everything",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "director_inspect_capabilities",
+      "name": "director.inspect_capabilities",
+      "since": 1,
+      "title": "Inspect capabilities"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The Director's default audio-reactivity plan for this scene (ADR-927), from the reactive catalogue (director.inspect_capabilities, \"reactive\"): routes at three levels -- hats and claps on small things, the kick and the bar on the heroes (each hero its own layer, timing and amplitude), the section on the world's light, fog, wind and colour -- with staggered delays and depth that follows the section. Returns the plan (its \"routes\" and \"sources\"), the music's layers, a summary and what was left alone and why. Changes nothing: edit the plan if the request asks for something else, then director.propose_plan it for the person's approval.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The plan's id; default \"reactivity\". Reuse an existing id to revise it",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "director_propose_reactivity",
+      "name": "director.propose_reactivity",
+      "since": 1,
+      "title": "The default audio-reactivity plan"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Place a time as a person said it -- \"1:30\", \"bar 64 beat 3\", \"the second chorus\", \"end of the bridge + 2s\" -- in seconds, against this song's sections and beat grid. Use it to check; in a plan, write the time as said and let the engine place it.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "The time as said",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_resolve_time",
+      "name": "director.resolve_time",
+      "since": 1,
+      "title": "Resolve a musical time"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "The fields and vocabularies of a Director Plan, generated from what the engine accepts.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpName": "director_plan_schema",
+      "name": "director.plan_schema",
+      "since": 1,
+      "title": "The Director Plan contract"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Check a plan against the scene without changing anything: names, times, capabilities, clearances, overlaps, camera precedence, determinism. Every finding names the plan item it concerns; an error means that item (and what depends on it) would not be built.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan": {
+            "description": "A Director Plan (schemaVersion 1); see director.plan_schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_validate_plan",
+      "name": "director.validate_plan",
+      "since": 1,
+      "title": "Validate a Director Plan"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "job",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": true,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Bake a plan whose performances are live (mode goal): play the project from zero on a scratch copy, keep what each character actually did and when its events happened, check the recording plays back and scrubs exactly, and put the RECORDED plan in front of the person for approval. Nothing is applied until they approve. Takes seconds; use it when the person wants a live performance fixed, or wants cues on its events (which only a recording can time).",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan": {
+            "description": "A Director Plan (schemaVersion 1); see director.plan_schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_record_plan",
+      "name": "director.record_plan",
+      "since": 1,
+      "title": "Record a plan's live performances"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Play the project from zero on a scratch copy (audio off, nothing changed) and list every world event it raises -- a scenario's beat, a character's named completion, a goal's arrival -- with its time and who raised it. Then propose a plan whose times are {\"event\": name, \"subject\": who, \"occurrence\": n}: the observation is attached to it for you. Takes seconds.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "untilSeconds": {
+            "description": "how far to watch; default: the whole piece, at most 240 s",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "director_watch_events",
+      "name": "director.watch_events",
+      "since": 1,
+      "title": "Watch the film for what happens in it"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "subprocess"
+        ],
+        "readOnly": false,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Render a span of the film with a plan in it -- a candidate you have not proposed (\"plan\"), or a revision the project already holds (\"planId\") -- on a scratch copy, and ask the Creative Critic about it. Nothing in the project changes and nothing is proposed: evaluate several candidates, director.compare them, and director.propose_plan only the one that won. Returns the evaluator's headline, dimension scores and findings, each finding keyed by the plan items its time span overlaps; the report is kept with the plan's evaluations. Minutes, not seconds: render the span that matters (a set piece, a section), not the film.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "description": "film seconds the span starts at",
+            "type": "number"
+          },
+          "label": {
+            "description": "What to call this iteration in comparisons, e.g. \"lower hover\"",
+            "type": "string"
+          },
+          "mode": {
+            "description": "fast | preview (default) | deep: the evaluator's depth",
+            "type": "string"
+          },
+          "plan": {
+            "description": "A Director Plan (schemaVersion 1); see director.plan_schema",
+            "type": "object"
+          },
+          "planId": {
+            "description": "A plan the project holds, evaluated as it is (instead of \"plan\")",
+            "type": "string"
+          },
+          "until": {
+            "description": "film seconds it ends at (at most 60 s after from)",
+            "type": "number"
+          }
+        },
+        "required": [
+          "from",
+          "until"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_evaluate",
+      "name": "director.evaluate",
+      "since": 1,
+      "title": "Evaluate a plan with the quality evaluator"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Diff two of a plan's kept evaluations (director.evaluate): dimension scores up and down, findings resolved, new and persisting (matched by the evaluator's stable keys), and the issues per plan item in each. Name them by label or by revision (\"revision 3\"); omit both for the last two.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "a": {
+            "description": "The baseline: a label, or \"revision N\"; default the second-last",
+            "type": "string"
+          },
+          "b": {
+            "description": "The candidate: a label, or \"revision N\"; default the last",
+            "type": "string"
+          },
+          "planId": {
+            "description": "The plan whose evaluations to compare",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planId"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_compare",
+      "name": "director.compare",
+      "since": 1,
+      "title": "Compare two evaluations of a plan"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": true,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requiresApproval": true,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Compile a plan against the scene WITHOUT changing it, and put the result in front of the person: what will be added or replaced, and every finding. Nothing is applied until they approve; the task then ends waiting for them. Whatever cannot be built is left out and said, never substituted -- if you want a substitute (a jump for a backflip), propose it as a change and say so. Reuse an existing plan's id to revise it.",
+      "domain": "director",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan": {
+            "description": "A Director Plan (schemaVersion 1); see director.plan_schema",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plan"
+        ],
+        "type": "object"
+      },
+      "mcpName": "director_propose_plan",
+      "name": "director.propose_plan",
+      "since": 1,
+      "title": "Propose a Director Plan"
+    }
+  ],
+  "version": 1
+}

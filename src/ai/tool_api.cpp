@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
+#include <iterator>
 #include <stdexcept>
 
 namespace avgen::ai {
@@ -69,6 +70,58 @@ const char* toolErrorCodeName(ToolErrorCode code) {
     return "INTERNAL";
 }
 
+static_assert(std::size(kAllToolErrorCodes) == static_cast<std::size_t>(ToolErrorCode::Internal) + 1,
+              "kAllToolErrorCodes must list every ToolErrorCode");
+
+const char* toolErrorCodeMeaning(ToolErrorCode code) {
+    switch (code) {
+    case ToolErrorCode::InvalidArguments:
+        return "The call did not match the tool's input schema, or named something in a form the tool cannot read. Fix the "
+               "arguments; the message names the field.";
+    case ToolErrorCode::NotFound:
+        return "A named parameter, node, track, signal, file or tool does not exist. Look the name up (parameter.search, "
+               "scene.find_nodes, signal.list, capability.list_tools) and retry.";
+    case ToolErrorCode::OutOfRange:
+        return "A value is outside its hard range. Clamp it into the range the schema or parameter.get reports.";
+    case ToolErrorCode::Unsupported:
+        return "A valid request this build cannot serve. Retrying will not help; the recovery text says what the build "
+               "lacks.";
+    case ToolErrorCode::Unavailable:
+        return "The subsystem exists but is not present in this session (no renderer, no audio, no host hook). It may be "
+               "available in another kind of session.";
+    case ToolErrorCode::Conflict:
+        return "The change would be overwritten by automation or a route, or a name collides. Resolve the conflict the "
+               "message names.";
+    case ToolErrorCode::Cancelled:
+        return "The call was cancelled, or the host did not service it in time. Nothing further was applied.";
+    case ToolErrorCode::Internal:
+        return "An engine fault. Report it with the message; the project was not necessarily modified.";
+    }
+    return "";
+}
+
+const char* executionClassName(ExecutionClass c) {
+    switch (c) {
+    case ExecutionClass::Read: return "read";
+    case ExecutionClass::Instant: return "instant";
+    case ExecutionClass::Rebind: return "rebind";
+    case ExecutionClass::Structural: return "structural";
+    case ExecutionClass::Session: return "session";
+    case ExecutionClass::Job: return "job";
+    }
+    return "read";
+}
+
+ExecutionClass ToolAnnotations::effectiveExecutionClass() const {
+    if (executionClass) {
+        return *executionClass;
+    }
+    if (readOnly) {
+        return ExecutionClass::Read;
+    }
+    return mutatesProject ? ExecutionClass::Instant : ExecutionClass::Session;
+}
+
 ToolResult ToolResult::ok(nlohmann::json value, std::string summary) {
     ToolResult r;
     r.success = true;
@@ -121,6 +174,8 @@ nlohmann::json ToolAnnotations::toJson() const {
     j["supportsProgress"] = supportsProgress;
     j["requiresApproval"] = requiresApproval;
     j["deterministic"] = deterministic;
+    j["executionClass"] = executionClassName(effectiveExecutionClass());
+    j["permissions"] = permissions;
     return j;
 }
 
@@ -154,6 +209,30 @@ void ToolRegistry::add(Tool tool) {
     if (a.readOnly && (a.mutatesProject || a.mutatesSession || a.destructive)) {
         throw std::logic_error("ToolRegistry::add: tool '" + tool.definition.name +
                                "' is readOnly and also claims to modify something");
+    }
+    // ADR-2150: a stated execution class must agree with what the tool says it touches -- a "read"
+    // that writes, or a project write classed as a session change, would mis-schedule it in a
+    // live host. `Job` is exempt: a job may be read-only (a render of a scratch copy) or not.
+    if (a.executionClass) {
+        const ExecutionClass c = *a.executionClass;
+        const bool agrees = c == ExecutionClass::Job ||
+                            (c == ExecutionClass::Read && a.readOnly) ||
+                            (c == ExecutionClass::Session && a.mutatesSession) ||
+                            ((c == ExecutionClass::Instant || c == ExecutionClass::Rebind ||
+                              c == ExecutionClass::Structural) && a.mutatesProject);
+        if (!agrees) {
+            throw std::logic_error("ToolRegistry::add: tool '" + tool.definition.name + "' is classed '" +
+                                   executionClassName(c) + "', which disagrees with its annotations");
+        }
+    }
+    for (const std::string& p : a.permissions) {
+        if (std::find(std::begin(kToolPermissions), std::end(kToolPermissions), p) == std::end(kToolPermissions)) {
+            throw std::logic_error("ToolRegistry::add: tool '" + tool.definition.name + "' names unknown permission '" +
+                                   p + "'");
+        }
+    }
+    if (tool.definition.since < 1) {
+        throw std::logic_error("ToolRegistry::add: tool '" + tool.definition.name + "' has no API level ('since')");
     }
     index_.emplace(tool.definition.name, tools_.size());
     tools_.push_back(std::move(tool));

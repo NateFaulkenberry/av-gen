@@ -160,7 +160,7 @@ add(registry, "camera.set_focus", "Set focus distance",
     });
 ```
 
-Four rules the registry and the tests enforce:
+Six rules the registry and the tests enforce:
 
 1. **Classify it.** `readOnly()`, `mutating()`, or a hand-built `ToolAnnotations` with
    `mutatesSession`. `ToolRegistry::add` throws on an unclassified tool, and a test asserts it.
@@ -173,9 +173,22 @@ Four rules the registry and the tests enforce:
    result.
 4. **Report what landed, not what was asked.** Read the value back. `setParameter` /
    `outcomeJson` do this, including clamping and automation overrides.
+5. **State its execution class and permissions when they are not the default** (ADR-2150). The class
+   is derived (read-only is `read`, a project write `instant`, a session write `session`); wrap the
+   annotations in `as(..., ExecutionClass::Structural)` for a tool that rebuilds the composition,
+   `Rebind` for one that adds or removes a route, key or shot, and `Job` for seconds-to-minutes work.
+   Wrap them in `needs(..., {"read", "write"})` for a tool that reads or writes files the caller
+   names, `"subprocess"` for a child process, `"gpu"` for GPU work. Registration refuses a class
+   that contradicts the annotations.
+6. **Regenerate the catalogue.** Run `tools/gen_api.sh` and commit `schemas/` and `docs/api/`. A new
+   tool without an `outputSchema` must be listed, with its reason, in
+   `schemas/tools-without-output-schema.json`. A breaking change to an existing tool (removed,
+   renamed, a new required input, a changed input type, a lost output field) also needs
+   `avgen::api::kApiLevel` raised and `tools/gen_api.sh --baseline`.
 
 Add the domain to `kDomains` in `capabilities.cpp` if it is new. If you *cannot* expose something,
-add an `available = false` record with the reason and the smallest engine change that would lift it
+add an `available = false` record with the reason (published as `supported: false` with an
+`unsupportedReason`) and the smallest engine change that would lift it
 — that is more useful to an agent than silence.
 
 ### Adding a provider
@@ -209,23 +222,15 @@ a name in `activityKindName` and a colour in `ai_panel.cpp`.
 
 ## Available tools
 
-34 tools across 13 namespaces. `capability.list_tools` is authoritative at runtime.
+The catalogue is generated from the registry the engine runs, so it cannot go stale:
 
-| Namespace | Tools |
-|---|---|
-| `capability` | `list`, `list_tools` |
-| `project` | `get_state`, `create_snapshot`, `list_snapshots`, `restore_snapshot` |
-| `parameter` | `list_groups`, `search`, `get`, `set`, `reset` |
-| `scene` | `get_summary`, `find_nodes`, `get_node`, `set_node_transform`, `set_node_visible` |
-| `camera` | `get`, `set`, `frame_node` |
-| `environment` | `get`, `set` |
-| `lighting` | `list` |
-| `material` | `list` |
-| `sequencer` | `get_state`, `add_keyframe`, `remove_track`, `set_playhead` |
-| `audio` | `get_analysis` |
-| `signal` | `list` |
-| `modulation` | `list`, `create`, `set_depth`, `remove` |
-| `performance` | `get_stats` |
+- [docs/api/tools.md](api/tools.md): every tool, with its input schema, annotations, execution class, the
+  permissions it needs and its MCP name;
+- [docs/api/errors.md](api/errors.md): the error codes;
+- `schemas/tool-catalogue.json`: the same catalogue as JSON.
+
+Regenerate them with `tools/gen_api.sh` after changing a tool; `tests/unit/test_api_catalogue.cpp` fails until you
+do. At run time, `capability.list_tools` and `avgen --describe tools` report the same set.
 
 ## What is not exposed, and why
 
@@ -233,8 +238,7 @@ a name in `activityKindName` and a colour in `ai_panel.cpp`.
 
 | Domain | Why not |
 |---|---|
-| Creating and deleting nodes | Outside the snapshot domain, so a rollback would leave it behind. Add it once the transaction is backed by the editor's undo stack. |
 | Terrain, water, navigation | Being reworked concurrently; their parameter surfaces are in flux. Whatever the current scene registers is still visible to `parameter.search`. |
-| Editing an individual light | Lights are regenerated on every scene rebuild, so a direct write would be discarded. Change them through `lightrig/*`, `scene/keyLight`, `env/sky/sunIntensity`. Exposing per-light editing needs each flattened light to register parameters the way a light rig's already do. |
+| Adding or removing a light | Authored scene lights already register `lights/<id>/*` parameters (`enabled`, `intensity`, `position`, `color`, ...), so editing one is `parameter.set`. Adding or removing one is a scene-document change, which has no tool yet. |
 | Rendering to a file | An external side effect; needs a separately designed capability with explicit consent, not a tool. |
 | Seeing the rendered frame | The agent inspects structured renderer and performance state. Faking visual verification would be worse than not having it. |

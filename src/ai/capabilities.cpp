@@ -1,5 +1,6 @@
 #include "ai/capabilities.hpp"
 
+#include "api/version.hpp"
 #include "app/engine.hpp"
 #include "scene/composition.hpp"
 
@@ -129,10 +130,13 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
             j["description"] = domain.description;
         }
         nlohmann::json operations = operationsIn(domain.id);
-        const bool available = !operations.empty() || domain.available;
-        j["available"] = available;
+        // ADR-2150: "supported" means THIS BUILD can do it (it has tools in the domain). Whether it can be done
+        // in this session (available: the host hook, the GPU, the audio) and whether this client may (permitted)
+        // are separate answers, given per tool by the session (session.info), never inferred from this one.
+        const bool supported = !operations.empty() || domain.available;
+        j["supported"] = supported;
         if (!domain.unavailableReason.empty()) {
-            j[available ? "limits" : "unavailableReason"] = domain.unavailableReason;
+            j[supported ? "limits" : "unsupportedReason"] = domain.unavailableReason;
         }
         if (!operations.empty()) {
             j["operations"] = std::move(operations);
@@ -146,7 +150,7 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
             continue;
         }
         described.push_back(id);
-        domains.push_back({{"id", id}, {"title", id}, {"available", true}, {"operations", operationsIn(id)}});
+        domains.push_back({{"id", id}, {"title", id}, {"supported", true}, {"operations", operationsIn(id)}});
     }
 
     nlohmann::json present;
@@ -168,6 +172,7 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
 
     nlohmann::json out;
     out["engine"] = "AV Gen";
+    out["version"] = api::version().toJson(); // ADR-2150: the same identity as avgen --version
     out["domains"] = std::move(domains);
     out["thisSession"] = std::move(present);
     out["transaction"] =

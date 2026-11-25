@@ -200,7 +200,6 @@ public:
     // ---- project (milestone 0.9, ADR-019): parameters, routes, sources, presets, shaders,
     // timeline, plus the asset references (audio, scene, environment) that make a project a
     // complete session. Paths are written relative to the project file. ----
-    static constexpr const char* kAppVersion = "0.1.0";
     [[nodiscard]] Result<void> saveProject(const std::filesystem::path& path);
     // The document `saveProject` would write for `path`, without writing it. Split out so the
     // unsaved-changes comparison below is the *same function* the save is -- a second serialiser

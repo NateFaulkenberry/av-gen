@@ -329,6 +329,7 @@ void registerDirectorTools(ToolRegistry& registry) {
     // result. Nothing is applied by this tool.
     ToolAnnotations records = proposes;
     records.deterministic = false; // what the characters do while recorded is theirs
+    records.executionClass = ExecutionClass::Job; // plays the project from zero on a scratch copy
     add(registry, "director.record_plan", "Record a plan's live performances",
         "Bake a plan whose performances are live (mode goal): play the project from zero on a scratch "
         "copy, keep what each character actually did and when its events happened, check the recording "
@@ -399,6 +400,8 @@ void registerDirectorTools(ToolRegistry& registry) {
     evaluates.mutatesSession = true;  // ...outside the project's content and its undo history
     evaluates.expensive = true;       // a render and an evaluation: seconds to minutes
     evaluates.idempotent = false;
+    evaluates.executionClass = ExecutionClass::Job;
+    evaluates.permissions = {"subprocess"}; // the render and the Critic run as child processes (ADR-931)
     add(registry, "director.evaluate", "Evaluate a plan with the quality evaluator",
         "Render a span of the film with a plan in it -- a candidate you have not proposed (\"plan\"), or a "
         "revision the project already holds (\"planId\") -- on a scratch copy, and ask the Creative Critic "

@@ -1,0 +1,665 @@
+{
+  "api": 1,
+  "format": "avgen-api-baseline",
+  "tools": {
+    "asset.get": {
+      "output": [],
+      "required": [
+        "id"
+      ],
+      "types": {
+        "id": "string"
+      }
+    },
+    "asset.import": {
+      "output": [],
+      "required": [],
+      "types": {
+        "file": "string"
+      }
+    },
+    "asset.import_audio": {
+      "output": [],
+      "required": [],
+      "types": {
+        "file": "string"
+      }
+    },
+    "asset.list": {
+      "output": [],
+      "required": [],
+      "types": {
+        "limit": "integer",
+        "query": "string"
+      }
+    },
+    "asset.list_importable": {
+      "output": [],
+      "required": [],
+      "types": {
+        "kind": "string",
+        "limit": "integer"
+      }
+    },
+    "asset.search": {
+      "output": [],
+      "required": [],
+      "types": {
+        "limit": "integer",
+        "query": "string"
+      }
+    },
+    "audio.get_analysis": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "camera.frame_node": {
+      "output": [],
+      "required": [
+        "name"
+      ],
+      "types": {
+        "azimuthDegrees": "number",
+        "elevationDegrees": "number",
+        "margin": "number",
+        "name": "string"
+      }
+    },
+    "camera.get": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "camera.set": {
+      "output": [],
+      "required": [],
+      "types": {
+        "fovDegrees": "number",
+        "mode": "string",
+        "position": "array",
+        "target": "array"
+      }
+    },
+    "capability.list": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "capability.list_tools": {
+      "output": [],
+      "required": [],
+      "types": {
+        "domain": "string"
+      }
+    },
+    "director.compare": {
+      "output": [],
+      "required": [
+        "planId"
+      ],
+      "types": {
+        "a": "string",
+        "b": "string",
+        "planId": "string"
+      }
+    },
+    "director.evaluate": {
+      "output": [],
+      "required": [
+        "from",
+        "until"
+      ],
+      "types": {
+        "from": "number",
+        "label": "string",
+        "mode": "string",
+        "plan": "object",
+        "planId": "string",
+        "until": "number"
+      }
+    },
+    "director.inspect_capabilities": {
+      "output": [],
+      "required": [],
+      "types": {
+        "subject": "string"
+      }
+    },
+    "director.inspect_scene": {
+      "output": [],
+      "required": [],
+      "types": {
+        "kinds": "array"
+      }
+    },
+    "director.inspect_subject": {
+      "output": [],
+      "required": [
+        "name"
+      ],
+      "types": {
+        "kind": "string",
+        "name": "string"
+      }
+    },
+    "director.plan_schema": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "director.propose_plan": {
+      "output": [],
+      "required": [
+        "plan"
+      ],
+      "types": {
+        "plan": "object"
+      }
+    },
+    "director.propose_reactivity": {
+      "output": [],
+      "required": [],
+      "types": {
+        "id": "string"
+      }
+    },
+    "director.record_plan": {
+      "output": [],
+      "required": [
+        "plan"
+      ],
+      "types": {
+        "plan": "object"
+      }
+    },
+    "director.resolve_time": {
+      "output": [],
+      "required": [
+        "text"
+      ],
+      "types": {
+        "text": "string"
+      }
+    },
+    "director.validate_plan": {
+      "output": [],
+      "required": [
+        "plan"
+      ],
+      "types": {
+        "plan": "object"
+      }
+    },
+    "director.watch_events": {
+      "output": [],
+      "required": [],
+      "types": {
+        "untilSeconds": "number"
+      }
+    },
+    "entity.list": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "environment.get": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "environment.set": {
+      "output": [],
+      "required": [
+        "values"
+      ],
+      "types": {
+        "values": "object"
+      }
+    },
+    "field.create": {
+      "output": [],
+      "required": [],
+      "types": {
+        "center": "array",
+        "falloff": "string",
+        "floorGain": "number",
+        "name": "string",
+        "radius": "number",
+        "source": "string",
+        "strength": "number",
+        "tags": "array"
+      }
+    },
+    "field.list": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "lighting.list": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "material.list": {
+      "output": [],
+      "required": [],
+      "types": {
+        "limit": "integer",
+        "node": "string"
+      }
+    },
+    "modulation.create": {
+      "output": [],
+      "required": [
+        "source",
+        "target"
+      ],
+      "types": {
+        "amount": "number",
+        "attackMs": "number",
+        "component": "integer",
+        "decayMs": "number",
+        "envelope": "string",
+        "envelopeFallPerSecond": "number",
+        "op": "string",
+        "polarity": "string",
+        "source": "string",
+        "target": "string"
+      }
+    },
+    "modulation.list": {
+      "output": [],
+      "required": [],
+      "types": {
+        "source": "string",
+        "target": "string"
+      }
+    },
+    "modulation.remove": {
+      "output": [],
+      "required": [
+        "index"
+      ],
+      "types": {
+        "index": "integer"
+      }
+    },
+    "modulation.set_depth": {
+      "output": [],
+      "required": [
+        "index"
+      ],
+      "types": {
+        "amount": "number",
+        "enabled": "boolean",
+        "index": "integer"
+      }
+    },
+    "parameter.get": {
+      "output": [],
+      "required": [
+        "paths"
+      ],
+      "types": {
+        "paths": "array"
+      }
+    },
+    "parameter.list_groups": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "parameter.reset": {
+      "output": [],
+      "required": [
+        "path"
+      ],
+      "types": {
+        "path": "string"
+      }
+    },
+    "parameter.search": {
+      "output": [],
+      "required": [],
+      "types": {
+        "group": "string",
+        "limit": "integer",
+        "modulatableOnly": "boolean",
+        "offset": "integer",
+        "query": "string"
+      }
+    },
+    "parameter.set": {
+      "output": [],
+      "required": [
+        "path",
+        "value"
+      ],
+      "types": {
+        "component": "integer",
+        "path": "string",
+        "value": "any"
+      }
+    },
+    "performance.apply_low_risk_optimizations": {
+      "output": [],
+      "required": [],
+      "types": {
+        "critic": "boolean",
+        "height": "integer",
+        "heroPolicy": "string",
+        "quality": "string",
+        "start": "number",
+        "targetFps": "number",
+        "width": "integer"
+      }
+    },
+    "performance.benchmark_before_after": {
+      "output": [],
+      "required": [],
+      "types": {
+        "critic": "boolean",
+        "height": "integer",
+        "heroPolicy": "string",
+        "levers": "string",
+        "quality": "string",
+        "start": "number",
+        "targetFps": "number",
+        "width": "integer"
+      }
+    },
+    "performance.get_live_quality": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "performance.get_stats": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "performance.optimize_scene": {
+      "output": [],
+      "required": [],
+      "types": {
+        "apply": "boolean",
+        "critic": "boolean",
+        "height": "integer",
+        "heroPolicy": "string",
+        "maxRisk": "string",
+        "quality": "string",
+        "start": "number",
+        "targetFps": "number",
+        "width": "integer"
+      }
+    },
+    "performance.profile_scene": {
+      "output": [],
+      "required": [],
+      "types": {
+        "deep": "boolean",
+        "height": "integer",
+        "mode": "string",
+        "quality": "string",
+        "start": "number",
+        "targetFps": "number",
+        "verifyCandidates": "integer",
+        "width": "integer"
+      }
+    },
+    "performance.set_live_quality": {
+      "output": [],
+      "required": [],
+      "types": {
+        "applyLevers": "array",
+        "clearOverrides": "boolean",
+        "minimumLevel": "string",
+        "priority": "array",
+        "profile": "string",
+        "strategy": "string"
+      }
+    },
+    "project.create": {
+      "output": [],
+      "required": [],
+      "types": {
+        "name": "string"
+      }
+    },
+    "project.create_snapshot": {
+      "output": [],
+      "required": [],
+      "types": {
+        "label": "string"
+      }
+    },
+    "project.get_state": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "project.list": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "project.list_snapshots": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "project.open": {
+      "output": [],
+      "required": [],
+      "types": {
+        "name": "string"
+      }
+    },
+    "project.restore_snapshot": {
+      "output": [],
+      "required": [
+        "id"
+      ],
+      "types": {
+        "id": "string"
+      }
+    },
+    "project.save": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "project.save_as": {
+      "output": [],
+      "required": [],
+      "types": {
+        "name": "string"
+      }
+    },
+    "render.probe": {
+      "output": [],
+      "required": [],
+      "types": {
+        "aspect": "number",
+        "limit": "integer",
+        "node": "string"
+      }
+    },
+    "scene.create_node": {
+      "output": [],
+      "required": [],
+      "types": {
+        "asset": "string",
+        "kind": "string",
+        "name": "string",
+        "parent": "string",
+        "position": "array",
+        "rotationDegrees": "array",
+        "scale": "number"
+      }
+    },
+    "scene.delete_node": {
+      "output": [],
+      "required": [],
+      "types": {
+        "name": "string"
+      }
+    },
+    "scene.find_nodes": {
+      "output": [],
+      "required": [],
+      "types": {
+        "kind": "string",
+        "limit": "integer",
+        "query": "string"
+      }
+    },
+    "scene.get_node": {
+      "output": [],
+      "required": [
+        "name"
+      ],
+      "types": {
+        "name": "string"
+      }
+    },
+    "scene.get_summary": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "scene.set_node_transform": {
+      "output": [],
+      "required": [
+        "name"
+      ],
+      "types": {
+        "name": "string",
+        "position": "array",
+        "rotation": "array",
+        "scale": "array"
+      }
+    },
+    "scene.set_node_visible": {
+      "output": [],
+      "required": [
+        "name",
+        "visible"
+      ],
+      "types": {
+        "name": "string",
+        "visible": "boolean"
+      }
+    },
+    "scene.set_parent": {
+      "output": [],
+      "required": [],
+      "types": {
+        "name": "string",
+        "parent": "string"
+      }
+    },
+    "sequence.add_marker": {
+      "output": [],
+      "required": [],
+      "types": {
+        "kind": "string",
+        "name": "string",
+        "time": "number"
+      }
+    },
+    "sequence.add_overlay": {
+      "output": [],
+      "required": [],
+      "types": {
+        "end": "number",
+        "id": "string",
+        "start": "number",
+        "style": "string",
+        "text": "string"
+      }
+    },
+    "sequence.add_shot": {
+      "output": [],
+      "required": [],
+      "types": {
+        "duration": "number",
+        "name": "string",
+        "scene": "string",
+        "start": "number"
+      }
+    },
+    "sequence.get_state": {
+      "output": [],
+      "required": [],
+      "types": {
+        "beatWindow": "number",
+        "beatsAround": "number",
+        "limit": "integer"
+      }
+    },
+    "sequencer.add_keyframe": {
+      "output": [],
+      "required": [
+        "target",
+        "time"
+      ],
+      "types": {
+        "component": "integer",
+        "interp": "string",
+        "mode": "string",
+        "target": "string",
+        "time": "number",
+        "timeBase": "string",
+        "value": "any"
+      }
+    },
+    "sequencer.get_state": {
+      "output": [],
+      "required": [],
+      "types": {}
+    },
+    "sequencer.remove_track": {
+      "output": [],
+      "required": [
+        "target"
+      ],
+      "types": {
+        "component": "integer",
+        "target": "string"
+      }
+    },
+    "sequencer.set_playhead": {
+      "output": [],
+      "required": [
+        "seconds"
+      ],
+      "types": {
+        "seconds": "number"
+      }
+    },
+    "signal.list": {
+      "output": [],
+      "required": [],
+      "types": {
+        "eventsOnly": "boolean",
+        "limit": "integer",
+        "query": "string"
+      }
+    },
+    "world.generate": {
+      "output": [],
+      "required": [],
+      "types": {
+        "recipe": "string"
+      }
+    },
+    "world.list_recipes": {
+      "output": [],
+      "required": [],
+      "types": {}
+    }
+  },
+  "version": 1
+}

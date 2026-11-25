@@ -3,6 +3,7 @@
 // relinking both directions share. Split from engine.cpp (QA pass 2); the members are declared in engine.hpp.
 
 #include "app/engine.hpp"
+#include "api/version.hpp"
 #include "audio/capture_coreaudio.hpp"
 #include "app/project_paths.hpp"
 
@@ -381,7 +382,7 @@ nlohmann::json Engine::projectDocument(const std::filesystem::path& path) {
     // ADR-2132: the overrides, not every registered value (params::ParameterBasis has the rule and the measurement).
     nlohmann::json doc = params::saveProject(params_, modulator_, &sources_, &presets_, &parameterBasis_);
     const auto dir = std::filesystem::absolute(path).parent_path();
-    doc["app"] = {{"name", "avgen"}, {"version", kAppVersion}};
+    doc["app"] = {{"name", "avgen"}, {"version", api::kEngineVersion}}; // ADR-2150: the one version
     // Shader layer paths relative to the project, with size and content hash for relinking.
     nlohmann::json shaders = shaderLayers_.toJson();
     for (auto& entry : shaders) {

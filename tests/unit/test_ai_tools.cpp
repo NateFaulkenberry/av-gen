@@ -541,19 +541,22 @@ TEST_CASE("The capability registry reports what is missing and why", "[ai][tools
     bool sawUnavailableWithReason = false;
     bool sawTerrain = false;
     for (const auto& domain : result.value.at("domains")) {
-        if (!domain.value("available", true)) {
-            REQUIRE(domain.contains("unavailableReason"));
-            CHECK(domain.at("unavailableReason").get<std::string>().size() > 40);
+        if (!domain.value("supported", true)) {
+            REQUIRE(domain.contains("unsupportedReason"));
+            CHECK(domain.at("unsupportedReason").get<std::string>().size() > 40);
             sawUnavailableWithReason = true;
         }
         if (domain.at("id") == "terrain") {
             sawTerrain = true;
-            CHECK_FALSE(domain.at("available").get<bool>());
+            CHECK_FALSE(domain.at("supported").get<bool>());
         }
     }
     CHECK(sawUnavailableWithReason);
     CHECK(sawTerrain);
     CHECK(result.value.at("thisSession").at("composition").get<bool>() == false);
+    // ADR-2150: the build identity, the same one avgen --version prints.
+    CHECK(result.value.at("version").at("api").get<int>() >= 1);
+    CHECK_FALSE(result.value.at("version").at("revision").get<std::string>().empty());
 
     SECTION("and each available domain's operations come from the tool registry itself") {
         for (const auto& domain : result.value.at("domains")) {

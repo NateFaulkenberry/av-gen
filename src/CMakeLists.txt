@@ -6,7 +6,7 @@
 # shared line. Everything in it is names, paths and plain data -- no device, no renderer -- so the
 # CPU suite can check it.
 file(GLOB_RECURSE AVGEN_CORE_SOURCES CONFIGURE_DEPENDS
-    core/*.cpp labs/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp directing/*.cpp
+    core/*.cpp labs/*.cpp audio/*.cpp analysis/*.cpp signals/*.cpp params/*.cpp scene/*.cpp spatial/*.cpp world/*.cpp graph/*.cpp shaders/*.cpp assets/*.cpp ai/*.cpp entity/*.cpp stage/*.cpp search/*.cpp organism/*.cpp directing/*.cpp api/*.cpp
     control/*.cpp comp/*.cpp seq/*.cpp song/*.cpp help/*.cpp pathtrace/*.cpp sonic/*.cpp)
 # The cinematic shot vocabulary (ADR-062) is pure geometry and JSON, and the sequencer (ADR-089)
 # holds an app::Shot by value in every shot it bakes. It lives in app/ for history's sake; it
@@ -34,7 +34,27 @@ else()
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/control/midi_coremidi.cpp")
     list(REMOVE_ITEM AVGEN_CORE_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/comp/font_coretext.mm")
 endif()
+# The engine revision, regenerated on every build so a benchmark record's conditions cannot be
+# stale (ADR-113). Script mode rather than configure time: a revision captured at configure time is
+# whatever it was the last time somebody ran cmake, which is exactly the kind of number that makes
+# two measurements look comparable when they are not.
+set(AVGEN_BUILD_INFO_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+add_custom_target(avgen_build_info ALL
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DTEMPLATE=${CMAKE_SOURCE_DIR}/cmake/build_info.hpp.in
+        -DOUT=${AVGEN_BUILD_INFO_DIR}/avgen_build_info.hpp
+        -DAVGEN_BUILD_TYPE=$<CONFIG>
+        -P ${CMAKE_SOURCE_DIR}/cmake/GitRevision.cmake
+    BYPRODUCTS "${AVGEN_BUILD_INFO_DIR}/avgen_build_info.hpp"
+    COMMENT "Recording the engine revision for benchmark records"
+    VERBATIM)
+
 add_library(avgen_core STATIC ${AVGEN_CORE_SOURCES})
+# ADR-2150: the engine's one version identity (src/api/version.cpp) reads the revision, so the library
+# that holds it sees the generated header too.
+add_dependencies(avgen_core avgen_build_info)
+target_include_directories(avgen_core PRIVATE "${AVGEN_BUILD_INFO_DIR}")
 target_include_directories(avgen_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(avgen_core
     PUBLIC fmt::fmt spdlog::spdlog glm::glm nlohmann_json::nlohmann_json Threads::Threads
@@ -105,21 +125,6 @@ file(GLOB_RECURSE AVGEN_APP_SOURCES CONFIGURE_DEPENDS app/*.cpp)
 list(REMOVE_ITEM AVGEN_APP_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/app/cinematic.cpp"
                                    "${CMAKE_CURRENT_SOURCE_DIR}/app/song_plan.cpp"
                                    "${CMAKE_CURRENT_SOURCE_DIR}/app/song_director.cpp")
-# The engine revision, regenerated on every build so a benchmark record's conditions cannot be
-# stale (ADR-113). Script mode rather than configure time: a revision captured at configure time is
-# whatever it was the last time somebody ran cmake, which is exactly the kind of number that makes
-# two measurements look comparable when they are not.
-set(AVGEN_BUILD_INFO_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
-add_custom_target(avgen_build_info ALL
-    COMMAND ${CMAKE_COMMAND}
-        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -DTEMPLATE=${CMAKE_SOURCE_DIR}/cmake/build_info.hpp.in
-        -DOUT=${AVGEN_BUILD_INFO_DIR}/avgen_build_info.hpp
-        -DAVGEN_BUILD_TYPE=$<CONFIG>
-        -P ${CMAKE_SOURCE_DIR}/cmake/GitRevision.cmake
-    BYPRODUCTS "${AVGEN_BUILD_INFO_DIR}/avgen_build_info.hpp"
-    COMMENT "Recording the engine revision for benchmark records"
-    VERBATIM)
 
 add_executable(avgen ${AVGEN_APP_SOURCES})
 add_dependencies(avgen avgen_build_info)

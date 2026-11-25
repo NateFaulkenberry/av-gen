@@ -199,8 +199,8 @@ TEST_CASE("capability.list derives availability from the tools, so a domain with
         INFO(domain.at("id").get<std::string>());
         if (domain.contains("operations") && !domain.at("operations").empty()) {
             ++domainsWithTools;
-            CHECK(domain.at("available").get<bool>());
-            CHECK_FALSE(domain.contains("unavailableReason"));
+            CHECK(domain.at("supported").get<bool>());
+            CHECK_FALSE(domain.contains("unsupportedReason"));
         }
     }
     CHECK(domainsWithTools > 0);
