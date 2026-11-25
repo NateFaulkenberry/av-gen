@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <unistd.h>
 #include <cmath>
 #include <fstream>
 #include <set>
@@ -28,16 +29,17 @@ ai::ToolError err(ai::ToolErrorCode code, std::string message, std::string recov
     return ai::ToolError{code, std::move(message), std::move(recovery), std::move(details)};
 }
 
-// The session's own tools: they ARE the transaction machinery, so they are never wrapped in one.
+// The session's own tools: they ARE the transaction machinery, so they are never wrapped in one. ADR-2159: the
+// `job.*` tools read and cancel the session's job records, which no transaction covers either.
 bool isSessionTool(const ai::Tool& tool) {
     const std::string domain = tool.definition.domain();
-    return domain == "session" || domain == "transaction";
+    return domain == "session" || domain == "transaction" || domain == "job";
 }
 
 // A Live host refuses these by name while a show runs, beside the structural, job and project classes: a
 // seek moves the show's own clock, and replacing the track swaps what the audience is hearing.
 // ADR-2155: what a GPU tool answers on a host that cannot render, when asked and when called.
-constexpr std::string_view kNoGpuHost = "no GPU host in this session yet";
+constexpr std::string_view kNoGpuHost = "this host cannot render (no GPU half, or no device could be created)";
 
 constexpr std::array<std::string_view, 2> kLiveRefusedByName = {"sequencer.set_playhead", "asset.import_audio"};
 
@@ -144,6 +146,11 @@ CallResult CallResult::refused(ai::ToolError error) {
 
 // ---- the local host ----------------------------------------------------------------------------------
 
+std::optional<ai::ToolError> Host::submitJob(JobSubmission /*submission*/) {
+    return err(ai::ToolErrorCode::Unavailable, std::string(kNoGpuHost), "run it in avgen serve or avgen call",
+               json{{"field", "gpu"}});
+}
+
 void LocalHost::installHooks(ai::ToolContext& ctx) {
     if (performance_) {
         ctx.setPerformanceSource(performance_);
@@ -168,6 +175,7 @@ void registerAllTools(ai::ToolRegistry& registry) {
     ai::registerEngineTools(registry);
     ai::registerDirectorTools(registry);
     registerSessionTools(registry);
+    registerRenderTools(registry);
 }
 
 // ---- life cycle --------------------------------------------------------------------------------------
@@ -205,12 +213,44 @@ Session::~Session() {
     if (state() != SessionState::Closed) {
         close();
     }
+    // The snapshots its renders loaded. A job still running in a host that outlives the session has its engine
+    // loaded already; nothing reads the copy after the load.
+    if (!scratch_.empty()) {
+        std::error_code ec;
+        fs::remove_all(scratch_, ec);
+    }
+}
+
+Result<fs::path> Session::scratchDir() {
+    const std::lock_guard lock(scratchMutex_);
+    if (!scratch_.empty()) {
+        return scratch_;
+    }
+    std::error_code ec;
+    const fs::path base = fs::temp_directory_path(ec);
+    if (ec) {
+        return fail("no temporary directory for the session's scratch files: {}", ec.message());
+    }
+    const fs::path dir = base / fmt::format("avgen-session-{}-{}", static_cast<long long>(::getpid()), id_);
+    fs::create_directories(dir, ec);
+    if (ec) {
+        return fail("cannot create the session's scratch directory '{}': {}", dir.string(), ec.message());
+    }
+    scratch_ = fs::weakly_canonical(dir, ec);
+    if (ec) {
+        scratch_ = dir;
+    }
+    return scratch_;
 }
 
 void Session::close() {
     SessionState expected = SessionState::Ready;
     if (!state_.compare_exchange_strong(expected, SessionState::Closing)) {
         return;
+    }
+    // ADR-2159: this session's jobs stop with it (partial output is kept, as job.cancel keeps it).
+    if (host_->queue().running()) {
+        host_->cancelJobs(*jobs_);
     }
     if (explicit_) {
         if (host_->queue().running()) {
@@ -394,6 +434,11 @@ CallResult Session::call(std::string_view toolName, const json& args, const Call
     if (auto e = permissionDenial(*tool)) {
         return CallResult::refused(std::move(*e));
     }
+    // ADR-2159: `job.wait` blocks the caller on the job table, never the host thread -- unless the caller IS the
+    // host thread (a one-shot client), which runs the body inline and drives the jobs while it waits.
+    if (tool->definition.name == "job.wait" && !host_->queue().onPumpingThread()) {
+        return waitOnCaller(args, options);
+    }
     CallResult out;
     const bool ran = host_->queue().run([&] { out = runOnHost(*tool, args, options, artifacts); }, options.cancel,
                                         options.timeout);
@@ -420,12 +465,16 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
     if (std::find(a.permissions.begin(), a.permissions.end(), "gpu") != a.permissions.end() && !host_->canRender()) {
         return CallResult::refused(err(ai::ToolErrorCode::Unavailable,
                                        fmt::format("'{}' needs the GPU: {}", tool.definition.name, kNoGpuHost),
-                                       "run it in a host that renders (avgen serve gains one in stage S6)",
+                                       "run it in avgen serve or avgen call (their host renders), on a machine with a GPU",
                                        json{{"field", "gpu"}}));
     }
     const std::string& name = tool.definition.name;
     const bool sessionTool = isSessionTool(tool);
-    const bool mutating = !a.readOnly && !sessionTool;
+    // ADR-2159: a render job changes neither the project nor anything a transaction restores (it reads a snapshot
+    // and writes files outside the document), so a client may preview an open transaction's state.
+    const bool renderJob = a.effectiveExecutionClass() == ai::ExecutionClass::Job && !a.mutatesProject &&
+                           tool.definition.domain() == "render";
+    const bool mutating = !a.readOnly && !sessionTool && !renderJob;
 
     OpenTransaction* joined = nullptr;
     if (options.transaction) {
@@ -490,6 +539,14 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
     CallResult out;
     out.success = r.success;
     out.result = r.success ? r.value : json::object();
+    // ADR-2159: a render tool's job id is also the envelope's `job`, so a client finds it in one place.
+    if (r.success && (a.effectiveExecutionClass() == ai::ExecutionClass::Job || tool.definition.domain() == "job") &&
+        r.value.is_object() && r.value.contains("job") && r.value.at("job").is_string()) {
+        out.job = r.value.at("job").get<std::string>();
+    } else if (r.success && tool.definition.domain() == "job" && r.value.is_object() && r.value.contains("id") &&
+               r.value.at("id").is_string()) {
+        out.job = r.value.at("id").get<std::string>();
+    }
     out.summary = r.summary;
     out.error = r.error;
     out.changes = ctx.changes().records();
@@ -541,6 +598,17 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
         out.transaction = implicitId;
     }
     return out;
+}
+
+CallResult Session::waitOnCaller(const json& args, const CallOptions& options) {
+    const std::string id = args.value("id", std::string{});
+    const auto timeout = std::chrono::milliseconds(std::max<std::int64_t>(0, args.value("timeoutMs", std::int64_t{30'000})));
+    const auto record = jobs_->wait(id, timeout, &options.cancel);
+    if (!record) {
+        return CallResult::refused(err(ai::ToolErrorCode::NotFound, fmt::format("no job '{}' in this session", id),
+                                       "job.list reports this session's jobs", json{{"field", "id"}}));
+    }
+    return jobWaitResult(*record, !jobFinished(record->state));
 }
 
 // ---- files -------------------------------------------------------------------------------------------

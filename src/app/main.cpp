@@ -3,6 +3,7 @@
 #include "api/jsonrpc_server.hpp"
 #include "api/version.hpp"
 #include "app/application.hpp"
+#include "app/offline_render.hpp"
 #include "app/reactivity_cli.hpp"
 #include "app/route_audit_cli.hpp"
 #include "app/sonic_trace_cli.hpp"
@@ -29,12 +30,14 @@ int main(int argc, char** argv) {
     if (argc > 1 && std::string(argv[1]) == "--describe") {
         return avgen::api::runDescribeCommand(argc, argv);
     }
-    // ADR-2155: the external interface. Before parseArgs and Application, so neither runs: no window, no GPU, no
-    // settings file, no OSC or MIDI listener. Each builds an api::EngineHost (CPU only) and one api::Session.
+    // ADR-2155: the external interface. Before parseArgs and Application, so neither runs: no window, no
+    // settings file, no OSC or MIDI listener. Each builds an api::EngineHost and one api::Session. ADR-2159: the host
+    // gets its GPU half here, which creates a device only when the first render job starts.
     if (argc > 1 && (std::string(argv[1]) == "serve" || std::string(argv[1]) == "call")) {
         avgen::log::init(avgen::log::Level::Info); // stderr; stdout is the protocol
-        return std::string(argv[1]) == "serve" ? avgen::api::runServeCommand(argc, argv)
-                                               : avgen::api::runCallCommand(argc, argv);
+        auto gpu = avgen::app::gpuRenderBackendFactory(avgen::app::GpuBackendOptions{std::filesystem::path(argv[0]), {}, true});
+        return std::string(argv[1]) == "serve" ? avgen::api::runServeCommand(argc, argv, std::move(gpu))
+                                               : avgen::api::runCallCommand(argc, argv, std::move(gpu));
     }
     // ADR-1051: the spatial validator has its own arguments and needs no window, GPU or engine.
     if (argc > 1 && std::string(argv[1]) == "--validate-space") {

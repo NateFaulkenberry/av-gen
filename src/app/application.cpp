@@ -1,6 +1,7 @@
 #include "app/live_audio_policy.hpp"
 #include "audio/synthetic_capture.hpp"
 #include "app/application.hpp"
+#include "app/offline_render.hpp"
 #include "api/version.hpp"
 #include "control/midi_rig.hpp"
 #include "control/osc.hpp"
@@ -6548,27 +6549,8 @@ Result<RenderSource> Application::writeRenderSource(std::string_view tag) {
 Result<std::unique_ptr<RenderJob>> Application::makeRenderJob(const std::filesystem::path& projectFile,
                                                               RenderSettings settings,
                                                               const std::filesystem::path& outputBase) {
-    auto offline = std::make_unique<Engine>(EngineMode::Offline);
-    offline->setLiveControl(false); // a render is a pure function of its file, not of the OSC port
-    if (auto r = offline->loadProject(projectFile); !r) {
-        return std::unexpected(r.error());
-    }
-    // ADR-1288: a render of the default scene in place of the project's is not a render of the project. It
-    // used to write every frame and exit 0, which made a broken scene file look like a finished deliverable.
-    if (auto r = offline->requireProjectScene(); !r) {
-        return std::unexpected(r.error());
-    }
-    for (const auto& w : offline->projectWarnings()) {
-        log::warn("render project: {}", w);
-    }
-    auto job = std::make_unique<RenderJob>(*context_, *shaders_, std::move(offline), std::move(settings),
-                                           outputBase.empty() ? std::filesystem::absolute(projectFile).parent_path()
-                                                              : outputBase);
-    job->setDebugOptions(debugOptions());
-    if (auto r = job->start(); !r) {
-        return std::unexpected(r.error());
-    }
-    return job;
+    // ADR-2159: the one way a render job is built, shared with the API host (app/offline_render.hpp).
+    return makeOfflineRenderJob(*context_, *shaders_, projectFile, std::move(settings), outputBase, debugOptions());
 }
 
 // The CPU path tracer (ADR-351). Unlike `--render` this needs no GPU at all: the tracer is CPU-only

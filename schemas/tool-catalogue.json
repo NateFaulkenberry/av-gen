@@ -1266,14 +1266,30 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "What the camera can currently see, as numbers: which nodes fall inside the frustum, where each sits in the frame, and how much of the height it fills. Use it to check a shot frames its subject before trusting that it does -- a camera pointed at nothing reports nothing rather than looking fine. It reads the camera the last frame used, the same as camera.get, so after moving the camera let a frame happen before asking what it sees.",
+      "description": "What the camera can currently see, as numbers: which nodes fall inside the frustum, where each sits in the frame, and how much of the height it fills. Use it to check a shot frames its subject before trusting that it does -- a camera pointed at nothing reports nothing rather than looking fine. Without `time` or `frame` it reads the camera the last frame used, the same as camera.get, so after moving the camera let a frame happen before asking what it sees. With `time` (or `frame` at `fps`) it evaluates the session's project as it is now -- unsaved edits included -- on a fresh offline engine at that time, exactly as a render's frame there is evaluated (history seek), so the rectangle is the one render.capture will draw: use it on a host that runs no frames (avgen serve). With `width` and `height` each rectangle is also given in pixels.",
       "domain": "render",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
           "aspect": {
-            "description": "Frame aspect ratio (default 16:9)",
+            "description": "Frame aspect ratio (default 16:9, or width/height)",
             "type": "number"
+          },
+          "fps": {
+            "description": "The rate `frame` counts in (default: the project's render fps)",
+            "minimum": 0.001,
+            "type": "number"
+          },
+          "frame": {
+            "description": "Evaluate at this frame (at `fps`) on a fresh engine",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "height": {
+            "description": "The frame's height in pixels: adds a pixel rectangle",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "type": "integer"
           },
           "limit": {
             "description": "Maximum nodes reported (default 40)",
@@ -1284,6 +1300,17 @@
           "node": {
             "description": "Ask about one node; omit for everything visible",
             "type": "string"
+          },
+          "time": {
+            "description": "Evaluate the scene at this time (seconds) on a fresh engine",
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "width": {
+            "description": "The frame's width in pixels: adds a pixel rectangle",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "type": "integer"
           }
         },
         "type": "object"
@@ -4406,6 +4433,912 @@
       },
       "since": 1,
       "title": "Transaction status"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": true,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "gpu",
+          "write"
+        ],
+        "readOnly": false,
+        "requirements": [
+          "composition"
+        ],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": true,
+        "supportsProgress": true,
+        "undoable": false
+      },
+      "description": "Render one frame of the project as it is in this session -- unsaved edits included; nothing is saved -- to a PNG (or EXR, by the path's extension), through the same offline render path a sequence uses, so the frame hash equals that frame's hash in a render.start sequence. Give `frame` (at `fps`) or `time` (seconds); neither is time 0. `history: play` (the default) first renders and discards every frame from 0, so the frame has the history a play-through had (cost grows with the time); `seek` jumps there, which is fast but may differ slightly on stateful content (envelopes, simulations). Returns a job id at once: job.wait for the result (frame hash, file sha256, timing). The size, rate and tier default to the project's render settings.",
+      "domain": "render",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fps": {
+            "description": "Frames per second (default: the project's render fps)",
+            "minimum": 0.001,
+            "type": "number"
+          },
+          "frame": {
+            "description": "The frame index at `fps` (frame / fps seconds)",
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "height": {
+            "description": "Pixels (default: the project's render height)",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "history": {
+            "description": "play (default): render from 0 and keep the last frame; seek: jump to the frame",
+            "enum": [
+              "play",
+              "seek"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "description": "The image to write, .png or .exr; relative to the project folder; inside a write root",
+            "type": "string"
+          },
+          "tier": {
+            "description": "Quality tier (default: the project's, normally offline)",
+            "enum": [
+              "preview",
+              "realtime",
+              "high",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "time": {
+            "description": "Seconds; used when `frame` is not given",
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "width": {
+            "description": "Pixels (default: the project's render width)",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpName": "render_capture",
+      "name": "render.capture",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "end": {
+            "description": "Range end, seconds (exclusive)",
+            "type": "number"
+          },
+          "format": {
+            "description": "png, exr or video",
+            "enum": [
+              "png",
+              "exr",
+              "video"
+            ],
+            "type": "string"
+          },
+          "fps": {
+            "description": "Frames per second",
+            "type": "number"
+          },
+          "frames": {
+            "description": "Frames it will render (the range is [start, end))",
+            "type": "integer"
+          },
+          "height": {
+            "description": "Pixels",
+            "type": "integer"
+          },
+          "history": {
+            "description": "play or seek",
+            "enum": [
+              "play",
+              "seek"
+            ],
+            "type": "string"
+          },
+          "historyFrames": {
+            "description": "history: play -- frames rendered and discarded before the range",
+            "type": "integer"
+          },
+          "job": {
+            "description": "The job's id: pass it to job.wait, job.status or job.cancel",
+            "type": "string"
+          },
+          "kind": {
+            "description": "capture or sequence",
+            "enum": [
+              "capture",
+              "sequence"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "description": "Where the output goes (absolute)",
+            "type": "string"
+          },
+          "snapshot": {
+            "description": "The project copy the job renders",
+            "type": "string"
+          },
+          "start": {
+            "description": "Range start, seconds",
+            "type": "number"
+          },
+          "state": {
+            "description": "queued",
+            "enum": [
+              "queued"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "description": "Pixels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job",
+          "state",
+          "kind",
+          "frames",
+          "path"
+        ],
+        "type": "object"
+      },
+      "since": 2,
+      "title": "Capture a frame"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": true,
+        "executionClass": "job",
+        "expensive": true,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [
+          "gpu",
+          "write"
+        ],
+        "readOnly": false,
+        "requirements": [
+          "composition"
+        ],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": true,
+        "supportsProgress": true,
+        "undoable": false
+      },
+      "description": "Render a range of the project as it is in this session (unsaved edits included; nothing is saved) to a PNG or EXR sequence in a folder (frame_000000.png, numbered from the range's first frame) or to a video file. `range` is \"start:end\" in seconds, end exclusive, as --range is. Every frame is hashed in order as it is read back, before any encoder, so a video and a PNG sequence of one range report the same frame hashes. `history` as render.capture: play (the default) renders and discards the frames before a range that does not start at 0. Returns a job id at once; job.wait for the result, job.cancel to stop (the frames written so far are kept and listed).",
+      "domain": "render",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fps": {
+            "description": "Frames per second (default: the project's render fps)",
+            "minimum": 0.001,
+            "type": "number"
+          },
+          "height": {
+            "description": "Pixels (default: the project's render height)",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "history": {
+            "description": "play (default) or seek, for a range that starts after 0",
+            "enum": [
+              "play",
+              "seek"
+            ],
+            "type": "string"
+          },
+          "output": {
+            "description": "png or exr (a folder of frames) or video (a file)",
+            "enum": [
+              "png",
+              "exr",
+              "video"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "description": "The folder (png, exr) or movie file (video, .mp4 or .mov); relative to the project folder; inside a write root",
+            "type": "string"
+          },
+          "range": {
+            "description": "\"start:end\" in seconds, end exclusive, e.g. \"0:4\"",
+            "type": "string"
+          },
+          "tier": {
+            "description": "Quality tier (default: the project's, normally offline)",
+            "enum": [
+              "preview",
+              "realtime",
+              "high",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "description": "Pixels (default: the project's render width)",
+            "maximum": 16384.0,
+            "minimum": 1.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "range",
+          "output",
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpName": "render_start",
+      "name": "render.start",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "end": {
+            "description": "Range end, seconds (exclusive)",
+            "type": "number"
+          },
+          "format": {
+            "description": "png, exr or video",
+            "enum": [
+              "png",
+              "exr",
+              "video"
+            ],
+            "type": "string"
+          },
+          "fps": {
+            "description": "Frames per second",
+            "type": "number"
+          },
+          "frames": {
+            "description": "Frames it will render (the range is [start, end))",
+            "type": "integer"
+          },
+          "height": {
+            "description": "Pixels",
+            "type": "integer"
+          },
+          "history": {
+            "description": "play or seek",
+            "enum": [
+              "play",
+              "seek"
+            ],
+            "type": "string"
+          },
+          "historyFrames": {
+            "description": "history: play -- frames rendered and discarded before the range",
+            "type": "integer"
+          },
+          "job": {
+            "description": "The job's id: pass it to job.wait, job.status or job.cancel",
+            "type": "string"
+          },
+          "kind": {
+            "description": "capture or sequence",
+            "enum": [
+              "capture",
+              "sequence"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "description": "Where the output goes (absolute)",
+            "type": "string"
+          },
+          "snapshot": {
+            "description": "The project copy the job renders",
+            "type": "string"
+          },
+          "start": {
+            "description": "Range start, seconds",
+            "type": "number"
+          },
+          "state": {
+            "description": "queued",
+            "enum": [
+              "queued"
+            ],
+            "type": "string"
+          },
+          "width": {
+            "description": "Pixels",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job",
+          "state",
+          "kind",
+          "frames",
+          "path"
+        ],
+        "type": "object"
+      },
+      "since": 2,
+      "title": "Render a sequence"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "One job's record: its state (queued, preparing, running, succeeded, failed, cancelled), what it is doing now, its progress, the files written so far and, once it has ended, its result -- per-frame hashes, the sequence hash, each file's sha256, timing (cold or warm device, pipeline compiles), whether it waited for the machine's GPU lock and for how long, and the warnings it logged.",
+      "domain": "job",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The job id a render tool returned",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "job_status",
+      "name": "job.status",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "cancelRequested": {
+            "description": "job.cancel was called",
+            "type": "boolean"
+          },
+          "created": {
+            "description": "UTC, ISO 8601",
+            "type": "string"
+          },
+          "error": {
+            "description": "{code, message, recovery, details?} when it failed, else null"
+          },
+          "finished": {
+            "description": "UTC, ISO 8601, or null"
+          },
+          "framesDone": {
+            "description": "Frames of the range rendered",
+            "type": "integer"
+          },
+          "framesTotal": {
+            "description": "Frames in the range",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The job's id, e.g. job-3",
+            "type": "string"
+          },
+          "kind": {
+            "description": "capture or sequence",
+            "enum": [
+              "capture",
+              "sequence"
+            ],
+            "type": "string"
+          },
+          "outputs": {
+            "description": "The files written, partial ones too when it failed or was cancelled",
+            "items": {
+              "description": "{path, frame?, bytes, sha256}"
+            },
+            "type": "array"
+          },
+          "phase": {
+            "description": "What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)",
+            "type": "string"
+          },
+          "progress": {
+            "description": "0..1 over the whole job, history frames included",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "request": {
+            "description": "The normalised request: time range, size, fps, format, history, output path"
+          },
+          "result": {
+            "description": "When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"
+          },
+          "snapshot": {
+            "description": "The project copy it renders (in the session's scratch directory)",
+            "type": "string"
+          },
+          "state": {
+            "description": "Where it is in its life",
+            "enum": [
+              "queued",
+              "preparing",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tool": {
+            "description": "The tool that started it",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool",
+          "kind",
+          "state",
+          "phase",
+          "progress",
+          "outputs",
+          "result",
+          "error"
+        ],
+        "type": "object"
+      },
+      "since": 2,
+      "title": "Job status"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Block until the job ends or `timeoutMs` passes (default 30000), then return its record, with `timedOut` true when it is still running. It blocks only this caller: the session keeps answering other clients' calls and the job keeps rendering. A failed or cancelled job is a successful wait whose record says so.",
+      "domain": "job",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The job id a render tool returned",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "How long to wait, milliseconds (default 30000)",
+            "minimum": 0.0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "job_wait",
+      "name": "job.wait",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "cancelRequested": {
+            "description": "job.cancel was called",
+            "type": "boolean"
+          },
+          "created": {
+            "description": "UTC, ISO 8601",
+            "type": "string"
+          },
+          "error": {
+            "description": "{code, message, recovery, details?} when it failed, else null"
+          },
+          "finished": {
+            "description": "UTC, ISO 8601, or null"
+          },
+          "framesDone": {
+            "description": "Frames of the range rendered",
+            "type": "integer"
+          },
+          "framesTotal": {
+            "description": "Frames in the range",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The job's id, e.g. job-3",
+            "type": "string"
+          },
+          "kind": {
+            "description": "capture or sequence",
+            "enum": [
+              "capture",
+              "sequence"
+            ],
+            "type": "string"
+          },
+          "outputs": {
+            "description": "The files written, partial ones too when it failed or was cancelled",
+            "items": {
+              "description": "{path, frame?, bytes, sha256}"
+            },
+            "type": "array"
+          },
+          "phase": {
+            "description": "What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)",
+            "type": "string"
+          },
+          "progress": {
+            "description": "0..1 over the whole job, history frames included",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "request": {
+            "description": "The normalised request: time range, size, fps, format, history, output path"
+          },
+          "result": {
+            "description": "When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"
+          },
+          "snapshot": {
+            "description": "The project copy it renders (in the session's scratch directory)",
+            "type": "string"
+          },
+          "state": {
+            "description": "Where it is in its life",
+            "enum": [
+              "queued",
+              "preparing",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "timedOut": {
+            "description": "The wait ended at timeoutMs with the job still unfinished",
+            "type": "boolean"
+          },
+          "tool": {
+            "description": "The tool that started it",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool",
+          "kind",
+          "state",
+          "phase",
+          "progress",
+          "outputs",
+          "result",
+          "error",
+          "timedOut"
+        ],
+        "type": "object"
+      },
+      "since": 2,
+      "title": "Wait for a job"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Stop a job: a queued one never starts; a running one stops after the frame it is on, keeping (and listing) the frames already written. Cancelling a job that has ended changes nothing and says so.",
+      "domain": "job",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The job id a render tool returned",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "mcpName": "job_cancel",
+      "name": "job.cancel",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "cancelRequested": {
+            "description": "job.cancel was called",
+            "type": "boolean"
+          },
+          "created": {
+            "description": "UTC, ISO 8601",
+            "type": "string"
+          },
+          "error": {
+            "description": "{code, message, recovery, details?} when it failed, else null"
+          },
+          "finished": {
+            "description": "UTC, ISO 8601, or null"
+          },
+          "framesDone": {
+            "description": "Frames of the range rendered",
+            "type": "integer"
+          },
+          "framesTotal": {
+            "description": "Frames in the range",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The job's id, e.g. job-3",
+            "type": "string"
+          },
+          "kind": {
+            "description": "capture or sequence",
+            "enum": [
+              "capture",
+              "sequence"
+            ],
+            "type": "string"
+          },
+          "outputs": {
+            "description": "The files written, partial ones too when it failed or was cancelled",
+            "items": {
+              "description": "{path, frame?, bytes, sha256}"
+            },
+            "type": "array"
+          },
+          "phase": {
+            "description": "What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)",
+            "type": "string"
+          },
+          "progress": {
+            "description": "0..1 over the whole job, history frames included",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "request": {
+            "description": "The normalised request: time range, size, fps, format, history, output path"
+          },
+          "result": {
+            "description": "When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"
+          },
+          "snapshot": {
+            "description": "The project copy it renders (in the session's scratch directory)",
+            "type": "string"
+          },
+          "state": {
+            "description": "Where it is in its life",
+            "enum": [
+              "queued",
+              "preparing",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tool": {
+            "description": "The tool that started it",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool",
+          "kind",
+          "state",
+          "phase",
+          "progress",
+          "outputs",
+          "result",
+          "error"
+        ],
+        "type": "object"
+      },
+      "since": 2,
+      "title": "Cancel a job"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "This session's jobs, oldest first, each as job.status reports it.",
+      "domain": "job",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": null,
+        "type": "object"
+      },
+      "mcpName": "job_list",
+      "name": "job.list",
+      "outputSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "jobs": {
+            "description": "The session's jobs, oldest first",
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "cancelRequested": {
+                  "description": "job.cancel was called",
+                  "type": "boolean"
+                },
+                "created": {
+                  "description": "UTC, ISO 8601",
+                  "type": "string"
+                },
+                "error": {
+                  "description": "{code, message, recovery, details?} when it failed, else null"
+                },
+                "finished": {
+                  "description": "UTC, ISO 8601, or null"
+                },
+                "framesDone": {
+                  "description": "Frames of the range rendered",
+                  "type": "integer"
+                },
+                "framesTotal": {
+                  "description": "Frames in the range",
+                  "type": "integer"
+                },
+                "id": {
+                  "description": "The job's id, e.g. job-3",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "capture or sequence",
+                  "enum": [
+                    "capture",
+                    "sequence"
+                  ],
+                  "type": "string"
+                },
+                "outputs": {
+                  "description": "The files written, partial ones too when it failed or was cancelled",
+                  "items": {
+                    "description": "{path, frame?, bytes, sha256}"
+                  },
+                  "type": "array"
+                },
+                "phase": {
+                  "description": "What it is doing now, in words (waiting for the GPU lock, compiling pipelines, playing history, rendering)",
+                  "type": "string"
+                },
+                "progress": {
+                  "description": "0..1 over the whole job, history frames included",
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                "request": {
+                  "description": "The normalised request: time range, size, fps, format, history, output path"
+                },
+                "result": {
+                  "description": "When it ended: frameHashes, sequenceHash, frameHash, outputs, timing, lock, warnings, gpuErrors; null before"
+                },
+                "snapshot": {
+                  "description": "The project copy it renders (in the session's scratch directory)",
+                  "type": "string"
+                },
+                "state": {
+                  "description": "Where it is in its life",
+                  "enum": [
+                    "queued",
+                    "preparing",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                "tool": {
+                  "description": "The tool that started it",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "tool",
+                "kind",
+                "state",
+                "phase",
+                "progress",
+                "outputs",
+                "result",
+                "error"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobs"
+        ],
+        "type": "object"
+      },
+      "since": 2,
+      "title": "List jobs"
     }
   ],
   "version": 1

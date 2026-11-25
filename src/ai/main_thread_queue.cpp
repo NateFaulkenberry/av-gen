@@ -155,6 +155,18 @@ bool MainThreadQueue::waitForWork() {
     return !stopped_ && !queue_.empty();
 }
 
+bool MainThreadQueue::waitForWork(std::chrono::milliseconds timeout) {
+    std::unique_lock lock(mutex_);
+    work_.wait_for(lock, timeout, [this] { return stopped_ || woken_ || !queue_.empty(); });
+    woken_ = false;
+    return !stopped_ && !queue_.empty();
+}
+
+bool MainThreadQueue::onPumpingThread() const {
+    const std::lock_guard lock(mutex_);
+    return haveOwner_ && owner_ == std::this_thread::get_id();
+}
+
 void MainThreadQueue::wake() {
     {
         const std::lock_guard lock(mutex_);

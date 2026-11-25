@@ -168,10 +168,12 @@ Result<void> RenderJob::start() {
         if (auto r = warm.resize(settings_.width, settings_.height); !r) {
             return r;
         }
-        // One engine update with deltaTime 0 (no integration drifts), rendered twice.
+        // One engine update with deltaTime 0 (no integration drifts), rendered twice. ADR-2159: a `Play` render warms
+        // up where it will start playing, so its engine has seen nothing a render from 0 did not.
+        const double warmAt = history_ == RenderHistory::Play ? playStartSeconds() : settings_.startSeconds;
         FixedStepClock warmClock(settings_.fps);
-        warmClock.restartAt(settings_.startSeconds);
-        engine_->seekSeconds(settings_.startSeconds);
+        warmClock.restartAt(warmAt);
+        engine_->seekSeconds(warmAt);
         const FrameTime t = engine_->tick(warmClock);
         engine_->setViewport(settings_.width, settings_.height);
         engine_->update(t);
@@ -463,7 +465,15 @@ Result<void> RenderJob::start() {
     // before it (ADR-1932): the pre-roll leaves the clock and the engine exactly where a plain start would, one frame
     // short of the range, with the ring full.
     clock_ = std::make_unique<FixedStepClock>(settings_.fps);
-    {
+    if (history_ == RenderHistory::Play && playHistoryFrames() > 0) {
+        // ADR-2159: play from (near) 0 and discard up to the range in `step()`. This subsumes the temporal pre-roll:
+        // the whole history is rendered, not only the ring's length of it.
+        historyTotal_ = playHistoryFrames();
+        clock_->restartAt(playStartSeconds());
+        engine_->seekSeconds(playStartSeconds());
+        log::info("render: history play -- {} frame(s) from {:.3f}s rendered and discarded before {:.3f}s",
+                  historyTotal_, playStartSeconds(), settings_.startSeconds);
+    } else {
         auto preRolled = temporalPreRoll();
         if (!preRolled) {
             return std::unexpected(preRolled.error());
@@ -730,6 +740,18 @@ Result<std::uint32_t> RenderJob::temporalPreRoll() {
     log::info("render: temporal pre-roll -- {} frame(s) from {:.3f}s, so the history at {:.3f}s is a play-through's",
               frames, preStart, settings_.startSeconds);
     return frames;
+}
+
+double RenderJob::playStartSeconds() const {
+    return settings_.startSeconds - static_cast<double>(playHistoryFrames()) / settings_.fps;
+}
+
+std::uint64_t RenderJob::playHistoryFrames() const {
+    if (settings_.startSeconds <= 0.0) {
+        return 0;
+    }
+    // The same rounding the temporal pre-roll uses, so the range's first frame lands on start exactly.
+    return static_cast<std::uint64_t>(std::floor(settings_.startSeconds * settings_.fps + 1.0e-6));
 }
 
 Result<void> RenderJob::renderDiscarded() {
@@ -1112,6 +1134,20 @@ bool RenderJob::step(int maxFrames, double budgetSeconds) {
         if (cancelled_ || rendered_ >= total_) {
             break;
         }
+        // ADR-2159: a `Play` render's history first, a frame at a time, in the same slices as the range.
+        if (historyRendered_ < historyTotal_) {
+            if (auto r = renderDiscarded(); !r) {
+                fail(r.error().message);
+                cancelled_ = true;
+                break;
+            }
+            ++historyRendered_;
+            if (budgetSeconds > 0.0 &&
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count() >= budgetSeconds) {
+                break;
+            }
+            continue;
+        }
         if (auto r = renderOne(); !r) {
             fail(r.error().message);
             cancelled_ = true;
@@ -1174,6 +1210,8 @@ RenderProgress RenderJob::progress() const {
     p.sequenceHash = sequenceHash_;
     p.finished = done_;
     p.cancelled = cancelled_;
+    p.historyFrames = historyTotal_;
+    p.historyFramesRendered = historyRendered_;
     if (started_) {
         p.elapsedSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - startedAt_).count();
         p.renderFps = p.elapsedSeconds > 0.0 ? static_cast<double>(rendered_) / p.elapsedSeconds : 0.0;

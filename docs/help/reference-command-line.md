@@ -108,9 +108,11 @@ These need no window, no GPU and no project, and print to stdout.
 
 Two sub-commands run the engine for another program, through the same tools Studio's assistant uses. Both come
 first on the command line (`avgen serve ...`, `avgen call ...`), and neither starts the application: **no window,
-no GPU, no settings file, no OSC port and no MIDI input**. Tools that need the GPU answer `UNAVAILABLE` ("no GPU
-host in this session yet"). The log goes to stderr; stdout carries only the protocol or the result, and anything
-else the engine prints is sent to stderr.
+no settings file, no OSC port and no MIDI input**. A GPU device is created only when the first render job starts
+(`render.capture`, `render.start`), and each job takes the machine's GPU lock -- the same lock directory
+`tools/gpu-lock.sh` uses -- for as long as it renders, so a render and an agent's locked GPU job never share the
+GPU. A session that never renders never creates a device. The log goes to stderr; stdout carries only the protocol
+or the result, and anything else the engine prints is sent to stderr.
 
 | Command | Does |
 |---|---|
@@ -128,7 +130,8 @@ Flags for both:
 | `--allow-subprocess` | tools may start child processes (`performance.profile_scene` and its family) |
 
 `call` also takes `--project <p.json>` (open it first; its folder becomes readable and writable) and `--save`
-(save the project after the calls, if they all succeeded).
+(save the project after the calls, if they all succeeded). A render job a `call` started and did not `job.wait`
+for is run to the end before the process exits.
 
 **With no root, every path is refused** with `PERMISSION_DENIED`: a session is never given a folder by guessing.
 Each root must exist, and is made absolute once, on the command line; inside the session a relative path means
@@ -143,6 +146,8 @@ not be created.
 | Variable | Does |
 |---|---|
 | `AVGEN_SHADER_DIR` | prepended to the shader search path |
+| `AVGEN_AGENT` | `serve` and `call`: the name a render job writes into the machine GPU lock's `holder` file (else `avgen-<pid>`), as `tools/gpu-lock.sh` does |
+| `AVGEN_GPU_LOCK_TIMEOUT` | `serve` and `call`: seconds a render job waits for the machine GPU lock before it fails `BUSY` (default 3600, as `tools/gpu-lock.sh`) |
 | `AVGEN_EXAMPLES_DIR` | prepended to the examples search path — **and to the asset browser's scan roots** |
 | `AVGEN_HELP_DIR` | where this Help system looks for its content first |
 | `AVGEN_TIMELINE_RAW` | dump raw GPU timestamps to standard error |

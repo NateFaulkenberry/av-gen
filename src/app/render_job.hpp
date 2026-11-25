@@ -43,6 +43,10 @@ struct RenderProgress {
     double renderFps = 0.0;            // frames rendered per second of wall time
     std::uint64_t lastFrameHash = 0;
     std::uint64_t sequenceHash = 0;    // FNV-1a over all frame hashes so far
+    // ADR-2159, `history: play`: frames rendered from 0 up to the range's start and discarded, so the range opens
+    // with the history a play-through had. Not counted in framesRendered or framesTotal.
+    std::uint64_t historyFrames = 0;
+    std::uint64_t historyFramesRendered = 0;
     bool finished = false;
     bool cancelled = false;
     std::string error;                 // first error, empty when none
@@ -50,6 +54,13 @@ struct RenderProgress {
         return framesTotal == 0 ? 0.0 : static_cast<double>(framesRendered) / static_cast<double>(framesTotal);
     }
 };
+
+// ADR-2159: how a range that does not start at 0 reaches its first frame. `Seek` (the default, and what every
+// existing caller gets): the engine seeks to the start, plus ADR-1932's temporal pre-roll. `Play`: every frame from
+// 0 to the start is rendered on the real renderer and discarded (an extension of the pre-roll to the whole history),
+// so frame f of the range is frame (start * fps + f) of a render from 0 -- the same pixels, not approximately.
+// Its cost grows with the start time, so it is spent in `step()`'s slices rather than in `start()`.
+enum class RenderHistory : std::uint8_t { Seek, Play };
 
 class RenderJob {
 public:
@@ -75,6 +86,9 @@ public:
     // at, and until ADR-262 the overlays existed exclusively behind ImGui checkboxes, which meant
     // the one artefact everybody diagnoses from was the one artefact they could not appear in.
     void setDebugOptions(const rendering::DebugViewOptions& options) { debug_ = options; }
+    // ADR-2159. Before `start()`.
+    void setHistory(RenderHistory history) { history_ = history; }
+    [[nodiscard]] RenderHistory history() const { return history_; }
 
     [[nodiscard]] RenderProgress progress() const;
     [[nodiscard]] const RenderSettings& settings() const { return settings_; }
@@ -178,6 +192,10 @@ private:
     // real renderer and discarded, so a render of a range draws its first frame with the history a play-through had.
     [[nodiscard]] Result<std::uint32_t> temporalPreRoll();
     [[nodiscard]] Result<void> renderDiscarded();
+    // ADR-2159: where a `Play` render starts playing (the frame-aligned time at or below 0 + the history's length,
+    // which is `startSeconds` minus a whole number of frames), and how many frames it discards before the range.
+    [[nodiscard]] double playStartSeconds() const;
+    [[nodiscard]] std::uint64_t playHistoryFrames() const;
     // Hands completed readbacks to the encoders; `all` waits for every frame in flight first.
     [[nodiscard]] Result<void> drain(bool all);
     void handleFrame(gpu::ReadbackRing::Frame frame);
@@ -194,6 +212,9 @@ private:
     std::filesystem::path output_;
     std::unique_ptr<rendering::SceneRenderer> renderer_;
     rendering::DebugViewOptions debug_{}; // `--debug-draw`; every flag false by default
+    RenderHistory history_ = RenderHistory::Seek;
+    std::uint64_t historyTotal_ = 0;    // ADR-2159: frames to discard before the range (Play)
+    std::uint64_t historyRendered_ = 0;
     // The 2D composition (ADR-083), installed as the renderer's overlay exactly as the live path
     // installs it. The offline frame is the live frame plus a fixed clock; the composition must
     // not be one of the differences.

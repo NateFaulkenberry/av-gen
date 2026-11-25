@@ -84,6 +84,12 @@ public:
     // happened. Returns true when there is work to pump. A frame loop (Studio) never calls it: it pumps
     // every frame anyway.
     bool waitForWork();
+    // The same, giving up after `timeout` (ADR-2159: an EngineHost waiting for the machine's GPU lock polls it
+    // between pumps, so it cannot sleep until the next call).
+    bool waitForWork(std::chrono::milliseconds timeout);
+    // True on the thread that pumps (bound or last pumped). ADR-2159: `job.wait` blocks its caller, and a
+    // caller that IS the host thread must drive the jobs itself instead of waiting for a pump.
+    [[nodiscard]] bool onPumpingThread() const;
     // Releases a `waitForWork` without queueing anything (a host asked to stop).
     void wake();
 

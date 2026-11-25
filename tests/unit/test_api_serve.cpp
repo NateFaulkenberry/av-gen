@@ -311,7 +311,7 @@ TEST_CASE("serve: initialize, tools/list and tools/call over a pipe, with the pr
         if (t.at("name") == "test.gpu_probe") {
             sawGpu = true;
             CHECK(t.at("availability").at("available") == false);
-            CHECK(t.at("availability").at("unavailableReason") == "no GPU host in this session yet");
+            CHECK(t.at("availability").at("unavailableReason").get<std::string>().starts_with("this host cannot render"));
         }
     }
     CHECK(sawGpu);

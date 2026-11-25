@@ -34,13 +34,19 @@
 // a client other than Studio's own assistant with `Busy` for structural and job calls, project calls and
 // seeks. Reads stay available.
 //
-// Not here yet: revisions and dirty state, the time policy (S1b); jobs and render submission (S6).
+// Jobs (ADR-2159, S6): the session owns the job RECORDS (`jobs()`, a thread-safe table) and a scratch directory for
+// the project snapshots renders load; the host owns the GPU work (`Host::submitJob`). `job.wait` blocks the CALLER
+// on the table -- `call` serves it on the caller's thread, never through the host queue -- unless the caller is the
+// host thread itself, which then drives the jobs while it waits.
+//
+// Not here yet: revisions and dirty state, the time policy (S1b).
 
 #include "ai/main_thread_queue.hpp"
 #include "ai/tool_api.hpp"
 #include "ai/tool_context.hpp"
 #include "ai/transaction.hpp"
 #include "api/compensation.hpp"
+#include "api/jobs.hpp"
 #include "api/path_policy.hpp"
 #include "core/error.hpp"
 
@@ -103,7 +109,7 @@ struct CallResult {
     std::vector<Warning> warnings;
     std::optional<ai::ToolError> error;
     std::optional<std::string> transaction; // the one it ran in, implicit or explicit
-    std::optional<std::string> job;         // set by job-starting tools (stage S6)
+    std::optional<std::string> job;         // set by the render tools and job.* (ADR-2159)
 
     // The envelope (Part 1 section 5.3): success, result, summary, changes, warnings, transaction, job,
     // and on failure error {code, message, recovery, details?}. Every key is present on every call, so a
@@ -123,8 +129,16 @@ struct CallArtifacts {
     std::shared_ptr<ai::DeferredResult> deferredResult;         // out
 };
 
-// What owns the Engine and its thread. Studio's is a `LocalHost` over `Application::engine_`; stage S6
-// adds an EngineHost with lazy GPU and render jobs. Render submission is deliberately not here yet.
+class JobTable;
+
+// A render handed to a host: the record it reports into, and what to render.
+struct JobSubmission {
+    std::shared_ptr<JobTable> table;
+    RenderRequest request;
+};
+
+// What owns the Engine and its thread. Studio's is a `LocalHost` over `Application::engine_`; the EngineHost
+// (`avgen serve`, `avgen call`) adds lazy GPU and render jobs (ADR-2159).
 class Host {
 public:
     virtual ~Host() = default;
@@ -138,10 +152,18 @@ public:
     [[nodiscard]] virtual bool showRunning() { return false; }
     // When it will stop, if the host knows (seconds); for `details.retryAfterMs`.
     [[nodiscard]] virtual std::optional<double> showRemainingSeconds() { return std::nullopt; }
-    // Whether this host can run GPU work (ADR-2155). No host can yet: a tool whose permissions include "gpu"
-    // answers `Unavailable` ("no GPU host in this session yet"), in its capability answer and when called.
-    // Stage S6's EngineHost GPU half is the first to say true.
+    // Whether this host can run GPU work (ADR-2155). When it cannot, a tool whose permissions include "gpu"
+    // answers `Unavailable` ("this host cannot render ..."), in its capability answer and when called.
+    // ADR-2159: an EngineHost with a GPU half says true (Studio's LocalHost stays false until stage S10).
     [[nodiscard]] virtual bool canRender() { return false; }
+    // ADR-2159. Host thread. Queues a GPU job whose record is already in `submission.table`; the host reports
+    // into it from then on. A refusal (Busy: the queue is full; Unavailable: no GPU) leaves the record alone.
+    [[nodiscard]] virtual std::optional<ai::ToolError> submitJob(JobSubmission submission);
+    // Host thread: one slice of job work. True while jobs remain. A caller that waits for a job ON the host
+    // thread (`avgen call`'s `job.wait`) drives them through this.
+    virtual bool stepJobs() { return false; }
+    // Host thread: stop every job reporting into `table` (its session is closing).
+    virtual void cancelJobs(const JobTable& /*table*/) {}
 };
 
 // A host over an engine someone else owns, with its own queue and the hooks an application installs.
@@ -233,6 +255,13 @@ public:
     // Takes permissions away. Refused (and nothing changes) when `narrower` is not within the current ones.
     [[nodiscard]] Result<void> narrow(SessionPermissions narrower);
 
+    // ---- jobs (ADR-2159; any thread) ----
+    [[nodiscard]] JobTable& jobs() { return *jobs_; }
+    [[nodiscard]] const std::shared_ptr<JobTable>& jobTable() const { return jobs_; }
+    // Where this session's render snapshots go: a folder of its own under the system temp directory, made on
+    // first use and removed when the session is destroyed. Never inside a project or a root.
+    [[nodiscard]] Result<std::filesystem::path> scratchDir();
+
     // ---- host-thread state ----
     [[nodiscard]] ai::SnapshotStore& snapshots() { return snapshots_; }
     // Null restores the default snapshot sink. Refused while an explicit transaction is open.
@@ -282,6 +311,8 @@ private:
     [[nodiscard]] nlohmann::json transactionJson(const OpenTransaction& t) const;
     [[nodiscard]] bool referencedOutside(const std::filesystem::path& file);
     [[nodiscard]] PathPolicy pathsNow() const;
+    // `job.wait` on a thread that is not the host's: blocks on the job table.
+    [[nodiscard]] CallResult waitOnCaller(const nlohmann::json& args, const CallOptions& options);
 
     std::uint64_t id_;
     ClientInfo client_;
@@ -299,6 +330,9 @@ private:
     std::uint64_t nextTransaction_ = 1;
     Host* host_;
     std::atomic<SessionState> state_{SessionState::Ready};
+    std::shared_ptr<JobTable> jobs_ = std::make_shared<JobTable>();
+    std::mutex scratchMutex_;
+    std::filesystem::path scratch_;
 };
 
 // The standard registry: the engine tools, the Director tools and the session tools, registered in place
@@ -306,5 +340,9 @@ private:
 void registerAllTools(ai::ToolRegistry& registry);
 // The session tools alone (api/session_tools.cpp).
 void registerSessionTools(ai::ToolRegistry& registry);
+// `render.capture`, `render.start` and `job.*` (api/render_tools.cpp, ADR-2159).
+void registerRenderTools(ai::ToolRegistry& registry);
+// `job.wait`'s answer for a record, shared by the tool body (host thread) and `Session::waitOnCaller`.
+[[nodiscard]] CallResult jobWaitResult(const JobRecord& record, bool timedOut);
 
 } // namespace avgen::api

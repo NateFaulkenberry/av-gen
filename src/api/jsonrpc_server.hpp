@@ -69,6 +69,8 @@ struct ServeOptions {
     HostFlags flags;
     // Tools added beside the standard catalogue (a test's probe), as `SessionOptions::extraTools`.
     std::vector<ai::Tool> extraTools;
+    // ADR-2159: the host's GPU half. Empty: a CPU host (render tools `UNAVAILABLE`).
+    RenderBackendFactory renderBackend;
 };
 
 // Runs a server reading requests from `inFd` and writing to `outFd` until `shutdown` or end of input, with the
@@ -77,7 +79,7 @@ struct ServeOptions {
 
 // `avgen serve --stdio [--root d] [--read-root d] [--write-root d] [--allow-subprocess]`: protects stdout and
 // serves stdin/stdout. Exit code 0, 2 for usage, 7 for a host failure.
-[[nodiscard]] int runServeCommand(int argc, char** argv);
+[[nodiscard]] int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend = {});
 [[nodiscard]] const char* serveUsage();
 
 } // namespace avgen::api

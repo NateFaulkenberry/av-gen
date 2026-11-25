@@ -230,6 +230,8 @@ if(TARGET avgen_gpu AND AVGEN_RENDER_TEST_SOURCES)
         # binaries' mtimes against your sources before trusting a green run (docs/testing.md).
         "${CMAKE_SOURCE_DIR}/src/app/frame_range.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/render_job.cpp"
+        # ADR-2159: the one way a render job is built, and the API host's GPU half.
+        "${CMAKE_SOURCE_DIR}/src/app/offline_render.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/control_hub.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/scene_states.cpp"
         "${CMAKE_SOURCE_DIR}/src/app/profile_capture.cpp"

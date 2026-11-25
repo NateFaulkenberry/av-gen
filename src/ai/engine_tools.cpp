@@ -10,6 +10,7 @@
 #include "analysis/analysis_track.hpp"
 #include "core/hash.hpp"
 #include "core/log.hpp"
+#include "core/time.hpp"
 #include "params/serialization.hpp"
 #include "scene/composition.hpp"
 #include "entity/entity.hpp"
@@ -18,6 +19,7 @@
 #include "seq/layers.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstddef>
 #include <expected>
@@ -27,6 +29,7 @@
 #include <future>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 namespace avgen::ai {
 namespace {
@@ -1874,14 +1877,64 @@ void registerParameterTools(ToolRegistry& registry) {
         "What the camera can currently see, as numbers: which nodes fall inside the frustum, where "
         "each sits in the frame, and how much of the height it fills. Use it to check a shot frames "
         "its subject before trusting that it does -- a camera pointed at nothing reports nothing "
-        "rather than looking fine. It reads the camera the last frame used, the same as camera.get, "
-        "so after moving the camera let a frame happen before asking what it sees.",
+        "rather than looking fine. Without `time` or `frame` it reads the camera the last frame used, "
+        "the same as camera.get, so after moving the camera let a frame happen before asking what it "
+        "sees. With `time` (or `frame` at `fps`) it evaluates the session's project as it is now -- "
+        "unsaved edits included -- on a fresh offline engine at that time, exactly as a render's frame "
+        "there is evaluated (history seek), so the rectangle is the one render.capture will draw: use it "
+        "on a host that runs no frames (avgen serve). With `width` and `height` each rectangle is also "
+        "given in pixels.",
         schema::object({{"node", schema::string("Ask about one node; omit for everything visible")},
-                        {"aspect", schema::number("Frame aspect ratio (default 16:9)")},
-                        {"limit", schema::integer("Maximum nodes reported (default 40)", 1, kMaxLimit)}}),
+                        {"aspect", schema::number("Frame aspect ratio (default 16:9, or width/height)")},
+                        {"limit", schema::integer("Maximum nodes reported (default 40)", 1, kMaxLimit)},
+                        {"time", schema::number("Evaluate the scene at this time (seconds) on a fresh engine", 0.0)},
+                        {"frame", schema::integer("Evaluate at this frame (at `fps`) on a fresh engine", 0.0)},
+                        {"fps", schema::number("The rate `frame` counts in (default: the project's render fps)", 0.001)},
+                        {"width", schema::integer("The frame's width in pixels: adds a pixel rectangle", 1, 16384)},
+                        {"height", schema::integer("The frame's height in pixels: adds a pixel rectangle", 1, 16384)}}),
         requiring(readOnly(), {"composition"}),
         [](const json& args, ToolContext& ctx) -> ToolResult {
-            app::Engine& engine = ctx.engine();
+            app::Engine* evaluated = &ctx.engine();
+            // ADR-2159: the frame a render at `time` would draw. A fresh Offline engine from a copy of the session's
+            // in-memory project, sought and updated once as RenderJob positions its first frame; nothing renders.
+            std::unique_ptr<app::Engine> fresh;
+            std::optional<double> at;
+            if (args.contains("frame")) {
+                const double fps = args.value("fps", ctx.engine().renderSettings().fps);
+                at = static_cast<double>(args.at("frame").get<std::int64_t>()) / std::max(fps, 0.001);
+            } else if (args.contains("time")) {
+                at = args.at("time").get<double>();
+            }
+            const auto pixelWidth = args.value("width", 0);
+            const auto pixelHeight = args.value("height", 0);
+            if (at) {
+                static std::atomic<std::uint64_t> serial{0};
+                std::error_code ec;
+                const std::filesystem::path copy =
+                    std::filesystem::temp_directory_path(ec) /
+                    fmt::format("avgen-probe-{}-{}.json", static_cast<long long>(::getpid()), ++serial);
+                if (auto r = ctx.engine().writeProjectCopy(copy); !r) {
+                    return ToolResult::failure(ToolErrorCode::Internal, r.error().message);
+                }
+                fresh = std::make_unique<app::Engine>(app::EngineMode::Offline);
+                fresh->setLiveControl(false);
+                auto loaded = fresh->loadProject(copy);
+                std::filesystem::remove(copy, ec);
+                if (!loaded) {
+                    return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                               fmt::format("the project could not be evaluated: {}", loaded.error().message));
+                }
+                const double fps = args.value("fps", fresh->renderSettings().fps);
+                FixedStepClock clock(std::max(fps, 0.001));
+                clock.restartAt(*at);
+                fresh->seekSeconds(*at);
+                const FrameTime t = fresh->tick(clock);
+                fresh->setViewport(pixelWidth > 0 ? static_cast<std::uint32_t>(pixelWidth) : fresh->renderSettings().width,
+                                   pixelHeight > 0 ? static_cast<std::uint32_t>(pixelHeight) : fresh->renderSettings().height);
+                fresh->update(t);
+                evaluated = fresh.get();
+            }
+            app::Engine& engine = *evaluated;
             scene::Composition* comp = engine.composition();
             if (comp == nullptr) {
                 return ToolResult::failure(ToolErrorCode::FailedPrecondition,
@@ -1889,7 +1942,10 @@ void registerParameterTools(ToolRegistry& registry) {
                                            "create a project with a scene (project.create {scene: \"empty\"}) or open one that has a scene");
             }
             const scene::Camera& camera = engine.scene().camera;
-            const auto aspect = static_cast<float>(std::max(args.value("aspect", 16.0 / 9.0), 0.01));
+            const double defaultAspect = pixelWidth > 0 && pixelHeight > 0
+                                             ? static_cast<double>(pixelWidth) / static_cast<double>(pixelHeight)
+                                             : 16.0 / 9.0;
+            const auto aspect = static_cast<float>(std::max(args.value("aspect", defaultAspect), 0.01));
             const glm::mat4 viewProjection = camera.projection(aspect) * camera.view();
             const std::string only = args.value("node", std::string{});
             const std::size_t limit = limitOf(args);
@@ -1938,6 +1994,18 @@ void registerParameterTools(ToolRegistry& registry) {
                                   {"right", (maxX + 1.0f) * 0.5f},
                                   {"top", 1.0f - (maxY + 1.0f) * 0.5f},
                                   {"bottom", 1.0f - (minY + 1.0f) * 0.5f}};
+                // ADR-2159: the same rectangle in pixels of a width x height frame (unclamped: a node partly off
+                // the frame reaches past its edges; clamp to [0, width] x [0, height] to intersect).
+                if (pixelWidth > 0 && pixelHeight > 0) {
+                    const auto w = static_cast<float>(pixelWidth);
+                    const auto h = static_cast<float>(pixelHeight);
+                    j["pixels"] = json{{"left", (minX + 1.0f) * 0.5f * w},
+                                       {"right", (maxX + 1.0f) * 0.5f * w},
+                                       {"top", (1.0f - (maxY + 1.0f) * 0.5f) * h},
+                                       {"bottom", (1.0f - (minY + 1.0f) * 0.5f) * h},
+                                       {"width", pixelWidth},
+                                       {"height", pixelHeight}};
+                }
                 j["heightFraction"] = std::clamp((maxY - minY) * 0.5f, 0.0f, 4.0f);
                 j["nearestDistance"] = nearestZ;
                 if (!overlaps) {
@@ -1951,6 +2019,7 @@ void registerParameterTools(ToolRegistry& registry) {
                                  {"target", {camera.target.x, camera.target.y, camera.target.z}},
                                  {"fovYDegrees", camera.effectiveFovY() * 57.2957795f},
                                  {"aspect", aspect}};
+            out["evaluatedAt"] = at ? json(*at) : json(nullptr);
             if (!only.empty()) {
                 if (comp->findNode(only) == nullptr) {
                     return ToolResult::failure(ToolErrorCode::NotFound,

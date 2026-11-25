@@ -13,6 +13,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include <chrono>
+#include <thread>
+
 #include <cerrno>
 #include <cstdio>
 #include <fstream>
@@ -102,7 +105,9 @@ const char* callUsage() {
     return "usage: avgen call <tool> ['<json arguments>'] [options]\n"
            "       avgen call --calls <file.json> [options]\n"
            "  Runs one tool (or a list of calls, in one session) and prints the envelope as JSON on stdout.\n"
-           "  No window, no GPU, no settings file, no OSC or MIDI listener. The log is on stderr.\n"
+           "  No window, no settings file, no OSC or MIDI listener. The log is on stderr. A GPU device only if\n"
+           "  a render job starts (under the machine's GPU lock); jobs still running after the calls are run\n"
+           "  to the end before the process exits (job.wait in the list returns their results).\n"
            "  --calls <file>       a JSON list of {\"tool\", \"arguments\"?, \"irreversible\"?}; prints\n"
            "                       {\"success\", \"calls\": [{\"tool\", \"envelope\"}]}\n"
            "  --project <p.json>   open this project first; its folder becomes a read and write root\n"
@@ -114,7 +119,7 @@ const char* callUsage() {
            "  exit: 0 success, 1 a tool failed (the envelope is still printed), 2 usage, 7 host failure\n";
 }
 
-int runCallCommand(int argc, char** argv) {
+int runCallCommand(int argc, char** argv, RenderBackendFactory renderBackend) {
     HostFlags flags;
     std::optional<std::string> tool;
     std::optional<json> arguments;
@@ -196,7 +201,9 @@ int runCallCommand(int argc, char** argv) {
         return code;
     };
 
-    EngineHost host;
+    EngineHostOptions hostOptions;
+    hostOptions.renderBackend = std::move(renderBackend);
+    EngineHost host(std::move(hostOptions));
     host.bindHostThread();
     SessionOptions so;
     so.client = ClientInfo{ClientKind::Cli, "avgen-call", version().engine};
@@ -241,6 +248,16 @@ int runCallCommand(int argc, char** argv) {
                 log::error("call: --save failed: {}", r.error ? r.error->message : r.summary);
             }
         }
+    }
+    // ADR-2159: a render the calls started and did not wait for still finishes: this is the host thread, and nothing
+    // else will step it once the process exits.
+    for (bool more = host.stepJobs(); more; more = host.stepJobs()) {
+        if (host.jobStats().queued > 0 && !host.jobStats().running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{100}); // waiting for the GPU lock
+        }
+    }
+    for (const JobRecord& r : session.jobs().list()) {
+        log::info("call: {} {}", r.id, jobStateName(r.state));
     }
     session.close(); // rolls back an explicit transaction a --calls list left open; never saves
 

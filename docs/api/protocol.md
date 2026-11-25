@@ -9,7 +9,8 @@ Protocol `avgen-jsonrpc` version 1. `avgen serve --stdio` speaks it on stdin and
 - **JSON-RPC 2.0, one message per line.** Each request, response and notification is a single line of JSON ending in `\n`. A batch (a JSON array of requests) is answered with an array of the replies.
 - **stdout is the protocol and nothing else.** At start the server duplicates fd 1 for the protocol and points fd 1 at stderr, so a stray `printf` in the engine lands in the log, never in the stream. The log is on stderr.
 - **One call at a time.** Requests are answered in the order they arrive; a long tool call delays the next request.
-- **No listener.** stdio only: the process opens no socket, no OSC port and no MIDI input, reads no settings file and creates no window. It does not touch the GPU: tools that need it answer `UNAVAILABLE` ("no GPU host in this session yet").
+- **No listener.** stdio only: the process opens no socket, no OSC port and no MIDI input, reads no settings file and creates no window.
+- **The GPU is lazy.** No device exists until the first render job starts; a session that never renders never creates one. `initialize` answers `capabilities.gpu` (a device can be made here) and `capabilities.render`.
 - **Session.** One session per process, created at start with the command line's permissions (`--root`, `--read-root`, `--write-root`, `--allow-subprocess`). `initialize` must come first.
 - **Shutdown.** `shutdown`, or end of input, closes the session: an open explicit transaction is rolled back, and the project is never saved for you (call `project.save`).
 
@@ -22,7 +23,7 @@ Protocol `avgen-jsonrpc` version 1. `avgen serve --stdio` speaks it on stdin and
 | `tools/list` | request | none | `{tools: [...]}` | The catalogue: each tool as `schemas/tool-catalogue.json` lists it, plus `availability` `{available, permitted, unavailableReason?, deniedReason?}` for this session at this moment. |
 | `tools/call` | request | `{name, arguments?, transaction?, dryRun?, irreversible?}` | the call envelope (`docs/api/transactions.md`) | Runs one tool through `Session::call` and answers its envelope: `success`, `result`, `summary`, `changes`, `warnings`, `transaction`, `job`, and `error` on failure. A tool failure is a successful response with `success: false`. `transaction` joins the open explicit transaction; `irreversible: true` (or `"accept"`) accepts a call a rollback cannot undo; `dryRun: true` checks the name, the arguments, the permissions and availability and runs nothing. |
 | `shutdown` | request | none | `{closed: true, rolledBack: <transaction id or null>}` | Closes the session -- an open explicit transaction is rolled back, and nothing is saved -- answers, and ends the process. End of input does the same without the answer. |
-| `notifications/progress` | server notification | `{requestId, tool, progress, message}` | none | Sent while a `tools/call` runs a tool that reports progress; `requestId` is the call's `id`, `progress` is 0 to 1. |
+| `notifications/progress` | server notification | `{requestId, tool, progress, message}`, or for a job `{job, tool, state, phase, progress, framesDone, framesTotal}` | none | Sent while a `tools/call` runs a tool that reports progress (`requestId` is the call's `id`), and for a render job (`job` is its id) on every state or phase change -- waiting for the GPU lock, compiling pipelines, playing history, rendering, the end -- and at most every 250 ms between. `progress` is 0 to 1. |
 | `notifications/log` | server notification | `{level, message}` | none | A line of the engine's own log at or above the `logLevel` the client chose. The full log is on stderr. |
 
 ## Errors
@@ -38,21 +39,55 @@ A **tool** failure is not a protocol error: it is a successful response whose `r
 | `-32002` | not initialized | any request but `initialize` or `shutdown` before `initialize` |
 | `-32603` | internal error | the server failed while answering; the session is unchanged or rolled back |
 
+## Render jobs
+
+`render.capture` and `render.start` return `{job}` at once; the work runs on the host between calls, so the session keeps answering. A job's life:
+
+```text
+queued -> preparing -> running -> succeeded
+                                | failed     (error; partial outputs listed)
+                                | cancelled  (job.cancel; partial outputs listed)
+```
+
+- **queued**: FIFO, one GPU job at a time; four queued or running at most (a fifth is `BUSY`).
+- **preparing**: a fresh offline engine is loaded from the job's snapshot -- the session's in-memory project, written with `Engine::writeProjectCopy` into the session's scratch directory when the call was made, so a render right after `parameter.set` shows it and nothing is saved. Then the machine's GPU lock (below), the device on the first job, and the pipeline compile (72 s measured on a cold Metal cache; `phase` counts the pipelines).
+- **running**: `history: play` renders and discards the frames before the range first; then the range, each frame hashed as it is read back.
+- **job.wait** blocks only the caller (the server's reader waits on the job table, not the host), so requests after it wait their turn but the job keeps running. `job.status`, `job.list` and `job.cancel` never block.
+- **Results**: `frameHashes` (FNV-1a over each frame's read-back pixels, 16 hex digits), `sequenceHash`, `frameHash` (the last), `outputs` `[{path, frame, bytes, sha256}]`, `timing` (queued, load, lock wait, start -- device and compile -- render, total; `deviceCreated` for the cold job; `pipelinesCreated`), `lock` `{path, waited, waitedSeconds, heldByAncestor, holderSeen}`, `warnings` and `gpuErrors`.
+
+## The machine's GPU lock
+
+GPU work on one machine is serialised by a lock directory that `tools/gpu-lock.sh` and the server share. The server takes it for each job, after loading the snapshot and before touching the device, and releases it when the job ends; an idle server holds nothing. The protocol, which a client wrapping its own GPU work in the script already follows:
+
+1. The lock is the directory `${TMPDIR:-/tmp}/avgen-gpu.lock`, created with `mkdir` (atomic). The path depends only on the environment, never on a source tree.
+2. The winner writes its pid to `pid.<pid>` and renames it to `pid` (so it is never read half-written), and its name to `holder` (`AVGEN_AGENT`, else `avgen-<pid>`).
+3. A waiter that reads a `pid` naming a dead process removes the directory -- only if `pid` still names that process -- and tries again. A directory with no `pid` is removed once it is older than 30 s.
+4. A holder removes the directory only while `pid` is still its own.
+5. **Held by an ancestor.** When `pid` is the server's own process or one of its ancestors -- the server was started under `gpu-lock.sh`, which holds the lock in the wrapper shell and exports nothing -- the lock counts as held for the server: it neither waits nor creates nor removes anything.
+6. A job waits for the lock as long as `AVGEN_GPU_LOCK_TIMEOUT` seconds (default 3600, the script's), reporting `phase: "waiting for the GPU lock (held by '<holder>' (pid <n>))"`, then fails `BUSY`. `job.cancel` stops the wait.
+
+One difference from the script, in the safe direction: a pid owned by another user (`kill -0` answers EPERM) is alive here; the script would reclaim it.
+
 ## Example session
 
-`>` is what the client writes, `<` what the server answers (long values elided with `...`). Started as `avgen serve --stdio --root /work`, with `resonator.glb` in `/work`. A relative path is relative to the open project's folder, so the import names `../resonator.glb` from inside `/work/poc`.
+`>` is what the client writes, `<` what the server answers (long values elided with `...`). Started as `avgen serve --stdio --root /work`, with `resonator.glb` in `/work`; the render's numbers are the S6 measurement's. A relative path is relative to the open project's folder, so the import names `../resonator.glb` from inside `/work/poc`.
 
 ```text
 > {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"poc-client","version":"1"}}}
-< {"id":1,"jsonrpc":"2.0","result":{"api":1,"capabilities":{"batch":true,"cancellation":false,"concurrency":"sequential","dryRun":true,"gpu":false,"jobs":false,"notifications":["notifications/progress","notifications/log"],"render":false,"tools":{"count":81,"listChanged":false},"transactions":{"explicit":true,"perSession":1}},"permissions":{"gpu":true,"liveControl":false,"openProjectFolder":false,"projectAccess":"read-write","readRoots":["/work"],"subprocess":false,"writeRoots":["/work"]},"protocol":{"name":"avgen-jsonrpc","version":1},"server":{"name":"avgen","version":"0.3.0"},"session":{"client":{"kind":"json-rpc","name":"poc-client","version":"1"},"id":1,"policy":"authoring"},"versions":{...}}}
+< {"id":1,"jsonrpc":"2.0","result":{"api":2,"capabilities":{"batch":true,"cancellation":false,"concurrency":"sequential","dryRun":true,"gpu":true,"jobs":true,"notifications":["notifications/progress","notifications/log"],"render":true,"tools":{"count":87,"listChanged":false},"transactions":{"explicit":true,"perSession":1}},"permissions":{"gpu":true,"liveControl":false,"openProjectFolder":false,"projectAccess":"read-write","readRoots":["/work"],"subprocess":false,"writeRoots":["/work"]},"protocol":{"name":"avgen-jsonrpc","version":1},"server":{"name":"avgen","version":"0.3.0"},"session":{"client":{"kind":"json-rpc","name":"poc-client","version":"1"},"id":1,"policy":"authoring"},"versions":{...}}}
 > {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"project.create","arguments":{"name":"poc"}}}
 < {"id":2,"jsonrpc":"2.0","result":{"changes":[],"job":null,"result":{"exists":true,"file":"/work/poc/poc.json","name":"poc"},"success":true,"summary":"created 'poc'","transaction":null,"warnings":[]}}
 > {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"asset.import","arguments":{"file":"../resonator.glb"}}}
 < {"id":3,"jsonrpc":"2.0","result":{"changes":[],"job":null,"result":{"copied":["/work/poc/assets/models/resonator.glb"],"id":"asset://project/models/resonator","path":"/work/poc/assets/models/resonator.glb",...},"success":true,"summary":"asset imported into project","transaction":null,"warnings":[]}}
-> {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"no.such_tool"}}
-< {"id":4,"jsonrpc":"2.0","result":{"changes":[],"error":{"code":"NOT_FOUND","message":"no tool named 'no.such_tool'","recovery":"call capability.list_tools for the available tool names"},"job":null,"result":null,"success":false,"summary":"no tool named 'no.such_tool'","transaction":null,"warnings":[]}}
-> {"jsonrpc":"2.0","id":5,"method":"tools/delete"}
-< {"error":{"code":-32601,"message":"no method 'tools/delete'"},"id":5,"jsonrpc":"2.0"}
-> {"jsonrpc":"2.0","id":6,"method":"shutdown"}
-< {"id":6,"jsonrpc":"2.0","result":{"closed":true,"rolledBack":null}}
+> {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"render.capture","arguments":{"frame":24,"fps":24,"width":480,"height":270,"path":"renders/a.png"}}}
+< {"id":4,"jsonrpc":"2.0","result":{"changes":[],"job":"job-1","result":{"frames":1,"history":"play","historyFrames":24,"job":"job-1","path":"/work/poc/renders/a.png","state":"queued",...},"success":true,"summary":"job-1 queued: 1 frame(s) at 480x270 -> /work/poc/renders/a.png","transaction":null,"warnings":[]}}
+< {"jsonrpc":"2.0","method":"notifications/progress","params":{"framesDone":0,"framesTotal":1,"job":"job-1","phase":"compiling pipelines: 41 of 120 pipeline(s) compiled; waiting for scene-lit","progress":0.0,"state":"preparing","tool":"render.capture"}}
+> {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"job.wait","arguments":{"id":"job-1","timeoutMs":600000}}}
+< {"id":5,"jsonrpc":"2.0","result":{"changes":[],"job":"job-1","result":{"id":"job-1","state":"succeeded","outputs":[{"bytes":201734,"frame":0,"path":"/work/poc/renders/a.png","sha256":"ca97..."}],"result":{"frameHash":"645df906acfb383c","frameHashes":["645df906acfb383c"],"lock":{"heldByAncestor":false,"waited":false,...},"timing":{"deviceCreated":true,"startSeconds":74.06,...},...},"timedOut":false,...},"success":true,"summary":"job-1 succeeded","transaction":null,"warnings":[]}}
+> {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"no.such_tool"}}
+< {"id":6,"jsonrpc":"2.0","result":{"changes":[],"error":{"code":"NOT_FOUND","message":"no tool named 'no.such_tool'","recovery":"call capability.list_tools for the available tool names"},"job":null,"result":null,"success":false,"summary":"no tool named 'no.such_tool'","transaction":null,"warnings":[]}}
+> {"jsonrpc":"2.0","id":7,"method":"tools/delete"}
+< {"error":{"code":-32601,"message":"no method 'tools/delete'"},"id":7,"jsonrpc":"2.0"}
+> {"jsonrpc":"2.0","id":8,"method":"shutdown"}
+< {"id":8,"jsonrpc":"2.0","result":{"closed":true,"rolledBack":null}}
 ```
