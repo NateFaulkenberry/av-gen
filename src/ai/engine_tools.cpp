@@ -1,4 +1,5 @@
 #include "ai/engine_tools.hpp"
+#include "api/session.hpp"
 #include "assets/asset_catalog.hpp"
 #include "assets/asset_registry.hpp"
 
@@ -847,6 +848,10 @@ void registerProjectTools(ToolRegistry& registry) {
                 j["audioFile"] = engine.audioPath().filename().generic_string();
                 j["durationSeconds"] = engine.durationSeconds();
             }
+            // ADR-2154: "changed since the last save" from the revision counters (never a serialisation), and the
+            // world clock's policy.
+            j["revisions"] = api::revisionsJson(engine.revisions());
+            j["timePolicy"] = app::timePolicyName(engine.timePolicy());
             j["playing"] = engine.isPlaying();
             j["positionSeconds"] = engine.positionSeconds();
             j["beats"] = engine.timelineClock().beats;

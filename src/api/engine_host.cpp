@@ -113,7 +113,13 @@ EngineHost::EngineHost(EngineHostOptions options)
     // ADR-2133/2155: an API host opens no OSC port and no MIDI input, whatever a project it opens says. Nothing
     // here or in the clients calls setLiveOsc.
     engine_->setLiveControl(false);
-    // Stage S1b: the host's time policy is set here, from EngineHostOptions (Stepped by default for API hosts).
+    // ADR-2154: Stepped by default; nothing advances until a client asks (transport.step).
+    const app::TimePolicy policy = options_.timePolicy.value_or(app::TimePolicy::Stepped);
+    if (auto r = engine_->setTimePolicy(policy); !r) {
+        log::warn("engine host: time policy refused ({}); keeping '{}'", r.error().message,
+                  app::timePolicyName(engine_->timePolicy()));
+    }
+    local_.setOfferedTimePolicies({app::TimePolicy::Stepped, app::TimePolicy::Offline});
     if (options_.renderBackend) {
         warnings_ = std::make_shared<JobWarningSink>();
         spdlog::default_logger()->sinks().push_back(warnings_);

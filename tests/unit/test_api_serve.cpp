@@ -18,7 +18,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -713,4 +715,17 @@ TEST_CASE("The protocol document is generated from the server's own tables", "[a
         listed = listed || a.relativePath == "docs/api/protocol.md";
     }
     CHECK(listed);
+}
+
+TEST_CASE("An API host's world clock is stepped: nothing advances between calls", "[api][serve][adr2154]") {
+    // 02-session-api.md section 3.4: an agent session costs nothing between calls; time moves only on transport.step.
+    api::EngineHost host;
+    CHECK(host.engine().timePolicy() == app::TimePolicy::Stepped);
+    const std::vector<app::TimePolicy> offered = host.offeredTimePolicies();
+    CHECK(std::find(offered.begin(), offered.end(), app::TimePolicy::Stepped) != offered.end());
+    CHECK(std::find(offered.begin(), offered.end(), app::TimePolicy::Offline) != offered.end());
+    // A stepped host's engine moves by exactly n/fps per step.
+    const double before = host.engine().lastRenderTime();
+    REQUIRE(host.engine().stepFrames(24, 24.0).has_value());
+    CHECK(std::abs(host.engine().lastRenderTime() - before - 1.0) < 1e-9);
 }

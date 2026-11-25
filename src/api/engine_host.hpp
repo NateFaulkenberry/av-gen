@@ -37,6 +37,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <optional>
 #include <vector>
 
 namespace avgen::app {
@@ -46,8 +47,10 @@ class Engine;
 namespace avgen::api {
 
 struct EngineHostOptions {
-    // Stage S1b adds the time policy here (`Stepped` by default for API hosts, 02-session-api.md section 3.4);
-    // `EngineHost::EngineHost` is where it is applied to the engine.
+    // ADR-2154: the host's time policy. Empty: `Stepped` -- an API session costs nothing between calls and its
+    // world advances only on transport.step (02-session-api.md section 3.4). The host offers Stepped and
+    // Offline; render jobs run their own Offline engines whatever this says.
+    std::optional<app::TimePolicy> timePolicy;
 
     // ADR-2159: the GPU half. Empty: this host cannot render.
     RenderBackendFactory renderBackend;
@@ -78,6 +81,7 @@ public:
     [[nodiscard]] app::Engine& engine() override { return local_.engine(); }
     [[nodiscard]] ai::MainThreadQueue& queue() override { return local_.queue(); }
     void installHooks(ai::ToolContext& ctx) override { local_.installHooks(ctx); }
+    [[nodiscard]] std::vector<app::TimePolicy> offeredTimePolicies() override { return local_.offeredTimePolicies(); }
     // ADR-2159: a backend is installed and no device creation has failed. No device is created to answer.
     [[nodiscard]] bool canRender() override;
     [[nodiscard]] std::optional<ai::ToolError> submitJob(JobSubmission submission) override;
