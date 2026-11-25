@@ -20,7 +20,7 @@ inline constexpr const char* kEngineVersion = "0.3.0";
 // and never for an additive one. There are no aliases for a renamed tool (ADR-441): the level goes
 // up and every caller moves. tests/unit/test_api_catalogue.cpp refuses a breaking catalogue change
 // that does not bump it.
-inline constexpr int kApiLevel = 1;
+inline constexpr int kApiLevel = 2; // 2: ADR-2156 (project tools take a path; asset.import requires file)
 
 struct VersionInfo {
     std::string engine;    // kEngineVersion

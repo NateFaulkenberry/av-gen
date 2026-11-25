@@ -1111,7 +1111,7 @@
   ],
   "title": "AV Gen project",
   "type": "object",
-  "x-avgen-api": 1,
+  "x-avgen-api": 2,
   "x-avgen-notWrittenBack": [],
   "x-avgen-unknownKeys": "keep"
 }

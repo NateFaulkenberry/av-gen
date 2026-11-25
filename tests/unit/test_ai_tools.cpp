@@ -916,7 +916,7 @@ TEST_CASE("An assistant can create a project, save it and open it again", "[ai][
     REQUIRE(listed.success);
     CHECK(listed.value["projects"].empty());
 
-    const auto created = f.call("project.create", json{{"name", "All You Got"}});
+    const auto created = f.call("project.create", json{{"path", "All You Got"}});
     INFO((created.error ? created.error->message : std::string{}));
     REQUIRE(created.success);
     CHECK(created.value["exists"].get<bool>());
@@ -943,7 +943,7 @@ TEST_CASE("An assistant can create a project, save it and open it again", "[ai][
     // same engine would pass even if the file on disk were empty.
     Fixture other;
     other.allow({}, {root});
-    const auto opened = other.call("project.open", json{{"name", "All You Got"}});
+    const auto opened = other.call("project.open", json{{"path", "All You Got"}});
     INFO((opened.error ? opened.error->message : std::string{}));
     REQUIRE(opened.success);
     CHECK(opened.value["parameters"].get<std::size_t>() > 0);
@@ -955,9 +955,9 @@ TEST_CASE("An assistant can create a project, save it and open it again", "[ai][
 }
 
 TEST_CASE("The project tools refuse a name that would escape the projects folder", "[ai][tools][project]") {
-    // A tool that took a path would let one bad argument write anywhere. These take a name, and a
-    // name that is not a name is reported rather than quietly rewritten into something safe --
-    // sanitising it would hide the mistake from the thing that made it.
+    // ADR-2156: the tools take a path, held to the session's write roots by its PathPolicy, and a bare
+    // name -- what the assistant sends -- that is not a name is reported rather than quietly rewritten
+    // into something safe: sanitising it would hide the mistake from the thing that made it.
     const auto root = std::filesystem::temp_directory_path() /
                       ("avgen_ai_projects_guard_" + std::to_string(static_cast<long long>(getpid())));
     std::filesystem::remove_all(root);
@@ -965,12 +965,21 @@ TEST_CASE("The project tools refuse a name that would escape the projects folder
     Fixture f;
     f.allow({}, {root});
 
-    for (const char* bad : {"../escape", "..", ".hidden", "a/b", "", "with\\backslash"}) {
+    for (const char* bad : {"..", ".hidden", "", "with\\backslash"}) {
         INFO("name: " << bad);
-        const auto r = f.call("project.create", json{{"name", bad}});
+        const auto r = f.call("project.create", json{{"path", bad}});
         CHECK_FALSE(r.success);
         REQUIRE(r.error.has_value());
         CHECK(r.error->code == ai::ToolErrorCode::InvalidArguments);
+    }
+    // A path that leaves the write root is the session's refusal, not a bad name.
+    for (const std::string bad : {std::string("../escape"), std::string("../escape/escape.json"),
+                                  (root.parent_path() / "outside.json").string()}) {
+        INFO("path: " << bad);
+        const auto r = f.call("project.create", json{{"path", bad}});
+        CHECK_FALSE(r.success);
+        REQUIRE(r.error.has_value());
+        CHECK(r.error->code == ai::ToolErrorCode::PermissionDenied);
     }
     // Nothing was created by any of them.
     std::size_t entries = 0;
@@ -978,9 +987,9 @@ TEST_CASE("The project tools refuse a name that would escape the projects folder
     CHECK(entries == 0);
 
     // And a real name still works, so the guard is a guard and not a wall.
-    CHECK(f.call("project.create", json{{"name", "Night Shift"}}).success);
+    CHECK(f.call("project.create", json{{"path", "Night Shift"}}).success);
     // Creating it twice is a conflict, not a silent overwrite of somebody's work.
-    const auto again = f.call("project.create", json{{"name", "Night Shift"}});
+    const auto again = f.call("project.create", json{{"path", "Night Shift"}});
     CHECK_FALSE(again.success);
     REQUIRE(again.error.has_value());
     CHECK(again.error->code == ai::ToolErrorCode::Conflict);
@@ -998,7 +1007,7 @@ TEST_CASE("Saving without a project says which tool to use instead", "[ai][tools
     CHECK(r.error->recovery.find("project.create") != std::string::npos);
 
     // And without a root configured, the name-based tools refuse rather than guessing a location.
-    const auto created = f.call("project.create", json{{"name", "Somewhere"}});
+    const auto created = f.call("project.create", json{{"path", "Somewhere"}});
     CHECK_FALSE(created.success);
     REQUIRE(created.error.has_value());
     // ADR-2153: a session with no write root is refused by its permissions, and told how to get one.
@@ -1100,7 +1109,7 @@ TEST_CASE("The assistant can create a project and import a track into it", "[ai]
     REQUIRE(early.error.has_value());
     CHECK(early.error->recovery.find("project.create") != std::string::npos);
 
-    REQUIRE(f.call("project.create", json{{"name", "All You Got"}}).success);
+    REQUIRE(f.call("project.create", json{{"path", "All You Got"}}).success);
 
     const auto found = f.call("asset.list_importable", json{{"kind", "audio"}});
     REQUIRE(found.success);
@@ -1136,7 +1145,7 @@ TEST_CASE("Importing refuses a file outside the readable folders", "[ai][tools][
 
     Fixture f;
     f.allow({root / "allowed"}, {root / "projects"});
-    REQUIRE(f.call("project.create", json{{"name", "Guarded"}}).success);
+    REQUIRE(f.call("project.create", json{{"path", "Guarded"}}).success);
 
     for (const auto& bad : {root / "secret" / "private.wav",
                             root / "allowed" / ".." / "secret" / "private.wav"}) {
@@ -1162,7 +1171,7 @@ TEST_CASE("The assistant imports visual assets transactionally", "[ai][tools][as
 
     Fixture f;
     f.allow({root / "allowed"}, {root / "projects"});
-    REQUIRE(f.call("project.create", json{{"name", "Visual"}}).success);
+    REQUIRE(f.call("project.create", json{{"path", "Visual"}}).success);
 
     const auto imported = f.call("asset.import", json{{"file", (root / "allowed" / "tree.glb").string()}});
     REQUIRE(imported.success);

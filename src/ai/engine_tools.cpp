@@ -1,5 +1,6 @@
 #include "ai/engine_tools.hpp"
 #include "assets/asset_catalog.hpp"
+#include "assets/asset_registry.hpp"
 
 #include "ai/capabilities.hpp"
 #include "ai/tool_context.hpp"
@@ -23,6 +24,7 @@
 #include <iterator>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <string>
 #include <vector>
 
@@ -413,6 +415,155 @@ std::expected<std::filesystem::path, ToolError> projectsFolder(const ToolContext
     return root;
 }
 
+// A tool with a published result shape and the API level its contract dates from (ADR-2150).
+void addContract(ToolRegistry& r, std::string name, std::string title, std::string description, json inputSchema,
+                 ToolAnnotations annotations, json outputSchema, int since, ToolFn fn) {
+    Tool tool;
+    tool.definition.name = std::move(name);
+    tool.definition.title = std::move(title);
+    tool.definition.description = std::move(description);
+    tool.definition.inputSchema = std::move(inputSchema);
+    tool.definition.outputSchema = std::move(outputSchema);
+    tool.definition.annotations = annotations;
+    tool.definition.since = since;
+    tool.execute = std::move(fn);
+    r.add(std::move(tool));
+}
+
+// An output field of any type (an object, or null), described.
+json anything(std::string description) { return json{{"description", std::move(description)}}; }
+
+// ADR-2156: the project a `project.*` call names. A bare name (no separator, no `.json`) is
+// `<first write root>/<name>/<name>.json`, what Studio's assistant has always sent; a `.json` path is the
+// project file; any other path is a folder whose file is `<folder>/<folder name>.json`. Everything that is
+// not a bare name goes through the session's PathPolicy, so it resolves the way every other path does and
+// is held to the same roots.
+struct ProjectTarget {
+    std::filesystem::path file;
+    std::string name;
+};
+
+std::expected<ProjectTarget, ToolError> projectTarget(const ToolContext& ctx, std::string given, bool forWriting) {
+    if (given.empty()) {
+        return std::unexpected(ToolError{ToolErrorCode::InvalidArguments, "no project path given",
+                                         "pass a project name, a .json path or a folder", json{{"field", "path"}}});
+    }
+    if (given.starts_with("asset://")) {
+        return std::unexpected(ToolError{ToolErrorCode::InvalidArguments,
+                                         fmt::format("'{}' is an asset id, not a project", given),
+                                         "pass a project name, a .json path or a folder", json{{"field", "path"}}});
+    }
+    while (given.size() > 1 && (given.back() == '/' || given.back() == '\\')) {
+        given.pop_back();
+    }
+    const bool bare = given.find('/') == std::string::npos && !given.ends_with(".json");
+    std::string candidate;
+    if (bare) {
+        if (!safeProjectName(given)) {
+            return std::unexpected(ToolError{ToolErrorCode::InvalidArguments,
+                                             fmt::format("'{}' is not a usable project name", given),
+                                             "use a plain name with no slashes or leading dots, or a path",
+                                             json{{"field", "path"}}});
+        }
+        const auto root = projectsFolder(ctx);
+        if (!root) {
+            return std::unexpected(root.error());
+        }
+        candidate = (*root / given / (given + ".json")).string();
+    } else if (given.ends_with(".json")) {
+        candidate = given;
+    } else {
+        const std::filesystem::path folder(given);
+        candidate = (folder / (folder.filename().string() + ".json")).string();
+    }
+    const auto resolved = forWriting ? ctx.paths().forWrite(candidate) : ctx.paths().forRead(candidate);
+    if (!resolved) {
+        return std::unexpected(resolved.error());
+    }
+    if (resolved->stem().empty()) {
+        return std::unexpected(ToolError{ToolErrorCode::InvalidArguments,
+                                         fmt::format("'{}' names no project file", given),
+                                         "pass a project name, a .json path or a folder", json{{"field", "path"}}});
+    }
+    return ProjectTarget{*resolved, resolved->stem().string()};
+}
+
+// ADR-2156: what the engine's own load of an imported model found -- `GltfLoadSummary`, plus the counts and
+// names an author checks a file against (triangles, the clips and their lengths, the parts, the joints).
+json importSummaryJson(const assets::SceneAsset& asset) {
+    const assets::GltfLoadSummary& s = asset.summary;
+    std::size_t triangles = 0;
+    for (const auto& mesh : asset.scene.meshes) {
+        triangles += mesh.indices.size() / 3;
+    }
+    const auto unique = [](std::vector<std::string> v) {
+        std::vector<std::string> out;
+        for (std::string& x : v) {
+            if (!x.empty() && std::find(out.begin(), out.end(), x) == out.end() && out.size() < 256) {
+                out.push_back(std::move(x));
+            }
+        }
+        return out;
+    };
+    std::vector<std::string> entityNames;
+    std::vector<std::string> materialNames;
+    for (const auto& e : asset.scene.entities) {
+        entityNames.push_back(e.name);
+        materialNames.push_back(e.materialName);
+    }
+    json clips = json::array();
+    json rigs = json::array();
+    for (const auto& rig : asset.scene.rigs) {
+        std::vector<std::string> joints;
+        for (const auto& j : rig.skeleton.joints) {
+            joints.push_back(j.name);
+        }
+        rigs.push_back(json{{"name", rig.name}, {"joints", unique(std::move(joints))}});
+        for (const auto& clip : rig.clips) {
+            clips.push_back(json{{"name", clip.name}, {"seconds", clip.length()}, {"rig", rig.name}});
+        }
+    }
+    return json{{"meshes", s.meshes},
+                {"entities", s.entities},
+                {"materials", s.materials},
+                {"textures", s.textures},
+                {"lights", s.lights},
+                {"cameras", s.cameras},
+                {"rigs", s.rigs},
+                {"joints", s.joints},
+                {"clips", s.clips},
+                {"triangles", triangles},
+                {"bounds", json{{"min", {s.boundsMin.x, s.boundsMin.y, s.boundsMin.z}},
+                                {"max", {s.boundsMax.x, s.boundsMax.y, s.boundsMax.z}}}},
+                {"warnings", s.warnings},
+                {"entityNames", unique(std::move(entityNames))},
+                {"materialNames", unique(std::move(materialNames))},
+                {"rigDetail", std::move(rigs)},
+                {"clipDetail", std::move(clips)}};
+}
+
+// Loads `file` with a PRIVATE registry on a worker thread (the engine's registry belongs to the host thread
+// and has no lock) and summarises it. The caller still waits for it: a tool body runs on the host thread, and
+// the Session has no phase that runs a body anywhere else yet (S6 jobs).
+Result<json> summariseModel(const std::filesystem::path& file, const std::filesystem::path& anchor) {
+    auto pending = std::async(std::launch::async, [file, anchor]() -> Result<json> {
+        assets::AssetRegistry privateRegistry(anchor);
+        auto loaded = privateRegistry.loadScene(file);
+        if (!loaded) {
+            return std::unexpected(loaded.error());
+        }
+        return importSummaryJson(**loaded);
+    });
+    return pending.get();
+}
+
+json importSummarySchema() {
+    return json{{"description",
+                 "The engine's load of the file: {meshes, entities, materials, textures, lights, cameras, rigs, joints, "
+                 "clips, triangles, bounds {min, max}, warnings, entityNames, materialNames, rigDetail [{name, joints}], "
+                 "clipDetail [{name, seconds, rig}]}; null for a texture or environment"}};
+}
+
 // ================================================================================================
 // capability.*
 // ================================================================================================
@@ -596,79 +747,126 @@ void registerParameterTools(ToolRegistry& registry) {
     // assistant asked to *start* a piece had no verb for it: `project.get_state` could describe the
     // session and the snapshot tools could roll one back, and nothing could make one or keep it.
     //
-    // Every one takes a **name**, never a path. A tool that took a path would let one bad argument
-    // write anywhere on the machine; a name resolves under the session's first write root (ADR-2153), so the
-    // worst a wrong answer does is make a directory in a folder the user already owns.
-    add(registry, "project.list", "List projects",
-        "Every project in the projects folder, by name. Use this before opening one rather than "
-        "guessing a name.",
+    // ADR-2156: each takes a `path` (projectTarget above). A bare name -- what Studio's assistant sends --
+    // is `<first write root>/<name>/<name>.json`, as before; anything else is a path, resolved by the
+    // session's PathPolicy and held to its roots, so a wrong answer is refused rather than written.
+    addContract(registry, "project.list", "List projects",
+        "Every project in the session's write roots, by name: a folder holding <name>/<name>.json. Use this "
+        "before opening one rather than guessing a name.",
         noArgs(), needs(readOnly(), {"read"}),
+        schema::object({{"root", schema::string("The first write root, where a bare name is created")},
+                        {"roots", schema::array(schema::string("folder"), "Every write root listed")},
+                        {"projects", schema::array(schema::string("name"), "Project names")},
+                        {"files", schema::array(schema::string("path"), "Each project's file, parallel to projects")}},
+                       {"root", "projects"}, true),
+        1,
         [](const json&, ToolContext& ctx) -> ToolResult {
             const auto root = projectsFolder(ctx);
             if (!root) {
                 return ToolResult::failure(root.error());
             }
             json names = json::array();
+            json files = json::array();
+            json roots = json::array();
             std::error_code ec;
-            for (const auto& entry : std::filesystem::directory_iterator(*root, ec)) {
-                if (!entry.is_directory(ec)) {
-                    continue;
+            for (const std::filesystem::path& writeRoot : ctx.paths().permissions().writeRoots) {
+                roots.push_back(writeRoot.string());
+                std::vector<std::pair<std::string, std::filesystem::path>> found; // sorted per root: a stable answer
+                for (const auto& entry : std::filesystem::directory_iterator(writeRoot, ec)) {
+                    if (!entry.is_directory(ec)) {
+                        continue;
+                    }
+                    const std::string name = entry.path().filename().string();
+                    const std::filesystem::path file = entry.path() / (name + ".json");
+                    if (!std::filesystem::exists(file, ec)) {
+                        continue;
+                    }
+                    found.emplace_back(name, file);
                 }
-                const std::string name = entry.path().filename().string();
-                if (!std::filesystem::exists(entry.path() / (name + ".json"), ec)) {
-                    continue;
+                std::sort(found.begin(), found.end());
+                for (const auto& [name, file] : found) {
+                    names.push_back(name);
+                    files.push_back(file.string());
                 }
-                names.push_back(name);
             }
             const auto count = names.size();
             return ToolResult::ok(json{{"root", root->string()},
-                                       {"projects", std::move(names)}},
+                                       {"roots", std::move(roots)},
+                                       {"projects", std::move(names)},
+                                       {"files", std::move(files)}},
                                   fmt::format("{} project(s)", count));
         });
 
-    add(registry, "project.create", "Create a project",
-        "Start a new empty project under this name and save it, so it exists on disk before "
-        "anything is built in it. The session is replaced: anything unsaved is lost.",
-        schema::object({{"name", schema::string("Project name, used as its folder and file name")}}),
+    addContract(registry, "project.create", "Create a project",
+        "Start a new project at this path and save it, so it exists on disk before anything is built in it. "
+        "`path` is a bare name (created as <first write root>/<name>/<name>.json), a project file ending in "
+        ".json, or a folder (its file is <folder>/<folder name>.json); a relative path resolves against the "
+        "open project's folder, else the first write root, never the working directory. `scene: \"empty\"` "
+        "also starts an empty composition and saves it as <stem>.scene.json beside the project, so nodes can "
+        "be added at once and asset://project/ ids resolve against the project folder; `\"none\"` (the "
+        "default) starts the built-in orb with no composition. The session is replaced: anything unsaved is "
+        "lost.",
+        schema::object({{"path", schema::string("A bare project name, a project .json path, or a folder")},
+                        {"scene", schema::string("empty: start an empty composition saved beside the project; "
+                                                 "none (default): no composition",
+                                                 {"empty", "none"})}},
+                       {"path"}),
         needs(sessionWrite(true), {"write"}),
+        schema::object({{"name", schema::string("The project's name (the file's stem)")},
+                        {"file", schema::string("The project file, absolute")},
+                        {"folder", schema::string("The project folder: asset://project/<p> is <folder>/assets/<p>")},
+                        {"scene", anything("The scene file written beside the project (scene: empty), or null")},
+                        {"exists", schema::boolean("The project file is on disk")}},
+                       {"name", "file", "folder", "scene", "exists"}, true),
+        2,
         [](const json& args, ToolContext& ctx) -> ToolResult {
-            const std::string name = args.value("name", std::string{});
-            if (!safeProjectName(name)) {
-                return ToolResult::failure(ToolErrorCode::InvalidArguments,
-                                           fmt::format("'{}' is not a usable project name", name),
-                                           "use a plain name with no slashes or leading dots");
+            const auto target = projectTarget(ctx, args.value("path", std::string{}), true);
+            if (!target) {
+                return ToolResult::failure(target.error());
             }
-            const auto root = projectsFolder(ctx);
-            if (!root) {
-                return ToolResult::failure(root.error());
-            }
-            const auto dirChecked = ctx.paths().forWrite((*root / name).string());
-            if (!dirChecked) {
-                return ToolResult::failure(dirChecked.error());
-            }
-            const std::filesystem::path dir = *dirChecked;
-            const std::filesystem::path file = dir / (name + ".json");
+            const std::string sceneMode = args.value("scene", std::string("none"));
+            const std::filesystem::path file = target->file;
+            const std::filesystem::path dir = file.parent_path();
+            const std::filesystem::path sceneFile = dir / (file.stem().string() + ".scene.json");
             std::error_code ec;
             if (std::filesystem::exists(file, ec)) {
                 return ToolResult::failure(ToolErrorCode::Conflict,
-                                           fmt::format("a project called '{}' already exists", name),
-                                           "open it with project.open, or choose another name");
+                                           fmt::format("a project already exists at '{}'", file.string()),
+                                           "open it with project.open, or choose another path",
+                                           json{{"path", file.string()}});
+            }
+            if (sceneMode == "empty" && std::filesystem::exists(sceneFile, ec)) {
+                return ToolResult::failure(ToolErrorCode::Conflict,
+                                           fmt::format("a scene already exists at '{}'", sceneFile.string()),
+                                           "choose another path, or create with scene: none and open that scene",
+                                           json{{"path", sceneFile.string()}});
             }
             std::filesystem::create_directories(dir, ec);
             if (ec) {
                 return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           fmt::format("cannot create '{}': {}", dir.string(),
-                                                       ec.message()));
+                                           fmt::format("cannot create '{}': {}", dir.string(), ec.message()));
             }
             app::Engine& engine = ctx.engine();
             engine.newProject();
+            json scene = nullptr;
+            if (sceneMode == "empty") {
+                // The scene lives in the project folder, so the engine's registry (anchored to the scene's
+                // folder) and the session's ids (anchored to the project's) name the same files.
+                engine.newComposition();
+                if (auto r = engine.saveComposition(sceneFile); !r) {
+                    return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
+                }
+                scene = sceneFile.string();
+            }
             if (auto r = engine.saveProject(file); !r) {
                 return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
             }
-            return ToolResult::ok(json{{"name", name},
+            return ToolResult::ok(json{{"name", target->name},
                                        {"file", file.string()},
+                                       {"folder", dir.string()},
+                                       {"scene", scene},
                                        {"exists", std::filesystem::exists(file, ec)}},
-                                  fmt::format("created '{}'", name));
+                                  fmt::format("created '{}'", target->name));
         });
 
     add(registry, "project.save", "Save the project",
@@ -700,72 +898,57 @@ void registerParameterTools(ToolRegistry& registry) {
                 fmt::format("saved {}", file.filename().string()));
         });
 
-    add(registry, "project.save_as", "Save the project under a name",
-        "Write the open session to a project of this name and carry on working in it. Use it to "
-        "name a session that was never saved, or to fork one.",
-        schema::object({{"name", schema::string("Project name, used as its folder and file name")}}),
+    addContract(registry, "project.save_as", "Save the project under a path",
+        "Write the open session to a project at this path and carry on working in it. Use it to name a session "
+        "that was never saved, or to fork one. `path` takes the same forms as project.create's.",
+        schema::object({{"path", schema::string("A bare project name, a project .json path, or a folder")}}, {"path"}),
         needs(sessionWrite(), {"write"}),
+        json(nullptr), 2,
         [](const json& args, ToolContext& ctx) -> ToolResult {
-            const std::string name = args.value("name", std::string{});
-            if (!safeProjectName(name)) {
-                return ToolResult::failure(ToolErrorCode::InvalidArguments,
-                                           fmt::format("'{}' is not a usable project name", name));
+            const auto target = projectTarget(ctx, args.value("path", std::string{}), true);
+            if (!target) {
+                return ToolResult::failure(target.error());
             }
-            const auto root = projectsFolder(ctx);
-            if (!root) {
-                return ToolResult::failure(root.error());
-            }
-            const auto dirChecked = ctx.paths().forWrite((*root / name).string());
-            if (!dirChecked) {
-                return ToolResult::failure(dirChecked.error());
-            }
-            const std::filesystem::path dir = *dirChecked;
-            const std::filesystem::path file = dir / (name + ".json");
+            const std::filesystem::path file = target->file;
             std::error_code ec;
-            std::filesystem::create_directories(dir, ec);
+            std::filesystem::create_directories(file.parent_path(), ec);
             app::Engine& engine = ctx.engine();
             if (auto r = engine.saveProject(file); !r) {
                 return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
             }
-            return ToolResult::ok(json{{"name", name},
+            return ToolResult::ok(json{{"name", target->name},
                                        {"file", file.string()},
                                        {"exists", std::filesystem::exists(file, ec)}},
-                                  fmt::format("saved as '{}'", name));
+                                  fmt::format("saved as '{}'", target->name));
         });
 
-    add(registry, "project.open", "Open a project",
-        "Load a project by name, replacing the session. Anything unsaved is lost. Reports what came "
-        "back -- parameters, routes, tracks, whether audio and a scene resolved -- and any load "
-        "warnings, because a project whose scene is missing still 'opens' and the warnings are how "
-        "you find out.",
-        schema::object({{"name", schema::string("Project name, as reported by project.list")}}),
+    addContract(registry, "project.open", "Open a project",
+        "Load a project, replacing the session. Anything unsaved is lost. `path` is a bare name (as reported by "
+        "project.list), a project .json path, or a project folder. Reports what came back -- parameters, routes, "
+        "tracks, whether audio and a scene resolved -- and any load warnings, because a project whose scene is "
+        "missing still 'opens' and the warnings are how you find out.",
+        schema::object({{"path", schema::string("A project name from project.list, a project .json path, or a folder")}},
+                       {"path"}),
         needs(sessionWrite(true), {"read"}),
+        json(nullptr), 2,
         [](const json& args, ToolContext& ctx) -> ToolResult {
-            const std::string name = args.value("name", std::string{});
-            if (!safeProjectName(name)) {
-                return ToolResult::failure(ToolErrorCode::InvalidArguments,
-                                           fmt::format("'{}' is not a usable project name", name));
-            }
-            const auto root = projectsFolder(ctx);
-            if (!root) {
-                return ToolResult::failure(root.error());
-            }
-            const auto found = ctx.paths().forRead((*root / name / (name + ".json")).string());
-            if (!found) {
-                if (found.error().code == ToolErrorCode::NotFound) {
-                    return ToolResult::failure(ToolErrorCode::NotFound,
-                                               fmt::format("no project called '{}'", name),
-                                               "project.list reports what is there");
+            const auto target = projectTarget(ctx, args.value("path", std::string{}), false);
+            if (!target) {
+                if (target.error().code == ToolErrorCode::NotFound) {
+                    ToolError e = target.error();
+                    e.message = fmt::format("no project at '{}'", args.value("path", std::string{}));
+                    e.recovery = "project.list reports what is there";
+                    return ToolResult::failure(std::move(e));
                 }
-                return ToolResult::failure(found.error());
+                return ToolResult::failure(target.error());
             }
-            const std::filesystem::path file = *found;
+            const std::filesystem::path file = target->file;
             app::Engine& engine = ctx.engine();
             if (auto r = engine.loadProject(file); !r) {
                 return ToolResult::failure(ToolErrorCode::Unavailable, r.error().message);
             }
             json out;
-            out["name"] = name;
+            out["name"] = target->name;
             out["file"] = file.string();
             out["parameters"] = engine.params().size();
             out["routes"] = engine.modulator().routes().size();
@@ -776,7 +959,7 @@ void registerParameterTools(ToolRegistry& registry) {
                 out["warnings"] = engine.projectWarnings();
                 out["warningNote"] = "the project opened, but these assets did not resolve";
             }
-            return ToolResult::ok(std::move(out), fmt::format("opened '{}'", name));
+            return ToolResult::ok(std::move(out), fmt::format("opened '{}'", target->name));
         });
 
     // ---- generating a world ---------------------------------------------------------------------
@@ -904,87 +1087,160 @@ void registerParameterTools(ToolRegistry& registry) {
     // different answer: `ToolContext::paths()` (the session's PathPolicy, ADR-2153) bounds it to the
     // directories the session was given, with `..` and symlinks resolved *before* the containment test. Without that an import tool is
     // an arbitrary-file-read primitive handed to a language model.
+    // ADR-2156: the catalogue walks the read roots and, when the session may read it, the open project's
+    // folder -- write roots are readable, and a project in one has assets an agent must be able to list.
+    const auto catalogFor = [](const ToolContext& ctx) {
+        std::vector<std::filesystem::path> roots = ctx.paths().readRoots();
+        const std::filesystem::path folder = ctx.paths().projectFolder();
+        if (!folder.empty() && ctx.paths().forRead(folder.string())) {
+            roots.push_back(folder);
+        }
+        return assets::catalogAssets(roots, folder);
+    };
+    const auto recordJson = [](const assets::AssetRecord& asset) {
+        return json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
+                    {"source", assets::assetSourceName(asset.source)},
+                    {"path", asset.path.string()}, {"tags", asset.tags}};
+    };
     add(registry, "asset.list", "List available assets",
-        "List stable asset IDs visible to this session, including built-in and project-owned assets.",
+        "List the assets visible to this session. A project asset's id is asset://project/<type>/<file>.<ext> "
+        "(the id asset.import returns); anything else is named by its absolute path. Every tool that takes an "
+        "asset accepts either.",
         schema::object({{"query", schema::string("Optional name, ID or type search")},
                         {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
         needs(readOnly(), {"read"}),
-        [](const json& args, ToolContext& ctx) -> ToolResult {
-            const auto catalog = assets::catalogAssets(ctx.paths().readRoots(), ctx.paths().projectFolder());
+        [catalogFor, recordJson](const json& args, ToolContext& ctx) -> ToolResult {
+            const auto catalog = catalogFor(ctx);
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
             const auto found = assets::searchAssets(*catalog, args.value("query", std::string{}), limitOf(args));
             json out = json::array();
             for (const auto& asset : found) {
-                out.push_back(json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
-                                   {"source", assets::assetSourceName(asset.source)},
-                                   {"path", asset.path.string()}, {"tags", asset.tags}});
+                out.push_back(recordJson(asset));
             }
             return ToolResult::ok(json{{"assets", std::move(out)}, {"totalVisible", catalog->size()}},
                                   fmt::format("{} asset(s) visible", found.size()));
         });
 
     add(registry, "asset.search", "Search available assets",
-        "Search built-in and project asset metadata by stable ID, name or type.",
+        "Search the assets visible to this session by id, name or type (ids as asset.list reports them).",
         schema::object({{"query", schema::string("Name, ID or type search")},
                         {"limit", schema::integer("Maximum results (default 100)", 1, kMaxLimit)}}),
         needs(readOnly(), {"read"}),
-        [](const json& args, ToolContext& ctx) -> ToolResult {
+        [catalogFor, recordJson](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string query = args.value("query", std::string{});
             if (query.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "query must not be empty");
-            const auto catalog = assets::catalogAssets(ctx.paths().readRoots(), ctx.paths().projectFolder());
+            const auto catalog = catalogFor(ctx);
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
             const auto found = assets::searchAssets(*catalog, query, limitOf(args));
             json out = json::array();
             for (const auto& asset : found) {
-                out.push_back(json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
-                                   {"source", assets::assetSourceName(asset.source)},
-                                   {"path", asset.path.string()}, {"tags", asset.tags}});
+                out.push_back(recordJson(asset));
             }
             return ToolResult::ok(json{{"assets", std::move(out)}}, fmt::format("{} matching asset(s)", found.size()));
         });
 
-    add(registry, "asset.get", "Get asset metadata",
-        "Resolve one stable asset ID from asset.list or asset.search and return its ownership, type, path and tags.",
-        schema::object({{"id", schema::string("Stable asset ID")}}, {"id"}),
+    addContract(registry, "asset.get", "Get asset metadata",
+        "One asset, by its asset://project/ id or by a path (a relative path resolves against the open project's "
+        "folder): its id, ownership, type, path and tags, and for a project asset its manifest entry -- size, "
+        "sha256, where it came from and what the engine's import found.",
+        schema::object({{"id", schema::string("An asset://project/ id, or a file path")}}, {"id"}),
         needs(readOnly(), {"read"}),
-        [](const json& args, ToolContext& ctx) -> ToolResult {
-            const std::string id = args.at("id").get<std::string>();
-            const auto catalog = assets::catalogAssets(ctx.paths().readRoots(), ctx.paths().projectFolder());
+        schema::object({{"id", schema::string("asset://project/... for a project asset, else the absolute path")},
+                        {"name", schema::string("File stem")},
+                        {"type", schema::string("model, environment, texture, audio or scene")},
+                        {"source", schema::string("project, builtin or external", {"project", "builtin", "external"})},
+                        {"path", schema::string("Absolute path")},
+                        {"tags", schema::array(schema::string("tag"), "Tags")},
+                        {"manifest", anything("The project manifest's entry {size, sha256, source, import}, or null")}},
+                       {"id", "name", "type", "source", "path", "tags", "manifest"}, true),
+        1,
+        [catalogFor, recordJson](const json& args, ToolContext& ctx) -> ToolResult {
+            const std::string given = args.at("id").get<std::string>();
+            const auto resolved = ctx.paths().forRead(given);
+            if (!resolved) return ToolResult::failure(resolved.error());
+            const auto catalog = catalogFor(ctx);
             if (!catalog) return ToolResult::failure(ToolErrorCode::Unavailable, catalog.error().message);
             for (const auto& asset : *catalog) {
-                if (asset.id != id) continue;
-                return ToolResult::ok(json{{"id", asset.id}, {"name", asset.name}, {"type", asset.type},
-                                           {"source", assets::assetSourceName(asset.source)},
-                                           {"path", asset.path.string()}, {"tags", asset.tags}},
-                                      "asset metadata");
+                std::error_code ec;
+                if (!std::filesystem::equivalent(asset.path, *resolved, ec)) continue;
+                json out = recordJson(asset);
+                out["manifest"] = nullptr;
+                const std::filesystem::path folder = ctx.paths().projectFolder();
+                if (asset.source == assets::AssetSource::Project && !folder.empty()) {
+                    if (auto manifest = assets::readManifest(folder)) {
+                        const std::string rel = asset.id.rfind("asset://project/", 0) == 0
+                                                    ? "assets/" + asset.id.substr(16)
+                                                    : std::string{};
+                        if (const auto* entry = manifest->findByPath(rel)) {
+                            out["manifest"] = json{{"size", entry->size}, {"sha256", entry->sha256},
+                                                   {"source", entry->source}, {"import", entry->import}};
+                        }
+                    }
+                }
+                return ToolResult::ok(std::move(out), "asset metadata");
             }
-            return ToolResult::failure(ToolErrorCode::NotFound, "asset ID is not visible in this session");
+            return ToolResult::failure(ToolErrorCode::NotFound,
+                                       fmt::format("'{}' is not an asset this session lists", given),
+                                       "asset.list reports the assets visible here",
+                                       json{{"path", given}, {"resolved", resolved->string()}});
         });
 
-    add(registry, "asset.import", "Import an asset into the project",
-        "Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.",
-        schema::object({{"file", schema::string("Path to a reachable model, environment or texture")}}),
+    addContract(registry, "asset.import", "Import an asset into the project",
+        "Copy a supported model, environment or texture into the open project's assets/<type>/ folder and "
+        "record it in assets/manifest.json. `file` is any path this session may read (a relative path resolves "
+        "against the open project's folder). The original is never modified. Returns the asset's id, "
+        "asset://project/<type>/<file>.<ext>, which every asset-taking tool accepts; importing the same bytes "
+        "again returns the existing file's id. A model is loaded by the engine before the call succeeds, and "
+        "`import` reports what it found (meshes, rigs, joints, clips, materials, triangles, bounds, warnings): "
+        "a file that does not load is refused and nothing is left behind. `source` records where the file came "
+        "from in the manifest.",
+        schema::object({{"file", schema::string("Path to a reachable model, environment or texture")},
+                        {"source", schema::object({{"file", schema::string("The file the client exported")},
+                                                   {"tool", schema::string("The exporting tool, e.g. Blender")},
+                                                   {"toolVersion", schema::string("Its version")},
+                                                   {"exportProfile", schema::string("The export profile's name")},
+                                                   {"exportSettingsSha256",
+                                                    schema::string("SHA-256 of the export settings")}})}},
+                       {"file"}),
         needs(sessionWrite(), {"read", "write"}),
+        schema::object({{"id", schema::string("asset://project/<type>/<file>.<ext>")},
+                        {"source", schema::string("Always project", {"project"})},
+                        {"type", schema::string("models, environments or textures")},
+                        {"path", schema::string("The copy in the project, absolute")},
+                        {"sha256", schema::string("SHA-256 of the file")},
+                        {"size", schema::integer("Bytes")},
+                        {"duplicate", schema::boolean("These bytes were already in the project; nothing was copied")},
+                        {"copied", schema::array(schema::string("path"), "Files copied (the asset, then its glTF dependencies)")},
+                        {"import", importSummarySchema()}},
+                       {"id", "source", "type", "path", "sha256", "size", "duplicate", "copied", "import"}, true),
+        2,
         [](const json& args, ToolContext& ctx) -> ToolResult {
             const std::string given = args.value("file", std::string{});
             if (given.empty()) return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named");
             const auto source = ctx.paths().forRead(given);
             if (!source) return ToolResult::failure(source.error());
-            app::Engine& engine = ctx.engine();
-            if (engine.projectPath().empty()) {
-                return ToolResult::failure(ToolErrorCode::FailedPrecondition, "open or create a project before importing assets",
-                                           "use project.create or project.open first");
-            }
             if (auto refused = ctx.paths().projectWriteRefusal()) return ToolResult::failure(std::move(*refused));
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(*source, ec)) {
+                return ToolResult::failure(ToolErrorCode::NotFound, fmt::format("'{}' is not a file", given));
+            }
             const std::string type = importTypeFor(*source);
             if (type.empty()) return ToolResult::failure(ToolErrorCode::Unsupported, "supported asset types are glTF, GLB, HDR, EXR and common textures");
             auto hash = sha256File(*source);
             if (!hash) return ToolResult::failure(ToolErrorCode::Unavailable, hash.error().message);
+            const auto bytes = static_cast<std::uint64_t>(std::filesystem::file_size(*source, ec));
             const std::filesystem::path projectDir = ctx.paths().projectFolder();
             const auto assetRootChecked = ctx.paths().forWrite((projectDir / "assets" / type).string());
             if (!assetRootChecked) return ToolResult::failure(assetRootChecked.error());
             const std::filesystem::path assetRoot = *assetRootChecked;
-            std::error_code ec;
+            // Read before anything is written: a manifest this build cannot read is refused, never overwritten.
+            auto manifest = assets::readManifest(projectDir);
+            if (!manifest) {
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition, manifest.error().message,
+                                           "repair or move assets/manifest.json, then import again");
+            }
+            const json clientSource = args.contains("source") ? args.at("source") : json(nullptr);
+            const bool isModel = type == "models";
             std::filesystem::create_directories(assetRoot, ec);
             if (ec) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot create project asset directory: " + ec.message());
             std::vector<std::filesystem::path> dependencies;
@@ -1013,26 +1269,86 @@ void registerParameterTools(ToolRegistry& registry) {
                     }
                 }
             }
+            // The manifest is rewritten whole (always version 2, a v1 file's ids corrected), through a temporary
+            // name, and its previous bytes go to the compensation log so a rollback puts them back.
+            const std::filesystem::path manifestFile = assets::manifestPath(projectDir);
+            const auto writeManifest = [&](const assets::AssetManifest& m) -> std::optional<ToolResult> {
+                std::string previous;
+                const bool existed = std::filesystem::exists(manifestFile, ec);
+                if (existed) {
+                    std::ifstream in(manifestFile, std::ios::binary);
+                    previous.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+                }
+                const std::filesystem::path temp = manifestFile.string() + ".tmp";
+                { std::ofstream out(temp, std::ios::trunc); out << m.toJson().dump(2) << '\n'; }
+                std::filesystem::rename(temp, manifestFile, ec);
+                if (ec) {
+                    std::error_code removeError;
+                    std::filesystem::remove(temp, removeError);
+                    return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
+                }
+                if (existed) {
+                    ctx.noteReplacedFile(manifestFile, std::move(previous));
+                } else {
+                    ctx.noteCreatedFile(manifestFile, ToolContext::FileRole::ProjectDocument);
+                }
+                return std::nullopt;
+            };
+            const auto relativeToProject = [&](const std::filesystem::path& file) {
+                return file.lexically_relative(projectDir).generic_string();
+            };
+            // The same bytes already in the project: its id, in the same form, and no copy.
             for (const auto& entry : std::filesystem::recursive_directory_iterator(projectDir / "assets",
                                                                                      std::filesystem::directory_options::skip_permission_denied, ec)) {
                 if (!entry.is_regular_file(ec)) continue;
+                const std::string filename = entry.path().filename().string();
+                if (filename == "manifest.json" || filename.starts_with(".")) continue;
                 auto existing = sha256File(entry.path());
-                if (existing && *existing == *hash) {
-                    // The project now depends on a file another import made: a rollback of that import must
-                    // not delete it from under this one (api/compensation.hpp, rule 3).
-                    ctx.noteUsedFile(entry.path());
-                    return ToolResult::ok(json{{"id", "asset://project/" + type + "/" + entry.path().filename().string()},
-                                               {"path", entry.path().string()}, {"source", "project"}, {"duplicate", true}},
-                                          "asset already imported");
+                if (!existing || *existing != *hash) continue;
+                const std::string id = ctx.paths().assetIdFor(entry.path());
+                if (id.empty()) continue;
+                // The project now depends on a file another import made: a rollback of that import must
+                // not delete it from under this one (api/compensation.hpp, rule 3).
+                ctx.noteUsedFile(entry.path());
+                const std::string rel = relativeToProject(entry.path());
+                const assets::ManifestEntry* known = manifest->findByPath(rel);
+                json summary = known != nullptr ? known->import : json(nullptr);
+                if (known == nullptr || manifest->corrected || (known->source.is_null() && !clientSource.is_null())) {
+                    if (isModel && summary.is_null()) {
+                        auto s = summariseModel(entry.path(), projectDir);
+                        if (!s) return ToolResult::failure(ToolErrorCode::Unsupported, "the model does not load: " + s.error().message);
+                        summary = std::move(*s);
+                    }
+                    assets::ManifestEntry e;
+                    e.id = id;
+                    e.type = std::filesystem::path(rel).parent_path().filename().string();
+                    e.path = rel;
+                    e.size = static_cast<std::uint64_t>(std::filesystem::file_size(entry.path(), ec));
+                    e.sha256 = *hash;
+                    e.source = known != nullptr && !known->source.is_null() ? known->source : clientSource;
+                    e.import = summary;
+                    manifest->upsert(std::move(e));
+                    if (auto failed = writeManifest(*manifest)) return std::move(*failed);
                 }
+                return ToolResult::ok(json{{"id", id}, {"source", "project"}, {"type", type},
+                                           {"path", entry.path().string()}, {"sha256", *hash},
+                                           {"size", static_cast<std::uint64_t>(std::filesystem::file_size(entry.path(), ec))},
+                                           {"duplicate", true}, {"copied", json::array()}, {"import", summary}},
+                                      "asset already imported");
             }
             // Every file written is reported to the session's compensation log, which deletes or restores it
-            // when this call fails or its transaction rolls back (ADR-2153). The tool keeps no rollback of
-            // its own.
+            // when this call fails or its transaction rolls back (ADR-2153). Each is copied under a dot-name
+            // first and renamed into place, so a half-written copy never sits at the name an id resolves to.
             const auto copyInto = [&](const std::filesystem::path& from, const std::filesystem::path& to) -> bool {
                 const bool existed = std::filesystem::exists(to, ec);
-                std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, ec);
-                if (ec) return false;
+                const std::filesystem::path staging = to.parent_path() / ("." + to.filename().string() + ".importing");
+                std::filesystem::copy_file(from, staging, std::filesystem::copy_options::overwrite_existing, ec);
+                if (!ec) std::filesystem::rename(staging, to, ec);
+                if (ec) {
+                    std::error_code removeError;
+                    std::filesystem::remove(staging, removeError);
+                    return false;
+                }
                 if (existed) {
                     ctx.noteOverwrittenFile(to);
                 } else {
@@ -1051,50 +1367,35 @@ void registerParameterTools(ToolRegistry& registry) {
                 }
                 copied.push_back(dependencyTarget.string());
             }
-            const std::string id = "asset://project/" + type + "/" + target.stem().string();
-            const std::filesystem::path manifestPath = projectDir / "assets" / "manifest.json";
-            json manifest = json::object();
-            manifest["format"] = "avgen-project-assets";
-            manifest["version"] = 1;
-            manifest["assets"] = json::array();
-            std::string previousManifest;
-            const bool manifestExisted = std::filesystem::exists(manifestPath, ec);
-            {
-                std::ifstream manifestIn(manifestPath, std::ios::binary);
-                if (manifestIn) {
-                    previousManifest.assign(std::istreambuf_iterator<char>(manifestIn), std::istreambuf_iterator<char>());
-                    json existing = json::parse(previousManifest, nullptr, false);
-                    if (!existing.is_discarded() && existing.is_object() && existing["assets"].is_array()) {
-                        manifest = std::move(existing);
-                    }
+            // The copy, loaded by the engine's own loader, is the import's proof: a model that does not load
+            // from where the project will load it fails the call, and the log removes the copies.
+            json summary = nullptr;
+            if (isModel) {
+                auto s = summariseModel(target, projectDir);
+                if (!s) {
+                    return ToolResult::failure(ToolErrorCode::Unsupported, "the model does not load: " + s.error().message,
+                                               "check the file opens in a glTF viewer; nothing was kept");
                 }
+                summary = std::move(*s);
             }
-            const std::string relative = std::filesystem::relative(target, projectDir).generic_string();
-            bool replaced = false;
-            for (auto& entry : manifest["assets"]) {
-                if (entry.is_object() && entry.value("id", std::string{}) == id) {
-                    entry = json{{"id", id}, {"type", type}, {"path", relative}, {"sha256", *hash}};
-                    replaced = true;
-                }
+            const std::string id = ctx.paths().assetIdFor(target);
+            if (id.empty()) {
+                return ToolResult::failure(ToolErrorCode::Internal,
+                                           fmt::format("'{}' has no asset id under '{}'", target.string(), projectDir.string()));
             }
-            if (!replaced) {
-                manifest["assets"].push_back(json{{"id", id}, {"type", type}, {"path", relative}, {"sha256", *hash}});
-            }
-            const std::filesystem::path manifestTemp = manifestPath.string() + ".tmp";
-            { std::ofstream out(manifestTemp, std::ios::trunc); out << manifest.dump(2) << '\n'; }
-            std::filesystem::rename(manifestTemp, manifestPath, ec);
-            if (ec) {
-                std::error_code removeError;
-                std::filesystem::remove(manifestTemp, removeError);
-                return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
-            }
-            if (manifestExisted) {
-                ctx.noteReplacedFile(manifestPath, std::move(previousManifest));
-            } else {
-                ctx.noteCreatedFile(manifestPath, ToolContext::FileRole::ProjectDocument);
-            }
+            assets::ManifestEntry e;
+            e.id = id;
+            e.type = type;
+            e.path = relativeToProject(target);
+            e.size = bytes;
+            e.sha256 = *hash;
+            e.source = clientSource;
+            e.import = summary;
+            manifest->upsert(std::move(e));
+            if (auto failed = writeManifest(*manifest)) return std::move(*failed);
             return ToolResult::ok(json{{"id", id}, {"source", "project"}, {"type", type},
-                                       {"path", target.string()}, {"sha256", *hash}, {"copied", copied}},
+                                       {"path", target.string()}, {"sha256", *hash}, {"size", bytes},
+                                       {"duplicate", false}, {"copied", copied}, {"import", summary}},
                                   "asset imported into project");
         });
 
@@ -1701,18 +2002,34 @@ void registerParameterTools(ToolRegistry& registry) {
     // transaction now captures the composition as well as the parameters (see
     // `SnapshotStore::captureDocument`). Before that, a rollback would have restored a tool's
     // numbers and left the object it made standing in the scene.
-    add(registry, "scene.create_node", "Create a node",
-        "Put an object in the scene: a glTF asset by file, or an empty Group to parent things to. "
-        "The asset path is resolved against the folders this session may read, so a model that is "
-        "not reachable is refused here rather than becoming a node that renders nothing.",
+    addContract(registry, "scene.create_node", "Create a node",
+        "Put an object in the scene: a glTF asset, or an empty Group to parent things to. `asset` is an "
+        "asset://project/ id (what asset.import returns) or a path; a relative path resolves against the open "
+        "project's folder, never the working directory. It is resolved against the folders this session may "
+        "read, so a model that is not reachable is refused here rather than becoming a node that renders "
+        "nothing. Reports the node's world bounds, read back from the built node.",
         schema::object({{"name", schema::string("Node name; must not already exist")},
                         {"kind", schema::string("gltf (default) or group")},
-                        {"asset", schema::string("Path to the .gltf/.glb, for kind gltf")},
+                        {"asset", schema::string("asset://project/ id or path of the .gltf/.glb, for kind gltf")},
                         {"parent", schema::string("Parent node name; omit for the root")},
                         {"position", schema::array(schema::number("metres"), "World position", 3, 3)},
                         {"scale", schema::number("Uniform scale (default 1)")},
                         {"rotationDegrees", schema::array(schema::number("degrees"), "Euler XYZ", 3, 3)}}),
         requiring(needs(as(mutating(), ExecutionClass::Structural), {"read"}), {"composition"}),
+        schema::object({{"name", schema::string("The node's name")},
+                        {"kind", schema::string("gltf or group")},
+                        {"parent", schema::string("Parent node name, empty for the root")},
+                        {"nodes", schema::integer("Nodes in the composition now")},
+                        {"asset", anything("For a gltf node {id, path}: its asset://project/ id (empty when the file "
+                                           "is not a project asset) and the file; null for a group")},
+                        {"bounds", schema::object({{"valid", schema::boolean("The node has geometry")},
+                                                   {"min", schema::array(schema::number("metres"), "World min", 3, 3)},
+                                                   {"max", schema::array(schema::number("metres"), "World max", 3, 3)},
+                                                   {"size", schema::array(schema::number("metres"), "max - min", 3, 3)}},
+                                                  {"valid", "min", "max", "size"})},
+                        {"warning", schema::string("Set when a gltf node came out with no geometry")}},
+                       {"name", "kind", "parent", "nodes", "asset", "bounds"}, true),
+        1,
         [](const json& args, ToolContext& ctx) -> ToolResult {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
@@ -1748,6 +2065,8 @@ void registerParameterTools(ToolRegistry& registry) {
             scene::CompositionNode node;
             node.name = name;
             node.kind = *kind;
+            std::string assetId;
+            std::filesystem::path assetFile;
             if (*kind == scene::NodeKind::Gltf) {
                 const std::string asset = args.value("asset", std::string{});
                 if (asset.empty()) {
@@ -1763,7 +2082,17 @@ void registerParameterTools(ToolRegistry& registry) {
                     return ToolResult::failure(ToolErrorCode::NotFound,
                                                fmt::format("'{}' is not a file", resolved->string()));
                 }
-                node.asset = *resolved;
+                // ADR-2156: the node keeps the id when the engine's registry (anchored to the scene file's folder)
+                // reads it back as this file -- true for every project project.create made, and what keeps the
+                // saved scene portable -- and the absolute file otherwise (a scene that lives elsewhere), which
+                // the scene save rebases. Either way it is this file, whatever the working directory.
+                assetId = ctx.paths().assetIdFor(*resolved);
+                std::error_code same;
+                const bool idReadsBack = !assetId.empty() && !engine.assetRegistry().baseDirectory().empty() &&
+                                         engine.assetRegistry().baseDirectory().is_absolute() &&
+                                         std::filesystem::equivalent(engine.assetRegistry().resolve(assetId), *resolved, same);
+                node.asset = idReadsBack ? std::filesystem::path(assetId) : *resolved;
+                assetFile = *resolved;
                 ctx.noteUsedFile(*resolved); // a node made from an import depends on it (compensation rule 3)
             }
             const std::string parent = args.value("parent", std::string{});
@@ -1800,7 +2129,10 @@ void registerParameterTools(ToolRegistry& registry) {
                      {"kind", scene::nodeKindName(*kind)},
                      {"parent", (*added)->parent},
                      {"nodes", comp->nodes().size()}};
+            out["asset"] = assetFile.empty() ? json(nullptr) : json{{"id", assetId}, {"path", assetFile.string()}};
             out["bounds"] = json{{"valid", bounds.valid},
+                                 {"min", {bounds.min.x, bounds.min.y, bounds.min.z}},
+                                 {"max", {bounds.max.x, bounds.max.y, bounds.max.z}},
                                  {"size", {bounds.size().x, bounds.size().y, bounds.size().z}}};
             if (*kind == scene::NodeKind::Gltf && !bounds.valid) {
                 out["warning"] = "the node was created but has no geometry: the asset loaded nothing";

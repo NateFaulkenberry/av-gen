@@ -35,8 +35,11 @@ TEST_CASE("asset catalog distinguishes built-in and project assets", "[assets][c
     CHECK(find("tree")->source == assets::AssetSource::Builtin);
     CHECK(find("custom")->source == assets::AssetSource::Project);
     CHECK(find("moon")->type == "environment");
-    CHECK(find("custom")->id == "asset://project/models/custom-identity");
-    CHECK(find("tree")->id.rfind("asset://builtin/", 0) == 0);
+    // ADR-2156: one id. A project asset's is what its path says (a manifest's own spelling is not kept), and
+    // a file outside the project's assets folder is named by its path, which every tool accepts.
+    CHECK(find("custom")->id == "asset://project/models/custom.glb");
+    CHECK(find("moon")->id == "asset://project/moon.hdr");
+    CHECK(find("tree")->id == fs::weakly_canonical(root / "builtin" / "models" / "tree.glb").string());
 
     const auto matches = assets::searchAssets(*records, "custom");
     REQUIRE(matches.size() == 1);

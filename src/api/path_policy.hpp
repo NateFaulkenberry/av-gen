@@ -24,9 +24,12 @@
 //      "<root>/../../etc/passwd" starts with the root. This is `ToolContext::resolveContent`'s algorithm,
 //      moved here; that function is gone.
 //   3. Write roots are implicitly readable.
-//   4. `asset://` ids are not paths. They resolve through the project's asset registry in stage S3; until
-//      then a path tool refuses one with `Unsupported` and says to pass the file path (the seam is
-//      `resolveAssetId`).
+//   4. `asset://project/<p>` is an asset id (ADR-2156, stage S3): the file `<project>/assets/<p>`, resolved by
+//      `AssetRegistry::resolve` anchored to the open PROJECT's folder (not the scene file's, which is the
+//      engine registry's base), then held to `<project>/assets` on its canonical form -- so `..` and a
+//      symlink that leaves the folder are refused -- and then to the same root test as any path. Every tool
+//      that takes a file therefore takes an id too, with no resolution of its own. Other `asset://` schemes
+//      are refused with `Unsupported` (`asset://engine/` is reserved).
 //
 // The engine's own resources (shaders, built-in content, help) are not gated: permissions apply to paths a
 // client names and to files the session writes.
@@ -91,7 +94,9 @@ public:
 
     // A path the session may read. `PermissionDenied` outside every readable root (details.path is what
     // was given, details.resolved what it resolved to), `NotFound` when it is inside but does not exist,
-    // `InvalidArguments` when empty, `Unsupported` for an `asset://` id (stage S3).
+    // `InvalidArguments` when empty. An `asset://project/` id resolves as described above (`FailedPrecondition`
+    // with no project open, `PermissionDenied` when it leaves the project's assets folder); another
+    // `asset://` scheme is `Unsupported`.
     [[nodiscard]] PathResult forRead(std::string_view given) const;
     // A path the session may write (it need not exist). `PermissionDenied` outside every writable root.
     [[nodiscard]] PathResult forWrite(std::string_view given) const;
@@ -105,6 +110,9 @@ public:
     [[nodiscard]] std::filesystem::path projectFolder() const;
     // Where a bare name (`project.create {name}`) lives: the first write root, or empty.
     [[nodiscard]] std::filesystem::path firstWriteRoot() const;
+    // The asset id of a file in the open project's assets folder (`asset://project/models/x.glb`), the form
+    // `AssetRegistry::assetId` gives anchored to the project folder; empty for any other file or no project.
+    [[nodiscard]] std::string assetIdFor(const std::filesystem::path& file) const;
     // The explicit read roots, as given.
     [[nodiscard]] const std::vector<std::filesystem::path>& readRoots() const { return permissions_.readRoots; }
     // The folders a listing walks (`asset.list_importable`, `world.list_recipes`): the read roots, then the
@@ -119,7 +127,7 @@ public:
 private:
     [[nodiscard]] PathResult resolve(std::string_view given) const;
     [[nodiscard]] bool inside(const std::filesystem::path& full, bool forWriting) const;
-    // Stage S3's seam: `asset://project/<p>` -> the project's asset registry, then the same containment test.
+    // `asset://project/<p>` -> the project-anchored registry, held to `<project>/assets` (ADR-2156).
     [[nodiscard]] PathResult resolveAssetId(std::string_view id) const;
 
     SessionPermissions permissions_;

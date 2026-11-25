@@ -1,6 +1,7 @@
 #include "api/path_policy.hpp"
 
 #include "app/engine.hpp"
+#include "assets/asset_registry.hpp"
 
 #include <fmt/format.h>
 
@@ -158,13 +159,48 @@ bool PathPolicy::inside(const fs::path& full, bool forWriting) const {
 }
 
 PathResult PathPolicy::resolveAssetId(std::string_view id) const {
-    // Stage S3 resolves `asset://project/<p>` through the project's asset registry and then applies the
-    // same containment test as a path. Until then, refuse it plainly rather than treat it as a file name.
-    return std::unexpected(refusal(
-        ai::ToolErrorCode::Unsupported, fmt::format("'{}' is an asset id; this tool takes a file path", id),
-        "pass the file path (asset.import reports it as `path`); asset ids are resolved by path tools in a later "
-        "API level",
-        nlohmann::json{{"path", std::string(id)}}));
+    constexpr std::string_view kProject = "asset://project/";
+    if (!id.starts_with(kProject)) {
+        return std::unexpected(refusal(
+            ai::ToolErrorCode::Unsupported,
+            fmt::format("'{}' is not an id this engine resolves; project assets are asset://project/<path>", id),
+            "pass the file path, or the asset://project/ id asset.import returned (asset://engine/ is reserved)",
+            nlohmann::json{{"path", std::string(id)}}));
+    }
+    if (id.size() == kProject.size()) {
+        return std::unexpected(refusal(ai::ToolErrorCode::InvalidArguments, fmt::format("'{}' names no file", id),
+                                       "asset://project/<type>/<file>.<ext>", nlohmann::json{{"path", std::string(id)}}));
+    }
+    const fs::path folder = projectFolder();
+    if (folder.empty()) {
+        return std::unexpected(refusal(ai::ToolErrorCode::FailedPrecondition,
+                                       fmt::format("'{}' names a file in the open project, and none is open", id),
+                                       "use project.create or project.open first",
+                                       nlohmann::json{{"path", std::string(id)}}));
+    }
+    // The one resolver: the registry's own mapping, anchored to the project folder. A private registry,
+    // because the engine's is anchored to the scene file's folder and belongs to the host thread.
+    const assets::AssetRegistry anchor(folder);
+    const fs::path full = anchor.resolve(fs::path(std::string(id)));
+    if (!pathInside(full, folder / "assets")) {
+        return std::unexpected(refusal(
+            ai::ToolErrorCode::PermissionDenied,
+            fmt::format("'{}' leaves the project's assets folder", id),
+            "an asset id names a file below <project>/assets; asset.list reports the ids there",
+            nlohmann::json{{"path", std::string(id)}, {"resolved", full.string()}}));
+    }
+    return full.lexically_normal();
+}
+
+std::string PathPolicy::assetIdFor(const fs::path& file) const {
+    const fs::path folder = projectFolder();
+    if (folder.empty() || file.empty()) {
+        return {};
+    }
+    const assets::AssetRegistry anchor(folder);
+    const fs::path full = anchor.resolve(file);
+    // assetId tests the lexical relation; the containment answer is taken on the canonical form, as everywhere.
+    return pathInside(full, folder / "assets") ? anchor.assetId(full) : std::string{};
 }
 
 PathResult PathPolicy::resolve(std::string_view given) const {

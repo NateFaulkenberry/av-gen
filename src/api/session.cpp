@@ -4,6 +4,7 @@
 #include "ai/engine_tools.hpp"
 #include "api/version.hpp"
 #include "app/engine.hpp"
+#include "assets/asset_registry.hpp"
 #include "core/log.hpp"
 #include "scene/composition.hpp"
 
@@ -549,6 +550,15 @@ bool Session::referencedOutside(const fs::path& file) {
     const auto matches = [&](const std::string& s, const fs::path& base) {
         if (s.empty() || s.size() > 4096) {
             return false;
+        }
+        // ADR-2156: an asset id names a file too -- in a document, the folder its own registry is anchored to
+        // (the scene's), and through the tools, the project's. Both are tested, so a save that wrote the id a
+        // node was made from keeps the file a rollback would otherwise delete.
+        if (s.starts_with("asset://project/")) {
+            const auto underAnchor = [&](const fs::path& anchor) {
+                return !anchor.empty() && names(assets::AssetRegistry(anchor).resolve(fs::path(s)));
+            };
+            return underAnchor(base) || underAnchor(projectDir) || underAnchor(sceneDir);
         }
         const fs::path p(s);
         if (p.is_absolute()) {

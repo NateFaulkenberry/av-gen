@@ -1,9 +1,17 @@
 {
-  "api": 1,
+  "api": 2,
   "format": "avgen-api-baseline",
   "tools": {
     "asset.get": {
-      "output": [],
+      "output": [
+        "id",
+        "manifest",
+        "name",
+        "path",
+        "source",
+        "tags",
+        "type"
+      ],
       "required": [
         "id"
       ],
@@ -12,10 +20,23 @@
       }
     },
     "asset.import": {
-      "output": [],
-      "required": [],
+      "output": [
+        "copied",
+        "duplicate",
+        "id",
+        "import",
+        "path",
+        "sha256",
+        "size",
+        "source",
+        "type"
+      ],
+      "required": [
+        "file"
+      ],
       "types": {
-        "file": "string"
+        "file": "string",
+        "source": "object"
       }
     },
     "asset.import_audio": {
@@ -421,10 +442,19 @@
       }
     },
     "project.create": {
-      "output": [],
-      "required": [],
+      "output": [
+        "exists",
+        "file",
+        "folder",
+        "name",
+        "scene"
+      ],
+      "required": [
+        "path"
+      ],
       "types": {
-        "name": "string"
+        "path": "string",
+        "scene": "string"
       }
     },
     "project.create_snapshot": {
@@ -440,7 +470,12 @@
       "types": {}
     },
     "project.list": {
-      "output": [],
+      "output": [
+        "files",
+        "projects",
+        "root",
+        "roots"
+      ],
       "required": [],
       "types": {}
     },
@@ -451,9 +486,11 @@
     },
     "project.open": {
       "output": [],
-      "required": [],
+      "required": [
+        "path"
+      ],
       "types": {
-        "name": "string"
+        "path": "string"
       }
     },
     "project.restore_snapshot": {
@@ -472,9 +509,11 @@
     },
     "project.save_as": {
       "output": [],
-      "required": [],
+      "required": [
+        "path"
+      ],
       "types": {
-        "name": "string"
+        "path": "string"
       }
     },
     "render.probe": {
@@ -487,7 +526,15 @@
       }
     },
     "scene.create_node": {
-      "output": [],
+      "output": [
+        "asset",
+        "bounds",
+        "kind",
+        "name",
+        "nodes",
+        "parent",
+        "warning"
+      ],
       "required": [],
       "types": {
         "asset": "string",
@@ -639,6 +686,27 @@
         "seconds": "number"
       }
     },
+    "session.info": {
+      "output": [
+        "client",
+        "permissions",
+        "policy",
+        "project",
+        "rollbackPoints",
+        "session",
+        "showRunning",
+        "state",
+        "toolDetail",
+        "tools",
+        "transaction",
+        "transactionSink",
+        "version"
+      ],
+      "required": [],
+      "types": {
+        "tools": "array"
+      }
+    },
     "signal.list": {
       "output": [],
       "required": [],
@@ -646,6 +714,98 @@
         "eventsOnly": "boolean",
         "limit": "integer",
         "query": "string"
+      }
+    },
+    "transaction.begin": {
+      "output": [
+        "backedBy",
+        "calls",
+        "changedTargets",
+        "createdFiles",
+        "editState",
+        "files",
+        "id",
+        "irreversible",
+        "label",
+        "notRestorable",
+        "notRestored",
+        "partial",
+        "rollbackPoint",
+        "state"
+      ],
+      "required": [],
+      "types": {
+        "label": "string"
+      }
+    },
+    "transaction.commit": {
+      "output": [
+        "backedBy",
+        "calls",
+        "changedTargets",
+        "createdFiles",
+        "editState",
+        "files",
+        "id",
+        "irreversible",
+        "label",
+        "notRestorable",
+        "notRestored",
+        "partial",
+        "rollbackPoint",
+        "state"
+      ],
+      "required": [
+        "id"
+      ],
+      "types": {
+        "id": "string"
+      }
+    },
+    "transaction.rollback": {
+      "output": [
+        "backedBy",
+        "calls",
+        "changedTargets",
+        "createdFiles",
+        "editState",
+        "files",
+        "id",
+        "irreversible",
+        "label",
+        "notRestorable",
+        "notRestored",
+        "partial",
+        "rollbackPoint",
+        "state"
+      ],
+      "required": [
+        "id"
+      ],
+      "types": {
+        "id": "string"
+      }
+    },
+    "transaction.status": {
+      "output": [
+        "backedBy",
+        "calls",
+        "changedTargets",
+        "createdFiles",
+        "editState",
+        "files",
+        "id",
+        "irreversible",
+        "label",
+        "notRestorable",
+        "notRestored",
+        "partial",
+        "rollbackPoint",
+        "state"
+      ],
+      "required": [],
+      "types": {
+        "id": "string"
       }
     },
     "world.generate": {

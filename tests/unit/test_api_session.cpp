@@ -110,7 +110,7 @@ fs::path writeWav(const fs::path& file) {
 
 // A project created through the session, so the folder it lives in is the session's write root.
 fs::path createProject(api::Session& s, const std::string& name) {
-    const auto created = s.call("project.create", json{{"name", name}});
+    const auto created = s.call("project.create", json{{"path", name}});
     INFO(created.summary);
     REQUIRE(created.success);
     return fs::path(created.result.at("file").get<std::string>()).parent_path();
@@ -149,7 +149,7 @@ TEST_CASE("A session with no roots refuses path tools and says how to start one"
     auto s = makeSession(host, options());
     for (const char* tool : {"project.list", "project.create"}) {
         INFO(tool);
-        const auto r = s->call(tool, std::string(tool) == "project.create" ? json{{"name", "x"}} : json::object());
+        const auto r = s->call(tool, std::string(tool) == "project.create" ? json{{"path", "x"}} : json::object());
         CHECK(code(r) == "PERMISSION_DENIED");
         REQUIRE(r.error);
         CHECK(r.error->recovery == "start the session with --root <dir> or --write-root <dir>");
@@ -460,7 +460,7 @@ TEST_CASE("A rollback keeps a file another transaction depends on", "[api][sessi
     auto a = makeSession(hostA, options({root / "allowed"}, {root / "projects"}));
     auto b = makeSession(hostB, options({root / "allowed"}, {root / "projects"}));
     const fs::path project = createProject(*a, "Shared");
-    REQUIRE(b->call("project.open", json{{"name", "Shared"}}).success);
+    REQUIRE(b->call("project.open", json{{"path", "Shared"}}).success);
     const fs::path model = project / "assets" / "models" / "tree.glb";
 
     api::CallOptions inA;

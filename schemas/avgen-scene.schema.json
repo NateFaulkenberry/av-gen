@@ -1805,7 +1805,7 @@
   ],
   "title": "AV Gen scene",
   "type": "object",
-  "x-avgen-api": 1,
+  "x-avgen-api": 2,
   "x-avgen-notWrittenBack": [
     {
       "note": "written back as environment.lightRig, which the parser also reads",

@@ -72,14 +72,14 @@ Read-only tools (execution class `read`) change nothing and have nothing to roll
 | `modulation.create`, `modulation.remove` | rebind | yes | the route list, re-bound | — |
 | `sequencer.add_keyframe`, `sequencer.remove_track` | rebind | yes | the timeline | — |
 | `sequence.add_marker`, `sequence.add_shot`, `sequence.add_overlay` | rebind | yes | the sequence, re-installed | — |
-| `scene.create_node`, `scene.delete_node`, `scene.set_parent` | structural | yes | the composition and its parameters | the model file a created node uses (it is the import's, not the node's) |
+| `scene.create_node`, `scene.delete_node`, `scene.set_parent` | structural | yes | the composition and its parameters | the model file a created node uses (it is the import's, not the node's; the node's use of it keeps it through another transaction's rollback, and a project saved naming it by id or path keeps it through this one's) |
 | `field.create` | structural | yes | the composition | — |
 | `world.generate` | structural | yes | the composition (the terrain's ecology) | — |
 | `project.restore_snapshot` | structural | yes | the document before the restore | — |
-| `asset.import` | session | no | the copied model, texture or environment and its glTF dependencies are deleted, and `assets/manifest.json` gets its previous bytes back (or is deleted when the import created it), under the file rules above | a file it overwrote; the source is never touched |
+| `asset.import` | session | no | the copied model, texture or environment and its glTF dependencies are deleted, and `assets/manifest.json` gets its previous bytes back (or is deleted when the import created it), under the file rules above. A duplicate import copies nothing; it records a use of the existing file, so that file outlives a rollback of the import that made it while this one depends on it. Each copy is written under a dot-name and renamed into place (ADR-2156), so a failed or interrupted copy never sits at the name its id resolves to | a file it overwrote (same name, other bytes); a manifest rewrite that upgraded a version 1 file is undone with the rest (the old bytes come back). Not staged until commit: the returned id must resolve inside the same transaction (ADR-2156, Staging) |
 | `asset.import_audio` | session | no | the copied track is deleted, unless the engine still plays it or a saved project names it (both are true right after a successful import, so in practice it is kept and reported) | the engine's loaded audio (not in the snapshot) |
 | `project.save`, `project.save_as` | session | no | — | the written project and scene files |
-| `project.create`, `project.open` | session | no | — | the replaced session. A rollback after one restores the **old** project's document into the newly opened engine: do not open or create a project inside a transaction you may roll back |
+| `project.create`, `project.open` | session | no | — | the replaced session, and the files `project.create` wrote (the project file and, with `scene: "empty"`, `<stem>.scene.json`; they are never deleted by a rollback). A rollback after one restores the **old** project's document into the newly opened engine: do not open or create a project inside a transaction you may roll back |
 | `sequencer.set_playhead` | session | no | — | the transport position |
 | `performance.set_live_quality` | session | no | — | the live-quality settings |
 | `performance.optimize_scene`, `performance.apply_low_risk_optimizations` | job | no | — | the live ceilings they add to the project when the child process answers |
