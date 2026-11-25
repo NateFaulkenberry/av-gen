@@ -158,6 +158,36 @@ constexpr LiveQualityRung auroraPlanes(LiveQualityRung r, float scale) {
     r.auroraStepScale = scale;
     return r;
 }
+// ADR-2134: the cloud Environment's march (ADR-2100) by level, the same on every ladder: its resolution, view steps and
+// light taps as fractions of what the clouds block authored, and a ceiling on its erosion octaves. Nothing in a scene
+// without clouds. Low is about the Neon Dreams `--quality live` preset (0.4 of 0.5's resolution, 40 of 128 steps, 3 of
+// 6 taps, 2 octaves); Emergency goes past it.
+struct CloudMarchRow {
+    float resolution;
+    float steps;
+    float lightSteps;
+    std::uint32_t octaves;
+};
+constexpr std::array<CloudMarchRow, kLiveQualityLevels> kCloudMarchByLevel{{
+    {1.0f, 1.0f, 1.0f, 3u},   // Ultra: as authored
+    {1.0f, 0.75f, 1.0f, 3u},  // High
+    {0.8f, 0.5f, 0.67f, 3u},  // Medium
+    {0.8f, 0.33f, 0.5f, 2u},  // Low
+    {0.6f, 0.25f, 0.34f, 2u}, // Emergency
+}};
+constexpr LiveQualityRung cloudMarch(LiveQualityRung r, const CloudMarchRow& row) {
+    r.cloudResolutionScale = row.resolution;
+    r.cloudStepScale = row.steps;
+    r.cloudLightStepScale = row.lightSteps;
+    r.cloudErosionOctaves = row.octaves;
+    return r;
+}
+constexpr LiveQualityLadder withCloudMarch(LiveQualityLadder ladder) {
+    for (LiveQualityRung& r : ladder) {
+        r = cloudMarch(r, kCloudMarchByLevel[static_cast<std::size_t>(r.level)]);
+    }
+    return ladder;
+}
 constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, float particleMetres, float lod) {
     r.shadowCasterMinPixels = casterPixels;
     r.particleCullDistance = particleMetres;
@@ -165,25 +195,25 @@ constexpr LiveQualityRung background(LiveQualityRung r, float casterPixels, floa
     return r;
 }
 
-constexpr LiveQualityLadder kResolutionFirst{
+constexpr LiveQualityLadder kResolutionFirst = withCloudMarch(LiveQualityLadder{
     rung(L::Ultra, 1.0f),
     rung(L::High, 0.85f),
     singleRead(astral(volumes(noGlossySsr(noContact(rung(L::Medium, 0.71f))), 0.25f), 2)),
     auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Low, 0.5f))), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.75f),
     auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Emergency, 0.38f))), 0.25f, 0.25f))), 2)),
                24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
-};
+});
 
-constexpr LiveQualityLadder kBalanced{
+constexpr LiveQualityLadder kBalanced = withCloudMarch(LiveQualityLadder{
     rung(L::Ultra, 1.0f),
     volumes(rung(L::High, 0.85f), 0.25f),
     auroraPlanes(singleRead(astral(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Medium, 0.71f))), 0.25f)), 2)), 0.75f),
     auroraPlanes(refraction(astral(sdfShadows(background(cascades(noDepthOfField(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Low, 0.5f))), 0.25f, 0.5f))), 2), 12.0f, 80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
     auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Emergency, 0.42f))), 0.25f, 0.25f))), 2)),
                24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
-};
+});
 
-constexpr LiveQualityLadder kEffectsFirst{
+constexpr LiveQualityLadder kEffectsFirst = withCloudMarch(LiveQualityLadder{
     rung(L::Ultra, 1.0f),
     auroraPlanes(cascades(noDepthOfField(volumes(rung(L::High, 1.0f), 0.25f)), 2), 0.75f),
     auroraPlanes(singleRead(astral(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Medium, 0.85f))), 0.25f, 0.5f))), 2)), 2)), 0.5f),
@@ -191,7 +221,7 @@ constexpr LiveQualityLadder kEffectsFirst{
                80.0f, 1.5f), 4), 3), false, 0.5f), 0.5f),
     auroraPlanes(refraction(astral(sdfShadows(background(plainShadows(cascades(noDepthOfField(noMotionBlur(volumes(noGlossySsr(noContact(rung(L::Emergency, 0.5f))), 0.25f, 0.25f))), 2)),
                24.0f, 50.0f, 2.0f), 4), 4), false, 0.0f), 0.5f),
-};
+});
 
 // ADR-1099: the profiles, rows of the same family. QUALITY is the tier. BALANCED spends nothing on what is small or far
 // (the background levers, and a quarter-resolution fog). PERFORMANCE adds the half-resolution post effects, fewer
@@ -224,6 +254,7 @@ int effectChanges(const LiveQualityRung& a, const LiveQualityRung& b) {
            (a.refraction != b.refraction ? 1 : 0) + (a.waterSsrScale != b.waterSsrScale ? 1 : 0) + // ADR-1603
            (a.contactShadows != b.contactShadows ? 1 : 0) +                                        // ADR-1816
            (a.glossySsr != b.glossySsr ? 1 : 0);                                                  // ADR-1820
+    // ADR-2134: nor are the cloud march's levers: a gain only where a scene has clouds.
     // ADR-1651: auroraStepScale is not counted either, for the same reason: it is a gain only where a scene has
     // ribbons, and counting it would promise every other scene's controller a step it cannot take.
     // ADR-1640: refractionDispersion is not counted. Seven reads for one on the refractive pixels only (+0.15 ms at 4K
@@ -264,6 +295,10 @@ void applyStageTwoCeilings(rendering::QualitySettings& q, const rendering::Quali
     q.waterSsrScale = std::min(base.waterSsrScale, rung.waterSsrScale);
     q.refractionDispersion = base.refractionDispersion && rung.refractionDispersion; // ADR-1640
     q.auroraStepScale = std::min(base.auroraStepScale, rung.auroraStepScale);         // ADR-1651
+    q.cloudResolutionScale = std::min(base.cloudResolutionScale, rung.cloudResolutionScale); // ADR-2134
+    q.cloudStepScale = std::min(base.cloudStepScale, rung.cloudStepScale);
+    q.cloudLightStepScale = std::min(base.cloudLightStepScale, rung.cloudLightStepScale);
+    q.cloudErosionOctaves = std::min(base.cloudErosionOctaves, rung.cloudErosionOctaves);
     // ADR-1816: off where the rung turns it off; never on where the base had it off. contactSteps is left as the base
     // set it, so turning the lever back on restores exactly the base's march.
     q.contactShadows = base.contactShadows && rung.contactShadows;
@@ -401,6 +436,15 @@ void InteractiveResolution::reset() {
     atLevel_ = 0;
     raisedInto_ = false;
     unsustainable_ = false;
+    unsustainableNoticed_ = false;
+}
+
+bool InteractiveResolution::takeUnsustainableNotice() {
+    if (!unsustainable_ || unsustainableNoticed_) {
+        return false;
+    }
+    unsustainableNoticed_ = true;
+    return true;
 }
 
 void InteractiveResolution::forgetBackoff() {
@@ -826,6 +870,7 @@ void giveUp(LiveQualityRung& r, std::string_view group, int depth) {
         r.volumeResolutionScale = 0.25f;
         r.volumeStepScale = full ? 0.5f : 1.0f;
         r.auroraStepScale = full ? 0.5f : 0.75f; // ADR-1651: the ribbons' plane march is a sky volume
+        r = cloudMarch(r, kCloudMarchByLevel[full ? 3 : 2]); // ADR-2134: and so is the cloud march (Low, Medium)
     } else if (group == "post") {
         r.postEffectQuality = 0.5f;
         r.waterSsrScale = full ? 0.0f : 0.5f; // ADR-1603: the screen-space effects go with the post group
@@ -906,6 +951,10 @@ bool applyLeverToCeiling(LiveQualityRung& c, std::string_view lever) {
     else if (lever == "nowaterssr") c.waterSsrScale = 0.0f;
     else if (lever == "auroraplanes75") c.auroraStepScale = std::min(c.auroraStepScale, 0.75f);  // ADR-1651
     else if (lever == "auroraplaneshalf") c.auroraStepScale = std::min(c.auroraStepScale, 0.5f); // ADR-1651
+    else if (lever == "cloudres") c.cloudResolutionScale = std::min(c.cloudResolutionScale, 0.6f);  // ADR-2134
+    else if (lever == "cloudsteps") c.cloudStepScale = std::min(c.cloudStepScale, 0.5f);           // ADR-2134
+    else if (lever == "cloudlight") c.cloudLightStepScale = std::min(c.cloudLightStepScale, 0.5f); // ADR-2134
+    else if (lever == "cloudoctaves") c.cloudErosionOctaves = std::min(c.cloudErosionOctaves, 2u); // ADR-2134
     else if (lever == "nomotionblur") c.motionBlur = false;
     else if (lever == "nodof") c.depthOfField = false;
     else if (lever == "castercull") c.shadowCasterMinPixels = std::max(c.shadowCasterMinPixels, 24.0f);
@@ -953,6 +1002,10 @@ std::string ceilingJsonText(const LiveQualityRung& c) {
     if (c.waterSsrScale != n.waterSsrScale) j["waterSsrScale"] = c.waterSsrScale;
     if (c.refractionDispersion != n.refractionDispersion) j["refractionDispersion"] = c.refractionDispersion; // ADR-1640
     if (c.auroraStepScale != n.auroraStepScale) j["auroraStepScale"] = c.auroraStepScale;                     // ADR-1651
+    if (c.cloudResolutionScale != n.cloudResolutionScale) j["cloudResolutionScale"] = c.cloudResolutionScale; // ADR-2134
+    if (c.cloudStepScale != n.cloudStepScale) j["cloudStepScale"] = c.cloudStepScale;
+    if (c.cloudLightStepScale != n.cloudLightStepScale) j["cloudLightStepScale"] = c.cloudLightStepScale;
+    if (c.cloudErosionOctaves != n.cloudErosionOctaves) j["cloudErosionOctaves"] = c.cloudErosionOctaves;
     return j.dump();
 }
 
@@ -989,6 +1042,10 @@ std::optional<LiveQualityRung> ceilingFromJsonText(const std::string& text, std:
         else if (key == "waterSsrScale" && num) c.waterSsrScale = std::clamp(v.get<float>(), 0.0f, 1.0f);
         else if (key == "refractionDispersion" && flag) c.refractionDispersion = v.get<bool>();         // ADR-1640
         else if (key == "auroraStepScale" && num) c.auroraStepScale = std::clamp(v.get<float>(), 0.1f, 1.0f); // ADR-1651
+        else if (key == "cloudResolutionScale" && num) c.cloudResolutionScale = std::clamp(v.get<float>(), 0.25f, 1.0f); // ADR-2134
+        else if (key == "cloudStepScale" && num) c.cloudStepScale = std::clamp(v.get<float>(), 0.1f, 1.0f);
+        else if (key == "cloudLightStepScale" && num) c.cloudLightStepScale = std::clamp(v.get<float>(), 0.1f, 1.0f);
+        else if (key == "cloudErosionOctaves" && num) c.cloudErosionOctaves = std::clamp(v.get<std::uint32_t>(), 1u, 3u);
         else {
             error = "'" + key + "' is not a quality ceiling (or has the wrong type)";
             return std::nullopt;

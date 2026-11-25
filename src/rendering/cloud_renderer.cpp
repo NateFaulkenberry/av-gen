@@ -664,7 +664,9 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     }
 
     // The targets at the march's resolution, and whether last frame's result can be reused.
-    const float scale = std::clamp(c.resolution, 0.25f, 1.0f);
+    // ADR-2134: the knobs below as the live ladder leaves them (the authored values exactly when it has not moved).
+    const CloudMarchQuality mq = cloudMarchQuality(c, f.quality);
+    const float scale = mq.resolution;
     const auto mw = std::max(1u, static_cast<std::uint32_t>(std::lround(static_cast<float>(f.width) * scale)));
     const auto mh = std::max(1u, static_cast<std::uint32_t>(std::lround(static_cast<float>(f.height) * scale)));
     ensureTargets(mw, mh);
@@ -682,9 +684,9 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.warm = glm::vec4(glm::normalize(c.warmDirection), c.warmHeight);
     u.warmColor = glm::vec4(c.warmColor, c.noiseAmount);
     u.haze = glm::vec4(c.hazeColor, c.hazeDistance);
-    u.march = glm::vec4(static_cast<float>(c.steps), static_cast<float>(c.lightSteps), c.lightDistance, c.noiseScale);
+    u.march = glm::vec4(static_cast<float>(mq.steps), static_cast<float>(mq.lightSteps), c.lightDistance, c.noiseScale);
     // ADR-2109: a negative growth asks the shader for ADR-1289's even steps
-    u.march2 = glm::vec4(c.minStep, c.evenSteps ? -1.0f : c.stepGrowth, c.maxDistance, c.detailScale);
+    u.march2 = glm::vec4(c.minStep, c.evenSteps ? -1.0f : mq.stepGrowth, c.maxDistance, c.detailScale);
     const float seaTop = c.sea.top + c.swell * 0.5f * (c.sea.top - c.sea.base);
     u.sea = glm::vec4(c.sea.base, seaTop, std::clamp(c.sea.coverage + 0.15f * c.swell, 0.0f, 1.0f),
                       c.sea.coverageScale);
@@ -775,7 +777,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
     u.farGrid2 = glm::vec4(static_cast<float>(farBins_.nz), farBins_.yLo, farBins_.yHi, farOn_ ? 1.0f : 0.0f);
     u.heroSpan = glm::vec4(heroYLo_, heroYHi_, static_cast<float>(farWordBase_), jitter.y); // ADR-2111: w = light jitter
     u.erosion = glm::vec4(c.erosion, c.erosionScale, c.erosionDetail, c.erosionCurl); // ADR-2106
-    u.erosion2 = glm::vec4(static_cast<float>(c.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
+    u.erosion2 = glm::vec4(static_cast<float>(mq.erosionOctaves), static_cast<float>(c.lightSpacing), c.multiScatter,
                            c.erosionFlatten);
     u.erosion3 = glm::vec4(c.erosionEdge, c.erosionDetailFloor, c.lobeBlend, c.lobeMist); // ADR-2123: z, w
     // ADR-2119: the churn's two clocks, half a period apart (each restarts, on a fresh region of the volume, when its
@@ -879,7 +881,7 @@ void CloudRenderer::encode(const EnvironmentFrame& f) {
               {bufferEntry(0, frameBuf), bufferEntry(1, uniforms_), viewEntry(2, f.linearDepth),
                viewEntry(3, noiseView_), samplerEntryOf(4, repeatSampler_), bufferEntry(5, lobes_),
                bufferEntry(6, bins_)});
-    const std::uint32_t bands = cloudMarchBands(mw, mh, c.steps, c.lightSteps, unitsPerSubmit_);
+    const std::uint32_t bands = cloudMarchBands(mw, mh, mq.steps, mq.lightSteps, unitsPerSubmit_);
     lastMarchBands_ = bands;
     if (bands <= 1) {
         pass("clouds", {marchColorView_, marchDepthView_}, false, march_, marchGroup);

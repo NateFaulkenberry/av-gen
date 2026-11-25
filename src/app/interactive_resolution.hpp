@@ -288,6 +288,11 @@ struct LiveQualityRung {
     float waterSsrScale = 1.0f;         // ADR-1603: ceiling on QualitySettings::waterSsrScale (0 = no water SSR)
     bool refractionDispersion = true;   // ADR-1640: QualitySettings::refractionDispersion (off: the single read)
     float auroraStepScale = 1.0f;       // ADR-1651: ceiling on QualitySettings::auroraStepScale (the ribbons' planes)
+    // ADR-2134: ceilings on QualitySettings' cloud march levers (resolution, view steps, light taps, erosion octaves)
+    float cloudResolutionScale = 1.0f;
+    float cloudStepScale = 1.0f;
+    float cloudLightStepScale = 1.0f;
+    std::uint32_t cloudErosionOctaves = 3;
     // ADR-1816: QualitySettings::contactShadows (off: no screen-space contact march). Ultra and High keep it.
     bool contactShadows = true;
     // ADR-1820: QualitySettings::glossySsr (off: a scene's glossy reflections fall back to the environment). Ultra and
@@ -434,6 +439,9 @@ public:
     // ADR-1103: at the project's minimum and still over the budget, for at least one decision window. Shown as
     // "LIVE TARGET UNSUSTAINABLE"; cleared as soon as a window fits.
     [[nodiscard]] bool unsustainable() const { return unsustainable_; }
+    // ADR-2135: true exactly once per controller run (until `reset`) -- the first time it is unsustainable -- so the
+    // application can say so in the log once instead of every dwell. A later clear and return does not say it again.
+    [[nodiscard]] bool takeUnsustainableNotice();
     [[nodiscard]] const InteractiveResolutionSettings& settings() const { return settings_; }
 
     // ADR-1362: the frame cap the live loop is paced to (`liveFrameCapPeriodMs`, 0 = not capped) and the display's
@@ -550,6 +558,7 @@ private:
     bool probation_ = false;
     std::array<int, kLiveQualityLevels> holdScale_{1, 1, 1, 1, 1};
     bool unsustainable_ = false;
+    bool unsustainableNoticed_ = false; // ADR-2135
     Pacing pacing_{};
     int missesAtLastMove_ = 0;
     double gpuAtLastMove_ = -1.0;

@@ -38,6 +38,8 @@ target_sources(avgen_tests PRIVATE
     # takes a GPU time and a wall time per frame and returns a rung -- so the control law can be
     # checked for the thing a benchmark cannot show it: that it settles instead of oscillating.
     "${CMAKE_SOURCE_DIR}/src/app/interactive_resolution.cpp"
+    # ADR-2134: the cloud march's knobs under the live ladder's levers -- arithmetic on the clouds block, no device.
+    "${CMAKE_SOURCE_DIR}/src/rendering/cloud_march_quality.cpp"
     # ADR-1090: the live profiler's logic (statistics, categories, candidates, writers). No device.
     "${CMAKE_SOURCE_DIR}/src/app/live_drop_reason.cpp"
     "${CMAKE_SOURCE_DIR}/src/app/live_profile.cpp"

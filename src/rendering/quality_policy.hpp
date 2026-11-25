@@ -111,7 +111,9 @@ struct QualityPolicy {
                settings.astralTier == 0 &&     // ADR-1222: every particle, the full march, the exact seek
                settings.refraction && settings.waterSsrScale == 1.0f && // ADR-1603
                settings.refractionDispersion &&                          // ADR-1640
-               settings.auroraStepScale == 1.0f;                         // ADR-1651
+               settings.auroraStepScale == 1.0f &&                       // ADR-1651
+               settings.cloudResolutionScale == 1.0f && settings.cloudStepScale == 1.0f && // ADR-2134
+               settings.cloudLightStepScale == 1.0f && settings.cloudErosionOctaves >= 3;
     }
 };
 

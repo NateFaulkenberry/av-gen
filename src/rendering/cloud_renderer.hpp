@@ -10,6 +10,7 @@
 // The lobes are binned on an xz grid once when they change, so a sample reads only the lobes near it; the shape noise
 // is a tiling 64^3 texture built once per process.
 
+#include "rendering/cloud_march_quality.hpp"
 #include "rendering/environment_renderer.hpp"
 
 #include <glm/glm.hpp>

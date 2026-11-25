@@ -6159,6 +6159,37 @@ int Application::runLive() {
                 }
                 livePassGrowth_.reset();
             }
+            // ADR-2135: at the lowest level the ladder may use and still over the target, it says so -- once, in the
+            // log, with the heaviest pass of the frame -- rather than sitting there several times over budget in
+            // silence (Neon Dreams at 5K: Emergency, ~9x over, and only the Live panel's flag said anything).
+            if (autoResolution_.takeUnsustainableNotice()) {
+                std::string heaviest = "none reported";
+                double heaviestMs = 0.0;
+                std::vector<std::pair<std::string, double>> byLabel;
+                for (const auto& pass : renderer_->timeline().passes()) {
+                    auto it = std::find_if(byLabel.begin(), byLabel.end(),
+                                           [&](const auto& e) { return e.first == pass.label; });
+                    if (it == byLabel.end()) {
+                        byLabel.emplace_back(pass.label, pass.ms);
+                    } else {
+                        it->second += pass.ms;
+                    }
+                }
+                for (const auto& [label, ms] : byLabel) {
+                    if (ms > heaviestMs) {
+                        heaviest = label;
+                        heaviestMs = ms;
+                    }
+                }
+                const auto& ladder = autoResolution_.ladder();
+                log::warn("live quality: cannot reach the {:.0f} fps target -- at {}, the lowest level, the GPU frame is "
+                          "{:.1f} ms against a {:.1f} ms budget ({:.1f}x over); heaviest pass '{}' {:.1f} ms. Nothing is "
+                          "left to lower; the editor stays at {} (said once)",
+                          autoResolution_.settings().targetFps, liveQualityLevelName(ladder[autoResolution_.rung()].level),
+                          autoResolution_.gpuCostMs(), autoResolution_.settings().budgetMs,
+                          autoResolution_.gpuCostMs() / std::max(autoResolution_.settings().budgetMs, 1e-3), heaviest,
+                          heaviestMs, liveQualityLevelName(ladder[autoResolution_.rung()].level));
+            }
             // ADR-1086: the quality changes this frame *rendered with* (applied in serviceLiveQuality before the
             // render), whether the controller or a pinned level made them -- the frame to look at for a hitch.
             prof.count(kPhScaleChanges, static_cast<double>(liveTransitions_ - liveTransitionsProfiled_));
@@ -7836,10 +7867,13 @@ void Application::serviceLiveQuality() {
         }
         appliedLiveQuality_ = now;
         log::info("live quality: {} ({}) -- scene {}x{} into {}x{} (scale {:.2f}); volumes {:.2f}x res {:.2f}x steps, "
+                  "clouds {:.2f}x res {:.2f}x steps {:.2f}x light {} octaves, "
                   "motion blur {}, depth of field {}, cascades <= {}, shadow atlas {}{}; applied in {:.2f} ms",
                   liveQualityLevelName(r.level), liveQualityStrategyLabel(want.strategy), renderer_->stats().width,
                   renderer_->stats().height, renderWidth_, renderHeight_, static_cast<double>(q.renderScale),
                   static_cast<double>(q.volumeResolutionScale), static_cast<double>(q.volumeStepScale),
+                  static_cast<double>(q.cloudResolutionScale), static_cast<double>(q.cloudStepScale), // ADR-2134
+                  static_cast<double>(q.cloudLightStepScale), q.cloudErosionOctaves,
                   q.motionBlur ? "on" : "off", q.depthOfField ? "on" : "off", q.cascadeCount, q.shadowResolution,
                   q.softShadows ? "" : ", plain filtering", applyMs);
     }

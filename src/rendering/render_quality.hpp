@@ -390,6 +390,16 @@ struct QualitySettings {
     // ADR-1651: the aurora ribbons' planes (ADR-1641 `ribbonSteps`), as a fraction of the authored count (never under
     // the march's own floor of 8). 1 = as authored; nothing else reads it, so a scene with no ribbons is unchanged.
     float auroraStepScale = 1.0f;
+    // ADR-2134: the cloud Environment's march (ADR-2100), which read only the scene and so cost the same at every live
+    // level (Neon Dreams: ~180 ms of a 5K Emergency frame). Multipliers on what the clouds block authored, applied in
+    // `cloudMarchQuality`: the march's resolution (a fraction of the authored `resolution`), its view steps (at least
+    // 8; the v2 march's step growth widened so the rays still reach as far), its light taps (at least 1 where any
+    // were authored), and a ceiling on its erosion octaves. Each is neutral at its default and no tier moves it: only
+    // the live ladder lowers them, so a render (and `assertOfflineIsUncompromised`) is exactly as before.
+    float cloudResolutionScale = 1.0f;
+    float cloudStepScale = 1.0f;
+    float cloudLightStepScale = 1.0f;
+    std::uint32_t cloudErosionOctaves = 3;
 
     // The local-light budget of one tier. One place, so the shader's table and the CPU's cannot
     // drift apart.
