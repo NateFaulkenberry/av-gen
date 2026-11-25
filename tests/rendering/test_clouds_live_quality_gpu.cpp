@@ -113,7 +113,7 @@ TEST_CASE("neutral cloud levers draw the authored march; the lowest live level a
 
     // the Balanced ladder's Emergency rung over the same tier
     const auto& ladder = app::liveQualityLadder(app::LiveQualityStrategy::Balanced);
-    const rendering::QualitySettings emergency = app::applyLiveRung(tier, tier, ladder.back(), 1.0f);
+    const rendering::QualitySettings emergency = app::applyLiveRung(tier, tier, ladder.back(), app::kLiveScaleFloorMin);
     REQUIRE(emergency.renderScale < 1.0f);
     rendering::QualitySettings cheap = tier; // only the cloud levers, so the frames compare at one size
     cheap.cloudResolutionScale = emergency.cloudResolutionScale;
