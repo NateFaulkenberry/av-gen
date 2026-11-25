@@ -1,8 +1,10 @@
 #!/bin/bash
-# Regenerates the engine's published contracts from the engine itself (ADR-2150):
-#   schemas/tool-catalogue.json, docs/api/tools.md, docs/api/errors.md
-# Run it after changing any tool's name, description, schema or annotations, or an error code;
-# tests/unit/test_api_catalogue.cpp fails until you do.
+# Regenerates the engine's published contracts from the engine itself (ADR-2150, ADR-2152):
+#   schemas/tool-catalogue.json, docs/api/tools.md, docs/api/errors.md,
+#   schemas/avgen-project.schema.json, schemas/avgen-scene.schema.json
+# Run it after changing any tool's name, description, schema or annotations, an error code, a parser
+# key list or a typing table (src/api/schema_types_*.cpp); tests/unit/test_api_catalogue.cpp fails
+# until you do.
 #
 #   tools/gen_api.sh [path/to/avgen]          (default: build/release/src/avgen)
 #   tools/gen_api.sh --baseline [path/to/avgen]

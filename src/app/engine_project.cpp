@@ -1011,6 +1011,8 @@ constexpr std::string_view kProjectKeys[] = {
 
 } // namespace
 
+std::span<const std::string_view> Engine::projectFileKeys() { return kProjectKeys; }
+
 bool Engine::isProjectKey(std::string_view key) {
     return std::find(std::begin(kProjectKeys), std::end(kProjectKeys), key) != std::end(kProjectKeys);
 }

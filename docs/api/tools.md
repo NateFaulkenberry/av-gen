@@ -168,7 +168,7 @@ Output: not yet described (listed in `schemas/tools-without-output-schema.json`)
 
 MCP name `capability_list`. Class `read`. Permissions: none. Since API 1. Flags: readOnly, idempotent.
 
-The capability registry: every engine domain, whether it is reachable from here, what this particular session actually contains, and -- importantly -- the domains that are NOT exposed and why. Call this before planning anything ambitious; it will save you from trying to do something this build cannot do.
+The capability registry: every engine domain, whether it is reachable from here, what this particular session actually contains, and -- importantly -- the domains that are NOT exposed and why, and `features`: the scene keys, node kinds, effect kinds, render outputs and AOVs this build can parse. Call this before planning anything ambitious; it will save you from trying to do something this build cannot do.
 
 Input: none.
 

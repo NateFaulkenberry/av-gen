@@ -367,9 +367,10 @@ json routeToJson(const ModRoute& route) {
 namespace {
 
 // The keys a route reads (routeToJson writes them), and the processor chain's -- which belong under "chain".
-constexpr std::array<std::string_view, 13> kRouteKeys{"source",   "target",    "component",    "amount", "op",
+constexpr std::array<std::string_view, 14> kRouteKeys{"source",   "target",    "component",    "amount", "op",
                                                        "polarity", "enabled",   "chain",        "depthSource",
-                                                       "depthMin", "depthMax",  "depthDefault", "optional"};
+                                                       "depthMin", "depthMax",  "depthDefault", "optional",
+                                                       "planItem"};
 constexpr std::array<std::string_view, 33> kChainKeys{
     "attackMs",       "clampEnabled",     "clampMax",          "clampMin",        "curve",
     "curveAmount",    "decayMs",          "delayMs",           "envelope",        "envelopeFallPerSecond",
@@ -379,7 +380,25 @@ constexpr std::array<std::string_view, 33> kChainKeys{
     "remapOutMin",    "springDamping",    "springHz",          "threshold",       "thresholdLevel",
     "trendFastMs",    "trendFloor",       "trendSeconds"};
 
+template <typename E, std::size_t N>
+std::vector<std::string_view> namesOf(const std::array<EnumName<E>, N>& table) {
+    std::vector<std::string_view> out;
+    out.reserve(N);
+    for (const auto& entry : table) {
+        out.push_back(entry.name);
+    }
+    return out;
+}
+
 } // namespace
+
+std::vector<std::string_view> curveTypeNames() { return namesOf(kCurveNames); }
+std::vector<std::string_view> modOpNames() { return namesOf(kOpNames); }
+std::vector<std::string_view> polarityNames() { return namesOf(kPolarityNames); }
+std::vector<std::string_view> thresholdModeNames() { return namesOf(kThresholdNames); }
+std::vector<std::string_view> envelopeModeNames() { return namesOf(kEnvelopeNames); }
+std::span<const std::string_view> routeFileKeys() { return kRouteKeys; }
+std::span<const std::string_view> chainFileKeys() { return kChainKeys; }
 
 Result<ModRoute> routeFromJson(const json& j) {
     if (!j.is_object()) {
@@ -394,8 +413,7 @@ Result<ModRoute> routeFromJson(const json& j) {
     }
     // CP-D r2 (ADR-278's rule for routes): a processor-chain key written on the route itself was read as nothing --
     // draft3's smoothing never ran -- so it is refused, by name; any other unknown key is warned about.
-    std::vector<std::string_view> known(kRouteKeys.begin(), kRouteKeys.end());
-    known.push_back("planItem");
+    const std::vector<std::string_view> known(kRouteKeys.begin(), kRouteKeys.end());
     for (const auto& [key, value] : j.items()) {
         (void)value;
         if (std::find(kChainKeys.begin(), kChainKeys.end(), key) != kChainKeys.end()) {

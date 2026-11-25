@@ -3,6 +3,16 @@
 Decision: ADR-010 (serialisation) and ADR-011 (what is serialised). Implemented in
 `src/params/serialization.cpp`; used by tests today and by the project system in 0.9.
 
+**Machine-readable schemas (ADR-2152).** `schemas/avgen-project.schema.json` and
+`schemas/avgen-scene.schema.json` are generated from the engine (`avgen --describe schema:project`,
+`schema:scene`; `tools/gen_api.sh`). Their keys are the parsers' own key lists and their types a
+typing table in `src/api/schema_types_{project,scene}.cpp`; a block marked `x-avgen-untyped` is read
+by the engine but not typed yet, `x-avgen-unknownKeys` says what an object does with a key it does
+not read, and `x-avgen-notWrittenBack` lists what a save does not write back as read. They are JSON
+Schema 2020-12 in the subset the engine's own validator enforces, and every shipped example
+validates (tests/unit/test_api_schemas.cpp). This page is the prose; where the two disagree, the
+schema is the code.
+
 Version 2 (milestone 0.3) adds modulation sources, presets and per-route polarity. Version 3
 (milestone 0.8) adds `"shaders"` (written by the engine since 0.4) and `"timeline"`. Version 4
 (milestone 0.9) adds `"assets"` (audio / scene / environment references) and `"app"`

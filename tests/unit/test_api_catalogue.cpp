@@ -37,10 +37,12 @@ std::string readFile(const std::filesystem::path& path) {
 json readJson(const std::filesystem::path& path) { return json::parse(readFile(path)); }
 
 // The keywords ai::validateAgainstSchema enforces, plus `description` (documentation). A schema that
-// uses anything else would be published as a constraint the engine silently does not check.
-const std::set<std::string> kValidatorKeywords = {"type",    "properties", "required", "additionalProperties",
-                                                  "enum",    "minimum",    "maximum",  "minItems",
-                                                  "maxItems", "items",     "description"};
+// uses anything else would be published as a constraint the engine silently does not check. ADR-2152
+// added `anyOf`, `const` and a local `$ref` for the document schemas (test_api_schemas.cpp holds those).
+const std::set<std::string> kValidatorKeywords = {"type",     "properties", "required", "additionalProperties",
+                                                  "enum",     "minimum",    "maximum",  "minItems",
+                                                  "maxItems", "items",      "anyOf",    "const",
+                                                  "$ref",     "description"};
 
 void checkSchema(const json& schema, const std::string& where, std::vector<std::string>& problems) {
     if (!schema.is_object()) {
@@ -68,6 +70,15 @@ void checkSchema(const json& schema, const std::string& where, std::vector<std::
     }
     if (const auto i = schema.find("items"); i != schema.end()) {
         checkSchema(*i, where + ".items", problems);
+    }
+    if (const auto any = schema.find("anyOf"); any != schema.end() && any->is_array()) {
+        for (std::size_t n = 0; n < any->size(); ++n) {
+            checkSchema(any->at(n), where + ".anyOf[" + std::to_string(n) + "]", problems);
+        }
+    }
+    if (const auto r = schema.find("$ref"); r != schema.end()) {
+        // A tool schema has no $defs to resolve against; only the document schemas use $ref.
+        problems.push_back(where + ": '$ref' in a tool schema resolves against nothing");
     }
 }
 

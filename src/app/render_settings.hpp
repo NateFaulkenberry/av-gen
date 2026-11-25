@@ -33,6 +33,15 @@ struct FrameRange;
 // EXRs from the HDR target before tone mapping (compositing/grading). Video: see VideoWriter.
 enum class RenderOutput : std::uint8_t { PngSequence, Video, ExrSequence };
 [[nodiscard]] const char* renderOutputName(RenderOutput output); // "sequence" | "video" | "exr"
+// ADR-2152: every output, in enumerator order (the feature list's `render.<output>`), and every spelling
+// `render.output` accepts with the output it names (the project schema's enum). "png" is read as the PNG sequence and
+// written back as "sequence".
+[[nodiscard]] std::span<const RenderOutput> allRenderOutputs();
+struct RenderOutputSpelling {
+    std::string_view name;
+    RenderOutput output;
+};
+[[nodiscard]] std::span<const RenderOutputSpelling> renderOutputSpellings();
 [[nodiscard]] bool isSequence(RenderOutput output);
 
 

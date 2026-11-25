@@ -1,0 +1,1117 @@
+{
+  "$defs": {
+    "assetRef": {
+      "anyOf": [
+        {
+          "description": "A path relative to the project file (the older form, still read).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "path": {
+              "description": "Relative to the project file.",
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            },
+            "size": {
+              "description": "Bytes; with sha256, relinks a moved file.",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "path"
+          ],
+          "type": "object",
+          "x-avgen-unknownKeys": "drop"
+        }
+      ],
+      "description": "A file the project names. A missing file is searched for under the project folder by name, size and hash."
+    },
+    "assets": {
+      "additionalProperties": true,
+      "properties": {
+        "audio": {
+          "$ref": "#/$defs/assetRef"
+        },
+        "audioClips": {
+          "description": "An arrangement; wins over `audio` (never both written).",
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "duration": {
+                "type": "number"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "fadeIn": {
+                "type": "number"
+              },
+              "fadeOut": {
+                "type": "number"
+              },
+              "file": {
+                "$ref": "#/$defs/assetRef"
+              },
+              "gain": {
+                "type": "number"
+              },
+              "in": {
+                "description": "Seconds into the file.",
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "start": {
+                "description": "Seconds on the timeline.",
+                "type": "number"
+              }
+            },
+            "required": [
+              "file"
+            ],
+            "type": "object",
+            "x-avgen-unknownKeys": "drop"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "$ref": "#/$defs/assetRef"
+        },
+        "scene": {
+          "additionalProperties": true,
+          "properties": {
+            "inline": {
+              "additionalProperties": true,
+              "description": "A whole scene document (avgen-scene.schema.json).",
+              "type": "object"
+            },
+            "kind": {
+              "description": "The three kinds Engine::loadProject branches on; orb when absent.",
+              "enum": [
+                "orb",
+                "gltf",
+                "composition"
+              ],
+              "type": "string"
+            },
+            "path": {
+              "$ref": "#/$defs/assetRef"
+            }
+          },
+          "type": "object",
+          "x-avgen-unknownKeys": "drop"
+        },
+        "stems": {
+          "description": "ADR-1520: analysis stems.",
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "file": {
+                "$ref": "#/$defs/assetRef"
+              },
+              "gainDb": {
+                "description": "Clamped to the analysis trim range.",
+                "type": "number"
+              },
+              "key": {
+                "description": "The stem's signal key: stem.<key>.*.",
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "offset": {
+                "description": "Seconds.",
+                "type": "number"
+              },
+              "role": {
+                "description": "ADR-1630: what the stem is. Any other value is read as other, with a warning.",
+                "enum": [
+                  "drums",
+                  "bass",
+                  "synth",
+                  "vocal",
+                  "other"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "file"
+            ],
+            "type": "object",
+            "x-avgen-unknownKeys": "drop"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "chain": {
+      "additionalProperties": true,
+      "properties": {
+        "attackMs": {
+          "type": "number"
+        },
+        "clampEnabled": {
+          "type": "boolean"
+        },
+        "clampMax": {
+          "type": "number"
+        },
+        "clampMin": {
+          "type": "number"
+        },
+        "curve": {
+          "enum": [
+            "linear",
+            "power",
+            "log",
+            "exp",
+            "scurve"
+          ],
+          "type": "string"
+        },
+        "curveAmount": {
+          "type": "number"
+        },
+        "decayMs": {
+          "type": "number"
+        },
+        "delayMs": {
+          "description": "ADR-900.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "envelope": {
+          "enum": [
+            "none",
+            "peakhold",
+            "linearfall"
+          ],
+          "type": "string"
+        },
+        "envelopeFallPerSecond": {
+          "type": "number"
+        },
+        "envelopeHoldMs": {
+          "type": "number"
+        },
+        "envelopeRearm": {
+          "type": "number"
+        },
+        "envelopeRefractoryMs": {
+          "type": "number"
+        },
+        "gain": {
+          "type": "number"
+        },
+        "integrate": {
+          "type": "boolean"
+        },
+        "integrateMax": {
+          "type": "number"
+        },
+        "integrateMin": {
+          "type": "number"
+        },
+        "normalizeFloor": {
+          "type": "number"
+        },
+        "normalizeSeconds": {
+          "description": "ADR-1182; 0 is off.",
+          "maximum": 3600.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "normalizeSmoothMs": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "remapEnabled": {
+          "type": "boolean"
+        },
+        "remapInMax": {
+          "type": "number"
+        },
+        "remapInMin": {
+          "type": "number"
+        },
+        "remapOutMax": {
+          "type": "number"
+        },
+        "remapOutMin": {
+          "type": "number"
+        },
+        "springDamping": {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "springHz": {
+          "description": "ADR-1041; 0 is off.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "threshold": {
+          "enum": [
+            "none",
+            "gate",
+            "binary",
+            "subtract"
+          ],
+          "type": "string"
+        },
+        "thresholdLevel": {
+          "type": "number"
+        },
+        "trendFastMs": {
+          "type": "number"
+        },
+        "trendFloor": {
+          "type": "number"
+        },
+        "trendSeconds": {
+          "type": "number"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "material": {
+      "additionalProperties": true,
+      "properties": {
+        "alphaCutoff": {
+          "description": "Procedural only.",
+          "type": "number"
+        },
+        "alphaMode": {
+          "enum": [
+            "opaque",
+            "mask",
+            "blend"
+          ],
+          "type": "string"
+        },
+        "baseColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "baseColorTexture": {
+          "description": "Procedural only.",
+          "type": "string"
+        },
+        "doubleSided": {
+          "description": "Procedural only.",
+          "type": "boolean"
+        },
+        "emissiveColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "emissiveIntensity": {
+          "type": "number"
+        },
+        "metallic": {
+          "type": "number"
+        },
+        "opacity": {
+          "type": "number"
+        },
+        "program": {
+          "type": "string"
+        },
+        "roughness": {
+          "type": "number"
+        },
+        "toon": {
+          "description": "ADR-1071.",
+          "x-avgen-untyped": true
+        },
+        "unlit": {
+          "description": "Procedural only.",
+          "type": "boolean"
+        },
+        "wire": {
+          "description": "ADR-1073.",
+          "x-avgen-untyped": true
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "node": {
+      "additionalProperties": true,
+      "anyOf": [
+        {
+          "description": "gltf: a glTF asset.",
+          "properties": {
+            "animation": {
+              "description": "ADR-086: a skinned character's opening state.",
+              "x-avgen-untyped": true
+            },
+            "kind": {
+              "const": "gltf"
+            },
+            "lod": {
+              "additionalProperties": false,
+              "description": "ADR-351; an unknown key is refused.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "hysteresis": {
+                  "type": "number"
+                },
+                "maxScreenError": {
+                  "type": "number"
+                },
+                "ratios": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "thinning": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "waterMaterials": {
+              "description": "ADR-2020: glTF material name -> water.",
+              "x-avgen-untyped": true
+            }
+          }
+        },
+        {
+          "description": "group: an empty transform that parents other nodes.",
+          "properties": {
+            "kind": {
+              "const": "group"
+            }
+          }
+        },
+        {
+          "description": "procedural: geometry from the `procedural` block.",
+          "properties": {
+            "kind": {
+              "const": "procedural"
+            }
+          }
+        },
+        {
+          "description": "Every other kind: its own blocks (world, terrain, scatter, particles, ...) are not typed.",
+          "properties": {
+            "kind": {
+              "enum": [
+                "orb",
+                "grid",
+                "particles",
+                "scene",
+                "field",
+                "spline",
+                "sdf",
+                "terrain",
+                "city"
+              ],
+              "type": "string"
+            }
+          },
+          "x-avgen-untyped": true
+        }
+      ],
+      "description": "A scene node. A key the parser does not read is dropped on save; `_` keys are kept.",
+      "properties": {
+        "asset": {
+          "description": "A path relative to the scene file, or an asset:// id.",
+          "type": "string"
+        },
+        "bob": {
+          "description": "A cloud formation's name (ADR-2112).",
+          "type": "string"
+        },
+        "canopyFrom": {
+          "x-avgen-untyped": true
+        },
+        "canopySource": {
+          "x-avgen-untyped": true
+        },
+        "castsShadow": {
+          "description": "ADR-1547.",
+          "type": "boolean"
+        },
+        "emissiveBoost": {
+          "type": "number"
+        },
+        "energy": {
+          "x-avgen-untyped": true
+        },
+        "float": {
+          "x-avgen-untyped": true
+        },
+        "importance": {
+          "enum": [
+            "hero",
+            "foreground",
+            "normal",
+            "background",
+            "ambient"
+          ],
+          "type": "string"
+        },
+        "journey": {
+          "description": "ADR-1042: {distance}.",
+          "x-avgen-untyped": true
+        },
+        "kind": {
+          "enum": [
+            "gltf",
+            "orb",
+            "grid",
+            "particles",
+            "scene",
+            "procedural",
+            "field",
+            "spline",
+            "sdf",
+            "terrain",
+            "group",
+            "city"
+          ],
+          "type": "string"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "material": {
+          "$ref": "#/$defs/material"
+        },
+        "name": {
+          "description": "Sanitised (`.`, `/` and space become `_`) and made unique.",
+          "type": "string"
+        },
+        "opacity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "parent": {
+          "description": "Another node's name.",
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "procedural": {
+          "$ref": "#/$defs/procedural"
+        },
+        "program": {
+          "description": "ADR-1572.",
+          "type": "string"
+        },
+        "rotation": {
+          "description": "Euler degrees. Written back as Euler degrees from a quaternion (ADR-2151).",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "roughnessScale": {
+          "type": "number"
+        },
+        "scale": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "tags": {
+          "description": "Non-empty strings.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "temporalSlot": {
+          "description": "ADR-1934.",
+          "maximum": 16.0,
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "tint": {
+          "description": "Declaring one registers nodes/<name>/tint (ADR-1044).",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "vortexAttractor": {
+          "x-avgen-untyped": true
+        },
+        "vortexReach": {
+          "x-avgen-untyped": true
+        },
+        "wind": {
+          "x-avgen-untyped": true
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "procedural": {
+      "additionalProperties": true,
+      "description": "Procedural geometry (ProceduralGeometry::fromJson): a source, a distribution and a material. Typed for a box placed once; every other source and distribution kind is untyped.",
+      "properties": {
+        "castsShadow": {
+          "type": "boolean"
+        },
+        "deformers": {
+          "x-avgen-untyped": true
+        },
+        "distribution": {
+          "anyOf": [
+            {
+              "description": "single: one copy.",
+              "properties": {
+                "count": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "single"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Every other distribution kind, untyped.",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "linear",
+                    "grid",
+                    "radial",
+                    "spiral",
+                    "spline",
+                    "grammar",
+                    "scatter",
+                    "generator",
+                    "points"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-avgen-untyped": true
+            }
+          ],
+          "description": "Where copies go (Distribution)."
+        },
+        "distributionTransform": {
+          "x-avgen-untyped": true
+        },
+        "effectors": {
+          "x-avgen-untyped": true
+        },
+        "emissiveField": {
+          "type": "string"
+        },
+        "emissiveFieldAmount": {
+          "type": "number"
+        },
+        "extraLane": {
+          "x-avgen-untyped": true
+        },
+        "flatFarRungs": {
+          "x-avgen-untyped": true
+        },
+        "grammar": {
+          "x-avgen-untyped": true
+        },
+        "hierarchy": {
+          "x-avgen-untyped": true
+        },
+        "lod": {
+          "x-avgen-untyped": true
+        },
+        "material": {
+          "$ref": "#/$defs/material"
+        },
+        "materialVariation": {
+          "x-avgen-untyped": true
+        },
+        "motion": {
+          "x-avgen-untyped": true
+        },
+        "name": {
+          "type": "string"
+        },
+        "normalStep": {
+          "description": "Metres.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "ops": {
+          "x-avgen-untyped": true
+        },
+        "partMaterials": {
+          "x-avgen-untyped": true
+        },
+        "partOf": {
+          "type": "string"
+        },
+        "slabDebugFaces": {
+          "x-avgen-untyped": true
+        },
+        "slabEdgeOn": {
+          "x-avgen-untyped": true
+        },
+        "slabFarPixels": {
+          "x-avgen-untyped": true
+        },
+        "slabSidePixels": {
+          "x-avgen-untyped": true
+        },
+        "slabs": {
+          "x-avgen-untyped": true
+        },
+        "source": {
+          "anyOf": [
+            {
+              "description": "box",
+              "properties": {
+                "bevel": {
+                  "type": "number"
+                },
+                "bevelSegments": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "box"
+                },
+                "size": {
+                  "description": "Metres.",
+                  "items": {
+                    "type": "number"
+                  },
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "type": "array"
+                },
+                "subdivisions": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Every other primitive kind, untyped.",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "cylinder",
+                    "sphere",
+                    "torus",
+                    "point",
+                    "procedural",
+                    "tube",
+                    "mesh",
+                    "generated",
+                    "text",
+                    "fiber"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-avgen-untyped": true
+            }
+          ],
+          "description": "What is placed (SourceSpec)."
+        },
+        "sourceTransform": {
+          "x-avgen-untyped": true
+        },
+        "variation": {
+          "x-avgen-untyped": true
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "render": {
+      "additionalProperties": true,
+      "description": "Offline render settings (RenderSettings::fromJson).",
+      "properties": {
+        "aovs": {
+          "description": "Comma-separated, from: normal emission depth velocity id shadow",
+          "type": "string"
+        },
+        "backend": {
+          "type": "string"
+        },
+        "codec": {
+          "type": "string"
+        },
+        "encoderThreads": {
+          "type": "number"
+        },
+        "end": {
+          "type": "number"
+        },
+        "fps": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "limits": {
+          "type": "string"
+        },
+        "muxAudio": {
+          "type": "boolean"
+        },
+        "output": {
+          "description": "png is read as sequence.",
+          "enum": [
+            "sequence",
+            "png",
+            "video",
+            "exr"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "quality": {
+          "type": "number"
+        },
+        "start": {
+          "type": "number"
+        },
+        "supersample": {
+          "type": "number"
+        },
+        "tier": {
+          "type": "string"
+        },
+        "width": {
+          "type": "number"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "route": {
+      "additionalProperties": true,
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "chain": {
+          "$ref": "#/$defs/chain"
+        },
+        "component": {
+          "description": "Which component of a vector parameter; -1 for all.",
+          "type": "integer"
+        },
+        "depthDefault": {
+          "description": "ADR-1570.",
+          "type": "number"
+        },
+        "depthMax": {
+          "type": "number"
+        },
+        "depthMin": {
+          "type": "number"
+        },
+        "depthSource": {
+          "description": "ADR-900: a signal scaling the amount.",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "op": {
+          "enum": [
+            "add",
+            "multiply",
+            "replace",
+            "min",
+            "max"
+          ],
+          "type": "string"
+        },
+        "optional": {
+          "description": "ADR-1570.",
+          "type": "boolean"
+        },
+        "planItem": {
+          "description": "ADR-924: the Director plan item that made the route.",
+          "type": "string"
+        },
+        "polarity": {
+          "enum": [
+            "unipolar",
+            "bipolar"
+          ],
+          "type": "string"
+        },
+        "source": {
+          "description": "A signal name (signal.list).",
+          "type": "string"
+        },
+        "target": {
+          "description": "A parameter path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "type": "object",
+      "x-avgen-unknownKeys": "warn-drop"
+    }
+  },
+  "$id": "avgen-project.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "An AV Gen project document, format version 4. Generated by `avgen --describe schema:project` (ADR-2152): the keys are the engine's own key lists, the types its typing table. A block marked x-avgen-untyped is read by the engine but not typed here yet. Unknown top-level keys are kept verbatim (ADR-2132).",
+  "properties": {
+    "app": {
+      "additionalProperties": true,
+      "description": "The writer's stamp, replaced on every save (api::version()).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "assets": {
+      "$ref": "#/$defs/assets"
+    },
+    "atmosphericEffects": {
+      "description": "Refused at load (pre-ADR-702).",
+      "x-avgen-untyped": true
+    },
+    "autoDirector": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "cameraAimFollow": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "cameraContinuousTake": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "cameraDirection": {
+      "x-avgen-untyped": true
+    },
+    "cameraShotSpans": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "composition": {
+      "x-avgen-untyped": true
+    },
+    "control": {
+      "x-avgen-untyped": true
+    },
+    "directingEvaluations": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "directingPlans": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "director": {
+      "x-avgen-untyped": true
+    },
+    "effects": {
+      "description": "The session's effects, over the scene's (ADR-702).",
+      "x-avgen-untyped": true
+    },
+    "feeds": {
+      "description": "ADR-1580: which sources feed analysis.",
+      "x-avgen-untyped": true
+    },
+    "format": {
+      "const": "avgen-project"
+    },
+    "heroes": {
+      "description": "The session's heroes, when they differ from the scene file's.",
+      "x-avgen-untyped": true
+    },
+    "lights": {
+      "description": "The session's authored lights, when they differ from the scene file's.",
+      "x-avgen-untyped": true
+    },
+    "live": {
+      "description": "ADR-1100: the live block.",
+      "x-avgen-untyped": true
+    },
+    "outputs": {
+      "x-avgen-untyped": true
+    },
+    "palette": {
+      "x-avgen-untyped": true
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "description": "Overrides of registered parameters, path -> value (ADR-2132). A path no parameter answers is kept for the next save. Paths come from parameter.search.",
+      "type": "object"
+    },
+    "parkedDirector": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "pathtrace": {
+      "description": "ADR-366.",
+      "x-avgen-untyped": true
+    },
+    "presets": {
+      "x-avgen-untyped": true
+    },
+    "render": {
+      "$ref": "#/$defs/render"
+    },
+    "routes": {
+      "description": "Modulation routes: a signal driving a parameter.",
+      "items": {
+        "$ref": "#/$defs/route"
+      },
+      "type": "array"
+    },
+    "sceneNodes": {
+      "additionalProperties": true,
+      "description": "ADR-330: the node edits a project makes to the scene file it names by path.",
+      "properties": {
+        "added": {
+          "description": "Nodes added in the session, as a scene file writes them.",
+          "items": {
+            "$ref": "#/$defs/node"
+          },
+          "type": "array"
+        },
+        "removed": {
+          "description": "Names of scene-file nodes removed in the session.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "sequence": {
+      "x-avgen-untyped": true
+    },
+    "shaders": {
+      "description": "Shader layers; each `path` is an asset reference.",
+      "x-avgen-untyped": true
+    },
+    "songPlan": {
+      "description": "Director state.",
+      "x-avgen-untyped": true
+    },
+    "sonic": {
+      "description": "ADR-1020.",
+      "x-avgen-untyped": true
+    },
+    "sources": {
+      "description": "Derived signals.",
+      "x-avgen-untyped": true
+    },
+    "staging": {
+      "x-avgen-untyped": true
+    },
+    "states": {
+      "x-avgen-untyped": true
+    },
+    "timeline": {
+      "description": "Parameter automation.",
+      "x-avgen-untyped": true
+    },
+    "transport": {
+      "x-avgen-untyped": true
+    },
+    "version": {
+      "description": "Older versions are migrated in memory; a newer one is refused.",
+      "maximum": 4.0,
+      "minimum": 1.0,
+      "type": "integer"
+    },
+    "worldEffects": {
+      "description": "Refused at load (pre-ADR-702).",
+      "x-avgen-untyped": true
+    },
+    "worldMacros": {
+      "x-avgen-untyped": true
+    }
+  },
+  "required": [
+    "format",
+    "version"
+  ],
+  "title": "AV Gen project",
+  "type": "object",
+  "x-avgen-api": 1,
+  "x-avgen-notWrittenBack": [],
+  "x-avgen-unknownKeys": "keep"
+}

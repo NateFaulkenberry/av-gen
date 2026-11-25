@@ -44,6 +44,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -73,6 +74,7 @@ namespace avgen::scene {
 enum class PrimitiveKind : std::uint8_t { Box, Cylinder, Sphere, Torus, Point, Procedural, Tube, Mesh, Generated, Text, Fiber };
 [[nodiscard]] const char* primitiveKindName(PrimitiveKind kind);
 [[nodiscard]] std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name);
+[[nodiscard]] std::span<const PrimitiveKind> allPrimitiveKinds(); // ADR-2152: what primitiveKindFromName accepts
 
 // What a scene stores for one procedurally *searched* organism -- a hero mushroom, a tree -- and what
 // the world editor edits (ADR-175).
@@ -313,6 +315,7 @@ struct ProceduralGeometry;
 enum class DistributionKind : std::uint8_t { Single, Linear, Grid, Radial, Spiral, Spline, Grammar, Scatter, Generator, Points };
 [[nodiscard]] const char* distributionKindName(DistributionKind kind);
 [[nodiscard]] std::optional<DistributionKind> distributionKindFromName(std::string_view name);
+[[nodiscard]] std::span<const DistributionKind> allDistributionKinds(); // ADR-2152: what distributionKindFromName accepts
 
 enum class OrientationMode : std::uint8_t { None, Outward, Inward, Tangent };
 [[nodiscard]] const char* orientationModeName(OrientationMode mode);

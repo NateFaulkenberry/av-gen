@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -609,6 +610,9 @@ struct PunctualLight {
 [[nodiscard]] std::optional<PunctualLight::Type> lightTypeFromName(std::string_view name);
 [[nodiscard]] const char* lightRoleName(PunctualLight::Role role);
 [[nodiscard]] std::optional<PunctualLight::Role> lightRoleFromName(std::string_view name);
+// Every light type and role, in enumerator order: what the two `FromName`s accept (ADR-2152's schemas read these).
+[[nodiscard]] std::span<const PunctualLight::Type> allLightTypes();
+[[nodiscard]] std::span<const PunctualLight::Role> allLightRoles();
 // Linear sRGB of a black body at `kelvin` (1500..12000), normalised to luminance 1, with `tint`
 // applied perpendicular to the locus. 6500 K with tint 0 returns white.
 [[nodiscard]] glm::vec3 colorTemperatureToRgb(float kelvin, float tint = 0.0f);

@@ -256,6 +256,102 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
     return p;
 }
 
+namespace {
+
+// The keys a scene's `post` block sets, by the parameter each sets. One table for `applyPostJson` and `postFileKeys`
+// (ADR-2152), so the published schema is the reader.
+const std::pair<const char*, params::Parameter<float>* PostParameters::*> kPostFloats[] = {
+    {"referenceHeight", &PostParameters::referenceHeight}, // ADR-917
+    {"bloomIntensity", &PostParameters::bloomIntensity}, {"bloomThreshold", &PostParameters::bloomThreshold},
+    {"bloomKnee", &PostParameters::bloomKnee},           {"bloomRadius", &PostParameters::bloomRadius},
+    {"bloomEmissionWeight", &PostParameters::bloomEmissionWeight},
+    {"halationIntensity", &PostParameters::halationIntensity}, {"halationThreshold", &PostParameters::halationThreshold},
+    {"halationRadius", &PostParameters::halationRadius}, {"halationWarmth", &PostParameters::halationWarmth},
+    {"anamorphicIntensity", &PostParameters::anamorphicIntensity},
+    {"chromaticAberration", &PostParameters::chromaticAberration},
+    {"distortion", &PostParameters::distortion},         {"antialias", &PostParameters::antialias},
+    {"fisheye", &PostParameters::fisheye},               {"fisheyeModel", &PostParameters::fisheyeModel}, // ADR-1540
+    {"sharpen", &PostParameters::sharpen},               {"vignette", &PostParameters::vignette},
+    {"grain", &PostParameters::grain},                   {"chromaRetention", &PostParameters::chromaRetention},
+    {"dither", &PostParameters::dither}, // ADR-1977
+    {"upscaleSharpness", &PostParameters::upscaleSharpness}, // ADR-1613
+    {"contrast", &PostParameters::contrast},             {"saturation", &PostParameters::saturation},
+    {"tiltShiftRotation", &PostParameters::tiltShiftRotation},
+    {"tiltShiftBandWidth", &PostParameters::tiltShiftBandWidth},
+    {"tiltShiftFalloff", &PostParameters::tiltShiftFalloff},
+    {"tiltShiftMaxRadius", &PostParameters::tiltShiftMaxRadius},
+    // Cinematic integration (§52.1). Read here *and* written back, because ADR-350's failure was
+    // a block with a reader and no writer, and this block's writer is the echo of what was read
+    // -- so a key this table does not name is a key a scene cannot carry.
+    {"motionBlurAmount", &PostParameters::motionBlurAmount},
+    {"motionBlurMaxRadius", &PostParameters::motionBlurMaxRadius},
+    {"lookAtmospheric", &PostParameters::lookAtmospheric},
+    {"lookAtmosphericDistance", &PostParameters::lookAtmosphericDistance},
+    {"lookColour", &PostParameters::lookColour},
+    {"lookLocalContrast", &PostParameters::lookLocalContrast},
+    {"lookLocalContrastRadius", &PostParameters::lookLocalContrastRadius},
+    {"lookLightWrap", &PostParameters::lookLightWrap},
+    // ADR-1050
+    {"sweepProgress", &PostParameters::sweepProgress}, {"sweepWidth", &PostParameters::sweepWidth}, {"sweepIntensity", &PostParameters::sweepIntensity},
+    {"sweepWash", &PostParameters::sweepWash},         {"sweepAngle", &PostParameters::sweepAngle}, {"sweepSpan", &PostParameters::sweepSpan},
+    {"sweepHue", &PostParameters::sweepHue},           {"sweepTrail", &PostParameters::sweepTrail},
+    // ADR-1055
+    {"waveProgress", &PostParameters::waveProgress},   {"waveWidth", &PostParameters::waveWidth},       {"waveIntensity", &PostParameters::waveIntensity},
+    {"waveHue", &PostParameters::waveHue},             {"waveHueSpan", &PostParameters::waveHueSpan},   {"waveEdgeTint", &PostParameters::waveEdgeTint},
+    {"waveTrail", &PostParameters::waveTrail},
+};
+const std::pair<const char*, params::Parameter<bool>* PostParameters::*> kPostBools[] = {
+    {"bloomEnabled", &PostParameters::bloomEnabled}, {"halationEnabled", &PostParameters::halationEnabled},
+    {"tiltShiftEnabled", &PostParameters::tiltShiftEnabled},
+};
+// This table used to not exist: `applyPostJson` handled no vec3 at all, so `lift`, `gamma`,
+// `gain` and both tints were registered parameters that a scene's own `post` block could not
+// set -- it got `post.lift: unknown key, ignored`. Adding the type closes that gap, and it is
+// safe to close now rather than never: no scene file in `examples/` names any of these five
+// keys (surveyed 2026-09-19), so nothing changes behaviour today and the next scene that wants
+// a tint gets one. `lookAtmosphericTint` is the new one the cinematic integration needs.
+const std::pair<const char*, params::Parameter<glm::vec3>* PostParameters::*> kPostVec3s[] = {
+    {"lift", &PostParameters::lift},
+    {"gamma", &PostParameters::gamma},
+    {"gain", &PostParameters::gain},
+    {"halationTint", &PostParameters::halationTint},
+    {"anamorphicTint", &PostParameters::anamorphicTint},
+    {"lookAtmosphericTint", &PostParameters::lookAtmosphericTint},
+    {"waveOrigin", &PostParameters::waveOrigin}, // ADR-1055
+    {"waveDirection", &PostParameters::waveDirection},
+    {"waveColor", &PostParameters::waveColor},
+    {"waveTrailColor", &PostParameters::waveTrailColor},
+};
+
+} // namespace
+
+std::vector<PostFileKey> postFileKeys() {
+    std::vector<PostFileKey> out;
+    for (const auto& entry : kPostFloats) {
+        out.push_back({entry.first, PostKeyType::Number});
+    }
+    for (const auto& entry : kPostBools) {
+        out.push_back({entry.first, PostKeyType::Boolean});
+    }
+    for (const auto& entry : kPostVec3s) {
+        out.push_back({entry.first, PostKeyType::Vec3});
+    }
+    out.push_back({"tiltShiftCentre", PostKeyType::Vec2});
+    out.push_back({"tonemap", PostKeyType::UnsignedInteger});
+    out.push_back({"bloomLevels", PostKeyType::UnsignedInteger});
+    // The outline and glitch rows name their keys where they register, so they are read from a registration.
+    params::ParameterSet scratch;
+    const PostParameters registered = registerPostParameters(scratch, PostSettings{});
+    for (const auto& row : registered.outline.rows) {
+        out.push_back({row.key, PostKeyType::Number});
+    }
+    out.push_back({"outlineColor", PostKeyType::Vec3});
+    for (const auto& row : registered.glitch.rows) {
+        out.push_back({row.key, PostKeyType::Number});
+    }
+    return out;
+}
+
 // A composition's own `post` block, applied as parameter *base* values (ADR-059).
 //
 // Ten scene files in this repository carried one of these and none of them did anything: nothing
@@ -274,68 +370,6 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
     if (!j.is_object()) {
         return fail("'post' must be an object");
     }
-    const std::pair<const char*, params::Parameter<float>*> floats[] = {
-        {"referenceHeight", p.referenceHeight}, // ADR-917
-        {"bloomIntensity", p.bloomIntensity}, {"bloomThreshold", p.bloomThreshold},
-        {"bloomKnee", p.bloomKnee},           {"bloomRadius", p.bloomRadius},
-        {"bloomEmissionWeight", p.bloomEmissionWeight},
-        {"halationIntensity", p.halationIntensity}, {"halationThreshold", p.halationThreshold},
-        {"halationRadius", p.halationRadius}, {"halationWarmth", p.halationWarmth},
-        {"anamorphicIntensity", p.anamorphicIntensity},
-        {"chromaticAberration", p.chromaticAberration},
-        {"distortion", p.distortion},         {"antialias", p.antialias},
-        {"fisheye", p.fisheye},               {"fisheyeModel", p.fisheyeModel}, // ADR-1540
-        {"sharpen", p.sharpen},               {"vignette", p.vignette},
-        {"grain", p.grain},                   {"chromaRetention", p.chromaRetention},
-        {"dither", p.dither}, // ADR-1977
-        {"upscaleSharpness", p.upscaleSharpness}, // ADR-1613
-        {"contrast", p.contrast},             {"saturation", p.saturation},
-        {"tiltShiftRotation", p.tiltShiftRotation},
-        {"tiltShiftBandWidth", p.tiltShiftBandWidth},
-        {"tiltShiftFalloff", p.tiltShiftFalloff},
-        {"tiltShiftMaxRadius", p.tiltShiftMaxRadius},
-        // Cinematic integration (§52.1). Read here *and* written back, because ADR-350's failure was
-        // a block with a reader and no writer, and this block's writer is the echo of what was read
-        // -- so a key this table does not name is a key a scene cannot carry.
-        {"motionBlurAmount", p.motionBlurAmount},
-        {"motionBlurMaxRadius", p.motionBlurMaxRadius},
-        {"lookAtmospheric", p.lookAtmospheric},
-        {"lookAtmosphericDistance", p.lookAtmosphericDistance},
-        {"lookColour", p.lookColour},
-        {"lookLocalContrast", p.lookLocalContrast},
-        {"lookLocalContrastRadius", p.lookLocalContrastRadius},
-        {"lookLightWrap", p.lookLightWrap},
-        // ADR-1050
-        {"sweepProgress", p.sweepProgress}, {"sweepWidth", p.sweepWidth}, {"sweepIntensity", p.sweepIntensity},
-        {"sweepWash", p.sweepWash},         {"sweepAngle", p.sweepAngle}, {"sweepSpan", p.sweepSpan},
-        {"sweepHue", p.sweepHue},           {"sweepTrail", p.sweepTrail},
-        // ADR-1055
-        {"waveProgress", p.waveProgress},   {"waveWidth", p.waveWidth},       {"waveIntensity", p.waveIntensity},
-        {"waveHue", p.waveHue},             {"waveHueSpan", p.waveHueSpan},   {"waveEdgeTint", p.waveEdgeTint},
-        {"waveTrail", p.waveTrail},
-    };
-    const std::pair<const char*, params::Parameter<bool>*> bools[] = {
-        {"bloomEnabled", p.bloomEnabled}, {"halationEnabled", p.halationEnabled},
-        {"tiltShiftEnabled", p.tiltShiftEnabled},
-    };
-    // This table used to not exist: `applyPostJson` handled no vec3 at all, so `lift`, `gamma`,
-    // `gain` and both tints were registered parameters that a scene's own `post` block could not
-    // set -- it got `post.lift: unknown key, ignored`. Adding the type closes that gap, and it is
-    // safe to close now rather than never: no scene file in `examples/` names any of these five
-    // keys (surveyed 2026-09-19), so nothing changes behaviour today and the next scene that wants
-    // a tint gets one. `lookAtmosphericTint` is the new one the cinematic integration needs.
-    const std::pair<const char*, params::Parameter<glm::vec3>*> vec3s[] = {
-        {"lift", p.lift},
-        {"gamma", p.gamma},
-        {"gain", p.gain},
-        {"halationTint", p.halationTint},
-        {"anamorphicTint", p.anamorphicTint},
-        {"lookAtmosphericTint", p.lookAtmosphericTint},
-        {"waveOrigin", p.waveOrigin}, // ADR-1055
-        {"waveDirection", p.waveDirection},
-        {"waveColor", p.waveColor},
-        {"waveTrailColor", p.waveTrailColor},
-    };
     for (const auto& [key, value] : j.items()) {
         bool handled = false;
         {
@@ -353,7 +387,8 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
             }
             continue;
         }
-        for (const auto& [name, param] : floats) {
+        for (const auto& [name, slot] : kPostFloats) {
+            params::Parameter<float>* param = p.*slot;
             if (key == name && param != nullptr) {
                 if (!value.is_number()) {
                     return fail("post.{} must be a number", key);
@@ -366,7 +401,8 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         if (handled) {
             continue;
         }
-        for (const auto& [name, param] : bools) {
+        for (const auto& [name, slot] : kPostBools) {
+            params::Parameter<bool>* param = p.*slot;
             if (key == name && param != nullptr) {
                 if (!value.is_boolean()) {
                     return fail("post.{} must be a boolean", key);
@@ -379,7 +415,8 @@ Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p) {
         if (handled) {
             continue;
         }
-        for (const auto& [name, param] : vec3s) {
+        for (const auto& [name, slot] : kPostVec3s) {
+            params::Parameter<glm::vec3>* param = p.*slot;
             if (key == name && param != nullptr) {
                 if (!value.is_array() || value.size() != 3 || !value[0].is_number() || !value[1].is_number() ||
                     !value[2].is_number()) {

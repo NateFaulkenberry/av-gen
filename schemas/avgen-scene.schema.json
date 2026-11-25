@@ -1,0 +1,1840 @@
+{
+  "$defs": {
+    "camera": {
+      "additionalProperties": true,
+      "properties": {
+        "distance": {
+          "description": "Orbit distance; 0 or less fits the bounds.",
+          "type": "number"
+        },
+        "far": {
+          "description": "ADR-1280; 0 is automatic.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "fov": {
+          "description": "Degrees.",
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "journey": {
+          "description": "ADR-1042.",
+          "x-avgen-untyped": true
+        },
+        "mode": {
+          "description": "0..3; clamped.",
+          "maximum": 3.0,
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "near": {
+          "description": "ADR-1058; 0 is automatic.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "orbitPivot": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "orbitPivotWeight": {
+          "description": "Clamped to 0..1 (ADR-1123).",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "orbitSpeed": {
+          "type": "number"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "spline": {
+          "description": "A spline node the camera rides.",
+          "type": "string"
+        },
+        "target": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "environment": {
+      "additionalProperties": true,
+      "properties": {
+        "ambientOcclusion": {
+          "type": "boolean"
+        },
+        "aoFadeEnd": {
+          "type": "number"
+        },
+        "aoFadeStart": {
+          "type": "number"
+        },
+        "aoRadius": {
+          "type": "number"
+        },
+        "background": {
+          "description": "Linear RGB; any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "bands": {
+          "description": "Reflection bands (ADR-1151).",
+          "x-avgen-untyped": true
+        },
+        "contactShadows": {
+          "type": "boolean"
+        },
+        "dayNight": {
+          "description": "The day/night cycle (ADR-343).",
+          "x-avgen-untyped": true
+        },
+        "depthPrepass": {
+          "type": "boolean"
+        },
+        "ecologyGlowCell": {
+          "type": "number"
+        },
+        "ecologyLight": {
+          "type": "number"
+        },
+        "ecologyLightRange": {
+          "type": "number"
+        },
+        "ecologyPoolFaintest": {
+          "type": "number"
+        },
+        "ecologyPoolReach": {
+          "type": "number"
+        },
+        "fallbackAmbient": {
+          "type": "boolean"
+        },
+        "fogColor": {
+          "description": "Linear RGB; any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "fogGroundFollow": {
+          "type": "number"
+        },
+        "fogHeight": {
+          "type": "number"
+        },
+        "fogHeightAmount": {
+          "type": "number"
+        },
+        "fogHeightCurve": {
+          "type": "number"
+        },
+        "fogHeightFalloff": {
+          "type": "number"
+        },
+        "fogPooling": {
+          "type": "number"
+        },
+        "fogSky": {
+          "description": "Clamped to 0..1.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "fogSkyBeyond": {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "fogSkyDistance": {
+          "description": "Metres; 0 is automatic.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "fogSpectral": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "fogUpperDensity": {
+          "type": "number"
+        },
+        "glossyReflections": {
+          "type": "boolean"
+        },
+        "horizonDensity": {
+          "type": "number"
+        },
+        "horizonFill": {
+          "type": "number"
+        },
+        "intensity": {
+          "description": "Image-based lighting strength.",
+          "type": "number"
+        },
+        "lightFromEnvironment": {
+          "type": "boolean"
+        },
+        "lightRig": {
+          "anyOf": [
+            {
+              "description": "a light rig file, relative to the scene file",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/lightRig"
+            }
+          ],
+          "description": "A light rig (ADR-033): a file path or the rig itself"
+        },
+        "map": {
+          "description": "An HDR environment map, relative to the scene file.",
+          "type": "string"
+        },
+        "proceduralSkyBackground": {
+          "type": "boolean"
+        },
+        "rotation": {
+          "type": "number"
+        },
+        "shadowCascades": {
+          "description": "0 = the quality tier; more than 4 is read as 4.",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "shadowCasterReach": {
+          "type": "number"
+        },
+        "shadowRange": {
+          "type": "number"
+        },
+        "shadowResolution": {
+          "anyOf": [
+            {
+              "const": 0
+            },
+            {
+              "maximum": 8192.0,
+              "minimum": 256.0,
+              "type": "integer"
+            }
+          ],
+          "description": "0 = the quality tier, or 256..8192 texels (ADR-1867)."
+        },
+        "shadowSplitLambda": {
+          "type": "number"
+        },
+        "sky": {
+          "$ref": "#/$defs/sky"
+        },
+        "skyBloom": {
+          "type": "number"
+        },
+        "skyIntensity": {
+          "type": "number"
+        },
+        "skyTint": {
+          "description": "ADR-2103.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "skybox": {
+          "type": "boolean"
+        },
+        "styledAmbientFloor": {
+          "type": "number"
+        },
+        "styledGroundAmbient": {
+          "description": "Linear RGB; any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "styledSkyAmbient": {
+          "description": "Linear RGB; any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "stylized": {
+          "type": "boolean"
+        },
+        "tileDynamics": {
+          "description": "ADR-1953.",
+          "x-avgen-untyped": true
+        },
+        "volumeAbsorption": {
+          "type": "number"
+        },
+        "volumeAnisotropy": {
+          "type": "number"
+        },
+        "volumeColorField": {
+          "description": "A field name.",
+          "type": "string"
+        },
+        "volumeDensity": {
+          "type": "number"
+        },
+        "volumeDensityField": {
+          "description": "A field name.",
+          "type": "string"
+        },
+        "volumeEmission": {
+          "type": "number"
+        },
+        "volumeJitter": {
+          "description": "Clamped to 0..1.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "volumeLocalLights": {
+          "type": "number"
+        },
+        "volumeMaxDistance": {
+          "type": "number"
+        },
+        "volumeNoise": {
+          "type": "number"
+        },
+        "volumeNoiseScale": {
+          "type": "number"
+        },
+        "volumeNoiseSpeed": {
+          "type": "number"
+        },
+        "volumeScattering": {
+          "type": "number"
+        },
+        "volumeShadowSteps": {
+          "description": "Clamped to 0..16.",
+          "type": "integer"
+        },
+        "volumeShadowStrength": {
+          "type": "number"
+        },
+        "volumeSteps": {
+          "description": "Clamped to 4..256.",
+          "type": "integer"
+        },
+        "vortex": {
+          "description": "The pre-ADR-387 vortex, read and converted into an effect.",
+          "x-avgen-note": "migrated to an effect instance in `effects` (ADR-441); not written back here",
+          "x-avgen-untyped": true,
+          "x-avgen-writtenBack": false
+        },
+        "waterDownwelling": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "waterSurface": {
+          "type": "number"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "warn-drop"
+    },
+    "light": {
+      "additionalProperties": true,
+      "properties": {
+        "castsShadow": {
+          "type": "boolean"
+        },
+        "color": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "contactShadow": {
+          "type": "boolean"
+        },
+        "diffuseOnly": {
+          "type": "boolean"
+        },
+        "direction": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "flicker": {
+          "type": "number"
+        },
+        "flickerRate": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "id": {
+          "description": "The parameter-path id, when it has stopped matching the name (after a rename).",
+          "type": "string"
+        },
+        "innerCone": {
+          "description": "Degrees.",
+          "type": "number"
+        },
+        "intensity": {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "name": {
+          "description": "Required and non-empty: the light's identity in reports and parameter paths.",
+          "type": "string"
+        },
+        "node": {
+          "description": "A node this light rides on.",
+          "type": "string"
+        },
+        "outerCone": {
+          "description": "Degrees.",
+          "type": "number"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "radius": {
+          "type": "number"
+        },
+        "range": {
+          "type": "number"
+        },
+        "role": {
+          "enum": [
+            "key",
+            "fill",
+            "rim",
+            "back",
+            "ambient",
+            "practical"
+          ],
+          "type": "string"
+        },
+        "shadowBias": {
+          "type": "number"
+        },
+        "shadowStrength": {
+          "type": "number"
+        },
+        "softness": {
+          "type": "number"
+        },
+        "specularOnly": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "tint": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "directional",
+            "point",
+            "spot",
+            "rect",
+            "disk",
+            "tube",
+            "sphere"
+          ],
+          "type": "string"
+        },
+        "up": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "volumetric": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object",
+      "x-avgen-unknownKeys": "warn-drop"
+    },
+    "lightRig": {
+      "additionalProperties": true,
+      "properties": {
+        "ambientColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "ambientIntensity": {
+          "type": "number"
+        },
+        "ambientTemperature": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "format": {
+          "const": "avgen-lightrig"
+        },
+        "keyIntensity": {
+          "type": "number"
+        },
+        "lights": {
+          "items": {
+            "$ref": "#/$defs/rigLight"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "description": "A version newer than 1 is refused.",
+          "maximum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lights"
+      ],
+      "type": "object",
+      "x-avgen-unknownKeys": "warn-drop"
+    },
+    "material": {
+      "additionalProperties": true,
+      "properties": {
+        "alphaCutoff": {
+          "description": "Procedural only.",
+          "type": "number"
+        },
+        "alphaMode": {
+          "enum": [
+            "opaque",
+            "mask",
+            "blend"
+          ],
+          "type": "string"
+        },
+        "baseColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "baseColorTexture": {
+          "description": "Procedural only.",
+          "type": "string"
+        },
+        "doubleSided": {
+          "description": "Procedural only.",
+          "type": "boolean"
+        },
+        "emissiveColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "emissiveIntensity": {
+          "type": "number"
+        },
+        "metallic": {
+          "type": "number"
+        },
+        "opacity": {
+          "type": "number"
+        },
+        "program": {
+          "type": "string"
+        },
+        "roughness": {
+          "type": "number"
+        },
+        "toon": {
+          "description": "ADR-1071.",
+          "x-avgen-untyped": true
+        },
+        "unlit": {
+          "description": "Procedural only.",
+          "type": "boolean"
+        },
+        "wire": {
+          "description": "ADR-1073.",
+          "x-avgen-untyped": true
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "node": {
+      "additionalProperties": true,
+      "anyOf": [
+        {
+          "description": "gltf: a glTF asset.",
+          "properties": {
+            "animation": {
+              "description": "ADR-086: a skinned character's opening state.",
+              "x-avgen-untyped": true
+            },
+            "kind": {
+              "const": "gltf"
+            },
+            "lod": {
+              "additionalProperties": false,
+              "description": "ADR-351; an unknown key is refused.",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "hysteresis": {
+                  "type": "number"
+                },
+                "maxScreenError": {
+                  "type": "number"
+                },
+                "ratios": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "thinning": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "waterMaterials": {
+              "description": "ADR-2020: glTF material name -> water.",
+              "x-avgen-untyped": true
+            }
+          }
+        },
+        {
+          "description": "group: an empty transform that parents other nodes.",
+          "properties": {
+            "kind": {
+              "const": "group"
+            }
+          }
+        },
+        {
+          "description": "procedural: geometry from the `procedural` block.",
+          "properties": {
+            "kind": {
+              "const": "procedural"
+            }
+          }
+        },
+        {
+          "description": "Every other kind: its own blocks (world, terrain, scatter, particles, ...) are not typed.",
+          "properties": {
+            "kind": {
+              "enum": [
+                "orb",
+                "grid",
+                "particles",
+                "scene",
+                "field",
+                "spline",
+                "sdf",
+                "terrain",
+                "city"
+              ],
+              "type": "string"
+            }
+          },
+          "x-avgen-untyped": true
+        }
+      ],
+      "description": "A scene node. A key the parser does not read is dropped on save; `_` keys are kept.",
+      "properties": {
+        "asset": {
+          "description": "A path relative to the scene file, or an asset:// id.",
+          "type": "string"
+        },
+        "bob": {
+          "description": "A cloud formation's name (ADR-2112).",
+          "type": "string"
+        },
+        "canopyFrom": {
+          "x-avgen-untyped": true
+        },
+        "canopySource": {
+          "x-avgen-untyped": true
+        },
+        "castsShadow": {
+          "description": "ADR-1547.",
+          "type": "boolean"
+        },
+        "emissiveBoost": {
+          "type": "number"
+        },
+        "energy": {
+          "x-avgen-untyped": true
+        },
+        "float": {
+          "x-avgen-untyped": true
+        },
+        "importance": {
+          "enum": [
+            "hero",
+            "foreground",
+            "normal",
+            "background",
+            "ambient"
+          ],
+          "type": "string"
+        },
+        "journey": {
+          "description": "ADR-1042: {distance}.",
+          "x-avgen-untyped": true
+        },
+        "kind": {
+          "enum": [
+            "gltf",
+            "orb",
+            "grid",
+            "particles",
+            "scene",
+            "procedural",
+            "field",
+            "spline",
+            "sdf",
+            "terrain",
+            "group",
+            "city"
+          ],
+          "type": "string"
+        },
+        "locked": {
+          "type": "boolean"
+        },
+        "material": {
+          "$ref": "#/$defs/material"
+        },
+        "name": {
+          "description": "Sanitised (`.`, `/` and space become `_`) and made unique.",
+          "type": "string"
+        },
+        "opacity": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "parent": {
+          "description": "Another node's name.",
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "procedural": {
+          "$ref": "#/$defs/procedural"
+        },
+        "program": {
+          "description": "ADR-1572.",
+          "type": "string"
+        },
+        "rotation": {
+          "description": "Euler degrees. Written back as Euler degrees from a quaternion (ADR-2151).",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "roughnessScale": {
+          "type": "number"
+        },
+        "scale": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "tags": {
+          "description": "Non-empty strings.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "temporalSlot": {
+          "description": "ADR-1934.",
+          "maximum": 16.0,
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "tint": {
+          "description": "Declaring one registers nodes/<name>/tint (ADR-1044).",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "vortexAttractor": {
+          "x-avgen-untyped": true
+        },
+        "vortexReach": {
+          "x-avgen-untyped": true
+        },
+        "wind": {
+          "x-avgen-untyped": true
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "post": {
+      "additionalProperties": true,
+      "description": "Post-processing base values (ADR-059); kept verbatim and written back.",
+      "properties": {
+        "anamorphicIntensity": {
+          "type": "number"
+        },
+        "anamorphicTint": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "antialias": {
+          "type": "number"
+        },
+        "bloomEmissionWeight": {
+          "type": "number"
+        },
+        "bloomEnabled": {
+          "type": "boolean"
+        },
+        "bloomIntensity": {
+          "type": "number"
+        },
+        "bloomKnee": {
+          "type": "number"
+        },
+        "bloomLevels": {
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "bloomRadius": {
+          "type": "number"
+        },
+        "bloomThreshold": {
+          "type": "number"
+        },
+        "chromaRetention": {
+          "type": "number"
+        },
+        "chromaticAberration": {
+          "type": "number"
+        },
+        "contrast": {
+          "type": "number"
+        },
+        "displayDither": {
+          "type": "number"
+        },
+        "displayLetterbox": {
+          "type": "number"
+        },
+        "displayLetterboxAmount": {
+          "type": "number"
+        },
+        "displayLines": {
+          "type": "number"
+        },
+        "displayPixelate": {
+          "type": "number"
+        },
+        "displayPosterize": {
+          "type": "number"
+        },
+        "displayScanlines": {
+          "type": "number"
+        },
+        "distortion": {
+          "type": "number"
+        },
+        "dither": {
+          "type": "number"
+        },
+        "fisheye": {
+          "type": "number"
+        },
+        "fisheyeModel": {
+          "type": "number"
+        },
+        "gain": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "gamma": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "glitchAmount": {
+          "type": "number"
+        },
+        "glitchBlock": {
+          "type": "number"
+        },
+        "glitchDrift": {
+          "type": "number"
+        },
+        "glitchRate": {
+          "type": "number"
+        },
+        "glitchSeed": {
+          "type": "number"
+        },
+        "glitchSwap": {
+          "type": "number"
+        },
+        "glitchTear": {
+          "type": "number"
+        },
+        "glitchTearShift": {
+          "type": "number"
+        },
+        "grain": {
+          "type": "number"
+        },
+        "halationEnabled": {
+          "type": "boolean"
+        },
+        "halationIntensity": {
+          "type": "number"
+        },
+        "halationRadius": {
+          "type": "number"
+        },
+        "halationThreshold": {
+          "type": "number"
+        },
+        "halationTint": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "halationWarmth": {
+          "type": "number"
+        },
+        "lift": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "lookAtmospheric": {
+          "type": "number"
+        },
+        "lookAtmosphericDistance": {
+          "type": "number"
+        },
+        "lookAtmosphericTint": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "lookColour": {
+          "type": "number"
+        },
+        "lookLightWrap": {
+          "type": "number"
+        },
+        "lookLocalContrast": {
+          "type": "number"
+        },
+        "lookLocalContrastRadius": {
+          "type": "number"
+        },
+        "motionBlurAmount": {
+          "type": "number"
+        },
+        "motionBlurMaxRadius": {
+          "type": "number"
+        },
+        "outlineAmount": {
+          "type": "number"
+        },
+        "outlineColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "outlineDepthThreshold": {
+          "type": "number"
+        },
+        "outlineFadeEnd": {
+          "type": "number"
+        },
+        "outlineFadeStart": {
+          "type": "number"
+        },
+        "outlineIntensity": {
+          "type": "number"
+        },
+        "outlineNormalThreshold": {
+          "type": "number"
+        },
+        "outlineObjectEdges": {
+          "type": "number"
+        },
+        "outlineSilhouette": {
+          "type": "number"
+        },
+        "outlineWidth": {
+          "type": "number"
+        },
+        "radialAmount": {
+          "type": "number"
+        },
+        "radialCenterX": {
+          "type": "number"
+        },
+        "radialCenterY": {
+          "type": "number"
+        },
+        "referenceHeight": {
+          "type": "number"
+        },
+        "saturation": {
+          "type": "number"
+        },
+        "sharpen": {
+          "type": "number"
+        },
+        "shockAmount": {
+          "type": "number"
+        },
+        "shockCenterX": {
+          "type": "number"
+        },
+        "shockCenterY": {
+          "type": "number"
+        },
+        "shockChroma": {
+          "type": "number"
+        },
+        "shockRadius": {
+          "type": "number"
+        },
+        "shockWidth": {
+          "type": "number"
+        },
+        "sortAmount": {
+          "type": "number"
+        },
+        "sortAngle": {
+          "type": "number"
+        },
+        "sortInvert": {
+          "type": "number"
+        },
+        "sortLength": {
+          "type": "number"
+        },
+        "sortThreshold": {
+          "type": "number"
+        },
+        "splitAmount": {
+          "type": "number"
+        },
+        "splitAngle": {
+          "type": "number"
+        },
+        "splitSpectral": {
+          "type": "number"
+        },
+        "sweepAngle": {
+          "type": "number"
+        },
+        "sweepHue": {
+          "type": "number"
+        },
+        "sweepIntensity": {
+          "type": "number"
+        },
+        "sweepProgress": {
+          "type": "number"
+        },
+        "sweepSpan": {
+          "type": "number"
+        },
+        "sweepTrail": {
+          "type": "number"
+        },
+        "sweepWash": {
+          "type": "number"
+        },
+        "sweepWidth": {
+          "type": "number"
+        },
+        "tiltShiftBandWidth": {
+          "type": "number"
+        },
+        "tiltShiftCentre": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "tiltShiftEnabled": {
+          "type": "boolean"
+        },
+        "tiltShiftFalloff": {
+          "type": "number"
+        },
+        "tiltShiftMaxRadius": {
+          "type": "number"
+        },
+        "tiltShiftRotation": {
+          "type": "number"
+        },
+        "tonemap": {
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "upscaleSharpness": {
+          "type": "number"
+        },
+        "vignette": {
+          "type": "number"
+        },
+        "waveColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "waveDirection": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "waveEdgeTint": {
+          "type": "number"
+        },
+        "waveHue": {
+          "type": "number"
+        },
+        "waveHueSpan": {
+          "type": "number"
+        },
+        "waveIntensity": {
+          "type": "number"
+        },
+        "waveOrigin": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "waveProgress": {
+          "type": "number"
+        },
+        "waveTrail": {
+          "type": "number"
+        },
+        "waveTrailColor": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "waveWidth": {
+          "type": "number"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "warn"
+    },
+    "procedural": {
+      "additionalProperties": true,
+      "description": "Procedural geometry (ProceduralGeometry::fromJson): a source, a distribution and a material. Typed for a box placed once; every other source and distribution kind is untyped.",
+      "properties": {
+        "castsShadow": {
+          "type": "boolean"
+        },
+        "deformers": {
+          "x-avgen-untyped": true
+        },
+        "distribution": {
+          "anyOf": [
+            {
+              "description": "single: one copy.",
+              "properties": {
+                "count": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "single"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Every other distribution kind, untyped.",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "linear",
+                    "grid",
+                    "radial",
+                    "spiral",
+                    "spline",
+                    "grammar",
+                    "scatter",
+                    "generator",
+                    "points"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-avgen-untyped": true
+            }
+          ],
+          "description": "Where copies go (Distribution)."
+        },
+        "distributionTransform": {
+          "x-avgen-untyped": true
+        },
+        "effectors": {
+          "x-avgen-untyped": true
+        },
+        "emissiveField": {
+          "type": "string"
+        },
+        "emissiveFieldAmount": {
+          "type": "number"
+        },
+        "extraLane": {
+          "x-avgen-untyped": true
+        },
+        "flatFarRungs": {
+          "x-avgen-untyped": true
+        },
+        "grammar": {
+          "x-avgen-untyped": true
+        },
+        "hierarchy": {
+          "x-avgen-untyped": true
+        },
+        "lod": {
+          "x-avgen-untyped": true
+        },
+        "material": {
+          "$ref": "#/$defs/material"
+        },
+        "materialVariation": {
+          "x-avgen-untyped": true
+        },
+        "motion": {
+          "x-avgen-untyped": true
+        },
+        "name": {
+          "type": "string"
+        },
+        "normalStep": {
+          "description": "Metres.",
+          "minimum": 0.0,
+          "type": "number"
+        },
+        "ops": {
+          "x-avgen-untyped": true
+        },
+        "partMaterials": {
+          "x-avgen-untyped": true
+        },
+        "partOf": {
+          "type": "string"
+        },
+        "slabDebugFaces": {
+          "x-avgen-untyped": true
+        },
+        "slabEdgeOn": {
+          "x-avgen-untyped": true
+        },
+        "slabFarPixels": {
+          "x-avgen-untyped": true
+        },
+        "slabSidePixels": {
+          "x-avgen-untyped": true
+        },
+        "slabs": {
+          "x-avgen-untyped": true
+        },
+        "source": {
+          "anyOf": [
+            {
+              "description": "box",
+              "properties": {
+                "bevel": {
+                  "type": "number"
+                },
+                "bevelSegments": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "const": "box"
+                },
+                "size": {
+                  "description": "Metres.",
+                  "items": {
+                    "type": "number"
+                  },
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "type": "array"
+                },
+                "subdivisions": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Every other primitive kind, untyped.",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "cylinder",
+                    "sphere",
+                    "torus",
+                    "point",
+                    "procedural",
+                    "tube",
+                    "mesh",
+                    "generated",
+                    "text",
+                    "fiber"
+                  ],
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-avgen-untyped": true
+            }
+          ],
+          "description": "What is placed (SourceSpec)."
+        },
+        "sourceTransform": {
+          "x-avgen-untyped": true
+        },
+        "variation": {
+          "x-avgen-untyped": true
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "drop"
+    },
+    "rigLight": {
+      "additionalProperties": true,
+      "properties": {
+        "aspect": {
+          "type": "number"
+        },
+        "azimuth": {
+          "description": "Degrees from the camera's view direction about the subject's up axis.",
+          "type": "number"
+        },
+        "castsShadow": {
+          "type": "boolean"
+        },
+        "color": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "cone": {
+          "description": "Spot cone, degrees.",
+          "type": "number"
+        },
+        "contactShadow": {
+          "type": "boolean"
+        },
+        "distance": {
+          "description": "Subject radii.",
+          "type": "number"
+        },
+        "elevation": {
+          "description": "Degrees above the horizon.",
+          "type": "number"
+        },
+        "followCamera": {
+          "type": "boolean"
+        },
+        "intensity": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "key",
+            "fill",
+            "rim",
+            "back",
+            "ambient",
+            "practical"
+          ],
+          "type": "string"
+        },
+        "shadowStrength": {
+          "type": "number"
+        },
+        "size": {
+          "description": "Subject radii.",
+          "type": "number"
+        },
+        "softness": {
+          "type": "number"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "tint": {
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "directional",
+            "point",
+            "spot",
+            "rect",
+            "disk",
+            "tube",
+            "sphere"
+          ],
+          "type": "string"
+        },
+        "volumetric": {
+          "type": "number"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "warn-drop"
+    },
+    "sky": {
+      "additionalProperties": true,
+      "properties": {
+        "background": {
+          "type": "boolean"
+        },
+        "cirrus": {
+          "description": "ADR-1864.",
+          "x-avgen-untyped": true
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "groundColor": {
+          "description": "Any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "haze": {
+          "type": "number"
+        },
+        "horizonColor": {
+          "description": "Any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "intensity": {
+          "type": "number"
+        },
+        "sunColor": {
+          "description": "Any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "sunDirection": {
+          "description": "Any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "sunGlow": {
+          "type": "number"
+        },
+        "sunIntensity": {
+          "type": "number"
+        },
+        "sunSize": {
+          "type": "number"
+        },
+        "useKeyLight": {
+          "type": "boolean"
+        },
+        "zenithColor": {
+          "description": "Any other shape is ignored.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "type": "object",
+      "x-avgen-unknownKeys": "warn-drop"
+    }
+  },
+  "$id": "avgen-scene.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "An AV Gen scene document, format version 1. Generated by `avgen --describe schema:scene` (ADR-2152): the keys are the parser's own key lists, the types its typing table. A block marked x-avgen-untyped is read by the engine but not typed here yet. An unknown top-level key is warned about at load and kept on save (ADR-2151); x-avgen-unknownKeys says what each object does with one, and x-avgen-notWrittenBack lists what a save does not write back as read.",
+  "properties": {
+    "astral": {
+      "description": "ADR-1221.",
+      "x-avgen-untyped": true
+    },
+    "attractorWorld": {
+      "description": "ADR-1850.",
+      "x-avgen-untyped": true
+    },
+    "camera": {
+      "$ref": "#/$defs/camera"
+    },
+    "cameraDirection": {
+      "description": "The scene's camera rig and shots (CameraDirection::fromJson).",
+      "x-avgen-untyped": true
+    },
+    "clouds": {
+      "description": "ADR-1289.",
+      "x-avgen-untyped": true
+    },
+    "composition": {
+      "description": "The 2D composition layer (CompositionData::fromJson).",
+      "x-avgen-untyped": true
+    },
+    "corruption": {
+      "description": "ADR-1873.",
+      "x-avgen-untyped": true
+    },
+    "ecosystem": {
+      "description": "ADR-1200.",
+      "x-avgen-untyped": true
+    },
+    "effects": {
+      "description": "Authored world effects (ADR-702).",
+      "x-avgen-untyped": true
+    },
+    "entities": {
+      "description": "Entities (entity::entitiesFromJson).",
+      "x-avgen-note": "an empty list is written as absent, which means the same",
+      "x-avgen-untyped": true,
+      "x-avgen-writtenBack": false
+    },
+    "entityProfiles": {
+      "description": "An entity profile file, relative to the scene file.",
+      "type": "string"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "fields": {
+      "description": "Spatial fields (entity::fieldsFromJson).",
+      "x-avgen-untyped": true
+    },
+    "flight": {
+      "description": "ADR-1956.",
+      "x-avgen-untyped": true
+    },
+    "format": {
+      "const": "avgen-scene"
+    },
+    "graph": {
+      "description": "A procedural graph file or document.",
+      "x-avgen-untyped": true
+    },
+    "grids": {
+      "x-avgen-untyped": true
+    },
+    "heroes": {
+      "description": "Hero points (world::HeroPoint).",
+      "x-avgen-note": "an empty list is written as absent, which means the same",
+      "x-avgen-untyped": true,
+      "x-avgen-writtenBack": false
+    },
+    "lightRig": {
+      "anyOf": [
+        {
+          "description": "a light rig file, relative to the scene file",
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/lightRig"
+        }
+      ],
+      "description": "A light rig (ADR-033): a file path or the rig itself; the environment's wins when both name one",
+      "x-avgen-note": "written back as environment.lightRig, which the parser also reads",
+      "x-avgen-writtenBack": false
+    },
+    "lights": {
+      "description": "Authored lights (ADR-278); each registers lights/<id>/* parameters.",
+      "items": {
+        "$ref": "#/$defs/light"
+      },
+      "type": "array",
+      "x-avgen-note": "an empty list is written as absent, which means the same",
+      "x-avgen-writtenBack": false
+    },
+    "looks": {
+      "description": "ADR-1886: named parameter looks by portal crossing.",
+      "x-avgen-untyped": true
+    },
+    "lunarWorld": {
+      "description": "ADR-1882.",
+      "x-avgen-untyped": true
+    },
+    "materialPrograms": {
+      "x-avgen-untyped": true
+    },
+    "meshWire": {
+      "description": "ADR-1862.",
+      "x-avgen-untyped": true
+    },
+    "name": {
+      "description": "Defaults to the file's stem.",
+      "type": "string"
+    },
+    "navBodyRadius": {
+      "description": "Metres; 0 keeps the navigator's default.",
+      "maximum": 40.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "navCellSize": {
+      "description": "Metres; 0 disables pathfinding.",
+      "maximum": 64.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "navWadeDepth": {
+      "description": "Metres; 0 stops walkers at the water.",
+      "maximum": 8.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "nodes": {
+      "description": "The scene's objects, in order.",
+      "items": {
+        "$ref": "#/$defs/node"
+      },
+      "type": "array"
+    },
+    "portal": {
+      "description": "ADR-1879.",
+      "x-avgen-untyped": true
+    },
+    "portals": {
+      "description": "ADR-1895; needs `portal`.",
+      "x-avgen-untyped": true
+    },
+    "post": {
+      "$ref": "#/$defs/post"
+    },
+    "staging": {
+      "description": "Staging (stage::stagingFromJson).",
+      "x-avgen-untyped": true
+    },
+    "version": {
+      "const": 1,
+      "description": "Any other version is refused."
+    },
+    "wind": {
+      "additionalProperties": true,
+      "description": "The weather (ADR-055); its keys are not typed yet.",
+      "type": "object",
+      "x-avgen-unknownKeys": "drop",
+      "x-avgen-untyped": true
+    },
+    "worldEvents": {
+      "x-avgen-untyped": true
+    }
+  },
+  "required": [
+    "format",
+    "version"
+  ],
+  "title": "AV Gen scene",
+  "type": "object",
+  "x-avgen-api": 1,
+  "x-avgen-notWrittenBack": [
+    {
+      "note": "written back as environment.lightRig, which the parser also reads",
+      "pointer": "/lightRig"
+    },
+    {
+      "note": "an empty list is written as absent, which means the same",
+      "pointer": "/lights"
+    },
+    {
+      "note": "an empty list is written as absent, which means the same",
+      "pointer": "/heroes"
+    },
+    {
+      "note": "an empty list is written as absent, which means the same",
+      "pointer": "/entities"
+    },
+    {
+      "note": "migrated to an effect instance in `effects` (ADR-441); not written back here",
+      "pointer": "/environment/vortex"
+    },
+    {
+      "note": "a node key the parser does not read is dropped on save (only `_` keys are kept): nodes have no key list yet (ADR-2151, reported)",
+      "pointer": "/nodes/*/<unknown>"
+    },
+    {
+      "note": "an empty list is written as absent, and a world read without the key gets the default biomes (src/world/world_map.cpp worldMapToJson; ADR-2151, reported)",
+      "pointer": "/nodes/*/world/biomes"
+    }
+  ],
+  "x-avgen-unknownKeys": "warn"
+}

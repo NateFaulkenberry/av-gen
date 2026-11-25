@@ -791,11 +791,15 @@ const char* nodeKindName(NodeKind kind) {
     return "gltf";
 }
 
+std::span<const NodeKind> allNodeKinds() {
+    static constexpr NodeKind kKinds[] = {NodeKind::Gltf,       NodeKind::Orb,   NodeKind::Grid,   NodeKind::Particles,
+                                          NodeKind::Scene,      NodeKind::Procedural, NodeKind::Field, NodeKind::Spline,
+                                          NodeKind::Sdf,        NodeKind::Terrain, NodeKind::Group, NodeKind::City};
+    return kKinds;
+}
+
 Result<NodeKind> nodeKindFromName(const std::string& name) {
-    for (const NodeKind kind :
-         {NodeKind::Gltf, NodeKind::Orb, NodeKind::Grid, NodeKind::Particles, NodeKind::Scene, NodeKind::Procedural,
-          NodeKind::Field, NodeKind::Spline, NodeKind::Sdf, NodeKind::Terrain, NodeKind::Group,
-          NodeKind::City}) {
+    for (const NodeKind kind : allNodeKinds()) {
         if (name == nodeKindName(kind)) {
             return kind;
         }

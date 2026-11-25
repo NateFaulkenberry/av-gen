@@ -244,6 +244,8 @@ public:
     static constexpr std::size_t kPinnedOverridesReported = 16;
     // Whether `key` is a top-level project key this build reads or writes (anything else is kept verbatim).
     [[nodiscard]] static bool isProjectKey(std::string_view key);
+    // ADR-2152: that list itself, in the style of `scene::sceneFileKeys()`, for the generated project schema.
+    [[nodiscard]] static std::span<const std::string_view> projectFileKeys();
     [[nodiscard]] const std::filesystem::path& projectPath() const { return projectPath_; }
     [[nodiscard]] const std::vector<std::string>& projectWarnings() const { return projectWarnings_; }
     // Why the scene the last project names did not load, or empty. Also one of projectWarnings(), but

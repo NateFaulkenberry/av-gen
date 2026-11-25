@@ -23,6 +23,8 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace avgen::scene {
 
@@ -376,6 +378,13 @@ PostParameters registerPostParameters(params::ParameterSet& params, const PostSe
 // ADR-059: apply a composition's own `post` block as parameter base values. The project's
 // `parameters` block is applied after the scene loads and therefore still wins.
 Result<void> applyPostJson(const nlohmann::json& j, const PostParameters& p);
+// ADR-2152: every key `applyPostJson` reads, and the JSON type it requires, for the generated scene schema.
+enum class PostKeyType : std::uint8_t { Number, Boolean, Vec3, Vec2, UnsignedInteger };
+struct PostFileKey {
+    std::string_view key;
+    PostKeyType type;
+};
+[[nodiscard]] std::vector<PostFileKey> postFileKeys();
 void applyPostParameters(const PostParameters& p, PostSettings& settings);
 const char* tonemapOperatorName(TonemapOperator op);
 

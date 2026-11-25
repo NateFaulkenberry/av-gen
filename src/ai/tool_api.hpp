@@ -193,9 +193,11 @@ private:
 
 // A deliberately small JSON Schema subset: `type` (object/array/string/number/integer/boolean),
 // `properties`, `required`, `additionalProperties: false`, `enum`, `minimum`/`maximum`,
-// `minItems`/`maxItems`, `items`. That is the whole vocabulary the tool schemas use, and a general
-// validator would be a dependency bought for no consumer -- the same call ADR-065 made about
-// tensors.
+// `minItems`/`maxItems`, `items`, and (ADR-2152, for the document schemas) `anyOf`, `const` and a
+// local `$ref` (`#/$defs/...`, resolved against `schema` itself). That is the whole vocabulary the
+// tool and document schemas use, and a general validator would be a dependency bought for no
+// consumer -- the same call ADR-065 made about tensors. Every other keyword is ignored, so
+// tests/unit/test_api_catalogue.cpp (T2) and test_api_schemas.cpp hold the published schemas to it.
 //
 // Returns an empty optional when the value conforms. `path` seeds the error's location text.
 [[nodiscard]] std::optional<ToolError> validateAgainstSchema(const nlohmann::json& schema,

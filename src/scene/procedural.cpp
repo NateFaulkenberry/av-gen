@@ -834,11 +834,16 @@ const char* primitiveKindName(PrimitiveKind kind) {
     return "cylinder";
 }
 
+std::span<const PrimitiveKind> allPrimitiveKinds() {
+    static constexpr PrimitiveKind kKinds[] = {PrimitiveKind::Box,   PrimitiveKind::Cylinder,   PrimitiveKind::Sphere,
+                                               PrimitiveKind::Torus, PrimitiveKind::Point,      PrimitiveKind::Procedural,
+                                               PrimitiveKind::Tube,  PrimitiveKind::Mesh,       PrimitiveKind::Generated,
+                                               PrimitiveKind::Text,  PrimitiveKind::Fiber};
+    return kKinds;
+}
+
 std::optional<PrimitiveKind> primitiveKindFromName(std::string_view name) {
-    for (const auto kind : {PrimitiveKind::Box, PrimitiveKind::Cylinder, PrimitiveKind::Sphere, PrimitiveKind::Torus,
-                            PrimitiveKind::Point, PrimitiveKind::Procedural, PrimitiveKind::Tube,
-                            PrimitiveKind::Mesh, PrimitiveKind::Generated, PrimitiveKind::Text,
-                            PrimitiveKind::Fiber}) {
+    for (const auto kind : allPrimitiveKinds()) {
         if (name == primitiveKindName(kind)) {
             return kind;
         }
@@ -872,11 +877,17 @@ const char* distributionKindName(DistributionKind kind) {
     return "single";
 }
 
+std::span<const DistributionKind> allDistributionKinds() {
+    static constexpr DistributionKind kKinds[] = {DistributionKind::Single,  DistributionKind::Linear,
+                                                  DistributionKind::Grid,    DistributionKind::Radial,
+                                                  DistributionKind::Spiral,  DistributionKind::Spline,
+                                                  DistributionKind::Grammar, DistributionKind::Scatter,
+                                                  DistributionKind::Generator, DistributionKind::Points};
+    return kKinds;
+}
+
 std::optional<DistributionKind> distributionKindFromName(std::string_view name) {
-    for (const auto kind : {DistributionKind::Single, DistributionKind::Linear, DistributionKind::Grid,
-                            DistributionKind::Radial, DistributionKind::Spiral, DistributionKind::Spline,
-                            DistributionKind::Grammar, DistributionKind::Scatter, DistributionKind::Generator,
-                            DistributionKind::Points}) {
+    for (const auto kind : allDistributionKinds()) {
         if (name == distributionKindName(kind)) {
             return kind;
         }

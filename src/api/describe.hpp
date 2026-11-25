@@ -11,6 +11,7 @@
 //   schemas/tool-catalogue-baseline.json  the contract at the current API level (see apiBaseline)
 //   schemas/tools-without-output-schema.json  the output-schema ratchet (authored; may only shrink)
 //   docs/api/tools.md, docs/api/errors.md
+//   schemas/avgen-project.schema.json, schemas/avgen-scene.schema.json  (ADR-2152)
 //
 // The CPU suite regenerates each in-process and compares it with the committed file byte for byte
 // (tests/unit/test_api_catalogue.cpp), so a tool changed without regenerating fails a test that
@@ -26,6 +27,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace avgen::api {
 
@@ -49,6 +51,18 @@ namespace avgen::api {
 [[nodiscard]] nlohmann::json apiBaseline(const nlohmann::json& catalogue);
 [[nodiscard]] std::vector<std::string> breakingChanges(const nlohmann::json& baseline, const nlohmann::json& catalogue);
 
+// ADR-2152: the document schemas, JSON Schema 2020-12 in the subset `ai::validateAgainstSchema` enforces
+// (plus annotations), so the engine validates its own documents. Completeness comes from the parsers'
+// key lists, typing from the tables in schema_types_{project,scene}.cpp; see api/schema_types.hpp.
+[[nodiscard]] nlohmann::json projectSchema(); // schemas/avgen-project.schema.json
+[[nodiscard]] nlohmann::json sceneSchema();   // schemas/avgen-scene.schema.json
+
+// ADR-2152: the feature ids this build can parse, generated from the key lists and name tables that decide
+// them (scene keys, environment keys, node kinds, effect kinds, render outputs, AOV names). Defined in
+// api/features.cpp, so `capability.list` reaches it without the catalogue's registry. Not an artefact:
+// it is printed by `avgen --describe features` and returned by `capability.list`.
+[[nodiscard]] std::vector<std::string> featureList();
+
 [[nodiscard]] std::string toolsMarkdown(const nlohmann::json& catalogue);
 [[nodiscard]] std::string errorsMarkdown(const nlohmann::json& errors);
 
@@ -62,7 +76,8 @@ struct Artefact {
 };
 [[nodiscard]] std::vector<Artefact> generatedArtefacts(const ai::ToolRegistry& registry);
 
-// `avgen --version` and `avgen --describe <tools|errors|version|baseline|all> [--out <dir>]`.
+// `avgen --version` and
+// `avgen --describe <tools|errors|schema:project|schema:scene|features|version|baseline|all> [--out <dir>]`.
 // Returns the process exit code: 0, or 2 for a usage error.
 [[nodiscard]] int runVersionCommand();
 [[nodiscard]] int runDescribeCommand(int argc, char** argv);

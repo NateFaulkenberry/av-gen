@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace avgen::scene {
@@ -11,6 +12,7 @@ namespace avgen::scene {
 enum class Importance : std::uint8_t { Hero, Foreground, Normal, Background, Ambient };
 [[nodiscard]] const char* importanceName(Importance importance);
 [[nodiscard]] bool importanceFromName(std::string_view name, Importance& out);
+[[nodiscard]] std::span<const Importance> allImportances(); // ADR-2152: what importanceFromName accepts
 // How hard the live levers press on a node of this importance: 0 = exempt, 1 = as set, >1 = sooner.
 [[nodiscard]] float importanceLeverWeight(Importance importance);
 

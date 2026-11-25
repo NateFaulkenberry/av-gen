@@ -138,10 +138,16 @@ const char* lightTypeName(PunctualLight::Type type) {
     return "directional";
 }
 
+std::span<const PunctualLight::Type> allLightTypes() {
+    static constexpr PunctualLight::Type kTypes[] = {PunctualLight::Type::Directional, PunctualLight::Type::Point,
+                                                     PunctualLight::Type::Spot,        PunctualLight::Type::Rect,
+                                                     PunctualLight::Type::Disk,        PunctualLight::Type::Tube,
+                                                     PunctualLight::Type::Sphere};
+    return kTypes;
+}
+
 std::optional<PunctualLight::Type> lightTypeFromName(std::string_view name) {
-    for (const auto t : {PunctualLight::Type::Directional, PunctualLight::Type::Point, PunctualLight::Type::Spot,
-                         PunctualLight::Type::Rect, PunctualLight::Type::Disk, PunctualLight::Type::Tube,
-                         PunctualLight::Type::Sphere}) {
+    for (const auto t : allLightTypes()) {
         if (name == lightTypeName(t)) {
             return t;
         }
@@ -161,9 +167,15 @@ const char* lightRoleName(PunctualLight::Role role) {
     return "key";
 }
 
+std::span<const PunctualLight::Role> allLightRoles() {
+    static constexpr PunctualLight::Role kRoles[] = {PunctualLight::Role::Key,  PunctualLight::Role::Fill,
+                                                     PunctualLight::Role::Rim,  PunctualLight::Role::Back,
+                                                     PunctualLight::Role::Ambient, PunctualLight::Role::Practical};
+    return kRoles;
+}
+
 std::optional<PunctualLight::Role> lightRoleFromName(std::string_view name) {
-    for (const auto r : {PunctualLight::Role::Key, PunctualLight::Role::Fill, PunctualLight::Role::Rim,
-                         PunctualLight::Role::Back, PunctualLight::Role::Ambient, PunctualLight::Role::Practical}) {
+    for (const auto r : allLightRoles()) {
         if (name == lightRoleName(r)) {
             return r;
         }

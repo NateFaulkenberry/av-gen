@@ -1,5 +1,6 @@
 #include "ai/capabilities.hpp"
 
+#include "api/describe.hpp"
 #include "api/version.hpp"
 #include "app/engine.hpp"
 #include "scene/composition.hpp"
@@ -55,30 +56,36 @@ const std::vector<DomainCapability> kDomains = {
      true, {}},
 
     // ---- what this build deliberately does not expose -------------------------------------------
-    {"entity", "Creating and deleting objects", {}, false,
-     "Not exposed in this pass. Composition node structure is outside the snapshot the AI "
-     "transaction restores, so a created or deleted node would survive a rollback. The editor's "
-     "undo system is being built concurrently; once the AI transaction is backed by it rather than "
-     "by parameter snapshots, node creation and deletion can be added. Nodes that already exist "
-     "can be moved, hidden and shown."},
+    // ADR-2152 (C3): the old text said node creation and deletion were not exposed because a rollback
+    // could not undo them. The scene domain has both now, and the rollback snapshot captures the
+    // composition (ai::SnapshotStore::captureDocument), so what is left unexposed is the entities'.
+    {"entity", "Entities and their behaviour", {}, false,
+     "Entities can be read: what each drives, its behaviours and reactions, and its profile. "
+     "Adding, removing or re-profiling an entity is not exposed; scene nodes are created, deleted "
+     "and parented in the scene domain."},
     {"terrain", "Terrain", {}, false,
      "Not exposed in this pass. Terrain generation is being reworked concurrently and its "
      "parameter surface is in flux. The LOD and view-distance knobs on an existing terrain node "
-     "are reachable through parameter.set today."},
+     "are reachable through the parameter domain today."},
     {"water", "Water", {}, false,
      "Not exposed in this pass. Water bodies and their rendering are being reworked concurrently. "
-     "Whatever water parameters the current scene registers are visible to parameter.search."},
+     "Whatever water parameters the current scene registers can be found and set through the "
+     "parameter domain."},
     {"navigation", "Navigation and character behaviour", {}, false,
      "Not exposed in this pass. The navigation and entity-behaviour surfaces are being reworked "
      "concurrently."},
-    {"light-editing", "Editing individual lights", {}, false,
-     "Lights are regenerated from the scene description on every rebuild, so a direct write to one "
-     "would be discarded. Lighting is changed through the lightrig/*, scene/keyLight and "
-     "env/sky/sunIntensity parameters. Exposing per-light editing would need each light in the "
-     "flattened scene to register parameters the way a light rig's lights already do."},
+    // ADR-2152 (C3): the old text said per-light editing needed each light to register parameters.
+    // Authored scene lights already do (Composition registers lights/<id>/*).
+    {"light-editing", "Adding and removing lights", {}, false,
+     "A light the scene file authors registers parameters (lights/<id>/enabled, intensity, color, "
+     "position, temperature, tint, castsShadow, range and more), so an existing light is edited "
+     "through the parameter domain like any other value. Adding or removing a light changes the "
+     "scene document and is not exposed yet. Lights a rig drives are changed through lightrig/*; "
+     "lights the ecology derives are rebuilt every frame and are not editable."},
     {"render", "Rendering to a file", {}, false,
-     "Not exposed. Writing files is an external side effect and, per the security model, needs a "
-     "separately designed capability with explicit consent rather than a tool."},
+     "What the camera sees can be measured. Writing a render to a file is not exposed: it is an "
+     "external side effect and, per the security model, needs a separately designed capability "
+     "with explicit consent rather than a tool."},
     {"vision", "Looking at the rendered frame", {}, false,
      "Not exposed. The agent inspects structured renderer and performance state; it cannot see the "
      "image. Faking visual verification would be worse than not having it. The provider layer "
@@ -173,6 +180,9 @@ nlohmann::json capabilityDocument(const ToolRegistry& registry, const app::Engin
     nlohmann::json out;
     out["engine"] = "AV Gen";
     out["version"] = api::version().toJson(); // ADR-2150: the same identity as avgen --version
+    // ADR-2152: what this build can parse, generated (api::featureList). Supported, not available: a
+    // feature here is one the parser reads, which says nothing about this session's GPU, audio or files.
+    out["features"] = api::featureList();
     out["domains"] = std::move(domains);
     out["thisSession"] = std::move(present);
     out["transaction"] =

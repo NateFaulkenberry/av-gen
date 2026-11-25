@@ -143,6 +143,9 @@ enum class NodeKind : std::uint8_t { Gltf, Orb, Grid, Particles, Scene, Procedur
 
 const char* nodeKindName(NodeKind kind);
 Result<NodeKind> nodeKindFromName(const std::string& name);
+// Every node kind, in enumerator order: what `nodeKindFromName` accepts, and what the scene schema and the
+// feature list name (ADR-2152). One list, so a kind added to the enum and not here fails the name round trip.
+[[nodiscard]] std::span<const NodeKind> allNodeKinds();
 
 struct MaterialPartParameters {
     params::Parameter<glm::vec3>* tint = nullptr;

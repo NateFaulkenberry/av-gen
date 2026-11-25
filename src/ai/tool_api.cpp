@@ -313,13 +313,86 @@ ToolResult ToolRegistry::invoke(std::string_view name, const nlohmann::json& arg
 
 // ---- schema validation --------------------------------------------------------------------------
 
-std::optional<ToolError> validateAgainstSchema(const nlohmann::json& schema,
-                                               const nlohmann::json& value, std::string_view path) {
+namespace {
+
+// The validator proper. `root` is the schema a local `$ref` (`#/$defs/...`) resolves against: the
+// document schemas (ADR-2152) name their shared shapes once, and a tool schema that has no `$defs`
+// never meets one.
+std::optional<ToolError> validateNode(const nlohmann::json& schema, const nlohmann::json& root,
+                                      const nlohmann::json& value, std::string_view path, int depth) {
     const auto invalid = [&](std::string message, std::string recovery = {}) {
         return ToolError{ToolErrorCode::InvalidArguments, std::move(message), std::move(recovery)};
     };
     if (!schema.is_object()) {
         return std::nullopt; // no constraint declared
+    }
+    // A `$ref` that points at itself (directly or round a loop) would recurse for ever; no schema
+    // this engine publishes nests anywhere near this deep.
+    constexpr int kMaxDepth = 256;
+    if (depth > kMaxDepth) {
+        return ToolError{ToolErrorCode::Internal, fmt::format("{}: the schema nests deeper than {} levels", path, kMaxDepth),
+                         "report this; the schema refers to itself"};
+    }
+
+    // ADR-2152: a local reference, applied beside the keywords next to it (JSON Schema 2020-12). Only
+    // `#/...` is resolved; a schema that names another document is a schema bug, said so.
+    if (const auto ref = schema.find("$ref"); ref != schema.end() && ref->is_string()) {
+        const std::string target = ref->get<std::string>();
+        const nlohmann::json* resolved = nullptr;
+        if (target.starts_with("#")) {
+            try {
+                const nlohmann::json::json_pointer pointer(target.substr(1));
+                if (root.contains(pointer)) {
+                    resolved = &root.at(pointer);
+                }
+            } catch (const nlohmann::json::exception&) {
+                resolved = nullptr;
+            }
+        }
+        if (resolved == nullptr) {
+            return ToolError{ToolErrorCode::Internal,
+                             fmt::format("{}: the schema's $ref '{}' does not resolve", path, target),
+                             "report this; the schema names a definition it does not contain"};
+        }
+        if (auto e = validateNode(*resolved, root, value, path, depth + 1)) {
+            return e;
+        }
+    }
+
+    // ADR-2152: `const`, one allowed value. Reported like a one-value `enum`.
+    if (const auto c = schema.find("const"); c != schema.end()) {
+        if (*c != value) {
+            return invalid(fmt::format("{} must be {}", path, c->dump()), fmt::format("use {}", c->dump()));
+        }
+    }
+
+    // ADR-2152: `anyOf`, at least one form must hold. When none does, every form's reason is listed,
+    // so a client sees each way the value could have been right.
+    if (const auto any = schema.find("anyOf"); any != schema.end() && any->is_array()) {
+        std::vector<ToolError> reasons;
+        bool matched = false;
+        for (const nlohmann::json& branch : *any) {
+            auto e = validateNode(branch, root, value, path, depth + 1);
+            if (!e) {
+                matched = true;
+                break;
+            }
+            if (e->code == ToolErrorCode::Internal) {
+                return e; // a broken schema is not a reason the value is wrong
+            }
+            reasons.push_back(std::move(*e));
+        }
+        if (!matched) {
+            if (reasons.size() == 1) {
+                return reasons.front();
+            }
+            std::string why;
+            for (std::size_t i = 0; i < reasons.size(); ++i) {
+                why += fmt::format("{}({}) {}", i == 0 ? "" : "; ", i + 1, reasons[i].message);
+            }
+            return invalid(fmt::format("{} matches none of the {} allowed forms: {}", path, reasons.size(), why),
+                           "make the value match one of the forms");
+        }
     }
 
     if (const auto type = schema.find("type"); type != schema.end() && type->is_string()) {
@@ -387,8 +460,7 @@ std::optional<ToolError> validateAgainstSchema(const nlohmann::json& schema,
         }
         if (const auto items = schema.find("items"); items != schema.end() && items->is_object()) {
             for (std::size_t i = 0; i < value.size(); ++i) {
-                if (auto e = validateAgainstSchema(*items, value[i],
-                                                   fmt::format("{}[{}]", path, i))) {
+                if (auto e = validateNode(*items, root, value[i], fmt::format("{}[{}]", path, i), depth + 1)) {
                     return e;
                 }
             }
@@ -431,7 +503,7 @@ std::optional<ToolError> validateAgainstSchema(const nlohmann::json& schema,
                 if (!value.contains(key) || value.at(key).is_null()) {
                     continue;
                 }
-                if (auto e = validateAgainstSchema(sub, value.at(key), joinPath(path, key))) {
+                if (auto e = validateNode(sub, root, value.at(key), joinPath(path, key), depth + 1)) {
                     return e;
                 }
             }
@@ -439,6 +511,13 @@ std::optional<ToolError> validateAgainstSchema(const nlohmann::json& schema,
     }
 
     return std::nullopt;
+}
+
+} // namespace
+
+std::optional<ToolError> validateAgainstSchema(const nlohmann::json& schema,
+                                               const nlohmann::json& value, std::string_view path) {
+    return validateNode(schema, schema, value, path, 0);
 }
 
 // ---- schema helpers ------------------------------------------------------------------------------

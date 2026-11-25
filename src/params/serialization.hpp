@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <set>
+#include <span>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -38,6 +39,17 @@ Result<void> parameterFromJson(IParameter& param, const nlohmann::json& value);
 [[nodiscard]] std::optional<CurveType> curveTypeFromName(std::string_view name);
 [[nodiscard]] std::string_view modOpName(ModOp op);
 [[nodiscard]] std::optional<ModOp> modOpFromName(std::string_view name);
+
+// ADR-2152: every name each reader above (and the chain's) accepts, in table order. The document schemas' enums are
+// these, so a name added to a table is in the published schema at the next regeneration.
+[[nodiscard]] std::vector<std::string_view> curveTypeNames();
+[[nodiscard]] std::vector<std::string_view> modOpNames();
+[[nodiscard]] std::vector<std::string_view> polarityNames();
+[[nodiscard]] std::vector<std::string_view> thresholdModeNames();
+[[nodiscard]] std::vector<std::string_view> envelopeModeNames();
+// The keys `routeFromJson` reads on a route, and `chainFromJson` in its "chain" (ADR-278's lists, for the schemas).
+[[nodiscard]] std::span<const std::string_view> routeFileKeys();
+[[nodiscard]] std::span<const std::string_view> chainFileKeys();
 
 nlohmann::json chainToJson(const ProcessorChain& chain);
 Result<ProcessorChain> chainFromJson(const nlohmann::json& j);

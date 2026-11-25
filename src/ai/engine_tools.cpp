@@ -397,8 +397,9 @@ void registerCapabilityTools(ToolRegistry& registry) {
     add(registry, "capability.list", "What AV Gen supports",
         "The capability registry: every engine domain, whether it is reachable from here, what "
         "this particular session actually contains, and -- importantly -- the domains that are NOT "
-        "exposed and why. Call this before planning anything ambitious; it will save you from "
-        "trying to do something this build cannot do.",
+        "exposed and why, and `features`: the scene keys, node kinds, effect kinds, render outputs "
+        "and AOVs this build can parse. Call this before planning anything ambitious; it will save "
+        "you from trying to do something this build cannot do.",
         noArgs(), readOnly(),
         [&registry](const json&, ToolContext& ctx) -> ToolResult {
             json doc = capabilityDocument(registry, ctx.engine());

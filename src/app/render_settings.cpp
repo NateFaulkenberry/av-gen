@@ -26,6 +26,19 @@ const char* renderOutputName(RenderOutput output) {
     return "sequence";
 }
 
+std::span<const RenderOutput> allRenderOutputs() {
+    static constexpr RenderOutput kOutputs[] = {RenderOutput::PngSequence, RenderOutput::Video, RenderOutput::ExrSequence};
+    return kOutputs;
+}
+
+std::span<const RenderOutputSpelling> renderOutputSpellings() {
+    static constexpr RenderOutputSpelling kSpellings[] = {{"sequence", RenderOutput::PngSequence},
+                                                          {"png", RenderOutput::PngSequence},
+                                                          {"video", RenderOutput::Video},
+                                                          {"exr", RenderOutput::ExrSequence}};
+    return kSpellings;
+}
+
 bool isSequence(RenderOutput output) {
     return output != RenderOutput::Video;
 }
@@ -310,15 +323,13 @@ Result<RenderSettings> RenderSettings::fromJson(const nlohmann::json& j) {
     std::string output;
     if (auto r = text("output", output); !r) return std::unexpected(r.error());
     if (!output.empty()) {
-        if (output == "video") {
-            s.output = RenderOutput::Video;
-        } else if (output == "sequence" || output == "png") {
-            s.output = RenderOutput::PngSequence;
-        } else if (output == "exr") {
-            s.output = RenderOutput::ExrSequence;
-        } else {
+        const auto spellings = renderOutputSpellings();
+        const auto it = std::find_if(spellings.begin(), spellings.end(),
+                                     [&](const RenderOutputSpelling& sp) { return sp.name == output; });
+        if (it == spellings.end()) {
             return fail("render.output '{}' is not 'sequence', 'exr' or 'video'", output);
         }
+        s.output = it->output;
     }
     std::string path;
     if (auto r = text("path", path); !r) return std::unexpected(r.error());

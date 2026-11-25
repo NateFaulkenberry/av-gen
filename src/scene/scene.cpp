@@ -640,9 +640,14 @@ const char* importanceName(Importance importance) {
     return "normal";
 }
 
+std::span<const Importance> allImportances() {
+    static constexpr Importance kAll[] = {Importance::Hero, Importance::Foreground, Importance::Normal,
+                                          Importance::Background, Importance::Ambient};
+    return kAll;
+}
+
 bool importanceFromName(std::string_view name, Importance& out) {
-    for (const auto i : {Importance::Hero, Importance::Foreground, Importance::Normal, Importance::Background,
-                         Importance::Ambient}) {
+    for (const auto i : allImportances()) {
         if (name == importanceName(i)) {
             out = i;
             return true;
