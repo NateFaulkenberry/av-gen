@@ -264,6 +264,141 @@ std::optional<Scene::PosedBox> Scene::posedMeshBounds(MeshId meshId, RigId rigId
         return entry.box;
     }
     ++posedBoundsComputes_;
+    // ADR-2136: each influencing joint's box, carried by its palette matrix, unioned. The carried box
+    // is the exact axis-aligned box of the joint's oriented box (centre moved, half extents through
+    // the absolute rotation-scale), so this is the box of a union of boxes that each contain every
+    // posed position of their joint's vertices -- and a skinned vertex is a weighted average of
+    // those positions, which no union of boxes can lose.
+    const JointBoxTable& table = jointBoxes(meshId, rig);
+    glm::vec3 posedLo(std::numeric_limits<float>::max());
+    glm::vec3 posedHi(std::numeric_limits<float>::lowest());
+    bool any = false;
+    for (const JointBox& box : table.boxes) {
+        if (box.joint >= rig.palette.size()) {
+            continue; // the skin skips an out-of-range joint, so its vertices are not posed by it
+        }
+        const glm::mat4& m = rig.palette[box.joint];
+        const glm::vec3 centre = glm::vec3(m * glm::vec4(box.centre, 1.0f));
+        const glm::mat3 a = glm::mat3(m) * box.frame;
+        const glm::vec3 half = glm::abs(a[0]) * box.half.x + glm::abs(a[1]) * box.half.y + glm::abs(a[2]) * box.half.z;
+        const glm::mat3 b = glm::mat3(m);
+        const glm::vec3 modelCentre = glm::vec3(m * glm::vec4(box.modelCentre, 1.0f));
+        const glm::vec3 modelHalf =
+            glm::abs(b[0]) * box.modelHalf.x + glm::abs(b[1]) * box.modelHalf.y + glm::abs(b[2]) * box.modelHalf.z;
+        // Both carried boxes hold every posed position of this joint's vertices, so their overlap does.
+        posedLo = glm::min(posedLo, glm::max(centre - half, modelCentre - modelHalf));
+        posedHi = glm::max(posedHi, glm::min(centre + half, modelCentre + modelHalf));
+        any = true;
+    }
+    if (any) {
+        // A few float ulps of the box's magnitude: the exact skin rounds too (and the frame is an
+        // inverse computed in float), and "never smaller" has to survive both.
+        const float scale = std::max({std::abs(posedLo.x), std::abs(posedLo.y), std::abs(posedLo.z),
+                                      std::abs(posedHi.x), std::abs(posedHi.y), std::abs(posedHi.z)});
+        const glm::vec3 pad(scale * 1e-5f + 1e-6f);
+        posedLo -= pad;
+        posedHi += pad;
+    }
+    entry.meshVersion = meshVersion;
+    entry.palette = rig.palette;
+    entry.box = any ? std::optional<PosedBox>(PosedBox{posedLo, posedHi}) : std::nullopt;
+    return entry.box;
+}
+
+const Scene::JointBoxTable& Scene::jointBoxes(MeshId meshId, const SkinnedRig& rig) const {
+    if (jointBoxCache_.size() < meshes.size()) {
+        jointBoxCache_.resize(meshes.size());
+    }
+    JointBoxTable& table = jointBoxCache_[meshId];
+    const MeshData& mesh = meshes[meshId];
+    if (table.meshVersion == meshVersion && table.vertexCount == mesh.vertices.size() &&
+        table.skinCount == mesh.skin.size() && table.vertexData == mesh.vertices.data() &&
+        table.skinData == mesh.skin.data()) {
+        return table;
+    }
+    ++jointBoxBuilds_;
+    table.meshVersion = meshVersion;
+    table.vertexCount = mesh.vertices.size();
+    table.skinCount = mesh.skin.size();
+    table.vertexData = mesh.vertices.data();
+    table.skinData = mesh.skin.data();
+    table.boxes.clear();
+
+    // The frame each joint's box is held in: its bind matrix (the inverse of its inverse bind), so
+    // a forearm's box is long and thin along the forearm rather than whatever the bone's diagonal
+    // makes of an axis-aligned one. Any frame is correct (see `JointBox`); one that is not finite
+    // or not invertible falls back to model space.
+    std::size_t joints = 0;
+    for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
+        for (std::size_t j = 0; j < kJointInfluences; ++j) {
+            joints = std::max(joints, static_cast<std::size_t>(mesh.skin[i].joints[j]) + 1);
+        }
+    }
+    struct Accum {
+        glm::mat4 toFrame{1.0f};
+        glm::mat4 fromFrame{1.0f};
+        glm::vec3 lo{std::numeric_limits<float>::max()};
+        glm::vec3 hi{std::numeric_limits<float>::lowest()};
+        glm::vec3 modelLo{std::numeric_limits<float>::max()};
+        glm::vec3 modelHi{std::numeric_limits<float>::lowest()};
+        bool used = false;
+    };
+    std::vector<Accum> accum(joints);
+    for (std::size_t k = 0; k < joints; ++k) {
+        if (k >= rig.skeleton.inverseBind.size()) {
+            continue;
+        }
+        const glm::mat4& inverseBind = rig.skeleton.inverseBind[k];
+        const glm::mat4 bind = glm::inverse(inverseBind);
+        bool finiteBind = std::abs(glm::determinant(glm::mat3(inverseBind))) > 1e-12f;
+        for (int c = 0; c < 4 && finiteBind; ++c) {
+            finiteBind = finite(glm::vec3(bind[c])) && finite(glm::vec3(inverseBind[c]));
+        }
+        if (finiteBind) {
+            accum[k].toFrame = inverseBind;
+            accum[k].fromFrame = bind;
+        }
+    }
+    for (std::size_t i = 0; i < mesh.vertices.size() && i < mesh.skin.size(); ++i) {
+        const SkinInfluence& influence = mesh.skin[i];
+        float weightSum = 0.0f;
+        for (std::size_t j = 0; j < kJointInfluences; ++j) {
+            weightSum += std::max(influence.weights[j], 0.0f);
+        }
+        if (weightSum <= 1e-6f) {
+            continue; // the skin leaves an unweighted vertex out of the posed box, and so does this
+        }
+        for (std::size_t j = 0; j < kJointInfluences; ++j) {
+            if (influence.weights[j] <= 0.0f) {
+                continue;
+            }
+            Accum& a = accum[influence.joints[j]];
+            const glm::vec3 local = glm::vec3(a.toFrame * glm::vec4(mesh.vertices[i].position, 1.0f));
+            a.lo = glm::min(a.lo, local);
+            a.hi = glm::max(a.hi, local);
+            a.modelLo = glm::min(a.modelLo, mesh.vertices[i].position);
+            a.modelHi = glm::max(a.modelHi, mesh.vertices[i].position);
+            a.used = true;
+        }
+    }
+    for (std::size_t k = 0; k < joints; ++k) {
+        const Accum& a = accum[k];
+        if (!a.used) {
+            continue;
+        }
+        JointBox box;
+        box.joint = static_cast<std::uint32_t>(k);
+        box.frame = glm::mat3(a.fromFrame);
+        box.centre = glm::vec3(a.fromFrame * glm::vec4((a.lo + a.hi) * 0.5f, 1.0f));
+        box.half = (a.hi - a.lo) * 0.5f;
+        box.modelCentre = (a.modelLo + a.modelHi) * 0.5f;
+        box.modelHalf = (a.modelHi - a.modelLo) * 0.5f;
+        table.boxes.push_back(box);
+    }
+    return table;
+}
+
+std::optional<Scene::PosedBox> skinnedVertexBounds(const MeshData& mesh, std::span<const glm::mat4> palette) {
     // Every vertex is transformed by its own weighted joints -- the same arithmetic the skinning
     // shader does -- so the box is the geometry the frame will actually draw rather than the
     // geometry the asset was authored in.
@@ -276,11 +411,10 @@ std::optional<Scene::PosedBox> Scene::posedMeshBounds(MeshId meshId, RigId rigId
         const SkinInfluence& influence = mesh.skin[i];
         for (std::size_t j = 0; j < kJointInfluences; ++j) {
             const float weight = influence.weights[j];
-            if (weight <= 0.0f || influence.joints[j] >= rig.palette.size()) {
+            if (weight <= 0.0f || influence.joints[j] >= palette.size()) {
                 continue;
             }
-            position += glm::vec3(rig.palette[influence.joints[j]] * glm::vec4(mesh.vertices[i].position, 1.0f)) *
-                        weight;
+            position += glm::vec3(palette[influence.joints[j]] * glm::vec4(mesh.vertices[i].position, 1.0f)) * weight;
             weightSum += weight;
         }
         if (weightSum <= 1e-6f) {
@@ -291,10 +425,7 @@ std::optional<Scene::PosedBox> Scene::posedMeshBounds(MeshId meshId, RigId rigId
         posedHi = glm::max(posedHi, position);
         any = true;
     }
-    entry.meshVersion = meshVersion;
-    entry.palette = rig.palette;
-    entry.box = any ? std::optional<PosedBox>(PosedBox{posedLo, posedHi}) : std::nullopt;
-    return entry.box;
+    return any ? std::optional<Scene::PosedBox>(Scene::PosedBox{posedLo, posedHi}) : std::nullopt;
 }
 
 std::pair<glm::vec3, glm::vec3> Scene::bounds() const {
@@ -355,6 +486,7 @@ void Scene::clear() {
     // moves for an ordinary edit.
     identity = mintSceneIdentity();
     posedBoundsCache_.clear(); // ADR-1082: content-keyed, so this is memory, not correctness
+    jointBoxCache_.clear();    // ADR-2136: fingerprinted, the same
 }
 
 CullBounds entityCullBounds(const Scene& scene, const Entity& entity, float padFraction,

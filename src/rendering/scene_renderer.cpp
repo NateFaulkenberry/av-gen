@@ -3465,6 +3465,11 @@ Result<void> SceneRenderer::render(wgpu::CommandEncoder& encoder, const scene::S
             // Answering both from the padded box is the mistake this comment exists to prevent: it
             // makes the reported bounds 0.25 m larger than the object in every direction, which a
             // GPU test caught immediately and a person reading the panel would have believed.
+            //
+            // ADR-2136: for a skinned entity both now start from the per-joint posed box, which holds
+            // the skinned mesh and is larger than it (about 10% of the body's size per side on a
+            // clip). Exact would mean skinning every vertex every frame of every render again -- the
+            // cost ADR-2136 removed -- and the margins have to be the cull's own box in any case.
             const scene::CullBounds trueBounds = scene::entityCullBounds(scene, entity, 0.0f, 0.0f);
             diagnostic.worldBoundsMin = trueBounds.min;
             diagnostic.worldBoundsMax = trueBounds.max;

@@ -35,6 +35,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <unordered_map>
 #include <string>
 #include <utility>
@@ -194,10 +195,21 @@ struct Scene {
     // `MeshData::bounds()` instead and cost the Tree of Life 90 ms a frame. A timing test would have
     // caught that only on a quiet machine; a rebuild count catches it anywhere.
     [[nodiscard]] std::uint64_t meshBoundsRebuilds() const { return meshBoundsRebuilds_; }
-    // ADR-1082: a skinned mesh's box in the rig's current pose (model space, unpadded), computed by
-    // CPU-skinning every vertex -- once per pose rather than once per caller. The camera cull, the
-    // renderer's diagnostic and anything else that asks within a frame used to skin the mesh again
-    // each time (up to four times per character per frame, about 3 ms of Glowmere's CPU frame).
+    // ADR-1082: a skinned mesh's box in the rig's current pose (model space, unpadded), computed
+    // once per pose rather than once per caller. The camera cull, the renderer's diagnostic and
+    // anything else that asks within a frame used to skin the mesh again each time (up to four
+    // times per character per frame, about 3 ms of Glowmere's CPU frame).
+    //
+    // ADR-2136: the box is no longer the per-vertex skin. It is built from one box per joint: at
+    // the first ask (and again after a mesh edit) every vertex a joint weights goes into that
+    // joint's box, held in the joint's own bind frame; per pose, each joint's box is carried by its
+    // palette matrix and the boxes are unioned. A skinned vertex is a weighted average of its
+    // joints' transforms of it, each of which lies in that joint's carried box, so the average lies
+    // in the union's box: the result is never smaller than `skinnedVertexBounds` (tested over every
+    // clip of the aliens, farm animals and a musician, plus random poses), and it is padded by a few
+    // float ulps so rounding cannot make it so. It is looser (measured in ADR-2136). Neon Dreams'
+    // ~2,000 skinned entities of up to 11.5k vertices cost 44 ms a frame to skin; this is a box per
+    // influencing joint.
     //
     // The cache is keyed by (rig, mesh) and is valid while the mesh is at the same `meshVersion`
     // and the palette holds the same matrices. The palette is compared by content, not by
@@ -215,6 +227,9 @@ struct Scene {
     // How many times the posed box was actually computed (cache misses). For the same reason as
     // `meshBoundsRebuilds`: a count catches a regression on a loaded machine where a timing cannot.
     [[nodiscard]] std::uint64_t posedBoundsComputes() const { return posedBoundsComputes_; }
+    // ADR-2136: how many times a mesh's per-joint boxes were built (once per mesh, again after an
+    // edit) -- the vertex scan that used to run per pose, counted so it cannot quietly return there.
+    [[nodiscard]] std::uint64_t jointBoxBuilds() const { return jointBoxBuilds_; }
     TextureId addTexture(TextureData texture);
     Entity& addEntity(std::string name, MeshId mesh);
     PunctualLight& addLight(PunctualLight light);
@@ -246,7 +261,40 @@ private:
     };
     mutable std::unordered_map<std::uint64_t, PosedBoundsEntry> posedBoundsCache_; // ADR-1082
     mutable std::uint64_t posedBoundsComputes_ = 0;
+    // ADR-2136: one mesh's per-joint boxes. Each box is held in `frame` (the inverse of the joint's
+    // inverse bind, so the box hugs the bone at rest): it bounds `inverse(frame) * v` over the joint's
+    // vertices, with `centre` already carried back to model space by `frame`. Posed, the box is
+    // carried by `palette[joint] * frame`. That is right whatever `frame` is -- `palette * frame *
+    // inverse(frame) * v` is `palette * v` -- so a frame taken from the first rig that asks is right
+    // for every rig that draws the mesh; only the tightness depends on it.
+    struct JointBox {
+        std::uint32_t joint = 0; // palette index
+        glm::mat3 frame{1.0f};
+        glm::vec3 centre{0.0f}; // bind model space
+        glm::vec3 half{0.0f};   // half extents, in `frame`
+        // The same vertices' box in bind model space. Carried by the palette alone it is a second
+        // box that holds them; the two are intersected, which beats either on a bone at a diagonal.
+        glm::vec3 modelCentre{0.0f};
+        glm::vec3 modelHalf{0.0f};
+    };
+    struct JointBoxTable {
+        std::uint64_t meshVersion = ~0ULL;
+        std::size_t vertexCount = 0;
+        std::size_t skinCount = 0;
+        const void* vertexData = nullptr;
+        const void* skinData = nullptr;
+        std::vector<JointBox> boxes;
+    };
+    const JointBoxTable& jointBoxes(MeshId mesh, const SkinnedRig& rig) const;
+    mutable std::vector<JointBoxTable> jointBoxCache_;
+    mutable std::uint64_t jointBoxBuilds_ = 0;
 };
+
+// ADR-2136: the exact posed box -- every vertex skinned by its weighted joints, the arithmetic the
+// skinning shader does. What `posedMeshBounds` computed per pose before ADR-2136; kept as the
+// reference the cheap box is tested against. `std::nullopt` when no vertex is weighted.
+[[nodiscard]] std::optional<Scene::PosedBox> skinnedVertexBounds(const MeshData& mesh,
+                                                                 std::span<const glm::mat4> palette);
 
 // ---- culling bounds (ADR-046 culling, renderer forensics Phase 5.1) ----------------------------
 //
