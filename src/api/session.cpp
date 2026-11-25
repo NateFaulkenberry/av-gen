@@ -653,6 +653,13 @@ bool Session::referencedOutside(const fs::path& file) {
     if (names(engine.audioPath()) || names(engine.environmentPath())) {
         return true;
     }
+    // ADR-2158: the analysis stems are session state no snapshot restores, so a stem still in the list keeps its
+    // file (deleting it would leave the project naming a missing file).
+    for (const app::Engine::StemState& stem : engine.stems()) {
+        if (names(stem.source.file)) {
+            return true;
+        }
+    }
     // The document as restored: the parameter domain, the composition and the sequence.
     std::vector<std::string> strings;
     collectStrings(ai::SnapshotStore::captureDocument(engine), strings);

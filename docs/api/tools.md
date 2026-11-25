@@ -11,7 +11,7 @@ Every call through a session returns the same envelope (ADR-2153): `{success, re
 ## Domains
 
 - [asset](#asset) (6)
-- [audio](#audio) (1)
+- [audio](#audio) (4)
 - [camera](#camera) (3)
 - [capability](#capability) (2)
 - [director](#director) (12)
@@ -123,6 +123,46 @@ What the analyzer currently hears: loudness, the five frequency bands (auto-gain
 Input: none.
 
 Output: not yet described (listed in `schemas/tools-without-output-schema.json`).
+
+### `audio.import_stem`: Import an analysis stem
+
+MCP name `audio_import_stem`. Class `session`. Permissions: `read`, `write`. Requires: nothing. Since API 2. Flags: mutatesSession, idempotent.
+
+Copy a stem (one part of the song: drums, bass, ...) into the open project's assets/audio/stems/, record it in assets/manifest.json, and analyse it beside the mix. A stem is analysis only -- never played or mixed -- and publishes its own signals, stem.<key>.* (active, rms, peak, level, onset, onsetStrength, the five bands, centroid, width, onsetLow/Mid/High), which `signals` lists as they are on the bus now; route them with modulation.create. `key` is that identity: lower-case letters, digits and _, unique in the project, and never changed by a relabel. `role` (default other) is the artist's statement of what the stem is, never inferred; role.<role>.* follows the first stem of each role. Importing the same bytes again reuses the project's copy. The stem is session state: project.save keeps it (assets.stems), and a rollback does not remove it.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `file` | string | yes |  | Path to the stem's audio file (wav, aiff, flac, mp3, ogg, m4a) |
+| `gainDb` | number |  | >= -24.0, <= 24.0 | Trim before analysis, dB (default 0) |
+| `key` | string | yes |  | The signal identity, stem.<key>.*: [a-z0-9_]+, unique, e.g. drums |
+| `label` | string |  |  | Free text shown to the artist (default: the key) |
+| `offset` | number |  |  | Seconds into the project the stem's first sample sits (default 0) |
+| `role` | string, one of `drums`, `bass`, `synth`, `vocal`, `other` |  |  | What the stem is (default other) |
+| `source` | object |  |  |  |
+
+Output schema: `{"additionalProperties":true,"properties":{"analysis":{"additionalProperties":false,"properties":{"analysed":{"description":"The stem was decoded and analysed; false publishes stem.<key>.active 0","type":"boolean"},"channels":{"description":"Channel count (analysed as mono; width needs two)","type":"integer"},"diagnostics":{"description":"What checking the file found, then what comparing it with the mix found","items":{"additionalProperties":false,"properties":{"message":{"description":"What was found, naming the file","type":"string"},"severity":{"description":"info, warning or error","enum":["info","warning","error"],"type":"string"}},"required":["severity","message"],"type":"object"},"type":"array"},"durationSeconds":{"description":"Length read back from the decoder","type":"number"},"format":{"description":"The file's own sample format: s16, s24, f32, ...; empty when unknown","type":"string"},"frames":{"description":"Sample frames","type":"integer"},"peak":{"description":"Peak sample magnitude, 0..1 for a file that does not clip","type":"number"},"sampleRate":{"description":"Hz, the file's own (stems are analysed at their own rate)","type":"integer"},"silent":{"description":"Every sample is exactly 0","type":"boolean"}},"required":["analysed","durationSeconds","sampleRate","channels","frames","format","peak","silent","diagnostics"],"type":"object"},"analysisMs":{"description":"Host-thread time the analysis took, milliseconds","type":"number"},"duplicate":{"description":"These bytes were already in the project; nothing was copied","type":"boolean"},"gainDb":{"description":"Trim before analysis, dB","type":"number"},"id":{"description":"asset://project/... when the file is in the project's assets, else null"},"key":{"description":"The signal identity: stem.<key>.*","type":"string"},"label":{"description":"Free text shown to the artist","type":"string"},"offsetSeconds":{"description":"Where the stem's first sample sits on the project timeline","type":"number"},"path":{"description":"The stem file, absolute","type":"string"},"role":{"description":"What the stem is; role.<role>.* follows the first of each role","enum":["drums","bass","synth","vocal","other"],"type":"string"},"roleSignals":{"description":"role.<role>.*: the first active stem of the role publishes these","items":{"description":"name","type":"string"},"type":"array"},"sha256":{"description":"SHA-256 of the file","type":"string"},"signals":{"description":"Every stem.<key>.* signal now on the bus, read back from it","items":{"additionalProperties":false,"properties":{"isEvent":{"description":"A momentary event rather than a level","type":"boolean"},"label":{"description":"What it is","type":"string"},"max":{"description":"Declared maximum","type":"number"},"min":{"description":"Declared minimum","type":"number"},"name":{"description":"The signal's name, as modulation.create takes it","type":"string"},"value":{"description":"Its value now","type":"number"}},"required":["name","value","min","max","isEvent"],"type":"object"},"type":"array"},"size":{"description":"Bytes","type":"integer"}},"required":["key","label","role","offsetSeconds","gainDb","id","path","sha256","size","duplicate","analysis","signals","roleSignals","analysisMs"],"type":"object"}`
+
+### `audio.list_stems`: List analysis stems
+
+MCP name `audio_list_stems`. Class `read`. Permissions: none. Requires: nothing. Since API 2. Flags: readOnly, idempotent.
+
+The project's analysis stems, in order: key, label, role, offset, trim, file and what its analysis found. Each publishes stem.<key>.*; signal.list with query 'stem.<key>.' gives their values. `roles` is the role vocabulary audio.import_stem takes.
+
+Input: none.
+
+Output schema: `{"additionalProperties":false,"properties":{"roles":{"description":"The valid roles","items":{"description":"role","type":"string"},"type":"array"},"stems":{"description":"Every stem, in the project's order","items":{"additionalProperties":true,"properties":{"analysis":{"additionalProperties":false,"properties":{"analysed":{"description":"The stem was decoded and analysed; false publishes stem.<key>.active 0","type":"boolean"},"channels":{"description":"Channel count (analysed as mono; width needs two)","type":"integer"},"diagnostics":{"description":"What checking the file found, then what comparing it with the mix found","items":{"additionalProperties":false,"properties":{"message":{"description":"What was found, naming the file","type":"string"},"severity":{"description":"info, warning or error","enum":["info","warning","error"],"type":"string"}},"required":["severity","message"],"type":"object"},"type":"array"},"durationSeconds":{"description":"Length read back from the decoder","type":"number"},"format":{"description":"The file's own sample format: s16, s24, f32, ...; empty when unknown","type":"string"},"frames":{"description":"Sample frames","type":"integer"},"peak":{"description":"Peak sample magnitude, 0..1 for a file that does not clip","type":"number"},"sampleRate":{"description":"Hz, the file's own (stems are analysed at their own rate)","type":"integer"},"silent":{"description":"Every sample is exactly 0","type":"boolean"}},"required":["analysed","durationSeconds","sampleRate","channels","frames","format","peak","silent","diagnostics"],"type":"object"},"gainDb":{"description":"Trim before analysis, dB","type":"number"},"id":{"description":"asset://project/... when the file is in the project's assets, else null"},"key":{"description":"The signal identity: stem.<key>.*","type":"string"},"label":{"description":"Free text shown to the artist","type":"string"},"offsetSeconds":{"description":"Where the stem's first sample sits on the project timeline","type":"number"},"path":{"description":"The stem file, absolute","type":"string"},"role":{"description":"What the stem is; role.<role>.* follows the first of each role","enum":["drums","bass","synth","vocal","other"],"type":"string"},"signalCount":{"description":"stem.<key>.* signals on the bus","type":"integer"}},"required":["key","label","role","offsetSeconds","gainDb","id","path","analysis","signalCount"],"type":"object"},"type":"array"}},"required":["stems","roles"],"type":"object"}`
+
+### `audio.remove_stem`: Remove an analysis stem
+
+MCP name `audio_remove_stem`. Class `session`. Permissions: none. Requires: nothing. Since API 2. Flags: mutatesSession, destructive.
+
+Take a stem out of the project's analysis list. Its file stays in the project's assets (another stem or a later import may use it). The bus cannot undeclare a name, so its stem.<key>.* signals stay listed and read 0 (inactive) from now on: a route on one does nothing, and `routes` counts them. Session state, like the import: project.save writes the list without it.
+
+| Input | Type | Required | Range | Description |
+|---|---|---|---|---|
+| `key` | string | yes |  | The stem's key, from audio.list_stems |
+
+Output schema: `{"additionalProperties":false,"properties":{"key":{"description":"The stem removed","type":"string"},"remaining":{"description":"Stems left in the project","type":"integer"},"routes":{"description":"Modulation routes whose source is one of its stem.<key>.* signals; each now reads 0","type":"integer"}},"required":["key","remaining","routes"],"type":"object"}`
 
 ## camera
 

@@ -8,6 +8,9 @@
 #include "app/engine.hpp"
 #include "app/world_builder.hpp"
 #include "analysis/analysis_track.hpp"
+#include "analysis/stem_analysis.hpp"
+#include "audio/source_role.hpp"
+#include "audio/stem_source.hpp"
 #include "core/hash.hpp"
 #include "core/log.hpp"
 #include "core/time.hpp"
@@ -20,6 +23,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <expected>
@@ -565,6 +569,194 @@ json importSummarySchema() {
                  "The engine's load of the file: {meshes, entities, materials, textures, lights, cameras, rigs, joints, "
                  "clips, triangles, bounds {min, max}, warnings, entityNames, materialNames, rigDetail [{name, joints}], "
                  "clipDetail [{name, seconds, rig}]}; null for a texture or environment"}};
+}
+
+// ---- project files (ADR-2156, shared by asset.import and audio.import_stem, ADR-2158) --------------------------
+
+// The asset manifest, rewritten whole (always version 2) through a temporary name. Its previous bytes go to the
+// compensation log, so a rollback puts them back; a manifest that did not exist is logged as created.
+std::optional<ToolResult> writeProjectManifest(ToolContext& ctx, const std::filesystem::path& projectDir,
+                                               const assets::AssetManifest& m) {
+    const std::filesystem::path manifestFile = assets::manifestPath(projectDir);
+    std::error_code ec;
+    std::string previous;
+    const bool existed = std::filesystem::exists(manifestFile, ec);
+    if (existed) {
+        std::ifstream in(manifestFile, std::ios::binary);
+        previous.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    const std::filesystem::path temp = manifestFile.string() + ".tmp";
+    { std::ofstream out(temp, std::ios::trunc); out << m.toJson().dump(2) << '\n'; }
+    std::filesystem::rename(temp, manifestFile, ec);
+    if (ec) {
+        std::error_code removeError;
+        std::filesystem::remove(temp, removeError);
+        return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
+    }
+    if (existed) {
+        ctx.noteReplacedFile(manifestFile, std::move(previous));
+    } else {
+        ctx.noteCreatedFile(manifestFile, ToolContext::FileRole::ProjectDocument);
+    }
+    return std::nullopt;
+}
+
+// Every file written is reported to the session's compensation log, which deletes or restores it when the call
+// fails or its transaction rolls back (ADR-2153). It is copied under a dot-name first and renamed into place, so a
+// half-written copy never sits at the name an id resolves to. `ec` says why on false.
+bool copyIntoProject(ToolContext& ctx, const std::filesystem::path& from, const std::filesystem::path& to,
+                     std::error_code& ec) {
+    const bool existed = std::filesystem::exists(to, ec);
+    const std::filesystem::path staging = to.parent_path() / ("." + to.filename().string() + ".importing");
+    std::filesystem::copy_file(from, staging, std::filesystem::copy_options::overwrite_existing, ec);
+    if (!ec) std::filesystem::rename(staging, to, ec);
+    if (ec) {
+        std::error_code removeError;
+        std::filesystem::remove(staging, removeError);
+        return false;
+    }
+    if (existed) {
+        ctx.noteOverwrittenFile(to);
+    } else {
+        ctx.noteCreatedFile(to);
+    }
+    return true;
+}
+
+// `ext` with its dot, any case: what asset.list_importable calls audio and audio.import_stem takes.
+bool isAudioExtension(std::string ext) {
+    std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".wav" || ext == ".mp3" || ext == ".flac" || ext == ".aiff" || ext == ".aif" || ext == ".ogg" ||
+           ext == ".m4a";
+}
+
+// ---- signals (signal.list, and the stems' read-back) ----------------------------------------------------------
+
+json signalJson(const signals::SignalBus& bus, signals::SignalId id) {
+    const signals::SignalInfo& info = bus.info(id);
+    json entry{{"name", info.name},
+               {"value", bus.value(id)},
+               {"min", info.minValue},
+               {"max", info.maxValue},
+               {"isEvent", info.isEvent}};
+    if (!info.label.empty()) {
+        entry["label"] = info.label;
+    }
+    return entry;
+}
+
+json signalEntrySchema() {
+    return schema::object({{"name", schema::string("The signal's name, as modulation.create takes it")},
+                           {"value", schema::number("Its value now")},
+                           {"min", schema::number("Declared minimum")},
+                           {"max", schema::number("Declared maximum")},
+                           {"isEvent", schema::boolean("A momentary event rather than a level")},
+                           {"label", schema::string("What it is")}},
+                          {"name", "value", "min", "max", "isEvent"});
+}
+
+// Every signal on the bus whose name starts with `prefix`, in declaration order: what signal.list reads.
+json signalsWithPrefix(const signals::SignalBus& bus, std::string_view prefix) {
+    json list = json::array();
+    for (signals::SignalId id = 0; id < bus.size(); ++id) {
+        if (bus.info(id).name.starts_with(prefix)) {
+            list.push_back(signalJson(bus, id));
+        }
+    }
+    return list;
+}
+
+// ---- analysis stems (ADR-2158) ---------------------------------------------------------------------------------
+
+// The roles, enumerated at their source (audio/source_role.hpp), never copied.
+std::vector<std::string> stemRoleNames() {
+    std::vector<std::string> roles;
+    for (const char* name : audio::kSourceRoleNames) {
+        roles.emplace_back(name);
+    }
+    return roles;
+}
+
+std::string stemRoleList() {
+    std::string out;
+    for (const char* name : audio::kSourceRoleNames) {
+        if (!out.empty()) out += ", ";
+        out += name;
+    }
+    return out;
+}
+
+const char* stemSeverityName(audio::StemSeverity s) {
+    switch (s) {
+    case audio::StemSeverity::Info: return "info";
+    case audio::StemSeverity::Warning: return "warning";
+    case audio::StemSeverity::Error: return "error";
+    }
+    return "info";
+}
+
+// What analysing one stem found: the decoder's facts, and every diagnostic (the file's, then against the mix).
+json stemAnalysisJson(const app::Engine::StemState& stem) {
+    json diagnostics = json::array();
+    const auto addAll = [&diagnostics](const std::vector<audio::StemDiagnostic>& list) {
+        for (const audio::StemDiagnostic& d : list) {
+            diagnostics.push_back(json{{"severity", stemSeverityName(d.severity)}, {"message", d.message}});
+        }
+    };
+    addAll(stem.report.diagnostics);
+    addAll(stem.mix);
+    return json{{"analysed", stem.track != nullptr},
+                {"durationSeconds", stem.report.durationSeconds},
+                {"sampleRate", stem.report.sampleRate},
+                {"channels", stem.report.channels},
+                {"frames", stem.report.frames},
+                {"format", stem.report.format},
+                {"peak", stem.report.peak},
+                {"silent", stem.report.silent},
+                {"diagnostics", std::move(diagnostics)}};
+}
+
+json stemAnalysisSchema() {
+    return schema::object(
+        {{"analysed", schema::boolean("The stem was decoded and analysed; false publishes stem.<key>.active 0")},
+         {"durationSeconds", schema::number("Length read back from the decoder")},
+         {"sampleRate", schema::integer("Hz, the file's own (stems are analysed at their own rate)")},
+         {"channels", schema::integer("Channel count (analysed as mono; width needs two)")},
+         {"frames", schema::integer("Sample frames")},
+         {"format", schema::string("The file's own sample format: s16, s24, f32, ...; empty when unknown")},
+         {"peak", schema::number("Peak sample magnitude, 0..1 for a file that does not clip")},
+         {"silent", schema::boolean("Every sample is exactly 0")},
+         {"diagnostics", schema::array(schema::object({{"severity", schema::string("info, warning or error",
+                                                                                   {"info", "warning", "error"})},
+                                                       {"message", schema::string("What was found, naming the file")}},
+                                                      {"severity", "message"}),
+                                       "What checking the file found, then what comparing it with the mix found")}},
+        {"analysed", "durationSeconds", "sampleRate", "channels", "frames", "format", "peak", "silent", "diagnostics"});
+}
+
+// One stem as the tools report it.
+json stemJson(const app::Engine::StemState& stem, const ToolContext& ctx) {
+    const std::string id = ctx.paths().assetIdFor(stem.source.file);
+    return json{{"key", stem.source.key},
+                {"label", stem.source.label},
+                {"role", audio::sourceRoleName(stem.source.role)},
+                {"offsetSeconds", stem.source.offsetSeconds},
+                {"gainDb", stem.source.gainDb},
+                {"id", id.empty() ? json(nullptr) : json(id)},
+                {"path", stem.source.file.string()},
+                {"analysis", stemAnalysisJson(stem)}};
+}
+
+json stemFieldsSchema() {
+    return json{{"key", schema::string("The signal identity: stem.<key>.*")},
+                {"label", schema::string("Free text shown to the artist")},
+                {"role", schema::string("What the stem is; role.<role>.* follows the first of each role",
+                                        stemRoleNames())},
+                {"offsetSeconds", schema::number("Where the stem's first sample sits on the project timeline")},
+                {"gainDb", schema::number("Trim before analysis, dB")},
+                {"id", anything("asset://project/... when the file is in the project's assets, else null")},
+                {"path", schema::string("The stem file, absolute")},
+                {"analysis", stemAnalysisSchema()}};
 }
 
 // ================================================================================================
@@ -1272,30 +1464,10 @@ void registerParameterTools(ToolRegistry& registry) {
                     }
                 }
             }
-            // The manifest is rewritten whole (always version 2, a v1 file's ids corrected), through a temporary
-            // name, and its previous bytes go to the compensation log so a rollback puts them back.
-            const std::filesystem::path manifestFile = assets::manifestPath(projectDir);
-            const auto writeManifest = [&](const assets::AssetManifest& m) -> std::optional<ToolResult> {
-                std::string previous;
-                const bool existed = std::filesystem::exists(manifestFile, ec);
-                if (existed) {
-                    std::ifstream in(manifestFile, std::ios::binary);
-                    previous.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-                }
-                const std::filesystem::path temp = manifestFile.string() + ".tmp";
-                { std::ofstream out(temp, std::ios::trunc); out << m.toJson().dump(2) << '\n'; }
-                std::filesystem::rename(temp, manifestFile, ec);
-                if (ec) {
-                    std::error_code removeError;
-                    std::filesystem::remove(temp, removeError);
-                    return ToolResult::failure(ToolErrorCode::Unavailable, "cannot update project asset manifest: " + ec.message());
-                }
-                if (existed) {
-                    ctx.noteReplacedFile(manifestFile, std::move(previous));
-                } else {
-                    ctx.noteCreatedFile(manifestFile, ToolContext::FileRole::ProjectDocument);
-                }
-                return std::nullopt;
+            // The manifest is rewritten whole (always version 2, a v1 file's ids corrected); its previous bytes
+            // go to the compensation log so a rollback puts them back.
+            const auto writeManifest = [&](const assets::AssetManifest& m) {
+                return writeProjectManifest(ctx, projectDir, m);
             };
             const auto relativeToProject = [&](const std::filesystem::path& file) {
                 return file.lexically_relative(projectDir).generic_string();
@@ -1339,25 +1511,8 @@ void registerParameterTools(ToolRegistry& registry) {
                                            {"duplicate", true}, {"copied", json::array()}, {"import", summary}},
                                       "asset already imported");
             }
-            // Every file written is reported to the session's compensation log, which deletes or restores it
-            // when this call fails or its transaction rolls back (ADR-2153). Each is copied under a dot-name
-            // first and renamed into place, so a half-written copy never sits at the name an id resolves to.
-            const auto copyInto = [&](const std::filesystem::path& from, const std::filesystem::path& to) -> bool {
-                const bool existed = std::filesystem::exists(to, ec);
-                const std::filesystem::path staging = to.parent_path() / ("." + to.filename().string() + ".importing");
-                std::filesystem::copy_file(from, staging, std::filesystem::copy_options::overwrite_existing, ec);
-                if (!ec) std::filesystem::rename(staging, to, ec);
-                if (ec) {
-                    std::error_code removeError;
-                    std::filesystem::remove(staging, removeError);
-                    return false;
-                }
-                if (existed) {
-                    ctx.noteOverwrittenFile(to);
-                } else {
-                    ctx.noteCreatedFile(to);
-                }
-                return true;
+            const auto copyInto = [&](const std::filesystem::path& from, const std::filesystem::path& to) {
+                return copyIntoProject(ctx, from, to, ec);
             };
             const std::filesystem::path target = assetRoot / source->filename();
             if (!copyInto(*source, target)) return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy asset: " + ec.message());
@@ -1413,8 +1568,7 @@ void registerParameterTools(ToolRegistry& registry) {
             const std::string kind = args.value("kind", std::string{});
             const std::size_t limit = limitOf(args);
             const auto wanted = [&kind](const std::string& ext) {
-                const bool audio = ext == ".wav" || ext == ".mp3" || ext == ".flac" || ext == ".aiff" ||
-                                   ext == ".aif" || ext == ".ogg" || ext == ".m4a";
+                const bool audio = isAudioExtension(ext);
                 const bool scene = ext == ".gltf" || ext == ".glb";
                 const bool env = ext == ".hdr";
                 if (kind.empty()) return audio || scene || env;
@@ -3581,21 +3735,316 @@ void registerAudioTools(ToolRegistry& registry) {
                 }
                 ++matched;
                 if (list.size() < limit) {
-                    json entry{{"name", info.name},
-                               {"value", bus.value(id)},
-                               {"min", info.minValue},
-                               {"max", info.maxValue},
-                               {"isEvent", info.isEvent}};
-                    if (!info.label.empty()) {
-                        entry["label"] = info.label;
-                    }
-                    list.push_back(std::move(entry));
+                    list.push_back(signalJson(bus, id));
                 }
             }
             json out;
             out["signals"] = std::move(list);
             out["matched"] = matched;
             return ToolResult::ok(std::move(out), fmt::format("{} signal(s)", matched));
+        });
+
+    // ---- analysis stems (ADR-2158) ------------------------------------------------------------------------
+    //
+    // A stem is analysis only (ADR-1520): never played, never mixed. Importing one is `Engine::setStems` with
+    // one more entry, so the tools and Studio's sequence panel share one path; the list is session state that
+    // `project.save` writes as `assets.stems` and no snapshot reaches, hence session writes, `undoable=false`.
+    json importStemOutput = stemFieldsSchema();
+    importStemOutput["sha256"] = schema::string("SHA-256 of the file");
+    importStemOutput["size"] = schema::integer("Bytes");
+    importStemOutput["duplicate"] = schema::boolean("These bytes were already in the project; nothing was copied");
+    importStemOutput["signals"] =
+        schema::array(signalEntrySchema(), "Every stem.<key>.* signal now on the bus, read back from it");
+    importStemOutput["roleSignals"] =
+        schema::array(schema::string("name"), "role.<role>.*: the first active stem of the role publishes these");
+    importStemOutput["analysisMs"] = schema::number("Host-thread time the analysis took, milliseconds");
+    addContract(registry, "audio.import_stem", "Import an analysis stem",
+        "Copy a stem (one part of the song: drums, bass, ...) into the open project's assets/audio/stems/, record it "
+        "in assets/manifest.json, and analyse it beside the mix. A stem is analysis only -- never played or mixed -- "
+        "and publishes its own signals, stem.<key>.* (active, rms, peak, level, onset, onsetStrength, the five bands, "
+        "centroid, width, onsetLow/Mid/High), which `signals` lists as they are on the bus now; route them with "
+        "modulation.create. `key` is that identity: lower-case letters, digits and _, unique in the project, and "
+        "never changed by a relabel. `role` (default other) is the artist's statement of what the stem is, never "
+        "inferred; role.<role>.* follows the first stem of each role. Importing the same bytes again reuses the "
+        "project's copy. The stem is session state: project.save keeps it (assets.stems), and a rollback does not "
+        "remove it.",
+        schema::object({{"file", schema::string("Path to the stem's audio file (wav, aiff, flac, mp3, ogg, m4a)")},
+                        {"key", schema::string("The signal identity, stem.<key>.*: [a-z0-9_]+, unique, e.g. drums")},
+                        {"role", schema::string("What the stem is (default other)", stemRoleNames())},
+                        {"label", schema::string("Free text shown to the artist (default: the key)")},
+                        {"offset", schema::number("Seconds into the project the stem's first sample sits (default 0)")},
+                        {"gainDb", schema::number("Trim before analysis, dB (default 0)",
+                                                  static_cast<double>(analysis::kMinTrimDb),
+                                                  static_cast<double>(analysis::kMaxTrimDb))},
+                        {"source", schema::object({{"file", schema::string("The file the client exported")},
+                                                   {"tool", schema::string("The exporting tool")},
+                                                   {"toolVersion", schema::string("Its version")}})}},
+                       {"file", "key"}),
+        needs(sessionWrite(), {"read", "write"}),
+        schema::object(importStemOutput,
+                       {"key", "label", "role", "offsetSeconds", "gainDb", "id", "path", "sha256", "size", "duplicate",
+                        "analysis", "signals", "roleSignals", "analysisMs"},
+                       true),
+        2,
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            const std::string given = args.value("file", std::string{});
+            if (given.empty()) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "no file named", {}, json{{"field", "file"}});
+            }
+            const std::string key = args.value("key", std::string{});
+            if (!audio::validStemKey(key) || key.size() > 64) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                           fmt::format("'{}' is not a usable stem key", key),
+                                           "use 1-64 lower-case letters, digits and _, e.g. drums: it becomes the "
+                                           "signal names stem.<key>.*",
+                                           json{{"field", "key"}});
+            }
+            audio::SourceRole role = audio::SourceRole::Other;
+            if (args.contains("role")) {
+                const auto parsed = args.at("role").is_string()
+                                        ? audio::sourceRoleFromName(args.at("role").get<std::string>())
+                                        : std::nullopt;
+                if (!parsed) {
+                    return ToolResult::failure(ToolErrorCode::InvalidArguments,
+                                               fmt::format("role {} is not a stem role", args.at("role").dump()),
+                                               "choose one of: " + stemRoleList(),
+                                               json{{"field", "role"}, {"valid", stemRoleNames()}});
+                }
+                role = *parsed;
+            }
+            const double offset = args.value("offset", 0.0);
+            const double gainDb = args.value("gainDb", 0.0);
+            if (!std::isfinite(offset)) {
+                return ToolResult::failure(ToolErrorCode::InvalidArguments, "offset must be a finite number of seconds",
+                                           {}, json{{"field", "offset"}});
+            }
+            if (!(gainDb >= analysis::kMinTrimDb && gainDb <= analysis::kMaxTrimDb)) {
+                return ToolResult::failure(ToolErrorCode::OutOfRange,
+                                           fmt::format("gainDb {} is outside {}..{} dB", gainDb, analysis::kMinTrimDb,
+                                                       analysis::kMaxTrimDb),
+                                           {}, json{{"field", "gainDb"}});
+            }
+            if (engine.projectPath().empty()) {
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                           "this session has no project to import into",
+                                           "use project.create or project.open first: the stem is copied into the "
+                                           "project's assets folder");
+            }
+            for (const app::Engine::StemState& stem : engine.stems()) {
+                if (stem.source.key == key) {
+                    return ToolResult::failure(ToolErrorCode::Conflict,
+                                               fmt::format("the project already has a stem keyed '{}'", key),
+                                               "choose another key, or audio.remove_stem the existing one first "
+                                               "(routes on stem.<key>.* follow the key)",
+                                               json{{"field", "key"}});
+                }
+            }
+            const auto source = ctx.paths().forRead(given);
+            if (!source) return ToolResult::failure(source.error());
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(*source, ec)) {
+                return ToolResult::failure(ToolErrorCode::NotFound, fmt::format("'{}' is not a file", given));
+            }
+            if (!isAudioExtension(source->extension().string())) {
+                return ToolResult::failure(ToolErrorCode::Unsupported,
+                                           fmt::format("'{}' is not an audio file", source->filename().string()),
+                                           "a stem is a wav, aiff, flac, mp3, ogg or m4a file");
+            }
+            if (auto refused = ctx.paths().projectWriteRefusal()) return ToolResult::failure(std::move(*refused));
+            auto hash = sha256File(*source);
+            if (!hash) return ToolResult::failure(ToolErrorCode::Unavailable, hash.error().message);
+            const auto bytes = static_cast<std::uint64_t>(std::filesystem::file_size(*source, ec));
+            const std::filesystem::path projectDir = ctx.paths().projectFolder();
+            const auto stemsDir = ctx.paths().forWrite((projectDir / "assets" / "audio" / "stems").string());
+            if (!stemsDir) return ToolResult::failure(stemsDir.error());
+            // Read before anything is written: a manifest this build cannot read is refused, never overwritten.
+            auto manifest = assets::readManifest(projectDir);
+            if (!manifest) {
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition, manifest.error().message,
+                                           "repair or move assets/manifest.json, then import again");
+            }
+
+            // The same bytes already in the project's assets: that file, and no copy (ADR-2156's identity rule).
+            std::filesystem::path target;
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                     projectDir / "assets", std::filesystem::directory_options::skip_permission_denied, ec)) {
+                if (!entry.is_regular_file(ec)) continue;
+                const std::string filename = entry.path().filename().string();
+                if (filename == "manifest.json" || filename.starts_with(".")) continue;
+                if (std::filesystem::file_size(entry.path(), ec) != bytes) continue;
+                auto existing = sha256File(entry.path());
+                if (existing && *existing == *hash && !ctx.paths().assetIdFor(entry.path()).empty()) {
+                    target = entry.path();
+                    break;
+                }
+            }
+            const bool duplicate = !target.empty();
+            if (duplicate) {
+                ctx.noteUsedFile(target); // a rollback of the import that made it must not delete it (rule 3)
+            } else {
+                std::filesystem::create_directories(*stemsDir, ec);
+                if (ec) {
+                    return ToolResult::failure(ToolErrorCode::Unavailable,
+                                               "cannot create the project's stems folder: " + ec.message());
+                }
+                // Another stem's file with this name is never overwritten: its analysis would change under it.
+                target = *stemsDir / source->filename();
+                for (int n = 2; std::filesystem::exists(target, ec); ++n) {
+                    target = *stemsDir / fmt::format("{}-{}{}", source->stem().string(), n,
+                                                     source->extension().string());
+                }
+                if (!copyIntoProject(ctx, *source, target, ec)) {
+                    return ToolResult::failure(ToolErrorCode::Unavailable, "cannot copy the stem: " + ec.message());
+                }
+            }
+
+            // The analysis, on the copy the project will load. setStems re-analyses only what changed.
+            std::vector<audio::StemSource> previous;
+            for (const app::Engine::StemState& stem : engine.stems()) {
+                previous.push_back(stem.source);
+            }
+            audio::StemSource added;
+            added.key = key;
+            added.label = args.value("label", std::string{});
+            if (added.label.empty()) added.label = key;
+            added.file = target;
+            added.offsetSeconds = offset;
+            added.role = role;
+            added.gainDb = static_cast<float>(gainDb);
+            std::vector<audio::StemSource> next = previous;
+            next.push_back(added);
+            const auto started = std::chrono::steady_clock::now();
+            engine.setStems(std::move(next));
+            const double analysisMs =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+            const auto& stems = engine.stems();
+            const auto it = std::find_if(stems.begin(), stems.end(),
+                                         [&](const app::Engine::StemState& s) { return s.source.key == key; });
+            if (it == stems.end() || it->source.file != target) {
+                engine.setStems(std::move(previous));
+                return ToolResult::failure(ToolErrorCode::Internal, fmt::format("the stem '{}' was not installed", key));
+            }
+            if (!it->report.ok()) {
+                std::string why;
+                for (const audio::StemDiagnostic& d : it->report.diagnostics) {
+                    if (d.severity == audio::StemSeverity::Error) why = d.message;
+                }
+                // The stem list goes back to what it was; the call's log removes the copy.
+                engine.setStems(std::move(previous));
+                return ToolResult::failure(ToolErrorCode::Unsupported,
+                                           why.empty() ? std::string("the stem could not be analysed") : why,
+                                           "check the file decodes; nothing was kept");
+            }
+            const json stemOut = stemJson(*it, ctx);
+
+            // The manifest names the file with what the analysis found.
+            const std::string rel = target.lexically_relative(projectDir).generic_string();
+            const json clientSource = args.contains("source") ? args.at("source") : json(nullptr);
+            const assets::ManifestEntry* known = manifest->findByPath(rel);
+            if (known == nullptr || manifest->corrected || (known->source.is_null() && !clientSource.is_null())) {
+                assets::ManifestEntry e;
+                e.id = ctx.paths().assetIdFor(target);
+                e.type = "stems";
+                e.path = rel;
+                e.size = bytes;
+                e.sha256 = *hash;
+                e.source = known != nullptr && !known->source.is_null() ? known->source : clientSource;
+                e.import = json{{"durationSeconds", it->report.durationSeconds},
+                                {"sampleRate", it->report.sampleRate},
+                                {"channels", it->report.channels},
+                                {"frames", it->report.frames},
+                                {"format", it->report.format}};
+                manifest->upsert(std::move(e));
+                if (auto failed = writeProjectManifest(ctx, projectDir, *manifest)) {
+                    engine.setStems(std::move(previous));
+                    return std::move(*failed);
+                }
+            }
+
+            json out = stemOut;
+            out["sha256"] = *hash;
+            out["size"] = bytes;
+            out["duplicate"] = duplicate;
+            out["signals"] = signalsWithPrefix(engine.signals(), "stem." + key + ".");
+            json roleNames = json::array();
+            for (const json& s : signalsWithPrefix(engine.signals(), fmt::format("role.{}.", audio::sourceRoleName(role)))) {
+                roleNames.push_back(s.at("name"));
+            }
+            out["roleSignals"] = std::move(roleNames);
+            out["analysisMs"] = analysisMs;
+            const double seconds = it->report.durationSeconds;
+            const std::size_t count = out["signals"].size();
+            return ToolResult::ok(std::move(out), fmt::format("stem '{}' imported ({:.1f} s, {} signals)", key, seconds,
+                                                              count));
+        });
+
+    json stemItem = stemFieldsSchema();
+    stemItem["signalCount"] = schema::integer("stem.<key>.* signals on the bus");
+    addContract(registry, "audio.list_stems", "List analysis stems",
+        "The project's analysis stems, in order: key, label, role, offset, trim, file and what its analysis found. "
+        "Each publishes stem.<key>.*; signal.list with query 'stem.<key>.' gives their values. `roles` is the role "
+        "vocabulary audio.import_stem takes.",
+        noArgs(), readOnly(),
+        schema::object({{"stems", schema::array(schema::object(stemItem,
+                                                               {"key", "label", "role", "offsetSeconds", "gainDb",
+                                                                "id", "path", "analysis", "signalCount"},
+                                                               true),
+                                                "Every stem, in the project's order")},
+                        {"roles", schema::array(schema::string("role"), "The valid roles")}},
+                       {"stems", "roles"}),
+        2,
+        [](const json&, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            json list = json::array();
+            for (const app::Engine::StemState& stem : engine.stems()) {
+                json item = stemJson(stem, ctx);
+                item["signalCount"] = signalsWithPrefix(engine.signals(), "stem." + stem.source.key + ".").size();
+                list.push_back(std::move(item));
+            }
+            const std::size_t count = list.size();
+            return ToolResult::ok(json{{"stems", std::move(list)}, {"roles", stemRoleNames()}},
+                                  fmt::format("{} stem(s)", count));
+        });
+
+    addContract(registry, "audio.remove_stem", "Remove an analysis stem",
+        "Take a stem out of the project's analysis list. Its file stays in the project's assets (another stem or a "
+        "later import may use it). The bus cannot undeclare a name, so its stem.<key>.* signals stay listed and read "
+        "0 (inactive) from now on: a route on one does nothing, and `routes` counts them. Session state, like the "
+        "import: project.save writes the list without it.",
+        schema::object({{"key", schema::string("The stem's key, from audio.list_stems")}}, {"key"}),
+        sessionWrite(true),
+        schema::object({{"key", schema::string("The stem removed")},
+                        {"remaining", schema::integer("Stems left in the project")},
+                        {"routes", schema::integer("Modulation routes whose source is one of its stem.<key>.* "
+                                                   "signals; each now reads 0")}},
+                       {"key", "remaining", "routes"}),
+        2,
+        [](const json& args, ToolContext& ctx) -> ToolResult {
+            app::Engine& engine = ctx.engine();
+            const std::string key = args.value("key", std::string{});
+            std::vector<audio::StemSource> next;
+            bool found = false;
+            for (const app::Engine::StemState& stem : engine.stems()) {
+                if (stem.source.key == key) {
+                    found = true;
+                } else {
+                    next.push_back(stem.source);
+                }
+            }
+            if (!found) {
+                return ToolResult::failure(ToolErrorCode::NotFound, fmt::format("no stem keyed '{}'", key),
+                                           "audio.list_stems lists the keys", json{{"field", "key"}});
+            }
+            const std::size_t remaining = next.size();
+            engine.setStems(std::move(next));
+            std::size_t routes = 0;
+            const std::string prefix = "stem." + key + ".";
+            for (const params::ModRoute& route : engine.modulator().routes()) {
+                if (route.source.starts_with(prefix)) ++routes;
+            }
+            return ToolResult::ok(json{{"key", key}, {"remaining", remaining}, {"routes", routes}},
+                                  fmt::format("stem '{}' removed ({} route(s) on it now read 0)", key, routes));
         });
 }
 
