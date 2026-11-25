@@ -41,7 +41,23 @@ Once the lookups are pointer reads the remaining cost is small (below); the skip
 
 ## Measurements
 
-(filled from `~/Desktop/av-gen-review/112-neon-dreams/03-engine-perf-fixes/proc-params/`)
+Headless `--live-frame` at 1936x1262, base (414d47790) and this build interleaved in one GPU-lock hold, two runs
+each, `sample` attached for 15 s of steady frames; cost = the function's inclusive samples / main-thread samples x the
+run's median frame (the investigation's method; it measured 20 ms on its run4 sample this way). Load average 20-30 on
+12 cores (other agents compiling), so absolute numbers are inflated; the ratio is the result.
+
+| Example | `applyProceduralParameterValues` before | after | share of main thread before / after |
+|---|---|---|---|
+| Neon Dreams (t=25 s) | 29.1, 39.7 ms/frame | 1.7, 1.3 ms/frame | 4.3-6.0 % / 0.2-0.25 % |
+| Liminal *All You Got* pass 4 (t=20 s) | 5.6, 4.5 ms/frame | 0.5, 0.4 ms/frame | 8.1-5.2 % / 0.6 % |
+
+Liminal's `cpu(update) controller` median (the composition's per-frame update, which contains the apply) went 11.1,
+11.2 -> 8.3, 8.1 ms. Neon Dreams headless is GPU-bound (the frame waits ~440 ms on the GPU), so its headless frame
+time cannot show a CPU saving; see the evidence folder for the editor profile.
+
+Bit-identical: offline PNG renders (960x540, 30 fps) of Neon Dreams 25-26 s and 56-57 s, Liminal pass 4 20-22 s,
+Audio Response Lab 5-7 s and Cel Dream 10-12 s -- 240 frames: every PNG's md5 and every sequence hash equal between
+base and this build.
 
 ## Consequences
 
