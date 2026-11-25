@@ -53,7 +53,8 @@ run's median frame (the investigation's method; it measured 20 ms on its run4 sa
 
 Liminal's `cpu(update) controller` median (the composition's per-frame update, which contains the apply) went 11.1,
 11.2 -> 8.3, 8.1 ms. Neon Dreams headless is GPU-bound (the frame waits ~440 ms on the GPU), so its headless frame
-time cannot show a CPU saving; see the evidence folder for the editor profile.
+time cannot show a CPU saving; an editor A/B on the CPU-bound `nd-noclouds` (`gui_ab.sh` in the evidence folder)
+is prepared but was not run.
 
 Bit-identical: offline PNG renders (960x540, 30 fps) of Neon Dreams 25-26 s and 56-57 s, Liminal pass 4 20-22 s,
 Audio Response Lab 5-7 s and Cel Dream 10-12 s -- 240 frames: every PNG's md5 and every sequence hash equal between
