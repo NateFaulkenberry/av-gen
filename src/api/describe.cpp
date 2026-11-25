@@ -1,4 +1,5 @@
 #include "api/describe.hpp"
+#include "api/mcp_shaper.hpp"
 #include "api/session.hpp"
 
 #include "ai/director_tools.hpp"
@@ -418,6 +419,7 @@ std::vector<Artefact> generatedArtefacts(const ai::ToolRegistry& registry) {
         {"docs/api/tools.md", toolsMarkdown(catalogue)},
         {"docs/api/errors.md", errorsMarkdown(errors)},
         {"docs/api/protocol.md", protocolMarkdown()}, // ADR-2155: avgen serve's methods and error codes
+        {"docs/api/mcp.md", mcpMarkdown(catalogue)},  // ADR-2162: avgen mcp's methods, shapes and name table
         {"schemas/avgen-project.schema.json", artefactText(projectSchema())},
         {"schemas/avgen-scene.schema.json", artefactText(sceneSchema())},
     };
@@ -433,7 +435,7 @@ int runDescribeCommand(int argc, char** argv) {
         "usage: avgen --describe <tools|errors|schema:project|schema:scene|features|version|baseline|all> [--out <dir>]\n"
         "  prints the contract as JSON on stdout; with --out writes the artefacts under <dir> instead\n"
         "  (all: schemas/tool-catalogue.json, docs/api/tools.md, docs/api/errors.md, docs/api/protocol.md,\n"
-        "   schemas/avgen-project.schema.json, schemas/avgen-scene.schema.json;\n"
+        "   docs/api/mcp.md, schemas/avgen-project.schema.json, schemas/avgen-scene.schema.json;\n"
         "   baseline: schemas/tool-catalogue-baseline.json, rewritten only when the API level goes up;\n"
         "   features: the feature ids this build parses, printed only)\n";
     if (argc < 3) {

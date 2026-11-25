@@ -1,0 +1,25 @@
+{
+  "revision": "2025-11-25",
+  "note": "ADR-2162: MCP initialize, revision 2025-11-25. \"<any>\" matches any value (build versions, the session's roots, the serve answer under _meta).",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {},
+      "clientInfo": {"name": "fixture-client", "version": "1.0"}
+    }
+  },
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {"tools": {"listChanged": false}, "logging": {}},
+      "serverInfo": {"name": "avgen", "title": "AV Gen", "version": "<any>"},
+      "instructions": "<any>",
+      "_meta": {"avgen/server": "<any>"}
+    }
+  }
+}

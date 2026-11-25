@@ -1,0 +1,103 @@
+{
+  "exchanges": [
+    {
+      "request": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+          "name": "transaction_status"
+        }
+      },
+      "response": {
+        "id": 3,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "no transaction open\n{\"changes\":[],\"job\":null,\"result\":{\"state\":\"none\"},\"success\":true,\"summary\":\"no transaction open\",\"transaction\":null,\"warnings\":[]}",
+              "type": "text"
+            }
+          ],
+          "isError": false,
+          "structuredContent": {
+            "changes": [],
+            "job": null,
+            "result": {
+              "state": "none"
+            },
+            "success": true,
+            "summary": "no transaction open",
+            "transaction": null,
+            "warnings": []
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "id": 4,
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+          "arguments": {},
+          "name": "parameter.set"
+        }
+      },
+      "response": {
+        "error": {
+          "code": -32602,
+          "data": {
+            "name": "parameter.set",
+            "recovery": "call tools/list for the tool names"
+          },
+          "message": "Unknown tool: parameter.set"
+        },
+        "id": 4,
+        "jsonrpc": "2.0"
+      }
+    },
+    {
+      "request": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+          "arguments": {
+            "path": "x"
+          },
+          "name": "parameter_set"
+        }
+      },
+      "response": {
+        "id": 5,
+        "jsonrpc": "2.0",
+        "result": {
+          "content": [
+            {
+              "text": "arguments is missing required field 'value'\n{\"changes\":[],\"error\":{\"code\":\"INVALID_ARGUMENTS\",\"message\":\"arguments is missing required field 'value'\",\"recovery\":\"include 'value' in the arguments\"},\"job\":null,\"result\":null,\"success\":false,\"summary\":\"arguments is missing required field 'value'\",\"transaction\":null,\"warnings\":[]}",
+              "type": "text"
+            }
+          ],
+          "isError": true,
+          "structuredContent": {
+            "changes": [],
+            "error": {
+              "code": "INVALID_ARGUMENTS",
+              "message": "arguments is missing required field 'value'",
+              "recovery": "include 'value' in the arguments"
+            },
+            "job": null,
+            "result": null,
+            "success": false,
+            "summary": "arguments is missing required field 'value'",
+            "transaction": null,
+            "warnings": []
+          }
+        }
+      }
+    }
+  ],
+  "note": "ADR-2162: MCP tools/call, revision 2025-11-25: a success (structuredContent is the envelope, content[0] the summary and the compact envelope), an unknown name (the canonical dotted name is not an MCP name: -32602 with data), and a tool execution error (invalid arguments: isError true).",
+  "revision": "2025-11-25"
+}

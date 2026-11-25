@@ -19,12 +19,17 @@
 //
 // Shutdown: a `shutdown` request, or end of input, closes the session on the host thread -- an open explicit
 // transaction is rolled back -- and ends the loop. The project is never saved for the client.
+//
+// ADR-2162: the same loop speaks MCP (`avgen mcp`, `ServeProtocol::Mcp`). Only the method table and the shape of
+// the answers differ, and the shapes come from api/mcp_shaper.hpp; the reader, the writer, the host thread, the
+// argument checks and `Session::call` are this file's, for both protocols.
 
 #include "ai/tool_api.hpp"
 #include "api/engine_host.hpp"
 
 #include <nlohmann/json.hpp>
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
@@ -65,8 +70,15 @@ struct RpcErrorRow {
 // docs/api/protocol.md (a generated artefact, api/describe.hpp).
 [[nodiscard]] std::string protocolMarkdown();
 
+// Which protocol the server speaks on the stream (ADR-2162).
+enum class ServeProtocol : std::uint8_t {
+    JsonRpc, // `avgen serve --stdio`: docs/api/protocol.md
+    Mcp,     // `avgen mcp`: docs/api/mcp.md
+};
+
 struct ServeOptions {
     HostFlags flags;
+    ServeProtocol protocol = ServeProtocol::JsonRpc;
     // Tools added beside the standard catalogue (a test's probe), as `SessionOptions::extraTools`.
     std::vector<ai::Tool> extraTools;
     // ADR-2159: the host's GPU half. Empty: a CPU host (render tools `UNAVAILABLE`).
@@ -77,9 +89,12 @@ struct ServeOptions {
 // calling thread as the host thread. Returns 0, or 7 when the session could not be created. Closes neither fd.
 [[nodiscard]] int serve(ServeOptions options, int inFd, int outFd);
 
-// `avgen serve --stdio [--root d] [--read-root d] [--write-root d] [--allow-subprocess]`: protects stdout and
-// serves stdin/stdout. Exit code 0, 2 for usage, 7 for a host failure.
-[[nodiscard]] int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend = {});
+// `avgen serve --stdio [--root d] [--read-root d] [--write-root d] [--allow-subprocess]`, and with
+// `ServeProtocol::Mcp` `avgen mcp [--stdio] [the same flags]`: protects stdout and serves stdin/stdout. Exit code
+// 0, 2 for usage, 7 for a host failure.
+[[nodiscard]] int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend = {},
+                                  ServeProtocol protocol = ServeProtocol::JsonRpc);
 [[nodiscard]] const char* serveUsage();
+[[nodiscard]] const char* mcpUsage();
 
 } // namespace avgen::api

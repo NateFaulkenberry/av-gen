@@ -2,6 +2,7 @@
 
 #include "ai/tool_context.hpp"
 #include "api/describe.hpp"
+#include "api/mcp_shaper.hpp"
 #include "api/version.hpp"
 #include "app/engine.hpp"
 #include "core/log.hpp"
@@ -146,15 +147,24 @@ private:
 
 class Server {
 public:
-    Server(Session& session, EngineHost& host, int inFd, int outFd)
-        : session_(session), host_(host), in_(inFd), out_(outFd),
-          catalogue_(toolCatalogue(session.tools()).at("tools")) {}
+    Server(Session& session, EngineHost& host, int inFd, int outFd, ServeProtocol protocol)
+        : session_(session), host_(host), in_(inFd), out_(outFd), protocol_(protocol),
+          catalogue_(toolCatalogue(session.tools()).at("tools")), names_(catalogue_) {}
 
     void start() {
         // ADR-2159: a job's state and progress reach the client as notifications, from the host thread, through
-        // the one writer. Sent only once the client has initialized.
+        // the one writer. Sent only once the client has initialized. ADR-2162: over MCP, only to the progress
+        // token of the call waiting on that job (MCP progress belongs to a request).
         session_.jobs().setListener([this](const json& event) {
             if (!initialized_.load(std::memory_order_acquire)) {
+                return;
+            }
+            if (protocol_ == ServeProtocol::Mcp) {
+                std::string message = event.value("state", std::string{});
+                if (const std::string phase = event.value("phase", std::string{}); !phase.empty()) {
+                    message += ": " + phase;
+                }
+                mcpProgress(event.value("progress", 0.0), message, event.value("job", std::string{}));
                 return;
             }
             send(json{{"jsonrpc", "2.0"}, {"method", "notifications/progress"}, {"params", event}});
@@ -178,6 +188,15 @@ public:
     void forwardLog(spdlog::level::level_enum level, std::string_view text) {
         if (tInWriter || !initialized_.load(std::memory_order_acquire) ||
             level < logLevel_.load(std::memory_order_acquire)) {
+            return;
+        }
+        if (protocol_ == ServeProtocol::Mcp) {
+            if (!clientReady_.load(std::memory_order_acquire)) {
+                return; // nothing unasked-for before notifications/initialized
+            }
+            send(json{{"jsonrpc", "2.0"},
+                      {"method", "notifications/message"},
+                      {"params", json{{"level", mcpLogLevelName(level)}, {"logger", "avgen"}, {"data", std::string(text)}}}});
             return;
         }
         send(json{{"jsonrpc", "2.0"},
@@ -265,6 +284,10 @@ private:
             return;
         }
         if (message.is_array()) {
+            if (protocol_ == ServeProtocol::Mcp) {
+                send(errorResponse(nullptr, kInvalidRequest, "MCP has no batches: send one request per line"));
+                return;
+            }
             if (message.empty()) {
                 send(errorResponse(nullptr, kInvalidRequest, "an empty batch"));
                 return;
@@ -327,6 +350,9 @@ private:
     }
 
     json dispatch(const std::string& method, const json& id, const json& params) {
+        if (protocol_ == ServeProtocol::Mcp) {
+            return dispatchMcp(method, id, params);
+        }
         const bool known = std::any_of(std::begin(kMethods), std::end(kMethods), [&](const RpcMethod& r) {
             return r.name == method && r.kind != "server notification";
         });
@@ -380,7 +406,14 @@ private:
         }
         log::info("serve: initialized by '{}' {}", clientInfo["name"].get<std::string>(),
                   clientInfo["version"].get<std::string>());
-        json out{{"protocol", json{{"name", kProtocolName}, {"version", kProtocolVersion}}},
+        json out = describeServer(clientInfo);
+        initialized_.store(true, std::memory_order_release);
+        return response(id, std::move(out));
+    }
+
+    // What `initialize` answers about this server and session, for either protocol (MCP carries it in `_meta`).
+    json describeServer(const json& clientInfo) {
+        return json{{"protocol", json{{"name", kProtocolName}, {"version", kProtocolVersion}}},
                  {"server", json{{"name", "avgen"}, {"version", version().engine}}},
                  {"versions", version().toJson()},
                  {"api", kApiLevel},
@@ -397,11 +430,18 @@ private:
                        {"gpu", host_.canRender()},
                        {"render", host_.canRender()},
                        {"jobs", true}}}};
-        initialized_.store(true, std::memory_order_release);
-        return response(id, std::move(out));
     }
 
     json toolsList(const json& id) {
+        auto tools = listedTools();
+        if (!tools) {
+            return errorResponse(id, kInternalError, "the host did not answer");
+        }
+        return response(id, json{{"tools", std::move(*tools)}});
+    }
+
+    // The catalogue with each tool's availability in this session now, or nothing when the host did not answer.
+    std::optional<json> listedTools() {
         json tools = catalogue_;
         bool ran = session_.onHost([&](app::Engine&) {
             for (json& t : tools) {
@@ -417,9 +457,9 @@ private:
             }
         });
         if (!ran) {
-            return errorResponse(id, kInternalError, "the host did not answer");
+            return std::nullopt;
         }
-        return response(id, json{{"tools", std::move(tools)}});
+        return tools;
     }
 
     json toolsCall(const json& id, const json& params) {
@@ -430,36 +470,14 @@ private:
             return errorResponse(id, kInvalidParams, "tools/call needs a string name");
         }
         const std::string name = params.at("name").get<std::string>();
-        json args = json::object();
-        if (params.contains("arguments") && !params.at("arguments").is_null()) {
-            if (!params.at("arguments").is_object()) {
-                return errorResponse(id, kInvalidParams, "arguments must be an object");
-            }
-            args = params.at("arguments");
+        json args;
+        if (auto bad = callArguments(params, args)) {
+            return errorResponse(id, kInvalidParams, *bad);
         }
         CallOptions options;
-        if (params.contains("transaction") && !params.at("transaction").is_null()) {
-            if (!params.at("transaction").is_string()) {
-                return errorResponse(id, kInvalidParams, "transaction must be a string");
-            }
-            options.transaction = params.at("transaction").get<std::string>();
-        }
-        if (params.contains("irreversible") && !params.at("irreversible").is_null()) {
-            const json& i = params.at("irreversible");
-            if (i.is_boolean()) {
-                options.irreversible = i.get<bool>() ? Irreversible::Accept : Irreversible::Refuse;
-            } else if (i == "accept" || i == "refuse") {
-                options.irreversible = i == "accept" ? Irreversible::Accept : Irreversible::Refuse;
-            } else {
-                return errorResponse(id, kInvalidParams, "irreversible must be a boolean, \"accept\" or \"refuse\"");
-            }
-        }
         bool dryRun = false;
-        if (params.contains("dryRun") && !params.at("dryRun").is_null()) {
-            if (!params.at("dryRun").is_boolean()) {
-                return errorResponse(id, kInvalidParams, "dryRun must be a boolean");
-            }
-            dryRun = params.at("dryRun").get<bool>();
+        if (auto bad = callOptions(params, "transaction", "irreversible", "dryRun", options, dryRun)) {
+            return errorResponse(id, kInvalidParams, *bad);
         }
         if (dryRun) {
             return response(id, dryRunEnvelope(name, args, options).toWire());
@@ -470,6 +488,189 @@ private:
                       {"params", json{{"requestId", id}, {"tool", name}, {"progress", progress}, {"message", message}}}});
         };
         return response(id, session_.call(name, args, options).toWire());
+    }
+
+    // `arguments`, absent or null meaning {}. An error message when it is not an object.
+    static std::optional<std::string> callArguments(const json& params, json& args) {
+        args = json::object();
+        if (params.contains("arguments") && !params.at("arguments").is_null()) {
+            if (!params.at("arguments").is_object()) {
+                return "arguments must be an object";
+            }
+            args = params.at("arguments");
+        }
+        return std::nullopt;
+    }
+
+    // The call options both protocols take, from `in` under the given keys (JSON-RPC: the params themselves;
+    // MCP: `_meta` with the `avgen/` keys). An error message when one is malformed.
+    static std::optional<std::string> callOptions(const json& in, const char* transactionKey, const char* irreversibleKey,
+                                                  const char* dryRunKey, CallOptions& options, bool& dryRun) {
+        if (in.contains(transactionKey) && !in.at(transactionKey).is_null()) {
+            if (!in.at(transactionKey).is_string()) {
+                return fmt::format("{} must be a string", transactionKey);
+            }
+            options.transaction = in.at(transactionKey).get<std::string>();
+        }
+        if (in.contains(irreversibleKey) && !in.at(irreversibleKey).is_null()) {
+            const json& i = in.at(irreversibleKey);
+            if (i.is_boolean()) {
+                options.irreversible = i.get<bool>() ? Irreversible::Accept : Irreversible::Refuse;
+            } else if (i == "accept" || i == "refuse") {
+                options.irreversible = i == "accept" ? Irreversible::Accept : Irreversible::Refuse;
+            } else {
+                return fmt::format("{} must be a boolean, \"accept\" or \"refuse\"", irreversibleKey);
+            }
+        }
+        dryRun = false;
+        if (in.contains(dryRunKey) && !in.at(dryRunKey).is_null()) {
+            if (!in.at(dryRunKey).is_boolean()) {
+                return fmt::format("{} must be a boolean", dryRunKey);
+            }
+            dryRun = in.at(dryRunKey).get<bool>();
+        }
+        return std::nullopt;
+    }
+
+    // ---- MCP (ADR-2162): the same session and calls, MCP's method table and shapes ---------------------
+
+    json dispatchMcp(const std::string& method, const json& id, const json& params) {
+        if (!mcpKnownClientMethod(method)) {
+            return errorResponse(id, kMethodNotFound, fmt::format("no method '{}'", method));
+        }
+        if (method == "notifications/initialized") {
+            clientReady_.store(true, std::memory_order_release);
+            return response(id, json::object()); // dropped: it is a notification
+        }
+        if (method == "notifications/cancelled") {
+            return response(id, json::object()); // dropped: no cancellation
+        }
+        if (method == "ping") {
+            return response(id, json::object());
+        }
+        if (method == "initialize") {
+            return mcpInitialize(id, params);
+        }
+        if (!initialized_.load(std::memory_order_acquire)) {
+            return errorResponse(id, kMcpInvalidRequest,
+                                 fmt::format("'{}' before initialize: send initialize first", method));
+        }
+        if (method == "logging/setLevel") {
+            const json level = params.is_object() ? params.value("level", json()) : json();
+            const auto spd = level.is_string() ? mcpLogLevelToSpd(level.get<std::string>()) : std::nullopt;
+            if (!spd) {
+                return errorResponse(id, kInvalidParams,
+                                     "level must be one of debug, info, notice, warning, error, critical, alert, emergency");
+            }
+            logLevel_.store(static_cast<spdlog::level::level_enum>(*spd), std::memory_order_release);
+            return response(id, json::object());
+        }
+        if (method == "tools/list") {
+            if (params.is_object() && params.contains("cursor") && !params.at("cursor").is_null()) {
+                return errorResponse(id, kInvalidParams, "invalid cursor: the list has one page");
+            }
+            auto tools = listedTools();
+            if (!tools) {
+                return errorResponse(id, kInternalError, "the host did not answer");
+            }
+            return response(id, mcpToolsListResult(*tools));
+        }
+        return mcpToolsCall(id, params);
+    }
+
+    json mcpInitialize(const json& id, const json& params) {
+        if (initialized_.load(std::memory_order_acquire)) {
+            return errorResponse(id, kInvalidRequest, "the session is already initialized");
+        }
+        if (!params.is_object() || !params.contains("protocolVersion") || !params.at("protocolVersion").is_string()) {
+            return errorResponse(id, kInvalidParams, "initialize takes {protocolVersion, capabilities, clientInfo}");
+        }
+        json clientInfo = json{{"kind", clientKindName(session_.client().kind)}, {"name", ""}, {"version", ""}};
+        if (params.contains("clientInfo")) {
+            const json& c = params.at("clientInfo");
+            if (!c.is_object() || (c.contains("name") && !c.at("name").is_string()) ||
+                (c.contains("version") && !c.at("version").is_string())) {
+                return errorResponse(id, kInvalidParams, "clientInfo must be {name: string, version: string}");
+            }
+            clientInfo["name"] = c.value("name", std::string{});
+            clientInfo["version"] = c.value("version", std::string{});
+        }
+        const std::string asked = params.at("protocolVersion").get<std::string>();
+        log::info("mcp: initialized by '{}' {} (asked for revision {}, answering {})",
+                  clientInfo["name"].get<std::string>(), clientInfo["version"].get<std::string>(), asked,
+                  kMcpProtocolRevision);
+        json out = mcpInitializeResult(describeServer(clientInfo));
+        initialized_.store(true, std::memory_order_release);
+        return response(id, std::move(out));
+    }
+
+    json mcpToolsCall(const json& id, const json& params) {
+        if (!params.is_object() || !params.contains("name") || !params.at("name").is_string()) {
+            return errorResponse(id, kInvalidParams, "tools/call takes {name, arguments?, _meta?}");
+        }
+        const std::string mcpName = params.at("name").get<std::string>();
+        const std::optional<std::string> name = names_.toolFor(mcpName);
+        if (!name) {
+            return errorResponse(id, kMcpInvalidParams, fmt::format("Unknown tool: {}", mcpName),
+                                 json{{"name", mcpName}, {"recovery", "call tools/list for the tool names"}});
+        }
+        json args;
+        if (auto bad = callArguments(params, args)) {
+            return errorResponse(id, kInvalidParams, *bad);
+        }
+        const json meta = params.contains("_meta") && params.at("_meta").is_object() ? params.at("_meta") : json::object();
+        CallOptions options;
+        bool dryRun = false;
+        if (auto bad = callOptions(meta, kMcpMetaTransaction, kMcpMetaIrreversible, kMcpMetaDryRun, options, dryRun)) {
+            return errorResponse(id, kInvalidParams, *bad);
+        }
+        if (dryRun) {
+            return response(id, mcpCallToolResult(dryRunEnvelope(*name, args, options).toWire()));
+        }
+        const json token = meta.contains("progressToken") ? meta.at("progressToken") : json();
+        const bool tracked = token.is_string() || token.is_number_integer();
+        if (tracked) {
+            // job.wait reports the waited job's progress; any tool reports its own.
+            const std::string job = *name == "job.wait" && args.contains("id") && args.at("id").is_string()
+                                        ? args.at("id").get<std::string>()
+                                        : std::string{};
+            const std::lock_guard lock(progressMutex_);
+            progress_ = McpProgress{token, job, -1.0, {}, true};
+            options.onProgress = [this](float progress, const std::string& message) {
+                mcpProgress(static_cast<double>(progress), message, {});
+            };
+        }
+        const json envelope = session_.call(*name, args, options).toWire();
+        if (tracked) {
+            const std::lock_guard lock(progressMutex_);
+            progress_ = McpProgress{}; // no progress for this token after its response
+        }
+        return response(id, mcpCallToolResult(envelope));
+    }
+
+    // A progress notification to the running call's token: the tool's own (`job` empty) or, for job.wait, the
+    // waited job's. MCP's progress must increase: a repeat of the last message at no more progress is not sent, and
+    // a new message (a new phase) at no more progress is nudged up, and dropped at the top.
+    void mcpProgress(double progress, const std::string& message, const std::string& job) {
+        const std::lock_guard lock(progressMutex_);
+        if (!progress_.active || (!job.empty() && job != progress_.job)) {
+            return;
+        }
+        progress = std::clamp(progress, 0.0, 1.0);
+        if (progress <= progress_.last) {
+            if (message == progress_.message) {
+                return;
+            }
+            progress = progress_.last + 1e-4;
+            if (progress > 1.0) {
+                return;
+            }
+        }
+        progress_.last = progress;
+        progress_.message = message;
+        send(json{{"jsonrpc", "2.0"},
+                  {"method", "notifications/progress"},
+                  {"params", mcpProgressParams(progress_.token, progress, message)}});
     }
 
     // What the call would meet, without running it: the name, the arguments (on this thread, as Session::call
@@ -515,11 +716,24 @@ private:
         return rolledBack;
     }
 
+    struct McpProgress {
+        json token;
+        std::string job; // job.wait's job, or empty
+        double last = -1.0;
+        std::string message; // the last one sent
+        bool active = false;
+    };
+
     Session& session_;
     EngineHost& host_;
     int in_;
     int out_;
+    const ServeProtocol protocol_;
     const json catalogue_;
+    const McpNameTable names_;
+    std::mutex progressMutex_; // taken before writeMutex_, never after
+    McpProgress progress_;     // guarded by progressMutex_
+    std::atomic<bool> clientReady_{false}; // MCP: notifications/initialized arrived
     std::mutex writeMutex_;
     bool broken_ = false; // guarded by writeMutex_
     std::atomic<bool> initialized_{false};
@@ -649,7 +863,8 @@ int serve(ServeOptions options, int inFd, int outFd) {
     hostOptions.renderBackend = std::move(options.renderBackend);
     EngineHost host(std::move(hostOptions));
     SessionOptions so;
-    so.client = ClientInfo{ClientKind::JsonRpc, "json-rpc", ""};
+    so.client = options.protocol == ServeProtocol::Mcp ? ClientInfo{ClientKind::Mcp, "mcp", ""}
+                                                       : ClientInfo{ClientKind::JsonRpc, "json-rpc", ""};
     so.permissions = std::move(options.flags.permissions);
     so.permissions.liveControl = false;
     so.extraTools = std::move(options.extraTools);
@@ -658,7 +873,7 @@ int serve(ServeOptions options, int inFd, int outFd) {
         log::error("serve: {}", session.error().message);
         return 7;
     }
-    Server server(**session, host, inFd, outFd);
+    Server server(**session, host, inFd, outFd, options.protocol);
     server.start();
     host.run(**session);
     server.join();
@@ -666,8 +881,19 @@ int serve(ServeOptions options, int inFd, int outFd) {
     return 0;
 }
 
-int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend) {
-    bool stdio = false;
+const char* mcpUsage() {
+    return "usage: avgen mcp [--stdio] [--root <dir>]... [--read-root <dir>]... [--write-root <dir>]... "
+           "[--allow-subprocess]\n"
+           "  The Model Context Protocol on stdin and stdout (docs/api/mcp.md): avgen serve's server and flags, with\n"
+           "  MCP's methods and result shapes. Client configuration: {\"mcpServers\": {\"avgen\": {\"command\":\n"
+           "  \"/path/to/avgen\", \"args\": [\"mcp\", \"--root\", \"/path/to/work\"]}}}. The log is on stderr.\n";
+}
+
+int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend, ServeProtocol wire) {
+    const bool mcp = wire == ServeProtocol::Mcp;
+    const char* command = mcp ? "avgen mcp" : "avgen serve";
+    const char* usage = mcp ? mcpUsage() : serveUsage();
+    bool stdio = mcp; // stdio is MCP's only transport here; `--stdio` is accepted and changes nothing
     HostFlags flags;
     for (int i = 2; i < argc; ++i) {
         const std::string_view a = argv[i];
@@ -676,21 +902,21 @@ int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend) {
             continue;
         }
         if (a == "--help" || a == "-h") {
-            std::fputs(serveUsage(), stdout);
+            std::fputs(usage, stdout);
             return 0;
         }
         auto consumed = parseHostFlag(argc, argv, i, flags);
         if (!consumed) {
-            std::fprintf(stderr, "avgen serve: %s\n%s", consumed.error().message.c_str(), serveUsage());
+            std::fprintf(stderr, "%s: %s\n%s", command, consumed.error().message.c_str(), usage);
             return 2;
         }
         if (!*consumed) {
-            std::fprintf(stderr, "avgen serve: unknown argument '%s'\n%s", argv[i], serveUsage());
+            std::fprintf(stderr, "%s: unknown argument '%s'\n%s", command, argv[i], usage);
             return 2;
         }
     }
     if (!stdio) {
-        std::fprintf(stderr, "avgen serve: pass --stdio (the only transport)\n%s", serveUsage());
+        std::fprintf(stderr, "%s: pass --stdio (the only transport)\n%s", command, usage);
         return 2;
     }
     auto protocol = protectStdout();
@@ -699,9 +925,14 @@ int runServeCommand(int argc, char** argv, RenderBackendFactory renderBackend) {
         return 7;
     }
     std::signal(SIGPIPE, SIG_IGN); // a client that closes our stdout ends the session through a write error
-    log::info("{} serving JSON-RPC on stdio ({}; no window, no listeners)", versionLine(),
+    log::info("{} serving {} on stdio ({}; no window, no listeners)", versionLine(),
+              mcp ? fmt::format("MCP {}", kMcpProtocolRevision) : std::string("JSON-RPC"),
               renderBackend ? "GPU on the first render" : "CPU host: no GPU");
-    const int code = serve(ServeOptions{std::move(flags), {}, std::move(renderBackend)}, STDIN_FILENO, *protocol);
+    ServeOptions options;
+    options.flags = std::move(flags);
+    options.protocol = wire;
+    options.renderBackend = std::move(renderBackend);
+    const int code = serve(std::move(options), STDIN_FILENO, *protocol);
     restoreStdout(*protocol);
     return code;
 }

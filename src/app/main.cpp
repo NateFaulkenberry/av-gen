@@ -62,13 +62,18 @@ int main(int argc, char** argv) {
     // ADR-2155: the external interface. Before parseArgs and Application, so neither runs: no window, no
     // settings file, no OSC or MIDI listener. Each builds an api::EngineHost and one api::Session. ADR-2159: the host
     // gets its GPU half here, which creates a device only when the first render job starts.
-    if (argc > 1 && (std::string(argv[1]) == "serve" || std::string(argv[1]) == "call")) {
+    // ADR-2162: `avgen mcp` is the same server speaking MCP.
+    if (argc > 1 && (std::string(argv[1]) == "serve" || std::string(argv[1]) == "call" || std::string(argv[1]) == "mcp")) {
         avgen::log::init(avgen::log::Level::Info); // stderr; stdout is the protocol
         // ADR-2160: the shaders are found beside the executable (<exe>/shaders), so name the file that is running,
         // not argv[0]: started through PATH, argv[0] is a bare "avgen" with no directory at all.
         auto gpu = avgen::app::gpuRenderBackendFactory(avgen::app::GpuBackendOptions{runningExecutable(argv[0]), {}, true});
-        return std::string(argv[1]) == "serve" ? avgen::api::runServeCommand(argc, argv, std::move(gpu))
-                                               : avgen::api::runCallCommand(argc, argv, std::move(gpu));
+        const std::string sub = argv[1];
+        if (sub == "mcp") {
+            return avgen::api::runServeCommand(argc, argv, std::move(gpu), avgen::api::ServeProtocol::Mcp);
+        }
+        return sub == "serve" ? avgen::api::runServeCommand(argc, argv, std::move(gpu))
+                              : avgen::api::runCallCommand(argc, argv, std::move(gpu));
     }
     // ADR-1051: the spatial validator has its own arguments and needs no window, GPU or engine.
     if (argc > 1 && std::string(argv[1]) == "--validate-space") {
@@ -86,8 +91,8 @@ int main(int argc, char** argv) {
     if (options->showHelp) {
         std::printf("%s", avgen::app::usageText().c_str());
         // ADR-2155: the two sub-commands that run without the application.
-        std::printf("\nsub-commands (no window, no GPU, no settings file, no listeners):\n%s\n%s",
-                    avgen::api::serveUsage(), avgen::api::callUsage());
+        std::printf("\nsub-commands (no window, no GPU, no settings file, no listeners):\n%s\n%s\n%s",
+                    avgen::api::serveUsage(), avgen::api::mcpUsage(), avgen::api::callUsage());
         return 0;
     }
     // `--labs` prints the suite and exits, beside the other two enumerations, because it answers

@@ -1,0 +1,239 @@
+{
+  "note": "ADR-2162: MCP tools/list, revision 2025-11-25. Two tools checked in full: one without an outputSchema of its own (result: {}) and one with (result: anyOf [its schema, null]). \"<any>\" matches any value.",
+  "request": {
+    "id": 2,
+    "jsonrpc": "2.0",
+    "method": "tools/list"
+  },
+  "revision": "2025-11-25",
+  "tools": [
+    {
+      "_meta": {
+        "avgen/availability": {
+          "available": true,
+          "permitted": true
+        },
+        "avgen/executionClass": "instant",
+        "avgen/permissions": [],
+        "avgen/since": 1,
+        "avgen/tool": "parameter.set"
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false,
+        "title": "Set a parameter"
+      },
+      "description": "<any>",
+      "inputSchema": "<any>",
+      "name": "parameter_set",
+      "outputSchema": {
+        "description": "The AV Gen call envelope. `result` is the tool's value (null on failure); `error` is present only on failure.",
+        "properties": {
+          "changes": {
+            "items": {
+              "properties": {
+                "clamped": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "error": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "job": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {},
+          "success": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "transaction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warnings": {
+            "items": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "pointer": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "success",
+          "result",
+          "summary",
+          "changes",
+          "warnings",
+          "transaction",
+          "job"
+        ],
+        "type": "object"
+      },
+      "title": "Set a parameter"
+    },
+    {
+      "_meta": {
+        "avgen/availability": "<any>",
+        "avgen/executionClass": "read",
+        "avgen/permissions": [],
+        "avgen/since": 1,
+        "avgen/tool": "transaction.status"
+      },
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true,
+        "title": "Transaction status"
+      },
+      "description": "<any>",
+      "inputSchema": "<any>",
+      "name": "transaction_status",
+      "outputSchema": {
+        "description": "The AV Gen call envelope. `result` is the tool's value (null on failure); `error` is present only on failure.",
+        "properties": {
+          "changes": {
+            "items": {
+              "properties": {
+                "clamped": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "error": {
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              },
+              "message": {
+                "type": "string"
+              },
+              "recovery": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "job": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "anyOf": [
+              "<any>",
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "transaction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warnings": {
+            "items": {
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "pointer": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "success",
+          "result",
+          "summary",
+          "changes",
+          "warnings",
+          "transaction",
+          "job"
+        ],
+        "type": "object"
+      },
+      "title": "Transaction status"
+    }
+  ]
+}

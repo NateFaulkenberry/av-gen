@@ -118,6 +118,7 @@ or the result, and anything else the engine prints is sent to stderr.
 | Command | Does |
 |---|---|
 | `serve --stdio` | a JSON-RPC 2.0 server on stdin and stdout, one message per line: `initialize`, `tools/list`, `tools/call`, `shutdown`, with `notifications/progress` and `notifications/log` (`docs/api/protocol.md`). One session for the life of the process. `shutdown`, or the end of stdin, rolls back an open transaction and exits; nothing is saved unless a client calls `project.save` |
+| `mcp` | the same server speaking the Model Context Protocol (revision 2025-11-25) for an MCP client: `initialize`, `tools/list`, `tools/call`, `ping`, `logging/setLevel`. Tool names are the `mcpName`s (`parameter_set`); each result's `structuredContent` is the same envelope `serve` answers. Same flags as `serve`; `--stdio` is implied. Client configuration and the name table: `docs/api/mcp.md` |
 | `call <tool> ['<json>']` | one tool call in a fresh session; prints its envelope (`success`, `result`, `summary`, `changes`, `warnings`, `transaction`, `job`, and `error` on failure) as JSON |
 | `call --calls <file.json>` | a list of calls, `[{"tool": "...", "arguments": {...}}, ...]`, in one session; prints `{"success", "calls": [{"tool", "envelope"}]}`. Every call runs, even after one fails |
 
