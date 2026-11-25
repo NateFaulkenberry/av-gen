@@ -81,6 +81,23 @@ parked behaviour (`StoppedAmbient`) by default, the policy is explicit, `Stopped
 4. **Studio defaults to `StoppedFrozen`.** Not done: it changes what the editor shows (water, wind and rigs stop),
    and the owner chose today's behaviour as the default.
 
+## Measured (2026-11-25, REPORT.md's method: the editor on Neon Dreams, parked, `--profile-csv`, 500 frames, stats from frame 100)
+
+| Run | frame median / p95 | `ui.build` median / p95 / max | frames with `ui.build` > 100 ms | `engine.update` median |
+|---|---|---|---|---|
+| before (REPORT.md g1, 8731bf360) | 274 / 477 ms | 18.3 / 190.8 / 209.3 ms | 61 of 400 | 98.2 ms |
+| after, `StoppedAmbient` (default) | 294 / 336 ms | 18.0 / 19.7 / 20.6 ms | 0 of 400 | 86.7 ms |
+| after, `--parked-clock frozen` | 320 / 365 ms | 17.9 / 19.7 / 20.6 ms | 0 of 400 | 25.6 ms |
+
+The dirty sampler's spikes are gone. Freezing the parked clock takes 61 ms of CPU off every parked frame, but Neon
+Dreams' frame is GPU-bound (about 300 ms of GPU, most of it the cloud march, REPORT.md fix 1), so the frame time does
+not fall to a static frame's: the renderer still draws the whole scene every frame. Other agents' CPU suites were
+running during these runs (the GPU was held), so the CPU columns are comparable with each other, not absolute.
+
+The dev assertion across 17 `--ui-script` arms (one arm per run, on `examples/hero/hero.json`): only `sliders` left an
+unrecorded difference (452 parameter paths); `edit` and `gizmo` were recorded; the rest changed nothing. The `sliders`
+arm writes parameters exactly as `ui::drawParameterValue` does, which is the bypass named below.
+
 ## Consequences
 
 - **Panel writes that bypass the edit history no longer mark the title.** `ui::drawParameterValue` (the Parameters
