@@ -15,13 +15,13 @@
 After ADR-2153 every client goes through one `api::Session`, but the only client was in the process: Studio's
 assistant. A program outside the engine had two ways in, and both were the wrong shape:
 
-- `--ai-script` runs a scripted conversation through the whole `Application`: it creates a window (or a headless
-  one), a GPU device, reads the settings file, and (before ADR-2133) opened an OSC port;
+- `--ai-script` runs a scripted conversation inside the whole `Application`, whose `init` always creates a
+  `gpu::Context` and the scene renderer, headless or not (the evaluation's start-up trace, section 3);
 - nothing at all for a conversation: each run is a fresh process that loads, acts and exits.
 
-The evaluation (01-evaluation, "poc-today") ran its probe sequence through `--ai-script`: `project.create` and
-`asset.import` were refused because the run had no roots to give the session, and a GPU device was created for a
-sequence that draws nothing.
+The evaluation's probe sequence (01-evaluation/evidence/poc-today/probe.ai.json) has `project.create` and
+`asset.import` refused when the session has no roots, which is what a run with nothing to give it roots gets (run
+again through `avgen call --calls` with no roots at ecbada74f: both `PERMISSION_DENIED`).
 
 ## Decision
 
@@ -78,6 +78,14 @@ sequence that draws nothing.
 - A created project has no composition until stage S3 (`project.create {scene: "empty"}`), so the probe's
   `scene.create_node` right after `project.create` is still refused ("no composition"); on a project with a scene
   it succeeds.
+
+- Every tool in the catalogue, called with `{}` on a fresh session with no project, answers a structured result:
+  no crash and no `INTERNAL` (`tests/unit/test_api_serve.cpp`). The 81 tools in one `avgen call --calls` session at
+  ecbada74f: 29 succeed, 35 `INVALID_ARGUMENTS`, 5 `PERMISSION_DENIED`, 11 `UNAVAILABLE` (the composition tools,
+  `camera.set` on the orb scene, `performance.get_stats`, `director.watch_events`) and 1 `FAILED_PRECONDITION`
+  (`project.save`). The composition tools answer
+  `UNAVAILABLE` "no composition", which is what ADR-2153's capability answer says for the `composition`
+  requirement (`available: false`); they were left as they are rather than changed to `FAILED_PRECONDITION`.
 
 ## Revisit triggers
 

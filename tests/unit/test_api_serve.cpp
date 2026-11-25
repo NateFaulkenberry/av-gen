@@ -13,6 +13,7 @@
 #include "api/session.hpp"
 #include "api/version.hpp"
 #include "app/engine.hpp"
+#include "core/log.hpp"
 #include "support/gltf_fixture.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -407,12 +408,17 @@ TEST_CASE("serve: progress and the log reach the client as notifications", "[api
         if (ctx.onProgress) {
             ctx.onProgress(0.5f, "half way");
         }
+        log::warn("test.progress: a warning for the client");
+        log::info("test.progress: an info line below the client's level");
         return ai::ToolResult::ok(json::object(), "done");
     }));
+    // The process-wide level is whatever the last test left; this one needs warnings to reach the sinks.
+    const auto level = spdlog::get_level();
+    spdlog::set_level(spdlog::level::info);
     Client c(std::move(o));
-    REQUIRE(c.request(1, "initialize", json{{"logLevel", "info"}}).contains("result"));
+    REQUIRE(c.request(1, "initialize", json{{"logLevel", "warn"}}).contains("result"));
     REQUIRE(envelope(c.request(2, "tools/call", json{{"name", "test.progress"}})).at("success") == true);
-    REQUIRE(envelope(c.request(3, "tools/call", json{{"name", "transaction.begin"}})).at("success") == true);
+    spdlog::set_level(level);
     bool progress = false;
     bool logged = false;
     for (const json& n : c.notifications) {
@@ -423,12 +429,14 @@ TEST_CASE("serve: progress and the log reach the client as notifications", "[api
             CHECK(n.at("params").at("message") == "half way");
         }
         if (n.at("method") == "notifications/log") {
-            logged = logged || n.at("params").at("message").get<std::string>().find("transaction") != std::string::npos;
-            CHECK(n.at("params").at("level") == "info");
+            const std::string message = n.at("params").at("message").get<std::string>();
+            logged = logged || message == "test.progress: a warning for the client";
+            CHECK(message.find("below the client's level") == std::string::npos);
+            CHECK(n.at("params").at("level") != "info");
         }
     }
     CHECK(progress);
-    CHECK(logged); // transaction.begin logs at info
+    CHECK(logged);
     c.request(4, "shutdown");
 }
 
