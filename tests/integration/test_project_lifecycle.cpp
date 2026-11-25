@@ -30,6 +30,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -163,36 +164,52 @@ TEST_CASE("a project is clean when it is opened and dirty once something changes
         REQUIRE(engine.loadProject(project).has_value());
         INFO("just opened " << project.filename().string());
         // Asked as the application asks it at a close: "something touched me since you last asked".
-        CHECK_FALSE(engine.projectDirty(true));
+        CHECK_FALSE(engine.revisions().dirty());
+        CHECK_FALSE(engine.compareWithSaved().differs);
+        CHECK_FALSE(engine.projectDirtyOnDemand(true));
 
         // The control (ADR-182): change one number and the same call must say yes. Without this the
-        // assertion above would pass on a `projectDirty` that returned false unconditionally.
+        // assertion above would pass on a comparison that returned false unconditionally. Written
+        // straight into the parameter, as an editor write that bypasses the edit history would: no
+        // revision records it, and the close's comparison is what catches it (ADR-2154).
         params::IParameter* p = engine.params().find("camera/fov");
         REQUIRE(p != nullptr);
         const float fov = p->baseComponent(0);
         p->setBaseComponent(0, fov + 3.0f);
         REQUIRE(p->baseComponent(0) != fov); // the edit actually took (ADR-387)
-        CHECK(engine.projectDirty(true));
+        CHECK_FALSE(engine.revisions().dirty()); // nothing recorded it...
+        const app::SavedComparison seen = engine.compareWithSaved();
+        CHECK(seen.unrecorded);                  // ...and the comparison says so, with the path
+        CHECK(std::any_of(seen.paths.begin(), seen.paths.end(),
+                          [](const std::string& path) { return path.find("camera~1fov") != std::string::npos; }));
+        CHECK(engine.projectDirtyOnDemand(true));
 
-        // And it is monotone: putting the value back does not un-dirty the project, because a save
-        // is the only thing that makes memory and disk agree again.
+        // Putting the value back is the counters' one false positive: dirty until a comparison finds
+        // nothing to save, which clears it (ADR-2154, owner decision 2).
         p->setBaseComponent(0, fov);
-        CHECK(engine.projectDirty(true));
+        CHECK(engine.revisions().dirty());
+        CHECK_FALSE(engine.projectDirtyOnDemand(true));
+        CHECK_FALSE(engine.revisions().dirty());
     }
 
     // A save clears it, and the state survives a round trip through the disk (ADR-225/350).
     const fs::path out = testsupport::processTempDir() / "lifecycle-roundtrip.json";
+    engine.bumpProjectRevision(); // an authored change, so the save has something to clear
+    REQUIRE(engine.revisions().dirty());
     REQUIRE(engine.saveProject(out).has_value());
-    CHECK_FALSE(engine.projectDirty(true));
-    CHECK_FALSE(engine.projectDirtyCached());
+    CHECK_FALSE(engine.revisions().dirty());
+    CHECK_FALSE(engine.projectDirtyOnDemand(true));
 
     app::Engine reopened(app::EngineMode::Offline);
     REQUIRE(reopened.loadProject(out).has_value());
-    CHECK_FALSE(reopened.projectDirty(true));
+    CHECK_FALSE(reopened.revisions().dirty());
+    CHECK_FALSE(reopened.projectDirtyOnDemand(true));
 
     // A new project is clean: there is nothing in it yet to lose.
+    reopened.bumpProjectRevision();
     reopened.newProject();
-    CHECK_FALSE(reopened.projectDirty(true));
+    CHECK_FALSE(reopened.revisions().dirty());
+    CHECK_FALSE(reopened.projectDirtyOnDemand(true));
 
     std::error_code ec;
     fs::remove(out, ec);
@@ -225,15 +242,15 @@ TEST_CASE("the engine's own writeback does not dirty an untouched project",
             ft.deltaTime = dt;
             t += dt;
             engine.update(ft);
-            // What the application does on an idle frame: sample, reporting that nothing touched it.
-            engine.sampleProjectDirty(false);
         }
     };
 
     play(600);
     INFO("after 20 s of playback with no input");
-    CHECK_FALSE(engine.projectDirtyCached());
-    CHECK_FALSE(engine.projectDirty(false));
+    // ADR-2154: the engine's own writeback bumps no revision...
+    CHECK_FALSE(engine.revisions().dirty());
+    // ...and the close's comparison, untouched, absorbs whatever it moved.
+    CHECK_FALSE(engine.projectDirtyOnDemand(false));
 
     // The control (ADR-182), and the one that matters most: an edit made *during* playback is not
     // absorbed by the same mechanism. Without this, "the drift is ignored" and "everything is
@@ -243,11 +260,12 @@ TEST_CASE("the engine's own writeback does not dirty an untouched project",
     const float fov = p->baseComponent(0);
     p->setBaseComponent(0, fov + 5.0f);
     REQUIRE(p->baseComponent(0) != fov); // the edit actually took (ADR-387)
-    CHECK(engine.projectDirty(true));
-    // ...and it stays dirty across further playback, rather than being absorbed by the next quiet
-    // sample. This is the monotonicity that keeps the absorption from becoming a work-loser.
+    CHECK(engine.projectDirtyOnDemand(true));
+    // ...and it stays dirty across further playback: once adopted it is a revision, and nothing the
+    // engine does on its own moves a revision back.
     play(120);
-    CHECK(engine.projectDirtyCached());
+    CHECK(engine.revisions().dirty());
+    CHECK(engine.projectDirtyOnDemand(false));
 #endif
 }
 
@@ -296,7 +314,7 @@ TEST_CASE("a close during playback, with no periodic sample, still answers corre
         // The document did move, so "absorbed" below is not "there was nothing to absorb".
         REQUIRE(engine.projectDocument(engine.projectPath()) != opened);
         // The close, as `Application::requestClose` asks it after an untouched playback.
-        CHECK_FALSE(engine.projectDirty(/*touchedSinceLastSample=*/false));
+        CHECK_FALSE(engine.projectDirtyOnDemand(/*touchedSinceSave=*/false));
     }
 
     SECTION("an edit made mid-playback is reported by the close") {
@@ -310,15 +328,14 @@ TEST_CASE("a close during playback, with no periodic sample, still answers corre
         p->setBaseComponent(0, fov + 5.0f);
         REQUIRE(p->baseComponent(0) != fov); // the edit actually took (ADR-387)
         play(engine, 300);
-        // Nothing sampled in 20 s, and the cached answer is the stale one the title would show...
-        CHECK_FALSE(engine.projectDirtyCached());
-        // ...which is why a close never reads it: measured on demand, with the touch the schedule
-        // kept, the edit is there.
-        CHECK(engine.projectDirty(/*touchedSinceLastSample=*/true));
-        // And the stop sample that follows keeps it (monotone).
+        // A write no revision recorded: the title's answer is "clean"...
+        CHECK_FALSE(engine.revisions().dirty());
+        // ...which is why a close never trusts it alone: measured on demand, with the touch the
+        // window kept, the edit is there.
+        CHECK(engine.projectDirtyOnDemand(/*touchedSinceSave=*/true));
+        // And from then on it is a revision.
         play(engine, 60);
-        engine.sampleProjectDirty(false);
-        CHECK(engine.projectDirtyCached());
+        CHECK(engine.revisions().dirty());
     }
 #endif
 }

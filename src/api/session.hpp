@@ -39,7 +39,14 @@
 // on the table -- `call` serves it on the caller's thread, never through the host queue -- unless the caller is the
 // host thread itself, which then drives the jobs while it waits.
 //
-// Not here yet: revisions and dirty state, the time policy (S1b).
+// Revisions (ADR-2154): a successful `mutatesProject` call bumps `Engine::revisions()` once, after its
+// implicit transaction commits; an explicit transaction bumps once, at commit; a rollback (explicit, or a
+// failed call's implicit one) restores the counters recorded at its begin; a failed call bumps nothing. A
+// call whose own work already moved the counters (a save, an open, a command pushed onto Studio's edit
+// history by its sink) is not bumped again.
+//
+// The time policy (ADR-2154) is the host's: `Host::offeredTimePolicies` says which parked policies its
+// loop honours, and `transport.set_policy` refuses the others.
 
 #include "ai/main_thread_queue.hpp"
 #include "ai/tool_api.hpp"
@@ -65,6 +72,8 @@
 
 namespace avgen::app {
 class Engine;
+enum class TimePolicy : std::uint8_t; // app/engine.hpp (ADR-2154)
+struct ProjectRevisions;
 } // namespace avgen::app
 
 namespace avgen::api {
@@ -164,6 +173,9 @@ public:
     virtual bool stepJobs() { return false; }
     // Host thread: stop every job reporting into `table` (its session is closing).
     virtual void cancelJobs(const JobTable& /*table*/) {}
+    // ADR-2154: the time policies this host's loop honours, which `transport.set_policy` may choose
+    // between. Never empty: a host offers at least the one it runs (the default: the engine's setting).
+    [[nodiscard]] virtual std::vector<app::TimePolicy> offeredTimePolicies();
 };
 
 // A host over an engine someone else owns, with its own queue and the hooks an application installs.
@@ -179,6 +191,11 @@ public:
     [[nodiscard]] std::optional<double> showRemainingSeconds() override {
         return showRemaining_ ? showRemaining_() : std::nullopt;
     }
+    // Empty (the default): only the engine's current setting -- a headless run's Offline engine is
+    // ticked by its fixed-step loop and honours nothing else. Studio offers StoppedAmbient and
+    // StoppedFrozen; a test may offer Stepped.
+    [[nodiscard]] std::vector<app::TimePolicy> offeredTimePolicies() override;
+    void setOfferedTimePolicies(std::vector<app::TimePolicy> offered) { offered_ = std::move(offered); }
 
     void setPerformanceSource(ai::PerformanceSource source) { performance_ = std::move(source); }
     void setRecordingHook(ai::RecordingHook hook) { recording_ = std::move(hook); }
@@ -200,6 +217,7 @@ private:
     ai::ProfileHook profile_;
     std::function<bool()> showRunning_;
     std::function<std::optional<double>()> showRemaining_;
+    std::vector<app::TimePolicy> offered_;
 };
 
 struct SessionOptions {
@@ -281,6 +299,9 @@ public:
     [[nodiscard]] ai::ToolResult rollbackTransaction(const std::string& id);
     [[nodiscard]] ai::ToolResult transactionStatus(const std::string& id) const;
     [[nodiscard]] nlohmann::json info(const nlohmann::json& toolNames);
+    // ADR-2154: {policy, effective, offered[], renderTime}, and the host's choice of a parked policy.
+    [[nodiscard]] nlohmann::json timePolicyJson();
+    [[nodiscard]] ai::ToolResult setTimePolicy(const std::string& name);
     [[nodiscard]] ToolAvailability availability(std::string_view tool);
     // "s3/txn-2": a transaction's process-wide name, which the file claims are recorded under.
     [[nodiscard]] std::string transactionKey(const std::string& id) const;
@@ -298,6 +319,13 @@ private:
         int calls = 0;
         std::vector<std::string> irreversible; // tools accepted that a rollback cannot reach
         CompensationLog files;
+        // ADR-2154: the counters at begin (a rollback restores them), and whether a call inside made an
+        // authored change its own work did not already account for (commit bumps once for it).
+        std::uint64_t revisionsProject = 0;
+        std::uint64_t revisionsScene = 0;
+        std::uint64_t revisionsSavedAt = 0;
+        bool pendingBump = false;
+        bool pendingScene = false;
     };
 
     // Each runs on the caller's thread and refuses before the queue is involved.
@@ -347,5 +375,9 @@ void registerRenderTools(ai::ToolRegistry& registry);
 // ADR-2157: `document.get`, `document.validate`, `document.patch` and `project.validate`
 // (api/document_tools.cpp).
 void registerDocumentTools(ai::ToolRegistry& registry);
+//
+// {project, scene, savedAt, dirty}: how session.info, project.diff_saved and the transaction results
+// report `Engine::revisions()` (ADR-2154).
+[[nodiscard]] nlohmann::json revisionsJson(const app::ProjectRevisions& revisions);
 
 } // namespace avgen::api

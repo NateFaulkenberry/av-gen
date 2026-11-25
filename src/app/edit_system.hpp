@@ -39,6 +39,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace avgen::app {
@@ -152,6 +153,13 @@ public:
 
 class EditSystem {
 public:
+    // Observes its own history (the observer holds `this`), so it stays where it was made.
+    EditSystem();
+    EditSystem(const EditSystem&) = delete;
+    EditSystem& operator=(const EditSystem&) = delete;
+    EditSystem(EditSystem&&) = delete;
+    EditSystem& operator=(EditSystem&&) = delete;
+
     [[nodiscard]] ui::EditHistory& history() { return history_; }
     [[nodiscard]] const ui::EditHistory& history() const { return history_; }
     [[nodiscard]] Clipboard& clipboard() { return clipboard_; }
@@ -185,14 +193,20 @@ public:
     // description comes from the command, so the menu says what will actually happen.
     [[nodiscard]] std::string menuLabel(EditAction action) const;
 
-    // ---- save state ----------------------------------------------------------------------------
-    // The project is clean when the document is in the state it was saved in. Compared by the
-    // history's state identity rather than its depth, so a re-edit after an undo is dirty even
-    // though the count agrees (see EditHistory::stateId).
-    void markSaved();
-    [[nodiscard]] bool dirty() const;
+    // ---- project revisions (ADR-2154) ----------------------------------------------------------
+    // The engine whose revisions this history bumps; null (the default, and every test that only
+    // checks dispatch) bumps nothing. Every push, undo and redo bumps `Engine::revisions().project`
+    // (and `scene` for a command that changes the composition's structure), whoever pushed it.
+    //
+    // Undo back to the saved state is clean again. Each history state remembers the project revision
+    // it was reached at; an undo or redo that lands on a remembered state puts that revision back, so
+    // when it is the one the last save recorded, `dirty()` is false -- however the save was asked for
+    // (Cmd-S, a Session call, a load). The memory is dropped whenever something changed the project
+    // outside this history (`Engine::unrecordedEpoch` moved): the states it describes no longer
+    // include that change, and restoring their revisions would call a changed project clean.
+    void attach(Engine* engine);
     // A project boundary: the old history describes a document that is gone, and undoing into it
-    // would edit the new one. Leaves the project clean, because a freshly loaded one is.
+    // would edit the new one. Changes no revision: the load that caused it already reset them.
     void clearHistory();
 
 private:
@@ -200,11 +214,16 @@ private:
     void announceSelection(const std::vector<std::string>& names);
     static void report(const ui::EditApply& applied, const char* what);
 
+    void historyChanged(ui::EditHistory::Change change, const ui::EditCommand* command, bool applied);
+
     ui::EditHistory history_;
     Clipboard clipboard_;
     std::vector<EditContext*> contexts_;
     EditContext* focus_ = nullptr;
-    std::uint64_t savedState_ = 0;
+    Engine* engine_ = nullptr;
+    // ADR-2154: history state id -> the project revision it was reached at, valid for `epoch_`.
+    std::unordered_map<std::uint64_t, std::uint64_t> stateRevisions_;
+    std::uint64_t epoch_ = 0;
 };
 
 } // namespace avgen::app

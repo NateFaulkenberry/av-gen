@@ -67,7 +67,7 @@ TEST_CASE("a proposal's stills come from a scratch copy with it installed, and l
 
     const std::string sequenceBefore = live.sequence().toJson().dump();
     const std::string camerasBefore = live.composition()->cameraDirection().toJson().dump();
-    const bool dirtyBefore = live.projectDirty();
+    const bool dirtyBefore = live.projectDirtyOnDemand(true);
     const fs::path project = live.projectPath();
 
     constexpr std::uint32_t kW = 256;
@@ -92,7 +92,7 @@ TEST_CASE("a proposal's stills come from a scratch copy with it installed, and l
     CHECK(live.sequence().toJson().dump() == sequenceBefore);
     CHECK(live.composition()->cameraDirection().toJson().dump() == camerasBefore);
     CHECK(live.directingPlans().empty());
-    CHECK(live.projectDirty() == dirtyBefore);
+    CHECK(live.projectDirtyOnDemand(true) == dirtyBefore);
     CHECK(live.projectPath() == project);
 
     // It is the proposal's shot: the same instant of the project WITHOUT the proposal (whatever

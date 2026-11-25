@@ -10,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -194,49 +195,97 @@ TEST_CASE("An undo hands the selection back to the editors", "[app][edits]") {
     CHECK(world.restored[0] == std::vector<std::string>{"rock", "fern"});
 }
 
-TEST_CASE("The project is dirty when it differs from what was saved", "[app][edits]") {
+TEST_CASE("The project is dirty when it differs from what was saved", "[app][edits][revisions]") {
+    // ADR-2154: the edit history bumps the engine's project revisions, and an undo back to the saved
+    // state is clean again -- compared by the history's state identity rather than its depth, so a
+    // re-edit after an undo is dirty even though the count agrees (see EditHistory::stateId).
     app::Engine engine(app::EngineMode::Offline);
+    // A composition: an undo with none to edit reports a problem, and an undo that could not apply is
+    // not trusted to land on a known state.
+    REQUIRE(engine.loadFile(std::filesystem::path(AVGEN_SOURCE_DIR) / "examples" / "helix" / "helix.scene.json")
+                .has_value());
+    engine.markProjectSaved(); // a document to lose: before one, nothing is ever dirty
     app::EditSystem edits;
-    const auto edit = [&edits](const char* label, float to) {
+    edits.attach(&engine);
+    // A real parameter, so an undo applies cleanly: an undo that could not apply is not trusted to
+    // land on a known state.
+    const std::string path = "scene/volumeDensity";
+    REQUIRE(engine.params().find(path) != nullptr);
+    const float origin = engine.params().find(path)->baseComponent(0);
+    float current = origin;
+    const auto edit = [&](const char* label, float to) {
         ui::EditCommand command(label);
-        command.params.push_back(ui::ParamChange{"nodes/a/position", {0.0f}, {to}});
+        engine.params().find(path)->setBaseComponent(0, to);
+        command.params.push_back(ui::ParamChange{path, {current}, {to}});
+        current = to;
         edits.history().push(std::move(command));
     };
+    const auto dirty = [&engine] { return engine.revisions().dirty(); };
 
-    edits.markSaved();
-    CHECK_FALSE(edits.dirty());
+    CHECK_FALSE(dirty());
+    edit("Create Alien", origin + 1.0f);
+    CHECK(dirty());
 
-    edit("Create Alien", 1.0f);
-    CHECK(edits.dirty());
-
-    edits.markSaved();
-    CHECK_FALSE(edits.dirty());
+    engine.markProjectSaved();
+    CHECK_FALSE(dirty());
 
     SECTION("undoing back to the saved state is clean again") {
-        edit("Move Alien", 2.0f);
-        CHECK(edits.dirty());
+        edit("Move Alien", origin + 2.0f);
+        CHECK(dirty());
         REQUIRE(edits.execute(app::EditAction::Undo, engine));
-        CHECK_FALSE(edits.dirty());
+        CHECK_FALSE(dirty());
+        // ...and redo is the unsaved state again.
+        REQUIRE(edits.execute(app::EditAction::Redo, engine));
+        CHECK(dirty());
+    }
+
+    SECTION("undoing past the saved state is dirty") {
+        REQUIRE(edits.execute(app::EditAction::Undo, engine));
+        CHECK(dirty());
+        REQUIRE(edits.execute(app::EditAction::Redo, engine));
+        CHECK_FALSE(dirty());
     }
 
     SECTION("a different edit at the saved depth is dirty") {
         // The case depth cannot answer. Edit, undo, edit again: one command deep either way, and
         // the second one is not the document that was saved.
-        edit("Move Alien", 2.0f);
+        edit("Move Alien", origin + 2.0f);
         REQUIRE(edits.execute(app::EditAction::Undo, engine));
-        REQUIRE_FALSE(edits.dirty());
-        edit("Move Alien Again", 7.0f);
-        CHECK(edits.dirty());
+        REQUIRE_FALSE(dirty());
+        edit("Move Alien Again", origin + 7.0f);
+        CHECK(dirty());
     }
 
-    SECTION("a project boundary clears the history and starts clean") {
-        edit("Move Alien", 2.0f);
-        CHECK(edits.dirty());
-        edits.clearHistory();
-        CHECK_FALSE(edits.dirty());
+    SECTION("a change outside the history is not undone by an undo") {
+        // A Session call (a save is not one) that the history did not record: undoing the history's
+        // own edit must not call the project clean, because that change is still there.
+        edit("Move Alien", origin + 2.0f);
+        engine.bumpProjectRevision();
+        REQUIRE(edits.execute(app::EditAction::Undo, engine));
+        CHECK(dirty());
+    }
+
+    SECTION("a project boundary clears the history and changes no revision") {
+        edit("Move Alien", origin + 2.0f);
+        CHECK(dirty());
+        engine.newProject(); // the load resets the revisions...
+        edits.clearHistory(); // ...and the history goes with the old document
+        CHECK_FALSE(dirty());
         CHECK_FALSE(edits.canExecute(app::EditAction::Undo));
         CHECK_FALSE(edits.canExecute(app::EditAction::Redo));
     }
+}
+
+TEST_CASE("An unattached edit system bumps nothing", "[app][edits][revisions]") {
+    // The tests above that only check dispatch construct one with no engine; so does nothing in the
+    // application, which attaches its own at start-up.
+    app::Engine engine(app::EngineMode::Offline);
+    engine.markProjectSaved();
+    app::EditSystem edits;
+    ui::EditCommand command("Move");
+    command.params.push_back(ui::ParamChange{"nodes/a/position", {0.0f}, {1.0f}});
+    edits.history().push(std::move(command));
+    CHECK_FALSE(engine.revisions().dirty());
 }
 
 TEST_CASE("The clipboard carries what it holds, not just bytes", "[app][edits]") {

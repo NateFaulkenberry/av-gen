@@ -64,7 +64,7 @@ TEST_CASE("a project copy carries the unsaved session and leaves the person's pr
     direction.addCamera(rig);
     REQUIRE(engine.setCameraDirection(direction).has_value());
     testsupport::stepFrames(engine, 1);
-    REQUIRE(engine.projectDirty(true));
+    REQUIRE(engine.projectDirtyOnDemand(true));
 
     const fs::path copy = elsewhere / "session-copy.json";
     REQUIRE(engine.writeProjectCopy(copy).has_value());
@@ -72,7 +72,8 @@ TEST_CASE("a project copy carries the unsaved session and leaves the person's pr
     // Nothing about the person's session moved.
     CHECK(bytesOf(project) == onDisk);
     CHECK(engine.projectPath() == project);
-    CHECK(engine.projectDirty(true));
+    CHECK(engine.revisions().dirty());
+    CHECK(engine.projectDirtyOnDemand(true));
 
     // And the copy is the session as it is now, loadable from somewhere else: its asset paths were
     // made relative to where it was written, so the scene and the glTF resolve.

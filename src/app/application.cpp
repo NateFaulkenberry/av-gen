@@ -297,6 +297,9 @@ std::string usageText() {
            "                      '+seeknow' (the playhead's re-simulation back inside the gesture),\n"
            "                      so each fix has a before arm in the same process\n"
            "  --canvas-scale <f>  render the world at this fraction of the canvas's pixels (0.25-1)\n"
+           "  --parked-clock <ambient|frozen>  the editor's world clock while the transport is parked:\n"
+           "                      ambient (default) keeps the world moving on the wall clock; frozen\n"
+           "                      holds it, so a parked frame costs a static one. Never a render (ADR-2154)\n"
            "  --adaptive-scale <on|off>  on: the live quality ladder holds the target frame rate;\n"
            "                      off: Ultra, always. Overrides the settings file for this run; never\n"
            "                      applies to a render, where the Offline tier is pinned (ADR-1083)\n"
@@ -1042,6 +1045,17 @@ Result<AppOptions> parseArgsImpl(int argc, char** argv) {
             ++i;
         } else if (arg == "--viewport-matches-render") {
             options.liftViewportLimits = true;
+        } else if (arg == "--parked-clock") {
+            auto v = need(i, "--parked-clock");
+            if (!v) return std::unexpected(v.error());
+            if (*v == "ambient") {
+                options.parkedClock = TimePolicy::StoppedAmbient;
+            } else if (*v == "frozen") {
+                options.parkedClock = TimePolicy::StoppedFrozen;
+            } else {
+                return fail("--parked-clock expects ambient or frozen, got '{}'", *v);
+            }
+            ++i;
         } else if (arg == "--adaptive-scale") {
             auto v = need(i, "--adaptive-scale");
             if (!v) return std::unexpected(v.error());
@@ -1347,6 +1361,7 @@ Application::~Application() {
     step("ptSequence_");
     imgui_.reset();
     step("imgui_");
+    edits_.attach(nullptr);
     engine_.reset();
     step("engine_");
     renderer_.reset();
@@ -1370,6 +1385,10 @@ void Application::initControlPlane(api::SessionOptions session) {
     // project opened after this -- File > Open, a recent file, `project.open` -- needs no refresh.
     session.permissions.liveControl = liveControlAllowed_;
     ai_ = std::make_unique<ai::ControlPlane>(*engine_, jobs_.get(), std::move(session));
+    // ADR-2154: Studio's loop honours both parked clocks; a headless run's fixed-step loop only its own.
+    if (engine_->mode() == EngineMode::Live) {
+        ai_->host().setOfferedTimePolicies({TimePolicy::StoppedAmbient, TimePolicy::StoppedFrozen});
+    }
     // ADR-101: an assistant's edit lands in the same history as a person's, so Cmd+Z takes back
     // "the last thing that happened" rather than "the last thing *I* did". The snapshot sink stays
     // underneath -- it is what makes a task abortable, which is a different promise from undoable.
@@ -1525,6 +1544,15 @@ Result<void> Application::init(const AppOptions& options, const std::filesystem:
     }
     options_ = options;
     engine_ = std::make_unique<Engine>(options.headless ? EngineMode::Offline : EngineMode::Live);
+    // ADR-2154: the parked clock is a named setting. A headless run's Offline engine keeps its fixed-step
+    // clock (`Offline`), whatever the flag says: its outputs must not change.
+    if (!options.headless) {
+        if (auto r = engine_->setTimePolicy(options.parkedClock); !r) {
+            log::warn("--parked-clock: {}", r.error().message);
+        }
+    }
+    // The edit history bumps this engine's project revisions (ADR-2154).
+    edits_.attach(engine_.get());
     // ADR-2133: live control is off in every engine until this turns it on. Before the project loads, so the project's
     // control map opens what it names in a session that may listen, and nothing in one that may not.
     {
@@ -2891,14 +2919,6 @@ bool Application::opensADifferentProject(const std::filesystem::path& path) {
            format->get<std::string>() != scene::Composition::kFormatName;
 }
 
-namespace {
-// The dirty schedule's clock (ADR-952): milliseconds on the steady clock.
-double dirtyClockMs() {
-    return std::chrono::duration<double, std::milli>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-}
-} // namespace
 
 bool Application::requestClose(ui::CloseIntent intent, std::function<void()> action,
                                const std::filesystem::path& path) {
@@ -2907,23 +2927,17 @@ bool Application::requestClose(ui::CloseIntent intent, std::function<void()> act
         // three taps on Cmd-Q from stacking three pending quits behind one dialog.
         return false;
     }
-    // Measured here and nowhere else: this is the one moment the answer is needed, and it costs a
-    // full serialisation (31 ms on the heaviest project in the repository), which is invisible
-    // beside the two-second load it is about to gate.
-    //
-    // `edits_.dirty()` is asked first because it is free and it can only say yes: a world edit that
-    // has not been saved is unsaved work whatever the documents say. It is not trusted to say *no*
-    // -- it knows about the world editor's commands and nothing about a slider, a light or a
-    // timeline -- so a clean history falls through to the comparison rather than short-circuiting
-    // it. (It also gives `EditSystem::dirty()` its first production reader; before ADR-440 it had
-    // neither a reader nor a writer.)
-    //
-    // Also measured here *during playback*, where the periodic sample does not run (ADR-952): the
-    // touch window then spans the whole of the playback so far, so an edit made while the film
-    // played is reported and an untouched playback is absorbed. The cached answer is never what a
-    // close reads.
-    const bool dirty = edits_.dirty() || engine_->projectDirty(dirtySchedule_.touched());
-    dirtySchedule_.restart(dirtyClockMs());
+    // ADR-2154: the one serialisation left. The revision counters are the per-frame answer; this is
+    // the exact one, run once, here, where it is needed (185 ms on Neon Dreams, invisible beside the
+    // load or quit it gates). Both directions:
+    //   - the counters say dirty and nothing differs (an edit set back): clean, no prompt;
+    //   - nothing was recorded and something differs: an editor write that bypassed the edit history
+    //     when the application was touched since the save (adopted, logged with its paths -- the
+    //     writer to route through EditSystem), the engine's own writeback when it was not (absorbed).
+    // The ADR-440 cases the old sampler caught therefore still prompt here, recorded or not.
+    const bool dirty = engine_->projectDirtyOnDemand(dirtyTouches_.touched());
+    dirtyTouches_.restart();
+    refreshWindowTitle();
     if (closeGate_.requestClose(intent, dirty, path)) {
         action();
         return true;
@@ -2948,7 +2962,7 @@ void Application::serviceCloseGate() {
                 saveProjectAsForGate();
             } else {
                 saveProjectTo(engine_->projectPath());
-                closeGate_.saveFinished(!engine_->projectDirtyCached());
+                closeGate_.saveFinished(!engine_->revisions().dirty());
             }
         }
         if (!closeGate_.busy() && closeGate_.state() == ui::UnsavedChangesGate::State::Idle) {
@@ -2976,7 +2990,7 @@ void Application::saveProjectAsForGate() {
             return;
         }
         saveProjectTo(std::filesystem::path(chosen));
-        closeGate_.saveFinished(!engine_->projectDirtyCached());
+        closeGate_.saveFinished(!engine_->revisions().dirty());
     });
 }
 
@@ -2992,7 +3006,8 @@ void Application::refreshWindowTitle() {
     std::string title = "avgen " + std::string(api::kEngineVersion) + " - ";
     title += engine_->projectPath().empty() ? std::string("Untitled")
                                             : engine_->projectPath().filename().string();
-    if (engine_->projectDirtyCached()) {
+    titleShowsDirty_ = engine_->revisions().dirty();
+    if (titleShowsDirty_) {
         title += " \u2022";
     }
     window_->setTitle(title);
@@ -3003,47 +3018,26 @@ void Application::refreshWindowTitle() {
 // **Not "an input event arrived".** The drift the absorption exists to swallow -- hero positions,
 // a world effect's parameter writeback -- happens while *time advances*, which is exactly when a
 // film is playing. If moving the pointer across the window counted as a touch, then watching a
-// project play with a hand on the mouse would attribute twenty paths of simulation to the user and
-// the prompt would fire on a project nobody had edited. That is the failure the brief calls worse
-// than having no prompt.
+// project play with a hand on the mouse would attribute the simulation to the user and the prompt
+// would fire on a project nobody had edited.
 //
 // So the signal is `ImGui::IsAnyItemActive()` -- a slider being dragged, a field being typed in, a
-// menu item under the pointer -- plus the edit history, which is what a gizmo drag in the canvas
-// produces. Pointer motion over the viewport is neither, and is not a change to the project.
+// menu item under the pointer. Pointer motion over the viewport is neither. Read before
+// `panel_->draw`, so it reports the state the *previous* frame's widgets left behind.
 //
-// Read before `panel_->draw`, so it reports the state the *previous* frame's widgets left behind,
-// which is the window this sample is asking about.
-//
-// Sampled no more often than ten times the cost of the last sample -- so the 675 KB project is
-// checked about every 310 ms and a small one four times a second -- and never while a widget is
-// active, so a 31 ms serialisation cannot land in the middle of a drag.
-//
-// And never while the transport is playing (ADR-952, the owner's decision of 2026-09-28): on
-// Glowmere Valley 3 each sample is ~36 ms, two dropped frames of the film about 2.6 times a second.
-// The first idle frame after playback stops samples at once, so the title's marker catches up as
-// soon as the film does; until then it shows the answer from before playback. Every close measures
-// on demand, so no discard ever reads that frozen answer.
+// ADR-2154: this no longer serialises anything. Until then it sampled the whole project every
+// max(250 ms, 10x its cost) on idle frames -- 185 ms per sample on Neon Dreams' 22 MB, the editor's
+// p95 frame (112-neon-dreams/02-ui-perf-investigation). The title's marker now follows the revision
+// counters, an integer comparison per frame; the comparison itself runs once, at a close.
 void Application::sampleProjectDirtyIfIdle() {
-    const double now = dirtyClockMs();
-    // ADR-952: not while the transport plays. Touches are still recorded by `due`, so the window a
-    // later sample (or a close, measured on demand) attributes over forgets none of them.
-    if (!dirtySchedule_.due(now, engine_->isPlaying(), ImGui::IsAnyItemActive(), edits_.dirty())) {
-        return;
+    if (ImGui::IsAnyItemActive()) {
+        dirtyTouches_.touch();
     }
-    const bool wasDirty = engine_->projectDirtyCached();
-    const bool touched = dirtySchedule_.touched();
-    if (std::getenv("AVGEN_DIRTY_TRACE") != nullptr) {
-        log::info("DIRTYTRACE sample touched={} dirty={}", touched, wasDirty);
-    }
-    engine_->sampleProjectDirty(touched);
-    const double cost = dirtyClockMs() - now;
-    dirtySchedule_.sampled(now, cost);
-    if (engine_->projectDirtyCached() != wasDirty) {
+    if (engine_->revisions().dirty() != titleShowsDirty_) {
         refreshWindowTitle();
         // Said once per transition, because "the title grew a dot" is the kind of claim that is
-        // true of the code and false of the running application (ADR-387), and this is the only
-        // place the answer changes on its own.
-        log::info("project has unsaved changes (sampled in {:.1f} ms)", cost);
+        // true of the code and false of the running application (ADR-387).
+        log::info("project {}", titleShowsDirty_ ? "has unsaved changes" : "is saved");
     }
 }
 
@@ -3182,7 +3176,7 @@ void Application::performOpen(const std::filesystem::path& path) {
     }
     // Whatever happens below, the attribution window starts again here: a load resets the engine's
     // baseline, and the click that asked for the load is not an edit to what just arrived.
-    dirtySchedule_.restart(dirtyClockMs());
+    dirtyTouches_.restart();
     if (!r) {
         log::error("open '{}': {}", path.string(), r.error().message);
         if (panel_) {
@@ -3515,7 +3509,7 @@ void Application::startRenderFromUi() {
 // The one way a project reaches the disk from the editor. Cmd-S, Save As and the unsaved-changes
 // modal's Yes all come through here, so "what counts as a successful save" cannot have two answers
 // (ADR-440) -- and `Engine::saveProject` is what clears the dirty state, so the gate reading
-// `projectDirtyCached()` afterwards is reading the save's own verdict rather than a second one.
+// `revisions().dirty()` afterwards is reading the save's own verdict rather than a second one.
 // Save As, with copies. The bookkeeping below is `saveProjectTo`'s, because "what counts as a
 // successful save" must not grow a second answer (ADR-440) -- only the writing differs.
 void Application::saveProjectAsCopyTo(const std::filesystem::path& path) {
@@ -3531,9 +3525,8 @@ void Application::saveProjectAsCopyTo(const std::filesystem::path& path) {
     if (panel_ != nullptr) {
         panel_->setStatus("saved " + written.filename().string() + " with its own assets");
     }
-    edits_.markSaved();
     rememberProject(written);
-    dirtySchedule_.restart(dirtyClockMs());
+    dirtyTouches_.restart();
     refreshWindowTitle();
 }
 
@@ -3549,15 +3542,13 @@ void Application::saveProjectTo(const std::filesystem::path& path) {
     if (panel_ != nullptr) {
         panel_->setStatus("saved " + path.filename().string());
     }
-    // The edit history now describes the document on disk. Until this line `EditSystem::markSaved`
-    // had no production caller at all -- a writer with no writer, the shape ADR-225 is about. It is
-    // not what the prompt reads (the document comparison is), but leaving it permanently unset
-    // would make `EditSystem::dirty()` answer a question it has the data for and get it wrong.
-    edits_.markSaved();
+    // `Engine::saveProject` set `savedAt`: the edit history's states remember their revisions, so an
+    // undo back to this one is clean again without being told (ADR-2154).
     rememberProject(path);
     // The baseline has just moved, so the window this attributes over starts here. Without this,
     // the click that asked for the save would be attributed to whatever the engine wrote next.
-    dirtySchedule_.restart(dirtyClockMs());
+    dirtyTouches_.restart();
+    refreshWindowTitle();
 }
 
 void Application::rememberProject(const std::filesystem::path& path) {
@@ -5279,7 +5270,7 @@ int Application::runLive() {
             // The stress driver stands in for a user and reaches the engine directly, so it has to
             // say so: without this its edits are indistinguishable from the engine's own writeback
             // and are absorbed. Found by running it and watching nothing happen (ADR-387).
-            dirtySchedule_.touch();
+            dirtyTouches_.touch();
         }
         if (!engineShaderWatcher_.poll().empty()) {
             if (auto r = renderer_->reloadEngineShaders(); !r) {
@@ -5708,11 +5699,8 @@ int Application::runLive() {
         if (ai_) {
             core::PhaseProfiler::Scope scope(prof, kPhAi);
             ai_->pump();
-            // No touch is recorded here, and that is checked rather than assumed: ADR-101 routes
-            // every assistant edit through `EditHistoryTransactionSink` into `edits_`, so the
-            // `edits_.dirty()` arm of the sampler already sees them. An assistant edit that did not
-            // reach the undo history would also not be undoable, which is a louder failure than
-            // this one.
+            // No touch is recorded here: every assistant call is a Session call, which bumps the
+            // project revisions itself (ADR-2154), and ADR-101 routes its edits into `edits_`.
         }
 
         // ADR-186's limits in the viewport. Set every frame rather than on the checkbox's edge:
@@ -6450,6 +6438,17 @@ int Application::runLive() {
               renderWidth_, renderHeight_,
               static_cast<double>(renderWidth_) * renderHeight_ / 1.0e6, renderer_->stats().triangles,
               renderer_->stats().drawCalls);
+    if (!options_.uiScript.empty() || !options_.uiAb.empty()) {
+        // ADR-2154's dev assertion, across the scripted arms: anything the arms changed that no revision
+        // recorded is a writer that bypasses the edit history and the Session -- a false "clean" at Quit if
+        // the close's own comparison did not catch it. `compareWithSaved` logs the differing paths.
+        const SavedComparison c = engine_->compareWithSaved(UnrecordedChange::Report);
+        log::info("unsaved changes after the script: revisions {} (project {}, saved at {}); the saved document "
+                  "{} ({} path(s), {:.1f} ms){}",
+                  engine_->revisions().dirty() ? "dirty" : "clean", engine_->revisions().project,
+                  engine_->revisions().savedAt, !c.compared ? "was never taken" : c.differs ? "differs" : "matches",
+                  c.pathCount, c.ms, c.unrecorded ? " -- UNRECORDED WRITER" : "");
+    }
     log::info("rendered {} frames; GPU errors: {}", framesRendered, context_->errorCount());
     if (renderer_ && renderer_->liveSkyBuilds() > 0) {
         // ADR-1070: how often the live schedule rebuilt the sky's lighting, for a measurement to read.

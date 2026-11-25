@@ -455,6 +455,9 @@ void EditHistory::push(EditCommand command) {
     undoIds_.push_back(nextId_++);
     ++revision_;
     trim();
+    if (observer_) {
+        observer_(Change::Push, &undo_.back(), true);
+    }
 }
 
 std::uint64_t EditHistory::stateId() const {
@@ -503,6 +506,9 @@ EditApply EditHistory::undo(app::Engine& engine, std::vector<std::string>* selec
         undoIds_.pop_back();
     }
     ++revision_;
+    if (observer_) {
+        observer_(Change::Undo, &redo_.back(), out.ok());
+    }
     return out;
 }
 
@@ -524,6 +530,9 @@ EditApply EditHistory::redo(app::Engine& engine, std::vector<std::string>* selec
         redoIds_.pop_back();
     }
     ++revision_;
+    if (observer_) {
+        observer_(Change::Redo, &undo_.back(), out.ok());
+    }
     return out;
 }
 
@@ -539,6 +548,9 @@ void EditHistory::clear() {
     ++revision_;
     dragging_ = false;
     drag_ = EditCommand{};
+    if (observer_) {
+        observer_(Change::Clear, nullptr, true);
+    }
 }
 
 std::vector<std::string> EditHistory::redoLabels() const {

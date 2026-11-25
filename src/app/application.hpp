@@ -159,6 +159,11 @@ struct AppOptions {
     std::string aiPrompt;
     std::optional<std::filesystem::path> aiScript;
     float canvasScale = 1.0f; // --canvas-scale: the world's share of the canvas's pixels
+    // --parked-clock ambient|frozen (ADR-2154): what Studio's world clock does while the transport is
+    // parked. Ambient (the default) is the editor's behaviour before ADR-2154, byte for byte: the world
+    // keeps breathing on the wall clock. Frozen holds renderTime, so a parked frame costs a static
+    // frame. A headless run's Offline engine ignores it.
+    TimePolicy parkedClock = TimePolicy::StoppedAmbient;
     // --adaptive-scale on|off, --live-quality <auto|ultra|high|medium|low|emergency> (ADR-1083):
     // override this machine's live quality setting for the run (`on` is auto, `off` pins Ultra).
     // Unset means "whatever this machine's settings say", which is what a person launching the
@@ -483,14 +488,15 @@ private:
     // The window title, with the project name and an unsaved marker. The prompt is the last line of
     // defence, not the only signal.
     void refreshWindowTitle();
-    // Anything that touched the application since the last dirty sample -- a pointer, a key, a menu
-    // pick, a drop. Not a dirty flag: it never decides that something changed, only whether a
-    // measured change could be the user's. See `Engine::sampleProjectDirty`.
-    //
-    // The schedule holds that window, the throttle, and ADR-952's rule that the periodic sample does
-    // not run while the transport is playing (see ui/unsaved_changes.hpp).
-    ui::DirtySampleSchedule dirtySchedule_;
+    // Anything that touched the application since the last save, load or close -- a widget, a drop.
+    // Not a dirty flag: it never decides that something changed, only whether a difference the
+    // close's on-demand comparison finds, and that no revision recorded, could be the user's
+    // (`Engine::compareWithSaved`, ADR-440/2154).
+    ui::TouchWindow dirtyTouches_;
+    // ADR-2154: once per frame, an integer comparison -- `revisions().dirty()` -- that keeps the title's
+    // marker current. It never serialises the project.
     void sampleProjectDirtyIfIdle();
+    bool titleShowsDirty_ = false;
     void rememberProject(const std::filesystem::path& path); // recent list + window title
     // Input diagnostics (AVGEN_UI_SELFTEST=1): raw SDL mouse events seen this run.
     std::uint64_t uiMotionEvents_ = 0;

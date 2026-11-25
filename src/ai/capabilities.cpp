@@ -63,6 +63,11 @@ const std::vector<DomainCapability> kDomains = {
      "Explicit transactions: begin, commit (one undo in Studio), roll back (the project document and the files "
      "its calls created), status. Irreversible calls inside one are refused unless accepted.",
      true, {}},
+    // ADR-2154.
+    {"transport", "Time policy",
+     "What the world clock does while nothing is playing (running, stopped-frozen, stopped-ambient, stepped, "
+     "offline), which policies this host offers, and stepping time by playing at a fixed rate.",
+     true, {}},
 
     // ---- what this build deliberately does not expose -------------------------------------------
     // ADR-2152 (C3): the old text said node creation and deletion were not exposed because a rollback

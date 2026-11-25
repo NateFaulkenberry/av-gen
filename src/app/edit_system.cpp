@@ -191,14 +191,68 @@ std::string EditSystem::menuLabel(EditAction action) const {
     return name;
 }
 
-void EditSystem::markSaved() { savedState_ = history_.stateId(); }
+// ---- project revisions (ADR-2154) --------------------------------------------------------------
 
-bool EditSystem::dirty() const { return history_.stateId() != savedState_; }
+EditSystem::EditSystem() {
+    history_.setObserver([this](ui::EditHistory::Change change, const ui::EditCommand* command, bool applied) {
+        historyChanged(change, command, applied);
+    });
+}
 
-void EditSystem::clearHistory() {
-    history_.clear();
-    // Clean, because a project that has just been loaded or created is exactly as it was stored.
-    savedState_ = history_.stateId();
+void EditSystem::attach(Engine* engine) {
+    engine_ = engine;
+    stateRevisions_.clear();
+    if (engine_ != nullptr) {
+        epoch_ = engine_->unrecordedEpoch();
+        stateRevisions_[history_.stateId()] = engine_->revisions().project;
+    }
+}
+
+void EditSystem::clearHistory() { history_.clear(); }
+
+namespace {
+
+// A command that changes the composition's structure rather than only parameter values.
+bool touchesScene(const ui::EditCommand& c) {
+    return !c.parents.empty() || !c.heroes.empty() || !c.added.empty() || !c.removed.empty() || c.lights != nullptr ||
+           c.effects != nullptr || c.cameras != nullptr || c.staging != nullptr;
+}
+
+} // namespace
+
+void EditSystem::historyChanged(ui::EditHistory::Change change, const ui::EditCommand* command, bool applied) {
+    if (engine_ == nullptr) {
+        return;
+    }
+    if (engine_->unrecordedEpoch() != epoch_) {
+        // Something changed the project outside this history (or a new document arrived): what the
+        // states remember is about a project that no longer exists.
+        stateRevisions_.clear();
+        epoch_ = engine_->unrecordedEpoch();
+    }
+    const std::uint64_t state = history_.stateId();
+    if (change == ui::EditHistory::Change::Clear) {
+        // A project boundary; the load reset the revisions, and the new base state is that document.
+        stateRevisions_.clear();
+        stateRevisions_[state] = engine_->revisions().project;
+        return;
+    }
+    const RevisionScope scope =
+        command != nullptr && touchesScene(*command) ? RevisionScope::Scene : RevisionScope::Project;
+    const bool replay = change == ui::EditHistory::Change::Undo || change == ui::EditHistory::Change::Redo;
+    if (replay && applied) {
+        if (const auto known = stateRevisions_.find(state); known != stateRevisions_.end()) {
+            engine_->setProjectRevision(known->second, scope == RevisionScope::Scene);
+            return;
+        }
+    }
+    // A new state, or one this history cannot vouch for (an undo that could not fully apply).
+    const std::uint64_t revision = engine_->bumpProjectRevisionFromHistory(scope);
+    if (applied) {
+        stateRevisions_[state] = revision;
+    } else {
+        stateRevisions_.erase(state);
+    }
 }
 
 } // namespace avgen::app

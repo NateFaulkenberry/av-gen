@@ -56,6 +56,7 @@ This page covers the flags most work needs; it is not complete. `avgen --help` p
 | `--midi <filter>` | MIDI sources for this run (name substring or `*`); in a headless or scripted run it also opens MIDI input |
 | `--list-audio-devices`, `--list-midi` | enumerate and exit |
 | `--play` | start playing immediately |
+| `--parked-clock <ambient\|frozen>` | the editor's world clock while the transport is parked: `ambient` (default) keeps the world moving; `frozen` holds it, so a parked frame costs a static one. Never changes a render |
 | `--start-at <s>` | live editor: put the playhead at second *s* before the first frame (a diagnostic, for profiling one shot) |
 | `--direct` | cut the camera to the loaded track |
 
@@ -169,7 +170,6 @@ not be created.
 | `AVGEN_PIPELINE_CACHE` | `off` (or `0`): run without the persistent pipeline cache; `<dir>`: keep it there instead of `~/Library/Caches/avgen/pipeline-cache` (ADR-1811). Startup only: it never changes a frame |
 | `AVGEN_SHADOW_STATS` | log the shadow views every thirtieth frame |
 | `AVGEN_EDITOR_TRACE` | print the editor's per-frame inputs and what it made of them |
-| `AVGEN_DIRTY_TRACE` | log each unsaved-changes sample |
 | `AVGEN_HEIGHT_CENSUS` | count terrain height queries and print the census at exit |
 | `AVGEN_TRACE_DEBUG` | print each river course's trace while a world generates |
 | `AVGEN_ASTRAL_TRACE` | log the Astral renderer's steps each frame |

@@ -38,6 +38,29 @@ A rollback restores the document captured at `begin` (`ai::SnapshotStore::captur
 A rollback is a restore, not a reverse diff: whatever else changed the same domains while the transaction
 was open (a person editing in Studio's panels) is put back too.
 
+## Revisions: what "unsaved changes" means (ADR-2154)
+
+`session.info` reports `revisions {project, scene, savedAt, dirty}`, and every transaction result carries them
+too. `dirty` is `project != savedAt`: something authored happened since the last save, open or new project.
+
+| Event | `project` |
+|---|---|
+| A successful `mutatesProject` call outside an explicit transaction | bumped once, after its implicit transaction commits |
+| A call inside an explicit transaction | not bumped; `transaction.commit` bumps once if any call changed the project |
+| `transaction.rollback`, or a failed call's implicit rollback | put back to what it was at begin: as clean or dirty as before. A save made inside the transaction leaves it dirty (the disk holds the middle of the transaction) |
+| A failed or refused call | not bumped |
+| A call that already moved the counters itself (`project.save`, `project.open`, a command Studio's sink pushed onto the edit history) | not bumped again |
+| An edit in Studio (the edit history: commit, undo, redo) | bumped; an undo back to the saved state is clean again |
+| The engine's own writebacks (entities walking, world-effect parameter writebacks, a rebuild's defaults) | never bumped |
+| `project.save`, `project.save_as` | `savedAt = project` |
+| `project.open`, `project.create` | a fresh base, clean |
+
+`scene` moves with every authored change to the composition (structural and `scene.*` calls). A revision says
+"something authored happened", not "a save would write different bytes": a value edited and then set back is
+dirty until `project.diff_saved` (the expensive serialise-and-compare, on demand only) finds nothing different
+and clears it. `diff_saved` also reports a difference no revision recorded (`unrecorded`, with its paths): a
+writer that bypassed both the Session and Studio's edit history.
+
 ## Files
 
 Each tool reports the files it writes; the session keeps a compensation log (`src/api/compensation.hpp`).
@@ -91,3 +114,4 @@ Read-only tools (execution class `read`) change nothing and have nothing to roll
 | `director.record_plan` | job | no | — (it proposes; nothing changes until a person approves, and the approval is its own transaction) | — |
 | `director.evaluate` | job | no | — | the evaluation record it keeps with the plan |
 | `transaction.begin`, `transaction.commit`, `transaction.rollback` | session | no | they are the mechanism; never wrapped in a transaction | — |
+| `transport.set_policy`, `transport.step` | session | no | — | the time policy; the world time a step advanced |

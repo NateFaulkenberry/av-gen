@@ -1,5 +1,5 @@
 {
-  "api": 2,
+  "api": 1,
   "engine": "0.3.0",
   "format": "avgen-tool-catalogue",
   "tools": [
@@ -235,7 +235,7 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Every project in the session's write roots, by name: a folder holding <name>/<name>.json. Use this before opening one rather than guessing a name.",
+      "description": "Every project in the projects folder, by name. Use this before opening one rather than guessing a name.",
       "domain": "project",
       "inputSchema": {
         "additionalProperties": false,
@@ -244,44 +244,6 @@
       },
       "mcpName": "project_list",
       "name": "project.list",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "files": {
-            "description": "Each project's file, parallel to projects",
-            "items": {
-              "description": "path",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "projects": {
-            "description": "Project names",
-            "items": {
-              "description": "name",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "root": {
-            "description": "The first write root, where a bare name is created",
-            "type": "string"
-          },
-          "roots": {
-            "description": "Every write root listed",
-            "items": {
-              "description": "folder",
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "root",
-          "projects"
-        ],
-        "type": "object"
-      },
       "since": 1,
       "title": "List projects"
     },
@@ -307,64 +269,21 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Start a new project at this path and save it, so it exists on disk before anything is built in it. `path` is a bare name (created as <first write root>/<name>/<name>.json), a project file ending in .json, or a folder (its file is <folder>/<folder name>.json); a relative path resolves against the open project's folder, else the first write root, never the working directory. `scene: \"empty\"` also starts an empty composition and saves it as <stem>.scene.json beside the project, so nodes can be added at once and asset://project/ ids resolve against the project folder; `\"none\"` (the default) starts the built-in orb with no composition. The session is replaced: anything unsaved is lost.",
+      "description": "Start a new empty project under this name and save it, so it exists on disk before anything is built in it. The session is replaced: anything unsaved is lost.",
       "domain": "project",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "path": {
-            "description": "A bare project name, a project .json path, or a folder",
-            "type": "string"
-          },
-          "scene": {
-            "description": "empty: start an empty composition saved beside the project; none (default): no composition",
-            "enum": [
-              "empty",
-              "none"
-            ],
+          "name": {
+            "description": "Project name, used as its folder and file name",
             "type": "string"
           }
         },
-        "required": [
-          "path"
-        ],
         "type": "object"
       },
       "mcpName": "project_create",
       "name": "project.create",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "exists": {
-            "description": "The project file is on disk",
-            "type": "boolean"
-          },
-          "file": {
-            "description": "The project file, absolute",
-            "type": "string"
-          },
-          "folder": {
-            "description": "The project folder: asset://project/<p> is <folder>/assets/<p>",
-            "type": "string"
-          },
-          "name": {
-            "description": "The project's name (the file's stem)",
-            "type": "string"
-          },
-          "scene": {
-            "description": "The scene file written beside the project (scene: empty), or null"
-          }
-        },
-        "required": [
-          "name",
-          "file",
-          "folder",
-          "scene",
-          "exists"
-        ],
-        "type": "object"
-      },
-      "since": 2,
+      "since": 1,
       "title": "Create a project"
     },
     {
@@ -423,25 +342,22 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Write the open session to a project at this path and carry on working in it. Use it to name a session that was never saved, or to fork one. `path` takes the same forms as project.create's.",
+      "description": "Write the open session to a project of this name and carry on working in it. Use it to name a session that was never saved, or to fork one.",
       "domain": "project",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "path": {
-            "description": "A bare project name, a project .json path, or a folder",
+          "name": {
+            "description": "Project name, used as its folder and file name",
             "type": "string"
           }
         },
-        "required": [
-          "path"
-        ],
         "type": "object"
       },
       "mcpName": "project_save_as",
       "name": "project.save_as",
-      "since": 2,
-      "title": "Save the project under a path"
+      "since": 1,
+      "title": "Save the project under a name"
     },
     {
       "annotations": {
@@ -465,24 +381,21 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Load a project, replacing the session. Anything unsaved is lost. `path` is a bare name (as reported by project.list), a project .json path, or a project folder. Reports what came back -- parameters, routes, tracks, whether audio and a scene resolved -- and any load warnings, because a project whose scene is missing still 'opens' and the warnings are how you find out.",
+      "description": "Load a project by name, replacing the session. Anything unsaved is lost. Reports what came back -- parameters, routes, tracks, whether audio and a scene resolved -- and any load warnings, because a project whose scene is missing still 'opens' and the warnings are how you find out.",
       "domain": "project",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "path": {
-            "description": "A project name from project.list, a project .json path, or a folder",
+          "name": {
+            "description": "Project name, as reported by project.list",
             "type": "string"
           }
         },
-        "required": [
-          "path"
-        ],
         "type": "object"
       },
       "mcpName": "project_open",
       "name": "project.open",
-      "since": 2,
+      "since": 1,
       "title": "Open a project"
     },
     {
@@ -580,7 +493,7 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "List the assets visible to this session. A project asset's id is asset://project/<type>/<file>.<ext> (the id asset.import returns); anything else is named by its absolute path. Every tool that takes an asset accepts either.",
+      "description": "List stable asset IDs visible to this session, including built-in and project-owned assets.",
       "domain": "asset",
       "inputSchema": {
         "additionalProperties": false,
@@ -625,7 +538,7 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Search the assets visible to this session by id, name or type (ids as asset.list reports them).",
+      "description": "Search built-in and project asset metadata by stable ID, name or type.",
       "domain": "asset",
       "inputSchema": {
         "additionalProperties": false,
@@ -670,13 +583,13 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "One asset, by its asset://project/ id or by a path (a relative path resolves against the open project's folder): its id, ownership, type, path and tags, and for a project asset its manifest entry -- size, sha256, where it came from and what the engine's import found.",
+      "description": "Resolve one stable asset ID from asset.list or asset.search and return its ownership, type, path and tags.",
       "domain": "asset",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
           "id": {
-            "description": "An asset://project/ id, or a file path",
+            "description": "Stable asset ID",
             "type": "string"
           }
         },
@@ -687,57 +600,6 @@
       },
       "mcpName": "asset_get",
       "name": "asset.get",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "id": {
-            "description": "asset://project/... for a project asset, else the absolute path",
-            "type": "string"
-          },
-          "manifest": {
-            "description": "The project manifest's entry {size, sha256, source, import}, or null"
-          },
-          "name": {
-            "description": "File stem",
-            "type": "string"
-          },
-          "path": {
-            "description": "Absolute path",
-            "type": "string"
-          },
-          "source": {
-            "description": "project, builtin or external",
-            "enum": [
-              "project",
-              "builtin",
-              "external"
-            ],
-            "type": "string"
-          },
-          "tags": {
-            "description": "Tags",
-            "items": {
-              "description": "tag",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": {
-            "description": "model, environment, texture, audio or scene",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "type",
-          "source",
-          "path",
-          "tags",
-          "manifest"
-        ],
-        "type": "object"
-      },
       "since": 1,
       "title": "Get asset metadata"
     },
@@ -764,7 +626,7 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Copy a supported model, environment or texture into the open project's assets/<type>/ folder and record it in assets/manifest.json. `file` is any path this session may read (a relative path resolves against the open project's folder). The original is never modified. Returns the asset's id, asset://project/<type>/<file>.<ext>, which every asset-taking tool accepts; importing the same bytes again returns the existing file's id. A model is loaded by the engine before the call succeeds, and `import` reports what it found (meshes, rigs, joints, clips, materials, triangles, bounds, warnings): a file that does not load is refused and nothing is left behind. `source` records where the file came from in the manifest.",
+      "description": "Copy a supported model, environment or texture into the open project's assets directory. The source must be reported by asset.list_importable or be inside an authorized content root; the original is never modified. Returns a stable project asset ID and copied dependencies.",
       "domain": "asset",
       "inputSchema": {
         "additionalProperties": false,
@@ -772,101 +634,13 @@
           "file": {
             "description": "Path to a reachable model, environment or texture",
             "type": "string"
-          },
-          "source": {
-            "additionalProperties": false,
-            "properties": {
-              "exportProfile": {
-                "description": "The export profile's name",
-                "type": "string"
-              },
-              "exportSettingsSha256": {
-                "description": "SHA-256 of the export settings",
-                "type": "string"
-              },
-              "file": {
-                "description": "The file the client exported",
-                "type": "string"
-              },
-              "tool": {
-                "description": "The exporting tool, e.g. Blender",
-                "type": "string"
-              },
-              "toolVersion": {
-                "description": "Its version",
-                "type": "string"
-              }
-            },
-            "type": "object"
           }
         },
-        "required": [
-          "file"
-        ],
         "type": "object"
       },
       "mcpName": "asset_import",
       "name": "asset.import",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "copied": {
-            "description": "Files copied (the asset, then its glTF dependencies)",
-            "items": {
-              "description": "path",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "duplicate": {
-            "description": "These bytes were already in the project; nothing was copied",
-            "type": "boolean"
-          },
-          "id": {
-            "description": "asset://project/<type>/<file>.<ext>",
-            "type": "string"
-          },
-          "import": {
-            "description": "The engine's load of the file: {meshes, entities, materials, textures, lights, cameras, rigs, joints, clips, triangles, bounds {min, max}, warnings, entityNames, materialNames, rigDetail [{name, joints}], clipDetail [{name, seconds, rig}]}; null for a texture or environment"
-          },
-          "path": {
-            "description": "The copy in the project, absolute",
-            "type": "string"
-          },
-          "sha256": {
-            "description": "SHA-256 of the file",
-            "type": "string"
-          },
-          "size": {
-            "description": "Bytes",
-            "type": "integer"
-          },
-          "source": {
-            "description": "Always project",
-            "enum": [
-              "project"
-            ],
-            "type": "string"
-          },
-          "type": {
-            "description": "models, environments or textures",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "source",
-          "type",
-          "path",
-          "sha256",
-          "size",
-          "duplicate",
-          "copied",
-          "import"
-        ],
-        "type": "object"
-      },
-      "since": 2,
+      "since": 1,
       "title": "Import an asset into the project"
     },
     {
@@ -1317,13 +1091,13 @@
         "supportsProgress": false,
         "undoable": true
       },
-      "description": "Put an object in the scene: a glTF asset, or an empty Group to parent things to. `asset` is an asset://project/ id (what asset.import returns) or a path; a relative path resolves against the open project's folder, never the working directory. It is resolved against the folders this session may read, so a model that is not reachable is refused here rather than becoming a node that renders nothing. Reports the node's world bounds, read back from the built node.",
+      "description": "Put an object in the scene: a glTF asset by file, or an empty Group to parent things to. The asset path is resolved against the folders this session may read, so a model that is not reachable is refused here rather than becoming a node that renders nothing.",
       "domain": "scene",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
           "asset": {
-            "description": "asset://project/ id or path of the .gltf/.glb, for kind gltf",
+            "description": "Path to the .gltf/.glb, for kind gltf",
             "type": "string"
           },
           "kind": {
@@ -1367,89 +1141,6 @@
       },
       "mcpName": "scene_create_node",
       "name": "scene.create_node",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "asset": {
-            "description": "For a gltf node {id, path}: its asset://project/ id (empty when the file is not a project asset) and the file; null for a group"
-          },
-          "bounds": {
-            "additionalProperties": false,
-            "properties": {
-              "max": {
-                "description": "World max",
-                "items": {
-                  "description": "metres",
-                  "type": "number"
-                },
-                "maxItems": 3,
-                "minItems": 3,
-                "type": "array"
-              },
-              "min": {
-                "description": "World min",
-                "items": {
-                  "description": "metres",
-                  "type": "number"
-                },
-                "maxItems": 3,
-                "minItems": 3,
-                "type": "array"
-              },
-              "size": {
-                "description": "max - min",
-                "items": {
-                  "description": "metres",
-                  "type": "number"
-                },
-                "maxItems": 3,
-                "minItems": 3,
-                "type": "array"
-              },
-              "valid": {
-                "description": "The node has geometry",
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "valid",
-              "min",
-              "max",
-              "size"
-            ],
-            "type": "object"
-          },
-          "kind": {
-            "description": "gltf or group",
-            "type": "string"
-          },
-          "name": {
-            "description": "The node's name",
-            "type": "string"
-          },
-          "nodes": {
-            "description": "Nodes in the composition now",
-            "type": "integer"
-          },
-          "parent": {
-            "description": "Parent node name, empty for the root",
-            "type": "string"
-          },
-          "warning": {
-            "description": "Set when a gltf node came out with no geometry",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "kind",
-          "parent",
-          "nodes",
-          "asset",
-          "bounds"
-        ],
-        "type": "object"
-      },
       "since": 1,
       "title": "Create a node"
     },
@@ -2640,542 +2331,6 @@
       "name": "signal.list",
       "since": 1,
       "title": "List signals"
-    },
-    {
-      "annotations": {
-        "destructive": false,
-        "deterministic": false,
-        "executionClass": "session",
-        "expensive": false,
-        "idempotent": true,
-        "mutatesProject": false,
-        "mutatesSession": true,
-        "permissions": [
-          "read",
-          "write"
-        ],
-        "readOnly": false,
-        "requirements": [],
-        "requiresApproval": false,
-        "requiresAudioThread": false,
-        "requiresMainThread": true,
-        "requiresRenderThread": false,
-        "supportsCancellation": false,
-        "supportsProgress": false,
-        "undoable": false
-      },
-      "description": "Copy a stem (one part of the song: drums, bass, ...) into the open project's assets/audio/stems/, record it in assets/manifest.json, and analyse it beside the mix. A stem is analysis only -- never played or mixed -- and publishes its own signals, stem.<key>.* (active, rms, peak, level, onset, onsetStrength, the five bands, centroid, width, onsetLow/Mid/High), which `signals` lists as they are on the bus now; route them with modulation.create. `key` is that identity: lower-case letters, digits and _, unique in the project, and never changed by a relabel. `role` (default other) is the artist's statement of what the stem is, never inferred; role.<role>.* follows the first stem of each role. Importing the same bytes again reuses the project's copy. The stem is session state: project.save keeps it (assets.stems), and a rollback does not remove it.",
-      "domain": "audio",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "file": {
-            "description": "Path to the stem's audio file (wav, aiff, flac, mp3, ogg, m4a)",
-            "type": "string"
-          },
-          "gainDb": {
-            "description": "Trim before analysis, dB (default 0)",
-            "maximum": 24.0,
-            "minimum": -24.0,
-            "type": "number"
-          },
-          "key": {
-            "description": "The signal identity, stem.<key>.*: [a-z0-9_]+, unique, e.g. drums",
-            "type": "string"
-          },
-          "label": {
-            "description": "Free text shown to the artist (default: the key)",
-            "type": "string"
-          },
-          "offset": {
-            "description": "Seconds into the project the stem's first sample sits (default 0)",
-            "type": "number"
-          },
-          "role": {
-            "description": "What the stem is (default other)",
-            "enum": [
-              "drums",
-              "bass",
-              "synth",
-              "vocal",
-              "other"
-            ],
-            "type": "string"
-          },
-          "source": {
-            "additionalProperties": false,
-            "properties": {
-              "file": {
-                "description": "The file the client exported",
-                "type": "string"
-              },
-              "tool": {
-                "description": "The exporting tool",
-                "type": "string"
-              },
-              "toolVersion": {
-                "description": "Its version",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "required": [
-          "file",
-          "key"
-        ],
-        "type": "object"
-      },
-      "mcpName": "audio_import_stem",
-      "name": "audio.import_stem",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "analysis": {
-            "additionalProperties": false,
-            "properties": {
-              "analysed": {
-                "description": "The stem was decoded and analysed; false publishes stem.<key>.active 0",
-                "type": "boolean"
-              },
-              "channels": {
-                "description": "Channel count (analysed as mono; width needs two)",
-                "type": "integer"
-              },
-              "diagnostics": {
-                "description": "What checking the file found, then what comparing it with the mix found",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "message": {
-                      "description": "What was found, naming the file",
-                      "type": "string"
-                    },
-                    "severity": {
-                      "description": "info, warning or error",
-                      "enum": [
-                        "info",
-                        "warning",
-                        "error"
-                      ],
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "severity",
-                    "message"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "durationSeconds": {
-                "description": "Length read back from the decoder",
-                "type": "number"
-              },
-              "format": {
-                "description": "The file's own sample format: s16, s24, f32, ...; empty when unknown",
-                "type": "string"
-              },
-              "frames": {
-                "description": "Sample frames",
-                "type": "integer"
-              },
-              "peak": {
-                "description": "Peak sample magnitude, 0..1 for a file that does not clip",
-                "type": "number"
-              },
-              "sampleRate": {
-                "description": "Hz, the file's own (stems are analysed at their own rate)",
-                "type": "integer"
-              },
-              "silent": {
-                "description": "Every sample is exactly 0",
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "analysed",
-              "durationSeconds",
-              "sampleRate",
-              "channels",
-              "frames",
-              "format",
-              "peak",
-              "silent",
-              "diagnostics"
-            ],
-            "type": "object"
-          },
-          "analysisMs": {
-            "description": "Host-thread time the analysis took, milliseconds",
-            "type": "number"
-          },
-          "duplicate": {
-            "description": "These bytes were already in the project; nothing was copied",
-            "type": "boolean"
-          },
-          "gainDb": {
-            "description": "Trim before analysis, dB",
-            "type": "number"
-          },
-          "id": {
-            "description": "asset://project/... when the file is in the project's assets, else null"
-          },
-          "key": {
-            "description": "The signal identity: stem.<key>.*",
-            "type": "string"
-          },
-          "label": {
-            "description": "Free text shown to the artist",
-            "type": "string"
-          },
-          "offsetSeconds": {
-            "description": "Where the stem's first sample sits on the project timeline",
-            "type": "number"
-          },
-          "path": {
-            "description": "The stem file, absolute",
-            "type": "string"
-          },
-          "role": {
-            "description": "What the stem is; role.<role>.* follows the first of each role",
-            "enum": [
-              "drums",
-              "bass",
-              "synth",
-              "vocal",
-              "other"
-            ],
-            "type": "string"
-          },
-          "roleSignals": {
-            "description": "role.<role>.*: the first active stem of the role publishes these",
-            "items": {
-              "description": "name",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "sha256": {
-            "description": "SHA-256 of the file",
-            "type": "string"
-          },
-          "signals": {
-            "description": "Every stem.<key>.* signal now on the bus, read back from it",
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "isEvent": {
-                  "description": "A momentary event rather than a level",
-                  "type": "boolean"
-                },
-                "label": {
-                  "description": "What it is",
-                  "type": "string"
-                },
-                "max": {
-                  "description": "Declared maximum",
-                  "type": "number"
-                },
-                "min": {
-                  "description": "Declared minimum",
-                  "type": "number"
-                },
-                "name": {
-                  "description": "The signal's name, as modulation.create takes it",
-                  "type": "string"
-                },
-                "value": {
-                  "description": "Its value now",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "name",
-                "value",
-                "min",
-                "max",
-                "isEvent"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "size": {
-            "description": "Bytes",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "key",
-          "label",
-          "role",
-          "offsetSeconds",
-          "gainDb",
-          "id",
-          "path",
-          "sha256",
-          "size",
-          "duplicate",
-          "analysis",
-          "signals",
-          "roleSignals",
-          "analysisMs"
-        ],
-        "type": "object"
-      },
-      "since": 2,
-      "title": "Import an analysis stem"
-    },
-    {
-      "annotations": {
-        "destructive": false,
-        "deterministic": false,
-        "executionClass": "read",
-        "expensive": false,
-        "idempotent": true,
-        "mutatesProject": false,
-        "mutatesSession": false,
-        "permissions": [],
-        "readOnly": true,
-        "requirements": [],
-        "requiresApproval": false,
-        "requiresAudioThread": false,
-        "requiresMainThread": true,
-        "requiresRenderThread": false,
-        "supportsCancellation": false,
-        "supportsProgress": false,
-        "undoable": false
-      },
-      "description": "The project's analysis stems, in order: key, label, role, offset, trim, file and what its analysis found. Each publishes stem.<key>.*; signal.list with query 'stem.<key>.' gives their values. `roles` is the role vocabulary audio.import_stem takes.",
-      "domain": "audio",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {},
-        "type": "object"
-      },
-      "mcpName": "audio_list_stems",
-      "name": "audio.list_stems",
-      "outputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "roles": {
-            "description": "The valid roles",
-            "items": {
-              "description": "role",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "stems": {
-            "description": "Every stem, in the project's order",
-            "items": {
-              "additionalProperties": true,
-              "properties": {
-                "analysis": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "analysed": {
-                      "description": "The stem was decoded and analysed; false publishes stem.<key>.active 0",
-                      "type": "boolean"
-                    },
-                    "channels": {
-                      "description": "Channel count (analysed as mono; width needs two)",
-                      "type": "integer"
-                    },
-                    "diagnostics": {
-                      "description": "What checking the file found, then what comparing it with the mix found",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "message": {
-                            "description": "What was found, naming the file",
-                            "type": "string"
-                          },
-                          "severity": {
-                            "description": "info, warning or error",
-                            "enum": [
-                              "info",
-                              "warning",
-                              "error"
-                            ],
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "severity",
-                          "message"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    },
-                    "durationSeconds": {
-                      "description": "Length read back from the decoder",
-                      "type": "number"
-                    },
-                    "format": {
-                      "description": "The file's own sample format: s16, s24, f32, ...; empty when unknown",
-                      "type": "string"
-                    },
-                    "frames": {
-                      "description": "Sample frames",
-                      "type": "integer"
-                    },
-                    "peak": {
-                      "description": "Peak sample magnitude, 0..1 for a file that does not clip",
-                      "type": "number"
-                    },
-                    "sampleRate": {
-                      "description": "Hz, the file's own (stems are analysed at their own rate)",
-                      "type": "integer"
-                    },
-                    "silent": {
-                      "description": "Every sample is exactly 0",
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "analysed",
-                    "durationSeconds",
-                    "sampleRate",
-                    "channels",
-                    "frames",
-                    "format",
-                    "peak",
-                    "silent",
-                    "diagnostics"
-                  ],
-                  "type": "object"
-                },
-                "gainDb": {
-                  "description": "Trim before analysis, dB",
-                  "type": "number"
-                },
-                "id": {
-                  "description": "asset://project/... when the file is in the project's assets, else null"
-                },
-                "key": {
-                  "description": "The signal identity: stem.<key>.*",
-                  "type": "string"
-                },
-                "label": {
-                  "description": "Free text shown to the artist",
-                  "type": "string"
-                },
-                "offsetSeconds": {
-                  "description": "Where the stem's first sample sits on the project timeline",
-                  "type": "number"
-                },
-                "path": {
-                  "description": "The stem file, absolute",
-                  "type": "string"
-                },
-                "role": {
-                  "description": "What the stem is; role.<role>.* follows the first of each role",
-                  "enum": [
-                    "drums",
-                    "bass",
-                    "synth",
-                    "vocal",
-                    "other"
-                  ],
-                  "type": "string"
-                },
-                "signalCount": {
-                  "description": "stem.<key>.* signals on the bus",
-                  "type": "integer"
-                }
-              },
-              "required": [
-                "key",
-                "label",
-                "role",
-                "offsetSeconds",
-                "gainDb",
-                "id",
-                "path",
-                "analysis",
-                "signalCount"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "stems",
-          "roles"
-        ],
-        "type": "object"
-      },
-      "since": 2,
-      "title": "List analysis stems"
-    },
-    {
-      "annotations": {
-        "destructive": true,
-        "deterministic": false,
-        "executionClass": "session",
-        "expensive": false,
-        "idempotent": false,
-        "mutatesProject": false,
-        "mutatesSession": true,
-        "permissions": [],
-        "readOnly": false,
-        "requirements": [],
-        "requiresApproval": false,
-        "requiresAudioThread": false,
-        "requiresMainThread": true,
-        "requiresRenderThread": false,
-        "supportsCancellation": false,
-        "supportsProgress": false,
-        "undoable": false
-      },
-      "description": "Take a stem out of the project's analysis list. Its file stays in the project's assets (another stem or a later import may use it). The bus cannot undeclare a name, so its stem.<key>.* signals stay listed and read 0 (inactive) from now on: a route on one does nothing, and `routes` counts them. Session state, like the import: project.save writes the list without it.",
-      "domain": "audio",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "key": {
-            "description": "The stem's key, from audio.list_stems",
-            "type": "string"
-          }
-        },
-        "required": [
-          "key"
-        ],
-        "type": "object"
-      },
-      "mcpName": "audio_remove_stem",
-      "name": "audio.remove_stem",
-      "outputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "key": {
-            "description": "The stem removed",
-            "type": "string"
-          },
-          "remaining": {
-            "description": "Stems left in the project",
-            "type": "integer"
-          },
-          "routes": {
-            "description": "Modulation routes whose source is one of its stem.<key>.* signals; each now reads 0",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "key",
-          "remaining",
-          "routes"
-        ],
-        "type": "object"
-      },
-      "since": 2,
-      "title": "Remove an analysis stem"
     },
     {
       "annotations": {
@@ -4443,6 +3598,34 @@
           "project": {
             "description": "{state, file, folder, writable, hasComposition}"
           },
+          "revisions": {
+            "additionalProperties": false,
+            "properties": {
+              "dirty": {
+                "description": "project != savedAt: changed since the last save",
+                "type": "boolean"
+              },
+              "project": {
+                "description": "Bumped by every authored change to the project",
+                "type": "integer"
+              },
+              "savedAt": {
+                "description": "`project` at the last save, open or new document",
+                "type": "integer"
+              },
+              "scene": {
+                "description": "Bumped by every authored change to the composition",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "project",
+              "scene",
+              "savedAt",
+              "dirty"
+            ],
+            "type": "object"
+          },
           "rollbackPoints": {
             "description": "Snapshots this session holds",
             "type": "integer"
@@ -4458,6 +3641,63 @@
           "state": {
             "description": "ready or closing",
             "type": "string"
+          },
+          "timePolicy": {
+            "additionalProperties": false,
+            "properties": {
+              "effective": {
+                "description": "What governs time now: running while a live transport plays",
+                "enum": [
+                  "running",
+                  "stopped-frozen",
+                  "stopped-ambient",
+                  "stepped",
+                  "offline"
+                ],
+                "type": "string"
+              },
+              "offered": {
+                "description": "What transport.set_policy accepts on this host",
+                "items": {
+                  "description": "policy",
+                  "enum": [
+                    "running",
+                    "stopped-frozen",
+                    "stopped-ambient",
+                    "stepped",
+                    "offline"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "policy": {
+                "description": "The host's setting",
+                "enum": [
+                  "running",
+                  "stopped-frozen",
+                  "stopped-ambient",
+                  "stepped",
+                  "offline"
+                ],
+                "type": "string"
+              },
+              "renderTime": {
+                "description": "The world clock, seconds",
+                "type": "number"
+              },
+              "stepped": {
+                "description": "transport.step: frames advanced",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "policy",
+              "effective",
+              "offered",
+              "renderTime"
+            ],
+            "type": "object"
           },
           "toolDetail": {
             "description": "Per named tool, when `tools` was passed",
@@ -4579,6 +3819,34 @@
             "description": "A call it accepted as irreversible is outside what it can roll back",
             "type": "boolean"
           },
+          "revisions": {
+            "additionalProperties": false,
+            "properties": {
+              "dirty": {
+                "description": "project != savedAt: changed since the last save",
+                "type": "boolean"
+              },
+              "project": {
+                "description": "Bumped by every authored change to the project",
+                "type": "integer"
+              },
+              "savedAt": {
+                "description": "`project` at the last save, open or new document",
+                "type": "integer"
+              },
+              "scene": {
+                "description": "Bumped by every authored change to the composition",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "project",
+              "scene",
+              "savedAt",
+              "dirty"
+            ],
+            "type": "object"
+          },
           "rollbackPoint": {
             "description": "The snapshot id it restores on rollback, or null"
           },
@@ -4694,6 +3962,34 @@
           "partial": {
             "description": "A call it accepted as irreversible is outside what it can roll back",
             "type": "boolean"
+          },
+          "revisions": {
+            "additionalProperties": false,
+            "properties": {
+              "dirty": {
+                "description": "project != savedAt: changed since the last save",
+                "type": "boolean"
+              },
+              "project": {
+                "description": "Bumped by every authored change to the project",
+                "type": "integer"
+              },
+              "savedAt": {
+                "description": "`project` at the last save, open or new document",
+                "type": "integer"
+              },
+              "scene": {
+                "description": "Bumped by every authored change to the composition",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "project",
+              "scene",
+              "savedAt",
+              "dirty"
+            ],
+            "type": "object"
           },
           "rollbackPoint": {
             "description": "The snapshot id it restores on rollback, or null"
@@ -4811,6 +4107,34 @@
             "description": "A call it accepted as irreversible is outside what it can roll back",
             "type": "boolean"
           },
+          "revisions": {
+            "additionalProperties": false,
+            "properties": {
+              "dirty": {
+                "description": "project != savedAt: changed since the last save",
+                "type": "boolean"
+              },
+              "project": {
+                "description": "Bumped by every authored change to the project",
+                "type": "integer"
+              },
+              "savedAt": {
+                "description": "`project` at the last save, open or new document",
+                "type": "integer"
+              },
+              "scene": {
+                "description": "Bumped by every authored change to the composition",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "project",
+              "scene",
+              "savedAt",
+              "dirty"
+            ],
+            "type": "object"
+          },
           "rollbackPoint": {
             "description": "The snapshot id it restores on rollback, or null"
           },
@@ -4924,6 +4248,34 @@
             "description": "A call it accepted as irreversible is outside what it can roll back",
             "type": "boolean"
           },
+          "revisions": {
+            "additionalProperties": false,
+            "properties": {
+              "dirty": {
+                "description": "project != savedAt: changed since the last save",
+                "type": "boolean"
+              },
+              "project": {
+                "description": "Bumped by every authored change to the project",
+                "type": "integer"
+              },
+              "savedAt": {
+                "description": "`project` at the last save, open or new document",
+                "type": "integer"
+              },
+              "scene": {
+                "description": "Bumped by every authored change to the composition",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "project",
+              "scene",
+              "savedAt",
+              "dirty"
+            ],
+            "type": "object"
+          },
           "rollbackPoint": {
             "description": "The snapshot id it restores on rollback, or null"
           },
@@ -4948,436 +4300,11 @@
         "destructive": false,
         "deterministic": false,
         "executionClass": "read",
-        "expensive": false,
-        "idempotent": true,
-        "mutatesProject": false,
-        "mutatesSession": false,
-        "permissions": [],
-        "readOnly": true,
-        "requirements": [],
-        "requiresApproval": false,
-        "requiresAudioThread": false,
-        "requiresMainThread": true,
-        "requiresRenderThread": false,
-        "supportsCancellation": false,
-        "supportsProgress": false,
-        "undoable": false
-      },
-      "description": "The scene or project document as the engine would write it now, with a content hash to compare later reads with. `scene` is Composition::toJson: every key the scene reads, plus the keys it keeps without reading (`_` notes, unknown top-level keys); the shape is schemas/avgen-scene.schema.json, and it is what document.patch paths point into. `project` is the document a project save would write, built without writing anything. Read it before patching.",
-      "domain": "document",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "document": {
-            "description": "Which document",
-            "enum": [
-              "scene",
-              "project"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "document"
-        ],
-        "type": "object"
-      },
-      "mcpName": "document_get",
-      "name": "document.get",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "content": {
-            "description": "The document"
-          },
-          "document": {
-            "description": "scene or project",
-            "type": "string"
-          },
-          "hash": {
-            "description": "sha256:<hex> of the document's canonical JSON text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "document",
-          "content",
-          "hash"
-        ],
-        "type": "object"
-      },
-      "since": 2,
-      "title": "Get a document"
-    },
-    {
-      "annotations": {
-        "destructive": false,
-        "deterministic": false,
-        "executionClass": "job",
         "expensive": true,
-        "idempotent": true,
-        "mutatesProject": false,
-        "mutatesSession": false,
-        "permissions": [],
-        "readOnly": true,
-        "requirements": [],
-        "requiresApproval": false,
-        "requiresAudioThread": false,
-        "requiresMainThread": true,
-        "requiresRenderThread": false,
-        "supportsCancellation": false,
-        "supportsProgress": false,
-        "undoable": false
-      },
-      "description": "Check a scene or project document without installing it. First against the generated schema (schemas/avgen-<document>.schema.json, with the engine's own validator), then by building it on a private offline engine with its own asset registry: a scene is parsed into a composition and its node assets are resolved as the session's scene resolves them; a project is loaded from a scratch copy whose relative paths are resolved against the open project's folder. Returns structured findings {severity, code, pointer, message, document}; valid is true when none is an error. Unknown scene keys are warnings here (a file on disk is only warned about); document.patch refuses a patch that adds one.",
-      "domain": "document",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "content": {
-            "additionalProperties": true,
-            "properties": {},
-            "type": "object"
-          },
-          "document": {
-            "description": "Which kind of document `content` is",
-            "enum": [
-              "scene",
-              "project"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "document",
-          "content"
-        ],
-        "type": "object"
-      },
-      "mcpName": "document_validate",
-      "name": "document.validate",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "document": {
-            "description": "scene or project",
-            "type": "string"
-          },
-          "findings": {
-            "description": "Structured findings",
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "code": {
-                  "description": "A finding code (docs/api/errors.md)",
-                  "enum": [
-                    "schema.type",
-                    "schema.required",
-                    "schema.enum",
-                    "schema.range",
-                    "schema.invalid",
-                    "scene.unknownKey",
-                    "scene.parse",
-                    "scene.missing",
-                    "project.parse",
-                    "project.unknownKey",
-                    "project.warning",
-                    "asset.missing",
-                    "asset.relinked",
-                    "parameter.unknown",
-                    "route.dead",
-                    "route.hazard"
-                  ],
-                  "type": "string"
-                },
-                "document": {
-                  "description": "scene or project",
-                  "enum": [
-                    "scene",
-                    "project"
-                  ],
-                  "type": "string"
-                },
-                "message": {
-                  "description": "What was found, in a sentence",
-                  "type": "string"
-                },
-                "pointer": {
-                  "description": "A JSON pointer into `document`; empty for the whole document",
-                  "type": "string"
-                },
-                "severity": {
-                  "description": "error, warning or info",
-                  "enum": [
-                    "error",
-                    "warning",
-                    "info"
-                  ],
-                  "type": "string"
-                }
-              },
-              "required": [
-                "severity",
-                "code",
-                "pointer",
-                "message",
-                "document"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "hash": {
-            "description": "sha256:<hex> of the content",
-            "type": "string"
-          },
-          "parameters": {
-            "description": "scene: the parameters the parsed composition registers",
-            "type": "integer"
-          },
-          "valid": {
-            "description": "No finding is an error",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "valid",
-          "document",
-          "hash",
-          "findings"
-        ],
-        "type": "object"
-      },
-      "since": 2,
-      "title": "Validate a document"
-    },
-    {
-      "annotations": {
-        "destructive": false,
-        "deterministic": false,
-        "executionClass": "structural",
-        "expensive": false,
         "idempotent": false,
-        "mutatesProject": true,
-        "mutatesSession": false,
-        "permissions": [],
-        "readOnly": false,
-        "requirements": [
-          "composition"
-        ],
-        "requiresApproval": false,
-        "requiresAudioThread": false,
-        "requiresMainThread": true,
-        "requiresRenderThread": false,
-        "supportsCancellation": false,
-        "supportsProgress": false,
-        "undoable": true
-      },
-      "description": "Edit the scene by applying an RFC 6902 JSON Patch to its document (document.get {document: scene}), then rebuilding the composition from the result. One contract for every structural edit: add a light (`{op: add, path: /lights/-, value: {...}}`), a node (`/nodes/-`), change a node's tint (`/nodes/<i>/tint`), remove anything. Refused with INVALID_ARGUMENTS and details.pointer when an operation does not apply, when the result has a schema error it did not have before, or when it adds a key the engine does not read; nothing is changed then. Keys the patch does not touch are kept, including `_` notes and unknown top-level keys. The session's parameter overrides survive the rebuild: each is re-applied unless the patch set the value the document carries (overrides.yielded lists those). Routes are kept. dryRun checks the patch, builds the result on a private engine and changes nothing. It runs in the call's transaction, so transaction.rollback restores the pre-patch document. A rebuild restarts entity simulations; a live host refuses it while a show runs.",
-      "domain": "document",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "document": {
-            "description": "Only the scene can be patched",
-            "enum": [
-              "scene"
-            ],
-            "type": "string"
-          },
-          "dryRun": {
-            "description": "Check and predict, change nothing",
-            "type": "boolean"
-          },
-          "patch": {
-            "description": "RFC 6902 operations, applied in order",
-            "items": {
-              "additionalProperties": true,
-              "properties": {
-                "from": {
-                  "description": "move/copy: the source pointer",
-                  "type": "string"
-                },
-                "op": {
-                  "description": "RFC 6902 operation",
-                  "enum": [
-                    "add",
-                    "remove",
-                    "replace",
-                    "move",
-                    "copy",
-                    "test"
-                  ],
-                  "type": "string"
-                },
-                "path": {
-                  "description": "A JSON pointer into the scene",
-                  "type": "string"
-                },
-                "value": {
-                  "description": "add/replace/test: the value"
-                }
-              },
-              "required": [
-                "op",
-                "path"
-              ],
-              "type": "object"
-            },
-            "maxItems": 256,
-            "minItems": 1,
-            "type": "array"
-          }
-        },
-        "required": [
-          "document",
-          "patch"
-        ],
-        "type": "object"
-      },
-      "mcpName": "document_patch",
-      "name": "document.patch",
-      "outputSchema": {
-        "additionalProperties": true,
-        "properties": {
-          "applied": {
-            "description": "The composition was rebuilt from the patched document",
-            "type": "boolean"
-          },
-          "changed": {
-            "description": "What changed in the scene document",
-            "items": {
-              "description": "{op, path}: a JSON pointer that changed"
-            },
-            "type": "array"
-          },
-          "dryRun": {
-            "description": "This was a dry run",
-            "type": "boolean"
-          },
-          "findings": {
-            "description": "Structured findings",
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "code": {
-                  "description": "A finding code (docs/api/errors.md)",
-                  "enum": [
-                    "schema.type",
-                    "schema.required",
-                    "schema.enum",
-                    "schema.range",
-                    "schema.invalid",
-                    "scene.unknownKey",
-                    "scene.parse",
-                    "scene.missing",
-                    "project.parse",
-                    "project.unknownKey",
-                    "project.warning",
-                    "asset.missing",
-                    "asset.relinked",
-                    "parameter.unknown",
-                    "route.dead",
-                    "route.hazard"
-                  ],
-                  "type": "string"
-                },
-                "document": {
-                  "description": "scene or project",
-                  "enum": [
-                    "scene",
-                    "project"
-                  ],
-                  "type": "string"
-                },
-                "message": {
-                  "description": "What was found, in a sentence",
-                  "type": "string"
-                },
-                "pointer": {
-                  "description": "A JSON pointer into `document`; empty for the whole document",
-                  "type": "string"
-                },
-                "severity": {
-                  "description": "error, warning or info",
-                  "enum": [
-                    "error",
-                    "warning",
-                    "info"
-                  ],
-                  "type": "string"
-                }
-              },
-              "required": [
-                "severity",
-                "code",
-                "pointer",
-                "message",
-                "document"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "hashAfter": {
-            "description": "Its hash after (equal to hashBefore on a dry run)",
-            "type": "string"
-          },
-          "hashBefore": {
-            "description": "The scene document's hash before",
-            "type": "string"
-          },
-          "overrides": {
-            "description": "{kept, yielded, dropped}: the session's overrides after the rebuild"
-          },
-          "parametersAdded": {
-            "description": "Parameters the rebuild registered that did not exist",
-            "items": {
-              "description": "parameter path",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "parametersRemoved": {
-            "description": "Parameters that no longer exist",
-            "items": {
-              "description": "parameter path",
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "predictedHash": {
-            "description": "dryRun: the hash of the patched document as sent",
-            "type": "string"
-          }
-        },
-        "required": [
-          "dryRun",
-          "applied",
-          "hashBefore",
-          "hashAfter",
-          "changed",
-          "parametersAdded",
-          "parametersRemoved",
-          "findings"
-        ],
-        "type": "object"
-      },
-      "since": 2,
-      "title": "Patch the scene document"
-    },
-    {
-      "annotations": {
-        "destructive": false,
-        "deterministic": false,
-        "executionClass": "job",
-        "expensive": true,
-        "idempotent": true,
         "mutatesProject": false,
         "mutatesSession": false,
-        "permissions": [
-          "read"
-        ],
+        "permissions": [],
         "readOnly": true,
         "requirements": [],
         "requiresApproval": false,
@@ -5388,112 +4315,393 @@
         "supportsProgress": false,
         "undoable": false
       },
-      "description": "Check a project without opening it in this session: it is loaded on a private offline engine with its own asset registry (Engine::loadProject, requireProjectScene, the route audit), checked against schemas/avgen-project.schema.json, its scene file against the scene schema, and every asset it and its scene name is resolved. Returns findings {severity, code, pointer, message, document} with codes such as asset.missing, asset.relinked, parameter.unknown, route.dead, scene.unknownKey and schema.*; valid is true when none is an error. `path` is a project file (resolved like project.open); without it, the session's own project as it is in memory, through a scratch copy (nothing of the person's is written).",
+      "description": "Serialise the project and compare it with what was last saved or opened: the exact answer to \"would a save write anything different?\". Expensive (a full serialisation: up to hundreds of milliseconds on a large project), so ask only when it matters -- before closing. session.info's `revisions.dirty` is the cheap answer, and errs only towards dirty: a value edited and then set back. When nothing differs and the revisions said dirty, this clears it. A difference the revisions did not record is reported as `unrecorded` with its paths and left as it is.",
       "domain": "project",
       "inputSchema": {
         "additionalProperties": false,
-        "properties": {
-          "path": {
-            "description": "A project .json; omit for the open project as it is now",
-            "type": "string"
-          }
-        },
+        "properties": null,
         "type": "object"
       },
-      "mcpName": "project_validate",
-      "name": "project.validate",
+      "mcpName": "project_diff_saved",
+      "name": "project.diff_saved",
       "outputSchema": {
-        "additionalProperties": true,
+        "additionalProperties": false,
         "properties": {
-          "counts": {
-            "description": "{error, warning, info}"
+          "cleared": {
+            "description": "The revisions said dirty and nothing differed; now clean",
+            "type": "boolean"
           },
-          "file": {
-            "description": "The project validated, or (session) for the in-memory one",
-            "type": "string"
+          "compared": {
+            "description": "False before the first save or open: nothing to compare",
+            "type": "boolean"
           },
-          "findings": {
-            "description": "Structured findings",
+          "differs": {
+            "description": "A save would write a different document",
+            "type": "boolean"
+          },
+          "ms": {
+            "description": "What the comparison cost",
+            "type": "number"
+          },
+          "pathCount": {
+            "description": "How many paths differ",
+            "type": "integer"
+          },
+          "paths": {
+            "description": "The first differing paths",
             "items": {
-              "additionalProperties": false,
-              "properties": {
-                "code": {
-                  "description": "A finding code (docs/api/errors.md)",
-                  "enum": [
-                    "schema.type",
-                    "schema.required",
-                    "schema.enum",
-                    "schema.range",
-                    "schema.invalid",
-                    "scene.unknownKey",
-                    "scene.parse",
-                    "scene.missing",
-                    "project.parse",
-                    "project.unknownKey",
-                    "project.warning",
-                    "asset.missing",
-                    "asset.relinked",
-                    "parameter.unknown",
-                    "route.dead",
-                    "route.hazard"
-                  ],
-                  "type": "string"
-                },
-                "document": {
-                  "description": "scene or project",
-                  "enum": [
-                    "scene",
-                    "project"
-                  ],
-                  "type": "string"
-                },
-                "message": {
-                  "description": "What was found, in a sentence",
-                  "type": "string"
-                },
-                "pointer": {
-                  "description": "A JSON pointer into `document`; empty for the whole document",
-                  "type": "string"
-                },
-                "severity": {
-                  "description": "error, warning or info",
-                  "enum": [
-                    "error",
-                    "warning",
-                    "info"
-                  ],
-                  "type": "string"
-                }
-              },
-              "required": [
-                "severity",
-                "code",
-                "pointer",
-                "message",
-                "document"
-              ],
-              "type": "object"
+              "description": "JSON pointer",
+              "type": "string"
             },
             "type": "array"
           },
-          "loaded": {
-            "description": "{parameters, routes, hasComposition} when the load succeeded, else null"
+          "revisions": {
+            "additionalProperties": false,
+            "properties": {
+              "dirty": {
+                "description": "project != savedAt: changed since the last save",
+                "type": "boolean"
+              },
+              "project": {
+                "description": "Bumped by every authored change to the project",
+                "type": "integer"
+              },
+              "savedAt": {
+                "description": "`project` at the last save, open or new document",
+                "type": "integer"
+              },
+              "scene": {
+                "description": "Bumped by every authored change to the composition",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "project",
+              "scene",
+              "savedAt",
+              "dirty"
+            ],
+            "type": "object"
           },
-          "valid": {
-            "description": "No finding is an error",
+          "unrecorded": {
+            "description": "Something differs that no revision recorded",
             "type": "boolean"
           }
         },
         "required": [
-          "valid",
-          "file",
-          "findings",
-          "counts"
+          "compared",
+          "differs",
+          "cleared",
+          "unrecorded",
+          "paths",
+          "pathCount",
+          "ms",
+          "revisions"
         ],
         "type": "object"
       },
-      "since": 2,
-      "title": "Validate a project"
+      "since": 1,
+      "title": "Compare with the saved project"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "read",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": false,
+        "permissions": [],
+        "readOnly": true,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "What the world clock does while nothing is playing, and which policies this host offers. running: the transport plays. stopped-ambient: parked, the world keeps moving on the wall clock (rigs, wind, water). stopped-frozen: parked, time does not advance, so two reads with no edit between them agree. stepped: nothing advances until transport.step. offline: the fixed-step clock of a render.",
+      "domain": "transport",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": null,
+        "type": "object"
+      },
+      "mcpName": "transport_get_policy",
+      "name": "transport.get_policy",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "description": "What governs time now: running while a live transport plays",
+            "enum": [
+              "running",
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "offered": {
+            "description": "What transport.set_policy accepts on this host",
+            "items": {
+              "description": "policy",
+              "enum": [
+                "running",
+                "stopped-frozen",
+                "stopped-ambient",
+                "stepped",
+                "offline"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "policy": {
+            "description": "The host's setting",
+            "enum": [
+              "running",
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "renderTime": {
+            "description": "The world clock, seconds",
+            "type": "number"
+          },
+          "stepped": {
+            "description": "transport.step: frames advanced",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy",
+          "effective",
+          "offered",
+          "renderTime"
+        ],
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Time policy"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": true,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Choose what the world clock does while the transport is parked. Refused (FAILED_PRECONDITION) for a policy this host does not offer: transport.get_policy lists them. Never changes a render: every render job has its own offline engine.",
+      "domain": "transport",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "description": "The policy",
+            "enum": [
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "running",
+              "offline"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy"
+        ],
+        "type": "object"
+      },
+      "mcpName": "transport_set_policy",
+      "name": "transport.set_policy",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "description": "What governs time now: running while a live transport plays",
+            "enum": [
+              "running",
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "offered": {
+            "description": "What transport.set_policy accepts on this host",
+            "items": {
+              "description": "policy",
+              "enum": [
+                "running",
+                "stopped-frozen",
+                "stopped-ambient",
+                "stepped",
+                "offline"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "policy": {
+            "description": "The host's setting",
+            "enum": [
+              "running",
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "renderTime": {
+            "description": "The world clock, seconds",
+            "type": "number"
+          },
+          "stepped": {
+            "description": "transport.step: frames advanced",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy",
+          "effective",
+          "offered",
+          "renderTime"
+        ],
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Set the time policy"
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "deterministic": false,
+        "executionClass": "session",
+        "expensive": false,
+        "idempotent": false,
+        "mutatesProject": false,
+        "mutatesSession": true,
+        "permissions": [],
+        "readOnly": false,
+        "requirements": [],
+        "requiresApproval": false,
+        "requiresAudioThread": false,
+        "requiresMainThread": true,
+        "requiresRenderThread": false,
+        "supportsCancellation": false,
+        "supportsProgress": false,
+        "undoable": false
+      },
+      "description": "Under the stepped policy: advance the world by `frames` frames (or by `seconds`, rounded to whole frames) at `fps` (default: the project's render rate), by PLAYING -- the same update a running frame takes, deltaTime 1/fps each -- not by seeking. renderTime moves by exactly frames/fps. To get the state a playback reaches at time t, step there; sequencer.set_playhead seeks instead.",
+      "domain": "transport",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fps": {
+            "description": "Frames per second; default the project's render rate",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "type": "number"
+          },
+          "frames": {
+            "description": "Frames to advance",
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "seconds": {
+            "description": "Or seconds to advance, rounded to whole frames",
+            "minimum": 0.0,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "mcpName": "transport_step",
+      "name": "transport.step",
+      "outputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "description": "What governs time now: running while a live transport plays",
+            "enum": [
+              "running",
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "offered": {
+            "description": "What transport.set_policy accepts on this host",
+            "items": {
+              "description": "policy",
+              "enum": [
+                "running",
+                "stopped-frozen",
+                "stopped-ambient",
+                "stepped",
+                "offline"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "policy": {
+            "description": "The host's setting",
+            "enum": [
+              "running",
+              "stopped-frozen",
+              "stopped-ambient",
+              "stepped",
+              "offline"
+            ],
+            "type": "string"
+          },
+          "renderTime": {
+            "description": "The world clock, seconds",
+            "type": "number"
+          },
+          "stepped": {
+            "description": "transport.step: frames advanced",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy",
+          "effective",
+          "offered",
+          "renderTime"
+        ],
+        "type": "object"
+      },
+      "since": 1,
+      "title": "Step time"
     }
   ],
   "version": 1

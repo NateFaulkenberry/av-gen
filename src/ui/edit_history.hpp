@@ -41,6 +41,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -348,6 +349,16 @@ public:
 
     void clear();
 
+    // ---- who is told (ADR-2154) ------------------------------------------------------------------
+    // Called after every change of state: a push (not an empty one, which changes nothing), an undo, a
+    // redo, a clear. `command` is the command pushed, undone or redone (null for a clear); `applied` is
+    // false when an undo or redo could not fully apply it. The EditSystem's project revisions hang off
+    // this, so a command pushed straight onto the history -- most panels do -- bumps them like one that
+    // came through `EditSystem::execute`.
+    enum class Change : std::uint8_t { Push, Undo, Redo, Clear };
+    using Observer = std::function<void(Change change, const EditCommand* command, bool applied)>;
+    void setObserver(Observer observer) { observer_ = std::move(observer); }
+
     // ---- identity, for save state and for the UI ------------------------------------------------
     //
     // `stateId` names *the document state*, not the depth of the stack. Depth cannot answer "is this
@@ -404,6 +415,7 @@ private:
     std::size_t capacity_;
     bool dragging_ = false;
     EditCommand drag_;
+    Observer observer_;
 };
 
 // Reads a parameter's base value into a component vector, or an empty vector when it does not

@@ -36,6 +36,14 @@ bool isSessionTool(const ai::Tool& tool) {
     return domain == "session" || domain == "transaction" || domain == "job";
 }
 
+// ADR-2154: an authored change to the composition's structure also bumps the scene revision.
+app::RevisionScope revisionScope(const ai::Tool& tool) {
+    return tool.definition.domain() == "scene" ||
+                   tool.definition.annotations.effectiveExecutionClass() == ai::ExecutionClass::Structural
+               ? app::RevisionScope::Scene
+               : app::RevisionScope::Project;
+}
+
 // A Live host refuses these by name while a show runs, beside the structural, job and project classes: a
 // seek moves the show's own clock, and replacing the track swaps what the audience is hearing.
 // ADR-2155: what a GPU tool answers on a host that cannot render, when asked and when called.
@@ -149,6 +157,15 @@ CallResult CallResult::refused(ai::ToolError error) {
 std::optional<ai::ToolError> Host::submitJob(JobSubmission /*submission*/) {
     return err(ai::ToolErrorCode::Unavailable, std::string(kNoGpuHost), "run it in avgen serve or avgen call",
                json{{"field", "gpu"}});
+}
+
+std::vector<app::TimePolicy> Host::offeredTimePolicies() { return {engine().timePolicy()}; }
+
+std::vector<app::TimePolicy> LocalHost::offeredTimePolicies() {
+    if (offered_.empty()) {
+        return Host::offeredTimePolicies();
+    }
+    return offered_;
 }
 
 void LocalHost::installHooks(ai::ToolContext& ctx) {
@@ -523,6 +540,9 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
                                               : std::string{};
 
     app::Engine& engine = host_->engine();
+    // ADR-2154: the counters before the call. A failed call puts them back with its rollback; a successful
+    // mutating one bumps once, unless its own work moved them (a save, an open, a pushed edit).
+    const app::ProjectRevisions revisionsBefore = engine.revisions();
     ai::ToolContext ctx(engine);
     prepareContext(ctx, pathsNow());
     ctx.setCancelToken(options.cancel);
@@ -562,6 +582,7 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
         // file check sees the document as restored, then its own files.
         if (implicit) {
             implicit->rollback();
+            engine.restoreProjectRevisions(revisionsBefore);
         }
         const auto files = callFiles.rollback(referenced);
         if (!files.kept.empty() || !files.deleted.empty()) {
@@ -575,6 +596,17 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
         }
     } else if (joined != nullptr) {
         ++joined->calls;
+        if (a.mutatesProject) {
+            // Bumped once, at commit. A call that moved the counters itself (a save inside the transaction
+            // records everything before it) resets the debt to what came after it.
+            if (engine.revisions() == revisionsBefore) {
+                joined->pendingBump = true;
+                joined->pendingScene = joined->pendingScene || revisionScope(tool) == app::RevisionScope::Scene;
+            } else {
+                joined->pendingBump = false;
+                joined->pendingScene = false;
+            }
+        }
         joined->files.absorb(std::move(callFiles));
         if (accepted) {
             joined->partial = true;
@@ -589,6 +621,9 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
     } else {
         if (implicit) {
             implicit->commit();
+        }
+        if (a.mutatesProject && !sessionTool && engine.revisions() == revisionsBefore) {
+            engine.bumpProjectRevision(revisionScope(tool));
         }
         callFiles.commit();
         FileClaims::instance().committed(key);
@@ -719,6 +754,10 @@ ai::ToolResult Session::beginTransaction(const std::string& label) {
     t.txn = std::make_unique<ai::Transaction>(*sink_, t.label);
     t.rollbackPoint = sink_->rollbackPoint();
     t.files = CompensationLog(transactionKey(t.id));
+    const app::ProjectRevisions& revisions = host_->engine().revisions();
+    t.revisionsProject = revisions.project;
+    t.revisionsScene = revisions.scene;
+    t.revisionsSavedAt = revisions.savedAt;
     explicit_ = std::move(t);
     return ai::ToolResult::ok(transactionJson(*explicit_), fmt::format("opened {}", explicit_->id));
 }
@@ -733,7 +772,15 @@ ai::ToolResult Session::commitTransaction(const std::string& id) {
     const json after = ai::SnapshotStore::captureDocument(host_->engine());
     const std::vector<std::string> changed = ai::SnapshotStore::changedParameters(t.before, after);
     json out = transactionJson(t);
+    app::Engine& engine = host_->engine();
+    const app::ProjectRevisions revisionsBefore = engine.revisions();
     t.txn->commit();
+    // ADR-2154: once for the whole transaction, unless the commit itself recorded it (Studio's sink
+    // pushes the transaction onto the edit history, which bumps).
+    if (t.pendingBump && engine.revisions() == revisionsBefore) {
+        engine.bumpProjectRevision(t.pendingScene ? app::RevisionScope::Scene : app::RevisionScope::Project);
+    }
+    out["revisions"] = revisionsJson(engine.revisions());
     out["state"] = "committed";
     out["changedTargets"] = changed;
     out["editState"] = sink_->committedEditState();
@@ -756,9 +803,19 @@ ai::ToolResult Session::rollbackTransaction(const std::string& id) {
     json out = transactionJson(t);
     // The document first, so the file check reads the project as it is restored.
     t.txn->rollback();
+    // ADR-2154: the counters as they were at begin, so the project is exactly as clean or dirty as it was.
+    // Unless a save ran inside (accepted as irreversible): the disk then holds the document from the middle
+    // of the transaction, not the one restored, so it is dirty.
+    app::Engine& engine = host_->engine();
+    const bool savedInside = engine.revisions().savedAt != t.revisionsSavedAt;
+    engine.restoreProjectRevisions(app::ProjectRevisions{t.revisionsProject, t.revisionsScene, t.revisionsSavedAt});
+    if (savedInside) {
+        engine.bumpProjectRevision();
+    }
     const CompensationLog::Outcome files = t.files.rollback([this](const fs::path& p) { return referencedOutside(p); });
     FileClaims::instance().rolledBack(transactionKey(t.id));
     out["state"] = "rolled-back";
+    out["revisions"] = revisionsJson(engine.revisions());
     out["files"] = files.toJson();
     out["notRestored"] = json{{"tools", t.irreversible}, {"files", files.kept}};
     explicit_.reset();
@@ -784,6 +841,47 @@ ai::ToolResult Session::transactionStatus(const std::string& id) const {
 }
 
 // ---- discovery -----------------------------------------------------------------------------------------------
+
+json revisionsJson(const app::ProjectRevisions& r) {
+    return json{{"project", r.project}, {"scene", r.scene}, {"savedAt", r.savedAt}, {"dirty", r.dirty()}};
+}
+
+json Session::timePolicyJson() {
+    app::Engine& engine = host_->engine();
+    json offered = json::array();
+    for (const app::TimePolicy p : host_->offeredTimePolicies()) {
+        offered.push_back(app::timePolicyName(p));
+    }
+    return json{{"policy", app::timePolicyName(engine.timePolicy())},
+                {"effective", app::timePolicyName(engine.effectiveTimePolicy())},
+                {"offered", std::move(offered)},
+                {"renderTime", engine.lastRenderTime()}};
+}
+
+ai::ToolResult Session::setTimePolicy(const std::string& name) {
+    const auto policy = app::parseTimePolicy(name);
+    if (!policy) {
+        return ai::ToolResult::failure(ai::ToolErrorCode::InvalidArguments, fmt::format("'{}' is not a time policy", name),
+                                       "one of running, stopped-frozen, stopped-ambient, stepped, offline",
+                                       json{{"field", "policy"}});
+    }
+    const std::vector<app::TimePolicy> offered = host_->offeredTimePolicies();
+    if (std::find(offered.begin(), offered.end(), *policy) == offered.end()) {
+        std::string list;
+        for (const app::TimePolicy p : offered) {
+            list += (list.empty() ? "" : ", ") + std::string(app::timePolicyName(p));
+        }
+        return ai::ToolResult::failure(ai::ToolErrorCode::FailedPrecondition,
+                                       fmt::format("this host does not offer the '{}' time policy", name),
+                                       fmt::format("choose one it offers: {}", list),
+                                       json{{"field", "policy"}, {"offered", timePolicyJson().at("offered")}});
+    }
+    if (auto r = host_->engine().setTimePolicy(*policy); !r) {
+        return ai::ToolResult::failure(ai::ToolErrorCode::FailedPrecondition, r.error().message,
+                                       "choose a policy this host offers", json{{"field", "policy"}});
+    }
+    return ai::ToolResult::ok(timePolicyJson(), fmt::format("time policy {}", name));
+}
 
 ToolAvailability Session::availability(std::string_view name) {
     ToolAvailability out;
@@ -845,6 +943,8 @@ json Session::info(const json& toolNames) {
              {"permissions", std::move(permissionsJson)},
              {"version", version().toJson()},
              {"project", std::move(project)},
+             {"revisions", revisionsJson(engine.revisions())},
+             {"timePolicy", timePolicyJson()},
              {"transaction", explicit_ ? transactionJson(*explicit_) : json(nullptr)},
              {"transactionSink", std::string(sink_->kind())},
              {"rollbackPoints", snapshots_.size()},

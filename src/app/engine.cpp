@@ -590,7 +590,9 @@ std::optional<TempoSource> tempoSourceFromName(std::string_view name) {
     return std::nullopt;
 }
 
-Engine::Engine(EngineMode mode) : mode_(mode), shaderLayers_(params_) {
+Engine::Engine(EngineMode mode)
+    : mode_(mode), shaderLayers_(params_),
+      timePolicy_(mode == EngineMode::Offline ? TimePolicy::Offline : TimePolicy::StoppedAmbient) {
     // Generators that scenes can name (ADR-175). Registering here rather than from a static
     // initialiser keeps the order explicit and keeps `scene` free of any knowledge of what a
     // mushroom is; re-registering a name is defined to replace it, so calling this per Engine is
@@ -4147,6 +4149,15 @@ FrameTime Engine::tick(FrameClock& clock) {
     }
     transport_.setMode(TransportMode::Realtime);
     refreshTransport();
+    if (timePolicy_ == TimePolicy::Stepped || (timePolicy_ == TimePolicy::StoppedFrozen && !transport_.isPlaying())) {
+        // ADR-2154: the clock is held. The wall clock is re-anchored at the held time every tick, so a
+        // policy change back to StoppedAmbient (or a play) resumes from here rather than jumping by the
+        // time spent frozen. Stepped holds even a playing transport: only a step moves it.
+        time.renderTime = lastRenderTime_;
+        time.deltaTime = 0.0;
+        clock.seek(lastRenderTime_);
+        return time;
+    }
     if (transport_.isPlaying()) {
         // Audio is still the master clock while it is running (ADR-012): the transport reads the
         // play-head rather than integrating, so a device that jitters or stalls cannot make the
@@ -4168,6 +4179,83 @@ FrameTime Engine::tick(FrameClock& clock) {
         clock.seek(time.renderTime);
     }
     lastRenderTime_ = time.renderTime;
+    return time;
+}
+
+// ---- the time policy (ADR-2154) ----------------------------------------------------------------------
+
+const char* timePolicyName(TimePolicy policy) {
+    switch (policy) {
+    case TimePolicy::Running: return "running";
+    case TimePolicy::StoppedFrozen: return "stopped-frozen";
+    case TimePolicy::StoppedAmbient: return "stopped-ambient";
+    case TimePolicy::Stepped: return "stepped";
+    case TimePolicy::Offline: return "offline";
+    }
+    return "stopped-ambient";
+}
+
+std::optional<TimePolicy> parseTimePolicy(std::string_view name) {
+    for (const TimePolicy p : {TimePolicy::Running, TimePolicy::StoppedFrozen, TimePolicy::StoppedAmbient,
+                               TimePolicy::Stepped, TimePolicy::Offline}) {
+        if (name == timePolicyName(p)) {
+            return p;
+        }
+    }
+    return std::nullopt;
+}
+
+TimePolicy Engine::effectiveTimePolicy() const {
+    if (mode_ == EngineMode::Live && transport_.isPlaying() &&
+        (timePolicy_ == TimePolicy::StoppedAmbient || timePolicy_ == TimePolicy::StoppedFrozen)) {
+        return TimePolicy::Running;
+    }
+    return timePolicy_;
+}
+
+Result<void> Engine::setTimePolicy(TimePolicy policy) {
+    if (policy == TimePolicy::Running) {
+        return fail("'running' is what a playing transport is, not a setting: play the transport");
+    }
+    if ((policy == TimePolicy::Offline) != (mode_ == EngineMode::Offline) && policy != TimePolicy::Stepped) {
+        return fail("'{}' is not a policy a {} engine can follow", timePolicyName(policy),
+                    mode_ == EngineMode::Offline ? "offline" : "live");
+    }
+    if (policy != timePolicy_) {
+        log::info("time policy: {} -> {}", timePolicyName(timePolicy_), timePolicyName(policy));
+    }
+    timePolicy_ = policy;
+    return {};
+}
+
+Result<FrameTime> Engine::stepFrames(int frames, double fps) {
+    if (timePolicy_ != TimePolicy::Stepped) {
+        return fail("stepping needs the stepped time policy, and this engine's is '{}'", timePolicyName(timePolicy_));
+    }
+    if (frames < 1 || !(fps > 0.0)) {
+        return fail("a step is at least one frame at a positive frame rate");
+    }
+    const double dt = 1.0 / fps;
+    const double base = lastRenderTime_;
+    FrameTime time{};
+    for (int i = 1; i <= frames; ++i) {
+        time.renderTime = base + static_cast<double>(i) * dt; // from the base, so n steps are exactly n/fps
+        time.deltaTime = dt;
+        time.frameIndex = ++steppedFrame_;
+        if (mode_ == EngineMode::Live) {
+            // Playing, as `tick` plays: the transport advances by the same step, and a wrap is a seek.
+            transport_.setMode(TransportMode::Realtime);
+            refreshTransport();
+            if (transport_.isPlaying()) {
+                const TransportTick tick = transport_.advance(dt);
+                if (tick.looped) {
+                    seekSeconds(tick.positionSeconds);
+                }
+            }
+        }
+        lastRenderTime_ = time.renderTime;
+        update(time);
+    }
     return time;
 }
 

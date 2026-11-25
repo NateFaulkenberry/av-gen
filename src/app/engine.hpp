@@ -84,6 +84,60 @@ namespace avgen::app {
 
 enum class EngineMode { Live, Offline };
 
+// ---- ADR-2154: project revisions and the time policy ----------------------------------------------
+//
+// "Changed since the last save", answered by two integers rather than by serialising the project.
+// Every client shares them because they live on the Engine. What bumps `project`: a successful mutating
+// Session call (once, after its transaction commits), an explicit transaction's commit, and every edit
+// the editor's history records (EditSystem). What does NOT: the engine's own writebacks -- entity
+// positions, a world effect's parameter writeback, the defaults a rebuild re-registers -- because nothing
+// here is called by them. `scene` is bumped by an authored change to the composition, which also bumps
+// `project`. `savedAt` is `project` at the last save, load or new document.
+//
+// A revision says "something authored happened since the save", not "the next save writes different
+// bytes": a value edited and then set back is dirty until the on-demand comparison
+// (`Engine::compareWithSaved`) finds the documents equal and clears it. That false positive is the safe
+// direction; the comparison is never run on a timer (owner decision, 2026-11-25).
+struct ProjectRevisions {
+    std::uint64_t project = 0;
+    std::uint64_t scene = 0;
+    std::uint64_t savedAt = 0;
+    [[nodiscard]] bool dirty() const { return project != savedAt; }
+    bool operator==(const ProjectRevisions&) const = default;
+};
+enum class RevisionScope : std::uint8_t { Project, Scene };
+
+// What a comparison does with a difference the revisions did not record (they said clean).
+//   Report: nothing -- the caller is told (`project.diff_saved`).
+//   Adopt:  it is the person's: bump, so the project is dirty (the close gate, when the application was
+//           touched since the save -- an editor write that bypassed the edit history).
+//   Absorb: it is the engine's own writeback: the saved baseline moves over it (the close gate, untouched).
+enum class UnrecordedChange : std::uint8_t { Report, Adopt, Absorb };
+
+struct SavedComparison {
+    bool compared = false;   // false: nothing to compare against (before the first load or save)
+    bool differs = false;    // the document a save would write is not the one last saved or opened
+    bool cleared = false;    // revisions said dirty and nothing differs: `savedAt = project` now
+    bool unrecorded = false; // something differs while revisions said clean
+    std::vector<std::string> paths; // JSON pointers of the differences (the first kMaxPaths)
+    std::size_t pathCount = 0;
+    double ms = 0.0;         // what the serialisation and comparison cost
+    static constexpr std::size_t kMaxPaths = 64;
+};
+
+// What the world clock does (02-session-api.md section 3.4). An explicit, host-owned setting, never
+// implied by the type of clock. The engine holds the PARKED setting; while the transport plays a Live
+// engine reports `Running`, and an Offline engine reports `Offline` unless its host chose `Stepped`.
+//   Running:        the transport plays; renderTime follows it (reported, never set).
+//   StoppedFrozen:  parked; renderTime does not advance and deltaTime is 0.
+//   StoppedAmbient: parked; renderTime free-runs on the wall clock (Studio's behaviour before ADR-2154,
+//                   and still its default).
+//   Stepped:        nothing advances until a client steps it (`Engine::stepFrames`, `transport.step`).
+//   Offline:        the fixed-step clock is the authority (every render job's own engine).
+enum class TimePolicy : std::uint8_t { Running, StoppedFrozen, StoppedAmbient, Stepped, Offline };
+[[nodiscard]] const char* timePolicyName(TimePolicy policy);
+[[nodiscard]] std::optional<TimePolicy> parseTimePolicy(std::string_view name);
+
 // ADR-870: everything the per-frame signal pipeline carries from one frame into the next -- the
 // offline analysis cursor, the last analysis frame published, the music classifier and the beat
 // clock. One copyable struct, so a seek's replay can run the very same pipeline on its own copy
@@ -265,32 +319,55 @@ public:
     // `avgen --audit-routes` writes; `scene::routeAuditToJson`).
     [[nodiscard]] scene::RouteAudit auditRoutes() const;
 
-    // ---- unsaved changes (ADR-440) --------------------------------------------------------------
+    // ---- unsaved changes (ADR-440, ADR-2154) ----------------------------------------------------
     //
-    // "Is there work in this session that closing it would lose?" -- computed by serialising the
-    // project and comparing it against the serialisation taken when it was last opened or saved,
-    // never by a flag that every mutation site has to remember to set. The long comment above
-    // `Engine::sampleProjectDirty` carries the measurement that rules out the two obvious
-    // alternatives (comparing against the file; a hand-maintained list of noisy keys).
-    //
-    // `touchedSinceLastSample` is the host's answer to "did anything happen to this application
-    // since you last asked me" -- a pointer, a key, a menu, a drop. It is not a dirty flag: it is
-    // never consulted to decide that something *did* change, only to decide whether a change that
-    // has already been measured could possibly be the user's. On a sample where nothing touched the
-    // application, every difference is the engine writing its own state (entity positions, a world
-    // effect's parameter writeback) and the baseline moves to absorb it.
-    //
-    // Costs a full project serialisation: 31 ms on `glowmere-valley-2-multicam.json` (675 KB, 5,502
-    // parameters), under a millisecond on everything small. Call it when closing something, and
-    // otherwise only on idle frames -- `Application` throttles it against its own measured cost.
-    void sampleProjectDirty(bool touchedSinceLastSample);
-    // Samples and answers. Monotone: once dirty, dirty until a save or a load.
-    [[nodiscard]] bool projectDirty(bool touchedSinceLastSample = true);
-    // The last answer, with no serialisation. For a per-frame reader such as the window title.
-    [[nodiscard]] bool projectDirtyCached() const { return projectDirty_; }
+    // The per-frame answer is `revisions().dirty()`: two integers (see ProjectRevisions above). The
+    // ADR-440 comparison -- serialise the project and compare it with the serialisation taken when it
+    // was last opened or saved -- is kept, but only ON DEMAND (`compareWithSaved`): at Close and Quit,
+    // and when a client asks (`project.diff_saved`). It costs a full serialisation: 31 ms on
+    // `glowmere-valley-2-multicam.json`, 185 ms on Neon Dreams' 22 MB.
+    [[nodiscard]] const ProjectRevisions& revisions() const { return revisions_; }
+    // An authored change made outside the edit history (a Session call). A fresh value, never one a
+    // restore could have produced, and it invalidates what the edit history knows about its states.
+    void bumpProjectRevision(RevisionScope scope = RevisionScope::Project);
+    // The edit history's own bump (EditSystem): the same, without invalidating its states. Returns the
+    // new `project` value.
+    std::uint64_t bumpProjectRevisionFromHistory(RevisionScope scope);
+    // EditSystem: undo or redo landed on a history state whose revision it recorded. `sceneChanged`
+    // moves `scene` too (the composition changed back, which is still a change to it).
+    void setProjectRevision(std::uint64_t project, bool sceneChanged);
+    // A rollback: the counters recorded at its begin.
+    void restoreProjectRevisions(const ProjectRevisions& revisions) { revisions_ = revisions; }
+    // Moves on every bump made outside the edit history and on every new document: the edit history's
+    // recorded state revisions are valid only while this has not moved.
+    [[nodiscard]] std::uint64_t unrecordedEpoch() const { return unrecordedEpoch_; }
+    // The on-demand comparison. With nothing differing it clears a dirty that was a false positive (an
+    // edit set back). `unrecorded` says what to do with a difference the revisions did not record.
+    SavedComparison compareWithSaved(UnrecordedChange unrecorded = UnrecordedChange::Report);
+    // What a close asks: one comparison (`Adopt` when the application was touched since the save,
+    // `Absorb` when not -- ADR-440's attribution), then `revisions().dirty()`.
+    [[nodiscard]] bool projectDirtyOnDemand(bool touchedSinceSave);
     // "What is in memory is what is stored." Called by `saveProject` and at the end of a load; also
-    // the hook for anything else that makes the two agree.
+    // the hook for anything else that makes the two agree. Takes the comparison baseline and sets
+    // `savedAt = project`.
     void markProjectSaved();
+
+    // ---- the time policy (ADR-2154) --------------------------------------------------------------
+    // The parked setting the host chose. Live engines start at StoppedAmbient, Offline ones at Offline.
+    [[nodiscard]] TimePolicy timePolicy() const { return timePolicy_; }
+    // What governs time right now: Running while a Live engine's transport plays under a Stopped*
+    // setting, otherwise the setting.
+    [[nodiscard]] TimePolicy effectiveTimePolicy() const;
+    // The host's choice. Running is not a setting (it is what playing is) and Offline belongs to an
+    // Offline engine; the Session refuses what the host does not offer before this is reached.
+    [[nodiscard]] Result<void> setTimePolicy(TimePolicy policy);
+    // Stepped: advances `frames` frames at `fps` by PLAYING -- the same update path as a running
+    // frame, deltaTime 1/fps each -- not by seeking. renderTime moves by exactly frames/fps. On an
+    // Offline engine the transport follows renderTime; on a Live one the transport advances when it is
+    // playing and stays parked otherwise. Fails unless the policy is Stepped.
+    [[nodiscard]] Result<FrameTime> stepFrames(int frames, double fps);
+    // renderTime as the last tick or step left it.
+    [[nodiscard]] double lastRenderTime() const { return lastRenderTime_; }
 
     // ---- what a load is doing while it does it (the brief's section 5) -------------------------
     //
@@ -1083,7 +1160,9 @@ public:
     void setVolume(float volume);
     [[nodiscard]] float volume() const;
 
-    // Produces this frame's time. Live: audio position while playing, free-running while paused.
+    // Produces this frame's time. Live: audio position while playing; while parked, by the time policy
+    // (ADR-2154): free-running under StoppedAmbient, held (deltaTime 0) under StoppedFrozen and Stepped.
+    // Offline: the clock's own time, whatever the policy.
     FrameTime tick(FrameClock& clock);
 
     // Evaluates the pipeline for one frame: signals -> modulation -> scene.
@@ -1505,7 +1584,13 @@ private:
     // every parameter's origin is its value now.
     void resetProjectBasis();
     void captureParameterOrigins();
-    bool projectDirty_ = false;
+    // ADR-2154.
+    ProjectRevisions revisions_;
+    std::uint64_t nextRevision_ = 1;
+    std::uint64_t unrecordedEpoch_ = 0;
+    void resetProjectRevisions();
+    TimePolicy timePolicy_ = TimePolicy::StoppedAmbient; // the constructor sets Offline for an Offline engine
+    std::uint64_t steppedFrame_ = 0;
     // Appends to projectWarnings_ if it is not already there. Unresolved bindings are re-reported
     // on every rebind, and a warning list that grew a duplicate per scene swap would stop being
     // read.

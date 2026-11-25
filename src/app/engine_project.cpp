@@ -1031,6 +1031,10 @@ void Engine::resetProjectBasis() {
     parameterBasis_ = params::ParameterBasis{};
     projectExtras_ = nlohmann::json::object();
     captureParameterOrigins();
+    // ADR-2154: the project now holds another world (a scene, a glTF or the orb opened on its own, a new
+    // composition) -- an authored change to it, as the ADR-440 comparison always counted it. A project load
+    // and File > New reset the revisions after this, so for them it is replaced.
+    bumpProjectRevision(RevisionScope::Scene);
 }
 
 Engine::PinnedOverrides Engine::pinnedOverrides() const {
@@ -1080,7 +1084,7 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
     // written, so this cannot disagree with them (ADR-440).
     projectBaseline_ = std::move(doc);
     projectBaselineValid_ = true;
-    projectDirty_ = false;
+    revisions_.savedAt = revisions_.project; // ADR-2154
     return {};
 }
 
@@ -1133,30 +1137,106 @@ Result<void> Engine::saveProject(const std::filesystem::path& path) {
 //
 // And it is monotone: once dirty, dirty until a save or a load. Otherwise a quiet second after an
 // edit would absorb the edit, which is the flag's failure mode reintroduced by the back door.
-void Engine::sampleProjectDirty(bool touchedSinceLastSample) {
-    if (projectDirty_ || !projectBaselineValid_) {
-        return;
+//
+// **ADR-2154: no longer on a timer.** Studio sampled this every 6-12 idle frames; on Neon Dreams (22 MB)
+// each sample was a 185 ms stall, the editor's p95 frame. The per-frame answer is now the revision
+// counters, and this comparison runs on demand: at Close and Quit, and when a client asks
+// (`project.diff_saved`). The attribution rule above is unchanged and is applied only to a difference the
+// counters did not record -- an editor write that bypassed the edit history, or the engine's own drift.
+SavedComparison Engine::compareWithSaved(UnrecordedChange unrecorded) {
+    SavedComparison out;
+    if (!projectBaselineValid_) {
+        return out; // nothing has been opened or saved: nothing to lose
     }
+    const auto start = std::chrono::steady_clock::now();
     nlohmann::json doc = projectDocument(projectPath_);
-    if (doc == projectBaseline_) {
-        return;
+    out.compared = true;
+    out.differs = doc != projectBaseline_;
+    if (out.differs) {
+        const nlohmann::json patch = nlohmann::json::diff(projectBaseline_, doc);
+        out.pathCount = patch.size();
+        for (const nlohmann::json& op : patch) {
+            if (out.paths.size() >= SavedComparison::kMaxPaths) {
+                break;
+            }
+            out.paths.push_back(op.value("path", std::string{}));
+        }
     }
-    if (touchedSinceLastSample) {
-        projectDirty_ = true;
-    } else {
-        projectBaseline_ = std::move(doc);
+    if (!out.differs && revisions_.dirty()) {
+        // An edit set back to where it was saved: the counters' one false positive, cleared here.
+        revisions_.savedAt = revisions_.project;
+        out.cleared = true;
+    } else if (out.differs && !revisions_.dirty()) {
+        out.unrecorded = true;
+        // The dev assertion of 02-session-api.md 3.3: the counters missed a change. Either an editor
+        // write that bypassed the edit history and every Session call (a false "clean" -- the
+        // dangerous direction), or the engine's own writeback. The paths name which.
+        std::string list;
+        for (std::size_t k = 0; k < out.paths.size() && k < 12; ++k) {
+            list += (k == 0 ? "" : ", ") + out.paths[k];
+        }
+        log::warn("unsaved changes: {} path(s) differ from the saved project with no revision recorded ({}): {}{}",
+                  out.pathCount,
+                  unrecorded == UnrecordedChange::Adopt    ? "an unrecorded writer; adopted as an edit"
+                  : unrecorded == UnrecordedChange::Absorb ? "absorbed as the engine's own writeback"
+                                                           : "reported",
+                  list, out.pathCount > 12 ? ", ..." : "");
+        if (unrecorded == UnrecordedChange::Adopt) {
+            bumpProjectRevision();
+        } else if (unrecorded == UnrecordedChange::Absorb) {
+            projectBaseline_ = std::move(doc);
+        }
+    }
+    out.ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    return out;
+}
+
+bool Engine::projectDirtyOnDemand(bool touchedSinceSave) {
+    static_cast<void>(compareWithSaved(touchedSinceSave ? UnrecordedChange::Adopt : UnrecordedChange::Absorb));
+    return revisions_.dirty();
+}
+
+void Engine::bumpProjectRevision(RevisionScope scope) {
+    ++unrecordedEpoch_;
+    static_cast<void>(bumpProjectRevisionFromHistory(scope));
+}
+
+std::uint64_t Engine::bumpProjectRevisionFromHistory(RevisionScope scope) {
+    revisions_.project = nextRevision_++;
+    if (scope == RevisionScope::Scene) {
+        revisions_.scene = nextRevision_++;
+    }
+    if (!projectBaselineValid_) {
+        // ADR-440's rule, kept: before the first load or save there is no document to lose, so nothing
+        // is dirty (an editor started with no project never prompts at Quit).
+        revisions_.savedAt = revisions_.project;
+    }
+    return revisions_.project;
+}
+
+void Engine::setProjectRevision(std::uint64_t project, bool sceneChanged) {
+    revisions_.project = project;
+    if (sceneChanged) {
+        revisions_.scene = nextRevision_++;
+    }
+    if (!projectBaselineValid_) {
+        revisions_.savedAt = revisions_.project; // nothing to lose yet (see bumpProjectRevisionFromHistory)
     }
 }
 
-bool Engine::projectDirty(bool touchedSinceLastSample) {
-    sampleProjectDirty(touchedSinceLastSample);
-    return projectDirty_;
+void Engine::resetProjectRevisions() {
+    // A new document: fresh values (a rollback across the replacement restores the old ones, which
+    // then cannot collide with these), clean, and whatever the edit history recorded is about the old one.
+    revisions_.project = nextRevision_++;
+    revisions_.scene = nextRevision_++;
+    revisions_.savedAt = revisions_.project;
+    ++unrecordedEpoch_;
 }
 
 void Engine::markProjectSaved() {
     projectBaseline_ = projectDocument(projectPath_);
     projectBaselineValid_ = true;
-    projectDirty_ = false;
+    revisions_.savedAt = revisions_.project;
 }
 
 // ---- loading a project, and starting a new one ------------------------------------------------
@@ -2167,7 +2247,8 @@ Result<void> Engine::loadProject(const std::filesystem::path& path) try {
     // end of the load and from the same builder a save uses, rather than from `doc` -- the document
     // that was read is not the document this engine would write, by between 279 and 19,798 JSON
     // paths depending on the project, and a baseline taken from it would report every project dirty
-    // the instant it opened. The comment on `sampleProjectDirty` has the measurement.
+    // the instant it opened. The comment on `compareWithSaved` has the measurement.
+    resetProjectRevisions(); // ADR-2154
     markProjectSaved();
     log::info("project '{}' loaded: {} parameters, {} routes, {} sources, {} presets, {} timeline tracks, {} cues, {} warning(s)",
               path.filename().string(), params_.size(), modulator_.routes().size(), sources_.sources().size(),
@@ -2245,6 +2326,7 @@ void Engine::newProject() {
     // photographs the engine this function has finished resetting rather than the one it started
     // with -- taken at the top it would make File > New produce an immediately-dirty project.
     resetProjectBasis(); // ADR-2132: and every value it holds is the new document's origin
+    resetProjectRevisions(); // ADR-2154
     markProjectSaved();
 }
 
