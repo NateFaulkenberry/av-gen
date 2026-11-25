@@ -1318,7 +1318,8 @@ TEST_CASE("Entity and field tools say so when there is no composition", "[ai][to
         const auto r = f.call(tool);
         CHECK_FALSE(r.success);
         REQUIRE(r.error.has_value());
-        CHECK(r.error->code == ai::ToolErrorCode::Unavailable);
+        // The session is not in the state the call needs; nothing is missing from the host (ADR-2153's meaning).
+        CHECK(r.error->code == ai::ToolErrorCode::FailedPrecondition);
     }
 }
 

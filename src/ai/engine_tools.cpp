@@ -1725,8 +1725,9 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json&, ToolContext& ctx) -> ToolResult {
             const scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "this session has no composition");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                           "this session has no composition",
+                                           "create a project with a scene (project.create {scene: \"empty\"}) or open one that has a scene");
             }
             json list = json::array();
             for (const entity::EntityDesc& e : comp->entities()) {
@@ -1755,8 +1756,9 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json&, ToolContext& ctx) -> ToolResult {
             const scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "this session has no composition");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                           "this session has no composition",
+                                           "create a project with a scene (project.create {scene: \"empty\"}) or open one that has a scene");
             }
             json list = json::array();
             for (const entity::FieldDesc& f : comp->fields()) {
@@ -1798,8 +1800,9 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "this session has no composition to put a field in");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                           "this session has no composition to put a field in",
+                                           "create a project with a scene (project.create {scene: \"empty\"}) or open one that has a scene");
             }
             const std::string name = args.value("name", std::string{});
             if (name.empty()) {
@@ -1881,8 +1884,9 @@ void registerParameterTools(ToolRegistry& registry) {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
-                                           "this session has no composition to look at");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
+                                           "this session has no composition to look at",
+                                           "create a project with a scene (project.create {scene: \"empty\"}) or open one that has a scene");
             }
             const scene::Camera& camera = engine.scene().camera;
             const auto aspect = static_cast<float>(std::max(args.value("aspect", 16.0 / 9.0), 0.01));
@@ -2034,9 +2038,9 @@ void registerParameterTools(ToolRegistry& registry) {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable,
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition,
                                            "this session has no composition to put a node in",
-                                           "open a project with a scene, or generate a world first");
+                                           "create a project with a scene (project.create {scene: \"empty\"}), open one that has a scene, or generate a world first");
             }
             const std::string name = args.value("name", std::string{});
             if (name.empty()) {
@@ -2148,7 +2152,9 @@ void registerParameterTools(ToolRegistry& registry) {
         [](const json& args, ToolContext& ctx) -> ToolResult {
             scene::Composition* comp = ctx.engine().composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable, "this session has no composition");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition, "this session has no composition",
+                                           "create a project with a scene (project.create {scene: \"empty\"}) or "
+                                           "open one that has a scene");
             }
             const std::string name = args.value("name", std::string{});
             if (comp->findNode(name) == nullptr) {
@@ -2196,7 +2202,9 @@ void registerParameterTools(ToolRegistry& registry) {
             app::Engine& engine = ctx.engine();
             scene::Composition* comp = engine.composition();
             if (comp == nullptr) {
-                return ToolResult::failure(ToolErrorCode::Unavailable, "this session has no composition");
+                return ToolResult::failure(ToolErrorCode::FailedPrecondition, "this session has no composition",
+                                           "create a project with a scene (project.create {scene: \"empty\"}) or "
+                                           "open one that has a scene");
             }
             const std::string name = args.value("name", std::string{});
             scene::CompositionNode* node = comp->findNode(name);

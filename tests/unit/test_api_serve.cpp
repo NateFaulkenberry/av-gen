@@ -343,7 +343,7 @@ TEST_CASE("serve: initialize, tools/list and tools/call over a pipe, with the pr
     CHECK(toolCode(gpuCall) == "UNAVAILABLE");
 
     // dryRun: checked, not run.
-    const json dry = envelope(c.request(23, "tools/call", json{{"name", "project.create"}, {"arguments", {{"name", "dry"}}}, {"dryRun", true}}));
+    const json dry = envelope(c.request(23, "tools/call", json{{"name", "project.create"}, {"arguments", {{"path", "dry"}}}, {"dryRun", true}}));
     CHECK(dry.at("success") == true);
     CHECK(dry.at("result").at("dryRun") == true);
     CHECK_FALSE(fs::exists(root / "dry"));
@@ -378,7 +378,7 @@ TEST_CASE("serve: with a root, a project is created and an asset imported; end o
     fs::copy_file(glb, root / "tri.glb", fs::copy_options::overwrite_existing);
     Client c(rootedAt(root));
     initialize(c);
-    const json created = envelope(c.request(2, "tools/call", json{{"name", "project.create"}, {"arguments", {{"name", "demo"}}}}));
+    const json created = envelope(c.request(2, "tools/call", json{{"name", "project.create"}, {"arguments", {{"path", "demo"}}}}));
     REQUIRE(created.at("success") == true);
     CHECK(fs::exists(root / "demo" / "demo.json"));
 
@@ -552,7 +552,7 @@ TEST_CASE("serve: the server and its engine open no socket", "[api][serve]") {
     const int before = socketCount();
     Client c(rootedAt(root));
     initialize(c);
-    REQUIRE(envelope(c.request(2, "tools/call", json{{"name", "project.create"}, {"arguments", {{"name", "s"}}}})).at("success") == true);
+    REQUIRE(envelope(c.request(2, "tools/call", json{{"name", "project.create"}, {"arguments", {{"path", "s"}}}})).at("success") == true);
     REQUIRE(envelope(c.request(3, "tools/call", json{{"name", "capability.list"}})).at("success") == true);
     // While it serves, with a project open: no OSC port, no MIDI client socket, no listener of any kind.
     CHECK(socketCount() == before);
@@ -629,7 +629,7 @@ TEST_CASE("avgen call --calls: the evaluation's probe sequence, refused without 
     const std::string model = (content / "assets" / "column.glb").string();
     const json calls = json::array({
         json{{"tool", "capability.list"}},
-        json{{"tool", "project.create"}, {"arguments", {{"name", "poc-from-api"}}}},
+        json{{"tool", "project.create"}, {"arguments", {{"path", "poc-from-api"}, {"scene", "empty"}}}},
         json{{"tool", "asset.import"}, {"arguments", {{"file", model}}}},
         json{{"tool", "scene.create_node"}, {"arguments", {{"name", "column2"}, {"asset", model}, {"position", {3.0, 0.0, 0.0}}}}},
         json{{"tool", "camera.set"}, {"arguments", {{"position", {4.0, 3.0, 8.0}}, {"target", {0.0, 2.0, 0.0}}, {"fovDegrees", 45.0}}}},
@@ -675,18 +675,10 @@ TEST_CASE("avgen call --calls: the evaluation's probe sequence, refused without 
     CHECK(ran.at("asset.import").at("success") == true);
     CHECK(fs::exists(root / "projects" / "poc-from-api" / "assets" / "models" / "column.glb"));
     CHECK(ran.at("lighting.list").at("success") == true);
-    // Stage S3 (project.create {scene: "empty"}) gives a created project a composition; until then a node cannot be
-    // put in it, and the camera of the built-in orb scene has no parameters to set. Each refusal says why. The node
-    // half is shown on a project with a scene, below.
-    const json& node = ran.at("scene.create_node");
-    if (node.at("success") != true) {
-        CHECK(node.at("error").at("message").get<std::string>().find("no composition") != std::string::npos);
-    }
-    const json& camera = ran.at("camera.set");
-    if (camera.at("success") != true) {
-        CHECK(toolCode(camera) == "UNAVAILABLE");
-    }
-    CHECK(code == 1); // the steps that await S3, and the probe's route to a node that is not there
+    // With S3 (ADR-2156) a created project has a scene: the node is made from the model, and the camera is set.
+    CHECK(ran.at("scene.create_node").at("success") == true);
+    CHECK(ran.at("camera.set").at("success") == true);
+    CHECK(code == 1); // the probe's route targets nodes/column, a node that is not there
 
     // A project with a scene, opened with --project: the node is created from the model under the read root.
     const fs::path project = root / "projects" / "column" / "column.json";
