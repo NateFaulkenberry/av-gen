@@ -36,6 +36,9 @@ bool isSessionTool(const ai::Tool& tool) {
 
 // A Live host refuses these by name while a show runs, beside the structural, job and project classes: a
 // seek moves the show's own clock, and replacing the track swaps what the audience is hearing.
+// ADR-2155: what a GPU tool answers on a host that cannot render, when asked and when called.
+constexpr std::string_view kNoGpuHost = "no GPU host in this session yet";
+
 constexpr std::array<std::string_view, 2> kLiveRefusedByName = {"sequencer.set_playhead", "asset.import_audio"};
 
 void collectStrings(const json& j, std::vector<std::string>& out) {
@@ -336,6 +339,11 @@ std::optional<ai::ToolError> Session::livePolicyRefusal(const ai::Tool& tool) {
 }
 
 std::string Session::unavailability(const ai::Tool& tool, ai::ToolContext& ctx) {
+    if (std::find(tool.definition.annotations.permissions.begin(), tool.definition.annotations.permissions.end(),
+                  "gpu") != tool.definition.annotations.permissions.end() &&
+        !host_->canRender()) {
+        return std::string(kNoGpuHost);
+    }
     for (const std::string& r : tool.definition.annotations.requirements) {
         if (r == "composition" && host_->engine().composition() == nullptr) {
             return "no composition is loaded";
@@ -409,6 +417,12 @@ CallResult Session::runOnHost(const ai::Tool& tool, const json& args, const Call
         return CallResult::refused(std::move(*e));
     }
     const ai::ToolAnnotations& a = tool.definition.annotations;
+    if (std::find(a.permissions.begin(), a.permissions.end(), "gpu") != a.permissions.end() && !host_->canRender()) {
+        return CallResult::refused(err(ai::ToolErrorCode::Unavailable,
+                                       fmt::format("'{}' needs the GPU: {}", tool.definition.name, kNoGpuHost),
+                                       "run it in a host that renders (avgen serve gains one in stage S6)",
+                                       json{{"field", "gpu"}}));
+    }
     const std::string& name = tool.definition.name;
     const bool sessionTool = isSessionTool(tool);
     const bool mutating = !a.readOnly && !sessionTool;

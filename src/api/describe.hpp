@@ -10,7 +10,7 @@
 //   schemas/tool-catalogue.json           the catalogue (every tool: schemas, annotations, MCP name)
 //   schemas/tool-catalogue-baseline.json  the contract at the current API level (see apiBaseline)
 //   schemas/tools-without-output-schema.json  the output-schema ratchet (authored; may only shrink)
-//   docs/api/tools.md, docs/api/errors.md
+//   docs/api/tools.md, docs/api/errors.md, docs/api/protocol.md (ADR-2155: the JSON-RPC server's own tables)
 //   schemas/avgen-project.schema.json, schemas/avgen-scene.schema.json  (ADR-2152)
 //
 // The CPU suite regenerates each in-process and compares it with the committed file byte for byte

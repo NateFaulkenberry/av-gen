@@ -1,4 +1,6 @@
 #include "api/describe.hpp"
+#include "api/engine_host.hpp"
+#include "api/jsonrpc_server.hpp"
 #include "api/version.hpp"
 #include "app/application.hpp"
 #include "app/reactivity_cli.hpp"
@@ -27,6 +29,13 @@ int main(int argc, char** argv) {
     if (argc > 1 && std::string(argv[1]) == "--describe") {
         return avgen::api::runDescribeCommand(argc, argv);
     }
+    // ADR-2155: the external interface. Before parseArgs and Application, so neither runs: no window, no GPU, no
+    // settings file, no OSC or MIDI listener. Each builds an api::EngineHost (CPU only) and one api::Session.
+    if (argc > 1 && (std::string(argv[1]) == "serve" || std::string(argv[1]) == "call")) {
+        avgen::log::init(avgen::log::Level::Info); // stderr; stdout is the protocol
+        return std::string(argv[1]) == "serve" ? avgen::api::runServeCommand(argc, argv)
+                                               : avgen::api::runCallCommand(argc, argv);
+    }
     // ADR-1051: the spatial validator has its own arguments and needs no window, GPU or engine.
     if (argc > 1 && std::string(argv[1]) == "--validate-space") {
         return avgen::app::runSpaceValidateCommand(argc, argv);
@@ -42,6 +51,9 @@ int main(int argc, char** argv) {
     }
     if (options->showHelp) {
         std::printf("%s", avgen::app::usageText().c_str());
+        // ADR-2155: the two sub-commands that run without the application.
+        std::printf("\nsub-commands (no window, no GPU, no settings file, no listeners):\n%s\n%s",
+                    avgen::api::serveUsage(), avgen::api::callUsage());
         return 0;
     }
     // `--labs` prints the suite and exits, beside the other two enumerations, because it answers

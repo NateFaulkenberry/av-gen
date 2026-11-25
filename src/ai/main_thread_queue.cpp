@@ -48,6 +48,7 @@ bool MainThreadQueue::run(std::function<void()> fn, const CancelToken& cancel,
         }
         queue_.push_back(item);
     }
+    work_.notify_all();
 
     // Erases `item` from the queue if it has not started. Returns true when it was still waiting,
     // which means it never ran and never will.
@@ -144,6 +145,22 @@ void MainThreadQueue::shutdown() {
         queue_.clear();
     }
     done_.notify_all();
+    work_.notify_all();
+}
+
+bool MainThreadQueue::waitForWork() {
+    std::unique_lock lock(mutex_);
+    work_.wait(lock, [this] { return stopped_ || woken_ || !queue_.empty(); });
+    woken_ = false;
+    return !stopped_ && !queue_.empty();
+}
+
+void MainThreadQueue::wake() {
+    {
+        const std::lock_guard lock(mutex_);
+        woken_ = true;
+    }
+    work_.notify_all();
 }
 
 bool MainThreadQueue::running() const {

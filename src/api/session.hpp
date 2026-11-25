@@ -138,6 +138,10 @@ public:
     [[nodiscard]] virtual bool showRunning() { return false; }
     // When it will stop, if the host knows (seconds); for `details.retryAfterMs`.
     [[nodiscard]] virtual std::optional<double> showRemainingSeconds() { return std::nullopt; }
+    // Whether this host can run GPU work (ADR-2155). No host can yet: a tool whose permissions include "gpu"
+    // answers `Unavailable` ("no GPU host in this session yet"), in its capability answer and when called.
+    // Stage S6's EngineHost GPU half is the first to say true.
+    [[nodiscard]] virtual bool canRender() { return false; }
 };
 
 // A host over an engine someone else owns, with its own queue and the hooks an application installs.

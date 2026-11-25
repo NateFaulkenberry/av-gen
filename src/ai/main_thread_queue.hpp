@@ -79,6 +79,14 @@ public:
     // down, or a worker will wait on a pump that is never coming again.
     void shutdown();
 
+    // For a host whose thread has nothing else to do (api::EngineHost, ADR-2155): blocks until work is
+    // queued, `wake()` is called or the queue shuts down, and returns at once if any of those already
+    // happened. Returns true when there is work to pump. A frame loop (Studio) never calls it: it pumps
+    // every frame anyway.
+    bool waitForWork();
+    // Releases a `waitForWork` without queueing anything (a host asked to stop).
+    void wake();
+
     [[nodiscard]] std::size_t pending() const;
     [[nodiscard]] bool running() const; // guarded: a session asks it from whichever thread closes it
 
@@ -91,6 +99,8 @@ private:
 
     mutable std::mutex mutex_;
     std::condition_variable done_;
+    std::condition_variable work_; // waitForWork: work queued, wake() or shutdown
+    bool woken_ = false;
     std::deque<std::shared_ptr<Item>> queue_;
     std::thread::id owner_{};
     bool haveOwner_ = false;

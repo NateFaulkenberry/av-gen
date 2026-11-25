@@ -102,7 +102,41 @@ These need no window, no GPU and no project, and print to stdout.
 | Command | Does |
 |---|---|
 | `--version` | one line: engine version, API level, the revision the build came from (with `-dirty` if the tree had uncommitted changes) and the build type |
-| `--describe <what> [--out <dir>]` | the published contracts as JSON: `tools` (the tool catalogue), `errors` (the error codes), `schema:project` and `schema:scene` (the document schemas, JSON Schema 2020-12), `features` (the feature ids this build can parse: scene keys, node kinds, effect kinds, render outputs, AOVs; printed only), `version`, `baseline` (the contract at this API level, for the breaking-change check), or `all`. With `--out` it writes the artefacts under `<dir>` instead: `schemas/tool-catalogue.json`, `docs/api/tools.md`, `docs/api/errors.md`, `schemas/avgen-project.schema.json`, `schemas/avgen-scene.schema.json` (`tools/gen_api.sh` runs it on the repository) |
+| `--describe <what> [--out <dir>]` | the published contracts as JSON: `tools` (the tool catalogue), `errors` (the error codes), `schema:project` and `schema:scene` (the document schemas, JSON Schema 2020-12), `features` (the feature ids this build can parse: scene keys, node kinds, effect kinds, render outputs, AOVs; printed only), `version`, `baseline` (the contract at this API level, for the breaking-change check), or `all`. With `--out` it writes the artefacts under `<dir>` instead: `schemas/tool-catalogue.json`, `docs/api/tools.md`, `docs/api/errors.md`, `docs/api/protocol.md`, `schemas/avgen-project.schema.json`, `schemas/avgen-scene.schema.json` (`tools/gen_api.sh` runs it on the repository) |
+
+## Driving the engine from another program: `serve` and `call`
+
+Two sub-commands run the engine for another program, through the same tools Studio's assistant uses. Both come
+first on the command line (`avgen serve ...`, `avgen call ...`), and neither starts the application: **no window,
+no GPU, no settings file, no OSC port and no MIDI input**. Tools that need the GPU answer `UNAVAILABLE` ("no GPU
+host in this session yet"). The log goes to stderr; stdout carries only the protocol or the result, and anything
+else the engine prints is sent to stderr.
+
+| Command | Does |
+|---|---|
+| `serve --stdio` | a JSON-RPC 2.0 server on stdin and stdout, one message per line: `initialize`, `tools/list`, `tools/call`, `shutdown`, with `notifications/progress` and `notifications/log` (`docs/api/protocol.md`). One session for the life of the process. `shutdown`, or the end of stdin, rolls back an open transaction and exits; nothing is saved unless a client calls `project.save` |
+| `call <tool> ['<json>']` | one tool call in a fresh session; prints its envelope (`success`, `result`, `summary`, `changes`, `warnings`, `transaction`, `job`, and `error` on failure) as JSON |
+| `call --calls <file.json>` | a list of calls, `[{"tool": "...", "arguments": {...}}, ...]`, in one session; prints `{"success", "calls": [{"tool", "envelope"}]}`. Every call runs, even after one fails |
+
+Flags for both:
+
+| Flag | Does |
+|---|---|
+| `--root <dir>` | a folder the session may read and write; a bare project name (`project.create {"name": "demo"}`) is made in the first one. Repeatable |
+| `--read-root <dir>` | a folder it may read (models to import, recipes). Repeatable |
+| `--write-root <dir>` | a folder it may write, and so read. Repeatable |
+| `--allow-subprocess` | tools may start child processes (`performance.profile_scene` and its family) |
+
+`call` also takes `--project <p.json>` (open it first; its folder becomes readable and writable) and `--save`
+(save the project after the calls, if they all succeeded).
+
+**With no root, every path is refused** with `PERMISSION_DENIED`: a session is never given a folder by guessing.
+Each root must exist, and is made absolute once, on the command line; inside the session a relative path means
+the open project's folder (or the first write root), never the directory you started in.
+
+`call`'s exit codes: 0 success; 1 a tool failed (the envelope is still printed); 2 bad arguments; 7 the host
+could not start (or `--project` would not open). `serve` exits 0, 2 for bad arguments, 7 if the session could
+not be created.
 
 ## Environment variables
 
